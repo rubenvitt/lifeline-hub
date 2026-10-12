@@ -276,13 +276,12 @@ export interface AbschnittZeile {
    */
   auftragsbilanz: { erledigt: number; gesamt: number };
   /**
-   * Die folgenden vier gehören dem obersten Abschnitt selbst, nicht dem Teilbaum: eine Beurteilung
+   * Die folgenden drei gehören dem obersten Abschnitt selbst, nicht dem Teilbaum: eine Beurteilung
    * lässt sich nicht aufsummieren. `null` = nicht gepflegt.
    */
   kurzbezeichnung: string | null;
   lagezustand: AbschnittLagezustand | null;
   abschnittsauftrag: string | null;
-  fortschritt: number | null;
   /**
    * Schlechtester Lagezustand eines Unterabschnitts, nur wenn schlechter als der eigene — damit ein
    * kritischer Unterabschnitt nicht hinter einer grünen Kante verschwindet.
@@ -418,7 +417,6 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       kurzbezeichnung: abschnitt?.kurzbezeichnung ?? null,
       lagezustand: eigeneLage,
       abschnittsauftrag: abschnitt?.abschnittsauftrag ?? null,
-      fortschritt: abschnitt?.fortschritt ?? null,
       unterLage: lageRang(unterLage) > lageRang(eigeneLage) ? unterLage : null,
       // Kein Kurzschluss auf leeren `teilbaum`: „Ohne Abschnitt" hat keine Abschnitt-ids, ihre
       // Einheiten melden trotzdem zurück.

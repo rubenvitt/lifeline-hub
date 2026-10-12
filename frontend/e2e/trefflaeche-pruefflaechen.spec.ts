@@ -752,11 +752,23 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
           mindestens: 1,
           kurz: true,
         },
+        // Das Detail bearbeitet an der Zeile (LFH-1208): Wert- und Eintragen-Knöpfe und die Stufen
+        // des Lagezustands. „Verschieben unter …“ und „Auflösen“ stehen hinter „Weitere Aktionen“
+        // (LFH-1212).
         {
-          // Seit LFH-1212 stehen „Verschieben unter …“ und „Auflösen“ hinter „Weitere Aktionen“.
-          sorte: 'Abschnitt Detailaktionen',
-          ziele: knopf(/^(Bearbeiten|Weitere Aktionen zu Abschnitt .+)$/),
-          mindestens: 2,
+          sorte: 'Abschnitt Zeilen',
+          ziele: knopf(/ (bearbeiten|eintragen)$/),
+          mindestens: 8,
+        },
+        {
+          sorte: 'Abschnitt Lagezustand',
+          ziele: segment(/^(nicht beurteilt|planmäßig|angespannt|kritisch)$/),
+          mindestens: 4,
+        },
+        {
+          sorte: 'Abschnitt Weitere Aktionen',
+          ziele: knopf(/^Weitere Aktionen zu Abschnitt .+$/),
+          mindestens: 1,
         },
         {
           // Der Griff zum Umhängen ist ein Zeigerziel der Staffel (LFH-1212), kein Tastaturziel.
@@ -797,7 +809,15 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/einsatzabschnitte`,
       anker: (page) => inMain(page).locator('.ant-tree-node-content-wrapper').first(),
-      fehlt: knopf('Abschnitt anlegen'),
+      // Ohne Schreibrecht fehlen Anlegen, Zeilenstifte, Stufenwahl, „Weitere Aktionen“ (LFH-1208)
+      // und die Griffe zum Umhängen (LFH-1212).
+      fehlt: (page) =>
+        inMain(page)
+          .getByRole('button', {
+            name: /^Abschnitt anlegen$| (bearbeiten|eintragen)$|^Weitere Aktionen zu Abschnitt /,
+          })
+          .or(inMain(page).getByRole('radiogroup', { name: 'Lagezustand' }))
+          .or(inMain(page).locator('[data-lfh="drag-handle"]')),
       ziele: [
         {
           sorte: 'Baumknoten',

@@ -52,6 +52,38 @@ const funkAbschnitt = {
   sprechgruppen: [tmoSprechgruppe],
 };
 
+/** Ein Abschnitt in der Gliederung — der Name steht auch im Detail (Zeile „Name“, LFH-1208). */
+async function findInTree(name: string) {
+  return within(await screen.findByRole('tree')).findByText(name);
+}
+
+/**
+ * Ist die Erfassung zu? jsdom kennt kein `transitionend`: antd beginnt das Ausblenden
+ * (`ant-zoom-leave`), beendet es aber nie (Muster `stammdaten/verwaltungstabellen.test.tsx`).
+ */
+function isModalClosed(): boolean {
+  return [...document.querySelectorAll('.ant-modal')].every((m) =>
+    m.classList.contains('ant-zoom-leave'),
+  );
+}
+
+/**
+ * Mitschnitt der PATCH-Körper eines Abschnitts. Der Server ist zustandsbehaftet: `basis` ist
+ * dasselbe Objekt, das der GET der Liste liefert, und wird geändert — sonst holte der Neuabruf
+ * nach dem Speichern den alten Stand zurück.
+ */
+function recordPatches(basis: Record<string, unknown>, aid = 5) {
+  const bodies: Record<string, unknown>[] = [];
+  server.use(
+    http.patch(`/api/einsaetze/1/abschnitte/${aid}`, async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      bodies.push(body);
+      return HttpResponse.json(Object.assign(basis, body));
+    }),
+  );
+  return bodies;
+}
+
 /** Das offene Menü eines `MenueAusloeser` (`frontend/AGENTS.md`, „Aktionen“). */
 async function offenesMenue(): Promise<HTMLElement> {
   let menue: HTMLElement | null = null;
@@ -120,7 +152,7 @@ describe('EinsatzabschnittePage', () => {
       </Routes>,
       { route: '/einsaetze/1/einsatzabschnitte' },
     );
-    expect(await screen.findByText('Nord')).toBeInTheDocument();
+    expect(await findInTree('Nord')).toBeInTheDocument();
     // Im Baumknoten; das vorgewählte Detail nennt den Leiter ein zweites Mal.
     expect(within(screen.getByRole('tree')).getByText(/Leiter Nord/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
@@ -233,7 +265,7 @@ describe('EinsatzabschnittePage', () => {
       ),
     );
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await findInTree('Nord'));
 
     // Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
     const eigene = screen
@@ -259,8 +291,8 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * Schnellaktion der Sprungpalette (LFH-506): `?neu=1` öffnet den lokalen Entwurf, wie der Knopf.
-   * Als Paar: ohne den Parameter bleibt er zu.
+   * Schnellaktion der Sprungpalette (LFH-506): `?neu=1` öffnet die Erfassung „Abschnitt anlegen“
+   * (LFH-1208), wie der Knopf. Als Paar: ohne den Parameter bleibt sie zu.
    */
   describe('Schnellerfassung per ?neu=1', () => {
     /** Macht den Query-String sichtbar — der Beleg, dass `?neu=1` verbraucht wurde. */
@@ -279,35 +311,35 @@ describe('EinsatzabschnittePage', () => {
       );
     }
 
-    it('?neu=1 öffnet den Entwurf eines neuen Abschnitts und räumt den Parameter', async () => {
+    it('?neu=1 öffnet die Erfassung eines neuen Abschnitts und räumt den Parameter', async () => {
       server.use(...handlers());
       rendereMit('/einsaetze/1/einsatzabschnitte?neu=1');
-      expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
-      expect(screen.getByLabelText('Name')).toBeInTheDocument();
+      const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
+      expect(within(dialog).getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     });
 
-    it('ohne ?neu=1 bleibt der Entwurf zu', async () => {
+    it('ohne ?neu=1 bleibt die Erfassung zu', async () => {
       server.use(...handlers());
       rendereMit('/einsaetze/1/einsatzabschnitte');
-      await screen.findByText('Nord');
+      await findInTree('Nord');
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
       });
-      expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('?neu=1 öffnet den Entwurf NICHT für Beobachter', async () => {
+    it('?neu=1 öffnet die Erfassung NICHT für Beobachter', async () => {
       server.use(...handlers('beobachter', 'aktiv'));
       rendereMit('/einsaetze/1/einsatzabschnitte?neu=1');
       // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
       // entschieden.
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
-      await screen.findByText('Nord');
+      await findInTree('Nord');
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
       });
-      expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
@@ -330,7 +362,7 @@ describe('EinsatzabschnittePage', () => {
       </Routes>,
       { route: '/einsaetze/1/einsatzabschnitte' },
     );
-    await screen.findByText('Nord');
+    await findInTree('Nord');
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).not.toBeInTheDocument(),
     );
@@ -342,7 +374,7 @@ describe('EinsatzabschnittePage', () => {
   it('abgeschlossener Einsatz: „Nur Ansicht · Einsatz abgeschlossen“ statt Satz', async () => {
     server.use(...handlers('einsatzleitung', 'abgeschlossen'));
     renderPage();
-    await screen.findByText('Nord');
+    await findInTree('Nord');
     const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
     expect(hinweis?.textContent).toBe('Nur Ansicht Einsatz abgeschlossen');
     expect(screen.queryByText(/nur Ansicht\./)).not.toBeInTheDocument();
@@ -351,74 +383,134 @@ describe('EinsatzabschnittePage', () => {
   it('mit Schreibrecht kein Rechtehinweis', async () => {
     server.use(...handlers());
     renderPage();
-    await screen.findByText('Nord');
+    await findInTree('Nord');
     expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
-  it('zeigt SprechgruppenPicker im Edit-Formular statt Freitext-Inputs', async () => {
+  it('kein Knopf „Bearbeiten“ und kein Langformular: jede Angabe steht an ihrem Wert (LFH-1208)', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    // Alte Freitext-Inputs sind weg
-    expect(screen.queryByLabelText('Sprechgruppe TMO')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Sprechgruppe DMO')).not.toBeInTheDocument();
-    // Erreichbarkeit-Feld ist im Edit-Modus da und vorbelegt
-    expect(await screen.findByDisplayValue('0151 23456')).toBeInTheDocument();
-    // Picker-Label ist sichtbar
-    expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select
-    expect(await screen.findByText('412_F_DRK')).toBeInTheDocument();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    expect(within(detail).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(detail).queryByRole('textbox')).toBeNull();
+    expect(
+      within(detail).getByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
+    ).toHaveAccessibleDescription('Digitalfunk');
+    expect(
+      within(detail).getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }),
+    ).toHaveAccessibleDescription('0151 23456');
+    expect(within(detail).getByRole('radiogroup', { name: 'Lagezustand' })).toBeInTheDocument();
   });
 
-  it('zeigt eine Funk-Erreichbarkeits-Zusammenfassung im Detail', async () => {
-    server.use(
-      ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, erreichbarkeit: null }]),
-    );
+  it('Sprechgruppen: die Zeile öffnet den Picker mit der zugeordneten Sprechgruppe', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    const zusammenfassung = await screen.findByTestId('funk-erreichbarkeit');
-    expect(zusammenfassung).toHaveTextContent('412_F_DRK');
-    expect(zusammenfassung).toHaveTextContent(/Digitalfunk/i);
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(within(detail).getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    expect(within(detail).getByRole('combobox', { name: 'Sprechgruppen' })).toBeInTheDocument();
+    // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select.
+    expect(await within(detail).findByTitle('412_F_DRK')).toBeInTheDocument();
+    // Alte Freitext-Inputs gibt es nicht.
+    expect(screen.queryByLabelText('Sprechgruppe TMO')).not.toBeInTheDocument();
   });
 
-  it('sendet sprechgruppe_ids beim Speichern, nicht mehr tmo/dmo-Freitextfelder', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+  it('Kommunikationsmittel: genau dieses Feld geht hinaus', async () => {
+    const nord = { ...funkAbschnitt };
+    server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
+    const bodies = recordPatches(nord);
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
+    );
+    await userEvent.click(within(detail).getByRole('combobox', { name: 'Kommunikationsmittel' }));
+    await userEvent.click(await screen.findByText('Mobil'));
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Kommunikationsmittel speichern' }),
+    );
+    await waitFor(() => expect(bodies).toEqual([{ kommunikationsmittel: 'mobil' }]));
+    expect(
+      await within(detail).findByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
+    ).toHaveAccessibleDescription('Mobil');
+  });
+
+  it('Abschnittsleiter ablösen: genau `leiter_id` geht hinaus (LFH-1208)', async () => {
+    // Der erste passende Handler gewinnt: das Personal steht vor der Grundausstattung.
     server.use(
-      ...handlers('einsatzleitung', 'aktiv', [
-        { ...funkAbschnitt, kommunikationsmittel: null, erreichbarkeit: null },
-      ]),
-      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...funkAbschnitt, ...patchBody });
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json([
+          { id: 3, name: 'Carla Christ' },
+          { id: 4, name: 'Dora Dreher' },
+        ]),
+      ),
+      ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, leiter_id: 3 }]),
+    );
+    const bodies = recordPatches({ ...funkAbschnitt });
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(
+      await within(detail).findByRole('button', {
+        name: /Abschnittsleiter (bearbeiten|eintragen)/,
       }),
     );
-    renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-
-    // Erreichbarkeit mit Whitespace befüllen (→ null), Kommunikationsmittel via Select
-    await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '   ');
-    await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
-    await userEvent.click(await screen.findByText('Mobil'));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
-
-    // Kein sprechgruppe_tmo / _dmo mehr im Payload
-    expect(patchBody).not.toHaveProperty('sprechgruppe_tmo');
-    expect(patchBody).not.toHaveProperty('sprechgruppe_dmo');
-    // sprechgruppe_ids wird gesendet (vorbelegt mit tmoSprechgruppe.id=7)
-    expect(patchBody).toHaveProperty('sprechgruppe_ids');
-    expect(patchBody!['sprechgruppe_ids'] as number[]).toContain(7);
-    // Kommunikationsmittel und getrimmte Erreichbarkeit bleiben
-    expect(patchBody).toMatchObject({
-      kommunikationsmittel: 'mobil',
-      erreichbarkeit: null,
-    });
+    await userEvent.click(within(detail).getByRole('combobox', { name: 'Abschnittsleiter' }));
+    await userEvent.click(await screen.findByText('Dora Dreher'));
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Abschnittsleiter speichern' }),
+    );
+    await waitFor(() => expect(bodies).toEqual([{ leiter_id: 4 }]));
   });
 
-  it('zeigt Kürzel, Lagezustand, festen Auftrag und Fortschritt in der Lese-Ansicht (LFH-608)', async () => {
+  it('Gegenprobe: eine Zeile aus altem Stand überschreibt die Änderung eines anderen Arbeitsplatzes nicht', async () => {
+    const nord = { ...funkAbschnitt, lagezustand: 'planmaessig' };
+    server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
+    const bodies = recordPatches(nord);
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    // Der gezeigte Stand ist ab jetzt alt: ein anderer Arbeitsplatz setzt „kritisch“.
+    nord.lagezustand = 'kritisch';
+    await userEvent.click(within(detail).getByRole('button', { name: 'Bemerkung eintragen' }));
+    await userEvent.type(
+      within(detail).getByRole('textbox', { name: 'Bemerkung' }),
+      'Zufahrt Nord',
+    );
+    await userEvent.click(within(detail).getByRole('button', { name: 'Bemerkung speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ bemerkung: 'Zufahrt Nord' }]));
+    // Nach dem Speichern zeigt das Detail den Stand des Servers, „kritisch“ bleibt.
+    const leiste = within(detail).getByRole('radiogroup', { name: 'Lagezustand' });
+    await waitFor(() =>
+      expect(within(leiste).getByRole('radio', { name: 'kritisch' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
+    );
+  });
+
+  it('Lagezustand mit einem Klick: genau `lagezustand` geht hinaus (LFH-1208)', async () => {
+    const nord = { ...funkAbschnitt, lagezustand: 'angespannt' };
+    server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
+    const bodies = recordPatches(nord);
+    const { client } = renderPage();
+    const invalidieren = vi.spyOn(client, 'invalidateQueries');
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    const leiste = within(detail).getByRole('radiogroup', { name: 'Lagezustand' });
+    await userEvent.click(within(leiste).getByRole('radio', { name: 'kritisch' }));
+    await waitFor(() => expect(bodies).toEqual([{ lagezustand: 'kritisch' }]));
+    // Der Wechsel schreibt serverseitig ins ETB; die Seite holt das Tagebuch neu.
+    await waitFor(() =>
+      expect(
+        invalidieren.mock.calls.some(
+          ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)),
+        ),
+      ).toBe(true),
+    );
+    expect(within(leiste).getByRole('radio', { name: 'kritisch' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('zeigt Kürzel, Lagezustand und festen Auftrag, aber keinen Fortschritt (LFH-608, LFH-1208)', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [
         {
@@ -431,89 +523,34 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    expect(await screen.findByText('Lagezustand')).toBeInTheDocument();
-    expect(screen.getByText('EA-N')).toBeInTheDocument();
-    // Einmal im Baumknoten (LFH-962), einmal in den Abschnittsdaten.
-    expect(screen.getAllByText('angespannt')).toHaveLength(2);
-    expect(screen.getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
-    expect(screen.getByText('72 %')).toBeInTheDocument();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    expect(within(detail).getByText('EA-N')).toBeInTheDocument();
+    expect(
+      within(within(detail).getByRole('radiogroup', { name: 'Lagezustand' })).getByRole('radio', {
+        name: 'angespannt',
+      }),
+    ).toHaveAttribute('aria-checked', 'true');
+    expect(within(detail).getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
+    // Der Altwert 72 hat keine Oberfläche mehr (LFH-1208).
+    expect(screen.queryByText('72 %')).toBeNull();
+    expect(screen.queryByText('Fortschritt')).toBeNull();
   });
 
   it('nennt eine fehlende Beurteilung ausdrücklich, statt eine Stufe zu zeigen (LFH-608)', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
-    expect(screen.getByText('nicht eingeschätzt')).toBeInTheDocument();
-    expect(screen.queryByText(/planmäßig|angespannt|kritisch/)).toBeNull();
-  });
-
-  it('sendet die vier Lage-Angaben beim Speichern, leere als null (LFH-608)', async () => {
-    let patchBody: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers('einsatzleitung', 'aktiv', [
-        { ...funkAbschnitt, kurzbezeichnung: 'EA-N', abschnittsauftrag: 'Deich halten' },
-      ]),
-      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...funkAbschnitt, ...patchBody });
-      }),
+    const leiste = await screen.findByRole('radiogroup', { name: 'Lagezustand' });
+    expect(within(leiste).getByRole('radio', { name: 'nicht beurteilt' })).toHaveAttribute(
+      'aria-checked',
+      'true',
     );
-    renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-
-    // Vorbelegung aus dem Datensatz
-    expect(await screen.findByLabelText('Kurzbezeichnung')).toHaveValue('EA-N');
-    // Feldhilfen ohne Satz (LFH-1078): Platzhalter statt „Leer heißt …“.
-    expect(screen.queryByText(/Leer heißt|je Einsatz nur einmal|im ETB vermerkt/)).toBeNull();
-    expect(screen.getByLabelText('Fortschritt')).toHaveAttribute(
-      'placeholder',
-      'nicht eingeschätzt',
-    );
-    await userEvent.clear(screen.getByLabelText('Abschnittsauftrag'));
-    await userEvent.click(screen.getByLabelText('Lagezustand'));
-    await userEvent.click(await screen.findByText('kritisch'));
-    await userEvent.type(screen.getByLabelText('Fortschritt'), '40');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
-    expect(patchBody).toMatchObject({
-      kurzbezeichnung: 'EA-N',
-      lagezustand: 'kritisch',
-      abschnittsauftrag: null,
-      fortschritt: 40,
-    });
-  });
-
-  // „Überblick zuerst": der Detailbereich ist Lese-Ansicht, Bearbeiten ist ein eigener Modus.
-  it('zeigt beim Öffnen die Lese-Ansicht (Kerninfos) ohne Formular-Inputs', async () => {
-    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
-    renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    // Kerninfos als Überblick sichtbar
-    expect(await screen.findByText('Abschnittsleiter')).toBeInTheDocument();
-    expect(await screen.findByTestId('funk-erreichbarkeit')).toBeInTheDocument();
-    // Keine Eingabefelder in der Lese-Ansicht
-    expect(screen.queryByLabelText('Erreichbarkeit / Nummer')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
-  });
-
-  it('öffnet die Eingabefelder erst nach Klick auf Bearbeiten', async () => {
-    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
-    renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    expect(await screen.findByLabelText('Erreichbarkeit / Nummer')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 
   it('die Rückfrage vor dem Auflösen nennt die Handlung im roten Knopf (LFH-1090)', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    // Seit LFH-1212 drei Handlungen: „Auflösen“ steht im Menü, die Rückfrage als Dialog.
+    await userEvent.click(await findInTree('Nord'));
+    // Seit LFH-1212 steht „Auflösen“ im Menü „Weitere Aktionen“, die Rückfrage als Dialog.
     await weitereAktion('Nord', 'Auflösen');
     const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt „Nord“ auflösen?' });
     expect(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' })).toHaveClass(
@@ -522,13 +559,16 @@ describe('EinsatzabschnittePage', () => {
     expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
   });
 
-  it('Nur-Lese-Nutzer sehen weder Bearbeiten-Button noch Inputs, aber die Funk-Zusammenfassung', async () => {
+  it('Nur-Lese-Nutzer sehen weder Stift noch Stufenwahl noch Auflösen', async () => {
     server.use(...handlers('beobachter', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    expect(await screen.findByTestId('funk-erreichbarkeit')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Erreichbarkeit / Nummer')).not.toBeInTheDocument();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    expect(within(detail).getByText('Digitalfunk')).toBeInTheDocument();
+    expect(
+      within(detail).queryByRole('button', { name: /bearbeiten|eintragen|Auflösen/ }),
+    ).toBeNull();
+    expect(within(detail).queryByRole('radiogroup')).toBeNull();
+    expect(within(detail).getByText('nicht beurteilt')).toBeInTheDocument();
   });
 
   /**
@@ -566,7 +606,7 @@ describe('EinsatzabschnittePage', () => {
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Abschnitten im Cache scheitert', async () => {
     server.use(...handlers());
     const { client } = renderPage();
-    await screen.findByText('Nord');
+    await findInTree('Nord');
 
     server.use(
       http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 500 })),
@@ -575,7 +615,7 @@ describe('EinsatzabschnittePage', () => {
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
-    expect(screen.getByText('Nord')).toBeInTheDocument();
+    expect(within(screen.getByRole('tree')).getByText('Nord')).toBeInTheDocument();
     expect(screen.queryByText('Abschnitte konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
@@ -583,7 +623,7 @@ describe('EinsatzabschnittePage', () => {
    * Die Primäraktion des Leerzustands trägt denselben Wortlaut wie der Kopfknopf; eindeutig wird
    * der Griff über `within(...)` auf die Gliederungs-Karte.
    */
-  it('bietet im leeren Baum genau eine Primäraktion, und die öffnet einen Entwurf', async () => {
+  it('bietet im leeren Baum genau eine Primäraktion, und die öffnet die Erfassung', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', []));
     renderPage();
     const karte = (await screen.findByText('Noch keine Abschnitte')).closest('[data-lfh="paneel"]');
@@ -594,16 +634,14 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.click(
       within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }),
     );
-    expect(
-      await within(karte as HTMLElement).findByText('Neuer Abschnitt (ungespeichert)'),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
   });
 
   /**
-   * Der Datensatz entsteht erst beim Speichern; Abbrechen hinterlässt nichts, auch keine
-   * Invalidierung des Tagebuchs.
+   * Der Datensatz entsteht erst beim Absenden; Abbrechen hinterlässt nichts, auch keine
+   * Invalidierung des Tagebuchs und keinen Eintrag in der Gliederung.
    */
-  it('legt beim Öffnen und Abbrechen des Entwurfs nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
+  it('legt beim Öffnen und Abbrechen der Erfassung nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
     let posts = 0;
     server.use(
       ...handlers(),
@@ -616,12 +654,16 @@ describe('EinsatzabschnittePage', () => {
     const invalidieren = vi.spyOn(client, 'invalidateQueries');
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
 
-    expect(screen.getByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveFocus();
-    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus(),
+    );
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Verworfen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
 
-    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    await waitFor(() => expect(isModalClosed()).toBe(true));
     expect(posts).toBe(0);
+    expect(within(screen.getByRole('tree')).queryByText('Verworfen')).toBeNull();
     expect(
       invalidieren.mock.calls.some(
         ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)),
@@ -629,89 +671,40 @@ describe('EinsatzabschnittePage', () => {
     ).toBe(false);
   });
 
-  it('schreibt den Abschnitt erst beim Speichern und wählt ihn dann aus', async () => {
+  it('legt den Abschnitt per Enter an und wählt ihn danach im Detail (LFH-1208)', async () => {
     const bodies: unknown[] = [];
+    const ost = {
+      id: 9,
+      einsatz_id: 1,
+      ueber_abschnitt_id: null,
+      name: 'Ost',
+      leiter_id: null,
+      leiter_name: null,
+      bemerkung: null,
+      sortier: 1,
+      sprechgruppen: [],
+    };
+    // Zustandsbehaftet: der Neuabruf nach dem Anlegen liefert „Ost“ mit.
+    const liste: unknown[] = [{ ...funkAbschnitt }];
     server.use(
-      ...handlers(),
+      ...handlers('einsatzleitung', 'aktiv', liste),
       http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({
-          id: 9,
-          einsatz_id: 1,
-          ueber_abschnitt_id: null,
-          name: 'Ost',
-          leiter_id: null,
-          leiter_name: null,
-          bemerkung: null,
-          sortier: 1,
-          sprechgruppen: [],
-        });
+        liste.push(ost);
+        return HttpResponse.json(ost);
       }),
     );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Ost');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Ost{Enter}');
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toMatchObject({ name: 'Ost' });
-    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
-  });
-
-  it('verwirft den Entwurf, wenn im Baum ein bestehender Abschnitt gewählt wird', async () => {
-    server.use(...handlers());
-    renderPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    await userEvent.click(screen.getByText('Nord'));
-    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
-    expect(screen.getByText('Abschnitt: Nord')).toBeInTheDocument();
-  });
-
-  /**
-   * Der Kopfknopf „Abschnitt anlegen" ist klickbar, bevor `abschnitteQuery` aufgelöst ist. Setzt
-   * der Deeplink (`?abschnitt=<id>`) danach `gewaehlt`, muss er den offenen Entwurf verwerfen wie
-   * `Tree onSelect`. Sonst nähme `speichern` wegen `!entwurf === false` fälschlich den POST-Zweig
-   * für einen bestehenden Abschnitt.
-   */
-  it('verwirft den Entwurf, wenn der Deeplink nach dem Öffnen einen Abschnitt selektiert', async () => {
-    // Die Reihenfolge ist die Zusicherung: erst der Klick, dann die aufgelöste Query. Ein von Hand
-    // freigegebenes Promise macht das unabhängig von der Wanduhr; ein `setTimeout` hinge an der
-    // Geschwindigkeit des Rechners.
-    let queryFreigeben!: () => void;
-    const queryGesperrt = new Promise<void>((aufloesen) => {
-      queryFreigeben = aufloesen;
-    });
-    server.use(
-      http.get('/api/einsaetze/1/abschnitte', async () => {
-        await queryGesperrt;
-        return HttpResponse.json([
-          {
-            id: 5,
-            einsatz_id: 1,
-            ueber_abschnitt_id: null,
-            name: 'Nord',
-            leiter_id: null,
-            leiter_name: 'Leiter Nord',
-            bemerkung: null,
-            sortier: 0,
-          },
-        ]);
-      }),
-      ...handlers(),
-    );
-    renderMitProviders(
-      <Routes>
-        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
-      </Routes>,
-      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5' },
-    );
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    // Erst jetzt antwortet die Abschnitts-Query — der Entwurf steht also schon, wenn der Deeplink
-    // greift.
-    queryFreigeben();
-    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
-    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    expect(bodies[0]).toEqual({ name: 'Ost', kurzbezeichnung: null, ueber_abschnitt_id: null });
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Ost' });
+    // Dort wird er ergänzt.
+    expect(within(detail).getByRole('radiogroup', { name: 'Lagezustand' })).toBeInTheDocument();
+    await waitFor(() => expect(isModalClosed()).toBe(true));
   });
 
   /**
@@ -729,7 +722,7 @@ describe('EinsatzabschnittePage', () => {
     expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
     expect(screen.queryByText(/Wähle einen Abschnitt/)).not.toBeInTheDocument();
     // Eine andere Wahl gilt; die Vorwahl ist nur der Anfang.
-    await userEvent.click(screen.getByText('Süd'));
+    await userEvent.click(within(screen.getByRole('tree')).getByText('Süd'));
     expect(await screen.findByText('Abschnitt: Süd')).toBeInTheDocument();
   });
 
@@ -754,41 +747,41 @@ describe('EinsatzabschnittePage', () => {
       }),
     );
     renderPage();
-    await userEvent.click(await screen.findByText('Süd'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    const feld = await screen.findByLabelText('Kurzbezeichnung');
+    await userEvent.click(await findInTree('Süd'));
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }),
+    );
+    const feld = within(detail).getByRole('textbox', { name: 'Kurzbezeichnung' });
     expect(feld).toHaveAttribute('placeholder', 'z. B. EA-N');
     await userEvent.clear(feld);
-    await userEvent.type(feld, 'ea-n');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Schon vergeben (Nord)')).toBeInTheDocument();
+    await userEvent.type(feld, 'ea-n{Enter}');
+    expect(await within(detail).findByText('Schon vergeben (Nord)')).toBeInTheDocument();
     expect(gesendet).toBe(false);
   });
 
   it('Kurzbezeichnung: faltet wie SQLite NOCASE nur A–Z', async () => {
-    let gesendet = false;
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [
         { ...funkAbschnitt, id: 5, name: 'Nord', kurzbezeichnung: 'EA-SÜD' },
         { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
       ]),
-      http.patch('/api/einsaetze/1/abschnitte/6', () => {
-        gesendet = true;
-        return HttpResponse.json({ ...funkAbschnitt, id: 6, name: 'Süd' });
-      }),
     );
+    const bodies = recordPatches({ ...funkAbschnitt, id: 6, name: 'Süd' }, 6);
     renderPage();
-    await userEvent.click(await screen.findByText('Süd'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    const feld = await screen.findByLabelText('Kurzbezeichnung');
+    await userEvent.click(await findInTree('Süd'));
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }),
+    );
+    const feld = within(detail).getByRole('textbox', { name: 'Kurzbezeichnung' });
     await userEvent.clear(feld);
-    await userEvent.type(feld, 'EA-Süd');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(gesendet).toBe(true));
+    await userEvent.type(feld, 'EA-Süd{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ kurzbezeichnung: 'EA-Süd' }]));
     expect(screen.queryByText(/Schon vergeben/)).not.toBeInTheDocument();
   });
 
-  it('verschwindet der bearbeitete Abschnitt, füllt das Formular keinen anderen', async () => {
+  it('verschwindet der Abschnitt mit offener Zeile, speichert sie in keinen anderen', async () => {
     const liste = [
       { ...funkAbschnitt, id: 5, name: 'Nord' },
       { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
@@ -798,26 +791,20 @@ describe('EinsatzabschnittePage', () => {
       ...handlers('einsatzleitung', 'aktiv', []),
     );
     const { client } = renderPage();
-    await userEvent.click(await screen.findByText('Süd'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    expect(await screen.findByLabelText('Kurzbezeichnung')).toBeInTheDocument();
+    await userEvent.click(await findInTree('Süd'));
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Kurzbezeichnung eintragen' }),
+    );
+    expect(screen.getByRole('textbox', { name: 'Kurzbezeichnung' })).toBeInTheDocument();
     // Ein anderer Arbeitsplatz löst „Süd“ auf.
     liste.splice(1, 1);
     await client.invalidateQueries();
-    await waitFor(() => expect(screen.queryByText('Süd')).not.toBeInTheDocument());
-    expect(screen.queryByLabelText('Kurzbezeichnung')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(screen.getByRole('tree')).queryByText('Süd')).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('textbox', { name: 'Kurzbezeichnung' })).not.toBeInTheDocument();
     expect(screen.queryByText('Abschnitt: Nord')).not.toBeInTheDocument();
-  });
-
-  it('zeigt die Funk-Daten nicht doppelt (Zusammenfassung nur in der Lese-Ansicht)', async () => {
-    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
-    renderPage();
-    await userEvent.click(await screen.findByText('Nord'));
-    // Lese-Ansicht: genau eine Funk-Zusammenfassung
-    expect(screen.getAllByTestId('funk-erreichbarkeit')).toHaveLength(1);
-    // Edit-Modus: keine Zusammenfassung mehr (nur Inputs)
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    expect(screen.queryByTestId('funk-erreichbarkeit')).not.toBeInTheDocument();
   });
 
   // Unter `md` stapeln Gliederung und Detail. Behauptet wird die Flex-Richtung, nicht eine
@@ -911,19 +898,19 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
   });
 
-  it('„Abschnitt anlegen“ im Organigramm führt in die Gliederung mit offenem Entwurf', async () => {
+  it('„Abschnitt anlegen“ im Organigramm öffnet die Erfassung und führt in die Gliederung', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     await screen.findByRole('region', { name: 'Organigramm' });
     await userEvent.click(screen.getByRole('button', { name: 'Abschnitt anlegen' }));
-    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
   });
 
-  it('?neu=1 gewinnt gegen ?ansicht=organigramm: der Entwurf steht sichtbar in der Gliederung', async () => {
+  it('?neu=1 gewinnt gegen ?ansicht=organigramm: die Erfassung öffnet über der Gliederung', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?neu=1&ansicht=organigramm');
-    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
   });
@@ -944,11 +931,11 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
     expect(screen.queryByText(/Führungsorganisation entsteht/)).not.toBeInTheDocument();
-    // Kopfknopf und Leeraktion tragen denselben Wortlaut; die Leeraktion führt in den Entwurf.
+    // Kopfknopf und Leeraktion tragen denselben Wortlaut; die Leeraktion öffnet die Erfassung.
     const knoepfe = screen.getAllByRole('button', { name: 'Abschnitt anlegen' });
     expect(knoepfe).toHaveLength(2);
     await userEvent.click(knoepfe[1]);
-    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
   });
 
   it('leeres Organigramm ohne Schreibrecht: keine Leeraktion', async () => {
@@ -975,80 +962,114 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
 });
 
 /**
- * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Speichern und
- * Auflösen melden im Detailpaneel des Abschnitts, kein Fehler-Toast. Der Grund bleibt bis zum
- * nächsten Absenden; Abbrechen und der Wechsel des Abschnitts räumen ihn.
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): eine Zeile meldet
+ * an sich selbst, Auflösen im Detailpaneel, kein Fehler-Toast. Der Grund bleibt bis zum nächsten
+ * Absenden; Abbrechen und der Wechsel des Abschnitts räumen ihn.
  */
 describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   const sued = { ...funkAbschnitt, id: 6, name: 'Süd', sprechgruppen: [] };
   const detail = (name: string) => screen.getByRole('region', { name: `Abschnitt: ${name}` });
 
-  async function bearbeiteUndSpeichere() {
-    await userEvent.click(await screen.findByText('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+  async function bemerkungSpeichern() {
+    const d = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(within(d).getByRole('button', { name: 'Bemerkung eintragen' }));
+    await userEvent.type(within(d).getByRole('textbox', { name: 'Bemerkung' }), 'Zufahrt Nord');
+    await userEvent.click(within(d).getByRole('button', { name: 'Bemerkung speichern' }));
   }
   async function loeseAuf(name: string) {
-    await userEvent.click(await screen.findByText(name));
+    await userEvent.click(await findInTree(name));
     await weitereAktion(name, 'Auflösen');
     const rueckfrage = await screen.findByRole('dialog', { name: `Abschnitt „${name}“ auflösen?` });
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
   }
 
-  it('Speichern: der Grund steht im Detailpaneel, das Formular bleibt, kein Toast', async () => {
+  it('Zeile: der Grund steht an der Zeile, die Eingabe bleibt, kein Toast', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
       http.patch('/api/einsaetze/1/abschnitte/5', () =>
-        HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 }),
+        HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
     renderPage();
-    await bearbeiteUndSpeichere();
+    await bemerkungSpeichern();
 
-    expect(await within(detail('Nord')).findByRole('alert')).toHaveTextContent(
-      'Kurzbezeichnung schon vergeben',
+    expect(await within(detail('Nord')).findByRole('alert')).toHaveTextContent('Bemerkung zu lang');
+    expect(within(detail('Nord')).getByRole('textbox', { name: 'Bemerkung' })).toHaveValue(
+      'Zufahrt Nord',
     );
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('Speichern: das nächste Speichern räumt den Grund', async () => {
+  it('Zeile: das nächste Speichern räumt den Grund', async () => {
     let erster = true;
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
       http.patch('/api/einsaetze/1/abschnitte/5', async () => {
         if (erster) {
           erster = false;
-          return HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 });
+          return HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 });
         }
         await delay('infinite');
         return HttpResponse.json(funkAbschnitt);
       }),
     );
     renderPage();
-    await bearbeiteUndSpeichere();
+    await bemerkungSpeichern();
     await within(detail('Nord')).findByRole('alert');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(
+      within(detail('Nord')).getByRole('button', { name: 'Bemerkung speichern' }),
+    );
     await waitFor(() => expect(within(detail('Nord')).queryByRole('alert')).toBeNull());
   });
 
-  it('Speichern: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
+  it('Zeile: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
       http.patch('/api/einsaetze/1/abschnitte/5', () =>
-        HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 }),
+        HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
     renderPage();
-    await bearbeiteUndSpeichere();
+    await bemerkungSpeichern();
     await within(detail('Nord')).findByRole('alert');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(
+      within(detail('Nord')).getByRole('button', { name: 'Bearbeitung von Bemerkung abbrechen' }),
+    );
     expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await screen.findByRole('button', { name: 'Speichern' });
+    await userEvent.click(
+      within(detail('Nord')).getByRole('button', { name: 'Bemerkung eintragen' }),
+    );
+    await within(detail('Nord')).findByRole('button', { name: 'Bemerkung speichern' });
     expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
+  });
+
+  it('Auflösen bestätigt: der Abschnitt verschwindet sofort, das Detail zeigt den ersten verbliebenen', async () => {
+    let freigeben!: () => void;
+    const neuabrufGesperrt = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    const liste = [funkAbschnitt, sued];
+    let geloescht = false;
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', async () => {
+        // Der Neuabruf nach dem Auflösen hängt: belegt wird der Cache, nicht der Server.
+        if (geloescht) await neuabrufGesperrt;
+        return HttpResponse.json(liste);
+      }),
+      ...handlers('einsatzleitung', 'aktiv', []),
+      http.delete('/api/einsaetze/1/abschnitte/5', () => {
+        geloescht = true;
+        liste.splice(0, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderPage();
+    await loeseAuf('Nord');
+    expect(await screen.findByRole('region', { name: 'Abschnitt: Süd' })).toBeInTheDocument();
+    expect(within(screen.getByRole('tree')).queryByText('Nord')).toBeNull();
+    freigeben();
   });
 
   it('Auflösen: der Grund steht im Detailpaneel, der Wechsel des Abschnitts räumt ihn', async () => {
@@ -1067,10 +1088,10 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
     // Der Grund gehört zu „Nord“: im nächsten Abschnitt stünde er falsch.
-    await userEvent.click(screen.getByText('Süd'));
+    await userEvent.click(within(screen.getByRole('tree')).getByText('Süd'));
     await screen.findByRole('region', { name: 'Abschnitt: Süd' });
     expect(within(detail('Süd')).queryByRole('alert')).toBeNull();
-    await userEvent.click(screen.getByText('Nord'));
+    await userEvent.click(within(screen.getByRole('tree')).getByText('Nord'));
     await screen.findByRole('region', { name: 'Abschnitt: Nord' });
     expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
   });
@@ -1166,7 +1187,7 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
     it('lässt den Abschnitt selbst und seine Unterabschnitte weg: ein Zyklus ist unwählbar', async () => {
       mitPatches();
       renderPage();
-      await userEvent.click(await screen.findByText('Nord'));
+      await userEvent.click(await findInTree('Nord'));
       await weitereAktion('Nord', 'Verschieben unter …');
 
       const dialog = await screen.findByRole('dialog', { name: '„Nord“ verschieben unter …' });
@@ -1359,7 +1380,7 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       const messung = messeZiele();
       const { einheitPatches } = mitPatches();
       renderPage();
-      await userEvent.click(await screen.findByText('Nord'));
+      await userEvent.click(await findInTree('Nord'));
       await screen.findByText('1. Zug');
 
       zieheBis(griff('einheit', 10), mitte('Süd'))();
@@ -1413,7 +1434,8 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       // Der Knopf ist weg; der Fokus fiel nicht auf <body>, die Standzeile hat ihn.
       expect(document.activeElement).toBe(document.querySelector('[data-lfh="gliederung-stand"]'));
       fireEvent.pointerLeave(bereich, { pointerType: 'mouse' });
-      act(() => screen.getByRole('button', { name: 'Bearbeiten' }).focus());
+      // Ein Ziel außerhalb des Bereichs: die Zeile „Name“ des Details (LFH-1208).
+      act(() => screen.getByRole('button', { name: 'Name bearbeiten' }).focus());
       expect(await screen.findByText('Live')).toBeInTheDocument();
     });
 

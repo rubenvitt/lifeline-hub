@@ -192,8 +192,11 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   „offen" `achtung`, „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
-  kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB.
-  Fortschritt manuell (leer ≠ 0 %); Überblick meldet schlechtere Unterabschnitte („UA kritisch").
+  kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB. Im
+  Abschnittsdetail eine `Segmentleiste` mit vier Stufen, jede Wahl speichert sofort, auch per
+  Pfeiltaste (LFH-1208). Überblick meldet schlechtere Unterabschnitte („UA kritisch"). Ein
+  Fortschritt hat keine Oberfläche (LFH-1208): die Spalte trägt nur Altdaten, die Lage trägt der
+  Lagezustand, den Arbeitsstand die offenen Aufträge.
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
   `SichtungsTag`/`sichtungsfarben`, umrandetes Farbfeld, SK I rot, II gelb, III grün, IV blau,
   Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
@@ -640,7 +643,10 @@ und `pages/personen/`.
   invalid").
 - Stärke EINMAL summieren (`anzeige/staerke.ts:summiereStaerke`, `null` bei leerer Menge;
   kumuliert `pages/einsatzabschnitte/abschnittStaerke.ts`).
-  „Abschnitt anlegen" ist ein lokaler Entwurf, kein Fake-Datensatz.
+  „Abschnitt anlegen" ist eine Erfassung mit drei Feldern (`ErfassungsModal`), den Datensatz gibt
+  es erst nach dem Absenden; das Detail bearbeitet jede Angabe einzeln (`patcheAbschnitt`, ein
+  Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208,
+  `openspec/changes/archive/2026-10-11-lfh-1208-abschnitt-bearbeiten-in-ansicht/design.md`).
 
 **Entwürfe** (Verlustschutz, Navigationsschutz, „Entwurf speichern“, Lagebericht-Akkordeon):
 `frontend/src/entwurf/AGENTS.md` — gilt auch für `lageberichte/`, `pages/BefehlDetailPage.tsx` und

@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/stab/einsatzleiter.ts]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/stab/einsatzleiter.ts]
 ---
 
 ## Überblick
@@ -20,35 +20,49 @@ Führungspersonal.
 
 1. „Einsatzabschnitte“ öffnen. Die „Gliederung“ zeigt den Baum der Abschnitte mit Lage, Stärke,
    Zahl der direkt zugeordneten Einheiten und dem Hinweis „ohne Leiter“.
-2. Einen Abschnitt wählen. Rechts stehen seine Angaben und die „Zugeordneten Einheiten“.
+2. Einen Abschnitt wählen. Rechts stehen seine Angaben, der „Lagezustand“ und die „Zugeordneten
+   Einheiten“.
 
-   ![Gliederung mit dem gewählten Abschnitt Sanitätsdienst und seinen Angaben](../bilder/einsatzabschnitte/gliederung.png)
+   ![Gliederung mit dem gewählten Abschnitt Sanitätsdienst, seinen Angaben und der Stufenleiste des Lagezustands](../bilder/einsatzabschnitte/gliederung.png)
 
 3. „Zu den Einheiten ↗“ führt zur Seite der Einheiten.
 
 ### Einen Abschnitt anlegen
 
+Für Einsatzleitung und Führungspersonal:
+
 1. Im Seitenkopf „Abschnitt anlegen“ wählen.
 2. „Name“ eintragen, bei Bedarf „Kurzbezeichnung“ und den „Über-Abschnitt“ für einen
    Unterabschnitt.
-3. Unter „Lage“ „Lagezustand“, „Abschnittsauftrag“ und „Fortschritt“ eintragen, unter „Funk /
-   Kommunikation“ die Sprechgruppen, das Kommunikationsmittel und die „Erreichbarkeit / Nummer“.
 
-   ![Formular „Neuer Abschnitt“ mit Name, Kurzbezeichnung, Lagezustand und Abschnittsauftrag](../bilder/einsatzabschnitte/abschnitt-anlegen.png)
+   ![Dialog „Abschnitt anlegen“ mit Name, Kurzbezeichnung und Über-Abschnitt](../bilder/einsatzabschnitte/abschnitt-anlegen.png)
 
-4. „Speichern“ wählen.
+3. „Anlegen“ wählen. Der neue Abschnitt steht danach gewählt in der Gliederung; Lagezustand,
+   Leitung, Auftrag und Funkangaben werden dort ergänzt.
+
+### Die Lage eines Abschnitts setzen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. In der Gliederung den Abschnitt wählen.
+2. Unter „Lagezustand“ die Stufe wählen: „nicht beurteilt“, „planmäßig“, „angespannt“ oder
+   „kritisch“. Die Wahl gilt sofort.
+
+### Eine Angabe ändern
+
+Für Einsatzleitung und Führungspersonal:
+
+1. In der Gliederung den Abschnitt wählen.
+2. Auf den Wert der Angabe tippen, etwa auf den Abschnittsleiter; eine leere Angabe heißt
+   „… eintragen“.
+3. Den neuen Wert eingeben und „Speichern“ wählen. „Abbrechen“ lässt den alten Wert stehen.
 
 Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie für diesen Einsatz an
 („Neue Bezeichnung“, „Neue Betriebsart“, dann „Anlegen“). Sie trägt danach den Zusatz „(lokal)“.
 
-### Einen Abschnitt ändern oder auflösen
-
-1. In der Gliederung den Abschnitt wählen und „Bearbeiten“ wählen.
-2. Die Angaben ändern und „Speichern“ wählen.
-3. Zum Auflösen neben „Bearbeiten“ das Menü „Weitere Aktionen“ öffnen, „Auflösen“ wählen und
-   die Rückfrage „Abschnitt „…“ auflösen?“ mit „Abschnitt auflösen“ bestätigen.
-
 ### Einen Abschnitt umhängen
+
+Für Einsatzleitung und Führungspersonal:
 
 1. In der Gliederung den Abschnitt am Griff vor seinem Namen fassen.
 2. Auf den künftigen Über-Abschnitt ziehen und loslassen. Gestrichelt umrandet sind die Ziele,
@@ -58,7 +72,7 @@ Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie f
 3. Der Hinweis „„…“ unter „…“ verschoben“ (bzw. „„…“ auf die oberste Ebene verschoben“) bietet
    einige Sekunden lang „Rückgängig“ an.
 
-Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
+Für Einsatzleitung und Führungspersonal, ohne Ziehen, etwa per Tastatur oder mit Handschuh:
 
 1. Den Abschnitt wählen, im Menü „Weitere Aktionen“ „Verschieben unter …“ wählen.
 2. Im Dialog das Ziel wählen; „Oberste Ebene“ steht zuerst, der jetzige Ort trägt den Zusatz
@@ -69,6 +83,8 @@ Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
 
 ### Eine Einheit einem anderen Abschnitt zuordnen
 
+Für Einsatzleitung und Führungspersonal:
+
 1. Den Abschnitt wählen, unter dem die Einheit steht.
 2. Unter „Zugeordnete Einheiten“ die Einheit am Griff vor ihrem Namen fassen und auf einen
    anderen Abschnitt der Gliederung ziehen.
@@ -76,6 +92,14 @@ Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
 
 Ohne Ziehen ordnet das Feld „Abschnitt“ an der Einheit selbst zu („Zu den Einheiten ↗“); dort
 lässt sich die Zuordnung auch aufheben.
+
+### Einen Abschnitt auflösen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. In der Gliederung den Abschnitt wählen.
+2. Unter den Angaben das Menü „Weitere Aktionen“ öffnen, „Auflösen“ wählen und die Rückfrage
+   „Abschnitt „…“ auflösen?“ mit „Abschnitt auflösen“ bestätigen.
 
 ### Das Organigramm ansehen, drucken oder übernehmen
 
@@ -110,6 +134,13 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ### Regeln der Gliederung
 
+- Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz inzwischen an einer anderen
+  Angabe geändert hat, bleibt dabei stehen.
+- Die Lage eines Abschnitts trägt der Lagezustand, seinen Arbeitsstand zeigen die offenen
+  Aufträge des Abschnitts im Führungsüberblick.
+- Jede Wahl in „Lagezustand“ gilt sofort, auch mit den Pfeiltasten, und jeder Wechsel steht im
+  Einsatztagebuch. Wer mit den Pfeiltasten über eine Stufe hinweg wandert, erzeugt deshalb auch
+  für die Zwischenstufe einen Eintrag; ein Klick auf die Zielstufe erzeugt nur einen.
 - Die „Kurzbezeichnung“ ist höchstens 20 Zeichen lang und je Einsatz eindeutig, ohne Rücksicht auf
   Groß- und Kleinschreibung; eine doppelte meldet „Schon vergeben (…)“.
 - Beim Auflösen rücken Unterabschnitte eine Ebene hoch, zugeordnete Einheiten stehen danach
