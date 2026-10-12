@@ -151,11 +151,25 @@ relativ zu `frontend/src/`.
 
 ## 8. e2e und Gate
 
-- [ ] 8.1 e2e `e2e/auftrag-aufheben.spec.ts` (neu): als Einsatzleitung einen Auftrag erteilen, über
+- [x] 8.1 e2e `e2e/auftrag-aufheben.spec.ts` (neu): als Einsatzleitung einen Auftrag erteilen, über
   das Menü aufheben (Grund), „Abgeschlossen“ wählen, dann stehen „Aufgehoben“ und der Grund dort.
-  Ein zweiter Fall: Frist berichtigen, im ETB steht „geändert“. Als Beobachter fehlen beide
+  Ein zweiter Fall: Auftragstext berichtigen, im ETB steht „geändert“. Als Beobachter fehlen beide
   Handlungen (Regeln aus `e2e/AGENTS.md`). Nachweis: Spec grün (Chromium).
-- [ ] 8.2 `origin/alpha` hereinholen (LLH-1091 und LLH-1084 prüfen, Migrationsnummer prüfen),
+- [x] 8.2 `origin/alpha` hereinholen (LLH-1091 und LLH-1084 prüfen, Migrationsnummer prüfen),
   dann `./scripts/check-all.sh` grün, dazu Vitest und die Rust-Tests der berührten Dateien.
   Nachweis: Lauf ohne Fehler; das Kästchen wird mit Verweis auf diesen Lauf bzw. die CI des PRs
   abgehakt.
+
+  Lauf 12.10.2026 (Cloud-Sitzung, Chromium), nach Merge von `origin/alpha` (21c802e): Bündel
+  `schnell` grün (Schritte 1–3, 6, 8–14, Migration 0180 über 0179). Vitest voll mit
+  `TZ=Europe/Berlin`: 13 287 von 13 289 grün; rot waren der Typ-Wächter `apiResponseTypen`
+  (Request-Typ umbenannt in `AuftragAufhebenBody`, danach grün) und
+  `FreiesZeichenPicker` (Timeout unter Last eines parallelen Builds, einzeln grün). Rust: `--lib`
+  (2 868) und `auftrag`, `auftrag_aufheben`, `auftrag_berichtigen`, `auftrag_blaettern`,
+  `auftrag_erteilen_freigabe`, `aufbewahrung_e2e`, `eingabegrenzen_auftrag`,
+  `eingabegrenzen_spiegel`, `geraet_routen_guard`, `geraet_kopplung`, `modul_zaehler`,
+  `modul_zaehler_abfragen`, `enum_wire_kontrakt`, `verdichtung_fixture`, `openapi_spec_aktuell`,
+  `chat`, `etb` grün. e2e: `auftrag-aufheben.spec.ts` (3) und `knopf-wortlaut.spec.ts` (2) grün,
+  `auftraege-abgeschlossen.spec.ts` mit drei Workern einmal im Timeout (30,3 s, 105 gesäte
+  Aufträge), allein in 15 s grün. Den vollen Rust-Workspace und die ganze e2e-Suite trägt die CI
+  des PRs (die Sitzung hat nicht den Platz für alle Testbinaries).
