@@ -18,9 +18,9 @@ pnpm laufen über `mise exec -- …`.
   `limit` liefert die erste Seite den ältesten von 150 Aufträgen, wenn nach seinem Text gesucht
   wird; die Kennzahlen zählen nur Treffer.
 - [ ] 1.3 `src/routes/auftrag.rs`: `q` in `ListeParams` und `KennzahlenParams`. Der Begriff wird
-  getrimmt, leer zählt als nichts, mehr als 200 Zeichen ergibt 422 über `support::hoechstens`.
+  getrimmt, leer zählt als nichts, mehr als 200 Zeichen ergibt 400 über `support::hoechstens`.
   Nachweis: Routentests (`tests/`) für Treffer, Leerzeichen-Begriff gleich ohne Begriff, 201
-  Zeichen gleich 422 mit Feldname `q`. `cargo test` für die betroffenen Module ist grün.
+  Zeichen gleich 400 mit Feldname `q`. `cargo test` für die betroffenen Module ist grün.
 - [ ] 1.4 `src/AGENTS.md`: Die Suchregel der geblätterten Listen nennt die Auftragsliste und den
   gemeinsamen Ort von `like_muster`.
   Nachweis: `grep -n "like_muster" src/AGENTS.md`.

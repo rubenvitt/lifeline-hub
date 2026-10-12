@@ -168,11 +168,13 @@ export default function BefehlDetail({
       </Descriptions>
 
       <div style={{ marginTop: token.marginLG }}>
-        <Augenbraue als="h5" style={{ display: 'block', marginBottom: token.marginXS }}>
+        {/* Etikett, keine Überschrift: die Abschnittsköpfe darunter sind selbst h5, ein h5
+            „Befehlstext“ stünde neben statt über ihnen. */}
+        <Augenbraue style={{ display: 'block', marginBottom: token.marginXS }}>
           Befehlstext
         </Augenbraue>
         {detailQuery.data ? (
-          // h5 unter dem Paneel (h4) und seiner Augenbraue; dieselbe Lesefassung wie die Vollseite.
+          // h5 unter dem Paneel (h4); dieselbe Lesefassung wie die Vollseite.
           <BefehlLesefassung vorlage={v} abschnitte={detailQuery.data.abschnitte} ebene={5} />
         ) : (
           <SeitenSkeleton />

@@ -99,7 +99,7 @@ Für Einsatzleitung und Führungspersonal:
 Ein gespeicherter Entwurf öffnet sich wieder über den Reiter „Einsatzbefehle“, Ansicht
 „Entwürfe“: Befehl wählen und „Entwurf bearbeiten“.
 
-### Einen Einsatzbefehl lesen, freigeben und fortschreiben
+### Einen Einsatzbefehl lesen
 
 1. Im Reiter „Einsatzbefehle“ die Ansicht „Entwürfe“ oder „Freigegeben“ wählen, bei Bedarf im
    Suchfeld „Titel oder Schema“ suchen, und einen Befehl wählen. Er steht mit Schema, Zeitstand,
@@ -107,15 +107,21 @@ Ein gespeicherter Entwurf öffnet sich wieder über den Reiter „Einsatzbefehle
 
    ![Einsatzbefehle mit der Liste der Befehle links und dem gewählten Befehl rechts, darin „Entwurf bearbeiten“, „Freigeben“ und der Befehlstext](../bilder/auftraege-befehle/befehl-detail.png)
 
-2. Für Einsatzleitung und Führungspersonal: Am Entwurf „Freigeben“ wählen. Die Rückfrage
-   „Befehl freigeben?“ warnt: „Endgültig: geht ins ETB, Korrektur nur per Fortschreibung.“ Mit
-   „Freigeben“ bestätigen.
-3. Ist später etwas zu ändern, am freigegebenen Befehl „Fortschreiben“ wählen. Es entsteht eine
-   neue Fassung als Entwurf, die sich zum Bearbeiten öffnet und wieder freigegeben wird.
-4. „Vollansicht“ öffnet den Befehl ganzseitig. Dort führt ein freigegebener Befehl im Kopf mit
+2. „Vollansicht“ öffnet den Befehl ganzseitig. Dort führt ein freigegebener Befehl im Kopf mit
    „Zum ETB-Eintrag“ ins Tagebuch, und „Drucken / als PDF“ gibt ihn auf Papier aus (siehe
    [Drucken und Export](drucken-export.md)). „Aufträge/Befehle“ oben im Ortspfad führt zurück, der
    Befehl ist dann gewählt.
+
+### Einen Einsatzbefehl freigeben und fortschreiben
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Entwurf in der Ansicht „Entwürfe“ wählen und „Freigeben“ wählen. Die Rückfrage „Befehl
+   freigeben?“ warnt: „Endgültig: geht ins ETB, Korrektur nur per Fortschreibung.“ Mit
+   „Freigeben“ bestätigen.
+2. Ist später etwas zu ändern, den Befehl in der Ansicht „Freigegeben“ wählen und „Fortschreiben“
+   wählen. Es entsteht eine neue Fassung als Entwurf, die sich zum Bearbeiten öffnet und wieder
+   freigegeben wird.
 
 Ein Befehl ohne jeden Text lässt sich nicht freigeben; die Rückfrage meldet dann „Der Befehl ist
 leer und kann nicht freigegeben werden“. Die Fassung steht als „v1“, „v2“ … an der Karte; eine

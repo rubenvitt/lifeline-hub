@@ -73,6 +73,15 @@ describe('BefehlDetail (Spec `auftraege-befehle`, „Einsatzbefehl im Detail“)
     expect(ladeBefehl).toHaveBeenCalledWith(5, 7);
   });
 
+  it('gliedert unter dem Paneel (h4) mit h5-Abschnitten; „Befehlstext“ ist Etikett, keine Überschrift', async () => {
+    rendern(kopf());
+    await screen.findByText('Brand im Lager');
+    expect(screen.getByRole('heading', { level: 4, name: 'Befehl v1' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 5 }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Befehlstext')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Befehlstext' })).toBeNull();
+  });
+
   it('ein Entwurf trägt „Entwurf bearbeiten“ und „Freigeben“; Freigeben fragt mit Folge nach', async () => {
     const freigegeben = kopf({ status: 'freigegeben', freigegeben_at: '2026-06-11 08:40:00' });
     gibBefehlFrei.mockResolvedValue(anzeige(freigegeben));

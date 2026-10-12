@@ -283,7 +283,7 @@ Die Liste hält Menge und Folge, solange Fokus oder ein Maus- bzw. Stiftzeiger i
 
 - **Route**: `ListeParams` und `KennzahlenParams` in `src/routes/auftrag.rs` bekommen
   `q: Option<String>`. Der Begriff wird getrimmt; leer zählt als nichts, mehr als 200 Zeichen ergibt
-  422 über `routes::support::hoechstens`, wie bei der Schadenliste.
+  400 über `routes::support::hoechstens`, wie bei der Schadenliste.
 - **Repo**: `AuftragFilter` bekommt `suche`. `filter_bedingung` hängt an:
 
   ```sql
