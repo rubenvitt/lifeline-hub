@@ -1,3 +1,26 @@
+## [1.0.0-alpha.116](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.115...v1.0.0-alpha.116) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Beim Start wird eine neue Datenbankmigration eingespielt. Sie legt fest, welche Einheiten ein Auftragseintrag im Einsatztagebuch betrifft. Bestehende Einträge erhalten dabei die Einheiten, die heute als Empfänger eingetragen sind.
+
+### Einsatztagebuch
+
+- **Einheitenfilter bei Aufträgen:** Der Filter „Einheit“ ordnet Auftragseinträge jetzt den Einheiten zu, die beim Schreiben des Eintrags Empfänger waren. Wurden die Empfänger eines Auftrags vor der ersten Quittung berichtigt, erscheint die ursprüngliche Anordnung weiter bei der alten Einheit. Bisher wanderte sie zum neuen Empfänger. Der Eintrag über die geänderten Empfänger erscheint bei der alten und bei der neuen Einheit.
+
+### Aufträge und Meldungen
+
+- **Meldung erneut als Auftrag erteilen:** Wurde der Auftrag zu einer Meldung aufgehoben, lässt sich aus der Meldung wieder ein Auftrag erteilen. Die Meldungskarte zeigt dann „Auftrag aufgehoben“ und bietet wieder „Auftrag erteilen“ an. Der alte Auftrag bleibt im Einsatztagebuch und in der Ansicht der abgeschlossenen Aufträge nachvollziehbar. Die Meldungsansicht aktualisiert sich live, sobald ein zugehöriger Auftrag aufgehoben wird.
+- **Berichtigen von Aufträgen:**
+  - Werden dieselben Empfänger nur umsortiert, gilt das nicht mehr als Änderung. Es entsteht auch kein überflüssiger Eintrag „Empfänger … (vorher …)“ mehr im Einsatztagebuch.
+  - Bisher scheiterte das Berichtigen eines anderen Felds mit einem Fehler, wenn das Ziel eines vorhandenen Empfängers inzwischen aufgelöst war. Das ist behoben. Nur neu hinzukommende Empfänger werden geprüft.
+  - Mehrere Empfänger mit aufgelöstem Ziel zählen beim Berichtigen nur einmal.
+  - Ist ein Empfänger-Abschnitt oder eine Empfänger-Einheit aufgelöst, ist das Empfängerfeld im Formular gesperrt. Bisher erschien dort ein fehlerhafter Eintrag, der beim nächsten Speichern falsch übernommen werden konnte.
+
+### Führung
+
+- **Entlassene Personen in Führungsfunktionen:** Wird der Einsatzleiter oder eine Person aus der Stab-Besetzung entlassen, zeigen Führungsstelle und Stab den Hinweis „nicht mehr disponiert“ sofort live an. Das gilt auch für Nutzer ohne Zugriff auf das Personal, etwa Beobachter.
+
 ## [1.0.0-alpha.115](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.114...v1.0.0-alpha.115) (2026-10-12)
 
 ### Aufträge und Befehle
