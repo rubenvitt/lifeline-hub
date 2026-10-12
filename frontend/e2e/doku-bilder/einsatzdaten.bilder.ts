@@ -122,7 +122,6 @@ test.describe(KAPITEL, () => {
           'Starkregen seit dem Morgen, Mühlbach über die Ufer getreten. Keller und Straßen im ' +
           'Ortsteil Nord überflutet, Evakuierung einzelner Straßenzüge.',
         anzahl_betroffene_initial: 40,
-        naechste_lagebesprechung_at: new Date(Date.now() + 45 * 60_000).toISOString(),
       });
     }
     const sg1 = await sprechgruppe(api, id, 'TMO 311_F_EL', 'TMO');

@@ -23,7 +23,7 @@ beforeEach(() => {
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
     http.put('/api/einsaetze/1/stab/besetzung/s2', async ({ request }) => {
       puts.push(await request.json());
-      return HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] });
+      return HttpResponse.json({ besetzung: [] });
     }),
     http.delete('/api/einsaetze/1/stab/besetzung/s2', () => {
       deletes += 1;
@@ -191,7 +191,7 @@ describe('BesetzungModal', () => {
     server.use(
       http.put('/api/einsaetze/1/stab/besetzung/s2', async ({ request }) => {
         puts.push(await request.json());
-        return HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] });
+        return HttpResponse.json({ besetzung: [] });
       }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));

@@ -7,12 +7,13 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
-import StabPage from './StabPage';
-import { benutzerFixture } from '../test/fixtures';
+import LagebesprechungPage from './LagebesprechungPage';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
 /**
- * „Neue Zeile" der Stab-Seite mit demselben Rechte-Riegel wie die Kopfaktion. Eigene Datei aus
+ * „Neue Zeile" der Seite Lagebesprechung (seit LLH-1111, vorher Stab-Seite) mit demselben
+ * Rechte-Riegel wie die Kopfaktion. Eigene Datei aus
  * denselben Gründen wie `SchaedenPage.palette.test.tsx`: `vi.mock` hoistet dateiweit, und das echte
  * `useBefehle` fordert `/api/einsaetze` an.
  */
@@ -47,15 +48,15 @@ const einsatzAktiv = {
 
 function render(
   einsatzObj: object,
-  stab: () => Response | Promise<Response> = () =>
-    HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] }),
+  stand: () => Response | Promise<Response> = () =>
+    HttpResponse.json({ anzahl_lagebesprechungen: 0 }),
 ) {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/stab', stab),
-    http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/lagebesprechung', stand),
+    http.get('/api/einsaetze/1/lagebesprechungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[
       'personen',
@@ -74,20 +75,21 @@ function render(
   return renderMitProviders(
     <CommandPaletteProvider>
       <Routes>
-        <Route path="/einsaetze/:id/stab" element={<StabPage />} />
+        <Route path="/einsaetze/:id/lagebesprechung" element={<LagebesprechungPage />} />
       </Routes>
     </CommandPaletteProvider>,
-    { route: '/einsaetze/1/stab' },
+    { route: '/einsaetze/1/lagebesprechung' },
   );
 }
 
 /** Der Stand muss da sein — ohne ihn ist `neueZeile` absichtlich nicht registriert. */
 async function standGeladen() {
-  const sektion = await screen.findByRole('region', { name: 'Lagebesprechung' });
-  await waitFor(() => expect(sektion).toHaveTextContent('kein Termin'));
+  const termin = await screen.findByRole('region', { name: 'Termin' });
+  // Nicht über „kein Termin“: der gleichnamige Knopf steht auch ohne Stand da.
+  await waitFor(() => expect(within(termin).getByText('noch keine')).toBeInTheDocument());
 }
 
-describe('StabPage · „Neue Zeile" in der Kommandopalette', () => {
+describe('LagebesprechungPage · „Neue Zeile" in der Kommandopalette', () => {
   it('bietet „Neue Zeile" mit Schreibrecht an und öffnet damit den Abschluss', async () => {
     const u = userEvent.setup();
     render(einsatzAktiv);
@@ -116,11 +118,12 @@ describe('StabPage · „Neue Zeile" in der Kommandopalette', () => {
   it('bietet sie NICHT an, solange der Stand lädt', async () => {
     const u = userEvent.setup();
     render(einsatzAktiv, () => new Promise<never>(() => {}));
-    const sektion = await screen.findByRole('region', { name: 'Lagebesprechung' });
+    const termin = await screen.findByRole('region', { name: 'Termin' });
     // Schreibrecht besteht (kein Rechte-Hinweis) und der Stand lädt — sonst fehlte der Eintrag aus
     // dem falschen Grund.
-    await waitFor(() => expect(screen.queryByText(/Nur Einsatzleitung/)).toBeNull());
-    expect(within(sektion).queryByText('kein Termin')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Nur Ansicht')).toBeNull());
+    // Die Kennzahlen des Termins stehen auf „lädt“ (der Knopf „kein Termin“ steht immer da).
+    expect(termin.querySelector('[data-lfh="kennzahl"][aria-busy="true"]')).not.toBeNull();
     await u.keyboard('{Control>}k{/Control}');
     // Positivhälfte: die Palette ist offen.
     expect(await screen.findByRole('combobox')).toBeInTheDocument();

@@ -7,32 +7,32 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 
 ## 1. Backend: Modul-Key und Herauslösen aus dem Stab (D1, D2, D4)
 
-- [ ] 1.1 `lagebesprechung` in `MODUL_KEYS` zwischen `auftraege` und `stab`, Marker `Lagebesprechung`, `PFAD_KEY` für `…/lagebesprechung` und `…/lagebesprechungen`; `marker_key_werte_stimmen`, `tests/einsatz_kontext_guard.rs`, `tests/modul_freigaben.rs` grün (Länge 32)
-- [ ] 1.2 Lagebesprechungsteile per `git mv`/Ausschneiden von `src/stab/{mod,repo}.rs` nach `src/lagebesprechung/{mod,repo}.rs` (Typen `LagebesprechungAnzeige`, `LagebesprechungAbschluss`, `render_snapshot`, Abschluss-Transaktion unverändert); `cargo build` grün, `tests/aufbewahrung_e2e.rs` `AUSNAHMEN_SYSTEM_ETB` auf die neue Datei umgestellt und grün
-- [ ] 1.3 `src/routes/lagebesprechung.rs`: `GET …/lagebesprechung` (`LagebesprechungStand`), `GET`/`POST …/lagebesprechungen` mit `EinsatzLesezugriff`/`EinsatzSchreibzugriff<Lagebesprechung>`; Routen in `src/app.rs`, `src/routes/mod.rs`, `src/api_doc.rs`; die alten `…/stab/lagebesprechungen`-Routen und die drei Felder aus `StabAnzeige` entfernt; Lagebesprechungs-Tests aus `tests/stab.rs` nach `tests/lagebesprechung.rs` verschoben und auf die neuen Pfade umgestellt, alle grün
-- [ ] 1.4 Gate-Tests in `tests/lagebesprechung.rs`: Stab ausgeblendet → Lagebesprechung lesen und abschließen gelingt; Lagebesprechung ausgeblendet → 403 für Lesen und Schreiben; fremde Org → 404; Beobachter liest, schreibt 403; System-Admin ohne Einsatzrolle schreibt 403
-- [ ] 1.5 `tests/modul_override.rs`: `lagebesprechung` in `MODUL_GET_PFADE` mit seinem GET-Pfad, Eintrag `stab` in `OHNE_EIGENE_ROUTEN` geprüft und berichtigt; `jeder_ausblendbare_modul_key_ist_guard_abgedeckt` grün. Der Abgleich `backend_modul_keys_decken_frontend_registry` braucht den Registry-Eintrag, deshalb landen 1.1 und 4.1 im selben Commit
-- [ ] 1.6 Entschluss-Grenze (D10): `ENTSCHLUSS_MAX` = 10 000, länger → 400, nichts gespeichert; Test `zu_langer_entschluss_ist_400`; Spiegel `LAGEBESPRECHUNG_ENTSCHLUSS_MAX` in `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`
+- [x] 1.1 `lagebesprechung` in `MODUL_KEYS` zwischen `auftraege` und `stab`, Marker `Lagebesprechung`, `PFAD_KEY` für `…/lagebesprechung` und `…/lagebesprechungen`; `marker_key_werte_stimmen`, `tests/einsatz_kontext_guard.rs`, `tests/modul_freigaben.rs` grün (Länge 32)
+- [x] 1.2 Lagebesprechungsteile per `git mv`/Ausschneiden von `src/stab/{mod,repo}.rs` nach `src/lagebesprechung/{mod,repo}.rs` (Typen `LagebesprechungAnzeige`, `LagebesprechungAbschluss`, `render_snapshot`, Abschluss-Transaktion unverändert); `cargo build` grün, `tests/aufbewahrung_e2e.rs` `AUSNAHMEN_SYSTEM_ETB` auf die neue Datei umgestellt und grün
+- [x] 1.3 `src/routes/lagebesprechung.rs`: `GET …/lagebesprechung` (`LagebesprechungStand`), `GET`/`POST …/lagebesprechungen` mit `EinsatzLesezugriff`/`EinsatzSchreibzugriff<Lagebesprechung>`; Routen in `src/app.rs`, `src/routes/mod.rs`, `src/api_doc.rs`; die alten `…/stab/lagebesprechungen`-Routen und die drei Felder aus `StabAnzeige` entfernt; Lagebesprechungs-Tests aus `tests/stab.rs` nach `tests/lagebesprechung.rs` verschoben und auf die neuen Pfade umgestellt, alle grün
+- [x] 1.4 Gate-Tests in `tests/lagebesprechung.rs`: Stab ausgeblendet → Lagebesprechung lesen und abschließen gelingt; Lagebesprechung ausgeblendet → 403 für Lesen und Schreiben; fremde Org → 404; Beobachter liest, schreibt 403; System-Admin ohne Einsatzrolle schreibt 403
+- [x] 1.5 `tests/modul_override.rs`: `lagebesprechung` in `MODUL_GET_PFADE` mit seinem GET-Pfad, Eintrag `stab` in `OHNE_EIGENE_ROUTEN` geprüft und berichtigt; `jeder_ausblendbare_modul_key_ist_guard_abgedeckt` grün. Der Abgleich `backend_modul_keys_decken_frontend_registry` braucht den Registry-Eintrag, deshalb landen 1.1 und 4.1 im selben Commit
+- [x] 1.6 Entschluss-Grenze (D10): `ENTSCHLUSS_MAX` = 10 000, länger → 400, nichts gespeichert; Test `zu_langer_entschluss_ist_400`; Spiegel `LAGEBESPRECHUNG_ENTSCHLUSS_MAX` in `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`
 
 ## 2. Backend: Termin-Schreibweg und Kopf-PATCH (D3)
 
-- [ ] 2.1 `PUT …/lagebesprechung/termin` mit Body `{ naechste_at: string | null }` (Schlüssel Pflicht, sonst 400), Schreiben mit `IS NOT ?1`, `fordere_aktiv` (409), Antwort `LagebesprechungStand`; Tests: setzen, leeren, unverändert, abgeschlossener Einsatz 409, Beobachter 403, kein ETB-Eintrag entsteht
-- [ ] 2.2 `KopfdatenPatch`: gesetztes `naechste_lagebesprechung_at` (auch `null`) → 400 mit Hinweis auf das Modul, nichts geschrieben; `tests/einsatz.rs` `lagebesprechung_patch_*` durch diesen Fall ersetzt, `lagebesprechung_respektiert_einsatzrechte_und_abschluss` nach `tests/lagebesprechung.rs` auf den neuen Weg umgestellt
-- [ ] 2.3 `EinsatzAnzeige` trägt den Termin unverändert für alle Mitglieder; bestehender Test in `tests/modul_override.rs` (`einsatzkopf_erreicht_*`) grün
+- [x] 2.1 `PUT …/lagebesprechung/termin` mit Body `{ naechste_at: string | null }` (Schlüssel Pflicht, sonst 400), Schreiben mit `IS NOT ?1`, `fordere_aktiv` (409), Antwort `LagebesprechungStand`; Tests: setzen, leeren, unverändert, abgeschlossener Einsatz 409, Beobachter 403, kein ETB-Eintrag entsteht
+- [x] 2.2 `KopfdatenPatch`: gesetztes `naechste_lagebesprechung_at` (auch `null`) → 400 mit Hinweis auf das Modul, nichts geschrieben; `tests/einsatz.rs` `lagebesprechung_patch_*` durch diesen Fall ersetzt, `lagebesprechung_respektiert_einsatzrechte_und_abschluss` nach `tests/lagebesprechung.rs` auf den neuen Weg umgestellt
+- [x] 2.3 `EinsatzAnzeige` trägt den Termin unverändert für alle Mitglieder; bestehender Test in `tests/modul_override.rs` (`einsatzkopf_erreicht_*`) grün
 
 ## 3. Backend: Live-Ereignis und Migration (D5, D6)
 
-- [ ] 3.1 `LiveEvent::Lagebesprechung` (Wire `lagebesprechung`, Gate `["lagebesprechung"]`), Pin-Tabelle in `src/live/mod.rs`, `tests/enum_wire_kontrakt.rs`; Kommentar an `LiveEvent::Stab` auf Besetzung/Checkliste gekürzt
-- [ ] 3.2 Abschluss und Termin verteilen `lagebesprechung` (Abschluss zusätzlich `etb`), nie `stab`; `kopf_geaendert` nur bei geändertem Termin; `tests/einsatz_live.rs`: die drei `lagebesprechung_*`-Tests auf `lagebesprechung` statt `stab` umgestellt, neu: Termin per PUT geändert → `einsatz`, unverändert → kein `einsatz`, Leser mit Stab- aber ohne Lagebesprechungs-Recht erhält nichts
-- [ ] 3.3 Migration `0182_lagebesprechung_modul.sql` laut design.md D5 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `tests/lagebesprechung_migration.rs` (oder bestehendes Migrationsmuster): Stab-Rolle je Einsatz und je Org wird übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
-- [ ] 3.4 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommittet
+- [x] 3.1 `LiveEvent::Lagebesprechung` (Wire `lagebesprechung`, Gate `["lagebesprechung"]`), Pin-Tabelle in `src/live/mod.rs`, `tests/enum_wire_kontrakt.rs`; Kommentar an `LiveEvent::Stab` auf Besetzung/Checkliste gekürzt
+- [x] 3.2 Abschluss und Termin verteilen `lagebesprechung` (Abschluss zusätzlich `etb`), nie `stab`; `kopf_geaendert` nur bei geändertem Termin; `tests/einsatz_live.rs`: die drei `lagebesprechung_*`-Tests auf `lagebesprechung` statt `stab` umgestellt, neu: Termin per PUT geändert → `einsatz`, unverändert → kein `einsatz`, Leser mit Stab- aber ohne Lagebesprechungs-Recht erhält nichts
+- [x] 3.3 Migration `0182_lagebesprechung_modul.sql` laut design.md D5 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `tests/lagebesprechung_migration.rs` (oder bestehendes Migrationsmuster): Stab-Rolle je Einsatz und je Org wird übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
+- [x] 3.4 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommittet
 
 ## 4. Frontend: Registry, Route, API, Query-Keys (D1, D2, D6)
 
-- [ ] 4.1 Registry-Eintrag `lagebesprechung` (Führung, zwischen Aufträge und Stab, `beschreibung: 'Termin, Vorbereitung, Entschluss'`, Stab-`beschreibung` auf `'S1–S6'`); `modulRegistry.test.ts` (Reihenfolge-Pin), `sprungmarken.test.ts`, `ModulPanel.test.tsx` und `tests/modul_override.rs::backend_modul_keys_decken_frontend_registry` grün
-- [ ] 4.2 Icon nach Rubens Wahl (Open Question) über `icons/index.ts`; bis dahin kein Platzhalter-Commit, Aufgabe blockiert nur 4.2
-- [ ] 4.3 `routing/deeplinks.ts`: `lagebesprechungPfad(id, { neu? })` mit Test; `App.tsx` `MODUL_ELEMENTE.lagebesprechung`
-- [ ] 4.4 API-Modul `api/lagebesprechung.ts` (Stand, Verlauf, Abschluss, Termin) und Entfernen von `ladeLagebesprechungen`/`schliesseLagebesprechungAb` und der Lagebesprechungsfelder aus `api/stab.ts`; `tsc` grün
+- [x] 4.1 Registry-Eintrag `lagebesprechung` (Führung, zwischen Aufträge und Stab, `beschreibung: 'Termin, Vorbereitung, Entschluss'`, Stab-`beschreibung` auf `'S1–S6'`); `modulRegistry.test.ts` (Reihenfolge-Pin), `sprungmarken.test.ts`, `ModulPanel.test.tsx` und `tests/modul_override.rs::backend_modul_keys_decken_frontend_registry` grün
+- [x] 4.2 Icon nach Rubens Wahl (Open Question) über `icons/index.ts`; bis dahin kein Platzhalter-Commit, Aufgabe blockiert nur 4.2
+- [x] 4.3 `routing/deeplinks.ts`: `lagebesprechungPfad(id, { neu? })` mit Test; `App.tsx` `MODUL_ELEMENTE.lagebesprechung`
+- [x] 4.4 API-Modul `api/lagebesprechung.ts` (Stand, Verlauf, Abschluss, Termin) und Entfernen von `ladeLagebesprechungen`/`schliesseLagebesprechungAb` und der Lagebesprechungsfelder aus `api/stab.ts`; `tsc` grün
 - [ ] 4.5 Query-Keys: Prefix `einsatz-lagebesprechung` (`lagebesprechung`, `lagebesprechungen`) live über `lagebesprechung`, `einsatz` invalidiert `lagebesprechung(id)` statt `stab(id)`, `stabLagebesprechungen` entfernt, `LAGEBILD_OFFLINE` unverändert mit Begründung; `queryKeys.test.ts`, `queryKeys.guard.test.ts`, `liveEvent.contract.test.ts`, `lagebildOffline.guard.test.ts` grün
 
 ## 5. Frontend: Seite Lagebesprechung (D7)
@@ -56,8 +56,8 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 
 ## 7. Regeln (D9)
 
-- [ ] 7.1 Neue `frontend/src/lagebesprechung/AGENTS.md` mit Geltungsbereich, „Vorbereitung der Lagebesprechung“, „Überfälliger Besprechungstermin“ (aus `frontend/src/stab/AGENTS.md` verschoben) und „Ein Termin, ein Schreibweg“; in `frontend/src/stab/AGENTS.md` gelöscht
-- [ ] 7.2 Wurzel-`AGENTS.md` Regeltabelle (neue Zeile, Stab-Zeile gekürzt; Datei unter 200 Zeilen) und `frontend/AGENTS.md` (Verweisblock Stab, LFH-463-Zeile, „Der Einsatzkopf ist live“, „Eine Heimat je Zahl“) nachgezogen; `grep -rn "stab/AGENTS.md" frontend src` zeigt keinen Verweis auf die verschobenen Abschnitte mehr; Prettier über `frontend/` grün
+- [x] 7.1 Neue `frontend/src/lagebesprechung/AGENTS.md` mit Geltungsbereich, „Vorbereitung der Lagebesprechung“, „Überfälliger Besprechungstermin“ (aus `frontend/src/stab/AGENTS.md` verschoben) und „Ein Termin, ein Schreibweg“; in `frontend/src/stab/AGENTS.md` gelöscht
+- [x] 7.2 Wurzel-`AGENTS.md` Regeltabelle (neue Zeile, Stab-Zeile gekürzt; Datei unter 200 Zeilen) und `frontend/AGENTS.md` (Verweisblock Stab, LFH-463-Zeile, „Der Einsatzkopf ist live“, „Eine Heimat je Zahl“) nachgezogen; `grep -rn "stab/AGENTS.md" frontend src` zeigt keinen Verweis auf die verschobenen Abschnitte mehr; Prettier über `frontend/` grün
 
 ## 8. Anwenderdoku (D11)
 

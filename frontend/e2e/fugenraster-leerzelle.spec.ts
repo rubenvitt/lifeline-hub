@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { einsatzdatenPfad, stabPfad, ueberblickPfad } from '../src/routing/deeplinks';
+import { einsatzdatenPfad, lagebesprechungPfad, ueberblickPfad } from '../src/routing/deeplinks';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -18,8 +18,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * liegt schon die Zelle. Mutationsproben: `background: rollen.linie` zurück macht die Restspur
  * rot, die Regel `[data-fugenraster] > *` entfernt macht die Fuge rot.
  *
- * Der Stab hat nach dem Fix KEINE Restspur mehr (zwei Spalten statt drei, „Letzte“ läuft breit);
- * dort ist die Spaltenzahl die Aussage.
+ * Das Paneel „Termin“ der Seite Lagebesprechung (LLH-1111, vorher der Stand auf der Stab-Seite)
+ * hat KEINE Restspur: zwei Kennzahlen in zwei Spalten; dort ist die Spaltenzahl die Aussage.
  *
  * ROLLEN (LFH-435, `e2e/AGENTS.md`): jede Seite auch als Beobachter. Die Kopfangaben der
  * Einsatzdaten sind ohne Schreibrecht Text statt Knopf, der Überblick zeigt gesperrte Kennzahlen
@@ -182,19 +182,17 @@ for (const rolleName of ROLLEN) {
   }
 
   for (const breite of [820, 1440]) {
-    test(`Stab ${breite} px (${rolleName}): Stand der Lagebesprechung ohne leere Spur`, async ({
+    test(`Lagebesprechung ${breite} px (${rolleName}): Termin ohne leere Spur`, async ({
       page,
     }) => {
       const id = await vorbereiten(page, rolleName);
       await page.setViewportSize({ width: breite, height: 900 });
-      await page.goto(stabPfad(id));
-      const raster = page.getByLabel('Stand der Lagebesprechung');
+      await page.goto(lagebesprechungPfad(id));
+      const raster = page.getByRole('group', { name: 'Termin der nächsten Lagebesprechung' });
       await expect(raster.getByText('noch keine', { exact: true })).toBeVisible();
       const v = await pruefeRaster(page, raster, false);
       expect(v.spalten).toBe(2);
-      expect(v.rest, 'die letzte Reihe des Stands ist voll').toBeNull();
-      // „noch keine“ steht einmal; die Historie wiederholt es nicht.
-      await expect(page.getByText('Noch keine Lagebesprechung abgeschlossen')).toHaveCount(0);
+      expect(v.rest, 'die letzte Reihe des Termins ist voll').toBeNull();
     });
   }
 }

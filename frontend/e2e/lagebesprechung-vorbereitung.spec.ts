@@ -2,10 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
- * Vorbereitung der Lagebesprechung (LFH-550) im Browser:
+ * Vorbereitung der Lagebesprechung (LFH-550) im Browser, seit LLH-1111 auf der Seite
+ * Lagebesprechung (vorher Stab):
  *
- * - GLEICHE ZAHLEN: Betroffene, Kräfte und „Aufträge offen" stehen auf der Stab-Seite genau so
- *   wie auf dem Lage-Dashboard — eine Zusammenstellung, ein Rechenweg.
+ * - GLEICHE ZAHLEN: Betroffene, Kräfte und „Aufträge offen" stehen auf der Seite Lagebesprechung
+ *   genau so wie auf dem Lage-Dashboard — eine Zusammenstellung, ein Rechenweg.
  * - „DAVON ÜBERFÄLLIG": ein vollzogener Auftrag mit abgelaufener Frist und Quittungslücke zählt
  *   weder offen noch überfällig, auf beiden Seiten.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, danach der Bericht offen. Geklickt, nicht nur
@@ -75,7 +76,7 @@ test('dieselben Zahlen wie das Dashboard, Übernahme in EINEM Aufruf', async ({ 
   const dashboard = await dashboardWerte(page, einsatzId);
   expect(dashboard).toEqual({ betroffene: '2', kraefte: '0', auftraege: '2' });
 
-  await page.goto(`/einsaetze/${einsatzId}/stab`);
+  await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
   const wert = (s: string) => zeile(page, s).locator('[data-teil="wert"]');
   await expect(wert('auftraege')).toHaveText(dashboard.auftraege);
   await expect(zeile(page, 'auftraege')).toContainText('1 überfällig');
@@ -99,7 +100,7 @@ test('Beobachter: Lagestand ja, Übernahme nein', async ({ page }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await seede(page);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
-  await page.goto(`/einsaetze/${einsatzId}/stab`);
+  await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
   await expect(zeile(page, 'auftraege').locator('[data-teil="wert"]')).toHaveText('2');
   await expect(page.getByRole('button', { name: 'In Lagebericht übernehmen' })).toHaveCount(0);
 });

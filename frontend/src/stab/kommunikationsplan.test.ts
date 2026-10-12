@@ -53,7 +53,7 @@ function stelle(id: number, p: Partial<KommunikationsStelle> = {}): Kommunikatio
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
 function stab(besetzung: Stab['besetzung']): Stab {
-  return { besetzung, anzahl_lagebesprechungen: 0 } as Stab;
+  return { besetzung };
 }
 
 function quellen(p: Partial<KommunikationsplanQuellen> = {}): KommunikationsplanQuellen {

@@ -44,11 +44,14 @@ async function keinQuerlauf(page: Page, kaesten: Locator[], wo: string) {
 const paneel = (page: Page, name: string) => page.getByRole('region', { name, exact: true });
 const PANEELE = ['Einsatz', 'Einsatzort', 'Erstmeldung', 'Eigene Führungsstelle'];
 
-/** Unter `md` steht das Etikett ÜBER dem Wert, nicht daneben. */
+/**
+ * Unter `md` steht das Etikett ÜBER dem Wert, nicht daneben. Gemessen an der Leitstellen-Nr., die
+ * ein neuer Einsatz leer trägt; die Zeile „Nächste Lagebesprechung“ ist entfallen (LLH-1111).
+ */
 async function gestapelt(page: Page) {
   const einsatz = paneel(page, 'Einsatz');
-  const etikett = einsatz.locator('dt', { hasText: 'Nächste Lagebesprechung' });
-  const knopf = einsatz.getByRole('button', { name: 'Nächste Lagebesprechung eintragen' });
+  const etikett = einsatz.locator('dt', { hasText: 'Leitstellen-Nr.' });
+  const knopf = einsatz.getByRole('button', { name: 'Leitstellen-Nr. eintragen' });
   const [e, k] = [(await etikett.boundingBox())!, (await knopf.boundingBox())!];
   expect(k.y, 'Wert unter dem Etikett').toBeGreaterThanOrEqual(e.y + e.height - 1);
 }

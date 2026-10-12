@@ -237,6 +237,8 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
 /** Die Module, aus denen der Bericht schöpft (`druck/einsatzbericht/quellen.ts`). */
 const BERICHT_MODULE = [
   'stab',
+  // Die Lagebesprechungen schöpfen seit LLH-1111 aus dem eigenen Modul, nicht mehr aus dem Stab.
+  'lagebesprechung',
   'einheiten',
   'personal',
   'fahrzeuge',
