@@ -1,3 +1,46 @@
+## [1.0.0-alpha.111](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.110...v1.0.0-alpha.111) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Koordinaten des Einsatzorts werden geprüft:** Beim Anlegen und Ändern eines Einsatzes nimmt der Server die Koordinate nur noch als vollständiges Paar an. Fehlt ein Wert, antwortet er mit 422, liegt ein Wert außerhalb des gültigen Bereichs, mit 400. Bisher wurde jeder Wert ungeprüft gespeichert. Der Einsatzort selbst darf höchstens 500 Zeichen lang sein.
+- **Neue Felder beim Anlegen eines Einsatzes:** Die Schnittstelle zum Anlegen nimmt jetzt auch den Einsatzort und dessen Koordinate an.
+- **Andere Berechtigung für die Ortssuche im Einsatz:** Die Adresssuche im Einsatz verlangt jetzt das Recht auf die Einsatzdaten statt auf die Lagekarte. Für das Anlegen eines Einsatzes gibt es zusätzlich eine Ortssuche auf Ebene der Organisation. Sie steht Admins und Führungskräften zur Verfügung und nutzt den Geocoder der eigenen Organisation.
+- **Einsatzdaten ohne Vollformular:** Die Schaltfläche „Bearbeiten“ mit dem großen Formular gibt es nicht mehr. Jede Angabe wird direkt an ihrem Wert bearbeitet.
+
+### Einsatzdaten
+
+- **Neue Gliederung:** Die Angaben stehen in den Paneelen „Einsatz“, „Einsatzort“, „Erstmeldung“ und „Eigene Führungsstelle“. Auf breiten Bildschirmen stehen sie zweispaltig, jede Angabe genau einmal.
+- **Kennungen im Seitenkopf:** Einsatznummer und Leitstellen-Nummer stehen jetzt oben im Seitenkopf. Den Klappbereich „Technische Angaben“ gibt es nicht mehr.
+- **Bezeichnung und Koordinate direkt bearbeiten:** Beide sind jetzt eigene Zeilen. Eine unlesbare Koordinate wird nicht gespeichert. Das Feld ist dann als fehlerhaft markiert, nennt den Grund auch für Screenreader und behält den Fokus.
+- **Zugriff in den Einstellungen:** Die Mitgliederverwaltung ist aus den Einsatzdaten in die Einsatz-Einstellungen unter „Zugriff“ umgezogen. Die Einsatzleitung erreicht sie über „Zugriff verwalten“. Alle anderen sehen dort „Nur Ansicht · nur Einsatzleitung“. Die Rechte selbst sind unverändert.
+- **Schnellaktion „Mitglied aufnehmen“:** In einem laufenden Einsatz bietet die Sprungpalette der Einsatzleitung „Mitglied aufnehmen“ an. Die Aktion öffnet direkt die Personenauswahl.
+
+### Einsatzort und Ortssuche
+
+- **Paneel „Einsatzort“:** Adresse und Koordinate werden gemeinsam gepflegt.
+  - Die Adresssuche startet mit Enter oder mit „Ort suchen“, nie schon beim Tippen.
+  - Die Trefferliste zeigt eine Kurzadresse („Straße Nr, PLZ Ort“).
+  - Ein gewählter Treffer übernimmt Adresse und Koordinate in einem Schritt. Wird der Text danach von Hand geändert, entfällt die Koordinate.
+- **Kartenausschnitt:** Unter der Adresse zeigt eine kleine Karte den Ort mit einer Nadel. Ohne Koordinate steht dort „Nicht verortet“. Mit Lagekarten-Recht springt „Auf Lagekarte zeigen ↗“ direkt zum Ort auf der Lagekarte.
+- **Einsatzort beim Anlegen:** Der Dialog „Neuen Einsatz anlegen“ hat ein optionales Feld für den Einsatzort. Es bietet dieselbe Suche, und ein kleiner Kartenausschnitt bestätigt den gewählten Ort.
+- Die Suche im Einsatz bevorzugt Treffer in der Umgebung des Einsatzorts. Ohne Netz ist sie gesperrt.
+- Bedienung: Escape schließt zuerst nur die offene Trefferliste. Nach der Wahl eines Treffers kehrt der Fokus ins Feld zurück. Auf schmalen Handy-Bildschirmen läuft die Trefferzeile nicht mehr über den Rand.
+- Die Kopfleiste des Einsatzes zeigt den Einsatzort nur noch an. Bearbeitet wird er im Paneel.
+
+### Führung – Einsatzabschnitte
+
+- **Bearbeiten direkt in der Ansicht:** Jede Angabe eines Abschnitts wird an ihrem Wert bearbeitet. Gespeichert wird nur das geänderte Feld, so überschreibt eine Änderung nicht mehr, was ein anderer Arbeitsplatz inzwischen geändert hat.
+- **Lagezustand per Segmentleiste:** Der Lagezustand wechselt mit einem Klick. Eine Wahl während einer noch laufenden Speicherung geht nicht mehr verloren.
+- **Abschnitt anlegen:** Ein kurzer Dialog mit drei Feldern ersetzt das lange Formular. Danach ist der neue Abschnitt im Detail ausgewählt.
+- **Auflösen** geht jetzt über „Weitere Aktionen“, mit Rückfrage. Der Abschnitt verschwindet sofort aus der Ansicht.
+- Die Zeile „Über-Abschnitt“ entfällt. Ein Abschnitt wird stattdessen durch Ziehen umgehängt.
+- Leere Angaben wie Leiter, Kommunikationsmittel oder Erreichbarkeit zeigen einen Platzhalter.
+- **Fortschritt entfernt:** Detail, Sprungpalette, Funktionsansicht und Führungsüberblick zeigen keinen Fortschritt mehr. Bereits gespeicherte Werte bleiben erhalten.
+
+### Dokumentation
+
+- Die Anwenderkapitel zu Einsatzdaten, Einsatz anlegen, Rechten im Einsatz, Einstellungen und Einsatzabschnitten beschreiben die neuen Abläufe. Die Bilder wurden neu aufgenommen.
+
 ## [1.0.0-alpha.110](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.109...v1.0.0-alpha.110) (2026-10-11)
 
 ### Wichtige Änderungen
