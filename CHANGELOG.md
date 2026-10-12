@@ -1,3 +1,11 @@
+## [1.0.0-alpha.112](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.111...v1.0.0-alpha.112) (2026-10-12)
+
+### Betrieb und Installation
+
+- **Releases erscheinen wieder regulär:** Seit Version 1.0.0-alpha.110 blieben Releases als Entwurf liegen, weil der Bau für macOS (Apple Silicon) abbrach. Der Fehler ist behoben, die Pakete für alle Plattformen werden wieder veröffentlicht.
+- **Bilder im HEIC-Format:** Die Komponente, die HEIC-Fotos öffnet (etwa von iPhones), ist auf eine neuere Fassung gehoben. Die mitgelieferten Lizenz- und Quellenhinweise sind daran angepasst.
+- **Neuere Fremdkomponenten:** Die Kartendarstellung, die Zeichenwerkzeuge der Lagekarte, die Desktop-Anwendung samt Update-Funktion und die Serverbasis nutzen jetzt neuere Fassungen ihrer Bibliotheken.
+
 ## [1.0.0-alpha.111](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.110...v1.0.0-alpha.111) (2026-10-12)
 
 ### Wichtige Änderungen
