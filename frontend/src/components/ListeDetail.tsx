@@ -83,6 +83,12 @@ export interface ListeDetailProps<T> {
   sprung?: { id: number; nr: number } | null;
   karte: (eintrag: T, zustand: KartenZustand) => ReactNode;
   detail: (eintrag: T, zustand: { entfallen: boolean }) => ReactNode;
+  /**
+   * Frischer Stand eines Objekts, das aus der Menge gefallen ist (Spec „Gewähltes Objekt
+   * entfällt“): etwa die Antwort der Handlung, die es hinausgeschoben hat. Ohne Treffer zeigt das
+   * Detail den zuletzt gesehenen Stand.
+   */
+  aufloesen?: (id: number) => T | undefined;
   gruppen?: ListeDetailGruppen<T>;
   /** Erste Lieferung läuft: Skelett, keine Aussage über die Menge. */
   ladend?: boolean;
@@ -94,6 +100,27 @@ export interface ListeDetailProps<T> {
   fuss?: ReactNode;
   /** Ab {@link LISTE_DETAIL_SCHWELLE} Einträgen nur den Sichtbereich rendern (nur ohne `gruppen`). */
   fenster?: boolean;
+}
+
+/**
+ * Stil des Auswahlziels (`frontend/AGENTS.md`, „Handgebautes Bedienziel“): der Boden aus
+ * `controlHeight`, KEINE eigene Polsterung. Die trägt die Karte (`KommKarte`), und ein Klick auf
+ * sie wählt über den Kartenhalter von {@link ListeDetail}; eine zweite Polsterung verdoppelte sie.
+ */
+export function auswahlZielStil(token: { controlHeight: number }) {
+  return {
+    display: 'block',
+    width: '100%',
+    minHeight: token.controlHeight,
+    margin: 0,
+    padding: 0,
+    border: 0,
+    background: 'none',
+    color: 'inherit',
+    font: 'inherit',
+    textAlign: 'start',
+    cursor: 'pointer',
+  } as const;
 }
 
 /**
@@ -114,20 +141,7 @@ export function AuswahlZiel({
       data-lfh="auswahl-ziel"
       aria-label={name}
       {...ziel}
-      style={{
-        display: 'block',
-        width: '100%',
-        minHeight: token.controlHeight,
-        margin: 0,
-        padding: 0,
-        border: 0,
-        background: 'none',
-        color: 'inherit',
-        font: 'inherit',
-        textAlign: 'start',
-        cursor: 'pointer',
-        ...style,
-      }}
+      style={{ ...auswahlZielStil(token), ...style }}
     >
       {children}
     </button>
@@ -179,6 +193,7 @@ export default function ListeDetail<T>({
   sprung = null,
   karte,
   detail,
+  aufloesen,
   gruppen,
   ladend = false,
   fehler = null,
@@ -220,15 +235,34 @@ export default function ListeDetail<T>({
    * Das zuletzt gesehene gewählte Objekt (Spec „Gewähltes Objekt entfällt“): fällt es aus der
    * Menge, zeigt das Detail diesen Stand weiter, bis eine andere Wahl fällt.
    */
-  const zuletzt = useRef<{ id: number; eintrag: T } | null>(null);
+  const zuletzt = useRef<{ id: number; eintrag: T; vorgaenger: number | null } | null>(null);
   const aktuell = gewaehlt == null ? undefined : eintraege.find((e) => schluessel(e) === gewaehlt);
+  const gemerkt = zuletzt.current?.id === gewaehlt ? zuletzt.current : null;
+  const entfallen = aktuell === undefined && gemerkt != null;
+  const detailEintrag =
+    aktuell ?? (entfallen ? (aufloesen?.(gewaehlt!) ?? gemerkt.eintrag) : undefined);
+
   useLayoutEffect(() => {
-    if (gewaehlt == null) zuletzt.current = null;
-    else if (aktuell !== undefined) zuletzt.current = { id: gewaehlt, eintrag: aktuell };
+    if (gewaehlt == null) {
+      zuletzt.current = null;
+      return;
+    }
+    if (aktuell === undefined) return;
+    // Der Vorgänger in der gezeigten Folge: unter `lg` bleibt ein entfallenes Detail hinter ihm
+    // stehen, statt ans Ende der Liste zu springen (Spec `liste-detail`, „Kein Sprung“).
+    const i = sichtbar.findIndex((e) => schluessel(e) === gewaehlt);
+    const vorgaenger = i > 0 ? schluessel(sichtbar[i - 1]) : null;
+    zuletzt.current = { id: gewaehlt, eintrag: aktuell, vorgaenger };
   });
-  const gemerkt = zuletzt.current?.id === gewaehlt ? zuletzt.current.eintrag : undefined;
-  const detailEintrag = aktuell ?? gemerkt;
-  const entfallen = aktuell === undefined && gemerkt !== undefined;
+  /** Wo das entfallene Detail unter `lg` steht: hinter seinem Vorgänger, sonst am Anfang. */
+  const entfallenHinter = entfallen ? gemerkt.vorgaenger : null;
+  const entfallenOrt: 'hinter' | 'anfang' | 'ende' | null = !entfallen
+    ? null
+    : entfallenHinter == null
+      ? 'anfang'
+      : sichtbar.some((e) => schluessel(e) === entfallenHinter)
+        ? 'hinter'
+        : 'ende';
 
   /** Vorauswahl ab `lg`: das erste Objekt der gezeigten Folge, ohne den Fokus zu bewegen. */
   const erster = sichtbar.length > 0 ? schluessel(sichtbar[0]) : null;
@@ -268,13 +302,12 @@ export default function ListeDetail<T>({
         neu.set(id, vorher);
         continue;
       }
-      const props: AuswahlZielProps = breit
-        ? { onClick: () => waehle(id), ...(ist ? { 'aria-current': 'true' as const } : {}) }
-        : {
-            onClick: () => waehle(id),
-            'aria-expanded': ist,
-            ...(ist ? { 'aria-controls': detailId } : {}),
-          };
+      // `aria-controls` in jeder Breite: ab `lg` steuert die Wahl das Detail daneben.
+      const props: AuswahlZielProps = {
+        onClick: () => waehle(id),
+        ...(breit ? (ist ? { 'aria-current': 'true' as const } : {}) : { 'aria-expanded': ist }),
+        ...(ist ? { 'aria-controls': detailId } : {}),
+      };
       neu.set(id, { breit, ist, props });
     }
     auswahlCache.current = neu;
@@ -295,7 +328,9 @@ export default function ListeDetail<T>({
     schaetzung: KARTE_SCHAETZUNG,
     start,
     wurzel: liste,
-    anker: sprung?.id ?? null,
+    // Der Sprung, sonst die Wahl: ein vorgewähltes Objekt steht im Ausschnitt, ein entfallenes
+    // hält seinen Vorgänger darin, damit das Detail an seiner Stelle bleibt.
+    anker: sprung?.id ?? (entfallen ? entfallenHinter : gewaehlt),
   });
 
   // ── Sprung: einmal je Deeplink in den Blick, sobald die Karte im DOM steht ──────────────────
@@ -311,7 +346,14 @@ export default function ListeDetail<T>({
   // ── Rendern ─────────────────────────────────────────────────────────────────────────────
   const detailFlaeche =
     detailEintrag !== undefined ? (
-      <div id={detailId} data-lfh="liste-detail-detail">
+      // Je Objekt neu eingehängt: kein Formular- oder Klappzustand wandert zum nächsten.
+      // `tabIndex={-1}`: Ziel des Sprunglinks, nicht in der Tab-Folge.
+      <div
+        key={schluessel(detailEintrag)}
+        id={detailId}
+        data-lfh="liste-detail-detail"
+        tabIndex={-1}
+      >
         {detail(detailEintrag, { entfallen })}
       </div>
     ) : null;
@@ -324,17 +366,40 @@ export default function ListeDetail<T>({
         key={id}
         data-liste-detail-eintrag={id}
         {...(virtuell ? { [FENSTER_EINTRAG]: String(id) } : {})}
-        onClick={(ev) => kartenKlick(ev, id)}
         style={{ listStyle: 'none' }}
       >
-        {karte(e, {
-          gewaehlt: ist,
-          hervorgehoben: sprung?.id === id,
-          auswahl: auswahlJe.get(id)!,
-        })}
+        {/* Nur die Karte wählt per Klick; das Detail daneben ist ihr Geschwister, ein Klick
+            darin klappt nichts zu. */}
+        <div onClick={(ev) => kartenKlick(ev, id)}>
+          {karte(e, {
+            gewaehlt: ist,
+            hervorgehoben: sprung?.id === id,
+            auswahl: auswahlJe.get(id)!,
+          })}
+        </div>
+        {/* Ab `lg` steht das Detail im DOM hinter der ganzen Liste: ein Sprunglink, sichtbar erst
+            mit dem Fokus, erspart das Tabben durch alle übrigen Karten (WCAG 2.4.1). */}
+        {breit && ist && detailEintrag !== undefined && (
+          <a
+            href={`#${detailId}`}
+            className="lfh-sprung-detail"
+            onClick={(ev) => {
+              ev.preventDefault();
+              document.getElementById(detailId)?.focus({ preventScroll: true });
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: token.controlHeight,
+              padding: `0 ${token.padding}px`,
+            }}
+          >
+            Zum Detail
+          </a>
+        )}
         {/* Unter `lg` steht das Detail direkt unter seiner Karte, im selben Eintrag: so zählt seine
             Höhe im Ausschnitt zur Karte. */}
-        {!breit && ist && detailFlaeche}
+        {!breit && (ist || (entfallenOrt === 'hinter' && id === entfallenHinter)) && detailFlaeche}
       </li>
     );
   };
@@ -426,9 +491,11 @@ export default function ListeDetail<T>({
   if (!breit) {
     return (
       <div data-lfh="liste-detail">
+        {/* Ein entfallenes Objekt steht nicht mehr in der Liste; sein Detail bleibt an seiner
+            Stelle: hinter dem Vorgänger, als erstes vor der Liste, sonst hinter ihr. */}
+        {entfallenOrt === 'anfang' && detailFlaeche}
         {listenSpalte}
-        {/* Ein entfallenes Objekt steht nicht mehr in der Liste; sein Detail folgt ihr. */}
-        {entfallen && detailFlaeche}
+        {entfallenOrt === 'ende' && detailFlaeche}
       </div>
     );
   }

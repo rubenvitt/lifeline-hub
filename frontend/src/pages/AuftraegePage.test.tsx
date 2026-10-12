@@ -622,6 +622,14 @@ describe('AuftraegePage', () => {
     ).toBeInTheDocument();
   });
 
+  it('nennt vor der ersten Lieferung keine Mengen (keine „0 offen“, solange nichts da ist)', async () => {
+    listeAuftraege.mockImplementation(() => new Promise(() => {}));
+    renderPage();
+    expect(await screen.findByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Abgeschlossen' })).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ offen/)).toBeNull();
+  });
+
   it('meldet Vollzug über das Modal; fällt der Auftrag aus der Ansicht, bleibt sein Detail stehen', async () => {
     let stand = [auftrag()];
     listeAuftraege.mockImplementation(() => Promise.resolve(stand));
@@ -652,6 +660,11 @@ describe('AuftraegePage', () => {
     expect(await within(detail()).findByText('Nicht mehr in dieser Ansicht')).toBeInTheDocument();
     await waitFor(() => expect(karte(1)).toBeNull());
     expect(within(detail()).getByText('Deich sichern')).toBeInTheDocument();
+    // Das Detail zeigt den Stand nach der Meldung, nicht den davor: Vermerk da, nächste Handlung
+    // „Abnehmen“, kein zweites „Vollzug melden“ (ListeDetail `aufloesen`).
+    expect(within(detail()).getAllByText(/Deich gehalten/).length).toBeGreaterThan(0);
+    expect(within(detail()).getByRole('button', { name: 'Abnehmen' })).toBeInTheDocument();
+    expect(within(detail()).queryByRole('button', { name: 'Vollzug melden' })).toBeNull();
   });
 
   it('trennt Offen/Abgeschlossen (Read-back im Detail der Abgeschlossen-Ansicht)', async () => {

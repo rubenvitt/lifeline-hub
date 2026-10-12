@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anzahl } from './anzahl';
+import { anzahl, mitZahl } from './anzahl';
 
 describe('anzahl', () => {
   it('nimmt bei genau eins die Einzahl', () => {
@@ -13,5 +13,16 @@ describe('anzahl', () => {
 
   it('stellt die Zahl vor das Wort', () => {
     expect(anzahl(12, 'Befehl', 'Befehle')).toBe('12 Befehle');
+  });
+});
+
+describe('mitZahl', () => {
+  it('hängt eine bekannte Menge in Klammern an, auch null', () => {
+    expect(mitZahl('Offen', 3)).toBe('Offen (3)');
+    expect(mitZahl('Offen', 0)).toBe('Offen (0)');
+  });
+
+  it('lässt eine unbekannte Menge weg', () => {
+    expect(mitZahl('Offen', null)).toBe('Offen');
   });
 });

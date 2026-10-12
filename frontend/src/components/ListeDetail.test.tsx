@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import KommKarte from '../kommunikation/KommKarte';
-import ListeDetail, { AuswahlZiel, type ListeDetailProps } from './ListeDetail';
+import ListeDetail, { AuswahlZiel, auswahlZielStil, type ListeDetailProps } from './ListeDetail';
+import { dichten } from '../theme/tokens';
 import { SeitenLeer } from './SeitenZustand';
 
 interface Objekt {
@@ -308,5 +310,124 @@ describe('ListeDetail — Gruppen und Ausschnitt', () => {
     expect(screen.getByRole('button', { name: 'Objekt 90: Nr 90' })).toBeInTheDocument();
     expect(detail()).toHaveTextContent('Detail Nr 90');
     expect(screen.getAllByRole('button', { name: /^Objekt / }).length).toBeLessThan(120);
+  });
+});
+
+describe('ListeDetail — Review-Befunde (oxgob5gk)', () => {
+  it('unter lg klappt ein Klick ins aufgeklappte Detail es nicht zu', () => {
+    setzeViewportBreite(390);
+    rendere(<Harness eintraege={[A, B]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 1: Alpha' }));
+    fireEvent.click(screen.getByTestId('detail'));
+    expect(detail()).toHaveTextContent('Detail Alpha');
+  });
+
+  it('ein Klick in einem Portal aus dem Detail klappt es nicht zu', () => {
+    setzeViewportBreite(390);
+    rendere(
+      <Harness
+        eintraege={[A, B]}
+        detail={(o) => (
+          <div data-testid="detail">
+            Detail {o.titel}
+            {createPortal(<p data-testid="im-portal">Rückfrage</p>, document.body)}
+          </div>
+        )}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 1: Alpha' }));
+    fireEvent.click(screen.getByTestId('im-portal'));
+    expect(detail()).toHaveTextContent('Detail Alpha');
+  });
+
+  it('ein entfallenes Objekt zeigt den frischen Stand aus `aufloesen`', () => {
+    const frisch = { ...B, titel: 'Bravo vollzogen' };
+    const { rerender } = rendere(<Harness eintraege={[A, B]} startWahl={2} />);
+    rerender(
+      <Harness eintraege={[A]} startWahl={2} aufloesen={(id) => (id === 2 ? frisch : undefined)} />,
+    );
+    expect(detail()).toHaveTextContent('Detail Bravo vollzogen · nicht mehr in der Liste');
+  });
+
+  it('das Detail hängt je Objekt neu ein (kein Zustand über einen Wechsel der Wahl)', () => {
+    function Zaehler({ titel }: { titel: string }) {
+      const [n, setN] = useState(0);
+      return (
+        <button type="button" onClick={() => setN(n + 1)}>
+          {titel} {n}
+        </button>
+      );
+    }
+    rendere(<Harness eintraege={[A, B]} detail={(o) => <Zaehler titel={o.titel} />} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Alpha 0' }));
+    expect(screen.getByRole('button', { name: 'Alpha 1' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 2: Bravo' }));
+    expect(screen.getByRole('button', { name: 'Bravo 0' })).toBeInTheDocument();
+  });
+
+  it('unter lg bleibt ein entfallenes Detail an der Stelle seiner Karte', () => {
+    setzeViewportBreite(390);
+    const { container, rerender } = rendere(<Harness eintraege={[A, B, C]} startWahl={2} />);
+    rerender(<Harness eintraege={[A, C]} startWahl={2} />);
+    const region = screen.getByTestId('detail');
+    const karteA = container.querySelector('[data-objekt="1"]')!;
+    const karteC = container.querySelector('[data-objekt="3"]')!;
+    expect(karteA.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(region.compareDocumentPosition(karteC) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('ab lg verweist das gewählte Auswahlziel auf das Detail (aria-controls)', () => {
+    rendere(<Harness eintraege={[A, B]} />);
+    const ziel = screen.getByRole('button', { name: 'Objekt 1: Alpha' });
+    const region = document.getElementById(ziel.getAttribute('aria-controls')!);
+    expect(region).toHaveTextContent('Detail Alpha');
+  });
+
+  it('ab lg führt ein Sprunglink hinter der gewählten Karte direkt ins Detail', () => {
+    rendere(<Harness eintraege={[A, B, C]} />);
+    const sprungLinks = screen.getAllByRole('link', { name: 'Zum Detail' });
+    expect(sprungLinks).toHaveLength(1);
+    // Er steht im Eintrag der gewählten Karte, vor der nächsten.
+    expect(sprungLinks[0].closest('[data-liste-detail-eintrag]')).toHaveAttribute(
+      'data-liste-detail-eintrag',
+      '1',
+    );
+    fireEvent.click(sprungLinks[0]);
+    expect(document.activeElement).toBe(screen.getByTestId('detail').parentElement);
+  });
+
+  it('unter lg gibt es keinen Sprunglink: das Detail steht ohnehin unter der Karte', () => {
+    setzeViewportBreite(390);
+    rendere(<Harness eintraege={[A, B]} startWahl={1} />);
+    expect(screen.queryByRole('link', { name: 'Zum Detail' })).toBeNull();
+  });
+
+  it('der Ausschnitt ankert auf die Wahl, auch ohne Sprung', async () => {
+    setzeViewportBreite(390);
+    const viele = Array.from({ length: 120 }, (_, i) => ({ id: i + 1, titel: `Nr ${i + 1}` }));
+    rendere(<Harness eintraege={viele} fenster startWahl={90} />);
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: 'Objekt 90: Nr 90' })).toBeInTheDocument();
+    expect(detail()).toHaveTextContent('Detail Nr 90');
+  });
+});
+
+/**
+ * Boden des Auswahlziels (`frontend/AGENTS.md`, „Handgebautes Bedienziel“): die Böden stehen als
+ * Literale da, sonst prüfte der Token sich selbst.
+ */
+describe('auswahlZielStil', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(auswahlZielStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(auswahlZielStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(auswahlZielStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('polstert nicht selbst: die Polsterung trägt die Karte', () => {
+    expect(auswahlZielStil(tokenFuer('handschuh')).padding).toBe(0);
   });
 });

@@ -12,7 +12,7 @@ import { befehlDetailPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { ErfassungsModal } from '../components/Erfassung';
-import { anzahl } from '../anzeige/anzahl';
+import { anzahl, mitZahl } from '../anzeige/anzahl';
 import ListeDetail from '../components/ListeDetail';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { Segmentleiste, useRollen } from '../components/instrument';
@@ -143,7 +143,12 @@ export default function BefehlListe({
     <div>
       <Bereichskopf
         titel="Befehle"
-        meta={`${anzahl(entwuerfe, 'Entwurf', 'Entwürfe')} · ${freigegebene} freigegeben`}
+        meta={
+          // Vor der ersten Lieferung keine Menge (wie bei den Aufträgen).
+          befehleQuery.isSuccess
+            ? `${anzahl(entwuerfe, 'Entwurf', 'Entwürfe')} · ${freigegebene} freigegeben`
+            : undefined
+        }
         dataUpdatedAt={befehleQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
@@ -178,11 +183,21 @@ export default function BefehlListe({
           optionen={[
             {
               wert: 'entwurf',
-              label: `Entwürfe (${gefunden.filter((b) => b.status === 'entwurf').length})`,
+              label: mitZahl(
+                'Entwürfe',
+                befehleQuery.isSuccess
+                  ? gefunden.filter((b) => b.status === 'entwurf').length
+                  : null,
+              ),
             },
             {
               wert: 'freigegeben',
-              label: `Freigegeben (${gefunden.filter((b) => b.status === 'freigegeben').length})`,
+              label: mitZahl(
+                'Freigegeben',
+                befehleQuery.isSuccess
+                  ? gefunden.filter((b) => b.status === 'freigegeben').length
+                  : null,
+              ),
             },
           ]}
         />

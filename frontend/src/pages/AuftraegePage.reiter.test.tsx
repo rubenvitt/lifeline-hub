@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -74,13 +74,16 @@ describe('AuftraegePage — beide Reiter gleich gebaut (Spec `auftraege-befehle`
   beforeEach(() => vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ as never));
 
   /** Die Filterleiste eines Reiters: Segmentleiste mit zwei Segmenten samt Zahl und Suchfeld. */
-  function pruefeLeiste(leiste: HTMLElement) {
+  async function pruefeLeiste(leiste: HTMLElement) {
     const gruppe = within(leiste).getAllByRole('radiogroup')[0];
-    const segmente = within(gruppe).getAllByRole('radio');
-    expect(segmente.map((s) => s.textContent)).toEqual([
-      expect.stringMatching(/\(\d+\)$/),
-      expect.stringMatching(/\(\d+\)$/),
-    ]);
+    // Die Zahl steht erst mit der ersten Lieferung da (vorher keine Aussage über die Menge).
+    await waitFor(() =>
+      expect(
+        within(gruppe)
+          .getAllByRole('radio')
+          .map((s) => s.textContent),
+      ).toEqual([expect.stringMatching(/\(\d+\)$/), expect.stringMatching(/\(\d+\)$/)]),
+    );
     expect(within(leiste).getByRole('textbox', { name: /durchsuchen/ })).toBeInTheDocument();
   }
 
@@ -88,14 +91,14 @@ describe('AuftraegePage — beide Reiter gleich gebaut (Spec `auftraege-befehle`
     const { container } = renderPage();
     await screen.findByRole('textbox', { name: 'Aufträge durchsuchen' });
     const auftragsLeiste = container.querySelector<HTMLElement>('[data-lfh="auftraege-filter"]')!;
-    pruefeLeiste(auftragsLeiste);
+    await pruefeLeiste(auftragsLeiste);
     expect(within(auftragsLeiste).getByText('Empfänger filtern')).toBeInTheDocument();
     expect(within(auftragsLeiste).getByText('Alle Richtungen')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Einsatzbefehle' }));
     await screen.findByRole('textbox', { name: 'Befehle durchsuchen' });
     const befehlsLeiste = container.querySelector<HTMLElement>('[data-lfh="befehle-filter"]')!;
-    pruefeLeiste(befehlsLeiste);
+    await pruefeLeiste(befehlsLeiste);
     expect(within(befehlsLeiste).queryByText('Empfänger filtern')).toBeNull();
     expect(within(befehlsLeiste).queryByText('Alle Richtungen')).toBeNull();
   });

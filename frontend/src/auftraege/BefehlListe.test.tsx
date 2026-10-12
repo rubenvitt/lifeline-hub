@@ -147,6 +147,14 @@ describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () =
     );
   });
 
+  it('nennt vor der ersten Lieferung keine Mengen', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockImplementation(() => new Promise(() => {}));
+    renderListe();
+    expect(await screen.findByRole('radio', { name: 'Entwürfe' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Freigegeben' })).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ freigegeben/)).toBeNull();
+  });
+
   it('steht ohne Entwurf auf „Freigegeben“', async () => {
     vi.mocked(befehleApi.listeBefehle).mockResolvedValue([KETTE[0], KETTE[1]] as never);
     renderListe();

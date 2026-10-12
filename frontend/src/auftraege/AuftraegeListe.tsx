@@ -1,5 +1,6 @@
 import { IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { mitZahl } from '../anzeige/anzahl';
 import { App, Button, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -210,6 +211,13 @@ export default function AuftraegeListe({
    */
   const kartenFehler = useZeilenFehler<number>();
   const quittierFehler = useZeilenFehler<number>();
+  /*
+   * Der Stand aus der jüngsten Antwort einer Handlung: schiebt sie den gewählten Auftrag aus der
+   * Ansicht (Vollzug, Abnahme), zeigt das Detail diesen Stand statt des letzten Listenstands
+   * (`ListeDetail`, `aufloesen`; Spec `liste-detail`, „Gewähltes Objekt entfällt“).
+   */
+  const [frisch, setFrisch] = useState<Auftrag | null>(null);
+  const aufloesen = (id: number) => (frisch?.id === id ? frisch : undefined);
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
   // Optimistische Updates treffen jede Form unter dem Prefix, nie die Kennzahlen (D5).
   const aendere = (fn: (a: Auftrag) => Auftrag) =>
@@ -271,6 +279,7 @@ export default function AuftraegeListe({
       return { vorher, quittiertAt };
     },
     onSuccess: (serverStand) => {
+      setFrisch(serverStand);
       aendere((auftrag) => (auftrag.id === serverStand.id ? serverStand : auftrag));
       message.success('Empfang quittiert');
     },
@@ -313,13 +322,17 @@ export default function AuftraegeListe({
   const ruecknahmeMutation = useMutation({
     mutationFn: (auftragId: number) => setzeVollzug(einsatzId, auftragId, 'offen'),
     onMutate: () => onSeitenFehler?.(null),
-    onSuccess: invalidiere,
+    onSuccess: (stand) => {
+      setFrisch(stand);
+      invalidiere();
+    },
     onError: (e) => onSeitenFehler?.(e),
   });
   const inArbeitMutation = useMutation({
     mutationFn: (auftragId: number) => setzeVollzug(einsatzId, auftragId, 'in_arbeit'),
     onMutate: (auftragId) => kartenFehler.beginne(auftragId),
-    onSuccess: (_daten, auftragId) => {
+    onSuccess: (stand, auftragId) => {
+      setFrisch(stand);
       invalidiere();
       zeigeRueckgaengig(message, 'Auftrag in Bearbeitung', () =>
         ruecknahmeMutation.mutate(auftragId),
@@ -333,7 +346,8 @@ export default function AuftraegeListe({
     // Eine neue Handlung an der Karte räumt deren alten Grund.
     onMutate: ({ auftragId }) => kartenFehler.beginne(auftragId),
     // Nur den eigenen Dialog schließen: steht er inzwischen für einen anderen Auftrag, bleibt er.
-    onSuccess: (_daten, { auftragId }) => {
+    onSuccess: (stand, { auftragId }) => {
+      setFrisch(stand);
       invalidiere();
       setVollzugFuer((f) => (f === auftragId ? null : f));
     },
@@ -341,7 +355,10 @@ export default function AuftraegeListe({
   const abnahmeMutation = useMutation({
     mutationFn: (auftragId: number) => nimmAb(einsatzId, auftragId),
     onMutate: (auftragId) => kartenFehler.beginne(auftragId),
-    onSuccess: invalidiere,
+    onSuccess: (stand) => {
+      setFrisch(stand);
+      invalidiere();
+    },
     onError: (e, auftragId) => kartenFehler.melde(auftragId, e, 'Abnahme fehlgeschlagen'),
   });
 
@@ -400,8 +417,11 @@ export default function AuftraegeListe({
     [verlinkteAngeheftet],
   );
   const kennzahlen = kennzahlenQuery.data;
-  const offenZahl = kennzahlen?.offen ?? offene.length;
-  const abgeschlossenZahl = kennzahlen?.abgeschlossen ?? abgeschlossene.length;
+  // Vor der ersten Lieferung keine Zahl: „Offen (0)“ wäre eine falsche Aussage über die Lage.
+  const offenZahl = kennzahlen?.offen ?? (offeneQuery.data ? offene.length : null);
+  const abgeschlossenZahl =
+    kennzahlen?.abgeschlossen ??
+    (abgeschlosseneQuery.data && !abgeschlosseneQuery.hasNextPage ? abgeschlossene.length : null);
 
   const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
   const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
@@ -448,7 +468,16 @@ export default function AuftraegeListe({
     <>
       <Bereichskopf
         titel="Aufträge"
-        meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
+        meta={
+          offenZahl == null && abgeschlossenZahl == null
+            ? undefined
+            : [
+                offenZahl != null && `${offenZahl} offen`,
+                abgeschlossenZahl != null && `${abgeschlossenZahl} abgeschlossen`,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+        }
         dataUpdatedAt={offeneQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
@@ -473,8 +502,8 @@ export default function AuftraegeListe({
           wert={ansicht}
           onWechsel={wechsleAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offenZahl})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
+            { wert: 'offen', label: mitZahl('Offen', offenZahl) },
+            { wert: 'abgeschlossen', label: mitZahl('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
         <Input
@@ -512,6 +541,7 @@ export default function AuftraegeListe({
         gewaehlt={gewaehlt}
         onWahl={waehle}
         sprung={sprung}
+        aufloesen={aufloesen}
         gruppen={imOffenen ? offeneGruppen : verlinktGruppen}
         fenster={!imOffenen}
         ladend={listenQuery.isPending}
@@ -570,7 +600,8 @@ export default function AuftraegeListe({
                 Ältere laden
               </Button>
               <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                {abgeschlossene.length}
+                {abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
               </div>
             </div>
           )
