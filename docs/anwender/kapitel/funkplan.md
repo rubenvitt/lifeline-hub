@@ -18,7 +18,7 @@ Einsatzleitung und Führungspersonal.
 
 ### Den Funkplan lesen und Lücken schließen
 
-1. „Stab“ öffnen und in der Zeile S6 „Funkplan“ wählen.
+1. In der Modulliste unter „Stab“ „Funkplan“ wählen, oder in der Sprungpalette „Funk“ tippen.
 2. In der Leiste „Darstellung“ „Tabelle“ wählen. Oben stehen die „Lücken“, darunter der Plan von
    der Führungsstelle über die Abschnitte bis zu Einheiten und Fahrzeugen.
 
@@ -38,7 +38,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Die Fernmeldeskizze bearbeiten
 
-1. Im Funkplan in der Leiste „Darstellung“ „Skizze“ wählen.
+1. Im Funkplan in der Leiste „Darstellung“ „Skizze“ wählen, oder in der Modulliste unter „Stab“
+   gleich „Fernmeldeskizze“.
 
    ![Fernmeldeskizze mit Einsatzleitung, Sprechgruppen als Schienen, Abschnitten, Einheiten und externen Stellen](../bilder/funkplan/skizze.png)
 
@@ -54,7 +55,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Eine Stelle in den Kommunikationsplan aufnehmen
 
-1. „Stab“ öffnen und in der Zeile S6 „Kommunikationsplan“ wählen.
+1. In der Modulliste unter „Stab“ „Kommunikationsplan“ wählen, oder „Stab“ öffnen und in der Zeile
+   S6 „Kommunikationsplan“ wählen.
 
    ![Kommunikationsplan mit Einsatzleitung und Stab, abgeleiteten Abschnitten und externen Stellen](../bilder/funkplan/kommunikationsplan.png)
 

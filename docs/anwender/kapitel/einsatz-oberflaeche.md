@@ -132,8 +132,10 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
-(Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene) sowie
-„FMS-Tableau“ (Fahrzeuge).
+(Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
+(Fahrzeuge) sowie unter „Stab“ dessen Arbeitsseiten „Pressearbeit“, „Informationstelefon“,
+„Funkplan“, „Fernmeldeskizze“ und „Kommunikationsplan“. Eine Sprungmarke ist gesperrt oder fehlt,
+wenn ihr Zielmodul gesperrt ist oder fehlt.
 
 Wer aus einem Einsatz ins Profil oder in die Verwaltung wechselt, findet dort „Zurück zu …“: Es
 führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft.
@@ -141,10 +143,11 @@ führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft
 ### Was die Sprungpalette kennt
 
 Ohne Eingabe stehen oben die zuletzt ausgeführten Befehle und die zuletzt geöffneten Module.
-Mit Eingabe sucht die Palette in Modulen, Schnellaktionen („Person erfassen“, „ETB-Eintrag
-schreiben“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
+Mit Eingabe sucht die Palette in Modulen, Ansichten (den Sprungmarken der Modulliste, etwa
+„Funkplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
+„Anruf erfassen“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
 Einsatzes: Personen, Fahrzeuge, Personal, Einheiten, Einträge des Einsatztagebuchs und weitere.
-Module, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
+Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
 Rolle schreiben darf.
 
 „Koordinaten: …“ in der Palette stellt das Koordinatenformat für dieses Gerät ein. Es gilt vor
