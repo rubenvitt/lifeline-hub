@@ -24,15 +24,15 @@ const dateien = import.meta.glob('/src/**/*.tsx', {
 
 /**
  * Direkte Einbindungen außerhalb eines Formulars; jede prüft den Wert selbst, bevor sie ihn
- * wandelt (Verhalten belegt in `Sidebar.test.tsx` und `EinsatzdatenPage.test.tsx`, „unlesbare
- * Koordinate“).
+ * sendet oder wandelt (Verhalten belegt in `Sidebar.test.tsx` und `EinsatzdatenPage.test.tsx`,
+ * „unlesbare Koordinate“).
  */
 const DIREKT = new Set([
   '/src/anzeige/KoordinatenFeld.tsx', // die Formularhülle selbst
   '/src/pages/lagekarte/Sidebar.tsx', // „Übernehmen“ und „Mittelpunkt setzen“, kein Form
-  // Koordinatenzeile des Einsatzorts (LFH-1170) und Standort der eigenen Führungsstelle
-  // (LFH-1181): je `InlineAngabe` mit eigenem `<form>`, kein `Form.Item`; ein ungültiger Wert wird
-  // vor dem Senden abgefangen (`isValid` bzw. vor `alsLatLon`).
+  // Zeile „Koordinate“ im Paneel „Einsatzort“ (LFH-1175/LFH-1170) und Standort der eigenen
+  // Führungsstelle (LFH-1181): je `InlineAngabe` mit eigenem `<form>`, kein `Form.Item`; ein
+  // ungültiger Wert wird vor dem Senden abgefangen (`isValid` bzw. vor `alsLatLon`).
   '/src/pages/EinsatzdatenPage.tsx',
 ]);
 

@@ -87,6 +87,8 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
   it('Karte: barer Prefix und alle acht Bereiche', () => {
     expect(globalKeys.adminKarte()).toEqual(['admin-karte']);
     expect(globalKeys.karteConfig()).toEqual(['karte-config']);
+    // Ortssuche ohne Einsatz (LFH-1175); nicht `ort-suche`, das ist der Einsatz-Prefix der Lagekarte.
+    expect(globalKeys.orgOrtSuche('Hauptstraße 12')).toEqual(['org-ort-suche', 'Hauptstraße 12']);
     for (const b of [
       'katalog',
       'bau-status',
@@ -121,10 +123,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 31 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 32 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(31);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(31);
+    expect(werte).toHaveLength(32);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(32);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

@@ -34,6 +34,10 @@ interface NeuerEinsatz {
   einsatzart?: Einsatzart;
   /** Alarmzeit. Format wie im Kopfdaten-PATCH: `'YYYY-MM-DD HH:mm:ss'`. */
   begonnen_at?: string;
+  /** Einsatzort (LFH-1175); die Koordinate nur als Paar. */
+  einsatzort?: string;
+  einsatzort_lat?: number;
+  einsatzort_lon?: number;
 }
 
 export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {

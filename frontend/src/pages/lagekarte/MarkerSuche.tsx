@@ -8,9 +8,9 @@ import { SeitenLeer } from '../../components/SeitenZustand';
 import { monoStil } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { erkenneKoordinate } from '../../anzeige/koordinatenErkennung';
-import { adressBegriff, type GefundenerOrt } from '../../anzeige/ortssuche';
+import { adressAussage, adressBegriff, type GefundenerOrt } from '../../anzeige/ortssuche';
 import { einsatzKeys } from '../../api/queryKeys';
-import { sucheOrt, type OrtSucheAntwort } from '../../api/karteOrtSuche';
+import { sucheOrt } from '../../api/karteOrtSuche';
 /*
  * Wert-Import aus `./Sidebar`, die ihrerseits `MarkerSuche` importiert — ein bewusster Zyklus:
  * `bedienzielStil` ist das repo-weit zitierte Referenzmuster und bleibt an seinem Ort.
@@ -71,24 +71,6 @@ interface AdressAnfrage {
  * `ok` — „ausgelastet“ und „nicht erreichbar“ verlangen ausdrücklich einen neuen Versuch.
  */
 const ADRESSE_FRISCH_MS = 10 * 60_000;
-
-/** Die eine Aussage der Gruppe „Adresse“, wenn sie keine Treffer zeigt. */
-function adressAussage(
-  begriff: string,
-  antwort: OrtSucheAntwort | undefined,
-  fehler: boolean,
-): string | null {
-  if (fehler || antwort?.zustand === 'nicht_erreichbar') {
-    return 'Adresssuche nicht erreichbar';
-  }
-  if (antwort?.zustand === 'ausgelastet') {
-    return 'Adresssuche ausgelastet';
-  }
-  if (antwort?.zustand === 'ok' && antwort.treffer.length === 0) {
-    return `Keine Adresse zu „${begriff}“ gefunden`;
-  }
-  return null;
-}
 
 export default function MarkerSuche({
   marker,

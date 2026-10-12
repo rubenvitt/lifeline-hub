@@ -31,8 +31,11 @@ import {
   istUngueltigeKoordinate,
   type KoordinatenWert,
 } from '../anzeige/koordinatenWert';
+import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
+import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams } from 'react-router';
-import { einsatzberichtPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
+import { einsatzberichtPfad, einsatzEinstellungenPfad, lagekartePfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -218,9 +221,8 @@ function isSameKoordinate(a: KoordinatenWert, b: KoordinatenWert): boolean {
 }
 
 /**
- * Die Koordinate als Zeile (LFH-1170, design.md D3): Übergang bis zur Ortssuche (LFH-1175), die
- * Adresse und Koordinate gemeinsam erfasst. Das Paar geht in EINEM PATCH hinaus, geleert als
- * zweimal `null`.
+ * Die Koordinate als Zeile im Paneel „Einsatzort“ (LFH-1170, design.md D3; LFH-1175). Das Paar
+ * geht in EINEM PATCH hinaus, geleert als zweimal `null`.
  *
  * Keine `KoordinatenFeld`-Hülle: die Zeile ist kein `Form.Item`. Die Eingabe meldet unlesbaren Text
  * als `ungueltig` und nennt den Grund selbst unter dem Feld; `isValid` sperrt damit das Senden
@@ -413,6 +415,124 @@ function useFahrzeugeQuelle(einsatzId: number): {
       a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
     ),
   };
+}
+
+/**
+ * Paneel „Einsatzort“ (LFH-1175, Spec `einsatzdaten-bearbeitung`, „Paneel Einsatzort mit
+ * Kartenausschnitt“): Adresse über das Ortsfeld mit Suche, Koordinate in allen Formaten, darunter
+ * der Kartenausschnitt und der Sprung zur Lagekarte. Ein gewählter Treffer schickt Adresse und
+ * Koordinate in EINEM PATCH; nur geänderter Text schickt nur die Adresse.
+ */
+function EinsatzortPaneel({
+  einsatz,
+  darfSchreiben,
+  speichern,
+}: {
+  einsatz: EinsatzAnzeige;
+  darfSchreiben: boolean;
+  speichern: FeldSpeichern;
+}) {
+  const { token } = useRollen();
+  const navigate = useNavigate();
+  const einsatzId = einsatz.id;
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const lagekarteFrei =
+    freigabenQuery.data != null && istKeyFreigegeben('lagekarte', freigabenQuery.data);
+  const punkt =
+    einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
+      ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
+      : null;
+  const adresse = einsatz.einsatzort ?? '';
+
+  return (
+    <Paneel titel="Einsatzort">
+      <Angaben
+        zeilen={[
+          {
+            etikett: 'Adresse',
+            wert: (
+              <InlineAngabe<OrtsfeldWert>
+                etikett="Adresse"
+                wert={{ text: adresse, koordinate: null }}
+                anzeige={adresse}
+                leer={(w) => w.text.trim() === ''}
+                // Ein gewählter Treffer ist eine Änderung, auch bei gleichem Text: er bringt die
+                // Koordinate mit.
+                gleich={(a, b) => a.text.trim() === b.text.trim() && a.koordinate === b.koordinate}
+                darfSchreiben={darfSchreiben}
+                onSpeichern={(w) =>
+                  speichern(
+                    'Adresse',
+                    w.koordinate
+                      ? {
+                          einsatzort: leerZuNull(w.text),
+                          einsatzort_lat: w.koordinate.lat,
+                          einsatzort_lon: w.koordinate.lon,
+                        }
+                      : { einsatzort: leerZuNull(w.text) },
+                  )
+                }
+                eingabe={({ feld, popup, value, onChange }) => (
+                  <Ortsfeld
+                    {...feld}
+                    {...popup}
+                    value={value}
+                    onChange={onChange}
+                    suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
+                    suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
+                  />
+                )}
+              />
+            ),
+          },
+          {
+            etikett: 'Koordinate',
+            wert: (
+              <KoordinatenAngabe
+                einsatzId={einsatzId}
+                lat={einsatz.einsatzort_lat}
+                lon={einsatz.einsatzort_lon}
+                darfSchreiben={darfSchreiben}
+                speichern={speichern}
+              />
+            ),
+          },
+        ]}
+      />
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: token.marginXS,
+          paddingBlock: token.paddingSM,
+          paddingInline: token.padding,
+        }}
+      >
+        <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
+        {punkt && lagekarteFrei && (
+          // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
+          // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
+          <div data-lfh="inspector-sprung">
+            <Button
+              type="link"
+              href={lagekartePfad(einsatzId, { zentrum: punkt })}
+              style={{ paddingInline: 0 }}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
+              }}
+            >
+              Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
+            </Button>
+          </div>
+        )}
+      </div>
+    </Paneel>
+  );
 }
 
 const ART_OPTIONEN: { wert: FuehrungsstellenArt; label: string }[] = [
@@ -1121,18 +1241,9 @@ export default function EinsatzdatenPage() {
             />
           }
         />
-        <KopfAngabe
-          etikett="Einsatzort"
-          wert={
-            <TextAngabe
-              etikett="Einsatzort"
-              wert={einsatz.einsatzort}
-              darfSchreiben={darfBearbeiten}
-              speichern={feldSpeichern}
-              zuPatch={(w) => ({ einsatzort: w })}
-            />
-          }
-        />
+        {/* Nur Anzeige: bearbeitet wird im Paneel „Einsatzort“ (LFH-1175), ein Wert, eine
+            Bearbeitungsstelle. */}
+        <KopfAngabe etikett="Einsatzort" wert={einsatz.einsatzort || '—'} />
         {/* Der Einsatzleiter der Führungsstelle, nie die App-Rolle `einsatzleitung`: sie ist
             ein Rechtebündel, kein Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine
             erfundenen Daten“). Gepflegt wird er im Paneel „Eigene Führungsstelle“. */}
@@ -1241,25 +1352,11 @@ export default function EinsatzdatenPage() {
           />
         </Paneel>
 
-        {/* Bis zur Ortssuche (LFH-1175) nur die Koordinate: die Adresse steht in der Kopfleiste. */}
-        <Paneel titel="Einsatzort">
-          <Angaben
-            zeilen={[
-              {
-                etikett: 'Koordinate',
-                wert: (
-                  <KoordinatenAngabe
-                    einsatzId={einsatzId}
-                    lat={einsatz.einsatzort_lat}
-                    lon={einsatz.einsatzort_lon}
-                    darfSchreiben={darfBearbeiten}
-                    speichern={feldSpeichern}
-                  />
-                ),
-              },
-            ]}
-          />
-        </Paneel>
+        <EinsatzortPaneel
+          einsatz={einsatz}
+          darfSchreiben={darfBearbeiten}
+          speichern={feldSpeichern}
+        />
 
         <Paneel titel="Erstmeldung">
           <Angaben

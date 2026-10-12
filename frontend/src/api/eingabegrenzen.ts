@@ -40,6 +40,8 @@ export const PRESSE_THEMA_MAX = 500;
 export const PRESSE_ANTWORT_MAX = 8_000;
 /** Ort und Kontakt des Geschädigten eines Schadens. */
 export const SCHADEN_ORT_MAX = 500;
+/** Einsatzort als Text (Adresse oder Freitext, LFH-1175). */
+export const EINSATZORT_MAX = 500;
 /** Beschreibung eines Schadens. */
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */

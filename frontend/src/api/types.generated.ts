@@ -3649,6 +3649,8 @@ export interface components {
          */
         OrtSucheZustand: "ok" | "ausgelastet" | "nicht_erreichbar";
         OrtTreffer: {
+            /** @description Kurzadresse „Straße Nr, PLZ Ort“, wenn der Geocoder die Teile liefert (LFH-1175). */
+            kurz?: string | null;
             /** Format: double */
             lat: number;
             /** Format: double */

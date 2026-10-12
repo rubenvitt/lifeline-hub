@@ -6,6 +6,9 @@ import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
+import { sucheOrtInOrg } from '../api/ortSuche';
+import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
+import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -43,6 +46,35 @@ interface AnlegeWerte {
   stichwort?: string;
   einsatzart: Einsatzart;
   begonnen_at: Dayjs;
+  /** Einsatzort aus dem Ortsfeld (LFH-1175); die Koordinate nur nach Wahl eines Treffers. */
+  einsatzort?: OrtsfeldWert;
+}
+
+/** Höhe des Kartenausschnitts im Anlegedialog: klein, er bestätigt nur die Wahl. */
+const AUSSCHNITT_ANLEGEN_PX = 120;
+
+/**
+ * Kartenausschnitt des gewählten Einsatzorts im Anlegedialog. Eigene Komponente IM Formular:
+ * `Form.useWatch` außerhalb (Dialog zu, `destroyOnHidden`) meldete eine Instanz ohne Formular.
+ */
+function GewaehlterOrt() {
+  const form = Form.useFormInstance<AnlegeWerte>();
+  const punkt = Form.useWatch('einsatzort', form)?.koordinate ?? null;
+  if (!punkt) return null;
+  return <Kartenausschnitt punkt={punkt} etikett="Einsatzort" hoehe={AUSSCHNITT_ANLEGEN_PX} />;
+}
+
+/** Einsatzort-Felder des Anlegerumpfs; ein leeres Feld schickt keines (Spec `ortsfeld`). */
+function einsatzortFelder(ort: OrtsfeldWert | undefined): {
+  einsatzort?: string;
+  einsatzort_lat?: number;
+  einsatzort_lon?: number;
+} {
+  const text = ort?.text.trim() ?? '';
+  if (text === '') return {};
+  return ort?.koordinate
+    ? { einsatzort: text, einsatzort_lat: ort.koordinate.lat, einsatzort_lon: ort.koordinate.lon }
+    : { einsatzort: text };
 }
 
 /**
@@ -204,6 +236,7 @@ function EinsaetzeInhalt() {
         // `begonnen_at` ist ein UTC-Wirestring und wird auch so gelesen (`anzeige/format.ts` parst
         // mit `dayjs.utc`); `alsBackendZeit` rechnet den Zeitpunkt nach UTC um.
         begonnen_at: werte.begonnen_at ? alsBackendZeit(werte.begonnen_at) : undefined,
+        ...einsatzortFelder(werte.einsatzort),
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
@@ -413,9 +446,10 @@ function EinsaetzeInhalt() {
         </div>
       )}
 
-      {/* Vier Felder: Einsatzart und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den
-          Kopfdaten im Regelfall entfällt. Vier ist die Obergrenze einer Schnellerfassung; ein
-          fünftes gehört in die Kopfdaten. */}
+      {/* Fünf Felder: Einsatzart und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den
+          Kopfdaten im Regelfall entfällt. Vier war die Obergrenze einer Schnellerfassung; das
+          optionale fünfte, der Einsatzort, ist die wichtigste Erstangabe und erspart den Gang in
+          die Kopfdaten (LFH-1175, Entscheidung 11.10.2026). Ein sechstes gehört in die Kopfdaten. */}
       <ErfassungsModal<AnlegeWerte>
         offen={dialogOffen}
         titel="Neuen Einsatz anlegen"
@@ -449,6 +483,10 @@ function EinsaetzeInhalt() {
         <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
           <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
+        <Form.Item label="Einsatzort" name="einsatzort">
+          <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />
+        </Form.Item>
+        <GewaehlterOrt />
         <SpeicherFehler
           fehler={anlegen.error}
           titel="Einsatz nicht angelegt"

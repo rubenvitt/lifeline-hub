@@ -1,0 +1,120 @@
+import { useQuery } from '@tanstack/react-query';
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { useEffect, useRef } from 'react';
+import '../pages/lagekarte/maplibreWorker';
+import { ladeKarteConfig } from '../api/karte';
+import { globalKeys } from '../api/queryKeys';
+import { useRollen } from '../components/instrument';
+import {
+  absolutiereProxyAnfrage,
+  baueBasemapStyle,
+  defaultModus,
+} from '../pages/lagekarte/basemapStil';
+import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
+import type { LatLon } from './koordinaten';
+
+/** Vorgabehöhe des Ausschnitts in Pixeln. */
+const HOEHE_VORGABE = 200;
+/** Durchmesser der Nadel; sie ist kein Bedienziel (die Karte hat keine Bedienung). */
+const NADEL_PX = 20;
+
+export interface KartenausschnittProps {
+  punkt: LatLon | null;
+  /** Wofür der Punkt steht; Name der Nadel und der Karte („Karte: Einsatzort“). */
+  etikett: string;
+  hoehe?: number;
+}
+
+/**
+ * Kleiner Kartenausschnitt um EINEN Punkt (LFH-1175, Spec `ortsfeld`, „Kartenausschnitt zeigt den
+ * Ort“): MapLibre ohne Bedienung, Kartengrundlage wie die Lagekarte (online, Offline-Karten oder
+ * Blindstil, `pages/lagekarte/basemapStil.ts`), Nadel als DOM-Marker. Ohne Punkt keine Karte,
+ * sondern „Nicht verortet“. Muster: `geraet/LagemonitorKarte.tsx` (mehrere Punkte, Monitormaße).
+ */
+export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: KartenausschnittProps) {
+  const { token, rollen, dunkel } = useRollen();
+  const container = useRef<HTMLDivElement>(null);
+  const karte = useRef<maplibregl.Map | null>(null);
+  const nadel = useRef<maplibregl.Marker | null>(null);
+  const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
+  const config = configQuery.data;
+  const verortet = punkt !== null;
+  const lat = punkt?.lat;
+  const lon = punkt?.lon;
+
+  // Karte je Stil einmal bauen; der Stil hängt an Konfiguration und Tag/Nacht.
+  useEffect(() => {
+    if (!container.current || !config || !verortet) return;
+    const map = new maplibregl.Map({
+      container: container.current,
+      style: baueBasemapStyle(
+        defaultModus(config),
+        dunkel ? 'dark' : 'light',
+        config,
+        config.online_styles[0],
+      ),
+      center: [10.45, 51.16],
+      zoom: 5,
+      interactive: false,
+      attributionControl: false,
+      transformRequest: absolutiereProxyAnfrage,
+    });
+    karte.current = map;
+    return () => {
+      nadel.current = null;
+      karte.current = null;
+      map.remove();
+    };
+  }, [config, dunkel, verortet]);
+
+  // Ausschnitt und Nadel nachführen, wenn der Punkt sich ändert.
+  useEffect(() => {
+    const map = karte.current;
+    if (!map || lat === undefined || lon === undefined) return;
+    map.jumpTo({ center: [lon, lat], zoom: PUNKT_ZOOM });
+    nadel.current?.remove();
+    const el = document.createElement('div');
+    el.setAttribute('aria-label', etikett);
+    Object.assign(el.style, {
+      width: `${NADEL_PX}px`,
+      height: `${NADEL_PX}px`,
+      borderRadius: '50%',
+      background: rollen.marke,
+      border: `3px solid ${rollen.grund}`,
+    });
+    nadel.current = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+  }, [lat, lon, etikett, config, dunkel, rollen]);
+
+  if (!verortet) {
+    return (
+      <div
+        data-lfh="kartenausschnitt"
+        style={{
+          height: hoehe,
+          display: 'grid',
+          placeItems: 'center',
+          color: rollen.text2,
+          border: `1px dashed ${rollen.linie}`,
+        }}
+      >
+        Nicht verortet
+      </div>
+    );
+  }
+  return (
+    <div
+      ref={container}
+      data-lfh="kartenausschnitt"
+      role="img"
+      aria-label={`Karte: ${etikett}`}
+      style={{
+        width: '100%',
+        height: hoehe,
+        pointerEvents: 'none',
+        border: `1px solid ${rollen.linie}`,
+        marginBlockStart: token.marginXXS,
+      }}
+    />
+  );
+}

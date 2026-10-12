@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -28,6 +28,15 @@ import { setzeViewportBreite } from '../test/viewport';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
+    <div data-testid="kartenausschnitt">
+      {punkt ? `Karte ${punkt.lat}, ${punkt.lon}` : 'Nicht verortet'}
+    </div>
+  ),
+}));
 
 const admin = adminFixture();
 
@@ -408,7 +417,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-1170)', () => {
         'Angelegt',
         'Nächste Lagebesprechung',
       ],
-      Einsatzort: ['Koordinate'],
+      Einsatzort: ['Adresse', 'Koordinate'],
       Erstmeldung: ['Meldende Stelle', 'Sachverhalt / Meldebild', 'Anzahl Betroffene (initial)'],
     };
     for (const [name, etiketten] of Object.entries(paneele)) {
@@ -561,9 +570,11 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     setup({ einsatz: { einsatzort: 'Deich Süd' } });
     const bodies = patchMitschnitt({ einsatzort: 'Deich Süd' });
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Einsatzort bearbeiten' }));
-    await user.clear(screen.getByRole('textbox', { name: 'Einsatzort' }));
-    await user.keyboard('{Enter}');
+    // Der Einsatzort wird im Paneel „Einsatzort“ bearbeitet (LFH-1175); Enter sucht dort, gespeichert
+    // wird über den Knopf.
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Adresse' }));
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
     await waitFor(() => expect(bodies).toEqual([{ einsatzort: null }]));
   });
 
@@ -697,10 +708,12 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     expect(within(zelle).queryByRole('button')).toBeNull();
   });
 
-  it('Einsatzleitung, Einsatznummer und „Angelegt“ tragen keine Aufforderung', async () => {
-    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+  it('Einsatzort in der Kopfleiste, Einsatzleitung, Einsatznummer und „Angelegt“ tragen keine Aufforderung', async () => {
+    setup({
+      einsatz: { einsatzort: 'Deich Süd', einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 },
+    });
     await screen.findByRole('region', { name: 'Einsatz' });
-    for (const angabe of ['Einsatzleitung', 'Einsatznummer', 'Angelegt']) {
+    for (const angabe of ['Einsatzort', 'Einsatzleitung', 'Einsatznummer', 'Angelegt']) {
       for (const aufforderung of ['bearbeiten', 'eintragen']) {
         expect(screen.queryByRole('button', { name: `${angabe} ${aufforderung}` })).toBeNull();
       }
@@ -746,7 +759,8 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
 });
 
 /**
- * Bezeichnung und Koordinate als Zeile (LFH-1170): bis dahin nur im Vollformular änderbar.
+ * Bezeichnung und Koordinate als Zeile (LFH-1170): bis dahin nur im Vollformular änderbar. Setzen
+ * und Leeren der Koordinate belegt das Paneel „Einsatzort“ (LFH-1175) weiter unten.
  */
 describe('EinsatzdatenPage · Bezeichnung und Koordinate als Zeile (LFH-1170)', () => {
   it('Bezeichnung: genau { bezeichnung } geht hinaus, der Ortspfad folgt', async () => {
@@ -789,28 +803,6 @@ describe('EinsatzdatenPage · Bezeichnung und Koordinate als Zeile (LFH-1170)', 
     await user.type(screen.getByRole('textbox', { name: 'Bezeichnung' }), '  {Enter}');
     expect(await screen.findByRole('button', { name: 'Bezeichnung bearbeiten' })).toBeVisible();
     expect(bodies).toEqual([]);
-  });
-
-  it('Koordinate setzen: genau das Paar geht hinaus', async () => {
-    setup();
-    const { bodies } = serverStand();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Koordinate eintragen' }));
-    await user.type(screen.getByRole('textbox', { name: 'Koordinate' }), '52.52, 13.405');
-    await user.click(screen.getByRole('button', { name: 'Koordinate speichern' }));
-    await waitFor(() =>
-      expect(bodies).toEqual([{ einsatzort_lat: 52.52, einsatzort_lon: 13.405 }]),
-    );
-  });
-
-  it('Koordinate leeren: beide Felder null', async () => {
-    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
-    const { bodies } = serverStand({ einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 });
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Koordinate bearbeiten' }));
-    await user.clear(screen.getByRole('textbox', { name: 'Koordinate' }));
-    await user.click(screen.getByRole('button', { name: 'Koordinate speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ einsatzort_lat: null, einsatzort_lon: null }]));
   });
 
   it('Koordinate unverändert: kein PATCH', async () => {
@@ -1889,5 +1881,198 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
     await act(() => new Promise((r) => setTimeout(r, 20)));
     expect(paneel8.queryByRole('alert')).toBeNull();
     expect((await abschlussPaneel()).queryByRole('alert')).toBeNull();
+  });
+});
+
+/**
+ * LFH-1175, Spec `einsatzdaten-bearbeitung` und `ortsfeld`: Paneel „Einsatzort“ mit Adresse
+ * (Ortsfeld mit Suche), Koordinate, Kartenausschnitt und Sprung zur Lagekarte.
+ */
+describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
+  function patchMitschnitt(einsatz: Partial<EinsatzAnzeige> = {}) {
+    const bodies: Record<string, unknown>[] = [];
+    let stand: EinsatzAnzeige = { ...basisEinsatz, ...einsatz };
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        const body = (await request.json()) as Partial<EinsatzAnzeige>;
+        bodies.push(body);
+        stand = { ...stand, ...body };
+        return HttpResponse.json(stand);
+      }),
+    );
+    return bodies;
+  }
+
+  function geocoder() {
+    const begriffe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/ort-suche', ({ request }) => {
+        begriffe.push(new URL(request.url).searchParams.get('q')!);
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            {
+              lat: 51.1,
+              lon: 10.4,
+              name: 'Bahnhofstraße 1, Musterstadt, Landkreis X, 12345, Deutschland',
+              kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
+            },
+          ],
+        });
+      }),
+    );
+    return begriffe;
+  }
+
+  it('ein Treffer speichert Adresse und Koordinate in genau einem PATCH', async () => {
+    setup({ einsatz: { einsatzort: 'Bahnhofstr' } });
+    const bodies = patchMitschnitt({ einsatzort: 'Bahnhofstr' });
+    const begriffe = geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Adresse' });
+    await user.clear(feld);
+    await user.type(feld, 'Bahnhofstraße 1{Enter}');
+    expect(bodies).toEqual([]);
+    const liste = await screen.findByRole('list', { name: 'Treffer' });
+    expect(begriffe).toEqual(['Bahnhofstraße 1']);
+    await user.click(within(liste).getByRole('button', { name: /Bahnhofstraße 1, 12345/ }));
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          einsatzort: 'Bahnhofstraße 1, 12345 Musterstadt',
+          einsatzort_lat: 51.1,
+          einsatzort_lon: 10.4,
+        },
+      ]),
+    );
+    expect(await screen.findByText('Karte 51.1, 10.4')).toBeInTheDocument();
+  });
+
+  it('ein Treffer mit unverändertem Text sendet trotzdem: er bringt die Koordinate', async () => {
+    const text = 'Bahnhofstraße 1, 12345 Musterstadt';
+    setup({ einsatz: { einsatzort: text } });
+    const bodies = patchMitschnitt({ einsatzort: text });
+    geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Ort suchen' }));
+    const liste = await screen.findByRole('list', { name: 'Treffer' });
+    await user.click(within(liste).getByRole('button', { name: /Bahnhofstraße 1, 12345/ }));
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ einsatzort: text, einsatzort_lat: 51.1, einsatzort_lon: 10.4 }]),
+    );
+  });
+
+  it('Escape schließt zuerst die Trefferliste, erst das zweite verwirft die Zeile', async () => {
+    setup({ einsatz: { einsatzort: 'Deich Süd' } });
+    const bodies = patchMitschnitt({ einsatzort: 'Deich Süd' });
+    geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Ort suchen' }));
+    await screen.findByRole('list', { name: 'Treffer' });
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Adresse' })).toHaveValue('Deich Süd');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('textbox', { name: 'Adresse' })).not.toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it('nur geänderter Text speichert nur die Adresse, die Koordinate bleibt', async () => {
+    const stand = { einsatzort: 'Deich Süd', einsatzort_lat: 48.1, einsatzort_lon: 11.6 };
+    setup({ einsatz: stand });
+    const bodies = patchMitschnitt(stand);
+    const begriffe = geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Adresse' }), ', Abschnitt 2');
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ einsatzort: 'Deich Süd, Abschnitt 2' }]));
+    expect(begriffe).toEqual([]);
+    expect(screen.getByText('Karte 48.1, 11.6')).toBeInTheDocument();
+  });
+
+  it('die Zeile Koordinate sendet das Paar, geleert als Paar aus null', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    expect(await screen.findByText('Nicht verortet')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Koordinate eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Koordinate' }), '51.16040, 10.45140');
+    await user.click(screen.getByRole('button', { name: 'Koordinate speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ einsatzort_lat: 51.1604, einsatzort_lon: 10.4514 }]),
+    );
+    expect(await screen.findByText('Karte 51.1604, 10.4514')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Koordinate bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Koordinate' }));
+    await user.click(screen.getByRole('button', { name: 'Koordinate speichern' }));
+    await waitFor(() => expect(bodies[1]).toEqual({ einsatzort_lat: null, einsatzort_lon: null }));
+  });
+
+  it('eine ungültige Koordinate geht nicht hinaus, der Fehler steht an der Zeile', async () => {
+    setup({ einsatz: { einsatzort_lat: 48.1, einsatzort_lon: 11.6 } });
+    const bodies = patchMitschnitt({ einsatzort_lat: 48.1, einsatzort_lon: 11.6 });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Koordinate bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+    await user.clear(feld);
+    await user.type(feld, 'Deich');
+    await user.click(screen.getByRole('button', { name: 'Koordinate speichern' }));
+    // Die Eingabe nennt den Grund selbst, die Zeile bleibt offen (`isValid`, LFH-1170).
+    expect(await screen.findByText(/^Ungültige Koordinate/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Koordinate' })).toHaveValue('Deich');
+    expect(bodies).toEqual([]);
+    expect(screen.getByText('Karte 48.1, 11.6')).toBeInTheDocument();
+  });
+
+  it('der Sprung zur Lagekarte steht nur mit Koordinate und Lagekarten-Recht', async () => {
+    setup({ einsatz: { einsatzort_lat: 51.1, einsatzort_lon: 10.4 } });
+    const sprung = await screen.findByRole('link', { name: /Auf Lagekarte zeigen/ });
+    expect(sprung).toHaveAttribute('href', expect.stringContaining('/einsaetze/7/lagekarte'));
+    expect(sprung.getAttribute('href')).toContain('zentrum=');
+  });
+
+  it('ohne Koordinate kein Sprung zur Lagekarte', async () => {
+    setup();
+    expect(await screen.findByText('Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Auf Lagekarte zeigen/ })).toBeNull();
+  });
+
+  it('ohne Lagekarten-Recht kein Sprung', async () => {
+    setup({ einsatz: { einsatzort_lat: 51.1, einsatzort_lon: 10.4 } });
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false, sichtbar: false } })),
+      ),
+    );
+    expect(await screen.findByText('Karte 51.1, 10.4')).toBeInTheDocument();
+    // Die Freigaben laden nach; der Sprung erscheint nie.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('link', { name: /Auf Lagekarte zeigen/ })).toBeNull();
+  });
+
+  it('ohne Schreibrecht zeigt das Paneel nur an', async () => {
+    setup({
+      einsatz: {
+        meine_rolle: 'beobachter',
+        einsatzort: 'Deich Süd',
+        einsatzort_lat: 48.1,
+        einsatzort_lon: 11.6,
+      },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
+    expect(await screen.findByText('Karte 48.1, 11.6')).toBeInTheDocument();
+    expect(screen.getAllByText('Deich Süd').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('button', { name: /^(Adresse|Koordinate) (bearbeiten|eintragen)$/ }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ort suchen' })).toBeNull();
   });
 });

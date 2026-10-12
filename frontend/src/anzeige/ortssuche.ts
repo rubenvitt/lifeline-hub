@@ -1,3 +1,4 @@
+import type { OrtSucheAntwort } from '../api/karteOrtSuche';
 import { erkenneKoordinate } from './koordinatenErkennung';
 
 /**
@@ -30,4 +31,25 @@ export function adressBegriff(eingabe: string): string | null {
   if (zeichen < ADRESSE_MIN_ZEICHEN || zeichen > ADRESSE_MAX_ZEICHEN) return null;
   if (erkenneKoordinate(text) !== null) return null;
   return text;
+}
+
+/**
+ * Die eine Aussage einer Adresssuche, wenn sie keine Treffer zeigt (Lagekarte, Gruppe „Adresse“;
+ * Ortsfeld, LFH-1175). Ein Fehler der Anfrage zählt wie „nicht erreichbar“.
+ */
+export function adressAussage(
+  begriff: string,
+  antwort: OrtSucheAntwort | undefined,
+  fehler: boolean,
+): string | null {
+  if (fehler || antwort?.zustand === 'nicht_erreichbar') {
+    return 'Adresssuche nicht erreichbar';
+  }
+  if (antwort?.zustand === 'ausgelastet') {
+    return 'Adresssuche ausgelastet';
+  }
+  if (antwort?.zustand === 'ok' && antwort.treffer.length === 0) {
+    return `Keine Adresse zu „${begriff}“ gefunden`;
+  }
+  return null;
 }

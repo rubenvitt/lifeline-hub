@@ -199,6 +199,7 @@ async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError
                         stichwort: Some(stichwort),
                         einsatzart: None,
                         begonnen_at: None,
+                        ort: Default::default(),
                     },
                     ersteller_id,
                 )

@@ -9,12 +9,14 @@ geändert werden: jede Angabe einzeln in der Leseansicht, ohne zweiten Bearbeitu
 
 ### Requirement: Einzelne Angabe in der Leseansicht bearbeiten
 Die Seite Einsatzdaten SHALL die folgenden Angaben einzeln in der Leseansicht bearbeitbar
-machen: Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzort (Adresse), Koordinate,
-Einsatzart, Nächste Lagebesprechung, Meldende Stelle, Sachverhalt / Meldebild, Anzahl
-Betroffene (initial) und Leitstellen-Nr. Während eine Angabe bearbeitet wird, MUST die Seite in
-der Leseansicht bleiben; alle übrigen Angaben bleiben sichtbar. Einsatzleitung, Einsatznummer
-und „Angelegt“ MUST NOT zeilenweise bearbeitbar sein. Die Zeile ist der einzige
-Bearbeitungsweg der Seite; ein Formular, das die Leseansicht ersetzt, MUST es nicht geben.
+machen: Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzort (Adresse), Koordinate des
+Einsatzorts, Einsatzart, Nächste Lagebesprechung, Meldende Stelle, Sachverhalt / Meldebild,
+Anzahl Betroffene (initial) und Leitstellen-Nr. Während eine Angabe bearbeitet wird, MUST die
+Seite in der Leseansicht bleiben; alle übrigen Angaben bleiben sichtbar. Einsatzleitung,
+Einsatznummer und „Angelegt“ MUST NOT zeilenweise bearbeitbar sein. Adresse und Koordinate des
+Einsatzorts MUST in einem Paneel „Einsatzort“ bearbeitet werden; die Kopfleiste zeigt den
+Einsatzort nur an. Die Zeile ist der einzige Bearbeitungsweg der Seite; ein Formular, das die
+Leseansicht ersetzt, MUST es nicht geben.
 
 #### Scenario: Leitstellen-Nr. nachtragen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Leitstellen-Nr." die Bearbeitung öffnet, `ILS-4711` eingibt und speichert
@@ -30,12 +32,19 @@ Bearbeitungsweg der Seite; ein Formular, das die Leseansicht ersetzt, MUST es ni
 
 #### Scenario: Nicht inline bearbeitbare Angaben
 - **WHEN** eine schreibberechtigte Person die Seite öffnet
-- **THEN** tragen Einsatzleitung, Einsatznummer und „Angelegt“ keine Bearbeiten-Aufforderung, und es gibt keinen Knopf „Bearbeiten“, der ein Formular öffnet
+- **THEN** tragen Einsatzleitung, Einsatznummer, „Angelegt“ und der Einsatzort in der Kopfleiste keine Bearbeiten-Aufforderung, und es gibt keinen Knopf „Bearbeiten“, der ein Formular öffnet
+
+#### Scenario: Koordinate nachtragen
+- **WHEN** eine schreibberechtigte Person an der Zeile „Koordinate" im Paneel „Einsatzort" eine MGRS-Angabe eingibt und speichert
+- **THEN** sendet die Seite `einsatzort_lat` und `einsatzort_lon` gemeinsam, und der Kartenausschnitt zeigt den Punkt
 
 ### Requirement: Eine Zeile schickt nur ihr eigenes Feld
-Das Speichern einer Zeile SHALL genau die Felder ihrer Angabe an `PATCH /api/einsaetze/{id}`
-senden: ein Feld je Zeile, die Koordinate als Paar `einsatzort_lat` und `einsatzort_lon`. Ist
-der neue Wert gleich dem bisherigen, MUST keine Anfrage gesendet werden. Eine leer gespeicherte
+Das Speichern einer Zeile SHALL nur die Felder ihrer Angabe an `PATCH /api/einsaetze/{id}`
+senden. Eine Zeile trägt genau ein Feld, mit zwei Ausnahmen: Die Zeile „Koordinate“ sendet
+`einsatzort_lat` und `einsatzort_lon` als Paar. Die Zeile „Adresse“ des Einsatzorts sendet mit
+einem gewählten Treffer der Ortssuche `einsatzort`, `einsatzort_lat` und `einsatzort_lon` in einer
+Anfrage; ohne gewählten Treffer sendet sie nur `einsatzort`, und die Koordinate bleibt. Ist der
+neue Wert gleich dem bisherigen, MUST keine Anfrage gesendet werden. Eine leer gespeicherte
 optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als beide Felder
 `null`.
 
@@ -58,6 +67,14 @@ optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als be
 #### Scenario: Koordinate leeren
 - **WHEN** eine Person die Koordinate leert und speichert
 - **THEN** sendet die Seite `{ "einsatzort_lat": null, "einsatzort_lon": null }`
+
+#### Scenario: Treffer speichert Adresse und Koordinate
+- **WHEN** eine Person an der Zeile „Adresse“ nach „Bahnhofstraße 1“ sucht, den Treffer bei 51.1, 10.4 wählt und speichert
+- **THEN** geht genau eine Anfrage mit `einsatzort`, `einsatzort_lat: 51.1` und `einsatzort_lon: 10.4` hinaus
+
+#### Scenario: Nur die Adresse geändert
+- **WHEN** eine Person an der Zeile „Adresse“ den Text ändert, ohne einen Treffer zu wählen, und speichert
+- **THEN** sendet die Seite nur `einsatzort`, und die bisherige Koordinate bleibt
 
 ### Requirement: Pflichtangabe wird nicht leer gespeichert
 Bezeichnung und Alarmzeit sind Pflichtangaben. Wird eine von ihnen in der Zeilenbearbeitung
@@ -147,13 +164,33 @@ Die Seite Einsatzdaten SHALL ihre Angaben in dieser Reihenfolge zeigen: Kopfleis
 (Einsatzstichwort, Alarmzeit, Einsatzort, Einsatzleitung), Paneel „Einsatz“, Paneel
 „Einsatzort“, Paneel „Erstmeldung“, Paneel „Eigene Führungsstelle“, zuletzt der
 Einsatzabschluss. Kopfleiste und Paneele MUST keine Angabe wiederholen; die Kennungen im
-Seitenkopf sind eine Lesekopie aus dem Paneel „Einsatz“. Die Seite MUST die volle
-Inhaltsbreite nutzen.
+Seitenkopf sind eine Lesekopie aus dem Paneel „Einsatz“, der Einsatzort in der Kopfleiste eine aus
+dem Paneel „Einsatzort“. Die Seite MUST die volle Inhaltsbreite nutzen.
 
 #### Scenario: Angaben je Paneel
 - **WHEN** eine Person die Seite öffnet
-- **THEN** trägt „Einsatz“ Bezeichnung, Einsatzart, Einsatznummer, Leitstellen-Nr., Angelegt und Nächste Lagebesprechung, „Einsatzort“ die Koordinate und „Erstmeldung“ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial)
+- **THEN** trägt „Einsatz“ Bezeichnung, Einsatzart, Einsatznummer, Leitstellen-Nr., Angelegt und Nächste Lagebesprechung, „Einsatzort“ Adresse und Koordinate und „Erstmeldung“ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial)
 
 #### Scenario: Handschirm ohne Querlauf
 - **WHEN** die Seite bei 390 px Breite geöffnet wird
 - **THEN** endet das Dokument bei 390 px, und die Paneele stehen untereinander
+
+### Requirement: Paneel Einsatzort mit Kartenausschnitt
+Die Seite Einsatzdaten SHALL ein Paneel „Einsatzort“ zeigen mit den Zeilen „Adresse“ und
+„Koordinate“ und darunter einem Kartenausschnitt des Einsatzorts. Ist der Einsatzort verortet und
+darf die Person die Lagekarte sehen, SHALL das Paneel den Sprung „Auf Lagekarte zeigen ↗“ tragen,
+der die Lagekarte um den Einsatzort öffnet. In der Zeile „Koordinate“ direkt unter der Adresse
+SHALL der Ortsname der Koordinate stehen, wie die Koordinatenanzeige ihn liefert, damit auffällt,
+wenn Adresse und Koordinate auseinanderfallen.
+
+#### Scenario: Verorteter Einsatz
+- **WHEN** eine Person die Einsatzdaten eines Einsatzes mit Adresse und Koordinate öffnet
+- **THEN** zeigt das Paneel „Einsatzort“ Adresse, Koordinate, den Kartenausschnitt mit Nadel und „Auf Lagekarte zeigen ↗“
+
+#### Scenario: Nicht verortet
+- **WHEN** der Einsatz eine Adresse, aber keine Koordinate trägt
+- **THEN** zeigt der Ausschnitt „Nicht verortet“, und der Sprung zur Lagekarte fehlt
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** eine Person mit der Rolle Beobachter die Seite öffnet
+- **THEN** zeigt das Paneel Adresse, Koordinate und Ausschnitt ohne Bearbeiten-Aufforderung und ohne Suche
