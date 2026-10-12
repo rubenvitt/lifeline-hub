@@ -33,7 +33,7 @@ pnpm laufen über `mise exec -- …`.
 
 ## 2. Zufluss-Logik herauslösen (D8)
 
-- [ ] 2.1 Die Zustandsmaschine des Zuflusses aus `components/Datensicht.tsx` nach
+- [x] 2.1 Die Zustandsmaschine des Zuflusses aus `components/Datensicht.tsx` nach
   `components/useZuflussSchleuse.ts` ziehen: offen bzw. gefroren, Fokus- und Zeigerbedingung,
   Portal-Ausnahme, Bewegung statt `pointerenter`, Bannerwortlaut. Ohne Verhaltensänderung.
   Nachweis: alle `Datensicht*.test.tsx` laufen unverändert grün, und ein eigener
@@ -64,7 +64,7 @@ pnpm laufen über `mise exec -- …`.
   Wahl von Hand räumt die Markierung.
   Nachweis: Vitest „Deeplink bei aktivem Filter“ (zusammen mit dem Aufrufer, siehe 4.4) und „Wahl
   von Hand“.
-- [ ] 3.5 Zufluss über `useZuflussSchleuse` und die flache `baumSchleuse`, Sammelbanner in der
+- [ ] 3.5 Zufluss über `useZuflussSchleuse` und `flachZufluss`, Sammelbanner in der
   Standzeile über der Liste.
   Nachweis: Vitest „Neuer Eintrag unter dem Zeiger“, „Banner einfügen“ und „Ohne Zeiger und
   Fokus“; Touch hält nicht.

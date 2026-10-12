@@ -266,8 +266,12 @@ Die Liste hält Menge und Folge, solange Fokus oder ein Maus- bzw. Stiftzeiger i
   Zeigerbedingung, Ausnahme für Portal-Menüs, „erst die Bewegung zählt“, Wortlaut des
   Sammelbanners). Sie kommt nach `components/useZuflussSchleuse.ts`, und `Datensicht` wie
   `ListeDetail` nutzen sie.
-- Die Folgelogik einer flachen Liste ist `baumSchleuse` mit Knoten ohne Kinder. Es entsteht keine
-  zweite Logik (Regel „Zufluss der Datensicht“, LFH-1020).
+- Die Folgelogik einer flachen Liste ist die der flachen `Datensicht` (`flachZufluss`, gehaltene
+  Folge, Inhalt frisch, Entfallenes fällt weg), im selben Modul. Es entsteht keine zweite Logik
+  (Regel „Zufluss der Datensicht“, LFH-1020).
+- Zwei Hooks statt einem: `useZuflussSteuerung` (Zustand, `nachBenutzeraktion`) steht in der
+  `Datensicht` vor den Sortier- und Filtersettern, `useZuflussSchleuse` (Einfrieren, Bedingungen)
+  nach den gezeigten Zeilen.
 - **Unterschied zur `Datensicht`**: Das gewählte Objekt bleibt im Detail stehen, auch wenn es
   entfällt (D2). Die Liste lässt es fallen wie die `Datensicht`.
 - **Verworfen**:

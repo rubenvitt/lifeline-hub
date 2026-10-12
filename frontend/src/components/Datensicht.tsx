@@ -1,12 +1,6 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
 import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
-import type {
-  HTMLAttributes,
-  Key,
-  PointerEvent as ReactPointerEvent,
-  ReactNode,
-  TableHTMLAttributes,
-} from 'react';
+import type { HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
 import type { TableColumnType } from 'antd';
 import {
   createContext,
@@ -49,6 +43,12 @@ import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { kennungsLinkStil } from './kennungsLink';
 import { useDruckModus } from './druck/useDruckModus';
+import {
+  bannerText,
+  flachZufluss,
+  useZuflussSchleuse,
+  useZuflussSteuerung,
+} from './useZuflussSchleuse';
 import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
 import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleuse';
 
@@ -562,15 +562,7 @@ export function baumZufluss<T extends object>(args: {
   return { zeilen: zurueck(stand.gezeigt), wartend: { neu, umgehaengt, umsortiert } };
 }
 
-/** Wortlaut des Sammelbanners (Spec `datensicht-zufluss`); ohne Wartendes `null`. */
-export function bannerText(w: Omit<Wartend, 'entfallen'>): string | null {
-  const teile = [
-    w.neu === 1 ? '1 neuer Eintrag' : w.neu > 1 ? `${w.neu} neue Einträge` : null,
-    w.umgehaengt > 0 ? `${w.umgehaengt} umgehängt` : null,
-    w.umsortiert > 0 ? `${w.umsortiert} umsortiert` : null,
-  ].filter((t): t is string => t !== null);
-  return teile.length > 0 ? `${teile.join(' · ')} — anzeigen` : null;
-}
+export { bannerText };
 
 /**
  * Die EINE Quelle der gerenderten Zeilen. Flach: filtern, suchen, gruppen-sortieren, sortieren.
@@ -954,38 +946,15 @@ export default function Datensicht<T extends object, const K extends string>(
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
 
   /**
-   * DIE ZEILENSCHLEUSE (Kriterium 12). Im Zustand `gefroren` hält `folge` die Schlüsselreihenfolge
-   * beim Fokuseintritt; gerendert wird diese FOLGE, der Inhalt kommt frisch aus `daten`. Ein
-   * Statuswechsel bleibt sofort sichtbar, die Zeile wandert nicht. (Die frischen Zeilen auf die
-   * gefrorene Menge zu filtern gäbe den Überlebenden die NEUE Reihenfolge.)
-   *
-   * `gruppeVon` friert auch die GRUPPENZUGEHÖRIGKEIT ein: sonst hinge ein Live-Statuswechsel die
-   * Karte unter einen anderen Gruppenkopf um. Bis zum Auftauen bleibt sie unter dem alten Kopf.
-   *
-   * Drei Zustände statt `readonly Key[] | null`: eine Zeile, die von SELBST wegrutscht, ist der
-   * verbotene Sprung; eine Neuordnung, die der Benutzer angestoßen hat (Sortierklick, Suche,
-   * Filter, Banner), muss sofort sichtbar sein. `'neu'` ist ein AUFTRAG, neu einzufrieren, den der
-   * Layout-Effekt mit der neu geordneten Folge erfüllt. Das Einfrieren beim Fokuseintritt geschieht
-   * SYNCHRON im Handler.
+   * DIE ZEILENSCHLEUSE (Kriterium 12): Zustand und Benutzeraktion aus `useZuflussSteuerung`
+   * (`components/useZuflussSchleuse.ts`), damit `ListeDetail` dieselbe Schleuse trägt. Hier, vor den
+   * Settern, weil jede Sortier-, Such- und Filteränderung `nachBenutzeraktion` ruft.
    */
-  type Schleuse =
-    | { art: 'offen' }
-    | { art: 'neu' }
-    | {
-        art: 'gefroren';
-        folge: readonly Key[];
-        gruppeVon: ReadonlyMap<Key, string>;
-        /** Im Baum die gezeigten Wurzelzeilen MIT ihren Kindern (LFH-1020); flach `null`. */
-        gerippe: readonly T[] | null;
-      };
-  const [schleuse, setSchleuse] = useState<Schleuse>({ art: 'offen' });
+  const zuflussSteuerung = useZuflussSteuerung<T>();
+  const { stand: schleuse, nachBenutzeraktion } = zuflussSteuerung;
   const gefroren = schleuse.art === 'gefroren' ? schleuse.folge : null;
   const gefroreneGruppeVon = schleuse.art === 'gefroren' ? schleuse.gruppeVon : null;
   const gefrorenesGerippe = schleuse.art === 'gefroren' ? schleuse.gerippe : null;
-
-  const nachBenutzeraktion = useCallback(() => {
-    setSchleuse((vorher) => (vorher.art === 'offen' ? vorher : { art: 'neu' }));
-  }, []);
 
   // ── Zustand: Voreinstellung ODER kontrolliert, nie beides ──────────────────────────
   const [eigeneSortierung, setEigeneSortierung] = useState<Sortierung<K>>(standardSortierung);
@@ -1236,46 +1205,9 @@ export default function Datensicht<T extends object, const K extends string>(
       });
       return { sichtbareZeilen: z.zeilen, banner: bannerText(z.wartend) };
     }
-    const nachSchluessel = new Map(zeilen.map((z) => [schluessel(z), z]));
-    const gefrorenMenge = new Set(gefroren);
-    const neu = zeilen.filter((z) => !gefrorenMenge.has(schluessel(z))).length;
-    return {
-      // Entfallene Schlüssel fallen sofort weg; die Schleuse hält nur Zuwachs zurück.
-      sichtbareZeilen: gefroren
-        .map((k) => nachSchluessel.get(k))
-        .filter((z): z is T => z !== undefined),
-      banner: bannerText({ neu, umgehaengt: 0, umsortiert: 0 }),
-    };
+    const flach = flachZufluss(gefroren, zeilen, schluessel);
+    return { sichtbareZeilen: flach.zeilen, banner: flach.banner };
   }, [gefroren, druckt, gefrorenesGerippe, baumKinder, zeilen, schluessel]);
-
-  /**
-   * Erfüllt den `'neu'`-Auftrag mit `useLayoutEffect`: ein nachgelagerter Effekt ließe genau EINEN
-   * Bildaufbau zwischen Benutzeraktion und erneutem Einfrieren, in dem ein Datenstand
-   * durchrutschen könnte.
-   */
-  /**
-   * Der eingefrorene Stand, Folge UND Gruppenzugehörigkeit. Beide Einfrierstellen (`'neu'`-Auftrag
-   * und {@link betreten}) gehen hierdurch, damit keine die Gruppen vergisst.
-   */
-  const standJetzt = useCallback(
-    (): {
-      folge: readonly Key[];
-      gruppeVon: ReadonlyMap<Key, string>;
-      gerippe: readonly T[] | null;
-    } => ({
-      folge: zeilen.map(schluessel),
-      gruppeVon: new Map(
-        gruppen ? zeilen.map((z) => [schluessel(z), gruppen.schluessel(z)] as const) : [],
-      ),
-      gerippe: baumKinder ? zeilen : null,
-    }),
-    [zeilen, schluessel, gruppen, baumKinder],
-  );
-
-  useLayoutEffect(() => {
-    if (schleuse.art !== 'neu') return;
-    setSchleuse({ art: 'gefroren', ...standJetzt() });
-  }, [schleuse, standJetzt]);
 
   /**
    * Im Servermodus kommt die Antwort auf Suche, Filter oder Sortierklick erst nach der
@@ -1290,103 +1222,15 @@ export default function Datensicht<T extends object, const K extends string>(
     nachBenutzeraktion();
   }, [serverStand, nachBenutzeraktion]);
 
-  /**
-   * DIE LEERE LADEANSICHT FRIERT NICHT EIN: wer den Fokus vor der ersten Antwort ins Suchfeld setzt,
-   * fröre eine LEERE Folge ein, und die erste Lieferung landete hinter dem Sammelbanner. Ohne
-   * gerenderte Zeile kann nichts unter dem Cursor wegrutschen.
-   *
-   * Nicht auf `ladend` gaten: ein Query, der auf `[]` auflöst und per SSE nachbekommt, hat
-   * `ladend === false` bei leerer Menge. `zeilen` ist die ehrliche Quelle. Der `'neu'`-Pfad braucht
-   * die Bedingung nicht: {@link nachBenutzeraktion} ist aus `'offen'` ein No-op.
-   *
-   * Bleibt der Fokus nach dem Eintreffen in der Werkzeugzeile, ist die Schleuse offen, bis zum
-   * nächsten Fokuseintritt (`focusin` bubbelt, der Sprung Suchfeld → Zeilenlink genügt). Ein
-   * Einfrieren beim ersten Datenstand fröre ausgerechnet die erwartete Lieferung ein.
-   */
-  const schliessen = useCallback(() => {
-    if (zufluss !== 'sammelbanner') return;
-    if (zeilen.length === 0) return;
-    // SYNCHRON im Handler: die jetzt sichtbare Folge ist die richtige.
-    setSchleuse((vorher) =>
-      vorher.art === 'offen' ? { art: 'gefroren', ...standJetzt() } : vorher,
-    );
-  }, [zufluss, zeilen.length, standJetzt]);
-
-  /**
-   * ZWEI BEDINGUNGEN, wie im Gerüst `HaengenderBaum` (LFH-1020, Spec `datensicht-zufluss`): Fokus
-   * ODER ein Maus- bzw. Stiftzeiger über der Sicht schließt; offen erst, wenn keine mehr gilt. Wer
-   * mit der Maus auf eine Zeile zielt, hat oft noch nicht geklickt.
-   */
-  const bedingung = useRef({ zeiger: false, fokus: false });
-  const pruefeOffen = useCallback(() => {
-    if (!bedingung.current.zeiger && !bedingung.current.fokus) setSchleuse({ art: 'offen' });
-  }, []);
-
-  const betreten = useCallback(() => {
-    bedingung.current.fokus = true;
-    schliessen();
-  }, [schliessen]);
-
-  /**
-   * ERST DIE BEWEGUNG ZÄHLT, nicht `pointerenter`: Chromium meldet das Betreten auch, wenn Inhalt
-   * unter einem ruhenden Zeiger auftaucht. Baut sich eine Seite in Stufen auf (Stellen, dann
-   * Abschnitte), hielte die Schleuse sonst die zweite Lieferung hinter dem Banner, obwohl niemand
-   * zielt. Wer zielt, bewegt den Zeiger. Die Bewegung schließt auch, wenn die Sicht beim Betreten
-   * noch leer war: die erste Lieferung steht dann schon da, die nächste rückt nicht mehr.
-   *
-   * Touch zählt nicht: ein Tipp betritt und verlässt die Sicht; nach dem Tipp hält der Fokus.
-   */
-  const offenJetzt = useRef(true);
-  useLayoutEffect(() => {
-    offenJetzt.current = schleuse.art === 'offen';
+  // Einfrieren, Fokus- und Zeigerbedingung: `useZuflussSchleuse` (Spec `datensicht-zufluss`).
+  const zuflussBereich = useZuflussSchleuse(zuflussSteuerung, {
+    zeilen,
+    schluessel,
+    aktiv: zufluss === 'sammelbanner',
+    gruppeVon: gruppen?.schluessel,
+    mitGerippe: baumKinder != null,
+    wurzel,
   });
-  const zeigerBewegt = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.pointerType === 'touch') return;
-      if (bedingung.current.zeiger && !offenJetzt.current) return;
-      bedingung.current.zeiger = true;
-      schliessen();
-    },
-    [schliessen],
-  );
-  const zeigerRaus = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.pointerType === 'touch') return;
-      bedingung.current.zeiger = false;
-      pruefeOffen();
-    },
-    [pruefeOffen],
-  );
-
-  /**
-   * `focusout` feuert auch beim Sprung von der Titelzelle zum Aktionsknopf derselben Sicht; ohne
-   * `contains`-Prüfung taute die Schleuse genau beim Bedienen auf.
-   */
-  const pruefeVerlassen = useCallback(
-    (ziel: EventTarget | null) => {
-      if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
-      /**
-       * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN. Menüs (Statuswahl, `weitere`) liegen in einem
-       * PORTAL an `document.body`, und antds `autoFocus` schiebt den Fokus dorthin; ohne diesen Zweig
-       * taute die Schleuse, während jemand das Menü offen hält.
-       *
-       * In jsdom bleibt der Fokus beim Öffnen auf dem Auslöser: ein Test, der nur ein Menü öffnet,
-       * ist auch ohne diesen Zweig grün. Geprüft wird der Handler direkt, mit `relatedTarget` im
-       * Portal. Erkennung über antds Overlay-Klassen, weil die Overlays keinem Knoten dieser Sicht
-       * gehören. (Für den Zeiger gilt das von selbst: Reacts `pointerleave` folgt dem React-Baum,
-       * das Portal unter der Zeile liegt darin.)
-       */
-      if (
-        ziel instanceof Node &&
-        (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')
-      ) {
-        return;
-      }
-      bedingung.current.fokus = false;
-      pruefeOffen();
-    },
-    [pruefeOffen],
-  );
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
   /**
@@ -2378,14 +2222,7 @@ export default function Datensicht<T extends object, const K extends string>(
   );
 
   return (
-    <section
-      ref={wurzel}
-      aria-label={bezeichnung}
-      onFocus={betreten}
-      onBlur={(e) => pruefeVerlassen(e.relatedTarget)}
-      onPointerMove={zeigerBewegt}
-      onPointerLeave={zeigerRaus}
-    >
+    <section ref={wurzel} aria-label={bezeichnung} {...zuflussBereich}>
       {werkzeugzeile}
       {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
