@@ -54,7 +54,7 @@ Priorität und Richtung stehen.
 1. Im Reiter „Einzelaufträge“ die Ansicht „Offen“ oder „Abgeschlossen“ wählen. Bei Bedarf im
    Suchfeld „Kennung, Text oder Empfänger“ suchen, eine Richtung wählen oder „Empfänger filtern“.
 
-   ![Einzelaufträge mit der Liste der offenen Aufträge links und dem gewählten Auftrag rechts, darin „Bearbeitung beginnen“, „Vollzug melden“, dem Menü der weiteren Aktionen und „Quittung offen:“ mit „Quittieren“](../bilder/auftraege-befehle/auftraege-liste.png)
+   ![Einzelaufträge mit der Liste der offenen Aufträge links und dem gewählten Auftrag rechts, darin „Bearbeitung beginnen“, „Vollzug melden“, dem Menü der weiteren Aktionen, „Quittung offen:“ mit „Quittieren“ und unten „Druckansicht“](../bilder/auftraege-befehle/auftraege-liste.png)
 
 2. Einen Auftrag in der Liste wählen. Auf breitem Bildschirm steht er rechts neben der Liste, auf
    schmalem klappt er unter seiner Karte auf.
