@@ -54,7 +54,7 @@ stehen in der neuen Fähigkeit.)
 
 ## Impact
 
-- **Backend:** neue Migration `0182` mit den Tabellen `befehl_verteiler` und
+- **Backend:** neue Migration `0183` mit den Tabellen `befehl_verteiler` und
   `lagebericht_verteiler`. Ein Haken `VERTEILER` an `Dokumentart`, belegt von Befehl und
   Lagebericht, nicht von der Pressemitteilung. Neues Modul `src/vorlagendokument/verteiler.rs`
   für Laden, Ersetzen, Kopieren und Rendern. Die Empfängerprüfung und der Snapshot aus

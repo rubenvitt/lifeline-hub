@@ -3,7 +3,7 @@
 //!
 //! Der Verteiler nennt, an wen ein Dokument geht: eine geordnete Liste aus Einsatzabschnitten,
 //! Einheiten, Führungsfunktionen und externen Stellen, eine Zeile je Empfänger in einer Tabelle je
-//! Dokumentart ([`VerteilerTabelle`], Migration `0182_dokument_verteiler.sql`). Prüfung und
+//! Dokumentart ([`VerteilerTabelle`], Migration `0183_dokument_verteiler.sql`). Prüfung und
 //! Anzeigename kommen von den Auftragsempfängern (`auftrag::eingabe::validate_verteiler`,
 //! `auftrag::repo::snap_anzeige_fuer`). Der Anzeigename entsteht beim Speichern und bleibt; die
 //! Freigabe schreibt ihn ins ETB ([`build_an`], [`render_abschnitt`]), das Fortschreiben kopiert die

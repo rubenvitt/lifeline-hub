@@ -7,7 +7,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 ## 1. Backend: Tabellen und Haken (D1)
 
 - [x] 1.1 Nummer prüfen mit `git fetch origin alpha && scripts/check-migrationen.sh`. Dann
-  `migrations/0182_dokument_verteiler.sql` mit `befehl_verteiler` und `lagebericht_verteiler`
+  `migrations/0183_dokument_verteiler.sql` mit `befehl_verteiler` und `lagebericht_verteiler`
   nach D1 anlegen (CHECKs, FKs, `UNIQUE(<art>_id, reihenfolge)`, Index auf `einsatz_id`,
   Kopfkommentar mit LLH-1172 und dieser Change). Nachweis: `scripts/check-migrationen.sh` meldet
   keinen Konflikt, und `db::tests::migrationsnummern_sind_eindeutig` ist grün.

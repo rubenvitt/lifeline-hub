@@ -44,7 +44,7 @@ Entwurfsseiten binden ihr Formular als `Record<string, string>` an `useEntwurfVe
 
 ### D1 Eine Kindtabelle je Art, angesteuert über einen Haken `VERTEILER`
 
-Migration `0182_dokument_verteiler.sql` legt `befehl_verteiler` und `lagebericht_verteiler` an.
+Migration `0183_dokument_verteiler.sql` legt `befehl_verteiler` und `lagebericht_verteiler` an.
 Die Spalten sind dieselben:
 
 - `id`, `einsatz_id` (FK, CASCADE), `<art>_id` (FK, CASCADE), `reihenfolge`
@@ -221,7 +221,7 @@ Server und Schwärzung brauchen.
 
 ## Migration Plan
 
-Die Migration `0182` ist rein additiv: zwei neue Tabellen, keine Datenübernahme. Bestand und
+Die Migration `0183` ist rein additiv: zwei neue Tabellen, keine Datenübernahme. Bestand und
 Demo-Daten haben einen leeren Verteiler. Ein Rollback des Codes lässt die Tabellen unbenutzt
-stehen. Vor dem Push zeigt `scripts/check-migrationen.sh` gegen `origin/alpha`, ob `0182` noch
+stehen. Vor dem Push zeigt `scripts/check-migrationen.sh` gegen `origin/alpha`, ob `0183` noch
 frei ist.
