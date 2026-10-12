@@ -352,3 +352,60 @@ async fn beobachter_liest_kennzahlen_und_einzelabruf_wie_die_liste() {
         assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
     }
 }
+
+/// Oxgob5gk, D9: `q` sucht in Kennung, Text und Empfänger, auch in den Kennzahlen; nur
+/// Leerzeichen ist keine Suche, mehr als 200 Zeichen sind ein Feldfehler.
+#[tokio::test]
+async fn suche_q_wirkt_in_liste_und_kennzahlen_und_ist_begrenzt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let alle = anlegen(&app, &admin, e, 3, "intern").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&auftrag("Keller auspumpen", "intern")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let keller = v["id"].as_i64().unwrap();
+    abnehmen(&pool, &[alle[0]], |_| "2026-10-01 10:00:00".into()).await;
+
+    let basis = format!("/api/einsaetze/{e}/auftraege");
+    let (s, v) = get(&app, &admin, &format!("{basis}?q=keller")).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(ids(&v), vec![keller]);
+    let (_, v) = get(&app, &admin, &format!("{basis}?q=%231")).await;
+    assert_eq!(ids(&v), vec![alle[0]], "Kennung #1");
+    let (_, v) = get(&app, &admin, &format!("{basis}?phase=abgeschlossen&q=%231")).await;
+    assert_eq!(ids(&v), vec![alle[0]]);
+    let (_, k) = get(&app, &admin, &format!("{basis}/kennzahlen?q=keller")).await;
+    assert_eq!(k, json!({ "offen": 1, "abgeschlossen": 0 }));
+
+    // Nur Leerzeichen: wie ohne `q`.
+    let (s, v) = get(&app, &admin, &format!("{basis}?q=%20%20%20")).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(ids(&v).len(), 4);
+    let (_, k) = get(&app, &admin, &format!("{basis}/kennzahlen?q=%20")).await;
+    assert_eq!(k, json!({ "offen": 3, "abgeschlossen": 1 }));
+
+    let lang = "x".repeat(201);
+    for pfad in [
+        format!("{basis}?q={lang}"),
+        format!("{basis}/kennzahlen?q={lang}"),
+    ] {
+        let (s, v) = get(&app, &admin, &pfad).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+        assert!(
+            v["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("q darf höchstens 200"),
+            "{v}"
+        );
+    }
+    let (s, _) = get(&app, &admin, &format!("{basis}?q={}", "x".repeat(200))).await;
+    assert_eq!(s, StatusCode::OK, "200 Zeichen gehen");
+}

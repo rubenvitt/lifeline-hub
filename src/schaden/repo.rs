@@ -155,20 +155,6 @@ enum Bind {
     Zahl(i64),
 }
 
-/// Maskiert `%`, `_` und `\` für `LIKE … ESCAPE '\'`.
-fn like_muster(begriff: &str) -> String {
-    let mut m = String::with_capacity(begriff.len() + 2);
-    m.push('%');
-    for c in begriff.chars() {
-        if matches!(c, '%' | '_' | '\\') {
-            m.push('\\');
-        }
-        m.push(c);
-    }
-    m.push('%');
-    m
-}
-
 /// WHERE-Ergänzungen (nach `s.einsatz_id = ?`) samt Bindwerten in textueller Reihenfolge.
 /// `mit_status = false` lässt den Statusfilter weg (Kennzahlen zählen je Status).
 fn filter_bedingung(f: &SchadenFilter, mit_status: bool) -> (String, Vec<Bind>) {
@@ -215,7 +201,7 @@ fn filter_bedingung(f: &SchadenFilter, mit_status: bool) -> (String, Vec<Bind>) 
              OR s.ort LIKE ? ESCAPE '\\' OR s.beschreibung LIKE ? ESCAPE '\\' \
              OR COALESCE(gpe.snap_name, go.name, s.geschaedigt_kontakt, '') LIKE ? ESCAPE '\\')",
         );
-        let m = like_muster(begriff);
+        let m = crate::db::suche::like_muster(begriff);
         // Vier Platzhalter, vier Bindungen (positionell, wie alle übrigen).
         for _ in 0..4 {
             werte.push(Bind::Text(m.clone()));

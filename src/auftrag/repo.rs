@@ -255,6 +255,9 @@ pub struct AuftragFilter<'a> {
     pub bereich: Option<&'a EmpfaengerBereich>,
     pub phase: Option<crate::kommunikation::ListenPhase>,
     pub seite: Option<crate::kommunikation::Seite>,
+    /// Suchbegriff (getrimmt, nicht leer): Teil der Kennung „#n“, des Auftragstexts oder der
+    /// Anzeige eines Empfängers.
+    pub suche: Option<&'a str>,
 }
 
 /// WHERE-Ergänzungen (ohne Cursor) samt Bindwerten in textueller Reihenfolge.
@@ -303,6 +306,21 @@ fn filter_bedingung(f: &AuftragFilter<'_>) -> (String, Vec<FilterWert>) {
         );
         werte.push(FilterWert::Text(b.abschnitte_json.clone()));
         werte.push(FilterWert::Text(b.einheiten_json.clone()));
+    }
+    if let Some(begriff) = f.suche {
+        // Kennung „#12“, Auftragstext und die Anzeige jedes Empfängers (`src/AGENTS.md`, Suche
+        // der geblätterten Listen). Drei Platzhalter, drei Bindungen. Ein Auftrag von vor 0067
+        // hat keine Nummer: `printf('#%d', NULL)` ergäbe „#0“ und träfe die Suche nach „0“.
+        sql.push_str(
+            " AND ((a.lfd_nr IS NOT NULL AND printf('#%d', a.lfd_nr) LIKE ? ESCAPE '\\') \
+             OR a.auftrag_text LIKE ? ESCAPE '\\' \
+             OR EXISTS (SELECT 1 FROM auftrag_empfaenger se WHERE se.auftrag_id = a.id \
+               AND se.snap_anzeige LIKE ? ESCAPE '\\'))",
+        );
+        let m = crate::db::suche::like_muster(begriff);
+        for _ in 0..3 {
+            werte.push(FilterWert::Text(m.clone()));
+        }
     }
     (sql, werte)
 }
@@ -409,17 +427,19 @@ pub async fn liste_gefiltert(
 }
 
 /// Kennzahlen des Auftragsboards (LFH-1071, D3): EINE gruppierte Abfrage über dieselben
-/// Fragmente wie die Liste, mit deren Richtungs- und Empfängerfilter (ohne Status, Phase und
-/// Seite). Bind-Reihenfolge: `einsatz_id`, Filter.
+/// Fragmente wie die Liste, mit deren Richtungs-, Empfänger- und Suchfilter (ohne Status, Phase
+/// und Seite). Bind-Reihenfolge: `einsatz_id`, Filter.
 pub async fn kennzahlen(
     pool: &SqlitePool,
     einsatz_id: i64,
     richtung: Option<&str>,
     empfaenger: Option<&EmpfaengerFilter>,
+    suche: Option<&str>,
 ) -> Result<super::AuftragKennzahlen, AppError> {
     let (bedingung, werte) = filter_bedingung(&AuftragFilter {
         richtung,
         empfaenger,
+        suche,
         ..Default::default()
     });
     let sql = format!(
@@ -2152,5 +2172,159 @@ mod tests {
             );
         }
         assert!(empfaenger_von_allen(&pool, &[]).await.unwrap().is_empty());
+    }
+
+    /// Kennungen der Treffer einer Suche, in Listenordnung.
+    async fn treffer(pool: &SqlitePool, e: i64, filter: &AuftragFilter<'_>) -> Vec<i64> {
+        liste_gefiltert(pool, e, filter, "2026-06-11 10:00:00")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|d| d.auftrag.id)
+            .collect()
+    }
+
+    fn suche(begriff: &str) -> AuftragFilter<'_> {
+        AuftragFilter {
+            suche: Some(begriff),
+            ..Default::default()
+        }
+    }
+
+    /// Oxgob5gk, D9: die Suche trifft Text, Empfänger und Kennung „#n“, ohne Rücksicht auf
+    /// ASCII-Groß-/Kleinschreibung; `%` und `_` suchen wörtlich.
+    #[tokio::test]
+    async fn suche_trifft_text_empfaenger_und_kennung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut ids = Vec::new();
+        for (text, empf) in [
+            ("Keller auspumpen", "EA Nord"),
+            ("Straße sperren", "Polizei Süd"),
+            ("50% Wasser abpumpen", "EA Nord"),
+            ("50 Prozent Wasser abpumpen", "EA Nord"),
+            ("500 Liter bereitstellen", "EA Nord"),
+            ("Pumpe a_b holen", "EA Nord"),
+            ("Pumpe axb holen", "EA Nord"),
+        ] {
+            let d = anlegen(
+                &pool,
+                e,
+                b,
+                daten(text, None, vec![funktion(empf)]),
+                "2026-06-11 09:00:00",
+            )
+            .await
+            .unwrap();
+            ids.push(d.auftrag.id);
+        }
+        // Bis #12 auffüllen, damit die Kennung eindeutig ist.
+        while ids.len() < 12 {
+            let d = anlegen(
+                &pool,
+                e,
+                b,
+                daten("Füllung", None, vec![funktion("EA Nord")]),
+                "2026-06-11 09:00:00",
+            )
+            .await
+            .unwrap();
+            ids.push(d.auftrag.id);
+        }
+
+        assert_eq!(treffer(&pool, e, &suche("keller")).await, vec![ids[0]]);
+        assert_eq!(treffer(&pool, e, &suche("KELLER")).await, vec![ids[0]]);
+        assert_eq!(treffer(&pool, e, &suche("polizei")).await, vec![ids[1]]);
+        assert_eq!(treffer(&pool, e, &suche("#12")).await, vec![ids[11]]);
+        assert_eq!(treffer(&pool, e, &suche("50%")).await, vec![ids[2]]);
+        assert_eq!(treffer(&pool, e, &suche("a_b")).await, vec![ids[5]]);
+        assert!(treffer(&pool, e, &suche("nirgends")).await.is_empty());
+        // Ohne Nummer (Altbestand vor 0067) trifft keine Kennungssuche, auch nicht „#0“.
+        sqlx::query("UPDATE auftrag SET lfd_nr = NULL WHERE id = ?")
+            .bind(ids[6])
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(treffer(&pool, e, &suche("#0")).await.is_empty());
+        // Die Suche verengt die übrigen Filter, sie ersetzt sie nicht.
+        assert!(treffer(
+            &pool,
+            e,
+            &AuftragFilter {
+                suche: Some("keller"),
+                richtung: Some("extern"),
+                ..Default::default()
+            }
+        )
+        .await
+        .is_empty());
+    }
+
+    /// Oxgob5gk, D9: die Suche wirkt vor dem `LIMIT` — der älteste von 150 Abgeschlossenen steht
+    /// auf der ersten Seite, wenn nach seinem Text gesucht wird; die Kennzahlen zählen nur Treffer.
+    #[tokio::test]
+    async fn suche_wirkt_vor_der_seite_und_in_den_kennzahlen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut ids = Vec::new();
+        for i in 0..150 {
+            let text = if i == 0 {
+                "Ältester Sandsackauftrag".to_string()
+            } else {
+                format!("Auftrag {i}")
+            };
+            let d = anlegen(
+                &pool,
+                e,
+                b,
+                daten(&text, None, vec![funktion("EA")]),
+                "2026-06-11 09:00:00",
+            )
+            .await
+            .unwrap();
+            ids.push(d.auftrag.id);
+        }
+        for (i, id) in ids.iter().enumerate() {
+            sqlx::query("UPDATE auftrag SET abgenommen_at = ? WHERE id = ?")
+                .bind(format!("2026-06-11 {:02}:{:02}:00", 8 + i / 60, i % 60))
+                .bind(id)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        // Ein offener Treffer zählt in den Kennzahlen als offen.
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten("Sandsack nachfüllen", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+
+        let seite = |s| AuftragFilter {
+            suche: s,
+            phase: Some(crate::kommunikation::ListenPhase::Abgeschlossen),
+            seite: Some(crate::kommunikation::Seite {
+                vor: None,
+                limit: 100,
+            }),
+            ..Default::default()
+        };
+        let ohne = treffer(&pool, e, &seite(None)).await;
+        assert_eq!(ohne.len(), 100);
+        assert!(!ohne.contains(&ids[0]), "ohne Suche nicht auf Seite 1");
+        assert_eq!(
+            treffer(&pool, e, &seite(Some("sandsackauftrag"))).await,
+            vec![ids[0]]
+        );
+
+        let k = kennzahlen(&pool, e, None, None, Some("sandsack"))
+            .await
+            .unwrap();
+        assert_eq!((k.offen, k.abgeschlossen), (1, 1));
+        let k = kennzahlen(&pool, e, None, None, None).await.unwrap();
+        assert_eq!((k.offen, k.abgeschlossen), (1, 150));
     }
 }
