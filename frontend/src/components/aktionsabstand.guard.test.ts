@@ -107,7 +107,13 @@ const MIT_NACHBARSCHAFT = [
  * behauptete das Gegenteil des Wahren. Die Zusicherung steht deshalb als Kommentar in der Karte
  * selbst; der Test unten pinnt beide Hälften.
  */
-const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx'];
+const BEWERTET_OHNE_SCANNER_DECKUNG = [
+  'nachforderungen/NachforderungKarte.tsx',
+  // LLH-1098: „Auftrag aufheben“ (`danger`) neben „Vollzug melden“ bzw. „Abnehmen“, gespreizt aus
+  // `{aktionen}` und `weitere.map` in ein `<Space size="middle">`; ab drei Aktionen steht es rot
+  // hinter dem Trenner des Menüs.
+  'auftraege/AuftragKarte.tsx',
+];
 
 /**
  * Bewertet, aber OHNE Nachbarschaft: die destruktive Aktion steht allein. Mitgescannt, damit

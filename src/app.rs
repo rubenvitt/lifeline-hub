@@ -471,7 +471,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/auftraege/{aid}",
-            get(routes::auftrag::detail),
+            get(routes::auftrag::detail).patch(routes::auftrag::berichtigen),
         )
         .route(
             "/api/einsaetze/{id}/auftraege",
@@ -488,6 +488,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/auftraege/{aid}/abnehmen",
             post(routes::auftrag::abnehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/auftraege/{aid}/aufheben",
+            post(routes::auftrag::aufheben),
         )
         // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(

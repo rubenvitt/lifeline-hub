@@ -543,3 +543,79 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     await waitFor(() => expect(screen.getByLabelText('Empfänger')).toHaveFocus());
   });
 });
+
+describe('AuftragFormular — Berichtigen (LLH-1098)', () => {
+  const auftrag = {
+    id: 1,
+    lfd_nr: 4,
+    auftrag_text: 'Sandsäcke zum Deich',
+    absicht: null,
+    lage: null,
+    ort: null,
+    zeit: null,
+    mittel: 'LKW',
+    verbindung: null,
+    sicherheit: null,
+    prioritaet: 'normal',
+    richtung: 'intern',
+    frist_at: null,
+    erteilt_at: '2026-10-12 12:00:00',
+    empfaenger: [
+      {
+        id: 1,
+        empfaenger_typ: 'einheit',
+        einheit_id: 2,
+        snap_anzeige: 'LZ 1',
+        quittiert_at: null,
+      },
+    ],
+  } as unknown as Parameters<typeof AuftragFormular>[0]['berichtigen'] extends infer B
+    ? B extends { auftrag: infer A }
+      ? A
+      : never
+    : never;
+
+  it('belegt vor, heißt „Berichtigung speichern“ und sendet nur das Geänderte', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    rendern({ berichtigen: { auftrag, onSpeichern }, onFertig });
+    const text = screen.getByLabelText('Auftrag / Was');
+    expect(text).toHaveValue('Sandsäcke zum Deich');
+    expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).toBeNull();
+    await userEvent.clear(text);
+    await userEvent.type(text, 'Sandsäcke zum Deich Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith({ auftrag_text: 'Sandsäcke zum Deich Nord' }),
+    );
+    await waitFor(() => expect(onFertig).toHaveBeenCalled());
+  });
+
+  it('sendet ohne Änderung nichts und schließt', async () => {
+    const onSpeichern = vi.fn();
+    const onFertig = vi.fn();
+    rendern({ berichtigen: { auftrag, onSpeichern }, onFertig });
+    await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+    await waitFor(() => expect(onFertig).toHaveBeenCalled());
+    expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  it('ein geleertes Schemafeld geht als null', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    rendern({ berichtigen: { auftrag, onSpeichern } });
+    await openAusfuehrung();
+    await userEvent.clear(screen.getByLabelText('Mittel / Womit'));
+    await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ mittel: null }));
+  });
+
+  /** LLH-1091: der Weg ist ein Schemafeld wie die übrigen und lässt sich berichtigen. */
+  it('ein geänderter Weg geht als weg, sonst nichts', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    rendern({ berichtigen: { auftrag, onSpeichern } });
+    await openAusfuehrung();
+    await userEvent.type(screen.getByLabelText('Weg'), ' über B 3 ');
+    await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ weg: 'über B 3' }));
+  });
+});

@@ -392,6 +392,7 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
               (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
             ),
           );
+    const bilanzMenge = anTeilbaum.filter((a) => a.bearbeitungsstatus !== 'aufgehoben');
     const eigeneLage = abschnitt?.lagezustand ?? null;
     let unterLage: AbschnittLagezustand | null = null;
     for (const uid of abschnittIds) {
@@ -410,9 +411,10 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       staerkeText: staerkeText(knoten.staerke),
       einheitenStatus: einheitenVerteilung(einheitIds.map((eid) => einheitNachId.get(eid))),
       auftraege: offen.filter((a) => anTeilbaum.includes(a)),
+      // Ein aufgehobener Auftrag ist weder erledigt noch Teil der Arbeit (LLH-1098).
       auftragsbilanz: {
-        erledigt: anTeilbaum.filter((a) => !istOffen(a)).length,
-        gesamt: anTeilbaum.length,
+        erledigt: bilanzMenge.filter((a) => !istOffen(a)).length,
+        gesamt: bilanzMenge.length,
       },
       kurzbezeichnung: abschnitt?.kurzbezeichnung ?? null,
       lagezustand: eigeneLage,

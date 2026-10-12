@@ -1,3 +1,79 @@
+## [1.0.0-alpha.113](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.112...v1.0.0-alpha.113) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Aufträge haben neue Felder für Zeitpunkt, Person und Grund einer Aufhebung.
+- **Neuer Auftragsstatus „Aufgehoben“:** Schnittstellen, die den Bearbeitungsstatus eines Auftrags auswerten, müssen diesen Wert kennen. Ein aufgehobener Auftrag gilt als abgeschlossen. Er zählt nie als offen und nie als überfällig.
+- **Neue Schnittstellen:** Mit der einen wird ein Auftrag aufgehoben, mit der anderen berichtigt. Neu ist auch die Angabe am Auftrag, ob er noch berichtigt werden kann. Abschnittsgeräte können keine der beiden Schnittstellen nutzen.
+
+### Aufträge und Befehle
+
+- **Erteilten Auftrag aufheben:** An der Auftragskarte gibt es den roten Knopf „Auftrag aufheben“. Bei drei oder mehr Aktionen steht er im Menü. Ein Dialog fragt nach dem Grund, der Pflicht ist und bis zu 2 000 Zeichen lang sein darf. Die Aufhebung lässt sich nicht rückgängig machen. Bereits abgenommene oder schon aufgehobene Aufträge lassen sich nicht aufheben.
+- **Aufgehobene Aufträge:** Die Karte zeigt Zeitpunkt, Person und Grund der Aufhebung. Quittung, Vollzugsmeldung und Abnahme nimmt ein aufgehobener Auftrag nicht mehr an. Das gilt auch, wenn jemand gleichzeitig aufhebt und meldet.
+- **Auftrag vor der ersten Quittung berichtigen:** „Berichtigen“ öffnet das Auftragsformular mit den bisherigen Werten. Auftragstext, Empfänger, Priorität, Frist und Befehlsschema lassen sich ändern, und nur geänderte Felder werden übernommen. Hat ein Empfänger quittiert, ist „Berichtigen“ gesperrt und zeigt den Grund dafür. Empfänger, die das Formular nicht darstellen kann, stehen gesperrt im Formular.
+- **Darstellung und Zählung:** Der Status „Aufgehoben“ erscheint bei den abgeschlossenen Aufträgen in neutraler Farbe und nicht wie ein erledigter Auftrag. In der Bilanz der Abschnitte im Überblick zählen aufgehobene Aufträge nicht mit.
+- **Erinnerung „Quittierfrist“:** Beim Aufheben wird die Erinnerung geschlossen. Beim Berichtigen folgt sie der geänderten Frist.
+
+### Einsatztagebuch
+
+- Wird ein Auftrag aufgehoben, steht automatisch die Anordnung „Auftrag #N aufgehoben: <Grund>“ im Einsatztagebuch. Das gilt auch, wenn der automatische ETB-Eintrag sonst abgeschaltet ist.
+- Eine Berichtigung schreibt die Anordnung „Auftrag #N geändert: …“ mit neuem und altem Wert ins Einsatztagebuch. Bei geänderten Feldern des Befehlsschemas steht nur der Feldname im Eintrag. Ohne echte Änderung entsteht kein Eintrag.
+
+### Dokumentation
+
+- Das Kapitel „Aufträge und Befehle“ beschreibt jetzt, wie man einen Auftrag berichtigt oder aufhebt und was dabei mit der Erinnerung und dem Einsatztagebuch passiert. Neue Bilder in hellem und dunklem Design zeigen die Auftragsliste und den Dialog „Auftrag aufheben“.
+
+## [1.0.0-alpha.112](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.111...v1.0.0-alpha.112) (2026-10-12)
+
+### Betrieb und Installation
+
+- **Releases erscheinen wieder regulär:** Seit Version 1.0.0-alpha.110 blieben Releases als Entwurf liegen, weil der Bau für macOS (Apple Silicon) abbrach. Der Fehler ist behoben, die Pakete für alle Plattformen werden wieder veröffentlicht.
+- **Bilder im HEIC-Format:** Die Komponente, die HEIC-Fotos öffnet (etwa von iPhones), ist auf eine neuere Fassung gehoben. Die mitgelieferten Lizenz- und Quellenhinweise sind daran angepasst.
+- **Neuere Fremdkomponenten:** Die Kartendarstellung, die Zeichenwerkzeuge der Lagekarte, die Desktop-Anwendung samt Update-Funktion und die Serverbasis nutzen jetzt neuere Fassungen ihrer Bibliotheken.
+
+## [1.0.0-alpha.111](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.110...v1.0.0-alpha.111) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Koordinaten des Einsatzorts werden geprüft:** Beim Anlegen und Ändern eines Einsatzes nimmt der Server die Koordinate nur noch als vollständiges Paar an. Fehlt ein Wert, antwortet er mit 422, liegt ein Wert außerhalb des gültigen Bereichs, mit 400. Bisher wurde jeder Wert ungeprüft gespeichert. Der Einsatzort selbst darf höchstens 500 Zeichen lang sein.
+- **Neue Felder beim Anlegen eines Einsatzes:** Die Schnittstelle zum Anlegen nimmt jetzt auch den Einsatzort und dessen Koordinate an.
+- **Andere Berechtigung für die Ortssuche im Einsatz:** Die Adresssuche im Einsatz verlangt jetzt das Recht auf die Einsatzdaten statt auf die Lagekarte. Für das Anlegen eines Einsatzes gibt es zusätzlich eine Ortssuche auf Ebene der Organisation. Sie steht Admins und Führungskräften zur Verfügung und nutzt den Geocoder der eigenen Organisation.
+- **Einsatzdaten ohne Vollformular:** Die Schaltfläche „Bearbeiten“ mit dem großen Formular gibt es nicht mehr. Jede Angabe wird direkt an ihrem Wert bearbeitet.
+
+### Einsatzdaten
+
+- **Neue Gliederung:** Die Angaben stehen in den Paneelen „Einsatz“, „Einsatzort“, „Erstmeldung“ und „Eigene Führungsstelle“. Auf breiten Bildschirmen stehen sie zweispaltig, jede Angabe genau einmal.
+- **Kennungen im Seitenkopf:** Einsatznummer und Leitstellen-Nummer stehen jetzt oben im Seitenkopf. Den Klappbereich „Technische Angaben“ gibt es nicht mehr.
+- **Bezeichnung und Koordinate direkt bearbeiten:** Beide sind jetzt eigene Zeilen. Eine unlesbare Koordinate wird nicht gespeichert. Das Feld ist dann als fehlerhaft markiert, nennt den Grund auch für Screenreader und behält den Fokus.
+- **Zugriff in den Einstellungen:** Die Mitgliederverwaltung ist aus den Einsatzdaten in die Einsatz-Einstellungen unter „Zugriff“ umgezogen. Die Einsatzleitung erreicht sie über „Zugriff verwalten“. Alle anderen sehen dort „Nur Ansicht · nur Einsatzleitung“. Die Rechte selbst sind unverändert.
+- **Schnellaktion „Mitglied aufnehmen“:** In einem laufenden Einsatz bietet die Sprungpalette der Einsatzleitung „Mitglied aufnehmen“ an. Die Aktion öffnet direkt die Personenauswahl.
+
+### Einsatzort und Ortssuche
+
+- **Paneel „Einsatzort“:** Adresse und Koordinate werden gemeinsam gepflegt.
+  - Die Adresssuche startet mit Enter oder mit „Ort suchen“, nie schon beim Tippen.
+  - Die Trefferliste zeigt eine Kurzadresse („Straße Nr, PLZ Ort“).
+  - Ein gewählter Treffer übernimmt Adresse und Koordinate in einem Schritt. Wird der Text danach von Hand geändert, entfällt die Koordinate.
+- **Kartenausschnitt:** Unter der Adresse zeigt eine kleine Karte den Ort mit einer Nadel. Ohne Koordinate steht dort „Nicht verortet“. Mit Lagekarten-Recht springt „Auf Lagekarte zeigen ↗“ direkt zum Ort auf der Lagekarte.
+- **Einsatzort beim Anlegen:** Der Dialog „Neuen Einsatz anlegen“ hat ein optionales Feld für den Einsatzort. Es bietet dieselbe Suche, und ein kleiner Kartenausschnitt bestätigt den gewählten Ort.
+- Die Suche im Einsatz bevorzugt Treffer in der Umgebung des Einsatzorts. Ohne Netz ist sie gesperrt.
+- Bedienung: Escape schließt zuerst nur die offene Trefferliste. Nach der Wahl eines Treffers kehrt der Fokus ins Feld zurück. Auf schmalen Handy-Bildschirmen läuft die Trefferzeile nicht mehr über den Rand.
+- Die Kopfleiste des Einsatzes zeigt den Einsatzort nur noch an. Bearbeitet wird er im Paneel.
+
+### Führung – Einsatzabschnitte
+
+- **Bearbeiten direkt in der Ansicht:** Jede Angabe eines Abschnitts wird an ihrem Wert bearbeitet. Gespeichert wird nur das geänderte Feld, so überschreibt eine Änderung nicht mehr, was ein anderer Arbeitsplatz inzwischen geändert hat.
+- **Lagezustand per Segmentleiste:** Der Lagezustand wechselt mit einem Klick. Eine Wahl während einer noch laufenden Speicherung geht nicht mehr verloren.
+- **Abschnitt anlegen:** Ein kurzer Dialog mit drei Feldern ersetzt das lange Formular. Danach ist der neue Abschnitt im Detail ausgewählt.
+- **Auflösen** geht jetzt über „Weitere Aktionen“, mit Rückfrage. Der Abschnitt verschwindet sofort aus der Ansicht.
+- Die Zeile „Über-Abschnitt“ entfällt. Ein Abschnitt wird stattdessen durch Ziehen umgehängt.
+- Leere Angaben wie Leiter, Kommunikationsmittel oder Erreichbarkeit zeigen einen Platzhalter.
+- **Fortschritt entfernt:** Detail, Sprungpalette, Funktionsansicht und Führungsüberblick zeigen keinen Fortschritt mehr. Bereits gespeicherte Werte bleiben erhalten.
+
+### Dokumentation
+
+- Die Anwenderkapitel zu Einsatzdaten, Einsatz anlegen, Rechten im Einsatz, Einstellungen und Einsatzabschnitten beschreiben die neuen Abläufe. Die Bilder wurden neu aufgenommen.
+
 ## [1.0.0-alpha.110](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.109...v1.0.0-alpha.110) (2026-10-11)
 
 ### Wichtige Änderungen

@@ -102,7 +102,7 @@ zehn Felder auf einmal bringt und die Ausführung nicht für sich erreichbar ist
 ### D3 `ort` wird „Ziel / Ort“, `absicht` wird „Absicht“, neue Spalte `weg`
 
 Entscheidung 12.10.2026. Die Spalten bleiben, es ändern sich nur Etikett und Ort im Formular.
-Neu ist allein die Spalte `weg` (Migration `0180_auftrag_weg.sql`: `ALTER TABLE auftrag ADD
+Neu ist allein die Spalte `weg` (Migration `0181_auftrag_weg.sql`: `ALTER TABLE auftrag ADD
 COLUMN weg TEXT;`, Kopfkommentar nach dem Muster von 0179, Verweis auf diese Change).
 
 Die Fehlermeldungen von Server und Formular nennen die Felder mit dem neuen Etikett: „Ziel/Ort
@@ -175,7 +175,7 @@ Speichern wirft (`vorlage(...)!`) und Editor und Druck leer blieben.
 
 ## Migration Plan
 
-- Die Migration `0180` hängt eine nullbare Spalte an, alte Zeilen tragen `NULL`. Die Nummer wird
+- Die Migration `0181` hängt eine nullbare Spalte an, alte Zeilen tragen `NULL`. Die Nummer wird
   vor dem PR gegen `origin/alpha` geprüft (`scripts/check-migrationen.sh`).
 - Kein Rückweg nötig: Ein Client ohne `weg` sendet das Feld nicht, und der Server führt es dann
   als nicht gesetzt.

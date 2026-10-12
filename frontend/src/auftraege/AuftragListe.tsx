@@ -27,6 +27,8 @@ interface AuftragListeProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  onBerichtigen?: (auftragId: number) => void;
+  onAufheben?: (auftragId: number) => void;
   /** Ab {@link AUFTRAG_SCHWELLE} Aufträgen nur den Sichtbereich rendern (LFH-949, D6). */
   fenster?: boolean;
   /**
@@ -58,6 +60,8 @@ export default function AuftragListe({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  onBerichtigen,
+  onAufheben,
   fenster = false,
   kartenFehler,
   quittierFehler,
@@ -94,6 +98,8 @@ export default function AuftragListe({
       onInArbeit={onInArbeit}
       onVollzugMelden={onVollzugMelden}
       onAbnehmen={onAbnehmen}
+      onBerichtigen={onBerichtigen}
+      onAufheben={onAufheben}
       fehlerGrund={kartenFehler?.(a.id) ?? null}
       quittierFehlerGrund={quittierFehler?.(a.id) ?? null}
     />

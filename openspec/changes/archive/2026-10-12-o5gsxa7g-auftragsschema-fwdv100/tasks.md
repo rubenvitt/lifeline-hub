@@ -6,7 +6,7 @@ Repo-Wurzelverzeichnis.
 
 ## 1. Backend: Feld „Weg“ (D3)
 
-- [x] 1.1 Migration `migrations/0180_auftrag_weg.sql` mit `ALTER TABLE auftrag ADD COLUMN weg
+- [x] 1.1 Migration `migrations/0181_auftrag_weg.sql` mit `ALTER TABLE auftrag ADD COLUMN weg
   TEXT;` und einem Kopfkommentar (LLH-1091, Verweis auf diese Change). Vorher die Nummer mit
   `git fetch origin alpha && scripts/check-migrationen.sh` gegen `origin/alpha` prüfen.
   Nachweis: `db::tests::migrationsnummern_sind_eindeutig` ist grün, und

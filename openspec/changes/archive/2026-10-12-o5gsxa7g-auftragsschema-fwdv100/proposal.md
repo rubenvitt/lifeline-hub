@@ -58,7 +58,7 @@ deckt damit „Weg“ ohne Textänderung ab; der Spiegeltest bekommt keine neue 
 ## Impact
 
 - **Backend:**
-  - Migration `0180_auftrag_weg.sql` (`ALTER TABLE auftrag ADD COLUMN weg TEXT`)
+  - Migration `0181_auftrag_weg.sql` (`ALTER TABLE auftrag ADD COLUMN weg TEXT`)
   - `src/auftrag/` (`mod.rs` `AuftragAnzeige`, `eingabe.rs` `NeuerAuftrag`/`ValidierterAuftrag`,
     `repo.rs` Daten, Select und Insert)
   - Struct-Literale in `etb`, `chat`, `meldung` und `demo/import.rs`

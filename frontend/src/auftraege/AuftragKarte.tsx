@@ -12,6 +12,7 @@ import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
 const { Text } = Typography;
@@ -55,6 +56,10 @@ interface AuftragKarteProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  /** Öffnet das Formular zum Berichtigen (LLH-1098); nur angeboten, solange `berichtigbar`. */
+  onBerichtigen?: (auftragId: number) => void;
+  /** Öffnet die Rückfrage „Auftrag aufheben“ der Liste (LLH-1098). */
+  onAufheben?: (auftragId: number) => void;
   /**
    * Grund der zuletzt abgelehnten Karten-Aktion (In Bearbeitung, Rücknahme, Abnahme), aus
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
@@ -83,6 +88,8 @@ function AuftragKarte({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  onBerichtigen,
+  onAufheben,
   fehlerGrund,
   quittierFehlerGrund,
 }: AuftragKarteProps) {
@@ -119,7 +126,10 @@ function AuftragKarte({
   // Knopf, und die Auto-Frist-Erinnerung schlösse nie.
   const sichtbareQuittierte = quittierteEmpf.slice(0, QUITTIERT_CHIP_GRENZE);
   const restQuittierte = quittierteEmpf.length - sichtbareQuittierte.length;
-  const darfQuittieren = !!(darfSchreiben && onQuittieren);
+  const aufgehoben = a.bearbeitungsstatus === 'aufgehoben';
+  // Ein aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): kein Knopf, die Zeile
+  // nennt die Unquittierten ohne „offen“.
+  const darfQuittieren = !!(darfSchreiben && onQuittieren) && !aufgehoben;
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
@@ -154,6 +164,46 @@ function AuftragKarte({
       ].filter(Boolean)
     : [];
 
+  /*
+   * Berichtigen und Aufheben (LLH-1098). Der `darfSchreiben`-Riegel steht hier, ein Callback ist
+   * kein Rechtebeleg. Berichtigen nur an einem offenen Auftrag; nach der ersten Quittung steht es
+   * gesperrt mit Grund (LFH-966), der Server liefert die Regel als `berichtigbar`. Aufheben bis
+   * zur Abnahme.
+   */
+  const kannAufheben =
+    a.bearbeitungsstatus === 'offen' ||
+    a.bearbeitungsstatus === 'in_arbeit' ||
+    a.bearbeitungsstatus === 'vollzogen';
+  const weitere: MenueEintrag<'berichtigen' | 'aufheben'>[] = darfSchreiben
+    ? [
+        ...(a.bearbeitungsstatus === 'offen' && onBerichtigen
+          ? [
+              a.berichtigbar
+                ? { key: 'berichtigen' as const, label: 'Berichtigen' }
+                : {
+                    key: 'berichtigen' as const,
+                    label: 'Berichtigen (schon quittiert)',
+                    gesperrt: true as const,
+                  },
+            ]
+          : []),
+        ...(kannAufheben && onAufheben
+          ? [
+              {
+                key: 'aufheben' as const,
+                label: AUFTRAG_HANDLUNG.aufgehoben,
+                gefahr: true as const,
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const waehle = (key: 'berichtigen' | 'aufheben') =>
+    key === 'berichtigen' ? onBerichtigen?.(a.id) : onAufheben?.(a.id);
+  // Gebündelt ab drei Aktionen nach der Rechteprüfung (LFH-365); darunter wäre ein Menü ein Umweg.
+  const buendeln = aktionen.length + weitere.length >= 3;
+  const kennung = a.lfd_nr != null ? `Auftrag #${a.lfd_nr}` : 'Auftrag';
+
   return (
     // Erteilungszeit links in Mono, darunter die Nummer; überfällig schlägt „offen" am Rand.
     // `erteilt_at`, nicht `erstellt_at` (LFH-972): ein über Funk erteilter Auftrag wird oft erst
@@ -182,6 +232,7 @@ function AuftragKarte({
             phase={status.phase}
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
+            ton={status.ton}
           />
           {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
@@ -241,7 +292,7 @@ function AuftragKarte({
       {offeneEmpf.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
           <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-            Quittung offen:
+            {aufgehoben ? 'Nicht quittiert:' : 'Quittung offen:'}
           </Text>
           {offeneEmpf.map((e) => (
             <Space key={e.id} size={4}>
@@ -283,6 +334,21 @@ function AuftragKarte({
         </div>
       )}
 
+      {aufgehoben && (
+        <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
+          <Text style={{ fontSize: 13 }}>
+            {[
+              `Aufgehoben am: ${a.aufgehoben_at ? formatZeit(a.aufgehoben_at) : '—'}`,
+              a.aufgehoben_von_name,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+          {a.aufhebungsgrund && (
+            <Text style={{ fontSize: 13 }}>{`Grund: ${a.aufhebungsgrund}`}</Text>
+          )}
+        </Space>
+      )}
       {ansicht === 'abgeschlossen' && (
         <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
           {a.vollzogen_at && (
@@ -340,9 +406,31 @@ function AuftragKarte({
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
-      {aktionen.length > 0 && (
-        <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
-          {aktionen}
+      {aktionen.length + weitere.length > 0 && (
+        <Flex justify="flex-end" style={{ marginTop: 8 }}>
+          {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
+             diese gespreizte Reihe nicht und führt die Karte unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
+          <Space size="middle" wrap>
+            {aktionen}
+            {buendeln ? (
+              <MenueAusloeser
+                eintraege={weitere}
+                zugaenglicherName={`Aktionen zu ${kennung}`}
+                onWahl={waehle}
+              />
+            ) : (
+              weitere.map((w) => (
+                <Button
+                  key={w.key}
+                  danger={w.gefahr}
+                  disabled={w.gesperrt}
+                  onClick={() => waehle(w.key)}
+                >
+                  {w.label}
+                </Button>
+              ))
+            )}
+          </Space>
         </Flex>
       )}
     </KommKarte>

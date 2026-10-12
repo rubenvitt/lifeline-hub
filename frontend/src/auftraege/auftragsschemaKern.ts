@@ -7,9 +7,10 @@
  * (D2, D3, D5).
  */
 
-/** Die Freitextfelder des Befehlsschemas am Auftrag (Wire-Namen). */
-export type SchemaFeld =
-  'mittel' | 'ort' | 'weg' | 'zeit' | 'lage' | 'absicht' | 'verbindung' | 'sicherheit';
+import type { AuftragSchemafeld } from '../api/types';
+
+/** Die Freitextfelder des Befehlsschemas am Auftrag (Wire-Namen, auch die der Berichtigung). */
+export type SchemaFeld = AuftragSchemafeld;
 
 /** Schlüssel der beiden Klappteile des Formulars. */
 export const KLAPPTEIL = { ausfuehrung: 'ausfuehrung', weitere: 'weitere' } as const;

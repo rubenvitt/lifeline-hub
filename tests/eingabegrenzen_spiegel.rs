@@ -21,6 +21,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "AUFTRAG_EXTERN_BEZEICHNUNG_MAX",
             auftrag::EXTERN_BEZEICHNUNG_MAX,
         ),
+        ("AUFTRAG_AUFHEBUNGSGRUND_MAX", auftrag::AUFHEBUNGSGRUND_MAX),
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
         ("PERSONAL_ADHOC_TEXT_MAX", personal::ADHOC_TEXT_MAX),
         (
