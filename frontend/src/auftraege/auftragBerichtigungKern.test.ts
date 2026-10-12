@@ -82,6 +82,19 @@ describe('vorbelegungAus (LLH-1098)', () => {
         .empfaengerAenderbar,
     ).toBe(false);
   });
+
+  it('sperrt die Empfänger, wenn ein Ziel aufgelöst ist (LLH-1176)', () => {
+    const { werte, empfaengerAenderbar } = vorbelegungAus(
+      auftrag({
+        empfaenger: [
+          empf({ id: 1, empfaenger_typ: 'einheit', einheit_id: null }),
+          empf({ id: 2, empfaenger_typ: 'abschnitt', abschnitt_id: 3 }),
+        ],
+      }),
+    );
+    expect(empfaengerAenderbar).toBe(false);
+    expect(werte.empfaenger).not.toContain('einheit:null');
+  });
 });
 
 describe('berichtigungAus (LLH-1098)', () => {

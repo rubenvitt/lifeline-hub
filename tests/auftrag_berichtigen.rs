@@ -561,3 +561,65 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": liste })).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
 }
+
+/// LLH-1176: Zwei aufgelöste Empfänger-Einheiten hinterlassen zwei gleiche Zeilen (ohne Ziel). Die
+/// Liste so zurückzuschicken ist keine Empfänger-Änderung, und beide Zeilen bleiben.
+#[tokio::test]
+async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let eins = einheit(&app, &admin, e, "Logistiktrupp 1").await;
+    let zwei = einheit(&app, &admin, e, "Logistiktrupp 2").await;
+    let aid = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "frist_at": FRIST,
+            "empfaenger": [
+                { "empfaenger_typ": "einheit", "einheit_id": eins },
+                { "empfaenger_typ": "einheit", "einheit_id": zwei }
+            ]
+        }),
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    for eid in [eins, zwei] {
+        lifeline_hub::einheit::repo::loese_auf(&pool, e, eid)
+            .await
+            .unwrap();
+    }
+    let (_, gelesen) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00", "empfaenger": gelesen["empfaenger"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(
+        j["empfaenger"], gelesen["empfaenger"],
+        "beide Zeilen bleiben"
+    );
+    let geaendert: Vec<String> = inhalte(&anordnungen(&app, &admin, e).await)
+        .into_iter()
+        .filter(|i| i.contains("geändert"))
+        .collect();
+    assert_eq!(
+        geaendert,
+        ["Auftrag #1 geändert: Frist 12.10. 16:00 (vorher 12.10. 15:00)."]
+    );
+}

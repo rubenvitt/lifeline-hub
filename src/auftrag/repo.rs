@@ -1350,13 +1350,17 @@ pub async fn berichtigen_tx(
         }
         _ => alt.auftrag_text.clone(),
     };
-    // Die Empfänger sind eine Menge: eine andere Reihenfolge ist keine Berichtigung (LLH-1176).
-    let alter_bestand = |z: &EmpfaengerZiel| alte_ziele.iter().find(|(_, a, _)| a == z);
+    // Die Empfänger sind eine Menge (LLH-1176): eine andere Reihenfolge ist keine Berichtigung,
+    // und gleiche Zeilen zählen einmal. Gleich werden sie etwa, wenn zwei Empfänger-Einheiten
+    // aufgelöst sind (ON DELETE SET NULL), oder wenn zwei Eingabezeilen dasselbe Ziel meinen.
+    let ist_alt = |z: &EmpfaengerZiel| alte_ziele.iter().any(|(_, a, _)| a == z);
     let neue_empfaenger = b.empfaenger.as_ref().filter(|neu| {
         let mut neue: Vec<EmpfaengerZiel> = neu.iter().map(ziel_von).collect();
         let mut alte: Vec<&EmpfaengerZiel> = alte_ziele.iter().map(|(_, z, _)| z).collect();
         neue.sort();
+        neue.dedup();
         alte.sort();
+        alte.dedup();
         neue.iter().collect::<Vec<_>>() != alte
     });
     let empfaenger_index = aenderungen.len();
@@ -1418,7 +1422,17 @@ pub async fn berichtigen_tx(
             // Sicher, weil niemand quittiert hat (Prüfung oben, in derselben Transaktion). Ein
             // bleibender Empfänger behält seine Zeile samt Anzeige, auch wenn sein Ziel inzwischen
             // aufgelöst ist (LLH-1176); nur weggefallene gehen, nur hinzugekommene entstehen.
-            let neue_ziele: Vec<EmpfaengerZiel> = neu.iter().map(ziel_von).collect();
+            let mut neue_ziele: Vec<EmpfaengerZiel> = Vec::new();
+            let mut hinzu: Vec<EmpfaengerEingabe> = Vec::new();
+            for e in neu {
+                let z = ziel_von(e);
+                if !neue_ziele.contains(&z) {
+                    if !ist_alt(&z) {
+                        hinzu.push(e.clone());
+                    }
+                    neue_ziele.push(z);
+                }
+            }
             for (id, ziel, _) in &alte_ziele {
                 if !neue_ziele.contains(ziel) {
                     sqlx::query("DELETE FROM auftrag_empfaenger WHERE id = ?")
@@ -1427,21 +1441,23 @@ pub async fn berichtigen_tx(
                         .await?;
                 }
             }
-            let hinzu: Vec<EmpfaengerEingabe> = neu
-                .iter()
-                .zip(&neue_ziele)
-                .filter(|(_, z)| alter_bestand(z).is_none())
-                .map(|(e, _)| e.clone())
-                .collect();
             let mut hinzu_namen =
                 empfaenger_einfuegen_tx(&mut *conn, einsatz_id, auftrag_id, &hinzu)
                     .await?
                     .into_iter();
             let namen: Vec<String> = neue_ziele
                 .iter()
-                .map(|z| match alter_bestand(z) {
-                    Some((_, _, n)) => n.clone(),
-                    None => hinzu_namen.next().unwrap_or_default(),
+                .flat_map(|z| {
+                    let behalten: Vec<String> = alte_ziele
+                        .iter()
+                        .filter(|(_, a, _)| a == z)
+                        .map(|(_, _, n)| n.clone())
+                        .collect();
+                    if behalten.is_empty() {
+                        hinzu_namen.next().into_iter().collect()
+                    } else {
+                        behalten
+                    }
                 })
                 .collect();
             aenderungen.insert(

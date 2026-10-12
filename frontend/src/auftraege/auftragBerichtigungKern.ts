@@ -23,8 +23,9 @@ const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
 
 /**
  * Formularwerte aus dem Auftrag. `empfaengerAenderbar` ist falsch, wenn das Formular einen
- * Empfänger nicht abbilden kann (Person, Fahrzeug, mehr als ein externer Adressat): dann steht das
- * Feld gesperrt, und der Patch schickt keine Empfänger.
+ * Empfänger nicht abbilden kann (Person, Fahrzeug, mehr als ein externer Adressat, ein seit dem
+ * Erteilen aufgelöster Abschnitt oder aufgelöste Einheit): dann steht das Feld gesperrt, und der
+ * Patch schickt keine Empfänger.
  */
 export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAenderbar: boolean } {
   let aenderbar = true;
@@ -33,10 +34,12 @@ export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAender
   for (const e of a.empfaenger) {
     switch (e.empfaenger_typ) {
       case 'abschnitt':
-        tags.push(`abschnitt:${e.abschnitt_id}`);
+        if (e.abschnitt_id == null) aenderbar = false;
+        else tags.push(`abschnitt:${e.abschnitt_id}`);
         break;
       case 'einheit':
-        tags.push(`einheit:${e.einheit_id}`);
+        if (e.einheit_id == null) aenderbar = false;
+        else tags.push(`einheit:${e.einheit_id}`);
         break;
       case 'funktion': {
         const wert = kodiere({
