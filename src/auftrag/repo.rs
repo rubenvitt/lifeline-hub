@@ -601,34 +601,8 @@ pub async fn anlegen_tx(
     .fetch_one(&mut *tx)
     .await?;
 
-    // Wirksame Mandantenlabels für den Snapshot eines Katalogempfängers (LFH-549).
-    let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *tx, einsatz_id).await?;
-    // Jeder Anzeigename entsteht einmal: für die Zeile und für das ETB-`an` (LFH-937, D3).
-    let mut namen = Vec::new();
-    for e in &daten.empfaenger {
-        debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
-        let snap = snap_anzeige_fuer(&mut *tx, e, &karte).await?;
-        sqlx::query(
-            "INSERT INTO auftrag_empfaenger \
-               (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
-                funktion, extern_kategorie, extern_bezeichnung, snap_anzeige) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(auftrag_id)
-        .bind(&e.empfaenger_typ)
-        .bind(e.abschnitt_id)
-        .bind(e.einheit_id)
-        .bind(e.person_id)
-        .bind(e.fahrzeug_id)
-        .bind(e.funktion_text.as_deref())
-        .bind(e.funktion.map(|f| f.as_str()))
-        .bind(e.extern_kategorie.as_deref())
-        .bind(e.extern_bezeichnung.as_deref())
-        .bind(&snap)
-        .execute(&mut *tx)
-        .await?;
-        namen.push(snap);
-    }
+    let namen =
+        empfaenger_einfuegen_tx(&mut *tx, einsatz_id, auftrag_id, &daten.empfaenger).await?;
 
     // ETB-Anordnung (Pattern B): erst NACH den Inserts, im selben Commit.
     // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish wird kein
@@ -667,6 +641,45 @@ pub async fn anlegen_tx(
     }
 
     Ok(auftrag_id)
+}
+
+/// Schreibt die Empfänger-Zeilen eines Auftrags samt Snapshot und liefert die Anzeigenamen in
+/// derselben Reihenfolge. Geteilt von Erteilen und Berichtigen (LLH-1098).
+async fn empfaenger_einfuegen_tx(
+    tx: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    empfaenger: &[EmpfaengerEingabe],
+) -> Result<Vec<String>, AppError> {
+    // Wirksame Mandantenlabels für den Snapshot eines Katalogempfängers (LFH-549).
+    let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *tx, einsatz_id).await?;
+    // Jeder Anzeigename entsteht einmal: für die Zeile und für das ETB-`an` (LFH-937, D3).
+    let mut namen = Vec::new();
+    for e in empfaenger {
+        debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
+        let snap = snap_anzeige_fuer(&mut *tx, e, &karte).await?;
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger \
+               (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
+                funktion, extern_kategorie, extern_bezeichnung, snap_anzeige) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(auftrag_id)
+        .bind(&e.empfaenger_typ)
+        .bind(e.abschnitt_id)
+        .bind(e.einheit_id)
+        .bind(e.person_id)
+        .bind(e.fahrzeug_id)
+        .bind(e.funktion_text.as_deref())
+        .bind(e.funktion.map(|f| f.as_str()))
+        .bind(e.extern_kategorie.as_deref())
+        .bind(e.extern_bezeichnung.as_deref())
+        .bind(&snap)
+        .execute(&mut *tx)
+        .await?;
+        namen.push(snap);
+    }
+    Ok(namen)
 }
 
 /// Legt einen Auftrag an (eigener Commit) und liefert das Detail. Dünner Wrapper
@@ -1105,6 +1118,264 @@ pub async fn aufheben_tx(
     )
     .await?;
     Ok(etb_id)
+}
+
+/// Was eine Empfänger-Zeile als Ziel meint, ohne Snapshot und Quittung: der Vergleichsschlüssel
+/// der Berichtigung.
+type EmpfaengerZiel = (
+    String,
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
+fn ziel_von(e: &EmpfaengerEingabe) -> EmpfaengerZiel {
+    (
+        e.empfaenger_typ.clone(),
+        e.abschnitt_id,
+        e.einheit_id,
+        e.person_id,
+        e.fahrzeug_id,
+        e.funktion_text.clone(),
+        e.funktion.map(|f| f.as_str().to_string()),
+        e.extern_kategorie.clone(),
+        e.extern_bezeichnung.clone(),
+    )
+}
+
+/// Der fachliche Stand eines Auftrags, den eine Berichtigung ändern kann.
+#[derive(sqlx::FromRow)]
+struct BerichtigungsStand {
+    auftrag_text: String,
+    prioritaet: String,
+    frist_at: Option<String>,
+    absicht: Option<String>,
+    lage: Option<String>,
+    ort: Option<String>,
+    zeit: Option<String>,
+    mittel: Option<String>,
+    verbindung: Option<String>,
+    sicherheit: Option<String>,
+}
+
+impl BerichtigungsStand {
+    fn schema(&self) -> [&Option<String>; 7] {
+        [
+            &self.absicht,
+            &self.lage,
+            &self.ort,
+            &self.zeit,
+            &self.mittel,
+            &self.verbindung,
+            &self.sicherheit,
+        ]
+    }
+}
+
+/// Frist in der Zone des Einsatzes für den ETB-Text („12.10. 16:00“).
+fn frist_text(frist: &Option<String>, tz: chrono_tz::Tz) -> Option<String> {
+    frist.as_deref().map(|f| match crate::zeit::parse_utc(f) {
+        Some(t) => t.with_timezone(&tz).format("%d.%m. %H:%M").to_string(),
+        None => f.to_string(),
+    })
+}
+
+/// Berichtigt einen Auftrag (LLH-1098, Spec `auftrag-aufheben-berichtigen`, design.md D6/D7) und
+/// liefert die id der ETB-Anordnung, ohne fachliche Änderung `None` (dann wurde nichts
+/// geschrieben). In EINER Transaktion: Prüfung „offen und unquittiert“ (sonst 422), Felder,
+/// gegebenenfalls neue Empfänger-Zeilen, Erinnerung „Quittierfrist“ und die Anordnung
+/// „Auftrag #N geändert: …“. `b` ist vom Handler geprüft.
+#[allow(clippy::too_many_arguments)]
+pub async fn berichtigen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    etb_startwert: i64,
+    tz: chrono_tz::Tz,
+    b: &super::ValidierteBerichtigung,
+    jetzt: &str,
+) -> Result<Option<i64>, AppError> {
+    use super::etb_text::Aenderung;
+    use super::AuftragBearbeitungsstatus as S;
+    let (status, lfd_nr, berichtigbar) = stand_in_tx(&mut *conn, einsatz_id, auftrag_id).await?;
+    if !berichtigbar {
+        return Err(AppError::UnprocessableEntity(
+            match status {
+                S::Aufgehoben => "Der Auftrag ist aufgehoben",
+                S::Offen => {
+                    "Ein Empfänger hat schon quittiert: den Auftrag aufheben und neu erteilen"
+                }
+                S::InArbeit | S::Vollzogen | S::Abgenommen => {
+                    "Nur ein offener Auftrag lässt sich berichtigen"
+                }
+            }
+            .into(),
+        ));
+    }
+    let alt: BerichtigungsStand = sqlx::query_as(
+        "SELECT auftrag_text, prioritaet, frist_at, absicht, lage, ort, zeit, mittel, verbindung, \
+                sicherheit FROM auftrag WHERE id = ?",
+    )
+    .bind(auftrag_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let alte_ziele: Vec<(EmpfaengerZiel, String)> = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
+        "SELECT empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
+                funktion, extern_kategorie, extern_bezeichnung, snap_anzeige \
+         FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
+    )
+    .bind(auftrag_id)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .map(|(t, a, e, p, f, ft, fc, ek, eb, snap)| ((t, a, e, p, f, ft, fc, ek, eb), snap))
+    .collect();
+    let alte_namen: Vec<String> = alte_ziele.iter().map(|(_, n)| n.clone()).collect();
+
+    let mut aenderungen = Vec::new();
+    let text = match &b.auftrag_text {
+        Some(t) if *t != alt.auftrag_text => {
+            aenderungen.push(Aenderung::Text(t.clone()));
+            t.clone()
+        }
+        _ => alt.auftrag_text.clone(),
+    };
+    let neue_empfaenger = b.empfaenger.as_ref().filter(|neu| {
+        let neue: Vec<EmpfaengerZiel> = neu.iter().map(ziel_von).collect();
+        let alte: Vec<&EmpfaengerZiel> = alte_ziele.iter().map(|(z, _)| z).collect();
+        neue.iter().collect::<Vec<_>>() != alte
+    });
+    let empfaenger_index = aenderungen.len();
+    let prioritaet = match &b.prioritaet {
+        Some(p) if *p != alt.prioritaet => {
+            aenderungen.push(Aenderung::Prioritaet {
+                neu: p.clone(),
+                vorher: alt.prioritaet.clone(),
+            });
+            p.clone()
+        }
+        _ => alt.prioritaet.clone(),
+    };
+    let frist = match &b.frist_at {
+        Some(f) if *f != alt.frist_at => {
+            aenderungen.push(Aenderung::Frist {
+                neu: frist_text(f, tz),
+                vorher: frist_text(&alt.frist_at, tz),
+            });
+            Some(f.clone())
+        }
+        _ => None,
+    };
+    let mut schema: Vec<Option<String>> = alt.schema().into_iter().cloned().collect();
+    for (i, neu) in b.schema.iter().enumerate() {
+        if let Some(neu) = neu {
+            if *neu != schema[i] {
+                aenderungen.push(Aenderung::Schemafeld(super::eingabe::SCHEMAFELDER[i].1));
+                schema[i] = neu.clone();
+            }
+        }
+    }
+    if aenderungen.is_empty() && neue_empfaenger.is_none() {
+        return Ok(None);
+    }
+
+    let frist_wert = frist.clone().unwrap_or(alt.frist_at.clone());
+    sqlx::query(
+        "UPDATE auftrag SET auftrag_text = ?, prioritaet = ?, frist_at = ?, absicht = ?, lage = ?, \
+           ort = ?, zeit = ?, mittel = ?, verbindung = ?, sicherheit = ? WHERE id = ?",
+    )
+    .bind(&text)
+    .bind(&prioritaet)
+    .bind(&frist_wert)
+    .bind(&schema[0])
+    .bind(&schema[1])
+    .bind(&schema[2])
+    .bind(&schema[3])
+    .bind(&schema[4])
+    .bind(&schema[5])
+    .bind(&schema[6])
+    .bind(auftrag_id)
+    .execute(&mut *conn)
+    .await?;
+
+    let namen = match neue_empfaenger {
+        Some(neu) => {
+            // Sicher, weil niemand quittiert hat (Prüfung oben, in derselben Transaktion).
+            sqlx::query("DELETE FROM auftrag_empfaenger WHERE auftrag_id = ?")
+                .bind(auftrag_id)
+                .execute(&mut *conn)
+                .await?;
+            let namen = empfaenger_einfuegen_tx(&mut *conn, einsatz_id, auftrag_id, neu).await?;
+            aenderungen.insert(
+                empfaenger_index,
+                Aenderung::Empfaenger {
+                    neu: super::kappe_an(&namen),
+                    vorher: super::kappe_an(&alte_namen),
+                },
+            );
+            namen
+        }
+        None => alte_namen,
+    };
+
+    if let Some(f) = &frist {
+        match f {
+            Some(f) => {
+                crate::erinnerung::repo::setze_auto_frist_tx(
+                    &mut *conn,
+                    einsatz_id,
+                    von_id,
+                    crate::kommunikation::OBJEKT_AUFTRAG,
+                    auftrag_id,
+                    &super::quittierfrist_titel(lfd_nr),
+                    f,
+                )
+                .await?;
+            }
+            None => {
+                crate::erinnerung::repo::schliesse_offene_auto_tx(
+                    &mut *conn,
+                    crate::kommunikation::OBJEKT_AUFTRAG,
+                    auftrag_id,
+                    jetzt,
+                )
+                .await?;
+            }
+        }
+    }
+
+    let etb_id = anordnung_tx(
+        &mut *conn,
+        einsatz_id,
+        auftrag_id,
+        von_id,
+        etb_startwert,
+        &super::etb_text::geaendert(lfd_nr, &aenderungen),
+        &super::kappe_an(&namen),
+        jetzt,
+    )
+    .await?;
+    Ok(Some(etb_id))
 }
 
 #[cfg(test)]

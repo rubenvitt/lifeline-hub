@@ -85,6 +85,7 @@ const auftrag = (id: number, over: Partial<Auftrag> = {}): Auftrag => ({
   quittiert_anzahl: 0,
   ist_ueberfaellig: false,
   bearbeitungsstatus: 'offen',
+  berichtigbar: true,
   empfaenger: [],
   ...over,
 });

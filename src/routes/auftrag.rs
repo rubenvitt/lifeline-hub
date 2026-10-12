@@ -213,10 +213,7 @@ pub async fn anlegen(
     // bei Fristablauf `erinnerung` mit Diskriminator → In-App-Alarm; Quittieren aller Empfänger
     // schließt sie wieder (siehe quittieren). Reuse des Meldungs-Pfads (routes/meldung.rs).
     if let Some(frist) = d.auftrag.frist_at.as_deref() {
-        let titel = match d.auftrag.lfd_nr {
-            Some(nr) => format!("Auftrag #{nr} Quittierfrist"),
-            None => "Auftrag Quittierfrist".to_string(),
-        };
+        let titel = crate::auftrag::quittierfrist_titel(d.auftrag.lfd_nr);
         crate::erinnerung::repo::anlegen_aus_frist(
             &state.pool,
             einsatz_id,
@@ -526,6 +523,52 @@ pub async fn aufheben(
     )
     .await?;
     sse(&state, einsatz_id);
+    Ok(Json(d))
+}
+
+/// PATCH /api/einsaetze/{id}/auftraege/{aid} — Auftrag berichtigen, solange er offen ist und
+/// niemand quittiert hat (LLH-1098, Spec `auftrag-aufheben-berichtigen`). Teil-Patch; ohne
+/// fachliche Änderung weder ETB noch Ereignis.
+pub async fn berichtigen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
+    PfadParam((einsatz_id, auftrag_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    let b = crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, &req).await?;
+    let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
+    // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
+    let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
+    let now = jetzt();
+    let von_id = ctx.benutzer.id;
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        repo::berichtigen_tx(
+            conn,
+            einsatz_id,
+            auftrag_id,
+            von_id,
+            etb_startwert,
+            tz,
+            &b,
+            &now,
+        )
+        .await
+    })?;
+    let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        sse(&state, einsatz_id);
+    }
     Ok(Json(d))
 }
 

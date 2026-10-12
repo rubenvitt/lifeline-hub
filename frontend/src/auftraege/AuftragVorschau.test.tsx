@@ -58,6 +58,7 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   quittiert_anzahl: 1,
   ist_ueberfaellig: false,
   bearbeitungsstatus: 'offen',
+  berichtigbar: true,
   empfaenger: [
     empfaenger(),
     empfaenger({ id: 2, snap_anzeige: 'EA Süd', quittiert_at: '2026-06-11 09:02:00' }),

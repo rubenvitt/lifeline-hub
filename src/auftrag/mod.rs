@@ -7,7 +7,8 @@ pub mod etb_text;
 pub mod repo;
 
 pub use eingabe::{
-    validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag,
+    validiere_berichtigung, validiere_neuen_auftrag, AuftragPatch, EmpfaengerEingabeReq,
+    NeuerAuftrag, ValidierteBerichtigung, ValidierterAuftrag,
 };
 
 use crate::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
@@ -68,6 +69,15 @@ pub fn kappe_an(namen: &[String]) -> String {
         return format!("{}…{rest}", name.chars().take(platz).collect::<String>());
     }
     an
+}
+
+/// Titel der Auto-Frist-Erinnerung eines Auftrags (LFH-118), beim Erteilen und beim Berichtigen
+/// der Frist (LLH-1098) gleich.
+pub fn quittierfrist_titel(lfd_nr: Option<i64>) -> String {
+    match lfd_nr {
+        Some(nr) => format!("Auftrag #{nr} Quittierfrist"),
+        None => "Auftrag Quittierfrist".to_string(),
+    }
 }
 
 /// Priorität eines Auftrags (TEXT in der DB, im Code validiert).
@@ -237,11 +247,16 @@ pub struct AuftragAnzeige {
     // abgenommen_at gesetzt, sonst vollzug_status.
     #[sqlx(try_from = "String")]
     pub bearbeitungsstatus: AuftragBearbeitungsstatus,
-    /// Aufhebung (LLH-1098): Zeitpunkt, Person und Grund; alle drei oder keiner.
+    /// Aufhebung (LLH-1098): Zeitpunkt, Person und Grund; alle drei oder keiner. Fehlen am
+    /// nicht aufgehobenen Auftrag (Norm LFH-265).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgehoben_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgehoben_von_id: Option<i64>,
     /// Anzeigename der aufhebenden Person zur Lesezeit.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgehoben_von_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aufhebungsgrund: Option<String>,
     /// Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
     /// nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).

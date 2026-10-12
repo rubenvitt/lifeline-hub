@@ -471,7 +471,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/auftraege/{aid}",
-            get(routes::auftrag::detail),
+            get(routes::auftrag::detail).patch(routes::auftrag::berichtigen),
         )
         .route(
             "/api/einsaetze/{id}/auftraege",

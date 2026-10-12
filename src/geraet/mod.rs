@@ -665,6 +665,9 @@ mod tests {
             ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
             ("POST", "/api/einsaetze/{id}/auftraege"),
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
+            // Aufheben und Berichtigen gehören der Führung (LLH-1098).
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
+            ("PATCH", "/api/einsaetze/{id}/auftraege/{aid}"),
             ("GET", "/api/einsaetze/{id}/auftraege/kennzahlen"),
             ("POST", "/api/einsaetze/{id}/zonen"),
             ("GET", "/api/einsaetze/{id}/freie-zeichen"),

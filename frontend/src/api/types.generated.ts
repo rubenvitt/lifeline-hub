@@ -390,8 +390,23 @@ export interface components {
             /** Format: int64 */
             abgenommen_von_id?: number | null;
             absicht?: string | null;
+            /**
+             * @description Aufhebung (LLH-1098): Zeitpunkt, Person und Grund; alle drei oder keiner. Fehlen am
+             *     nicht aufgehobenen Auftrag (Norm LFH-265).
+             */
+            aufgehoben_at?: string | null;
+            /** Format: int64 */
+            aufgehoben_von_id?: number | null;
+            /** @description Anzeigename der aufhebenden Person zur Lesezeit. */
+            aufgehoben_von_name?: string | null;
+            aufhebungsgrund?: string | null;
             auftrag_text: string;
             bearbeitungsstatus: components["schemas"]["AuftragBearbeitungsstatus"];
+            /**
+             * @description Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
+             *     nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).
+             */
+            berichtigbar: boolean;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */
@@ -441,7 +456,7 @@ export interface components {
          *     Wire == `bearbeitungsstatus`.
          * @enum {string}
          */
-        AuftragBearbeitungsstatus: "offen" | "in_arbeit" | "vollzogen" | "abgenommen";
+        AuftragBearbeitungsstatus: "offen" | "in_arbeit" | "vollzogen" | "abgenommen" | "aufgehoben";
         /** @description Auftrag + seine Empfänger (Detail-/Anlege-/Mutations-Antwort). */
         AuftragDetail: components["schemas"]["AuftragAnzeige"] & {
             empfaenger: components["schemas"]["AuftragEmpfaengerAnzeige"][];
@@ -479,7 +494,7 @@ export interface components {
         AuftragKennzahlen: {
             /**
              * Format: int64
-             * @description Vollzogen oder abgenommen.
+             * @description Vollzogen, abgenommen oder aufgehoben.
              */
             abgeschlossen: number;
             /**

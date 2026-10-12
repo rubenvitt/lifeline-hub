@@ -834,6 +834,27 @@ export interface NeuerAuftrag {
   empfaenger: NeuerEmpfaenger[];
 }
 
+/** Die Felder des Befehlsschemas, die eine Berichtigung einzeln leeren kann. */
+export type AuftragSchemafeld =
+  'absicht' | 'lage' | 'ort' | 'zeit' | 'mittel' | 'verbindung' | 'sicherheit';
+
+/**
+ * Kein Backend-Schema: Teil-Patch der Berichtigung (LLH-1098), FE-lokal. Ein fehlendes Feld bleibt,
+ * `null` leert ein optionales Feld; `empfaenger` ersetzt die ganze Liste.
+ */
+export type AuftragPatch = {
+  auftrag_text?: string;
+  empfaenger?: NeuerEmpfaenger[];
+  prioritaet?: AuftragPrioritaet;
+  /** 'YYYY-MM-DD HH:MM' (UTC); `null` entfernt die Frist. */
+  frist_at?: string | null;
+} & Partial<Record<AuftragSchemafeld, string | null>>;
+
+/** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
+export interface AuftragAufheben {
+  grund: string;
+}
+
 // --- Meldungen (eingehend) ---
 export type MeldungPrioritaet = S['Prioritaet'];
 export type MeldungStatus = S['MeldungStatus'];
