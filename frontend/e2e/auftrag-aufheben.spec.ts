@@ -10,7 +10,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 async function einsatzMitAuftrag(page: Page): Promise<{ einsatzId: string; nr: number }> {
   const e = await page.request.post('/api/einsaetze', {
-    data: { bezeichnung: `E2E Auftrag aufheben ${Date.now()}` },
+    data: { bezeichnung: `E2E Auftragsrücknahme ${Date.now()}` },
   });
   expect(e.ok(), `POST /api/einsaetze: ${e.status()} ${await e.text()}`).toBe(true);
   const einsatzId = String(((await e.json()) as { id: number }).id);
@@ -73,6 +73,8 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     await expect(page.getByText('Sandsäcke zum Deich bringen')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Quittieren' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: `Aktionen zu Auftrag #${nr}` })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Auftrag aufheben' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Auftrag aufheben', exact: true })).toHaveCount(
+      0,
+    );
   });
 });
