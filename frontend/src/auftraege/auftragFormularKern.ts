@@ -39,7 +39,7 @@ export interface FormWerte {
  * stammen aus den Optionen, `funktion:<code>` aus dem Katalog (LFH-549), alles andere wird
  * Funktionstext — ohne Rückschluss von „S3“ auf den Code (`fuehrung/funktionsOptionenKern.ts`).
  */
-export function baueEmpfaenger(
+export function buildEmpfaenger(
   werte: string[],
   katalog: FunktionsVorschlaege['katalog'],
 ): NeuerEmpfaenger[] {
@@ -76,7 +76,7 @@ export function alleEmpfaenger(
   w: Pick<FormWerte, 'empfaenger' | 'richtung' | 'externKategorie' | 'externBezeichnung'>,
   katalog: FunktionsVorschlaege['katalog'],
 ): NeuerEmpfaenger[] {
-  const empfaenger = baueEmpfaenger(w.empfaenger ?? [], katalog);
+  const empfaenger = buildEmpfaenger(w.empfaenger ?? [], katalog);
   if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
     empfaenger.push({
       empfaenger_typ: 'extern',

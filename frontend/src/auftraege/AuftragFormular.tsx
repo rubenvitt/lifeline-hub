@@ -14,7 +14,7 @@ import type {
   NeuerAuftrag,
   Richtung,
 } from '../api/types';
-import { alleEmpfaenger, baueEmpfaenger, type FormWerte } from './auftragFormularKern';
+import { alleEmpfaenger, buildEmpfaenger, type FormWerte } from './auftragFormularKern';
 import { berichtigungAus, vorbelegungAus } from './auftragBerichtigungKern';
 import { funktionsOptionen, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
@@ -58,7 +58,7 @@ function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
   return {
     validator: (_: unknown, werte: unknown) =>
       Array.isArray(werte) &&
-      baueEmpfaenger(werte as string[], katalog).some((e) =>
+      buildEmpfaenger(werte as string[], katalog).some((e) =>
         istZuLang(e.funktion_text, FUNKTION_TEXT_MAX),
       )
         ? Promise.reject(
