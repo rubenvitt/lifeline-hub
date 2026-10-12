@@ -54,7 +54,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 - [x] 4.3 Sprung „Druckansicht“ in `auftraege/AuftragDetail.tsx` (`DetailSprung` auf
   `auftragDruckPfad`), ohne Schreibrecht und in jeder Phase. Nachweis: Test in
   `auftraege/AuftragDetail.test.tsx` (Beobachter, aufgehobener Auftrag, Ziel der Adresse).
-- [ ] 4.4 `druck/AGENTS.md`: Abschnitt „Auftragsdruck“ (Route, nicht-live Key, Einstieg aus dem
+- [x] 4.4 `druck/AGENTS.md`: Abschnitt „Auftragsdruck“ (Route, nicht-live Key, Einstieg aus dem
   Detail, Feldfolge im Kern, Blatt über `druck/ZeilenListe.tsx`); der Verweis „Etikett-Wert-Liste“
   beim Einsatzbericht zeigt auf das neue Modul. Nachweis: Prettier über `frontend/` ist sauber,
   und `grep -rn "ZeilenListe" frontend/src/druck/AGENTS.md` nennt den neuen Pfad.
@@ -70,12 +70,12 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 6. Anwenderdoku
 
-- [ ] 6.1 `docs/anwender/kapitel/auftraege-befehle.md`: Ablauf „Auftrag drucken“ mit
+- [x] 6.1 `docs/anwender/kapitel/auftraege-befehle.md`: Ablauf „Auftrag drucken“ mit
   nummerierten Schritten (Auftrag wählen, „Druckansicht“, „Drucken / als PDF“). Unter
   Hintergrund: Schnappschuss und „Neu laden“, Druck ohne Schreibrecht. `quellen` um
   `frontend/src/pages/AuftragDruckPage.tsx` und `frontend/src/auftraege/AuftragDruckBlatt.tsx`
   ergänzt. Nachweis: Der Kapitelwächter (`docs/anwender/AGENTS.md`, „Wächter“) ist grün.
-- [ ] 6.2 `docs/anwender/kapitel/drucken-export.md`: Der Auftrag steht unter den Druckstücken,
+- [x] 6.2 `docs/anwender/kapitel/drucken-export.md`: Der Auftrag steht unter den Druckstücken,
   `quellen` sind ergänzt. Nachweis: Der Kapitelwächter ist grün.
 
 ## 7. Integration

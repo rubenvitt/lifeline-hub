@@ -55,11 +55,12 @@ export default function AuftragDruckBlatt({ auftrag: a }: { auftrag: Auftrag }) 
     { etikett: 'Grund', wert: a.aufhebungsgrund },
   ]);
 
+  // `auftrag-druck-blatt`: Anker des Druck-Gates (`e2e/druck-fluss.spec.ts`) für die Titel.
   return (
-    <>
+    <div data-lfh="auftrag-druck-blatt">
       <ZeilenListe titel={[titel('Auftrag')]} zeilen={druckFelder(a, formatZeit)} />
       <ZeilenListe titel={[titel('Quittung')]} zeilen={quittung} />
       <ZeilenListe titel={[titel('Bearbeitung')]} zeilen={bearbeitung} />
-    </>
+    </div>
   );
 }

@@ -152,6 +152,54 @@ async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Pro
   return id;
 }
 
+/** Schemafelder des Auftrags in der Folge des Blatts (`druckFelder`, LLH-1171). */
+const AUFTRAG_SCHEMAFELDER = [
+  'mittel',
+  'ort',
+  'weg',
+  'zeit',
+  'lage',
+  'absicht',
+  'verbindung',
+  'sicherheit',
+];
+
+/**
+ * Ein vollzogener Auftrag, dessen Schemafelder zusammen mehrere Seiten füllen. Die Endmarke steht
+ * im Vollzugsvermerk, der letzten Angabe des Blatts (Teil „Bearbeitung“): danach kommt nichts mehr,
+ * die Seiten nach ihr tragen nur die Zählung. Ein externer Empfänger braucht keine Stammdaten.
+ */
+async function auftragSaeen(page: Page, einsatzId: string): Promise<number> {
+  const felder = Object.fromEntries(
+    AUFTRAG_SCHEMAFELDER.map((feld) => [feld, langerText(feld, 3)]),
+  );
+  const neu = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+      data: {
+        auftrag_text: langerText('auftrag', 2),
+        ...felder,
+        richtung: 'extern',
+        empfaenger: [
+          {
+            empfaenger_typ: 'extern',
+            extern_kategorie: 'andere_bos',
+            extern_bezeichnung: 'Polizei',
+          },
+        ],
+      },
+    }),
+  );
+  expect(neu.ok(), await neu.text()).toBe(true);
+  const id = (await neu.json()).id as number;
+  const vollzug = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/auftraege/${id}/vollzug`, {
+      data: { status: 'vollzogen', vollzugsmeldung: `Leitung steht. ${ENDMARKE}` },
+    }),
+  );
+  expect(vollzug.ok(), await vollzug.text()).toBe(true);
+  return id;
+}
+
 /**
  * Lage der Druckwurzel, des Rahmens und der Endmarke im aktuellen Medium, über
  * `getComputedStyle` — `toBeVisible` trennt `display: none` nicht von `visibility: hidden`,
@@ -168,8 +216,9 @@ async function druckLage(page: Page) {
       return el ? getComputedStyle(el).display : 'fehlt';
     };
     // Die Endmarke als DARGESTELLTER Textknoten im gerenderten Markdown (`getClientRects`) —
-    // nicht im Textfeld des Editors und nicht in einer verborgenen Fassung.
-    const knoten = Array.from(wurzel.querySelectorAll('.markdown p')).find(
+    // nicht im Textfeld des Editors und nicht in einer verborgenen Fassung. Im Auftragsblatt
+    // (LLH-1171) steht sie als Wert einer Etikett-Wert-Liste (`druck/ZeilenListe.tsx`).
+    const knoten = Array.from(wurzel.querySelectorAll('.markdown p, dd')).find(
       (p) => p.textContent?.includes(endmarke) && p.getClientRects().length > 0,
     ) as HTMLElement | undefined;
     // Ein Textfeld im Druck ist Rohtext in Bildschirmhöhe, abgeschnitten, sobald der Text
@@ -179,10 +228,13 @@ async function druckLage(page: Page) {
     ).length;
     // LFH-1008: jeder sichtbare Abschnittstitel steht in einem Titelblock mit seinem ersten
     // Absatz. Abschnittstitel sind die Titel der Lesefassung (im Titelplatz des Markdowns) und
-    // die Papiertitel des Entwurfs; Akkordeonkopf und Feldetikett weichen dafür.
+    // die Papiertitel des Entwurfs; Akkordeonkopf und Feldetikett weichen dafür. Im Auftragsblatt
+    // sind es die `h3` der Etikett-Wert-Listen (LLH-1171).
     const sichtbar = (el: Element) => el.getClientRects().length > 0;
     const titel = Array.from(
-      wurzel.querySelectorAll('[data-lfh="titelplatz"], .markdown-editor__titel'),
+      wurzel.querySelectorAll(
+        '[data-lfh="titelplatz"], .markdown-editor__titel, [data-lfh="auftrag-druck-blatt"] h3',
+      ),
     ).filter(sichtbar);
     const bloecke = titel.map((t) => t.closest('[data-lfh="titelblock"]'));
     return {
@@ -489,6 +541,17 @@ test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
   await pruefeDruckImFluss(page, 'Befehl lesend');
+});
+
+test('Auftrag druckt im normalen Fluss über mehrere Seiten (LLH-1171)', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Auftrag ${Date.now()}`);
+  const id = await auftragSaeen(page, einsatzId);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/auftraege/${id}/druck`);
+  await expect(page.locator('dd', { hasText: ENDMARKE })).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled();
+  await pruefeDruckImFluss(page, 'Auftrag');
 });
 
 /**
