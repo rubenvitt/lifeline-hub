@@ -14,9 +14,9 @@ kein HEIC: dafür bräuchte er HEVC in C (libheif, libde265), und das Binary ble
 
 ## Bibliothek und Lizenz (LFH-1000)
 
-**`libheif-js` 1.23.2** (npm, exakt gepinnt), Variante `libheif-wasm/` mit Glue `libheif.js` und
-eigener `libheif.wasm`. Darin libheif 1.23.2 und libde265 1.0.15 (HEVC-Decoder), alle unter der
-**GNU LGPL 3.0**. Gebaut wird die WASM von `libheif-emscripten` v1.23.2 aus dem unveränderten
+**`libheif-js` 1.23.5** (npm, exakt gepinnt), Variante `libheif-wasm/` mit Glue `libheif.js` und
+eigener `libheif.wasm`. Darin libheif 1.23.5 und libde265 1.0.15 (HEVC-Decoder), alle unter der
+**GNU LGPL 3.0**. Gebaut wird die WASM von `libheif-emscripten` v1.23.5 aus dem unveränderten
 libheif.
 
 **Entscheidung (Ruben, 07.10.2026):** die Vorschau bleibt, die Auslieferung erfüllt die LGPL 3.0

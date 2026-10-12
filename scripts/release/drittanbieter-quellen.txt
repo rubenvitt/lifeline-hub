@@ -5,7 +5,7 @@
 # Bei jedem Wechsel von libheif-js alle vier Zeilen nachziehen (Test: frontend/src/heic/lizenz.test.ts).
 #
 # name                repository                                              tag      commit
-libheif-js            https://github.com/catdad-experiments/libheif-js         1.23.2   6ca00b818c0ff51cb2a5c75b9ce97d708083335a
-libheif-emscripten    https://github.com/catdad-experiments/libheif-emscripten v1.23.2  dd5a19b878149437a5a427f6e1afa8bac624a714
-libheif               https://github.com/strukturag/libheif                    v1.23.2  ac1cb05c39008f01525c991ff8b88f84ddf70fd2
+libheif-js            https://github.com/catdad-experiments/libheif-js         1.23.5   d8ec4bc3bc5bf8055975577bccbbc7e1d7313c2d
+libheif-emscripten    https://github.com/catdad-experiments/libheif-emscripten v1.23.5  5c8968a44e9c68ae677e24790d77d001ed7fe7cc
+libheif               https://github.com/strukturag/libheif                    v1.23.5  413e2a87e6a70b3eccc3a3adc5801179dd2d9e00
 libde265              https://github.com/strukturag/libde265                   v1.0.15  17bb8d9fcea62db8cdeb0fc7ef8d15dbd19a22e4

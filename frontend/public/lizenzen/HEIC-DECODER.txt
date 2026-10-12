@@ -6,11 +6,11 @@ Beide stehen unter der GNU Lesser General Public License, Version 3 (LGPL 3.0), 
 GNU General Public License, Version 3 (GPL 3.0) ergänzt.
 
 Enthaltene Bibliotheken
-- libheif-js 1.23.2 (Emscripten-Fassung von libheif, Lizenz LGPL 3.0)
-  https://github.com/catdad-experiments/libheif-js, Tag 1.23.2
-  gebaut von https://github.com/catdad-experiments/libheif-emscripten, Tag v1.23.2
-- libheif 1.23.2 (strukturag, Lizenz LGPL 3.0)
-  https://github.com/strukturag/libheif, Tag v1.23.2
+- libheif-js 1.23.5 (Emscripten-Fassung von libheif, Lizenz LGPL 3.0)
+  https://github.com/catdad-experiments/libheif-js, Tag 1.23.5
+  gebaut von https://github.com/catdad-experiments/libheif-emscripten, Tag v1.23.5
+- libheif 1.23.5 (strukturag, Lizenz LGPL 3.0)
+  https://github.com/strukturag/libheif, Tag v1.23.5
 - libde265 1.0.15 (strukturag, Lizenz LGPL 3.0), in die WebAssembly-Datei einkompiliert
   https://github.com/strukturag/libde265, Tag v1.0.15
 
