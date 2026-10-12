@@ -7,6 +7,7 @@ import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
+  AuftragAufhebung,
   AuftragEmpfaenger,
   AuftragHandlungen,
   AuftragKopf,
@@ -32,6 +33,8 @@ export interface AuftragDetailProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  onBerichtigen?: (auftragId: number) => void;
+  onAufheben?: (auftragId: number) => void;
   fehlerGrund?: ZeilenGrund | null;
   quittierFehlerGrund?: ZeilenGrund | null;
 }
@@ -60,6 +63,7 @@ export function auftragVerlauf(a: Auftrag): VerlaufEintrag[] {
     a.in_arbeit_at ? { zeit: a.in_arbeit_at, wort: 'in Bearbeitung' } : null,
     a.vollzogen_at ? { zeit: a.vollzogen_at, wort: 'vollzogen' } : null,
     a.abgenommen_at ? { zeit: a.abgenommen_at, wort: 'abgenommen' } : null,
+    a.aufgehoben_at ? { zeit: a.aufgehoben_at, wort: 'aufgehoben' } : null,
   ];
   return eintraege
     .filter((e): e is VerlaufEintrag => e !== null)
@@ -84,6 +88,8 @@ export default function AuftragDetail({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  onBerichtigen,
+  onAufheben,
   fehlerGrund,
   quittierFehlerGrund,
 }: AuftragDetailProps) {
@@ -117,6 +123,7 @@ export default function AuftragDetail({
       <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
         {a.auftrag_text}
       </Text>
+      <AuftragAufhebung auftrag={a} />
       <AuftragVollzug auftrag={a} ansicht="offen" />
       <AuftragHandlungen
         auftrag={a}
@@ -124,6 +131,8 @@ export default function AuftragDetail({
         onInArbeit={onInArbeit}
         onVollzugMelden={onVollzugMelden}
         onAbnehmen={onAbnehmen}
+        onBerichtigen={onBerichtigen}
+        onAufheben={onAufheben}
         fehlerGrund={fehlerGrund}
         ausrichtung="flex-start"
       />

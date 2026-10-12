@@ -1036,3 +1036,67 @@ async fn zeitpunkte_ausserhalb_des_jahresbereichs_sind_400() {
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}={wert}: {j:?}");
     }
 }
+
+/// LLH-1091 (FwDV 100, Einheit – Auftrag – Mittel – Ziel – Weg): der Weg wird getrimmt gespeichert
+/// und steht im Detail und in der Liste; leer heißt nicht gesetzt.
+#[tokio::test]
+async fn weg_wird_getrimmt_gespeichert_und_gelesen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    let body = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "weg": "  über B 3, Abfahrt Nord  ",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "S3" }]
+    })
+    .to_string();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert_eq!(json["weg"], "über B 3, Abfahrt Nord");
+    let aid = json["id"].as_i64().unwrap();
+
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(detail["weg"], "über B 3, Abfahrt Nord");
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["weg"], "über B 3, Abfahrt Nord");
+
+    let leer = serde_json::json!({
+        "auftrag_text": "Pumpe holen",
+        "weg": "   ",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "S4" }]
+    })
+    .to_string();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&leer),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert!(json["weg"].is_null(), "{json:?}");
+}

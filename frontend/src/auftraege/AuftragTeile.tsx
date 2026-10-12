@@ -11,6 +11,8 @@ import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
 /**
  * Die Teile eines Einzelauftrags (Change `oxgob5gk-auftraege-befehle-angleichen`, design.md D4).
@@ -23,15 +25,12 @@ const { Text } = Typography;
 /** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓". */
 const QUITTIERT_CHIP_GRENZE = 3;
 
-/** Befehlsschema-Felder für die Read-back-Detailansicht (Reihenfolge = Anzeige). */
+/**
+ * Befehlsschema-Felder für die Read-back-Detailansicht: Folge und Etiketten aus dem Kern, den das
+ * Formular teilt (FwDV 100, LLH-1091), danach die Erteilzeit.
+ */
 const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
-  { key: 'absicht', label: 'Absicht/Ziel' },
-  { key: 'lage', label: 'Lage' },
-  { key: 'ort', label: 'Ort' },
-  { key: 'zeit', label: 'Zeit' },
-  { key: 'mittel', label: 'Mittel' },
-  { key: 'verbindung', label: 'Verbindung/Meldewege' },
-  { key: 'sicherheit', label: 'Sicherheit/Besonderes' },
+  ...READ_ORDER.map((key) => ({ key, label: READ_LABEL[key] })),
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 
@@ -99,6 +98,7 @@ export function AuftragKopf({
           phase={status.phase}
           label={status.label}
           unbearbeitet={!!status.unbearbeitet}
+          ton={status.ton}
         />
         {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
         {mitEtbSprung && a.quell_etb_eintrag_id != null && einsatzId != null && (
@@ -185,7 +185,10 @@ export function AuftragEmpfaenger({
   // Knopf, und die Auto-Frist-Erinnerung schlösse nie.
   const sichtbareQuittierte = quittierteEmpf.slice(0, QUITTIERT_CHIP_GRENZE);
   const restQuittierte = quittierteEmpf.length - sichtbareQuittierte.length;
-  const darfQuittieren = !!(darfSchreiben && onQuittieren);
+  const aufgehoben = a.bearbeitungsstatus === 'aufgehoben';
+  // Ein aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): kein Knopf, die Zeile
+  // nennt die Unquittierten ohne „offen“.
+  const darfQuittieren = !!(darfSchreiben && onQuittieren) && !aufgehoben;
 
   return (
     <>
@@ -214,7 +217,7 @@ export function AuftragEmpfaenger({
       {offeneEmpf.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
           <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-            Quittung offen:
+            {aufgehoben ? 'Nicht quittiert:' : 'Quittung offen:'}
           </Text>
           {offeneEmpf.map((e) => (
             <Space key={e.id} size={4}>
@@ -256,6 +259,25 @@ export function AuftragEmpfaenger({
         </div>
       )}
     </>
+  );
+}
+
+/** Zeitpunkt, Person und Grund einer Aufhebung (LLH-1098); an einem anderen Auftrag nichts. */
+export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
+  const { formatZeit } = useAnzeigeKonventionen();
+  if (a.bearbeitungsstatus !== 'aufgehoben') return null;
+  return (
+    <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
+      <Text style={{ fontSize: 13 }}>
+        {[
+          `Aufgehoben am: ${a.aufgehoben_at ? formatZeit(a.aufgehoben_at) : '—'}`,
+          a.aufgehoben_von_name,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
+      {a.aufhebungsgrund && <Text style={{ fontSize: 13 }}>{`Grund: ${a.aufhebungsgrund}`}</Text>}
+    </Space>
   );
 }
 
@@ -320,6 +342,10 @@ export interface AuftragHandlungenProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  /** Öffnet das Formular zum Berichtigen (LLH-1098); nur angeboten, solange `berichtigbar`. */
+  onBerichtigen?: (auftragId: number) => void;
+  /** Öffnet die Rückfrage „Auftrag aufheben“ (LLH-1098). */
+  onAufheben?: (auftragId: number) => void;
   /**
    * Grund der zuletzt abgelehnten Handlung (In Bearbeitung, Rücknahme, Abnahme), aus
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
@@ -336,6 +362,8 @@ export function AuftragHandlungen({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  onBerichtigen,
+  onAufheben,
   fehlerGrund,
   ausrichtung = 'flex-end',
 }: AuftragHandlungenProps) {
@@ -371,6 +399,47 @@ export function AuftragHandlungen({
         ) : null,
       ].filter(Boolean)
     : [];
+
+  /*
+   * Berichtigen und Aufheben (LLH-1098). Der `darfSchreiben`-Riegel steht hier, ein Callback ist
+   * kein Rechtebeleg. Berichtigen nur an einem offenen Auftrag; nach der ersten Quittung steht es
+   * gesperrt mit Grund (LFH-966), der Server liefert die Regel als `berichtigbar`. Aufheben bis
+   * zur Abnahme.
+   */
+  const kannAufheben =
+    a.bearbeitungsstatus === 'offen' ||
+    a.bearbeitungsstatus === 'in_arbeit' ||
+    a.bearbeitungsstatus === 'vollzogen';
+  const weitere: MenueEintrag<'berichtigen' | 'aufheben'>[] = darfSchreiben
+    ? [
+        ...(a.bearbeitungsstatus === 'offen' && onBerichtigen
+          ? [
+              a.berichtigbar
+                ? { key: 'berichtigen' as const, label: 'Berichtigen' }
+                : {
+                    key: 'berichtigen' as const,
+                    label: 'Berichtigen (schon quittiert)',
+                    gesperrt: true as const,
+                  },
+            ]
+          : []),
+        ...(kannAufheben && onAufheben
+          ? [
+              {
+                key: 'aufheben' as const,
+                label: AUFTRAG_HANDLUNG.aufgehoben,
+                gefahr: true as const,
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const waehle = (key: 'berichtigen' | 'aufheben') =>
+    key === 'berichtigen' ? onBerichtigen?.(a.id) : onAufheben?.(a.id);
+  // Gebündelt ab drei Aktionen nach der Rechteprüfung (LFH-365); darunter wäre ein Menü ein Umweg.
+  const buendeln = aktionen.length + weitere.length >= 3;
+  const kennung = a.lfd_nr != null ? `Auftrag #${a.lfd_nr}` : 'Auftrag';
+
   return (
     <>
       {/* Grund einer abgelehnten Handlung über ihren Knöpfen, bis zur nächsten Handlung an diesem
@@ -380,9 +449,31 @@ export function AuftragHandlungen({
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
-      {aktionen.length > 0 && (
-        <Flex justify={ausrichtung} gap={8} wrap style={{ marginTop: 8 }}>
-          {aktionen}
+      {aktionen.length + weitere.length > 0 && (
+        <Flex justify={ausrichtung} style={{ marginTop: 8 }}>
+          {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
+             diese gespreizte Reihe nicht und führt die Teile unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
+          <Space size="middle" wrap>
+            {aktionen}
+            {buendeln ? (
+              <MenueAusloeser
+                eintraege={weitere}
+                zugaenglicherName={`Aktionen zu ${kennung}`}
+                onWahl={waehle}
+              />
+            ) : (
+              weitere.map((w) => (
+                <Button
+                  key={w.key}
+                  danger={w.gefahr}
+                  disabled={w.gesperrt}
+                  onClick={() => waehle(w.key)}
+                >
+                  {w.label}
+                </Button>
+              ))
+            )}
+          </Space>
         </Flex>
       )}
     </>

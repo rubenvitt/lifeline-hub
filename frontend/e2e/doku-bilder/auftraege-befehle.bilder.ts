@@ -12,7 +12,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/auftraege/AuftragListenKarte.tsx,
  *                          frontend/src/auftraege/AuftragDetail.tsx
  *   auftrag-erteilen.png   frontend/src/auftraege/AuftragErteilenDialog.tsx,
- *                          frontend/src/auftraege/AuftragFormular.tsx
+ *                          frontend/src/auftraege/AuftragFormular.tsx,
+ *                          frontend/src/auftraege/auftragsschemaKern.ts
+ *   auftrag-aufheben.png   frontend/src/auftraege/AuftragAufhebenDialog.tsx
  *   befehl-detail.png      frontend/src/auftraege/BefehlListe.tsx,
  *                          frontend/src/auftraege/BefehlListenKarte.tsx,
  *                          frontend/src/auftraege/BefehlDetail.tsx
@@ -47,12 +49,13 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/auftraege`);
     await page.getByRole('button', { name: 'Auftrag erteilen' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog
-      .getByLabel('Auftrag / Was')
-      .fill('Sandsäcke an der Unterführung Lindenstraße auslegen, Keller Nr. 6 sichern.');
+    // Reihenfolge der FwDV 100 (LLH-1091): erst die Einheit, dann der Auftrag.
     const empfaenger = dialog.getByRole('combobox', { name: 'Empfänger' });
     await empfaenger.fill('Logistiktrupp');
     await empfaenger.press('Enter');
+    await dialog
+      .getByLabel('Auftrag / Was')
+      .fill('Sandsäcke an der Unterführung Lindenstraße auslegen, Keller Nr. 6 sichern.');
     await waehleIn(dialog.getByRole('combobox', { name: 'Priorität' }), 'Dringend');
     await fokusWeg(page);
     await expect(dialog.getByTitle('Logistiktrupp')).toBeVisible();
@@ -83,6 +86,32 @@ test.describe(KAPITEL, () => {
     await expect(detail.getByText('Logistiktrupp sichert die Keller')).toBeVisible();
     await fokusWeg(page);
     await fotografiere(page.locator('[data-lfh="liste-detail"]'), KAPITEL, 'befehl-detail');
+  });
+
+  test('Rückfrage „Auftrag aufheben“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const auftrag = await fuelle<{ id: number; lfd_nr: number }>(
+      page,
+      'post',
+      `/api/einsaetze/${demo.id}/auftraege`,
+      {
+        auftrag_text: 'Sandsäcke vom Bauhof zur Unterführung Lindenstraße bringen.',
+        empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
+      },
+    );
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/auftraege?auftrag=${auftrag.id}`);
+    // Der Knopf der TanStack-Devtools (nur am Vite-Entwicklungsserver) liegt sonst über dem Menü,
+    // wie in `e2e/dialoge-handy.spec.ts`.
+    await page.addStyleTag({ content: '[class*="tsqd-open-btn"] { display: none !important; }' });
+    await page.getByRole('button', { name: `Aktionen zu Auftrag #${auftrag.lfd_nr}` }).click();
+    await page.getByRole('menuitem', { name: 'Auftrag aufheben' }).click();
+    const dialog = page.getByRole('dialog', { name: `Auftrag #${auftrag.lfd_nr} aufheben` });
+    await dialog.getByLabel('Grund').fill('Material kommt direkt vom Bauhof.');
+    await fokusWeg(page);
+    await expect(dialog.getByRole('button', { name: 'Auftrag aufheben' })).toBeVisible();
+    await fotografiere(dialog, KAPITEL, 'auftrag-aufheben');
   });
 
   test('Befehlsentwurf auf der Detailseite', async ({ page }) => {

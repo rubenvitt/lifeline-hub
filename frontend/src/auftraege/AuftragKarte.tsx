@@ -4,6 +4,7 @@ import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/
 import KommKarte from '../kommunikation/KommKarte';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
+  AuftragAufhebung,
   AuftragEmpfaenger,
   AuftragHandlungen,
   AuftragKopf,
@@ -33,6 +34,10 @@ interface AuftragKarteProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  /** Öffnet das Formular zum Berichtigen (LLH-1098); nur angeboten, solange `berichtigbar`. */
+  onBerichtigen?: (auftragId: number) => void;
+  /** Öffnet die Rückfrage „Auftrag aufheben“ der Liste (LLH-1098). */
+  onAufheben?: (auftragId: number) => void;
   /**
    * Grund der zuletzt abgelehnten Karten-Aktion (In Bearbeitung, Rücknahme, Abnahme), aus
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
@@ -63,6 +68,8 @@ function AuftragKarte({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  onBerichtigen,
+  onAufheben,
   fehlerGrund,
   quittierFehlerGrund,
 }: AuftragKarteProps) {
@@ -95,6 +102,7 @@ function AuftragKarte({
         quittierFehlerGrund={quittierFehlerGrund}
       />
 
+      <AuftragAufhebung auftrag={a} />
       <AuftragVollzug auftrag={a} ansicht={ansicht} />
 
       {hasSchema && (
@@ -119,6 +127,8 @@ function AuftragKarte({
         onInArbeit={onInArbeit}
         onVollzugMelden={onVollzugMelden}
         onAbnehmen={onAbnehmen}
+        onBerichtigen={onBerichtigen}
+        onAufheben={onAufheben}
         fehlerGrund={fehlerGrund}
       />
     </KommKarte>

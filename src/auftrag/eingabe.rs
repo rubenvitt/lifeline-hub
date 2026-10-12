@@ -9,7 +9,7 @@ use crate::auftrag::{
     RICHTUNG_INTERN,
 };
 use crate::error::AppError;
-use crate::routes::support::{hoechstens, pflicht_max};
+use crate::routes::support::{deserialize_optional_field, hoechstens, pflicht_max};
 use std::collections::HashSet;
 
 use serde::Deserialize;
@@ -78,6 +78,8 @@ pub struct NeuerAuftrag {
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
+    /// Weg der Einheit (FwDV 100: Einheit – Auftrag – Mittel – Ziel – Weg, LLH-1091).
+    pub weg: Option<String>,
     pub prioritaet: Option<String>,
     /// Richtung intern/extern (LFH-87); Default 'intern'.
     pub richtung: Option<String>,
@@ -229,6 +231,65 @@ async fn validiere_empfaenger(
     })
 }
 
+/// Pflicht und Obergrenze der Empfängerliste (LFH-937), vor jeder Abfrage; gezählt vor dem
+/// Entdoppeln.
+fn pruefe_empfaenger_zahl(empfaenger: &[EmpfaengerEingabeReq]) -> Result<(), AppError> {
+    if empfaenger.is_empty() {
+        return Err(AppError::Validation(
+            "Mindestens ein Empfänger ist erforderlich".into(),
+        ));
+    }
+    if empfaenger.len() > EMPFAENGER_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {EMPFAENGER_MAX} Empfänger je Auftrag"
+        )));
+    }
+    Ok(())
+}
+
+/// Prüft eine Empfängerliste so, wie das Erteilen sie prüft (LFH-937, design.md D3): gleiche Ziele
+/// zusammengeführt (erste Nennung und Reihenfolge bleiben), Textgrenzen vor der ersten Abfrage,
+/// dann jede Zeile auf Slot und Einsatz-Zugehörigkeit. Geteilt von Erteilen und Berichtigen
+/// (LLH-1098); die Zahl prüft [`pruefe_empfaenger_zahl`] vorher.
+async fn validiere_empfaenger_liste(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    liste: &[EmpfaengerEingabeReq],
+) -> Result<Vec<repo::EmpfaengerEingabe>, AppError> {
+    let mut gesehen = HashSet::new();
+    let eindeutig: Vec<&EmpfaengerEingabeReq> = liste
+        .iter()
+        .filter(|r| gesehen.insert(empfaenger_schluessel(r)))
+        .collect();
+    // Textgrenzen der Empfänger vor der ersten Abfrage, damit eine 400 nie hinter einer 422
+    // eines früheren Empfängers verschwindet (`src/AGENTS.md`, „Eingabegrenzen“).
+    for r in &eindeutig {
+        if let Some(t) = trimme(&r.funktion_text) {
+            hoechstens(t, "Funktion/Bezeichnung", crate::fuehrung::TEXT_MAX)?;
+        }
+        if let Some(b) = trimme(&r.extern_bezeichnung) {
+            hoechstens(b, "Externe Bezeichnung", EXTERN_BEZEICHNUNG_MAX)?;
+        }
+    }
+    // Die Labelkarte einmal je Request, nicht je Funktionsempfänger.
+    let s7_aktiv = if eindeutig
+        .iter()
+        .any(|r| r.empfaenger_typ.as_str() == EMPF_FUNKTION)
+    {
+        let mut conn = pool.acquire().await?;
+        crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
+            .await?
+            .s7_aktiv
+    } else {
+        false
+    };
+    let mut empfaenger = Vec::new();
+    for r in eindeutig {
+        empfaenger.push(validiere_empfaenger(pool, einsatz_id, r, s7_aktiv).await?);
+    }
+    Ok(empfaenger)
+}
+
 /// Validierte, besitzende Auftrags-Eingabe. Geteilt zwischen POST /auftraege und der
 /// Chat→Auftrag-Heraufstufung (LFH-101), damit BEIDE Pfade dieselben Pflicht-, Slot-
 /// und Zugehörigkeitsprüfungen durchlaufen. `daten()` baut daraus die borrowende
@@ -242,6 +303,7 @@ pub struct ValidierterAuftrag {
     mittel: Option<String>,
     verbindung: Option<String>,
     sicherheit: Option<String>,
+    weg: Option<String>,
     prioritaet: String,
     richtung: String,
     frist_at: Option<String>,
@@ -260,6 +322,7 @@ impl ValidierterAuftrag {
             mittel: self.mittel.as_deref(),
             verbindung: self.verbindung.as_deref(),
             sicherheit: self.sicherheit.as_deref(),
+            weg: self.weg.as_deref(),
             prioritaet: &self.prioritaet,
             richtung: &self.richtung,
             frist_at: self.frist_at.as_deref(),
@@ -290,23 +353,16 @@ pub async fn validiere_neuen_auftrag(
 ) -> Result<ValidierterAuftrag, AppError> {
     // Grenzen vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
     let text = pflicht_max(&req.auftrag_text, "Auftragstext", AUFTRAG_TEXT_MAX)?;
-    if req.empfaenger.is_empty() {
-        return Err(AppError::Validation(
-            "Mindestens ein Empfänger ist erforderlich".into(),
-        ));
-    }
-    if req.empfaenger.len() > EMPFAENGER_MAX {
-        return Err(AppError::Validation(format!(
-            "Höchstens {EMPFAENGER_MAX} Empfänger je Auftrag"
-        )));
-    }
+    pruefe_empfaenger_zahl(&req.empfaenger)?;
     let absicht = befehlsfeld(&req.absicht, "Absicht")?;
     let lage = befehlsfeld(&req.lage, "Lage")?;
-    let ort = befehlsfeld(&req.ort, "Ort")?;
+    // „Ziel/Ort“: das Ziel der Ausführung nach FwDV 100 (LLH-1091, design.md D3).
+    let ort = befehlsfeld(&req.ort, "Ziel/Ort")?;
     let zeit = befehlsfeld(&req.zeit, "Zeit")?;
     let mittel = befehlsfeld(&req.mittel, "Mittel")?;
     let verbindung = befehlsfeld(&req.verbindung, "Verbindung")?;
     let sicherheit = befehlsfeld(&req.sicherheit, "Sicherheit")?;
+    let weg = befehlsfeld(&req.weg, "Weg")?;
     let prioritaet = req.prioritaet.as_deref().unwrap_or(PRIO_NORMAL);
     if !crate::auftrag::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
@@ -331,39 +387,7 @@ pub async fn validiere_neuen_auftrag(
         None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 
-    // Gleiche Ziele zusammenführen, erste Nennung und Reihenfolge bleiben (D3).
-    let mut gesehen = HashSet::new();
-    let eindeutig: Vec<&EmpfaengerEingabeReq> = req
-        .empfaenger
-        .iter()
-        .filter(|r| gesehen.insert(empfaenger_schluessel(r)))
-        .collect();
-    // Textgrenzen der Empfänger vor der ersten Abfrage, damit eine 400 nie hinter einer 422
-    // eines früheren Empfängers verschwindet (`src/AGENTS.md`, „Eingabegrenzen“).
-    for r in &eindeutig {
-        if let Some(t) = trimme(&r.funktion_text) {
-            hoechstens(t, "Funktion/Bezeichnung", crate::fuehrung::TEXT_MAX)?;
-        }
-        if let Some(b) = trimme(&r.extern_bezeichnung) {
-            hoechstens(b, "Externe Bezeichnung", EXTERN_BEZEICHNUNG_MAX)?;
-        }
-    }
-    // Die Labelkarte einmal je Request, nicht je Funktionsempfänger.
-    let s7_aktiv = if eindeutig
-        .iter()
-        .any(|r| r.empfaenger_typ.as_str() == EMPF_FUNKTION)
-    {
-        let mut conn = pool.acquire().await?;
-        crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
-            .await?
-            .s7_aktiv
-    } else {
-        false
-    };
-    let mut empfaenger = Vec::new();
-    for r in eindeutig {
-        empfaenger.push(validiere_empfaenger(pool, einsatz_id, r, s7_aktiv).await?);
-    }
+    let empfaenger = validiere_empfaenger_liste(pool, einsatz_id, &req.empfaenger).await?;
 
     Ok(ValidierterAuftrag {
         text: text.to_string(),
@@ -374,10 +398,125 @@ pub async fn validiere_neuen_auftrag(
         mittel,
         verbindung,
         sicherheit,
+        weg,
         prioritaet: prioritaet.to_string(),
         richtung: richtung.to_string(),
         frist_at: frist,
         erteilt_at: erteilt,
         empfaenger,
+    })
+}
+
+/// Body von `PATCH …/auftraege/{aid}` (LLH-1098, design.md D6): Teil-Patch. Ein fehlendes Feld
+/// bleibt; `null` (oder leer) leert ein optionales Feld. Empfänger ersetzen die ganze Liste.
+#[derive(Debug, Default, Deserialize)]
+pub struct AuftragPatch {
+    #[serde(default)]
+    pub auftrag_text: Option<String>,
+    #[serde(default)]
+    pub empfaenger: Option<Vec<EmpfaengerEingabeReq>>,
+    #[serde(default)]
+    pub prioritaet: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub frist_at: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub absicht: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lage: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub zeit: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub mittel: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub verbindung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub sicherheit: Option<Option<String>>,
+    /// Weg der Einheit (FwDV 100, LLH-1091).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub weg: Option<Option<String>>,
+}
+
+/// Die Felder des Befehlsschemas in ihrer Reihenfolge mit Spaltenname und Wortlaut im ETB.
+pub const SCHEMAFELDER: [(&str, &str); 8] = [
+    ("absicht", "Absicht"),
+    ("lage", "Lage"),
+    // „Ziel/Ort“ wie beim Erteilen (LLH-1091, design.md D3).
+    ("ort", "Ziel/Ort"),
+    ("zeit", "Zeit"),
+    ("mittel", "Mittel"),
+    ("verbindung", "Verbindung"),
+    ("sicherheit", "Sicherheit"),
+    ("weg", "Weg"),
+];
+
+/// Geprüfter Teil-Patch: je Feld `None` = unverändert. Schemafelder in der Reihenfolge von
+/// [`SCHEMAFELDER`].
+#[derive(Debug, Default)]
+pub struct ValidierteBerichtigung {
+    pub auftrag_text: Option<String>,
+    pub empfaenger: Option<Vec<repo::EmpfaengerEingabe>>,
+    pub prioritaet: Option<String>,
+    pub frist_at: Option<Option<String>>,
+    pub schema: [Option<Option<String>>; 8],
+}
+
+/// Prüft einen Teil-Patch mit denselben Regeln wie das Erteilen (Spec `eingabegrenzen`): alle
+/// Feldfehler 400, Grenzen vor der ersten Abfrage. Ob der Auftrag noch berichtigt werden darf
+/// (422), prüft erst die Transaktion.
+pub async fn validiere_berichtigung(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    req: &AuftragPatch,
+) -> Result<ValidierteBerichtigung, AppError> {
+    let auftrag_text = req
+        .auftrag_text
+        .as_deref()
+        .map(|t| pflicht_max(t, "Auftragstext", AUFTRAG_TEXT_MAX))
+        .transpose()?;
+    if let Some(e) = &req.empfaenger {
+        pruefe_empfaenger_zahl(e)?;
+    }
+    let roh = [
+        &req.absicht,
+        &req.lage,
+        &req.ort,
+        &req.zeit,
+        &req.mittel,
+        &req.verbindung,
+        &req.sicherheit,
+        &req.weg,
+    ];
+    let mut schema: [Option<Option<String>>; 8] = Default::default();
+    for (i, wert) in roh.into_iter().enumerate() {
+        schema[i] = wert
+            .as_ref()
+            .map(|w| befehlsfeld(w, SCHEMAFELDER[i].1))
+            .transpose()?;
+    }
+    let prioritaet = match req.prioritaet.as_deref().map(str::trim) {
+        Some(p) if !crate::auftrag::prioritaet_gueltig(p) => {
+            return Err(AppError::Validation("Ungültige Priorität".into()))
+        }
+        p => p.map(str::to_string),
+    };
+    let frist_at = match &req.frist_at {
+        None => None,
+        Some(f) => Some(match trimme(f) {
+            Some(f) => Some(parse_zeit(f, "Frist")?),
+            None => None,
+        }),
+    };
+    let empfaenger = match &req.empfaenger {
+        Some(liste) => Some(validiere_empfaenger_liste(pool, einsatz_id, liste).await?),
+        None => None,
+    };
+    Ok(ValidierteBerichtigung {
+        auftrag_text,
+        empfaenger,
+        prioritaet,
+        frist_at,
+        schema,
     })
 }

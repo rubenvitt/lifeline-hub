@@ -200,6 +200,7 @@ async fn texte_des_auftrags_sind_begrenzt() {
         auftrag("T", vec![extern_(&x(200))]),
         mit_feld("absicht", x(2_000)),
         mit_feld("sicherheit", x(2_000)),
+        mit_feld("weg", x(2_000)),
     ];
     for body in gut {
         let (s, j) = anfrage(&app, "POST", &uri, &admin, Some(&body)).await;
@@ -212,11 +213,12 @@ async fn texte_des_auftrags_sind_begrenzt() {
         (auftrag("T", vec![extern_(&x(201))]), "Externe Bezeichnung"),
         (mit_feld("absicht", x(2_001)), "Absicht"),
         (mit_feld("lage", x(2_001)), "Lage"),
-        (mit_feld("ort", x(2_001)), "Ort"),
+        (mit_feld("ort", x(2_001)), "Ziel/Ort"),
         (mit_feld("zeit", x(2_001)), "Zeit"),
         (mit_feld("mittel", x(2_001)), "Mittel"),
         (mit_feld("verbindung", x(2_001)), "Verbindung"),
         (mit_feld("sicherheit", x(2_001)), "Sicherheit"),
+        (mit_feld("weg", x(2_001)), "Weg"),
     ];
     for (body, feld) in schlecht {
         let (s, j) = anfrage(&app, "POST", &uri, &admin, Some(&body)).await;
@@ -326,4 +328,42 @@ async fn ein_typ_mit_leerzeichen_wird_nicht_weggeduppelt() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
     assert_eq!(j["error"], "Ungültiger Empfänger-Typ");
+}
+
+/// LLH-1098: der Grund beim Aufheben hat seine eigene Grenze; darüber 400, der Auftrag bleibt
+/// offen (Spec `eingabegrenzen`, „Zu langer Aufhebungsgrund“).
+#[tokio::test]
+async fn zu_langer_aufhebungsgrund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, a) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&auftrag("T", vec![funktion("EA")])),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let aid = a["id"].as_i64().unwrap();
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &admin,
+        Some(&json!({ "grund": x(2_001) }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+    assert!(j["error"].as_str().unwrap().starts_with("Grund"), "{j:?}");
+    let (_, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["bearbeitungsstatus"], "offen");
 }

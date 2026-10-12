@@ -1,5 +1,5 @@
 import { Tooltip } from 'antd';
-import { StatusChip } from '../components/instrument';
+import { StatusChip, type StatusTon } from '../components/instrument';
 import { phaseTon } from './kartenKante';
 import type { KommPhase } from './phase';
 
@@ -12,10 +12,13 @@ export default function StatusBadge({
   label,
   title,
   unbearbeitet,
+  ton,
 }: {
   phase: KommPhase;
   label: string;
   title?: string;
+  /** Ton des Status, falls er vom Phasenton abweicht (`StatusDeskriptor.ton`, LLH-1098). */
+  ton?: StatusTon;
   /**
    * Eingangszustand: Achtung-Ton statt Phasenton, dazu fett — zweiter Kanal neben der Farbe sind
    * Gewicht UND Wortlaut (WCAG 1.4.1).
@@ -25,7 +28,7 @@ export default function StatusBadge({
   const chip = (
     <span data-lfh="komm-status" data-phase={phase} style={{ display: 'inline-flex' }}>
       <StatusChip
-        ton={phaseTon(phase, unbearbeitet)}
+        ton={ton ?? phaseTon(phase, unbearbeitet)}
         wort={label}
         style={unbearbeitet ? { fontWeight: 600 } : undefined}
       />

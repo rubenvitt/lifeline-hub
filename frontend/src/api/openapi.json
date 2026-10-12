@@ -1098,7 +1098,8 @@
           "empfaenger_anzahl",
           "quittiert_anzahl",
           "ist_ueberfaellig",
-          "bearbeitungsstatus"
+          "bearbeitungsstatus",
+          "berichtigbar"
         ],
         "properties": {
           "abgenommen_at": {
@@ -1120,11 +1121,42 @@
               "null"
             ]
           },
+          "aufgehoben_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Aufhebung (LLH-1098): Zeitpunkt, Person und Grund; alle drei oder keiner. Fehlen am\nnicht aufgehobenen Auftrag (Norm LFH-265)."
+          },
+          "aufgehoben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "aufgehoben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der aufhebenden Person zur Lesezeit."
+          },
+          "aufhebungsgrund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "auftrag_text": {
             "type": "string"
           },
           "bearbeitungsstatus": {
             "$ref": "#/components/schemas/AuftragBearbeitungsstatus"
+          },
+          "berichtigbar": {
+            "type": "boolean",
+            "description": "Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —\nnur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098)."
           },
           "einsatz_id": {
             "type": "integer",
@@ -1249,6 +1281,13 @@
               "null"
             ]
           },
+          "weg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Weg der Einheit (FwDV 100, LLH-1091)."
+          },
           "zeit": {
             "type": [
               "string",
@@ -1264,7 +1303,8 @@
           "offen",
           "in_arbeit",
           "vollzogen",
-          "abgenommen"
+          "abgenommen",
+          "aufgehoben"
         ]
       },
       "AuftragDetail": {
@@ -1413,7 +1453,7 @@
           "abgeschlossen": {
             "type": "integer",
             "format": "int64",
-            "description": "Vollzogen oder abgenommen."
+            "description": "Vollzogen, abgenommen oder aufgehoben."
           },
           "offen": {
             "type": "integer",

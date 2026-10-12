@@ -1,3 +1,5 @@
+import type { StatusTon } from '../components/instrument';
+
 /**
  * Geteilte Status-/Prio-Semantik der Kommunikations-Module.
  *
@@ -40,7 +42,20 @@ export function prioRang(prio: string): number {
  * Erinnerung und angeforderte Nachforderung liegen ebenfalls auf `offen` und wären von einer
  * neuen Phase zu „neu" umklassifiziert worden. Die Marke gehört an den Status, nicht an die Achse.
  */
-type StatusDeskriptor = Record<string, { label: string; phase: KommPhase; unbearbeitet?: true }>;
+type StatusDeskriptor = Record<
+  string,
+  {
+    label: string;
+    phase: KommPhase;
+    unbearbeitet?: true;
+    /**
+     * Eigener Ton statt des Phasentons (LLH-1098): ein aufgehobener Auftrag ist abgeschlossen für
+     * jede Zählung, aber kein erledigter Abschluss. Wie `unbearbeitet` eine Marke am Status, keine
+     * eigene Phase.
+     */
+    ton?: StatusTon;
+  }
+>;
 
 /** AUFTRAG (AuftragBearbeitungsstatus). */
 export const AUFTRAG_STATUS: StatusDeskriptor = {
@@ -48,6 +63,7 @@ export const AUFTRAG_STATUS: StatusDeskriptor = {
   in_arbeit: { label: 'In Bearbeitung', phase: 'in_arbeit' },
   vollzogen: { label: 'Vollzogen', phase: 'abgeschlossen' },
   abgenommen: { label: 'Abgenommen', phase: 'abgeschlossen' },
+  aufgehoben: { label: 'Aufgehoben', phase: 'abgeschlossen', ton: 'neutral' },
 };
 
 /** MELDUNG (MeldungStatus). */
@@ -88,6 +104,8 @@ export const MELDUNG_HANDLUNG: Record<string, string> = {
 
 export const AUFTRAG_HANDLUNG: Record<string, string> = {
   in_arbeit: 'Bearbeitung beginnen',
+  // Rot und mit Rückfrage (LLH-1098); das Etikett danach sagt „Aufgehoben“.
+  aufgehoben: 'Auftrag aufheben',
 };
 
 export const NACHFORDERUNG_HANDLUNG: Record<string, string> = {

@@ -7,7 +7,8 @@
       { "name": "in Arbeit", "bearbeitungsstatus": "in_arbeit", "ist_ueberfaellig": false, "offen": true, "ueberfaellig": false },
       { "name": "in Arbeit, überfällig", "bearbeitungsstatus": "in_arbeit", "ist_ueberfaellig": true, "offen": true, "ueberfaellig": true },
       { "name": "vollzogen mit Quittungslücke nach Frist", "bearbeitungsstatus": "vollzogen", "ist_ueberfaellig": true, "offen": false, "ueberfaellig": false },
-      { "name": "abgenommen", "bearbeitungsstatus": "abgenommen", "ist_ueberfaellig": false, "offen": false, "ueberfaellig": false }
+      { "name": "abgenommen", "bearbeitungsstatus": "abgenommen", "ist_ueberfaellig": false, "offen": false, "ueberfaellig": false },
+      { "name": "aufgehoben mit abgelaufener Frist und Quittungslücke", "bearbeitungsstatus": "aufgehoben", "ist_ueberfaellig": true, "offen": false, "ueberfaellig": false }
     ],
     "erwartet": { "offen": 4, "in_arbeit": 2, "ueberfaellig": 2 }
   },

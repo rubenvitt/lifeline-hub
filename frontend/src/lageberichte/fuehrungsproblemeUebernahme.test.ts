@@ -69,6 +69,15 @@ const AUFTRAEGE = [
     frist_at: '2026-10-04 10:00:00',
     auftrag_text: 'x',
   },
+  // Überfällig, aber aufgehoben (LLH-1098): nie offen.
+  {
+    id: 5,
+    lfd_nr: 21,
+    bearbeitungsstatus: 'aufgehoben',
+    ist_ueberfaellig: true,
+    frist_at: '2026-10-04 09:00:00',
+    auftrag_text: 'z',
+  },
   {
     id: 4,
     lfd_nr: 20,
@@ -160,6 +169,7 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
     );
     expect(text).not.toContain('Nr. 9 ');
     expect(text).not.toContain('Nr. 20 ');
+    expect(text).not.toContain('Nr. 21 ');
   });
 
   it('nennt Meldungen mit überfälliger Bestätigung mit Art und Frist und die neuen', async () => {

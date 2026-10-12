@@ -14,12 +14,14 @@ export const ETB_INHALT_MAX = 20_000;
 export const ETB_PARTEI_MAX = 500;
 /** Auftragstext. */
 export const AUFTRAG_TEXT_MAX = 10_000;
-/** Jedes Feld des Befehlsschemas (absicht, lage, ort, zeit, mittel, verbindung, sicherheit). */
+/** Jedes Feld des Befehlsschemas (absicht, lage, ort, zeit, mittel, verbindung, sicherheit, weg). */
 export const AUFTRAG_BEFEHLSFELD_MAX = 2_000;
 /** Empfänger eines Auftrags im Request (vor dem Entdoppeln). */
 export const AUFTRAG_EMPFAENGER_MAX = 50;
 /** Bezeichnung eines externen Empfängers. */
 export const AUFTRAG_EXTERN_BEZEICHNUNG_MAX = 200;
+/** Grund beim Aufheben eines Auftrags (LLH-1098); steht wörtlich in der ETB-Anordnung. */
+export const AUFTRAG_AUFHEBUNGSGRUND_MAX = 2_000;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
 /** Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045). */

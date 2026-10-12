@@ -11,19 +11,21 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import {
   AUFTRAEGE_SEITE,
   auftragAbschlussCursor,
+  hebeAuf,
   ladeAuftrag,
   ladeAuftragKennzahlen,
   legeAuftragAn,
   listeAbgeschlosseneAuftraege,
   listeOffeneAuftraege,
   nimmAb,
+  patcheAuftrag,
   quittiereEmpfaenger,
   setzeVollzug,
 } from '../api/auftraege';
 import type { AbschlussCursor } from '../api/meldungen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { Auftrag, NeuerAuftrag } from '../api/types';
+import type { Auftrag, AuftragPatch, NeuerAuftrag } from '../api/types';
 import {
   AUFTRAG_STATUS,
   GRUPPE_LABEL,
@@ -39,6 +41,7 @@ import AuftragErteilenDialog from './AuftragErteilenDialog';
 import AuftragListenKarte from './AuftragListenKarte';
 import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
+import AuftragAufhebenDialog from './AuftragAufhebenDialog';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { Segmentleiste, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -362,6 +365,35 @@ export default function AuftraegeListe({
     onError: (e, auftragId) => kartenFehler.melde(auftragId, e, 'Abnahme fehlgeschlagen'),
   });
 
+  // Aufheben (LLH-1098): EIN Dialog außerhalb der Karten-`map` (LFH-365/683); er schließt erst
+  // beim Erfolg, eine Ablehnung steht in ihm (LFH-1077). Unumkehrbar, also kein Rückgängig.
+  const [aufhebenFuer, setAufhebenFuer] = useState<number | null>(null);
+  const aufhebenMutation = useMutation({
+    mutationFn: ({ auftragId, grund }: { auftragId: number; grund: string }) =>
+      hebeAuf(einsatzId, auftragId, grund),
+    onMutate: ({ auftragId }) => kartenFehler.beginne(auftragId),
+    // Aufgehoben fällt aus „Offen“: das Detail zeigt den Stand der Antwort (Spec `liste-detail`).
+    onSuccess: (stand) => {
+      setFrisch(stand);
+      invalidiere();
+      message.success('Auftrag aufgehoben');
+    },
+  });
+
+  // Berichtigen (LLH-1098, design.md D9): dasselbe Formular wie beim Erteilen, im selben Dialog
+  // (Change oxgob5gk, D10: Erfassen per Dialog statt Paneel über der Liste), vorbelegt mit dem
+  // Stand beim Öffnen. Es schließt erst beim Erfolg.
+  const [berichtigenFuer, setBerichtigenFuer] = useState<Auftrag | null>(null);
+  const berichtigenMutation = useMutation({
+    mutationFn: ({ auftragId, patch }: { auftragId: number; patch: AuftragPatch }) =>
+      patcheAuftrag(einsatzId, auftragId, patch),
+    onSuccess: (stand) => {
+      setFrisch(stand);
+      invalidiere();
+      message.success('Auftrag berichtigt');
+    },
+  });
+
   /*
    * Gemerkt über den Datenstand (LFH-949, D6): die Karten sind `memo`, und eine je Render neu
    * gefilterte Liste gäbe ihnen nichts zu vergleichen. Die Aufträge selbst bleiben die Objekte aus
@@ -456,6 +488,27 @@ export default function AuftraegeListe({
     (auftragId: number) => mutationen.current.abnahmeMutation.mutate(auftragId),
     [],
   );
+  // Der Setter ist stabil; den Grund einer früheren Ablehnung räumt die Erfassungshülle beim Öffnen.
+  const onAufheben = setAufhebenFuer;
+  // Den Auftrag aus dem geladenen Stand, eingefroren für die Vorbelegung (design.md D9). Der Ref
+  // hält den Handler stabil wie die übrigen (LFH-949).
+  const geladeneListe = useMemo(
+    () => [...(offeneQuery.data ?? []), ...abgeschlossene, ...(verlinkte ? [verlinkte] : [])],
+    [offeneQuery.data, abgeschlossene, verlinkte],
+  );
+  const geladene = useRef<Auftrag[]>([]);
+  useLayoutEffect(() => {
+    geladene.current = geladeneListe;
+  });
+  const onBerichtigen = useCallback((auftragId: number) => {
+    const a = geladene.current.find((x) => x.id === auftragId);
+    if (a) setBerichtigenFuer(a);
+  }, []);
+  // Nummer für Titel und Satz der Rückfrage, aus dem geladenen Stand.
+  const aufhebenNummer =
+    aufhebenFuer == null
+      ? null
+      : (geladeneListe.find((a) => a.id === aufhebenFuer)?.lfd_nr ?? null);
 
   const imOffenen = ansicht === 'offen';
   const listenQuery = imOffenen ? offeneQuery : abgeschlosseneQuery;
@@ -582,6 +635,8 @@ export default function AuftraegeListe({
             onInArbeit={onInArbeit}
             onVollzugMelden={setVollzugFuer}
             onAbnehmen={onAbnehmen}
+            onBerichtigen={onBerichtigen}
+            onAufheben={onAufheben}
             fehlerGrund={kartenFehler.grund(a.id)}
             quittierFehlerGrund={quittierFehler.grund(a.id)}
           />
@@ -618,6 +673,36 @@ export default function AuftraegeListe({
         // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.
         onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
         speicherung={anlegenMutation}
+      />
+      <AuftragErteilenDialog
+        offen={darfSchreiben && berichtigenFuer != null}
+        onSchliessen={() => setBerichtigenFuer(null)}
+        abschnitte={abschnitte}
+        einheiten={einheiten}
+        einsatzId={einsatzId}
+        senden={berichtigenMutation.isPending}
+        onAnlegen={() => Promise.resolve()}
+        berichtigen={
+          berichtigenFuer
+            ? {
+                auftrag: berichtigenFuer,
+                onSpeichern: (patch) =>
+                  berichtigenMutation.mutateAsync({ auftragId: berichtigenFuer.id, patch }),
+              }
+            : undefined
+        }
+        speicherung={berichtigenMutation}
+      />
+      <AuftragAufhebenDialog
+        offen={aufhebenFuer !== null}
+        nummer={aufhebenNummer}
+        speicherung={aufhebenMutation}
+        onSchliessen={() => setAufhebenFuer(null)}
+        onAufheben={(grund) =>
+          aufhebenFuer == null
+            ? Promise.resolve()
+            : aufhebenMutation.mutateAsync({ auftragId: aufhebenFuer, grund })
+        }
       />
       <VollzugMeldenModal
         offen={vollzugFuer !== null}

@@ -1,5 +1,8 @@
 use crate::app::AppState;
-use crate::auftrag::{anreichern_alle, repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
+use crate::auftrag::{
+    anreichern_alle, repo, validiere_neuen_auftrag, AuftragBearbeitungsstatus, AuftragDetail,
+    NeuerAuftrag,
+};
 use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Auftraege;
@@ -235,10 +238,7 @@ pub async fn anlegen(
     // bei Fristablauf `erinnerung` mit Diskriminator → In-App-Alarm; Quittieren aller Empfänger
     // schließt sie wieder (siehe quittieren). Reuse des Meldungs-Pfads (routes/meldung.rs).
     if let Some(frist) = d.auftrag.frist_at.as_deref() {
-        let titel = match d.auftrag.lfd_nr {
-            Some(nr) => format!("Auftrag #{nr} Quittierfrist"),
-            None => "Auftrag Quittierfrist".to_string(),
-        };
+        let titel = crate::auftrag::quittierfrist_titel(d.auftrag.lfd_nr);
         crate::erinnerung::repo::anlegen_aus_frist(
             &state.pool,
             einsatz_id,
@@ -375,6 +375,29 @@ pub async fn vollzug(
     )
     .await?;
     let now = jetzt();
+    // Feldfehler zuerst (400 vor jedem 422, `src/AGENTS.md`, „Eingabegrenzen“).
+    let vollzugstext = match req.status.as_str() {
+        "offen" | "in_arbeit" => None,
+        // Wird der Inhalt einer ETB-Meldung: dessen Grenze (LFH-937, design.md D2).
+        "vollzogen" => Some(pflicht_max(
+            req.vollzugsmeldung.as_deref().unwrap_or_default(),
+            "Vollzugsmeldung",
+            crate::etb::INHALT_MAX,
+        )?),
+        _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
+    };
+    // Ein aufgehobener Auftrag nimmt keinen Fortschritt mehr an (LLH-1098), auch keine
+    // Rücknahme: Zustandsfehler → 422.
+    if repo::laden(&state.pool, auftrag_id, &now)
+        .await?
+        .auftrag
+        .bearbeitungsstatus
+        == AuftragBearbeitungsstatus::Aufgehoben
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist aufgehoben".into(),
+        ));
+    }
     match req.status.as_str() {
         // Rücknahme (LFH-343 · C8): nur aus `in_arbeit`. Aus `vollzogen`/`abgenommen`
         // wäre das die Rücknahme einer Vollzugsmeldung — ein fachlicher Vorgang mit
@@ -410,12 +433,7 @@ pub async fn vollzug(
             .await?;
         }
         "vollzogen" => {
-            // Wird der Inhalt einer ETB-Meldung: dessen Grenze (LFH-937, design.md D2).
-            let text = pflicht_max(
-                req.vollzugsmeldung.as_deref().unwrap_or_default(),
-                "Vollzugsmeldung",
-                crate::etb::INHALT_MAX,
-            )?;
+            let text = vollzugstext.unwrap_or_default();
             // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
             if repo::laden(&state.pool, auftrag_id, &now)
                 .await?
@@ -465,6 +483,11 @@ pub async fn abnehmen(
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
+    if aktuell.auftrag.bearbeitungsstatus == AuftragBearbeitungsstatus::Aufgehoben {
+        return Err(AppError::UnprocessableEntity(
+            "Ein aufgehobener Auftrag lässt sich nicht abnehmen".into(),
+        ));
+    }
     if aktuell.auftrag.vollzug_status != "vollzogen" {
         return Err(AppError::UnprocessableEntity(
             "Nur vollzogene Aufträge können abgenommen werden".into(),
@@ -483,6 +506,100 @@ pub async fn abnehmen(
     )
     .await?;
     sse(&state, einsatz_id);
+    Ok(Json(d))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AufhebenReq {
+    /// Pflichtgrund (LLH-1098); steht wörtlich in der ETB-Anordnung.
+    #[serde(default)]
+    pub grund: String,
+}
+
+/// POST /api/einsaetze/{id}/auftraege/{aid}/aufheben — Auftrag mit Grund aufheben (LLH-1098,
+/// Spec `auftrag-aufheben-berichtigen`). Unumkehrbar; schreibt eine Anordnung ins ETB.
+pub async fn aufheben(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
+    PfadParam((einsatz_id, auftrag_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<AufhebenReq>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    // 400 vor jedem 422 (`src/AGENTS.md`, „Eingabegrenzen“).
+    let grund = pflicht_max(&req.grund, "Grund", crate::auftrag::AUFHEBUNGSGRUND_MAX)?;
+    gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
+    let now = jetzt();
+    let von_id = ctx.benutzer.id;
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        repo::aufheben_tx(
+            conn,
+            einsatz_id,
+            auftrag_id,
+            von_id,
+            etb_startwert,
+            &grund,
+            &now,
+        )
+        .await
+    })?;
+    state.live.publiziere(einsatz_id, etb_id);
+    let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
+    sse(&state, einsatz_id);
+    Ok(Json(d))
+}
+
+/// PATCH /api/einsaetze/{id}/auftraege/{aid} — Auftrag berichtigen, solange er offen ist und
+/// niemand quittiert hat (LLH-1098, Spec `auftrag-aufheben-berichtigen`). Teil-Patch; ohne
+/// fachliche Änderung weder ETB noch Ereignis.
+pub async fn berichtigen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
+    PfadParam((einsatz_id, auftrag_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    let b = crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, &req).await?;
+    let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
+    // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
+    let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
+    let now = jetzt();
+    let von_id = ctx.benutzer.id;
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        repo::berichtigen_tx(
+            conn,
+            einsatz_id,
+            auftrag_id,
+            von_id,
+            etb_startwert,
+            tz,
+            &b,
+            &now,
+        )
+        .await
+    })?;
+    let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        sse(&state, einsatz_id);
+    }
     Ok(Json(d))
 }
 

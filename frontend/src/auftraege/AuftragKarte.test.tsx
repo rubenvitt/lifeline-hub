@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
@@ -46,6 +47,7 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   quittiert_anzahl: 0,
   ist_ueberfaellig: false,
   bearbeitungsstatus: 'offen',
+  berichtigbar: true,
   empfaenger: [],
   ...over,
 });
@@ -76,5 +78,26 @@ describe('AuftragKarte — Erteilungszeit (LFH-972)', () => {
     renderKarte(auftrag({ ort: 'Deichkrone Süd' }));
     expect(screen.getByText('Auftragsdetails (Schema)')).toBeInTheDocument();
     expect(screen.queryByText(/Befehlsdetails/)).toBeNull();
+  });
+});
+
+/** LLH-1091: die Lesefassung folgt dem Formular (FwDV 100), leere Felder fallen weg. */
+describe('AuftragKarte — Schema in Formularfolge (LLH-1091)', () => {
+  const etiketten = () =>
+    [...document.querySelectorAll('.ant-descriptions-item-label')].map((l) => l.textContent);
+
+  it('zeigt Mittel, Weg und Absicht in Formularfolge, danach die Erteilzeit', async () => {
+    renderKarte(
+      auftrag({ absicht: 'Überflutung verhindern', mittel: 'Sandsäcke', weg: 'über B 3' }),
+    );
+    await userEvent.click(screen.getByText('Auftragsdetails (Schema)'));
+    expect(etiketten()).toEqual(['Mittel', 'Weg', 'Absicht', 'Erteilt am']);
+    expect(screen.getByText('über B 3')).toBeInTheDocument();
+  });
+
+  it('führt einen Bestandsauftrag: Ort als „Ziel / Ort“, Absicht als „Absicht“', async () => {
+    renderKarte(auftrag({ ort: 'Halle 3', absicht: 'Brand eindämmen' }));
+    await userEvent.click(screen.getByText('Auftragsdetails (Schema)'));
+    expect(etiketten()).toEqual(['Ziel / Ort', 'Absicht', 'Erteilt am']);
   });
 });

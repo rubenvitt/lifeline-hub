@@ -825,6 +825,8 @@ export interface NeuerAuftrag {
   mittel?: string;
   verbindung?: string;
   sicherheit?: string;
+  /** Weg der Einheit (FwDV 100: Einheit – Auftrag – Mittel – Ziel – Weg, LLH-1091). */
+  weg?: string;
   prioritaet?: AuftragPrioritaet;
   richtung?: Richtung;
   /** 'YYYY-MM-DD HH:MM' (UTC). */
@@ -832,6 +834,27 @@ export interface NeuerAuftrag {
   /** Erteilzeitpunkt (UTC); leer = jetzt. */
   erteilt_at?: string;
   empfaenger: NeuerEmpfaenger[];
+}
+
+/** Die Felder des Befehlsschemas, die eine Berichtigung einzeln leeren kann. */
+export type AuftragSchemafeld =
+  'absicht' | 'lage' | 'ort' | 'zeit' | 'mittel' | 'verbindung' | 'sicherheit' | 'weg';
+
+/**
+ * Kein Backend-Schema: Teil-Patch der Berichtigung (LLH-1098), FE-lokal. Ein fehlendes Feld bleibt,
+ * `null` leert ein optionales Feld; `empfaenger` ersetzt die ganze Liste.
+ */
+export type AuftragPatch = {
+  auftrag_text?: string;
+  empfaenger?: NeuerEmpfaenger[];
+  prioritaet?: AuftragPrioritaet;
+  /** 'YYYY-MM-DD HH:MM' (UTC); `null` entfernt die Frist. */
+  frist_at?: string | null;
+} & Partial<Record<AuftragSchemafeld, string | null>>;
+
+/** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
+export interface AuftragAufhebenBody {
+  grund: string;
 }
 
 // --- Meldungen (eingehend) ---

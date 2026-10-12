@@ -1697,6 +1697,7 @@ mod tests {
                 mittel: None,
                 verbindung: None,
                 sicherheit: None,
+                weg: None,
                 prioritaet: crate::auftrag::PRIO_NORMAL,
                 richtung: crate::auftrag::RICHTUNG_INTERN,
                 frist_at: None,

@@ -140,8 +140,8 @@ Verweis zurück auf den Eintrag.
 Für Einsatzleitung und Führungspersonal:
 
 1. An dem Eintrag das Menü „Aktionen zu Eintrag …“ öffnen und „Auftrag erteilen“ wählen.
-2. Im Dialog „Aus ETB-Eintrag Auftrag erteilen“ den vorbelegten Text prüfen, den Empfänger
-   eintragen und den Auftrag erteilen.
+2. Im Dialog „Aus ETB-Eintrag Auftrag erteilen“ den Empfänger eintragen, den vorbelegten Text
+   unter „Auftrag / Was“ prüfen und den Auftrag erteilen.
 
 Ist das Modul Aufträge im Einsatz nicht freigegeben, steht der Menüpunkt gesperrt als „Auftrag
 erteilen (keine Berechtigung)“ da. Wie Aufträge weiterlaufen, beschreibt das Kapitel

@@ -12,8 +12,11 @@ type Filter = { richtung?: string; abschnittId?: number; einheitId?: number };
 type Quelle = (einsatzId: number, filter: Filter) => Promise<Auftrag[]>;
 
 const istAbgeschlossen = (a: Auftrag) =>
-  a.bearbeitungsstatus === 'vollzogen' || a.bearbeitungsstatus === 'abgenommen';
-const abschlussZeit = (a: Auftrag) => a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at;
+  a.bearbeitungsstatus === 'vollzogen' ||
+  a.bearbeitungsstatus === 'abgenommen' ||
+  a.bearbeitungsstatus === 'aufgehoben';
+const abschlussZeit = (a: Auftrag) =>
+  a.aufgehoben_at ?? a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at;
 
 export const AUFTRAEGE_SEITE_ATTRAPPE = 100;
 

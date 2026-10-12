@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlKopf } from '../api/types';
-import { VORLAGEN } from '../befehle/vorlagen';
+import { NEW_SELECTABLE } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
@@ -287,7 +287,8 @@ export default function BefehlListe({
         onAbbrechen={() => setAnlegenOffen(false)}
       >
         <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>
-          <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
+          {/* Nur Vorlagen für neue Befehle; der Bestand liest weiter `VORLAGEN` (LLH-1091). */}
+          <Select options={NEW_SELECTABLE.map((v) => ({ value: v.schluessel, label: v.label }))} />
         </Form.Item>
         <Form.Item
           label="Titel"

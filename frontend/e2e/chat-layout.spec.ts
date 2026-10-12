@@ -245,7 +245,12 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
   await expect(dialog.getByLabel('Auftrag / Was')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  await dialog.getByText(/Befehlsschema/).click();
-  await expect(dialog.getByLabel('Ort / Wo')).toBeVisible();
+  // Beide Klappteile (LLH-1091): die Ausführung mit Mittel, Ziel, Weg, Zeit und die weiteren Angaben.
+  await dialog.getByText(/^Ausführung:/).click();
+  await expect(dialog.getByLabel('Ziel / Ort')).toBeVisible();
+  expect(await ueberstand(page)).toBeLessThanOrEqual(0);
+
+  await dialog.getByText('Weitere Angaben').click();
+  await expect(dialog.getByLabel('Verbindung / Meldewege')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });
