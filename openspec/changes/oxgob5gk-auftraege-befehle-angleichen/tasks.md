@@ -42,13 +42,13 @@ pnpm laufen über `mise exec -- …`.
 
 ## 3. Baustein `ListeDetail` (D2, D7; Spec `liste-detail`)
 
-- [ ] 3.1 `kommunikation/KommKarte.tsx` bekommt `gewaehlt`, und `kartenGrund` nutzt die Folge
+- [x] 3.1 `kommunikation/KommKarte.tsx` bekommt `gewaehlt`, und `kartenGrund` nutzt die Folge
   alarm > hervorgehoben > gewählt > paneel. Die Linie oben und unten bleibt allein an
   `hervorgehoben`.
   Nachweis: `KommKarte.test.tsx` und `kartenKante.test.ts` prüfen die gewählte Karte auf
   `auswahlFlaeche` ohne Inset-Schatten, die gewählte und alarmierte Karte auf Alarmfläche und
   -kante, und die gewählte und hervorgehobene Karte auf Bedienfläche und Linie.
-- [ ] 3.2 `components/ListeDetail.tsx` mit Grid ab `lg` (Detail-Paneel `sticky`) und Detail unter
+- [x] 3.2 `components/ListeDetail.tsx` mit Grid ab `lg` (Detail-Paneel `sticky`) und Detail unter
   der gewählten Karte darunter; Auswahlziel als `<button>` samt `aria-current` bzw.
   `aria-expanded`/`aria-controls`; freie Kartenfläche wählt, Links bedienen sich allein;
   Vorauswahl ab `lg`; Zuklappen unter `lg`.
@@ -56,7 +56,7 @@ pnpm laufen über `mise exec -- …`.
   Handschirm“, „Wechsel der Wahl“, „Tastatur“ (Enter und Leertaste), „Zustand ohne Farbe“ und
   Klick auf einen Kennungs-Link wählt nicht. Die Breite wird über einen `matchMedia`-Stub
   gesetzt.
-- [ ] 3.3 Zustände in `ListeDetail`: Skelett bei erster Lieferung, `SeitenFehler` ohne Bestand,
+- [x] 3.3 Zustände in `ListeDetail`: Skelett bei erster Lieferung, `SeitenFehler` ohne Bestand,
   `SeitenStandVeraltet` bei Bestand, `SeitenLeer` mit Aktion.
   Nachweis: Vitest für die Szenarien „Erste Lieferung“, „Leer mit Schreibrecht“ (genau ein Knopf
   mit dem Wortlaut des Kopfes) und „Abgleich scheitert“.
@@ -64,19 +64,19 @@ pnpm laufen über `mise exec -- …`.
   Wahl von Hand räumt die Markierung.
   Nachweis: Vitest „Deeplink bei aktivem Filter“ (zusammen mit dem Aufrufer, siehe 4.4) und „Wahl
   von Hand“.
-- [ ] 3.5 Zufluss über `useZuflussSchleuse` und `flachZufluss`, Sammelbanner in der
+- [x] 3.5 Zufluss über `useZuflussSchleuse` und `flachZufluss`, Sammelbanner in der
   Standzeile über der Liste.
   Nachweis: Vitest „Neuer Eintrag unter dem Zeiger“, „Banner einfügen“ und „Ohne Zeiger und
   Fokus“; Touch hält nicht.
-- [ ] 3.6 Gewähltes Objekt entfällt: Der Baustein hält das zuletzt gesehene Objekt und reicht
+- [x] 3.6 Gewähltes Objekt entfällt: Der Baustein hält das zuletzt gesehene Objekt und reicht
   `entfallen: true` an `detail`; ein Wechsel der Ansicht löst die Wahl.
   Nachweis: Vitest „Auftrag wird abgenommen“ (Objekt verschwindet aus `eintraege`, Detail bleibt
   mit `entfallen`) und „Andere Wahl“.
-- [ ] 3.7 Gruppen und Ausschnitt: `gruppen` mit Augenbraue je Gruppe; `fenster` über
+- [x] 3.7 Gruppen und Ausschnitt: `gruppen` mit Augenbraue je Gruppe; `fenster` über
   `useFensterAusschnitt` mit Anker auf die Wahl, auch mit aufgeklapptem Detail unter `lg`.
   Nachweis: Vitest mit 120 Einträgen, gewähltem Eintrag 90 und Schmal-Breite (Eintrag und
   Detail im DOM, Platzhalter oben > 0).
-- [ ] 3.8 `frontend/AGENTS.md`, „UI-Form-Leitlinie“: Zeile **Liste + Detailpaneel** nach D12;
+- [x] 3.8 `frontend/AGENTS.md`, „UI-Form-Leitlinie“: Zeile **Liste + Detailpaneel** nach D12;
   „Deeplink-Muster“: `?befehl=` als Auswahl in der Liste, die Item-Route bleibt. Prettier über
   `frontend/`.
   Nachweis: `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md` ist grün, und der
@@ -149,7 +149,7 @@ pnpm laufen über `mise exec -- …`.
 
 ## 6. Seite und Gleichheit beider Reiter (D11)
 
-- [ ] 6.1 `pages/AuftraegePage.tsx`: `SeitenSkeleton` und `SeitenFehler` mit „Erneut versuchen“
+- [ ] 6.1 `pages/AuftraegePage.tsx`: `SeitenSkeleton` und `SeitenFehler` mit „Erneut abrufen“
   statt `Spin`/`Alert`.
   Nachweis: Vitest für Laden und Fehler (Ursache steht, Wiederholen ruft den Abruf).
 - [ ] 6.2 Gleichheit der Reiter festhalten.

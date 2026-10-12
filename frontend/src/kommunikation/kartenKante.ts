@@ -19,15 +19,22 @@ export function kartenKante(
 
 /**
  * Grund der Kommunikations-Karte — Gefahr gewinnt auch gegen die Deeplink-Markierung (LFH-896,
- * Spec `deeplink-hervorhebung`): `alarmFlaeche` vor `bedienFlaeche` vor `paneel`. Eine
- * angesprungene Alarmkarte behält ihre Fläche, die Markierung trägt dort nur die Linien.
+ * Spec `deeplink-hervorhebung`): `alarmFlaeche` vor `bedienFlaeche` vor `auswahlFlaeche` vor
+ * `paneel`. Eine angesprungene Alarmkarte behält ihre Fläche, die Markierung trägt dort nur die
+ * Linien. Die Auswahl (gewählte Karte im Muster „Liste + Detailpaneel“, Spec `liste-detail`) liegt
+ * unter der Markierung: angesprungen heißt zugleich gewählt.
  */
 export function kartenGrund(
-  rollen: Pick<Farbrollen, 'alarmFlaeche' | 'bedienFlaeche' | 'paneel'>,
-  { alarm, hervorgehoben }: { alarm: boolean; hervorgehoben: boolean },
+  rollen: Pick<Farbrollen, 'alarmFlaeche' | 'bedienFlaeche' | 'auswahlFlaeche' | 'paneel'>,
+  {
+    alarm,
+    hervorgehoben,
+    gewaehlt = false,
+  }: { alarm: boolean; hervorgehoben: boolean; gewaehlt?: boolean },
 ): string {
   if (alarm) return rollen.alarmFlaeche;
   if (hervorgehoben) return rollen.bedienFlaeche;
+  if (gewaehlt) return rollen.auswahlFlaeche;
   return rollen.paneel;
 }
 

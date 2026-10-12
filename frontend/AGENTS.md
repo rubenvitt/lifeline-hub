@@ -132,6 +132,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
   beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
+- **Liste + Detailpaneel** (`components/ListeDetail.tsx`, Spec `liste-detail`,
+  `openspec/changes/oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn Objekte je Stück
+  gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
+  Ab `lg` Liste links, Detail rechts (klebt), darunter klappt es unter der gewählten Karte auf; kein
+  Drawer. Die Karte trägt nur das Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen
+  im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
+  weiter auf der Vollseite geschrieben. Vorbild Aufträge/Befehle; Einsatzabschnitte und Gefahren
+  sind ältere Einzelbauten.
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -756,6 +764,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   befehl, person, tier, schaden), sonst **Query-Param** `?<modul>=<id>` (`?einheit=`,
   `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB
   `?eintrag=`); `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+  `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
+  Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
 - **Filter gehören in die URL** (`etbPfad`/`parseEtbFilter`, `mitQuery` kodiert). Unbekannter
   Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`).
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`

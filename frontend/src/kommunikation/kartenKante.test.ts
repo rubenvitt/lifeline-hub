@@ -43,6 +43,21 @@ describe('kartenGrund — Gefahr gewinnt auch gegen die Deeplink-Markierung (LFH
       farbenDunkel.paneel,
     );
   });
+
+  it('eine gewählte Karte steht auf der Auswahlfläche (Spec `liste-detail`)', () => {
+    expect(kartenGrund(farbenDunkel, { alarm: false, hervorgehoben: false, gewaehlt: true })).toBe(
+      farbenDunkel.auswahlFlaeche,
+    );
+  });
+
+  it('die Markierung steht über der Auswahl, Gefahr über beiden', () => {
+    expect(kartenGrund(farbenDunkel, { alarm: false, hervorgehoben: true, gewaehlt: true })).toBe(
+      farbenDunkel.bedienFlaeche,
+    );
+    expect(kartenGrund(farbenDunkel, { alarm: true, hervorgehoben: false, gewaehlt: true })).toBe(
+      farbenDunkel.alarmFlaeche,
+    );
+  });
 });
 
 describe('phaseTon / prioTon', () => {
