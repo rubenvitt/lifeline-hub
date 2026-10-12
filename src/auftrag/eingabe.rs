@@ -90,8 +90,8 @@ pub struct NeuerAuftrag {
 }
 
 /// Prüft Slot-Konsistenz + Einsatz-Zugehörigkeit einer Empfänger-Zeile.
-/// `s7_aktiv` kommt aus der Labelkarte, die [`validiere_neuen_auftrag`] einmal je Request lädt.
-async fn validiere_empfaenger(
+/// `s7_aktiv` kommt aus der Labelkarte, die [`validate_neuer_auftrag`] einmal je Request lädt.
+async fn validate_empfaenger(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     req: &EmpfaengerEingabeReq,
@@ -188,7 +188,7 @@ async fn validiere_empfaenger(
                     "Ungültige externe Adressat-Kategorie".into(),
                 ));
             }
-            // Die Länge prüft schon `validiere_neuen_auftrag` vor der ersten Abfrage.
+            // Die Länge prüft schon `validate_neuer_auftrag` vor der ersten Abfrage.
             if trimme(&req.extern_bezeichnung).is_none() {
                 return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
             }
@@ -233,7 +233,7 @@ async fn validiere_empfaenger(
 
 /// Pflicht und Obergrenze der Empfängerliste (LFH-937), vor jeder Abfrage; gezählt vor dem
 /// Entdoppeln.
-fn pruefe_empfaenger_zahl(empfaenger: &[EmpfaengerEingabeReq]) -> Result<(), AppError> {
+fn check_empfaenger_zahl(empfaenger: &[EmpfaengerEingabeReq]) -> Result<(), AppError> {
     if empfaenger.is_empty() {
         return Err(AppError::Validation(
             "Mindestens ein Empfänger ist erforderlich".into(),
@@ -248,7 +248,7 @@ fn pruefe_empfaenger_zahl(empfaenger: &[EmpfaengerEingabeReq]) -> Result<(), App
 }
 
 /// Meint die Eingabe-Zeile genau diesen gespeicherten Empfänger? Verglichen wird in der Form, in
-/// der [`validiere_empfaenger`] speichert (Texte getrimmt, Katalogcode als Code).
+/// der [`validate_empfaenger`] speichert (Texte getrimmt, Katalogcode als Code).
 fn is_bestand(r: &EmpfaengerEingabeReq, b: &repo::EmpfaengerEingabe) -> bool {
     r.empfaenger_typ == b.empfaenger_typ
         && [r.abschnitt_id, r.einheit_id, r.person_id, r.fahrzeug_id]
@@ -262,10 +262,10 @@ fn is_bestand(r: &EmpfaengerEingabeReq, b: &repo::EmpfaengerEingabe) -> bool {
 /// Prüft eine Empfängerliste so, wie das Erteilen sie prüft (LFH-937, design.md D3): gleiche Ziele
 /// zusammengeführt (erste Nennung und Reihenfolge bleiben), Textgrenzen vor der ersten Abfrage,
 /// dann jede Zeile auf Slot und Einsatz-Zugehörigkeit. Geteilt von Erteilen und Berichtigen
-/// (LLH-1098); die Zahl prüft [`pruefe_empfaenger_zahl`] vorher. Eine Zeile, die einen Empfänger
+/// (LLH-1098); die Zahl prüft [`check_empfaenger_zahl`] vorher. Eine Zeile, die einen Empfänger
 /// aus `bestand` wiederholt, wird nicht neu geprüft, sondern übernommen (LLH-1176): ein seit dem
 /// Erteilen aufgelöstes Ziel hält die Berichtigung eines anderen Felds nicht auf.
-async fn validiere_empfaenger_liste(
+async fn validate_empfaenger_liste(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     liste: &[EmpfaengerEingabeReq],
@@ -308,7 +308,7 @@ async fn validiere_empfaenger_liste(
     for (r, b) in eindeutig {
         empfaenger.push(match b {
             Some(b) => b.clone(),
-            None => validiere_empfaenger(pool, einsatz_id, r, s7_aktiv).await?,
+            None => validate_empfaenger(pool, einsatz_id, r, s7_aktiv).await?,
         });
     }
     Ok(empfaenger)
@@ -368,7 +368,7 @@ fn frist_aus_minuten(erteilt: &str, min: i64) -> Option<String> {
 /// für `erteilt_at`. Fehlt `frist_at` und ist `default_quittierung_frist_min` gesetzt
 /// (LFH-133), wird die Frist aus Erteilzeit + Minuten abgeleitet. Gemeinsamer Eingang
 /// für POST /auftraege und die Heraufstufungen.
-pub async fn validiere_neuen_auftrag(
+pub async fn validate_neuer_auftrag(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     req: &NeuerAuftrag,
@@ -377,7 +377,7 @@ pub async fn validiere_neuen_auftrag(
 ) -> Result<ValidierterAuftrag, AppError> {
     // Grenzen vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
     let text = pflicht_max(&req.auftrag_text, "Auftragstext", AUFTRAG_TEXT_MAX)?;
-    pruefe_empfaenger_zahl(&req.empfaenger)?;
+    check_empfaenger_zahl(&req.empfaenger)?;
     let absicht = befehlsfeld(&req.absicht, "Absicht")?;
     let lage = befehlsfeld(&req.lage, "Lage")?;
     // „Ziel/Ort“: das Ziel der Ausführung nach FwDV 100 (LLH-1091, design.md D3).
@@ -411,7 +411,7 @@ pub async fn validiere_neuen_auftrag(
         None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 
-    let empfaenger = validiere_empfaenger_liste(pool, einsatz_id, &req.empfaenger, &[]).await?;
+    let empfaenger = validate_empfaenger_liste(pool, einsatz_id, &req.empfaenger, &[]).await?;
 
     Ok(ValidierterAuftrag {
         text: text.to_string(),
@@ -490,7 +490,7 @@ pub struct ValidierteBerichtigung {
 /// Feldfehler 400, Grenzen vor der ersten Abfrage. Ob der Auftrag noch berichtigt werden darf
 /// (422), prüft erst die Transaktion. Von den Empfängern werden nur die hinzukommenden gegen den
 /// Bestand des Einsatzes geprüft (LLH-1176).
-pub async fn validiere_berichtigung(
+pub async fn validate_berichtigung(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     auftrag_id: i64,
@@ -502,7 +502,7 @@ pub async fn validiere_berichtigung(
         .map(|t| pflicht_max(t, "Auftragstext", AUFTRAG_TEXT_MAX))
         .transpose()?;
     if let Some(e) = &req.empfaenger {
-        pruefe_empfaenger_zahl(e)?;
+        check_empfaenger_zahl(e)?;
     }
     let roh = [
         &req.absicht,
@@ -537,7 +537,7 @@ pub async fn validiere_berichtigung(
     let empfaenger = match &req.empfaenger {
         Some(liste) => {
             let bestand = repo::empfaenger_bestand(pool, auftrag_id).await?;
-            Some(validiere_empfaenger_liste(pool, einsatz_id, liste, &bestand).await?)
+            Some(validate_empfaenger_liste(pool, einsatz_id, liste, &bestand).await?)
         }
         None => None,
     };

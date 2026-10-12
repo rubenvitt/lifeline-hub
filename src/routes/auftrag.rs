@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::auftrag::{
-    anreichern_alle, repo, validiere_neuen_auftrag, AuftragBearbeitungsstatus, AuftragDetail,
+    anreichern_alle, repo, validate_neuer_auftrag, AuftragBearbeitungsstatus, AuftragDetail,
     NeuerAuftrag,
 };
 use crate::einsatz::einstellungen;
@@ -223,7 +223,7 @@ pub async fn anlegen(
         crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
     let default_frist = auftrag_default_quittierung_frist_min(&einst, &org_einst);
     let validiert =
-        validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
+        validate_neuer_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
     let d = repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -568,7 +568,7 @@ pub async fn berichtigen(
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let b =
-        crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
+        crate::auftrag::validate_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
     // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
