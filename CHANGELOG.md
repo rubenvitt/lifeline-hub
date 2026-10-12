@@ -1,3 +1,23 @@
+## [1.0.0-alpha.114](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.113...v1.0.0-alpha.114) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Aufträge haben ein neues Feld „Weg“. Die Datenbank wird beim ersten Start der neuen Version angepasst. Bestehende Aufträge bleiben unverändert.
+- **Befehlsvorlage „Einzelauftrag (EA/ZMW)“:** Für neue Befehlsentwürfe steht sie nicht mehr zur Auswahl. Einzelaufträge erteilen Sie jetzt als Auftrag. Bestehende Befehle mit dieser Vorlage können Sie weiterhin lesen, bearbeiten, freigeben und fortschreiben.
+
+### Aufträge und Befehle
+
+- **Auftragsschema nach FwDV 100:** Formular und Auftragskarte folgen jetzt der Reihenfolge Einheit – Auftrag – Mittel – Ziel – Weg, dazu die Zeit.
+- **Empfänger zuerst:** Beim Erteilen steht der Cursor sofort im Feld für den Empfänger. Auch nach „Speichern und nächste“ springt er wieder dorthin.
+- **Übersichtlicheres Formular:** Sichtbar sind nur Empfänger, Auftrag, Priorität und Frist. Mittel, Ziel, Weg und Zeit stehen im aufklappbaren Bereich „Ausführung“, alles Übrige unter „Weitere Angaben“. Ist eine Eingabe in einem zugeklappten Bereich fehlerhaft, öffnet sich dieser Bereich von selbst.
+- **Neues Feld „Weg“:** Sie können den Anfahrts- oder Marschweg angeben, auf allen Wegen, auf denen ein Auftrag entsteht. Beim Berichtigen eines Auftrags lässt sich auch der Weg ändern.
+- **Klarere Bezeichnungen:** „Ort / Wo“ heißt jetzt „Ziel / Ort“, auch beim Berichtigen. „Absicht“ ist ein eigenes Feld.
+- **Richtung „Extern“ bleibt erkennbar:** Übernehmen Sie mit „Werte behalten“ die Angaben in den nächsten Auftrag, zeigt der zugeklappte Bereich „Weitere Angaben · Richtung: Extern“. So geht kein Folgeauftrag unbemerkt nach außen.
+
+### Dokumentation
+
+- Das Handbuchkapitel zu Aufträgen und Befehlen beschreibt das neue Schema und den Weg. Es nennt FwDV 100 als Grundlage und hat neue Abbildungen im hellen und dunklen Design.
+
 ## [1.0.0-alpha.113](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.112...v1.0.0-alpha.113) (2026-10-12)
 
 ### Wichtige Änderungen
