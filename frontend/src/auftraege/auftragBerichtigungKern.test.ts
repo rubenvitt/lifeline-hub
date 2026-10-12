@@ -124,6 +124,15 @@ describe('berichtigungAus (LLH-1098)', () => {
     });
   });
 
+  it('dieselben Empfänger in anderer Reihenfolge gelten als unverändert (LLH-1176)', () => {
+    const { werte } = vorbelegungAus(auftrag());
+    const umsortiert = { ...werte, empfaenger: [...werte.empfaenger].reverse() };
+    expect(berichtigungAus(werte, umsortiert, katalog, true)).toEqual({});
+    expect(
+      berichtigungAus(werte, { ...umsortiert, frist: werte.frist!.add(1, 'hour') }, katalog, true),
+    ).toEqual({ frist_at: '2026-10-12 14:00:00' });
+  });
+
   it('ein nicht eingehängtes Feld gilt als unverändert', () => {
     const { werte } = vorbelegungAus(auftrag());
     const ohneSchema = { ...werte } as Partial<typeof werte>;

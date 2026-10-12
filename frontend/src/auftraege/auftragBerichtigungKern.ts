@@ -76,6 +76,10 @@ export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAender
 
 const frist = (w: FormWerte) => (w.frist ? alsBackendZeit(w.frist) : null);
 
+/** Die Empfänger als Menge: eine andere Reihenfolge ist keine Berichtigung (LLH-1176). */
+const empfaengerMenge = (liste: readonly unknown[]) =>
+  JSON.stringify(liste.map((e) => JSON.stringify(e)).sort());
+
 /** Der Teil-Patch: nur Felder, die sich gegen `vorher` geändert haben; ein leeres Feld als `null`. */
 export function berichtigungAus(
   vorher: FormWerte,
@@ -95,7 +99,7 @@ export function berichtigungAus(
   if (text !== vorher.text.trim()) patch.auftrag_text = text;
   if (empfaengerAenderbar) {
     const neu = alleEmpfaenger(nachher, katalog);
-    if (JSON.stringify(neu) !== JSON.stringify(alleEmpfaenger(vorher, katalog))) {
+    if (empfaengerMenge(neu) !== empfaengerMenge(alleEmpfaenger(vorher, katalog))) {
       patch.empfaenger = neu;
     }
   }

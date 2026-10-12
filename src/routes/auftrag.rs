@@ -567,7 +567,8 @@ pub async fn berichtigen(
     JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
-    let b = crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, &req).await?;
+    let b =
+        crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
     // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
