@@ -65,6 +65,8 @@ const ANZEIGE_SELECT: &str = concat!(
     "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.meldeweg, m.inhalt, \
             m.meldungsart, m.prioritaet, m.richtung, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
+            EXISTS (SELECT 1 FROM auftrag a WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NOT NULL) \
+              AS is_auftrag_aufgehoben, \
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, ",
     ist_offen_sql!(),
@@ -801,8 +803,10 @@ pub async fn als_lagerelevant(
 /// Erteilt aus einer eingegangenen Meldung einen Auftrag (LFH-113) — in EINEM Commit:
 /// legt den Auftrag inkl. seiner ETB-Anordnung an (`auftrag::repo::anlegen_tx`, Pattern B,
 /// wie Chat→Auftrag LFH-101) und setzt den Rückverweis `meldung.auftrag_id`. First-write-wins:
-/// ist die Meldung bereits mit einem Auftrag verknüpft → `Conflict` (vor der Auftrags-Anlage
-/// geprüft, sodass kein verwaister Auftrag entsteht). `daten` ist bereits vom Handler validiert
+/// ist die Meldung bereits mit einem nicht aufgehobenen Auftrag verknüpft → `Conflict` (vor der
+/// Auftrags-Anlage geprüft, sodass kein verwaister Auftrag entsteht). Ein aufgehobener Auftrag
+/// sperrt nicht (LLH-1177): der Rückverweis wechselt auf den neuen, der alte bleibt über seine
+/// ETB-Anordnung und die Abgeschlossen-Ansicht nachvollziehbar. `daten` ist bereits vom Handler validiert
 /// (Auftragstext + >=1 Empfänger, Slots/Zugehörigkeit geprüft). Liefert die neue `auftrag_id`.
 pub async fn erteile_auftrag_tx(
     pool: &SqlitePool,
@@ -819,15 +823,18 @@ pub async fn erteile_auftrag_tx(
     let org_einst =
         crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let auftrag_id = crate::write_retry!(pool, |conn| {
-        // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
-        // Meldung kennt kein Soft-Delete (nur erledigt_at/status) → nur auftrag_id prüfen.
-        let auftrag_vorhanden: Option<Option<i64>> =
-            sqlx::query_scalar("SELECT auftrag_id FROM meldung WHERE id = ?")
-                .bind(meldung_id)
-                .fetch_optional(&mut *conn)
-                .await?;
-        let auftrag_vorhanden = auftrag_vorhanden.ok_or(AppError::NotFound)?;
-        if auftrag_vorhanden.is_some() {
+        // Guard: schon mit einem geltenden Auftrag verknüpft? (Sperrt Doppel-Verknüpfung;
+        // first-write-wins.) Ein aufgehobener Auftrag zählt nicht (LLH-1177). Meldung kennt kein
+        // Soft-Delete (nur erledigt_at/status) → nur den verknüpften Auftrag prüfen.
+        let has_geltenden_auftrag: Option<bool> = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM auftrag a \
+                            WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NULL) \
+             FROM meldung m WHERE m.id = ?",
+        )
+        .bind(meldung_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if has_geltenden_auftrag.ok_or(AppError::NotFound)? {
             return Err(AppError::Conflict(
                 "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
             ));
@@ -2012,6 +2019,66 @@ mod tests {
             anzahl, 1,
             "abgewiesene Doppel-Erteilung legt keinen zweiten Auftrag an (transaktional)"
         );
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_nach_aufhebung_stellt_verknuepfung_auf_neuen_auftrag_um() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Tank fordern", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        let erster = erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("erster"))
+            .await
+            .unwrap();
+        let vorher = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
+        assert!(
+            !vorher.is_auftrag_aufgehoben,
+            "offener Auftrag ist nicht aufgehoben"
+        );
+
+        sqlx::query(
+            "UPDATE auftrag SET aufgehoben_at = '2026-06-12 10:30:00', aufgehoben_von_id = ?, \
+             aufhebungsgrund = 'Lage erledigt' WHERE id = ?",
+        )
+        .bind(b)
+        .bind(erster)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let aufgehoben = laden(&pool, m.id, "2026-06-12 11:00:00").await.unwrap();
+        assert_eq!(aufgehoben.auftrag_id, Some(erster));
+        assert!(
+            aufgehoben.is_auftrag_aufgehoben,
+            "Meldung zeigt den aufgehobenen Auftrag an"
+        );
+
+        let zweiter = erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("zweiter"))
+            .await
+            .unwrap();
+        assert_ne!(zweiter, erster);
+        let nachher = laden(&pool, m.id, "2026-06-12 11:00:00").await.unwrap();
+        assert_eq!(
+            nachher.auftrag_id,
+            Some(zweiter),
+            "Verknüpfung zeigt auf den neuen Auftrag"
+        );
+        assert!(!nachher.is_auftrag_aufgehoben);
+
+        // Der alte Auftrag bleibt bestehen und aufgehoben (nachvollziehbar über ETB und Abgeschlossen).
+        let alt = crate::auftrag::repo::laden(&pool, erster, "2026-06-12 11:00:00")
+            .await
+            .unwrap();
+        assert!(alt.auftrag.aufgehoben_at.is_some());
+
+        // Ein offener (zweiter) Auftrag sperrt weiter.
+        let dritter = erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("dritter")).await;
+        assert!(matches!(dritter.unwrap_err(), AppError::Conflict(_)));
     }
 
     #[tokio::test]

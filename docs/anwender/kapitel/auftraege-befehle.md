@@ -113,7 +113,8 @@ Für Einsatzleitung und Führungspersonal, solange der Auftrag nicht abgenommen 
 
 Der Auftrag steht danach unter „Abgeschlossen“ mit dem Etikett „Aufgehoben“; gewählt zeigt er
 Zeit, Person und Grund. Quittungen werden nicht mehr erwartet; Quittieren, Vollzug und Abnahme sind nicht
-mehr möglich. Das Aufheben lässt sich nicht zurücknehmen.
+mehr möglich. Das Aufheben lässt sich nicht zurücknehmen. Kam der Auftrag aus einer Meldung, lässt
+sich aus ihr wieder ein Auftrag erteilen (siehe [Meldungen](meldungen.md)).
 
 ### Einen Einsatzbefehl entwerfen
 
