@@ -136,7 +136,7 @@ relativ zu `frontend/src/`.
 
 ## 7. Doku
 
-- [ ] 7.1 Kapitel `docs/anwender/kapitel/auftraege-befehle.md` nachziehen
+- [x] 7.1 Kapitel `docs/anwender/kapitel/auftraege-befehle.md` nachziehen
   (`docs/anwender/AGENTS.md`, Mitänderungsregel):
   - Überblick: Lebenslauf mit „aufgehoben“.
   - Neue Abläufe „Einen Auftrag berichtigen“ und „Einen Auftrag aufheben“, je mit der Rolle davor.
@@ -145,7 +145,7 @@ relativ zu `frontend/src/`.
   - `quellen` um den neuen Dialog ergänzen.
 
   Nachweis: `hilfe/anwenderdoku.guard.test.ts` grün.
-- [ ] 7.2 Das Bild `auftraege-liste` neu erzeugen (`pnpm doku:bilder --grep auftraege-befehle`,
+- [x] 7.2 Das Bild `auftraege-liste` und neu `auftrag-aufheben` erzeugen (`pnpm doku:bilder --grep auftraege-befehle`,
   hell und dunkel, je höchstens 300 KB). Nachweis: Bilder im Commit, Guard grün. Geht es in der
   Sitzung nicht, steht der Grund hier, und die CI des PRs belegt die Bilder.
 

@@ -64,7 +64,10 @@ test.describe(KAPITEL, () => {
       },
     );
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/auftraege`);
+    await page.goto(`/einsaetze/${demo.id}/auftraege?auftrag=${auftrag.id}`);
+    // Der Knopf der TanStack-Devtools (nur am Vite-Entwicklungsserver) liegt sonst über dem Menü,
+    // wie in `e2e/dialoge-handy.spec.ts`.
+    await page.addStyleTag({ content: '[class*="tsqd-open-btn"] { display: none !important; }' });
     await page.getByRole('button', { name: `Aktionen zu Auftrag #${auftrag.lfd_nr}` }).click();
     await page.getByRole('menuitem', { name: 'Auftrag aufheben' }).click();
     const dialog = page.getByRole('dialog', { name: `Auftrag #${auftrag.lfd_nr} aufheben` });
