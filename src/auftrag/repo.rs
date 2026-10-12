@@ -2205,7 +2205,7 @@ mod tests {
             vec![offen.auftrag.id]
         );
 
-        let k = kennzahlen(&pool, e, None, None).await.unwrap();
+        let k = kennzahlen(&pool, e, None, None, None).await.unwrap();
         assert_eq!((k.offen, k.abgeschlossen), (1, 2));
 
         let z = zaehlen(&pool, e, jetzt).await.unwrap();
