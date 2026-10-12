@@ -1,6 +1,12 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type { AbschlussCursor } from './meldungen';
-import type { Auftrag, AuftragKennzahlen, AuftragPatch, NeuerAuftrag } from './types';
+import type {
+  Auftrag,
+  AuftragAufhebenBody,
+  AuftragKennzahlen,
+  AuftragPatch,
+  NeuerAuftrag,
+} from './types';
 
 interface AuftragFilter {
   status?: string;
@@ -129,9 +135,12 @@ export function nimmAb(einsatzId: number, auftragId: number): Promise<Auftrag> {
 
 /** Hebt einen Auftrag mit Grund auf (LLH-1098); unumkehrbar, der Server schreibt das ETB. */
 export function hebeAuf(einsatzId: number, auftragId: number, grund: string): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}/aufheben`, 'POST', {
-    grund,
-  });
+  const body: AuftragAufhebenBody = { grund };
+  return apiSend<Auftrag>(
+    `/api/einsaetze/${einsatzId}/auftraege/${auftragId}/aufheben`,
+    'POST',
+    body,
+  );
 }
 
 /** Berichtigt einen Auftrag vor der ersten Quittung (LLH-1098): nur die geänderten Felder. */

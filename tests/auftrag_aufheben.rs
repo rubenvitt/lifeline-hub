@@ -393,3 +393,27 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     assert_eq!(z["auftraege"]["offen"], 0, "{z}");
     assert_eq!(z["auftraege"]["ueberfaellig"], 0, "{z}");
 }
+
+#[tokio::test]
+async fn feldfehler_am_vollzug_bleiben_400_auch_wenn_aufgehoben() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (aid, _) = auftrag_erteilen(&app, &admin, e, None).await;
+    let (s, _) = aufheben(&app, &admin, e, aid, &grund("Lage erledigt")).await;
+    assert_eq!(s, StatusCode::OK);
+    for body in [
+        r#"{"status":"xyz"}"#,
+        r#"{"status":"vollzogen","vollzugsmeldung":"  "}"#,
+    ] {
+        let (s, _) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: 400 vor 422");
+    }
+}

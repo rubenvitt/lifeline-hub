@@ -189,6 +189,9 @@ export default function AuftragFormular({
   const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
   // Die Vorbelegung gilt ab dem Öffnen: ein Live-Abgleich des Auftrags überschreibt keine Eingabe.
   const [vorbelegung] = useState(() => (berichtigen ? vorbelegungAus(berichtigen.auftrag) : null));
+  // Kann das Formular einen Empfänger nicht abbilden, stehen alle Empfängerfelder gesperrt; ihre
+  // Änderung fiele sonst still weg (der Patch schickt dann keine Empfänger).
+  const empfaengerGesperrt = !!vorbelegung && !vorbelegung.empfaengerAenderbar;
 
   /*
    * Die Empfänger-Regeln zählen den externen Adressaten mit: ändern sich Richtung oder Bezeichnung,
@@ -290,7 +293,11 @@ export default function AuftragFormular({
         <Row gutter={16}>
           <Col xs={24} sm={12}>
             <Form.Item name="externKategorie" label="Externe Stelle">
-              <Select<AdressatKategorie> aria-label="Externe Stelle" options={EXTERN_OPTIONEN} />
+              <Select<AdressatKategorie>
+                aria-label="Externe Stelle"
+                options={EXTERN_OPTIONEN}
+                disabled={empfaengerGesperrt}
+              />
             </Form.Item>
           </Col>
           <Col xs={24} sm={12}>
@@ -299,6 +306,7 @@ export default function AuftragFormular({
                 aria-label="Externe Bezeichnung"
                 placeholder="z. B. Leitstelle Nord"
                 maxLength={AUFTRAG_EXTERN_BEZEICHNUNG_MAX}
+                disabled={empfaengerGesperrt}
               />
             </Form.Item>
           </Col>
@@ -417,11 +425,7 @@ export default function AuftragFormular({
             label="Empfänger"
             // Ein Empfänger, den das Formular nicht abbildet (Person, Fahrzeug), sperrt das Feld;
             // der Grund steht sichtbar daran (LFH-1078).
-            extra={
-              vorbelegung && !vorbelegung.empfaengerAenderbar
-                ? 'Empfänger hier nicht änderbar'
-                : undefined
-            }
+            extra={empfaengerGesperrt ? 'Empfänger hier nicht änderbar' : undefined}
             rules={[
               (f) => pflichtEmpfaengerRegel(funktionen.katalog, f),
               empfaengerRegel(funktionen.katalog),
@@ -431,7 +435,7 @@ export default function AuftragFormular({
             <Select
               mode="tags"
               aria-label="Empfänger"
-              disabled={vorbelegung ? !vorbelegung.empfaengerAenderbar : false}
+              disabled={empfaengerGesperrt}
               // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
               maxCount={AUFTRAG_EMPFAENGER_MAX}
               options={zielOptionen}

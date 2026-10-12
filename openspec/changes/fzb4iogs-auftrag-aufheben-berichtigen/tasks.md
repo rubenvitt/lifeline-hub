@@ -74,7 +74,7 @@ relativ zu `frontend/src/`.
   `POST …/aufheben` und `PATCH …/auftraege/{aid}` als verboten ergänzen. Nachweis: Test grün und
   rot belegt, wenn die Route testweise in die Allowlist kommt.
 - [x] 3.4 `scripts/check-typ-codegen.sh` laufen lassen, danach `openapi.json` und
-  `types.generated.ts` committen. Request-Typen `AuftragPatch` und `AuftragAufheben` in
+  `types.generated.ts` committen. Request-Typen `AuftragPatch` und `AuftragAufhebenBody` in
   `api/types.ts`. Nachweis: Skript grün.
 
 ## 4. Frontend: Status und Zahlen (D8, D10)

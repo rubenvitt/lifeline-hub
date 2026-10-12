@@ -350,6 +350,17 @@ pub async fn vollzug(
     )
     .await?;
     let now = jetzt();
+    // Feldfehler zuerst (400 vor jedem 422, `src/AGENTS.md`, „Eingabegrenzen“).
+    let vollzugstext = match req.status.as_str() {
+        "offen" | "in_arbeit" => None,
+        // Wird der Inhalt einer ETB-Meldung: dessen Grenze (LFH-937, design.md D2).
+        "vollzogen" => Some(pflicht_max(
+            req.vollzugsmeldung.as_deref().unwrap_or_default(),
+            "Vollzugsmeldung",
+            crate::etb::INHALT_MAX,
+        )?),
+        _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
+    };
     // Ein aufgehobener Auftrag nimmt keinen Fortschritt mehr an (LLH-1098), auch keine
     // Rücknahme: Zustandsfehler → 422.
     if repo::laden(&state.pool, auftrag_id, &now)
@@ -397,12 +408,7 @@ pub async fn vollzug(
             .await?;
         }
         "vollzogen" => {
-            // Wird der Inhalt einer ETB-Meldung: dessen Grenze (LFH-937, design.md D2).
-            let text = pflicht_max(
-                req.vollzugsmeldung.as_deref().unwrap_or_default(),
-                "Vollzugsmeldung",
-                crate::etb::INHALT_MAX,
-            )?;
+            let text = vollzugstext.unwrap_or_default();
             // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
             if repo::laden(&state.pool, auftrag_id, &now)
                 .await?

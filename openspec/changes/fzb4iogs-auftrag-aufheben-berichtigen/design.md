@@ -223,9 +223,11 @@ phase: 'abgeschlossen', ton: 'neutral' }`. Die Phase bleibt `abgeschlossen`, dam
 
 - Die Fortschrittsknöpfe bleiben sichtbar wie heute: „Bearbeitung beginnen“ und „Vollzug melden“
   bzw. „Abnehmen“. Damit bleibt `e2e/knopf-wortlaut.spec.ts` gültig.
-- „Berichtigen“ und „Auftrag aufheben“ kommen hinter den `MenueAusloeser`. „Auftrag aufheben“
-  steht mit `gefahr: true` hinter dem Trenner. Vorbild ist `meldungen/MeldungKarte.tsx`; die Regel
-  LFH-365/683 verlangt den Auslöser ab drei Aktionen.
+- „Berichtigen“ und „Auftrag aufheben“ kommen hinter den `MenueAusloeser`, sobald die Karte
+  nach der Rechteprüfung drei oder mehr Aktionen hat (offener Auftrag). „Auftrag aufheben“
+  steht dort mit `gefahr: true` hinter dem Trenner. Darunter („in Arbeit“, „vollzogen“: zwei
+  Aktionen) steht es als roter Knopf mit Abstand neben dem Fortschrittsknopf. Vorbild ist
+  `meldungen/MeldungKarte.tsx`; die Regel LFH-365/683 verlangt den Auslöser ab drei Aktionen.
 - „Berichtigen“ steht bei `berichtigbar = false` gesperrt mit dem Grund im Etikett: „Berichtigen
   (schon quittiert)“ (LFH-966, Muster „Auftrag erteilen (keine Berechtigung)“ an der Meldung). Bei
   abgeschlossenen Aufträgen und im Status „in Arbeit“ fehlt es.

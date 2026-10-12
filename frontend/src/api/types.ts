@@ -851,7 +851,7 @@ export type AuftragPatch = {
 } & Partial<Record<AuftragSchemafeld, string | null>>;
 
 /** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
-export interface AuftragAufheben {
+export interface AuftragAufhebenBody {
   grund: string;
 }
 

@@ -524,9 +524,20 @@ pub async fn quittiere_empfaenger(
     .await?
     .rows_affected();
     if getroffen == 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Der Auftrag ist aufgehoben und erwartet keine Quittung mehr".into(),
-        ));
+        // Aufgehoben (422) oder die Zeile ist weg, etwa durch eine Berichtigung (404).
+        let aufgehoben: Option<bool> = sqlx::query_scalar(
+            "SELECT a.aufgehoben_at IS NOT NULL FROM auftrag_empfaenger ae \
+             JOIN auftrag a ON a.id = ae.auftrag_id WHERE ae.id = ?",
+        )
+        .bind(empfaenger_id)
+        .fetch_optional(pool)
+        .await?;
+        return Err(match aufgehoben {
+            Some(true) => AppError::UnprocessableEntity(
+                "Der Auftrag ist aufgehoben und erwartet keine Quittung mehr".into(),
+            ),
+            _ => AppError::NotFound,
+        });
     }
     Ok(())
 }
@@ -914,11 +925,21 @@ pub async fn melde_vollzug_tx(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
-        .bind(vollzugsmeldung)
-        .bind(auftrag_id)
-        .execute(&mut *conn)
-        .await?;
+    // Die Bedingung im UPDATE hält einen gleichzeitig aufgehobenen Auftrag draußen (LLH-1098);
+    // der Fehler rollt die Transaktion samt ETB-Meldung zurück.
+    let getroffen = sqlx::query(
+        "UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ? AND aufgehoben_at IS NULL",
+    )
+    .bind(vollzugsmeldung)
+    .bind(auftrag_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if getroffen == 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist aufgehoben".into(),
+        ));
+    }
     let etb_id = crate::etb::repo::anlegen_tx(
         &mut *conn,
         einsatz_id,
@@ -976,6 +997,18 @@ pub async fn nimm_ab(
     .bind(auftrag_id)
     .execute(pool)
     .await?;
+    // Ein gleichzeitig aufgehobener Auftrag wird nicht abgenommen (LLH-1098); eine schon erfolgte
+    // Abnahme bleibt idempotent.
+    let aufgehoben: Option<bool> =
+        sqlx::query_scalar("SELECT aufgehoben_at IS NOT NULL FROM auftrag WHERE id = ?")
+            .bind(auftrag_id)
+            .fetch_optional(pool)
+            .await?;
+    if aufgehoben == Some(true) {
+        return Err(AppError::UnprocessableEntity(
+            "Ein aufgehobener Auftrag lässt sich nicht abnehmen".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -2031,6 +2064,53 @@ mod tests {
             Some("Lage erledigt")
         );
         assert!(!nach.auftrag.berichtigbar);
+    }
+
+    /// Gegen den Wettlauf mit dem Aufheben (LLH-1098): die Schreibwege prüfen selbst, nicht nur
+    /// der Handler davor.
+    #[tokio::test]
+    async fn vollzug_abnahme_und_quittung_lehnen_den_aufgehobenen_ab() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        hebe_auf_roh(&pool, d.auftrag.id, b, "2026-06-11 10:00:00").await;
+
+        let vollzug =
+            melde_vollzug(&pool, 1, e, d.auftrag.id, b, "doch", "2026-06-11 11:00:00").await;
+        assert!(
+            matches!(vollzug, Err(AppError::UnprocessableEntity(_))),
+            "{vollzug:?}"
+        );
+        let meldungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE typ = 'meldung'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(meldungen, 0, "keine ETB-Meldung am aufgehobenen Auftrag");
+
+        let abnahme = nimm_ab(&pool, d.auftrag.id, b, "2026-06-11 12:00:00").await;
+        assert!(
+            matches!(abnahme, Err(AppError::UnprocessableEntity(_))),
+            "{abnahme:?}"
+        );
+
+        let quittung =
+            quittiere_empfaenger(&pool, d.empfaenger[0].id, b, "2026-06-11 12:00:00").await;
+        assert!(
+            matches!(quittung, Err(AppError::UnprocessableEntity(_))),
+            "{quittung:?}"
+        );
+        // Eine inzwischen ersetzte Empfängerzeile (Berichtigung) ist weg, nicht aufgehoben.
+        let weg = quittiere_empfaenger(&pool, 99_999, b, "2026-06-11 12:00:00").await;
+        assert!(matches!(weg, Err(AppError::NotFound)), "{weg:?}");
     }
 
     #[tokio::test]
