@@ -5,10 +5,10 @@ relativ zu `frontend/src/`.
 
 ## 1. Backend: Datenhaltung und Statusmodell (D1, D10)
 
-- [ ] 1.1 Migration `<nächste Nummer>_auftrag_aufhebung.sql` mit `aufgehoben_at`,
+- [x] 1.1 Migration `0180_auftrag_aufhebung.sql` mit `aufgehoben_at`,
   `aufgehoben_von_id` (FK `benutzer`) und `aufhebungsgrund` als `ADD COLUMN` anlegen. Nachweis:
   `git fetch origin alpha && scripts/check-migrationen.sh` grün, `db::tests` grün.
-- [ ] 1.2 Test zuerst:
+- [x] 1.2 Test zuerst:
   - Unit-Tests in `src/auftrag/repo.rs`: Ein Auftrag mit `aufgehoben_at` liefert den Status
     `aufgehoben`, auch wenn er vollzogen ist. Er ist abgeschlossen und nicht überfällig, und sein
     Abschluss-Cursor ist `aufgehoben_at`.
@@ -16,13 +16,13 @@ relativ zu `frontend/src/`.
   - Ein Fall in `tests/fixtures/verdichtung/regeln.json`.
 
   Nachweis: rot belegt.
-- [ ] 1.3 Enum `AuftragBearbeitungsstatus::Aufgehoben`, `BEARB_AUFGEHOBEN` und `ist_offen()`
+- [x] 1.3 Enum `AuftragBearbeitungsstatus::Aufgehoben`, `BEARB_AUFGEHOBEN` und `ist_offen()`
   umsetzen. Ebenso `bearbeitungsstatus_sql!`, `ist_abgeschlossen_sql!`, `abschluss_zeit_sql!`,
   `ist_ueberfaellig_sql!` und `AuftragAnzeige` (Felder `aufgehoben_at`, `aufgehoben_von_name`,
   `aufhebungsgrund`, `berichtigbar`). Den Pin in `tests/enum_wire_kontrakt.rs` und die Doku der
   Kennzahl `abgeschlossen` nachziehen. Nachweis: 1.2 grün, `tests/auftrag_blaettern.rs` und
   `tests/verdichtung_fixture.rs` grün.
-- [ ] 1.4 Schwärzungs-Register (D11): `aufhebungsgrund` scrub, Zeit und FK retain, gegebenenfalls
+- [x] 1.4 Schwärzungs-Register (D11): `aufhebungsgrund` scrub, Zeit und FK retain, gegebenenfalls
   `PERSONENBEZUEGE`. Nachweis: `jede_einsatz_scoped_spalte_ist_klassifiziert`,
   `jeder_personenverweis_ist_als_bezug_deklariert` und `tests/aufbewahrung_e2e.rs` grün.
 

@@ -64,23 +64,40 @@ pub struct EmpfaengerBereich {
     pub einheiten_json: String,
 }
 
-/// Bearbeitungsstatus als SQL-Ausdruck: `'abgenommen'`, wenn `abgenommen_at` gesetzt ist, sonst
-/// die Vollzugs-Achse. EINMAL definiert für die Spalte in [`ANZEIGE_SELECT`] und den
+/// Bearbeitungsstatus als SQL-Ausdruck: `'aufgehoben'`, wenn `aufgehoben_at` gesetzt ist
+/// (LLH-1098, schlägt jeden anderen), sonst `'abgenommen'`, wenn `abgenommen_at` gesetzt ist,
+/// sonst die Vollzugs-Achse. EINMAL definiert für die Spalte in [`ANZEIGE_SELECT`] und den
 /// Status-Filter in [`liste`] (LFH-933).
 macro_rules! bearbeitungsstatus_sql {
     () => {
-        "(CASE WHEN a.abgenommen_at IS NOT NULL THEN 'abgenommen' \
+        "(CASE WHEN a.aufgehoben_at IS NOT NULL THEN 'aufgehoben' \
+              WHEN a.abgenommen_at IS NOT NULL THEN 'abgenommen' \
               ELSE COALESCE(ks.vollzug_status, 'offen') END)"
     };
 }
 
-/// Überfällig: Frist abgelaufen und mindestens ein Empfänger hat nicht quittiert. Trägt EIN `?`
-/// für `jetzt`. EINMAL definiert für [`ANZEIGE_SELECT`] und den Modulzähler [`zaehlen`]
-/// (LFH-935).
+/// Überfällig: nicht aufgehoben, Frist abgelaufen und mindestens ein Empfänger hat nicht
+/// quittiert. Trägt EIN `?` für `jetzt`. EINMAL definiert für [`ANZEIGE_SELECT`] und den
+/// Modulzähler [`zaehlen`] (LFH-935). Ein aufgehobener Auftrag erwartet keine Quittung mehr
+/// (LLH-1098).
 macro_rules! ist_ueberfaellig_sql {
     () => {
-        "(a.frist_at IS NOT NULL AND a.frist_at <= ? \
+        "(a.aufgehoben_at IS NULL AND a.frist_at IS NOT NULL AND a.frist_at <= ? \
           AND EXISTS (SELECT 1 FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NULL))"
+    };
+}
+
+/// Berichtigbar (LLH-1098): Bearbeitungsstatus `offen` und kein Empfänger hat quittiert. EINMAL
+/// definiert für das Feld `berichtigbar` in [`ANZEIGE_SELECT`] und die Prüfung in
+/// [`berichtigen_tx`]; der Client rechnet die Regel nicht nach.
+macro_rules! ist_berichtigbar_sql {
+    () => {
+        concat!(
+            "(",
+            bearbeitungsstatus_sql!(),
+            " = 'offen' AND NOT EXISTS (SELECT 1 FROM auftrag_empfaenger aq \
+               WHERE aq.auftrag_id = a.id AND aq.quittiert_at IS NOT NULL))"
+        )
     };
 }
 
@@ -107,7 +124,12 @@ const ANZEIGE_SELECT: &str = concat!(
     ist_ueberfaellig_sql!(),
     " AS ist_ueberfaellig, ",
     bearbeitungsstatus_sql!(),
-    " AS bearbeitungsstatus \
+    " AS bearbeitungsstatus, \
+     a.aufgehoben_at, a.aufgehoben_von_id, \
+     (SELECT b.anzeigename FROM benutzer b WHERE b.id = a.aufgehoben_von_id) AS aufgehoben_von_name, \
+     a.aufhebungsgrund, ",
+    ist_berichtigbar_sql!(),
+    " AS berichtigbar \
      FROM auftrag a",
     vollzug_join_sql!()
 );
@@ -223,24 +245,24 @@ pub async fn empfaenger_von_allen(
     Ok(je_auftrag)
 }
 
-/// Abgeschlossen heißt vollzogen oder abgenommen (LFH-1071, D1); `offen` ist das Gegenteil.
-/// EINMAL definiert für Liste und [`kennzahlen`].
+/// Abgeschlossen heißt vollzogen, abgenommen oder aufgehoben (LFH-1071, D1; LLH-1098); `offen`
+/// ist das Gegenteil. EINMAL definiert für Liste und [`kennzahlen`].
 macro_rules! ist_abgeschlossen_sql {
     () => {
         concat!(
             "(",
             bearbeitungsstatus_sql!(),
-            " IN ('vollzogen', 'abgenommen'))"
+            " IN ('vollzogen', 'abgenommen', 'aufgehoben'))"
         )
     };
 }
 
-/// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-1071, D2): zuletzt abgenommen bzw. vollzogen
-/// oben, ohne Stempel die Anlage. Dieselbe Ordnung wie bisher im Board. Liste und Cursor lesen
-/// denselben Ausdruck.
+/// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-1071, D2): zuletzt aufgehoben, abgenommen
+/// bzw. vollzogen oben, ohne Stempel die Anlage. Liste und Cursor lesen denselben Ausdruck; der
+/// Client-Cursor `auftragAbschlussCursor` (`frontend/src/api/auftraege.ts`) dieselbe Reihenfolge.
 macro_rules! abschluss_zeit_sql {
     () => {
-        "COALESCE(a.abgenommen_at, ks.vollzogen_at, a.erstellt_at)"
+        "COALESCE(a.aufgehoben_at, a.abgenommen_at, ks.vollzogen_at, a.erstellt_at)"
     };
 }
 
@@ -1516,6 +1538,148 @@ mod tests {
             AuftragBearbeitungsstatus::Abgenommen
         );
         assert_eq!(nach.auftrag.abgenommen_von_id, Some(b));
+    }
+
+    /// Setzt die Aufhebung direkt in der Tabelle (LLH-1098): die Tests hier prüfen die
+    /// Ableitung, nicht den Schreibweg.
+    async fn hebe_auf_roh(pool: &SqlitePool, auftrag_id: i64, von_id: i64, at: &str) {
+        sqlx::query(
+            "UPDATE auftrag SET aufgehoben_at = ?, aufgehoben_von_id = ?, aufhebungsgrund = 'Lage erledigt' \
+             WHERE id = ?",
+        )
+        .bind(at)
+        .bind(von_id)
+        .bind(auftrag_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn aufgehoben_schlaegt_vollzug_und_ist_nie_ueberfaellig() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "fertig",
+            "2026-06-11 09:30:00",
+        )
+        .await
+        .unwrap();
+        hebe_auf_roh(&pool, d.auftrag.id, b, "2026-06-11 11:00:00").await;
+
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Aufgehoben
+        );
+        assert!(
+            !nach.auftrag.ist_ueberfaellig,
+            "Frist abgelaufen und unquittiert, aber aufgehoben: nicht überfällig"
+        );
+        assert_eq!(
+            nach.auftrag.vollzugsmeldung.as_deref(),
+            Some("fertig"),
+            "die Vollzugsmeldung bleibt lesbar"
+        );
+        assert_eq!(
+            nach.auftrag.aufgehoben_at.as_deref(),
+            Some("2026-06-11 11:00:00")
+        );
+        assert_eq!(nach.auftrag.aufgehoben_von_id, Some(b));
+        assert_eq!(
+            nach.auftrag.aufhebungsgrund.as_deref(),
+            Some("Lage erledigt")
+        );
+        assert!(!nach.auftrag.berichtigbar);
+    }
+
+    #[tokio::test]
+    async fn aufgehoben_ist_abgeschlossen_in_liste_kennzahlen_und_zaehler() {
+        use crate::kommunikation::{ListenPhase, Seite};
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let neu = |t: &'static str| daten(t, Some("2026-06-11 10:00:00"), vec![funktion("EA1")]);
+        let vollzogen = anlegen(&pool, e, b, neu("vollzogen"), "2026-06-11 09:00:00")
+            .await
+            .unwrap();
+        melde_vollzug(
+            &pool,
+            1,
+            e,
+            vollzogen.auftrag.id,
+            b,
+            "ok",
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
+        let aufgehoben = anlegen(&pool, e, b, neu("aufgehoben"), "2026-06-11 09:00:00")
+            .await
+            .unwrap();
+        hebe_auf_roh(&pool, aufgehoben.auftrag.id, b, "2026-06-11 12:00:00").await;
+        let offen = anlegen(&pool, e, b, neu("offen"), "2026-06-11 09:00:00")
+            .await
+            .unwrap();
+        let jetzt = "2026-06-11 13:00:00";
+
+        let abgeschlossen = liste_gefiltert(
+            &pool,
+            e,
+            &AuftragFilter {
+                phase: Some(ListenPhase::Abgeschlossen),
+                seite: Some(Seite {
+                    vor: None,
+                    limit: 10,
+                }),
+                ..Default::default()
+            },
+            jetzt,
+        )
+        .await
+        .unwrap();
+        let ids: Vec<i64> = abgeschlossen.iter().map(|d| d.auftrag.id).collect();
+        assert_eq!(
+            ids,
+            vec![aufgehoben.auftrag.id, vollzogen.auftrag.id],
+            "aufgehoben um 12:00 steht vor vollzogen um 11:00"
+        );
+        let offene = liste_gefiltert(
+            &pool,
+            e,
+            &AuftragFilter {
+                phase: Some(ListenPhase::Offen),
+                ..Default::default()
+            },
+            jetzt,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            offene.iter().map(|d| d.auftrag.id).collect::<Vec<_>>(),
+            vec![offen.auftrag.id]
+        );
+
+        let k = kennzahlen(&pool, e, None, None).await.unwrap();
+        assert_eq!((k.offen, k.abgeschlossen), (1, 2));
+
+        let z = zaehlen(&pool, e, jetzt).await.unwrap();
+        assert_eq!((z.offen, z.ueberfaellig), (1, 1));
     }
 
     #[tokio::test]

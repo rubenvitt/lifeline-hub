@@ -24,6 +24,8 @@ pub const AUFTRAG_TEXT_MAX: usize = 10_000;
 pub const BEFEHLSFELD_MAX: usize = 2_000;
 /// Höchstlänge der Bezeichnung eines externen Empfängers (LFH-937), wie `fuehrung::TEXT_MAX`.
 pub const EXTERN_BEZEICHNUNG_MAX: usize = 200;
+/// Höchstlänge des Grunds beim Aufheben (LLH-1098); er steht wörtlich in der ETB-Anordnung.
+pub const AUFHEBUNGSGRUND_MAX: usize = 2_000;
 
 /// ETB-`an` einer Anordnung aus den Anzeigenamen der Empfänger (LFH-937, design.md D4):
 /// kommagetrennt, höchstens `etb::PARTEI_MAX` Zeichen. Passen nicht alle Namen hinein, endet es
@@ -96,6 +98,8 @@ wire_enum! {
         InArbeit => "in_arbeit",
         Vollzogen => "vollzogen",
         Abgenommen => "abgenommen",
+        /// Mit Grund aufgehoben (LLH-1098): Endstatus, schlägt jeden anderen.
+        Aufgehoben => "aufgehoben",
     }
     try_from = |s| format!("Ungültiger AuftragBearbeitungsstatus: {s}");
 }
@@ -104,13 +108,15 @@ impl AuftragBearbeitungsstatus {
     /// Ob der Auftrag noch offen ist, also nicht abgeschlossen (LFH-612, Modulzähler).
     ///
     /// Spiegelt die Phasen des Frontends (`AUFTRAG_STATUS` in `kommunikation/phase.ts`):
-    /// `offen`/`in_arbeit` sind nicht abgeschlossen, `vollzogen`/`abgenommen` schon. Ein
+    /// `offen`/`in_arbeit` sind nicht abgeschlossen, `vollzogen`/`abgenommen`/`aufgehoben` schon. Ein
     /// vollständiger `match` — ein neuer Status muss hier entschieden werden, statt still
     /// in eine der beiden Mengen zu fallen.
     pub fn ist_offen(&self) -> bool {
         match self {
             AuftragBearbeitungsstatus::Offen | AuftragBearbeitungsstatus::InArbeit => true,
-            AuftragBearbeitungsstatus::Vollzogen | AuftragBearbeitungsstatus::Abgenommen => false,
+            AuftragBearbeitungsstatus::Vollzogen
+            | AuftragBearbeitungsstatus::Abgenommen
+            | AuftragBearbeitungsstatus::Aufgehoben => false,
         }
     }
 }
@@ -164,6 +170,7 @@ pub const BEARB_OFFEN: &str = AuftragBearbeitungsstatus::Offen.as_str();
 pub const BEARB_IN_ARBEIT: &str = AuftragBearbeitungsstatus::InArbeit.as_str();
 pub const BEARB_VOLLZOGEN: &str = AuftragBearbeitungsstatus::Vollzogen.as_str();
 pub const BEARB_ABGENOMMEN: &str = AuftragBearbeitungsstatus::Abgenommen.as_str();
+pub const BEARB_AUFGEHOBEN: &str = AuftragBearbeitungsstatus::Aufgehoben.as_str();
 
 /// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).
 pub const RICHTUNG_INTERN: &str = Richtung::Intern.as_str();
@@ -225,9 +232,19 @@ pub struct AuftragAnzeige {
     pub quittiert_anzahl: i64,
     // Abgeleitet: Frist überschritten UND noch nicht alle Empfänger quittiert.
     pub ist_ueberfaellig: bool,
-    // Abgeleitet: 'abgenommen' wenn abgenommen_at gesetzt, sonst vollzug_status.
+    // Abgeleitet: 'aufgehoben' wenn aufgehoben_at gesetzt, sonst 'abgenommen' wenn
+    // abgenommen_at gesetzt, sonst vollzug_status.
     #[sqlx(try_from = "String")]
     pub bearbeitungsstatus: AuftragBearbeitungsstatus,
+    /// Aufhebung (LLH-1098): Zeitpunkt, Person und Grund; alle drei oder keiner.
+    pub aufgehoben_at: Option<String>,
+    pub aufgehoben_von_id: Option<i64>,
+    /// Anzeigename der aufhebenden Person zur Lesezeit.
+    pub aufgehoben_von_name: Option<String>,
+    pub aufhebungsgrund: Option<String>,
+    /// Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
+    /// nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).
+    pub berichtigbar: bool,
 }
 
 /// Anzeige einer Empfänger-Zeile inkl. Quittung (Achse 1, pro Empfänger).
@@ -265,7 +282,7 @@ pub struct AuftragEmpfaengerAnzeige {
 pub struct AuftragKennzahlen {
     /// Offen oder in Bearbeitung.
     pub offen: i64,
-    /// Vollzogen oder abgenommen.
+    /// Vollzogen, abgenommen oder aufgehoben.
     pub abgeschlossen: i64,
 }
 
