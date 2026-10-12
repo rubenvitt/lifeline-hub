@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/BefehlListe.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs]
 ---
 
 ## Überblick
@@ -10,12 +10,15 @@ quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/Auftraege
 Das Modul „Aufträge/Befehle“ hat zwei Reiter:
 
 - **Einzelaufträge** gehen an einen oder mehrere Empfänger. Jeder Empfänger quittiert den
-  Empfang; ist die Arbeit getan, wird der Vollzug gemeldet und der Auftrag abgenommen.
+  Empfang; ist die Arbeit getan, wird der Vollzug gemeldet und der Auftrag abgenommen. Ein
+  Auftrag lässt sich berichtigen, solange noch niemand quittiert hat, und mit einem Grund
+  aufheben, solange er nicht abgenommen ist.
 - **Einsatzbefehle** sind Dokumente nach einem Befehlsschema. Sie entstehen als Entwurf, werden
   freigegeben und lassen sich danach nur noch in einer neuen Fassung fortschreiben.
 
-Lesen dürfen alle mit Zugang zum Einsatz. Erteilen, Quittieren, Entwerfen und Freigeben dürfen
-Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
+Lesen dürfen alle mit Zugang zum Einsatz. Erteilen, Quittieren, Berichtigen, Aufheben,
+Entwerfen und Freigeben dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
+(siehe
 [Rechte im Einsatz](rechte-im-einsatz.md)).
 
 ## Abläufe
@@ -47,7 +50,7 @@ stehen.
 1. Im Reiter „Einzelaufträge“ die Ansicht „Offen“ oder „Abgeschlossen“ wählen, bei Bedarf eine
    Richtung und „Empfänger filtern“.
 
-   ![Einzelaufträge mit zwei offenen Aufträgen in der Gruppe „Ohne Frist“, je mit „Quittung offen:“, „Quittieren“, „Bearbeitung beginnen“ und „Vollzug melden“](../bilder/auftraege-befehle/auftraege-liste.png)
+   ![Einzelaufträge mit zwei offenen Aufträgen in der Gruppe „Ohne Frist“, je mit „Quittung offen:“, „Quittieren“, „Bearbeitung beginnen“, „Vollzug melden“ und dem Menü der weiteren Aktionen](../bilder/auftraege-befehle/auftraege-liste.png)
 
 2. Neben „Quittung offen:“ steht jeder Empfänger, der noch nicht quittiert hat. „Quittieren“
    wählen und die Rückfrage „Empfang/Kenntnis quittieren?“ mit „Empfang quittieren“ bestätigen.
@@ -56,6 +59,20 @@ stehen.
 
 Offene Aufträge stehen in den Gruppen „Überfällig“, „Heute fällig“, „Später“ und „Ohne Frist“.
 „Auftragsdetails (Schema)“ an der Karte klappt die Felder des Befehlsschemas auf.
+
+### Einen Auftrag berichtigen
+
+Für Einsatzleitung und Führungspersonal, solange der Auftrag offen ist und noch kein Empfänger
+quittiert hat:
+
+1. An der Karte das Menü „Aktionen zu Auftrag #…“ öffnen und „Berichtigen“ wählen.
+2. Über der Liste öffnet sich „Auftrag #… berichtigen“ mit dem bisherigen Stand. Auftragstext,
+   Empfänger, Priorität, Frist und die Felder des Befehlsschemas ändern.
+3. „Berichtigung speichern“ wählen.
+
+Nach der ersten Quittung steht im Menü „Berichtigen (schon quittiert)“ gesperrt: Der Empfänger
+hat den alten Wortlaut bestätigt. Dann den Auftrag aufheben und neu erteilen. „Richtung“ und
+„Erteilt am“ lassen sich nicht berichtigen.
 
 ### Den Vollzug melden und den Auftrag abnehmen
 
@@ -68,6 +85,22 @@ Für Einsatzleitung und Führungspersonal:
    abnehmen?“ mit „Auftrag abnehmen“ bestätigen.
 
 Die Abnahme lässt sich nicht zurücknehmen.
+
+### Einen Auftrag aufheben
+
+Für Einsatzleitung und Führungspersonal, solange der Auftrag nicht abgenommen ist:
+
+1. An der Karte „Auftrag aufheben“ wählen. Bei einem offenen Auftrag steht es rot im Menü
+   „Aktionen zu Auftrag #…“, sonst als roter Knopf an der Karte.
+2. Im Dialog „Auftrag #… aufheben“ den „Grund“ eintragen.
+
+   ![Dialog „Auftrag #… aufheben“ mit dem Satz zur Folge, dem Feld „Grund“ und dem roten Knopf „Auftrag aufheben“](../bilder/auftraege-befehle/auftrag-aufheben.png)
+
+3. Mit „Auftrag aufheben“ bestätigen.
+
+Der Auftrag steht danach unter „Abgeschlossen“ mit dem Etikett „Aufgehoben“, mit Zeit, Person
+und Grund. Quittungen werden nicht mehr erwartet; Quittieren, Vollzug und Abnahme sind nicht
+mehr möglich. Das Aufheben lässt sich nicht zurücknehmen.
 
 ### Einen Einsatzbefehl entwerfen
 
@@ -116,10 +149,23 @@ die Frist ab, bevor alle Empfänger quittiert haben, meldet sich der Hinweis „
 mit „Quittierfrist überschritten“ und „Öffnen“; die Karte steht unter „Überfällig“. Quittieren
 alle Empfänger, schließt die Erinnerung.
 
+Eine berichtigte Frist verschiebt die Erinnerung; sie meldet sich zur neuen Frist erneut. Eine
+entfernte Frist und das Aufheben schließen sie. Eine selbst angelegte Erinnerung zum Auftrag
+bleibt stehen.
+
+Ein aufgehobener Auftrag ist nie offen und nie überfällig: Er fehlt in den Zahlen im Überblick,
+im Lagedashboard, in der Vorbereitung der Lagebesprechung und im Lagebericht.
+
 ### Aufträge im Einsatztagebuch
 
 Ein erteilter Auftrag schreibt eine „Anordnung“ ins ETB, solange „Automatische ETB-Einträge“
 nicht ausgeschaltet ist. Der gemeldete Vollzug schreibt immer eine „Meldung“ mit der Rückmeldung.
+
+Berichtigen und Aufheben schreiben immer eine „Anordnung“, auch bei ausgeschalteten
+automatischen Einträgen: „Auftrag #4 aufgehoben: Lage hat sich erledigt“ bzw. „Auftrag #4
+geändert: …“ mit neuem und vorherigem Wert, etwa „Frist 12.10. 16:00 (vorher 12.10. 15:00)“.
+Die Felder des Befehlsschemas erscheinen dort nur mit ihrem Namen. Die ursprüngliche Anordnung
+bleibt unverändert stehen.
 
 Aufträge lassen sich auch direkt aus einem ETB-Eintrag oder einer Meldung erteilen (siehe
 [Einsatztagebuch](einsatztagebuch.md) und [Meldungen](meldungen.md)). Ein Auftrag aus einem

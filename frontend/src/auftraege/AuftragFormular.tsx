@@ -6,19 +6,17 @@ import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { useEffect, useState, type ReactNode } from 'react';
-import dayjs from 'dayjs';
 import type {
   AdressatKategorie,
+  Auftrag,
+  AuftragPatch,
   AuftragPrioritaet,
   NeuerAuftrag,
-  NeuerEmpfaenger,
   Richtung,
 } from '../api/types';
-import {
-  dekodiere,
-  funktionsOptionen,
-  type FunktionsVorschlaege,
-} from '../fuehrung/funktionsOptionenKern';
+import { alleEmpfaenger, baueEmpfaenger, type FormWerte } from './auftragFormularKern';
+import { berichtigungAus, vorbelegungAus } from './auftragBerichtigungKern';
+import { funktionsOptionen, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import {
   AUFTRAG_BEFEHLSFELD_MAX,
@@ -43,64 +41,6 @@ export interface ZielOption {
   name: string;
 }
 
-/** Werte des Formulars; Zeiten sind Zeitpunkte, das Feld zeigt die Anzeigezone (LFH-692). */
-interface FormWerte {
-  /**
-   * EIN Empfängerfeld für alle Sorten: strukturierte Ziele tragen den Präfix
-   * `abschnitt:`/`einheit:`/`funktion:` (Katalog, LFH-549), alles andere ist freier Funktionstext
-   * (`mode="tags"`). Zwei Felder sprengten das Budget, und der Freitext darf nicht hinter den
-   * Collapse: ohne gepflegte Abschnitte/Einheiten ist er ein Weg zum Pflicht-Empfänger.
-   */
-  empfaenger: string[];
-  externKategorie: AdressatKategorie;
-  externBezeichnung: string;
-  text: string;
-  absicht: string;
-  lage: string;
-  ort: string;
-  zeit: string;
-  mittel: string;
-  verbindung: string;
-  sicherheit: string;
-  prioritaet: AuftragPrioritaet;
-  richtung: Richtung;
-  frist: dayjs.Dayjs | null;
-  erteiltAm: dayjs.Dayjs | null;
-}
-
-/**
- * Wandelt die Werte des Empfängerfeldes in Empfänger-DTOs: `abschnitt:<id>`/`einheit:<id>`
- * stammen aus den Optionen, `funktion:<code>` aus dem Katalog (LFH-549), alles andere wird
- * Funktionstext — ohne Rückschluss von „S3“ auf den Code (`fuehrung/funktionsOptionenKern.ts`).
- */
-function baueEmpfaenger(
-  werte: string[],
-  katalog: FunktionsVorschlaege['katalog'],
-): NeuerEmpfaenger[] {
-  return werte.flatMap((wert): NeuerEmpfaenger[] => {
-    const trenner = wert.indexOf(':');
-    const typ = trenner === -1 ? '' : wert.slice(0, trenner);
-    const id = Number(wert.slice(trenner + 1));
-    if (typ === 'abschnitt' && Number.isFinite(id)) {
-      return [{ empfaenger_typ: 'abschnitt', abschnitt_id: id }];
-    }
-    if (typ === 'einheit' && Number.isFinite(id)) {
-      return [{ empfaenger_typ: 'einheit', einheit_id: id }];
-    }
-    const angabe = dekodiere(wert, katalog);
-    if (angabe.funktion) {
-      return [
-        {
-          empfaenger_typ: 'funktion',
-          funktion: angabe.funktion,
-          ...(angabe.text ? { funktion_text: angabe.text } : {}),
-        },
-      ];
-    }
-    return angabe.text ? [{ empfaenger_typ: 'funktion', funktion_text: angabe.text }] : [];
-  });
-}
-
 /**
  * Freie Empfänger-Texte über der Grenze des Servers (`funktion_text`, LFH-937): der Tag-Modus hat
  * keinen Zähler, deshalb eine Regel statt eines stillen Kürzens.
@@ -119,26 +59,6 @@ function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
           )
         : Promise.resolve(),
   };
-}
-
-/**
- * Alle Empfänger eines Auftrags: die Werte des Empfängerfeldes und bei Richtung „extern“ mit
- * Bezeichnung der externe Adressat. Dieselbe Rechnung für Regel und Absenden, sonst ließe die
- * Regel durch, was beim Absenden leer bliebe.
- */
-function alleEmpfaenger(
-  w: Pick<FormWerte, 'empfaenger' | 'richtung' | 'externKategorie' | 'externBezeichnung'>,
-  katalog: FunktionsVorschlaege['katalog'],
-): NeuerEmpfaenger[] {
-  const empfaenger = baueEmpfaenger(w.empfaenger ?? [], katalog);
-  if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
-    empfaenger.push({
-      empfaenger_typ: 'extern',
-      extern_kategorie: w.externKategorie,
-      extern_bezeichnung: w.externBezeichnung.trim(),
-    });
-  }
-  return empfaenger;
 }
 
 /**
@@ -211,6 +131,7 @@ export default function AuftragFormular({
   speicherFehlerFallback,
   card = true,
   einsatzId,
+  berichtigen,
 }: {
   senden: boolean;
   abschnitte: ZielOption[];
@@ -249,6 +170,16 @@ export default function AuftragFormular({
   speicherFehlerFallback?: string;
   /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
+  /**
+   * Berichtigen statt Erteilen (LLH-1098, design.md D9): dasselbe Formular, vorbelegt mit dem
+   * Stand beim Öffnen; es sendet nur die geänderten Felder, ohne Änderung nichts. Richtung und
+   * Erteilzeit stehen gesperrt, sie berichtigt der Server nicht. `onAnlegen` bleibt dann ungenutzt.
+   */
+  berichtigen?: {
+    auftrag: Auftrag;
+    /** **Muss bei Ablehnung ablehnen** (`mutateAsync`). */
+    onSpeichern: (patch: AuftragPatch) => Promise<unknown>;
+  };
 }) {
   const [form] = Form.useForm<FormWerte>();
   // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
@@ -256,6 +187,11 @@ export default function AuftragFormular({
   // Tipptext des Empfängerfelds: speist „Fachberater: <Text>“/„Führungshilfspersonal: <Text>“.
   const [suche, setSuche] = useState('');
   const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
+  // Die Vorbelegung gilt ab dem Öffnen: ein Live-Abgleich des Auftrags überschreibt keine Eingabe.
+  const [vorbelegung] = useState(() => (berichtigen ? vorbelegungAus(berichtigen.auftrag) : null));
+  // Kann das Formular einen Empfänger nicht abbilden, stehen alle Empfängerfelder gesperrt; ihre
+  // Änderung fiele sonst still weg (der Patch schickt dann keine Empfänger).
+  const empfaengerGesperrt = !!vorbelegung && !vorbelegung.empfaengerAenderbar;
 
   /*
    * Die Empfänger-Regeln zählen den externen Adressaten mit: ändern sich Richtung oder Bezeichnung,
@@ -280,6 +216,15 @@ export default function AuftragFormular({
    * mehr an.
    */
   const absenden = (w: FormWerte) => {
+    if (berichtigen && vorbelegung) {
+      const patch = berichtigungAus(
+        vorbelegung.werte,
+        w,
+        funktionen.katalog,
+        vorbelegung.empfaengerAenderbar,
+      );
+      return Object.keys(patch).length === 0 ? Promise.resolve() : berichtigen.onSpeichern(patch);
+    }
     const empfaenger = alleEmpfaenger(w, funktionen.katalog);
     return onAnlegen({
       auftrag_text: w.text.trim(),
@@ -324,6 +269,7 @@ export default function AuftragFormular({
           <Form.Item name="richtung" label="Richtung">
             <Select<Richtung>
               aria-label="Richtung"
+              disabled={!!berichtigen}
               options={[
                 { value: 'intern', label: 'Intern' },
                 { value: 'extern', label: 'Extern' },
@@ -338,6 +284,7 @@ export default function AuftragFormular({
               style={{ width: '100%' }}
               format="YYYY-MM-DD HH:mm"
               placeholder="jetzt"
+              disabled={!!berichtigen}
             />
           </Form.Item>
         </Col>
@@ -346,7 +293,11 @@ export default function AuftragFormular({
         <Row gutter={16}>
           <Col xs={24} sm={12}>
             <Form.Item name="externKategorie" label="Externe Stelle">
-              <Select<AdressatKategorie> aria-label="Externe Stelle" options={EXTERN_OPTIONEN} />
+              <Select<AdressatKategorie>
+                aria-label="Externe Stelle"
+                options={EXTERN_OPTIONEN}
+                disabled={empfaengerGesperrt}
+              />
             </Form.Item>
           </Col>
           <Col xs={24} sm={12}>
@@ -355,6 +306,7 @@ export default function AuftragFormular({
                 aria-label="Externe Bezeichnung"
                 placeholder="z. B. Leitstelle Nord"
                 maxLength={AUFTRAG_EXTERN_BEZEICHNUNG_MAX}
+                disabled={empfaengerGesperrt}
               />
             </Form.Item>
           </Col>
@@ -419,23 +371,25 @@ export default function AuftragFormular({
   const formular = (
     <ErfassungsFormular<FormWerte>
       form={form}
-      initialValues={{
-        empfaenger: [],
-        externKategorie: 'leitstelle',
-        externBezeichnung: '',
-        text: initialText ?? '',
-        absicht: '',
-        lage: '',
-        ort: '',
-        zeit: '',
-        mittel: '',
-        verbindung: '',
-        sicherheit: '',
-        prioritaet: 'normal',
-        richtung: 'intern',
-        frist: null,
-        erteiltAm: serverJetzt(),
-      }}
+      initialValues={
+        vorbelegung?.werte ?? {
+          empfaenger: [],
+          externKategorie: 'leitstelle',
+          externBezeichnung: '',
+          text: initialText ?? '',
+          absicht: '',
+          lage: '',
+          ort: '',
+          zeit: '',
+          mittel: '',
+          verbindung: '',
+          sicherheit: '',
+          prioritaet: 'normal',
+          richtung: 'intern',
+          frist: null,
+          erteiltAm: serverJetzt(),
+        }
+      }
       onErfassen={absenden}
       // Das Inline-Formular schließt nach dem Senden NICHT; in den Modal-Einbettungen schließt der
       // Aufrufer selbst.
@@ -444,9 +398,9 @@ export default function AuftragFormular({
       speicherFehlerTitel={speicherFehlerTitel}
       speicherFehlerFallback={speicherFehlerFallback}
       laeuft={senden}
-      erfassenText="Auftrag erteilen"
-      serie={serie}
-      uebernahme={UEBERNAHME}
+      erfassenText={berichtigen ? 'Berichtigung speichern' : 'Auftrag erteilen'}
+      serie={serie && !berichtigen}
+      uebernahme={berichtigen ? undefined : UEBERNAHME}
     >
       {zitat}
       {/* „Auftrag / Was" bleibt oben in voller Breite. */}
@@ -469,6 +423,9 @@ export default function AuftragFormular({
           <Form.Item
             name="empfaenger"
             label="Empfänger"
+            // Ein Empfänger, den das Formular nicht abbildet (Person, Fahrzeug), sperrt das Feld;
+            // der Grund steht sichtbar daran (LFH-1078).
+            extra={empfaengerGesperrt ? 'Empfänger hier nicht änderbar' : undefined}
             rules={[
               (f) => pflichtEmpfaengerRegel(funktionen.katalog, f),
               empfaengerRegel(funktionen.katalog),
@@ -478,6 +435,7 @@ export default function AuftragFormular({
             <Select
               mode="tags"
               aria-label="Empfänger"
+              disabled={empfaengerGesperrt}
               // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
               maxCount={AUFTRAG_EMPFAENGER_MAX}
               options={zielOptionen}

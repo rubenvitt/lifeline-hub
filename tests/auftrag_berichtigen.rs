@@ -1,0 +1,418 @@
+//! Auftrag berichtigen (LLH-1098, Spec `auftrag-aufheben-berichtigen`): Teil-Patch vor der
+//! ersten Quittung, Anordnung mit den geänderten Feldern im ETB, Erinnerung folgt der Frist.
+use axum::http::StatusCode;
+use serde_json::{json, Value};
+use std::time::Duration;
+
+mod common;
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag, rolle_setzen,
+    setup_mit_pool_und_live,
+};
+
+/// 12.10.2026 15:00 Europe/Berlin (Vorgabezone ohne Org-Einstellung) = 13:00 UTC.
+const FRIST: &str = "2099-10-12 13:00:00";
+
+fn funktion(t: &str) -> Value {
+    json!({ "empfaenger_typ": "funktion", "funktion_text": t })
+}
+
+async fn erteilen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> Value {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j}");
+    j
+}
+
+async fn standard(app: &axum::Router, cookie: &str, e: i64) -> Value {
+    erteilen(
+        app,
+        cookie,
+        e,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "frist_at": FRIST,
+            "mittel": "LKW",
+            "empfaenger": [funktion("Logistiktrupp")]
+        }),
+    )
+    .await
+}
+
+async fn patch(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    aid: i64,
+    body: Value,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+async fn anordnungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
+    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["typ"] == "anordnung")
+        .cloned()
+        .collect()
+}
+
+fn inhalte(a: &[Value]) -> Vec<String> {
+    a.iter()
+        .map(|x| x["inhalt"].as_str().unwrap().to_string())
+        .collect()
+}
+
+async fn auto_erinnerung(pool: &sqlx::SqlitePool, aid: i64) -> Option<(String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT faellig_at, zuletzt_ausgeloest_at FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = 'auftrag' AND bezug_id = ?",
+    )
+    .bind(aid)
+    .fetch_optional(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn frist_und_prioritaet_berichtigen_nennt_beide_im_etb() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let a = standard(&app, &admin, e).await;
+    let aid = a["id"].as_i64().unwrap();
+    let mut rx = live.abonniere(e);
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00", "prioritaet": "sofort" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["frist_at"], "2099-10-12 14:00:00");
+    assert_eq!(j["prioritaet"], "sofort");
+    assert_eq!(
+        j["auftrag_text"], "Sandsäcke zum Deich bringen",
+        "Rest bleibt"
+    );
+    assert_eq!(j["mittel"], "LKW");
+    assert_eq!(j["berichtigbar"], true);
+    recv_until_tag(&mut rx, "auftrag", Duration::from_secs(1)).await;
+
+    let a = anordnungen(&app, &admin, e).await;
+    let berichtigt = a
+        .iter()
+        .find(|x| x["inhalt"].as_str().unwrap().contains("geändert"))
+        .unwrap_or_else(|| panic!("{a:?}"));
+    assert_eq!(
+        berichtigt["inhalt"],
+        "Auftrag #1 geändert: Priorität sofort (vorher normal), Frist 12.10. 16:00 (vorher 12.10. 15:00)."
+    );
+    assert_eq!(berichtigt["an"], "Logistiktrupp");
+    assert_eq!(berichtigt["auftrag_id"], aid);
+    assert!(
+        inhalte(&a).contains(&"Sandsäcke zum Deich bringen".to_string()),
+        "die ursprüngliche Anordnung bleibt"
+    );
+}
+
+#[tokio::test]
+async fn text_empfaenger_und_schema_im_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({
+            "auftrag_text": " Sandsäcke zum Deich Nord bringen ",
+            "empfaenger": [funktion("Versorgungszug"), funktion("Versorgungszug")],
+            "mittel": "Radlader",
+            "lage": null
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["auftrag_text"], "Sandsäcke zum Deich Nord bringen");
+    let empf = j["empfaenger"].as_array().unwrap();
+    assert_eq!(empf.len(), 1, "gleiche Empfänger zusammengeführt");
+    assert_eq!(empf[0]["snap_anzeige"], "Versorgungszug");
+    assert!(empf[0]["quittiert_at"].is_null());
+    assert_eq!(j["mittel"], "Radlader");
+
+    let a = anordnungen(&app, &admin, e).await;
+    assert!(
+        inhalte(&a).contains(
+            &"Auftrag #1 geändert: Auftragstext „Sandsäcke zum Deich Nord bringen“, Empfänger Versorgungszug (vorher Logistiktrupp), Mittel."
+                .to_string()
+        ),
+        "{a:?}"
+    );
+    let eintrag = a
+        .iter()
+        .find(|x| x["inhalt"].as_str().unwrap().contains("geändert"))
+        .unwrap();
+    assert_eq!(eintrag["an"], "Versorgungszug");
+}
+
+#[tokio::test]
+async fn null_leert_und_fehlendes_feld_bleibt() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "mittel": null })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert!(j["mittel"].is_null());
+    assert_eq!(j["frist_at"], FRIST);
+    assert!(inhalte(&anordnungen(&app, &admin, e).await)
+        .contains(&"Auftrag #1 geändert: Mittel.".to_string()));
+}
+
+#[tokio::test]
+async fn patch_ohne_aenderung_schreibt_nichts() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+    let vorher = anordnungen(&app, &admin, e).await.len();
+
+    let (s, _) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "frist_at": FRIST,
+            "mittel": " LKW ",
+            "prioritaet": "normal",
+            "empfaenger": [funktion("Logistiktrupp")]
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = patch(&app, &admin, e, aid, json!({})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(anordnungen(&app, &admin, e).await.len(), vorher);
+}
+
+#[tokio::test]
+async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let text = json!({ "auftrag_text": "neu" });
+
+    let quittiert = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({ "auftrag_text": "A", "empfaenger": [funktion("Nord"), funktion("Süd")] }),
+    )
+    .await;
+    let qid = quittiert["id"].as_i64().unwrap();
+    let empf = quittiert["empfaenger"][0]["id"].as_i64().unwrap();
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{qid}/empfaenger/{empf}/quittieren"),
+        &admin,
+        None,
+    )
+    .await;
+    let (s, j) = patch(&app, &admin, e, qid, text.clone()).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "quittiert: {j}");
+
+    for (status, body) in [
+        ("in_arbeit", json!({ "status": "in_arbeit" })),
+        (
+            "vollzogen",
+            json!({ "status": "vollzogen", "vollzugsmeldung": "ok" }),
+        ),
+    ] {
+        let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        let (s, _) = patch(&app, &admin, e, aid, text.clone()).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{status}");
+    }
+
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &admin,
+        Some(r#"{"grund":"erledigt"}"#),
+    )
+    .await;
+    let (s, _) = patch(&app, &admin, e, aid, text).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "aufgehoben");
+
+    let (_, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{qid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["auftrag_text"], "A", "unverändert");
+    assert_eq!(d["berichtigbar"], false);
+}
+
+#[tokio::test]
+async fn feldfehler_sind_400() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+    for body in [
+        json!({ "auftrag_text": "   " }),
+        json!({ "auftrag_text": "x".repeat(10_001) }),
+        json!({ "empfaenger": [] }),
+        json!({ "empfaenger": (0..51).map(|i| funktion(&format!("EA {i}"))).collect::<Vec<_>>() }),
+        json!({ "prioritaet": "egal" }),
+        json!({ "frist_at": "morgen" }),
+        json!({ "mittel": "x".repeat(2_001) }),
+    ] {
+        let (s, j) = patch(&app, &admin, e, aid, body.clone()).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
+    }
+    let (_, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["auftrag_text"], "Sandsäcke zum Deich bringen");
+}
+
+#[tokio::test]
+async fn rechte_und_einsatz_wie_beim_aufheben() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+    let body = json!({ "auftrag_text": "neu" });
+
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+    assert_eq!(
+        patch(&app, &erika_c, e, aid, body.clone()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        patch(&app, &admin, anderer, aid, body.clone()).await.0,
+        StatusCode::NOT_FOUND
+    );
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        patch(&app, &admin, e, aid, body).await.0,
+        StatusCode::CONFLICT
+    );
+}
+
+#[tokio::test]
+async fn frist_fuehrt_die_erinnerung_nach() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+    // Der Alarm hat schon ausgelöst.
+    sqlx::query(
+        "UPDATE erinnerung SET zuletzt_ausgeloest_at = '2026-01-01 00:00:00' \
+         WHERE quelle = 'auto_frist' AND bezug_id = ?",
+    )
+    .bind(aid)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, _) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        auto_erinnerung(&pool, aid).await,
+        Some(("2099-10-12 14:00:00".to_string(), None)),
+        "verschoben, Auslöser zurückgesetzt"
+    );
+
+    let (s, _) = patch(&app, &admin, e, aid, json!({ "frist_at": null })).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(auto_erinnerung(&pool, aid).await, None, "geschlossen");
+    assert!(inhalte(&anordnungen(&app, &admin, e).await)
+        .contains(&"Auftrag #1 geändert: Frist keine (vorher 12.10. 16:00).".to_string()));
+
+    let (s, _) = patch(&app, &admin, e, aid, json!({ "frist_at": FRIST })).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        auto_erinnerung(&pool, aid).await.map(|(f, _)| f),
+        Some(FRIST.to_string()),
+        "neu angelegt"
+    );
+}
+
+#[tokio::test]
+async fn liste_traegt_berichtigbar() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    standard(&app, &admin, e).await;
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["berichtigbar"], true);
+}

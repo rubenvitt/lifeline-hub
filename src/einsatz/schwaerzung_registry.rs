@@ -1862,6 +1862,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("richtung", G_ENUM),
             retain("quell_etb_eintrag_id", G_FK),
             retain("lfd_nr", G_ZAEHLER),
+            // Aufhebung (LLH-1098): der Grund ist Führungs-Freitext wie `vollzugsmeldung` und
+            // steht im ETB-Wortlaut; Zeit und Person bleiben wie bei der Abnahme.
+            retain("aufgehoben_at", G_ZEIT),
+            retain("aufgehoben_von_id", G_FK),
+            scrub("aufhebungsgrund", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

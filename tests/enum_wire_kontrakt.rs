@@ -313,6 +313,7 @@ fn serde_wire_gleich_as_str() {
         InArbeit,
         Vollzogen,
         Abgenommen,
+        Aufgehoben,
     });
     enum_wire_as_str!(lifeline_hub::auftrag::EmpfaengerTyp {
         Abschnitt,

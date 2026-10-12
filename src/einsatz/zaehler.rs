@@ -324,7 +324,13 @@ mod tests {
     fn gewicht_zaehlt_wie_gleiche_zeilen() {
         use AuftragBearbeitungsstatus as A;
         let mut auftraege = vec![];
-        for bs in [A::Offen, A::InArbeit, A::Vollzogen, A::Abgenommen] {
+        for bs in [
+            A::Offen,
+            A::InArbeit,
+            A::Vollzogen,
+            A::Abgenommen,
+            A::Aufgehoben,
+        ] {
             for ist_ueberfaellig in [false, true] {
                 auftraege.push(AuftragsMerkmale {
                     bearbeitungsstatus: bs,
@@ -384,5 +390,6 @@ mod tests {
         assert!(AuftragBearbeitungsstatus::InArbeit.ist_offen());
         assert!(!AuftragBearbeitungsstatus::Vollzogen.ist_offen());
         assert!(!AuftragBearbeitungsstatus::Abgenommen.ist_offen());
+        assert!(!AuftragBearbeitungsstatus::Aufgehoben.ist_offen());
     }
 }

@@ -1,6 +1,12 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type { AbschlussCursor } from './meldungen';
-import type { Auftrag, AuftragKennzahlen, NeuerAuftrag } from './types';
+import type {
+  Auftrag,
+  AuftragAufhebenBody,
+  AuftragKennzahlen,
+  AuftragPatch,
+  NeuerAuftrag,
+} from './types';
 
 interface AuftragFilter {
   status?: string;
@@ -37,9 +43,12 @@ function boardParameter(filter: AuftragBoardFilter) {
 }
 
 /** Cursor aus einem Auftrag: dieselbe Ordnungszeit wie am Server,
- *  `COALESCE(abgenommen_at, vollzogen_at, erstellt_at)`. */
+ *  `COALESCE(aufgehoben_at, abgenommen_at, vollzogen_at, erstellt_at)`. */
 export function auftragAbschlussCursor(a: Auftrag): AbschlussCursor {
-  return { zeit: a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at, id: a.id };
+  return {
+    zeit: a.aufgehoben_at ?? a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at,
+    id: a.id,
+  };
 }
 
 /** Alle offenen und in Bearbeitung befindlichen Aufträge, ungeblättert (LFH-1071). */
@@ -122,4 +131,23 @@ export function setzeVollzug(
 /** Abnahme durch die Führung (LFH-91). */
 export function nimmAb(einsatzId: number, auftragId: number): Promise<Auftrag> {
   return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}/abnehmen`, 'POST');
+}
+
+/** Hebt einen Auftrag mit Grund auf (LLH-1098); unumkehrbar, der Server schreibt das ETB. */
+export function hebeAuf(einsatzId: number, auftragId: number, grund: string): Promise<Auftrag> {
+  const body: AuftragAufhebenBody = { grund };
+  return apiSend<Auftrag>(
+    `/api/einsaetze/${einsatzId}/auftraege/${auftragId}/aufheben`,
+    'POST',
+    body,
+  );
+}
+
+/** Berichtigt einen Auftrag vor der ersten Quittung (LLH-1098): nur die geänderten Felder. */
+export function patcheAuftrag(
+  einsatzId: number,
+  auftragId: number,
+  patch: AuftragPatch,
+): Promise<Auftrag> {
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}`, 'PATCH', patch);
 }

@@ -23,6 +23,17 @@ describe('StatusBadge', () => {
     );
   });
 
+  it('nimmt einen Ton des Status vor dem Ton der Phase (LLH-1098)', () => {
+    const { rerender } = render(<StatusBadge phase="abgeschlossen" label="Vollzogen" />);
+    expect(chip('Vollzogen')).toHaveAttribute('data-ton', 'normal');
+    rerender(<StatusBadge phase="abgeschlossen" label="Aufgehoben" ton="neutral" />);
+    expect(chip('Aufgehoben')).toHaveAttribute('data-ton', 'neutral');
+    expect(chip('Aufgehoben').closest('[data-phase]')).toHaveAttribute(
+      'data-phase',
+      'abgeschlossen',
+    );
+  });
+
   it('färbt die Ausnahme-Phase als Alarm', () => {
     render(<StatusBadge phase="ausnahme" label="Abgelehnt" />);
     expect(chip('Abgelehnt')).toHaveAttribute('data-ton', 'alarm');
