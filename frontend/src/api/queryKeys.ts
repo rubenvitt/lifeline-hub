@@ -749,12 +749,18 @@ export const einsatzKeys = {
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
   /** Vollliste ohne Phase: Überblick, Sprungpalette, Chat, Übernahme. */
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,
-  /** Auftragsboard nach Phase, Richtung und Empfänger (LFH-1071); `abgeschlossen` ist eine
-   *  Seitenkette. Das Meldebild liest die ungefilterte offene Liste mit. */
-  auftraegePhase: (einsatzId: number, phase: ListenPhase, richtung: string, empfaenger: string) =>
-    [EINSATZ_KEYS.auftraege, einsatzId, phase, richtung, empfaenger] as const,
-  auftragKennzahlen: (einsatzId: number, richtung: string, empfaenger: string) =>
-    [EINSATZ_KEYS.auftraege, einsatzId, 'kennzahlen', richtung, empfaenger] as const,
+  /** Auftragsboard nach Phase, Richtung, Empfänger und Suchbegriff (LFH-1071, oxgob5gk D9);
+   *  `abgeschlossen` ist eine Seitenkette. Das Meldebild liest die ungefilterte offene Liste mit:
+   *  ohne Suchbegriff steht `''`, damit alle denselben Eintrag teilen. */
+  auftraegePhase: (
+    einsatzId: number,
+    phase: ListenPhase,
+    richtung: string,
+    empfaenger: string,
+    suche = '',
+  ) => [EINSATZ_KEYS.auftraege, einsatzId, phase, richtung, empfaenger, suche] as const,
+  auftragKennzahlen: (einsatzId: number, richtung: string, empfaenger: string, suche = '') =>
+    [EINSATZ_KEYS.auftraege, einsatzId, 'kennzahlen', richtung, empfaenger, suche] as const,
   /** Einzelabruf für einen Deeplink auf einen nicht geladenen Auftrag. */
   auftragEinzeln: (einsatzId: number, auftragId: number) =>
     [EINSATZ_KEYS.auftraege, einsatzId, 'einzeln', auftragId] as const,

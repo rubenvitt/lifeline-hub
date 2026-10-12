@@ -1,4 +1,5 @@
 import { Button } from 'antd';
+import { Link } from 'react-router';
 import {
   useEffect,
   useId,
@@ -130,6 +131,23 @@ export function AuswahlZiel({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Ein Sprung im Detail (LFH-616, „Ein Sprung ist keine Handlung“): eine Zeile mit Pfeil, als Link
+ * mit der Steuerhöhe der Stufe (`frontend/AGENTS.md`, Handgebautes Bedienziel), nie als Knopf.
+ */
+export function DetailSprung({ ziel, children }: { ziel: string; children: ReactNode }) {
+  const { token } = useRollen();
+  return (
+    <Link
+      to={ziel}
+      data-lfh="inspector-sprung"
+      style={{ display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight }}
+    >
+      {children}&nbsp;<span aria-hidden="true">↗</span>
+    </Link>
   );
 }
 

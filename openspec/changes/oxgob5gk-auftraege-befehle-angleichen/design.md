@@ -325,7 +325,7 @@ Die drei bestehenden Modal-Fassungen bleiben, wie sie sind.
 `AuftraegePage`:
 
 - Laden: `SeitenSkeleton`.
-- Fehler: `SeitenFehler` mit Ursache und „Erneut versuchen“ (`refetch`).
+- Fehler: `SeitenFehler` mit Ursache und „Erneut abrufen“ (`refetch`).
 
 `ListeDetail` zeigt je Reiter:
 

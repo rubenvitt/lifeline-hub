@@ -321,19 +321,23 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.erinnerungenPhase(1, 'offen')).toEqual(['einsatz-erinnerungen', 1, 'offen']);
     expect(einsatzKeys.erinnerungKennzahlen(1)).toEqual(['einsatz-erinnerungen', 1, 'kennzahlen']);
     expect(einsatzKeys.personenAuswahl(1)).toEqual(['einsatz-personen-auswahl', 1]);
+    // Ohne Suchbegriff steht `''` (oxgob5gk, D9): Meldebild, Kräfteübersicht und Gerät teilen so
+    // den Eintrag des ungefilterten Boards.
     expect(einsatzKeys.auftraegePhase(1, 'offen', 'alle', 'alle')).toEqual([
       'einsatz-auftraege',
       1,
       'offen',
       'alle',
       'alle',
+      '',
     ]);
-    expect(einsatzKeys.auftraegePhase(1, 'abgeschlossen', 'extern', 'einheit:3')).toEqual([
+    expect(einsatzKeys.auftraegePhase(1, 'abgeschlossen', 'extern', 'einheit:3', 'H12')).toEqual([
       'einsatz-auftraege',
       1,
       'abgeschlossen',
       'extern',
       'einheit:3',
+      'H12',
     ]);
     expect(einsatzKeys.auftragKennzahlen(1, 'alle', 'alle')).toEqual([
       'einsatz-auftraege',
@@ -341,6 +345,15 @@ describe('einsatzKeys (Factory-Output)', () => {
       'kennzahlen',
       'alle',
       'alle',
+      '',
+    ]);
+    expect(einsatzKeys.auftragKennzahlen(1, 'alle', 'alle', 'H12')).toEqual([
+      'einsatz-auftraege',
+      1,
+      'kennzahlen',
+      'alle',
+      'alle',
+      'H12',
     ]);
     expect(einsatzKeys.auftragEinzeln(1, 9)).toEqual(['einsatz-auftraege', 1, 'einzeln', 9]);
     expect(einsatzKeys.tiereHalter(1, 2)).toEqual(['einsatz-tiere', 1, 'halter', 2]);

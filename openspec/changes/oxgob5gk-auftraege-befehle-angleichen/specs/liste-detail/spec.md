@@ -82,7 +82,7 @@ Gefahrzustand MUST ihre Gefahrfläche und ihre linke Statuskante behalten, auch 
 
 Solange die erste Lieferung lädt, SHALL die Fläche ein Skelett zeigen und nichts über die Menge
 behaupten. Scheitert sie ohne gezeigten Bestand, MUST ein Fehlerzustand mit Ursache und
-„Erneut versuchen“ stehen. Ist die Menge leer, MUST ein Leerzustand stehen, mit Schreibrecht samt
+„Erneut abrufen“ stehen. Ist die Menge leer, MUST ein Leerzustand stehen, mit Schreibrecht samt
 der Erfassen-Aktion der Fläche. Scheitert ein Abgleich bei gezeigtem Bestand, MUST der Bestand
 stehen bleiben und ein Hinweis den veralteten Stand nennen.
 
@@ -96,7 +96,7 @@ stehen bleiben und ein Hinweis den veralteten Stand nennen.
 
 #### Scenario: Abgleich scheitert
 - **WHEN** Objekte gezeigt sind und ein späterer Abruf scheitert
-- **THEN** bleiben die Objekte stehen, und ein Hinweis meldet den veralteten Stand mit „Erneut versuchen“
+- **THEN** bleiben die Objekte stehen, und ein Hinweis meldet den veralteten Stand mit „Erneut abrufen“
 
 ### Requirement: Deeplink öffnet das Detail
 

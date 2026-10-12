@@ -74,7 +74,7 @@ const MODULE = [
 /** Karte → Statuskarte ihres Moduls. Jede Datei muss lesbar bleiben (sonst wirft `lies`). */
 const KARTEN = [
   ['meldungen/MeldungKarte.tsx', MELDUNG_STATUS],
-  ['auftraege/AuftragKarte.tsx', AUFTRAG_STATUS],
+  ['auftraege/AuftragTeile.tsx', AUFTRAG_STATUS],
   ['nachforderungen/NachforderungKarte.tsx', NACHFORDERUNG_STATUS],
   ['stammdaten/dienststatus.tsx', dienststatus],
 ] as const;

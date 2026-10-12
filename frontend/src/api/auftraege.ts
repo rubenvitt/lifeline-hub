@@ -7,6 +7,8 @@ interface AuftragFilter {
   richtung?: string;
   abschnittId?: number;
   einheitId?: number;
+  /** Suchbegriff über Kennung, Auftragstext und Empfänger (`q`, oxgob5gk D9); leer sendet nichts. */
+  suche?: string;
 }
 
 /** Vollliste ohne Phase (Überblick, Sprungpalette, Chat, Übernahme); das Board liest getrennt
@@ -25,7 +27,7 @@ export function listeAuftraege(einsatzId: number, filter: AuftragFilter = {}): P
 /** Seitengröße der abgeschlossenen Aufträge; der Server klemmt auf `[1, 500]` (LFH-1071). */
 export const AUFTRAEGE_SEITE = 100;
 
-/** Richtungs- und Empfängerfilter des Boards, ohne Status (LFH-1071). */
+/** Richtungs-, Empfänger- und Suchfilter des Boards, ohne Status (LFH-1071). */
 export type AuftragBoardFilter = Omit<AuftragFilter, 'status'>;
 
 function boardParameter(filter: AuftragBoardFilter) {
@@ -33,6 +35,7 @@ function boardParameter(filter: AuftragBoardFilter) {
     richtung: filter.richtung,
     abschnitt_id: filter.abschnittId,
     einheit_id: filter.einheitId,
+    q: filter.suche?.trim(),
   };
 }
 
