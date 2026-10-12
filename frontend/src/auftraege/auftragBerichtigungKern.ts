@@ -24,8 +24,9 @@ const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
 
 /**
  * Formularwerte aus dem Auftrag. `empfaengerAenderbar` ist falsch, wenn das Formular einen
- * Empfänger nicht abbilden kann (Person, Fahrzeug, mehr als ein externer Adressat): dann steht das
- * Feld gesperrt, und der Patch schickt keine Empfänger.
+ * Empfänger nicht abbilden kann (Person, Fahrzeug, mehr als ein externer Adressat, ein seit dem
+ * Erteilen aufgelöster Abschnitt oder aufgelöste Einheit): dann steht das Feld gesperrt, und der
+ * Patch schickt keine Empfänger.
  */
 export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAenderbar: boolean } {
   let aenderbar = true;
@@ -35,7 +36,12 @@ export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAender
   for (const e of a.empfaenger) {
     switch (e.empfaenger_typ) {
       case 'abschnitt':
+        // Ein seit dem Erteilen aufgelöster Abschnitt hat keinen Tag mehr (`toEmpfaengerTags`).
+        if (e.abschnitt_id == null) aenderbar = false;
+        break;
       case 'einheit':
+        if (e.einheit_id == null) aenderbar = false;
+        break;
       case 'funktion':
         break;
       case 'extern':
@@ -68,6 +74,10 @@ export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAender
 
 const frist = (w: FormWerte) => (w.frist ? alsBackendZeit(w.frist) : null);
 
+/** Die Empfänger als Menge: eine andere Reihenfolge ist keine Berichtigung (LLH-1176). */
+const empfaengerMenge = (liste: readonly unknown[]) =>
+  JSON.stringify(liste.map((e) => JSON.stringify(e)).sort());
+
 /** Der Teil-Patch: nur Felder, die sich gegen `vorher` geändert haben; ein leeres Feld als `null`. */
 export function berichtigungAus(
   vorher: FormWerte,
@@ -87,7 +97,7 @@ export function berichtigungAus(
   if (text !== vorher.text.trim()) patch.auftrag_text = text;
   if (empfaengerAenderbar) {
     const neu = alleEmpfaenger(nachher, katalog);
-    if (JSON.stringify(neu) !== JSON.stringify(alleEmpfaenger(vorher, katalog))) {
+    if (empfaengerMenge(neu) !== empfaengerMenge(alleEmpfaenger(vorher, katalog))) {
       patch.empfaenger = neu;
     }
   }

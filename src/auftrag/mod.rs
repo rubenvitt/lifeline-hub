@@ -7,7 +7,7 @@ pub mod etb_text;
 pub mod repo;
 
 pub use eingabe::{
-    validiere_berichtigung, validiere_neuen_auftrag, AuftragPatch, EmpfaengerEingabeReq,
+    validate_berichtigung, validate_neuer_auftrag, AuftragPatch, EmpfaengerEingabeReq,
     NeuerAuftrag, ValidierteBerichtigung, ValidierterAuftrag,
 };
 

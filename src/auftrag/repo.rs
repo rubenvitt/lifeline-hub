@@ -1217,6 +1217,38 @@ fn ziel_von(e: &EmpfaengerEingabe) -> EmpfaengerZiel {
     )
 }
 
+/// Die gespeicherten Empfänger eines Auftrags in der Form der Eingabe, damit eine Berichtigung
+/// unveränderte Empfänger übernehmen kann, statt sie neu zu prüfen (LLH-1176).
+pub async fn empfaenger_bestand(
+    pool: &SqlitePool,
+    auftrag_id: i64,
+) -> Result<Vec<EmpfaengerEingabe>, AppError> {
+    let zeilen: Vec<EmpfaengerZiel> = sqlx::query_as(
+        "SELECT empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
+                funktion, extern_kategorie, extern_bezeichnung \
+         FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
+    )
+    .bind(auftrag_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|(t, a, e, p, f, ft, fc, ek, eb)| EmpfaengerEingabe {
+            empfaenger_typ: t,
+            abschnitt_id: a,
+            einheit_id: e,
+            person_id: p,
+            fahrzeug_id: f,
+            funktion_text: ft,
+            funktion: fc
+                .as_deref()
+                .and_then(crate::fuehrung::Fuehrungsfunktion::parse),
+            extern_kategorie: ek,
+            extern_bezeichnung: eb,
+        })
+        .collect())
+}
+
 /// Der fachliche Stand eines Auftrags, den eine Berichtigung ändern kann.
 #[derive(sqlx::FromRow)]
 struct BerichtigungsStand {
@@ -1296,9 +1328,10 @@ pub async fn berichtigen_tx(
     .bind(auftrag_id)
     .fetch_one(&mut *conn)
     .await?;
-    let alte_ziele: Vec<(EmpfaengerZiel, String)> = sqlx::query_as::<
+    let alte_ziele: Vec<(i64, EmpfaengerZiel, String)> = sqlx::query_as::<
         _,
         (
+            i64,
             String,
             Option<i64>,
             Option<i64>,
@@ -1311,17 +1344,17 @@ pub async fn berichtigen_tx(
             String,
         ),
     >(
-        "SELECT empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
-                funktion, extern_kategorie, extern_bezeichnung, snap_anzeige \
+        "SELECT id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
+                funktion_text, funktion, extern_kategorie, extern_bezeichnung, snap_anzeige \
          FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
     )
     .bind(auftrag_id)
     .fetch_all(&mut *conn)
     .await?
     .into_iter()
-    .map(|(t, a, e, p, f, ft, fc, ek, eb, snap)| ((t, a, e, p, f, ft, fc, ek, eb), snap))
+    .map(|(id, t, a, e, p, f, ft, fc, ek, eb, snap)| (id, (t, a, e, p, f, ft, fc, ek, eb), snap))
     .collect();
-    let alte_namen: Vec<String> = alte_ziele.iter().map(|(_, n)| n.clone()).collect();
+    let alte_namen: Vec<String> = alte_ziele.iter().map(|(_, _, n)| n.clone()).collect();
 
     let mut aenderungen = Vec::new();
     let text = match &b.auftrag_text {
@@ -1331,9 +1364,17 @@ pub async fn berichtigen_tx(
         }
         _ => alt.auftrag_text.clone(),
     };
+    // Die Empfänger sind eine Menge (LLH-1176): eine andere Reihenfolge ist keine Berichtigung,
+    // und gleiche Zeilen zählen einmal. Gleich werden sie etwa, wenn zwei Empfänger-Einheiten
+    // aufgelöst sind (ON DELETE SET NULL), oder wenn zwei Eingabezeilen dasselbe Ziel meinen.
+    let ist_alt = |z: &EmpfaengerZiel| alte_ziele.iter().any(|(_, a, _)| a == z);
     let neue_empfaenger = b.empfaenger.as_ref().filter(|neu| {
-        let neue: Vec<EmpfaengerZiel> = neu.iter().map(ziel_von).collect();
-        let alte: Vec<&EmpfaengerZiel> = alte_ziele.iter().map(|(z, _)| z).collect();
+        let mut neue: Vec<EmpfaengerZiel> = neu.iter().map(ziel_von).collect();
+        let mut alte: Vec<&EmpfaengerZiel> = alte_ziele.iter().map(|(_, z, _)| z).collect();
+        neue.sort();
+        neue.dedup();
+        alte.sort();
+        alte.dedup();
         neue.iter().collect::<Vec<_>>() != alte
     });
     let empfaenger_index = aenderungen.len();
@@ -1392,12 +1433,47 @@ pub async fn berichtigen_tx(
 
     let namen = match neue_empfaenger {
         Some(neu) => {
-            // Sicher, weil niemand quittiert hat (Prüfung oben, in derselben Transaktion).
-            sqlx::query("DELETE FROM auftrag_empfaenger WHERE auftrag_id = ?")
-                .bind(auftrag_id)
-                .execute(&mut *conn)
-                .await?;
-            let namen = empfaenger_einfuegen_tx(&mut *conn, einsatz_id, auftrag_id, neu).await?;
+            // Sicher, weil niemand quittiert hat (Prüfung oben, in derselben Transaktion). Ein
+            // bleibender Empfänger behält seine Zeile samt Anzeige, auch wenn sein Ziel inzwischen
+            // aufgelöst ist (LLH-1176); nur weggefallene gehen, nur hinzugekommene entstehen.
+            let mut neue_ziele: Vec<EmpfaengerZiel> = Vec::new();
+            let mut hinzu: Vec<EmpfaengerEingabe> = Vec::new();
+            for e in neu {
+                let z = ziel_von(e);
+                if !neue_ziele.contains(&z) {
+                    if !ist_alt(&z) {
+                        hinzu.push(e.clone());
+                    }
+                    neue_ziele.push(z);
+                }
+            }
+            for (id, ziel, _) in &alte_ziele {
+                if !neue_ziele.contains(ziel) {
+                    sqlx::query("DELETE FROM auftrag_empfaenger WHERE id = ?")
+                        .bind(id)
+                        .execute(&mut *conn)
+                        .await?;
+                }
+            }
+            let mut hinzu_namen =
+                empfaenger_einfuegen_tx(&mut *conn, einsatz_id, auftrag_id, &hinzu)
+                    .await?
+                    .into_iter();
+            let namen: Vec<String> = neue_ziele
+                .iter()
+                .flat_map(|z| {
+                    let behalten: Vec<String> = alte_ziele
+                        .iter()
+                        .filter(|(_, a, _)| a == z)
+                        .map(|(_, _, n)| n.clone())
+                        .collect();
+                    if behalten.is_empty() {
+                        hinzu_namen.next().into_iter().collect()
+                    } else {
+                        behalten
+                    }
+                })
+                .collect();
             aenderungen.insert(
                 empfaenger_index,
                 Aenderung::Empfaenger {
@@ -1450,7 +1526,7 @@ pub async fn berichtigen_tx(
     // Die Anordnung nennt den alten Kreis („vorher …“), also steht sie auch unter ihm (LLH-1175);
     // den neuen hat `anordnung_tx` schon festgehalten.
     if neue_empfaenger.is_some() {
-        for (ziel, _) in &alte_ziele {
+        for (_, ziel, _) in &alte_ziele {
             if let ("einheit", Some(einheit_id)) = (ziel.0.as_str(), ziel.2) {
                 sqlx::query(
                     "INSERT OR IGNORE INTO etb_eintrag_einheit (eintrag_id, einheit_id) \

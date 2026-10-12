@@ -442,6 +442,40 @@ async fn weg_berichtigen_nennt_ihn_im_etb() {
     assert!(j["weg"].is_null());
 }
 
+/// LLH-1176: Die Empfänger sind eine Menge. Dieselben Empfänger in anderer Reihenfolge sind keine
+/// Berichtigung: kein ETB-Eintrag, die Zeilen bleiben.
+#[tokio::test]
+async fn umsortierte_empfaenger_sind_keine_aenderung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let a = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "empfaenger": [funktion("Logistiktrupp"), funktion("Bergungsgruppe")]
+        }),
+    )
+    .await;
+    let aid = a["id"].as_i64().unwrap();
+    let vorher = anordnungen(&app, &admin, e).await.len();
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "empfaenger": [funktion("Bergungsgruppe"), funktion("Logistiktrupp")] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["empfaenger"], a["empfaenger"], "Zeilen unverändert");
+    assert_eq!(anordnungen(&app, &admin, e).await.len(), vorher);
+}
+
+/// Eine Einheit des Einsatzes; liefert ihre id.
 async fn einheit(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
@@ -453,6 +487,141 @@ async fn einheit(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{j}");
     j["id"].as_i64().unwrap()
+}
+
+/// LLH-1176: Ein Empfänger, den es so im Einsatz nicht mehr gibt (Einheit aufgelöst), hält die
+/// Berichtigung eines anderen Felds nicht auf. Der Client schickt die Liste so zurück, wie er sie
+/// gelesen hat; geprüft werden nur hinzukommende Empfänger, die bisherigen behalten ihre Anzeige.
+#[tokio::test]
+async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit(&app, &admin, e, "Logistiktrupp 1").await;
+    let a = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "frist_at": FRIST,
+            "empfaenger": [{ "empfaenger_typ": "einheit", "einheit_id": eid }]
+        }),
+    )
+    .await;
+    let aid = a["id"].as_i64().unwrap();
+    lifeline_hub::einheit::repo::loese_auf(&pool, e, eid)
+        .await
+        .unwrap();
+    let (_, gelesen) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    let bisher = gelesen["empfaenger"].clone();
+    assert!(bisher[0]["einheit_id"].is_null(), "{bisher}");
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00", "empfaenger": bisher }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["frist_at"], "2099-10-12 14:00:00");
+    assert_eq!(j["empfaenger"][0]["snap_anzeige"], "Logistiktrupp 1");
+    assert!(inhalte(&anordnungen(&app, &admin, e).await)
+        .contains(&"Auftrag #1 geändert: Frist 12.10. 16:00 (vorher 12.10. 15:00).".to_string()));
+
+    // Kommt ein Empfänger hinzu, wird nur er geprüft; der bisherige bleibt mit seiner Anzeige.
+    let mut liste = bisher.as_array().unwrap().clone();
+    liste.push(funktion("Bergungsgruppe"));
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": liste })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    let namen: Vec<&str> = j["empfaenger"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["snap_anzeige"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, ["Logistiktrupp 1", "Bergungsgruppe"]);
+    assert!(inhalte(&anordnungen(&app, &admin, e).await).contains(
+        &"Auftrag #1 geändert: Empfänger Logistiktrupp 1, Bergungsgruppe (vorher Logistiktrupp 1)."
+            .to_string()
+    ));
+
+    // Ein neu genannter, ungültiger Empfänger bleibt ein Feldfehler.
+    let mut liste = bisher.as_array().unwrap().clone();
+    liste.push(json!({ "empfaenger_typ": "einheit", "einheit_id": eid }));
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": liste })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
+}
+
+/// LLH-1176: Zwei aufgelöste Empfänger-Einheiten hinterlassen zwei gleiche Zeilen (ohne Ziel). Die
+/// Liste so zurückzuschicken ist keine Empfänger-Änderung, und beide Zeilen bleiben.
+#[tokio::test]
+async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let eins = einheit(&app, &admin, e, "Logistiktrupp 1").await;
+    let zwei = einheit(&app, &admin, e, "Logistiktrupp 2").await;
+    let aid = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({
+            "auftrag_text": "Sandsäcke zum Deich bringen",
+            "frist_at": FRIST,
+            "empfaenger": [
+                { "empfaenger_typ": "einheit", "einheit_id": eins },
+                { "empfaenger_typ": "einheit", "einheit_id": zwei }
+            ]
+        }),
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    for eid in [eins, zwei] {
+        lifeline_hub::einheit::repo::loese_auf(&pool, e, eid)
+            .await
+            .unwrap();
+    }
+    let (_, gelesen) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00", "empfaenger": gelesen["empfaenger"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(
+        j["empfaenger"], gelesen["empfaenger"],
+        "beide Zeilen bleiben"
+    );
+    let geaendert: Vec<String> = inhalte(&anordnungen(&app, &admin, e).await)
+        .into_iter()
+        .filter(|i| i.contains("geändert"))
+        .collect();
+    assert_eq!(
+        geaendert,
+        ["Auftrag #1 geändert: Frist 12.10. 16:00 (vorher 12.10. 15:00)."]
+    );
 }
 
 /// Inhalte der Anordnungen, die der ETB-Filter „Einheit“ liefert, älteste zuerst.
