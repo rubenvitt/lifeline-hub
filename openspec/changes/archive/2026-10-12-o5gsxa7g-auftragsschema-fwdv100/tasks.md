@@ -126,7 +126,28 @@ Repo-Wurzelverzeichnis.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` ist grün (ohne `| tail`). Kästchen, die erst die CI des PRs
-  belegt, werden mit Verweis auf diesen Lauf abgehakt.
-- [ ] 6.2 Code-Review ist gelaufen (`superpowers:requesting-code-review` oder ein unabhängiger
-  Review-Agent), und die bestätigten Findings sind behoben.
+- [x] 6.1 `./scripts/check-all.sh` ist grün (ohne `| tail`). Kästchen, die erst die CI des PRs
+  belegt, werden mit Verweis auf diesen Lauf abgehakt. Stand lokal:
+  - Bündel `schnell` grün (11 Schritte)
+  - Bündel `frontend` in drei Shards grün (858 Dateien, 13 284 Tests)
+  - Rust gezielt grün: `auftrag`, `etb`, `befehl`, `eingabegrenzen_auftrag`,
+    `eingabegrenzen_spiegel`, `listen_abfragen`, `openapi_spec_aktuell`, dazu `--lib` für
+    Schwärzung, Migrationen und Auftrag
+  - e2e gezielt grün: `chat-layout`, `etb-folgeauftraege`, `fuehrungsfunktionen`,
+    `trefflaeche-pruefflaechen`, `auftraege-abgeschlossen`, `gate1-ueberlauf`,
+    `knopf-wortlaut`, `fehlertext-kontrast` (73/73, Chromium)
+
+  Die vollen Bündel `rust` und `e2e` laufen in der CI des PRs, weil der Container sie nicht
+  trägt: Plattenplatz für alle Testbinaries, Chromium einer anderen Playwright-Version.
+- [x] 6.2 Code-Review ist gelaufen (`superpowers:requesting-code-review` oder ein unabhängiger
+  Review-Agent), und die bestätigten Findings sind behoben. Ein unabhängiger Review-Agent lief,
+  denn `superpowers:requesting-code-review` steht in der Cloud-Sitzung nicht bereit. Seine
+  Funde:
+  - roter Bestandstest `AuftraegePage`
+  - Bezeichner-Sprache
+  - Richtung „Extern“ verborgen hinter dem zugeklappten Kopf
+  - Fokustest nach „Speichern und nächste“
+  - Kapitel Einsatztagebuch
+
+  Alles ist behoben (Commit `fix(auftrag): Richtung „Extern“ im Kopf …`). Den Archivpfad in
+  Migration und Kern prüft das Archiv am selben Tag.
