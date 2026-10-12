@@ -184,6 +184,7 @@ function AuftragKarte({
             phase={status.phase}
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
+            ton={status.ton}
           />
           {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (

@@ -35,6 +35,13 @@ describe('Status-Deskriptoren', () => {
     expect(AUFTRAG_STATUS.in_arbeit).toEqual({ label: 'In Bearbeitung', phase: 'in_arbeit' });
     expect(AUFTRAG_STATUS.vollzogen).toEqual({ label: 'Vollzogen', phase: 'abgeschlossen' });
     expect(AUFTRAG_STATUS.abgenommen).toEqual({ label: 'Abgenommen', phase: 'abgeschlossen' });
+    // LLH-1098: abgeschlossen für jede Zählung, aber neutral statt im Ton eines erledigten
+    // Abschlusses.
+    expect(AUFTRAG_STATUS.aufgehoben).toEqual({
+      label: 'Aufgehoben',
+      phase: 'abgeschlossen',
+      ton: 'neutral',
+    });
   });
 
   it('MELDUNG mappt neu/gesichtet→offen, in_bearbeitung→in_arbeit, erledigt→abgeschlossen', () => {

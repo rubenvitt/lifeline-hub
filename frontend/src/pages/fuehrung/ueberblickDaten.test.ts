@@ -513,6 +513,12 @@ describe('abschnittZeilen', () => {
         empfaenger: [empfaenger({ abschnitt_id: 1 })],
       }),
       auftrag({ auftrag_text: 'an Süd', empfaenger: [empfaenger({ abschnitt_id: 2 })] }),
+      // Aufgehoben (LLH-1098): weder erledigt noch im Gesamt.
+      auftrag({
+        auftrag_text: 'aufgehoben an Nord',
+        bearbeitungsstatus: 'aufgehoben',
+        empfaenger: [empfaenger({ abschnitt_id: 1 })],
+      }),
     ],
   });
 
@@ -618,7 +624,7 @@ describe('abschnittZeilen', () => {
   });
   it('zählt die Auftragsbilanz über den Teilbaum, jeden Auftrag einmal (LFH-608)', () => {
     const nord = zeilen.find((z) => z.abschnittId === 1)!;
-    // drei Aufträge an Nord/Nord-Deich, einer davon vollzogen
+    // drei Aufträge an Nord/Nord-Deich, einer davon vollzogen; der aufgehobene zählt nicht
     expect(nord.auftragsbilanz).toEqual({ erledigt: 1, gesamt: 3 });
     expect(zeilen.find((z) => z.abschnittId === 2)!.auftragsbilanz).toEqual({
       erledigt: 0,

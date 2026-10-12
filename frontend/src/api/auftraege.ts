@@ -37,9 +37,12 @@ function boardParameter(filter: AuftragBoardFilter) {
 }
 
 /** Cursor aus einem Auftrag: dieselbe Ordnungszeit wie am Server,
- *  `COALESCE(abgenommen_at, vollzogen_at, erstellt_at)`. */
+ *  `COALESCE(aufgehoben_at, abgenommen_at, vollzogen_at, erstellt_at)`. */
 export function auftragAbschlussCursor(a: Auftrag): AbschlussCursor {
-  return { zeit: a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at, id: a.id };
+  return {
+    zeit: a.aufgehoben_at ?? a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at,
+    id: a.id,
+  };
 }
 
 /** Alle offenen und in Bearbeitung befindlichen Aufträge, ungeblättert (LFH-1071). */

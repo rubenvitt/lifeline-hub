@@ -52,7 +52,7 @@ relativ zu `frontend/src/`.
 
 ## 3. Backend: Berichtigen (D6, D7)
 
-- [ ] 3.1 Test zuerst in `tests/auftrag_berichtigen.rs` (neu). Abgedeckt sind:
+- [x] 3.1 Test zuerst in `tests/auftrag_berichtigen.rs` (neu). Abgedeckt sind:
   - Teil-Patch je Feld, `null` leert ein optionales Feld, ein fehlendes Feld bleibt.
   - Empfänger ersetzen: Zusammenführen gleicher Empfänger, Funktions-Snapshot, 50er-Grenze.
   - 422 nach einer Quittung, im Status „in Arbeit“, „vollzogen“ und „aufgehoben“.
@@ -66,20 +66,20 @@ relativ zu `frontend/src/`.
   - Rechte und Statuscodes wie beim Aufheben.
 
   Nachweis: rot belegt.
-- [ ] 3.2 `AuftragPatch`, `repo::berichtigen_tx` im `write_retry!` und den Handler `berichtigen`
+- [x] 3.2 `AuftragPatch`, `repo::berichtigen_tx` im `write_retry!` und den Handler `berichtigen`
   (`.patch(...)` an der Detail-Route) umsetzen. `validiere_empfaenger` und `empfaenger_schluessel`
   auf `pub(crate)` öffnen und teilen. Nachweis: 3.1 grün, `tests/auftrag.rs` und
   `tests/auftrag_erteilen_freigabe.rs` grün.
-- [ ] 3.3 Den Wächtertest der Allowlist des Abschnittsgeräts in `src/geraet/mod.rs` um
+- [x] 3.3 Den Wächtertest der Allowlist des Abschnittsgeräts in `src/geraet/mod.rs` um
   `POST …/aufheben` und `PATCH …/auftraege/{aid}` als verboten ergänzen. Nachweis: Test grün und
   rot belegt, wenn die Route testweise in die Allowlist kommt.
-- [ ] 3.4 `scripts/check-typ-codegen.sh` laufen lassen, danach `openapi.json` und
+- [x] 3.4 `scripts/check-typ-codegen.sh` laufen lassen, danach `openapi.json` und
   `types.generated.ts` committen. Request-Typen `AuftragPatch` und `AuftragAufheben` in
   `api/types.ts`. Nachweis: Skript grün.
 
 ## 4. Frontend: Status und Zahlen (D8, D10)
 
-- [ ] 4.1 Test zuerst:
+- [x] 4.1 Test zuerst:
   - `kommunikation/phase.test.ts`: `aufgehoben` mit dem Etikett „Aufgehoben“, Phase
     `abgeschlossen` und Ton `neutral`.
   - `kommunikation/kartenKante.test.ts` bzw. `StatusBadge`: Der Ton-Override schlägt die Phase.
@@ -90,7 +90,7 @@ relativ zu `frontend/src/`.
   - `api/auftraege`: Der Abschluss-Cursor nimmt `aufgehoben_at` zuerst.
 
   Nachweis: rot belegt, `lage/verdichtungFixture.test.ts` rot mit dem neuen Fixture-Fall.
-- [ ] 4.2 Umsetzen: `StatusDeskriptor.ton` und `AUFTRAG_STATUS.aufgehoben`, dazu `phaseTon` und
+- [x] 4.2 Umsetzen: `StatusDeskriptor.ton` und `AUFTRAG_STATUS.aufgehoben`, dazu `phaseTon` und
   `StatusBadge`. Ebenso `auftragAbschlussCursor`, die Bilanz in `ueberblickDaten.ts`,
   `test/auftraegeAttrappe.ts` und die Client-Regel im Fixture-Test. Vorher
   `grep -rn "bearbeitungsstatus\|AuftragBearbeitungsstatus" frontend/src` nach weiteren
