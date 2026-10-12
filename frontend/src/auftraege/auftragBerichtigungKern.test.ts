@@ -82,6 +82,19 @@ describe('vorbelegungAus (LLH-1098)', () => {
         .empfaengerAenderbar,
     ).toBe(false);
   });
+
+  it('sperrt die Empfänger, wenn ein Ziel aufgelöst ist (LLH-1176)', () => {
+    const { werte, empfaengerAenderbar } = vorbelegungAus(
+      auftrag({
+        empfaenger: [
+          empf({ id: 1, empfaenger_typ: 'einheit', einheit_id: null }),
+          empf({ id: 2, empfaenger_typ: 'abschnitt', abschnitt_id: 3 }),
+        ],
+      }),
+    );
+    expect(empfaengerAenderbar).toBe(false);
+    expect(werte.empfaenger).not.toContain('einheit:null');
+  });
 });
 
 describe('berichtigungAus (LLH-1098)', () => {
@@ -122,6 +135,15 @@ describe('berichtigungAus (LLH-1098)', () => {
     expect(berichtigungAus(werte, { ...werte, empfaenger: ['einheit:9'] }, katalog, true)).toEqual({
       empfaenger: [{ empfaenger_typ: 'einheit', einheit_id: 9 }],
     });
+  });
+
+  it('dieselben Empfänger in anderer Reihenfolge gelten als unverändert (LLH-1176)', () => {
+    const { werte } = vorbelegungAus(auftrag());
+    const umsortiert = { ...werte, empfaenger: [...werte.empfaenger].reverse() };
+    expect(berichtigungAus(werte, umsortiert, katalog, true)).toEqual({});
+    expect(
+      berichtigungAus(werte, { ...umsortiert, frist: werte.frist!.add(1, 'hour') }, katalog, true),
+    ).toEqual({ frist_at: '2026-10-12 14:00:00' });
   });
 
   it('ein nicht eingehängtes Feld gilt als unverändert', () => {

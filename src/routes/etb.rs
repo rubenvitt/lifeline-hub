@@ -277,7 +277,7 @@ pub async fn auftrag_erteilen(
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
     let validiert =
-        crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
+        crate::auftrag::validate_neuer_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = crate::auftrag::repo::erteile_aus_etb_tx(
         &state.pool,
         einsatz_id,
