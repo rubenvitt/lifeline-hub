@@ -164,7 +164,7 @@ pnpm laufen über `mise exec -- …`.
   `knopf-wortlaut`, `gate1-ueberlauf`, `gate3-trefflaeche`, `trefflaeche-pruefflaechen` und
   `nav-schmal`, soweit sie die Seite berühren.
   Nachweis: Alle genannten Specs laufen grün.
-- [ ] 7.2 Neue e2e `frontend/e2e/auftraege-befehle-liste-detail.spec.ts` bei 1366 × 768 und
+- [x] 7.2 Neue e2e `frontend/e2e/auftraege-befehle-liste-detail.spec.ts` bei 1366 × 768 und
   390 px:
   - Auftrag erteilen, quittieren, Vollzug melden, abnehmen (Detail bleibt mit Hinweis).
   - Befehl entwerfen, auf der Vollseite schreiben, zurück, im Detail freigeben.
@@ -176,7 +176,7 @@ pnpm laufen über `mise exec -- …`.
   Einsatztauglichkeit (15 Kriterien) für die umgebaute Seite, jede Zeile mit Verdikt (erfüllt /
   offen mit Zielticket / nicht anwendbar).
   Nachweis: Keine Zeile ist ohne Verdikt.
-- [ ] 7.4 `docs/anwender/kapitel/auftraege-befehle.md` neu schreiben: Karte wählen, Detail,
+- [x] 7.4 `docs/anwender/kapitel/auftraege-befehle.md` neu schreiben: Karte wählen, Detail,
   Dialog „Auftrag erteilen“, Befehl im Detail lesen, freigeben und fortschreiben, Suche. `quellen:`
   ergänzen. Die Bilder aus `e2e/doku-bilder/auftraege-befehle.bilder.ts` neu erzeugen: Der Lauf
   sucht nicht mehr `region 'Neuer Auftrag'`, sondern den Dialog; neues Bild `befehl-detail`.
