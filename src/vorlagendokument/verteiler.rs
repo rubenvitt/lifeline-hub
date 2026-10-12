@@ -4,10 +4,10 @@
 //! Der Verteiler nennt, an wen ein Dokument geht: eine geordnete Liste aus Einsatzabschnitten,
 //! Einheiten, Führungsfunktionen und externen Stellen, eine Zeile je Empfänger in einer Tabelle je
 //! Dokumentart ([`VerteilerTabelle`], Migration `0182_dokument_verteiler.sql`). Prüfung und
-//! Anzeigename kommen von den Auftragsempfängern (`auftrag::eingabe::validiere_verteiler`,
+//! Anzeigename kommen von den Auftragsempfängern (`auftrag::eingabe::validate_verteiler`,
 //! `auftrag::repo::snap_anzeige_fuer`). Der Anzeigename entsteht beim Speichern und bleibt; die
-//! Freigabe schreibt ihn ins ETB ([`an_fuer`], [`render_abschnitt`]), das Fortschreiben kopiert die
-//! Zeilen in die neue Fassung ([`kopieren_tx`]). Je Fassung eigene Zeilen: eine spätere Quittung
+//! Freigabe schreibt ihn ins ETB ([`build_an`], [`render_abschnitt`]), das Fortschreiben kopiert die
+//! Zeilen in die neue Fassung ([`copy_tx`]). Je Fassung eigene Zeilen: eine spätere Quittung
 //! je Empfänger (LLH-1173) hängt so an genau einer Fassung.
 
 use super::Dokumentart;
@@ -62,9 +62,9 @@ pub struct VerteilerEintragAnzeige {
     pub snap_anzeige: String,
 }
 
-/// Ein Eintrag, wie ihn [`json_spalte`] aus SQLite liefert; die Enums prüft [`aus_json`].
+/// Ein Eintrag, wie ihn [`json_column`] aus SQLite liefert; die Enums prüft [`from_json`].
 #[derive(Deserialize)]
-struct Roh {
+struct Raw {
     id: i64,
     empfaenger_typ: String,
     abschnitt_id: Option<i64>,
@@ -79,7 +79,7 @@ struct Roh {
 /// Unterabfrage, die den Verteiler des Dokuments `<alias>.id` als JSON-Array liefert, für die
 /// Spaltenliste von `repo::select`. So bleibt das Laden eines Dokuments EINE Abfrage auf jedem
 /// Executor, auch innerhalb einer Transaktion. Ohne Haken ein leeres Array.
-pub(super) fn json_spalte<T: Dokumentart>(alias: &str) -> String {
+pub(super) fn json_column<T: Dokumentart>(alias: &str) -> String {
     let Some(t) = T::VERTEILER else {
         return "'[]'".into();
     };
@@ -95,10 +95,10 @@ pub(super) fn json_spalte<T: Dokumentart>(alias: &str) -> String {
     )
 }
 
-/// Liest die Spalte aus [`json_spalte`]. Ein unbekannter Typ oder eine unbekannte Kategorie
+/// Liest die Spalte aus [`json_column`]. Ein unbekannter Typ oder eine unbekannte Kategorie
 /// ist ein Datenfehler (500), kein Eingabefehler: der CHECK der Tabelle lässt beides nicht zu.
-pub(super) fn aus_json(json: &str) -> Result<Vec<VerteilerEintragAnzeige>, AppError> {
-    let roh: Vec<Roh> = serde_json::from_str(json)
+pub(super) fn from_json(json: &str) -> Result<Vec<VerteilerEintragAnzeige>, AppError> {
+    let roh: Vec<Raw> = serde_json::from_str(json)
         .map_err(|e| AppError::Internal(format!("Verteiler-JSON defekt: {e}")))?;
     roh.into_iter()
         .map(|r| {
@@ -129,13 +129,13 @@ pub(super) fn aus_json(json: &str) -> Result<Vec<VerteilerEintragAnzeige>, AppEr
 /// Ersetzt den Verteiler eines Dokuments ganz: löschen, dann je Eintrag in Reihenfolge mit
 /// Anzeigenamen einfügen. Läuft in der Transaktion des PATCH, der vorher im selben Zug den
 /// Entwurfs-Status per UPDATE gesichert hat. Eine Art ohne Haken → 400.
-pub async fn ersetzen_tx<T: Dokumentart>(
+pub async fn replace_tx<T: Dokumentart>(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     dokument_id: i64,
     eintraege: &[EmpfaengerEingabe],
 ) -> Result<(), AppError> {
-    let t = tabelle::<T>()?;
+    let t = table::<T>()?;
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM {tab} WHERE einsatz_id = ? AND {d} = ?",
         tab = t.tabelle,
@@ -178,7 +178,7 @@ pub async fn ersetzen_tx<T: Dokumentart>(
 
 /// Kopiert den Verteiler einer Fassung in die neue Fassung (Fortschreiben), samt Reihenfolge,
 /// Zielen und Anzeigenamen. Eine Art ohne Haken kopiert nichts.
-pub async fn kopieren_tx<T: Dokumentart>(
+pub async fn copy_tx<T: Dokumentart>(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     von_id: i64,
@@ -219,7 +219,7 @@ pub fn render_abschnitt(verteiler: &[VerteilerEintragAnzeige]) -> String {
 
 /// `an` des ETB-Eintrags der Freigabe: die Anzeigenamen kommagetrennt, gekappt wie bei der
 /// Anordnung eines Auftrags. Ohne Verteiler `None`, das ETB setzt dann „System“.
-pub fn an_fuer(verteiler: &[VerteilerEintragAnzeige]) -> Option<String> {
+pub fn build_an(verteiler: &[VerteilerEintragAnzeige]) -> Option<String> {
     if verteiler.is_empty() {
         return None;
     }
@@ -228,7 +228,7 @@ pub fn an_fuer(verteiler: &[VerteilerEintragAnzeige]) -> Option<String> {
 }
 
 /// Die Verteiler-Tabelle der Art; eine Art ohne Verteiler (Pressemitteilung) → 400.
-pub fn tabelle<T: Dokumentart>() -> Result<&'static VerteilerTabelle, AppError> {
+pub fn table<T: Dokumentart>() -> Result<&'static VerteilerTabelle, AppError> {
     T::VERTEILER.ok_or_else(|| {
         AppError::Validation(format!("{} trägt keinen Verteiler", T::NOMEN_MIT_ARTIKEL))
     })

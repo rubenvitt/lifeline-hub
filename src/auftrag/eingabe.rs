@@ -295,7 +295,7 @@ async fn validiere_empfaenger_liste(
 /// höchstens [`EMPFAENGER_MAX`] Einträge, gezählt vor dem Entdoppeln, dann dieselbe Zeilenprüfung.
 /// Anders als beim Auftrag darf die Liste leer sein, und Person und Fahrzeug sind keine Empfänger
 /// (400), beides vor der ersten Abfrage.
-pub(crate) async fn validiere_verteiler(
+pub(crate) async fn validate_verteiler(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     liste: &[EmpfaengerEingabeReq],

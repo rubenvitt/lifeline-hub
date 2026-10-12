@@ -26,16 +26,16 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
-import { VerteilerAnzeige, VerteilerFeld, useVerteilerQuellen } from '../entwurf/VerteilerFeld';
+import { VerteilerAnzeige, VerteilerField, useVerteilerSources } from '../entwurf/VerteilerField';
 import {
-  VERTEILER_FELD,
-  verteilerAusWerten,
+  VERTEILER_FIELD,
+  toVerteilerRequest,
   verteilerDruckzeile,
-  verteilerGeaendert,
-  verteilerNamen,
-  verteilerNamenAusWerten,
-  verteilerWerteAus,
-  type VerteilerWerte,
+  isVerteilerChanged,
+  verteilerNames,
+  verteilerNamesFromForm,
+  toVerteilerFormValues,
+  type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
 import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
@@ -44,11 +44,11 @@ import './befehlAktionsleiste.css';
 
 /**
  * Formularwerte des Entwurfs: Titel und Abschnitte als Text, daneben der Verteiler (LLH-1172).
- * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerFeld.guard.test.ts`).
+ * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerField.guard.test.ts`).
  */
-type FormWerte = { titel: string; [VERTEILER_FELD]?: VerteilerWerte } & Record<
+type FormWerte = { titel: string; [VERTEILER_FIELD]?: VerteilerFormValues } & Record<
   string,
-  string | VerteilerWerte | undefined
+  string | VerteilerFormValues | undefined
 >;
 
 export default function BefehlDetailPage() {
@@ -84,7 +84,7 @@ function BefehlDetail() {
   // Seite bei jedem Anschlag in einem Abschnitt neu rendern ließe.
   const formTitel = Form.useWatch('titel', form);
   // Der Verteiler speist ebenso den Druckkopf (LLH-1172); ein Feld, kein `useWatch([])`.
-  const formVerteiler = Form.useWatch(VERTEILER_FELD, form) as VerteilerWerte | undefined;
+  const formVerteiler = Form.useWatch(VERTEILER_FIELD, form) as VerteilerFormValues | undefined;
   const speicherfolge = useRef<Promise<unknown>>(Promise.resolve());
   const aktiv = useRef(true);
   useEffect(() => {
@@ -104,7 +104,7 @@ function BefehlDetail() {
     enabled: idGueltig,
   });
   // Optionen des Verteilers (LLH-1172), nur im Entwurf geladen; als Hook vor den frühen Rückgaben.
-  const verteilerQuellen = useVerteilerQuellen(
+  const verteilerQuellen = useVerteilerSources(
     einsatzId,
     befehlQuery.data?.status === 'entwurf' && einsatzQuery.data != null
       ? darfImEinsatzSchreiben(einsatzQuery.data)
@@ -131,10 +131,14 @@ function BefehlDetail() {
       const text = werte[a.schluessel];
       return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
     });
-    // Der Verteiler nur, wenn er sich geändert hat (`verteilerGeaendert`, LLH-1172).
+    // Der Verteiler nur, wenn er sich geändert hat (`isVerteilerChanged`, LLH-1172).
     const gespeichert = befehlQuery.data!.verteiler;
-    const verteiler = verteilerGeaendert(werte[VERTEILER_FELD], gespeichert)
-      ? verteilerAusWerten(werte[VERTEILER_FELD], verteilerQuellen.vorschlaege.katalog, gespeichert)
+    const verteiler = isVerteilerChanged(werte[VERTEILER_FIELD], gespeichert)
+      ? toVerteilerRequest(
+          werte[VERTEILER_FIELD],
+          verteilerQuellen.vorschlaege.katalog,
+          gespeichert,
+        )
       : undefined;
     // Blur-Autosave und explizites Speichern können direkt aufeinander folgen. In Reihenfolge
     // schreiben, damit eine späte S1-Antwort S2 nicht überschreibt.
@@ -163,7 +167,10 @@ function BefehlDetail() {
     istEntwurf: befehlQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {
-      const werte: FormWerte = { titel: b.titel, [VERTEILER_FELD]: verteilerWerteAus(b.verteiler) };
+      const werte: FormWerte = {
+        titel: b.titel,
+        [VERTEILER_FIELD]: toVerteilerFormValues(b.verteiler),
+      };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
     },
@@ -263,8 +270,8 @@ function BefehlDetail() {
   // Ebenso der Verteiler (LLH-1172): im Entwurf aus dem Formular, sonst der gespeicherte Stand.
   const druckVerteiler =
     istEntwurf && darfSchreiben && formVerteiler !== undefined
-      ? verteilerNamenAusWerten(formVerteiler, verteilerQuellen, befehl.verteiler)
-      : verteilerNamen(befehl.verteiler);
+      ? verteilerNamesFromForm(formVerteiler, verteilerQuellen, befehl.verteiler)
+      : verteilerNames(befehl.verteiler);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -521,7 +528,7 @@ function BefehlDetail() {
                 <Input />
               </Form.Item>
               {/* An wen der Befehl geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-              <VerteilerFeld quellen={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
+              <VerteilerField quellen={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
               {v?.abschnitte.map((a) => (
                 <Form.Item
                   key={a.schluessel}

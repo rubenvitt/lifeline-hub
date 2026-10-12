@@ -13,7 +13,7 @@ import { DetailSprung } from '../components/ListeDetail';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
-import { verteilerNamen } from '../entwurf/verteilerKern';
+import { verteilerNames } from '../entwurf/verteilerKern';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import BefehlLesefassung from './BefehlLesefassung';
 import { befehlSchemaLabel } from './befehlTexte';
@@ -52,7 +52,7 @@ export default function BefehlDetail({
   // Kopfdaten frisch aus dem Einzelabruf, sobald er da ist; vorher aus der Liste.
   const b: BefehlKopf | BefehlAnzeige = detailQuery.data ?? kopf;
   const v = vorlage(b.vorlage);
-  const verteiler = verteilerNamen(detailQuery.data?.verteiler);
+  const verteiler = verteilerNames(detailQuery.data?.verteiler);
   const isEntwurf = b.status === 'entwurf';
   const vollseite = befehlDetailPfad(einsatzId, b.id);
 

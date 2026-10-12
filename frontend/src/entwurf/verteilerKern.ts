@@ -12,18 +12,18 @@ import { dekodiere, type FunktionsVorschlaege } from '../fuehrung/funktionsOptio
 /**
  * Verteiler an Befehl und Lagebericht (LLH-1172, Spec `dokument-verteiler`, Herleitung
  * `openspec/changes/kz5udbog-verteiler-vorlagendokument/design.md`, D7): reiner Kern für die
- * beiden Entwurfsseiten. Das Formularfeld trägt den Verteiler unter {@link VERTEILER_FELD}, neben
+ * beiden Entwurfsseiten. Das Formularfeld trägt den Verteiler unter {@link VERTEILER_FIELD}, neben
  * `titel` und den Abschnitten als Feldnamen der obersten Ebene.
  */
 
-/** Name des Formularfelds; kein Abschnitt darf so heißen (`verteilerFeld.guard.test.ts`). */
-export const VERTEILER_FELD = 'verteiler';
+/** Name des Formularfelds; kein Abschnitt darf so heißen (`verteilerField.guard.test.ts`). */
+export const VERTEILER_FIELD = 'verteiler';
 
 /** Feldnamen neben den Abschnitten, die ein Abschnittsschlüssel nicht belegen darf. */
-const BELEGT = ['titel', VERTEILER_FELD];
+const BELEGT = ['titel', VERTEILER_FIELD];
 
 /** Abschnittsschlüssel der Vorlagen, die mit `titel` oder dem Verteiler zusammenfielen. */
-export function kollidierendeSchluessel(
+export function collidingKeys(
   vorlagen: readonly { abschnitte: readonly { schluessel: string }[] }[],
 ): string[] {
   return vorlagen.flatMap((v) =>
@@ -32,7 +32,7 @@ export function kollidierendeSchluessel(
 }
 
 /** Die gespeicherten Anzeigenamen in Verteiler-Reihenfolge. */
-export function verteilerNamen(verteiler: readonly VerteilerEintrag[] | undefined): string[] {
+export function verteilerNames(verteiler: readonly VerteilerEintrag[] | undefined): string[] {
   return (verteiler ?? []).map((e) => e.snap_anzeige);
 }
 
@@ -48,15 +48,15 @@ export function verteilerDruckzeile(namen: readonly string[]): { etikett: string
  * Wert des Formularfelds: die Tags der Empfängerwahl (Abschnitt, Einheit, Funktion, Freitext) und
  * die Zeilen der externen Stellen, je in Verteiler-Reihenfolge.
  */
-export interface VerteilerWerte {
+export interface VerteilerFormValues {
   intern: string[];
   extern: ExternerEmpfaenger[];
 }
 
 /** Gespeicherter Verteiler → Formularwert. */
-export function verteilerWerteAus(
+export function toVerteilerFormValues(
   verteiler: readonly VerteilerEintrag[] | undefined,
-): VerteilerWerte {
+): VerteilerFormValues {
   const intern: string[] = [];
   const extern: ExternerEmpfaenger[] = [];
   for (const e of verteiler ?? []) {
@@ -75,7 +75,7 @@ export function verteilerWerteAus(
 }
 
 /** Ein gespeicherter Eintrag (außer extern) als Request-Zeile, ohne Umweg über den Katalog. */
-function alsNeuerEmpfaenger(e: VerteilerEintrag): NeuerEmpfaenger {
+function toNeuerEmpfaenger(e: VerteilerEintrag): NeuerEmpfaenger {
   return {
     empfaenger_typ: e.empfaenger_typ,
     ...(e.abschnitt_id != null ? { abschnitt_id: e.abschnitt_id } : {}),
@@ -93,8 +93,8 @@ function alsNeuerEmpfaenger(e: VerteilerEintrag): NeuerEmpfaenger {
  * den Katalog: ist der Katalog noch nicht geladen, würde `dekodiere` aus „funktion:s3“ sonst einen
  * Freitext machen. Nur neu gewählte Tags werden dekodiert, und die gibt es erst mit Katalog.
  */
-export function verteilerAusWerten(
-  werte: VerteilerWerte | undefined,
+export function toVerteilerRequest(
+  werte: VerteilerFormValues | undefined,
   katalog: FunktionsVorschlaege['katalog'],
   gespeichert: readonly VerteilerEintrag[] = [],
 ): NeuerEmpfaenger[] {
@@ -105,7 +105,7 @@ export function verteilerAusWerten(
   }
   const intern = (werte?.intern ?? []).flatMap((tag): NeuerEmpfaenger[] => {
     const e = bekannt.get(tag);
-    return e ? [alsNeuerEmpfaenger(e)] : buildEmpfaenger([tag], katalog);
+    return e ? [toNeuerEmpfaenger(e)] : buildEmpfaenger([tag], katalog);
   });
   const extern = (werte?.extern ?? []).flatMap((z): NeuerEmpfaenger[] => {
     const bezeichnung = z.bezeichnung.trim();
@@ -127,13 +127,13 @@ export function verteilerAusWerten(
  * Speichern von Titel oder Text schreibt den Verteiler so nicht neu (neue Zeilen-ids, Rennen mit
  * dem Katalog).
  */
-export function verteilerGeaendert(
-  werte: VerteilerWerte | undefined,
+export function isVerteilerChanged(
+  werte: VerteilerFormValues | undefined,
   gespeichert: readonly VerteilerEintrag[] | undefined,
 ): boolean {
   if (werte === undefined) return false;
-  const vorher = verteilerWerteAus(gespeichert);
-  const normal = (w: VerteilerWerte) =>
+  const vorher = toVerteilerFormValues(gespeichert);
+  const normal = (w: VerteilerFormValues) =>
     JSON.stringify({
       intern: w.intern,
       extern: w.extern.map((z) => [z.kategorie ?? null, z.bezeichnung.trim()]),
@@ -142,7 +142,7 @@ export function verteilerGeaendert(
 }
 
 /** Was die Seite braucht, um ungespeicherte Tags zu benennen. */
-export interface VerteilerQuellen {
+export interface VerteilerSources {
   abschnitte: readonly ZielOption[];
   einheiten: readonly ZielOption[];
   vorschlaege: FunktionsVorschlaege;
@@ -152,7 +152,7 @@ export interface VerteilerQuellen {
  * Anzeigename einer Katalogfunktion wie der Snapshot des Servers (`fuehrung::Labelkarte::anzeige`):
  * „S3 Einsatz“, „Einsatzleitung“, „Fachberater: THW“, nie mit der besetzenden Person.
  */
-function funktionsName(wert: string, katalog: FunktionsVorschlaege['katalog']): string | undefined {
+function funktionLabel(wert: string, katalog: FunktionsVorschlaege['katalog']): string | undefined {
   const angabe = dekodiere(wert, katalog);
   const eintrag = angabe.funktion ? katalog.find((e) => e.funktion === angabe.funktion) : undefined;
   if (!eintrag) return angabe.text;
@@ -167,9 +167,9 @@ function funktionsName(wert: string, katalog: FunktionsVorschlaege['katalog']): 
  * zeigt den ungespeicherten Stand). Der Name eines Tags kommt aus den geladenen Optionen, sonst aus
  * dem gespeicherten Verteiler, sonst steht der Tag selbst da.
  */
-export function verteilerNamenAusWerten(
-  werte: VerteilerWerte | undefined,
-  quellen: VerteilerQuellen,
+export function verteilerNamesFromForm(
+  werte: VerteilerFormValues | undefined,
+  quellen: VerteilerSources,
   gespeichert: readonly VerteilerEintrag[] | undefined,
 ): string[] {
   const gespeicherteNamen = new Map<string, string>();
@@ -185,7 +185,7 @@ export function verteilerNamenAusWerten(
     const name =
       optionsNamen.get(tag) ??
       gespeicherteNamen.get(tag) ??
-      funktionsName(tag, quellen.vorschlaege.katalog);
+      funktionLabel(tag, quellen.vorschlaege.katalog);
     return name ? [name] : [];
   });
   const extern = (werte?.extern ?? []).flatMap((z) => {

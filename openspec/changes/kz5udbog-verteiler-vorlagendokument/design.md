@@ -93,7 +93,7 @@ brauchen ihren Weg nur wegen des Multipart-Uploads.
 
 ### D3 Prüfung und Snapshot aus dem Auftrag wiederverwenden, mit eingeschränkter Typmenge
 
-Neben die Prüfung des Auftrags tritt `auftrag::eingabe::validiere_verteiler` (`pub(crate)`). Sie
+Neben die Prüfung des Auftrags tritt `auftrag::eingabe::validate_verteiler` (`pub(crate)`). Sie
 prüft vor jeder Abfrage die Zahl (höchstens `EMPFAENGER_MAX`, leer erlaubt) und lehnt Person und
 Fahrzeug ab (400). Danach ruft sie dieselbe `validiere_empfaenger_liste` wie der Auftrag. Der
 Auftrag bleibt dabei unverändert. Aus `auftrag::repo` wird `snap_anzeige_fuer` `pub(crate)`.
@@ -123,7 +123,7 @@ schriftlichen Befehls, bei dem Anlagen und Verteiler am Ende stehen.
 
 ### D5 Fortschreiben kopiert in derselben Transaktion
 
-`verteiler::kopieren_tx::<T>(conn, einsatz_id, von, nach)` läuft als
+`verteiler::copy_tx::<T>(conn, einsatz_id, von, nach)` läuft als
 `INSERT … SELECT` mit allen Spalten außer `id` und dem neuen `<art>_id`. Es wird neben
 `anlage::kopieren_tx` aufgerufen.
 
@@ -167,7 +167,7 @@ Props, hält seinen Such-State selbst und baut die drei Optionsgruppen.
   nach LFH-1312 `buildEmpfaenger`.
 - `AuftragFormular` nutzt die Komponente und bleibt aus Bediensicht gleich. Seine Tests laufen
   unverändert.
-- Für den umgekehrten Weg von gespeicherten Einträgen zu Tags gibt es `empfaengerTagsAus(...)`
+- Für den umgekehrten Weg von gespeicherten Einträgen zu Tags gibt es `toEmpfaengerTags(...)`
   (Muster `auftragBerichtigungKern.vorbelegungAus`).
 
 **`fuehrung/ExterneEmpfaenger.tsx`** ist eine Zeilenliste aus Kategorie-Select und

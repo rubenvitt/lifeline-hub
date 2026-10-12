@@ -19,7 +19,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/auftraege/BefehlListenKarte.tsx,
  *                          frontend/src/auftraege/BefehlDetail.tsx
  *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx,
- *                          frontend/src/entwurf/VerteilerFeld.tsx,
+ *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/fuehrung/EmpfaengerWahl.tsx,
  *                          frontend/src/fuehrung/ExterneEmpfaenger.tsx
  */

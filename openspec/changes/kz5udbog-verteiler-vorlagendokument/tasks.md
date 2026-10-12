@@ -21,7 +21,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 
 ## 2. Backend: Prüfung, Speichern, Laden (D2, D3)
 
-- [x] 2.1 `validiere_verteiler` in `src/auftrag/eingabe.rs` (`pub(crate)`, Zahl und Person/Fahrzeug
+- [x] 2.1 `validate_verteiler` in `src/auftrag/eingabe.rs` (`pub(crate)`, Zahl und Person/Fahrzeug
   vor der ersten Abfrage, dann `validiere_empfaenger_liste`), `snap_anzeige_fuer` aus
   `src/auftrag/repo.rs` `pub(crate)` (design.md D3). Nachweis: Die bestehenden
   Auftragstests (`tests/auftrag*.rs`, `tests/eingabegrenzen_auftrag.rs`) sind unverändert grün.
@@ -41,7 +41,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
   `tests/dokument_anlage.rs`). Sie deckt jedes Szenario der Anforderungen „wird im Entwurf als
   Ganzes ersetzt“ und „Grenzen und Prüfung“ ab: Ersetzen, Feld fehlt, fremde Einheit → 400 und
   Titel unverändert, freigegeben → 422, 51 Einträge → 400, Doppelte zusammengeführt, Person →
-  400, Bezeichnung mit 201 Zeichen → 400. Mutationsprobe: Ohne `verteiler::kopieren_tx` im
+  400, Bezeichnung mit 201 Zeichen → 400. Mutationsprobe: Ohne `verteiler::copy_tx` im
   Fortschreiben wird `fortschreiben_uebernimmt_den_verteiler_je_fassung` rot.
 - [x] 2.5 Eingabegrenzen: `VERTEILER_MAX` und `VERTEILER_BEZEICHNUNG_MAX` als Alias in
   `src/vorlagendokument/verteiler.rs`, gespiegelt in `api/eingabegrenzen.ts` und
@@ -57,7 +57,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 - [x] 3.2 `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` um die drei Spalten je Art für
   `freigeben_tx` ergänzen (D6). Nachweis: `cargo test --test aufbewahrung_e2e` ist grün, und
   die Einträge stehen im Diff.
-- [x] 3.3 `fortschreiben_tx` ruft `verteiler::kopieren_tx`. Nachweis: Ein Test belegt, dass
+- [x] 3.3 `fortschreiben_tx` ruft `verteiler::copy_tx`. Nachweis: Ein Test belegt, dass
   Fassung 2 den Verteiler trägt und dass Leeren in Fassung 2 Fassung 1 unverändert lässt.
 - [x] 3.4 Schwärzungs-Ende-zu-Ende: Ein Einsatz mit Befehl, dessen Verteiler „ILS Musterstadt“
   nennt, wird geschwärzt. Nachweis: Kein Feld der Verteiler-Zeilen enthält den Text danach (Test
@@ -71,7 +71,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 
 ## 4. Frontend: Empfängerwahl herauslösen (D7)
 
-- [x] 4.1 `fuehrung/empfaengerKern.ts`: Kodierung, `baueEmpfaenger` und `empfaengerTagsAus` aus
+- [x] 4.1 `fuehrung/empfaengerKern.ts`: Kodierung, `baueEmpfaenger` und `toEmpfaengerTags` aus
   `auftraege/auftragFormularKern.ts` und `auftragBerichtigungKern.ts` herauslösen. Die alten
   Stellen importieren von dort. Nachweis: Ein neuer Kern-Test geht hin und zurück für Abschnitt,
   Einheit, Katalogfunktion mit Bezeichnung und Freitext. `auftragFormularKern`- und

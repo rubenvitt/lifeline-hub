@@ -106,7 +106,7 @@ export function empfaengerTag(e: GespeicherterEmpfaenger): string | undefined {
 }
 
 /** Die Umkehr von {@link buildEmpfaenger}: gespeicherte Empfänger als Tag-Werte, in ihrer Folge. */
-export function empfaengerTagsAus(eintraege: readonly GespeicherterEmpfaenger[]): string[] {
+export function toEmpfaengerTags(eintraege: readonly GespeicherterEmpfaenger[]): string[] {
   return eintraege.flatMap((e) => {
     const tag = empfaengerTag(e);
     return tag ? [tag] : [];

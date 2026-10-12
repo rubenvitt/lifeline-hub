@@ -9,7 +9,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   lageberichte.png       frontend/src/pages/LageberichtePage.tsx
  *   neuer-lagebericht.png  frontend/src/pages/LageberichtePage.tsx (Dialog „Neuer Lagebericht“)
  *   entwurf.png            frontend/src/pages/LageberichtDetailPage.tsx,
- *                          frontend/src/entwurf/VerteilerFeld.tsx,
+ *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/lageberichte/AbschnittsAkkordeon.tsx,
  *                          frontend/src/lageberichte/AbschnittUebernahme.tsx,
  *                          frontend/src/lageberichte/eigeneLageUebernahme.ts

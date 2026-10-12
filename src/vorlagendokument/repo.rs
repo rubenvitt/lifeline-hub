@@ -41,7 +41,7 @@ pub struct Patch<'a, A> {
     pub titel: Option<&'a str>,
     pub zeitstand: Option<&'a str>,
     pub abschnitte: Option<&'a [A]>,
-    /// Ersetzt den Verteiler ganz (LLH-1172), geprüft von `auftrag::eingabe::validiere_verteiler`;
+    /// Ersetzt den Verteiler ganz (LLH-1172), geprüft von `auftrag::eingabe::validate_verteiler`;
     /// leer leert ihn.
     pub verteiler: Option<&'a [crate::auftrag::repo::EmpfaengerEingabe]>,
 }
@@ -92,7 +92,7 @@ fn select<T: Dokumentart>() -> String {
     FROM {} l \
     JOIN benutzer b1 ON b1.id = l.ersteller_id \
     LEFT JOIN benutzer b2 ON b2.id = l.freigegeben_von_id",
-        super::verteiler::json_spalte::<T>("l"),
+        super::verteiler::json_column::<T>("l"),
         T::TABELLE
     )
 }
@@ -118,7 +118,7 @@ fn zu_dokument<T: Dokumentart>(row: Row) -> Result<Dokument<T::Abschnitt>, AppEr
         freigegeben_von_name: row.freigegeben_von_name,
         freigegeben_at: row.freigegeben_at,
         etb_eintrag_id: row.etb_eintrag_id,
-        verteiler: super::verteiler::aus_json(&row.verteiler)?,
+        verteiler: super::verteiler::from_json(&row.verteiler)?,
     })
 }
 
@@ -312,7 +312,7 @@ pub async fn aktualisiere_tx<T: Dokumentart>(
     }
     // Nach dem UPDATE mit Status-Guard: steht der Entwurf nicht mehr, ist hier schon abgebrochen.
     if let Some(verteiler) = patch.verteiler {
-        super::verteiler::ersetzen_tx::<T>(&mut *conn, einsatz_id, id, verteiler).await?;
+        super::verteiler::replace_tx::<T>(&mut *conn, einsatz_id, id, verteiler).await?;
     }
     laden::<T>(&mut *conn, einsatz_id, id).await
 }
@@ -363,7 +363,7 @@ pub async fn freigeben_tx<T: Dokumentart>(
     // LLH-1172: der Verteiler nach den Anlagen und als `an`; ohne Verteiler bleibt beides wie
     // vorher (kein Abschnitt, `an` = „System“).
     render.push_str(&super::verteiler::render_abschnitt(&dok.verteiler));
-    let an = super::verteiler::an_fuer(&dok.verteiler);
+    let an = super::verteiler::build_an(&dok.verteiler);
     snapshot_freigeben_tx::<T>(
         &mut *conn,
         einsatz_id,
@@ -504,7 +504,7 @@ async fn fortschreiben_tx<T: Dokumentart>(
     .await?;
     super::anlage::kopieren_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
     // LLH-1172: eigene Verteiler-Zeilen je Fassung (design.md D5, D5a).
-    super::verteiler::kopieren_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
+    super::verteiler::copy_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
     laden::<T>(&mut *conn, einsatz_id, neu_id).await
 }
 

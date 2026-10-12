@@ -37,13 +37,13 @@ fn befehl_und_lagebericht_tragen_einen_verteiler_die_pressemitteilung_nicht() {
         })
     );
     assert_eq!(Pressemitteilung::VERTEILER, None);
-    assert_eq!(json_spalte::<Pressemitteilung>("l"), "'[]'");
+    assert_eq!(json_column::<Pressemitteilung>("l"), "'[]'");
 }
 
 #[test]
 fn ohne_verteiler_kein_abschnitt_und_kein_an() {
     assert_eq!(render_abschnitt(&[]), "");
-    assert_eq!(an_fuer(&[]), None);
+    assert_eq!(build_an(&[]), None);
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn abschnitt_verteiler_nennt_jeden_eintrag_als_listenpunkt() {
         render_abschnitt(&v),
         "\n## Verteiler\n- EA Süd\n- S3 Einsatz\n"
     );
-    assert_eq!(an_fuer(&v).as_deref(), Some("EA Süd, S3 Einsatz"));
+    assert_eq!(build_an(&v).as_deref(), Some("EA Süd, S3 Einsatz"));
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn langer_verteiler_wird_im_an_gekappt_aber_im_wortlaut_vollstaendig_genannt() {
     let v: Vec<_> = (0..40)
         .map(|i| eintrag(&format!("Einheit mit langem Namen Nummer {i:02}")))
         .collect();
-    let an = an_fuer(&v).unwrap();
+    let an = build_an(&v).unwrap();
     assert!(an.chars().count() <= crate::etb::PARTEI_MAX, "{an}");
     assert!(an.contains(" … und "), "{an}");
     assert!(an.ends_with(" weitere"), "{an}");
@@ -77,12 +77,12 @@ fn json_wird_mit_typ_und_kategorie_gelesen() {
         {"id":8,"empfaenger_typ":"funktion","abschnitt_id":null,"einheit_id":null,
         "funktion":"s3","funktion_text":null,"extern_kategorie":null,
         "extern_bezeichnung":null,"snap_anzeige":"S3 Einsatz"}]"#;
-    let v = aus_json(json).unwrap();
+    let v = from_json(json).unwrap();
     assert_eq!(v.len(), 2);
     assert_eq!(v[0].empfaenger_typ, EmpfaengerTyp::Extern);
     assert_eq!(v[0].extern_kategorie, Some(AdressatKategorie::Leitstelle));
     assert_eq!(v[1].funktion.as_deref(), Some("s3"));
-    assert_eq!(aus_json("[]").unwrap(), vec![]);
+    assert_eq!(from_json("[]").unwrap(), vec![]);
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn unbekannter_typ_im_json_ist_ein_datenfehler() {
         "funktion":null,"funktion_text":null,"extern_kategorie":null,
         "extern_bezeichnung":null,"snap_anzeige":"x"}]"#;
     // `person` ist ein gültiger EmpfaengerTyp; nur ein ganz fremder Wert scheitert.
-    assert!(aus_json(json).is_ok());
+    assert!(from_json(json).is_ok());
     let kaputt = json.replace("\"person\"", "\"zug\"");
-    assert!(matches!(aus_json(&kaputt), Err(AppError::Internal(_))));
+    assert!(matches!(from_json(&kaputt), Err(AppError::Internal(_))));
 }

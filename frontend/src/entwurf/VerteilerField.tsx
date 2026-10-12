@@ -10,7 +10,7 @@ import { EmpfaengerWahl } from '../fuehrung/EmpfaengerWahl';
 import { ExterneEmpfaenger, externeEmpfaengerRule } from '../fuehrung/ExterneEmpfaenger';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { VERTEILER_MAX } from '../api/eingabegrenzen';
-import { VERTEILER_FELD, verteilerNamen, type VerteilerQuellen } from './verteilerKern';
+import { VERTEILER_FIELD, verteilerNames, type VerteilerSources } from './verteilerKern';
 
 /**
  * Verteiler an Befehl und Lagebericht (LLH-1172, Spec `dokument-verteiler`, Herleitung
@@ -22,7 +22,7 @@ import { VERTEILER_FELD, verteilerNamen, type VerteilerQuellen } from './verteil
  * Abschnitte, Einheiten und Funktionsvorschläge des Einsatzes: Optionen des Felds und Namen
  * ungespeicherter Tags im Druckkopf. Geladen wird nur im Entwurf mit Schreibrecht.
  */
-export function useVerteilerQuellen(einsatzId: number, aktiv: boolean): VerteilerQuellen {
+export function useVerteilerSources(einsatzId: number, aktiv: boolean): VerteilerSources {
   const abschnitte = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -49,17 +49,17 @@ export function useVerteilerQuellen(einsatzId: number, aktiv: boolean): Verteile
  * Freitext) und darunter die externen Stellen. Beides ist Bedienung und erscheint nicht auf dem
  * Papier; dort steht der Verteiler im Druckkopf.
  */
-export function VerteilerFeld({
+export function VerteilerField({
   quellen,
   ohneDruckKlasse,
 }: {
-  quellen: VerteilerQuellen;
+  quellen: VerteilerSources;
   /** Klasse, mit der die Seite Bedienung aus dem Druck nimmt (`befehl-no-print` …). */
   ohneDruckKlasse: string;
 }) {
   return (
     <div className={ohneDruckKlasse} data-lfh="verteiler-feld">
-      <Form.Item label="Verteiler" name={[VERTEILER_FELD, 'intern']}>
+      <Form.Item label="Verteiler" name={[VERTEILER_FIELD, 'intern']}>
         <EmpfaengerWahl
           abschnitte={quellen.abschnitte}
           einheiten={quellen.einheiten}
@@ -68,7 +68,7 @@ export function VerteilerFeld({
           placeholder="Abschnitt, Einheit oder Funktion"
         />
       </Form.Item>
-      <Form.Item name={[VERTEILER_FELD, 'extern']} rules={[externeEmpfaengerRule]}>
+      <Form.Item name={[VERTEILER_FIELD, 'extern']} rules={[externeEmpfaengerRule]}>
         <ExterneEmpfaenger />
       </Form.Item>
     </div>
@@ -83,7 +83,7 @@ export function VerteilerAnzeige({
   verteiler: readonly VerteilerEintrag[] | undefined;
   className?: string;
 }) {
-  const namen = verteilerNamen(verteiler);
+  const namen = verteilerNames(verteiler);
   if (namen.length === 0) return null;
   return (
     <div className={className} style={{ marginBottom: 16 }}>

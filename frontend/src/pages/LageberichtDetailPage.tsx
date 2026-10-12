@@ -49,16 +49,16 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
-import { VerteilerAnzeige, VerteilerFeld, useVerteilerQuellen } from '../entwurf/VerteilerFeld';
+import { VerteilerAnzeige, VerteilerField, useVerteilerSources } from '../entwurf/VerteilerField';
 import {
-  VERTEILER_FELD,
-  verteilerAusWerten,
+  VERTEILER_FIELD,
+  toVerteilerRequest,
   verteilerDruckzeile,
-  verteilerGeaendert,
-  verteilerNamen,
-  verteilerNamenAusWerten,
-  verteilerWerteAus,
-  type VerteilerWerte,
+  isVerteilerChanged,
+  verteilerNames,
+  verteilerNamesFromForm,
+  toVerteilerFormValues,
+  type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
@@ -69,12 +69,13 @@ import './lageberichtPrint.css';
  */
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand, Abschnitte als Text und der Verteiler (LLH-1172).
- * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerFeld.guard.test.ts`).
+ * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerField.guard.test.ts`).
  */
-type FormWerte = { titel: string; zeitstand?: Dayjs; [VERTEILER_FELD]?: VerteilerWerte } & Record<
-  string,
-  string | Dayjs | VerteilerWerte | undefined
->;
+type FormWerte = {
+  titel: string;
+  zeitstand?: Dayjs;
+  [VERTEILER_FIELD]?: VerteilerFormValues;
+} & Record<string, string | Dayjs | VerteilerFormValues | undefined>;
 
 export default function LageberichtDetailPage() {
   const { lbId } = useParams();
@@ -139,7 +140,7 @@ function LageberichtDetail() {
   );
   const druckWege = useDruckNebenwege();
   // Optionen des Verteilers (LLH-1172), nur im Entwurf mit Schreibrecht geladen.
-  const verteilerQuellen = useVerteilerQuellen(
+  const verteilerQuellen = useVerteilerSources(
     einsatzId,
     berichtQuery.data?.status === 'entwurf' && einsatzQuery.data != null
       ? darfImEinsatzSchreiben(einsatzQuery.data)
@@ -182,10 +183,14 @@ function LageberichtDetail() {
       const text = werte[a.schluessel];
       return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
     });
-    // Der Verteiler nur, wenn er sich geändert hat (`verteilerGeaendert`, LLH-1172).
+    // Der Verteiler nur, wenn er sich geändert hat (`isVerteilerChanged`, LLH-1172).
     const gespeichert = berichtQuery.data!.verteiler;
-    const verteiler = verteilerGeaendert(werte[VERTEILER_FELD], gespeichert)
-      ? verteilerAusWerten(werte[VERTEILER_FELD], verteilerQuellen.vorschlaege.katalog, gespeichert)
+    const verteiler = isVerteilerChanged(werte[VERTEILER_FIELD], gespeichert)
+      ? toVerteilerRequest(
+          werte[VERTEILER_FIELD],
+          verteilerQuellen.vorschlaege.katalog,
+          gespeichert,
+        )
       : undefined;
     return aktualisiereLagebericht(einsatzId, berichtId, {
       titel: werte.titel,
@@ -209,7 +214,7 @@ function LageberichtDetail() {
       const werte: FormWerte = {
         titel: b.titel,
         zeitstand: alsZeitpunkt(b.zeitstand),
-        [VERTEILER_FELD]: verteilerWerteAus(b.verteiler),
+        [VERTEILER_FIELD]: toVerteilerFormValues(b.verteiler),
       };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
@@ -340,11 +345,11 @@ function LageberichtDetail() {
       ? alsBackendZeit(werte.zeitstand)
       : bericht.zeitstand;
   // Ebenso der Verteiler (LLH-1172): im Entwurf aus dem Formular, sonst der gespeicherte Stand.
-  const formVerteiler = werte?.[VERTEILER_FELD] as VerteilerWerte | undefined;
+  const formVerteiler = werte?.[VERTEILER_FIELD] as VerteilerFormValues | undefined;
   const druckVerteiler =
     schreibtEntwurf && formVerteiler !== undefined
-      ? verteilerNamenAusWerten(formVerteiler, verteilerQuellen, bericht.verteiler)
-      : verteilerNamen(bericht.verteiler);
+      ? verteilerNamesFromForm(formVerteiler, verteilerQuellen, bericht.verteiler)
+      : verteilerNames(bericht.verteiler);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -562,7 +567,7 @@ function LageberichtDetail() {
               />
             </Form.Item>
             {/* An wen der Bericht geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-            <VerteilerFeld quellen={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />
+            <VerteilerField quellen={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />
             {/* Umschalter = Bedienung, kein Inhalt: im Druck weg. */}
             <Checkbox
               className="lagebericht-no-print"

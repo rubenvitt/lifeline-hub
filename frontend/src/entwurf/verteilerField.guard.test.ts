@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VORLAGEN as BEFEHL_VORLAGEN } from '../befehle/vorlagen';
 import { VORLAGEN as LAGEBERICHT_VORLAGEN } from '../lageberichte/vorlagen';
-import { VERTEILER_FELD, kollidierendeSchluessel } from './verteilerKern';
+import { VERTEILER_FIELD, collidingKeys } from './verteilerKern';
 
 /**
  * Die Entwurfsformulare von Befehl und Lagebericht tragen die Abschnitte als Feldnamen der obersten
@@ -10,17 +10,17 @@ import { VERTEILER_FELD, kollidierendeSchluessel } from './verteilerKern';
  */
 describe('Feldnamen der Entwurfsformulare', () => {
   it('kein Abschnitt einer Befehls- oder Lageberichtsvorlage heißt wie Titel oder Verteiler', () => {
-    expect(kollidierendeSchluessel(BEFEHL_VORLAGEN)).toEqual([]);
-    expect(kollidierendeSchluessel(LAGEBERICHT_VORLAGEN)).toEqual([]);
+    expect(collidingKeys(BEFEHL_VORLAGEN)).toEqual([]);
+    expect(collidingKeys(LAGEBERICHT_VORLAGEN)).toEqual([]);
   });
 
   it('meldet einen Abschnitt namens „verteiler“', () => {
     const vorlage = {
       abschnitte: [
         { schluessel: 'lage', label: 'Lage' },
-        { schluessel: VERTEILER_FELD, label: 'Verteiler' },
+        { schluessel: VERTEILER_FIELD, label: 'Verteiler' },
       ],
     };
-    expect(kollidierendeSchluessel([vorlage])).toEqual([VERTEILER_FELD]);
+    expect(collidingKeys([vorlage])).toEqual([VERTEILER_FIELD]);
   });
 });

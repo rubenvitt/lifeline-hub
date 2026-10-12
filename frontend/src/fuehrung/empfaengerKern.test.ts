@@ -6,7 +6,7 @@ import {
   buildEmpfaenger,
   einheitTag,
   empfaengerTag,
-  empfaengerTagsAus,
+  toEmpfaengerTags,
 } from './empfaengerKern';
 
 const KATALOG = TEST_VORSCHLAEGE.katalog;
@@ -52,14 +52,14 @@ describe('empfaengerKern: Tag-Werte hin und zurück (kz5udbog D7)', () => {
   for (const { name, tag, empfaenger } of faelle) {
     it(`${name}: der Tag wird zum Empfänger und der gespeicherte Empfänger wieder zum Tag`, () => {
       expect(buildEmpfaenger([tag], KATALOG)).toEqual([empfaenger]);
-      expect(empfaengerTagsAus([gespeichert(empfaenger)])).toEqual([tag]);
+      expect(toEmpfaengerTags([gespeichert(empfaenger)])).toEqual([tag]);
     });
   }
 
   it('hält die Reihenfolge über mehrere Empfänger', () => {
     const tags = ['funktion:s3', 'abschnitt:3', 'Logistiktrupp', 'einheit:9'];
     const empfaenger = buildEmpfaenger(tags, KATALOG);
-    expect(empfaengerTagsAus(empfaenger.map(gespeichert))).toEqual(tags);
+    expect(toEmpfaengerTags(empfaenger.map(gespeichert))).toEqual(tags);
   });
 
   it('baut die Tags von Abschnitt und Einheit über eigene Helfer', () => {
@@ -69,7 +69,7 @@ describe('empfaengerKern: Tag-Werte hin und zurück (kz5udbog D7)', () => {
 
   it('übergeht externe Stellen, Personen und Fahrzeuge: sie haben keinen Tag', () => {
     expect(
-      empfaengerTagsAus([
+      toEmpfaengerTags([
         { empfaenger_typ: 'extern' },
         { empfaenger_typ: 'person' },
         { empfaenger_typ: 'fahrzeug' },
@@ -87,6 +87,6 @@ describe('empfaengerKern: Tag-Werte hin und zurück (kz5udbog D7)', () => {
 
   it('lässt einen leeren Freitext weg', () => {
     expect(buildEmpfaenger(['  '], KATALOG)).toEqual([]);
-    expect(empfaengerTagsAus([gespeichert({ empfaenger_typ: 'funktion' })])).toEqual([]);
+    expect(toEmpfaengerTags([gespeichert({ empfaenger_typ: 'funktion' })])).toEqual([]);
   });
 });

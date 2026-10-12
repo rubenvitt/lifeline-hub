@@ -4,7 +4,7 @@
 
 use crate::anhang;
 use crate::app::AppState;
-use crate::auftrag::eingabe::{validiere_verteiler, EmpfaengerEingabeReq};
+use crate::auftrag::eingabe::{validate_verteiler, EmpfaengerEingabeReq};
 use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
@@ -220,8 +220,8 @@ pub async fn aktualisieren<T: DokumentRoute>(
     // Verteiler, Zahl, Typ und Textgrenzen vor der ersten Abfrage, dann Ziel im Einsatz.
     let verteiler = match &body.verteiler {
         Some(liste) => {
-            verteiler::tabelle::<T>()?;
-            Some(validiere_verteiler(&state.pool, einsatz_id, liste).await?)
+            verteiler::table::<T>()?;
+            Some(validate_verteiler(&state.pool, einsatz_id, liste).await?)
         }
         None => None,
     };

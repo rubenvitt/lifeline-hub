@@ -1,6 +1,6 @@
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import type { Auftrag, AuftragPatch, AuftragSchemafeld } from '../api/types';
-import { empfaengerTagsAus } from '../fuehrung/empfaengerKern';
+import { toEmpfaengerTags } from '../fuehrung/empfaengerKern';
 import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { alleEmpfaenger, type FormWerte } from './auftragFormularKern';
 
@@ -30,7 +30,7 @@ const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
 export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAenderbar: boolean } {
   let aenderbar = true;
   // Abschnitt, Einheit und Funktion trägt das Empfängerfeld; der Rest steht unten.
-  const tags = empfaengerTagsAus(a.empfaenger);
+  const tags = toEmpfaengerTags(a.empfaenger);
   let extern: { kategorie: FormWerte['externKategorie']; bezeichnung: string } | null = null;
   for (const e of a.empfaenger) {
     switch (e.empfaenger_typ) {
