@@ -66,7 +66,7 @@ const ANZEIGE_SELECT: &str = concat!(
             m.meldungsart, m.prioritaet, m.richtung, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             EXISTS (SELECT 1 FROM auftrag a WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NOT NULL) \
-              AS auftrag_aufgehoben, \
+              AS is_auftrag_aufgehoben, \
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, ",
     ist_offen_sql!(),
@@ -826,7 +826,7 @@ pub async fn erteile_auftrag_tx(
         // Guard: schon mit einem geltenden Auftrag verknüpft? (Sperrt Doppel-Verknüpfung;
         // first-write-wins.) Ein aufgehobener Auftrag zählt nicht (LLH-1177). Meldung kennt kein
         // Soft-Delete (nur erledigt_at/status) → nur den verknüpften Auftrag prüfen.
-        let auftrag_gilt: Option<bool> = sqlx::query_scalar(
+        let has_geltenden_auftrag: Option<bool> = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM auftrag a \
                             WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NULL) \
              FROM meldung m WHERE m.id = ?",
@@ -834,7 +834,7 @@ pub async fn erteile_auftrag_tx(
         .bind(meldung_id)
         .fetch_optional(&mut *conn)
         .await?;
-        if auftrag_gilt.ok_or(AppError::NotFound)? {
+        if has_geltenden_auftrag.ok_or(AppError::NotFound)? {
             return Err(AppError::Conflict(
                 "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
             ));
@@ -2038,7 +2038,7 @@ mod tests {
             .unwrap();
         let vorher = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert!(
-            !vorher.auftrag_aufgehoben,
+            !vorher.is_auftrag_aufgehoben,
             "offener Auftrag ist nicht aufgehoben"
         );
 
@@ -2054,7 +2054,7 @@ mod tests {
         let aufgehoben = laden(&pool, m.id, "2026-06-12 11:00:00").await.unwrap();
         assert_eq!(aufgehoben.auftrag_id, Some(erster));
         assert!(
-            aufgehoben.auftrag_aufgehoben,
+            aufgehoben.is_auftrag_aufgehoben,
             "Meldung zeigt den aufgehobenen Auftrag an"
         );
 
@@ -2068,7 +2068,7 @@ mod tests {
             Some(zweiter),
             "Verknüpfung zeigt auf den neuen Auftrag"
         );
-        assert!(!nachher.auftrag_aufgehoben);
+        assert!(!nachher.is_auftrag_aufgehoben);
 
         // Der alte Auftrag bleibt bestehen und aufgehoben (nachvollziehbar über ETB und Abgeschlossen).
         let alt = crate::auftrag::repo::laden(&pool, erster, "2026-06-12 11:00:00")

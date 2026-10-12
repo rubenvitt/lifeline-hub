@@ -3152,7 +3152,7 @@ export interface components {
              * @description Abgeleitet: der verknüpfte Auftrag ist aufgehoben (LLH-1177). Dann lässt sich aus der
              *     Meldung erneut ein Auftrag erteilen; `auftrag_id` zeigt bis dahin auf den alten.
              */
-            auftrag_aufgehoben: boolean;
+            is_auftrag_aufgehoben: boolean;
             /** Format: int64 */
             auftrag_id?: number | null;
             /** Format: int64 */

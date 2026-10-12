@@ -77,7 +77,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: null,
   auftrag_id: null,
-  auftrag_aufgehoben: false,
+  is_auftrag_aufgehoben: false,
   erfasst_von_id: 1,
   erstellt_at: '2026-06-12 09:05:00',
   lage_meldung_id: null,

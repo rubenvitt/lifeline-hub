@@ -545,12 +545,15 @@ pub async fn aufheben(
     state.live.publiziere(einsatz_id, etb_id);
     // Hängt eine Meldung an diesem Auftrag, zeigt ihre Karte jetzt „aufgehoben“ und bietet
     // „Auftrag erteilen“ wieder an (LLH-1177) → die Meldungen müssen nachladen.
-    let aus_meldung: bool =
+    // Nach dem Commit: ein Lesefehler macht das Aufheben nicht zum 500, dann lieber einmal zu viel
+    // melden.
+    let is_aus_meldung: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM meldung WHERE auftrag_id = ?)")
             .bind(auftrag_id)
             .fetch_one(&state.pool)
-            .await?;
-    if aus_meldung {
+            .await
+            .unwrap_or(true);
+    if is_aus_meldung {
         state
             .live
             .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);

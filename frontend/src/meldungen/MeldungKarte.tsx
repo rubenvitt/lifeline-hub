@@ -199,7 +199,7 @@ function MeldungKarte({
           : []),
         // Ein aufgehobener Auftrag gilt nicht mehr: die Meldung lässt sich erneut überführen, der
         // Server stellt den Rückverweis dann auf den neuen Auftrag um (LLH-1177).
-        ...((m.auftrag_id == null || m.auftrag_aufgehoben) && onAuftragErteilen
+        ...((m.auftrag_id == null || m.is_auftrag_aufgehoben) && onAuftragErteilen
           ? [
               auftragGesperrt
                 ? {
@@ -243,7 +243,7 @@ function MeldungKarte({
           {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
-            (m.auftrag_aufgehoben ? (
+            (m.is_auftrag_aufgehoben ? (
               <StatusChip ton="neutral" wort="Auftrag aufgehoben" />
             ) : (
               <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>

@@ -419,7 +419,7 @@ async fn feldfehler_am_vollzug_bleiben_400_auch_wenn_aufgehoben() {
 }
 
 /// Meldung → Auftrag erteilen → Auftrag aufheben → an der Meldung erneut erteilen (LLH-1177):
-/// die Meldung meldet das Aufheben live, zeigt `auftrag_aufgehoben` und nimmt einen neuen Auftrag
+/// die Meldung meldet das Aufheben live, zeigt `is_auftrag_aufgehoben` und nimmt einen neuen Auftrag
 /// an, der den Rückverweis übernimmt. Der alte bleibt aufgehoben bestehen.
 #[tokio::test]
 async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
@@ -462,7 +462,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let erster = json["auftrag_id"].as_i64().unwrap();
-    assert_eq!(json["auftrag_aufgehoben"], false);
+    assert_eq!(json["is_auftrag_aufgehoben"], false);
 
     let mut rx = live.abonniere(e);
     let (s, json) = aufheben(&app, &admin, e, erster, &grund("Lage erledigt")).await;
@@ -479,7 +479,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     .await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["auftrag_id"], erster);
-    assert_eq!(json["auftrag_aufgehoben"], true);
+    assert_eq!(json["is_auftrag_aufgehoben"], true);
 
     let (s, json) = anfrage(
         &app,
@@ -492,7 +492,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let zweiter = json["auftrag_id"].as_i64().unwrap();
     assert_ne!(zweiter, erster, "die Meldung zeigt auf den neuen Auftrag");
-    assert_eq!(json["auftrag_aufgehoben"], false);
+    assert_eq!(json["is_auftrag_aufgehoben"], false);
 
     let (_, alt) = anfrage(
         &app,

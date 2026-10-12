@@ -27,7 +27,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7,
   auftrag_id: null,
-  auftrag_aufgehoben: false,
+  is_auftrag_aufgehoben: false,
   erfasst_von_id: 1,
   erstellt_at: '2026-06-12 09:05:00',
   lage_meldung_id: null,
@@ -101,7 +101,7 @@ describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
   it('zeigt „Auftrag aufgehoben“ statt des Deeplinks', () => {
     renderKarte(
       <MeldungKarte
-        meldung={meldung({ auftrag_id: 99, auftrag_aufgehoben: true })}
+        meldung={meldung({ auftrag_id: 99, is_auftrag_aufgehoben: true })}
         einsatzId={7}
       />,
     );
@@ -111,7 +111,7 @@ describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
 
   it('bietet „Auftrag erteilen“ wieder an, solange der verknüpfte Auftrag aufgehoben ist', async () => {
     const cb = { darfSchreiben: true, onAuftragErteilen: vi.fn() };
-    const m = meldung({ auftrag_id: 99, auftrag_aufgehoben: true });
+    const m = meldung({ auftrag_id: 99, is_auftrag_aufgehoben: true });
     renderKarte(<MeldungKarte meldung={m} einsatzId={7} {...cb} />);
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     expect(cb.onAuftragErteilen).toHaveBeenCalledWith(m);

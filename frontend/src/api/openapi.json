@@ -8271,7 +8271,7 @@
           "lagerelevant",
           "ereigniszeit",
           "eingang_at",
-          "auftrag_aufgehoben",
+          "is_auftrag_aufgehoben",
           "erfasst_von_id",
           "erstellt_at",
           "ist_offen",
@@ -8292,7 +8292,7 @@
           "absender": {
             "type": "string"
           },
-          "auftrag_aufgehoben": {
+          "is_auftrag_aufgehoben": {
             "type": "boolean",
             "description": "Abgeleitet: der verknüpfte Auftrag ist aufgehoben (LLH-1177). Dann lässt sich aus der\nMeldung erneut ein Auftrag erteilen; `auftrag_id` zeigt bis dahin auf den alten."
           },
