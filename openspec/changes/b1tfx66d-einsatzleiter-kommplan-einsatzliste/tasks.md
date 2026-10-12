@@ -64,8 +64,12 @@ entsteht testgetrieben (`superpowers:test-driven-development`).
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (bei Umgebungsgrenzen der Cloud-Sitzung: die betroffenen
-  Bündel einzeln, Rest belegt die CI des PRs)
+- [x] 6.1 `./scripts/check-all.sh` grün (bei Umgebungsgrenzen der Cloud-Sitzung: die betroffenen
+  Bündel einzeln, Rest belegt die CI des PRs). In der Cloud-Sitzung vom 12.10.2026 (ohne mise,
+  Node 22): Bündel `schnell` grün; Rust: `--lib einsatz::` und 37 betroffene Testziele (640 Tests)
+  grün; Vitest: alle geänderten Dateien und die Guards grün, der volle Lauf riss das Zeitlimit,
+  rot nur `pages/uhs/Grundriss.test.tsx`, auf `origin/alpha` ebenso rot (Node 22, `Blob.stream`,
+  `mise.toml`). Den vollen Lauf belegt die CI des PRs.
 
 ## Workflow follow-up
 
