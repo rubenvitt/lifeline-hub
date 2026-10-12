@@ -79,6 +79,7 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
       'aktion:bereitstellungsraeume',
       'aktion:einsatzabschnitte',
       'aktion:lagekarte-gefahrengebiet',
+      'aktion:infotelefon-anruf',
     ]);
   });
 });

@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Flex, Typography } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -86,6 +86,8 @@ export default function InfotelefonPage() {
   const { istSchmal } = useViewport();
   const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
   const [anliegenOffen, setAnliegenOffen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [fokusAuftrag, setFokusAuftrag] = useState(0);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
@@ -116,6 +118,28 @@ export default function InfotelefonPage() {
       .querySelector(`[data-anruf="${hervorgehoben}"]`)
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben]);
+
+  // Schnellaktion „Anruf erfassen“ (LLH-1127): ?neu=1 legt den Fokus in die Erfassung. Das Literal
+  // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` verlangt
+  // den Leser auf genau dieser Stab-Unterseite. Warten, bis Freigabe und Einsatz feststehen; den
+  // Parameter immer räumen (apply-then-clean), fokussieren nur mit Freigabe und Schreibrecht.
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (stabFreigabe.zustand === 'laden') return;
+    if (frei && einsatzQuery.isLoading) return;
+    if (frei && einsatzQuery.data && darfImEinsatzSchreiben(einsatzQuery.data)) {
+      setFokusAuftrag((n) => n + 1);
+    }
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [
+    searchParams,
+    setSearchParams,
+    stabFreigabe.zustand,
+    frei,
+    einsatzQuery.isLoading,
+    einsatzQuery.data,
+  ]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.infotelefon(einsatzId) });
 
@@ -275,6 +299,7 @@ export default function InfotelefonPage() {
               laeuft={erfassenMutation.isPending}
               fehler={erfassenMutation.error}
               einklappbar={istSchmal && !fokusInLeiste}
+              fokusAuftrag={fokusAuftrag}
             />
           </div>
         ) : undefined

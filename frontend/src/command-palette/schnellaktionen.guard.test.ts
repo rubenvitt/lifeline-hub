@@ -4,6 +4,8 @@ import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad, parseZeichnenAuftrag } from '../routing/deeplinks';
 import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
+import { SACHGEBIETE } from '../stab/sachgebiete';
+import { unterseitenFuer } from '../stab/unterseiten';
 
 /**
  * Guard: die Schnellaktionen der Kommandopalette zeigen auf ein fertiges Modul der Registry und
@@ -32,6 +34,12 @@ import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
  *  4. TESTDATEIEN werden gar nicht gescannt.
  *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
  *     nicht zugeordnet.
+ *
+ * STAB-UNTERSEITEN (LLH-1127): Pressearbeit, Informationstelefon, Funkplan, Kommunikationsplan sind
+ * kein Modul, sondern Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger
+ * `stab` (`InfotelefonPage.tsx` → `stab`). Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
+ * der Leser in GENAU dieser Seite stehen: der Leser der Stab-Seite (Lagebesprechung) deckte sie
+ * sonst, und die Aktion liefe ins Leere.
  */
 
 /** Eine Fundstelle `X.get('<parameter>')` / `X.has('<parameter>')`. */
@@ -113,14 +121,40 @@ const LESER = new Map<SchnellaktionParameter, Leser[]>(
 /** Vergleichsform für die Dateiname-↔-Registry-Zuordnung: nur Buchstaben und Ziffern. */
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`InfotelefonPage.tsx` → `infotelefon`). */
+const dateiBasis = (pfad: string): string =>
+  normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
+
+/** Die Schlüssel der Stab-Unterseiten in Vergleichsform. */
+const STAB_UNTERSEITEN = new Set(
+  SACHGEBIETE.flatMap(({ sachgebiet }) => unterseitenFuer(sachgebiet)).map((u) => normal(u.key)),
+);
+
+/**
+ * Die Stab-Unterseite, auf die ein Ziel zeigt (`/einsaetze/1/stab/infotelefon?neu=1` →
+ * `infotelefon`), oder `null`. Nur für den Träger `stab`.
+ */
+export function stabUnterseiteVonZiel(
+  modulKey: string,
+  ziel: string,
+  basis: string,
+): string | null {
+  if (modulKey !== 'stab') return null;
+  const [pfadTeil] = ziel.split('?');
+  if (!pfadTeil.startsWith(`${basis}/`)) return null;
+  const segment = normal(pfadTeil.slice(basis.length + 1).split('/')[0] ?? '');
+  return STAB_UNTERSEITEN.has(segment) ? segment : null;
+}
+
 /**
  * Modulschlüssel zu einer Leser-Datei über ihren Dateinamen (`pages/PersonenPage.tsx` →
  * `personen`). Verglichen gegen Schlüssel UND Route, weil beide auseinanderfallen können
  * (`gefahrenzonen` hat die Route `gefahren`).
  */
 export function modulZuLeserDatei(pfad: string): string[] {
-  const basis = normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
+  const basis = dateiBasis(pfad);
   if (!basis) return [];
+  if (STAB_UNTERSEITEN.has(basis)) return ['stab'];
   return modulRegistry
     .filter((m) => [m.key, m.route, modulZielRoute(m)].some((s) => normal(s) === basis))
     .map((m) => m.key);
@@ -180,6 +214,19 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(findeLeser('/src/synthetisch.ts', quelle, 'neu').map((l) => l.zeile)).toEqual([6, 7]);
     // Ein `neu`-Leser deckt keine Zeichen-Aktion und umgekehrt.
     expect(findeLeser('/src/synthetisch.ts', quelle, 'zeichnen').map((l) => l.zeile)).toEqual([9]);
+  });
+
+  it('ordnet die Seiten der Stab-Unterseiten dem Stab zu und erkennt ihre Ziele (LLH-1127)', () => {
+    expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['stab']);
+    expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['stab']);
+    expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual(['stab']);
+    const basis = '/einsaetze/1/stab';
+    expect(stabUnterseiteVonZiel('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
+    expect(stabUnterseiteVonZiel('stab', `${basis}?neu=1`, basis)).toBeNull();
+    expect(stabUnterseiteVonZiel('stab', `${basis}/unbekannt?neu=1`, basis)).toBeNull();
+    expect(
+      stabUnterseiteVonZiel('etb', '/einsaetze/1/etb/infotelefon', '/einsaetze/1/etb'),
+    ).toBeNull();
   });
 
   it('prüft das Ziel je Parameter', () => {
@@ -245,6 +292,17 @@ describe('Schnellaktionen-Guard: Deckung', () => {
           `Moduls liest ?${a.parameter}. Gefundene Leser:\n${leser.map(zeige).join('\n')}\n` +
           `Zugeordnet: ${[...module].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
       ).not.toHaveLength(0);
+      // Stab-Unterseite: der Leser muss auf genau dieser Seite stehen (Kopfkommentar).
+      const m = modulRegistry.find((x) => x.key === a.modulKey)!;
+      const basis = einsatzModulPfad(4711, modulZielRoute(m));
+      const unterseite = stabUnterseiteVonZiel(a.modulKey, a.pfad(4711), basis);
+      if (unterseite) {
+        expect(
+          (module.get(a.modulKey) ?? []).filter((pfad) => dateiBasis(pfad) === unterseite),
+          `Schnellaktion „${a.label}" zeigt auf die Stab-Unterseite '${unterseite}', aber deren Seite ` +
+            `liest ?${a.parameter} nicht`,
+        ).not.toHaveLength(0);
+      }
     }
   });
 

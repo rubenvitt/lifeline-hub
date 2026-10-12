@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { erfasseAnruf, ladeAnrufe, setzeAnrufStatus } from '../api/infotelefon';
@@ -220,5 +220,59 @@ describe('InfotelefonPage auf dem Handschirm (LFH-1067)', () => {
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('button', { name: 'Nach Anliegen' }));
     await waitFor(() => expect(screen.queryByLabelText('Notiz')).toBeNull());
+  });
+});
+
+/** Schnellaktion „Anruf erfassen“ (LLH-1127): `?neu=1` setzt den Fokus in die Erfassung. */
+describe('InfotelefonPage · ?neu=1', () => {
+  function Ort() {
+    const ort = useLocation();
+    return <output data-testid="ort">{ort.search}</output>;
+  }
+  function setupMitOrt(route: string) {
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/stab/infotelefon"
+          element={
+            <>
+              <InfotelefonPage />
+              <Ort />
+            </>
+          }
+        />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it('fokussiert das Anliegen und räumt den Auftrag aus der Adresse', async () => {
+    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
+    await waitFor(() => expect(anliegen).toHaveFocus());
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
+  });
+
+  it('lässt ohne Auftrag den Fokus, wo er ist', async () => {
+    setupMitOrt('/einsaetze/1/stab/infotelefon');
+    const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
+    await screen.findByText('Sperrung B 3');
+    expect(anliegen).not.toHaveFocus();
+  });
+
+  it('räumt den Auftrag auch ohne Schreibrecht, ohne eine Erfassung zu zeigen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
+    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    await screen.findByText('Sperrung B 3');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
+  });
+
+  it('räumt den Auftrag bei gesperrtem Stab und zeigt keine Daten', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
+    expect(ladeAnrufe).not.toHaveBeenCalled();
   });
 });

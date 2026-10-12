@@ -140,6 +140,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:bereitstellungsraeume',
       'aktion:einsatzabschnitte',
       'aktion:lagekarte-gefahrengebiet',
+      'aktion:infotelefon-anruf',
     ]);
   });
   /**
@@ -161,6 +162,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
       ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
       ['aktion:lagekarte-gefahrengebiet', '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet'],
+      ['aktion:infotelefon-anruf', '/einsaetze/5/stab/infotelefon?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
@@ -178,6 +180,21 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(etb.kontext).toBe(modulEtb.label);
     expect(etb.icon).toBe(modulEtb.icon);
     expect(b.find((x) => x.id === 'aktion:personen')!.label).toBe('Person erfassen');
+    // Träger der Stab-Unterseite ist der Stab (LLH-1127).
+    const anruf = b.find((x) => x.id === 'aktion:infotelefon-anruf')!;
+    expect(anruf.label).toBe('Anruf erfassen');
+    expect(anruf.kontext).toBe('Stab');
+  });
+  it('führt „Anruf erfassen“ nur mit Schreibrecht und freiem Stab (LLH-1127)', () => {
+    const hat = (k: BefehlKontext) =>
+      baueBefehle(k).some((x) => x.id === 'aktion:infotelefon-anruf');
+    expect(hat(kontext())).toBe(true);
+    expect(hat(kontext({ darfSchreibenImEinsatz: false }))).toBe(false);
+    expect(hat(kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }))).toBe(false);
+    const q = 'bürgertelefon anruf';
+    expect(ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q)[0]?.id).toBe(
+      'aktion:infotelefon-anruf',
+    );
   });
   it.each([
     ['neuer etb', 'aktion:etb'],
@@ -253,12 +270,13 @@ describe('baueBefehle — Schnellaktionen', () => {
       zeile.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einstellungen/zugriff?neu=1');
     });
-    it('steht am Ende; die Bestandszeilen behalten ihre Reihenfolge', () => {
+    it('steht hinter den älteren Zeilen; die übrigen behalten ihre Reihenfolge', () => {
       const ids = baueBefehle(kontext({ darfEinsatzLeiten: true }))
         .map((x) => x.id)
         .filter((id) => id.startsWith('aktion:'));
-      expect(ids[ids.length - 1]).toBe(ID);
-      expect(ids.slice(0, -1)).toEqual(
+      // Hinter „Gefahrengebiet zeichnen“, vor der jüngeren Zeile „Anruf erfassen“ (LLH-1127).
+      expect(ids.indexOf(ID)).toBe(ids.indexOf('aktion:lagekarte-gefahrengebiet') + 1);
+      expect(ids.filter((id) => id !== ID)).toEqual(
         baueBefehle(kontext())
           .map((x) => x.id)
           .filter((id) => id.startsWith('aktion:')),

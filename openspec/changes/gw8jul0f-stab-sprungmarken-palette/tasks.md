@@ -16,9 +16,9 @@
 
 ## 3. Schnellaktion „Anruf erfassen“
 
-- [ ] 3.1 Guard zuerst (rot): `schnellaktionen.guard.test.ts` ordnet Stab-Unterseiten-Dateien `stab` zu und verlangt bei Zielen unter `…/stab/<unterseite>` einen Leser in genau dieser Datei (D7), Selbstbeweis mit synthetischem Fall; dann `infotelefonPfad` um `neu` erweitern und die Zeile ans Ende von `SCHNELLAKTIONEN` (D6); Pins in `befehle.test.ts`/`befehle.modulstatus.test.ts` nachziehen
-- [ ] 3.2 `InfotelefonPage.test.tsx` (rot): `?neu=1` fokussiert „Anliegen“ der Erfassung, sobald die Stab-Freigabe frei ist, und räumt den Parameter; ohne Freigabe kein Fokus; dann Leser in `InfotelefonPage.tsx` und Fokus-Griff an `AnrufErfassung`; Guard und Vitest grün
-- [ ] 3.3 Regeln: Satz zur Unterseiten-Zuordnung im Schnellaktionen-Absatz von `command-palette/AGENTS.md`; `prettier --check` grün
+- [x] 3.1 Guard zuerst (rot): `schnellaktionen.guard.test.ts` ordnet Stab-Unterseiten-Dateien `stab` zu und verlangt bei Zielen unter `…/stab/<unterseite>` einen Leser in genau dieser Datei (D7), Selbstbeweis mit synthetischem Fall; dann `infotelefonPfad` um `neu` erweitern und die Zeile ans Ende von `SCHNELLAKTIONEN` (D6); Pins in `befehle.test.ts`/`befehle.modulstatus.test.ts` nachziehen
+- [x] 3.2 `InfotelefonPage.test.tsx` (rot): `?neu=1` fokussiert „Anliegen“ der Erfassung, sobald die Stab-Freigabe frei ist, und räumt den Parameter; ohne Freigabe kein Fokus; dann Leser in `InfotelefonPage.tsx` und Fokus-Griff an `AnrufErfassung`; Guard und Vitest grün
+- [x] 3.3 Regeln: Satz zur Unterseiten-Zuordnung im Schnellaktionen-Absatz von `command-palette/AGENTS.md`; `prettier --check` grün
 
 ## 4. Anwenderdoku
 

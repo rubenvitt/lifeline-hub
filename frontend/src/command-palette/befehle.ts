@@ -32,6 +32,7 @@ import {
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
+  infotelefonPfad,
   lagekartePfad,
   personenPfad,
   schaedenPfad,
@@ -201,6 +202,17 @@ export const SCHNELLAKTIONEN: {
     // Erfassung von Betroffenen (dort führt die Palette „Person erfassen“).
     schlagworte: ['zugriff', 'hinzufügen', 'rolle', 'benutzer', 'einsatzkraft'],
     recht: 'leitung',
+  },
+  {
+    // Ans ENDE (LLH-1127): ein Bürgeranruf geht ein, die Erfassung soll in einem Griff offen sein.
+    // Träger ist der Stab (das Informationstelefon ist seine Unterseite, kein Modul). Leser:
+    // `pages/InfotelefonPage.tsx`; der Guard verlangt den Leser auf GENAU dieser Unterseite.
+    modulKey: 'stab',
+    parameter: 'neu',
+    kennung: 'infotelefon-anruf',
+    pfad: (id) => infotelefonPfad(id, { neu: true }),
+    label: 'Anruf erfassen',
+    schlagworte: ['anruf', 'bürgertelefon', 'hotline', 'infotelefon', 'informationstelefon'],
   },
 ];
 
