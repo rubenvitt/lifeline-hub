@@ -4,8 +4,10 @@ import { flaeche, kontrast, schattenKontrast } from './kontrast-kern';
 /**
  * Deeplink-Hervorhebung (LFH-698, Spec `deeplink-hervorhebung`): die angesprungene Zeile trägt
  * zwei Kanäle aus Rollen — getönte Fläche und eine Linie oben und unten. Die Kommunikationskarten
- * (Meldung, Auftrag) tragen dieselbe Form statt eines Rings; eine alarmierte Karte behält ihre
- * Alarmfläche, die Markierung legt nur die Linie darüber (LFH-896). Gemessen im Browser,
+ * (Meldung, Auftrag, Einsatzbefehl) tragen dieselbe Form statt eines Rings; eine alarmierte Karte
+ * behält ihre Alarmfläche, die Markierung legt nur die Linie darüber (LFH-896). Eine gewählte, nicht
+ * angesprungene Karte (Muster „Liste + Detailpaneel“) trägt die Auswahlfläche und keine Linie
+ * (Change oxgob5gk, Spec „Markierung bleibt von der Auswahl unterscheidbar“). Gemessen im Browser,
  * weil jsdom kein CSS rechnet (`css: false`) und antd seine Zellfarben zur Laufzeit injiziert.
  *
  * Böden als Literale (Kriterium 5 und WCAG 1.4.11): Text Tag ≥ 7, Nacht ≥ 5; Linie ≥ 3 gegen
@@ -250,6 +252,8 @@ for (const modus of ['light', 'dark'] as const) {
     await page.goto(`/einsaetze/${einsatzId}/auftraege?auftrag=${zielId}`);
     const ziel = karte(zielId);
     await expect(ziel).toHaveAttribute('data-hervorgehoben', 'true');
+    // Angesprungen heißt auch gewählt; die Markierung steht über der Auswahlfläche (oxgob5gk).
+    await expect(ziel).toHaveAttribute('data-gewaehlt', 'true');
     await expect(nachbar).not.toHaveAttribute('data-hervorgehoben');
     await zeigerWeg(page);
     await expect(async () => {
@@ -287,6 +291,105 @@ for (const modus of ['light', 'dark'] as const) {
         alarm.getByText('Überfälliger Auftrag', { exact: true }),
         TEXT[modus],
         'Alarmkarte',
+      );
+    }).toPass({ timeout: 10_000 });
+  });
+
+  test(`${modus}: Befehlskarte per ?befehl= — dieselbe Fläche und Linie wie der Auftrag`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E oxgob5gk Befehl ${modus} ${Date.now()}`,
+    });
+    const befehl = async (titel: string) =>
+      (await post(page, `/api/einsaetze/${einsatzId}/befehle`, { vorlage: 'befehl_lad', titel }))
+        .id;
+    const nachbarId = await befehl('Nachbarbefehl');
+    const zielId = await befehl('Angesprungener Befehl');
+    const karte = (id: number) => page.locator(`[data-lfh="komm-karte"][data-befehl-id="${id}"]`);
+    const nachbar = karte(nachbarId);
+
+    // Der Ortspfad der Vollseite führt so zurück (oxgob5gk D6): Befehl gewählt UND markiert.
+    await page.goto(`/einsaetze/${einsatzId}/auftraege?befehl=${zielId}&reiter=befehle`);
+    const ziel = karte(zielId);
+    await expect(ziel).toHaveAttribute('data-hervorgehoben', 'true');
+    await expect(ziel).toHaveAttribute('data-gewaehlt', 'true');
+    await expect(nachbar).not.toHaveAttribute('data-hervorgehoben');
+    await expect(nachbar).not.toHaveAttribute('data-gewaehlt');
+    await zeigerWeg(page);
+    await expect(async () => {
+      const m = await schattenKontrast(ziel, nachbar);
+      expect(m.gegenFlaeche, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      expect(m.gegenNachbar, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      // Markierung über der Auswahlfläche (Spec „Markierung bleibt von der Auswahl unterscheidbar“).
+      await pruefeRollen(page, ziel, nachbar, 'Befehlskarte');
+      await pruefeText(
+        ziel.getByText('Angesprungener Befehl', { exact: true }),
+        TEXT[modus],
+        'Befehlskarte',
+      );
+    }).toPass({ timeout: 10_000 });
+  });
+
+  test(`${modus}: gewählte, nicht angesprungene Karte — Auswahlfläche ohne Linie`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E oxgob5gk Wahl ${modus} ${Date.now()}`,
+    });
+    const ids: number[] = [];
+    for (const auftrag_text of ['Erster Auftrag', 'Gewählter Auftrag', 'Dritter Auftrag']) {
+      ids.push(
+        (
+          await post(page, `/api/einsaetze/${einsatzId}/auftraege`, {
+            auftrag_text,
+            empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
+          })
+        ).id,
+      );
+    }
+    const karte = (id: number) => page.locator(`[data-lfh="komm-karte"][data-auftrag-id="${id}"]`);
+
+    // Ohne Deeplink: ab lg ist eine Karte vorgewählt, keine markiert.
+    await page.goto(`/einsaetze/${einsatzId}/auftraege`);
+    await expect(page.locator('[data-lfh="komm-karte"][data-gewaehlt="true"]')).toHaveCount(1);
+    // Von Hand wählen: eine Karte, die nicht die vorgewählte ist.
+    const vorgewaehlt = await page
+      .locator('[data-lfh="komm-karte"][data-gewaehlt="true"]')
+      .getAttribute('data-auftrag-id');
+    const zielId = ids.find((id) => String(id) !== vorgewaehlt)!;
+    const ziel = karte(zielId);
+    await ziel.locator('[data-lfh="auswahl-ziel"]').click();
+    await expect(ziel).toHaveAttribute('data-gewaehlt', 'true');
+    await expect(page.locator('[data-lfh="komm-karte"][data-gewaehlt="true"]')).toHaveCount(1);
+    await expect(page.locator('[data-lfh="komm-karte"][data-hervorgehoben]')).toHaveCount(0);
+    const nachbar = page.locator('[data-lfh="komm-karte"]:not([data-gewaehlt])').first();
+    await zeigerWeg(page);
+
+    await expect(async () => {
+      // Keine Linie: die bleibt allein der Markierung.
+      expect(await ziel.evaluate((el) => getComputedStyle(el).boxShadow), 'gewählt: Linie').toBe(
+        'none',
+      );
+      expect(rgb(await flaeche(ziel)), 'gewählt: Fläche').toBe(
+        await rolle(page, '--lfh-auswahl-flaeche'),
+      );
+      expect(rgb(await flaeche(ziel)), 'gewählt gleicht der Markierung').not.toBe(
+        await rolle(page, '--lfh-bedien-flaeche'),
+      );
+      expect(rgb(await flaeche(ziel)), 'gewählt gleicht der Nachbarkarte').not.toBe(
+        rgb(await flaeche(nachbar)),
+      );
+      await pruefeText(
+        ziel.getByText('Gewählter Auftrag', { exact: true }),
+        TEXT[modus],
+        'gewählte Karte',
       );
     }).toPass({ timeout: 10_000 });
   });

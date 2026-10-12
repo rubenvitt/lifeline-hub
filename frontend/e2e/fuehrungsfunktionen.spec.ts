@@ -37,23 +37,28 @@ test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ p
   await besetzeExtern(page, einsatzId, 's3', 'Müller');
 
   await page.goto(auftraegePfad(einsatzId));
-  // Der Kopfknopf trägt ein Icon im Namen; danach heißt er „Formular schließen“.
-  await page.getByRole('button', { name: /Auftrag erteilen/ }).click();
-  await page.getByLabel('Auftrag / Was').fill('Lage an der Brücke erkunden');
-  const empfaenger = page.getByRole('combobox', { name: 'Empfänger', exact: true });
+  // Der Kopfknopf öffnet den Dialog „Auftrag erteilen“ (oxgob5gk D10); die leere Liste trägt
+  // dieselbe Aktion, der Kopfknopf steht im DOM zuerst.
+  await page.getByRole('button', { name: 'Auftrag erteilen', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Auftrag erteilen' });
+  await dialog.getByLabel('Auftrag / Was').fill('Lage an der Brücke erkunden');
+  const empfaenger = dialog.getByRole('combobox', { name: 'Empfänger', exact: true });
   await waehleIn(empfaenger, 'S3 – Einsatz (Müller)');
   // Mehrere Empfänger sind erlaubt, die Liste bleibt offen: Escape schließt sie.
   await empfaenger.press('Escape');
   // Senden über den Knopf im <form> (der Select schluckt Enter).
-  await page.getByRole('button', { name: 'Auftrag erteilen', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Auftrag erteilen', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 
+  // Gemessen an der Karte in der Liste; das Detail daneben zeigt den Empfänger ebenso.
+  const liste = page.getByRole('list', { name: 'Offene Aufträge' });
   const offen = page.getByText('S3 Einsatz · Müller', { exact: true });
-  await expect(offen).toBeVisible();
+  await expect(liste.getByText('S3 Einsatz · Müller', { exact: true })).toBeVisible();
 
   // Umbesetzen über die API: das Stab-Ereignis kommt über den Live-Strom und invalidiert die
   // Aufträge — die Karte folgt ohne Neuladen, der Snapshot bleibt.
   await besetzeExtern(page, einsatzId, 's3', 'Schulz');
-  await expect(page.getByText('S3 Einsatz · Schulz', { exact: true })).toBeVisible();
+  await expect(liste.getByText('S3 Einsatz · Schulz', { exact: true })).toBeVisible();
   await expect(offen).toHaveCount(0);
 });
 
@@ -77,7 +82,9 @@ test('Ohne Stab-Freigabe steht nur der Snapshot da (Führungspersonal)', async (
   await wechsleZuRolle(page, 'fuehrungspersonal', String(einsatzId));
   await page.goto(auftraegePfad(einsatzId));
   // Vorbedingung des Rollenzweigs: der Auftrag steht da, die Besetzung nicht.
-  await expect(page.getByText('S3 Einsatz', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Offene Aufträge' }).getByText('S3 Einsatz', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText(/S3 Einsatz · /)).toHaveCount(0);
   await expect(page.getByText('Müller')).toHaveCount(0);
 });

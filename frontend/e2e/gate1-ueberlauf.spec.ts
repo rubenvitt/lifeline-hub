@@ -797,8 +797,13 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         // irreführender Timeout.
         await expect(reiter).toHaveCount(1);
         await reiter.click();
+        // Gemessen mit offenem Detail (Muster „Liste + Detailpaneel“, oxgob5gk): ab lg ist der
+        // Befehl vorgewählt und bleibt es beim Klick, darunter klappt der Klick das Detail unter
+        // der Karte auf.
+        await p.getByRole('button', { name: /^Befehl v1: Befehl an den 2\. Zug/ }).click();
+        await expect(p.locator('[data-lfh="liste-detail-detail"]')).toContainText('Befehlstext');
       },
-      anker: (p: Page) => p.getByRole('link', { name: /Befehl an den 2\. Zug/ }),
+      anker: (p: Page) => p.getByRole('button', { name: /^Befehl v1: Befehl an den 2\. Zug/ }),
     },
     {
       pfad: `/einsaetze/${einsatzId}/personen`,

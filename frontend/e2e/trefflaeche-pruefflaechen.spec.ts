@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import {
   FUEKW,
+  HANDSCHIRM,
   STAFFEL,
   SUBPIXEL,
   alleHaltenStufe,
@@ -302,13 +303,75 @@ async function kommunikationSaeen(page: Page, einsatzId: string) {
     bezeichnung: 'RTW',
     adressat_kategorie: 'leitstelle',
   });
-  await seed(page, `${E}/auftraege`, {
+  // Aus einem ETB-Eintrag erteilt: erst dann trägt das Auftragsdetail seinen Sprung
+  // „ETB-Eintrag ↗“ (oxgob5gk, Spec `einsatztauglichkeit-layout`: Sprünge des Detailpaneels).
+  const quelle = await seed(page, `${E}/etb`, {
+    typ: 'meldung',
+    inhalt: 'Brücke Nord erkunden lassen',
+    von: 'EL',
+    an: 'S2',
+  });
+  await seed(page, `${E}/etb/${quelle.id}/auftrag`, {
     auftrag_text: 'Erkundung Brücke Nord',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
   });
   await seed(page, `${E}/befehle`, { vorlage: 'befehl_ladef', titel: 'Befehl Brücke Nord' });
   const kanaele = (await (await page.request.get(`${E}/chat/kanaele`)).json()) as { id: number }[];
   await seed(page, `${E}/chat/kanaele/${kanaele[0].id}/nachrichten`, { inhalt: 'Funkprobe' });
+}
+
+/*
+ * Seite Aufträge im Muster „Liste + Detailpaneel“ (Change oxgob5gk, Spec
+ * `einsatztauglichkeit-layout`): Ziele sind die Tabs, Status-Segmente und Suchfeld beider Reiter,
+ * das Auswahlziel jeder Karte und die Handlungen und Sprünge des Detailpaneels. Die Karte selbst
+ * trägt keine Handlung mehr.
+ *
+ * antd hält den zuerst gezeigten Reiter im DOM, verborgen mit `aria-hidden`: gemessen wird im
+ * aktiven, und `getByRole` lässt den verborgenen aus.
+ */
+const aktiverReiter = (page: Page) => inMain(page).getByRole('tabpanel');
+const detail = (page: Page) => aktiverReiter(page).locator('[data-lfh="liste-detail-detail"]');
+/** Das Auswahlziel einer Karte: ein `<button>` über die ganze Kartenbreite. */
+const auswahlZiel = (name: RegExp) => (page: Page) =>
+  aktiverReiter(page).locator('[data-lfh="auswahl-ziel"]').and(page.getByRole('button', { name }));
+const imDetail = (name: RegExp) => (page: Page) => detail(page).getByRole('button', { name });
+/** Ein Sprung im Detail (LFH-616) ist ein Link mit Pfeil, kein Knopf. */
+const detailSprung = (name: RegExp) => (page: Page) =>
+  detail(page).locator('[data-lfh="inspector-sprung"]').and(page.getByRole('link', { name }));
+/** Das Suchfeld: gemessen wird die antd-Hülle (Feld samt Löschkreuz), nicht das innere `input`. */
+const suchfeld = (label: string) => (page: Page) =>
+  aktiverReiter(page)
+    .locator('.ant-input-affix-wrapper')
+    .filter({ has: page.getByRole('textbox', { name: label }) });
+const auftraegeTabs: Ziel = {
+  sorte: 'Aufträge Tabs',
+  ziele: (page) => inMain(page).locator('.ant-tabs-tab'),
+  mindestens: 2,
+};
+const auftraegeFilter: Ziel[] = [
+  {
+    sorte: 'Aufträge Status-Segmente',
+    ziele: segment(/^(Offen|Abgeschlossen) \(\d+\)$/),
+    mindestens: 2,
+  },
+  { sorte: 'Aufträge Suche', ziele: suchfeld('Aufträge durchsuchen'), mindestens: 1 },
+];
+const befehleFilter: Ziel[] = [
+  {
+    sorte: 'Befehle Status-Segmente',
+    ziele: segment(/^(Entwürfe|Freigegeben) \(\d+\)$/),
+    mindestens: 2,
+  },
+  { sorte: 'Befehle Suche', ziele: suchfeld('Befehle durchsuchen'), mindestens: 1 },
+];
+/** Vorbedingung: das Detail des gewählten Objekts steht. */
+const detailSteht = (text: string) => async (page: Page) => {
+  await expect(detail(page)).toContainText(text);
+};
+async function befehleReiter(page: Page) {
+  await inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }).click();
+  await expect(auswahlZiel(/^Befehl v1: Befehl Brücke Nord$/)(page)).toBeVisible();
+  await detailSteht('Befehlstext')(page);
 }
 
 function kommunikationFlaechen(einsatzId: string): Flaeche[] {
@@ -359,40 +422,49 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
     },
     {
       pfad: `${R}/auftraege`,
-      anker: (page) => inMain(page).getByText('Erkundung Brücke Nord').first(),
+      anker: auswahlZiel(/^Auftrag #\d+: Erkundung Brücke Nord$/),
+      // Ab lg ist der erste Auftrag vorgewählt; sein Detail steht rechts (Muster „Liste +
+      // Detailpaneel“, oxgob5gk).
+      vorbereiten: detailSteht('Erkundung Brücke Nord'),
       ziele: [
-        {
-          sorte: 'Aufträge Tabs',
-          ziele: (page) => inMain(page).locator('.ant-tabs-tab'),
-          mindestens: 2,
-        },
+        auftraegeTabs,
         { sorte: 'Auftrag erteilen', ziele: knopf('Auftrag erteilen'), mindestens: 1 },
+        ...auftraegeFilter,
         {
-          sorte: 'Auftrag Karte',
-          ziele: knopf(/^(Bearbeitung beginnen|Vollzug melden|Empfang für .* quittieren)$/),
-          mindestens: 3,
-        },
-        {
-          sorte: 'Auftragsdetails',
-          ziele: (page) => inMain(page).locator('.ant-collapse-header'),
+          sorte: 'Auftrag Auswahlziel',
+          ziele: auswahlZiel(/^Auftrag #\d+: /),
           mindestens: 1,
         },
+        {
+          sorte: 'Auftrag Detail Handlungen',
+          ziele: imDetail(/^(Bearbeitung beginnen|Vollzug melden|Empfang für .* quittieren)$/),
+          mindestens: 3,
+        },
+        { sorte: 'Auftrag Detail Sprung', ziele: detailSprung(/^ETB-Eintrag/), mindestens: 1 },
       ],
     },
     {
       pfad: `${R}/auftraege`,
       anker: (page) => inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }),
-      vorbereiten: async (page) => {
-        await inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }).click();
-        await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
-      },
+      vorbereiten: befehleReiter,
       ziele: [
         { sorte: 'Befehl entwerfen', ziele: knopf('Befehl entwerfen'), mindestens: 1 },
+        ...befehleFilter,
         {
-          sorte: 'Befehl Karte',
-          ziele: (page) => inMain(page).getByRole('link', { name: 'Befehl Brücke Nord' }),
+          sorte: 'Befehl Auswahlziel',
+          ziele: auswahlZiel(/^Befehl v1: Befehl Brücke Nord$/),
           mindestens: 1,
         },
+        {
+          // „Entwurf bearbeiten“ ist ein Link in Knopfgestalt (Strg+Klick öffnet einen Tab).
+          sorte: 'Befehl Detail Handlungen',
+          ziele: (page) =>
+            detail(page)
+              .getByRole('link', { name: 'Entwurf bearbeiten', exact: true })
+              .or(detail(page).getByRole('button', { name: 'Freigeben', exact: true })),
+          mindestens: 2,
+        },
+        { sorte: 'Befehl Detail Sprung', ziele: detailSprung(/^Vollansicht/), mindestens: 1 },
       ],
     },
     {
@@ -447,35 +519,34 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
     },
     {
       pfad: `${R}/auftraege`,
-      anker: (page) => inMain(page).getByText('Erkundung Brücke Nord').first(),
-      fehlt: knopf('Auftrag erteilen'),
+      anker: auswahlZiel(/^Auftrag #\d+: Erkundung Brücke Nord$/),
+      vorbereiten: detailSteht('Erkundung Brücke Nord'),
+      // Ohne Schreibrecht weder Erfassen noch eine Handlung im Detail (Spec `auftraege-befehle`,
+      // „Ohne Schreibrecht“); Empfänger, Verlauf und Sprung bleiben.
+      fehlt: knopf(/^(Auftrag erteilen|Bearbeitung beginnen|Vollzug melden|Empfang für .*)$/),
       ziele: [
-        {
-          sorte: 'Aufträge Tabs',
-          ziele: (page) => inMain(page).locator('.ant-tabs-tab'),
-          mindestens: 2,
-        },
-        {
-          sorte: 'Auftragsdetails',
-          ziele: (page) => inMain(page).locator('.ant-collapse-header'),
-          mindestens: 1,
-        },
+        auftraegeTabs,
+        ...auftraegeFilter,
+        { sorte: 'Auftrag Auswahlziel', ziele: auswahlZiel(/^Auftrag #\d+: /), mindestens: 1 },
+        { sorte: 'Auftrag Detail Sprung', ziele: detailSprung(/^ETB-Eintrag/), mindestens: 1 },
       ],
     },
     {
       pfad: `${R}/auftraege`,
       anker: (page) => inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }),
-      vorbereiten: async (page) => {
-        await inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }).click();
-        await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
-      },
-      fehlt: knopf('Befehl entwerfen'),
+      vorbereiten: befehleReiter,
+      fehlt: (page) =>
+        inMain(page)
+          .getByRole('button', { name: /^(Befehl entwerfen|Freigeben|Fortschreiben)$/ })
+          .or(inMain(page).getByRole('link', { name: 'Entwurf bearbeiten' })),
       ziele: [
+        ...befehleFilter,
         {
-          sorte: 'Befehl Karte',
-          ziele: (page) => inMain(page).getByRole('link', { name: 'Befehl Brücke Nord' }),
+          sorte: 'Befehl Auswahlziel',
+          ziele: auswahlZiel(/^Befehl v1: Befehl Brücke Nord$/),
           mindestens: 1,
         },
+        { sorte: 'Befehl Detail Sprung', ziele: detailSprung(/^Vollansicht/), mindestens: 1 },
       ],
     },
     {
@@ -486,6 +557,54 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
       // Die Eingabe weicht dem Hinweis; der Zweig wird als Vorbedingung belegt, ein eigenes
       // Bedienziel bleibt im Nachrichtenbereich nicht.
       ziele: [],
+    },
+  ]);
+});
+
+/*
+ * Liste und Detail der Aufträge auf dem Handschirm (oxgob5gk, Spec `einsatztauglichkeit-layout`,
+ * „Liste und Detail der Aufträge im Handschuh-Betrieb“): unter lg ist nichts vorgewählt, die Wahl
+ * klappt das Detail unter der Karte auf. Gemessen wird erst, wenn es aufgeklappt steht; die
+ * Gegenprobe in `kompakt` belegt, dass die Stufe durchschlägt.
+ */
+test('C8 · Aufträge auf dem Handschirm: Auswahlziel und Detailknöpfe halten 72 px, kompakt bleibt kleiner', async ({
+  page,
+}) => {
+  await page.setViewportSize(HANDSCHIRM);
+  const einsatzId = await einsatzAnlegen(page, `E2E oxgob5gk Handschirm ${Date.now()}`);
+  const E = `/api/einsaetze/${einsatzId}`;
+  for (const auftrag_text of ['Erkundung Brücke Nord', 'Absperrung Brücke Süd']) {
+    await seed(page, `${E}/auftraege`, {
+      auftrag_text,
+      empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
+    });
+  }
+  await messeFlaechen(page, [
+    {
+      pfad: `/einsaetze/${einsatzId}/auftraege`,
+      anker: auswahlZiel(/^Auftrag #\d+: Erkundung Brücke Nord$/),
+      vorbereiten: async (page) => {
+        // Vorbedingung: unter lg ist nichts vorgewählt, das Detail steht nicht.
+        await expect(detail(page)).toHaveCount(0);
+        const ziel = auswahlZiel(/^Auftrag #\d+: Erkundung Brücke Nord$/)(page);
+        await expect(ziel).toHaveAttribute('aria-expanded', 'false');
+        await ziel.click();
+        await expect(ziel).toHaveAttribute('aria-expanded', 'true');
+        await detailSteht('Quittung offen')(page);
+      },
+      ziele: [
+        { sorte: 'Handschirm Auswahlziel', ziele: auswahlZiel(/^Auftrag #\d+: /), mindestens: 2 },
+        {
+          sorte: 'Handschirm Quittieren',
+          ziele: imDetail(/^Empfang für .* quittieren$/),
+          mindestens: 1,
+        },
+        {
+          sorte: 'Handschirm Detail Handlungen',
+          ziele: imDetail(/^(Bearbeitung beginnen|Vollzug melden)$/),
+          mindestens: 2,
+        },
+      ],
     },
   ]);
 });

@@ -237,12 +237,15 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
   await expect(page.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  // Das Erfassungsformular aufgeklappt gemessen — die Fläche, die es im Betrieb gibt.
-  await page.getByRole('button', { name: /Auftrag erteilen/ }).click();
-  await expect(page.getByLabel('Auftrag / Was')).toBeVisible();
+  // Das Erfassungsformular offen gemessen — die Fläche, die es im Betrieb gibt. Seit oxgob5gk
+  // ein Dialog; die leere Liste trägt dieselbe Erfassen-Aktion, gemeint ist die im Bereichskopf
+  // (sie steht im DOM zuerst).
+  await page.getByRole('button', { name: 'Auftrag erteilen', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Auftrag erteilen' });
+  await expect(dialog.getByLabel('Auftrag / Was')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  await page.getByText(/Befehlsschema/).click();
-  await expect(page.getByLabel('Ort / Wo')).toBeVisible();
+  await dialog.getByText(/Befehlsschema/).click();
+  await expect(dialog.getByLabel('Ort / Wo')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });
