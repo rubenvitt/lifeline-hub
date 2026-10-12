@@ -441,3 +441,95 @@ async fn weg_berichtigen_nennt_ihn_im_etb() {
     assert_eq!(s, StatusCode::OK, "{j}");
     assert!(j["weg"].is_null());
 }
+
+async fn einheit(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/einheiten"),
+        cookie,
+        Some(&json!({ "name": name }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j}");
+    j["id"].as_i64().unwrap()
+}
+
+/// Inhalte der Anordnungen, die der ETB-Filter „Einheit“ liefert, älteste zuerst.
+async fn anordnungen_der_einheit(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    einheit_id: i64,
+) -> Vec<String> {
+    let (s, etb) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb?einheit_id={einheit_id}&typ=anordnung"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{etb}");
+    let mut v = inhalte(etb.as_array().unwrap());
+    v.reverse();
+    v
+}
+
+/// LLH-1175: ein ETB-Eintrag bleibt den Einheiten zugeordnet, an die er sich beim Schreiben
+/// richtete. Die Erteilung an Logistiktrupp und Sanitätszug steht nach dem Umstellen auf die
+/// Bergungsgruppe weiter unter beiden und nicht unter der Bergungsgruppe; die Anordnung
+/// „… geändert: Empfänger …“ steht unter dem alten und dem neuen Kreis. Zwei alte Empfänger,
+/// damit das „An“-Feld („Logistiktrupp, Sanitätszug“) allein keinen Treffer liefert.
+#[tokio::test]
+async fn einheitenfilter_ordnet_nach_den_empfaengern_beim_schreiben() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let logistik = einheit(&app, &admin, e, "Logistiktrupp").await;
+    let sani = einheit(&app, &admin, e, "Sanitätszug").await;
+    let bergung = einheit(&app, &admin, e, "Bergungsgruppe").await;
+    let an = |id: i64| json!({ "empfaenger_typ": "einheit", "einheit_id": id });
+    let aid = erteilen(
+        &app,
+        &admin,
+        e,
+        json!({ "auftrag_text": "Sandsäcke zum Deich bringen", "empfaenger": [an(logistik), an(sani)] }),
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": [an(bergung)] })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+
+    let erteilung = "Sandsäcke zum Deich bringen".to_string();
+    let geaendert =
+        "Auftrag #1 geändert: Empfänger Bergungsgruppe (vorher Logistiktrupp, Sanitätszug)."
+            .to_string();
+    for alt in [logistik, sani] {
+        assert_eq!(
+            anordnungen_der_einheit(&app, &admin, e, alt).await,
+            vec![erteilung.clone(), geaendert.clone()],
+            "alter Empfänger {alt}"
+        );
+    }
+    assert_eq!(
+        anordnungen_der_einheit(&app, &admin, e, bergung).await,
+        vec![geaendert.clone()],
+        "der neue Empfänger bekommt die Erteilung nicht nachträglich"
+    );
+
+    // Eine Anordnung nach der Berichtigung richtet sich nur noch an den neuen Kreis.
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "prioritaet": "sofort" })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    let prio = "Auftrag #1 geändert: Priorität sofort (vorher normal).".to_string();
+    assert_eq!(
+        anordnungen_der_einheit(&app, &admin, e, bergung).await,
+        vec![geaendert.clone(), prio]
+    );
+    assert_eq!(
+        anordnungen_der_einheit(&app, &admin, e, logistik).await,
+        vec![erteilung, geaendert]
+    );
+}

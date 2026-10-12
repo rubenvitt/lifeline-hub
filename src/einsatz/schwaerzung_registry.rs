@@ -2169,6 +2169,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[retain("eintrag_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
+        // Junction (LLH-1175): die Einheiten, an die sich ein Auftragseintrag beim Schreiben
+        // richtete, für den ETB-Filter „Einheit“. Nur Verweise, kein Klartext; die Einsatz-
+        // Löschung räumt über `etb_eintrag` ab (ON DELETE CASCADE).
+        tabelle: "etb_eintrag_einheit",
+        scoping: Scoping::UeberParent {
+            fk: "eintrag_id",
+            parent: "etb_eintrag",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[retain("eintrag_id", G_FK), retain("einheit_id", G_FK)],
+    },
+    TabellenRegel {
         tabelle: "erinnerung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,

@@ -417,3 +417,101 @@ async fn feldfehler_am_vollzug_bleiben_400_auch_wenn_aufgehoben() {
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: 400 vor 422");
     }
 }
+
+/// Meldung → Auftrag erteilen → Auftrag aufheben → an der Meldung erneut erteilen (LLH-1177):
+/// die Meldung meldet das Aufheben live, zeigt `is_auftrag_aufgehoben` und nimmt einen neuen Auftrag
+/// an, der den Rückverweis übernimmt. Der alte bleibt aufgehoben bestehen.
+#[tokio::test]
+async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let meldung = serde_json::json!({
+        "absender": "Florian Nord 1",
+        "meldeweg": "funk",
+        "inhalt": "Deich instabil",
+        "ereigniszeit": "2026-06-12 09:00:00"
+    })
+    .to_string();
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&meldung),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    let mid = m["id"].as_i64().unwrap();
+    let auftrag = |text: &str| {
+        serde_json::json!({
+            "auftrag_text": text,
+            "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "S3" }]
+        })
+        .to_string()
+    };
+    let erteilen_pfad = format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag");
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &erteilen_pfad,
+        &admin,
+        Some(&auftrag("erster")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let erster = json["auftrag_id"].as_i64().unwrap();
+    assert_eq!(json["is_auftrag_aufgehoben"], false);
+
+    let mut rx = live.abonniere(e);
+    let (s, json) = aufheben(&app, &admin, e, erster, &grund("Lage erledigt")).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    recv_until_tag(&mut rx, "meldung", Duration::from_secs(1)).await;
+
+    let (s, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/meldungen/{mid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["auftrag_id"], erster);
+    assert_eq!(json["is_auftrag_aufgehoben"], true);
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &erteilen_pfad,
+        &admin,
+        Some(&auftrag("zweiter")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let zweiter = json["auftrag_id"].as_i64().unwrap();
+    assert_ne!(zweiter, erster, "die Meldung zeigt auf den neuen Auftrag");
+    assert_eq!(json["is_auftrag_aufgehoben"], false);
+
+    let (_, alt) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{erster}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(alt["bearbeitungsstatus"], "aufgehoben", "{alt}");
+
+    // Der neue Auftrag gilt: eine dritte Erteilung bleibt 409.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &erteilen_pfad,
+        &admin,
+        Some(&auftrag("dritter")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}

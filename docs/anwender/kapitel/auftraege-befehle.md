@@ -113,7 +113,8 @@ Für Einsatzleitung und Führungspersonal, solange der Auftrag nicht abgenommen 
 
 Der Auftrag steht danach unter „Abgeschlossen“ mit dem Etikett „Aufgehoben“; gewählt zeigt er
 Zeit, Person und Grund. Quittungen werden nicht mehr erwartet; Quittieren, Vollzug und Abnahme sind nicht
-mehr möglich. Das Aufheben lässt sich nicht zurücknehmen.
+mehr möglich. Das Aufheben lässt sich nicht zurücknehmen. Kam der Auftrag aus einer Meldung, lässt
+sich aus ihr wieder ein Auftrag erteilen (siehe [Meldungen](meldungen.md)).
 
 ### Einen Einsatzbefehl entwerfen
 
@@ -198,6 +199,11 @@ automatischen Einträgen: „Auftrag #4 aufgehoben: Lage hat sich erledigt“ bz
 geändert: …“ mit neuem und vorherigem Wert, etwa „Frist 12.10. 16:00 (vorher 12.10. 15:00)“.
 Die Felder des Befehlsschemas erscheinen dort nur mit ihrem Namen. Die ursprüngliche Anordnung
 bleibt unverändert stehen.
+
+Der Filter nach Einheit im ETB zeigt einen Eintrag zum Auftrag bei den Einheiten, an die er sich
+beim Schreiben richtete. Werden die Empfänger berichtigt, bleibt die ursprüngliche Anordnung bei
+den bisherigen Einheiten; die Anordnung „Auftrag #4 geändert: Empfänger …“ steht bei den bisherigen
+und den neuen.
 
 Aufträge lassen sich auch direkt aus einem ETB-Eintrag oder einer Meldung erteilen (siehe
 [Einsatztagebuch](einsatztagebuch.md) und [Meldungen](meldungen.md)). Ein Auftrag aus einem
