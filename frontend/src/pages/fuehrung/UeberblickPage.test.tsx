@@ -1376,5 +1376,4 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
       expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/lagebesprechung'),
     );
   });
-
 });

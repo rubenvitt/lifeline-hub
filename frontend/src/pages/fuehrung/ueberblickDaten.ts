@@ -45,7 +45,10 @@ import {
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
 import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
-import { dauerText, lagebesprechungUeberfaellig } from '../../lagebesprechung/lagebesprechungZustand';
+import {
+  dauerText,
+  lagebesprechungUeberfaellig,
+} from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
