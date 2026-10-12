@@ -93,10 +93,12 @@ brauchen ihren Weg nur wegen des Multipart-Uploads.
 
 ### D3 Prüfung und Snapshot aus dem Auftrag wiederverwenden, mit eingeschränkter Typmenge
 
-`auftrag::eingabe::validiere_empfaenger_liste` und `pruefe_empfaenger_zahl` werden
-`pub(crate)`. Sie nehmen die erlaubten Typen als Parameter, beim Auftrag alle sechs, beim
-Verteiler vier, und eine Pflicht-Angabe (beim Auftrag ja, beim Verteiler nein). Aus
-`auftrag::repo` wird `snap_anzeige_fuer` `pub(crate)`. Die Grenzen bleiben dieselben Konstanten
+Neben die Prüfung des Auftrags tritt `auftrag::eingabe::validiere_verteiler` (`pub(crate)`). Sie
+prüft vor jeder Abfrage die Zahl (höchstens `EMPFAENGER_MAX`, leer erlaubt) und lehnt Person und
+Fahrzeug ab (400). Danach ruft sie dieselbe `validiere_empfaenger_liste` wie der Auftrag. Der
+Auftrag bleibt dabei unverändert. Aus `auftrag::repo` wird `snap_anzeige_fuer` `pub(crate)`.
+(Ursprünglich geplant war ein Parameter für Typmenge und Pflicht. Die Hülle ist kleiner und lässt
+die Aufrufe des Auftrags unangetastet.) Die Grenzen bleiben dieselben Konstanten
 (`EMPFAENGER_MAX`, `EXTERN_BEZEICHNUNG_MAX`, `fuehrung::TEXT_MAX`). Sie bekommen im Spiegel
 eigene Namen für den Verteiler (`VERTEILER_MAX`, `VERTEILER_BEZEICHNUNG_MAX`) als Alias, damit
 das Frontend nicht `AUFTRAG_*` für Befehle benutzt.

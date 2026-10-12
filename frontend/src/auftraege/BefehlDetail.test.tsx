@@ -40,6 +40,7 @@ const anzeige = (k: BefehlKopf): BefehlAnzeige => ({
   ...k,
   aktualisiert_at: k.zeitstand,
   abschnitte: [{ schluessel: LAD.abschnitte[0].schluessel, text: 'Brand im Lager' }],
+  verteiler: [],
 });
 
 function Ort() {

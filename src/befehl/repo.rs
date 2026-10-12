@@ -30,6 +30,8 @@ pub struct BefehlAnzeige {
     pub freigegeben_von_name: Option<String>,
     pub freigegeben_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    /// An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist.
+    pub verteiler: Vec<crate::vorlagendokument::verteiler::VerteilerEintragAnzeige>,
 }
 
 impl From<Dokument<Abschnitt>> for BefehlAnzeige {
@@ -52,6 +54,7 @@ impl From<Dokument<Abschnitt>> for BefehlAnzeige {
             freigegeben_von_name: d.freigegeben_von_name,
             freigegeben_at: d.freigegeben_at,
             etb_eintrag_id: d.etb_eintrag_id,
+            verteiler: d.verteiler,
         }
     }
 }

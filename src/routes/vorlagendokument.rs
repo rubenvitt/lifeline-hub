@@ -4,6 +4,7 @@
 
 use crate::anhang;
 use crate::app::AppState;
+use crate::auftrag::eingabe::{validiere_verteiler, EmpfaengerEingabeReq};
 use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
@@ -17,6 +18,7 @@ use crate::vorlagendokument::anlage::{
     self, AnlageArt, DokumentAnlageAnzeige, NeueAnlage, ERLAUBTE_MIME_ANLAGE,
 };
 use crate::vorlagendokument::repo::{self as dok_repo, Patch};
+use crate::vorlagendokument::verteiler;
 use crate::vorlagendokument::{vorlage, Abschnittsart, Dokumentart, STATUS_ENTWURF};
 use crate::zeit::jetzt;
 use axum::extract::Multipart;
@@ -200,6 +202,8 @@ pub struct PatchBody<A> {
     pub titel: Option<String>,
     pub zeitstand: Option<String>,
     pub abschnitte: Option<Vec<A>>,
+    /// Ersetzt den Verteiler ganz (LLH-1172); fehlt = unverändert, leer = leeren.
+    pub verteiler: Option<Vec<EmpfaengerEingabeReq>>,
 }
 
 /// Nur solange Entwurf (sonst 422).
@@ -211,6 +215,16 @@ pub async fn aktualisieren<T: DokumentRoute>(
     body: PatchBody<T::Abschnitt>,
 ) -> Result<Json<T::Anzeige>, AppError> {
     fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
+
+    // Der Verteiler (LLH-1172) als Feld für sich vor dem Zusammenhang (400 vor 422): Art ohne
+    // Verteiler, Zahl, Typ und Textgrenzen vor der ersten Abfrage, dann Ziel im Einsatz.
+    let verteiler = match &body.verteiler {
+        Some(liste) => {
+            verteiler::tabelle::<T>()?;
+            Some(validiere_verteiler(&state.pool, einsatz_id, liste).await?)
+        }
+        None => None,
+    };
 
     let vorher = dok_repo::laden::<T>(&state.pool, einsatz_id, id).await?;
     if vorher.status != STATUS_ENTWURF {
@@ -238,6 +252,7 @@ pub async fn aktualisieren<T: DokumentRoute>(
             titel: titel.as_deref(),
             zeitstand: zeitstand.as_deref(),
             abschnitte: body.abschnitte.as_deref(),
+            verteiler: verteiler.as_deref(),
         },
     )
     .await?;

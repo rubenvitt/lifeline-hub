@@ -1,4 +1,4 @@
-//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl und Lagebericht: Entwurf aus einer festen
+//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl, Lagebericht und Pressemitteilung: Entwurf aus einer festen
 //! Vorlage, Freigabe als Snapshot ins ETB, Fortschreibung als neue Version.
 //!
 //! Die beiden Arten unterscheiden sich nur in den Werten von [`Dokumentart`] (Tabelle,
@@ -7,6 +7,7 @@
 
 pub mod anlage;
 pub mod repo;
+pub mod verteiler;
 
 use crate::error::AppError;
 use serde::de::DeserializeOwned;
@@ -64,6 +65,8 @@ pub trait Dokumentart: Send + Sync + 'static {
     const IM_NOMEN: &'static str;
     /// Linker der Bild-Anlagen (LFH-1028); `None` = die Art trägt keine Anlagen.
     const ANLAGEN: Option<&'static anlage::AnlagenTabelle> = None;
+    /// Verteiler-Tabelle (LLH-1172); `None` = die Art trägt keinen Verteiler.
+    const VERTEILER: Option<&'static verteiler::VerteilerTabelle> = None;
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

@@ -1901,6 +1901,52 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // Verteiler (LLH-1172): wie `auftrag_empfaenger`, ohne Person und Fahrzeug. Die
+        // Klartexte stehen zusätzlich verkettet in `etb_eintrag.an` und im Abschnitt „Verteiler“
+        // des Freigabe-Snapshots (`AUSNAHMEN_SYSTEM_ETB`).
+        tabelle: "befehl_verteiler",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("befehl_id", G_FK),
+            retain("reihenfolge", G_ZAEHLER),
+            retain("empfaenger_typ", G_ENUM),
+            retain("abschnitt_id", G_FK),
+            retain("einheit_id", G_FK),
+            retain("funktion", G_ENUM),
+            scrub("funktion_text", Strategie::NullSetzen, Z_EINSATZ),
+            retain("extern_kategorie", G_ENUM),
+            scrub("extern_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+        ],
+    },
+    TabellenRegel {
+        // Verteiler (LLH-1172): wie `auftrag_empfaenger`, ohne Person und Fahrzeug. Die
+        // Klartexte stehen zusätzlich verkettet in `etb_eintrag.an` und im Abschnitt „Verteiler“
+        // des Freigabe-Snapshots (`AUSNAHMEN_SYSTEM_ETB`).
+        tabelle: "lagebericht_verteiler",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("lagebericht_id", G_FK),
+            retain("reihenfolge", G_ZAEHLER),
+            retain("empfaenger_typ", G_ENUM),
+            retain("abschnitt_id", G_FK),
+            retain("einheit_id", G_FK),
+            retain("funktion", G_ENUM),
+            scrub("funktion_text", Strategie::NullSetzen, Z_EINSATZ),
+            retain("extern_kategorie", G_ENUM),
+            scrub("extern_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+        ],
+    },
+    TabellenRegel {
         tabelle: "lagebericht",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,

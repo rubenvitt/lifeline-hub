@@ -1694,7 +1694,8 @@
           "ersteller_id",
           "ersteller_name",
           "erstellt_at",
-          "aktualisiert_at"
+          "aktualisiert_at",
+          "verteiler"
         ],
         "properties": {
           "abschnitte": {
@@ -1759,6 +1760,13 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "verteiler": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerteilerEintragAnzeige"
+            },
+            "description": "An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist."
           },
           "vorgaenger_id": {
             "type": [
@@ -7483,7 +7491,8 @@
           "ersteller_id",
           "ersteller_name",
           "erstellt_at",
-          "aktualisiert_at"
+          "aktualisiert_at",
+          "verteiler"
         ],
         "properties": {
           "abschnitte": {
@@ -7548,6 +7557,13 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "verteiler": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerteilerEintragAnzeige"
+            },
+            "description": "An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist."
           },
           "vorgaenger_id": {
             "type": [
@@ -12871,6 +12887,78 @@
               "null"
             ],
             "description": "Die Version davor, nur wenn ein Versionswechsel stattfand."
+          }
+        }
+      },
+      "VerteilerEintragAnzeige": {
+        "type": "object",
+        "description": "Ein Eintrag des Verteilers auf dem Wire, in Verteiler-Reihenfolge.",
+        "required": [
+          "id",
+          "empfaenger_typ",
+          "snap_anzeige"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fehlt auch, wenn der Abschnitt inzwischen gelöscht ist; `snap_anzeige` bleibt."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "empfaenger_typ": {
+            "$ref": "#/components/schemas/EmpfaengerTyp",
+            "description": "`abschnitt`, `einheit`, `funktion` oder `extern`; Person und Fahrzeug kommen nicht vor."
+          },
+          "extern_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "extern_kategorie": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdressatKategorie"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "funktion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode; fehlt bei Freitext und anderen Empfängertypen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "funktion_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Freitext, oder die Bezeichnung bei Führungshilfspersonal und Fachberater."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "snap_anzeige": {
+            "type": "string",
+            "description": "Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person."
           }
         }
       },

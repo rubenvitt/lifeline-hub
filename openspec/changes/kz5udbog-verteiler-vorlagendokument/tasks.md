@@ -6,65 +6,65 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 
 ## 1. Backend: Tabellen und Haken (D1)
 
-- [ ] 1.1 Nummer prüfen mit `git fetch origin alpha && scripts/check-migrationen.sh`. Dann
+- [x] 1.1 Nummer prüfen mit `git fetch origin alpha && scripts/check-migrationen.sh`. Dann
   `migrations/0182_dokument_verteiler.sql` mit `befehl_verteiler` und `lagebericht_verteiler`
   nach D1 anlegen (CHECKs, FKs, `UNIQUE(<art>_id, reihenfolge)`, Index auf `einsatz_id`,
   Kopfkommentar mit LLH-1172 und dieser Change). Nachweis: `scripts/check-migrationen.sh` meldet
   keinen Konflikt, und `db::tests::migrationsnummern_sind_eindeutig` ist grün.
-- [ ] 1.2 `VerteilerTabelle` und `const VERTEILER` an `Dokumentart` anlegen, Befehl und
+- [x] 1.2 `VerteilerTabelle` und `const VERTEILER` an `Dokumentart` anlegen, Befehl und
   Lagebericht belegen ihn, die Pressemitteilung nicht. Nachweis: Der Repo-Test der `Fall`-Tabelle
   prüft die Belegung als Literal je Art.
-- [ ] 1.3 Schwärzung nach D6: `TABELLEN` in `src/einsatz/schwaerzung_registry.rs` um beide
+- [x] 1.3 Schwärzung nach D6: `TABELLEN` in `src/einsatz/schwaerzung_registry.rs` um beide
   Tabellen ergänzen. Nachweis: Die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, Guard
   2–5 und `jeder_personenverweis_ist_als_bezug_deklariert` sind grün. Gegenprobe: Ohne die
   Regel wird Guard 1 rot.
 
 ## 2. Backend: Prüfung, Speichern, Laden (D2, D3)
 
-- [ ] 2.1 Empfängerprüfung aus `src/auftrag/eingabe.rs` für eine Typmenge und eine
-  Pflicht-Angabe öffnen (`pub(crate)`), `snap_anzeige_fuer` aus `src/auftrag/repo.rs` ebenfalls.
-  Der Auftrag ruft sie mit allen sechs Typen und Pflicht auf. Nachweis: Die bestehenden
+- [x] 2.1 `validiere_verteiler` in `src/auftrag/eingabe.rs` (`pub(crate)`, Zahl und Person/Fahrzeug
+  vor der ersten Abfrage, dann `validiere_empfaenger_liste`), `snap_anzeige_fuer` aus
+  `src/auftrag/repo.rs` `pub(crate)` (design.md D3). Nachweis: Die bestehenden
   Auftragstests (`tests/auftrag*.rs`, `tests/eingabegrenzen_auftrag.rs`) sind unverändert grün.
-- [ ] 2.2 `src/vorlagendokument/verteiler.rs`: `VerteilerEintrag`/`VerteilerEintragAnzeige`
+- [x] 2.2 `src/vorlagendokument/verteiler.rs`: `VerteilerEintrag`/`VerteilerEintragAnzeige`
   (`ToSchema`), `laden_tx`, `ersetzen_tx` (löschen und mit Snapshot und Reihenfolge einfügen),
   `kopieren_tx`, `render_abschnitt`. Nachweis: Repo-Tests je Art: Ersetzen bewahrt die
   Reihenfolge, leert bei leerer Liste und lässt einen Snapshot nach `DELETE` des Abschnitts
   stehen. Der Snapshot einer besetzten Funktion lautet „S3 Einsatz“ ohne Personennamen.
-- [ ] 2.3 `Dokument<A>` um `verteiler` erweitern, `laden` liest ihn bei gesetztem Haken.
+- [x] 2.3 `Dokument<A>` um `verteiler` erweitern, `laden` liest ihn bei gesetztem Haken.
   `BefehlAnzeige` und `LageberichtAnzeige` tragen `verteiler`, die Pressemitteilung nicht.
   Nachweis: Integrationstest „Neuer Befehl hat leeren Verteiler“. Ein Test belegt, dass die
   Anzeige einer Pressemitteilung kein Feld `verteiler` hat.
-- [ ] 2.4 PATCH nach D2: `PatchBody.verteiler`, Prüfung mit Typmenge abschnitt, einheit,
+- [x] 2.4 PATCH nach D2: `PatchBody.verteiler`, Prüfung mit Typmenge abschnitt, einheit,
   funktion, extern und ohne Pflicht, alles in einem `write_retry!` (UPDATE mit Status-Guard,
   Ersetzen, Rücklesen). Eine Art ohne Haken antwortet bei gesetztem Feld mit 400. Nachweis: neue
   Datei `tests/dokument_verteiler.rs` mit `struct Art` für Befehl und Lagebericht (Muster
   `tests/dokument_anlage.rs`). Sie deckt jedes Szenario der Anforderungen „wird im Entwurf als
   Ganzes ersetzt“ und „Grenzen und Prüfung“ ab: Ersetzen, Feld fehlt, fremde Einheit → 400 und
   Titel unverändert, freigegeben → 422, 51 Einträge → 400, Doppelte zusammengeführt, Person →
-  400, Bezeichnung mit 201 Zeichen → 400. Mutationsprobe: Ohne die Transaktion zeigt der Test
-  „fremde Einheit“ einen geänderten Titel.
-- [ ] 2.5 Eingabegrenzen: `VERTEILER_MAX` und `VERTEILER_BEZEICHNUNG_MAX` als Alias in
+  400, Bezeichnung mit 201 Zeichen → 400. Mutationsprobe: Ohne `verteiler::kopieren_tx` im
+  Fortschreiben wird `fortschreiben_uebernimmt_den_verteiler_je_fassung` rot.
+- [x] 2.5 Eingabegrenzen: `VERTEILER_MAX` und `VERTEILER_BEZEICHNUNG_MAX` als Alias in
   `src/vorlagendokument/verteiler.rs`, gespiegelt in `api/eingabegrenzen.ts` und
   `tests/eingabegrenzen_spiegel.rs`. Nachweis: Der Spiegeltest ist grün.
 
 ## 3. Backend: Freigabe, ETB, Fortschreiben (D4, D5)
 
-- [ ] 3.1 `freigeben_tx`: Verteiler-Abschnitt nach den Anlagen, `an` = `kappe_an(namen)` oder
+- [x] 3.1 `freigeben_tx`: Verteiler-Abschnitt nach den Anlagen, `an` = `kappe_an(namen)` oder
   `None`. Nachweis: In `tests/dokument_verteiler.rs` sind `an` und Wortlaut mit Verteiler belegt,
   ebenso der lange Verteiler (≤ 500 Zeichen, „… und N weitere“, der Wortlaut nennt alle). Der
   byte-genaue Test `tests/befehl.rs` (ohne Verteiler) bleibt unverändert grün, und `an` lautet
   dort „System“.
-- [ ] 3.2 `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` um die drei Spalten je Art für
+- [x] 3.2 `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` um die drei Spalten je Art für
   `freigeben_tx` ergänzen (D6). Nachweis: `cargo test --test aufbewahrung_e2e` ist grün, und
   die Einträge stehen im Diff.
-- [ ] 3.3 `fortschreiben_tx` ruft `verteiler::kopieren_tx`. Nachweis: Ein Test belegt, dass
+- [x] 3.3 `fortschreiben_tx` ruft `verteiler::kopieren_tx`. Nachweis: Ein Test belegt, dass
   Fassung 2 den Verteiler trägt und dass Leeren in Fassung 2 Fassung 1 unverändert lässt.
-- [ ] 3.4 Schwärzungs-Ende-zu-Ende: Ein Einsatz mit Befehl, dessen Verteiler „ILS Musterstadt“
+- [x] 3.4 Schwärzungs-Ende-zu-Ende: Ein Einsatz mit Befehl, dessen Verteiler „ILS Musterstadt“
   nennt, wird geschwärzt. Nachweis: Kein Feld der Verteiler-Zeilen enthält den Text danach (Test
   im bestehenden Schwärzungstest-Muster).
-- [ ] 3.5 Demo-Import unverändert: `src/demo/import_tests.rs` und der Demo-Test „jedes ETB hat
+- [x] 3.5 Demo-Import unverändert: `src/demo/import_tests.rs` und der Demo-Test „jedes ETB hat
   Von/An“ bleiben grün. Nachweis: `cargo test demo` ist grün.
-- [ ] 3.6 Typ-Codegen: `scripts/check-typ-codegen.sh`, dazu `openapi.json` und
+- [x] 3.6 Typ-Codegen: `scripts/check-typ-codegen.sh`, dazu `openapi.json` und
   `types.generated.ts` committen. `BefehlPatch` in `api/befehle.ts` und den Lagebericht-Patch in
   `api/lageberichte.ts` um `verteiler?: NeuerEmpfaenger[]` ergänzen. Nachweis: Das Skript ist
   grün.

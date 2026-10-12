@@ -135,6 +135,7 @@ function bericht(p: Partial<LageberichtAnzeige>): LageberichtAnzeige {
     id: 1,
     einsatz_id: 1,
     vorlage: 'freitext',
+    verteiler: [],
     titel: 'Bericht',
     zeitstand: '2026-06-08 10:00:00',
     status: 'entwurf',
