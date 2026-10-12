@@ -28,7 +28,7 @@ export default function LagebesprechungZeile({
 }) {
   const { token } = theme.useToken();
   const jetzt = useUhr(30_000);
-  const gesperrt = istSprungGesperrt('lagebesprechung', freigaben);
+  const isGesperrt = istSprungGesperrt('lagebesprechung', freigaben);
   return (
     <Flex
       wrap
@@ -48,7 +48,7 @@ export default function LagebesprechungZeile({
         )}
         <StatusTag darstellung={lagebesprechungZustand(termin, jetzt)} />
       </Space>
-      <SprungKnopf to={lagebesprechungPfad(einsatzId)} gesperrt={gesperrt}>
+      <SprungKnopf to={lagebesprechungPfad(einsatzId)} gesperrt={isGesperrt}>
         Zur Lagebesprechung
       </SprungKnopf>
     </Flex>

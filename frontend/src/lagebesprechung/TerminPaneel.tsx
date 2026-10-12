@@ -56,8 +56,8 @@ export default function TerminPaneel({
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
     },
   });
-  const gesperrt = !darfSchreiben || stand == null || mutation.isPending;
-  const setze = (zeitpunkt: Dayjs | null) =>
+  const isGesperrt = !darfSchreiben || stand == null || mutation.isPending;
+  const setTermin = (zeitpunkt: Dayjs | null) =>
     mutation.mutate(zeitpunkt ? alsBackendZeit(zeitpunkt) : null);
 
   return (
@@ -88,24 +88,24 @@ export default function TerminPaneel({
           {SCHNELLWAHL.map((s) => (
             <Button
               key={s.label}
-              disabled={gesperrt}
-              onClick={() => setze(schnellwahlTermin(serverJetzt(), s.minuten))}
+              disabled={isGesperrt}
+              onClick={() => setTermin(schnellwahlTermin(serverJetzt(), s.minuten))}
             >
               {s.label}
             </Button>
           ))}
-          <Button disabled={gesperrt || !termin} onClick={() => setze(null)}>
+          <Button disabled={isGesperrt || !termin} onClick={() => setTermin(null)}>
             kein Termin
           </Button>
           <ZeitpunktEingabe
             aria-label="Termin wählen"
             placeholder="Termin wählen"
             format="YYYY-MM-DD HH:mm"
-            disabled={gesperrt}
+            disabled={isGesperrt}
             value={terminZeitpunkt(termin)}
             // Das Löschkreuz des Felds leert den Termin wie „kein Termin“.
             onChange={(zeitpunkt) => {
-              if (zeitpunkt || termin) setze(zeitpunkt);
+              if (zeitpunkt || termin) setTermin(zeitpunkt);
             }}
           />
         </Flex>

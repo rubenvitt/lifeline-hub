@@ -17,21 +17,21 @@ const ENTSCHLUSS_KURZ = 160;
 
 /** Entschluss gekürzt, mit Umschalter auf den vollen Wortlaut (Spec `lagebesprechung`, Verlauf). */
 function Entschluss({ text, nr }: { text: string; nr: number }) {
-  const [ganz, setGanz] = useState(false);
+  const [isGanz, setIsGanz] = useState(false);
   const kurz = kuerzeEntschluss(text, ENTSCHLUSS_KURZ);
-  const gekuerzt = kurz !== text.replace(/\s+/g, ' ').trim();
+  const isGekuerzt = kurz !== text.replace(/\s+/g, ' ').trim();
   return (
     <Flex vertical align="start">
-      <span style={{ whiteSpace: ganz ? 'pre-wrap' : undefined }}>{ganz ? text : kurz}</span>
-      {gekuerzt && (
+      <span style={{ whiteSpace: isGanz ? 'pre-wrap' : undefined }}>{isGanz ? text : kurz}</span>
+      {isGekuerzt && (
         <Button
           type="link"
-          aria-expanded={ganz}
-          aria-label={`Entschluss von Lagebesprechung Nr. ${nr} ${ganz ? 'kürzen' : 'ganz zeigen'}`}
-          onClick={() => setGanz((g) => !g)}
+          aria-expanded={isGanz}
+          aria-label={`Entschluss von Lagebesprechung Nr. ${nr} ${isGanz ? 'kürzen' : 'ganz zeigen'}`}
+          onClick={() => setIsGanz((g) => !g)}
           style={{ paddingInline: 0 }}
         >
-          {ganz ? 'kürzen' : 'ganz zeigen'}
+          {isGanz ? 'kürzen' : 'ganz zeigen'}
         </Button>
       )}
     </Flex>

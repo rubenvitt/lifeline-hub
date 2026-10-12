@@ -39,7 +39,7 @@ export default function LagebesprechungPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [abschlussOffen, setAbschlussOffen] = useState(false);
+  const [isAbschlussOffen, setIsAbschlussOffen] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -58,17 +58,17 @@ export default function LagebesprechungPage() {
   // Vor den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht, bevor
   // der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false.
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
-  const standDa = standQuery.data != null;
+  const hasStand = standQuery.data != null;
   // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden schickte
   // `naechste_at: null` und löschte ihn.
-  const abschlussErlaubt = darfSchreiben && standDa;
-  const oeffneAbschluss = useCallback(() => setAbschlussOffen(true), []);
+  const canAbschliessen = darfSchreiben && hasStand;
+  const openAbschluss = useCallback(() => setIsAbschlussOffen(true), []);
 
   // Fällt das Recht (oder der Stand) bei offener Maske weg, hängt der Render sie aus — der Merker
   // bliebe aber stehen, und kämen die Rechte zurück, stünde die Maske ungefragt wieder auf.
   useEffect(() => {
-    if (abschlussOffen && !abschlussErlaubt) setAbschlussOffen(false);
-  }, [abschlussOffen, abschlussErlaubt]);
+    if (isAbschlussOffen && !canAbschliessen) setIsAbschlussOffen(false);
+  }, [isAbschlussOffen, canAbschliessen]);
 
   // Schnellaktion: ?neu=1 öffnet den Abschluss (Kommandopalette). Das Literal
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` ordnet
@@ -77,7 +77,7 @@ export default function LagebesprechungPage() {
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading || standQuery.isLoading) return;
-    if (darfSchreiben && standDa) setAbschlussOffen(true);
+    if (darfSchreiben && hasStand) setIsAbschlussOffen(true);
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
   }, [
@@ -86,7 +86,7 @@ export default function LagebesprechungPage() {
     einsatzQuery.isLoading,
     standQuery.isLoading,
     darfSchreiben,
-    standDa,
+    hasStand,
   ]);
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -118,12 +118,12 @@ export default function LagebesprechungPage() {
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!abschlussErlaubt} onClick={oeffneAbschluss}>
+        <Button type="primary" disabled={!canAbschliessen} onClick={openAbschluss}>
           Lagebesprechung abschließen
         </Button>
       }
       // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
-      neueZeile={abschlussErlaubt ? oeffneAbschluss : undefined}
+      neueZeile={canAbschliessen ? openAbschluss : undefined}
       hinweis={
         !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
       }
@@ -163,14 +163,14 @@ export default function LagebesprechungPage() {
       {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
           Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
           dieser Seite — `<AntApp>` liegt außerhalb des Routers. */}
-      {abschlussOffen && darfSchreiben && standQuery.data && (
+      {isAbschlussOffen && darfSchreiben && standQuery.data && (
         <LagebesprechungModal
           einsatzId={einsatzId}
           stand={standQuery.data}
           onAbgeschlossen={(eigene) =>
             zeigeAbschlussToast(message, { einsatzId, eigene, navigate })
           }
-          onSchliessen={() => setAbschlussOffen(false)}
+          onSchliessen={() => setIsAbschlussOffen(false)}
         />
       )}
     </EinsatzSeite>
