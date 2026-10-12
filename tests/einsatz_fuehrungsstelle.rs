@@ -1169,6 +1169,56 @@ async fn entlassene_person_bleibt_mit_vermerk() {
     assert_eq!(el["personal_noch_disponiert"], false);
 }
 
+/// Das Entlassen feuert `personal`, das nur Leser mit Personal- oder Kartenrecht erreicht; die
+/// Führungsstelle liest jeder. Den Vermerk „nicht mehr disponiert“ trägt deshalb `einsatz`, wie
+/// beim Entlassen eines getragenen Fahrzeugs (LLH-1164).
+#[tokio::test]
+async fn entlassen_des_einsatzleiters_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Eine Stamm-Person ohne Einsatz, damit Stamm- und Dispositionskennung auseinanderfallen.
+    stammpersonal_anlegen(&app, &admin, "Carla Ohne").await;
+    let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Schulz").await;
+    let bernd = stammpersonal_disponieren(&app, &admin, einsatz, "Bernd Kurz").await;
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "personal", "personal_id": anna}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let mut rx = live.abonniere(einsatz);
+
+    let entlassen = |ep: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(entlassen(bernd).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        kopf_events(&mut rx),
+        0,
+        "kein Einsatzleiter, kein Kopf-Ereignis"
+    );
+    assert_eq!(entlassen(anna).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        kopf_events(&mut rx),
+        1,
+        "der Einsatzleiter ist nicht mehr disponiert"
+    );
+}
+
 #[tokio::test]
 async fn setzen_wechseln_leeren_schreibt_je_genau_einen_eintrag() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;

@@ -350,6 +350,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     eingang_at: '2026-10-04 09:30:00',
     etb_meldung_id: 8,
     auftrag_id: 3,
+    is_auftrag_aufgehoben: false,
     erfasst_von_id: 50,
     erstellt_at: '2026-10-04 09:30:00',
     lage_meldung_id: null,

@@ -27,6 +27,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7,
   auftrag_id: null,
+  is_auftrag_aufgehoben: false,
   erfasst_von_id: 1,
   erstellt_at: '2026-06-12 09:05:00',
   lage_meldung_id: null,
@@ -91,6 +92,36 @@ describe('MeldungKarte — Auftrags-Deeplink (F36/LFH-257)', () => {
   it('rendert ohne ausgelösten Auftrag keinen Auftrags-Deeplink', () => {
     renderKarte(<MeldungKarte meldung={meldung({ auftrag_id: null })} einsatzId={7} />);
     expect(screen.queryByRole('link', { name: /Auftrag/ })).toBeNull();
+  });
+});
+
+// LLH-1177: Ein aufgehobener Auftrag sperrt die Meldung nicht mehr; die Karte zeigt den Hinweis
+// statt des Bezugs und bietet „Auftrag erteilen“ wieder an.
+describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
+  it('zeigt „Auftrag aufgehoben“ statt des Deeplinks', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({ auftrag_id: 99, is_auftrag_aufgehoben: true })}
+        einsatzId={7}
+      />,
+    );
+    expect(screen.getByText('Auftrag aufgehoben')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Auftrag/ })).toBeNull();
+  });
+
+  it('bietet „Auftrag erteilen“ wieder an, solange der verknüpfte Auftrag aufgehoben ist', async () => {
+    const cb = { darfSchreiben: true, onAuftragErteilen: vi.fn() };
+    const m = meldung({ auftrag_id: 99, is_auftrag_aufgehoben: true });
+    renderKarte(<MeldungKarte meldung={m} einsatzId={7} {...cb} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    expect(cb.onAuftragErteilen).toHaveBeenCalledWith(m);
+  });
+
+  it('bietet „Auftrag erteilen“ nicht an, solange der verknüpfte Auftrag gilt', () => {
+    const cb = { darfSchreiben: true, onAuftragErteilen: vi.fn() };
+    renderKarte(<MeldungKarte meldung={meldung({ auftrag_id: 99 })} einsatzId={7} {...cb} />);
+    expect(screen.queryByRole('button', { name: /Auftrag erteilen/ })).toBeNull();
+    expect(screen.queryByText('Auftrag aufgehoben')).toBeNull();
   });
 });
 
