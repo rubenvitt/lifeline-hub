@@ -19,6 +19,8 @@ test.use({ viewport: FUEKW });
 const NORD = 'Umhang Nord';
 const SUED = 'Umhang Süd';
 const OST = 'Umhang Nord-Ost';
+const MITTE = 'Umhang Mitte';
+const WEST = 'Umhang West';
 
 async function seede(page: Page) {
   const einsatzId = await einsatzAnlegen(page, `E2E Umhängen ${Date.now()}`);
@@ -89,6 +91,61 @@ test('Gliederung: ein Abschnitt per Zeiger auf einen anderen wird sein Unterabsc
   await expect(page.getByRole('region', { name: `Abschnitt: ${SUED}` })).toBeVisible();
 
   await erwarteImOrganigramm(page, einsatzId, SUED, OST);
+});
+
+/**
+ * Nach einem Umhang klappt der neue Über-Abschnitt auf, und antds Baum zeichnet den verschobenen
+ * Knoten für die Animation ein zweites Mal. Teilten sich beide die dnd-kit-ID, nähme die Kopie beim
+ * Aushängen die Anmeldung des stehenden Knotens mit: sein Griff zöge nicht mehr (der Druck
+ * markierte Text), sein Ziel nähme nichts an.
+ *
+ * Mutationsprobe in `einsatzabschnitte/GliederungDrag.tsx`: `useInstanzId` liefert nur `basis` →
+ * der zweite Zug auf „Umhang West“ ändert nichts, der dritte startet nicht.
+ */
+test('Gliederung: der verschobene Abschnitt zieht wieder und nimmt selbst einen Zug an', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await anmelden(page);
+  // Süd hat keine Kinder, erst der Umhang klappt es auf; Mitte steht zwischen Süd und West, so
+  // rückt West in der Folge des Baums nach vorn (nur dann bleibt sein Knoten eingehängt).
+  const { einsatzId, nord, sued, ost } = await seede(page);
+  await post(page, einsatzId, 'abschnitte', { name: MITTE });
+  const west = await post(page, einsatzId, 'abschnitte', { name: WEST });
+  await oeffneGliederung(page, einsatzId);
+  // Erst nach der Aufklapp-Animation: die Kopie steht so lange neben dem Knoten. Der Toast kommt
+  // mit dem neuen Baum, der Server allein sagt nichts über die Anzeige.
+  const umgehaengt = async (text: string) => {
+    await expect(page.getByText(text)).toBeVisible();
+    await expect(page.locator('.ant-tree-treenode-motion')).toHaveCount(0);
+    await expect(griff(page, west)).toHaveCount(1);
+  };
+
+  await ziehe(page, griff(page, west), ziel(page, sued));
+  await umgehaengt(`„${WEST}“ unter „${SUED}“ verschoben`);
+  expect(await ueberAbschnitt(page, einsatzId, west)).toBe(sued);
+
+  // Der verschobene Abschnitt als Ziel.
+  await ziehe(page, griff(page, ost), ziel(page, west));
+  await umgehaengt(`„${OST}“ unter „${WEST}“ verschoben`);
+  expect(await ueberAbschnitt(page, einsatzId, ost)).toBe(west);
+
+  // Der verschobene Abschnitt als Zug, zurück auf die oberste Ebene. Die Wurzelzone steht nur
+  // während eines Zugs: ihr Erscheinen belegt, dass er begonnen hat.
+  const a = (await griff(page, west).boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 + 8, a.y + a.height / 2 + 8, { steps: 4 });
+  const wurzel = page.locator('[data-lfh="gliederung-wurzel"]');
+  await expect(wurzel).toBeVisible();
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  const w = (await wurzel.boundingBox())!;
+  await page.mouse.move(w.x + w.width / 2, w.y + w.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(() => ueberAbschnitt(page, einsatzId, west)).toBeNull();
+  // Nord-Ost hängt weiter unter West und zieht mit; Nord bleibt oben.
+  expect(await ueberAbschnitt(page, einsatzId, ost)).toBe(west);
+  expect(await ueberAbschnitt(page, einsatzId, nord)).toBeNull();
 });
 
 test('Gliederung: „Verschieben unter …“ hängt per Tastatur um und gibt den Fokus zurück', async ({

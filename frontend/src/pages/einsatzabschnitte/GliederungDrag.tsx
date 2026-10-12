@@ -1,5 +1,5 @@
 import { useDndContext, useDraggable, useDroppable, type Announcements } from '@dnd-kit/core';
-import type { CSSProperties, ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { IconMenue } from '../../icons';
@@ -54,6 +54,18 @@ export const DRAG_ANSAGEN: Announcements = {
 const dragKey = (d: DragDaten) => `drag-${d.art}-${d.id}`;
 const dropKey = (id: number | null) => (id === null ? 'ziel-wurzel' : `ziel-${id}`);
 
+/**
+ * Die dnd-kit-ID gilt je Instanz, nicht je Abschnitt. antds Baum (rc-tree) zeichnet beim
+ * Aufklappen die Kinder in einer Animationskopie, während der Knoten selbst eingehängt bleibt —
+ * nach einem Umhang klappt der neue Über-Abschnitt auf, und der verschobene Knoten steht kurz
+ * zweimal da. Unter derselben ID meldete sich die Kopie zuletzt an und nahm beim Aushängen die
+ * Anmeldung des stehenden Knotens mit: sein Griff zog nicht mehr (der Druck markierte Text), sein
+ * Ziel nahm nichts an. Wer gezogen wird und wohin, tragen `DragDaten` und `DropDaten`, nie die ID.
+ */
+function useInstanzId(basis: string): string {
+  return `${basis}${useId()}`;
+}
+
 /** Der laufende Zug, wenn einer läuft. */
 export function useActiveDrag(): DragDaten | null {
   const { active } = useDndContext();
@@ -87,8 +99,9 @@ function useDropStil(frei: boolean, darueber: boolean, laeuft: boolean): CSSProp
 /** Der Griff eines Abschnitts oder einer Einheit. */
 export function DragHandle({ daten }: { daten: DragDaten }) {
   const { token, rollen } = useRollen();
+  const id = useInstanzId(dragKey(daten));
   const { setNodeRef, setActivatorNodeRef, listeners, isDragging } = useDraggable({
-    id: dragKey(daten),
+    id,
     data: daten,
   });
   return (
@@ -111,6 +124,11 @@ export function DragHandle({ daten }: { daten: DragDaten }) {
         verticalAlign: 'middle',
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
+        // Ein Druck auf den Griff beginnt nie eine Textauswahl, auch nicht in den 5 px bis zum
+        // Zugbeginn oder als langer Druck auf dem Tablet.
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
         color: rollen.gedaempft,
       }}
     >
@@ -131,8 +149,9 @@ export function DropKnoten({
 }) {
   const drag = useActiveDrag();
   const frei = canDrop(drag, abschnitte, abschnitt.id);
+  const id = useInstanzId(dropKey(abschnitt.id));
   const { setNodeRef, isOver } = useDroppable({
-    id: dropKey(abschnitt.id),
+    id,
     data: { zielId: abschnitt.id, name: abschnitt.name } satisfies DropDaten,
     disabled: !frei,
   });
