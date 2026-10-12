@@ -19,7 +19,7 @@ const EINSATZ = {
   meine_rolle: 'beobachter',
 };
 
-function rendere(
+function renderPage(
   antwort: () => Response | Promise<Response>,
   pfad = '/einsaetze/5/auftraege/31/druck',
   client = neuerQueryClient(),
@@ -50,7 +50,7 @@ const kopf = () => document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')
 
 describe('AuftragDruckPage', () => {
   it('zeigt genau eine Druckwurzel mit sichtbarem Kopf „Auftrag #4“ und dem Blatt', async () => {
-    rendere(() => HttpResponse.json(druckAuftrag()));
+    renderPage(() => HttpResponse.json(druckAuftrag()));
     await fertig();
     const wurzeln = document.querySelectorAll('[data-lfh="druckwurzel"]');
     expect(wurzeln).toHaveLength(1);
@@ -58,7 +58,9 @@ describe('AuftragDruckPage', () => {
     expect(kopf()).toHaveTextContent('Auftrag');
     expect(kopf()).toHaveTextContent('#4');
     expect(kopf()).toHaveTextContent('Hochwasser Nord');
-    expect(kopf()).toHaveTextContent('Stand');
+    expect(kopf()).toHaveTextContent('E-2026-0005');
+    // Stand als taktische DTG des Abrufs, in der Zone der Organisation.
+    expect(kopf().textContent).toMatch(/Stand\s*\d{6}[A-Z]{3}\d{4}/);
     expect(
       within(wurzeln[0] as HTMLElement).getByRole('heading', { level: 3, name: 'Quittung' }),
     ).toBeInTheDocument();
@@ -68,7 +70,7 @@ describe('AuftragDruckPage', () => {
   it('sperrt „Drucken“, solange der Auftrag lädt', async () => {
     let freigeben!: () => void;
     const warten = new Promise<void>((r) => (freigeben = r));
-    rendere(async () => {
+    renderPage(async () => {
       await warten;
       return HttpResponse.json(druckAuftrag());
     });
@@ -81,7 +83,7 @@ describe('AuftragDruckPage', () => {
   it('ist ein Schnappschuss: das Ereignis `auftrag` ändert das Blatt nicht, „Neu laden“ schon', async () => {
     const client = neuerQueryClient();
     let stand: Auftrag = druckAuftrag({ empfaenger: [druckEmpfaenger(2, 'Logistiktrupp', null)] });
-    const abrufe = rendere(() => HttpResponse.json(stand), undefined, client);
+    const abrufe = renderPage(() => HttpResponse.json(stand), undefined, client);
     await fertig();
     expect(screen.getByText('nicht quittiert')).toBeInTheDocument();
 
@@ -97,24 +99,32 @@ describe('AuftragDruckPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neu laden' }));
     await waitFor(() => expect(screen.queryByText('nicht quittiert')).toBeNull());
     expect(abrufe.auftrag).toBe(2);
+    // Statt „nicht quittiert“ steht jetzt der Zeitpunkt der Quittung als DTG (Minute 15, die
+    // Stunde hängt an der Zone der Test-Umgebung).
+    const wert = screen.getByText('Logistiktrupp', { selector: 'dt' }).nextElementSibling;
+    expect(wert?.textContent).toMatch(/^11\d{2}15JUN2026$/);
   });
 
   it('unbekannter Auftrag: „nicht gefunden“ mit Rückweg, kein Druck', async () => {
-    rendere(() => HttpResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 }));
+    renderPage(() => HttpResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 }));
     expect(await screen.findByText('Auftrag nicht gefunden')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Zurück zu Aufträge/Befehle' })).toHaveAttribute(
+      'href',
+      '/einsaetze/5/auftraege?auftrag=31',
+    );
     expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
     expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
   });
 
   it('ohne Zugriff (403): „Kein Zugriff“, kein Druck', async () => {
-    rendere(() => HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 }));
+    renderPage(() => HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 }));
     expect(await screen.findByText('Kein Zugriff auf die Aufträge')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
   });
 
   it('anderer Fehler: Grund mit „Erneut laden“', async () => {
     let fehler = true;
-    rendere(() =>
+    renderPage(() =>
       fehler
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(druckAuftrag()),
@@ -126,7 +136,7 @@ describe('AuftragDruckPage', () => {
   });
 
   it('„Zurück zu Aufträge/Befehle“ führt auf die Liste mit diesem Auftrag gewählt', async () => {
-    rendere(() => HttpResponse.json(druckAuftrag()));
+    renderPage(() => HttpResponse.json(druckAuftrag()));
     await fertig();
     const zurueck = screen.getByRole('link', { name: 'Zurück zu Aufträge/Befehle' });
     expect(zurueck).toHaveAttribute('href', '/einsaetze/5/auftraege?auftrag=31');
@@ -135,7 +145,7 @@ describe('AuftragDruckPage', () => {
   });
 
   it('ungültige Auftrags-ID führt auf die Liste', async () => {
-    rendere(() => HttpResponse.json(druckAuftrag()), '/einsaetze/5/auftraege/abc/druck');
+    renderPage(() => HttpResponse.json(druckAuftrag()), '/einsaetze/5/auftraege/abc/druck');
     expect(await screen.findByText('Aufträge-Liste')).toBeInTheDocument();
   });
 });

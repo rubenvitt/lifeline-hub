@@ -4,14 +4,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeilenListe, type Titel, type Zeile } from '../druck/ZeilenListe';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { AUFTRAG_STATUS } from '../kommunikation';
-import { druckFelder } from './auftragsschemaKern';
-
-/** Nur gesetzte Angaben; ein Wert aus Leerzeichen fällt weg wie ein leerer. */
-function gesetzt(zeilen: { etikett: string; wert: string | null | undefined }[]): Zeile[] {
-  return zeilen.flatMap(({ etikett, wert }) =>
-    typeof wert === 'string' && wert.trim() !== '' ? [{ etikett, wert }] : [],
-  );
-}
+import { dropEmpty, druckFelder } from './auftragsschemaKern';
 
 /**
  * Das Blatt eines Einzelauftrags (LLH-1171, Spec `druck-dokumente`, Change
@@ -41,7 +34,7 @@ export default function AuftragDruckBlatt({ auftrag: a }: { auftrag: Auftrag }) 
     wert: e.quittiert_at ? formatZeit(e.quittiert_at) : 'nicht quittiert',
   }));
 
-  const bearbeitung = gesetzt([
+  const bearbeitung = dropEmpty([
     {
       etikett: 'Phase',
       wert: (AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen).label,

@@ -62,7 +62,7 @@ export default function AuftragDruckPage() {
   }
   const einsatz = einsatzQuery.data;
   const status = druckQuery.error instanceof ApiError ? druckQuery.error.status : null;
-  const ohneDruck = status === 403 || status === 404;
+  const isOhneDruck = status === 403 || status === 404;
   const auftrag = druckQuery.data;
   const modul = modulName('auftraege');
   const zurueck = auftraegePfad(einsatzId, { auftrag: auftragId });
@@ -94,12 +94,12 @@ export default function AuftragDruckPage() {
           >
             {`Zurück zu ${modul}`}
           </Button>
-          {!ohneDruck && (
+          {!isOhneDruck && (
             <Button onClick={() => void druckQuery.refetch()} disabled={druckQuery.isFetching}>
               Neu laden
             </Button>
           )}
-          {!ohneDruck && (
+          {!isOhneDruck && (
             <DruckKnopf typ="primary" gesperrt={!druckQuery.isSuccess || druckQuery.isFetching} />
           )}
         </>

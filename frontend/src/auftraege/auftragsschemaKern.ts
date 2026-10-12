@@ -89,6 +89,15 @@ export function klappteilFuer(feld: string): Klappteil | null {
   return null;
 }
 
+/** Nur die gesetzten Angaben; ein Wert aus Leerzeichen fällt weg wie ein leerer. */
+export function dropEmpty(
+  angaben: { etikett: string; wert: string | null | undefined }[],
+): { etikett: string; wert: string }[] {
+  return angaben.flatMap(({ etikett, wert }) =>
+    typeof wert === 'string' && wert.trim() !== '' ? [{ etikett, wert }] : [],
+  );
+}
+
 /** Etiketten der externen Stellen; das Formular bietet sie in dieser Folge an. */
 export const EXTERN_KATEGORIE_LABEL: Record<AdressatKategorie, string> = {
   leitstelle: 'Leitstelle',
@@ -133,7 +142,5 @@ export function druckFelder(
     { etikett: 'Richtung', wert: richtungText(a) },
     { etikett: 'Erteilt am', wert: formatZeit(a.erteilt_at) },
   ];
-  return felder.flatMap(({ etikett, wert }) =>
-    typeof wert === 'string' && wert.trim() !== '' ? [{ etikett, wert }] : [],
-  );
+  return dropEmpty(felder);
 }
