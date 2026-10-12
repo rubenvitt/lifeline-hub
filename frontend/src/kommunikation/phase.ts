@@ -104,6 +104,8 @@ export const MELDUNG_HANDLUNG: Record<string, string> = {
 
 export const AUFTRAG_HANDLUNG: Record<string, string> = {
   in_arbeit: 'Bearbeitung beginnen',
+  // Rot und mit Rückfrage (LLH-1098); das Etikett danach sagt „Aufgehoben“.
+  aufgehoben: 'Auftrag aufheben',
 };
 
 export const NACHFORDERUNG_HANDLUNG: Record<string, string> = {

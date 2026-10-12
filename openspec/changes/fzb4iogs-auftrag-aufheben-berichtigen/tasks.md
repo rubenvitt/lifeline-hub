@@ -99,38 +99,40 @@ relativ zu `frontend/src/`.
 
 ## 5. Frontend: Aufheben (D9)
 
-- [ ] 5.1 Test zuerst in `auftraege/AuftragAufhebenDialog.test.tsx` und
-  `pages/AuftraegePage.test.tsx`. Abgedeckt sind:
+- [x] 5.1 Test zuerst in `pages/AuftraegePage.test.tsx` (der Dialog über die Seite, Block
+  „Aufheben (LLH-1098)“). Abgedeckt sind:
   - Menüeintrag „Auftrag aufheben“ rot hinter dem Trenner, nur mit Schreibrecht.
   - Der Dialog verlangt einen Grund und sendet `{ grund }`.
   - Der Bestätigungsknopf heißt „Auftrag aufheben“.
   - Der Fehler steht im Dialog, und der Dialog bleibt offen; es gibt keinen Rückgängig-Toast.
   - Die Karte steht danach unter „Abgeschlossen“ mit „Aufgehoben“, Grund, Zeit und Name.
   - Ein abgenommener Auftrag hat keinen Eintrag.
+  - „In Bearbeitung“: zwei Aktionen, „Auftrag aufheben“ als roter Knopf neben „Vollzug melden“.
 
   Nachweis: rot belegt.
-- [ ] 5.2 `hebeAuf` in `api/auftraege.ts` (neben `nimmAb`), den Dialog, `MenueAusloeser` an
+- [x] 5.2 `hebeAuf` in `api/auftraege.ts` (neben `nimmAb`), den Dialog, `MenueAusloeser` an
   `AuftragKarte` und die Mutation in `AuftraegeListe` umsetzen (Invalidierung `auftraege` samt
   `modulZaehler`). Nachweis: 5.1 grün, `rueckfrage.guard.test.ts` grün,
   `e2e/knopf-wortlaut.spec.ts` unverändert grün.
 
 ## 6. Frontend: Berichtigen (D9)
 
-- [ ] 6.1 Test zuerst in `auftraege/AuftragFormular.test.tsx` und `pages/AuftraegePage.test.tsx`.
-  Abgedeckt sind:
+- [x] 6.1 Test zuerst in `auftraege/auftragBerichtigungKern.test.ts` (Vorbelegung, Patch),
+  `auftraege/AuftragFormular.test.tsx` und `pages/AuftraegePage.test.tsx`. Abgedeckt sind:
   - „Berichtigen“ öffnet das Formular vorbelegt mit dem Titel „Auftrag #4 berichtigen“.
   - Eine geänderte Frist sendet nur `frist_at`; ohne Änderung wird nichts gesendet.
   - Ein geleertes Schemafeld sendet `null`.
   - Der Knopf heißt „Berichtigung speichern“.
-  - Bei `berichtigbar = false` ist der Eintrag gesperrt mit dem Grund „Schon quittiert, nur noch
-    aufheben“.
+  - Bei `berichtigbar = false` ist der Eintrag gesperrt: „Berichtigen (schon quittiert)“.
+  - Ein nicht eingehängtes (eingeklapptes) Feld gilt als unverändert.
   - Eine Live-Aktualisierung überschreibt die Eingabe nicht.
   - Der Fehler steht am Formular.
 
   Nachweis: rot belegt.
-- [ ] 6.2 Modus `berichtigen` in `AuftragFormular` (Vorbelegung, Patch-Bildung als reine
-  Funktion), `patcheAuftrag` in `api/auftraege.ts` und die Einbindung in `AuftraegeListe`
-  umsetzen. Nachweis: 6.1 grün, `pnpm lint` und `tsc` grün.
+- [x] 6.2 Modus `berichtigen` in `AuftragFormular` (Vorbelegung und Patch-Bildung als reine
+  Funktionen in `auftragBerichtigungKern.ts`, Formularwerte und Empfänger-Umsetzung dafür nach
+  `auftragFormularKern.ts` gelöst), `patcheAuftrag` in `api/auftraege.ts` und die Einbindung in
+  `AuftraegeListe` umsetzen. Nachweis: 6.1 grün, `pnpm lint` und `tsc` grün.
 
 ## 7. Doku
 

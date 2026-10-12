@@ -226,8 +226,9 @@ phase: 'abgeschlossen', ton: 'neutral' }`. Die Phase bleibt `abgeschlossen`, dam
 - „Berichtigen“ und „Auftrag aufheben“ kommen hinter den `MenueAusloeser`. „Auftrag aufheben“
   steht mit `gefahr: true` hinter dem Trenner. Vorbild ist `meldungen/MeldungKarte.tsx`; die Regel
   LFH-365/683 verlangt den Auslöser ab drei Aktionen.
-- „Berichtigen“ steht bei `berichtigbar = false` gesperrt mit Grund „Schon quittiert, nur noch
-  aufheben“ (LFH-966). Bei abgeschlossenen Aufträgen fehlt es.
+- „Berichtigen“ steht bei `berichtigbar = false` gesperrt mit dem Grund im Etikett: „Berichtigen
+  (schon quittiert)“ (LFH-966, Muster „Auftrag erteilen (keine Berechtigung)“ an der Meldung). Bei
+  abgeschlossenen Aufträgen und im Status „in Arbeit“ fehlt es.
 
 **Rückfrage:** Neu ist `auftraege/AuftragAufhebenDialog.tsx`.
 

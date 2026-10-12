@@ -36,6 +36,8 @@ const legeAuftragAn = vi.fn();
 const quittiereEmpfaenger = vi.fn();
 const setzeVollzug = vi.fn();
 const nimmAb = vi.fn();
+const hebeAuf = vi.fn();
+const patcheAuftrag = vi.fn();
 // Phase, Seiten und Kennzahlen leitet die Attrappe aus der Vollliste ab (LFH-1071).
 vi.mock('../api/auftraege', async () => ({
   ...(await import('../test/auftraegeAttrappe')).auftraegeLeseAttrappe((...a) =>
@@ -45,6 +47,8 @@ vi.mock('../api/auftraege', async () => ({
   quittiereEmpfaenger: (...a: unknown[]) => quittiereEmpfaenger(...a),
   setzeVollzug: (...a: unknown[]) => setzeVollzug(...a),
   nimmAb: (...a: unknown[]) => nimmAb(...a),
+  hebeAuf: (...a: unknown[]) => hebeAuf(...a),
+  patcheAuftrag: (...a: unknown[]) => patcheAuftrag(...a),
 }));
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
@@ -916,6 +920,198 @@ describe('AuftraegePage', () => {
       );
       expect(karte(2).querySelector('[data-fehler]')).toBeNull();
       expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+  });
+
+  describe('Aufheben (LLH-1098)', () => {
+    const menue = async (name: string) => {
+      await userEvent.click(await screen.findByRole('button', { name }));
+      return document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      )!;
+    };
+    const aufgehoben = (over: Partial<Auftrag> = {}) =>
+      auftrag({
+        lfd_nr: 4,
+        bearbeitungsstatus: 'aufgehoben',
+        berichtigbar: false,
+        aufgehoben_at: '2026-06-11 10:30:00',
+        aufgehoben_von_id: 1,
+        aufgehoben_von_name: 'Erika Leitung',
+        aufhebungsgrund: 'Lage hat sich erledigt',
+        ...over,
+      });
+
+    it('steht rot im Menü, fragt nach dem Grund und hebt auf', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      hebeAuf.mockResolvedValue(aufgehoben());
+      renderPage();
+      const menu = await menue('Aktionen zu Auftrag #4');
+      const eintrag = within(menu).getByRole('menuitem', { name: 'Auftrag aufheben' });
+      expect(eintrag.closest('li')).toHaveClass('ant-dropdown-menu-item-danger');
+      await userEvent.click(eintrag);
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Auftrag #4 aufheben')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
+      expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
+      expect(hebeAuf).not.toHaveBeenCalled();
+
+      await userEvent.type(within(dialog).getByLabelText('Grund'), 'Lage hat sich erledigt');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
+      await waitFor(() => expect(hebeAuf).toHaveBeenCalledWith(1, 1, 'Lage hat sich erledigt'));
+      // Unumkehrbar: kein Rückgängig-Toast (LFH-343).
+      expect(screen.queryByRole('button', { name: 'Rückgängig' })).not.toBeInTheDocument();
+    });
+
+    it('zeigt eine Ablehnung im Dialog, der offen bleibt', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      hebeAuf.mockRejectedValue(new ApiError(422, 'Der Auftrag ist bereits aufgehoben'));
+      renderPage();
+      await userEvent.click(
+        within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+          name: 'Auftrag aufheben',
+        }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText('Grund'), 'doppelt');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
+      expect(
+        await within(dialog).findByText('Der Auftrag ist bereits aufgehoben'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('steht im Status „In Bearbeitung“ als roter Knopf neben „Vollzug melden“', async () => {
+      listeAuftraege.mockResolvedValue([
+        auftrag({ lfd_nr: 4, bearbeitungsstatus: 'in_arbeit', berichtigbar: false }),
+      ]);
+      renderPage();
+      const knopf = await screen.findByRole('button', { name: 'Auftrag aufheben' });
+      expect(knopf).toHaveClass('ant-btn-dangerous');
+      expect(screen.getByRole('button', { name: 'Vollzug melden' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Aktionen zu Auftrag #4' })).toBeNull();
+    });
+
+    it('zeigt den aufgehobenen Auftrag unter „Abgeschlossen“ mit Grund und ohne Handlung', async () => {
+      listeAuftraege.mockResolvedValue([aufgehoben()]);
+      renderPage();
+      await userEvent.click(await screen.findByText(/^Abgeschlossen/));
+      await screen.findByText('Deich sichern');
+      const chip = screen.getByText('Aufgehoben').closest('[data-lfh="status-chip"]');
+      expect(chip).toHaveAttribute('data-ton', 'neutral');
+      expect(screen.getByText(/Grund: Lage hat sich erledigt/)).toBeInTheDocument();
+      expect(screen.getByText(/Erika Leitung/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Quittieren' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Auftrag aufheben|Aktionen zu/ })).toBeNull();
+    });
+
+    it('bietet einem abgenommenen Auftrag kein Aufheben an', async () => {
+      listeAuftraege.mockResolvedValue([
+        auftrag({ lfd_nr: 4, bearbeitungsstatus: 'abgenommen', berichtigbar: false }),
+      ]);
+      renderPage();
+      await userEvent.click(await screen.findByText(/^Abgeschlossen/));
+      await screen.findByText('Deich sichern');
+      expect(screen.queryByRole('button', { name: /Auftrag aufheben|Aktionen zu/ })).toBeNull();
+    });
+
+    it('Beobachter sieht weder Menü noch Aufheben', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+        id: 1,
+        bezeichnung: 'Lage',
+        status: 'aktiv',
+        meine_rolle: 'beobachter',
+      } as Awaited<ReturnType<typeof ladeEinsatz>>);
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      renderPage();
+      await screen.findByText('Deich sichern');
+      expect(screen.queryByRole('button', { name: /Auftrag aufheben|Aktionen zu/ })).toBeNull();
+    });
+  });
+
+  describe('Berichtigen (LLH-1098)', () => {
+    const menue = async (name: string) => {
+      await userEvent.click(await screen.findByRole('button', { name }));
+      return document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      )!;
+    };
+
+    it('öffnet das Formular vorbelegt und sendet nur das Geänderte', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      patcheAuftrag.mockResolvedValue(auftrag({ lfd_nr: 4, auftrag_text: 'Deich Nord sichern' }));
+      renderPage();
+      await userEvent.click(
+        within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+          name: 'Berichtigen',
+        }),
+      );
+      expect(await screen.findByText('Auftrag #4 berichtigen')).toBeInTheDocument();
+      const text = screen.getByLabelText('Auftrag / Was');
+      expect(text).toHaveValue('Deich sichern');
+      await userEvent.clear(text);
+      await userEvent.type(text, 'Deich Nord sichern');
+      await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+      await waitFor(() =>
+        expect(patcheAuftrag).toHaveBeenCalledWith(1, 1, { auftrag_text: 'Deich Nord sichern' }),
+      );
+      await waitFor(() => expect(screen.queryByText('Auftrag #4 berichtigen')).toBeNull());
+    });
+
+    it('zeigt eine Ablehnung am Formular, das offen bleibt', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      patcheAuftrag.mockRejectedValue(
+        new ApiError(
+          422,
+          'Ein Empfänger hat schon quittiert: den Auftrag aufheben und neu erteilen',
+        ),
+      );
+      renderPage();
+      await userEvent.click(
+        within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+          name: 'Berichtigen',
+        }),
+      );
+      const text = await screen.findByLabelText('Auftrag / Was');
+      await userEvent.type(text, ' jetzt');
+      await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
+      expect(
+        await screen.findByText(
+          'Ein Empfänger hat schon quittiert: den Auftrag aufheben und neu erteilen',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Auftrag #4 berichtigen')).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('ein Live-Abgleich überschreibt die Eingabe nicht', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4 })]);
+      const { client } = renderPage();
+      await userEvent.click(
+        within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+          name: 'Berichtigen',
+        }),
+      );
+      const text = await screen.findByLabelText('Auftrag / Was');
+      await userEvent.clear(text);
+      await userEvent.type(text, 'Meine Fassung');
+      listeAuftraege.mockResolvedValue([auftrag({ lfd_nr: 4, auftrag_text: 'Fremde Fassung' })]);
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.auftraege(1) }));
+      await screen.findByText('Fremde Fassung');
+      expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Meine Fassung');
+    });
+
+    it('steht nach der ersten Quittung gesperrt mit Grund', async () => {
+      listeAuftraege.mockResolvedValue([
+        auftrag({ lfd_nr: 4, berichtigbar: false, quittiert_anzahl: 1 }),
+      ]);
+      renderPage();
+      const eintrag = within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+        name: 'Berichtigen (schon quittiert)',
+      });
+      expect(eintrag).toHaveAttribute('aria-disabled', 'true');
     });
   });
 });
