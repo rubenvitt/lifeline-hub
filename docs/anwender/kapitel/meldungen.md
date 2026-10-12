@@ -94,6 +94,10 @@ Für Einsatzleitung und Führungspersonal:
 Die Meldung geht dabei in Bearbeitung. Ist das Modul Aufträge im Einsatz nicht freigegeben, steht
 der Punkt gesperrt als „Auftrag erteilen (keine Berechtigung)“ da.
 
+Wird der Auftrag später aufgehoben, steht an der Karte „Auftrag aufgehoben“ statt des Verweises,
+und „Auftrag erteilen“ ist wieder da. Ein neu erteilter Auftrag tritt an die Stelle des alten; der
+aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztagebuch nachlesbar.
+
 ## Hintergrund
 
 ### Bestätigungspflicht und Frist

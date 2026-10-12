@@ -543,6 +543,18 @@ pub async fn aufheben(
         .await
     })?;
     state.live.publiziere(einsatz_id, etb_id);
+    // Hängt eine Meldung an diesem Auftrag, zeigt ihre Karte jetzt „aufgehoben“ und bietet
+    // „Auftrag erteilen“ wieder an (LLH-1177) → die Meldungen müssen nachladen.
+    let aus_meldung: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM meldung WHERE auftrag_id = ?)")
+            .bind(auftrag_id)
+            .fetch_one(&state.pool)
+            .await?;
+    if aus_meldung {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
+    }
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(
         &state.pool,
