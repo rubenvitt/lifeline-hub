@@ -1393,3 +1393,29 @@ async fn stream_ohne_session_ist_401() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// LLH-1091: der Weg reist auch auf dem Weg ETB → Auftrag mit (geteilte Validierung).
+#[tokio::test]
+async fn etb_auftrag_traegt_den_weg() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let (_, etb) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage"}"#,
+    )
+    .await;
+    let etb_id = etb["id"].as_i64().unwrap();
+
+    let (status, json) = post_json(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/auftrag"),
+        r#"{"auftrag_text":"Deich sichern","weg":" über B 3 ","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert_eq!(json["weg"], "über B 3");
+}

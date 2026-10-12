@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VORLAGEN, vorlage } from './vorlagen';
+import { NEU_WAEHLBAR, VORLAGEN, vorlage } from './vorlagen';
 
 describe('Befehlsvorlagen', () => {
   it('hat die vier Schemata mit erwarteter Abschnittszahl (Sync zu Backend)', () => {
@@ -20,5 +20,27 @@ describe('Befehlsvorlagen', () => {
     const ks = vorlage('befehl_ladef')!.abschnitte.map((a) => a.schluessel);
     expect(ks[0]).toBe('lage');
     expect(ks[ks.length - 1]).toBe('fuehrung_kommunikation');
+  });
+
+  /** LLH-1091: der Einzelauftrag ist ein Auftrag (Quittung, Vollzug), keine Befehlsvorlage mehr. */
+  it('markiert genau den Einzelauftrag als nur noch für den Bestand und behält alle vier', () => {
+    expect(VORLAGEN.filter((v) => v.nurBestand).map((v) => v.schluessel)).toEqual([
+      'befehl_ea_zmw',
+    ]);
+    expect(VORLAGEN).toHaveLength(4);
+    expect(vorlage('befehl_ea_zmw')!.abschnitte.map((a) => a.label)).toEqual([
+      'Einheit',
+      'Auftrag / Ziel',
+      'Mittel',
+      'Weg',
+    ]);
+  });
+
+  it('bietet für neue Befehle nur die drei Befehlsvorlagen an', () => {
+    expect(NEU_WAEHLBAR.map((v) => v.schluessel)).toEqual([
+      'befehl_lad',
+      'befehl_ladef',
+      'befehl_schnee',
+    ]);
   });
 });

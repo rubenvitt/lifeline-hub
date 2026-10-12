@@ -434,6 +434,8 @@ export interface components {
             vollzogen_von_id?: number | null;
             vollzug_status: string;
             vollzugsmeldung?: string | null;
+            /** @description Weg der Einheit (FwDV 100, LLH-1091). */
+            weg?: string | null;
             zeit?: string | null;
         };
         /**

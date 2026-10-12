@@ -2911,10 +2911,11 @@ mod tests {
         .unwrap();
         let auftrag_id: i64 = sqlx::query_scalar(
             "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, \
-                mittel, verbindung, sicherheit, vollzugsmeldung, erteilt_at, erstellt_von_id) \
+                mittel, verbindung, sicherheit, weg, vollzugsmeldung, erteilt_at, erstellt_von_id) \
              VALUES (?, 1, 'Fam. Yilmaz evakuieren', 'Tochter Yilmaz finden', \
                 'Herr Krause meldet Keller unter Wasser', 'Hauptstr. 5', 'sofort', 'Boot', \
-                'Tel. 0170 333', 'Hund im Haus', 'Fam. Yilmaz übergeben an Klinikum', \
+                'Tel. 0170 333', 'Hund im Haus', 'über den Hof von Fam. Yilmaz', \
+                'Fam. Yilmaz übergeben an Klinikum', \
                 '2026-01-01 10:05:00', ?) RETURNING id",
         )
         .bind(eid)
@@ -3021,7 +3022,7 @@ mod tests {
             "Meldung: Freitexte weg, Nummer/Meldeweg/Status bleiben"
         );
 
-        type AuftragZeile = (Option<i64>, String, [Option<String>; 8], String);
+        type AuftragZeile = (Option<i64>, String, [Option<String>; 9], String);
         let a: (
             Option<i64>,
             String,
@@ -3033,16 +3034,22 @@ mod tests {
             Option<String>,
             Option<String>,
             Option<String>,
+            Option<String>,
             String,
         ) = sqlx::query_as(
             "SELECT lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, \
-                sicherheit, vollzugsmeldung, erteilt_at FROM auftrag WHERE id = ?",
+                sicherheit, weg, vollzugsmeldung, erteilt_at FROM auftrag WHERE id = ?",
         )
         .bind(auftrag_id)
         .fetch_one(&pool)
         .await
         .unwrap();
-        let auftrag: AuftragZeile = (a.0, a.1, [a.2, a.3, a.4, a.5, a.6, a.7, a.8, a.9], a.10);
+        let auftrag: AuftragZeile = (
+            a.0,
+            a.1,
+            [a.2, a.3, a.4, a.5, a.6, a.7, a.8, a.9, a.10],
+            a.11,
+        );
         assert_eq!(
             auftrag,
             (

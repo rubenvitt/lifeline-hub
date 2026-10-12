@@ -200,6 +200,7 @@ async fn texte_des_auftrags_sind_begrenzt() {
         auftrag("T", vec![extern_(&x(200))]),
         mit_feld("absicht", x(2_000)),
         mit_feld("sicherheit", x(2_000)),
+        mit_feld("weg", x(2_000)),
     ];
     for body in gut {
         let (s, j) = anfrage(&app, "POST", &uri, &admin, Some(&body)).await;
@@ -212,11 +213,12 @@ async fn texte_des_auftrags_sind_begrenzt() {
         (auftrag("T", vec![extern_(&x(201))]), "Externe Bezeichnung"),
         (mit_feld("absicht", x(2_001)), "Absicht"),
         (mit_feld("lage", x(2_001)), "Lage"),
-        (mit_feld("ort", x(2_001)), "Ort"),
+        (mit_feld("ort", x(2_001)), "Ziel/Ort"),
         (mit_feld("zeit", x(2_001)), "Zeit"),
         (mit_feld("mittel", x(2_001)), "Mittel"),
         (mit_feld("verbindung", x(2_001)), "Verbindung"),
         (mit_feld("sicherheit", x(2_001)), "Sicherheit"),
+        (mit_feld("weg", x(2_001)), "Weg"),
     ];
     for (body, feld) in schlecht {
         let (s, j) = anfrage(&app, "POST", &uri, &admin, Some(&body)).await;

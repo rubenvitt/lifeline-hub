@@ -6,12 +6,12 @@ Repo-Wurzelverzeichnis.
 
 ## 1. Backend: Feld „Weg“ (D3)
 
-- [ ] 1.1 Migration `migrations/0180_auftrag_weg.sql` mit `ALTER TABLE auftrag ADD COLUMN weg
+- [x] 1.1 Migration `migrations/0180_auftrag_weg.sql` mit `ALTER TABLE auftrag ADD COLUMN weg
   TEXT;` und einem Kopfkommentar (LLH-1091, Verweis auf diese Change). Vorher die Nummer mit
   `git fetch origin alpha && scripts/check-migrationen.sh` gegen `origin/alpha` prüfen.
   Nachweis: `db::tests::migrationsnummern_sind_eindeutig` ist grün, und
   `scripts/check-migrationen.sh` meldet keinen Konflikt.
-- [ ] 1.2 `weg` durch `src/auftrag/` führen:
+- [x] 1.2 `weg` durch `src/auftrag/` führen:
   - `NeuerAuftrag` und `ValidierterAuftrag` (`eingabe.rs`), geprüft mit `befehlsfeld(&req.weg,
     "Weg")`; das Etikett von `ort` wird „Ziel/Ort“
   - `AuftragDaten`, `ANZEIGE_SELECT` und der Insert in `anlegen_tx` (`repo.rs`)
@@ -23,33 +23,33 @@ Repo-Wurzelverzeichnis.
   Nachweis: Ein neuer Integrationstest erteilt einen Auftrag mit Weg `"  über B 3  "` und liest
   im Detail und in der Liste `"über B 3"`. Ein Weg aus Leerzeichen ergibt `null` (Spec
   „Ein Auftrag trägt den Weg“). `cargo test` für `auftrag` ist grün.
-- [ ] 1.3 `tests/eingabegrenzen_auftrag.rs`: `mit_feld("weg", x(2_000))` unter `gut` und
+- [x] 1.3 `tests/eingabegrenzen_auftrag.rs`: `mit_feld("weg", x(2_000))` unter `gut` und
   `(mit_feld("weg", x(2_001)), "Weg")` unter `schlecht`. Nachweis: der Test ist grün. Als
   Mutationsprobe die Prüfung von `weg` in `eingabe.rs` entfernen: dann wird er rot.
-- [ ] 1.4 Weitere Entstehungswege: Ein Test für einen Auftrag aus dem ETB
+- [x] 1.4 Weitere Entstehungswege: Ein Test für einen Auftrag aus dem ETB
   (`AuftragAusEtbModal`-Weg, Route `…/etb/…/auftrag` o. ä.) trägt den Weg durch. Das gilt nur,
   wenn der Weg den Request-Body von `NeuerAuftrag` durchreicht. Reicht er ihn nicht durch, gilt
   stattdessen der Nachweis, dass Meldung, Chat und ETB `NeuerAuftrag` unverändert durchreichen
   (Code-Stelle im Commit nennen). Nachweis: der Test ist grün bzw. die Stellen sind belegt.
-- [ ] 1.5 Schwärzung: `scrub("weg", Strategie::NullSetzen, Z_EINSATZ)` in der Regel `auftrag`
+- [x] 1.5 Schwärzung: `scrub("weg", Strategie::NullSetzen, Z_EINSATZ)` in der Regel `auftrag`
   (`src/einsatz/schwaerzung_registry.rs`). Der Einsatz-Test in `src/einsatz/repo.rs` (Insert mit
   allen Feldern, Select samt Array) nimmt `weg` auf. Nachweis: Wächter
   `jede_einsatz_scoped_spalte_ist_klassifiziert` und der Einsatz-Test sind grün. Als Gegenprobe
   macht die Spalte ohne Regel den Wächter rot.
-- [ ] 1.6 Typ-Codegen mit `scripts/check-typ-codegen.sh`. `frontend/src/api/openapi.json` und
+- [x] 1.6 Typ-Codegen mit `scripts/check-typ-codegen.sh`. `frontend/src/api/openapi.json` und
   `types.generated.ts` werden mitcommittet, `NeuerAuftrag` in `api/types.ts` bekommt `weg?:
   string`. Nachweis: das Skript ist grün.
 
 ## 2. Frontend: Formular nach FwDV 100 (D1, D2, D4)
 
-- [ ] 2.1 Reines Modul `auftraege/auftragsschemaKern.ts` mit den beiden Feldfolgen:
+- [x] 2.1 Reines Modul `auftraege/auftragsschemaKern.ts` mit den beiden Feldfolgen:
   - `AUSFUEHRUNG_FELDER`: mittel, ort, weg, zeit
   - `WEITERE_FELDER`: lage, absicht, verbindung, sicherheit, richtung, erteiltAm, externKategorie,
     externBezeichnung
 
   Dazu die Etiketten für Formular und Karte und eine Funktion `klappteilFuer(feld)`. Nachweis:
   `auftragsschemaKern.test.ts` pinnt beide Folgen und ordnet jedes Feld genau einem Klappteil zu.
-- [ ] 2.2 `AuftragFormular.tsx`:
+- [x] 2.2 `AuftragFormular.tsx`:
   - Empfänger in eigener Zeile zuerst, darunter „Auftrag / Was“, darunter Priorität und Frist
   - zwei `Collapse`-Einträge „Ausführung: Mittel, Ziel, Weg, Zeit“ und „Weitere Angaben“, ohne
     `forceRender`
@@ -66,37 +66,38 @@ Repo-Wurzelverzeichnis.
 
   Dazu Testhelfer `oeffneAusfuehrung`/`oeffneWeitere` statt `/Befehlsschema/`, der bestehende
   Überlängen-Test über acht Felder.
-- [ ] 2.3 Selbstöffnen (D4): Ein kontrollierter `activeKey` (Mehrfachöffnung).
+- [x] 2.3 Selbstöffnen (D4): Ein kontrollierter `activeKey` (Mehrfachöffnung).
   `onPruefungGescheitert` nimmt die Klappteile der gescheiterten Felder auf (`klappteilFuer`).
   Nachweis: Ein Vitest tippt einen überlangen Weg, schließt „Ausführung“, sendet und findet den
   Klappteil offen, den Grund am Feld und keinen Aufruf von `onAnlegen`. Gegenprobe: Ein Fehler nur
   im Empfänger öffnet keinen Klappteil.
-- [ ] 2.4 Einbettungen: `etb/AuftragAusEtbModal.tsx` sowie die Wege aus Meldung und Chat
+- [x] 2.4 Einbettungen: `etb/AuftragAusEtbModal.tsx` sowie die Wege aus Meldung und Chat
   übernehmen die neue Folge ohne eigenen Code. Nachweis: Ihre bestehenden Tests sind grün, und ein
   Test der ETB-Einbettung prüft, dass der Empfänger vor dem vorbelegten Auftragstext steht und den
   Fokus hat.
 
 ## 3. Frontend: Karte (D5)
 
-- [ ] 3.1 `AuftragKarte.tsx` liest Folge und Etiketten aus `auftragsschemaKern.ts`, mit `weg`.
+- [x] 3.1 `AuftragKarte.tsx` liest Folge und Etiketten aus `auftragsschemaKern.ts`, mit `weg`.
   Nachweis in `AuftragKarte.test.tsx`:
   - Ein Auftrag mit Mittel, Weg und Absicht zeigt beim Aufklappen genau „Mittel“, „Weg“, „Absicht“
     und „Erteilt am“ in Folge.
   - Ein Bestandsauftrag mit `ort`/`absicht` zeigt „Ziel / Ort“ und „Absicht“.
-  - Ohne gesetztes Feld fehlt der Klappteil (bestehender Test bleibt).
+  - „Erteilt am“ steht immer (jeder Auftrag trägt eine Erteilzeit), deshalb gibt es keinen Fall
+    „ohne Feld kein Klappteil“; die Spec ist entsprechend gefasst.
 
 ## 4. Frontend: Befehlsvorlage (D6)
 
-- [ ] 4.1 `befehle/vorlagen.ts`: `nurBestand?: true` an `VorlageDef`, gesetzt an
+- [x] 4.1 `befehle/vorlagen.ts`: `nurBestand?: true` an `VorlageDef`, gesetzt an
   `befehl_ea_zmw`. Der Spiegelkommentar in `vorlagen.ts` und in `src/befehl/mod.rs` nennt die
   Markierung als reine Frontend-Angabe. Nachweis: `vorlagen.test.ts` pinnt, dass genau
   `befehl_ea_zmw` `nurBestand` trägt und alle vier Vorlagen in `VORLAGEN` bleiben.
-- [ ] 4.2 `auftraege/BefehlListe.tsx`: Der Dialog bietet nur `!nurBestand` an. Spaltenfilter und
+- [x] 4.2 `auftraege/BefehlListe.tsx`: Der Dialog bietet nur `!nurBestand` an. Spaltenfilter und
   Label lesen weiter die volle Liste. Nachweis in `BefehlListe.test.tsx`:
   - Der Dialog zeigt genau drei Optionen ohne „Einzelauftrag (EA/ZMW)“.
   - `waehleSchema` wählt „Befehl SCHNEE“ statt der EA-Vorlage.
   - Der Filter „Einzelauftrag (EA/ZMW)“ trifft einen Bestandsbefehl.
-- [ ] 4.3 Bestandsbefehl: Ein Test in `pages/BefehlDetailPage.test.tsx` öffnet einen Entwurf mit
+- [x] 4.3 Bestandsbefehl: Ein Test in `pages/BefehlDetailPage.test.tsx` öffnet einen Entwurf mit
   `befehl_ea_zmw`, zeigt die vier Abschnitte, und „Speichern“ sendet sie unter ihren Schlüsseln.
   Ein Test für die Fortschreibung mit dieser Vorlage gilt nur, wenn noch keiner besteht (Backend
   `vorlagendokument`). Nachweis: die Tests sind grün.

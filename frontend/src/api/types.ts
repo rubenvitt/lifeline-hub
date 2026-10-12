@@ -825,6 +825,8 @@ export interface NeuerAuftrag {
   mittel?: string;
   verbindung?: string;
   sicherheit?: string;
+  /** Weg der Einheit (FwDV 100: Einheit – Auftrag – Mittel – Ziel – Weg, LLH-1091). */
+  weg?: string;
   prioritaet?: AuftragPrioritaet;
   richtung?: Richtung;
   /** 'YYYY-MM-DD HH:MM' (UTC). */

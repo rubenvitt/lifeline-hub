@@ -99,7 +99,7 @@ wie das Formular haben:
 - Sicherheit / Besonderes
 - Erteilt am
 
-Leere Felder MUST wegfallen. Ohne ein gesetztes Feld MUST der Klappteil der Details fehlen.
+Leere Felder MUST wegfallen. „Erteilt am“ steht immer, weil jeder Auftrag eine Erteilzeit trägt.
 
 #### Scenario: Teilweise gefüllter Auftrag
 - **WHEN** ein Auftrag mit Mittel, Weg und Absicht angezeigt und seine Details aufgeklappt werden

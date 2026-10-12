@@ -78,6 +78,8 @@ pub struct NeuerAuftrag {
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
+    /// Weg der Einheit (FwDV 100: Einheit – Auftrag – Mittel – Ziel – Weg, LLH-1091).
+    pub weg: Option<String>,
     pub prioritaet: Option<String>,
     /// Richtung intern/extern (LFH-87); Default 'intern'.
     pub richtung: Option<String>,
@@ -242,6 +244,7 @@ pub struct ValidierterAuftrag {
     mittel: Option<String>,
     verbindung: Option<String>,
     sicherheit: Option<String>,
+    weg: Option<String>,
     prioritaet: String,
     richtung: String,
     frist_at: Option<String>,
@@ -260,6 +263,7 @@ impl ValidierterAuftrag {
             mittel: self.mittel.as_deref(),
             verbindung: self.verbindung.as_deref(),
             sicherheit: self.sicherheit.as_deref(),
+            weg: self.weg.as_deref(),
             prioritaet: &self.prioritaet,
             richtung: &self.richtung,
             frist_at: self.frist_at.as_deref(),
@@ -302,11 +306,13 @@ pub async fn validiere_neuen_auftrag(
     }
     let absicht = befehlsfeld(&req.absicht, "Absicht")?;
     let lage = befehlsfeld(&req.lage, "Lage")?;
-    let ort = befehlsfeld(&req.ort, "Ort")?;
+    // „Ziel/Ort“: das Ziel der Ausführung nach FwDV 100 (LLH-1091, design.md D3).
+    let ort = befehlsfeld(&req.ort, "Ziel/Ort")?;
     let zeit = befehlsfeld(&req.zeit, "Zeit")?;
     let mittel = befehlsfeld(&req.mittel, "Mittel")?;
     let verbindung = befehlsfeld(&req.verbindung, "Verbindung")?;
     let sicherheit = befehlsfeld(&req.sicherheit, "Sicherheit")?;
+    let weg = befehlsfeld(&req.weg, "Weg")?;
     let prioritaet = req.prioritaet.as_deref().unwrap_or(PRIO_NORMAL);
     if !crate::auftrag::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
@@ -374,6 +380,7 @@ pub async fn validiere_neuen_auftrag(
         mittel,
         verbindung,
         sicherheit,
+        weg,
         prioritaet: prioritaet.to_string(),
         richtung: richtung.to_string(),
         frist_at: frist,

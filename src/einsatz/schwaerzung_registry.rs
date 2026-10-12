@@ -1849,6 +1849,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("mittel", Strategie::NullSetzen, Z_EINSATZ),
             scrub("verbindung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("sicherheit", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("weg", Strategie::NullSetzen, Z_EINSATZ), // LLH-1091, wie die Fünf-Punkte-Felder
             retain("prioritaet", G_ENUM),
             retain("frist_at", G_ZEIT),
             retain("erteilt_at", G_ZEIT),

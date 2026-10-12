@@ -1249,6 +1249,13 @@
               "null"
             ]
           },
+          "weg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Weg der Einheit (FwDV 100, LLH-1091)."
+          },
           "zeit": {
             "type": [
               "string",

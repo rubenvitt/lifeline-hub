@@ -27,7 +27,9 @@ pub enum BefehlStatus {
 }
 
 /// Vorlagen-Registry (Spec „Befehlsschemata"). MUSS synchron zu
-/// frontend/src/befehle/vorlagen.ts gehalten werden (Schlüssel + Reihenfolge).
+/// frontend/src/befehle/vorlagen.ts gehalten werden (Schlüssel + Reihenfolge). Dass ein neuer
+/// Befehlsentwurf `befehl_ea_zmw` nicht mehr anbietet, ist rein Frontend (`nurBestand`, LLH-1091,
+/// Spec `befehlsvorlagen`); hier bleibt sie, weil Bestandsbefehle sie tragen.
 pub const VORLAGEN: &[VorlageDef] = &[
     VorlageDef {
         schluessel: "befehl_lad",
