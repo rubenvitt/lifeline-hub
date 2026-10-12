@@ -15,9 +15,14 @@ import type {
   Richtung,
 } from '../api/types';
 import { alleEmpfaenger, type FormWerte } from './auftragFormularKern';
-import { buildEmpfaenger } from '../fuehrung/empfaengerKern';
+import {
+  buildEmpfaenger,
+  EXTERN_KATEGORIE_OPTIONS,
+  type ZielOption,
+} from '../fuehrung/empfaengerKern';
+import { EmpfaengerWahl } from '../fuehrung/EmpfaengerWahl';
 import { berichtigungAus, vorbelegungAus } from './auftragBerichtigungKern';
-import { funktionsOptionen, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
+import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import {
   AUFTRAG_BEFEHLSFELD_MAX,
@@ -37,19 +42,10 @@ import {
   type SchemaFeld,
 } from './auftragsschemaKern';
 
-const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
-  { value: 'leitstelle', label: 'Leitstelle' },
-  { value: 'nachbar_ea', label: 'Nachbar-Einsatzabschnitt' },
-  { value: 'uebergeordnet', label: 'Übergeordnete Führung' },
-  { value: 'andere_bos', label: 'Andere BOS' },
-];
-
 const { TextArea } = Input;
 
-export interface ZielOption {
-  id: number;
-  name: string;
-}
+/** Die Optionen der Empfängerwahl; die Modale des Auftrags importieren sie von hier. */
+export type { ZielOption };
 
 /**
  * Freie Empfänger-Texte über der Grenze des Servers (`funktion_text`, LFH-937): der Tag-Modus hat
@@ -232,8 +228,6 @@ export default function AuftragFormular({
   const [form] = Form.useForm<FormWerte>();
   // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
   const richtung = Form.useWatch('richtung', form);
-  // Tipptext des Empfängerfelds: speist „Fachberater: <Text>“/„Führungshilfspersonal: <Text>“.
-  const [suche, setSuche] = useState('');
   const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
   // Die Vorbelegung gilt ab dem Öffnen: ein Live-Abgleich des Auftrags überschreibt keine Eingabe.
   const [vorbelegung] = useState(() => (berichtigen ? vorbelegungAus(berichtigen.auftrag) : null));
@@ -294,18 +288,6 @@ export default function AuftragFormular({
     });
   };
 
-  const zielOptionen = [
-    {
-      label: 'Einsatzabschnitte',
-      options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })),
-    },
-    {
-      label: 'Einheiten',
-      options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })),
-    },
-    { label: 'Funktionen', options: funktionsOptionen(funktionen, suche) },
-  ];
-
   /**
    * Klappteil „Ausführung“: Mittel, Ziel, Weg, Zeit nach FwDV 100 (LLH-1091). Beide Klappteile
    * bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand vier Felder“ samt Gegenprobe
@@ -358,7 +340,7 @@ export default function AuftragFormular({
             <Form.Item name="externKategorie" label="Externe Stelle">
               <Select<AdressatKategorie>
                 aria-label="Externe Stelle"
-                options={EXTERN_OPTIONEN}
+                options={EXTERN_KATEGORIE_OPTIONS}
                 disabled={empfaengerGesperrt}
               />
             </Form.Item>
@@ -437,18 +419,15 @@ export default function AuftragFormular({
           empfaengerAnzahlRegel,
         ]}
       >
-        <Select
-          mode="tags"
+        <EmpfaengerWahl
           aria-label="Empfänger"
           disabled={empfaengerGesperrt}
-          // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
-          maxCount={AUFTRAG_EMPFAENGER_MAX}
-          options={zielOptionen}
+          abschnitte={abschnitte}
+          einheiten={einheiten}
+          vorschlaege={funktionen}
           placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
-          allowClear
-          tokenSeparators={[',']}
-          onSearch={setSuche}
-          onBlur={() => setSuche('')}
+          // Bisheriges Verhalten des Auftrags: Verlassen übernimmt den Tipptext als Empfänger.
+          commitSearchOnBlur
         />
       </Form.Item>
       <Form.Item
