@@ -71,36 +71,36 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 
 ## 4. Frontend: Empfängerwahl herauslösen (D7)
 
-- [ ] 4.1 `fuehrung/empfaengerKern.ts`: Kodierung, `baueEmpfaenger` und `empfaengerTagsAus` aus
+- [x] 4.1 `fuehrung/empfaengerKern.ts`: Kodierung, `baueEmpfaenger` und `empfaengerTagsAus` aus
   `auftraege/auftragFormularKern.ts` und `auftragBerichtigungKern.ts` herauslösen. Die alten
   Stellen importieren von dort. Nachweis: Ein neuer Kern-Test geht hin und zurück für Abschnitt,
   Einheit, Katalogfunktion mit Bezeichnung und Freitext. `auftragFormularKern`- und
   `auftragBerichtigungKern`-Tests bleiben grün.
-- [ ] 4.2 `fuehrung/EmpfaengerWahl.tsx` (kontrollierter Tags-Select, drei Gruppen, eigener
+- [x] 4.2 `fuehrung/EmpfaengerWahl.tsx` (kontrollierter Tags-Select, drei Gruppen, eigener
   Such-State, Blur übernimmt keinen getippten Text). Nachweis: Komponententest „Blur nach Tippen
   erzeugt keinen Tag“, „Besetzung im Vorschlag, Wert ohne Namen“.
-- [ ] 4.3 `AuftragFormular.tsx` auf `EmpfaengerWahl` umstellen. Nachweis:
+- [x] 4.3 `AuftragFormular.tsx` auf `EmpfaengerWahl` umstellen. Nachweis:
   `AuftragFormular.test.tsx` ist ohne inhaltliche Änderung grün (Mock von
   `useFunktionsVorschlaege` gilt weiter).
-- [ ] 4.4 `fuehrung/ExterneEmpfaenger.tsx` (Zeilen aus Kategorie und Bezeichnung, Vorschläge
+- [x] 4.4 `fuehrung/ExterneEmpfaenger.tsx` (Zeilen aus Kategorie und Bezeichnung, Vorschläge
   aus `externeStellenVorschlaege`, Hinzufügen und Entfernen, Grenze 200 aus `eingabegrenzen.ts`
   mit Zählanzeige). Nachweis: Komponententest „Vorschlag übernehmen“, „Überlänge sperrt“,
   „Zeile entfernen“.
 
 ## 5. Frontend: Befehl und Lagebericht (D7)
 
-- [ ] 5.1 `pages/BefehlDetailPage.tsx`: Feld „Verteiler“ im Entwurf (`befehl-no-print`), Formtyp
+- [x] 5.1 `pages/BefehlDetailPage.tsx`: Feld „Verteiler“ im Entwurf (`befehl-no-print`), Formtyp
   erweitern, `werteAus`/`speichern` mit Verteiler, Abschnitte und Einheiten laden. Nachweis:
   `BefehlDetailPage.test.tsx` belegt „wählen und speichern sendet `verteiler` im PATCH“ und
   „Neuladen zeigt die Einträge“, und der Verlustschutz-Test markiert eine Verteiler-Änderung als
   ungespeichert.
-- [ ] 5.2 Druckkopf und Lesefassung Befehl: Zeile „Verteiler“ im `Druckkopf` aus
+- [x] 5.2 Druckkopf und Lesefassung Befehl: Zeile „Verteiler“ im `Druckkopf` aus
   `useWatch('verteiler')` (Entwurf) bzw. `snap_anzeige` (freigegeben), leer ohne Zeile. Dazu ein
   `Datenfeld` im freigegebenen Zweig, in `auftraege/BefehlLesefassung.tsx` und in
   `auftraege/BefehlDetail.tsx`. Nachweis: Tests „Druck eines Entwurfs mit ungespeichertem
   Verteiler“, „leerer Verteiler ohne Zeile“, „Detail nennt Verteiler“. Ein DOM-Test belegt,
   dass das Auswahlfeld `befehl-no-print` trägt.
-- [ ] 5.3 Wächtertest: Keine Vorlage in `befehle/vorlagen.ts` und den Lagebericht-Vorlagen trägt
+- [x] 5.3 Wächtertest: Keine Vorlage in `befehle/vorlagen.ts` und den Lagebericht-Vorlagen trägt
   den Schlüssel `verteiler`. Nachweis: Der Test ist grün, und mit einem Testschlüssel
   `verteiler` wird er rot.
 - [ ] 5.4 `lageberichte/LageberichtDetailPage.tsx`: Feld, Druckkopf und Lesefassung wie 5.1 und

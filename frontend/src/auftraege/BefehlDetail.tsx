@@ -13,6 +13,7 @@ import { DetailSprung } from '../components/ListeDetail';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
+import { verteilerNamen } from '../entwurf/verteilerKern';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import BefehlLesefassung from './BefehlLesefassung';
 import { befehlSchemaLabel } from './befehlTexte';
@@ -51,6 +52,7 @@ export default function BefehlDetail({
   // Kopfdaten frisch aus dem Einzelabruf, sobald er da ist; vorher aus der Liste.
   const b: BefehlKopf | BefehlAnzeige = detailQuery.data ?? kopf;
   const v = vorlage(b.vorlage);
+  const verteiler = verteilerNamen(detailQuery.data?.verteiler);
   const isEntwurf = b.status === 'entwurf';
   const vollseite = befehlDetailPfad(einsatzId, b.id);
 
@@ -159,6 +161,10 @@ export default function BefehlDetail({
           <ZeitAnzeige wert={b.zeitstand} />
         </Descriptions.Item>
         <Descriptions.Item label="Ersteller">{b.ersteller_name}</Descriptions.Item>
+        {verteiler.length > 0 && (
+          // An wen der Befehl geht (LLH-1172): die gespeicherten Anzeigenamen in Reihenfolge.
+          <Descriptions.Item label="Verteiler">{verteiler.join(', ')}</Descriptions.Item>
+        )}
         {b.freigegeben_at && (
           <Descriptions.Item label="Freigegeben">
             <ZeitAnzeige wert={b.freigegeben_at} />

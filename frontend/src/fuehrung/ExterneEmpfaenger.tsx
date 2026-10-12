@@ -1,5 +1,5 @@
 import { AutoComplete, Button, Col, Row, type FormRule } from 'antd';
-import { AUFTRAG_EXTERN_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
+import { VERTEILER_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import type { AdressatKategorie } from '../api/types';
 import { Select } from '../components/Select';
 import { teilwortSuche } from '../components/teilwortSuche';
@@ -25,7 +25,7 @@ export interface ExternerEmpfaenger {
   bezeichnung: string;
 }
 
-const BEZEICHNUNG_MAX = AUFTRAG_EXTERN_BEZEICHNUNG_MAX;
+const BEZEICHNUNG_MAX = VERTEILER_BEZEICHNUNG_MAX;
 
 /** Regel des `Form.Item`: Überlänge und eine Bezeichnung ohne Kategorie sperren das Senden. */
 export const externeEmpfaengerRule = {

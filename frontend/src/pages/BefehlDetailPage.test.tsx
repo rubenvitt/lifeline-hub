@@ -1162,3 +1162,95 @@ describe('BefehlDetailPage — Bestandsbefehl mit Einzelauftrag-Vorlage (LLH-109
     }
   });
 });
+
+/**
+ * ── Verteiler (LLH-1172, Spec `dokument-verteiler`) ──
+ *
+ * Im Entwurf ein Feld „Verteiler“, das mit dem Entwurf gespeichert wird; im Druckkopf die Zeile
+ * „Verteiler“ aus dem Formular (ungespeichert, wie der Titel, LFH-731), im Lesezweig aus dem
+ * gespeicherten Stand. Das Feld selbst steht nicht auf Papier.
+ */
+describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
+  const ABSCHNITT = { id: 3, name: 'EA Süd' };
+
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([ABSCHNITT])),
+    );
+    vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+  });
+
+  const druckkopf = () => document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!;
+
+  async function waehleEaSued() {
+    const feld = await screen.findByRole('combobox', { name: 'Verteiler' });
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByTitle('EA Süd'));
+    return feld;
+  }
+
+  it('wählen und speichern schickt den Verteiler im PATCH; die Änderung gilt als ungespeichert', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await waehleEaSued();
+    expect(await screen.findByText('ungespeicherte Änderungen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+        1,
+        7,
+        expect.objectContaining({
+          verteiler: [{ empfaenger_typ: 'abschnitt', abschnitt_id: 3 }],
+        }),
+      ),
+    );
+  });
+
+  it('ein gespeicherter Verteiler steht nach dem Laden im Feld', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('entwurf'),
+      verteiler: [{ id: 1, empfaenger_typ: 'abschnitt', abschnitt_id: 3, snap_anzeige: 'EA Süd' }],
+    } as never);
+    renderAt(7);
+    const feld = await screen.findByRole('combobox', { name: 'Verteiler' });
+    const auswahl = feld.closest('.ant-select') as HTMLElement;
+    await waitFor(() => expect(within(auswahl).getByText('EA Süd')).toBeInTheDocument());
+  });
+
+  it('der Druckkopf trägt den ungespeicherten Verteiler, das Feld steht nicht auf Papier', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await screen.findByRole('combobox', { name: 'Verteiler' });
+    expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
+    const feld = await waehleEaSued();
+    await waitFor(() => expect(within(druckkopf()).getByText('Verteiler')).toBeInTheDocument());
+    expect(within(druckkopf()).getByText('EA Süd')).toBeInTheDocument();
+    expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
+    expect(feld.closest('.befehl-no-print')).not.toBeNull();
+  });
+
+  it('ein freigegebener Befehl nennt den Verteiler am Schirm und im Druckkopf', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('freigegeben'),
+      verteiler: [
+        { id: 1, empfaenger_typ: 'abschnitt', abschnitt_id: 3, snap_anzeige: 'EA Süd' },
+        { id: 2, empfaenger_typ: 'funktion', funktion: 's3', snap_anzeige: 'S3 Einsatz' },
+      ],
+    } as never);
+    renderAt(7);
+    await screen.findByRole('button', { name: 'Fortschreiben' });
+    const anzeige = screen.getByRole('definition');
+    expect(anzeige).toHaveTextContent('EA Süd, S3 Einsatz');
+    expect(anzeige.closest('.befehl-no-print')).not.toBeNull();
+    expect(within(druckkopf()).getByText('EA Süd, S3 Einsatz')).toBeInTheDocument();
+  });
+
+  it('ohne Verteiler weder Anzeige noch Druckzeile (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('button', { name: 'Fortschreiben' });
+    expect(screen.queryByText('Verteiler')).toBeNull();
+    expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
+  });
+});

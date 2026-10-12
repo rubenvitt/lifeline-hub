@@ -26,10 +26,30 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
+import { VerteilerAnzeige, VerteilerFeld, useVerteilerQuellen } from '../entwurf/VerteilerFeld';
+import {
+  VERTEILER_FELD,
+  verteilerAusWerten,
+  verteilerDruckzeile,
+  verteilerGeaendert,
+  verteilerNamen,
+  verteilerNamenAusWerten,
+  verteilerWerteAus,
+  type VerteilerWerte,
+} from '../entwurf/verteilerKern';
 import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
+
+/**
+ * Formularwerte des Entwurfs: Titel und Abschnitte als Text, daneben der Verteiler (LLH-1172).
+ * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerFeld.guard.test.ts`).
+ */
+type FormWerte = { titel: string; [VERTEILER_FELD]?: VerteilerWerte } & Record<
+  string,
+  string | VerteilerWerte | undefined
+>;
 
 export default function BefehlDetailPage() {
   const { befehlId } = useParams();
@@ -59,10 +79,12 @@ function BefehlDetail() {
   const leisteRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_BEFEHL);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [form] = Form.useForm<Record<string, string>>();
+  const [form] = Form.useForm<FormWerte>();
   // Nur der Titel: er speist im Entwurf den Druckkopf (LFH-731). Kein `useWatch([])`, das die
   // Seite bei jedem Anschlag in einem Abschnitt neu rendern ließe.
   const formTitel = Form.useWatch('titel', form);
+  // Der Verteiler speist ebenso den Druckkopf (LLH-1172); ein Feld, kein `useWatch([])`.
+  const formVerteiler = Form.useWatch(VERTEILER_FELD, form) as VerteilerWerte | undefined;
   const speicherfolge = useRef<Promise<unknown>>(Promise.resolve());
   const aktiv = useRef(true);
   useEffect(() => {
@@ -81,6 +103,13 @@ function BefehlDetail() {
     queryFn: () => ladeBefehl(einsatzId, befehlId),
     enabled: idGueltig,
   });
+  // Optionen des Verteilers (LLH-1172), nur im Entwurf geladen; als Hook vor den frühen Rückgaben.
+  const verteilerQuellen = useVerteilerQuellen(
+    einsatzId,
+    befehlQuery.data?.status === 'entwurf' && einsatzQuery.data != null
+      ? darfImEinsatzSchreiben(einsatzQuery.data)
+      : false,
+  );
   // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
   // freigegebenen Befehl: ein Entwurf hat noch keinen ETB-Eintrag.
   const etbSprung = useZumEtbEintrag(
@@ -96,12 +125,17 @@ function BefehlDetail() {
 
   // Persistiert die Formularwerte als Entwurf (ohne Erfolgs-Toast); geteilt von „Entwurf speichern"
   // und dem Freigabe-Flow.
-  const speichern = (werte: Record<string, string>) => {
+  const speichern = (werte: FormWerte) => {
     const v = vorlage(befehlQuery.data!.vorlage)!;
-    const abschnitte: BefehlAbschnitt[] = v.abschnitte.map((a) => ({
-      schluessel: a.schluessel,
-      text: werte[a.schluessel] ?? '',
-    }));
+    const abschnitte: BefehlAbschnitt[] = v.abschnitte.map((a) => {
+      const text = werte[a.schluessel];
+      return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
+    });
+    // Der Verteiler nur, wenn er sich geändert hat (`verteilerGeaendert`, LLH-1172).
+    const gespeichert = befehlQuery.data!.verteiler;
+    const verteiler = verteilerGeaendert(werte[VERTEILER_FELD], gespeichert)
+      ? verteilerAusWerten(werte[VERTEILER_FELD], verteilerQuellen.vorschlaege.katalog, gespeichert)
+      : undefined;
     // Blur-Autosave und explizites Speichern können direkt aufeinander folgen. In Reihenfolge
     // schreiben, damit eine späte S1-Antwort S2 nicht überschreibt.
     const auftrag = speicherfolge.current
@@ -110,7 +144,11 @@ function BefehlDetail() {
         // „Verwerfen“/Unmount beendet noch nicht gestartete Aufträge dieses Editors.
         // Ein späteres Öffnen derselben ID bekommt seine eigene Ref und Speicherfolge.
         if (!aktiv.current) throw new DOMException('Editor verlassen', 'AbortError');
-        return aktualisiereBefehl(einsatzId, befehlId, { titel: werte.titel, abschnitte });
+        return aktualisiereBefehl(einsatzId, befehlId, {
+          titel: werte.titel,
+          abschnitte,
+          verteiler,
+        });
       });
     speicherfolge.current = auftrag;
     return auftrag;
@@ -120,12 +158,12 @@ function BefehlDetail() {
    * Riegel gegen den Fremd-Refetch, Autosave (30 s + Blur) und Reload-Warner; Begründungen in
    * `entwurf/useEntwurfVerlustschutz.ts`.
    */
-  const schutz = useEntwurfVerlustschutz<BefehlAnzeige, Record<string, string>>({
+  const schutz = useEntwurfVerlustschutz<BefehlAnzeige, FormWerte>({
     daten: befehlQuery.data,
     istEntwurf: befehlQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {
-      const werte: Record<string, string> = { titel: b.titel };
+      const werte: FormWerte = { titel: b.titel, [VERTEILER_FELD]: verteilerWerteAus(b.verteiler) };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
     },
@@ -142,7 +180,7 @@ function BefehlDetail() {
    * Seite. Ein Toast daneben wäre eine zweite Wahrheit, die nach drei Sekunden geht.
    */
   const speichernMutation = useMutation({
-    mutationFn: (werte: Record<string, string>) => schutz.speichereJetzt(werte),
+    mutationFn: (werte: FormWerte) => schutz.speichereJetzt(werte),
     onSuccess: () => message.success('Entwurf gespeichert'),
   });
 
@@ -151,7 +189,7 @@ function BefehlDetail() {
    * null` heißt offen). So kann der Dialog nicht ohne die Werte stehen, mit denen er gespeichert
    * werden soll.
    */
-  const [freigabeWerte, setFreigabeWerte] = useState<Record<string, string> | null>(null);
+  const [freigabeWerte, setFreigabeWerte] = useState<FormWerte | null>(null);
 
   /**
    * Kein `onError`: der Grund steht als `freigebenMutation.error` im Bestätigungsdialog, der bei
@@ -222,10 +260,15 @@ function BefehlDetail() {
    */
   const druckTitel =
     istEntwurf && darfSchreiben && typeof formTitel === 'string' ? formTitel : befehl.titel;
+  // Ebenso der Verteiler (LLH-1172): im Entwurf aus dem Formular, sonst der gespeicherte Stand.
+  const druckVerteiler =
+    istEntwurf && darfSchreiben && formVerteiler !== undefined
+      ? verteilerNamenAusWerten(formVerteiler, verteilerQuellen, befehl.verteiler)
+      : verteilerNamen(befehl.verteiler);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
-    let werte: Record<string, string>;
+    let werte: FormWerte;
     try {
       werte = await form.validateFields();
     } catch {
@@ -381,6 +424,7 @@ function BefehlDetail() {
             wert: `${BEFEHL_STATUS[befehl.status].label} · Version ${befehl.version}`,
           },
           { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={befehl.zeitstand} /> },
+          ...verteilerDruckzeile(druckVerteiler),
         ]}
       />
       <EinsatzSeite
@@ -461,7 +505,7 @@ function BefehlDetail() {
               // Der zweite Auslöser neben der Frist: ein verlassenes Feld. `onBlur` steigt aus den
               // Feldern auf, ein Handler am Formular genügt.
               onBlur={schutz.autosaveJetzt}
-              onFinish={(werte) => speichernMutation.mutate(werte as Record<string, string>)}
+              onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
             >
               {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                   (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
@@ -476,6 +520,8 @@ function BefehlDetail() {
               >
                 <Input />
               </Form.Item>
+              {/* An wen der Befehl geht (LLH-1172); auf Papier steht er im Druckkopf. */}
+              <VerteilerFeld quellen={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
               {v?.abschnitte.map((a) => (
                 <Form.Item
                   key={a.schluessel}
@@ -504,13 +550,17 @@ function BefehlDetail() {
               />
             </Form>
           ) : (
-            // h3 unter dem Paneel (h2); die Druckklasse bleibt an der Vollseite.
-            <BefehlLesefassung
-              className="befehl-druck"
-              vorlage={v}
-              abschnitte={befehl.abschnitte}
-              ebene={3}
-            />
+            <>
+              {/* Am Schirm; auf Papier trägt ihn der Druckkopf (LLH-1172). */}
+              <VerteilerAnzeige verteiler={befehl.verteiler} className="befehl-no-print" />
+              {/* h3 unter dem Paneel (h2); die Druckklasse bleibt an der Vollseite. */}
+              <BefehlLesefassung
+                className="befehl-druck"
+                vorlage={v}
+                abschnitte={befehl.abschnitte}
+                ebene={3}
+              />
+            </>
           )}
         </Paneel>
         {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}

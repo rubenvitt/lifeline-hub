@@ -74,6 +74,28 @@ describe('BefehlDetail (Spec `auftraege-befehle`, „Einsatzbefehl im Detail“)
     expect(ladeBefehl).toHaveBeenCalledWith(5, 7);
   });
 
+  it('nennt den Verteiler des Befehls (LLH-1172)', async () => {
+    const b = kopf({ status: 'freigegeben', freigegeben_at: '2026-06-11 08:40:00' });
+    ladeBefehl.mockResolvedValue({
+      ...anzeige(b),
+      verteiler: [
+        { id: 1, empfaenger_typ: 'abschnitt', abschnitt_id: 3, snap_anzeige: 'EA Süd' },
+        { id: 2, empfaenger_typ: 'funktion', funktion: 's3', snap_anzeige: 'S3 Einsatz' },
+      ],
+    });
+    renderMitProviders(<BefehlDetail befehl={b} einsatzId={5} darfSchreiben />, {
+      route: '/einsaetze/5/auftraege',
+    });
+    expect(await screen.findByText('EA Süd, S3 Einsatz')).toBeInTheDocument();
+    expect(screen.getByText('Verteiler')).toBeInTheDocument();
+  });
+
+  it('ohne Verteiler steht keine Zeile „Verteiler“', async () => {
+    rendern(kopf());
+    await screen.findByText('Brand im Lager');
+    expect(screen.queryByText('Verteiler')).toBeNull();
+  });
+
   it('gliedert unter dem Paneel (h4) mit h5-Abschnitten; „Befehlstext“ ist Etikett, keine Überschrift', async () => {
     rendern(kopf());
     await screen.findByText('Brand im Lager');
