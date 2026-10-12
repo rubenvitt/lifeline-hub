@@ -6,25 +6,25 @@ pnpm laufen über `mise exec -- …`.
 
 ## 1. Server-Suche `q` der Aufträge (D9)
 
-- [ ] 1.1 `like_muster` aus `src/schaden/repo.rs` an einen gemeinsamen Ort ziehen (Modul neben
+- [x] 1.1 `like_muster` aus `src/schaden/repo.rs` an einen gemeinsamen Ort ziehen (Modul neben
   `routes::support` oder `db`). Die Schadenliste nutzt ihn von dort.
   Nachweis: die bestehenden Suchtests der Schadenliste bleiben grün, und ein Unit-Test des
   gemeinsamen Moduls maskiert `%`, `_` und `\`.
-- [ ] 1.2 `src/auftrag/repo.rs`: `AuftragFilter.suche` und das Fragment über `#lfd_nr`,
+- [x] 1.2 `src/auftrag/repo.rs`: `AuftragFilter.suche` und das Fragment über `#lfd_nr`,
   `auftrag_text` und `auftrag_empfaenger.snap_anzeige` in `filter_bedingung`. Es wirkt damit auch
   in `kennzahlen`.
   Nachweis: Repo-Tests für Treffer im Text, im Empfänger und über die Kennung „#12“; „50%“ trifft
   nur den wörtlichen Text; Groß-/Kleinschreibung bei ASCII; mit `phase=abgeschlossen` und
   `limit` liefert die erste Seite den ältesten von 150 Aufträgen, wenn nach seinem Text gesucht
   wird; die Kennzahlen zählen nur Treffer.
-- [ ] 1.3 `src/routes/auftrag.rs`: `q` in `ListeParams` und `KennzahlenParams`. Der Begriff wird
+- [x] 1.3 `src/routes/auftrag.rs`: `q` in `ListeParams` und `KennzahlenParams`. Der Begriff wird
   getrimmt, leer zählt als nichts, mehr als 200 Zeichen ergibt 400 über `support::hoechstens`.
   Nachweis: Routentests (`tests/`) für Treffer, Leerzeichen-Begriff gleich ohne Begriff, 201
   Zeichen gleich 400 mit Feldname `q`. `cargo test` für die betroffenen Module ist grün.
-- [ ] 1.4 `src/AGENTS.md`: Die Suchregel der geblätterten Listen nennt die Auftragsliste und den
+- [x] 1.4 `src/AGENTS.md`: Die Suchregel der geblätterten Listen nennt die Auftragsliste und den
   gemeinsamen Ort von `like_muster`.
   Nachweis: `grep -n "like_muster" src/AGENTS.md`.
-- [ ] 1.5 `api/auftraege.ts` reicht `suche` an `listeOffeneAuftraege`,
+- [x] 1.5 `api/auftraege.ts` reicht `suche` an `listeOffeneAuftraege`,
   `listeAbgeschlosseneAuftraege` und `ladeAuftragKennzahlen` weiter; leer sendet kein `q`.
   `api/queryKeys.ts`: `auftraegePhase(…, suche)` und `auftragKennzahlen(…, suche)`.
   Nachweis: `queryKeys.test.ts` und die Charakterisierung mit Literalen sind angepasst, ein
@@ -84,18 +84,18 @@ pnpm laufen über `mise exec -- …`.
 
 ## 4. Reiter „Einzelaufträge“ (D3, D4, D10; Spec `auftraege-befehle`)
 
-- [ ] 4.1 `AuftragKarte.tsx` in `AuftragKopf`, `AuftragEmpfaenger`, `AuftragSchema`,
+- [x] 4.1 `AuftragKarte.tsx` in `AuftragKopf`, `AuftragEmpfaenger`, `AuftragSchema`,
   `AuftragHandlungen` und `AuftragZeit` zerlegen; `AuftragKarte` setzt sie wie bisher zusammen.
   Nachweis: `AuftragKarte.test.tsx`, `AuftragListe.test.tsx`, `AuftragVorschau.test.tsx`,
   `command-palette/Vorschau.test.tsx`, `geraet/GeraetAbschnitt.test.tsx` (rendert die
   Geräteansicht mit `AuftragListe`) und `kommunikation/wortlaut.guard.test.ts` laufen unverändert
   grün.
-- [ ] 4.2 `auftraege/AuftragListenKarte.tsx` (`memo`): Zeitspalte, Kopf ohne ETB-Sprung, Text
+- [x] 4.2 `auftraege/AuftragListenKarte.tsx` (`memo`): Zeitspalte, Kopf ohne ETB-Sprung, Text
   auf drei Zeilen, Empfänger und „q/n quittiert“, keine Knöpfe.
   Nachweis: Vitest prüft „Überfälliger Auftrag“ (Alarmkante, Wort), „Langer Auftragstext“ (Klasse
   bzw. Stil des Zeilenschnitts, voller Text im zugänglichen Namen) und „Keine Handlung in der
   Karte“ (kein `button` außer dem Auswahlziel).
-- [ ] 4.3 `auftraege/AuftragDetail.tsx`: Kopf, ganzer Text, `AuftragHandlungen` direkt unter dem
+- [x] 4.3 `auftraege/AuftragDetail.tsx`: Kopf, ganzer Text, `AuftragHandlungen` direkt unter dem
   Text, `AuftragEmpfaenger` mit Quittieren, `AuftragSchema` offen, Vollzugsvermerk, Verlauf
   aufsteigend, Sprung zum ETB-Eintrag, Hinweis „Nicht mehr in dieser Ansicht“ bei `entfallen`.
   Nachweis: Vitest „Quittieren im Detail“, „Ohne Schreibrecht“, „Abgeschlossener Auftrag“
@@ -158,7 +158,7 @@ pnpm laufen über `mise exec -- …`.
 
 ## 7. e2e, Prüfliste und Anwenderdoku
 
-- [ ] 7.1 Bestehende e2e auf die neue Bedienung ziehen: `auftraege-abgeschlossen`,
+- [x] 7.1 Bestehende e2e auf die neue Bedienung ziehen: `auftraege-abgeschlossen`,
   `befehl-navigation`, `befehl-aktionsleiste`, `etb-folgeauftraege`,
   `deeplink-hervorhebung-kontrast` (Auftrag und neu Befehl), `palette-oeffnung`,
   `knopf-wortlaut`, `gate1-ueberlauf`, `gate3-trefflaeche`, `trefflaeche-pruefflaechen` und
@@ -172,7 +172,7 @@ pnpm laufen über `mise exec -- …`.
   - Detail ab `lg` sticky.
   - Handschuh-Treffflächen nach dem neuen Szenario in `einsatztauglichkeit-layout`.
   Nachweis: Die Spec läuft grün.
-- [ ] 7.3 `openspec/changes/oxgob5gk-auftraege-befehle-angleichen/pruefliste.md`: Prüfliste
+- [x] 7.3 `openspec/changes/oxgob5gk-auftraege-befehle-angleichen/pruefliste.md`: Prüfliste
   Einsatztauglichkeit (15 Kriterien) für die umgebaute Seite, jede Zeile mit Verdikt (erfüllt /
   offen mit Zielticket / nicht anwendbar).
   Nachweis: Keine Zeile ist ohne Verdikt.
@@ -185,10 +185,13 @@ pnpm laufen über `mise exec -- …`.
 
 ## 8. Abschluss
 
-- [ ] 8.1 `./scripts/check-all.sh` grün (ohne `| tail`). `scripts/check-typ-codegen.sh` bleibt
+- [x] 8.1 `./scripts/check-all.sh` grün (ohne `| tail`). `scripts/check-typ-codegen.sh` bleibt
   ohne Diff, weil kein DTO wechselt.
   Nachweis: Ausgabe des Laufs bzw. CI des PRs.
-- [ ] 8.2 `superpowers:requesting-code-review` und `verification-before-completion`. Hinweis an
+  Lokal (12.10.2026): rustfmt, Lint, Typ-Drift, Advisories, Rust-Suite (175 Läufe) und
+  Vitest (13 360) grün, Rahmen-Guard-Befund behoben; die 13 Specs, die die Seite berühren, 113/113
+  grün. Hülle (GTK fehlt im Container) und volle e2e-Suite samt Firefox/WebKit über die CI des PRs.
+- [x] 8.2 `superpowers:requesting-code-review` und `verification-before-completion`. Hinweis an
   Ruben, dass das Design System „Lifeline Hub“ um den Baustein „Liste + Detailpaneel“ nachgezogen
   werden muss.
   Nachweis: Die Review-Befunde sind abgearbeitet, und der Hinweis steht im PR.

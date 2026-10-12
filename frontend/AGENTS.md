@@ -132,9 +132,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
   beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
-- **Liste + Detailpaneel** (`components/ListeDetail.tsx`, Spec `liste-detail`,
-  `openspec/changes/oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn Objekte je Stück
-  gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
+- **Liste + Detailpaneel** (`components/ListeDetail.tsx`, Spec `liste-detail`, Herleitung
+  `openspec/changes/archive/2026-10-12-oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn
+  Objekte je Stück gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
   Ab `lg` Liste links, Detail rechts (klebt), darunter klappt es unter der gewählten Karte auf; kein
   Drawer. Die Karte trägt nur das Auswahlziel (`AuswahlZiel`) und Kennungs-Links, Handlungen stehen
   im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird

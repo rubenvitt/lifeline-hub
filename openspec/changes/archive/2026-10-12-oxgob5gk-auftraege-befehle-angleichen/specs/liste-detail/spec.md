@@ -42,6 +42,10 @@ zuklappen.
 - **WHEN** auf dem Handschirm die aufgeklappte Karte erneut gewählt wird
 - **THEN** ist keine Karte mehr aufgeklappt
 
+#### Scenario: Bedienung im aufgeklappten Detail
+- **WHEN** auf dem Handschirm in das aufgeklappte Detail oder in eine Rückfrage daraus getippt wird
+- **THEN** bleibt das Detail aufgeklappt
+
 #### Scenario: Wechsel der Wahl
 - **WHEN** ein anderes Objekt gewählt wird
 - **THEN** zeigt das Detail nur noch dieses Objekt, und die vorige Karte gilt nicht mehr als gewählt
@@ -51,7 +55,8 @@ zuklappen.
 Jede Karte SHALL genau ein Auswahlziel tragen, das per Zeiger, Tipp und Tastatur (Enter, Leertaste)
 wählt und dessen zugänglicher Name die Kennung des Objekts nennt. Die gewählte Karte MUST ihren
 Zustand ohne Farbe zugänglich machen (ab `lg` als aktuelles Element, unter `lg` als aufgeklappt).
-Die Karte MUST NOT weitere Bedienziele tragen außer Kennungs-Links.
+Die Karte MUST NOT weitere Bedienziele tragen außer Kennungs-Links. Ab `lg` MUST ein Sprung per
+Tastatur von der gewählten Karte direkt ins Detail führen, ohne die übrigen Karten zu durchlaufen.
 
 #### Scenario: Tastatur
 - **WHEN** der Fokus auf dem Auswahlziel einer Karte steht und Enter gedrückt wird
@@ -60,6 +65,10 @@ Die Karte MUST NOT weitere Bedienziele tragen außer Kennungs-Links.
 #### Scenario: Zustand ohne Farbe
 - **WHEN** ab `lg` ein Objekt gewählt ist
 - **THEN** meldet sein Auswahlziel den Zustand „aktuell“, und genau ein Auswahlziel der Liste tut das
+
+#### Scenario: Ins Detail springen
+- **WHEN** ab `lg` der Fokus auf dem Auswahlziel der gewählten Karte steht und Tab gedrückt wird
+- **THEN** steht ein sichtbarer Sprung „Zum Detail“ im Fokus, und er setzt den Fokus ins Detail
 
 #### Scenario: Keine Handlung in der Karte
 - **WHEN** eine Karte mit Schreibrecht gerendert ist
@@ -140,11 +149,17 @@ es auf Wunsch einfügen. Touch MUST die Liste nicht anhalten.
 
 Entfällt das gewählte Objekt aus der gezeigten Menge (etwa weil es abgeschlossen wird und die
 Ansicht nur Offenes zeigt), SHALL das Detail es weiter zeigen, bis eine andere Wahl fällt oder die
-Ansicht wechselt. Das Detail MUST dann sagen, dass das Objekt nicht mehr in der Liste steht.
+Ansicht wechselt. Das Detail MUST dann sagen, dass das Objekt nicht mehr in der Liste steht, und
+den frischesten bekannten Stand zeigen (etwa die Antwort der Handlung, die es hinausgeschoben hat).
+Unter `lg` MUST es an der Stelle der entfallenen Karte stehen bleiben.
 
 #### Scenario: Auftrag wird abgenommen
 - **WHEN** in der Ansicht „Offen“ der gewählte Auftrag im Detail abgenommen wird
 - **THEN** zeigt das Detail ihn mit Phase „abgenommen“ und dem Hinweis, dass er nicht mehr in der Liste steht
+
+#### Scenario: Entfällt auf dem Handschirm
+- **WHEN** unter `lg` die mittlere von drei Karten aufgeklappt ist und ihr Objekt entfällt
+- **THEN** steht das Detail weiter zwischen der ersten und der dritten Karte
 
 #### Scenario: Andere Wahl
 - **WHEN** danach eine Karte der Liste gewählt wird
