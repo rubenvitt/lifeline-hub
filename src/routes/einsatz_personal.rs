@@ -281,12 +281,24 @@ pub async fn entfernen(
         person_bezeichnung(&anzeige)
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let (war_einsatzleiter, war_besetzt) = crate::write_retry!(&state.pool, |conn| {
+        let el =
+            crate::einsatz::fuehrungsstelle::ist_einsatzleiter_tx(conn, einsatz_id, ep_id).await?;
+        let stab = crate::stab::repo::besetzt_tx(conn, einsatz_id, ep_id).await?;
         disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        Ok((el, stab))
     })?;
     sse_personal(&state, einsatz_id, ep_id);
+    // `personal` erreicht nur Leser mit Personal- oder Kartenrecht. Den Vermerk „nicht mehr
+    // disponiert“ (ON DELETE SET NULL) lesen Führungsstelle und Stab mit eigenem Gate; sie hängen
+    // an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in LFH-1106).
+    if war_einsatzleiter {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    if war_besetzt {
+        state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

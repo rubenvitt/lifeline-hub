@@ -591,6 +591,24 @@ pub async fn entfernen(
     })
 }
 
+/// Besetzt die Dispositionszeile ein Sachgebiet? Wer sie löscht, fragt vorher: `ON DELETE SET
+/// NULL` (Migration 0102) setzt den Vermerk „nicht mehr disponiert“ still, das Ereignis `stab`
+/// muss der Aufrufer melden (LLH-1164).
+pub async fn besetzt_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einsatz_personal_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_stabsfunktion WHERE einsatz_id = ? AND personal_id = ? LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_personal_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(treffer.is_some())
+}
+
 /// Die Sachgebiete, die der mit `benutzer_id` verknüpfte Personaldatensatz in **diesem**
 /// Einsatz besetzt (Detail-Pfad von `EinsatzAnzeige`).
 ///

@@ -310,6 +310,59 @@ async fn snap_name_ueberlebt_das_entfernen_der_disposition() {
     );
 }
 
+/// Das Entlassen feuert `personal`, das einen Stab-Leser ohne Personalrecht nicht erreicht. Hat die
+/// Person ein Sachgebiet besetzt, trägt `stab` den Vermerk „nicht mehr disponiert“ (LLH-1164).
+#[tokio::test]
+async fn entlassen_einer_besetzten_person_feuert_stab() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let weber = person_anlegen(&app, &admin, "Weber", None).await;
+    let weber = disponieren(&app, &admin, einsatz, weber).await;
+    let kurz = person_anlegen(&app, &admin, "Kurz", None).await;
+    let kurz = disponieren(&app, &admin, einsatz, kurz).await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &besetzung_pfad(einsatz, "s1"),
+        &admin,
+        Some(&format!(
+            r#"{{"besetzung_art":"personal","personal_id":{weber}}}"#
+        )),
+    )
+    .await;
+    assert!(status.is_success(), "besetzen: {status}");
+    let mut rx = live.abonniere(einsatz);
+    let mut stab_events = || {
+        let mut n = 0;
+        while let Ok(nachricht) = rx.try_recv() {
+            if nachricht.event == lifeline_hub::live::LiveEvent::Stab {
+                n += 1;
+            }
+        }
+        n
+    };
+
+    let entlassen = |ep: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(entlassen(kurz).await, StatusCode::NO_CONTENT);
+    assert_eq!(stab_events(), 0, "keine Besetzung, kein Stab-Ereignis");
+    assert_eq!(entlassen(weber).await, StatusCode::NO_CONTENT);
+    assert_eq!(stab_events(), 1, "S1 ist nicht mehr disponiert");
+}
+
 // ---------- Statuscodes ----------
 
 #[tokio::test]
