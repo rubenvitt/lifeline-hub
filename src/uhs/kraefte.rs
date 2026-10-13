@@ -107,6 +107,8 @@ pub async fn setze_uhs_tx(
     ep_id: i64,
     uhs_id: Option<i64>,
 ) -> Result<(), AppError> {
+    // Fremd → 404, entlassen oder storniert → 409 (LLH-1079).
+    disposition_repo::fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let r = sqlx::query("UPDATE einsatz_personal SET uhs_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(uhs_id)
         .bind(ep_id)

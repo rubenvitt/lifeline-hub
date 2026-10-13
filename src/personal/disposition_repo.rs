@@ -474,14 +474,39 @@ pub async fn fordere_aktiv_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    match ende.ok_or(AppError::NotFound)?.as_deref() {
+    match ende.ok_or(AppError::NotFound)? {
         None => Ok(()),
-        Some("storniert") => Err(AppError::Conflict(
-            "Die Person ist storniert; erst erneut disponieren".into(),
-        )),
-        Some(_) => Err(AppError::Conflict(
-            "Die Person ist aus dem Einsatz entlassen; erst erneut disponieren".into(),
-        )),
+        Some(als) => Err(beendet_konflikt(&als)),
+    }
+}
+
+/// Der 409 an einer beendeten Kraft (Lebenszyklus), je Endzustand.
+pub fn beendet_konflikt(beendet_als: &str) -> AppError {
+    AppError::Conflict(match beendet_als {
+        "storniert" => "Die Person ist storniert; erst erneut disponieren".into(),
+        _ => "Die Person ist aus dem Einsatz entlassen; erst erneut disponieren".into(),
+    })
+}
+
+/// Wie [`fordere_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
+/// selbst prüfen (mit eigenem Statuscode) oder nur einen Pool haben: eine unbekannte Kraft ist
+/// hier kein Fehler, eine beendete der 409 aus [`beendet_konflikt`] (design.md D6).
+pub async fn fordere_nicht_beendet(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_personal \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NOT NULL",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?;
+    match ende.flatten() {
+        None => Ok(()),
+        Some(als) => Err(beendet_konflikt(&als)),
     }
 }
 

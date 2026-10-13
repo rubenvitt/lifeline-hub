@@ -1011,7 +1011,10 @@ async fn entlassen_und_erneut_disponieren() {
         json.get("beendet_als").is_none_or(|v| v.is_null()),
         "{json}"
     );
-    assert_eq!(namen(&app, &admin, einsatz, "").await, ["Anna", "Bert"]);
+    // Die Liste ordnet nach Disposition; die Reaktivierung disponiert neu.
+    let mut aktiv = namen(&app, &admin, einsatz, "").await;
+    aktiv.sort();
+    assert_eq!(aktiv, ["Anna", "Bert"]);
     assert!(namen(&app, &admin, einsatz, "?entlassene=1")
         .await
         .is_empty());
@@ -1088,4 +1091,65 @@ async fn stornieren_nur_ohne_spur() {
         aktion(&app, &admin, einsatz, fehl, "reaktivieren").await.0,
         StatusCode::OK
     );
+}
+
+/// Spec „Status an Entlassener“ und design.md D6: jeder Schreibweg an einer entlassenen Kraft
+/// außer dem erneuten Disponieren antwortet 409 — auch die Wege anderer Module, die eine Person
+/// binden (Einheit, Besatzung, UHS, Stab, Einsatzleitung, Abschnittsleitung, Schaden) und ihre
+/// Zeitachse.
+#[tokio::test]
+async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, bert).await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(r#"{"adhoc":{"funkrufname":"Florian 1","fahrzeugtyp":"ELW 2"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let fahrzeug = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        StatusCode::OK
+    );
+
+    let leiter = format!(r#"{{"name":"Nord","leiter_id":{anna}}}"#);
+    let besetzung = format!(r#"{{"besetzung_art":"personal","personal_id":{anna}}}"#);
+    let einsatzleiter = format!(r#"{{"einsatzleiter":{{"art":"personal","personal_id":{anna}}}}}"#);
+    let schaden = format!(
+        r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{anna}}}"#
+    );
+    let nachtrag = r#"{"art":"eintreffen","zeitpunkt_at":"2026-10-13T08:00:00Z"}"#.to_string();
+    for (methode, pfad, body) in [
+        ("PUT", format!("einheiten/{einheit}/personal/{anna}"), None),
+        (
+            "PUT",
+            format!("fahrzeuge/{fahrzeug}/besatzung/{anna}"),
+            None,
+        ),
+        ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
+        ("PUT", "stab/besetzung/s1".to_string(), Some(besetzung)),
+        ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
+        ("POST", "abschnitte".to_string(), Some(leiter)),
+        ("POST", "schaeden".to_string(), Some(schaden)),
+        ("POST", format!("personal/{anna}/zeitachse"), Some(nachtrag)),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            body.as_deref(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+    }
 }

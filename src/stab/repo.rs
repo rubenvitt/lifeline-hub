@@ -106,11 +106,15 @@ async fn snap_name_von(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    name.ok_or_else(|| {
+    let name = name.ok_or_else(|| {
         AppError::UnprocessableEntity(format!(
             "Person {personal_id} ist in diesem Einsatz nicht disponiert"
         ))
-    })
+    })?;
+    // Eine entlassene oder stornierte Kraft besetzt nichts mehr (409, LLH-1079).
+    crate::personal::disposition_repo::fordere_nicht_beendet(&mut *conn, einsatz_id, personal_id)
+        .await?;
+    Ok(name)
 }
 
 /// Menschenlesbarer Besetzungszustand für den ETB-Text.

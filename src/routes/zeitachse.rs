@@ -94,6 +94,21 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: i64, kraft: Kraft, beru
     }
 }
 
+/// Nachtrag und Streichung sind Schreibwege an der Kraft: an einer entlassenen oder stornierten
+/// Person und an einer aufgelösten Einheit 409 (LLH-1079, Spec `kraefte-entlassung`), fremd 404.
+async fn fordere_aktiv_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    kraft: Kraft,
+) -> Result<(), AppError> {
+    match kraft {
+        Kraft::Person(id) => {
+            crate::personal::disposition_repo::fordere_aktiv_tx(conn, einsatz_id, id).await
+        }
+        Kraft::Einheit(id) => crate::einheit::repo::fordere_aktiv_tx(conn, einsatz_id, id).await,
+    }
+}
+
 async fn nachtragen(
     state: &AppState,
     einsatz_id: i64,
@@ -108,6 +123,7 @@ async fn nachtragen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
+        fordere_aktiv_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let (ergebnis, beruehrt) = repo::schreibe_tx(
             conn,
@@ -154,6 +170,7 @@ async fn streichen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
+        fordere_aktiv_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let g = repo::streiche_tx(conn, einsatz_id, benutzer_id, kraft, zid, &grund, false).await?;
         let etb_id = crate::etb::system_audit_tx(

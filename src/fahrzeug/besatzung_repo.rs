@@ -42,6 +42,8 @@ pub async fn ordne_besatzung_zu_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
+    // Eine entlassene oder stornierte Kraft fährt nicht mit (409, LLH-1079).
+    crate::personal::disposition_repo::fordere_nicht_beendet(&mut *conn, einsatz_id, ep_id).await?;
     sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(ef_id)
         .bind(ep_id)
