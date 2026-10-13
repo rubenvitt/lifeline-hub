@@ -50,7 +50,9 @@ Einheiten-Vorlagen, was entfernt und was behalten wurde.
 ### Was der Import anlegt
 
 - Genau einen Einsatz der Einsatzart Übung, mit fiktivem Ort und erkennbar erfundenen Namen. Der
-  importierende System-Admin ist seine Einsatzleitung; sonst ist niemand Mitglied.
+  importierende System-Admin ist seine Einsatzleitung; sonst ist niemand Mitglied. Als
+  Einsatzleiter der eigenen Führungsstelle steht der Zugführer der Übungslage, mit dem Eintrag
+  „Einsatzleitung übernommen“ im Einsatztagebuch.
 - Alle Zeiten liegen kurz vor dem Import: der Einsatz läuft seit einigen Stunden, der jüngste
   Eintrag ist wenige Minuten alt. Beim Import entsteht kein Alarm.
 - Fahrzeuge, Personal und Material. Gibt es in der Organisation schon einen Datensatz im Dienst

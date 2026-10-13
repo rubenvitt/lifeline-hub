@@ -235,26 +235,6 @@ export async function fuehrungsstelleOrtFuellen(
 }
 
 /**
- * Setzt den Einsatzleiter der Führungsstelle (LFH-1199), falls noch keiner erfasst ist: der
- * Zugführer der Demo-Daten, seit dem Import. Wer Einsatzdaten, Organigramm oder Funkplan
- * fotografiert, ruft es, damit alle Bilder denselben Einsatzleiter zeigen.
- */
-export async function einsatzleiterFuellen(api: APIRequestContext, demo: DemoEinsatz) {
-  const e = `/api/einsaetze/${demo.id}`;
-  const fs = (await (await api.get(`${e}/fuehrungsstelle`)).json()) as { einsatzleiter?: unknown };
-  if (fs.einsatzleiter) return;
-  const personal = (await (await api.get(`${e}/personal`)).json()) as {
-    id: number;
-    name: string;
-  }[];
-  const max = personal.find((p) => p.name === 'Max Mustermann');
-  expect(max, 'Demo-Person „Max Mustermann“ fehlt').toBeTruthy();
-  await fuelle(api, 'patch', `${e}/fuehrungsstelle`, {
-    einsatzleiter: { art: 'personal', personal_id: max!.id, seit: demo.importiertAt.toISOString() },
-  });
-}
-
-/**
  * Hält die Browser-Uhr an (`page.clock.setFixedTime`), vor dem ersten `goto` aufrufen. Ohne
  * Zeitpunkt: die nächste volle Minute ab jetzt, also kurz nach dem Import und nach den eigenen
  * Füllungen (die der Server mit seiner Uhr stempelt; ein früherer Zeitpunkt zeigte sie in der
