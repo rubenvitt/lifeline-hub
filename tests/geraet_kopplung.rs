@@ -3626,6 +3626,98 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     assert!(!text.contains("\"funktion\""), "{text}");
 }
 
+/// LLH-1153, Spec `funktionsansichten`, „Lagemonitor zeigt Gefahrenzonen und Abschnittsflächen“:
+/// die Antwort des Monitors trägt die Gefahrenzonen des Einsatzes und die Flächen der Abschnitte,
+/// ohne Bezirke, Skizzen, Freitexte und Leiter. `/zonen` und `/abschnitte` bleiben gesperrt.
+#[tokio::test]
+async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    for typ in ["absperrbereich", "evakuierungsbezirk", "freie_skizze"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/zonen"),
+            &admin,
+            Some(&json!({
+                "typ": typ,
+                "geometrie_typ": "Polygon",
+                "geometrie": ZONE_POLY,
+                "label": "Garten Familie Muster",
+                "notiz": "Herr Muster wartet am Tor",
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v}");
+    }
+    let leiter = uhs_kraft(&app, &admin, einsatz, "Leitmann").await;
+    let mut abschnitte = Vec::new();
+    for (name, kurz) in [("EA Nord", "EA-N"), ("EA Süd", "EA-S")] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/abschnitte"),
+            &admin,
+            Some(&json!({
+                "name": name,
+                "kurzbezeichnung": kurz,
+                "leiter_id": leiter,
+                "bemerkung": "Herr Muster koordiniert",
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{name}: {v}");
+        abschnitte.push(v["id"].as_i64().unwrap());
+    }
+    // Nur Nord hat eine Fläche; Süd fehlt auf der Karte.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{basis}/abschnitte/{}/flaeche", abschnitte[0]),
+        &admin,
+        Some(&json!({"flaeche_geojson": ZONE_POLY})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/lagemonitor"), &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v["zonen"], "typ"), ["absperrbereich"]);
+    assert_eq!(v["zonen"][0]["geometrie"], json!(ZONE_POLY));
+    let flaechen = v["abschnitte"].as_array().unwrap();
+    assert_eq!(flaechen.len(), 1, "{v}");
+    assert_eq!(flaechen[0]["id"], json!(abschnitte[0]));
+    assert_eq!(flaechen[0]["bezeichnung"], json!("EA Nord"));
+    assert_eq!(flaechen[0]["kurzbezeichnung"], json!("EA-N"));
+    assert_eq!(flaechen[0]["flaeche_geojson"], json!(ZONE_POLY));
+    let text = v.to_string();
+    for wort in ["Muster", "Leitmann"] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+    for schluessel in [
+        "label",
+        "notiz",
+        "leiter_id",
+        "leiter_name",
+        "bemerkung",
+        "name",
+    ] {
+        assert!(
+            !text.contains(&format!("\"{schluessel}\"")),
+            "Feld {schluessel} in der Antwort: {text}"
+        );
+    }
+
+    // Die Listen der Personen tragen Notizen und Leiter; der Monitor liest sie nicht.
+    for pfad in ["zonen", "abschnitte", "gefahrengebiete"] {
+        let (s, _) = anfrage(&app, "GET", &format!("{basis}/{pfad}"), &monitor, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
+    }
+}
+
 // ---------- Betreuungsstelle (LFH-1041) ----------
 
 /// Legt eine Betreuungsstelle in Betrieb an.

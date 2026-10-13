@@ -65,6 +65,8 @@ const lage: LagemonitorAnzeige = {
       kraefte: 4,
     },
   ],
+  zonen: [],
+  abschnitte: [],
 };
 
 let lagebildAntwort: () => Response;

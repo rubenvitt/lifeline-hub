@@ -3082,12 +3082,26 @@ export interface components {
             /** Format: int64 */
             neu: number;
         };
+        /** @description Die Fläche eines Einsatzabschnitts für die Monitorkarte, ohne Leiter und Freitexte. */
+        LagemonitorAbschnitt: {
+            bezeichnung: string;
+            /** @description GeoJSON-Polygon als String. */
+            flaeche_geojson: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Kurzbezeichnung im Einsatz (z. B. „EA-N“), falls gesetzt. */
+            kurzbezeichnung?: string | null;
+        };
         LagemonitorAnzeige: {
+            /** @description Einsatzabschnitte mit gezeichneter Fläche. */
+            abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
             stand_at: string;
             uhs: components["schemas"]["LagemonitorUhs"][];
+            /** @description Gefahrenzonen; Evakuierungsbezirke und freie Skizzen fehlen. */
+            zonen: components["schemas"]["LagemonitorZone"][];
         };
         /** @description Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`). */
         LagemonitorBetroffene: {
@@ -3153,6 +3167,17 @@ export interface components {
             plaetze: number;
             status: components["schemas"]["UhsStatus"];
             typ: components["schemas"]["UhsTyp"];
+        };
+        /**
+         * @description Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit
+         *     und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.
+         */
+        LagemonitorZone: {
+            /** @description GeoJSON-Geometrie als String, wie in der Zonenliste. */
+            geometrie: string;
+            /** Format: int64 */
+            id: number;
+            typ: components["schemas"]["LageZoneTyp"];
         };
         /**
          * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).

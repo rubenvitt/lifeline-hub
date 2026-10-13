@@ -1,20 +1,30 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../pages/lagekarte/maplibreWorker';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
-import type { LagemonitorUhs } from '../api/types';
+import type { LagemonitorAbschnitt, LagemonitorUhs, LagemonitorZone } from '../api/types';
 import { useRollen } from '../components/instrument';
 import {
   absolutiereProxyAnfrage,
   baueBasemapStyle,
   defaultModus,
 } from '../pages/lagekarte/basemapStil';
+import { wendeKartenDatenAn } from '../pages/lagekarte/kartenDaten';
+import {
+  ABSCHNITT_FARBE,
+  sorgeFuerAbschnittLayer,
+  sorgeFuerZonenLayer,
+} from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
+import { baueMonitorFlaechen } from './lagemonitorFlaechen';
 
-/** Ein Punkt, den die Karte zeigen muss: der Einsatzort und jede verortete UHS. */
+/**
+ * Ein Punkt, den die Karte zeigen muss: der Einsatzort, jede verortete UHS und jeder Stützpunkt
+ * einer Gefahrenzone oder Abschnittsfläche.
+ */
 export interface MonitorPunkt {
   lat: number;
   lon: number;
@@ -45,15 +55,20 @@ export function monitorAusschnitt(
 
 /**
  * Karte des Lagemonitors (Spec `lagemonitor`, „Feste Kachelung ohne Bedienung“): Einsatzgebiet
- * mit Einsatzort und den UHS samt Belegung, **ohne jede Bedienung** (`interactive: false`): kein
- * Verschieben, kein Zoomen, kein Klick. Keine personenbezogene Ebene.
+ * mit Einsatzort, den UHS samt Belegung, den Gefahrenzonen und den Flächen der Einsatzabschnitte
+ * (LLH-1153), **ohne jede Bedienung** (`interactive: false`): kein Verschieben, kein Zoomen, kein
+ * Klick. Keine personenbezogene Ebene.
  */
 export default function LagemonitorKarte({
   einsatzort,
   uhs,
+  zonen = [],
+  abschnitte = [],
 }: {
   einsatzort: MonitorPunkt | null;
   uhs: readonly LagemonitorUhs[];
+  zonen?: readonly LagemonitorZone[];
+  abschnitte?: readonly LagemonitorAbschnitt[];
 }) {
   const { rollen, dunkel } = useRollen();
   const container = useRef<HTMLDivElement>(null);
@@ -63,9 +78,17 @@ export default function LagemonitorKarte({
   const config = configQuery.data;
 
   const verortet = uhs.filter((u) => u.lat != null && u.lon != null);
+  const verortetSchluessel = JSON.stringify(verortet);
+  const flaechenSchluessel = JSON.stringify([zonen, abschnitte]);
+  const flaechen = useMemo(
+    () => baueMonitorFlaechen(zonen, abschnitte),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
+    [flaechenSchluessel],
+  );
   const punkte: MonitorPunkt[] = [
     ...(einsatzort ? [einsatzort] : []),
     ...verortet.map((u) => ({ lat: u.lat!, lon: u.lon! })),
+    ...flaechen.stuetzpunkte,
   ];
   const ausschnitt = monitorAusschnitt(punkte);
   const ausschnittSchluessel = JSON.stringify(ausschnitt);
@@ -90,9 +113,13 @@ export default function LagemonitorKarte({
       transformRequest: absolutiereProxyAnfrage,
     });
     karte.current = map;
+    // Testhaken wie auf der Lagekarte (e2e/geraet-lagemonitor.spec.ts liest die gezeichneten
+    // Flächen); im Prod-Build ist die Zeile weg.
+    if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
       marker.current = [];
       karte.current = null;
+      if (import.meta.env.DEV) delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
       map.remove();
     };
   }, [config, dunkel, hatAusschnitt]);
@@ -115,7 +142,24 @@ export default function LagemonitorKarte({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität
   }, [ausschnittSchluessel, config, dunkel]);
 
-  // Marker: Einsatzort und je UHS ein Schild mit der Belegung.
+  // Gefahrenzonen und Abschnittsflächen als Ebenen der Lagekarte, nach dem Laden des Stils.
+  useEffect(() => {
+    const map = karte.current;
+    if (!map) return;
+    wendeKartenDatenAn(map, 'monitor-flaechen', () => {
+      sorgeFuerAbschnittLayer(map, flaechen.abschnitte);
+      (map.getSource('abschnitte') as maplibregl.GeoJSONSource | undefined)?.setData(
+        flaechen.abschnitte as never,
+      );
+      sorgeFuerZonenLayer(map, flaechen.zonen);
+      (map.getSource('zonen') as maplibregl.GeoJSONSource | undefined)?.setData(
+        flaechen.zonen as never,
+      );
+    });
+  }, [flaechen, config, dunkel, hatAusschnitt]);
+
+  // Marker: Einsatzort, je Abschnittsfläche ihre Bezeichnung und je UHS ein Schild mit der
+  // Belegung.
   useEffect(() => {
     const map = karte.current;
     if (!map) return;
@@ -132,6 +176,22 @@ export default function LagemonitorKarte({
         border: `4px solid ${rollen.grund}`,
       });
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([einsatzort.lon, einsatzort.lat]));
+    }
+    for (const a of flaechen.marken) {
+      const el = document.createElement('div');
+      el.textContent = a.text;
+      el.setAttribute('data-lfh', 'monitor-abschnitt');
+      Object.assign(el.style, {
+        fontSize: '28px',
+        fontWeight: '600',
+        padding: '2px 10px',
+        borderRadius: '6px',
+        whiteSpace: 'nowrap',
+        background: rollen.grund,
+        color: rollen.text,
+        border: `2px solid ${ABSCHNITT_FARBE}`,
+      });
+      neu.push(new maplibregl.Marker({ element: el }).setLngLat([a.lon, a.lat]));
     }
     for (const u of verortet) {
       const el = document.createElement('div');
@@ -151,7 +211,7 @@ export default function LagemonitorKarte({
     for (const m of neu) m.addTo(map);
     marker.current = neu;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
-  }, [JSON.stringify(verortet), einsatzort?.lat, einsatzort?.lon, config, dunkel, rollen]);
+  }, [verortetSchluessel, flaechen, einsatzort?.lat, einsatzort?.lon, config, dunkel, rollen]);
 
   if (!ausschnitt) {
     return (
