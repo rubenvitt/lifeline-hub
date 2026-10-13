@@ -132,6 +132,22 @@ describe('EinheitVorlageDetailPage', () => {
     );
   });
 
+  it('stellt in jeder Zeile Bedienung mit Abstand neben die Kennung, umbrechend (Treffläche)', async () => {
+    handler();
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const fahrzeuge = await screen.findByRole('region', { name: 'Fahrzeuge' });
+    const knopf = within(fahrzeuge).getByRole('button', { name: 'Fahrzeug hinzufügen' });
+    const auswahl = within(fahrzeuge).getByRole('combobox', { name: 'Fahrzeug wählen' });
+    // Die Zeile ist die nächste Hülle um Auswahl und Knopf. Ohne `display: flex` stünden beide
+    // als Inline-Blöcke bündig nebeneinander (gemessen 0 px im Handschuh-Modus).
+    let zeile: HTMLElement | null = knopf;
+    while (zeile && !zeile.contains(auswahl)) zeile = zeile.parentElement;
+    expect(zeile).not.toBeNull();
+    expect(zeile!.style.display).toBe('flex');
+    expect(parseFloat(zeile!.style.columnGap)).toBeGreaterThan(0);
+    expect(parseFloat(zeile!.style.rowGap)).toBeGreaterThan(0);
+  });
+
   it('nennt Warnungen am Fahrzeug als Wort: außer Dienst, auch in …', async () => {
     handler();
     renderDetail(RETTUNGSSTAFFEL.id);

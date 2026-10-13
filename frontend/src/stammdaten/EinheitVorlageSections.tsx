@@ -1,4 +1,4 @@
-import { Button, Space, Typography } from 'antd';
+import { Button, Space, Typography, theme } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
@@ -43,10 +43,23 @@ interface SectionProps {
 /** Breite der Auswahlfelder in einer Zeile. */
 const SELECT_STYLE = { minWidth: 180 };
 
-/** Eine Zeile: links Kennung und Marken, rechts Bedienung; bricht schmal um. */
+/**
+ * Eine Zeile: links Kennung und Marken, rechts Bedienung; bricht schmal um. Die Abstände folgen
+ * der Dichte (Handschuh: Zeilenabstand 16 px, Leitlinie Kriterium 2), damit Kennungs-Link,
+ * Auswahl und Knopf nie bündig aneinanderstoßen.
+ */
 function Row({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+  const { token } = theme.useToken();
   return (
-    <PaneelZeile style={{ flexWrap: 'wrap', rowGap: 8 }}>
+    <PaneelZeile
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: token.margin,
+        rowGap: token.marginSM,
+      }}
+    >
       <Space size={8} wrap style={{ flex: '1 1 240px', minWidth: 0 }}>
         {children}
       </Space>
