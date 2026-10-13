@@ -12,6 +12,10 @@ ALTER TABLE einsatz_personal ADD COLUMN beendet_at TEXT;
 ALTER TABLE einsatz_personal ADD COLUMN beendet_von INTEGER REFERENCES benutzer(id);
 ALTER TABLE einsatz_personal ADD COLUMN beendet_als TEXT
     CHECK (beendet_als IS NULL OR beendet_als IN ('entlassen', 'storniert'));
+-- Die letzte Entlassung bleibt über das erneute Disponieren hinaus stehen: wer einmal entlassen
+-- war, war im Einsatz und lässt sich nicht mehr stornieren (design.md D3), auch wenn seine
+-- Zeitachse leer blieb und das erneute Disponieren die Storno-Frist neu beginnen ließe.
+ALTER TABLE einsatz_personal ADD COLUMN zuletzt_entlassen_at TEXT;
 
 ALTER TABLE einsatz_fahrzeug ADD COLUMN beendet_at TEXT;
 ALTER TABLE einsatz_fahrzeug ADD COLUMN beendet_von INTEGER REFERENCES benutzer(id);

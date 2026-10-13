@@ -610,9 +610,12 @@ async fn set_beendet_tx(
     jetzt: &str,
     als: crate::entlassung::BeendetAls,
 ) -> Result<(), AppError> {
+    // `zuletzt_entlassen_at` überdauert das erneute Disponieren (Storno-Sperre, design.md D3).
     let r = sqlx::query(
-        "UPDATE einsatz_personal SET beendet_at = ?, beendet_von = ?, beendet_als = ? \
-         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NULL",
+        "UPDATE einsatz_personal SET beendet_at = ?1, beendet_von = ?2, beendet_als = ?3, \
+             zuletzt_entlassen_at = CASE WHEN ?3 = 'entlassen' THEN ?1 \
+                                         ELSE zuletzt_entlassen_at END \
+         WHERE id = ?4 AND einsatz_id = ?5 AND beendet_at IS NULL",
     )
     .bind(jetzt)
     .bind(benutzer_id)
@@ -682,15 +685,29 @@ async fn find_storno_hindernis_tx(
     ep_id: i64,
     jetzt: &str,
 ) -> Result<Option<String>, AppError> {
-    let (disponiert_at, einheit, fahrzeug, uhs): (String, Option<i64>, Option<i64>, Option<i64>) =
-        sqlx::query_as(
-            "SELECT disponiert_at, einheit_id, fahrzeug_id, uhs_id FROM einsatz_personal \
-             WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(ep_id)
-        .bind(einsatz_id)
-        .fetch_one(&mut *conn)
-        .await?;
+    let (disponiert_at, einheit, fahrzeug, uhs, entlassen_at): (
+        String,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "SELECT disponiert_at, einheit_id, fahrzeug_id, uhs_id, zuletzt_entlassen_at \
+         FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    // Wer einmal entlassen war, war im Einsatz: das erneute Disponieren setzt die Frist nicht
+    // zurück (Review LLH-1079).
+    if entlassen_at.is_some() {
+        return Ok(Some(
+            "Die Person war schon einmal aus dem Einsatz entlassen; \
+             die Person lässt sich entlassen"
+                .into(),
+        ));
+    }
     let fremde_ereignisse: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_kraft_zeitachse \
          WHERE personal_id = ? AND gestrichen_at IS NULL \

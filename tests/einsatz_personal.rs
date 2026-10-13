@@ -1093,6 +1093,52 @@ async fn stornieren_nur_ohne_spur() {
     );
 }
 
+/// Storno nach erneutem Disponieren (Review LLH-1079, S3): wer einmal entlassen war, war im
+/// Einsatz. Auch wenn die Zeitachse leer blieb (Status ohne Marke) und das erneute Disponieren
+/// die Frist neu beginnen ließe, ist ein Storno 422; die Person lässt sich nur entlassen.
+#[tokio::test]
+async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
+    let (app, pool) = setup_mit_pool().await;
+    // Ohne Marke am Status bleibt die Zeitachse leer; nur dann fiele der Storno durch.
+    sqlx::query("UPDATE personal_status SET zeitachse_marke = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Die Person war schon einmal aus dem Einsatz entlassen; die Person lässt sich entlassen",
+        "{json}"
+    );
+    // Ein Storno ist dagegen keine Entlassung: danach bleibt ein neuer Storno möglich.
+    let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+}
+
 /// Spec „Status an Entlassener“ und design.md D6: jeder Schreibweg an einer entlassenen Kraft
 /// außer dem erneuten Disponieren antwortet 409 — auch die Wege anderer Module, die eine Person
 /// binden (Einheit, Besatzung, UHS, Stab, Einsatzleitung, Abschnittsleitung, Schaden) und ihre
