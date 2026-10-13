@@ -169,6 +169,17 @@ describe('baueMarker', () => {
     expect(byKey('uhs-5')?.farbe).toBe(rollenFarbe('bedien', token));
     expect(byKey('uhs-5')?.farbe).not.toBe(rollenFarbe('marke', token));
   });
+
+  // UHS tragen keine eigene Organisation; ihr Zeichen steht in der des Betreibers (LLH-1161).
+  it('zeichnet die UHS in der Organisations-Vorgabe des Hubs, ohne Vorgabe neutral', () => {
+    const liste = [uhs({ id: 5, lat: 50.1, lon: 8.1 })];
+    const tz = (org?: string | null) =>
+      baueMarker(undefined, liste, [], token, org).verortet.find((m) => m.schluessel === 'uhs-5')
+        ?.tz;
+    expect(tz('feuerwehr')).toMatchObject({ grundzeichen: 'stelle', organisation: 'feuerwehr' });
+    expect(tz(null)).not.toHaveProperty('organisation');
+    expect(tz()).not.toHaveProperty('organisation');
+  });
 });
 
 function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
@@ -232,6 +243,14 @@ describe('baueBetreuungMarker (LFH-673)', () => {
     );
     expect(verortet).toEqual([]);
     expect(nichtVerortet).toEqual([{ typ: 'betreuungsstelle', id: 4, label: 'AS Rathaus' }]);
+  });
+  it('zeichnet die Stelle in der Organisations-Vorgabe des Hubs (LLH-1161)', () => {
+    const { verortet } = baueBetreuungMarker([stelle({ lat: 1, lon: 2 })], token, 'thw');
+    expect(verortet[0].tz).toEqual({
+      grundzeichen: 'stelle',
+      fachaufgabe: 'betreuung',
+      organisation: 'thw',
+    });
   });
 });
 
