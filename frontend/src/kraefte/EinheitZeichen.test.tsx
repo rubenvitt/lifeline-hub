@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { ZEICHEN_UNTERLAGE } from '../zeichen/EinsatzZeichen';
-import EinheitZeichen from './EinheitZeichen';
+import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 
 // Die Spalte „TZ“ im Meldebild (LFH-835): @einsatzzeichen, und ein gespeicherter Unsinnswert
 // bringt die Zeile nicht zum Absturz (vorher warf die Altkomponente ohne try/catch). Belegt über
@@ -50,5 +50,30 @@ describe('EinheitZeichen', () => {
     expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toHaveStyle({
       backgroundColor: ZEICHEN_UNTERLAGE,
     });
+  });
+});
+
+describe('FahrzeugZeichen', () => {
+  const beschreibung = () =>
+    document.querySelector('[data-lfh="fahrzeug-zeichen"] svg desc')?.textContent ?? null;
+  const tz = {
+    fahrzeugtyp: null,
+    traegerorganisation: null,
+    opta: null,
+    fachaufgabe: null,
+    organisation: null,
+  };
+
+  it('leitet Grundzeichen und Organisation aus Typ und Träger ab, wie die Lagekarte', () => {
+    renderMitProviders(
+      <FahrzeugZeichen tz={{ ...tz, fahrzeugtyp: 'HLF 20', traegerorganisation: 'FF Musterstadt' }} />,
+    );
+    expect(beschreibung()).toMatch(/Organisation: Feuerwehr/);
+    expect(beschreibung()).toMatch(/Brandbekämpfung/);
+  });
+
+  it('fällt ohne Angaben auf das Grundzeichen Fahrzeug zurück, nie auf ein leeres Zeichen', () => {
+    renderMitProviders(<FahrzeugZeichen tz={tz} />);
+    expect(beschreibung()).toMatch(/^Grundzeichen: /);
   });
 });
