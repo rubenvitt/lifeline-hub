@@ -14,7 +14,7 @@ import {
 } from './kern';
 
 /**
- * Bilder des Kapitels „Fernmeldewesen: Funkplan, Fernmeldeskizze und Kommunikationsplan“
+ * Bilder des Kapitels „Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan“
  * (`docs/anwender/kapitel/funkplan.md`). Seit LLH-1180 liegen die Seiten im Modul Fernmeldewesen
  * (Reiter unter dem h1), die Altadressen unter „Stab“ leiten um.
  *
