@@ -397,6 +397,19 @@ async fn org_grenze() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = send(
+        &app,
+        "PUT",
+        &bert,
+        &format!("/{a}/personal"),
+        r#"{"personal":[]}"#,
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "Stammbesetzung fremder Vorlage"
+    );
 
     // Verweise auf Typ, Vorlage und Fahrzeug der anderen Org sind 422.
     let (status, _) = create(&app, &bert, &format!(r#"{{"name":"X","typ_id":{zug_a}}}"#)).await;
