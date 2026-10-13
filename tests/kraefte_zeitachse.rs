@@ -530,15 +530,51 @@ async fn nachtrag_sendet_live_events() {
 
 const PERSONAL: &[(&str, &str)] = &[("personal", "personal_id")];
 
+/// Zweite Person der Einheit, die per eigenem Status schon eingetroffen ist: ihre Kopie eines
+/// Eintreffens aus dem Fan-out wird ausgelassen, ihre Zeitachse ändert sich also nicht.
+async fn schon_eingetroffen_in_einheit(w: &Welt, name: &str) -> i64 {
+    let ep = stammpersonal_disponieren(&w.app, &w.admin, w.e, name).await;
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("{}/personal/{ep}", w.einheit_pfad()),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let im_einsatz = katalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["zeitachse_marke"] == "eintreffen")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _) = anfrage(
+        &w.app,
+        "PATCH",
+        &format!("/api/einsaetze/{}/personal/{ep}", w.e),
+        &w.admin,
+        Some(&format!(r#"{{"status_id":{im_einsatz}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    ep
+}
+
 /// Ein markierter Fahrzeugstatus schreibt per Fan-out die Zeitachse der Personen seiner Einheit;
 /// `GET …/personal/{ep}/zeitachse` hängt am Personalrecht, also meldet der Wechsel `personal`
-/// genau für diese Personen (LLH-1185). Eine Person außerhalb der Einheit, ein Status ohne Marke
-/// und ein zweites Fahrzeug, dessen Eintreffen die Einheit schon trägt, melden nichts.
+/// genau für diese Personen (LLH-1185). Eine Person außerhalb der Einheit, eine schon
+/// eingetroffene Person der Einheit, ein Status ohne Marke und ein zweites Fahrzeug, dessen
+/// Eintreffen die Einheit schon trägt, melden nichts.
 #[tokio::test]
 async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
     let (app, live) = setup_mit_live().await;
     let w = welt_in(app).await;
     let fremd = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let eingetroffen = schon_eingetroffen_in_einheit(&w, "Carla").await;
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
@@ -599,7 +635,7 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
     assert_eq!(
         objekt_ereignisse(&mut rx, PERSONAL),
         vec![("personal".to_string(), w.ep)],
-        "Fan-out auf die Person der Einheit, nicht auf {fremd}"
+        "Fan-out auf die Person der Einheit, nicht auf {fremd} und {eingetroffen}"
     );
     assert_eq!(patch(fahrzeuge[1], am_ort).await, StatusCode::OK);
     assert_eq!(
@@ -610,12 +646,13 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
 }
 
 /// Der Handstatus einer Einheit ohne Fahrzeug schreibt denselben Fan-out und meldet ebenso
-/// `personal` genau für die Personen der Einheit (LLH-1185).
+/// `personal` genau für die Personen der Einheit, deren Zeitachse sich ändert (LLH-1185).
 #[tokio::test]
 async fn handstatus_meldet_personal_fuer_den_fan_out() {
     let (app, live) = setup_mit_live().await;
     let w = welt_in(app).await;
     let fremd = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let eingetroffen = schon_eingetroffen_in_einheit(&w, "Carla").await;
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
@@ -632,7 +669,7 @@ async fn handstatus_meldet_personal_fuer_den_fan_out() {
     .await;
 
     let mut rx = live.abonniere(w.e);
-    let setzen = |status: i64| {
+    let set = |status: i64| {
         let (app, admin, pfad) = (w.app.clone(), w.admin.clone(), w.einheit_pfad());
         async move {
             anfrage(
@@ -647,16 +684,16 @@ async fn handstatus_meldet_personal_fuer_den_fan_out() {
         }
     };
 
-    assert_eq!(setzen(ohne_marke).await, StatusCode::OK);
+    assert_eq!(set(ohne_marke).await, StatusCode::OK);
     assert_eq!(objekt_ereignisse(&mut rx, PERSONAL), vec![], "ohne Marke");
-    assert_eq!(setzen(am_ort).await, StatusCode::OK);
+    assert_eq!(set(am_ort).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, PERSONAL),
         vec![("personal".to_string(), w.ep)],
-        "Fan-out auf die Person der Einheit, nicht auf {fremd}"
+        "Fan-out auf die Person der Einheit, nicht auf {fremd} und {eingetroffen}"
     );
-    assert_eq!(setzen(ohne_marke).await, StatusCode::OK);
-    assert_eq!(setzen(am_ort).await, StatusCode::OK);
+    assert_eq!(set(ohne_marke).await, StatusCode::OK);
+    assert_eq!(set(am_ort).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, PERSONAL),
         vec![],

@@ -194,8 +194,8 @@ pub async fn aktualisieren(
         let mut beruehrt = Vec::new();
         if has_status_changed {
             // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
-            // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung). Das Live-Event
-            // `fahrzeug` lädt die Zeitachse im Client mit neu.
+            // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
+            // ihrer Personen; deren Leser erreicht nach dem Commit `personal`.
             if let Some(sid) = nachher.status_id {
                 if let Some((_, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
                     conn,
