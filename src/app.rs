@@ -673,6 +673,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/stab/infotelefon/zaehler",
+            get(routes::infotelefon::zaehler),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/infotelefon/{aid}",
+            get(routes::infotelefon::detail),
+        )
+        .route(
             "/api/einsaetze/{id}/stab/infotelefon/{aid}/status",
             post(routes::infotelefon::status_setzen),
         )

@@ -4,7 +4,7 @@
 //! erbt die Sperre des Stab-Moduls. Live: `LiveEvent::Infotelefon` nur mit Kennungen, nie mit
 //! Namen, Nummern oder Notizen.
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -14,8 +14,10 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Stab;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
-use crate::infotelefon::repo::{self, AnrufEingabe};
-use crate::infotelefon::{InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus};
+use crate::infotelefon::repo::{self, AnrufEingabe, AnrufFilter};
+use crate::infotelefon::{
+    InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus, InfotelefonZaehler,
+};
 use crate::live::LiveEvent;
 
 fn sse(state: &AppState, einsatz_id: i64, id: i64) {
@@ -24,12 +26,65 @@ fn sse(state: &AppState, einsatz_id: i64, id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Infotelefon, "anruf_id", id);
 }
 
-/// GET /api/einsaetze/{id}/stab/infotelefon — jüngster Eingang zuerst.
+#[derive(Debug, Deserialize)]
+pub struct ListParams {
+    status: Option<String>,
+    vor_zeit: Option<String>,
+    vor_id: Option<i64>,
+    limit: Option<i64>,
+}
+
+/// Liest den Filter. Unbekannter Status → 400 (das Feld für sich), bei Liste und Zählung gleich.
+fn parse_filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
+    let status = crate::routes::support::parse_enum_opt(
+        InfotelefonStatus::parse,
+        status.map(str::trim).filter(|s| !s.is_empty()),
+        "Ungültiger Status (erlaubt: offen, erledigt)",
+    )?;
+    Ok(AnrufFilter { status })
+}
+
+/// GET /api/einsaetze/{id}/stab/infotelefon — immer eine Seite, jüngster Eingang zuerst
+/// (`status`, Cursor `vor_zeit` + `vor_id`, `limit`; LLH-732, design.md D2, Regeln über
+/// [`crate::kommunikation::parse_page`]).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
+    Query(p): Query<ListParams>,
 ) -> Result<Json<Vec<InfotelefonAnrufAnzeige>>, AppError> {
-    Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
+    let filter = parse_filter(p.status.as_deref())?;
+    let seite = crate::kommunikation::parse_page(p.vor_zeit.as_deref(), p.vor_id, p.limit)?;
+    Ok(Json(
+        repo::list_page(&state.pool, ctx.einsatz.id, &filter, &seite).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CountParams {
+    status: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/stab/infotelefon/zaehler — dieselbe Menge wie die Liste über alle
+/// Seiten (LLH-732). Seitenparameter gehören nicht zum Filter und werden nicht gelesen.
+pub async fn zaehler(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+    Query(p): Query<CountParams>,
+) -> Result<Json<InfotelefonZaehler>, AppError> {
+    let filter = parse_filter(p.status.as_deref())?;
+    Ok(Json(
+        repo::count(&state.pool, ctx.einsatz.id, &filter).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/stab/infotelefon/{aid} — ein Anruf, 404 bei fremdem Einsatz. Für den
+/// Deeplink auf einen Anruf außerhalb der geladenen Seiten.
+pub async fn detail(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
+) -> Result<Json<InfotelefonAnrufAnzeige>, AppError> {
+    Ok(Json(repo::laden(&state.pool, ctx.einsatz.id, aid).await?))
 }
 
 #[derive(Debug, Deserialize)]
