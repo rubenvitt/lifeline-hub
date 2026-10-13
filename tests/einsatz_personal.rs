@@ -589,3 +589,214 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
         "absentes Feld lässt die Bemerkung unverändert"
     );
 }
+
+// ---------- Fremd-Ereignisse (LLH-1182) ----------
+
+/// Ad-hoc-Kraft mit Stärke-Position; liefert die `ep_id`.
+async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str, position: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&format!(
+            r#"{{"adhoc":{{"name":"{name}","staerke_position":"{position}"}}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Aktive UHS mit der Kraft `ep`; liefert die `uhs_id`.
+async fn uhs_mit_kraft(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        cookie,
+        Some(r#"{"typ":"behandlungsplatz","bezeichnung":"UHS 1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let uhs = json["id"].as_i64().unwrap();
+    for (methode, pfad, body) in [
+        (
+            "POST",
+            format!("uhs/{uhs}/status"),
+            Some(r#"{"status":"aktiv"}"#),
+        ),
+        ("PUT", format!("uhs/{uhs}/kraefte/{ep}"), None),
+    ] {
+        let (s, json) = anfrage(
+            app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            cookie,
+            body,
+        )
+        .await;
+        assert!(s.is_success(), "{pfad}: {s} {json}");
+    }
+    uhs
+}
+
+async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) -> i64 {
+    let einheit = einheit_bilden(app, cookie, einsatz, "1. Zug").await;
+    let (s, _) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{ep}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "zuordnen");
+    einheit
+}
+
+const FREMD: &[(&str, &str)] = &[
+    ("einheit", "einheit_id"),
+    ("uhs", "uhs_id"),
+    ("schaden", "schaden_id"),
+];
+
+fn ereignis(tag: &str, id: i64) -> (String, i64) {
+    (tag.to_string(), id)
+}
+
+/// Das Entlassen ändert die Stärke einer UHS, an der die Kraft arbeitet (LFH-1045), und nimmt
+/// einem Schaden die geschädigte Einsatzkraft samt Namen (ON DELETE SET NULL). `personal`
+/// erreicht UHS- und Schadenleser ohne Personalrecht nicht; `uhs` bzw. `schaden` tragen die
+/// Änderung, aber nur, wenn die Kraft dort steht.
+#[tokio::test]
+async fn entlassen_feuert_uhs_und_schaden_nur_bei_betroffener_kraft() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ohne = kraft(&app, &admin, einsatz, "Ohne Bezug", "mannschaft").await;
+    let an_uhs = kraft(&app, &admin, einsatz, "An der UHS", "mannschaft").await;
+    let geschaedigt = kraft(&app, &admin, einsatz, "Geschädigt", "mannschaft").await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, an_uhs).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &admin,
+        Some(&format!(
+            r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let schaden = json["id"].as_i64().unwrap();
+
+    let mut rx = live.abonniere(einsatz);
+    let entlassen = |ep: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(entlassen(ohne).await, StatusCode::NO_CONTENT);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
+    assert_eq!(entlassen(an_uhs).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Stärke der UHS geändert"
+    );
+    assert_eq!(entlassen(geschaedigt).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("schaden", schaden)],
+        "Geschädigte Einsatzkraft gelöst"
+    );
+    let (_, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/schaeden/{schaden}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        json.get("geschaedigt_personal_id")
+            .is_none_or(|v| v.is_null()),
+        "die Ansicht des Schadens hat sich wirklich geändert: {json}"
+    );
+}
+
+/// Die Stärke-Position zeigt die Mitgliederliste der Einheit, und die UHS zählt ihre Kräfte nach
+/// ihr. Der PATCH meldet `einheit` bzw. `uhs` genau dann, wenn sich die wirksame Position ändert,
+/// nicht bei Status, Bemerkung oder gleichem Wert.
+#[tokio::test]
+async fn staerke_position_aendern_feuert_einheit_und_uhs_nur_bei_wirksamer_aenderung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = kraft(&app, &admin, einsatz, "Frei", "mannschaft").await;
+    let mitglied = kraft(&app, &admin, einsatz, "Mitglied", "mannschaft").await;
+    let an_uhs = kraft(&app, &admin, einsatz, "An der UHS", "mannschaft").await;
+    let einheit = einheit_mit(&app, &admin, einsatz, mitglied).await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, an_uhs).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let patch = |ep: i64, body: &'static str| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &admin,
+                Some(body),
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(
+        patch(frei, r#"{"staerke_position":"fuehrer"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "freie Kraft");
+    assert_eq!(
+        patch(mitglied, r#"{"staerke_position":"fuehrer"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Position eines Mitglieds"
+    );
+    assert_eq!(
+        patch(mitglied, r#"{"staerke_position":"fuehrer"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "gleicher Wert");
+    assert_eq!(
+        patch(mitglied, r#"{"bemerkung":"vor Ort"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "nur Bemerkung");
+    assert_eq!(
+        patch(an_uhs, r#"{"staerke_position":null}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Position einer UHS-Kraft geleert"
+    );
+}

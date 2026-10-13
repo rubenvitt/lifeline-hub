@@ -210,7 +210,6 @@ pub async fn aktualisieren(
         parse_enum(StaerkePosition::parse, pos, "Ungültige Stärke-Position")?;
     }
 
-    let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm — wie bei `staerke_position`.
@@ -219,11 +218,13 @@ pub async fn aktualisieren(
     let staerke_position = body.staerke_position.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Dispo-UPDATE + (nur bei Statuswechsel) System-ETB-Eintrag atomar in
-    // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische, aufgelöste
-    // Anzeige für den ETB-Text UND die Response; SSE erst nach dem Commit.
+    // EINER Tx (BEGIN IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload
+    // liefert die frische, aufgelöste Anzeige für den ETB-Text UND die Response; SSE erst nach
+    // dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let nachher = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         disposition_repo::aktualisiere_tx(
             conn,
             einsatz_id,
@@ -259,9 +260,20 @@ pub async fn aktualisieren(
             )
             .await?;
         }
-        Ok(nachher)
+        Ok((vorher, nachher))
     })?;
     sse_personal(&state, einsatz_id, ep_id);
+    // Die wirksame Stärke-Position zeigt die Mitgliederliste der Einheit, und die UHS zählt ihre
+    // Kräfte nach ihr (LFH-1045); `personal` erreicht deren Leser ohne Personalrecht nicht
+    // (LLH-1182). Status und Bemerkung zeigen beide Ansichten nicht.
+    if vorher.staerke_position != nachher.staerke_position {
+        if let Some(einheit_id) = nachher.einheit_id {
+            super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+        }
+        if let Some(uhs_id) = nachher.uhs_id {
+            super::einsatz_uhs::sse_uhs(&state, einsatz_id, uhs_id);
+        }
+    }
     Ok(Json(nachher))
 }
 
@@ -281,42 +293,65 @@ pub async fn entfernen(
         person_bezeichnung(&anzeige)
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (was_einsatzleiter, was_besetzt, einheiten, abschnitte) =
-        crate::write_retry!(&state.pool, |conn| {
-            let el = crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(conn, einsatz_id, ep_id)
-                .await?;
-            let stab = crate::stab::repo::is_besetzt_tx(conn, einsatz_id, ep_id).await?;
-            let einheiten = crate::einheit::mitglied_repo::load_betroffene_einheiten_tx(
+    let betroffen = crate::write_retry!(&state.pool, |conn| {
+        let betroffen = EntlassenBetroffen {
+            einsatzleiter: crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(
                 conn, einsatz_id, ep_id,
             )
-            .await?;
-            let abschnitte = crate::einsatzabschnitt::repo::load_geleitete_abschnitte_tx(
+            .await?,
+            stab: crate::stab::repo::is_besetzt_tx(conn, einsatz_id, ep_id).await?,
+            einheiten: crate::einheit::mitglied_repo::load_betroffene_einheiten_tx(
                 conn, einsatz_id, ep_id,
             )
-            .await?;
-            disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
-            Ok((el, stab, einheiten, abschnitte))
-        })?;
+            .await?,
+            abschnitte: crate::einsatzabschnitt::repo::load_geleitete_abschnitte_tx(
+                conn, einsatz_id, ep_id,
+            )
+            .await?,
+            uhs: crate::uhs::kraefte::uhs_der_kraft_tx(conn, einsatz_id, ep_id).await?,
+            schaeden: crate::schaden::repo::load_geschaedigt_durch_tx(conn, einsatz_id, ep_id)
+                .await?,
+        };
+        disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
+        Ok(betroffen)
+    })?;
     sse_personal(&state, einsatz_id, ep_id);
     // `personal` erreicht nur Leser mit Personal- oder Kartenrecht. Den Vermerk „nicht mehr
     // disponiert“ (ON DELETE SET NULL) lesen Führungsstelle und Stab mit eigenem Gate; sie hängen
     // an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in LFH-1106). Ebenso tragen
-    // Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person (LLH-1178).
-    if was_einsatzleiter {
+    // Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person (LLH-1178), die UHS ihre
+    // Stärke und ein Schaden die geschädigte Einsatzkraft (LLH-1182).
+    if betroffen.einsatzleiter {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
     }
-    if was_besetzt {
+    if betroffen.stab {
         state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
     }
-    for einheit_id in einheiten {
+    for einheit_id in betroffen.einheiten {
         super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
     }
-    for abschnitt_id in abschnitte {
+    for abschnitt_id in betroffen.abschnitte {
         super::einsatzabschnitt::sse_abschnitt(&state, einsatz_id, abschnitt_id);
     }
+    if let Some(uhs_id) = betroffen.uhs {
+        super::einsatz_uhs::sse_uhs(&state, einsatz_id, uhs_id);
+    }
+    for schaden_id in betroffen.schaeden {
+        super::einsatz_schaden::sse_schaden(&state, einsatz_id, schaden_id);
+    }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Was eine entlassene Person außerhalb des Personalmoduls trug, in der Transaktion vor dem
+/// DELETE gefragt; jede Ansicht bekommt nach dem Commit ihr eigenes Ereignis.
+struct EntlassenBetroffen {
+    einsatzleiter: bool,
+    stab: bool,
+    einheiten: Vec<i64>,
+    abschnitte: Vec<i64>,
+    uhs: Option<i64>,
+    schaeden: Vec<i64>,
 }
 
 #[derive(Debug, Deserialize)]
