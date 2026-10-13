@@ -24,9 +24,9 @@ import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlae
 import { materialStatus, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
 import {
-  brauchtOhneFahrzeugKnoten,
+  needsOhneFahrzeugKnoten,
   kraeftebaum,
-  kumuliere,
+  accumulateStaerke,
   schluesselBisStufe,
   type FremdeBesatzung,
   type KraeftebaumKnoten,
@@ -120,7 +120,7 @@ export interface BesatzungAnzeige {
 /** Angaben einer Personenzeile: Positionsmarke, „EF“ und „fährt auf“. */
 export interface PersonAnzeige {
   position: StaerkePosition | null;
-  istFuehrer: boolean;
+  isFuehrer: boolean;
   faehrtAuf: string | null;
 }
 
@@ -374,7 +374,7 @@ function personZeile(x: PersonImBaum): RasterZeile {
     status: personStatus(ep),
     person: {
       position: ep.staerke_position ?? null,
-      istFuehrer: x.istFuehrer,
+      isFuehrer: x.isFuehrer,
       faehrtAuf: x.faehrtAuf,
     },
   };
@@ -414,7 +414,7 @@ function mittelZeilen(
     };
   });
   const personen = m.ohneFahrzeug.map(personZeile);
-  if (brauchtOhneFahrzeugKnoten(m)) {
+  if (needsOhneFahrzeugKnoten(m)) {
     zeilen.push({
       ...LEER,
       key: `ofz-${zweig}`,
@@ -472,7 +472,7 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
   // Eigenstärke je Einheit über die gefilterten Listen, kumuliert über den Baum (D2).
   const eigen = new Map<number, ReturnType<typeof verteilungAus>>();
   const einheitKnoten = wurzeln.flatMap((w) => (w.art === 'einheit' ? [w.knoten] : []));
-  const merke = (k: KraeftebaumKnoten) => {
+  const collectEigen = (k: KraeftebaumKnoten) => {
     eigen.set(
       k.einheit.id,
       verteilungAus(
@@ -480,10 +480,10 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
         k.mittel.fahrzeuge.map((f) => f.fahrzeug),
       ),
     );
-    k.kinder.forEach(merke);
+    k.kinder.forEach(collectEigen);
   };
-  einheitKnoten.forEach(merke);
-  const kumuliert = kumuliere(einheitKnoten, (x) => eigen.get(x.id)!.staerke);
+  einheitKnoten.forEach(collectEigen);
+  const kumuliert = accumulateStaerke(einheitKnoten, (x) => eigen.get(x.id)!.staerke);
 
   const einheitZeile = (k: KraeftebaumKnoten): RasterZeile => {
     const x = k.einheit;

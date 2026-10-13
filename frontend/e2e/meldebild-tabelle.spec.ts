@@ -5,7 +5,7 @@ import {
   anmelden,
   einsatzAnlegen,
   seedeKraefte,
-  seedeKraeftebaum,
+  seedKraeftebaum,
 } from './meldebild-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
@@ -349,7 +349,7 @@ test('Meldebild als Kräftebaum: Einheit → Untergruppe → Fahrzeug → Besatz
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Kräftebaum ${Date.now()}`);
-  const b = await seedeKraeftebaum(page, einsatzId);
+  const b = await seedKraeftebaum(page, einsatzId);
   for (const breite of [1366, 1440]) {
     await page.setViewportSize({ width: breite, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);

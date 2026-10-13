@@ -60,7 +60,7 @@ export interface GesaeterBaum {
  * Zugführer als Besatzung, in der Gruppe eine Kraft ohne Fahrzeug. Ohne Unterstellung und
  * Besatzung zeigte das Meldebild nur flache Zeilen — jede Baum-Messung wäre grün durch Nichtstun.
  */
-export async function seedeKraeftebaum(page: Page, einsatzId: string): Promise<GesaeterBaum> {
+export async function seedKraeftebaum(page: Page, einsatzId: string): Promise<GesaeterBaum> {
   const basis = `/api/einsaetze/${einsatzId}`;
   const neu = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}${pfad}`, { data });

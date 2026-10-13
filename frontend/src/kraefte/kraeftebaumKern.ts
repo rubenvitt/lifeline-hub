@@ -31,7 +31,7 @@ import type { StaerkeSumme } from './kraeftebild';
  * sortiert) → „Ohne Fahrzeug“ → Material → Untereinheiten (Abschnittsrang, dann Eingabefolge).
  * Personen: Einheitsführer (EF), dann F, UF, M, ohne Position, dann Name.
  *
- * STÄRKE kumuliert {@link kumuliere} über eine übergebene Eigenstärke: der Kern zählt keine Köpfe
+ * STÄRKE kumuliert {@link accumulateStaerke} über eine übergebene Eigenstärke: der Kern zählt keine Köpfe
  * selbst, die Zählung bleibt bei `verdichte` (Heimat der Kräftezahl, `frontend/AGENTS.md`).
  */
 
@@ -132,24 +132,24 @@ export function einheitenBaum(
     const a = abschnittVon(x);
     return a != null && rang.has(a) ? rang.get(a)! : Number.MAX_SAFE_INTEGER;
   };
-  const ordne = (liste: readonly Einheit[]) =>
+  const sortByRang = (liste: readonly Einheit[]) =>
     liste
       .map((x, i) => ({ x, i }))
       .sort((p, q) => rangVon(p.x) - rangVon(q.x) || p.i - q.i)
       .map((p) => p.x);
 
   const besucht = new Set<number>();
-  const baue = (x: Einheit): EinheitKnoten => {
+  const build = (x: Einheit): EinheitKnoten => {
     besucht.add(x.id);
-    const kinder = ordne((kinderJe.get(x.id) ?? []).filter((k) => !besucht.has(k.id)));
+    const kinder = sortByRang((kinderJe.get(x.id) ?? []).filter((k) => !besucht.has(k.id)));
     // Erst alle Kinder markieren, dann absteigen: ein Kind darf nicht über ein Geschwister
     // zweimal erreicht werden.
     for (const k of kinder) besucht.add(k.id);
-    return { einheit: x, abschnittId: abschnittVon(x), kinder: kinder.map(baue) };
+    return { einheit: x, abschnittId: abschnittVon(x), kinder: kinder.map(build) };
   };
-  const baum = ordne(wurzeln).map(baue);
+  const baum = sortByRang(wurzeln).map(build);
   // Zyklen (a ↔ b) hätten keine Wurzel — sie dürfen trotzdem nicht verschwinden.
-  for (const x of einheiten) if (!besucht.has(x.id)) baum.push(baue(x));
+  for (const x of einheiten) if (!besucht.has(x.id)) baum.push(build(x));
   return baum;
 }
 
@@ -201,13 +201,13 @@ export function besatzungsUrteilVon(
  * `achtung` im Vertrag `materialStatus` — defekt, verbraucht, Desinfektion nötig. Die eine
  * Zählfunktion, die LLH-1093 mitnutzt.
  */
-export function istMaterialAusfall(status: MaterialStatus): boolean {
+export function isMaterialAusfall(status: MaterialStatus): boolean {
   const rolle = materialStatus[status].rolle;
   return rolle === 'alarm' || rolle === 'achtung';
 }
 
 export function materialAusfall(material: readonly Pick<EinsatzMaterial, 'status'>[]): number {
-  return material.filter((m) => istMaterialAusfall(m.status)).length;
+  return material.filter((m) => isMaterialAusfall(m.status)).length;
 }
 
 // ── Mittel einer Einheit ──────────────────────────────────────────────────────
@@ -215,7 +215,7 @@ export function materialAusfall(material: readonly Pick<EinsatzMaterial, 'status
 export interface PersonImBaum {
   person: EinsatzPersonal;
   /** Einheitsführer (`Einheit.fuehrer_id`), die Marke „EF“. */
-  istFuehrer: boolean;
+  isFuehrer: boolean;
   /** Funkrufname eines Fahrzeugs außerhalb dieses Zweigs, auf dem die Person sitzt. */
   faehrtAuf: string | null;
 }
@@ -269,9 +269,9 @@ const POSITION_RANG: Record<StaerkePosition, number> = {
 };
 
 /** EF, F, UF, M, ohne Position, dann Name. */
-function vergleichePersonen(a: PersonImBaum, b: PersonImBaum): number {
+function comparePersonen(a: PersonImBaum, b: PersonImBaum): number {
   const rang = (x: PersonImBaum) =>
-    x.istFuehrer ? 0 : x.person.staerke_position ? POSITION_RANG[x.person.staerke_position] : 4;
+    x.isFuehrer ? 0 : x.person.staerke_position ? POSITION_RANG[x.person.staerke_position] : 4;
   return rang(a) - rang(b) || KOLLATOR.compare(a.person.name, b.person.name);
 }
 
@@ -306,7 +306,7 @@ export function fremdText(b: Pick<FahrzeugImBaum, 'fremd'>): string | null {
 }
 
 /** Der Knoten „Ohne Fahrzeug“ entsteht nur, wenn die Einheit Fahrzeuge UND Personal ohne hat (D5). */
-export function brauchtOhneFahrzeugKnoten(m: MittelDerEinheit): boolean {
+export function needsOhneFahrzeugKnoten(m: MittelDerEinheit): boolean {
   return m.fahrzeuge.length > 0 && m.ohneFahrzeug.length > 0;
 }
 
@@ -314,7 +314,7 @@ export function brauchtOhneFahrzeugKnoten(m: MittelDerEinheit): boolean {
  * Ordnet die EIGENEN Mittel eines Zweigs (schon nach Einheit gruppiert): Fahrzeug → Besatzung,
  * „Ohne Fahrzeug“, Material. `fuehrerId` markiert den Einheitsführer.
  */
-function ordneMittel(
+function sortMittel(
   eigene: MittelListen,
   fuehrerId: number | null,
   quelle: MittelQuelle,
@@ -327,7 +327,7 @@ function ordneMittel(
 
   const alsPerson = (ep: EinsatzPersonal): PersonImBaum => ({
     person: ep,
-    istFuehrer: fuehrerId != null && ep.id === fuehrerId,
+    isFuehrer: fuehrerId != null && ep.id === fuehrerId,
     faehrtAuf:
       ep.fahrzeug_id != null && !eigeneFahrzeuge.has(ep.fahrzeug_id)
         ? (fahrzeugName.get(ep.fahrzeug_id) ?? null)
@@ -367,7 +367,7 @@ function ordneMittel(
       }
       return {
         fahrzeug: f,
-        besatzung: (besatzungJe.get(f.id) ?? []).sort(vergleichePersonen),
+        besatzung: (besatzungJe.get(f.id) ?? []).sort(comparePersonen),
         ist,
         soll,
         urteil: besatzungsUrteilVon(alle.length, ist, soll),
@@ -377,7 +377,7 @@ function ordneMittel(
 
   return {
     fahrzeuge,
-    ohneFahrzeug: ohneFahrzeug.sort(vergleichePersonen),
+    ohneFahrzeug: ohneFahrzeug.sort(comparePersonen),
     material: [...eigene.material],
     materialAusfall: materialAusfall(eigene.material),
   };
@@ -406,7 +406,7 @@ export function mittelDerEinheit(
 ): MittelDerEinheit {
   const einheit = einheitId != null ? roh.einheiten.find((e) => e.id === einheitId) : undefined;
   const hier = (x: { einheit_id?: number | null }) => (x.einheit_id ?? null) === einheitId;
-  return ordneMittel(
+  return sortMittel(
     {
       personal: roh.personal.filter(hier),
       fahrzeuge: roh.fahrzeuge.filter(hier),
@@ -440,7 +440,7 @@ export interface KraeftebaumEingabe extends MittelListen {
   quelle?: Partial<MittelQuelle>;
 }
 
-function gruppiere<T extends { einheit_id?: number | null }>(
+function groupByEinheit<T extends { einheit_id?: number | null }>(
   liste: readonly T[],
   bekannt: ReadonlySet<number>,
 ): Map<number | null, T[]> {
@@ -457,11 +457,11 @@ function gruppiere<T extends { einheit_id?: number | null }>(
 export function kraeftebaum(e: KraeftebaumEingabe): KraeftebaumWurzel[] {
   const quelle = vollQuelle(e, e.quelle);
   const bekannt = new Set(e.einheiten.map((x) => x.id));
-  const personalJe = gruppiere(e.personal, bekannt);
-  const fahrzeugeJe = gruppiere(e.fahrzeuge, bekannt);
-  const materialJe = gruppiere(e.material, bekannt);
+  const personalJe = groupByEinheit(e.personal, bekannt);
+  const fahrzeugeJe = groupByEinheit(e.fahrzeuge, bekannt);
+  const materialJe = groupByEinheit(e.material, bekannt);
   const mittelVon = (id: number | null, fuehrerId: number | null) =>
-    ordneMittel(
+    sortMittel(
       {
         personal: personalJe.get(id) ?? [],
         fahrzeuge: fahrzeugeJe.get(id) ?? [],
@@ -494,15 +494,15 @@ export function kraeftebaum(e: KraeftebaumEingabe): KraeftebaumWurzel[] {
  * Aufrufer (Meldebild: `verdichte` über die GEFILTERTEN Listen, weil `ist_kumuliert` des Servers
  * den Filter nicht kennt).
  */
-export function kumuliere<K extends { einheit: Einheit; kinder: readonly K[] }>(
+export function accumulateStaerke<K extends { einheit: Einheit; kinder: readonly K[] }>(
   wurzeln: readonly K[],
   eigen: (e: Einheit) => StaerkeSumme,
 ): Map<number, StaerkeSumme> {
   const m = new Map<number, StaerkeSumme>();
-  const gehe = (k: K): StaerkeSumme => {
+  const visit = (k: K): StaerkeSumme => {
     const s = { ...eigen(k.einheit) };
     for (const kind of k.kinder) {
-      const t = gehe(kind);
+      const t = visit(kind);
       s.fuehrer += t.fuehrer;
       s.unterfuehrer += t.unterfuehrer;
       s.mannschaft += t.mannschaft;
@@ -511,7 +511,7 @@ export function kumuliere<K extends { einheit: Einheit; kinder: readonly K[] }>(
     m.set(k.einheit.id, s);
     return s;
   };
-  wurzeln.forEach(gehe);
+  wurzeln.forEach(visit);
   return m;
 }
 

@@ -367,7 +367,7 @@ describe('Raster als Kräftebaum', () => {
       urteil: 'unterbesetzt',
       fremd: [],
     });
-    expect(fahrzeug.children!.map((z) => [z.key, z.person?.istFuehrer])).toEqual([
+    expect(fahrzeug.children!.map((z) => [z.key, z.person?.isFuehrer])).toEqual([
       ['ep-3', true],
       ['ep-1', false],
     ]);

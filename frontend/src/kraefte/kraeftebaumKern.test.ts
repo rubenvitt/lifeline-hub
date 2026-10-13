@@ -3,11 +3,11 @@ import {
   abschnittDerObersten,
   besatzungsStaerke,
   besatzungsUrteilVon,
-  brauchtOhneFahrzeugKnoten,
+  needsOhneFahrzeugKnoten,
   einheitenBaum,
-  istMaterialAusfall,
+  isMaterialAusfall,
   kraeftebaum,
-  kumuliere,
+  accumulateStaerke,
   materialAusfall,
   mittelDerEinheit,
   schluesselBisStufe,
@@ -165,7 +165,7 @@ describe('mittelDerEinheit', () => {
     expect(m.fahrzeuge).toHaveLength(1);
     expect(m.fahrzeuge[0].besatzung.map((x) => x.person.id)).toEqual([2, 1]);
     expect(m.ohneFahrzeug.map((x) => x.person.id)).toEqual([3]);
-    expect(brauchtOhneFahrzeugKnoten(m)).toBe(true);
+    expect(needsOhneFahrzeugKnoten(m)).toBe(true);
   });
 
   it('ohne Fahrzeug in der Einheit braucht es keinen Knoten „Ohne Fahrzeug“', () => {
@@ -176,7 +176,7 @@ describe('mittelDerEinheit', () => {
       material: [],
     });
     expect(m.ohneFahrzeug.map((x) => x.person.id)).toEqual([1]);
-    expect(brauchtOhneFahrzeugKnoten(m)).toBe(false);
+    expect(needsOhneFahrzeugKnoten(m)).toBe(false);
   });
 
   it('Person auf fremdem Fahrzeug bleibt bei ihrer Einheit und „fährt auf“; das Fahrzeug zählt sie', () => {
@@ -253,7 +253,7 @@ describe('mittelDerEinheit', () => {
       'Zander',
       'Abel',
     ]);
-    expect(besatzung[0].istFuehrer).toBe(true);
+    expect(besatzung[0].isFuehrer).toBe(true);
   });
 
   it('Material ist eine Gruppe; Ausfall sind die Status mit Rolle alarm oder achtung', () => {
@@ -265,9 +265,9 @@ describe('mittelDerEinheit', () => {
     });
     expect(m.material.map((x) => x.id)).toEqual([1, 2, 3]);
     expect(m.materialAusfall).toBe(1);
-    expect(istMaterialAusfall('verbraucht')).toBe(true);
-    expect(istMaterialAusfall('desinfektion_noetig')).toBe(true);
-    expect(istMaterialAusfall('im_einsatz')).toBe(false);
+    expect(isMaterialAusfall('verbraucht')).toBe(true);
+    expect(isMaterialAusfall('desinfektion_noetig')).toBe(true);
+    expect(isMaterialAusfall('im_einsatz')).toBe(false);
     expect(materialAusfall([mt(4, 1, 'verbraucht'), mt(5, 1, 'einsatzbereit')])).toBe(1);
   });
 });
@@ -305,7 +305,7 @@ const eigeneStaerke =
       [],
     ).staerke;
 
-describe('kumuliere', () => {
+describe('accumulateStaerke', () => {
   it('Eltern = eigen + Σ Kinder; Kinder ihre eigene Teilsumme', () => {
     // Zug 1/1/2, Gruppen 0/1/8 und 0/1/8 → Zug 1/3/18//22.
     const personal = [
@@ -319,7 +319,7 @@ describe('kumuliere', () => {
       ]),
     ];
     const baum = einheitenBaum([eh(1, null), eh(2, null, 1), eh(3, null, 1)], []);
-    const k = kumuliere(baum, eigeneStaerke(personal));
+    const k = accumulateStaerke(baum, eigeneStaerke(personal));
     expect(staerkeText(k.get(1))).toBe('1/3/18//22');
     expect(staerkeText(k.get(2))).toBe('0/1/8//9');
     expect(staerkeText(k.get(3))).toBe('0/1/8//9');
@@ -394,7 +394,7 @@ describe('kraeftebaum', () => {
   });
 
   it('Σ Wurzeln = verdichte(...).staerke', () => {
-    const k = kumuliere(
+    const k = accumulateStaerke(
       wurzeln.flatMap((w) => (w.art === 'einheit' ? [w.knoten] : [])),
       eigeneStaerke(personal),
     );

@@ -80,7 +80,7 @@ export function PositionsMarken({ person }: { person: PersonAnzeige }) {
         text={pos ? POSITION_KURZ[pos] : '–'}
         titel={pos ? POSITION_WORT[pos] : 'ohne Stärkeposition'}
       />
-      {person.istFuehrer && <Marke text="EF" titel="Einheitsführer" />}
+      {person.isFuehrer && <Marke text="EF" titel="Einheitsführer" />}
     </>
   );
 }

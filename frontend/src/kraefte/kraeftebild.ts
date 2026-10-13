@@ -13,7 +13,7 @@ import { kraefteText, staerkeText } from '../anzeige/staerke';
 import {
   abschnittDerObersten,
   besatzungText,
-  brauchtOhneFahrzeugKnoten,
+  needsOhneFahrzeugKnoten,
   fremdText,
   mittelDerEinheit,
   type MittelDerEinheit,
@@ -170,7 +170,7 @@ function personMittelZeile(x: PersonImBaum): MeldebildZeile {
     key: `ep-${ep.id}`,
     mittelArt: 'person',
     bezeichnung: ep.name,
-    detail: [x.istFuehrer ? 'EF' : null, ep.funktion].filter(Boolean).join(' · ') || null,
+    detail: [x.isFuehrer ? 'EF' : null, ep.funktion].filter(Boolean).join(' · ') || null,
     staerke: ps,
     statusKategorie: ep.status_kategorie ?? null,
     statusLabel: ep.status_label ?? null,
@@ -202,7 +202,7 @@ function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
     };
   });
   const personen = m.ohneFahrzeug.map(personMittelZeile);
-  if (brauchtOhneFahrzeugKnoten(m)) {
+  if (needsOhneFahrzeugKnoten(m)) {
     zeilen.push({
       ...leereMittelZeile(),
       key: `ofz-${zweig}`,
