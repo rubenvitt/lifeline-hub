@@ -37,7 +37,7 @@ import {
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ersetzeAuftraege, findeAuftrag } from './auftragCache';
 import AuftragErteilenDialog from './AuftragErteilenDialog';
-import EmpfaengerFilter, { empfaengerFilterZiel } from './EmpfaengerFilter';
+import EmpfaengerFilter, { parseEmpfaengerFilter } from './EmpfaengerFilter';
 import AuftragListenKarte from './AuftragListenKarte';
 import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
@@ -93,7 +93,7 @@ export default function AuftraegeListe({
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   // Empfänger-Filter: kodiert als "abschnitt:<id>" bzw. "einheit:<id>" (`EmpfaengerFilter`).
   const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
-  const { abschnittId, einheitId } = empfaengerFilterZiel(empfFilter);
+  const { abschnittId, einheitId } = parseEmpfaengerFilter(empfFilter);
 
   // Suche am Server (`q`, oxgob5gk D9): das Feld zeigt sofort, abgefragt wird entprellt.
   const [suchEingabe, setSuchEingabe] = useState('');

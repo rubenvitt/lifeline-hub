@@ -159,7 +159,7 @@ export function AuftragEmpfaenger({
       a.empfaenger.map((e) => ({
         id: e.id,
         name: mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung),
-        zugaenglich: e.snap_anzeige,
+        ariaName: e.snap_anzeige,
         quittiertAt: e.quittiert_at,
       })),
     [a.empfaenger],
@@ -171,8 +171,8 @@ export function AuftragEmpfaenger({
     <EmpfaengerQuittung
       zeilen={zeilen}
       stand={{ anzahl: a.empfaenger_anzahl, quittiert: a.quittiert_anzahl }}
-      darfQuittieren={!!(darfSchreiben && onQuittieren) && !aufgehoben}
-      darfQuittierenFuer={
+      canQuittieren={!!(darfSchreiben && onQuittieren) && !aufgehoben}
+      canQuittierenFor={
         darfQuittierenFuer
           ? (id) => {
               const e = a.empfaenger.find((x) => x.id === id);
@@ -180,12 +180,12 @@ export function AuftragEmpfaenger({
             }
           : undefined
       }
-      gesperrt={!!quittierungLaeuft}
-      laeuftFuer={quittierungZiel?.auftragId === a.id ? quittierungZiel.empfaengerId : null}
+      isLocked={!!quittierungLaeuft}
+      pendingId={quittierungZiel?.auftragId === a.id ? quittierungZiel.empfaengerId : null}
       onQuittieren={(id) => onQuittieren?.(a.id, id)}
       rueckfrage={{ title: 'Empfang/Kenntnis quittieren?', okText: 'Empfang quittieren' }}
       offenLabel={aufgehoben ? 'Nicht quittiert:' : 'Quittung offen:'}
-      fehlerGrund={quittierFehlerGrund}
+      error={quittierFehlerGrund}
     />
   );
 }

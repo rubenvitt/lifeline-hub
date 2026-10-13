@@ -5,15 +5,15 @@ import { App as AntApp } from 'antd';
 import EmpfaengerQuittung, { type QuittungsZeile } from './EmpfaengerQuittung';
 
 const zeilen: QuittungsZeile[] = [
-  { id: 1, name: 'EA Süd', zugaenglich: 'EA Süd', quittiertAt: '2026-06-02 10:05:00' },
-  { id: 2, name: 'S3 Einsatz', zugaenglich: 'S3 Einsatz', quittiertAt: null },
+  { id: 1, name: 'EA Süd', ariaName: 'EA Süd', quittiertAt: '2026-06-02 10:05:00' },
+  { id: 2, name: 'S3 Einsatz', ariaName: 'S3 Einsatz', quittiertAt: null },
 ];
 
 function rendern(props: Partial<Parameters<typeof EmpfaengerQuittung>[0]> = {}) {
   const onQuittieren = vi.fn();
   render(
     <AntApp>
-      <EmpfaengerQuittung zeilen={zeilen} darfQuittieren onQuittieren={onQuittieren} {...props} />
+      <EmpfaengerQuittung zeilen={zeilen} canQuittieren onQuittieren={onQuittieren} {...props} />
     </AntApp>,
   );
   return onQuittieren;
@@ -51,7 +51,7 @@ describe('EmpfaengerQuittung (LLH-1173)', () => {
   });
 
   it('ohne Recht stehen die offenen Namen ohne Knopf', () => {
-    rendern({ darfQuittieren: false });
+    rendern({ canQuittieren: false });
     expect(screen.getByText('S3 Einsatz')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /quittieren/ })).not.toBeInTheDocument();
   });

@@ -75,30 +75,30 @@ export default function BefehlDetail({
    * (LFH-343). Die Antwort setzt das Detail, die Liste zieht nach (Quittungsstand der Karte).
    * Der Grund einer Ablehnung steht am Verteiler (LFH-1077), je Befehl.
    */
-  const quittungFehler = useZeilenFehler<number>();
-  const quittungFertig = (stand: BefehlAnzeige) => {
+  const quittungErrors = useZeilenFehler<number>();
+  const applyQuittung = (stand: BefehlAnzeige) => {
     qc.setQueryData(einsatzKeys.befehl(einsatzId, stand.id), stand);
     void qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
   const zuruecknehmenMutation = useMutation({
     mutationFn: ({ befehlId, eintragId }: { befehlId: number; eintragId: number }) =>
       nimmBefehlQuittungZurueck(einsatzId, befehlId, eintragId),
-    onMutate: ({ befehlId }) => quittungFehler.beginne(befehlId),
-    onSuccess: quittungFertig,
+    onMutate: ({ befehlId }) => quittungErrors.beginne(befehlId),
+    onSuccess: applyQuittung,
     onError: (e, { befehlId }) =>
-      quittungFehler.melde(befehlId, e, 'Quittung nicht zurückgenommen'),
+      quittungErrors.melde(befehlId, e, 'Quittung nicht zurückgenommen'),
   });
   const quittierenMutation = useMutation({
     mutationFn: ({ befehlId, eintragId }: { befehlId: number; eintragId: number }) =>
       quittiereBefehlEmpfang(einsatzId, befehlId, eintragId),
-    onMutate: ({ befehlId }) => quittungFehler.beginne(befehlId),
+    onMutate: ({ befehlId }) => quittungErrors.beginne(befehlId),
     onSuccess: (stand, ziel) => {
-      quittungFertig(stand);
+      applyQuittung(stand);
       zeigeRueckgaengig(message, 'Empfang quittiert', () => zuruecknehmenMutation.mutate(ziel));
     },
-    onError: (e, { befehlId }) => quittungFehler.melde(befehlId, e, 'Quittung fehlgeschlagen'),
+    onError: (e, { befehlId }) => quittungErrors.melde(befehlId, e, 'Quittung fehlgeschlagen'),
   });
-  const quittungLaeuft = quittierenMutation.isPending || zuruecknehmenMutation.isPending;
+  const isQuittungPending = quittierenMutation.isPending || zuruecknehmenMutation.isPending;
 
   const [freigabeOffen, setFreigabeOffen] = useState(false);
   // Kein `onError`: der Grund steht im Dialog, der bei Ablehnung offen bleibt.
@@ -223,16 +223,16 @@ export default function BefehlDetail({
               zeilen={verteiler.map((e) => ({
                 id: e.id,
                 name: e.snap_anzeige,
-                zugaenglich: e.snap_anzeige,
+                ariaName: e.snap_anzeige,
                 quittiertAt: e.quittiert_at,
               }))}
-              darfQuittieren={darfSchreiben && b.is_quittierbar === true}
-              gesperrt={quittungLaeuft}
-              laeuftFuer={
+              canQuittieren={darfSchreiben && b.is_quittierbar === true}
+              isLocked={isQuittungPending}
+              pendingId={
                 quittierenMutation.isPending ? quittierenMutation.variables.eintragId : null
               }
               onQuittieren={(eintragId) => quittierenMutation.mutate({ befehlId: b.id, eintragId })}
-              fehlerGrund={quittungFehler.grund(b.id)}
+              error={quittungErrors.grund(b.id)}
             />
           )}
         </div>

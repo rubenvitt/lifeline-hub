@@ -21,7 +21,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
 import BefehlListenKarte from './BefehlListenKarte';
 import BefehlDetail from './BefehlDetail';
 import { befehlSchemaLabel } from './befehlTexte';
-import EmpfaengerFilter, { trifftEmpfaenger } from './EmpfaengerFilter';
+import EmpfaengerFilter, { matchesEmpfaenger } from './EmpfaengerFilter';
 
 /**
  * Befehlsliste des Reiters „Einsatzbefehle“ im Muster „Liste + Detailpaneel“ (Spec
@@ -115,7 +115,7 @@ export default function BefehlListe({
   const gefunden = useMemo(
     () =>
       befehle.filter(
-        (b) => trifft(b, suche.trim()) && trifftEmpfaenger(b.verteiler ?? [], empfFilter),
+        (b) => trifft(b, suche.trim()) && matchesEmpfaenger(b.verteiler ?? [], empfFilter),
       ),
     [befehle, suche, empfFilter],
   );

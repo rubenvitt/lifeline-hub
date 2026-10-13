@@ -250,7 +250,7 @@ pub async fn quittieren_tx<T: Dokumentart>(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
-    aendern_tx::<T>(
+    update_quittung_tx::<T>(
         conn,
         einsatz_id,
         dokument_id,
@@ -270,7 +270,7 @@ pub async fn zuruecknehmen_tx<T: Dokumentart>(
     eintrag_id: i64,
     benutzer_id: i64,
 ) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
-    aendern_tx::<T>(conn, einsatz_id, dokument_id, eintrag_id, benutzer_id, None).await
+    update_quittung_tx::<T>(conn, einsatz_id, dokument_id, eintrag_id, benutzer_id, None).await
 }
 
 /// Gemeinsamer Weg beider Richtungen, auf der Transaktion des Aufrufers (`write_retry!`);
@@ -278,7 +278,7 @@ pub async fn zuruecknehmen_tx<T: Dokumentart>(
 /// Dokument laden (404), Entwurf (422) und überholte Fassung (422) ablehnen, die Zeile im
 /// geladenen Verteiler suchen (404), dann ein bedingtes UPDATE. Nur wenn es eine Zeile ändert,
 /// entsteht der ETB-Eintrag; ein Aufruf ohne Wirkung ist erfolgreich und schreibt nichts.
-async fn aendern_tx<T: Dokumentart>(
+async fn update_quittung_tx<T: Dokumentart>(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     dokument_id: i64,
@@ -287,8 +287,9 @@ async fn aendern_tx<T: Dokumentart>(
     quittiert_at: Option<&str>,
 ) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
     let t = table::<T>()?;
+    // Nur Arten mit Haken haben eine Route hierher; ohne ist es ein Fehler im Code.
     let nomen = T::QUITTUNG.ok_or_else(|| {
-        AppError::Validation(format!("{} wird nicht quittiert", T::NOMEN_MIT_ARTIKEL))
+        AppError::Internal(format!("{} wird nicht quittiert", T::NOMEN_MIT_ARTIKEL))
     })?;
     let dok = super::repo::laden::<T>(&mut *conn, einsatz_id, dokument_id).await?;
     if dok.status != super::STATUS_FREIGEGEBEN {

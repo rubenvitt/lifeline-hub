@@ -37,27 +37,27 @@ export interface QuittungsZeile {
   id: number;
   /** Angezeigter Name (beim Auftrag mit Besetzung). */
   name: string;
-  /** Name im zugänglichen Namen des Knopfs: „Empfang für <zugaenglich> quittieren“. */
-  zugaenglich: string;
+  /** Name im zugänglichen Namen des Knopfs: „Empfang für <ariaName> quittieren“. */
+  ariaName: string;
   quittiertAt?: string | null;
 }
 
 export interface EmpfaengerQuittungProps {
   zeilen: readonly QuittungsZeile[];
   /** Knöpfe überhaupt zeigen (Schreibrecht, Handler, Zustand des Objekts). */
-  darfQuittieren: boolean;
+  canQuittieren: boolean;
   /** Welche Zeilen quittierbar sind; ohne: alle (ein Abschnittsgerät nur seine). */
-  darfQuittierenFuer?: (id: number) => boolean;
-  /** Eine Quittung läuft: alle Knöpfe gesperrt, `laeuftFuer` zeigt den ladenden. */
-  gesperrt?: boolean;
-  laeuftFuer?: number | null;
+  canQuittierenFor?: (id: number) => boolean;
+  /** Eine Quittung läuft: alle Knöpfe isLocked, `pendingId` zeigt den ladenden. */
+  isLocked?: boolean;
+  pendingId?: number | null;
   onQuittieren?: (id: number) => void;
   /** Mit Rückfrage nur, wo es keinen Rückweg gibt (LFH-343). */
   rueckfrage?: { title: string; okText: string };
   /** Vorsatz der Zeile mit offenen Empfängern. */
   offenLabel?: string;
   /** Grund der zuletzt abgelehnten Quittung; steht unter den Empfängern. */
-  fehlerGrund?: ZeilenGrund | null;
+  error?: ZeilenGrund | null;
   /** Zählstand vom Server (Auftrag); ohne: aus den Zeilen gezählt. */
   stand?: { anzahl: number; quittiert: number };
 }
@@ -65,14 +65,14 @@ export interface EmpfaengerQuittungProps {
 /** Quittungsstand, quittierte Chips und die Zeile „Quittung offen:“ mit ihren Knöpfen. */
 export default function EmpfaengerQuittung({
   zeilen,
-  darfQuittieren,
-  darfQuittierenFuer,
-  gesperrt = false,
-  laeuftFuer = null,
+  canQuittieren,
+  canQuittierenFor,
+  isLocked = false,
+  pendingId = null,
   onQuittieren,
   rueckfrage,
   offenLabel = 'Quittung offen:',
-  fehlerGrund,
+  error,
   stand,
 }: EmpfaengerQuittungProps) {
   // Der Statuschip zeigt nur QUITTIERTE Empfänger; offene stehen in der Zeile „Quittung offen:".
@@ -80,8 +80,8 @@ export default function EmpfaengerQuittung({
   // des offenen Empfängers.
   // Ein optimistischer Cache kann das Ziel schon als quittiert markieren. Solange der Request
   // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen sind
-  // serialisiert und damit gesperrt.
-  const ziel = gesperrt ? laeuftFuer : null;
+  // serialisiert und damit isLocked.
+  const ziel = isLocked ? pendingId : null;
   const [quittierte, offene] = useMemo(
     () => [
       zeilen.filter((e) => e.quittiertAt && e.id !== ziel),
@@ -95,7 +95,7 @@ export default function EmpfaengerQuittung({
   const sichtbareQuittierte = quittierte.slice(0, QUITTIERT_CHIP_GRENZE);
   const restQuittierte = quittierte.length - sichtbareQuittierte.length;
   const quittiere = (id: number) => {
-    if (!gesperrt) onQuittieren?.(id);
+    if (!isLocked) onQuittieren?.(id);
   };
 
   return (
@@ -129,9 +129,9 @@ export default function EmpfaengerQuittung({
           {offene.map((e) => {
             const knopf = (
               <Button
-                aria-label={`Empfang für ${e.zugaenglich} quittieren`}
-                loading={gesperrt && laeuftFuer === e.id}
-                disabled={gesperrt}
+                aria-label={`Empfang für ${e.ariaName} quittieren`}
+                loading={isLocked && pendingId === e.id}
+                disabled={isLocked}
                 onClick={rueckfrage ? undefined : () => quittiere(e.id)}
               >
                 Quittieren
@@ -140,14 +140,14 @@ export default function EmpfaengerQuittung({
             return (
               <Space key={e.id} size={4}>
                 <Text style={{ fontSize: 13 }}>{e.name}</Text>
-                {darfQuittieren &&
-                  (darfQuittierenFuer?.(e.id) ?? true) &&
+                {canQuittieren &&
+                  (canQuittierenFor?.(e.id) ?? true) &&
                   (rueckfrage ? (
                     <Popconfirm
                       title={rueckfrage.title}
                       okText={rueckfrage.okText}
                       cancelText="Abbrechen"
-                      disabled={gesperrt}
+                      disabled={isLocked}
                       onConfirm={() => quittiere(e.id)}
                     >
                       {knopf}
@@ -163,9 +163,9 @@ export default function EmpfaengerQuittung({
       {/* Grund einer abgelehnten Quittung unter den Empfängern (LFH-1077, `frontend/AGENTS.md`,
          „Rückwege und Fehler“). Außerhalb der Zeile, weil sie fehlt, sobald alle quittiert sind:
          gerade „bereits quittiert“ bliebe sonst ungesagt. */}
-      {fehlerGrund && (
+      {error && (
         <div style={{ marginBottom: 8 }}>
-          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+          <ZeilenFehler fehler={error.fehler} fallback={error.fallback} />
         </div>
       )}
     </>

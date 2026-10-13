@@ -9,7 +9,7 @@ export interface FilterZiel {
  * Empfängerfilter beider Reiter „Einzelaufträge“ und „Einsatzbefehle“ (Spec `auftraege-befehle`,
  * „Beide Reiter gleich gebaut, mit Empfängerfilter“; LLH-1173 design.md D7). Der Wert ist
  * kodiert als `abschnitt:<id>` bzw. `einheit:<id>`; die Aufträge reichen ihn an den Server
- * ({@link empfaengerFilterZiel}), die Befehle prüfen im Client ({@link trifftEmpfaenger}).
+ * ({@link parseEmpfaengerFilter}), die Befehle prüfen im Client ({@link matchesEmpfaenger}).
  */
 export default function EmpfaengerFilter({
   abschnitte,
@@ -45,7 +45,7 @@ export default function EmpfaengerFilter({
 }
 
 /** Abschnitt bzw. Einheit aus dem Filterwert; ohne Filter beides leer. */
-export function empfaengerFilterZiel(filter: string | undefined): {
+export function parseEmpfaengerFilter(filter: string | undefined): {
   abschnittId?: number;
   einheitId?: number;
 } {
@@ -60,11 +60,11 @@ export function empfaengerFilterZiel(filter: string | undefined): {
  * Ob ein Empfänger der Liste das Filterziel nennt, genau wie der Server bei den Aufträgen: der
  * Abschnitt selbst, ohne Unterabschnitte. Ohne Filter trifft alles, auch eine leere Liste.
  */
-export function trifftEmpfaenger(
+export function matchesEmpfaenger(
   eintraege: readonly { abschnitt_id?: number | null; einheit_id?: number | null }[],
   filter: string | undefined,
 ): boolean {
-  const { abschnittId, einheitId } = empfaengerFilterZiel(filter);
+  const { abschnittId, einheitId } = parseEmpfaengerFilter(filter);
   if (abschnittId == null && einheitId == null) return true;
   return eintraege.some((e) =>
     abschnittId != null ? e.abschnitt_id === abschnittId : e.einheit_id === einheitId,
