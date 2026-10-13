@@ -775,7 +775,7 @@ pub async fn modul_overrides_laden(
 /// dazu Mitgliedschaft im Einsatz oder Zugehörigkeit zu seiner Organisation. Der Lesezugriff
 /// allein ließe jeden System-Admin serverweit durch, die Vorgaben einer Organisation gingen so an
 /// Admins fremder Organisationen.
-pub async fn modul_vorgaben_laden(
+pub async fn load_modul_vorgaben(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<HashMap<String, OrgModulEinstellung>>, AppError> {

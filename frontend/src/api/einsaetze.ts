@@ -155,7 +155,7 @@ export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
  * `GET /api/org-modul-einstellungen`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
  * Org-Rolle; daraus zeigt der Editor „Module“ die Herkunft von Rolle und Sichtbarkeit.
  */
-export function ladeModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
+export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
   return apiGet<OrgModulEinstellungen>(`/api/einsaetze/${id}/modul-vorgaben`);
 }
 

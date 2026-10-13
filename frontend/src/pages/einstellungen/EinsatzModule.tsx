@@ -9,7 +9,7 @@ import { quittiereModulGespeichert } from './modulQuittung';
 import {
   ladeModulFreigaben,
   ladeModulOverrides,
-  ladeModulVorgaben,
+  fetchModulVorgaben,
   setzeModulOverride,
 } from '../../api/einsaetze';
 import { orgVorgabe } from '../../components/vorgabeText';
@@ -75,7 +75,7 @@ export default function EinsatzModule() {
   // `GET /api/org-modul-einstellungen`. Nicht blockierend; scheitert der Abruf, fehlen nur Hinweise.
   const orgModulQuery = useQuery({
     queryKey: einsatzKeys.modulVorgaben(einsatzId),
-    queryFn: () => ladeModulVorgaben(einsatzId),
+    queryFn: () => fetchModulVorgaben(einsatzId),
   });
   // Dieselben Freigaben wie die Navigation: der wirksame Sichtbarkeitswert, vom Server aufgelöst.
   const freigabenQuery = useQuery({
@@ -133,8 +133,9 @@ export default function EinsatzModule() {
     orgModulDefaults[modulKey]?.sichtbar ??
     true;
   /**
-   * Blendet die Organisation aus? Aus der Vorgabe, oder — scheitert ihr Abruf — aus der Freigabe:
-   * ohne eigenen Wert kann nur die Organisation ausgeblendet haben.
+   * Blendet die Organisation aus? Aus der Vorgabe, und zusätzlich aus der Freigabe: ohne eigenen
+   * Wert kann nur die Organisation ausgeblendet haben. Der zweite Zweig trägt, wenn die Vorgaben
+   * nicht ladbar sind (Fehler, oder ein Admin einer fremden Organisation ohne Mitgliedschaft).
    */
   const orgBlendetAus = (modulKey: string) =>
     orgModulDefaults[modulKey]?.sichtbar === false ||

@@ -301,7 +301,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/modul-vorgaben",
-            get(routes::einsatz::modul_vorgaben_laden),
+            get(routes::einsatz::load_modul_vorgaben),
         )
         .route(
             "/api/einsaetze/{id}/modul-overrides/{modul_key}",

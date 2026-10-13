@@ -24,7 +24,7 @@ vi.mock('../../api/einsaetze', () => ({
   ladeEinstellungen: vi.fn(),
   ladeModulOverrides: vi.fn(),
   ladeModulFreigaben: vi.fn(),
-  ladeModulVorgaben: vi.fn(),
+  fetchModulVorgaben: vi.fn(),
   setzeModulOverride: vi.fn(),
 }));
 
@@ -39,7 +39,7 @@ import {
   ladeEinstellungen,
   ladeModulFreigaben,
   ladeModulOverrides,
-  ladeModulVorgaben,
+  fetchModulVorgaben,
   setzeModulOverride,
 } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
@@ -67,7 +67,7 @@ describe('EinsatzModule', () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
     vi.mocked(ladeModulOverrides).mockResolvedValue({});
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({});
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({});
     vi.mocked(ladeModulFreigaben).mockResolvedValue({});
     benutzerRolle.wert = 'admin';
     benutzerOrg.wert = 1;
@@ -137,7 +137,7 @@ describe('EinsatzModule', () => {
   });
 
   it('zeigt den Org-Rollen-Hinweis im Modul-Override', async () => {
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({
       etb: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
     });
 
@@ -149,7 +149,7 @@ describe('EinsatzModule', () => {
   });
 
   it('nennt eine Org-Vorgabe „Führung im Einsatz“ mit diesem Namen (LFH-1150)', async () => {
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({
       etb: { benoetigte_rolle: 'einsatzfuehrung', sichtbar: true },
     });
 
@@ -327,7 +327,7 @@ describe('EinsatzModule · Gruppierung und Filter (LFH-346)', () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
     vi.mocked(ladeModulOverrides).mockResolvedValue({});
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({});
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({});
     benutzerRolle.wert = 'admin';
   });
 
@@ -369,7 +369,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
     vi.mocked(ladeModulOverrides).mockResolvedValue({});
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
-    vi.mocked(ladeModulVorgaben).mockResolvedValue(ORG_BLENDET_STAB_AUS);
+    vi.mocked(fetchModulVorgaben).mockResolvedValue(ORG_BLENDET_STAB_AUS);
     vi.mocked(ladeModulFreigaben).mockResolvedValue(FREIGABE_STAB_AUS);
     benutzerRolle.wert = 'admin';
     benutzerOrg.wert = 1;
@@ -440,7 +440,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
   });
 
   it('bietet „Vorgabe übernehmen“ auch bei eigenem Wert ohne Org-Vorgabe an', async () => {
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({});
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({});
     vi.mocked(ladeModulFreigaben).mockResolvedValue({ etb: { sichtbar: false, zugriff: true } });
     vi.mocked(ladeModulOverrides).mockResolvedValue({
       etb: { sichtbar: false, benoetigte_rolle: null },
@@ -476,7 +476,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
 
   it('leitet die Herkunft aus den Freigaben her, wenn die Vorgaben nicht ladbar sind', async () => {
     // Rückfall für einen gescheiterten Abruf der Vorgaben; die Freigaben stehen.
-    vi.mocked(ladeModulVorgaben).mockRejectedValue(new ApiError(500, 'kaputt'));
+    vi.mocked(fetchModulVorgaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     rendern();
 
     await waitFor(() =>
@@ -489,7 +489,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
   });
 
   it('hält die Zeile gesperrt, bis Overrides und Freigaben neu geladen sind', async () => {
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({});
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({});
     vi.mocked(ladeModulFreigaben).mockResolvedValue({});
     vi.mocked(ladeModulOverrides).mockResolvedValueOnce({});
     let neuLaden!: (v: unknown) => void;
@@ -511,7 +511,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
   it('zeigt den Schalter erst, wenn die Freigaben feststehen', async () => {
     let freigabenDa!: (v: unknown) => void;
     vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise((r) => (freigabenDa = r)) as never);
-    vi.mocked(ladeModulVorgaben).mockRejectedValue(new ApiError(500, 'kaputt'));
+    vi.mocked(fetchModulVorgaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     rendern();
 
     await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
@@ -548,7 +548,7 @@ describe('EinsatzModule · Einsatzleitung ohne Org-Rolle (LLH-1183)', () => {
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
     // Der Org-Endpunkt antwortet ihr mit 403; der Einsatz liefert die Vorgaben.
     vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
-    vi.mocked(ladeModulVorgaben).mockResolvedValue({
+    vi.mocked(fetchModulVorgaben).mockResolvedValue({
       stab: { benoetigte_rolle: null, sichtbar: false },
       lagemeldungen: { benoetigte_rolle: 'einsatzfuehrung', sichtbar: true },
     });
@@ -596,7 +596,7 @@ describe('EinsatzModule · Einsatzleitung ohne Org-Rolle (LLH-1183)', () => {
     rendern();
 
     await screen.findByRole('switch', { name: 'Sichtbar: Stab' });
-    await waitFor(() => expect(ladeModulVorgaben).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(fetchModulVorgaben).toHaveBeenCalledWith(1));
     expect(ladeOrgModulEinstellungen).not.toHaveBeenCalled();
   });
 });
