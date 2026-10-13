@@ -403,7 +403,12 @@ describe('EinheitenPage', () => {
       zeige();
       const oben = await zeileVon('1. Zug');
       expect(within(oben).getByText('Anna Probe')).toBeInTheDocument();
-      expect(within(oben).getByText('2 · RTW 2, RTW 10')).toBeInTheDocument();
+      const fahrzeuge = oben.querySelector('[data-lfh="einheit-fahrzeuge"]') as HTMLElement;
+      expect(fahrzeuge).toHaveTextContent(/^2 · RTW 2, RTW 10$/);
+      // Ein Funkrufname bricht nie in sich um („Musterstadt 11-|1“), nur zwischen den Namen.
+      const namen = within(fahrzeuge).getAllByText(/^RTW /);
+      expect(namen.map((n) => n.textContent)).toEqual(['RTW 2', 'RTW 10']);
+      for (const n of namen) expect(n.style.whiteSpace).toBe('nowrap');
     });
 
     it('die Einheitzelle ist die des Kräftebaums: Zeichen, Link auf die Einheit, Typ', async () => {

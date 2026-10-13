@@ -1,5 +1,4 @@
 import { App, Breadcrumb, Button, Form, Input } from 'antd';
-import type { Key } from 'react';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
@@ -13,7 +12,7 @@ import {
   nichtGefundenInhalt,
 } from '../components/SeitenZustand';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type Key } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -103,9 +102,22 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       key: 'fahrzeuge',
       width: 180,
       abBreite: 'md',
-      zahl: true,
+      // Anzahl, dann die Funkrufnamen in Mono. Ein Name bricht nie in sich um („Musterstadt
+      // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
       render: (_t, z) =>
-        z.fahrzeuge.length > 0 ? `${z.fahrzeuge.length} · ${z.fahrzeuge.join(', ')}` : '—',
+        z.fahrzeuge.length > 0 ? (
+          <span data-lfh="einheit-fahrzeuge" style={monoStil(12)}>
+            {z.fahrzeuge.length} ·{' '}
+            {z.fahrzeuge.map((f, i) => (
+              <Fragment key={`${i}-${f}`}>
+                {i > 0 && ', '}
+                <span style={{ whiteSpace: 'nowrap' }}>{f}</span>
+              </Fragment>
+            ))}
+          </span>
+        ) : (
+          '—'
+        ),
     },
   ]);
 }
