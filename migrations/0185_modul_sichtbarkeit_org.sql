@@ -2,7 +2,7 @@
 -- LLH-1179: Sichtbarkeits-Vorgabe der Organisation je Modul. `sichtbar` = Einsatz ?? Organisation
 -- ?? sichtbar, aufgelöst zur Lesezeit (src/einsatz/effektiv.rs, `effektiv_sichtbar`). Herleitung:
 -- openspec/changes/archive/2026-10-12-wgnb0am2-stab-abwaehlbar/design.md (D1, D2), Bauweise:
--- openspec/changes/ivtkmf43-org-modul-sichtbarkeit/design.md (D1).
+-- openspec/changes/archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit/design.md (D1).
 --
 -- Org: neue Spalte, NULL = sichtbar, 0 = ausgeblendet. Geschrieben wird nie 1.
 -- Einsatz: `sichtbar` wird nullbar (NULL = erbt). Eine gespeicherte 1 wird NULL: bisher gab es

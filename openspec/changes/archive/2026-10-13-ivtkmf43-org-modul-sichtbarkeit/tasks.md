@@ -41,8 +41,10 @@ Frontend-Gates aus dem Frontend-Ordner über `mise exec -- pnpm …` (ohne mise:
 
 ## 7. Integration
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Migrationsnummern, Typ-Codegen, Prettier/rustfmt, Vitest, Rust-Tests
-- [ ] 7.2 Manuell oder per e2e am laufenden System belegt: Org blendet Stab aus → neuer und laufender Einsatz ohne Stab; Einsatz überstimmt; Rollenwechsel bei geerbter Ausblendung lässt sie geerbt
+- [x] 7.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Migrationsnummern, Typ-Codegen, Prettier/rustfmt, Vitest, Rust-Tests
+  - Stand 13.10.2026 in der Cloud-Sitzung: `--nur schnell` grün; Rust-Suite grün (5231 Tests: Bibliothek, Binaries, alle 169 Testdateien und Doku-Tests, wegen des Plattenkontingents in Paketen gefahren), Dev-Seed-Schritt grün; `--nur frontend` grün (879 Dateien, 13 559 Tests). `cargo test -p lifeline-desktop` baut hier nicht (GTK fehlt, `gdk-sys`), `src-tauri/` ist unberührt. e2e (Chromium): alle Specs zu Einstellungen, Navigation, Modulfreigabe, Stab und Lagebesprechung sowie Gate 1 und die Trefflächen grün; rot bleiben 9 Tests in `fokus-verdeckung.spec.ts`, die auf dem Frontend von `origin/alpha` gegen dasselbe Backend genauso scheitern (Chromium-Build 1194 statt des gepinnten 1234). Die volle e2e-Suite fährt die CI des PRs
+- [x] 7.2 Manuell oder per e2e am laufenden System belegt: Org blendet Stab aus → neuer und laufender Einsatz ohne Stab; Einsatz überstimmt; Rollenwechsel bei geerbter Ausblendung lässt sie geerbt
+  - Belegt am laufenden System mit `e2e/modulfreigabe-org-vorgabe.spec.ts` (Modul `nachforderungen` statt `stab`, wegen paralleler Specs): Vorgabe in der Verwaltung → laufender Einsatz ohne das Modul, Einsatz überstimmt, „Vorgabe übernehmen“. Gegen den echten Server belegt das `tests/modul_freigaben.rs` (Org-Ausblendung wirkt auf einen laufenden Einsatz, Überstimmen, Override nur mit Rolle). Den Rollenwechsel bei geerbter Ausblendung belegt `EinsatzModule.test.tsx`
 
 ## Workflow follow-up
 

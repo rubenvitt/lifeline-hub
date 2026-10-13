@@ -128,7 +128,7 @@ export type OrgModulEinstellung = S['OrgModulEinstellung'];
 export type OrgModulEinstellungen = Record<string, OrgModulEinstellung>;
 
 /** PUT-Eingabe einer Org-Modul-Vorgabe; der Client schickt immer beide Felder (design.md D5 der
- *  Change `ivtkmf43-org-modul-sichtbarkeit`). Kein Backend-Schema, FE-lokal. */
+ *  Change `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`). Kein Backend-Schema, FE-lokal. */
 export interface OrgModulEinstellungUpdate {
   benoetigte_rolle: BenoetigteRolle | null;
   sichtbar: boolean;

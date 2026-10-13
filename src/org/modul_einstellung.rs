@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 ///
 /// `sichtbar`: `None` = sichtbar (keine Vorgabe), `Some(false)` = für alle Einsätze ohne eigenen
 /// Wert ausgeblendet. Geschrieben wird nie `Some(true)` (design.md D1 der Change
-/// `ivtkmf43-org-modul-sichtbarkeit`); gelesen wird es trotzdem richtig.
+/// `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`); gelesen wird es trotzdem richtig.
 #[derive(Debug, Clone, Default, PartialEq, Eq, sqlx::FromRow)]
 pub struct OrgModulVorgabe {
     pub benoetigte_rolle: Option<String>,

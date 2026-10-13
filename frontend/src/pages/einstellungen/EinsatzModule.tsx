@@ -37,10 +37,11 @@ const RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
 /**
  * Sektion `…/einstellungen/module` — Modul-Sichtbarkeit und Rollen-Schranke je Modul.
  *
- * Sichtbarkeit (LLH-1179, design.md D4 der Change `ivtkmf43-org-modul-sichtbarkeit`): der Schalter
- * zeigt den wirksamen Wert — eigener Wert des Einsatzes, sonst die Freigabe des Servers (dort ist
- * die Org-Vorgabe schon aufgelöst, auch für eine Einsatzleitung, die die Vorgaben nicht lesen
- * darf), sonst die Org-Vorgabe, sonst sichtbar. Umlegen setzt einen eigenen Wert; „Vorgabe
+ * Sichtbarkeit (LLH-1179, design.md D4 der Change
+ * `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`): der Schalter zeigt den wirksamen Wert —
+ * eigener Wert des Einsatzes, sonst die Freigabe des Servers (dort ist die Org-Vorgabe schon
+ * aufgelöst, auch für eine Einsatzleitung, die die Vorgaben nicht lesen darf), sonst die
+ * Org-Vorgabe, sonst sichtbar. Umlegen setzt einen eigenen Wert; „Vorgabe
  * übernehmen“ nimmt ihn zurück (`sichtbar: null`). Ein Rollenwechsel schickt den eigenen Wert mit,
  * nie den wirksamen — sonst würde eine geerbte Ausblendung nebenbei festgeschrieben.
  *

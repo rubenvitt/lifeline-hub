@@ -243,7 +243,7 @@ pub struct ModulRolleUpdate {
     /// LLH-1179: `false` blendet das Modul für alle Einsätze ohne eigenen Wert aus, `true` nimmt das
     /// zurück. Fehlt das Feld, bleibt die gespeicherte Sichtbarkeit unverändert — ein Aufrufer, der
     /// nur die Rolle setzt, hebt keine Ausblendung auf (design.md D3 der Change
-    /// `ivtkmf43-org-modul-sichtbarkeit`).
+    /// `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`).
     #[serde(default)]
     pub sichtbar: Option<bool>,
 }
