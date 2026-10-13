@@ -12,7 +12,7 @@ import type { FuehrungsfunktionEintrag, Sachgebiet } from '../api/types';
  * `werkzeuge` sind Registry-Module oder Unterseiten aus `stab/unterseiten.ts`, in der Reihenfolge
  * der Kachel; die Freigabe entscheidet `stab/werkzeuge.ts` zur Laufzeit, für beide Arten gleich.
  * Eine Grenze für ihre Zahl gibt es nicht mehr: die Kachel bricht die Werkzeuge in ihr Raster um
- * (`openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D2).
+ * (`openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D2).
  */
 /** Ein Werkzeug einer Kachel: ein Registry-Modul oder eine Unterseite (`stab/unterseiten.ts`). */
 export type WerkzeugEintrag = { art: 'modul'; key: string } | { art: 'seite'; key: string };

@@ -65,7 +65,7 @@ function ohneZahl(zustand: Exclude<AbrufZustand, 'daten'>): WerkzeugZahl {
 
 /**
  * Die eine Zahl eines Werkzeugs der Stab-Seite, nur aus einer Quelle, die die Zahl schon führt
- * (`openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D4; `frontend/AGENTS.md`, „Eine Heimat je
+ * (`openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D4; `frontend/AGENTS.md`, „Eine Heimat je
  * Zahl“). Die Seite zählt nichts selbst:
  * - ein Modul mit Server-Zähler: Zahl und Wortlaut aus `bildeZaehler` wie im Modulmenü; Aufträge
  *   und Meldungen mit der Notiz des Führungsstands (`fuehrungsZahlen.ts`), überfällige Aufträge

@@ -33,7 +33,7 @@ const EINZEILIG: CSSProperties = {
 };
 
 /**
- * Ein Werkzeug einer Kachel der Stab-Seite (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/
+ * Ein Werkzeug einer Kachel der Stab-Seite (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/
  * design.md`, D3): der Name führt, die Zahl steht rechts daneben in Mono, darunter die Notiz
  * (Bedeutung oder Grund, einzeilig, voller Text im `title` und im zugänglichen Namen).
  *

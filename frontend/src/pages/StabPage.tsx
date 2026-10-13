@@ -28,7 +28,7 @@ import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 
 /**
  * Modul „Stab" (LFH-46): Übersicht der Stabsfunktionen S1–S6 (LLH-1124,
- * `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`).
+ * `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`).
  *
  * Oben die Zeile „Nächste Lagebesprechung“ mit Sprung in das eigene Modul (LLH-1111,
  * `lagebesprechung/LagebesprechungZeile.tsx`). Darunter ein Raster aus sechs Kacheln

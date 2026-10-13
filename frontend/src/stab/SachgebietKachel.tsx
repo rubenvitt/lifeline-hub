@@ -22,7 +22,7 @@ export function werkzeugRasterStil(rollen: Parameters<typeof fugenrasterGrund>[0
 }
 
 /**
- * Eine Kachel der Stab-Seite (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D1):
+ * Eine Kachel der Stab-Seite (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D1):
  * ein Paneel mit Kennung und wirksamem Label als Überschrift, „Besetzung ändern“ als Kopfaktion nur
  * mit Schreibrecht. Im Körper zuerst die Besetzung als Chip (erst mit Daten: vorher wird nichts über
  * sie behauptet, ein langer Name bricht um), dann die gekürzte Aufgabenzeile mit nie gekürzter Fundstelle (D7) und die

@@ -9,7 +9,7 @@ import { useNetzQuellen } from './useNetzQuellen';
 
 /**
  * Die Zahl der Funkplan-Lücken für das Werkzeug „Funkplan“ der Stab-Seite (LLH-1124,
- * `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D5). Dieselben Quellen wie Funkplan und
+ * `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D5). Dieselben Quellen wie Funkplan und
  * Skizzen-Anlage (`useNetzQuellen`, eine Weiche je Quelle), dieselbe Rechnung wie der Kopf des
  * Lücken-Paneels (`countLuecken`): die beiden Zahlen können nicht auseinanderlaufen.
  *

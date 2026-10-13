@@ -25,7 +25,7 @@ const FEHLT = { zustand: 'fehlt' } as const;
 
 /**
  * Was aus einem Werkzeug einer Kachel wird — EINE Regel für Module und Unterseiten
- * (`openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D2): ausgeblendet, unbekannt oder unfertig
+ * (`openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D2): ausgeblendet, unbekannt oder unfertig
  * fehlt es; gesperrt (`istSprungGesperrt`) steht es mit Grund da, ohne Sprung und ohne Zahl; sonst
  * springt es. Solange die Freigaben des Servers fehlen, fehlt jedes Werkzeug (unbekannt heißt nicht
  * frei). Früher verschwand ein gesperrtes Modul still, während die Unterseiten gesperrt standen.

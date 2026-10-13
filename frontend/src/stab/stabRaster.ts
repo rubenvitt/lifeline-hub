@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { AbBreitePunkt } from '../components/useViewport';
 
 /**
- * Spalten des Kachelrasters der Stab-Seite (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/
+ * Spalten des Kachelrasters der Stab-Seite (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/
  * design.md`, D1): eine unter `md`, zwei ab `md`, drei ab `xl`. Feste Stufen statt `auto-fit`, damit
  * S1–S3 ab `xl` sicher eine Reihe bilden. Rein.
  */

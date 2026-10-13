@@ -47,5 +47,5 @@ Code). Frontend-Gates aus `frontend/` über `mise exec -- pnpm …` (ohne mise: 
 ## 7. Abschluss
 
 - [x] 7.1 Nach dem Merge von PR #726: `alpha` in den Branch mergen, Konflikte in `stab/`, `StabPage.tsx`, `stab/AGENTS.md` lösen, Vitest der berührten Dateien grün
-- [ ] 7.2 `./scripts/check-all.sh` grün (Bündel `schnell` und `frontend`, e2e der Stab-Specs; Lauf im PR belegt den Rest)
-- [ ] 7.3 `/opsx:archive o5nxgqbl-stab-uebersicht` im selben Branch (Spec-Sync, neue Fähigkeit `stab-uebersicht`, Verweise auf den Change-Pfad in `stab/AGENTS.md` und Code-Kommentaren nachgezogen), dann PR gegen `alpha` mit Hinweis „Design System nachziehen (Werkzeugzelle, Kachel)“
+- [x] 7.2 `./scripts/check-all.sh` grün (Bündel `schnell` und `frontend`, e2e der Stab-Specs; Lauf im PR belegt den Rest)
+- [x] 7.3 `/opsx:archive o5nxgqbl-stab-uebersicht` im selben Branch (Spec-Sync, neue Fähigkeit `stab-uebersicht`, Verweise auf den Change-Pfad in `stab/AGENTS.md` und Code-Kommentaren nachgezogen), dann PR gegen `alpha` mit Hinweis „Design System nachziehen (Werkzeugzelle, Kachel)“

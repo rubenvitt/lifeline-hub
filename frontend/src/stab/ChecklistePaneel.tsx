@@ -39,7 +39,7 @@ import { CHECKLISTE, checklistenZeileStil, eintragFuer, erledigtAnzahl } from '.
  * - **Bemerkung** über `BemerkungZelle`; jedes Bedienziel schickt genau SEIN Feld (Design D3).
  * - **Ohne Schreibrecht** sind die Boxen gesperrt; den Grund nennt der `RechteHinweis` im Kopf der
  *   Stabseite, ein zweiter Hinweis entfiele hier.
- * - **Einklappen** (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D6): ist beim
+ * - **Einklappen** (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`, D6): ist beim
  *   ersten Eintreffen der Daten alles erledigt, steht das Paneel eingeklappt (Kopf mit „7/7
  *   erledigt“ und „Aufklappen“). Danach klappt nur die Person; der letzte Haken klappt nicht unter
  *   der Hand ein, eine Rücknahme im eingeklappten Zustand klappt auf.

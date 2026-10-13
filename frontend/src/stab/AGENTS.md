@@ -2,7 +2,7 @@
 
 Gilt für `frontend/src/stab/`, `frontend/src/fernmeldewesen/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
-**Stab-Seite** (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`): ein Raster aus
+**Stab-Seite** (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`): ein Raster aus
 sechs Kacheln S1–S6 (`stab/SachgebietKachel.tsx`, eine Spalte unter `md`, zwei ab `md`, drei ab
 `xl`, `stab/stabRaster.ts`), je ein `Paneel` mit `h2` „S4 · Versorgung“ (wirksames Label), Besetzung
 als Chip und „Besetzung ändern“ im Kopf, gekürzter Aufgabenzeile mit nie gekürzter Fundstelle und
