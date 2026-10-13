@@ -104,7 +104,7 @@ import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleu
  * · Der Statusslot ist NICHT das `render` der Statusspalte (dort drückt ein Auswahlfeld mit fester
  *   Mindestbreite die 390-px-Karte breit); er nimmt eine `StatusDarstellung` mit Pflicht-`label`.
  * · Filter, Suche und Gruppen sind im Baummodus VERBOTEN: die Aggregate der Elternzeilen sind
- *   stromaufwärts über die Vollmenge kumuliert (`kraefte/kraeftebild.ts`) und lögen still, fiele
+ *   stromaufwärts über die Vollmenge kumuliert (`kraefte/kraeftebaumKern.ts`) und lögen still, fiele
  *   hier eine Zeile weg. Vorgefiltert wird stromaufwärts (`filtereKraefte`).
  */
 
