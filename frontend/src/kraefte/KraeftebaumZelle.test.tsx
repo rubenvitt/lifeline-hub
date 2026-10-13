@@ -4,6 +4,7 @@ import { renderMitProviders } from '../test/utils';
 import KraeftebaumZelle, { gruppenText } from './KraeftebaumZelle';
 import { besatzungText, besatzungZeilen, fremdText } from './kraeftebaumKern';
 import { baueMeldebildRaster, type RasterZeile } from './meldebildRaster';
+import { schrift } from '../theme/tokens';
 import type { Einheit, EinsatzFahrzeug, EinsatzMaterial, EinsatzPersonal } from '../api/types';
 
 const EINHEIT = {
@@ -145,6 +146,12 @@ describe('KraeftebaumZelle', () => {
     expect(screen.getByText('Material')).toBeInTheDocument();
     expect(screen.getByText('· 2 Posten')).toBeInTheDocument();
     expect(screen.getByText('· 1 Ausfall')).toBeInTheDocument();
+    // Zahlen immer Mono: Anzahl und Ausfall in der Zahlenschrift.
+    const mono = document.createElement('span');
+    mono.style.fontFamily = schrift.zahl;
+    for (const text of ['· 2 Posten', '· 1 Ausfall']) {
+      expect(screen.getByText(text).style.fontFamily, text).toBe(mono.style.fontFamily);
+    }
   });
 });
 

@@ -187,9 +187,13 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
           }}
         >
           <Augenbraue style={{ fontSize: 11 }}>{z.bezeichnung}</Augenbraue>
-          <span style={{ fontSize: 11, color: rollen.gedaempft }}>· {anzahl}</span>
+          {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
+          <span style={{ ...monoStil(11), color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (
-            <span data-lfh="kraeftebaum-ausfall" style={{ fontSize: 11, color: rollen.alarmText }}>
+            <span
+              data-lfh="kraeftebaum-ausfall"
+              style={{ ...monoStil(11), color: rollen.alarmText }}
+            >
               · {ausfall}
             </span>
           )}
