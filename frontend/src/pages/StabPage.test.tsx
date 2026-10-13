@@ -64,7 +64,7 @@ function rendere({
   stab = leererStab as object,
   stabStatus = 200,
   freigaben = freigabenFixture(),
-  zaehler = {} as object,
+  zaehler = {} as object | null,
   presse = {
     gesamt: 0,
     offen: 0,
@@ -87,7 +87,11 @@ function rendere({
     http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     // Die Quellen der Zahlen je Werkzeug (LLH-1124, design.md D4/D5).
-    http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json(zaehler)),
+    http.get('/api/einsaetze/1/modul-zaehler', () =>
+      zaehler === null
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(zaehler),
+    ),
     http.get('/api/einsaetze/1/stab/medienkontakte/kennzahlen', () => HttpResponse.json(presse)),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
@@ -128,6 +132,10 @@ describe('StabPage', () => {
     rendere();
     expect(
       await screen.findByRole('heading', { level: 2, name: 'S4 · Versorgung (Logistik)' }),
+    ).toBeInTheDocument();
+    // Auch der Name der Kachelaktion trägt das Mandantenlabel.
+    expect(
+      await screen.findByRole('button', { name: 'Besetzung ändern – S4 Versorgung (Logistik)' }),
     ).toBeInTheDocument();
   });
 
@@ -383,6 +391,15 @@ describe('StabPage', () => {
     expect(
       await within(s5).findByRole('link', { name: 'Pressearbeit, 1, offene Anfragen' }),
     ).toBeInTheDocument();
+  });
+
+  it('scheitert der Modulzähler, zeigen seine Werkzeuge einen unbekannten Stand, keine 0', async () => {
+    rendere({ zaehler: null });
+    const s3 = await screen.findByRole('group', { name: 'Werkzeuge S3' });
+    expect(
+      await within(s3).findByRole('link', { name: `${label('auftraege')}, nicht geladen` }),
+    ).toBeInTheDocument();
+    expect(within(s3).queryByText('0')).toBeNull();
   });
 
   it('„Besetzung ändern" öffnet die Maske der Kachel', async () => {

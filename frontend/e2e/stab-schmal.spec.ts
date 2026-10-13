@@ -168,7 +168,26 @@ test.describe('Stab und Lagebesprechung am Handschirm (LFH-978)', () => {
     await page.setViewportSize(HANDSCHIRM);
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page);
+    // Eine lange Besetzung: sie bricht in der Kachel um, statt abgeschnitten zu werden (Review
+    // LLH-1124, design.md D1).
+    const lang = 'Integrierte Leitstelle Musterstadt (rückwärtige Führungsunterstützung)';
+    const besetzt = await page.request.put(`/api/einsaetze/${einsatzId}/stab/besetzung/s6`, {
+      data: { besetzung_art: 'rueckwaertig', bezeichnung: lang },
+    });
+    expect(besetzt.ok(), `Besetzung: ${besetzt.status()}`).toBe(true);
     await page.goto(`/einsaetze/${einsatzId}/stab`);
+    const s6 = page.getByRole('region', { name: /^S6 · / });
+    const chip = s6.getByText(lang, { exact: false });
+    await expect(chip).toBeVisible();
+    const kb = await kasten(s6, 'Kachel S6');
+    const cb = await kasten(chip, 'Chip S6');
+    expect(cb.x + cb.width, 'Chip S6 in der Kachel').toBeLessThanOrEqual(
+      kb.x + kb.width + SUBPIXEL,
+    );
+    expect(
+      await chip.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+      'Chip S6 nicht abgeschnitten',
+    ).toBe(true);
 
     const k = await kacheln(page);
     // „Besetzung ändern“ steht im Kopf jeder Kachel, innerhalb ihrer Breite.

@@ -370,7 +370,7 @@ export function verbindungenOhneGemeinsameSprechgruppe(
  * nicht, sie ist ein Hinweis auf ihren Pflegeort. Fehlt auch nur eine Quelle, gibt es keine
  * Teilsumme, sondern den schlechtesten Zustand.
  */
-export function lueckenAnzahl(
+export function countLuecken(
   luecken: FunkplanLuecken,
   netz: NetzLuecken,
 ): { zustand: AbrufZustand; anzahl: number | null } {

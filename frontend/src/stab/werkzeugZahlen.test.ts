@@ -113,6 +113,21 @@ describe('werkzeugZahl (design.md D4)', () => {
     });
   });
 
+  it('ohne Netz und ohne Stand „nicht geladen“ statt endlos „lädt“', () => {
+    const offline = quellen({
+      presse: abfrage(undefined),
+      zaehler: abfrage(undefined),
+      ohneVerbindung: true,
+    });
+    expect(werkzeugZahl(werkzeug('presse', 'stab'), offline)).toMatchObject({
+      zustand: 'fehler',
+      notiz: 'nicht geladen',
+    });
+    expect(werkzeugZahl(werkzeug('auftraege'), offline)?.zustand).toBe('fehler');
+    // Mit vorgehaltenem Stand bleibt die Zahl.
+    expect(wertVon(werkzeugZahl(werkzeug('etb'), quellen({ ohneVerbindung: true })))).toBe('47');
+  });
+
   it('ein gesperrtes Werkzeug trägt nie eine Zahl', () => {
     expect(werkzeugZahl({ ...werkzeug('auftraege'), zustand: 'gesperrt' }, quellen())).toBeNull();
   });

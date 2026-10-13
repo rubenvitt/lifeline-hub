@@ -31,7 +31,7 @@ function setup(over: Partial<Parameters<typeof SachgebietKachel>[0]> = {}) {
       einsatzId={7}
       eintrag={S4}
       zeile={zeile}
-      hatBesetzung
+      hasBesetzung
       darfSchreiben
       freigaben={freigabenFixture()}
       zahlQuellen={quellen}
@@ -67,7 +67,7 @@ describe('SachgebietKachel (design.md D1)', () => {
   });
 
   it('ohne geladene Besetzung weder Chip noch Aktion', () => {
-    setup({ hatBesetzung: false, zeile: undefined });
+    setup({ hasBesetzung: false, zeile: undefined });
     expect(screen.queryByText('nicht vergeben')).toBeNull();
     expect(screen.queryByRole('button', { name: /Besetzung ändern/ })).toBeNull();
   });

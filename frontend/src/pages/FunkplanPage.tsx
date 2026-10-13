@@ -55,7 +55,7 @@ import {
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
-import { lueckenAnzahl, type Luecke, type Verbindung } from '../stab/luecken';
+import { countLuecken, type Luecke, type Verbindung } from '../stab/luecken';
 import { anzahl } from '../anzeige/anzahl';
 import type { SkizzenAktionen } from '../stab/skizzenAktionen';
 import {
@@ -774,7 +774,7 @@ export default function FunkplanPage() {
   const leitstelle = netz.luecken.leitstelle;
   // Die Zahl im Kopf des Paneels: dieselbe Rechnung wie das Werkzeug „Funkplan“ der Stab-Seite
   // (LLH-1124). Fehlt eine Quelle, steht keine Teilsumme da; die Zeilen nennen den Grund.
-  const lueckenZahl = lueckenAnzahl(luecken, netz.luecken).anzahl;
+  const lueckenZahl = countLuecken(luecken, netz.luecken).anzahl;
   const leitstelleZeigen = leitstelle.zustand !== 'daten' || leitstelle.fehlt;
   const leitstelleName =
     leitstelle.element != null

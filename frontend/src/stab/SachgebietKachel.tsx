@@ -9,7 +9,7 @@ import { besetzungDarstellung } from './besetzung';
 import type { SachgebietEintrag } from './sachgebiete';
 import WerkzeugZelle from './WerkzeugZelle';
 import { werkzeugZahl, type WerkzeugZahlQuellen } from './werkzeugZahlen';
-import { werkzeugZustand, type SichtbaresWerkzeug } from './werkzeuge';
+import { werkzeugState, type SichtbaresWerkzeug } from './werkzeuge';
 
 /** Das Raster der Werkzeuge: Fugenraster, zwei Spalten ab rund 300 px Körperbreite. Rein. */
 export function werkzeugRasterStil(rollen: Parameters<typeof fugenrasterGrund>[0]): CSSProperties {
@@ -23,16 +23,16 @@ export function werkzeugRasterStil(rollen: Parameters<typeof fugenrasterGrund>[0
 
 /**
  * Eine Kachel der Stab-Seite (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D1):
- * ein Paneel mit Kennung und wirksamem Label als Überschrift, die Besetzung als Chip im Kopf (erst
- * mit Daten: vorher wird nichts über sie behauptet), „Besetzung ändern“ als Kopfaktion nur mit
- * Schreibrecht. Im Körper die gekürzte Aufgabenzeile mit nie gekürzter Fundstelle (D7) und die
+ * ein Paneel mit Kennung und wirksamem Label als Überschrift, „Besetzung ändern“ als Kopfaktion nur
+ * mit Schreibrecht. Im Körper zuerst die Besetzung als Chip (erst mit Daten: vorher wird nichts über
+ * sie behauptet, ein langer Name bricht um), dann die gekürzte Aufgabenzeile mit nie gekürzter Fundstelle (D7) und die
  * Werkzeuge im Fugenraster (D2–D4). Die Kachel selbst ist kein Ziel.
  */
 export default function SachgebietKachel({
   einsatzId,
   eintrag,
   zeile,
-  hatBesetzung,
+  hasBesetzung,
   darfSchreiben,
   freigaben,
   zahlQuellen,
@@ -42,7 +42,7 @@ export default function SachgebietKachel({
   eintrag: SachgebietEintrag;
   zeile: Stabsfunktion | undefined;
   /** Ob die Besetzung geladen ist. */
-  hatBesetzung: boolean;
+  hasBesetzung: boolean;
   darfSchreiben: boolean;
   freigaben: ModulFreigaben | undefined;
   zahlQuellen: WerkzeugZahlQuellen;
@@ -50,16 +50,16 @@ export default function SachgebietKachel({
 }) {
   const { token, rollen } = useRollen();
   const titel = `${eintrag.kuerzel} · ${eintrag.label}`;
+  const besetzung = besetzungDarstellung(zeile);
   const werkzeuge = eintrag.werkzeuge
-    .map((w) => werkzeugZustand(eintrag.sachgebiet, w, freigaben))
+    .map((w) => werkzeugState(eintrag.sachgebiet, w, freigaben))
     .filter((w): w is SichtbaresWerkzeug => w.zustand !== 'fehlt');
 
   return (
     <Paneel
       titel={titel}
-      meta={hatBesetzung ? <StatusTag darstellung={besetzungDarstellung(zeile)} /> : undefined}
       aktion={
-        darfSchreiben && hatBesetzung ? (
+        darfSchreiben && hasBesetzung ? (
           <Button
             aria-label={`Besetzung ändern – ${eintrag.kuerzel} ${eintrag.label}`}
             onClick={onBesetzungAendern}
@@ -70,6 +70,22 @@ export default function SachgebietKachel({
       }
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
     >
+      {/* Die Besetzung im Körper, nicht im Kopf: dort kürzte das Meta ohne Auslassung, und genau
+          der Warnteil („nicht mehr disponiert“) oder eine lange Bezeichnung fiel weg (design.md
+          D1). Erst mit Daten — vorher wird nichts über sie behauptet. */}
+      {hasBesetzung && (
+        <div
+          data-lfh="kachel-besetzung"
+          style={{
+            paddingBlockStart: token.paddingSM,
+            paddingInline: token.padding,
+            minWidth: 0,
+            overflowWrap: 'anywhere',
+          }}
+        >
+          <StatusTag darstellung={besetzung} title={besetzung.label} umbrechen />
+        </div>
+      )}
       <div
         style={{
           display: 'flex',

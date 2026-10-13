@@ -4,14 +4,14 @@ import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { baueFernmeldenetz } from './fernmeldeskizze';
 import { funkplanLuecken } from './funkplan';
-import { lueckenAnzahl } from './luecken';
+import { countLuecken } from './luecken';
 import { useNetzQuellen } from './useNetzQuellen';
 
 /**
  * Die Zahl der Funkplan-Lücken für das Werkzeug „Funkplan“ der Stab-Seite (LLH-1124,
  * `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D5). Dieselben Quellen wie Funkplan und
  * Skizzen-Anlage (`useNetzQuellen`, eine Weiche je Quelle), dieselbe Rechnung wie der Kopf des
- * Lücken-Paneels (`lueckenAnzahl`): die beiden Zahlen können nicht auseinanderlaufen.
+ * Lücken-Paneels (`countLuecken`): die beiden Zahlen können nicht auseinanderlaufen.
  *
  * Ohne Freigabe des Fernmeldewesens gibt es keine Zahl; dessen Quellen fragt `useNetzQuellen` dann
  * nicht ab, und das Werkzeug steht ohnehin gesperrt oder fehlt.
@@ -50,7 +50,7 @@ export function useFunkplanLuecken(einsatzId: number): {
       stellen,
       skizze,
     });
-    return lueckenAnzahl(luecken, netz.luecken);
+    return countLuecken(luecken, netz.luecken);
   }, [
     freigabeZustand,
     einsatzId,

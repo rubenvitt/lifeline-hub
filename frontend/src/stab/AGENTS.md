@@ -9,10 +9,10 @@ als Chip und „Besetzung ändern“ im Kopf, gekürzter Aufgabenzeile mit nie g
 den Werkzeugen im Fugenraster (`stab/WerkzeugZelle.tsx`). Die Kachel selbst ist kein Ziel. Werkzeuge
 nur aus `stab/sachgebiete.ts` (Modul oder Unterseite aus `stab/unterseiten.ts`, **keine Grenze ihrer
 Zahl**); ob eines fehlt, gesperrt mit Grund steht oder springt, entscheidet nur
-`stab/werkzeuge.ts:werkzeugZustand`, für Module und Unterseiten gleich (ausgeblendet fehlt, gesperrt
+`stab/werkzeuge.ts:werkzeugState`, für Module und Unterseiten gleich (ausgeblendet fehlt, gesperrt
 steht). **Je Werkzeug höchstens eine Zahl, nur über `stab/werkzeugZahlen.ts` aus ihrer Heimat:**
 Modulzähler wie im Modulmenü (`bildeZaehler`), Pressearbeit aus den Kennzahlen des Presse-Logs,
-Funkplan aus `stab/luecken.ts:lueckenAnzahl` (über `stab/useFunkplanLuecken.ts`). Ohne Quelle keine
+Funkplan aus `stab/luecken.ts:countLuecken` (über `stab/useFunkplanLuecken.ts`). Ohne Quelle keine
 Zahl, fehlende Quelle „—“ mit Grund; die Seite zählt nie selbst. Den Besetzungsstand trägt der
 Seitenkopf.
 
@@ -35,7 +35,7 @@ Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Kachel
 die Freigabe des Fernmeldewesens selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`stab/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
-`stab/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `lueckenAnzahl`. Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
+`stab/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `countLuecken`. Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Sechste Quelle ist die eigene Führungsstelle (LFH-849, `stab/fuehrungsstelle.ts`,
 gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungsstelleErfasst`, die
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle

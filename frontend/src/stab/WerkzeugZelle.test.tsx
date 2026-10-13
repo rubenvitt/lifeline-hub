@@ -70,6 +70,18 @@ describe('WerkzeugZelle', () => {
     expect(screen.getByRole('link', { name: 'Aufträge, lädt' })).toBeInTheDocument();
   });
 
+  it('nicht geladen: „?“ als unbekannter Stand, der Grund im Namen', () => {
+    renderMitProviders(
+      <WerkzeugZelle
+        einsatzId={7}
+        werkzeug={auftraege}
+        zahl={{ zustand: 'fehler', notiz: 'nicht geladen' }}
+      />,
+    );
+    expect(screen.getByText('?')).toHaveAttribute('title', 'Stand unbekannt');
+    expect(screen.getByRole('link', { name: 'Aufträge, nicht geladen' })).toBeInTheDocument();
+  });
+
   it('gesperrt: kein Link, keine Zahl, der Grund steht sichtbar am Werkzeug', () => {
     renderMitProviders(
       <WerkzeugZelle einsatzId={7} werkzeug={{ ...auftraege, zustand: 'gesperrt' }} zahl={null} />,

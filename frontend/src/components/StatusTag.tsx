@@ -35,6 +35,11 @@ interface StatusTagProps {
   darstellungsart?: 'flaeche' | 'rand';
   /** Zeichen vor dem Wortlaut, etwa ein Ladekreis für einen laufenden Vorgang (antds `icon`). */
   icon?: ReactNode;
+  /**
+   * Langer Wortlaut bricht um, statt über den Rand zu laufen (antd setzt `nowrap`): für Stellen,
+   * an denen der ganze Text die Aussage trägt, etwa die Besetzung einer Stab-Kachel (LLH-1124).
+   */
+  umbrechen?: boolean;
 }
 
 /** Die wirksame Darstellungsart — rein, damit die Regel ohne Render prüfbar ist. */
@@ -83,6 +88,7 @@ export default function StatusTag({
   farbe: ueberschrieben,
   darstellungsart,
   icon,
+  umbrechen = false,
 }: StatusTagProps) {
   const { token, rollen } = useRollen();
   const mandantenfarbe = ueberschrieben?.trim();
@@ -96,11 +102,12 @@ export default function StatusTag({
       icon={icon}
       data-rolle={darstellung.rolle}
       data-darstellung={art}
-      style={
-        flaeche
+      style={{
+        ...(flaeche
           ? { color: flaeche.text, borderColor: flaeche.kante, background: flaeche.grund }
-          : { color: token.colorText, borderColor: farbe, background: 'transparent' }
-      }
+          : { color: token.colorText, borderColor: farbe, background: 'transparent' }),
+        ...(umbrechen ? { whiteSpace: 'normal', maxWidth: '100%', marginInlineEnd: 0 } : {}),
+      }}
     >
       {darstellung.form && (
         <span aria-hidden="true" style={{ color: farbe, marginInlineEnd: token.marginXXS }}>

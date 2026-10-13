@@ -38,6 +38,19 @@ export interface WerkzeugZahlQuellen {
   };
   /** `stab/useFunkplanLuecken.ts`. */
   funkplan: { zustand: AbrufZustand; anzahl: number | null };
+  /**
+   * Ohne Netz pausiert ein Abruf ohne Stand und stünde für immer auf „lädt“; dann ist er „nicht
+   * geladen“, wie in `useNetzQuellen` (die Presse-Kennzahlen liegen nicht in `LAGEBILD_OFFLINE`).
+   */
+  ohneVerbindung?: boolean;
+}
+
+/** Zustand einer Abfrage, ohne Netz und ohne Stand „nicht geladen“ statt „lädt“. */
+function quellZustand(
+  q: { data: unknown; error: unknown; isError: boolean; isPending: boolean },
+  ohneVerbindung: boolean | undefined,
+): AbrufZustand {
+  return q.data == null && ohneVerbindung ? 'fehler' : abrufZustand(q);
 }
 
 const SERVER_QUELLEN = new Set<string>(ZAEHLER_QUELLEN);
@@ -58,7 +71,7 @@ function ohneZahl(zustand: Exclude<AbrufZustand, 'daten'>): WerkzeugZahl {
  *   und Meldungen mit der Notiz des Führungsstands (`fuehrungsZahlen.ts`), überfällige Aufträge
  *   als Achtung;
  * - „Pressearbeit“: die offenen Anfragen des Presse-Logs;
- * - „Funkplan“: die Zahl der Lücken (`lueckenAnzahl`).
+ * - „Funkplan“: die Zahl der Lücken (`countLuecken`).
  *
  * `null` heißt: keine Quelle, keine Zahl. Ein gesperrtes Werkzeug trägt nie eine.
  */
@@ -70,7 +83,7 @@ export function werkzeugZahl(
   if (werkzeug.zustand === 'gesperrt') return null;
 
   if (werkzeug.key === 'presse') {
-    const zustand = abrufZustand(quellen.presse);
+    const zustand = quellZustand(quellen.presse, quellen.ohneVerbindung);
     if (zustand !== 'daten' || !quellen.presse.data)
       return ohneZahl(zustand === 'daten' ? 'laden' : zustand);
     return {
@@ -95,7 +108,7 @@ export function werkzeugZahl(
 
   const quelle = register.find((m) => m.key === werkzeug.key)?.zaehlerQuelle;
   if (quelle == null || !SERVER_QUELLEN.has(quelle)) return null;
-  const zustand = abrufZustand(quellen.zaehler);
+  const zustand = quellZustand(quellen.zaehler, quellen.ohneVerbindung);
   if (zustand !== 'daten' || !quellen.zaehler.data)
     return ohneZahl(zustand === 'daten' ? 'laden' : zustand);
   const anzeige = bildeZaehler(quellen.zaehler.data)[quelle];

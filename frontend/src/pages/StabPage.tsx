@@ -22,6 +22,7 @@ import { mitWirksamemLabel } from '../stab/sachgebiete';
 import SachgebietKachel from '../stab/SachgebietKachel';
 import { stabRasterStil, stabSpalten } from '../stab/stabRaster';
 import { useFunkplanLuecken } from '../stab/useFunkplanLuecken';
+import { useOhneVerbindung } from '../offline/verbindung';
 import type { WerkzeugZahlQuellen } from '../stab/werkzeugZahlen';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 
@@ -83,10 +84,12 @@ export default function StabPage() {
     queryFn: () => ladeMedienkontaktKennzahlen(einsatzId),
   });
   const funkplan = useFunkplanLuecken(einsatzId);
+  const ohneVerbindung = useOhneVerbindung();
   const zahlQuellen: WerkzeugZahlQuellen = {
     zaehler: zaehlerQuery,
     presse: presseQuery,
     funkplan,
+    ohneVerbindung,
   };
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
@@ -154,7 +157,7 @@ export default function StabPage() {
                 einsatzId={einsatzId}
                 eintrag={s}
                 zeile={zeileFuer(stabQuery.data, s.sachgebiet)}
-                hatBesetzung={stabQuery.data != null}
+                hasBesetzung={stabQuery.data != null}
                 darfSchreiben={darfSchreiben}
                 freigaben={freigabenQuery.data}
                 zahlQuellen={zahlQuellen}
@@ -165,7 +168,9 @@ export default function StabPage() {
         </>
       )}
 
+      {/* `key`: der Startwert des Einklappens gilt je Einsatz; das Outlet des Rahmens hat keinen. */}
       <ChecklistePaneel
+        key={einsatzId}
         einsatzId={einsatzId}
         darfSchreiben={darfSchreiben}
         style={{ marginTop: token.margin }}

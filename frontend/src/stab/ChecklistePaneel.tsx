@@ -63,15 +63,17 @@ export default function ChecklistePaneel({
   const daten = query.data;
   const gescheitert = query.isError && !daten;
   const standVeraltet = query.isError && daten != null;
-  const vollstaendig = daten != null && erledigtAnzahl(daten) === CHECKLISTE.length;
-  const koerperId = useId();
+  const isVollstaendig = daten != null && erledigtAnzahl(daten) === CHECKLISTE.length;
+  const bodyId = useId();
   // Zustand aus dem vorigen Render statt Effekt: der Startwert fällt einmal mit den ersten Daten,
   // eine Rücknahme öffnet im selben Render, ohne Blitzen.
-  const [klappe, setKlappe] = useState({ gesetzt: false, eingeklappt: false });
-  if (daten && !klappe.gesetzt) setKlappe({ gesetzt: true, eingeklappt: vollstaendig });
-  if (daten && klappe.eingeklappt && !vollstaendig)
-    setKlappe({ gesetzt: true, eingeklappt: false });
-  const eingeklappt = klappe.gesetzt && klappe.eingeklappt;
+  const [klappe, setKlappe] = useState({ isInitialized: false, isEingeklappt: false });
+  if (daten && !klappe.isInitialized)
+    setKlappe({ isInitialized: true, isEingeklappt: isVollstaendig });
+  if (daten && klappe.isEingeklappt && !isVollstaendig) {
+    setKlappe({ isInitialized: true, isEingeklappt: false });
+  }
+  const isEingeklappt = klappe.isInitialized && klappe.isEingeklappt;
 
   return (
     <Paneel
@@ -79,21 +81,21 @@ export default function ChecklistePaneel({
       // Erst mit Daten: vor dem Laden wird nichts über die Menge behauptet.
       meta={daten ? `${erledigtAnzahl(daten)}/${CHECKLISTE.length} erledigt` : undefined}
       aktion={
-        vollstaendig || eingeklappt ? (
+        isVollstaendig || isEingeklappt ? (
           <Button
-            aria-expanded={!eingeklappt}
-            aria-controls={koerperId}
-            onClick={() => setKlappe({ gesetzt: true, eingeklappt: !eingeklappt })}
+            aria-expanded={!isEingeklappt}
+            aria-controls={bodyId}
+            onClick={() => setKlappe({ isInitialized: true, isEingeklappt: !isEingeklappt })}
           >
-            {eingeklappt ? 'Aufklappen' : 'Einklappen'}
+            {isEingeklappt ? 'Aufklappen' : 'Einklappen'}
           </Button>
         ) : undefined
       }
-      koerperPolster={!eingeklappt}
+      koerperPolster={!isEingeklappt}
       style={style}
     >
-      <div id={koerperId} hidden={eingeklappt}>
-        {eingeklappt ? null : gescheitert ? (
+      <div id={bodyId} hidden={isEingeklappt}>
+        {isEingeklappt ? null : gescheitert ? (
           <SeitenFehler
             text="Checkliste konnte nicht geladen werden"
             ursache={query.error}

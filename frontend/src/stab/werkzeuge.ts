@@ -19,7 +19,7 @@ export interface SichtbaresWerkzeug {
   pfad: (einsatzId: number) => string;
 }
 
-export type WerkzeugZustand = SichtbaresWerkzeug | { zustand: 'fehlt' };
+export type WerkzeugState = SichtbaresWerkzeug | { zustand: 'fehlt' };
 
 const FEHLT = { zustand: 'fehlt' } as const;
 
@@ -30,12 +30,12 @@ const FEHLT = { zustand: 'fehlt' } as const;
  * springt es. Solange die Freigaben des Servers fehlen, fehlt jedes Werkzeug (unbekannt heißt nicht
  * frei). Früher verschwand ein gesperrtes Modul still, während die Unterseiten gesperrt standen.
  */
-export function werkzeugZustand(
+export function werkzeugState(
   sachgebiet: Sachgebiet,
   eintrag: WerkzeugEintrag,
   freigaben: ModulFreigaben | undefined,
   register: ModulEintrag[] = modulRegistry,
-): WerkzeugZustand {
+): WerkzeugState {
   if (!freigaben) return FEHLT;
   if (eintrag.art === 'modul') {
     const modul = register.find((m) => m.key === eintrag.key);
@@ -55,7 +55,7 @@ function sichtbar(
   modulKey: string,
   freigaben: ModulFreigaben,
   pfad: (einsatzId: number) => string,
-): WerkzeugZustand {
+): WerkzeugState {
   const freigabe = freigaben[modulKey];
   if (!freigabe || !freigabe.sichtbar) return FEHLT;
   return {

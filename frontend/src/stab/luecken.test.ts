@@ -23,7 +23,7 @@ import {
   einheitenOhneSprechgruppe,
   leitstelleOhneVerbindung,
   lokaleSprechgruppenOhneZuordnung,
-  lueckenAnzahl,
+  countLuecken,
   type Luecke,
   type Verbindung,
   verbindungenOhneGemeinsameSprechgruppe,
@@ -693,7 +693,7 @@ describe('lokaleSprechgruppenOhneZuordnung — externe Stellen und Komponenten (
 
 // ── Zahl der Lücken (LLH-1124, Spec `stab-funkplan`, „Zahl der Lücken“) ──────────────────────────
 
-describe('lueckenAnzahl', () => {
+describe('countLuecken', () => {
   const daten = <T>(treffer: T[]): Luecke<T> => ({ zustand: 'daten', treffer });
   const leer = {
     abschnitteOhneSprechgruppe: daten<Einsatzabschnitt>([]),
@@ -715,11 +715,11 @@ describe('lueckenAnzahl', () => {
       einheitenOhneSprechgruppe: daten([einheit]),
       einheitenOhneErreichbarkeit: daten([einheit]),
     };
-    expect(lueckenAnzahl(luecken, netzLeer)).toEqual({ zustand: 'daten', anzahl: 3 });
+    expect(countLuecken(luecken, netzLeer)).toEqual({ zustand: 'daten', anzahl: 3 });
   });
 
   it('ohne Lücke ist die Zahl 0, nicht leer', () => {
-    expect(lueckenAnzahl(leer, netzLeer)).toEqual({ zustand: 'daten', anzahl: 0 });
+    expect(countLuecken(leer, netzLeer)).toEqual({ zustand: 'daten', anzahl: 0 });
   });
 
   it('zählt Sprechgruppen mit einem Teilnehmer und die Leitstelle ohne Verbindung als eine Lücke', () => {
@@ -727,7 +727,7 @@ describe('lueckenAnzahl', () => {
       schienenMitEinemTeilnehmer: daten([{ id: 9 } as Sprechgruppe]),
       leitstelle: { zustand: 'daten' as const, fehlt: true, element: null },
     };
-    expect(lueckenAnzahl(leer, netz)).toEqual({ zustand: 'daten', anzahl: 2 });
+    expect(countLuecken(leer, netz)).toEqual({ zustand: 'daten', anzahl: 2 });
   });
 
   it('eine gesperrte Quelle ergibt keine Teilsumme', () => {
@@ -736,7 +736,7 @@ describe('lueckenAnzahl', () => {
       abschnitteOhneSprechgruppe: daten([{ id: 4 } as Einsatzabschnitt]),
       einheitenOhneSprechgruppe: { zustand: 'gesperrt' as const, treffer: [] },
     };
-    expect(lueckenAnzahl(luecken, netzLeer)).toEqual({ zustand: 'gesperrt', anzahl: null });
+    expect(countLuecken(luecken, netzLeer)).toEqual({ zustand: 'gesperrt', anzahl: null });
   });
 
   it('nimmt den schlechtesten Zustand, auch an der Leitstelle', () => {
@@ -748,7 +748,7 @@ describe('lueckenAnzahl', () => {
       ...leer,
       einheitenOhneErreichbarkeit: { zustand: 'laden' as const, treffer: [] },
     };
-    expect(lueckenAnzahl(luecken, netz).anzahl).toBeNull();
-    expect(lueckenAnzahl(leer, netz)).toEqual({ zustand: 'fehler', anzahl: null });
+    expect(countLuecken(luecken, netz).anzahl).toBeNull();
+    expect(countLuecken(leer, netz)).toEqual({ zustand: 'fehler', anzahl: null });
   });
 });
