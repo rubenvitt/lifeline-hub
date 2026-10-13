@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EtbBaustein } from '../../api/types';
@@ -584,6 +584,50 @@ describe('EtbEntwurfsTabs', () => {
     fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
     expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
+  });
+
+  it('LLH-1152: scheitert beim 409 das Entfernen der alten Fassung, bleibt die 409 der Grund an der Erfassung', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    const erfassen = vi
+      .fn<(e: NeuerEintrag) => Promise<void>>()
+      .mockRejectedValueOnce(new ApiError(409, konflikt));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const alteId = aktiveEntwurfsId();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Wortlaut aus Tab 2');
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(1));
+    // Echte Platte, nur die Löschtransaktion bricht ab (Plattenfehler beim Entfernen).
+    const loeschen = IDBObjectStore.prototype.delete;
+    const spion = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      const anfrage = loeschen.apply(this, args);
+      this.transaction.abort();
+      return anfrage;
+    });
+    onTestFinished(() => spion.mockRestore());
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByText(new RegExp(konflikt.slice(0, 40)))).toBeInTheDocument();
+    expect(screen.queryByText(/AbortError|abort/i)).toBeNull();
+    await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(alteId));
+    const neueId = aktiveEntwurfsId();
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Wortlaut aus Tab 2');
+    await waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), expect.anything()),
+    );
+    spion.mockRestore();
+    // Neuladen: der Vorlauf trägt das Entfernen der alten id nach, die neue Fassung steht.
+    await waitFor(async () =>
+      expect((await entwuerfeLaden(ich.id, 7)).map((e) => [e.id, e.inhalt])).toEqual([
+        [neueId, 'Wortlaut aus Tab 2'],
+      ]),
+    );
   });
 });
 
