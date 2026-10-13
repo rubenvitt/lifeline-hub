@@ -11,7 +11,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::abloesung::repo::{self, AenderungEingabe, BeginnEingabe};
+use crate::abloesung::repo::{self, AenderungEingabe, BeginnEingabe, Zeitachsenwirkung};
 use crate::abloesung::{
     AbloesungAnzeige, AbloesungStatus, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
     RHYTHMUS_MAX_MINUTEN,
@@ -40,6 +40,17 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
         state.live.publiziere(einsatz_id, etb_id);
     }
     sse(state, einsatz_id);
+}
+
+/// Vollzug und Rücknahme ändern die Zeitachse der Einheit und per Fan-out die ihrer Personen;
+/// deren Leser mit nur Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189).
+fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Zeitachsenwirkung) {
+    if let Some((einheit_id, beruehrt)) = wirkung {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+        for ep_id in beruehrt.personen {
+            super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
+        }
+    }
 }
 
 /// Ein Rhythmus außerhalb von 1..=7 Tagen scheitert am Feld isoliert → 400 (LFH-267).
@@ -191,7 +202,7 @@ pub async fn vollziehen(
     let einsatz_id = ctx.einsatz.id;
     let jetzt = jetzt();
     let vollzogen_at = zeit(req.vollzogen_at, "Vollzug")?.unwrap_or_else(|| jetzt.clone());
-    let (anzeige, etb_id) = repo::vollziehen(
+    let (anzeige, etb_id, zeitachse) = repo::vollziehen(
         &state.pool,
         einsatz_id,
         aid,
@@ -202,6 +213,7 @@ pub async fn vollziehen(
     )
     .await?;
     publiziere(&state, einsatz_id, Some(etb_id));
+    publish_zeitachse(&state, einsatz_id, zeitachse);
     Ok(Json(anzeige))
 }
 
@@ -212,9 +224,10 @@ pub async fn zuruecknehmen(
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<AbloesungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let (anzeige, etb_id) =
+    let (anzeige, etb_id, zeitachse) =
         repo::zuruecknehmen(&state.pool, einsatz_id, aid, ctx.benutzer.id, &jetzt()).await?;
     publiziere(&state, einsatz_id, Some(etb_id));
+    publish_zeitachse(&state, einsatz_id, zeitachse);
     Ok(Json(anzeige))
 }
 
