@@ -328,8 +328,10 @@ describe('EinheitenPage', () => {
       ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 },
       ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 },
     };
-    function zeige() {
+    /** Abweichungen vorn: in `server.use` gewinnt der erste Treffer. */
+    function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
       server.use(
+        ...abweichungen,
         http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([gruppe, zug])),
         http.get('/api/einsaetze/1/abschnitte', () =>
           HttpResponse.json([
@@ -360,6 +362,25 @@ describe('EinheitenPage', () => {
           .paddingInlineStart;
       expect(einzug(oben)).toBe('0px');
       expect(einzug(unten)).not.toBe('0px');
+    });
+
+    it('wartet auf die Abschnitte, statt die Folge nach dem Laden umzustellen', async () => {
+      // Die Folge hängt am Abschnittsrang: eine Tabelle vorab in Serverfolge spränge danach um.
+      zeige(
+        http.get('/api/einsaetze/1/abschnitte', async () => {
+          await delay(300);
+          return HttpResponse.json([]);
+        }),
+      );
+      await screen.findByRole('heading', { name: /^Einheiten/ });
+      expect(screen.queryByRole('region', { name: 'Gliederung' })).toBeNull();
+      expect(await screen.findByRole('region', { name: 'Gliederung' })).toBeInTheDocument();
+    });
+
+    it('scheitern die Abschnitte, steht die Gliederung trotzdem, mit Abschnitt aus der Einheit', async () => {
+      zeige(http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 403 })));
+      const unten = await zeileVon('Gruppe Deich');
+      expect(within(unten).getByText('Nord')).toBeInTheDocument();
     });
 
     it('die Gruppe ohne eigenen Abschnitt zeigt den geerbten', async () => {

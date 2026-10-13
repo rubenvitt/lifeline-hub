@@ -256,7 +256,10 @@ export default function EinheitenPage() {
           etwas bedeutet. Reihenfolge: laden vor Fehler vor leer. Der Fehlerzweig trägt zusätzlich
           die Mengenbedingung (`listeGescheitert`): er verdrängt die Tabelle nur, wenn es keine
           gibt. */}
-      {einheitenQuery.isLoading ? (
+      {/* Auch auf die Abschnitte wird gewartet: die Folge hängt an ihrem Rang, eine Tabelle in
+          vorläufiger Serverfolge spränge nach deren Ankunft um. Scheitern sie, gilt die
+          Eingabefolge. */}
+      {einheitenQuery.isLoading || abschnitteQuery.isLoading ? (
         <SeitenSkeleton zeilen={3} />
       ) : listeGescheitert ? (
         <SeitenFehler
