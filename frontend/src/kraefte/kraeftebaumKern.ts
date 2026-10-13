@@ -9,7 +9,11 @@ import type {
   StaerkePosition,
 } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
-import { materialStatus, type BesatzungsUrteil } from '../theme/statusFarben';
+import {
+  materialStatus,
+  type BesatzungsUrteil,
+  type EinheitStaerkeUrteil,
+} from '../theme/statusFarben';
 import type { StaerkeSumme } from './kraeftebild';
 
 /**
@@ -190,6 +194,17 @@ export function besatzungsUrteilVon(
   soll: Staerke | null,
 ): BesatzungsUrteil {
   if (anzahlKraefte === 0) return 'nicht_erfasst';
+  if (!soll) return 'kein_soll';
+  return isSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
+}
+
+/**
+ * Das Urteil über die Stärke einer Einheit (LLH-1029): Ist KUMULIERT gegen Soll, je Achse wie die
+ * Besatzung. Anders als dort gibt es kein „nicht erfasst“: das Personal läuft über die Einheit
+ * selbst, null Kräfte bei gesetztem Soll ist unterbesetzt. Die Einheit-Ansicht (LLH-1036) nutzt
+ * dasselbe Urteil.
+ */
+export function einheitStaerkeUrteilVon(ist: Staerke, soll: Staerke | null): EinheitStaerkeUrteil {
   if (!soll) return 'kein_soll';
   return isSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
 }

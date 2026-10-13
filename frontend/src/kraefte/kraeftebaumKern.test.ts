@@ -3,6 +3,7 @@ import {
   abschnittDerObersten,
   besatzungsStaerke,
   besatzungsUrteilVon,
+  einheitStaerkeUrteilVon,
   needsOhneFahrzeugKnoten,
   einheitenBaum,
   isMaterialAusfall,
@@ -289,6 +290,37 @@ describe('besatzungsStaerke / besatzungsUrteilVon', () => {
       'erfuellt',
     );
     expect(besatzungsUrteilVon(4, ist, { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 })).toBe(
+      'unterbesetzt',
+    );
+  });
+});
+
+describe('einheitStaerkeUrteilVon (LLH-1029)', () => {
+  const soll = { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 };
+
+  it('ohne Soll kein Urteil', () => {
+    expect(einheitStaerkeUrteilVon({ fuehrer: 0, unterfuehrer: 0, mannschaft: 0 }, null)).toBe(
+      'kein_soll',
+    );
+  });
+
+  it('erfüllt nur, wenn JEDE Achse reicht; Überbesetzung einer Achse gleicht keine andere aus', () => {
+    expect(einheitStaerkeUrteilVon({ fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, soll)).toBe(
+      'erfuellt',
+    );
+    expect(einheitStaerkeUrteilVon({ fuehrer: 2, unterfuehrer: 4, mannschaft: 20 }, soll)).toBe(
+      'erfuellt',
+    );
+    // Σ 26 ≥ 22, aber ein Unterführer fehlt.
+    expect(einheitStaerkeUrteilVon({ fuehrer: 1, unterfuehrer: 2, mannschaft: 23 }, soll)).toBe(
+      'unterbesetzt',
+    );
+  });
+
+  it('eine Einheit ohne eine einzige Kraft ist unterbesetzt, nicht „nicht erfasst“', () => {
+    // Anders als beim Fahrzeug läuft das Personal hier über die Einheit selbst: null Kräfte ist
+    // eine Aussage, keine fehlende Erfassung.
+    expect(einheitStaerkeUrteilVon({ fuehrer: 0, unterfuehrer: 0, mannschaft: 0 }, soll)).toBe(
       'unterbesetzt',
     );
   });
