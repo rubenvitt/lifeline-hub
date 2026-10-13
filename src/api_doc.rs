@@ -312,6 +312,7 @@ use utoipa::OpenApi;
         crate::schaden::SchadenAuswahl,
         crate::schaden::anhang::SchadenAnhangAnzeige,
         crate::vorlagendokument::anlage::DokumentAnlageAnzeige,
+        crate::vorlagendokument::verteiler::VerteilerEintragAnzeige,
         crate::vorlagendokument::anlage::AnlageArt,
         crate::tier::anhang::TierAnhangAnzeige,
         crate::uhs::anhang::UhsAnhangAnzeige,

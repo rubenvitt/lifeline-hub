@@ -623,6 +623,8 @@ export interface components {
             titel: string;
             /** Format: int64 */
             version: number;
+            /** @description An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist. */
+            verteiler: components["schemas"]["VerteilerEintragAnzeige"][];
             /** Format: int64 */
             vorgaenger_id?: number | null;
             vorlage: components["schemas"]["BefehlVorlage"];
@@ -2857,6 +2859,8 @@ export interface components {
             titel: string;
             /** Format: int64 */
             version: number;
+            /** @description An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist. */
+            verteiler: components["schemas"]["VerteilerEintragAnzeige"][];
             /** Format: int64 */
             vorgaenger_id?: number | null;
             vorlage: components["schemas"]["LageberichtVorlage"];
@@ -4944,6 +4948,27 @@ export interface components {
             laufend: string;
             /** @description Die Version davor, nur wenn ein Versionswechsel stattfand. */
             zuletzt_gestartet?: string | null;
+        };
+        /** @description Ein Eintrag des Verteilers auf dem Wire, in Verteiler-Reihenfolge. */
+        VerteilerEintragAnzeige: {
+            /**
+             * Format: int64
+             * @description Fehlt auch, wenn der Abschnitt inzwischen gelöscht ist; `snap_anzeige` bleibt.
+             */
+            abschnitt_id?: number | null;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /** @description `abschnitt`, `einheit`, `funktion` oder `extern`; Person und Fahrzeug kommen nicht vor. */
+            empfaenger_typ: components["schemas"]["EmpfaengerTyp"];
+            extern_bezeichnung?: string | null;
+            extern_kategorie?: components["schemas"]["AdressatKategorie"] | null;
+            funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
+            /** @description Freitext, oder die Bezeichnung bei Führungshilfspersonal und Fachberater. */
+            funktion_text?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person. */
+            snap_anzeige: string;
         };
         /**
          * @description Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den

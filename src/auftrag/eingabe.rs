@@ -314,6 +314,32 @@ async fn validate_empfaenger_liste(
     Ok(empfaenger)
 }
 
+/// Prüft den Verteiler eines Befehls oder Lageberichts (LLH-1172, Change
+/// `kz5udbog-verteiler-vorlagendokument`, design.md D3) nach den Regeln der Auftragsempfänger:
+/// höchstens [`EMPFAENGER_MAX`] Einträge, gezählt vor dem Entdoppeln, dann dieselbe Zeilenprüfung.
+/// Anders als beim Auftrag darf die Liste leer sein, und Person und Fahrzeug sind keine Empfänger
+/// (400), beides vor der ersten Abfrage.
+pub(crate) async fn validate_verteiler(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    liste: &[EmpfaengerEingabeReq],
+) -> Result<Vec<repo::EmpfaengerEingabe>, AppError> {
+    if liste.len() > EMPFAENGER_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {EMPFAENGER_MAX} Empfänger je Verteiler"
+        )));
+    }
+    if liste
+        .iter()
+        .any(|r| matches!(r.empfaenger_typ.as_str(), EMPF_PERSON | EMPF_FAHRZEUG))
+    {
+        return Err(AppError::Validation(
+            "Person und Fahrzeug sind im Verteiler keine Empfänger".into(),
+        ));
+    }
+    validate_empfaenger_liste(pool, einsatz_id, liste, &[]).await
+}
+
 /// Validierte, besitzende Auftrags-Eingabe. Geteilt zwischen POST /auftraege und der
 /// Chat→Auftrag-Heraufstufung (LFH-101), damit BEIDE Pfade dieselben Pflicht-, Slot-
 /// und Zugehörigkeitsprüfungen durchlaufen. `daten()` baut daraus die borrowende

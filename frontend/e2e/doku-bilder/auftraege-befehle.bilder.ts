@@ -18,7 +18,10 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   befehl-detail.png      frontend/src/auftraege/BefehlListe.tsx,
  *                          frontend/src/auftraege/BefehlListenKarte.tsx,
  *                          frontend/src/auftraege/BefehlDetail.tsx
- *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx
+ *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx,
+ *                          frontend/src/entwurf/VerteilerField.tsx,
+ *                          frontend/src/fuehrung/EmpfaengerWahl.tsx,
+ *                          frontend/src/fuehrung/ExterneEmpfaenger.tsx
  */
 
 const KAPITEL = 'auftraege-befehle';
@@ -132,6 +135,22 @@ test.describe(KAPITEL, () => {
         {
           schluessel: 'durchfuehrung',
           text: 'Anfahrt über Mühlbachweg, Sandsäcke vom Bereitstellungsraum, Meldung bei Abschluss an ELW 1.',
+        },
+      ],
+    });
+    // Verteiler (LLH-1172): ein Abschnitt des Demo-Einsatzes, S3 und die Leitstelle.
+    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/abschnitte`);
+    expect(antwort.ok()).toBe(true);
+    const abschnitte = (await antwort.json()) as { id: number }[];
+    expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);
+    await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/befehle/${befehl.id}`, {
+      verteiler: [
+        { empfaenger_typ: 'abschnitt', abschnitt_id: abschnitte[0].id },
+        { empfaenger_typ: 'funktion', funktion: 's4' },
+        {
+          empfaenger_typ: 'extern',
+          extern_kategorie: 'leitstelle',
+          extern_bezeichnung: 'ILS Musterstadt',
         },
       ],
     });

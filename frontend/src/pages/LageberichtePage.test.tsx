@@ -36,6 +36,7 @@ const bericht: LageberichtAnzeige = {
   zeitstand: '2026-06-02 10:00:00',
   status: 'entwurf',
   abschnitte: [{ schluessel: 'text', text: 'Inhalt' }],
+  verteiler: [],
   version: 1,
   vorgaenger_id: null,
   ersteller_id: 1,

@@ -8,6 +8,7 @@ const b = (id: number, vorgaenger_id: number | null, version: number): Lageberic
   version,
   einsatz_id: 7,
   vorlage: 'freitext',
+  verteiler: [],
   titel: 'L',
   zeitstand: '',
   status: 'entwurf',

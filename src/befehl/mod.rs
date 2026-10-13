@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::vorlagendokument::anlage::AnlagenTabelle;
+use crate::vorlagendokument::verteiler::VerteilerTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
 /// Befehls-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `BefehlVorlageKey`).
@@ -142,6 +143,10 @@ impl Dokumentart for Befehl {
     const IM_NOMEN: &'static str = "im Befehl";
     const ANLAGEN: Option<&'static AnlagenTabelle> = Some(&AnlagenTabelle {
         tabelle: "befehl_anlage",
+        dokument_spalte: "befehl_id",
+    });
+    const VERTEILER: Option<&'static VerteilerTabelle> = Some(&VerteilerTabelle {
+        tabelle: "befehl_verteiler",
         dokument_spalte: "befehl_id",
     });
 }

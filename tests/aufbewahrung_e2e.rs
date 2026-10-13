@@ -459,6 +459,48 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
+        spalte: "lagebericht_verteiler.snap_anzeige",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Verteiler-Snapshots als `an` und im Abschnitt „Verteiler“ (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "lagebericht_verteiler.funktion_text",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Funktionsbezeichnung über den Verteiler-Snapshot (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "lagebericht_verteiler.extern_bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Klartext der externen Stelle über den Verteiler-Snapshot (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "befehl_verteiler.snap_anzeige",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Verteiler-Snapshots als `an` und im Abschnitt „Verteiler“ (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "befehl_verteiler.funktion_text",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Funktionsbezeichnung über den Verteiler-Snapshot (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "befehl_verteiler.extern_bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Klartext der externen Stelle über den Verteiler-Snapshot (LLH-1172)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
         spalte: "pressemitteilung.titel",
         gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Titel als Überschrift des Freigabe-Snapshots",
@@ -595,6 +637,9 @@ const GEHEIM: &[&str] = &[
     "Birkenallee-9",
     "Dachdecker-Ruehl",
     "Klinikum-Nordstadt",
+    // Verteiler eines Befehlsentwurfs (LLH-1172)
+    "ILS-Geheimstadt-5",
+    "Verbindungsperson-Geheim-6",
 ];
 
 /// Werte der Ausnahmeliste, die dieser Ablauf berührt: `(wert, erwarteter Textbaustein
@@ -1014,6 +1059,32 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         "POST",
         &format!("{basis}/etb"),
         json!({"von":"ELW 1","an":"ELW 1", "typ": "berichtigung", "inhalt": "Korrektur der Erstmeldung", "berichtigt_eintrag_id": erst }),
+    )
+    .await;
+
+    // Verteiler eines Befehlsentwurfs (LLH-1172): Klartext der externen Stelle und einer
+    // Freitext-Funktion. Ohne Freigabe steht nichts davon im ETB; die Schwärzung muss beides
+    // aus den Verteiler-Zeilen nehmen.
+    let befehl = ok(
+        &app,
+        &admin,
+        "POST",
+        &format!("{basis}/befehle"),
+        json!({ "vorlage": "befehl_lad", "titel": "Befehl Verteiler" }),
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    ok(
+        &app,
+        &admin,
+        "PATCH",
+        &format!("{basis}/befehle/{befehl}"),
+        json!({ "verteiler": [
+            { "empfaenger_typ": "extern", "extern_kategorie": "leitstelle",
+              "extern_bezeichnung": "ILS-Geheimstadt-5" },
+            { "empfaenger_typ": "funktion", "funktion_text": "Verbindungsperson-Geheim-6" }
+        ] }),
     )
     .await;
 

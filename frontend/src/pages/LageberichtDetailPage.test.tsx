@@ -636,3 +636,86 @@ describe('LageberichtDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
     expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
   });
 });
+
+/**
+ * ── Verteiler (LLH-1172, Spec `dokument-verteiler`) ──
+ *
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`: Feld im Entwurf, gespeichert mit dem
+ * Entwurf; Druckkopf aus dem Formular, im Lesezweig aus dem gespeicherten Stand.
+ */
+describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/abschnitte', () =>
+        HttpResponse.json([{ id: 3, name: 'EA Süd' }]),
+      ),
+    );
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockReset();
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
+  });
+
+  const druckkopf = () => document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!;
+
+  it('wählen und speichern schickt den Verteiler; der Druckkopf zeigt ihn schon vorher', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const feld = await screen.findByRole('combobox', { name: 'Verteiler' });
+    expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByTitle('EA Süd'));
+    await waitFor(() => expect(within(druckkopf()).getByText('EA Süd')).toBeInTheDocument());
+    expect(feld.closest('.lagebericht-no-print')).not.toBeNull();
+    expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenLastCalledWith(
+        1,
+        9,
+        expect.objectContaining({
+          verteiler: [{ empfaenger_typ: 'abschnitt', abschnitt_id: 3 }],
+        }),
+      ),
+    );
+  });
+
+  it('ein freigegebener Bericht nennt den Verteiler am Schirm und im Druckkopf', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({
+        verteiler: [
+          {
+            id: 1,
+            empfaenger_typ: 'extern',
+            extern_kategorie: 'uebergeordnet',
+            extern_bezeichnung: 'Kreisverwaltung',
+            snap_anzeige: 'Kreisverwaltung',
+          },
+        ],
+      }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const anzeige = await screen.findByText('Kreisverwaltung', {
+      selector: '[data-lfh="datenfeld"] dd',
+    });
+    expect(anzeige.closest('.lagebericht-no-print')).not.toBeNull();
+    expect(within(druckkopf()).getByText('Kreisverwaltung')).toBeInTheDocument();
+  });
+
+  it('ohne Verteiler weder Anzeige noch Druckzeile (Gegenaussage)', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByRole('link', { name: /ETB-Eintrag/ });
+    expect(screen.queryByText('Verteiler')).toBeNull();
+    expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
+  });
+});

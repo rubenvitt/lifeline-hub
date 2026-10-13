@@ -444,6 +444,8 @@ export type BefehlKopf = S['BefehlKopf'];
 
 // ============================== LFH-1028 Dokument-Anlagen ==============================
 export type DokumentAnlage = S['DokumentAnlageAnzeige'];
+/** Ein Eintrag des Verteilers an Befehl und Lagebericht (LLH-1172), mit Anzeigename. */
+export type VerteilerEintrag = S['VerteilerEintragAnzeige'];
 export type AnlageArt = S['AnlageArt'];
 
 // ============================== LFH-606 Pegel-Kennzahl ==============================
