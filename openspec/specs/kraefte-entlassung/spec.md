@@ -39,8 +39,8 @@ Das System SHALL eine Einheit auflösen können, ohne ihre Zeile zu löschen. Au
 alle Kräfte von der Einheit lösen und danach das Ereignis `entlassung` an der Einheit schreiben,
 das keine Person erreicht. Zeitachse, abgelöste Schichten und ETB-Verknüpfungen der Einheit MUST
 erhalten bleiben. Eine Einheit ohne Zeitachse, Schicht, ETB-Verknüpfung, Belegung eines
-Bereitstellungsraums und ohne jede (auch beendete) Kraft mit Verweis auf sie MAY stattdessen
-gelöscht werden.
+Bereitstellungsraums, ohne Auftrag, Meldung, Dokument und Verteiler mit Verweis auf sie und ohne
+jede (auch beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
 
 #### Scenario: Aufgelöste Einheit bleibt im Nachweis
 - **WHEN** die Einheit „Florian 1“ mit Eintreffen 06:40 um 15:00 aufgelöst wird
@@ -55,8 +55,8 @@ gelöscht werden.
 Das System SHALL eine Kraft stornieren können, die versehentlich disponiert wurde. Ein Storno
 MUST die Kraft als storniert beenden und jedes nicht gestrichene Zeitachsen-Ereignis der Kraft
 mit dem Grund „Fehldisposition storniert“ streichen. Ein Storno MUST nur gelingen, solange die
-Kraft aktiv ist, keine Bindung hat, keine andere Spur als die Ereignisse aus der Disposition
-trägt und die Disposition höchstens 15 Minuten zurückliegt. Sonst MUST das System mit 422 und
+Kraft aktiv ist, nie entlassen war, keine Bindung hat, keine andere Spur als die Ereignisse aus
+der Disposition trägt und die Disposition höchstens 15 Minuten zurückliegt. Sonst MUST das System mit 422 und
 dem Grund als Satz antworten, bei einer schon beendeten Kraft mit 409. Die Oberfläche MUST vor dem
 Storno mit einem Satz zur Folge rückfragen.
 

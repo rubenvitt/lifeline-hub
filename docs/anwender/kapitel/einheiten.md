@@ -110,8 +110,8 @@ Auswahllisten. Ihre Mitglieder bleiben im Einsatz, nur ohne Einheit; eine laufen
 ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztagebuch bleibt sie im
 Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
 Einsatzzeiten“ des Einsatzberichts. Eine Einheit ohne jede Spur (keine Mitglieder, keine
-Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum) wird beim
-Auflösen ganz gelöscht. An einer aufgelösten Einheit lässt sich nichts mehr ändern.
+Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
+Meldung, kein Dokument, kein Verteiler) wird beim Auflösen ganz gelöscht. An einer aufgelösten Einheit lässt sich nichts mehr ändern.
 
 ### Einsatztagebuch
 

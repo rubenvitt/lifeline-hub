@@ -879,45 +879,65 @@ pub async fn require_aktiv_tx(
     }
 }
 
+/// Spurprüfungen vor dem echten Löschen einer Einheit, je SQL und Grund ([`find_spur_tx`]).
+const SPUREN_EINHEIT: &[(&str, &str)] = &[
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse WHERE einheit_id = ?)",
+        "Die Einheit hat eine Zeitachse",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung \
+                       WHERE einheit_id = ?1 OR abloesende_einheit_id = ?1)",
+        "Die Einheit steht in der Ablösung",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
+        "Einträge im Einsatztagebuch nennen die Einheit",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM br_belegung WHERE objekt_typ = 'einheit' AND objekt_id = ?)",
+        "Die Einheit war in einem Bereitstellungsraum",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM auftrag_empfaenger WHERE einheit_id = ?)",
+        "Die Einheit ist Empfänger eines Auftrags",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM meldung WHERE einheit_id = ?)",
+        "Eine Meldung oder Rückmeldung nennt die Einheit",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_dokument WHERE bezug_einheit_id = ?)",
+        "Ein Dokument bezieht sich auf die Einheit",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM befehl_verteiler WHERE einheit_id = ?1) \
+             OR EXISTS(SELECT 1 FROM lagebericht_verteiler WHERE einheit_id = ?1)",
+        "Ein Verteiler nennt die Einheit",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_personal WHERE einheit_id = ?)",
+        "Der Einheit gehört Personal an",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_fahrzeug WHERE einheit_id = ?)",
+        "Der Einheit gehören Fahrzeuge an",
+    ),
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_material WHERE einheit_id = ?)",
+        "Der Einheit gehört Material an",
+    ),
+];
+
 /// Der erste Grund, warum eine Einheit nicht spurlos gelöscht werden darf (design.md D3): eine
 /// Zeitachse, eine Schicht der Ablösung, eine ETB-Verknüpfung, eine Belegung eines
-/// Bereitstellungsraums oder eine (auch beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
+/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler oder eine (auch
+/// beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
 pub async fn find_spur_tx(
     conn: &mut SqliteConnection,
     id: i64,
 ) -> Result<Option<&'static str>, AppError> {
-    const SPUREN: [(&str, &str); 7] = [
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse WHERE einheit_id = ?)",
-            "Die Einheit hat eine Zeitachse",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung \
-                           WHERE einheit_id = ?1 OR abloesende_einheit_id = ?1)",
-            "Die Einheit steht in der Ablösung",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
-            "Einträge im Einsatztagebuch nennen die Einheit",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM br_belegung WHERE objekt_typ = 'einheit' AND objekt_id = ?)",
-            "Die Einheit war in einem Bereitstellungsraum",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_personal WHERE einheit_id = ?)",
-            "Der Einheit gehört Personal an",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_fahrzeug WHERE einheit_id = ?)",
-            "Der Einheit gehören Fahrzeuge an",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_material WHERE einheit_id = ?)",
-            "Der Einheit gehört Material an",
-        ),
-    ];
-    for (sql, grund) in SPUREN {
+    for &(sql, grund) in SPUREN_EINHEIT {
         let hat: bool = sqlx::query_scalar(sql)
             .bind(id)
             .fetch_one(&mut *conn)
@@ -2300,10 +2320,41 @@ mod tests {
         assert_eq!(alle[0].ist_kumuliert, Staerke::neu(1, 1, 2));
     }
 
-    /// Eine als Auftrag-Empfänger referenzierte Einheit auflösen: der Bezug wird per ON DELETE SET
-    /// NULL freigegeben.
+    /// Jeder Fremdschlüssel auf `einsatz_einheit` ist eine Spur (Review LLH-1079, O1, wie D4 bei
+    /// Personen): eine Einheit, auf die etwas verweist, wird aufgelöst statt gelöscht. Ausgenommen
+    /// sind nur die Unterstellung (rückt beim Auflösen hoch) und die Sprechgruppen (gehen mit).
     #[tokio::test]
-    async fn aufloesen_setzt_empfaenger_einheit_null() {
+    async fn jeder_verweis_auf_eine_einheit_ist_spur() {
+        const KEINE_SPUR: &[(&str, &str)] = &[
+            ("einsatz_einheit", "ueber_einheit_id"),
+            ("einsatz_einheit_sprechgruppe", "einheit_id"),
+        ];
+        let pool = crate::db::test_pool().await;
+        let verweise: Vec<(String, String)> = sqlx::query_as(
+            "SELECT m.name, f.\"from\" FROM sqlite_master m \
+             JOIN pragma_foreign_key_list(m.name) f \
+             WHERE m.type = 'table' AND f.\"table\" = 'einsatz_einheit' ORDER BY 1, 2",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(verweise.len() > 5, "{verweise:?}");
+        let fehlend: Vec<_> = verweise
+            .iter()
+            .filter(|(t, c)| !KEINE_SPUR.contains(&(t.as_str(), c.as_str())))
+            .filter(|(t, c)| {
+                !SPUREN_EINHEIT.iter().any(|(sql, _)| {
+                    sql.contains(&format!("FROM {t} WHERE")) && sql.contains(&format!("{c} = ?"))
+                })
+            })
+            .collect();
+        assert!(fehlend.is_empty(), "Verweise ohne Spurprüfung: {fehlend:?}");
+    }
+
+    /// Eine als Auftrag-Empfänger referenzierte Einheit auflösen: der Verweis ist Spur, die
+    /// Einheit bleibt aufgelöst stehen und der Empfänger behält sie (Review LLH-1079, O1).
+    #[tokio::test]
+    async fn aufloesen_behaelt_den_auftragsempfaenger() {
         let pool = crate::db::test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -2348,15 +2399,20 @@ mod tests {
         .await
         .unwrap();
 
-        aufloesen(&pool, einsatz, einheit, bn)
+        let ergebnis = aufloesen(&pool, einsatz, einheit, bn)
             .await
             .expect("Einheit auflösen darf nicht am FK scheitern");
+        assert!(!ergebnis.geloescht, "{ergebnis:?}");
         let emp: Option<i64> =
             sqlx::query_scalar("SELECT einheit_id FROM auftrag_empfaenger WHERE auftrag_id = ?")
                 .bind(auftrag)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(emp, None, "Empfänger.einheit_id muss NULL sein (SET NULL)");
+        assert_eq!(
+            emp,
+            Some(einheit),
+            "der Empfänger nennt die aufgelöste Einheit weiter"
+        );
     }
 }
