@@ -484,6 +484,24 @@ pub async fn aktualisiere_flaeche(
     laden(pool, einsatz_id, aid).await
 }
 
+/// Die Abschnitte, die eine Dispositionszeile leitet. Wer die Zeile löscht, fragt vorher; das
+/// Ereignis `abschnitt` muss der Aufrufer melden, `personal` erreicht Abschnittsleser ohne
+/// Personalrecht nicht (LLH-1178).
+pub async fn load_geleitete_abschnitte_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar(
+        "SELECT id FROM einsatzabschnitt WHERE einsatz_id = ? AND leiter_id = ? ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(ids)
+}
+
 /// Löst einen Abschnitt auf einer offenen Verbindung auf: Unter-Abschnitte an den Parent hängen,
 /// Einheiten `abschnitt_id = NULL`, uhs/Bereitstellungsraum freigeben, dann löschen. `NotFound`,
 /// falls nicht zum Einsatz. Öffnet keine Transaktion; die Atomarität liefert der Aufrufer
