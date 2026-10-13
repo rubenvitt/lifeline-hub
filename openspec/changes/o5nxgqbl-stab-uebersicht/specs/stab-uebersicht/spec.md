@@ -12,7 +12,7 @@ Die Stab-Seite SHALL je Sachgebiet S1–S6 eine Kachel zeigen, in der festen Rei
 Das Raster MUST unter `md` eine Spalte, ab `md` zwei und ab `xl` drei Spalten haben, und die Seite
 MUST bei 390 px Breite ohne waagerechten Überlauf bleiben. Jede Kachel SHALL tragen:
 - als Überschrift die Kennung und das wirksame Label der Organisation („S4 · Versorgung (Logistik)“),
-- die Besetzung als Statuschip mit Wort,
+- die Besetzung als Statuschip mit Wort, ungekürzt (ein langer Name oder Zusatz bricht um),
 - die Aufgaben des Sachgebiets gekürzt auf eine Zeile mit der Fundstelle „FwDV 100 Anl. 2, S. n“,
 - die Werkzeuge des Sachgebiets.
 
@@ -102,9 +102,9 @@ Die Stab-Seite MUST NOT selbst zählen:
   Funkplan.
 - Ein Werkzeug ohne solche Quelle zeigt keine Zahl.
 
-Eine Null MUST als „0“ stehen. Fehlt die Quelle einer Zahl, weil sie nicht freigegeben, nicht
-geladen oder noch im Laden ist, MUST das Werkzeug „—“ mit Grund oder den Ladezustand zeigen und
-MUST NOT „0“ zeigen. Jede Zahl MUST live dem Stand ihrer Quelle folgen, ohne Neuladen der Seite.
+Eine Null MUST als „0“ stehen. Fehlt die Quelle einer Zahl, MUST das Werkzeug zeigen, warum, und
+MUST NOT „0“ zeigen: nicht freigegeben „—“ mit Grund, nicht geladen einen unbekannten Stand mit
+Grund (auch ohne Netz, wenn die Quelle nicht vorgehalten wird), im Laden den Ladezustand. Jede Zahl MUST live dem Stand ihrer Quelle folgen, ohne Neuladen der Seite.
 
 #### Scenario: Überfällige Aufträge
 - **WHEN** zwei Aufträge offen sind, einer davon überfällig

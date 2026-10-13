@@ -76,10 +76,13 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
 
 - Jede Kachel ist ein `Paneel` mit Überschrift `h2` und Titel „S4 · Versorgung“ (wirksames Label,
   `mitWirksamemLabel`).
-- `meta`: der Besetzungschip (`StatusTag` mit `besetzungDarstellung`), erst mit Daten.
 - `aktion`: „Besetzung ändern“ (antd-`Button`, zugänglicher Name mit Kennung und Label, nur mit
   Schreibrecht).
-- Körper: die Aufgabenzeile, darunter das Werkzeugraster.
+- Körper: zuerst die Besetzung (`StatusTag` mit `besetzungDarstellung`, erst mit Daten, darf
+  umbrechen), dann die Aufgabenzeile, darunter das Werkzeugraster. Der Chip stand zuerst im
+  `meta` des Kopfs; dort kürzt `paneelMetaStil` ohne Auslassung, und genau der Warnteil („nicht
+  mehr disponiert“) oder eine lange Bezeichnung („Integrierte Leitstelle …“) fiel weg (Review
+  13.10.2026).
 - Die Paneele stehen in einem CSS-Raster `stab/stabRaster.ts:stabRasterStil(spalten)`: 1 Spalte
   unter `md`, 2 ab `md`, 3 ab `xl` (aus `useViewport`, kein `auto-fit`, damit S1–S3 bei `xl` sicher
   eine Reihe bilden).
@@ -115,7 +118,7 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
   | S5 | Pressearbeit, Informationstelefon |
   | S6 | Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan |
 
-- `werkzeugeFuer` wird zu `werkzeugZustand(eintrag, freigaben)` mit drei Ergebnissen:
+- `werkzeugeFuer` wird zu `werkzeugState(eintrag, freigaben)` mit drei Ergebnissen:
   - `fehlt`: das Ziel ist ausgeblendet oder unbekannt, oder die Freigaben sind noch nicht da.
   - `gesperrt` (`istSprungGesperrt`).
   - `frei`.
@@ -141,8 +144,8 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
   - darunter die Notiz in 11 `gedaempft` (Bedeutung bzw. Grund, eine Zeile, gekürzt mit voller
     Fassung im zugänglichen Namen).
 - Die Zellen stehen im Fugenraster des Kennzahlenbands (`fugenrasterGrund`, `kennzahlZielStil`
-  für Zelle, Ziel und Eskalationskante). In der Kachel sind es zwei Spalten ab 280 px Körperbreite
-  (`repeat(auto-fit, minmax(min(140px,100%),1fr))`), sonst eine. Alle Zellen einer Kachel sind
+  für Zelle, Ziel und Eskalationskante). In der Kachel sind es zwei Spalten ab 300 px Körperbreite
+  (`repeat(auto-fit, minmax(min(150px,100%),1fr))`), sonst eine. Alle Zellen einer Kachel sind
   gleich hoch (Rasterzeile), auch ohne Zahl.
 - Höhe: mindestens `token.controlHeight` plus Einzug (`zielEinzug`), reine Stilfunktion
   `werkzeugZelleStil` mit Test je Dichtestufe („Handgebautes Bedienziel“).
@@ -174,7 +177,9 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
     Anfragen“.
   - **Funkplan:** `funkplanLueckenAnzahl` (D5).
 - Zustand:
-  - Modulzähler lädt → `laden`. Gescheitert ohne Stand → `fehler` mit Notiz „nicht geladen“.
+  - Modulzähler lädt → `laden`. Gescheitert ohne Stand → `fehler` („?“ wie die Kennzahl) mit Notiz
+    „nicht geladen“. Ohne Netz und ohne Stand ebenso `fehler`, nicht „lädt“: die Presse-Kennzahlen
+    liegen nicht in `LAGEBILD_OFFLINE`, der Abruf pausiert (Muster `useNetzQuellen`).
   - Feld fehlt in der Antwort, obwohl das Modul frei ist (Gerät, Rolle) → `daten` mit „—“ und Notiz
     „nicht freigegeben“ (`NICHT_FREIGEGEBEN`, wie `kennzahlZustand` im Überblick).
   - Wortlaut der Gründe aus `stab/funkplan.ts:ZUSTAND_GRUND`.
@@ -190,7 +195,7 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
 ### D5 Eine Lückenzahl, zwei Abnehmer
 
 - Neue reine Funktion in `stab/luecken.ts`:
-  `lueckenAnzahl(luecken: FunkplanLuecken, netzLuecken: { schienenMitEinemTeilnehmer, leitstelle })
+  `countLuecken(luecken: FunkplanLuecken, netzLuecken: { schienenMitEinemTeilnehmer, leitstelle })
   → { zustand, anzahl? }`.
   - Sie summiert `treffer.length` der sechs Listen-Lücken und zählt die Leitstelle mit 1, wenn sie
     `daten` ist und ein Element trägt.
@@ -200,10 +205,13 @@ Kachel- noch eine Rasterkomponente noch ein einklappbares Paneel gibt es; LFH-11
   bzw. kein Meta, solange eine Quelle fehlt. Die Zeilen darunter nennen den Grund schon.
 - Stab-Seite: Hook `stab/useFunkplanLuecken.ts`. Er ruft `useNetzQuellen(einsatzId, freigabe,
   ohneVerbindung)` und `baueFernmeldenetz` wie `SkizzenAufnahme` und gibt die Anzahl zurück. Mit
-  `enabled` nur, wenn das Fernmeldewesen sichtbar und frei ist; sonst fragt er nichts ab, und das
-  Werkzeug steht laut D2 gesperrt bzw. fehlt.
+  Freigabe des Fernmeldewesens, sonst fragt `useNetzQuellen` dessen eigene Quellen (Stellen,
+  Skizze) und die Modul-Listen nicht ab; Sprechgruppen und Führungsstelle laufen dort ohne Weiche
+  (Bestand, beide klein und meist im Cache). Das Werkzeug steht dann laut D2 gesperrt bzw. fehlt.
 - Die Funkplan-Seite rechnet ihr Netz weiter selbst (sie braucht es für Bild und Paneel), ruft aber
-  dieselbe `lueckenAnzahl`. Dass beide gleich zählen, prüft ein Test mit denselben Quellen.
+  dieselben Funktionen (`funkplanLuecken`, `baueFernmeldenetz`, `countLuecken`) auf denselben
+  Quellen aus `useNetzQuellen`. Belegt über die reine Funktion (`luecken.test.ts`), den Kopf der
+  Funkplan-Seite und den Hook.
 
 *Verworfen:*
 - **Server-Endpunkt für die Lückenzahl.** Die Lücken werden heute nur im Browser abgeleitet
