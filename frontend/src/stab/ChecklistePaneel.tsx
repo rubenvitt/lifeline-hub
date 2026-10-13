@@ -1,6 +1,6 @@
-import { Checkbox, Flex, Skeleton } from 'antd';
+import { Button, Checkbox, Flex, Skeleton } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useId, useRef, type CSSProperties } from 'react';
+import { useCallback, useId, useRef, useState, type CSSProperties } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeCheckliste, setzeChecklistenPunkt } from '../api/stab';
@@ -39,6 +39,10 @@ import { CHECKLISTE, checklistenZeileStil, eintragFuer, erledigtAnzahl } from '.
  * - **Bemerkung** über `BemerkungZelle`; jedes Bedienziel schickt genau SEIN Feld (Design D3).
  * - **Ohne Schreibrecht** sind die Boxen gesperrt; den Grund nennt der `RechteHinweis` im Kopf der
  *   Stabseite, ein zweiter Hinweis entfiele hier.
+ * - **Einklappen** (LLH-1124, `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D6): ist beim
+ *   ersten Eintreffen der Daten alles erledigt, steht das Paneel eingeklappt (Kopf mit „7/7
+ *   erledigt“ und „Aufklappen“). Danach klappt nur die Person; der letzte Haken klappt nicht unter
+ *   der Hand ein, eine Rücknahme im eingeklappten Zustand klappt auf.
  */
 export default function ChecklistePaneel({
   einsatzId,
@@ -59,41 +63,63 @@ export default function ChecklistePaneel({
   const daten = query.data;
   const gescheitert = query.isError && !daten;
   const standVeraltet = query.isError && daten != null;
+  const vollstaendig = daten != null && erledigtAnzahl(daten) === CHECKLISTE.length;
+  const koerperId = useId();
+  // Zustand aus dem vorigen Render statt Effekt: der Startwert fällt einmal mit den ersten Daten,
+  // eine Rücknahme öffnet im selben Render, ohne Blitzen.
+  const [klappe, setKlappe] = useState({ gesetzt: false, eingeklappt: false });
+  if (daten && !klappe.gesetzt) setKlappe({ gesetzt: true, eingeklappt: vollstaendig });
+  if (daten && klappe.eingeklappt && !vollstaendig)
+    setKlappe({ gesetzt: true, eingeklappt: false });
+  const eingeklappt = klappe.gesetzt && klappe.eingeklappt;
 
   return (
     <Paneel
       titel="Arbeitsaufnahme"
       // Erst mit Daten: vor dem Laden wird nichts über die Menge behauptet.
       meta={daten ? `${erledigtAnzahl(daten)}/${CHECKLISTE.length} erledigt` : undefined}
-      koerperPolster
+      aktion={
+        vollstaendig || eingeklappt ? (
+          <Button
+            aria-expanded={!eingeklappt}
+            aria-controls={koerperId}
+            onClick={() => setKlappe({ gesetzt: true, eingeklappt: !eingeklappt })}
+          >
+            {eingeklappt ? 'Aufklappen' : 'Einklappen'}
+          </Button>
+        ) : undefined
+      }
+      koerperPolster={!eingeklappt}
       style={style}
     >
-      {gescheitert ? (
-        <SeitenFehler
-          text="Checkliste konnte nicht geladen werden"
-          ursache={query.error}
-          onWiederholen={() => void query.refetch()}
-        />
-      ) : !daten ? (
-        <Skeleton title={false} paragraph={{ rows: 4 }} />
-      ) : (
-        <>
-          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void query.refetch()} />}
-          <Liste
-            dataSource={CHECKLISTE}
-            rowKey={(v) => v.punkt}
-            renderItem={(v) => (
-              <ChecklistenZeile
-                einsatzId={einsatzId}
-                vorlage={v}
-                eintrag={eintragFuer(daten, v.punkt)}
-                darfSchreiben={darfSchreiben}
-                abgleich={abgleich}
-              />
-            )}
+      <div id={koerperId} hidden={eingeklappt}>
+        {eingeklappt ? null : gescheitert ? (
+          <SeitenFehler
+            text="Checkliste konnte nicht geladen werden"
+            ursache={query.error}
+            onWiederholen={() => void query.refetch()}
           />
-        </>
-      )}
+        ) : !daten ? (
+          <Skeleton title={false} paragraph={{ rows: 4 }} />
+        ) : (
+          <>
+            {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void query.refetch()} />}
+            <Liste
+              dataSource={CHECKLISTE}
+              rowKey={(v) => v.punkt}
+              renderItem={(v) => (
+                <ChecklistenZeile
+                  einsatzId={einsatzId}
+                  vorlage={v}
+                  eintrag={eintragFuer(daten, v.punkt)}
+                  darfSchreiben={darfSchreiben}
+                  abgleich={abgleich}
+                />
+              )}
+            />
+          </>
+        )}
+      </div>
     </Paneel>
   );
 }

@@ -247,3 +247,64 @@ describe('ChecklistePaneel', () => {
     );
   });
 });
+
+/**
+ * LLH-1124 (design.md D6, Spec `stab-checkliste`, „Fläche auf der Stabseite“): ist beim Öffnen
+ * alles erledigt, steht das Paneel eingeklappt; danach klappt nur die Person, außer eine Rücknahme
+ * macht es wieder unvollständig.
+ */
+describe('ChecklistePaneel · Einklappen bei 7/7 (LLH-1124)', () => {
+  const ALLE: ChecklistenPunkt[] = [
+    'aufstellort',
+    'einweisung',
+    'lageskizze',
+    'funkarbeitsplaetze',
+    'sprechgruppen',
+    'etb_eroeffnet',
+    'leitstelle_gemeldet',
+  ];
+  const alleErledigt = () => ALLE.map((p) => eintrag(p, true));
+
+  it('alles erledigt beim Öffnen: eingeklappt mit „7/7 erledigt“, „Aufklappen“ zeigt die Punkte', async () => {
+    rendere({ liste: alleErledigt() });
+    const p = await paneel();
+    expect(await within(p).findByText('7/7 erledigt')).toBeInTheDocument();
+    const knopf = within(p).getByRole('button', { name: 'Aufklappen' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(within(p).queryAllByRole('checkbox')).toHaveLength(0);
+    await userEvent.click(knopf);
+    expect(await within(p).findAllByRole('checkbox')).toHaveLength(7);
+    expect(within(p).getByRole('button', { name: 'Einklappen' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('der letzte Haken klappt nicht ein', async () => {
+    const sechs = alleErledigt().map((e) =>
+      e.punkt === 'lageskizze' ? eintrag('lageskizze', false) : e,
+    );
+    rendere({ liste: sechs, put: () => HttpResponse.json(alleErledigt()) as Response });
+    const p = await paneel();
+    expect(await within(p).findByText('6/7 erledigt')).toBeInTheDocument();
+    expect(within(p).queryByRole('button', { name: 'Aufklappen' })).toBeNull();
+    fireEvent.click(await box('Lageskizze begonnen'));
+    expect(await within(p).findByText('7/7 erledigt')).toBeInTheDocument();
+    expect(within(p).getAllByRole('checkbox')).toHaveLength(7);
+  });
+
+  it('eine Rücknahme im eingeklappten Zustand klappt auf', async () => {
+    const liste = { aktuell: alleErledigt() };
+    server.use(http.get(PFAD, () => HttpResponse.json(liste.aktuell)));
+    const { client } = renderMitProviders(<ChecklistePaneel einsatzId={1} darfSchreiben />);
+    const p = await paneel();
+    await within(p).findByRole('button', { name: 'Aufklappen' });
+    // Auf einem anderen Schirm zurückgenommen; das Live-Ereignis lädt die Liste neu.
+    liste.aktuell = alleErledigt().map((e) =>
+      e.punkt === 'einweisung' ? eintrag('einweisung', false) : e,
+    );
+    await client.invalidateQueries();
+    expect(await within(p).findByText('6/7 erledigt')).toBeInTheDocument();
+    expect(await within(p).findAllByRole('checkbox')).toHaveLength(7);
+  });
+});

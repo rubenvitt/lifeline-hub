@@ -9,6 +9,7 @@ import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
+import { einsatzKeys } from '../api/queryKeys';
 import StabPage from './StabPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -348,6 +349,39 @@ describe('StabPage', () => {
     // Fehlt ein Feld in der Antwort, steht „—“ mit Grund, nie 0.
     expect(
       within(s3).getByRole('link', { name: `${label('einsatzabschnitte')}, —, nicht freigegeben` }),
+    ).toBeInTheDocument();
+  });
+
+  it('die Zahlen folgen live ihrer Quelle, ohne Neuladen der Seite (Spec `stab-uebersicht`)', async () => {
+    const { client } = rendere({
+      zaehler: { auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 0 } },
+    });
+    const s3 = await screen.findByRole('group', { name: 'Werkzeuge S3' });
+    await within(s3).findByRole('link', { name: `${label('auftraege')}, 2, keiner überfällig` });
+    const s5 = screen.getByRole('group', { name: 'Werkzeuge S5' });
+    await within(s5).findByRole('link', { name: 'Pressearbeit, 0, offene Anfragen' });
+    // Auf einem anderen Arbeitsplatz erledigt bzw. angefragt; das Live-Ereignis invalidiert.
+    server.use(
+      http.get('/api/einsaetze/1/modul-zaehler', () =>
+        HttpResponse.json({ auftraege: { offen: 1, in_arbeit: 0, ueberfaellig: 0 } }),
+      ),
+      http.get('/api/einsaetze/1/stab/medienkontakte/kennzahlen', () =>
+        HttpResponse.json({
+          gesamt: 1,
+          offen: 1,
+          offene_anfragen: 1,
+          je_art: { anfrage: 1, abstimmung: 0, termin: 0 },
+          medien: [],
+        }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(1) });
+    await client.invalidateQueries({ queryKey: einsatzKeys.medienkontaktKennzahlen(1) });
+    expect(
+      await within(s3).findByRole('link', { name: `${label('auftraege')}, 1, keiner überfällig` }),
+    ).toBeInTheDocument();
+    expect(
+      await within(s5).findByRole('link', { name: 'Pressearbeit, 1, offene Anfragen' }),
     ).toBeInTheDocument();
   });
 

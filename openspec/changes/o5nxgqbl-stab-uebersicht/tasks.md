@@ -27,8 +27,8 @@ Code). Frontend-Gates aus `frontend/` über `mise exec -- pnpm …` (ohne mise: 
 ## 4. Seite und Checkliste (D1, D6)
 
 - [x] 4.1 `pages/StabPage.tsx` neu: Termin-Zeile, Raster aus sechs `SachgebietKachel`, `EinsatzSeite meta` „n/6 besetzt“ erst mit Daten, Fehler mit Wiederholen statt Raster ohne Stand, `SeitenStandVeraltet` mit Stand, `BesetzungModal` wie bisher, Zahlenquellen (`useModulZaehler`, Presse-Kennzahlen, `useFunkplanLuecken`) einmal je Seite; Dateikopf neu; `StabPage.test.tsx` umgestellt (sechs Paneele `S1 · …`, Gruppen `Werkzeuge S1`–`S6`, Reihenfolge der Regionen S1…S6, „Arbeitsaufnahme“) und um die Fälle aus design.md D8 ergänzt, grün
-- [ ] 4.2 `stab/ChecklistePaneel.tsx`: Einklappen laut D6 (Startwert einmal mit den ersten Daten, Knopf „Aufklappen“/„Einklappen“ im Kopf mit `aria-expanded`/`aria-controls`, Rücknahme klappt auf, letzter Haken klappt nicht ein); `ChecklistePaneel.test.tsx` um die drei Szenarien der Spec `stab-checkliste` ergänzt, grün
-- [ ] 4.3 Live-Nachweis in Vitest: Invalidierung von `modulZaehler` bzw. `medienkontaktKennzahlen` aktualisiert die Zahl an „Aufträge“ bzw. „Pressearbeit“ ohne Neumontage
+- [x] 4.2 `stab/ChecklistePaneel.tsx`: Einklappen laut D6 (Startwert einmal mit den ersten Daten, Knopf „Aufklappen“/„Einklappen“ im Kopf mit `aria-expanded`/`aria-controls`, Rücknahme klappt auf, letzter Haken klappt nicht ein); `ChecklistePaneel.test.tsx` um die drei Szenarien der Spec `stab-checkliste` ergänzt, grün
+- [x] 4.3 Live-Nachweis in Vitest: Invalidierung von `modulZaehler` bzw. `medienkontaktKennzahlen` aktualisiert die Zahl an „Aufträge“ bzw. „Pressearbeit“ ohne Neumontage
 
 ## 5. Regeln und Doku
 
