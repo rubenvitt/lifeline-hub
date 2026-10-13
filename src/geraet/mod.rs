@@ -298,10 +298,12 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
 const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
 /// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
-/// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, Meldungen
-/// an die Einsatzleitung anlegen und die eigenen lesen, Gefahrenzonen lesen. Jeder Handler hier
-/// schneidet über [`abschnitt::Abschnittsbereich`] zu; Abschnitte und Einheiten ändern, Aufträge
-/// erteilen oder abnehmen, ETB, Personen und Stellen fehlen bewusst.
+/// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, die
+/// geltenden Einsatzbefehle an den Bereich lesen und ihre eigenen Verteiler-Einträge quittieren
+/// und zurücknehmen (LLH-1190), Meldungen an die Einsatzleitung anlegen und die eigenen lesen,
+/// Gefahrenzonen lesen. Jeder Handler hier schneidet über [`abschnitt::Abschnittsbereich`] zu;
+/// Abschnitte und Einheiten ändern, Aufträge erteilen oder abnehmen, Befehle schreiben und ihre
+/// Anlagen, ETB, Personen und Stellen fehlen bewusst.
 const EINSATZABSCHNITT: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/abschnitte"),
     ("GET", "/api/einsaetze/{id}/einheiten"),
@@ -312,6 +314,16 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
         "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
     ),
     ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+    ("GET", "/api/einsaetze/{id}/befehle"),
+    ("GET", "/api/einsaetze/{id}/befehle/{bid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/quittieren",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/zuruecknehmen",
+    ),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
     ("GET", "/api/einsaetze/{id}/zonen"),

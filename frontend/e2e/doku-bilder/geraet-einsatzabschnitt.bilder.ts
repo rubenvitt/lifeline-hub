@@ -14,18 +14,21 @@ import {
  * Bilder des Kapitels „Einsatzabschnitt“ (`docs/anwender/kapitel/geraet-einsatzabschnitt.md`): ein
  * Tablet an „EA 1 Sanitätsdienst“ des Demo-Einsatzes, Kontext Tablet, eigener Browserkontext wie
  * in `e2e/geraet-kopplung.spec.ts`. Zwei Aufträge an den Teilbaum erteilt die Spec als
- * Einsatzleitung über die API (D3).
+ * Einsatzleitung über die API (D3), dazu im Test „Einsatzbefehl“ einen freigegebenen Befehl an
+ * EA 1 und EA 2 (erst dort, damit das Bild der Aufträge ohne ihn bleibt).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-einsatzabschnitt`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   abschnitt.png   frontend/src/geraet/GeraetAbschnittPage.tsx
  *   auftraege.png   frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/auftraege/AuftragKarte.tsx
  *   vollzug.png     frontend/src/auftraege/VollzugMeldenModal.tsx
+ *   befehl.png      frontend/src/geraet/GeraetBefehle.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx
  */
 
 const KAPITEL = 'geraet-einsatzabschnitt';
 const AUFTRAG_EA1 = 'Zweite Behandlungsstelle im Gemeindehaus vorbereiten';
 const AUFTRAG_EA11 = 'Liegendtransporte in die Kreisklinik anmelden';
+const BEFEHL_TITEL = 'Verlegung der Behandlungsstelle';
 
 interface Abschnitt {
   id: number;
@@ -60,6 +63,26 @@ async function auftraegeErteilen(page: Page, einsatz: number, ea1: number, ea11:
   });
 }
 
+/** Ein freigegebener Einsatzbefehl an EA 1 und EA 2 (LLH-1190). */
+async function befehlFreigeben(page: Page, einsatz: number, ea1: number, ea2: number) {
+  const b = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${einsatz}/befehle`, {
+    vorlage: 'befehl_lad',
+    titel: BEFEHL_TITEL,
+    abschnitte: [
+      { schluessel: 'lage', text: 'Gemeindehaus wird zweite Behandlungsstelle.' },
+      { schluessel: 'auftrag', text: 'EA 1 verlegt die Behandlungsstelle bis 14:00 Uhr.' },
+      { schluessel: 'durchfuehrung', text: 'EA 2 übernimmt den Wartebereich.' },
+    ],
+  });
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/befehle/${b.id}`, {
+    verteiler: [
+      { empfaenger_typ: 'abschnitt', abschnitt_id: ea1 },
+      { empfaenger_typ: 'abschnitt', abschnitt_id: ea2 },
+    ],
+  });
+  await fuelle(page, 'post', `/api/einsaetze/${einsatz}/befehle/${b.id}/freigeben`);
+}
+
 /** Koppelt ein Tablet an EA 1, eigener Browserkontext, Uhr angehalten. */
 async function abschnittTablet(page: Page, browser: Browser) {
   await anmelden(page);
@@ -74,6 +97,7 @@ async function abschnittTablet(page: Page, browser: Browser) {
     { ansicht: 'einsatzabschnitt', stelle_id: ea1.id, bezeichnung: 'Tablet EA 1' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });
+  const leitung = { einsatz: demo.id, ea1: ea1.id };
   const geraet = await kontext.newPage();
   await uhrAnhalten(geraet);
   await geraet.goto(`/koppeln#${k.code.code}`);
@@ -81,7 +105,7 @@ async function abschnittTablet(page: Page, browser: Browser) {
   await expect(geraet).toHaveURL(new RegExp(`/geraet/${demo.id}/abschnitt$`));
   const nav = geraet.getByRole('navigation', { name: 'Gerätenavigation' });
   await expect(nav.getByRole('link')).toHaveText(['Abschnitt', 'Aufträge', 'Melden', 'Karte']);
-  return { kontext, geraet, nav };
+  return { kontext, geraet, nav, leitung };
 }
 
 test.describe(KAPITEL, () => {
@@ -135,6 +159,33 @@ test.describe(KAPITEL, () => {
       await expect(dialog).toHaveCount(0);
       // Vollzogen ist nicht mehr offen: der Auftrag verlässt die Liste.
       await expect(geraet.getByText(AUFTRAG_EA1)).toHaveCount(0);
+    } finally {
+      await kontext.close();
+    }
+  });
+
+  test('Einsatzbefehl quittieren', async ({ page, browser }) => {
+    const { kontext, geraet, nav, leitung } = await abschnittTablet(page, browser);
+    try {
+      const ea2 = await abschnitt(page, leitung.einsatz, 'EA 2');
+      await befehlFreigeben(page, leitung.einsatz, leitung.ea1, ea2.id);
+      await nav.getByRole('link', { name: 'Aufträge' }).click();
+      const block = geraet.locator('[data-lfh="geraet-befehle"]');
+      await expect(block.getByText(BEFEHL_TITEL)).toBeVisible();
+      const quittieren = block.getByRole('button', { name: /^Empfang für .*quittieren$/ });
+      // Nur der eigene Abschnitt trägt den Knopf.
+      await expect(quittieren).toHaveCount(1);
+      await geraet.mouse.move(0, 0);
+      await fotografiere(block, KAPITEL, 'befehl');
+
+      // Nachgeklickt: Text aufklappen, quittieren, rückgängig.
+      await block.getByRole('button', { name: 'Befehlstext' }).click();
+      await expect(block.getByText('EA 2 übernimmt den Wartebereich.')).toBeVisible();
+      await quittieren.click();
+      await expect(geraet.getByText('Empfang quittiert')).toBeVisible();
+      await expect(quittieren).toHaveCount(0);
+      await geraet.getByRole('button', { name: 'Rückgängig' }).click();
+      await expect(quittieren).toHaveCount(1);
     } finally {
       await kontext.close();
     }

@@ -106,8 +106,17 @@ pub async fn liste<T: DokumentRoute>(
     einsatz_id: i64,
 ) -> Result<Json<Vec<T::Kopf>>, AppError> {
     fordere_lesen::<T>(state, benutzer, einsatz_id).await?;
+    Ok(Json(liste_geprueft::<T>(state, einsatz_id).await?))
+}
+
+/// Die Liste ohne eigene Rechteprüfung: der Aufrufer hat sie schon über den Einsatzkontext
+/// gezogen (`routes::befehl`, LLH-1190).
+pub async fn liste_geprueft<T: DokumentRoute>(
+    state: &AppState,
+    einsatz_id: i64,
+) -> Result<Vec<T::Kopf>, AppError> {
     let alle = dok_repo::liste_koepfe::<T>(&state.pool, einsatz_id).await?;
-    Ok(Json(alle.into_iter().map(Into::into).collect()))
+    Ok(alle.into_iter().map(Into::into).collect())
 }
 
 pub async fn detail<T: DokumentRoute>(
@@ -117,11 +126,18 @@ pub async fn detail<T: DokumentRoute>(
     id: i64,
 ) -> Result<Json<T::Anzeige>, AppError> {
     fordere_lesen::<T>(state, benutzer, einsatz_id).await?;
-    Ok(Json(
-        dok_repo::laden::<T>(&state.pool, einsatz_id, id)
-            .await?
-            .into(),
-    ))
+    Ok(Json(detail_geprueft::<T>(state, einsatz_id, id).await?))
+}
+
+/// Das Detail ohne eigene Rechteprüfung, wie [`liste_geprueft`].
+pub async fn detail_geprueft<T: DokumentRoute>(
+    state: &AppState,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<T::Anzeige, AppError> {
+    Ok(dok_repo::laden::<T>(&state.pool, einsatz_id, id)
+        .await?
+        .into())
 }
 
 /// Anlegen. `abschnitte` ist der optionale Startinhalt (LFH-548): damit entsteht der Entwurf in
@@ -288,17 +304,17 @@ pub async fn freigeben<T: DokumentRoute>(
 }
 
 /// Quittiert eine Verteiler-Zeile (LLH-1173, Spec `befehl-quittung`) oder nimmt die Quittung
-/// zurück (`quittieren = false`). Rechte wie jeder Schreibweg des Dokuments; dieselben Prüfungen
-/// wie `EinsatzSchreibzugriff<Auftraege>` am Auftrag. Geräte erreichen keine Dokumentroute.
-pub async fn quittung<T: DokumentRoute>(
+/// zurück (`quittieren = false`), ohne eigene Rechteprüfung: der Aufrufer zieht
+/// `EinsatzSchreibzugriff<Auftraege>` wie am Auftrag und schneidet ein Abschnittsgerät auf seinen
+/// Bereich zu (`routes::befehl`, LLH-1190).
+pub async fn quittung_geprueft<T: DokumentRoute>(
     state: &AppState,
     benutzer: &Benutzer,
     einsatz_id: i64,
     id: i64,
     eintrag_id: i64,
     quittieren: bool,
-) -> Result<Json<T::Anzeige>, AppError> {
-    fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
+) -> Result<T::Anzeige, AppError> {
     let jetzt = jetzt();
     let (dok, etb_id) = crate::write_retry!(&state.pool, |conn| {
         if quittieren {
@@ -314,7 +330,7 @@ pub async fn quittung<T: DokumentRoute>(
         // Der Kopf ändert sich (Quittungsstand der Karte): ohne `nur_inhalt` (design.md D5).
         sse::<T>(state, einsatz_id, id);
     }
-    Ok(Json(dok.into()))
+    Ok(dok.into())
 }
 
 #[derive(Debug, Deserialize)]

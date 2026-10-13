@@ -7,21 +7,29 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Auftrag, AuftragEmpfaenger } from '../api/types';
+import type { Auftrag } from '../api/types';
 import AuftragListe from '../auftraege/AuftragListe';
 import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
 import EinsatzSeite from '../components/EinsatzSeite';
+import GeraetBefehle from './GeraetBefehle';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { prioRang } from '../kommunikation';
 
+/** Ziel einer Empfängerzeile (Auftrag) oder eines Verteiler-Eintrags (Befehl). */
+export type EmpfaengerZiel = {
+  abschnitt_id?: number | null;
+  einheit_id?: number | null;
+};
+
 /**
- * Ob eine Empfängerzeile zum Bereich des Geräts gehört: ein Abschnitt des Teilbaums oder eine
- * Einheit darin. Die Mengen kommen aus den Listen, die der Server schon zugeschnitten hat.
+ * Ob eine Empfängerzeile oder ein Verteiler-Eintrag zum Bereich des Geräts gehört: ein Abschnitt
+ * des Teilbaums oder eine Einheit darin. Die Mengen kommen aus den Listen, die der Server schon
+ * zugeschnitten hat.
  */
 export function istEigenerEmpfaenger(
-  e: Pick<AuftragEmpfaenger, 'abschnitt_id' | 'einheit_id'>,
+  e: EmpfaengerZiel,
   abschnitte: ReadonlySet<number>,
   einheiten: ReadonlySet<number>,
 ): boolean {
@@ -43,7 +51,8 @@ function vergleiche(a: Auftrag, b: Auftrag): number {
  * Aufträge des Abschnittsgeräts (LFH-1043, Spec `funktionsansichten`): die offenen Aufträge an den
  * eigenen Teilbaum und seine Einheiten, mit Quittung je eigener Empfängerzeile, „In Bearbeitung“
  * und „Vollzug melden“. Erteilen und Abnehmen fehlen; die Liste schneidet der Server zu. Kein
- * Rückverweis ins ETB: das liest das Gerät nicht.
+ * Rückverweis ins ETB: das liest das Gerät nicht. Darunter die Einsatzbefehle an den Bereich
+ * (LLH-1190, `GeraetBefehle`).
  */
 export default function GeraetAuftraegePage() {
   const { geraet } = useAuth();
@@ -82,8 +91,8 @@ export default function GeraetAuftraegePage() {
     () => new Set((einheitenQuery.data ?? []).map((e) => e.id)),
     [einheitenQuery.data],
   );
-  const darfQuittierenFuer = useCallback(
-    (e: AuftragEmpfaenger) => istEigenerEmpfaenger(e, eigeneAbschnitte, eigeneEinheiten),
+  const istEigen = useCallback(
+    (e: EmpfaengerZiel) => istEigenerEmpfaenger(e, eigeneAbschnitte, eigeneEinheiten),
     [eigeneAbschnitte, eigeneEinheiten],
   );
 
@@ -151,12 +160,15 @@ export default function GeraetAuftraegePage() {
           quittierungLaeuft={quittieren.isPending}
           quittierungZiel={quittieren.isPending ? quittieren.variables : null}
           onQuittieren={(auftragId, empfaengerId) => quittieren.mutate({ auftragId, empfaengerId })}
-          darfQuittierenFuer={darfQuittierenFuer}
+          darfQuittierenFuer={istEigen}
           onInArbeit={(auftragId) => inArbeit.mutate(auftragId)}
           onVollzugMelden={setVollzugFuer}
           kartenFehler={kartenFehler.grund}
           quittierFehler={quittierFehler.grund}
         />
+      )}
+      {geraet != null && (
+        <GeraetBefehle einsatzId={einsatzId} darfSchreiben={darfSchreiben} istEigen={istEigen} />
       )}
       <VollzugMeldenModal
         offen={vollzugFuer != null}

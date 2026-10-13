@@ -702,6 +702,250 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
+const BEFEHL_ROH: &str = r#"{"vorlage":"befehl_lad","titel":"TITEL","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"lage","text":"L"},{"schluessel":"auftrag","text":"A"},{"schluessel":"durchfuehrung","text":"D"}]}"#;
+
+/// Ein Befehlsentwurf mit dem Verteiler `verteiler`; freigegeben, wenn `freigeben`.
+async fn befehl_an(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    titel: &str,
+    verteiler: Value,
+    freigeben: bool,
+) -> Value {
+    let basis = format!("/api/einsaetze/{einsatz}/befehle");
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &basis,
+        admin,
+        Some(&BEFEHL_ROH.replace("TITEL", titel)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        app,
+        "PATCH",
+        &format!("{basis}/{id}"),
+        admin,
+        Some(&json!({ "verteiler": verteiler })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    if !freigeben {
+        return v;
+    }
+    let (s, v) = anfrage(app, "POST", &format!("{basis}/{id}/freigeben"), admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+/// LLH-1190 (Spec `funktionsansichten`, „Ansicht Einsatzabschnitt“): das Abschnittsgerät liest
+/// nur die geltenden Fassungen der Befehle an seinen Bereich und quittiert nur seine eigenen
+/// Verteiler-Zeilen.
+#[tokio::test]
+async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let basis = format!("/api/einsaetze/{}/befehle", l.einsatz);
+    let id = |v: &Value| v["id"].as_i64().unwrap();
+    let zeile = |v: &Value, schluessel: &str, wert: i64| {
+        v["verteiler"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e[schluessel] == wert)
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+
+    let gemischt = befehl_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Deich halten",
+        json!([
+            {"empfaenger_typ": "abschnitt", "abschnitt_id": l.sued},
+            {"empfaenger_typ": "einheit", "einheit_id": l.zug_ost},
+        ]),
+        true,
+    )
+    .await;
+    let an_sued = befehl_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Straße sperren",
+        json!([{"empfaenger_typ": "abschnitt", "abschnitt_id": l.sued}]),
+        true,
+    )
+    .await;
+    let entwurf = befehl_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Noch nicht frei",
+        json!([{"empfaenger_typ": "abschnitt", "abschnitt_id": l.nord}]),
+        false,
+    )
+    .await;
+    // Fassung 1 an Nord, Fassung 2 fortgeschrieben und freigegeben: nur Fassung 2 gilt.
+    let alt = befehl_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Sandsäcke",
+        json!([{"empfaenger_typ": "abschnitt", "abschnitt_id": l.nord}]),
+        true,
+    )
+    .await;
+    let (s, neu) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/{}/fortschreiben", id(&alt)),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{neu}");
+    let (s, neu) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/{}/freigeben", id(&neu)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{neu}");
+
+    // Liste: nur die geltenden Fassungen mit eigenem Empfänger.
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut ids: Vec<i64> = v.as_array().unwrap().iter().map(id).collect();
+    ids.sort_unstable();
+    let mut erwartet = vec![id(&gemischt), id(&neu)];
+    erwartet.sort_unstable();
+    assert_eq!(ids, erwartet, "{v}");
+
+    // Detail: eigener Befehl ja, fremder, Entwurf und überholte Fassung nicht.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&gemischt)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["abschnitte"][0]["text"], "L", "Befehlstext lesbar");
+    for (wer, b) in [
+        ("fremd", &an_sued),
+        ("Entwurf", &entwurf),
+        ("überholt", &alt),
+    ] {
+        let (s, _) = anfrage(&app, "GET", &format!("{basis}/{}", id(b)), &geraet, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{wer}");
+    }
+
+    // Quittieren: die eigene Zeile ja, auch ein zweites Mal; die von Süd nicht.
+    let pfad = |bid: i64, vid: i64, wort: &str| format!("{basis}/{bid}/verteiler/{vid}/{wort}");
+    let eigene = zeile(&gemischt, "einheit_id", l.zug_ost);
+    for _ in 0..2 {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &pfad(id(&gemischt), eigene, "quittieren"),
+            &geraet,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        let e = v["verteiler"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == eigene)
+            .unwrap()
+            .clone();
+        assert!(e["quittiert_at"].is_string(), "{e}");
+    }
+    for (wer, bid, vid) in [
+        (
+            "fremde Zeile",
+            id(&gemischt),
+            zeile(&gemischt, "abschnitt_id", l.sued),
+        ),
+        (
+            "fremder Befehl",
+            id(&an_sued),
+            zeile(&an_sued, "abschnitt_id", l.sued),
+        ),
+        (
+            "überholte Fassung",
+            id(&alt),
+            zeile(&alt, "abschnitt_id", l.nord),
+        ),
+    ] {
+        for wort in ["quittieren", "zuruecknehmen"] {
+            let (s, _) = anfrage(&app, "POST", &pfad(bid, vid, wort), &geraet, None).await;
+            assert_eq!(s, StatusCode::NOT_FOUND, "{wer} {wort}");
+        }
+    }
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_sued)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        v["verteiler"][0]["quittiert_at"].is_null(),
+        "Süd bleibt offen"
+    );
+
+    // Zurücknehmen der eigenen Zeile.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["verteiler"][1]["quittiert_at"].is_null(), "{v}");
+
+    // ETB nennt den Empfänger, einmal Quittung, einmal Rücknahme.
+    let etb = system_etb_inhalte(&app, &admin, l.einsatz).await;
+    let quittiert = etb
+        .iter()
+        .filter(|i| i.starts_with("Empfang quittiert: Einsatzbefehl v1"))
+        .count();
+    let zurueck = etb
+        .iter()
+        .filter(|i| i.starts_with("Quittung zurückgenommen: Einsatzbefehl v1"))
+        .count();
+    assert_eq!((quittiert, zurueck), (1, 1), "{etb:?}");
+
+    // Alles andere an Befehlen bleibt verboten.
+    for (m, p) in [
+        ("POST", basis.clone()),
+        ("PATCH", format!("{basis}/{}", id(&entwurf))),
+        ("POST", format!("{basis}/{}/freigeben", id(&entwurf))),
+        ("POST", format!("{basis}/{}/fortschreiben", id(&gemischt))),
+        ("GET", format!("{basis}/{}/anlagen", id(&gemischt))),
+    ] {
+        let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
+    }
+}
+
 #[tokio::test]
 async fn abschnittsgeraet_meldet_mit_eigenem_absender() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
