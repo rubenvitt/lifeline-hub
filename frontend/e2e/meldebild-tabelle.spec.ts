@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
-import { SUBPIXEL, anmelden, einsatzAnlegen, seedeKraefte } from './meldebild-kern';
+import {
+  SUBPIXEL,
+  anmelden,
+  einsatzAnlegen,
+  seedeKraefte,
+  seedeKraeftebaum,
+} from './meldebild-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -205,22 +211,21 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
     `Band scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
   ).toBeLessThanOrEqual(mass.clientWidth + SUBPIXEL);
 
-  // Jede Zelle ohne Bildlauf erreichbar: ein Band, das eine Zelle gar nicht rendert, scrollt
-  // ebenfalls nicht.
-  const zellen = band.locator('[data-lfh="kennzahl"]');
-  const anzahl = await zellen.count();
-  expect(anzahl, 'mindestens eine Fahrzeug- und eine Personalzelle').toBeGreaterThanOrEqual(2);
-  for (let i = 0; i < anzahl; i += 1) await expect(zellen.nth(i)).toBeInViewport();
-  // Fugenraster: bei 1024 px drei Spalten, alle Gruppen in derselben Geometrie. Ein Band, das
-  // nur einen Teil der Breite nutzte, hätte eine andere Spurzahl.
-  const spuren = await band
-    .locator('[data-lfh="kennzahlenband"]')
-    .evaluateAll((els) => els.map((el) => getComputedStyle(el).gridTemplateColumns.split(' ')));
-  // Drei Gruppen: „keine Rückmeldung" steht als eigene Gruppe daneben.
+  // Jede Kennzahl ohne Bildlauf erreichbar: ein Band, das eine Zelle gar nicht rendert, scrollt
+  // ebenfalls nicht. Drei Kennzahlen: „keine Rückmeldung" steht als eigene daneben.
   await expect(band.getByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeVisible();
-  expect(spuren.map((s) => s.length)).toEqual([3, 3, 3]);
-  expect(spuren[1], 'Personal in derselben Spaltengeometrie wie Fahrzeuge').toEqual(spuren[0]);
-  expect(spuren[2], 'Rückmeldung in derselben Spaltengeometrie').toEqual(spuren[0]);
+  const zellen = band.locator('[data-lfh="kennzahl"]');
+  await expect(zellen, 'Einheiten, Personal und keine Rückmeldung').toHaveCount(3);
+  for (let i = 0; i < 3; i += 1) await expect(zellen.nth(i)).toBeInViewport();
+  // EIN Fugenraster, das nach Breite füllt — und keine Füllkachel (Spec `kraeftebaum`,
+  // „Statusband ohne Füllkacheln“): vorher standen bei vier Status zwei leere Kacheln da.
+  await expect(band.locator('[data-lfh="kennzahlenband"]')).toHaveCount(1);
+  await expect(band.locator('[data-lfh="meldebild-bandluecke"]')).toHaveCount(0);
+  // Die Aufgliederung trägt die vier Einheiten, als Bild mit Wortlaut.
+  await expect(
+    band.getByRole('img', { name: /^Einheiten nach Status: / }),
+    'Aufgliederung der Einheiten',
+  ).toHaveCount(1);
   // Und das Meta im Seitenkopf nennt Einheiten und Stärke in BOS-Schreibweise.
   await expect(
     page.locator('[data-lfh="seitenkopf"]').getByText(/Einheiten? · Stärke \d+\/\d+\/\d+\/\/\d+/),
@@ -228,7 +233,7 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
 
   test.info().annotations.push({
     type: 'messwert',
-    description: `Statusband bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px, ${anzahl} Zellen`,
+    description: `Statusband bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px`,
   });
 });
 
@@ -331,4 +336,76 @@ test('Meldebild bei 1440 px: Rückmeldung und Auftrag ohne Querscrollen im Bild,
     route.fulfill({ status: 403, json: { fehler: 'keine Berechtigung' } }),
   );
   await pruefe('Führungspersonal ohne Leserecht auf Meldungen', false);
+});
+
+/**
+ * NACHWEIS 5 — der Kräftebaum (LLH-1025, Spec `kraeftebaum`). Am Fükw-Hauptgerät (1366) und am
+ * Desktop (1440): das Meldebild öffnet auf der Stufe „Einheiten“ (Untergruppe und Fahrzeug
+ * sichtbar, Besatzung zu), das Fahrzeug klappt seine Besatzung auf, und weder Tabelle noch
+ * Werkzeugzeile laufen über — die Werkzeugzeile steht in EINER Zeile.
+ */
+test('Meldebild als Kräftebaum: Einheit → Untergruppe → Fahrzeug → Besatzung, 1366 und 1440 px', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Kräftebaum ${Date.now()}`);
+  const b = await seedeKraeftebaum(page, einsatzId);
+  for (const breite of [1366, 1440]) {
+    await page.setViewportSize({ width: breite, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    const bereich = page.getByRole('region', { name: 'Meldebild' });
+    const zeile = (key: string) => bereich.locator(`tr[data-row-key="${key}"]`);
+
+    // Vorgabe „Einheiten“: Zug offen (Fahrzeug und Gruppe), Besatzung und Gruppenkraft zu.
+    await expect(zeile(`eh-${b.gruppe}`)).toBeVisible();
+    await expect(zeile(`ef-${b.fahrzeug}`)).toBeVisible();
+    await expect(zeile(`ep-${b.fuehrer}`)).toHaveCount(0);
+    await expect(zeile(`ep-${b.helfer}`)).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: 'Einheiten', exact: true })).toBeChecked();
+
+    // Die Elternzeile kumuliert, das Fahrzeug nennt seine Besatzung Ist.
+    await expect(zeile(`eh-${b.zug}`)).toContainText('1/0/1//2');
+    await expect(zeile(`ef-${b.fahrzeug}`).locator('[data-lfh="meldebild-besatzung"]')).toHaveText(
+      /^Ist 1\/0\/0\/\/1/,
+    );
+    // Zeichen statt Kürzel: Fahrzeugzeichen und taktisches Zeichen der Einheit.
+    await expect(zeile(`ef-${b.fahrzeug}`).locator('[data-lfh="fahrzeug-zeichen"]')).toHaveCount(1);
+    await expect(zeile(`eh-${b.gruppe}`).locator('[data-lfh="einheit-zeichen"]')).toHaveCount(1);
+
+    // Fahrzeug aufklappen (über das Symbol, `click()` prüft das Trefferziel) → Besatzung mit „EF“.
+    await zeile(`ef-${b.fahrzeug}`).locator('.ant-table-row-expand-icon').click();
+    await expect(zeile(`ep-${b.fuehrer}`)).toBeVisible();
+    await expect(zeile(`ep-${b.fuehrer}`).locator('[data-lfh="kraeftebaum-marke"]')).toHaveText([
+      'F',
+    ]);
+
+    // „alles“ öffnet auch die Gruppe; ihre Kraft steht direkt darunter (kein „Ohne Fahrzeug“).
+    await page.getByRole('radio', { name: 'alles', exact: true }).click();
+    await expect(zeile(`ep-${b.helfer}`)).toBeVisible();
+    await expect(bereich.locator('tr[data-row-key^="ofz-"]')).toHaveCount(0);
+
+    // Ohne Querscrollen: Tabelle und Werkzeugzeile.
+    const rest = await bereich
+      .locator('.ant-table-body, .ant-table-content')
+      .first()
+      .evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(rest, `${breite}px: die Tabelle scrollt waagerecht (${rest}px)`).toBeLessThanOrEqual(
+      SUBPIXEL,
+    );
+    const werkzeuge = page.locator('[data-lfh="meldebild-werkzeuge"]');
+    // Eine Zeile: jedes Kind beginnt, bevor das niedrigste endet (die Höhen unterscheiden sich,
+    // der Text ist niedriger als ein Knopf).
+    const kanten = await werkzeuge.evaluate((el) =>
+      [...el.children].map((k) => {
+        const r = k.getBoundingClientRect();
+        return { oben: r.top, unten: r.bottom };
+      }),
+    );
+    const tiefsteOberkante = Math.max(...kanten.map((k) => k.oben));
+    const hoechsteUnterkante = Math.min(...kanten.map((k) => k.unten));
+    expect(
+      tiefsteOberkante,
+      `${breite}px: die Werkzeugzeile bricht um (${JSON.stringify(kanten)})`,
+    ).toBeLessThan(hoechsteUnterkante);
+  }
 });
