@@ -1,108 +1,73 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { farbenHell } from '../theme/tokens';
 import Statusband from './Statusband';
 import type { BandZelle } from './meldebildRaster';
 
-function zelle(schluessel: string, ton: BandZelle['ton'], wert = 1): BandZelle {
-  return { schluessel, code: schluessel.toUpperCase(), wert, wort: `Wort ${schluessel}`, ton };
+function zelle(
+  schluessel: string,
+  ton: BandZelle['ton'],
+  wert = 1,
+  code: string | null = schluessel.toUpperCase(),
+): BandZelle {
+  return { schluessel, code, wert, wort: `Wort ${schluessel}`, ton };
 }
 
-/** CSS-Farbwert so, wie jsdom ihn aus einem Hex-Inline-Stil zurückgibt. */
-function rgb(hex: string): string {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
+/** Die Kennzahl einer Gruppe des Bands. */
+const kennzahl = (name: string) =>
+  screen.getByRole('region', { name }).querySelector('[data-lfh="kennzahl"]') as HTMLElement;
 
-describe('Statusband', () => {
-  it('jede Zelle ist eine Kennzahl auf der neutralen Fläche, der Ton im Quadrat und in der Marke', () => {
-    const { container } = renderMitProviders(
-      <Statusband einheiten={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
-    );
-    const band = screen.getByRole('region', { name: 'Einheiten je Status' });
-    const z = band.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
-    expect(z).toHaveAttribute('data-ton', 'achtung');
-    expect(z).toHaveTextContent('S3');
-    expect(z).toHaveTextContent('5');
-    expect(z).toHaveTextContent('Wort s3');
-    // Grund `flaeche` trägt die Klasse (`.lfh-kennzahl` in `sprache.css`), kein Inline-Ton.
-    expect(z).toHaveClass('lfh-kennzahl');
-    expect(z.style.background).toBe('');
-    const quadrat = z.querySelector('[data-lfh="kennzahl-punkt"]') as HTMLElement;
-    expect(quadrat.style.background).toBe(rgb(farbenHell.achtung));
-    // Am Tag trägt die Zahl die Textrolle — getönt wie nachts, aber über 7 : 1.
-    const wert = z.querySelector('[data-lfh="kennzahl-wert"]') as HTMLElement;
-    expect(wert.style.color).toBe(rgb(farbenHell.achtungText));
-    expect(container.querySelectorAll('[data-lfh="meldebild-bandzelle"]')).toHaveLength(0);
-  });
-
-  it('normal und bedien behalten ihre Tonfarbe auch tags', () => {
+describe('Statusband (Kennzahl mit Aufgliederung, LLH-1025)', () => {
+  it('die Zahl führt: Einheiten der Auswahl, aufgegliedert je FMS-Status', () => {
     renderMitProviders(
       <Statusband
-        einheiten={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
+        einheiten={[zelle('s3', 'achtung', 2), zelle('s4', 'achtung', 1), zelle('x', 'neutral', 1, null)]}
         personal={[]}
         zustand="daten"
       />,
     );
-    const wert = (ton: string) =>
-      document.querySelector(
-        `[data-lfh="kennzahl"][data-ton="${ton}"] [data-lfh="kennzahl-wert"]`,
-      ) as HTMLElement;
-    expect(wert('normal').style.color).toBe(rgb(farbenHell.normalText));
-    expect(wert('bedien').style.color).toBe(rgb(farbenHell.bedienText));
+    const k = kennzahl('Einheiten je Status');
+    expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^4$/);
+    // Ein Bild mit Wortlaut, die Legende sagt dasselbe fürs Auge; ohne Code steht das Wort.
+    expect(screen.getByRole('img', { name: 'Einheiten nach Status: S3 2, S4 1, Wort x 1' })).toBeInTheDocument();
+    expect(k).toHaveTextContent('S3 2 · S4 1 · Wort x 1');
   });
 
-  it.each([
-    [1440, 6, 2, 4],
-    [1024, 3, 2, 1],
-    [390, 2, 0, 0],
-  ])(
-    'bei %i px: %i Spalten für beide Gruppen, Auffüllung %i / %i',
-    (breite, spalten, lueckenF, lueckenP) => {
-      setzeViewportBreite(breite);
-      renderMitProviders(
-        <Statusband
-          einheiten={[
-            zelle('s1', 'normal'),
-            zelle('s2', 'normal'),
-            zelle('s3', 'achtung'),
-            zelle('s4', 'bedien'),
-          ]}
-          personal={[zelle('p1', 'normal'), zelle('p2', 'alarm')]}
-          zustand="daten"
-        />,
-      );
-      const fzg = screen.getByRole('region', { name: 'Einheiten je Status' });
-      const pers = screen.getByRole('region', { name: 'Personal je Status' });
-      const rasterF = fzg.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
-      const rasterP = pers.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
-      expect(rasterF.style.gridTemplateColumns).toBe(`repeat(${spalten}, minmax(0, 1fr))`);
-      expect(rasterP.style.gridTemplateColumns).toBe(rasterF.style.gridTemplateColumns);
-      expect(within(fzg).getAllByText(/^Wort/)).toHaveLength(4);
-      expect(fzg.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(4);
-      expect(fzg.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(lueckenF);
-      expect(pers.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(lueckenP);
-    },
-  );
-
-  it('eine volle Reihe braucht keine Auffüllung', () => {
-    // Sechs Zellen füllen jede der drei Stufen (6, 3, 2) restlos.
-    const sechs = ['a', 'b', 'c', 'd', 'e', 'f'].map((k) => zelle(k, 'normal'));
-    const { container } = renderMitProviders(
-      <Statusband einheiten={sechs} personal={[]} zustand="daten" />,
-    );
-    expect(container.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(0);
-  });
-  it('„keine Rückmeldung" steht als eigene Gruppe, nicht in der FMS-Reihe (LFH-610)', () => {
+  it('Personal als Zahl mit Aufgliederung je Zustand', () => {
     renderMitProviders(
       <Statusband
-        einheiten={[zelle('s4', 'bedien', 3)]}
+        einheiten={[]}
+        personal={[zelle('p1', 'achtung', 12, null)]}
+        zustand="daten"
+      />,
+    );
+    const k = kennzahl('Personal je Status');
+    expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^12$/);
+    expect(screen.getByRole('img', { name: 'Personal nach Status: Wort p1 12' })).toBeInTheDocument();
+  });
+
+  it.each([1440, 1024, 390])('bei %i px keine Füllkachel, auch bei wenigen Status', (breite) => {
+    setzeViewportBreite(breite);
+    const { container } = renderMitProviders(
+      <Statusband
+        einheiten={[zelle('s4', 'achtung', 3)]}
+        personal={[zelle('p1', 'achtung', 12, null)]}
+        zustand="daten"
+      />,
+    );
+    expect(container.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(2);
+  });
+
+  it('„keine Rückmeldung“ als dritte Kennzahl nur, wenn es sie gibt (LFH-610)', () => {
+    const { rerender } = renderMitProviders(
+      <Statusband
+        einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[]}
         rueckmeldung={{
           schluessel: 'rueckmeldung-keine',
-          code: '—',
+          code: null,
           wert: 2,
           wort: 'keine Rückmeldung',
           ton: 'alarm',
@@ -110,20 +75,30 @@ describe('Statusband', () => {
         zustand="daten"
       />,
     );
-    const fms = screen.getByRole('region', { name: 'Einheiten je Status' });
-    expect(within(fms).queryByText('keine Rückmeldung')).toBeNull();
-    const rueck = screen.getByRole('region', { name: 'Einheiten ohne Rückmeldung' });
-    const k = rueck.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
+    const k = kennzahl('Einheiten ohne Rückmeldung');
     expect(k).toHaveAttribute('data-ton', 'alarm');
-    expect(k).toHaveTextContent('—');
     expect(k).toHaveTextContent('2');
     expect(k).toHaveTextContent('keine Rückmeldung');
+    rerender(<Statusband einheiten={[zelle('s4', 'achtung', 3)]} personal={[]} zustand="daten" />);
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
   });
 
-  it('ohne Kachel keine Rückmeldungsgruppe', () => {
+  it('der Hinweis zu Mittelfiltern steht als Notiz an den Einheiten', () => {
     renderMitProviders(
-      <Statusband einheiten={[zelle('s4', 'bedien')]} personal={[]} zustand="daten" />,
+      <Statusband
+        einheiten={[zelle('s4', 'achtung', 3)]}
+        einheitenHinweis="ungefiltert"
+        personal={[]}
+        zustand="daten"
+      />,
     );
-    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Einheiten je Status' })).toHaveTextContent(
+      'ungefiltert',
+    );
+  });
+
+  it('laden und Fehler: Platzhalter statt einer Null', () => {
+    renderMitProviders(<Statusband einheiten={[]} personal={[]} zustand="fehler" />);
+    expect(screen.getAllByText('Stand unbekannt').length).toBeGreaterThan(0);
   });
 });
