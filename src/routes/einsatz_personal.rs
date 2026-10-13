@@ -311,17 +311,10 @@ pub async fn entfernen(
         state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
     }
     for einheit_id in einheiten {
-        state
-            .live
-            .publiziere_objekt(einsatz_id, LiveEvent::Einheit, "einheit_id", einheit_id);
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
     }
     for abschnitt_id in abschnitte {
-        state.live.publiziere_objekt(
-            einsatz_id,
-            LiveEvent::Abschnitt,
-            "abschnitt_id",
-            abschnitt_id,
-        );
+        super::einsatzabschnitt::sse_abschnitt(&state, einsatz_id, abschnitt_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
