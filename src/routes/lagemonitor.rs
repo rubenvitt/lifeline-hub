@@ -9,6 +9,7 @@
 
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
+use crate::einsatz::zaehler::{zaehle_kraefte, KraefteZaehler, KraftMerkmale};
 use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
 use crate::staerke::{Staerke, StaerkePosition};
@@ -118,22 +119,24 @@ pub async fn lagebild(
     .fetch_one(pool)
     .await?;
     // Wie die Verdichtung der Kräfte-Seiten (`kraefte/kraeftebild.ts`, `verdichte`): jedes
-    // aktive Personal, auch ohne Einheit; entlassene und stornierte zählen nicht (LLH-1079).
-    let positionen: Vec<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
+    // aktive Personal, auch ohne Einheit; entlassene und stornierte zählen nicht (LLH-1079,
+    // Regel `zaehle_kraefte`, Fixture `regeln.json` Abschnitt `kraefte`).
+    let zeilen: Vec<(Option<String>, bool)> = sqlx::query_as(
+        "SELECT COALESCE(ep.staerke_position, p.staerke_position), ep.beendet_at IS NOT NULL \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
          WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let personal = positionen.len() as i64;
-    let staerke = Staerke::aus_positionen(
-        positionen
-            .into_iter()
-            .flatten()
-            .filter_map(|s| StaerkePosition::parse(&s)),
-    );
+    let merkmale: Vec<KraftMerkmale> = zeilen
+        .into_iter()
+        .map(|(position, beendet)| KraftMerkmale {
+            staerke_position: position.as_deref().and_then(StaerkePosition::parse),
+            beendet,
+        })
+        .collect();
+    let KraefteZaehler { personal, staerke } = zaehle_kraefte(&merkmale);
 
     let zeilen: Vec<(
         i64,

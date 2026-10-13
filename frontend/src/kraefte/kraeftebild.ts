@@ -515,12 +515,14 @@ type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
  * Kräfteübersicht, UNGEFILTERT als Bezugswert daneben (die Gesamtstärke darf beim Anwählen
  * eines Abschnitts nicht verschwinden) und in der Verdichtungszeile der Kräfte-Modulseiten.
  * `soll` fehlt bewusst: es kumuliert über den Einheitenbaum und braucht `baueKraeftebild`.
+ * Gezählt wird nur aktives Personal (LLH-1079, Fixture `regeln.json` Abschnitt `kraefte`).
  */
 export function verdichte(
-  personal: EinsatzPersonal[],
+  allesPersonal: EinsatzPersonal[],
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
 ): Kurzverdichtung {
+  const personal = allesPersonal.filter((ep) => !ep.beendet_at);
   const staerke = leereStaerke();
   const personalStatus = leereVert();
   const fahrzeugStatus = leereVert();

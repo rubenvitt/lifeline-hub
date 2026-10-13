@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { Auftrag, Einheit, Einsatzabschnitt, EinsatzPersonal, Meldung } from '../api/types';
 import { summiereStaerke } from '../anzeige/staerke';
-import { baueKraeftebild, type MeldebildZeile } from '../kraefte/kraeftebild';
+import { baueKraeftebild, verdichte, type MeldebildZeile } from '../kraefte/kraeftebild';
 import { istAlarmiert } from '../meldungen/meldungKennzahlen';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
@@ -63,6 +63,22 @@ interface Fixture {
     erwartet_ist_kumuliert: Record<string, Tripel>;
     erwartet_abschnitte: Record<string, { eigene: Tripel; inkl_unter: Tripel }>;
     bereitstellungsraeume: Array<{ name: string; einheiten: number[]; erwartet: Tripel | null }>;
+  };
+  kraefte: {
+    personal: Array<{
+      name: string;
+      staerke_position: EinsatzPersonal['staerke_position'];
+      beendet_als: EinsatzPersonal['beendet_als'];
+    }>;
+    erwartet: { personal: number; staerke: Tripel };
+    einheiten: Array<{
+      id: number;
+      name: string;
+      ueber_einheit_id: number | null;
+      aufgeloest: boolean;
+      ist_kumuliert: Tripel;
+    }>;
+    erwartet_einheiten: Tripel;
   };
 }
 
@@ -184,5 +200,37 @@ describe('Fixture: Stärke', () => {
         alsStaerke(soll.inkl_unter),
       );
     }
+  });
+});
+
+describe('Fixture: Kräfte (LLH-1079)', () => {
+  const k = fixture.kraefte;
+
+  it('verdichte zählt nur aktive Kräfte, auch wenn beendete hineinkommen', () => {
+    const personal = k.personal.map(
+      (p, i) =>
+        ({
+          id: i + 1,
+          staerke_position: p.staerke_position,
+          status_kategorie: 'verfuegbar',
+          beendet_als: p.beendet_als,
+          beendet_at: p.beendet_als ? '2026-10-13 10:00:00' : null,
+        }) as unknown as EinsatzPersonal,
+    );
+    const v = verdichte(personal, [], []);
+    const { fuehrer, unterfuehrer, mannschaft } = v.staerke;
+    expect({ fuehrer, unterfuehrer, mannschaft }).toEqual(alsStaerke(k.erwartet.staerke));
+    expect(v.anzahlPersonal).toBe(k.erwartet.personal);
+  });
+
+  it('summiereStaerke lässt aufgelöste Einheiten aus', () => {
+    const einheiten = k.einheiten.map((e) => ({
+      id: e.id,
+      ueber_einheit_id: e.ueber_einheit_id,
+      aufgeloest_at: e.aufgeloest ? '2026-10-13 10:00:00' : null,
+      ist_kumuliert: alsStaerke(e.ist_kumuliert),
+    }));
+    expect(summiereStaerke(einheiten)).toEqual(alsStaerke(k.erwartet_einheiten));
+    expect(summiereStaerke(einheiten.filter((e) => e.aufgeloest_at))).toBeNull();
   });
 });
