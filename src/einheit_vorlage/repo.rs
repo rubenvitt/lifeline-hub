@@ -7,7 +7,7 @@
 //! Organisation ab, nie aus einem gespeicherten Flag (Spec `openspec/specs/einheit-vorlagen`,
 //! „Fahrzeuge und Stammbesetzung der Vorlage“).
 
-use super::{EinheitVorlage, EinheitVorlageFahrzeug, EinheitVorlagePersonal, PersonalEintrag};
+use super::{EinheitVorlage, EinheitVorlageFahrzeug, EinheitVorlagePersonal, PersonalEntry};
 use crate::error::AppError;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
 use crate::staerke::{Staerke, StaerkePosition};
@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Felder einer neuen Vorlage, schon getrimmt und geprüft (Grenzen, Soll vollständig).
 #[derive(Debug, Clone, Copy)]
-pub struct NeueVorlage<'a> {
+pub struct NewVorlage<'a> {
     pub name: &'a str,
     pub typ_id: i64,
     pub ueber_vorlage_id: Option<i64>,
@@ -75,76 +75,76 @@ fn json_ids(ids: impl IntoIterator<Item = i64>) -> Result<String, AppError> {
 /// Visited-Set, damit auch eine korrupte Schleife in der Datenbank terminiert (wie
 /// `einheit::repo::kumuliere`).
 #[derive(Debug, Default)]
-struct Kanten {
-    eltern: HashMap<i64, Option<i64>>,
-    kinder: BTreeMap<i64, Vec<i64>>,
+struct Edges {
+    parents: HashMap<i64, Option<i64>>,
+    children: BTreeMap<i64, Vec<i64>>,
 }
 
-impl Kanten {
+impl Edges {
     async fn load(conn: &mut SqliteConnection, org_id: i64) -> Result<Self, AppError> {
-        let zeilen: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        let rows: Vec<(i64, Option<i64>)> = sqlx::query_as(
             "SELECT id, ueber_vorlage_id FROM einheit_vorlage WHERE org_id = ? ORDER BY sortier, id",
         )
         .bind(org_id)
         .fetch_all(&mut *conn)
         .await?;
-        let mut kanten = Kanten::default();
-        for (id, ueber) in zeilen {
-            kanten.eltern.insert(id, ueber);
+        let mut edges = Edges::default();
+        for (id, ueber) in rows {
+            edges.parents.insert(id, ueber);
             if let Some(u) = ueber {
-                kanten.kinder.entry(u).or_default().push(id);
+                edges.children.entry(u).or_default().push(id);
             }
         }
-        Ok(kanten)
+        Ok(edges)
     }
 
     /// Die Wurzel des Baums von `id`. In einer korrupten Schleife gilt der Knoten als Wurzel, an
     /// dem die Wanderung sich selbst wieder trifft.
     fn wurzel(&self, id: i64) -> i64 {
-        let mut besucht = HashSet::new();
-        let mut aktuell = id;
-        while besucht.insert(aktuell) {
-            match self.eltern.get(&aktuell).copied().flatten() {
-                Some(u) if self.eltern.contains_key(&u) => aktuell = u,
-                _ => return aktuell,
+        let mut visited = HashSet::new();
+        let mut current = id;
+        while visited.insert(current) {
+            match self.parents.get(&current).copied().flatten() {
+                Some(u) if self.parents.contains_key(&u) => current = u,
+                _ => return current,
             }
         }
-        aktuell
+        current
     }
 
     /// `id` und alle Nachfahren, Eltern vor Kindern (Tiefensuche in Sortierfolge).
-    fn nachfahren(&self, id: i64) -> Vec<i64> {
-        let mut aus = Vec::new();
-        let mut besucht = HashSet::new();
-        let mut stapel = vec![id];
-        while let Some(knoten) = stapel.pop() {
-            if !besucht.insert(knoten) {
+    fn descendants(&self, id: i64) -> Vec<i64> {
+        let mut out = Vec::new();
+        let mut visited = HashSet::new();
+        let mut stack = vec![id];
+        while let Some(node) = stack.pop() {
+            if !visited.insert(node) {
                 continue;
             }
-            aus.push(knoten);
-            if let Some(kinder) = self.kinder.get(&knoten) {
-                stapel.extend(kinder.iter().rev().copied());
+            out.push(node);
+            if let Some(children) = self.children.get(&node) {
+                stack.extend(children.iter().rev().copied());
             }
         }
-        aus
+        out
     }
 
     /// Alle Vorlagen im selben Baum wie `id`, samt `id`.
     fn baum(&self, id: i64) -> Vec<i64> {
-        self.nachfahren(self.wurzel(id))
+        self.descendants(self.wurzel(id))
     }
 
-    /// Ob `start` unter `kandidat` zu stehen einen Zyklus bildete: `kandidat` ist `start` selbst
-    /// oder einer seiner Nachfahren. Läuft von `kandidat` nach oben; eine korrupte Schleife
+    /// Ob `start` unter `candidate` zu stehen einen Zyklus bildete: `candidate` ist `start` selbst
+    /// oder einer seiner Nachfahren. Läuft von `candidate` nach oben; eine korrupte Schleife
     /// unterwegs zählt als Zyklus.
-    fn waere_zyklus(&self, start: i64, kandidat: i64) -> bool {
-        let mut besucht = HashSet::new();
-        let mut aktuell = Some(kandidat);
-        while let Some(id) = aktuell {
-            if id == start || !besucht.insert(id) {
+    fn would_cycle(&self, start: i64, candidate: i64) -> bool {
+        let mut visited = HashSet::new();
+        let mut current = Some(candidate);
+        while let Some(id) = current {
+            if id == start || !visited.insert(id) {
                 return true;
             }
-            aktuell = self.eltern.get(&id).copied().flatten();
+            current = self.parents.get(&id).copied().flatten();
         }
         false
     }
@@ -153,7 +153,7 @@ impl Kanten {
 // ── Lesen ────────────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, sqlx::FromRow)]
-struct KopfZeile {
+struct HeadRow {
     id: i64,
     name: String,
     typ_id: i64,
@@ -175,7 +175,7 @@ struct KopfZeile {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-struct FahrzeugZeile {
+struct FahrzeugRow {
     vorlage_id: i64,
     vorlage_aktiv: bool,
     fahrzeug_id: i64,
@@ -186,7 +186,7 @@ struct FahrzeugZeile {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-struct PersonalZeile {
+struct PersonalRow {
     vorlage_id: i64,
     vorlage_aktiv: bool,
     personal_id: i64,
@@ -203,17 +203,17 @@ fn trio(f: Option<i64>, u: Option<i64>, m: Option<i64>) -> Option<Staerke> {
 }
 
 /// Welche Köpfe [`load_where`] liefert.
-enum Auswahl<'a> {
+enum Selection<'a> {
     /// Alle der Organisation, mit `true` nur die aktiven.
-    Alle(bool),
+    All(bool),
     /// Genau diese, in der Reihenfolge der Liste.
     Ids(&'a [i64]),
 }
 
 /// Andere aktive Vorlagen je Zuordnung: `(eintrag_id) → [vorlage_id]`.
-fn auch_in_index<'a>(paare: impl Iterator<Item = (i64, i64, bool)> + 'a) -> HashMap<i64, Vec<i64>> {
+fn auch_in_index<'a>(pairs: impl Iterator<Item = (i64, i64, bool)> + 'a) -> HashMap<i64, Vec<i64>> {
     let mut index: HashMap<i64, Vec<i64>> = HashMap::new();
-    for (eintrag, vorlage, aktiv) in paare {
+    for (eintrag, vorlage, aktiv) in pairs {
         if aktiv {
             index.entry(eintrag).or_default().push(vorlage);
         }
@@ -224,22 +224,21 @@ fn auch_in_index<'a>(paare: impl Iterator<Item = (i64, i64, bool)> + 'a) -> Hash
     index
 }
 
-fn ohne(liste: Option<&Vec<i64>>, selbst: i64) -> Vec<i64> {
-    liste
-        .map(|l| l.iter().copied().filter(|v| *v != selbst).collect())
+fn without(list: Option<&Vec<i64>>, own: i64) -> Vec<i64> {
+    list.map(|l| l.iter().copied().filter(|v| *v != own).collect())
         .unwrap_or_default()
 }
 
 async fn load_where(
     conn: &mut SqliteConnection,
     org_id: i64,
-    auswahl: Auswahl<'_>,
+    selection: Selection<'_>,
 ) -> Result<Vec<EinheitVorlage>, AppError> {
-    let (nur_aktive, ids) = match &auswahl {
-        Auswahl::Alle(nur_aktive) => (*nur_aktive, None),
-        Auswahl::Ids(ids) => (false, Some(json_ids(ids.iter().copied())?)),
+    let (nur_aktive, ids) = match &selection {
+        Selection::All(nur_aktive) => (*nur_aktive, None),
+        Selection::Ids(ids) => (false, Some(json_ids(ids.iter().copied())?)),
     };
-    let koepfe: Vec<KopfZeile> = sqlx::query_as(
+    let heads: Vec<HeadRow> = sqlx::query_as(
         "SELECT v.id, v.name, v.typ_id, t.label AS typ_label, v.ueber_vorlage_id, \
                 v.funkrufname, v.tz_fachaufgabe, v.tz_organisation, \
                 v.soll_fuehrer, v.soll_unterfuehrer, v.soll_mannschaft, \
@@ -258,12 +257,12 @@ async fn load_where(
     .bind(ids.as_deref())
     .fetch_all(&mut *conn)
     .await?;
-    if koepfe.is_empty() {
+    if heads.is_empty() {
         return Ok(Vec::new());
     }
 
     // Alle Zuordnungen der Organisation: `auch_in` braucht auch die der nicht gewählten Köpfe.
-    let fahrzeuge: Vec<FahrzeugZeile> = sqlx::query_as(
+    let fahrzeuge: Vec<FahrzeugRow> = sqlx::query_as(
         "SELECT x.vorlage_id, v.aktiv AS vorlage_aktiv, x.fahrzeug_id, f.funkrufname, \
                 f.fahrzeugtyp, f.dienststatus, \
                 EXISTS(SELECT 1 FROM demo_herkunft dh \
@@ -277,7 +276,7 @@ async fn load_where(
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
-    let personal: Vec<PersonalZeile> = sqlx::query_as(
+    let personal: Vec<PersonalRow> = sqlx::query_as(
         "SELECT x.vorlage_id, v.aktiv AS vorlage_aktiv, x.personal_id, p.name, \
                 x.staerke_position, x.fahrzeug_id, p.dienststatus, \
                 EXISTS(SELECT 1 FROM demo_herkunft dh \
@@ -312,7 +311,7 @@ async fn load_where(
             .entry(z.vorlage_id)
             .or_default()
             .push(EinheitVorlageFahrzeug {
-                auch_in: ohne(fahrzeug_in.get(&z.fahrzeug_id), z.vorlage_id),
+                auch_in: without(fahrzeug_in.get(&z.fahrzeug_id), z.vorlage_id),
                 fahrzeug_id: z.fahrzeug_id,
                 funkrufname: z.funkrufname,
                 fahrzeugtyp: z.fahrzeugtyp,
@@ -326,7 +325,7 @@ async fn load_where(
             .entry(z.vorlage_id)
             .or_default()
             .push(EinheitVorlagePersonal {
-                auch_in: ohne(personal_in.get(&z.personal_id), z.vorlage_id),
+                auch_in: without(personal_in.get(&z.personal_id), z.vorlage_id),
                 personal_id: z.personal_id,
                 name: z.name,
                 staerke_position: z
@@ -339,7 +338,7 @@ async fn load_where(
             });
     }
 
-    let mut vorlagen: Vec<EinheitVorlage> = koepfe
+    let mut vorlagen: Vec<EinheitVorlage> = heads
         .into_iter()
         .map(|k| {
             let eigen = trio(k.soll_fuehrer, k.soll_unterfuehrer, k.soll_mannschaft);
@@ -369,7 +368,7 @@ async fn load_where(
             }
         })
         .collect();
-    if let Auswahl::Ids(ids) = auswahl {
+    if let Selection::Ids(ids) = selection {
         let rang: HashMap<i64, usize> = ids.iter().enumerate().map(|(i, id)| (*id, i)).collect();
         vorlagen.sort_by_key(|v| rang.get(&v.id).copied().unwrap_or(usize::MAX));
     }
@@ -384,7 +383,7 @@ pub async fn list(
     nur_aktive: bool,
 ) -> Result<Vec<EinheitVorlage>, AppError> {
     let mut conn = pool.acquire().await?;
-    load_where(&mut conn, org_id, Auswahl::Alle(nur_aktive)).await
+    load_where(&mut conn, org_id, Selection::All(nur_aktive)).await
 }
 
 /// Eine Vorlage der Organisation, auch deaktiviert; `NotFound` bei fremder oder unbekannter id.
@@ -393,7 +392,7 @@ pub async fn load_tx(
     org_id: i64,
     id: i64,
 ) -> Result<EinheitVorlage, AppError> {
-    load_where(conn, org_id, Auswahl::Ids(&[id]))
+    load_where(conn, org_id, Selection::Ids(&[id]))
         .await?
         .pop()
         .ok_or(AppError::NotFound)
@@ -409,7 +408,7 @@ pub async fn load_tree_tx(
     wurzel_id: i64,
 ) -> Result<Vec<EinheitVorlage>, AppError> {
     let wurzel = load_tx(conn, org_id, wurzel_id).await?;
-    let kanten = Kanten::load(conn, org_id).await?;
+    let edges = Edges::load(conn, org_id).await?;
     let aktiv: HashSet<i64> =
         sqlx::query_scalar("SELECT id FROM einheit_vorlage WHERE org_id = ? AND aktiv = 1")
             .bind(org_id)
@@ -418,22 +417,22 @@ pub async fn load_tree_tx(
             .into_iter()
             .collect();
     let mut ids = vec![wurzel.id];
-    let mut besucht: HashSet<i64> = HashSet::from([wurzel.id]);
-    let mut stapel: Vec<i64> = kanten
-        .kinder
+    let mut visited: HashSet<i64> = HashSet::from([wurzel.id]);
+    let mut stack: Vec<i64> = edges
+        .children
         .get(&wurzel.id)
         .map(|k| k.iter().rev().copied().collect())
         .unwrap_or_default();
-    while let Some(id) = stapel.pop() {
-        if !aktiv.contains(&id) || !besucht.insert(id) {
+    while let Some(id) = stack.pop() {
+        if !aktiv.contains(&id) || !visited.insert(id) {
             continue;
         }
         ids.push(id);
-        if let Some(kinder) = kanten.kinder.get(&id) {
-            stapel.extend(kinder.iter().rev().copied());
+        if let Some(children) = edges.children.get(&id) {
+            stack.extend(children.iter().rev().copied());
         }
     }
-    let mut vorlagen = load_where(conn, org_id, Auswahl::Ids(&ids[1..])).await?;
+    let mut vorlagen = load_where(conn, org_id, Selection::Ids(&ids[1..])).await?;
     vorlagen.insert(0, wurzel);
     Ok(vorlagen)
 }
@@ -453,12 +452,12 @@ async fn check_typ(conn: &mut SqliteConnection, org_id: i64, typ_id: i64) -> Res
 pub async fn create_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
-    daten: &NeueVorlage<'_>,
+    daten: &NewVorlage<'_>,
 ) -> Result<i64, AppError> {
     check_typ(conn, org_id, daten.typ_id).await?;
     if let Some(ueber) = daten.ueber_vorlage_id {
-        let kanten = Kanten::load(conn, org_id).await?;
-        if !kanten.eltern.contains_key(&ueber) {
+        let edges = Edges::load(conn, org_id).await?;
+        if !edges.parents.contains_key(&ueber) {
             return Err(AppError::UnprocessableEntity(UNBEKANNTE_UEBER.into()));
         }
     }
@@ -499,7 +498,7 @@ pub async fn create_tx(
 pub async fn create(
     pool: &SqlitePool,
     org_id: i64,
-    daten: NeueVorlage<'_>,
+    daten: NewVorlage<'_>,
 ) -> Result<EinheitVorlage, AppError> {
     write_retry!(pool, |conn| {
         let id = create_tx(conn, org_id, &daten).await?;
@@ -580,19 +579,16 @@ pub async fn update_tx(
     }
     if let Some(Some(ueber)) = patch.ueber_vorlage_id {
         if bestand.3 != Some(ueber) {
-            let kanten = Kanten::load(conn, org_id).await?;
-            if !kanten.eltern.contains_key(&ueber) {
+            let edges = Edges::load(conn, org_id).await?;
+            if !edges.parents.contains_key(&ueber) {
                 return Err(AppError::UnprocessableEntity(UNBEKANNTE_UEBER.into()));
             }
-            if kanten.waere_zyklus(id, ueber) {
+            if edges.would_cycle(id, ueber) {
                 return Err(AppError::UnprocessableEntity(ZYKLUS.into()));
             }
-            let teilbaum = kanten.nachfahren(id);
+            let teilbaum = edges.descendants(id);
             let innen: HashSet<i64> = teilbaum.iter().copied().collect();
-            let ziel = kanten
-                .baum(ueber)
-                .into_iter()
-                .filter(|v| !innen.contains(v));
+            let ziel = edges.baum(ueber).into_iter().filter(|v| !innen.contains(v));
             if let Some(doppelt) =
                 first_overlap(conn, &json_ids(teilbaum)?, &json_ids(ziel)?).await?
             {
@@ -675,11 +671,11 @@ async fn other_tree_members(
     org_id: i64,
     vorlage_id: i64,
 ) -> Result<Vec<i64>, AppError> {
-    let kanten = Kanten::load(conn, org_id).await?;
-    if !kanten.eltern.contains_key(&vorlage_id) {
+    let edges = Edges::load(conn, org_id).await?;
+    if !edges.parents.contains_key(&vorlage_id) {
         return Err(AppError::NotFound);
     }
-    Ok(kanten
+    Ok(edges
         .baum(vorlage_id)
         .into_iter()
         .filter(|v| *v != vorlage_id)
@@ -805,7 +801,7 @@ pub async fn replace_fahrzeuge(
     })
 }
 
-/// Ersetzt die Stammbesetzung der Vorlage durch genau `eintraege` (schon entdoppelt und
+/// Ersetzt die Stammbesetzung der Vorlage durch genau `entries` (schon entdoppelt und
 /// gedeckelt, [`super::normalize_personal`]).
 ///
 /// Fremd oder unbekannt → 422; neu und außer Dienst → 422; ein Fahrzeug, das nicht zur Vorlage
@@ -814,10 +810,10 @@ pub async fn replace_personal_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     vorlage_id: i64,
-    eintraege: &[PersonalEintrag],
+    entries: &[PersonalEntry],
 ) -> Result<(), AppError> {
     let baum = other_tree_members(conn, org_id, vorlage_id).await?;
-    let ids_json = json_ids(eintraege.iter().map(|e| e.personal_id))?;
+    let ids_json = json_ids(entries.iter().map(|e| e.personal_id))?;
     let bekannt: Vec<(i64, String, bool)> = sqlx::query_as(
         "SELECT p.id, p.dienststatus, \
                 EXISTS(SELECT 1 FROM einheit_vorlage_personal x \
@@ -830,7 +826,7 @@ pub async fn replace_personal_tx(
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
-    check_zuordenbar(eintraege.iter().map(|e| e.personal_id), &bekannt, "Person")?;
+    check_zuordenbar(entries.iter().map(|e| e.personal_id), &bekannt, "Person")?;
 
     let fahrzeuge: HashSet<i64> =
         sqlx::query_scalar("SELECT fahrzeug_id FROM einheit_vorlage_fahrzeug WHERE vorlage_id = ?")
@@ -839,7 +835,7 @@ pub async fn replace_personal_tx(
             .await?
             .into_iter()
             .collect();
-    if let Some(fremd) = eintraege
+    if let Some(fremd) = entries
         .iter()
         .filter_map(|e| e.fahrzeug_id)
         .find(|f| !fahrzeuge.contains(f))
@@ -868,8 +864,8 @@ pub async fn replace_personal_tx(
         )));
     }
 
-    let zeilen = serde_json::to_string(
-        &eintraege
+    let rows = serde_json::to_string(
+        &entries
             .iter()
             .map(|e| {
                 serde_json::json!({
@@ -899,7 +895,7 @@ pub async fn replace_personal_tx(
             fahrzeug_id = excluded.fahrzeug_id, staerke_position = excluded.staerke_position",
     )
     .bind(vorlage_id)
-    .bind(&zeilen)
+    .bind(&rows)
     .execute(&mut *conn)
     .await?;
     Ok(())
@@ -910,10 +906,10 @@ pub async fn replace_personal(
     pool: &SqlitePool,
     org_id: i64,
     vorlage_id: i64,
-    eintraege: &[PersonalEintrag],
+    entries: &[PersonalEntry],
 ) -> Result<EinheitVorlage, AppError> {
     write_retry!(pool, |conn| {
-        replace_personal_tx(conn, org_id, vorlage_id, eintraege).await?;
+        replace_personal_tx(conn, org_id, vorlage_id, entries).await?;
         load_tx(conn, org_id, vorlage_id).await
     })
 }

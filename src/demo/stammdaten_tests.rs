@@ -1119,7 +1119,7 @@ async fn vorhandene_vorlage_gleichen_namens_wird_mitbenutzt() {
     let eigen = crate::einheit_vorlage::repo::create(
         &pool,
         a.org,
-        crate::einheit_vorlage::repo::NeueVorlage {
+        crate::einheit_vorlage::repo::NewVorlage {
             name: "Sanitätszug Musterstadt",
             typ_id: zug_typ,
             ueber_vorlage_id: None,
@@ -1192,7 +1192,7 @@ async fn eigene_untereinheit_haelt_die_demo_vorlage() {
     crate::einheit_vorlage::repo::create(
         &pool,
         a.org,
-        crate::einheit_vorlage::repo::NeueVorlage {
+        crate::einheit_vorlage::repo::NewVorlage {
             name: "Eigene Gruppe",
             typ_id: typ,
             ueber_vorlage_id: Some(zug),
@@ -1248,7 +1248,7 @@ async fn demo_vorlage_unter_eigener_obereinheit_bleibt() {
     let verband = crate::einheit_vorlage::repo::create(
         &pool,
         a.org,
-        crate::einheit_vorlage::repo::NeueVorlage {
+        crate::einheit_vorlage::repo::NewVorlage {
             name: "Eigener Verband",
             typ_id: typ,
             ueber_vorlage_id: None,

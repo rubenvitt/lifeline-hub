@@ -28,8 +28,8 @@ use sqlx::SqliteConnection;
 use super::katalog;
 use super::szenario::{self, Katalogeintrag};
 use super::{DemoBerichtZeile, DemoStammdatenArt};
-use crate::einheit_vorlage::repo::{self as vorlage_repo, NeueVorlage};
-use crate::einheit_vorlage::PersonalEintrag;
+use crate::einheit_vorlage::repo::{self as vorlage_repo, NewVorlage};
+use crate::einheit_vorlage::PersonalEntry;
 use crate::error::AppError;
 use crate::fahrzeug::repo::{self as fahrzeug_repo, FahrzeugDaten};
 use crate::material::repo::{self as material_repo, MaterialDaten};
@@ -252,7 +252,7 @@ pub async fn stammdaten_importieren_tx(
                     .filter(|u| angelegte_vorlagen.contains(u))
                     .map(|u| nachschlagen(&einheit_vorlagen, "Einheiten-Vorlage", u))
                     .transpose()?;
-                let daten = NeueVorlage {
+                let daten = NewVorlage {
                     name: vorlage.name,
                     typ_id: kataloge.id(Katalogeintrag::Einheitstyp(vorlage.typ))?,
                     ueber_vorlage_id: ueber,
@@ -275,7 +275,7 @@ pub async fn stammdaten_importieren_tx(
                     .personal
                     .iter()
                     .map(|p| {
-                        Ok(PersonalEintrag {
+                        Ok(PersonalEntry {
                             personal_id: nachschlagen(&personal, "Personal", p.personal)?,
                             fahrzeug_id: p
                                 .fahrzeug

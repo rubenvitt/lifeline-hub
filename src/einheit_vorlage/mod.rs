@@ -123,7 +123,7 @@ pub fn normalize_fahrzeug_ids(ids: Vec<i64>) -> Result<Vec<i64>, crate::error::A
 
 /// Eine Person der Stammbesetzung im Request, schon geparst.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PersonalEintrag {
+pub struct PersonalEntry {
     pub personal_id: i64,
     pub fahrzeug_id: Option<i64>,
     pub staerke_position: Option<StaerkePosition>,
@@ -132,19 +132,19 @@ pub struct PersonalEintrag {
 /// Stammbesetzung von außen: je Person der erste Eintrag, höchstens
 /// [`PERSONAL_JE_VORLAGE_MAX`] (sonst 400).
 pub fn normalize_personal(
-    eintraege: Vec<PersonalEintrag>,
-) -> Result<Vec<PersonalEintrag>, crate::error::AppError> {
+    entries: Vec<PersonalEntry>,
+) -> Result<Vec<PersonalEntry>, crate::error::AppError> {
     let mut gesehen = std::collections::HashSet::new();
-    let eintraege: Vec<PersonalEintrag> = eintraege
+    let entries: Vec<PersonalEntry> = entries
         .into_iter()
         .filter(|e| gesehen.insert(e.personal_id))
         .collect();
-    if eintraege.len() > PERSONAL_JE_VORLAGE_MAX {
+    if entries.len() > PERSONAL_JE_VORLAGE_MAX {
         return Err(crate::error::AppError::Validation(format!(
             "Höchstens {PERSONAL_JE_VORLAGE_MAX} Personen je Vorlage"
         )));
     }
-    Ok(eintraege)
+    Ok(entries)
 }
 
 #[cfg(test)]

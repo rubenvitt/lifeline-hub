@@ -7,9 +7,9 @@
 
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::einheit_vorlage::repo::{self, NeueVorlage, VorlagePatch};
+use crate::einheit_vorlage::repo::{self, NewVorlage, VorlagePatch};
 use crate::einheit_vorlage::{
-    normalize_fahrzeug_ids, normalize_personal, EinheitVorlage, PersonalEintrag, BEMERKUNG_MAX,
+    normalize_fahrzeug_ids, normalize_personal, EinheitVorlage, PersonalEntry, BEMERKUNG_MAX,
     FUNKRUFNAME_MAX, NAME_MAX, TZ_MAX,
 };
 use crate::error::AppError;
@@ -79,7 +79,7 @@ pub async fn create(
     let vorlage = repo::create(
         &state.pool,
         benutzer.org_id,
-        NeueVorlage {
+        NewVorlage {
             name: &name,
             typ_id: body.typ_id,
             ueber_vorlage_id: body.ueber_vorlage_id,
@@ -212,11 +212,11 @@ pub async fn replace_personal(
     PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<PersonalBody>,
 ) -> Result<Json<EinheitVorlage>, AppError> {
-    let eintraege = body
+    let entries = body
         .personal
         .into_iter()
         .map(|z| {
-            Ok(PersonalEintrag {
+            Ok(PersonalEntry {
                 personal_id: z.personal_id,
                 fahrzeug_id: z.fahrzeug_id,
                 staerke_position: parse_enum_opt(
@@ -227,8 +227,8 @@ pub async fn replace_personal(
             })
         })
         .collect::<Result<Vec<_>, AppError>>()?;
-    let eintraege = normalize_personal(eintraege)?;
+    let entries = normalize_personal(entries)?;
     Ok(Json(
-        repo::replace_personal(&state.pool, benutzer.org_id, id, &eintraege).await?,
+        repo::replace_personal(&state.pool, benutzer.org_id, id, &entries).await?,
     ))
 }

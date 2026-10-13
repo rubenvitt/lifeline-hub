@@ -1,5 +1,5 @@
-use super::repo::{self, NeueVorlage, VorlagePatch};
-use super::{normalize_fahrzeug_ids, normalize_personal, PersonalEintrag};
+use super::repo::{self, NewVorlage, VorlagePatch};
+use super::{normalize_fahrzeug_ids, normalize_personal, PersonalEntry};
 use crate::error::AppError;
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::SqlitePool;
@@ -58,8 +58,8 @@ async fn ausser_dienst(pool: &SqlitePool, tabelle: &str, id: i64) {
     .unwrap();
 }
 
-fn neu(name: &str, typ_id: i64) -> NeueVorlage<'_> {
-    NeueVorlage {
+fn neu(name: &str, typ_id: i64) -> NewVorlage<'_> {
+    NewVorlage {
         name,
         typ_id,
         ueber_vorlage_id: None,
@@ -82,7 +82,7 @@ async fn vorlage(
     repo::create(
         pool,
         org_id,
-        NeueVorlage {
+        NewVorlage {
             ueber_vorlage_id: ueber,
             ..neu(name, typ_id)
         },
@@ -99,12 +99,12 @@ fn unter(ueber: Option<i64>) -> VorlagePatch<'static> {
     }
 }
 
-fn ist_422(e: &AppError) -> bool {
+fn is_422(e: &AppError) -> bool {
     matches!(e, AppError::UnprocessableEntity(_))
 }
 
-fn eintrag(personal_id: i64, fahrzeug_id: Option<i64>) -> PersonalEintrag {
-    PersonalEintrag {
+fn eintrag(personal_id: i64, fahrzeug_id: Option<i64>) -> PersonalEntry {
+    PersonalEntry {
         personal_id,
         fahrzeug_id,
         staerke_position: None,
@@ -131,7 +131,7 @@ async fn ohne_eigenes_soll_gilt_das_des_typs() {
     let eigen = repo::create(
         &pool,
         o,
-        NeueVorlage {
+        NewVorlage {
             soll: Some(Staerke::neu(1, 2, 12)),
             ..neu("Kleiner Zug", zug)
         },
@@ -226,7 +226,7 @@ async fn patch_setzt_gesendete_felder_und_laesst_den_rest() {
     let id = repo::create(
         &pool,
         o,
-        NeueVorlage {
+        NewVorlage {
             funkrufname: Some("Musterstadt 11-1"),
             bemerkung: Some("Wache Mitte"),
             soll: Some(Staerke::neu(1, 2, 10)),
@@ -307,7 +307,7 @@ async fn fremder_typ_ist_422_und_fremde_vorlage_404() {
     let ta = typ(&pool, a, "Zug", None).await;
     let tb = typ(&pool, b, "Zug", None).await;
     let fehler = repo::create(&pool, a, neu("X", tb)).await.unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 
     let va = vorlage(&pool, a, "X", ta, None).await;
     let fehler = repo::update(&pool, b, va, VorlagePatch::default())
@@ -325,7 +325,7 @@ async fn fremder_typ_ist_422_und_fremde_vorlage_404() {
     )
     .await
     .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
     assert!(repo::list(&pool, b, false).await.unwrap().is_empty());
 }
 
@@ -378,7 +378,7 @@ async fn untereinheit_traegt_den_verweis_und_zyklus_ist_422() {
         let fehler = repo::update(&pool, o, start, unter(Some(ueber)))
             .await
             .unwrap_err();
-        assert!(ist_422(&fehler), "{start} unter {ueber}: {fehler:?}");
+        assert!(is_422(&fehler), "{start} unter {ueber}: {fehler:?}");
     }
     let ueber: Option<i64> =
         sqlx::query_scalar("SELECT ueber_vorlage_id FROM einheit_vorlage WHERE id = ?")
@@ -407,19 +407,19 @@ async fn unterstellung_nur_in_der_eigenen_org() {
     let fehler = repo::create(
         &pool,
         a,
-        NeueVorlage {
+        NewVorlage {
             ueber_vorlage_id: Some(fremd),
             ..neu("X", ta)
         },
     )
     .await
     .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
     let eigen = vorlage(&pool, a, "X", ta, None).await;
     let fehler = repo::update(&pool, a, eigen, unter(Some(fremd)))
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 }
 
 #[tokio::test]
@@ -484,7 +484,7 @@ async fn load_tree_liefert_wurzel_und_aktive_nachfahren_auch_bei_korruptem_zyklu
     let fehler = repo::replace_fahrzeuge(&pool, o, trupp, &[f])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 
     let b = org(&pool, "B").await;
     let mut conn = pool.acquire().await.unwrap();
@@ -534,7 +534,7 @@ async fn fremdes_oder_ausser_dienst_gestelltes_fahrzeug_ist_422() {
     let fehler = repo::replace_fahrzeuge(&pool, a, v, &[eigen, fremd])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
     assert!(
         repo::list(&pool, a, true).await.unwrap()[0]
             .fahrzeuge
@@ -547,7 +547,7 @@ async fn fremdes_oder_ausser_dienst_gestelltes_fahrzeug_ist_422() {
     let fehler = repo::replace_fahrzeuge(&pool, a, v, &[aus])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 
     let fehler = repo::replace_fahrzeuge(&pool, b, v, &[fremd])
         .await
@@ -618,7 +618,7 @@ async fn fahrzeug_doppelt_im_selben_baum_ist_422() {
     let fehler = repo::replace_fahrzeuge(&pool, o, staffel, &[f])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 
     // Umhängen, nach dem es doppelt stünde, ebenso.
     let andere = vorlage(&pool, o, "Andere", t, None).await;
@@ -628,7 +628,7 @@ async fn fahrzeug_doppelt_im_selben_baum_ist_422() {
     let fehler = repo::update(&pool, o, andere, unter(Some(staffel)))
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 }
 
 #[tokio::test]
@@ -648,7 +648,7 @@ async fn umhaengen_prueft_auch_die_stammbesetzung() {
     let fehler = repo::update(&pool, o, andere, unter(Some(zug)))
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 }
 
 #[tokio::test]
@@ -669,7 +669,7 @@ async fn stammbesetzung_mit_fahrzeug_und_position() {
         v,
         &[
             eintrag(max, None),
-            PersonalEintrag {
+            PersonalEntry {
                 personal_id: erika,
                 fahrzeug_id: Some(f),
                 staerke_position: Some(StaerkePosition::Fuehrer),
@@ -695,7 +695,7 @@ async fn stammbesetzung_mit_fahrzeug_und_position() {
     let fehler = repo::replace_personal(&pool, o, v, &[eintrag(max, Some(fremdes_fz))])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "Person auf fremdem Fahrzeug: {fehler:?}");
+    assert!(is_422(&fehler), "Person auf fremdem Fahrzeug: {fehler:?}");
 
     // Ein Fahrzeug fällt aus der Vorlage → die Bindung der Person fällt mit.
     let nach = repo::replace_fahrzeuge(&pool, o, v, &[]).await.unwrap();
@@ -713,7 +713,7 @@ async fn stammbesetzung_mit_fahrzeug_und_position() {
     let fehler = repo::replace_personal(&pool, o, v, &[eintrag(aus, None)])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
     ausser_dienst(&pool, "personal", max).await;
     let nach = repo::replace_personal(&pool, o, v, &[eintrag(max, None)])
         .await
@@ -737,7 +737,7 @@ async fn person_fremd_oder_doppelt_im_baum_ist_422_und_auch_in_ueber_baeume() {
     let fehler = repo::replace_personal(&pool, a, zug, &[eintrag(fremd, None)])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
 
     repo::replace_personal(&pool, a, zug, &[eintrag(p, None)])
         .await
@@ -745,7 +745,7 @@ async fn person_fremd_oder_doppelt_im_baum_ist_422_und_auch_in_ueber_baeume() {
     let fehler = repo::replace_personal(&pool, a, staffel, &[eintrag(p, None)])
         .await
         .unwrap_err();
-    assert!(ist_422(&fehler), "{fehler:?}");
+    assert!(is_422(&fehler), "{fehler:?}");
     let v = repo::replace_personal(&pool, a, anderer, &[eintrag(p, None)])
         .await
         .unwrap();
@@ -773,7 +773,7 @@ fn listen_von_aussen_werden_entdoppelt_und_gedeckelt() {
     ])
     .unwrap();
     assert_eq!(doppelt, vec![eintrag(1, Some(5)), eintrag(2, None)]);
-    let zu_viele: Vec<PersonalEintrag> = (0..=super::PERSONAL_JE_VORLAGE_MAX as i64)
+    let zu_viele: Vec<PersonalEntry> = (0..=super::PERSONAL_JE_VORLAGE_MAX as i64)
         .map(|i| eintrag(i, None))
         .collect();
     assert!(matches!(
