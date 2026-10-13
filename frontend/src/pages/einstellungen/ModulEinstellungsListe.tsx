@@ -114,6 +114,12 @@ interface ModulEinstellungsListeProps {
   fehlerKey?: string | null;
   /** Gedämpfter Zusatz unter dem Select, z. B. die geerbte Vorgabe der Organisation. */
   hinweisVon?: (modulKey: string) => ReactNode;
+  /**
+   * Zusatz in der Modulspalte unter dem Namen (LLH-1179): Herkunft der Sichtbarkeit und „Vorgabe
+   * übernehmen“. Steht neben der Beschriftung, nicht darin — ein Knopf im `<label>` legte sonst den
+   * Schalter mit um.
+   */
+  zusatzVon?: (modulKey: string) => ReactNode;
 }
 
 /**
@@ -151,6 +157,7 @@ export default function ModulEinstellungsListe({
   laeuftKey,
   fehlerKey,
   hinweisVon,
+  zusatzVon,
 }: ModulEinstellungsListeProps) {
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
@@ -192,6 +199,7 @@ export default function ModulEinstellungsListe({
     const sperrWort =
       sperrGrund === 'modul' ? MODUL_GRUND : sperrGrund === 'rechte' ? rechteGrund : null;
     const hinweis = hinweisVon?.(m.key);
+    const zusatz = zusatzVon?.(m.key);
     const hatFehler = fehlerKey === m.key;
     const feldId = `modul-sichtbar-${m.key}`;
     // Ein `<label htmlFor>` nur an der bedienbaren Zeile (Klick auf `disabled` leitet der Browser
@@ -215,6 +223,13 @@ export default function ModulEinstellungsListe({
         )}
       </>
     );
+    const beschriftungsZelle = bedienbar ? (
+      <label htmlFor={feldId} style={{ ...beschriftungStil, cursor: 'pointer' }}>
+        {beschriftung}
+      </label>
+    ) : (
+      <span style={beschriftungStil}>{beschriftung}</span>
+    );
     return (
       <div
         key={m.key}
@@ -225,12 +240,24 @@ export default function ModulEinstellungsListe({
           borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
         }}
       >
-        {bedienbar ? (
-          <label htmlFor={feldId} style={{ ...beschriftungStil, cursor: 'pointer' }}>
-            {beschriftung}
-          </label>
+        {zusatz ? (
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            {beschriftungsZelle}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.marginXS,
+                paddingInline: token.padding,
+                paddingBlockEnd: token.paddingXS,
+              }}
+            >
+              {zusatz}
+            </div>
+          </div>
         ) : (
-          <span style={beschriftungStil}>{beschriftung}</span>
+          beschriftungsZelle
         )}
         {sichtbarSpalte && (
           <div style={{ textAlign: istSchmal ? 'start' : 'center' }}>

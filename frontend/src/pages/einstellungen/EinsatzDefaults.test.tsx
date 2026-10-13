@@ -322,7 +322,9 @@ describe('EinsatzDefaults', () => {
   });
 
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {
-    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'fuehrungskraft' } as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      etb: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
+    } as never);
 
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
@@ -330,7 +332,12 @@ describe('EinsatzDefaults', () => {
     fireEvent.mouseDown(etbSelect);
     fireEvent.click(await screen.findByText('Admin'));
 
-    await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'));
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', {
+        benoetigte_rolle: 'admin',
+        sichtbar: true,
+      }),
+    );
   });
 
   it('setzt die Org-Vorgabe „Führung im Einsatz“ als einsatzfuehrung (LFH-1150)', async () => {
@@ -349,7 +356,10 @@ describe('EinsatzDefaults', () => {
     fireEvent.click(await screen.findByText('Führung im Einsatz'));
 
     await waitFor(() =>
-      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'einsatzfuehrung'),
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', {
+        benoetigte_rolle: 'einsatzfuehrung',
+        sichtbar: true,
+      }),
     );
   });
 
@@ -372,7 +382,7 @@ describe('EinsatzDefaults', () => {
     const { container } = renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     expect(await screen.findByRole('heading', { name: 'Einsatz-Vorgaben' })).toBeInTheDocument();
-    expect(screen.getByText('Rollen-Vorgabe je Modul')).toBeInTheDocument();
+    expect(screen.getByText('Module für alle Einsätze')).toBeInTheDocument();
     expect(screen.getByText('Benötigte Rolle (Vorgabe)')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Vorgabe-Bestätigungsfrist Meldungen (Minuten)'),
@@ -400,6 +410,77 @@ describe('EinsatzDefaults', () => {
     const optionen = await screen.findAllByText('Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     expect(await screen.findByText('Modul-Vorgabe gespeichert')).toBeInTheDocument();
+  });
+
+  // ── Sichtbarkeits-Vorgabe (LLH-1179) ──
+
+  it('nennt das Paneel „Module für alle Einsätze“ und sagt, dass es auf laufende Einsätze wirkt', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    const paneel = await screen.findByRole('region', { name: 'Module für alle Einsätze' });
+    expect(
+      within(paneel).getByText(
+        'Wirkt auf alle Einsätze ohne eigene Einstellung, auch auf laufende.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(paneel).getByText('Sichtbar')).toBeInTheDocument();
+    expect(screen.queryByText('Rollen-Vorgabe je Modul')).not.toBeInTheDocument();
+  });
+
+  it('blendet ein Modul für alle Einsätze aus und schickt die Rolle aus dem Bestand mit', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      stab: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
+    } as never);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    const schalter = await screen.findByRole('switch', { name: 'Sichtbar: Stab' });
+    expect(schalter).toBeChecked();
+    fireEvent.click(schalter);
+
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('stab', {
+        benoetigte_rolle: 'fuehrungskraft',
+        sichtbar: false,
+      }),
+    );
+    expect(await screen.findByText('Modul-Vorgabe gespeichert')).toBeInTheDocument();
+  });
+
+  it('zeigt eine Ausblendung der Organisation und schickt sie beim Rollenwechsel mit', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      stab: { benoetigte_rolle: null, sichtbar: false },
+    } as never);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    expect(await screen.findByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked();
+    // Ohne Vorgabe ist ein Modul sichtbar.
+    expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeChecked();
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' }));
+    const optionen = await screen.findAllByText('Admin');
+    fireEvent.click(optionen[optionen.length - 1]);
+
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('stab', {
+        benoetigte_rolle: 'admin',
+        sichtbar: false,
+      }),
+    );
+  });
+
+  it('sperrt den Sichtbar-Schalter für Führungskräfte und für nicht ausblendbare Module', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    expect(await screen.findByRole('switch', { name: 'Sichtbar: Einsatzdaten' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeDisabled();
+  });
+
+  it('lässt die Modulliste ohne geladenen Bestand nicht bedienen', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(500, 'kaputt'));
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    // Ein Klick schickte sonst einen erfundenen Bestand (sichtbar, frei) als Vollersatz.
+    expect(await screen.findByRole('switch', { name: 'Sichtbar: Stab' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
   });
 
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
@@ -431,6 +512,7 @@ describe('EinsatzDefaults', () => {
       .getByRole('combobox', { name: 'Benötigte Rolle: ETB' })
       .closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('nur System-Admin')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 });
 
