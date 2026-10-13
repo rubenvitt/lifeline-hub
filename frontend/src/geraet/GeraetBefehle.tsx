@@ -26,8 +26,8 @@ const { Text } = Typography;
 type QuittungsZiel = { befehlId: number; eintragId: number };
 
 /**
- * Einsatzbefehle an den Bereich des Abschnittsgeräts (LLH-1190, Spec `funktionsansichten`,
- * „Ansicht Einsatzabschnitt“; design.md D6). Der Server liefert nur die geltenden Fassungen mit
+ * Einsatzbefehle an den Bereich des Abschnittsgeräts (LLH-1190, `geraet/AGENTS.md`,
+ * „Abschnittsansicht“). Der Server liefert nur die geltenden Fassungen mit
  * einem Verteiler-Eintrag im Bereich; hier stehen sie als Karten unter den Aufträgen, mit
  * „Quittieren“ nur an den eigenen Einträgen. Quittiert wird wie im Befehlsdetail der Leitung mit
  * einem Klick und dem Hinweis „Rückgängig“ (LFH-343), Ablehnungen stehen an der Karte (LFH-1077).
@@ -36,12 +36,12 @@ type QuittungsZiel = { befehlId: number; eintragId: number };
 export default function GeraetBefehle({
   einsatzId,
   darfSchreiben,
-  istEigen,
+  isEigen,
 }: {
   einsatzId: number;
   darfSchreiben: boolean;
-  /** Ob ein Verteiler-Eintrag zum Bereich gehört (`istEigenerEmpfaenger` der Seite). */
-  istEigen: (e: EmpfaengerZiel) => boolean;
+  /** Ob ein Verteiler-Eintrag zum Bereich gehört (`isEigenerEmpfaenger` der Seite). */
+  isEigen: (e: EmpfaengerZiel) => boolean;
 }) {
   const { token } = useRollen();
   const { message } = App.useApp();
@@ -99,7 +99,7 @@ export default function GeraetBefehle({
           befehl={b}
           einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
-          istEigen={istEigen}
+          isEigen={isEigen}
           isLocked={isQuittungPending}
           pendingId={
             quittierenMutation.isPending && quittierenMutation.variables.befehlId === b.id
@@ -118,7 +118,7 @@ function BefehlKarte({
   befehl: b,
   einsatzId,
   darfSchreiben,
-  istEigen,
+  isEigen,
   isLocked,
   pendingId,
   onQuittieren,
@@ -127,28 +127,28 @@ function BefehlKarte({
   befehl: BefehlKopf;
   einsatzId: number;
   darfSchreiben: boolean;
-  istEigen: (e: EmpfaengerZiel) => boolean;
+  isEigen: (e: EmpfaengerZiel) => boolean;
   isLocked: boolean;
   pendingId: number | null;
   onQuittieren: (eintragId: number) => void;
   error: ZeilenGrund | null;
 }) {
   const { token, rollen } = useRollen();
-  const [textOffen, setTextOffen] = useState(false);
+  const [isTextOffen, setIsTextOffen] = useState(false);
   // Den Text liefert nur das Detail (LFH-931); geladen wird er erst beim Aufklappen.
   const detailQuery = useQuery({
     queryKey: einsatzKeys.befehl(einsatzId, b.id),
     queryFn: () => ladeBefehl(einsatzId, b.id),
-    enabled: textOffen,
+    enabled: isTextOffen,
   });
   const verteiler = b.verteiler ?? [];
-  const eigeneIds = new Set(verteiler.filter(istEigen).map((e) => e.id));
-  const eigenOffen = verteiler.some((e) => eigeneIds.has(e.id) && !e.quittiert_at);
+  const eigeneIds = new Set(verteiler.filter(isEigen).map((e) => e.id));
+  const hasEigenOffen = verteiler.some((e) => eigeneIds.has(e.id) && !e.quittiert_at);
   const textId = `geraet-befehl-text-${b.id}`;
   return (
     <KommKarte
       data-befehl-id={b.id}
-      unbearbeitet={eigenOffen}
+      unbearbeitet={hasEigenOffen}
       zeit={
         <>
           <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>Stand</span>
@@ -192,13 +192,13 @@ function BefehlKarte({
         />
       </div>
       <Button
-        aria-expanded={textOffen}
+        aria-expanded={isTextOffen}
         aria-controls={textId}
-        onClick={() => setTextOffen((o) => !o)}
+        onClick={() => setIsTextOffen((o) => !o)}
       >
         Befehlstext
       </Button>
-      {textOffen && (
+      {isTextOffen && (
         <div id={textId} style={{ marginTop: token.marginSM }}>
           {detailQuery.data ? (
             <BefehlLesefassung

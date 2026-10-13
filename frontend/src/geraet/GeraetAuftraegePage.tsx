@@ -28,7 +28,7 @@ export type EmpfaengerZiel = {
  * des Teilbaums oder eine Einheit darin. Die Mengen kommen aus den Listen, die der Server schon
  * zugeschnitten hat.
  */
-export function istEigenerEmpfaenger(
+export function isEigenerEmpfaenger(
   e: EmpfaengerZiel,
   abschnitte: ReadonlySet<number>,
   einheiten: ReadonlySet<number>,
@@ -91,8 +91,8 @@ export default function GeraetAuftraegePage() {
     () => new Set((einheitenQuery.data ?? []).map((e) => e.id)),
     [einheitenQuery.data],
   );
-  const istEigen = useCallback(
-    (e: EmpfaengerZiel) => istEigenerEmpfaenger(e, eigeneAbschnitte, eigeneEinheiten),
+  const isEigen = useCallback(
+    (e: EmpfaengerZiel) => isEigenerEmpfaenger(e, eigeneAbschnitte, eigeneEinheiten),
     [eigeneAbschnitte, eigeneEinheiten],
   );
 
@@ -160,7 +160,7 @@ export default function GeraetAuftraegePage() {
           quittierungLaeuft={quittieren.isPending}
           quittierungZiel={quittieren.isPending ? quittieren.variables : null}
           onQuittieren={(auftragId, empfaengerId) => quittieren.mutate({ auftragId, empfaengerId })}
-          darfQuittierenFuer={istEigen}
+          darfQuittierenFuer={isEigen}
           onInArbeit={(auftragId) => inArbeit.mutate(auftragId)}
           onVollzugMelden={setVollzugFuer}
           kartenFehler={kartenFehler.grund}
@@ -168,7 +168,7 @@ export default function GeraetAuftraegePage() {
         />
       )}
       {geraet != null && (
-        <GeraetBefehle einsatzId={einsatzId} darfSchreiben={darfSchreiben} istEigen={istEigen} />
+        <GeraetBefehle einsatzId={einsatzId} darfSchreiben={darfSchreiben} isEigen={isEigen} />
       )}
       <VollzugMeldenModal
         offen={vollzugFuer != null}

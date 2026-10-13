@@ -22,7 +22,7 @@ import type {
 } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { ordneEinheiten } from './GeraetAbschnittPage';
-import { istEigenerEmpfaenger } from './GeraetAuftraegePage';
+import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
 
@@ -547,14 +547,14 @@ describe('Bausteine', () => {
     expect(liste.map((e) => e.name)).toEqual(['Z', 'C', 'A', 'B']);
   });
 
-  it('istEigenerEmpfaenger: Abschnitt des Teilbaums oder eigene Einheit', () => {
+  it('isEigenerEmpfaenger: Abschnitt des Teilbaums oder eigene Einheit', () => {
     const a = new Set([20, 21]);
     const e = new Set([4]);
-    expect(istEigenerEmpfaenger({ abschnitt_id: 21, einheit_id: null }, a, e)).toBe(true);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 4 }, a, e)).toBe(true);
-    expect(istEigenerEmpfaenger({ abschnitt_id: 30, einheit_id: null }, a, e)).toBe(false);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 9 }, a, e)).toBe(false);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: null }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: 21, einheit_id: null }, a, e)).toBe(true);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 4 }, a, e)).toBe(true);
+    expect(isEigenerEmpfaenger({ abschnitt_id: 30, einheit_id: null }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 9 }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: null }, a, e)).toBe(false);
   });
 
   it('navigationZeigt: unbekannt offen, gesperrt oder ausgeblendet zu, fehlendes Modul zu', () => {
