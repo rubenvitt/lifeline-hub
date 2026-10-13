@@ -76,8 +76,22 @@ export function patcheEinheit(
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', patch);
 }
 
+/**
+ * Einheit auflösen (LLH-1079): Kräfte werden frei, die Einheit bleibt mit Zeitachse und
+ * ETB-Bezug als aufgelöst im Nachweis; ohne jede Spur löscht der Server sie.
+ */
 export function loeseEinheitAuf(einsatzId: number, eid: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'DELETE');
+}
+
+/** Aufgelöste Einheiten des Einsatzes (LLH-1079, Block „Aufgelöst“). */
+export function listeAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> {
+  return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/einheiten?aufgeloeste=1`);
+}
+
+/** Fehlanlage stornieren (LLH-1079): nur eine Einheit ohne jede Spur, sie wird gelöscht. */
+export function storniereEinheit(einsatzId: number, eid: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/stornieren`, 'POST');
 }
 
 export function ordnePersonalZu(einsatzId: number, eid: number, epId: number): Promise<void> {

@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import PersonalPage from './PersonalPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
@@ -63,7 +62,9 @@ function render(liste = [ep, zweite]) {
   server.use(
     meHandler(adminFixture()),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzFixture({ id: 7 }))),
-    http.get('/api/einsaetze/7/personal', () => HttpResponse.json(liste)),
+    http.get('/api/einsaetze/7/personal', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
+    ),
     http.get('/api/einsaetze/7/personal/zeitachse', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
@@ -164,33 +165,33 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
-  it('Entfernen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
+  it('Entlassen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
     const ersteAntwort = tor();
     server.use(
-      http.delete('/api/einsaetze/7/personal/10', async () => {
+      http.post('/api/einsaetze/7/personal/10/entlassen', async () => {
         await ersteAntwort.offen;
-        return HttpResponse.json({ error: 'Kraft ist Fahrzeugführer' }, { status: 409 });
+        return HttpResponse.json({ error: 'Die Person ist bereits entlassen' }, { status: 409 });
       }),
-      http.delete('/api/einsaetze/7/personal/11', () => new HttpResponse(null, { status: 204 })),
+      http.post('/api/einsaetze/7/personal/11/entlassen', () =>
+        HttpResponse.json({ ...zweite, beendet_als: 'entlassen' }),
+      ),
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(within(zeile(container, 10)).getByRole('button', { name: 'Entfernen' }));
     await userEvent.click(
-      within(await offeneRueckfrage()).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+      within(zeile(container, 10)).getByRole('button', { name: 'Thomas Müller entlassen' }),
     );
-    await userEvent.click(within(zeile(container, 11)).getByRole('button', { name: 'Entfernen' }));
-    const offen = [
-      ...document.querySelectorAll<HTMLElement>('.ant-popconfirm:not(.ant-popover-hidden)'),
-    ].pop()!;
-    await userEvent.click(within(offen).getByRole('button', { name: 'Aus Einsatz entfernen' }));
+    await userEvent.click(
+      within(zeile(container, 11)).getByRole('button', { name: 'Sara Weber entlassen' }),
+    );
     await act(async () => ersteAntwort.frei());
 
     expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
-      'Kraft ist Fahrzeugführer',
+      'Die Person ist bereits entlassen',
     );
     expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
-    expect(toasts()).toBe(0);
+    // Der Erfolg der zweiten trägt den Rückgängig-Toast; ein Fehler-Toast steht nirgends.
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 
   it('Bemerkung: das Feld wartet und bleibt bei Ablehnung mit dem Wortlaut offen', async () => {

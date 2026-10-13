@@ -26,7 +26,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheitTypen } from '../api/einheitTypen';
-import { bildeEinheit, listeEinheiten } from '../api/einheiten';
+import { bildeEinheit, listeAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -139,6 +140,13 @@ export default function EinheitenPage() {
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+  });
+  // Aufgelöste Einheiten (LLH-1079): getrennt geliefert, die Gliederung und ihre Zahl kennen sie
+  // nicht. Eine aufgelöste Einheit wird nicht wieder aktiv (design.md D5), der Block hat keine
+  // Aktion.
+  const aufgeloesteQuery = useQuery({
+    queryKey: einsatzKeys.einheitenAufgeloeste(einsatzId),
+    queryFn: () => listeAufgeloesteEinheiten(einsatzId),
   });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
@@ -298,6 +306,16 @@ export default function EinheitenPage() {
               </ConfigProvider>
             </>
           )}
+          <EntlassenBlock
+            titel="Aufgelöst"
+            endeWort="aufgelöst"
+            eintraege={(aufgeloesteQuery.data ?? []).map((e) => ({
+              id: e.id,
+              name: e.name,
+              zusatz: e.typ_label,
+              beendetAt: e.aufgeloest_at,
+            }))}
+          />
         </Paneel>
       </div>
 

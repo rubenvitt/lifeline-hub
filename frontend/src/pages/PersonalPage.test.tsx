@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import PersonalPage from './PersonalPage';
@@ -64,11 +63,20 @@ const disponiert = [
   },
 ];
 
-function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[] = disponiert) {
+function render(
+  einsatzObj: ReturnType<typeof einsatz>,
+  personalDaten: unknown[] = disponiert,
+  entlasseneDaten: unknown[] = [],
+) {
   server.use(
     meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personalDaten)),
+    // Aktive und entlassene Kräfte teilen den Pfad (LLH-1079, `?entlassene=1`).
+    http.get('/api/einsaetze/7/personal', ({ request }) =>
+      HttpResponse.json(
+        new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : personalDaten,
+      ),
+    ),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/personal-status', () =>
@@ -286,18 +294,110 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
     expect(screen.getByRole('button', { name: 'Person disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thomas Müller entlassen' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Thomas Müller' }),
+    ).toBeInTheDocument();
   });
 
-  it('die Rückfrage vor dem Entfernen nennt die Handlung, nicht „OK“ (LFH-1090)', async () => {
+  /**
+   * Entlassen ist umkehrbar (LLH-1079, design.md D8): ein Klick ohne Rückfrage, danach ein
+   * Rückgängig-Toast, der dieselbe Kraft erneut disponiert.
+   */
+  it('Entlassen fragt nicht nach und bietet Rückgängig an', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen', () => {
+        aufrufe.push('entlassen');
+        return HttpResponse.json({ ...disponiert[0], beendet_als: 'entlassen' });
+      }),
+      http.post('/api/einsaetze/7/personal/10/reaktivieren', () => {
+        aufrufe.push('reaktivieren');
+        return HttpResponse.json(disponiert[0]);
+      }),
+    );
     render(einsatz());
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: 'Entfernen' }));
-    const rueckfrage = await offeneRueckfrage();
-    expect(
-      within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
-    ).toBeInTheDocument();
-    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
+    const knopf = screen.getByRole('button', { name: 'Thomas Müller entlassen' });
+    expect(knopf).toHaveClass('ant-btn-dangerous');
+    await userEvent.click(knopf);
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
+    expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
+    expect(await screen.findByText('Thomas Müller entlassen')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
+  });
+
+  /**
+   * Stornieren ist unumkehrbar: es steht im Zeilenmenü und fragt per `<Modal>` mit einem Satz zur
+   * Folge nach; der Knopf nennt die Handlung (Spec `kraefte-entlassung`, „Fehldisposition
+   * stornieren“). Eine Ablehnung steht an der Zeile.
+   */
+  it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
+    let gesendet = 0;
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/stornieren', () => {
+        gesendet += 1;
+        return HttpResponse.json(
+          {
+            error:
+              'Stornieren geht nur in den ersten 15 Minuten nach der Disposition; die Kraft lässt sich entlassen',
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    const { container } = render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Thomas Müller' }),
+    );
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
+    // Der Name über `aria-labelledby` trägt in jsdom nicht: `useId` liefert hier überall „test-id“.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Thomas Müller stornieren?');
+    expect(dialog).toHaveTextContent('in keiner Liste und keinem Nachweis');
+    expect(gesendet).toBe(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stornieren' }));
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent(
+      'nur in den ersten 15 Minuten',
+    );
+    expect(gesendet).toBe(1);
+  });
+
+  /** Spec „Block Entlassen“: eingeklappt unter der Liste, mit „Erneut disponieren“. */
+  it('zeigt Entlassene eingeklappt unter der Liste und disponiert sie erneut', async () => {
+    let reaktiviert: number | null = null;
+    server.use(
+      http.post('/api/einsaetze/7/personal/:ep/reaktivieren', ({ params }) => {
+        reaktiviert = Number(params.ep);
+        return HttpResponse.json(disponiert[0]);
+      }),
+    );
+    const entlassen = (id: number, name: string) => ({
+      ...disponiert[0],
+      id,
+      name,
+      einheit_id: null,
+      fahrzeug_id: null,
+      beendet_at: '2026-05-26 12:00:00',
+      beendet_als: 'entlassen',
+    });
+    render(einsatz(), disponiert, [entlassen(20, 'Anna Alt'), entlassen(21, 'Bert Alt')]);
+    const kopf = await screen.findByRole('button', { name: /Entlassen \(2\)/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Anna Alt')).toBeNull();
+    // Die aktive Liste zählt nur ihre eigene Kraft.
+    expect(screen.getByText('1 Kräfte')).toBeInTheDocument();
+    await userEvent.click(kopf);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Erneut disponieren: Anna Alt' }),
+    );
+    await waitFor(() => expect(reaktiviert).toBe(20));
   });
 
   it('Beobachter / abgeschlossen: reine Ansicht', async () => {

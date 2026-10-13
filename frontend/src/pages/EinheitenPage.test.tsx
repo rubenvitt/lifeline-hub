@@ -292,6 +292,44 @@ describe('EinheitenPage', () => {
   });
 
   /**
+   * LLH-1079: aufgelöste Einheiten liefert der Server getrennt; sie stehen eingeklappt unter der
+   * Gliederung, ohne Aktion (eine aufgelöste Einheit wird nicht wieder aktiv), und zählen nicht.
+   */
+  it('zeigt aufgelöste Einheiten eingeklappt unter der Gliederung', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('aufgeloeste')
+            ? [
+                {
+                  ...einheiten[0],
+                  id: 99,
+                  name: 'Alter Zug',
+                  aufgeloest_at: '2026-05-26 15:00:00',
+                  aufgeloest_von: 1,
+                },
+              ]
+            : einheiten,
+        ),
+      ),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    const kopf = await screen.findByRole('button', { name: /Aufgelöst \(1\)/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText(`${einheiten.length} Einheiten`)).toBeInTheDocument();
+    await userEvent.click(kopf);
+    const liste = await screen.findByRole('list', { name: 'Aufgelöst' });
+    expect(within(liste).getByText('Alter Zug')).toBeInTheDocument();
+    expect(within(liste).queryByRole('button')).toBeNull();
+  });
+
+  /**
    * LFH-975: der Knoten ist ein Block aus zwei Zeilen, kein `Space`, dessen Kinder einzeln
    * umbrechen. Ist und Soll stehen in EINER Zeile, und der Ist-Wert trägt sein Etikett.
    */

@@ -218,7 +218,8 @@ export default function EinheitDetailPage() {
 
   const aufloesen = useMutation({
     mutationFn: () => loeseEinheitAuf(einsatzId, einheitId),
-    // Zurück zur Gliederung: die Einheit, auf die diese Route zeigt, gibt es nicht mehr.
+    // Zurück zur Gliederung: die Einheit ist aufgelöst (oder ohne Spur gelöscht) und steht nur noch
+    // im Block „Aufgelöst“ (LLH-1079).
     onSuccess: () => {
       invalidate();
       void navigate(einheitenPfad(einsatzId));
@@ -598,7 +599,7 @@ export default function EinheitDetailPage() {
                   </Button>
                   <Popconfirm
                     title="Einheit auflösen?"
-                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
+                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch. Die Einheit bleibt mit Zeitachse und Tagebuch im Nachweis."
                     okText="Einheit auflösen"
                     okButtonProps={{ danger: true }}
                     onConfirm={() => {
