@@ -30,6 +30,8 @@ export interface EntlassenBlockProps {
   };
   /** Grund einer Ablehnung am Eintrag (`useZeilenFehler`). */
   fehler?: (id: number) => ZeilenGrund | null;
+  /** Aufgeklappt erzwingen, etwa im Druck: ein eingeklappter Block fehlte auf dem Blatt. */
+  aufgeklappt?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export default function EntlassenBlock({
   eintraege,
   aktion,
   fehler,
+  aufgeklappt,
 }: EntlassenBlockProps) {
   const { formatZeitKurz } = useAnzeigeKonventionen();
   if (eintraege.length === 0) return null;
@@ -55,6 +58,7 @@ export default function EntlassenBlock({
       ghost
       data-lfh="entlassen-block"
       style={{ marginTop: abstand.md }}
+      {...(aufgeklappt ? { activeKey: ['entlassen'] } : {})}
       items={[
         {
           key: 'entlassen',

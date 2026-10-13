@@ -10,6 +10,7 @@ import type {
   MaterialStatus,
 } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
+import { rendereEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -458,8 +459,15 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
   return zeilen.join('\n');
 }
 
-/** Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. */
-export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): string {
+/**
+ * Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. Entlassene
+ * Kräfte stehen als eigener Block darunter (LLH-1079); `null` heißt „nicht geladen“.
+ */
+export function rendereMeldebildMarkdown(
+  bild: Kraeftebild,
+  stand: string,
+  entlassene: readonly EntlasseneKraft[] | null = [],
+): string {
   const v = bild.verdichtung;
   const zeilen: string[] = [];
 
@@ -501,6 +509,7 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
       zeilen.push('');
     }
   }
+  zeilen.push(...rendereEntlasseneMarkdown(entlassene));
 
   return zeilen.join('\n');
 }
@@ -560,11 +569,14 @@ export function verdichte(
 
 export function baueKraeftebild(
   abschnitte: Einsatzabschnitt[],
-  einheiten: Einheit[],
-  personal: EinsatzPersonal[],
+  alleEinheiten: Einheit[],
+  allesPersonal: EinsatzPersonal[],
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
 ): Kraeftebild {
+  // Nur aktive Kräfte (LLH-1079): Entlassene führt der Block „Entlassen“ (`entlassene.ts`).
+  const einheiten = alleEinheiten.filter((e) => !e.aufgeloest_at);
+  const personal = allesPersonal.filter((ep) => !ep.beendet_at);
   // ── Index nach einheit_id ─────────────────────────────────────────────────
   const personalByEinheit = new Map<number | null, EinsatzPersonal[]>();
   for (const ep of personal) {

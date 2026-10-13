@@ -4,12 +4,13 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
-import { listeEinsatzPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { zuEntlassenen } from '../kraefte/entlassene';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
   baueFuehrungsorganisation,
@@ -87,25 +88,37 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
     const lade = <T>(l: Liste, key: readonly unknown[], fn: () => Promise<T[]>) =>
       frei(l) ? ladeListe<T[]>(qc, key, fn, []) : Promise.resolve(gesperrt<T[]>([]));
     const stabFrei = istKeyFreigegeben('stab', freigaben);
-    const [abschnitte, einheiten, personal, fahrzeuge, material, stab, fuehrungsstelle] =
-      await Promise.all([
-        lade('abschnitte', einsatzKeys.abschnitte(einsatzId), () => listeAbschnitte(einsatzId)),
-        lade('einheiten', einsatzKeys.einheiten(einsatzId), () => listeEinheiten(einsatzId)),
-        lade('personal', einsatzKeys.personal(einsatzId), () => listeEinsatzPersonal(einsatzId)),
-        lade('fahrzeuge', einsatzKeys.fahrzeuge(einsatzId), () => listeEinsatzFahrzeuge(einsatzId)),
-        lade('material', einsatzKeys.material(einsatzId), () => listeEinsatzMaterial(einsatzId)),
-        stabFrei
-          ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
-          : Promise.resolve(null),
-        // Die Führungsstelle braucht kein Modul (LFH-849); sie trägt den Einsatzleiter (LFH-1199)
-        // und die Wurzel (LFH-1181). Gescheitert bleibt die Wurzel wie ohne sie, wie im Organigramm.
-        ladeListe(
-          qc,
-          einsatzKeys.fuehrungsstelle(einsatzId),
-          () => ladeFuehrungsstelle(einsatzId),
-          null,
-        ),
-      ]);
+    const [
+      abschnitte,
+      einheiten,
+      personal,
+      entlassene,
+      fahrzeuge,
+      material,
+      stab,
+      fuehrungsstelle,
+    ] = await Promise.all([
+      lade('abschnitte', einsatzKeys.abschnitte(einsatzId), () => listeAbschnitte(einsatzId)),
+      lade('einheiten', einsatzKeys.einheiten(einsatzId), () => listeEinheiten(einsatzId)),
+      lade('personal', einsatzKeys.personal(einsatzId), () => listeEinsatzPersonal(einsatzId)),
+      // Nachweis der Entlassenen (LLH-1079): fehlt er, sagt der Block „nicht geladen“.
+      lade('personal', einsatzKeys.personalEntlassene(einsatzId), () =>
+        listeEntlassenesPersonal(einsatzId),
+      ),
+      lade('fahrzeuge', einsatzKeys.fahrzeuge(einsatzId), () => listeEinsatzFahrzeuge(einsatzId)),
+      lade('material', einsatzKeys.material(einsatzId), () => listeEinsatzMaterial(einsatzId)),
+      stabFrei
+        ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
+        : Promise.resolve(null),
+      // Die Führungsstelle braucht kein Modul (LFH-849); sie trägt den Einsatzleiter (LFH-1199)
+      // und die Wurzel (LFH-1181). Gescheitert bleibt die Wurzel wie ohne sie, wie im Organigramm.
+      ladeListe(
+        qc,
+        einsatzKeys.fuehrungsstelle(einsatzId),
+        () => ladeFuehrungsstelle(einsatzId),
+        null,
+      ),
+    ]);
     const listen: Record<Liste, Geladen<unknown[]>> = {
       abschnitte,
       einheiten,
@@ -130,6 +143,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
             material.daten,
           ),
           stand(abschnitte, einheiten, personal, fahrzeuge, material),
+          entlassene.zustand === 'daten' ? zuEntlassenen(entlassene.daten) : null,
         )
       : teilFehlt('Kräftemeldebild', zustaende(MELDEBILD));
 
