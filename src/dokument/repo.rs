@@ -142,6 +142,10 @@ async fn check_bezug(
             "Unbekanntes oder fremdes Bezugsziel".into(),
         ));
     }
+    // Ein neuer Bezug auf eine aufgelöste Einheit ist ein Schreibweg an ihr (409, LLH-1079).
+    if let Bezug::Einheit(id) = bezug {
+        crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, id).await?;
+    }
     Ok(())
 }
 
@@ -290,8 +294,12 @@ pub async fn aendern(
             (_, _, Some(i)) => Some(Bezug::EtbEintrag(i)),
             _ => None,
         };
+        // Nur ein neuer Bezug wird geprüft: ein unverändert mitgesendeter auf eine inzwischen
+        // aufgelöste Einheit bleibt stehen (LLH-1079, Nachweis).
         if let Some(Some(b)) = aenderung.bezug {
-            check_bezug(conn, einsatz_id, b).await?;
+            if Some(b) != bezug_alt {
+                check_bezug(conn, einsatz_id, b).await?;
+            }
         }
 
         let titel = aenderung.titel.clone().unwrap_or_else(|| titel_alt.clone());

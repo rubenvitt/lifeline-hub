@@ -417,21 +417,31 @@ pub async fn laden(
         .ok_or(AppError::NotFound)
 }
 
-/// `NotFound`, falls die Einheit nicht (mehr) zum Einsatz gehört. Eine nackte
-/// Existenz-Abfrage, weil `laden()` die Anreicherung des ganzen Einsatzes zöge.
-/// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
+/// `NotFound`, falls die Einheit nicht (mehr) zum Einsatz gehört, `Conflict`, falls sie
+/// aufgelöst ist (wie [`require_aktiv_tx`], LLH-1079). Eine nackte Abfrage, weil `laden()` die
+/// Anreicherung des ganzen Einsatzes zöge. Executor-generisch, damit [`anlegen_tx`] auf der
+/// offenen Verbindung prüft.
 async fn check_gehoert_zum_einsatz(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     id: i64,
 ) -> Result<(), AppError> {
-    let t: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-            .bind(id)
-            .bind(einsatz_id)
-            .fetch_optional(executor)
-            .await?;
-    t.map(|_| ()).ok_or(AppError::NotFound)
+    let aufgeloest: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?;
+    match aufgeloest.ok_or(AppError::NotFound)? {
+        None => Ok(()),
+        Some(_) => Err(aufgeloest_conflict()),
+    }
+}
+
+/// Der 409 an einer aufgelösten Einheit (Lebenszyklus, `src/AGENTS.md`).
+fn aufgeloest_conflict() -> AppError {
+    AppError::Conflict("Die Einheit ist aufgelöst".into())
 }
 
 /// `NotFound`, falls der Abschnitt nicht zum Einsatz gehört. Executor-generisch (s.
@@ -865,7 +875,7 @@ pub async fn require_aktiv_tx(
     .await?;
     match aufgeloest.ok_or(AppError::NotFound)? {
         None => Ok(()),
-        Some(_) => Err(AppError::Conflict("Die Einheit ist aufgelöst".into())),
+        Some(_) => Err(aufgeloest_conflict()),
     }
 }
 
@@ -1961,6 +1971,49 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    /// Spec `kraefte-entlassung`, Schreibwege an beendeten Kräften: eine aufgelöste Einheit
+    /// wird keiner Einheit mehr übergeordnet, weder beim Bilden noch per PATCH (409).
+    #[tokio::test]
+    async fn aufgeloeste_einheit_ist_keine_uebergeordnete() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let alt = anlegen(&pool, einsatz, 1, daten("Alt", None, None, None, None), b)
+            .await
+            .unwrap();
+        let trupp = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-13 15:00:00' WHERE id = ?",
+        )
+        .bind(alt.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let neu = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Neu", None, None, Some(alt.id), None),
+            b,
+        )
+        .await;
+        assert!(matches!(neu, Err(AppError::Conflict(_))), "{neu:?}");
+        let patch = patche(
+            &pool,
+            einsatz,
+            1,
+            trupp.id,
+            EinheitPatch {
+                ueber_einheit_id: Some(Some(alt.id)),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert!(matches!(patch, Err(AppError::Conflict(_))), "{patch:?}");
     }
 
     /// Spec „Leere Einheit gelöscht“: ohne jede Spur geht die Zeile, beim Auflösen wie beim

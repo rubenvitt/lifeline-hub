@@ -216,12 +216,15 @@ pub async fn vorgaben(
 
 // ── Hilfen innerhalb der Transaktion ────────────────────────────────────────────────────────
 
-/// Name und Abschnitt einer Einheit des Einsatzes. `NotFound`, wenn sie nicht dazugehört.
+/// Name und Abschnitt einer aktiven Einheit des Einsatzes. `NotFound`, wenn sie nicht
+/// dazugehört, `Conflict`, wenn sie aufgelöst ist: eine aufgelöste Einheit bekommt keine
+/// Schicht und löst niemanden ab (LLH-1079, Spec `kraefte-entlassung`).
 async fn einheit_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
 ) -> Result<(String, Option<i64>), AppError> {
+    crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, einheit_id).await?;
     sqlx::query_as("SELECT name, abschnitt_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(einsatz_id)

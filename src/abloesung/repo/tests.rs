@@ -815,6 +815,41 @@ async fn aufloesen_behaelt_abgeloeste_schicht_und_leert_fremde_planung() {
     assert!(offene_fristen(&w.pool, folge.id).await.is_empty());
 }
 
+/// LLH-1079 (Spec `kraefte-entlassung`, Schreibwege an beendeten Kräften): eine aufgelöste
+/// Einheit bekommt keine Schicht, wird nicht als Ablösung geplant und löst niemanden ab.
+#[tokio::test]
+async fn aufgeloeste_einheit_ist_kein_ziel_der_abloesung() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    // Mit Spur, damit sie aufgelöst statt gelöscht wird.
+    eintreffen(&w, w.f2, T0).await;
+    let f2 = crate::einheit::repo::aufloesen(&w.pool, w.e, w.f2, w.b)
+        .await
+        .unwrap();
+    assert!(!f2.geloescht, "{f2:?}");
+
+    let neu = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, Some(360)), T0).await;
+    assert!(matches!(neu, Err(AppError::Conflict(_))), "{neu:?}");
+    let geplant = aendern(
+        &w.pool,
+        w.e,
+        a.id,
+        w.b,
+        &AenderungEingabe {
+            abloesende_einheit_id: Some(Some(w.f2)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await;
+    assert!(matches!(geplant, Err(AppError::Conflict(_))), "{geplant:?}");
+    let jetzt = "2026-09-22 15:40:00";
+    let vollzug = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt).await;
+    assert!(matches!(vollzug, Err(AppError::Conflict(_))), "{vollzug:?}");
+}
+
 // ── Kräfte-Zeitachse (LFH-552) ──────────────────────────────────────────────────────────────
 
 /// Schreibt ein Eintreffen der Einheit in die Kräfte-Zeitachse (wie ein markierter Status).

@@ -349,6 +349,11 @@ async fn check_im_einsatz(
             element.schluessel()
         )));
     }
+    // Eine aufgelöste Einheit steht in keiner Skizze mehr (409, LLH-1079; `vergiss` räumt ihre
+    // Bezüge beim Auflösen).
+    if let Element::Einheit(id) = element {
+        crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, id).await?;
+    }
     Ok(())
 }
 

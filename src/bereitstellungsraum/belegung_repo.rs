@@ -149,6 +149,8 @@ async fn belege_einheit(
     notiz: Option<&str>,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
+    // Eine aufgelöste Einheit belegt keinen Raum mehr (409, LLH-1079); fremd → 404.
+    crate::einheit::repo::require_aktiv_tx(&mut *conn, einsatz_id, objekt_id).await?;
     // 4. Objekt-Existenz + aktueller_br_id in derselben Tx lesen
     let cache: Option<Option<i64>> = sqlx::query_scalar(
         "SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
@@ -439,6 +441,27 @@ mod tests {
         assert_eq!(ev.objekt_id, einheit);
         assert_eq!(ev.br_id, br);
         assert_eq!(cache_einheit(&pool, einheit).await, Some(br));
+    }
+
+    /// LLH-1079 (Spec `kraefte-entlassung`): eine aufgelöste Einheit tritt in keinen
+    /// Bereitstellungsraum mehr ein (409, Lebenszyklus).
+    #[tokio::test]
+    async fn aufgeloeste_einheit_belegt_keinen_br() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Nord").await;
+        let einheit = neue_einheit(&pool, e).await;
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-05-28 10:00:00' WHERE id = ?",
+        )
+        .bind(einheit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let r = belege(&pool, e, br, "einheit", einheit, "eintritt", None, b).await;
+        assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+        assert_eq!(cache_einheit(&pool, einheit).await, None);
     }
 
     #[tokio::test]
