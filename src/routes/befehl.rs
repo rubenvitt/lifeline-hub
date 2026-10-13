@@ -86,6 +86,26 @@ pub async fn fortschreiben(
     kern::fortschreiben::<Befehl>(&state, &benutzer, einsatz_id, bid, body).await
 }
 
+/// POST /api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/quittieren — Empfang einer
+/// Verteiler-Zeile quittieren (LLH-1173). Nur die jüngste freigegebene Fassung, sonst 422.
+pub async fn quittieren(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, bid, vid)): PfadParam<(i64, i64, i64)>,
+) -> Result<Json<BefehlAnzeige>, AppError> {
+    kern::quittung::<Befehl>(&state, &benutzer, einsatz_id, bid, vid, true).await
+}
+
+/// POST /api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/zuruecknehmen — Quittung
+/// zurücknehmen (LLH-1173), der Rückweg zum Rückgängig-Knopf (LFH-343).
+pub async fn quittung_zuruecknehmen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, bid, vid)): PfadParam<(i64, i64, i64)>,
+) -> Result<Json<BefehlAnzeige>, AppError> {
+    kern::quittung::<Befehl>(&state, &benutzer, einsatz_id, bid, vid, false).await
+}
+
 /// GET /api/einsaetze/{id}/befehle/{bid}/anlagen — Bild-Anlagen (LFH-1028). Lesezugriff.
 pub async fn anlagen(
     State(state): State<AppState>,

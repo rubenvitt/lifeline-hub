@@ -3,7 +3,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BefehlAnzeige, BefehlKopf } from '../api/types';
-import { gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
+import {
+  gibBefehlFrei,
+  ladeBefehl,
+  nimmBefehlQuittungZurueck,
+  quittiereBefehlEmpfang,
+  schreibeBefehlFort,
+} from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import { vorlage } from '../befehle/vorlagen';
@@ -13,9 +19,11 @@ import { DetailSprung } from '../components/ListeDetail';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
-import { verteilerNames } from '../entwurf/verteilerKern';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useZeilenFehler } from '../components/useZeilenFehler';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import BefehlLesefassung from './BefehlLesefassung';
+import EmpfaengerQuittung from './EmpfaengerQuittung';
 import { befehlSchemaLabel } from './befehlTexte';
 
 /**
@@ -52,7 +60,8 @@ export default function BefehlDetail({
   // Kopfdaten frisch aus dem Einzelabruf, sobald er da ist; vorher aus der Liste.
   const b: BefehlKopf | BefehlAnzeige = detailQuery.data ?? kopf;
   const v = vorlage(b.vorlage);
-  const verteiler = verteilerNames(detailQuery.data?.verteiler);
+  // Der Verteiler kommt mit dem Kopf (LLH-1173), frischer aus dem Einzelabruf.
+  const verteiler = b.verteiler ?? [];
   const isEntwurf = b.status === 'entwurf';
   const vollseite = befehlDetailPfad(einsatzId, b.id);
 
@@ -60,6 +69,37 @@ export default function BefehlDetail({
     void qc.invalidateQueries({ queryKey: einsatzKeys.befehl(einsatzId, b.id) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
+  /*
+   * Quittung je Verteiler-Empfänger (LLH-1173, Spec `befehl-quittung`): ein Klick ohne Rückfrage,
+   * weil der Server einen Rückweg hat (`…/zuruecknehmen`); der Hinweis danach trägt „Rückgängig“
+   * (LFH-343). Die Antwort setzt das Detail, die Liste zieht nach (Quittungsstand der Karte).
+   * Der Grund einer Ablehnung steht am Verteiler (LFH-1077), je Befehl.
+   */
+  const quittungErrors = useZeilenFehler<number>();
+  const applyQuittung = (stand: BefehlAnzeige) => {
+    qc.setQueryData(einsatzKeys.befehl(einsatzId, stand.id), stand);
+    void qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
+  };
+  const zuruecknehmenMutation = useMutation({
+    mutationFn: ({ befehlId, eintragId }: { befehlId: number; eintragId: number }) =>
+      nimmBefehlQuittungZurueck(einsatzId, befehlId, eintragId),
+    onMutate: ({ befehlId }) => quittungErrors.beginne(befehlId),
+    onSuccess: applyQuittung,
+    onError: (e, { befehlId }) =>
+      quittungErrors.melde(befehlId, e, 'Quittung nicht zurückgenommen'),
+  });
+  const quittierenMutation = useMutation({
+    mutationFn: ({ befehlId, eintragId }: { befehlId: number; eintragId: number }) =>
+      quittiereBefehlEmpfang(einsatzId, befehlId, eintragId),
+    onMutate: ({ befehlId }) => quittungErrors.beginne(befehlId),
+    onSuccess: (stand, ziel) => {
+      applyQuittung(stand);
+      zeigeRueckgaengig(message, 'Empfang quittiert', () => zuruecknehmenMutation.mutate(ziel));
+    },
+    onError: (e, { befehlId }) => quittungErrors.melde(befehlId, e, 'Quittung fehlgeschlagen'),
+  });
+  const isQuittungPending = quittierenMutation.isPending || zuruecknehmenMutation.isPending;
+
   const [freigabeOffen, setFreigabeOffen] = useState(false);
   // Kein `onError`: der Grund steht im Dialog, der bei Ablehnung offen bleibt.
   const freigebenMutation = useMutation({
@@ -161,10 +201,6 @@ export default function BefehlDetail({
           <ZeitAnzeige wert={b.zeitstand} />
         </Descriptions.Item>
         <Descriptions.Item label="Ersteller">{b.ersteller_name}</Descriptions.Item>
-        {verteiler.length > 0 && (
-          // An wen der Befehl geht (LLH-1172): die gespeicherten Anzeigenamen in Reihenfolge.
-          <Descriptions.Item label="Verteiler">{verteiler.join(', ')}</Descriptions.Item>
-        )}
         {b.freigegeben_at && (
           <Descriptions.Item label="Freigegeben">
             <ZeitAnzeige wert={b.freigegeben_at} />
@@ -172,6 +208,35 @@ export default function BefehlDetail({
           </Descriptions.Item>
         )}
       </Descriptions>
+
+      {verteiler.length > 0 && (
+        // An wen der Befehl geht (LLH-1172) und wer den Empfang bestätigt hat (LLH-1173): derselbe
+        // Block wie die Empfänger eines Auftrags. Ein Entwurf nennt nur die Namen.
+        <div style={{ marginTop: token.marginLG }} data-lfh="befehl-verteiler">
+          <Augenbraue style={{ display: 'block', marginBottom: token.marginXS }}>
+            Verteiler
+          </Augenbraue>
+          {isEntwurf ? (
+            <Typography.Text>{verteiler.map((e) => e.snap_anzeige).join(', ')}</Typography.Text>
+          ) : (
+            <EmpfaengerQuittung
+              zeilen={verteiler.map((e) => ({
+                id: e.id,
+                name: e.snap_anzeige,
+                ariaName: e.snap_anzeige,
+                quittiertAt: e.quittiert_at,
+              }))}
+              canQuittieren={darfSchreiben && b.is_quittierbar === true}
+              isLocked={isQuittungPending}
+              pendingId={
+                quittierenMutation.isPending ? quittierenMutation.variables.eintragId : null
+              }
+              onQuittieren={(eintragId) => quittierenMutation.mutate({ befehlId: b.id, eintragId })}
+              error={quittungErrors.grund(b.id)}
+            />
+          )}
+        </div>
+      )}
 
       <div style={{ marginTop: token.marginLG }}>
         {/* Etikett, keine Überschrift: die Abschnittsköpfe darunter sind selbst h5, ein h5

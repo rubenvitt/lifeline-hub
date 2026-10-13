@@ -2,7 +2,6 @@ import { IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { segmentLabel } from '../anzeige/anzahl';
 import { App, Button, Input } from 'antd';
-import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -38,6 +37,7 @@ import {
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ersetzeAuftraege, findeAuftrag } from './auftragCache';
 import AuftragErteilenDialog from './AuftragErteilenDialog';
+import EmpfaengerFilter, { parseEmpfaengerFilter } from './EmpfaengerFilter';
 import AuftragListenKarte from './AuftragListenKarte';
 import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
@@ -91,11 +91,9 @@ export default function AuftraegeListe({
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
-  // Empfänger-Filter: kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
+  // Empfänger-Filter: kodiert als "abschnitt:<id>" bzw. "einheit:<id>" (`EmpfaengerFilter`).
   const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
-  const [empfTyp, empfId] = empfFilter ? empfFilter.split(':') : [undefined, undefined];
-  const abschnittId = empfTyp === 'abschnitt' ? Number(empfId) : undefined;
-  const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
+  const { abschnittId, einheitId } = parseEmpfaengerFilter(empfFilter);
 
   // Suche am Server (`q`, oxgob5gk D9): das Feld zeigt sofort, abgefragt wird entprellt.
   const [suchEingabe, setSuchEingabe] = useState('');
@@ -457,16 +455,6 @@ export default function AuftraegeListe({
 
   const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
   const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
-  const empfaengerOptionen = [
-    {
-      label: 'Einsatzabschnitte',
-      options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })),
-    },
-    {
-      label: 'Einheiten',
-      options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })),
-    },
-  ];
 
   /*
    * Stabile Handler über einen Ref-Bündel (LFH-949, D6): ein je Render neuer Pfeil machte jede
@@ -577,13 +565,11 @@ export default function AuftraegeListe({
             { wert: 'extern', label: 'Extern' },
           ]}
         />
-        <Select
-          allowClear
-          placeholder="Empfänger filtern"
-          style={{ minWidth: 220 }}
+        <EmpfaengerFilter
+          abschnitte={abschnitte}
+          einheiten={einheiten}
           value={empfFilter}
-          onChange={(v) => setEmpfFilter(v ?? undefined)}
-          options={empfaengerOptionen}
+          onChange={setEmpfFilter}
         />
       </div>
 

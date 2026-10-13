@@ -149,6 +149,7 @@ impl Dokumentart for Befehl {
         tabelle: "befehl_verteiler",
         dokument_spalte: "befehl_id",
     });
+    const QUITTUNG: Option<&'static str> = Some("Einsatzbefehl");
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

@@ -1353,6 +1353,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/befehle/{bid}/fortschreiben",
             post(routes::befehl::fortschreiben),
         )
+        // LLH-1173: Quittung je Verteiler-Empfänger.
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/quittieren",
+            post(routes::befehl::quittieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/zuruecknehmen",
+            post(routes::befehl::quittung_zuruecknehmen),
+        )
         // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
         .route(
             "/api/einsaetze/{id}/befehle/{bid}/anlagen",

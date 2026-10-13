@@ -15,6 +15,13 @@ import { einsatzKeys } from '../api/queryKeys';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 vi.mock('../api/befehle');
+vi.mock('../api/einsatzabschnitte', () => ({
+  listeAbschnitte: vi.fn().mockResolvedValue([
+    { id: 3, name: 'EA Süd' },
+    { id: 4, name: 'EA Nord' },
+  ]),
+}));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 /**
  * Befehlsliste als Kartensicht.
@@ -27,6 +34,8 @@ vi.mock('../api/befehle');
 
 const BASIS = {
   einsatz_id: 1,
+  verteiler: [],
+  is_quittierbar: false,
   abschnitte: [],
   ersteller_id: 1,
   ersteller_name: 'EL',
@@ -120,6 +129,35 @@ const kartenNamen = (ul: HTMLElement) =>
     .map((b) => b.getAttribute('aria-label'));
 
 describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () => {
+  it('der Empfängerfilter zeigt nur Befehle mit diesem Abschnitt im Verteiler (LLH-1173)', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue([
+      {
+        ...KETTE[1],
+        verteiler: [
+          { id: 1, empfaenger_typ: 'abschnitt', abschnitt_id: 3, snap_anzeige: 'EA Süd' },
+        ],
+      },
+      {
+        ...KETTE[0],
+        verteiler: [
+          { id: 2, empfaenger_typ: 'abschnitt', abschnitt_id: 4, snap_anzeige: 'EA Nord' },
+        ],
+      },
+    ] as never);
+    renderListe();
+    const frei = await liste('Freigegebene Befehle');
+    expect(kartenNamen(frei)).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(await screen.findByTitle('EA Süd'));
+    await waitFor(async () =>
+      expect(kartenNamen(await liste('Freigegebene Befehle'))).toEqual(['Befehl v1: Befehl A']),
+    );
+    // Der Bereichskopf zählt weiter den Bestand, das Segment das Gefundene.
+    expect(screen.getByText(/0 Entwürfe · 2 freigegeben/)).toBeInTheDocument();
+    expect(screen.getByText(/^Freigegeben \(1\)/)).toBeInTheDocument();
+  });
+
   it('macht die Fortschreibungskette über die v-Nummer lesbar, Entwürfe und Freigegebene getrennt', async () => {
     renderListe();
     // Vorgabe „Entwürfe“, weil der erste Datenstand einen Entwurf hat (design.md D5).
