@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EinsatzPersonal } from '../api/types';
 import { baueKraeftebild, rendereMeldebildMarkdown } from './kraeftebild';
-import { zuEntlassenen } from './entlassene';
+import { toEntlassene } from './entlassene';
 
 const person = (id: number, name: string, extra: Partial<EinsatzPersonal> = {}) =>
   ({
@@ -30,7 +30,7 @@ describe('Block „Entlassen“ im Meldebild (LLH-1079)', () => {
 
   it('nennt die Entlassenen als eigenen Block, die Stärke zählt sie nicht', () => {
     const bild = baueKraeftebild([], [], [...aktiv, ...entlassen], [], []);
-    const md = rendereMeldebildMarkdown(bild, 'Stand', zuEntlassenen(entlassen));
+    const md = rendereMeldebildMarkdown(bild, 'Stand', toEntlassene(entlassen));
     expect(md).toContain('## Entlassen\n\n- Bert Weg (Sanitäter)\n- Cora Weg\n');
     expect(md).not.toContain('Dora Fehl');
     expect(md).toContain('1/0/0//1');

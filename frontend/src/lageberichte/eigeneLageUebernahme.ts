@@ -4,13 +4,13 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
-import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { zuEntlassenen } from '../kraefte/entlassene';
+import { toEntlassene } from '../kraefte/entlassene';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
   baueFuehrungsorganisation,
@@ -103,7 +103,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
       lade('personal', einsatzKeys.personal(einsatzId), () => listeEinsatzPersonal(einsatzId)),
       // Nachweis der Entlassenen (LLH-1079): fehlt er, sagt der Block „nicht geladen“.
       lade('personal', einsatzKeys.personalEntlassene(einsatzId), () =>
-        listeEntlassenesPersonal(einsatzId),
+        listEntlassenesPersonal(einsatzId),
       ),
       lade('fahrzeuge', einsatzKeys.fahrzeuge(einsatzId), () => listeEinsatzFahrzeuge(einsatzId)),
       lade('material', einsatzKeys.material(einsatzId), () => listeEinsatzMaterial(einsatzId)),
@@ -143,7 +143,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
             material.daten,
           ),
           stand(abschnitte, einheiten, personal, fahrzeuge, material),
-          entlassene.zustand === 'daten' ? zuEntlassenen(entlassene.daten) : null,
+          entlassene.zustand === 'daten' ? toEntlassene(entlassene.daten) : null,
         )
       : teilFehlt('Kräftemeldebild', zustaende(MELDEBILD));
 

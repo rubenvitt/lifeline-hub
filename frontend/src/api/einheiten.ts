@@ -85,7 +85,7 @@ export function loeseEinheitAuf(einsatzId: number, eid: number): Promise<void> {
 }
 
 /** Aufgelöste Einheiten des Einsatzes (LLH-1079, Block „Aufgelöst“). */
-export function listeAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> {
+export function listAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> {
   return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/einheiten?aufgeloeste=1`);
 }
 

@@ -92,7 +92,7 @@ export default function EntlassenBlock({
                       </Button>
                     ) : null}
                   </Space>
-                  <EintragFehler grund={fehler?.(e.id) ?? null} />
+                  <EintragError grund={fehler?.(e.id) ?? null} />
                 </li>
               ))}
             </ul>
@@ -103,7 +103,7 @@ export default function EntlassenBlock({
   );
 }
 
-function EintragFehler({ grund }: { grund: ZeilenGrund | null }) {
+function EintragError({ grund }: { grund: ZeilenGrund | null }) {
   if (!grund) return null;
   return (
     <div>

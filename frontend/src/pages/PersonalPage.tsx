@@ -15,7 +15,7 @@ import {
   disponierePerson,
   entlasseDisposition,
   listeEinsatzPersonal,
-  listeEntlassenesPersonal,
+  listEntlassenesPersonal,
   reaktiviereDisposition,
   storniereDisposition,
 } from '../api/einsatzPersonal';
@@ -89,7 +89,7 @@ export default function PersonalPage() {
   // Entlassene Kräfte (LLH-1079): getrennt geliefert, die Liste und ihre Zahlen kennen sie nicht.
   const entlasseneQuery = useQuery({
     queryKey: einsatzKeys.personalEntlassene(einsatzId),
-    queryFn: () => listeEntlassenesPersonal(einsatzId),
+    queryFn: () => listEntlassenesPersonal(einsatzId),
   });
   const statusQuery = useQuery({
     queryKey: globalKeys.personalStatus(),
@@ -213,7 +213,7 @@ export default function PersonalPage() {
   const eps = epQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
   /** Läuft für diese Zeile Entlassen oder Stornieren? Dann keine zweite Handlung. */
-  const zeileLaeuft = (epId: number) =>
+  const isZeileBusy = (epId: number) =>
     (entlassenMutation.isPending && entlassenMutation.variables?.epId === epId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === epId);
   const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
@@ -488,7 +488,7 @@ export default function PersonalPage() {
                   loading={
                     entlassenMutation.isPending && entlassenMutation.variables?.epId === ep.id
                   }
-                  disabled={zeileLaeuft(ep.id)}
+                  disabled={isZeileBusy(ep.id)}
                   aria-label={`${ep.name} entlassen`}
                   onClick={() => entlassenMutation.mutate({ epId: ep.id, name: ep.name })}
                 >
@@ -497,7 +497,7 @@ export default function PersonalPage() {
                 <MenueAusloeser
                   eintraege={stornoEintraege}
                   zugaenglicherName={`Weitere Aktionen zu ${ep.name}`}
-                  gesperrt={zeileLaeuft(ep.id)}
+                  gesperrt={isZeileBusy(ep.id)}
                   laeuft={stornierenMutation.isPending && stornierenMutation.variables === ep.id}
                   onWahl={() => setStornoFuer({ id: ep.id, name: ep.name })}
                 />
@@ -633,7 +633,7 @@ export default function PersonalPage() {
                 ? {
                     eintraege: () => stornoEintraege,
                     zugaenglicherName: (ep) => `Weitere Aktionen zu ${ep.name}`,
-                    laeuft: (ep) => zeileLaeuft(ep.id),
+                    laeuft: (ep) => isZeileBusy(ep.id),
                     onWahl: (_, ep) => setStornoFuer({ id: ep.id, name: ep.name }),
                   }
                 : undefined,

@@ -57,7 +57,7 @@ pub async fn aufloesen(
     })?;
     // Eine entlassene oder stornierte Kraft bestätigt nichts mehr (409, LLH-1079).
     if let Some(als) = ende {
-        return Err(crate::personal::disposition_repo::beendet_konflikt(&als));
+        return Err(crate::personal::disposition_repo::beendet_conflict(&als));
     }
     Ok(Some(Bestaetigung { personal_id, name }))
 }

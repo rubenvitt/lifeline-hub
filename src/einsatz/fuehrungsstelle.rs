@@ -427,7 +427,7 @@ async fn load_snap_name(
         ))
     })?;
     // Eine entlassene oder stornierte Kraft leitet nicht (409, LLH-1079).
-    crate::personal::disposition_repo::fordere_nicht_beendet(&mut *conn, einsatz_id, personal_id)
+    crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, personal_id)
         .await?;
     Ok(name)
 }

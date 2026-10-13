@@ -1,10 +1,10 @@
 import { ApiError } from '../../api/client';
 import { ladeBetreuung } from '../../api/betreuung';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../../api/einsaetze';
-import { listeAufgeloesteEinheiten, listeEinheiten } from '../../api/einheiten';
+import { listAufgeloesteEinheiten, listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listePersonen } from '../../api/einsatzPerson';
-import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../../api/einsatzPersonal';
 import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeEtbZaehler } from '../../api/etb';
 import { listeEinheitenPerioden, listePersonalPerioden } from '../../api/kraefteZeitachse';
@@ -42,10 +42,10 @@ const ABRUF = {
   stab: ladeStab,
   lagebesprechungen: fetchLagebesprechungen,
   einheiten: listeEinheiten,
-  einheitenAufgeloest: listeAufgeloesteEinheiten,
+  einheitenAufgeloest: listAufgeloesteEinheiten,
   einheitenPerioden: listeEinheitenPerioden,
   personal: listeEinsatzPersonal,
-  personalEntlassen: listeEntlassenesPersonal,
+  personalEntlassen: listEntlassenesPersonal,
   personalPerioden: listePersonalPerioden,
   fahrzeuge: listeEinsatzFahrzeuge,
   lageberichte: ladeLageberichtQuelle,

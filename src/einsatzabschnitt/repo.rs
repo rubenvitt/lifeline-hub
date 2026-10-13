@@ -176,7 +176,7 @@ async fn check_leiter(
             "Abschnittsleiter muss eine disponierte Person des Einsatzes sein".into(),
         )),
         // Eine entlassene oder stornierte Kraft leitet nicht (409, LLH-1079).
-        Some(Some(als)) => Err(crate::personal::disposition_repo::beendet_konflikt(&als)),
+        Some(Some(als)) => Err(crate::personal::disposition_repo::beendet_conflict(&als)),
         Some(None) => Ok(()),
     }
 }

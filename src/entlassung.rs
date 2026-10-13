@@ -42,7 +42,7 @@ pub fn storno_frist_text() -> String {
 
 /// Liegt `disponiert_at` höchstens [`STORNO_FRIST_MINUTEN`] vor `jetzt`? Beide im kanonischen
 /// Format (`crate::zeit::FORMAT`); ein unlesbarer Zeitpunkt gilt als abgelaufen.
-pub fn in_storno_frist(disponiert_at: &str, jetzt: &str) -> bool {
+pub fn is_in_storno_frist(disponiert_at: &str, jetzt: &str) -> bool {
     match crate::zeit::plus_minuten(disponiert_at, STORNO_FRIST_MINUTEN) {
         Some(grenze) => jetzt <= grenze.as_str(),
         None => false,
@@ -56,11 +56,11 @@ mod tests {
     #[test]
     fn frist_endet_nach_fuenfzehn_minuten() {
         let d = "2026-10-13 10:00:00";
-        assert!(in_storno_frist(d, "2026-10-13 10:05:00"));
-        assert!(in_storno_frist(d, "2026-10-13 10:15:00"));
-        assert!(!in_storno_frist(d, "2026-10-13 10:15:01"));
-        assert!(!in_storno_frist(d, "2026-10-13 10:20:00"));
-        assert!(!in_storno_frist("kaputt", "2026-10-13 10:00:00"));
+        assert!(is_in_storno_frist(d, "2026-10-13 10:05:00"));
+        assert!(is_in_storno_frist(d, "2026-10-13 10:15:00"));
+        assert!(!is_in_storno_frist(d, "2026-10-13 10:15:01"));
+        assert!(!is_in_storno_frist(d, "2026-10-13 10:20:00"));
+        assert!(!is_in_storno_frist("kaputt", "2026-10-13 10:00:00"));
         assert!(storno_frist_text().contains("nur in den ersten 15 Minuten nach der Disposition"));
     }
 
@@ -101,13 +101,13 @@ mod tests {
     fn jede_abfrage_der_kraeftetabellen_prueft_den_zustand() {
         let wurzel = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let mut dateien = Vec::new();
-        sammle(&wurzel.join("src"), &mut dateien);
+        collect_rs(&wurzel.join("src"), &mut dateien);
         let mut fehler = Vec::new();
         let mut gezaehlt: std::collections::BTreeMap<String, Vec<String>> = Default::default();
         for (pfad, quelle) in dateien {
             let produktiv = quelle.split("#[cfg(test)]").next().unwrap_or("");
-            for (zeile, literal) in literale(produktiv) {
-                for tabelle in ungefilterte_lesungen(&literal) {
+            for (zeile, literal) in literals(produktiv) {
+                for tabelle in find_unfiltered_reads(&literal) {
                     gezaehlt
                         .entry(pfad.clone())
                         .or_default()
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn waechter_erkennt_filter_primaerschluessel_und_luecke() {
-        let pruefe = |sql: &str| ungefilterte_lesungen(sql);
+        let pruefe = |sql: &str| find_unfiltered_reads(sql);
         assert_eq!(
             pruefe("SELECT id FROM einsatz_personal WHERE einsatz_id = ?"),
             ["einsatz_personal"]
@@ -179,18 +179,18 @@ mod tests {
             ["einsatz_einheit"]
         );
         let quelle = "let a = 'x'; let b = r#\"SELECT 1 FROM einsatz_einheit\"#; // \"FROM einsatz_personal\"\nlet c = \"a\\\"b\";";
-        let l = literale(quelle);
+        let l = literals(quelle);
         assert_eq!(l.len(), 2, "{l:?}");
         assert_eq!(l[0], (1, "SELECT 1 FROM einsatz_einheit".to_string()));
     }
 
     /// Tabellen, die `sql` per `FROM`/`JOIN` ohne Zustandsfilter und ohne Primärschlüssel liest.
-    fn ungefilterte_lesungen(sql: &str) -> Vec<&'static str> {
-        const TABELLEN: &[(&str, &str)] = &[
+    fn find_unfiltered_reads(sql: &str) -> Vec<&'static str> {
+        const TABLES: &[(&str, &str)] = &[
             ("einsatz_personal", "beendet_at"),
             ("einsatz_einheit", "aufgeloest_at"),
         ];
-        const KEIN_ALIAS: &[&str] = &[
+        const NO_ALIAS: &[&str] = &[
             "where",
             "on",
             "join",
@@ -221,7 +221,7 @@ mod tests {
             if tokens[i] != "from" && tokens[i] != "join" {
                 continue;
             }
-            let Some((tabelle, spalte)) = TABELLEN.iter().find(|(t, _)| tokens[i + 1] == *t) else {
+            let Some((tabelle, spalte)) = TABLES.iter().find(|(t, _)| tokens[i + 1] == *t) else {
                 continue;
             };
             let mut alias = tokens.get(i + 2).map(String::as_str);
@@ -230,7 +230,7 @@ mod tests {
             }
             let alias = match alias {
                 Some(a)
-                    if !KEIN_ALIAS.contains(&a)
+                    if !NO_ALIAS.contains(&a)
                         && a.chars().all(|c| c.is_alphanumeric() || c == '_') =>
                 {
                     a
@@ -266,7 +266,7 @@ mod tests {
 
     /// Stringliterale (normal und roh) einer Rust-Quelle mit Zeilennummer, Kommentare
     /// übersprungen. Fortsetzungszeilen (`\` am Zeilenende) und Leerraum sind zusammengezogen.
-    fn literale(quelle: &str) -> Vec<(usize, String)> {
+    fn literals(quelle: &str) -> Vec<(usize, String)> {
         let b = quelle.as_bytes();
         let mut aus = Vec::new();
         let mut i = 0;
@@ -320,7 +320,7 @@ mod tests {
                     let ende = quelle[start..]
                         .find(&schluss)
                         .map_or(b.len(), |e| start + e);
-                    aus.push((zeile, normalisiere(&quelle[start..ende])));
+                    aus.push((zeile, normalize(&quelle[start..ende])));
                     zeile += zaehle(i, ende);
                     i = (ende + schluss.len()).min(b.len());
                 }
@@ -331,7 +331,7 @@ mod tests {
                         j += if b[j] == b'\\' { 2 } else { 1 };
                     }
                     let ende = j.min(b.len());
-                    aus.push((zeile, normalisiere(&quelle[start..ende])));
+                    aus.push((zeile, normalize(&quelle[start..ende])));
                     zeile += zaehle(i, ende);
                     i = ende + 1;
                 }
@@ -341,18 +341,18 @@ mod tests {
         aus
     }
 
-    fn normalisiere(s: &str) -> String {
+    fn normalize(s: &str) -> String {
         s.replace("\\\n", " ")
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ")
     }
 
-    fn sammle(dir: &std::path::Path, funde: &mut Vec<(String, String)>) {
+    fn collect_rs(dir: &std::path::Path, funde: &mut Vec<(String, String)>) {
         for eintrag in std::fs::read_dir(dir).unwrap() {
             let pfad = eintrag.unwrap().path();
             if pfad.is_dir() {
-                sammle(&pfad, funde);
+                collect_rs(&pfad, funde);
             } else if pfad.extension().is_some_and(|e| e == "rs")
                 && pfad
                     .file_name()

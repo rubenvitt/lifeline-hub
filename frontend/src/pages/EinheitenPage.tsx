@@ -26,7 +26,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheitTypen } from '../api/einheitTypen';
-import { bildeEinheit, listeAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';
+import { bildeEinheit, listAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit } from '../api/types';
@@ -146,7 +146,7 @@ export default function EinheitenPage() {
   // Aktion.
   const aufgeloesteQuery = useQuery({
     queryKey: einsatzKeys.einheitenAufgeloeste(einsatzId),
-    queryFn: () => listeAufgeloesteEinheiten(einsatzId),
+    queryFn: () => listAufgeloesteEinheiten(einsatzId),
   });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 

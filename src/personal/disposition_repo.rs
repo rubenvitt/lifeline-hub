@@ -413,7 +413,7 @@ pub async fn update_tx(
     staerke_position: Option<Option<&str>>,
     bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
-    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
@@ -462,7 +462,7 @@ pub async fn update(
 /// Jeder Schreibweg an einer Kraft fragt zuerst hier (design.md D6): `NotFound`, wenn die Zeile
 /// nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie entlassen oder
 /// storniert ist. Nur das erneute Disponieren schreibt an einer beendeten Kraft.
-pub async fn fordere_aktiv_tx(
+pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
@@ -476,22 +476,22 @@ pub async fn fordere_aktiv_tx(
     .await?;
     match ende.ok_or(AppError::NotFound)? {
         None => Ok(()),
-        Some(als) => Err(beendet_konflikt(&als)),
+        Some(als) => Err(beendet_conflict(&als)),
     }
 }
 
 /// Der 409 an einer beendeten Kraft (Lebenszyklus), je Endzustand.
-pub fn beendet_konflikt(beendet_als: &str) -> AppError {
+pub fn beendet_conflict(beendet_als: &str) -> AppError {
     AppError::Conflict(match beendet_als {
         "storniert" => "Die Person ist storniert; erst erneut disponieren".into(),
         _ => "Die Person ist aus dem Einsatz entlassen; erst erneut disponieren".into(),
     })
 }
 
-/// Wie [`fordere_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
+/// Wie [`require_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
 /// selbst prüfen (mit eigenem Statuscode) oder nur einen Pool haben: eine unbekannte Kraft ist
-/// hier kein Fehler, eine beendete der 409 aus [`beendet_konflikt`] (design.md D6).
-pub async fn fordere_nicht_beendet(
+/// hier kein Fehler, eine beendete der 409 aus [`beendet_conflict`] (design.md D6).
+pub async fn require_nicht_beendet(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     ep_id: i64,
@@ -506,7 +506,7 @@ pub async fn fordere_nicht_beendet(
     .await?;
     match ende.flatten() {
         None => Ok(()),
-        Some(als) => Err(beendet_konflikt(&als)),
+        Some(als) => Err(beendet_conflict(&als)),
     }
 }
 
@@ -524,7 +524,7 @@ pub struct Entlassen {
 /// die Leitung eines Abschnitts, Stab und Einsatzleitung (Spec `einsatz-fuehrungsstelle`:
 /// „nicht mehr disponiert“). Auftragsempfänger, Schadensbezug und Bestätigungen bleiben. In die
 /// Zeitachse geht die Entlassung mit Quelle `disposition`, sofern eine Periode offen ist.
-/// `NotFound`/`Conflict` wie [`fordere_aktiv_tx`].
+/// `NotFound`/`Conflict` wie [`require_aktiv_tx`].
 pub async fn entlassen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -532,7 +532,7 @@ pub async fn entlassen_tx(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<Entlassen, AppError> {
-    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let einheit_name: Option<String> = sqlx::query_scalar(
         "SELECT e.name FROM einsatz_personal ep \
          JOIN einsatz_einheit e ON e.id = ep.einheit_id \
@@ -641,7 +641,7 @@ pub async fn stornieren_tx(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     if let Some(grund) = find_storno_hindernis_tx(conn, einsatz_id, ep_id, jetzt).await? {
         return Err(AppError::UnprocessableEntity(grund));
     }
@@ -765,7 +765,7 @@ async fn find_storno_hindernis_tx(
             return Ok(Some(format!("{grund}; die Person lässt sich entlassen")));
         }
     }
-    if !crate::entlassung::in_storno_frist(&disponiert_at, jetzt) {
+    if !crate::entlassung::is_in_storno_frist(&disponiert_at, jetzt) {
         return Ok(Some(crate::entlassung::storno_frist_text()));
     }
     Ok(None)

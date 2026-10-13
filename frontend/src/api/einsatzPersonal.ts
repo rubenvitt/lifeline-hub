@@ -37,7 +37,7 @@ export function aktualisiereDisposition(
 }
 
 /** Entlassene Kräfte des Einsatzes (LLH-1079, Block „Entlassen“); Stornierte liefert keine Liste. */
-export function listeEntlassenesPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
+export function listEntlassenesPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
   return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal?entlassene=1`);
 }
 

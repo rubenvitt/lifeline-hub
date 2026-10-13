@@ -7,7 +7,7 @@
 use lifeline_hub::auftrag::AuftragBearbeitungsstatus;
 use lifeline_hub::einheit::repo::kumuliere;
 use lifeline_hub::einsatz::zaehler::{
-    zaehle_auftraege, zaehle_kraefte, zaehle_meldungen, AuftragsMerkmale, AuftragsZaehler,
+    count_kraefte, zaehle_auftraege, zaehle_meldungen, AuftragsMerkmale, AuftragsZaehler,
     KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
 };
 use lifeline_hub::entlassung::BeendetAls;
@@ -167,7 +167,7 @@ fn kraefte_zaehlen_nur_aktive_wie_das_fixture() {
         .collect();
     let e = &k["erwartet"];
     assert_eq!(
-        zaehle_kraefte(&merkmale),
+        count_kraefte(&merkmale),
         KraefteZaehler {
             personal: zahl(&e["personal"]),
             staerke: staerke(&e["staerke"]),

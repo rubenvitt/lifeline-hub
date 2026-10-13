@@ -389,7 +389,7 @@ pub async fn anlegen(
         }
         // Eine entlassene oder stornierte Kraft wird nicht neu als geschädigt eingetragen (409,
         // LLH-1079); ein bestehender Eintrag bleibt Historie.
-        crate::personal::disposition_repo::fordere_nicht_beendet(&state.pool, einsatz_id, ep_id)
+        crate::personal::disposition_repo::require_nicht_beendet(&state.pool, einsatz_id, ep_id)
             .await?;
     }
 
@@ -602,7 +602,7 @@ pub async fn aktualisieren(
         .await?
         .flatten();
         if bisher != Some(ep_id) {
-            crate::personal::disposition_repo::fordere_nicht_beendet(
+            crate::personal::disposition_repo::require_nicht_beendet(
                 &state.pool,
                 einsatz_id,
                 ep_id,

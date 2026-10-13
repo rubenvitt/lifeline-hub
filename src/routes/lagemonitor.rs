@@ -9,7 +9,7 @@
 
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
-use crate::einsatz::zaehler::{zaehle_kraefte, KraefteZaehler, KraftMerkmale};
+use crate::einsatz::zaehler::{count_kraefte, KraefteZaehler, KraftMerkmale};
 use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
 use crate::staerke::{Staerke, StaerkePosition};
@@ -120,7 +120,7 @@ pub async fn lagebild(
     .await?;
     // Wie die Verdichtung der Kräfte-Seiten (`kraefte/kraeftebild.ts`, `verdichte`): jedes
     // aktive Personal, auch ohne Einheit; entlassene und stornierte zählen nicht (LLH-1079,
-    // Regel `zaehle_kraefte`, Fixture `regeln.json` Abschnitt `kraefte`).
+    // Regel `count_kraefte`, Fixture `regeln.json` Abschnitt `kraefte`).
     let zeilen: Vec<(Option<String>, bool)> = sqlx::query_as(
         "SELECT COALESCE(ep.staerke_position, p.staerke_position), ep.beendet_at IS NOT NULL \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
@@ -136,7 +136,7 @@ pub async fn lagebild(
             beendet,
         })
         .collect();
-    let KraefteZaehler { personal, staerke } = zaehle_kraefte(&merkmale);
+    let KraefteZaehler { personal, staerke } = count_kraefte(&merkmale);
 
     let zeilen: Vec<(
         i64,

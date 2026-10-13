@@ -851,7 +851,7 @@ pub async fn setze_fuehrer(
 /// Jeder Schreibweg an einer Einheit fragt zuerst hier (LLH-1079, design.md D6): `NotFound`,
 /// wenn sie nicht zum Einsatz gehört, `Conflict` (Lebenszyklus), wenn sie aufgelöst ist. Eine
 /// aufgelöste Einheit wird nicht wieder aktiv (design.md D5).
-pub async fn fordere_aktiv_tx(
+pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -952,7 +952,7 @@ pub struct Aufgeloest {
 /// verlassen. Mit Spur ([`find_spur_tx`]) bleibt die Zeile als aufgelöst stehen und bekommt die
 /// Entlassung in die Zeitachse (der Fan-out erreicht niemanden mehr); ohne Spur wird sie gelöscht.
 /// [`Aufloesung::Stornieren`] lehnt eine Spur mit 422 ab. `NotFound`/`Conflict` wie
-/// [`fordere_aktiv_tx`].
+/// [`require_aktiv_tx`].
 pub async fn aufloesen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -961,7 +961,7 @@ pub async fn aufloesen_tx(
     jetzt: &str,
     art: Aufloesung,
 ) -> Result<Aufgeloest, AppError> {
-    fordere_aktiv_tx(conn, einsatz_id, id).await?;
+    require_aktiv_tx(conn, einsatz_id, id).await?;
     let spur = find_spur_tx(conn, id).await?;
     if let (Aufloesung::Stornieren, Some(grund)) = (art, spur) {
         return Err(AppError::UnprocessableEntity(format!(
@@ -1955,7 +1955,7 @@ mod tests {
         r
     }
 
-    async fn gibt_es(pool: &SqlitePool, id: i64) -> bool {
+    async fn exists(pool: &SqlitePool, id: i64) -> bool {
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM einsatz_einheit WHERE id = ?)")
             .bind(id)
             .fetch_one(pool)
@@ -1975,7 +1975,7 @@ mod tests {
                 .unwrap();
             let r = aufloesen_als(&pool, einsatz, e.id, b, art).await.unwrap();
             assert!(r.geloescht, "{art:?}");
-            assert!(!gibt_es(&pool, e.id).await, "{art:?}");
+            assert!(!exists(&pool, e.id).await, "{art:?}");
         }
     }
 

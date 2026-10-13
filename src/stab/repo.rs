@@ -112,7 +112,7 @@ async fn snap_name_von(
         ))
     })?;
     // Eine entlassene oder stornierte Kraft besetzt nichts mehr (409, LLH-1079).
-    crate::personal::disposition_repo::fordere_nicht_beendet(&mut *conn, einsatz_id, personal_id)
+    crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, personal_id)
         .await?;
     Ok(name)
 }

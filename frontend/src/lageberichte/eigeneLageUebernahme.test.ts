@@ -5,7 +5,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
-import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { ladeStab } from '../api/stab';
 import { ladeFuehrungsstelle } from '../api/einsaetze';
 import type {
@@ -28,7 +28,7 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({
   listeEinsatzPersonal: vi.fn(),
-  listeEntlassenesPersonal: vi.fn(),
+  listEntlassenesPersonal: vi.fn(),
 }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
@@ -109,7 +109,7 @@ beforeEach(() => {
   vi.mocked(listeAbschnitte).mockReset().mockResolvedValue(ABSCHNITTE);
   vi.mocked(listeEinheiten).mockReset().mockResolvedValue(EINHEITEN);
   vi.mocked(listeEinsatzPersonal).mockReset().mockResolvedValue(PERSONAL);
-  vi.mocked(listeEntlassenesPersonal).mockReset().mockResolvedValue([]);
+  vi.mocked(listEntlassenesPersonal).mockReset().mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockReset().mockResolvedValue(FAHRZEUGE);
   vi.mocked(listeEinsatzMaterial).mockReset().mockResolvedValue([]);
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
@@ -156,14 +156,14 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
         beendet_als: 'entlassen',
       },
     ] as unknown as EinsatzPersonal[];
-    vi.mocked(listeEntlassenesPersonal).mockResolvedValue(weg);
+    vi.mocked(listEntlassenesPersonal).mockResolvedValue(weg);
     const text = await erzeuge();
     expect(text).toContain('## Entlassen\n\n- Bert Weg (Sanitäter)\n');
     expect(text.indexOf('## Entlassen')).toBeLessThan(text.indexOf('# Führungsorganisation'));
   });
 
   it('sagt „nicht geladen“, wenn die Entlassenen scheitern, und lässt das Meldebild stehen', async () => {
-    vi.mocked(listeEntlassenesPersonal).mockRejectedValue(new Error('500'));
+    vi.mocked(listEntlassenesPersonal).mockRejectedValue(new Error('500'));
     const text = await erzeuge();
     expect(text).toContain('Erika Muster');
     expect(text).toContain('## Entlassen\n\n— nicht geladen\n');
@@ -172,7 +172,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
   it('führt ein Kräftemeldebild ohne Personal-Freigabe als „—“ mit Grund, nie als 0', async () => {
     const text = await erzeuge(freigabenFixture({ personal: { zugriff: false } }));
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
-    expect(listeEntlassenesPersonal).not.toHaveBeenCalled();
+    expect(listEntlassenesPersonal).not.toHaveBeenCalled();
     expect(text).toBe(`# Kräftemeldebild\n\n— nicht freigegeben (Personal)\n\n${ORG()}`);
   });
 

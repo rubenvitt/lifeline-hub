@@ -10,7 +10,7 @@ use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, pflicht, pruefe_koordinate, schalter, trimme,
+    deserialize_optional_field, parse_enum, parse_flag, pflicht, pruefe_koordinate, trimme,
     trimme_tri,
 };
 use crate::staerke::StaerkePosition;
@@ -55,7 +55,7 @@ pub async fn liste(
     let einsatz_id = ctx.einsatz.id;
     let aktiv = ctx.einsatz.ist_aktiv();
     Ok(Json(
-        if schalter(params.entlassene.as_deref(), "entlassene")? {
+        if parse_flag(params.entlassene.as_deref(), "entlassene")? {
             disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
         } else {
             disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
@@ -291,7 +291,7 @@ pub async fn entlassen(
     // Tx. Was die Person außerhalb des Personalmoduls trug, fragt die Tx vor dem Lösen; SSE erst
     // nach dem Commit.
     let (betroffen, anzeige) = crate::write_retry!(&state.pool, |conn| {
-        disposition_repo::fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let betroffen = EntlassenBetroffen {
             einsatzleiter: crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(
@@ -329,7 +329,7 @@ pub async fn entlassen(
         Ok((betroffen, anzeige))
     })?;
     sse_personal(&state, einsatz_id, ep_id);
-    melde_betroffene(&state, einsatz_id, &betroffen).await;
+    notify_betroffene(&state, einsatz_id, &betroffen).await;
     Ok(Json(anzeige))
 }
 
@@ -345,7 +345,7 @@ pub async fn stornieren(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     crate::write_retry!(&state.pool, |conn| {
-        disposition_repo::fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, ep_id, ctx.benutzer.id, &jetzt).await?;
         crate::etb::system_audit_tx(
@@ -407,7 +407,7 @@ pub async fn reaktivieren(
 /// LFH-1106). Ebenso tragen Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person
 /// (LLH-1178), die UHS ihre Stärke (LLH-1182) und ein Fahrzeug seine Besatzung. Schadensbezug,
 /// Auftrag und Bestätigungen bleiben unverändert und melden nichts.
-async fn melde_betroffene(state: &AppState, einsatz_id: i64, betroffen: &EntlassenBetroffen) {
+async fn notify_betroffene(state: &AppState, einsatz_id: i64, betroffen: &EntlassenBetroffen) {
     if betroffen.einsatzleiter {
         crate::routes::einsatz::kopf_geaendert(state, einsatz_id).await;
     }
@@ -463,7 +463,7 @@ pub async fn position(
     // Eine beendete Kraft ist nicht mehr verortbar (409, LLH-1079); fremd → 404.
     {
         let mut conn = state.pool.acquire().await?;
-        disposition_repo::fordere_aktiv_tx(&mut conn, einsatz_id, ep_id).await?;
+        disposition_repo::require_aktiv_tx(&mut conn, einsatz_id, ep_id).await?;
     }
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon.
     let vorher: (Option<f64>, Option<f64>) =

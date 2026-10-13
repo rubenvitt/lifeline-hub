@@ -403,7 +403,7 @@ pub fn pruefe_kommunikationsmittel(wert: Option<&str>) -> Result<(), AppError> {
 
 /// Schalter aus der Query (`?entlassene=1`): fehlt, leer, `0` oder `false` = aus, `1` oder
 /// `true` = an, alles andere 400 mit dem Namen (LLH-1079).
-pub fn schalter(wert: Option<&str>, name: &str) -> Result<bool, AppError> {
+pub fn parse_flag(wert: Option<&str>, name: &str) -> Result<bool, AppError> {
     match wert.map(str::trim) {
         None | Some("") | Some("0") | Some("false") => Ok(false),
         Some("1") | Some("true") => Ok(true),

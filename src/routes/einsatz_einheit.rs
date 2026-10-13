@@ -12,8 +12,8 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, pruefe_koordinate, schalter,
-    trimme, trimme_tri,
+    deserialize_optional_field, parse_flag, pflicht, pruefe_kommunikationsmittel,
+    pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::Staerke;
 use axum::extract::{Query, State};
@@ -30,7 +30,7 @@ pub(super) fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
 
 /// Lädt nur den Einheiten-Namen (für ETB-Texte) einer aktiven Einheit; `NotFound`, falls nicht
 /// zum Einsatz, `Conflict`, falls aufgelöst (LLH-1079, jeder Schreibweg fragt hier oder über
-/// [`einheit_repo::fordere_aktiv_tx`]).
+/// [`einheit_repo::require_aktiv_tx`]).
 async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<String, AppError> {
     let (name, aufgeloest) = sqlx::query_as::<_, (String, Option<String>)>(
         "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
@@ -47,9 +47,9 @@ async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<Str
 }
 
 /// Schreibwege ohne eigene Transaktion fragen vorab, ob die Einheit aktiv ist (LLH-1079).
-async fn fordere_aktiv(state: &AppState, einsatz_id: i64, eid: i64) -> Result<(), AppError> {
+async fn require_aktiv(state: &AppState, einsatz_id: i64, eid: i64) -> Result<(), AppError> {
     let mut conn = state.pool.acquire().await?;
-    einheit_repo::fordere_aktiv_tx(&mut conn, einsatz_id, eid).await
+    einheit_repo::require_aktiv_tx(&mut conn, einsatz_id, eid).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,7 +67,7 @@ pub async fn liste(
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<EinheitAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let mut liste = if schalter(params.aufgeloeste.as_deref(), "aufgeloeste")? {
+    let mut liste = if parse_flag(params.aufgeloeste.as_deref(), "aufgeloeste")? {
         einheit_repo::list_aufgeloeste(&state.pool, einsatz_id).await?
     } else {
         einheit_repo::liste(&state.pool, einsatz_id).await?
@@ -228,7 +228,7 @@ pub async fn aktualisieren(
         None => None,
     };
 
-    fordere_aktiv(&state, einsatz_id, eid).await?;
+    require_aktiv(&state, einsatz_id, eid).await?;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
     // Das Soll-Trio trägt die Mehrspalten-Invariante „alle drei oder keiner" und wird
     // deshalb gegen den EFFEKTIVZUSTAND geprüft (Patch gewinnt, sonst Bestand) — sonst
@@ -341,7 +341,7 @@ pub async fn sprechgruppe_zuordnen(
     PfadParam((_eid, eid, sg)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    fordere_aktiv(&state, einsatz_id, eid).await?;
+    require_aktiv(&state, einsatz_id, eid).await?;
     let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Einheit(eid);
     if crate::sprechgruppe::repo::einzeln_zuordnen(
         &state.pool,
@@ -379,7 +379,7 @@ pub async fn aufloesen(
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    beende(&state, &ctx, eid, einheit_repo::Aufloesung::Aufloesen).await
+    end_einheit(&state, &ctx, eid, einheit_repo::Aufloesung::Aufloesen).await
 }
 
 /// POST /api/einsaetze/{id}/einheiten/{eid}/stornieren — Fehlanlage löschen (LLH-1079,
@@ -389,11 +389,11 @@ pub async fn stornieren(
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    beende(&state, &ctx, eid, einheit_repo::Aufloesung::Stornieren).await
+    end_einheit(&state, &ctx, eid, einheit_repo::Aufloesung::Stornieren).await
 }
 
 /// Auflösen und Stornieren teilen Ablauf und Meldeweg.
-async fn beende(
+async fn end_einheit(
     state: &AppState,
     ctx: &EinsatzSchreibzugriff<Einheiten>,
     eid: i64,
@@ -415,14 +415,14 @@ async fn beende(
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(ergebnis)
     })?;
-    melde_aufgeloest(state, einsatz_id, eid, &ergebnis);
+    notify_aufgeloest(state, einsatz_id, eid, &ergebnis);
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Nach dem Commit des Auflösens: die Einheit selbst (auch ihre Zeitachse), ihre Unter-Einheiten,
 /// jede gelöste Kraft, die Ablösung und ein verlassener Bereitstellungsraum (LLH-1189-Meldeweg,
 /// design.md „Schnittstellen“).
-fn melde_aufgeloest(
+fn notify_aufgeloest(
     state: &AppState,
     einsatz_id: i64,
     eid: i64,
@@ -642,7 +642,7 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    fordere_aktiv(&state, einsatz_id, einheit_id).await?; // 404 falls fremd, 409 aufgelöst
+    require_aktiv(&state, einsatz_id, einheit_id).await?; // 404 falls fremd, 409 aufgelöst
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?;
     let eff_lat = body.lat.unwrap_or(vorher.lat);
     let eff_lon = body.lon.unwrap_or(vorher.lon);
@@ -687,7 +687,7 @@ pub async fn status_setzen(
     let status_id = body
         .status_id
         .ok_or_else(|| AppError::Validation("status_id fehlt".into()))?;
-    fordere_aktiv(&state, einsatz_id, eid).await?;
+    require_aktiv(&state, einsatz_id, eid).await?;
     if let Some(sid) = status_id {
         if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {
             return Err(AppError::Validation("Unbekannter Status".into()));

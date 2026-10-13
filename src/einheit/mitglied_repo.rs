@@ -40,7 +40,7 @@ pub async fn ordne_personal_zu_tx(
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
     // Eine entlassene oder stornierte Kraft wird keinem Verband mehr zugeordnet (409, LLH-1079).
-    crate::personal::disposition_repo::fordere_nicht_beendet(&mut *conn, einsatz_id, ep_id).await?;
+    crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, ep_id).await?;
 
     // Stale Führer-Verweis bereinigen (Person war evtl. anderswo Führer).
     sqlx::query(

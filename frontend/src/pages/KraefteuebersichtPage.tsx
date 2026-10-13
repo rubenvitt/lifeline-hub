@@ -14,7 +14,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
-import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -69,7 +69,7 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
-import { zuEntlassenen } from '../kraefte/entlassene';
+import { toEntlassene } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -671,7 +671,7 @@ export default function KraefteuebersichtPage() {
   // der Abruf, fehlt am Schirm nur der Block; der Lagebericht sagt „nicht geladen“.
   const entlasseneQuery = useQuery({
     queryKey: einsatzKeys.personalEntlassene(einsatzId),
-    queryFn: () => listeEntlassenesPersonal(einsatzId),
+    queryFn: () => listEntlassenesPersonal(einsatzId),
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
@@ -912,7 +912,7 @@ export default function KraefteuebersichtPage() {
       const entlassene = gefiltert
         ? []
         : entlasseneQuery.data
-          ? zuEntlassenen(entlasseneQuery.data)
+          ? toEntlassene(entlasseneQuery.data)
           : null;
       const md = rendereMeldebildMarkdown(bild, stand, entlassene);
       // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das

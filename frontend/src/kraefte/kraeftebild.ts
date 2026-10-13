@@ -10,7 +10,7 @@ import type {
   MaterialStatus,
 } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
-import { rendereEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
+import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -509,7 +509,7 @@ export function rendereMeldebildMarkdown(
       zeilen.push('');
     }
   }
-  zeilen.push(...rendereEntlasseneMarkdown(entlassene));
+  zeilen.push(...renderEntlasseneMarkdown(entlassene));
 
   return zeilen.join('\n');
 }

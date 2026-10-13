@@ -11,7 +11,7 @@ export interface EntlasseneKraft {
 }
 
 /** Die entlassenen Kräfte einer Liste; stornierte erscheinen in keinem Nachweis. */
-export function zuEntlassenen(personal: readonly EinsatzPersonal[]): EntlasseneKraft[] {
+export function toEntlassene(personal: readonly EinsatzPersonal[]): EntlasseneKraft[] {
   return personal
     .filter((ep) => ep.beendet_als === 'entlassen')
     .map((ep) => ({ name: ep.name, funktion: ep.funktion }));
@@ -21,7 +21,7 @@ export function zuEntlassenen(personal: readonly EinsatzPersonal[]): EntlasseneK
  * Markdown-Block „Entlassen“ unter dem Meldebild: leer ohne Entlassene, „— nicht geladen“, wenn
  * die Liste fehlt (`null`), damit ein gescheiterter Abruf nicht wie „niemand entlassen“ aussieht.
  */
-export function rendereEntlasseneMarkdown(entlassene: readonly EntlasseneKraft[] | null): string[] {
+export function renderEntlasseneMarkdown(entlassene: readonly EntlasseneKraft[] | null): string[] {
   if (entlassene === null) return ['## Entlassen', '', '— nicht geladen', ''];
   if (entlassene.length === 0) return [];
   return [

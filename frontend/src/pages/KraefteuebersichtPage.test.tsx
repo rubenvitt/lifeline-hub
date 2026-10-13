@@ -16,7 +16,7 @@ import { Routes, Route } from 'react-router';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
-import { listeEinsatzPersonal, listeEntlassenesPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -43,7 +43,7 @@ vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: v
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({
   listeEinsatzPersonal: vi.fn(),
-  listeEntlassenesPersonal: vi.fn(),
+  listEntlassenesPersonal: vi.fn(),
 }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
@@ -214,7 +214,7 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeEinheiten).mockResolvedValue([]);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
-  vi.mocked(listeEntlassenesPersonal).mockResolvedValue([]);
+  vi.mocked(listEntlassenesPersonal).mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
   vi.mocked(listeEinsatzMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
@@ -919,7 +919,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
 
   it('führt Entlassene als Block unter dem Raster und im Lagebericht (LLH-1079)', async () => {
     vi.mocked(legeLageberichtAn).mockClear();
-    vi.mocked(listeEntlassenesPersonal).mockResolvedValue([
+    vi.mocked(listEntlassenesPersonal).mockResolvedValue([
       {
         id: 7,
         einsatz_id: 1,
