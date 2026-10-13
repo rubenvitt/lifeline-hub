@@ -16,7 +16,8 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einheiten`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   gliederung.png      frontend/src/pages/EinheitenPage.tsx (Paneel „Gliederung“)
+ *   gliederung.png      frontend/src/pages/EinheitenPage.tsx (Tabelle „Gliederung“,
+ *                       frontend/src/kraefte/KraeftebaumZelle.tsx, components/Datensicht.tsx)
  *   einheit-bilden.png  frontend/src/pages/EinheitenPage.tsx (Dialog „Einheit bilden“)
  *   personal.png        frontend/src/pages/EinheitDetailPage.tsx (Paneel „Personal“)
  *
@@ -69,9 +70,10 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einheiten`);
-    const paneel = page.getByRole('region', { name: 'Gliederung' });
-    await expect(paneel.getByRole('link', { name: 'Rettungsstaffel' })).toBeVisible();
-    await fotografiere(paneel, KAPITEL, 'gliederung');
+    const tabelle = page.getByRole('region', { name: 'Gliederung' });
+    await expect(tabelle.getByRole('link', { name: 'Rettungsstaffel' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(tabelle, KAPITEL, 'gliederung');
   });
 
   test('Dialog „Einheit bilden“', async ({ page }) => {
