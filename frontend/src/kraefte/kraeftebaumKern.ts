@@ -275,7 +275,8 @@ export interface MittelListen {
   material: readonly EinsatzMaterial[];
 }
 
-const KOLLATOR = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
+/** Namen und Funkrufnamen natürlich sortiert („RTW 2“ vor „RTW 10“); eine Stelle für alle Kräfte-Listen. */
+export const COLLATOR = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
 
 const POSITION_RANG: Record<StaerkePosition, number> = {
   fuehrer: 1,
@@ -287,7 +288,7 @@ const POSITION_RANG: Record<StaerkePosition, number> = {
 function comparePersonen(a: PersonImBaum, b: PersonImBaum): number {
   const rang = (x: PersonImBaum) =>
     x.isFuehrer ? 0 : x.person.staerke_position ? POSITION_RANG[x.person.staerke_position] : 4;
-  return rang(a) - rang(b) || KOLLATOR.compare(a.person.name, b.person.name);
+  return rang(a) - rang(b) || COLLATOR.compare(a.person.name, b.person.name);
 }
 
 // ── Texte ─────────────────────────────────────────────────────────────────────
@@ -367,7 +368,7 @@ function sortMittel(
     id != null && einheitName.has(id) ? id : null;
 
   const fahrzeuge = [...eigene.fahrzeuge]
-    .sort((a, b) => KOLLATOR.compare(a.funkrufname, b.funkrufname))
+    .sort((a, b) => COLLATOR.compare(a.funkrufname, b.funkrufname))
     .map((f): FahrzeugImBaum => {
       const alle = quelle.personal.filter((ep) => ep.fahrzeug_id === f.id);
       const ist = besatzungsStaerke(alle);
