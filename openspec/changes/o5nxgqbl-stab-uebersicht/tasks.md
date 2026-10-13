@@ -34,7 +34,7 @@ Code). Frontend-Gates aus `frontend/` über `mise exec -- pnpm …` (ohne mise: 
 
 - [x] 5.1 `frontend/src/stab/AGENTS.md`: neuer Abschnitt „Stab-Seite“ (Kachel = Paneel, Werkzeuge aus `sachgebiete.ts` ohne Grenze, eine Sperrlogik über `werkzeugZustand`, Zahl nur über `werkzeugZahlen.ts` aus einer Heimat, Lückenzahl nur über `lueckenAnzahl`), Abschnitt „Checkliste Arbeitsaufnahme“ um das Einklappen ergänzt; `pnpm format:check` grün
 - [x] 5.2 `docs/anwender/kapitel/stab.md`: „Die Zeilen der Besetzung“ → „Die Kacheln“ mit vollem Aufgabentext je Sachgebiet, Zahlen je Werkzeug und Sperre, Abschnitt Checkliste um Einklappen; `quellen:` um neue Dateien ergänzt; `docs/anwender/kapitel/funkplan.md` um die Zahl im Kopf der Lücken; `src/hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 5.3 Bildlauf `e2e/doku-bilder/stab.bilder.ts`: neues Bild `uebersicht.png` (Seite mit Daten), Selektoren auf die Kacheln umgestellt; `mise exec -- pnpm doku:bilder --grep stab` erzeugt hell und dunkel, Bilder ≤ 300 KB committet, Kapitel bindet `uebersicht.png` ein
+- [x] 5.3 Bildlauf `e2e/doku-bilder/stab.bilder.ts`: neues Bild `uebersicht.png` (Seite mit Daten), Selektoren auf die Kacheln umgestellt; `mise exec -- pnpm doku:bilder --grep stab` erzeugt hell und dunkel, Bilder ≤ 300 KB committet, Kapitel bindet `uebersicht.png` ein
 - [x] 5.4 Zunder: Kommentar an LLH-722 (Feldbefund: Gestaltung, kein Ausbau) und Nachzug „Lagemeldungen mit Status und Zähler“ (angelegt als LLH-1206)
 
 ## 6. e2e und Prüfliste
