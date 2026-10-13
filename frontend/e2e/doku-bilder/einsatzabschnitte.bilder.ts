@@ -1,7 +1,6 @@
 import {
   anmelden,
   demoEinsatz,
-  einsatzleiterFuellen,
   expect,
   fotografiere,
   fuehrungsstelleOrtFuellen,
@@ -80,9 +79,9 @@ test.describe(KAPITEL, () => {
   test('Organigramm der Führungsorganisation', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    // Die Wurzel nennt die eigene Führungsstelle (LFH-1181) und den Einsatzleiter (LFH-1199).
+    // Die Wurzel nennt die eigene Führungsstelle (LFH-1181) und den Einsatzleiter (LFH-1199,
+    // aus dem Demo-Import, LLH-1169).
     await fuehrungsstelleOrtFuellen(page, demo.id);
-    await einsatzleiterFuellen(page.request, demo);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte?ansicht=organigramm`);
     const organigramm = page.locator('.organigramm-print-root');

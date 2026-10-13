@@ -899,6 +899,9 @@ export const GLOBAL_KEYS = {
   sprechgruppen: 'sprechgruppen',
   qualifikationen: 'qualifikationen',
   einheitTypen: 'einheit-typen',
+  // Katalog „Einheiten-Vorlagen“ (LLH-1042). Nicht im Lagebild: im Einsatz gebildet wird nur
+  // mit Netz (LLH-1049), und die Verwaltung arbeitet ohnehin online.
+  einheitVorlagen: 'einheit-vorlagen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
   // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
@@ -1024,6 +1027,12 @@ export const globalKeys = {
    */
   externeStellen: () => [GLOBAL_KEYS.externeStellen] as const,
   externeStellenListe: (umfang: 'aktiv' | 'alle') => [GLOBAL_KEYS.externeStellen, umfang] as const,
+  /**
+   * Einheiten-Vorlagen (LLH-1042): `'alle'` für die Verwaltung, `'aktiv'` für das Bilden im
+   * Einsatz (LLH-1049). Der argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.
+   */
+  einheitVorlagen: () => [GLOBAL_KEYS.einheitVorlagen] as const,
+  einheitVorlagenListe: (scope: 'aktiv' | 'alle') => [GLOBAL_KEYS.einheitVorlagen, scope] as const,
 
   /**
    * Präferenzen EINES Benutzers. Der Server-Slot ist pro Benutzer, sein Cache-Fach muss es auch
@@ -1083,6 +1092,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.sprechgruppen,
     GLOBAL_KEYS.qualifikationen,
     GLOBAL_KEYS.einheitTypen,
+    GLOBAL_KEYS.einheitVorlagen,
     GLOBAL_KEYS.etbBausteine,
     GLOBAL_KEYS.stichwortVorschlaege,
     GLOBAL_KEYS.externeStellen,

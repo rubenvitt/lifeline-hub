@@ -33,6 +33,7 @@ import GeraetMeldenPage from './geraet/GeraetMeldenPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
+import EinheitVorlageDetailPage from './stammdaten/EinheitVorlageDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
@@ -345,6 +346,7 @@ export const appRouten = createRoutesFromElements(
                und neben der `adminGruppen`-Schleife, weil die Registry keine Detailadressen führt. */}
             <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
             <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
+            <Route path="stammdaten/einheiten/:vorlageId" element={<EinheitVorlageDetailPage />} />
           </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}

@@ -1663,6 +1663,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/qualifikationen/{id}/deaktivieren",
             post(routes::qualifikation::deaktivieren),
         )
+        // Einheiten-Vorlagen (LLH-1042): Lesen für alle der Org, Schreiben Admin.
+        .route(
+            "/api/einheit-vorlagen",
+            get(routes::einheit_vorlage::list).post(routes::einheit_vorlage::create),
+        )
+        .route(
+            "/api/einheit-vorlagen/{id}",
+            patch(routes::einheit_vorlage::update),
+        )
+        .route(
+            "/api/einheit-vorlagen/{id}/fahrzeuge",
+            put(routes::einheit_vorlage::replace_fahrzeuge),
+        )
+        .route(
+            "/api/einheit-vorlagen/{id}/personal",
+            put(routes::einheit_vorlage::replace_personal),
+        )
         .route("/api/einheit-typen", get(routes::einheit_typ::liste))
         .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))
         .route(

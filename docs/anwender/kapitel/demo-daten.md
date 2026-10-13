@@ -10,7 +10,7 @@ quellen: [frontend/src/admin/DemoDatenPage.tsx, frontend/src/admin/adminNav.tsx,
 Demo-Daten sind eine fertig befüllte Übungslage: ein Einsatz „ÜBUNG – Starkregen Musterstadt“
 mit Abschnitten, Einheiten, Fahrzeugen, Betroffenen, Betreuung, Meldungen, Aufträgen,
 Lagebericht und Einsatztagebuch, dazu die Fahrzeuge, das Personal und das Material, die er
-braucht. Sie eignen sich zum Kennenlernen, für Schulungen und für Vorführungen. Ein System-Admin
+braucht, und eine Einheiten-Vorlage. Sie eignen sich zum Kennenlernen, für Schulungen und für Vorführungen. Ein System-Admin
 spielt sie ein, entfernt sie wieder oder setzt sie auf den Anfangsstand zurück.
 
 Die Seite „Demo-Daten“ gibt es nur, wenn der Server mit eingeschalteten Demo-Daten gestartet
@@ -42,20 +42,26 @@ ist weg.
 
    ![Rückfrage „Demo-Daten entfernen?“ mit dem Knopf „Endgültig entfernen“](../bilder/demo-daten/entfernen.png)
 
-Das Paneel „Letzter Vorgang“ zählt danach je Fahrzeuge, Personal und Material, was entfernt und
-was behalten wurde.
+Das Paneel „Letzter Vorgang“ zählt danach je Fahrzeuge, Personal, Material und
+Einheiten-Vorlagen, was entfernt und was behalten wurde.
 
 ## Hintergrund
 
 ### Was der Import anlegt
 
 - Genau einen Einsatz der Einsatzart Übung, mit fiktivem Ort und erkennbar erfundenen Namen. Der
-  importierende System-Admin ist seine Einsatzleitung; sonst ist niemand Mitglied.
+  importierende System-Admin ist seine Einsatzleitung; sonst ist niemand Mitglied. Als
+  Einsatzleiter der eigenen Führungsstelle steht der Zugführer der Übungslage, mit dem Eintrag
+  „Einsatzleitung übernommen“ im Einsatztagebuch.
 - Alle Zeiten liegen kurz vor dem Import: der Einsatz läuft seit einigen Stunden, der jüngste
   Eintrag ist wenige Minuten alt. Beim Import entsteht kein Alarm.
 - Fahrzeuge, Personal und Material. Gibt es in der Organisation schon einen Datensatz im Dienst
   mit derselben Kennung (Funkrufname, Personalnummer, Bestandsnummer), benutzt der Import ihn
   mit und lässt ihn unverändert. „Letzter Vorgang“ zählt das als „mitbenutzt“.
+- Die Einheiten-Vorlage „Sanitätszug Musterstadt“ mit der Untereinheit „Rettungsstaffel“, beide
+  mit Demo-Fahrzeugen und Stammbesetzung. Gibt es schon eine aktive Vorlage mit demselben Namen,
+  benutzt der Import sie unverändert mit. Ist der Sanitätszug mitbenutzt, steht eine neu
+  angelegte Rettungsstaffel ohne Unterstellung.
 - **Keine** Benutzerkonten. Kataloge wie Status, Einheitstypen und Qualifikationen benutzt der
   Import nur mit; fehlt ein benötigter Eintrag, bricht er mit einer Meldung ab.
 
@@ -72,6 +78,9 @@ Einsatzes. So bleibt erkennbar, was zur Übungslage gehört.
   die Demo-Stammdaten. Ein Demo-Datensatz, den inzwischen etwas anderes nutzt, etwa ein
   echter Einsatz, bleibt stehen und verliert seine Marke („behalten“). Mitbenutzte Datensätze
   rührt das Entfernen nicht an.
+- Demo-Vorlagen fallen vor den Demo-Fahrzeugen und dem Demo-Personal. Eine Demo-Vorlage, unter
+  der eine eigene Vorlage steht oder die unter einer eigenen Vorlage steht, bleibt als
+  „behalten“ stehen, mit ihren Fahrzeugen und ihrer Stammbesetzung.
 - **Neu importieren** entfernt und importiert in einem Zug. Scheitert der Import, bleibt der
   bisherige Demo-Stand erhalten.
 - Die Adresse eines entfernten Demo-Einsatzes führt nie zu einem anderen Einsatz: seine

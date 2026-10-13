@@ -26,6 +26,7 @@ import {
 } from './funkplan-kern';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { wechsleZuRolle } from './rollen-kern';
+import { doppelteSchluesselVerbieten } from './react-schluessel-kern';
 
 /**
  * Funkplan S6 (LFH-548): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein Layout,
@@ -51,6 +52,8 @@ import { wechsleZuRolle } from './rollen-kern';
  *
  * Mutationsprobe (LFH-977): mit dem `Datensicht` von vor LFH-977 wird der Einzug rot.
  */
+
+doppelteSchluesselVerbieten();
 
 const HANDSCHIRM = { width: 390, height: 844 };
 

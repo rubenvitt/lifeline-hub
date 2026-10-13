@@ -5872,4 +5872,204 @@ mod tests {
                 .unwrap();
         assert_eq!(aufgeloest, None);
     }
+
+    // --- LLH-1042: Einheiten-Vorlagen (0190) ---
+
+    /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem
+    /// Stand vor 0190.
+    async fn bild_vor_0190(pool: &SqlitePool) {
+        sqlx::raw_sql(
+            "INSERT INTO organisation (id, name) VALUES (1, 'Orga'); \
+             INSERT INTO einheit_typ (id, org_id, label) VALUES (1, 1, 'Zug'); \
+             INSERT INTO fahrzeug (id, org_id, funkrufname) VALUES (1, 1, 'F 1'), (2, 1, 'F 2'); \
+             INSERT INTO personal (id, org_id, name) VALUES (1, 1, 'Erika'); \
+             INSERT INTO demo_import (id, org_id, einsatz_id, bericht) VALUES (5, 1, 9, '{}'); \
+             INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) \
+                 VALUES (5, 'fahrzeug', 2), (5, 'personal', 1);",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// `demo_herkunft` wird für die vierte Art neu gebaut: Zeilen, Spalten, Schlüssel und die
+    /// Kaskade an `demo_import` bleiben, nur der CHECK kennt `einheit_vorlage` dazu.
+    #[tokio::test]
+    async fn migration_0190_baut_demo_herkunft_mit_vierter_art_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 189).await;
+        bild_vor_0190(&pool).await;
+        let alle = "SELECT import_id, tabelle, datensatz_id FROM demo_herkunft \
+                    ORDER BY tabelle, datensatz_id";
+        let vorher: Vec<(i64, String, i64)> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        let schema_vorher = schema_von(&pool, "demo_herkunft").await;
+        let ddl_vorher = ddl_ohne_namen(&pool, "demo_herkunft").await;
+
+        migriere_bis(&pool, 190).await;
+
+        let nachher: Vec<(i64, String, i64)> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(nachher, vorher, "jede Marke übersteht den Neubau");
+        assert_eq!(schema_von(&pool, "demo_herkunft").await, schema_vorher);
+        assert_eq!(
+            ddl_ohne_namen(&pool, "demo_herkunft")
+                .await
+                .replacen(", 'einheit_vorlage'", "", 1),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im tabelle-CHECK"
+        );
+        sqlx::query(
+            "INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) \
+             VALUES (5, 'einheit_vorlage', 1)",
+        )
+        .execute(&pool)
+        .await
+        .expect("der neue CHECK nimmt einheit_vorlage");
+        assert!(sqlx::query(
+            "INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (5, 'foo', 1)"
+        )
+        .execute(&pool)
+        .await
+        .is_err());
+        sqlx::query("DELETE FROM demo_import WHERE id = 5")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM demo_herkunft")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "die Marken hängen weiter per Kaskade am Kopf");
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'demo_herkunft_neu'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
+    /// Die drei Vorlagen-Tabellen: Name eindeutig nur unter aktiven Vorlagen, Soll alle drei
+    /// oder keiner, Position nur aus dem Bestand; die Kindtabellen kaskadieren an der Vorlage,
+    /// jeder andere Verweis hält fest (NO ACTION).
+    #[tokio::test]
+    async fn migration_0190_legt_vorlagen_mit_ihren_regeln_an() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 189).await;
+        bild_vor_0190(&pool).await;
+        migriere_bis(&pool, 190).await;
+
+        let vorlage = |name: &'static str, ueber: Option<i64>| {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO einheit_vorlage (org_id, name, typ_id, ueber_vorlage_id) \
+                 VALUES (1, ?, 1, ?) RETURNING id",
+            )
+            .bind(name)
+            .bind(ueber)
+        };
+        let zug = vorlage("Zug", None).fetch_one(&pool).await.unwrap();
+        let staffel = vorlage("Staffel", Some(zug))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(
+            vorlage("Zug", None).fetch_one(&pool).await.is_err(),
+            "zwei aktive Vorlagen gleichen Namens"
+        );
+        sqlx::query("UPDATE einheit_vorlage SET aktiv = 0 WHERE id = ?")
+            .bind(zug)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let zweiter = vorlage("Zug", None)
+            .fetch_one(&pool)
+            .await
+            .expect("eine deaktivierte Vorlage gibt ihren Namen frei");
+        assert!(
+            sqlx::query("UPDATE einheit_vorlage SET aktiv = 1 WHERE id = ?")
+                .bind(zug)
+                .execute(&pool)
+                .await
+                .is_err()
+        );
+
+        assert!(
+            sqlx::query("UPDATE einheit_vorlage SET soll_fuehrer = 1 WHERE id = ?")
+                .bind(staffel)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "ein halbes Soll verletzt den CHECK"
+        );
+        sqlx::query(
+            "UPDATE einheit_vorlage \
+             SET soll_fuehrer = 0, soll_unterfuehrer = 1, soll_mannschaft = 5 WHERE id = ?",
+        )
+        .bind(staffel)
+        .execute(&pool)
+        .await
+        .expect("ein volles Soll");
+
+        sqlx::query(
+            "INSERT INTO einheit_vorlage_fahrzeug (vorlage_id, fahrzeug_id) VALUES (?, 1), (?, 2)",
+        )
+        .bind(staffel)
+        .bind(zweiter)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einheit_vorlage_personal \
+                (vorlage_id, personal_id, fahrzeug_id, staerke_position) \
+             VALUES (?, 1, 1, 'unterfuehrer')",
+        )
+        .bind(staffel)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            sqlx::query(
+                "INSERT INTO einheit_vorlage_personal (vorlage_id, personal_id, staerke_position) \
+                 VALUES (?, 1, 'f')",
+            )
+            .bind(zweiter)
+            .execute(&pool)
+            .await
+            .is_err(),
+            "nur die Positionen des Bestands"
+        );
+
+        for (sql, was) in [
+            (
+                "DELETE FROM fahrzeug WHERE id = 1",
+                "Fahrzeug einer Vorlage",
+            ),
+            (
+                "DELETE FROM personal WHERE id = 1",
+                "Person einer Stammbesetzung",
+            ),
+            (
+                "DELETE FROM einheit_vorlage WHERE id = 1",
+                "Vorlage mit Untereinheit",
+            ),
+        ] {
+            let fehler = sqlx::query(sql).execute(&pool).await.expect_err(was);
+            assert!(
+                matches!(&fehler, sqlx::Error::Database(e) if e.is_foreign_key_violation()),
+                "{was}: {fehler:?}"
+            );
+        }
+
+        sqlx::query("DELETE FROM einheit_vorlage WHERE id = ?")
+            .bind(staffel)
+            .execute(&pool)
+            .await
+            .expect("die Untereinheit fällt samt Kindzeilen");
+        let kinder: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM einheit_vorlage_fahrzeug WHERE vorlage_id = ?1) \
+                  + (SELECT COUNT(*) FROM einheit_vorlage_personal WHERE vorlage_id = ?1)",
+        )
+        .bind(staffel)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(kinder, 0, "Kindzeilen kaskadieren an der Vorlage");
+    }
 }

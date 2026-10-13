@@ -30,3 +30,13 @@ export function fahrzeugListePfad(): string {
 export function personalListePfad(): string {
   return adminSektionPfad('stammdaten', 'personal');
 }
+
+/** `/admin/stammdaten/einheiten/<id>` (LLH-1042). */
+export function einheitVorlageDetailPath(id: number): string {
+  return `${einheitVorlageListPath()}/${id}`;
+}
+
+/** Rückweg der Vorlagen-Detailseite — die Sektion „Einheiten-Vorlagen“. */
+export function einheitVorlageListPath(): string {
+  return adminSektionPfad('stammdaten', 'einheiten');
+}

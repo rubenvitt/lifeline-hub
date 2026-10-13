@@ -571,6 +571,27 @@ impl Ablauf<'_> {
                 )
                 .await
             }
+            Vorgang::Einsatzleiter { personal } => {
+                // Wie `routes/einsatz_fuehrungsstelle.rs::aendern` (LFH-1199): derselbe Patch
+                // schreibt Einsatzleiter und Übernahme-Eintrag, „seit“ ist die Schrittzeit.
+                let ep_id = frueher(&self.personal, "Personal", personal)?;
+                let patch = crate::einsatz::fuehrungsstelle::FuehrungsstellePatch {
+                    einsatzleiter: Some(Some(
+                        crate::einsatz::fuehrungsstelle::EinsatzleiterEingabe::Personal {
+                            personal_id: ep_id,
+                            seit: zeit,
+                        },
+                    )),
+                    ..Default::default()
+                };
+                let schreiber = crate::einsatz::fuehrungsstelle::Schreiber {
+                    benutzer_id: self.admin_id,
+                    etb_startwert: self.startwert,
+                };
+                crate::einsatz::fuehrungsstelle::patch_tx(conn, self.einsatz_id, schreiber, &patch)
+                    .await?;
+                Ok(())
+            }
             Vorgang::PersonalAnUhs { personal, uhs } => {
                 // Wie `routes/einsatz_uhs_kraefte.rs::zuordnen` (LFH-1045): setzen, ETB.
                 let ep_id = frueher(&self.personal, "Personal", personal)?;

@@ -622,6 +622,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       umleitungOhneAdmin: true,
     },
     {
+      // LLH-1042: Anker ist der Seitentitel, die Vorlagenliste kann leer sein.
+      pfad: '/admin/stammdaten/einheiten',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Einheiten-Vorlagen', level: 1 }),
+      umleitungOhneAdmin: true,
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/personal`,
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
     },
@@ -900,6 +906,20 @@ function gate1VerwaltungRouten(): Gate1Route[] {
           await rechteHinweis(p, NUR_SYSTEM_ADMIN);
           await expect(
             p.getByRole('button', { name: 'Fahrzeug anlegen' }),
+            'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+          ).toBeDisabled();
+        },
+      },
+    },
+    {
+      // LLH-1042: Liste der Einheiten-Vorlagen, gelesen ohne Admin-Recht.
+      pfad: '/admin/stammdaten/einheiten',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Einheiten-Vorlagen', level: 1 }),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SYSTEM_ADMIN);
+          await expect(
+            p.getByRole('button', { name: 'Vorlage anlegen' }),
             'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
           ).toBeDisabled();
         },

@@ -4,7 +4,6 @@ import {
   apiAlsAdmin,
   anmelden,
   demoEinsatz,
-  einsatzleiterFuellen,
   expect,
   fotografiere,
   fuehrungsstelleOrtFuellen,
@@ -75,7 +74,6 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(api);
     const { id } = demo;
     const e = `/api/einsaetze/${id}`;
-    await einsatzleiterFuellen(api, demo);
     const el = await sprechgruppe(api, id, 'TMO 311_F_EL', 'TMO');
     const san = await sprechgruppe(api, id, 'TMO 311_F_SAN', 'TMO');
     const dmo = await sprechgruppe(api, id, 'DMO 505', 'DMO');
