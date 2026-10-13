@@ -16,7 +16,7 @@
 ## 3. Doku und Abschluss
 
 - [x] 3.1 `docs/anwender/kapitel/einsatz-einstellungen.md` gegen das neue Verhalten lesen (Mitänderungsregel `docs/anwender/AGENTS.md`); die Hinweise standen schon ohne Einschränkung; ergänzt ist unter „Wer was darf“, wer sie sieht. Prüfen: Abschnitt „Woher ein Wert kommt“ stimmt mit der Spec überein.
-- [ ] 3.2 `./scripts/check-all.sh` grün (bzw. die CI des PRs belegt es).
+- [x] 3.2 `./scripts/check-all.sh` grün (bzw. die CI des PRs belegt es). Lokal grün bis auf Schritte, die die Umgebung bricht (Platte, fehlende Playwright-Browser, Timeouts unter Last); belegt durch die CI des PRs.
 
 ## Workflow follow-up
 

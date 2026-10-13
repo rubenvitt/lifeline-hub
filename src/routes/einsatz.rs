@@ -771,10 +771,10 @@ pub async fn modul_overrides_laden(
 /// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-modul-einstellungen`.
 /// Damit sieht der Editor „Module“ die Herkunft auch bei einer Einsatzleitung ohne Org-Rolle.
 ///
-/// Gate (design.md D2 der Change `g145w6op-modul-vorgaben-einsatzleitung`): Lesezugriff und
-/// dazu Mitgliedschaft im Einsatz oder Zugehörigkeit zu seiner Organisation. Der Lesezugriff
-/// allein ließe jeden System-Admin serverweit durch, die Vorgaben einer Organisation gingen so an
-/// Admins fremder Organisationen.
+/// Gate (design.md D2 der Change `archive/2026-10-13-g145w6op-modul-vorgaben-einsatzleitung`):
+/// Lesezugriff und dazu Mitgliedschaft im Einsatz oder Zugehörigkeit zu seiner Organisation. Der
+/// Lesezugriff allein ließe jeden System-Admin serverweit durch, die Vorgaben einer Organisation
+/// gingen so an Admins fremder Organisationen.
 pub async fn load_modul_vorgaben(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
