@@ -643,7 +643,6 @@ export default function KommunikationsplanPage() {
                     <span>Leitstelle: keine Verbindung erfasst</span>
                     {vorschlag && darfSchreiben && (
                       <Button
-                        size="small"
                         className="kommunikationsplan-no-print"
                         disabled={ohneVerbindung}
                         title={sperrGrund}
