@@ -9,7 +9,8 @@ import { baueMedienlage, rendereMedienlageMarkdown } from './medienlage';
  * „Aus S5 übernehmen“ im Abschnitt „Medienlage“ (LFH-554, Spec `stab-medienlage`, D7; seit
  * LFH-870 eine Quelle des Übernahme-Bausteins). Frei nur mit Freigabe des Stabs; die Quellen
  * kommen über dieselben Keys wie die Presseseite, die Medienkontakte als Kennzahlen über den
- * ganzen Bestand (LFH-1075), die Anrufe als Zählung des Informationstelefons (LLH-732). Scheitert eine, trägt der Text „—“ mit Grund.
+ * ganzen Bestand (LFH-1075), die Anrufe als Zählung des Informationstelefons (LLH-732).
+ * Scheitert eine, trägt der Text „—“ mit Grund.
  */
 export const MEDIENLAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus S5 übernehmen',

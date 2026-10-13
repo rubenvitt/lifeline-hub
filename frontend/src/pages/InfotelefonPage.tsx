@@ -110,9 +110,14 @@ export default function InfotelefonPage() {
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
   // `gefrorenSeiten` merkt die Zahl der Seiten beim Einfrieren: was „Ältere laden“ danach anhängt,
-  // ist alt und wird über `erweitere` aufgenommen, nie als „neuer Anruf“ zurückgehalten.
+  // ist alt und wird über `erweitere` aufgenommen, nie als „neuer Anruf“ zurückgehalten. Die
+  // Kennungen einer angehängten Seite gelten so, wie sie ZUERST erschien (`nachgeladen`): ein
+  // Live-Nachladen derselben Seite bringt einen fremden Nachtrag sonst unbemerkt in den Stand.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
   const [gefrorenSeiten, setGefrorenSeiten] = useState(0);
+  const [nachgeladen, setNachgeladen] = useState<ReadonlyMap<number, readonly number[]>>(
+    () => new Map(),
+  );
   const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   // Die Erfassung hängt angepinnt am Fuß: ihre Höhe hält den Fokus der Zeitachse frei
@@ -152,7 +157,8 @@ export default function InfotelefonPage() {
     setSicht('alle');
     setGefroren(null);
     setHervorgehoben(aid);
-    setVerlinkteId(geladene.some((a) => a.id === aid) ? null : aid);
+    // Nur die Liste „alle“ zählt: unter „offene Rückrufe“ geladen heißt nicht unter „alle“ geladen.
+    setVerlinkteId(sicht === 'alle' && geladene.some((a) => a.id === aid) ? null : aid);
   });
   const verlinkteQuery = useQuery({
     queryKey: einsatzKeys.infotelefonAnruf(einsatzId, verlinkteId ?? 0),
@@ -218,7 +224,10 @@ export default function InfotelefonPage() {
   const seitenZahl = seiten?.length ?? 0;
   const betreten = useCallback(
     (e: FocusEvent<HTMLDivElement>) => {
-      if (gefroren == null) setGefrorenSeiten(seitenZahl);
+      if (gefroren == null) {
+        setGefrorenSeiten(seitenZahl);
+        setNachgeladen(new Map());
+      }
       setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
       // Steht ein per Tastatur erreichtes Ziel schon im Fenster, rollt der Browser nicht und
       // übergeht damit den Fokusabstand: unter `md` steht der erste Anruf beim Öffnen dicht über
@@ -241,6 +250,24 @@ export default function InfotelefonPage() {
     if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
     setGefroren(null);
   }, []);
+  // Hält die Kennungen jeder nach dem Einfrieren angehängten Seite beim ersten Erscheinen fest.
+  useEffect(() => {
+    if (gefroren == null || seiten == null) return;
+    const fehlend = seiten
+      .map((seite, i) => [i, seite] as const)
+      .filter(([i]) => i >= gefrorenSeiten && !nachgeladen.has(i));
+    if (fehlend.length === 0) return;
+    setNachgeladen((vorher) => {
+      const neu = new Map(vorher);
+      for (const [i, seite] of fehlend)
+        if (!neu.has(i))
+          neu.set(
+            i,
+            seite.map((a) => a.id),
+          );
+      return neu;
+    });
+  }, [gefroren, seiten, gefrorenSeiten, nachgeladen]);
   const zaehler = zaehlerQuery.data;
   const jeAnliegen = useMemo(
     () =>
@@ -276,7 +303,12 @@ export default function InfotelefonPage() {
   const gesamt = zaehler?.gesamt ?? 0;
   const offen = zaehler?.offen ?? 0;
   // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
-  const stand = gefroren && erweitere(gefroren, (seiten ?? []).slice(gefrorenSeiten).flat());
+  const angehaengt = gefroren
+    ? (seiten ?? [])
+        .slice(gefrorenSeiten)
+        .map((seite, i) => nachgeladen.get(gefrorenSeiten + i) ?? seite.map((a) => a.id))
+    : [];
+  const stand = gefroren && erweitere(gefroren, angehaengt.flat());
   const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, stand, benutzer?.id);
   const listeGeladen = anrufeQuery.isSuccess;
   // Unter `md` trägt die Meta die Kennzahlen; ab `md` stehen sie als Kacheln darunter.
@@ -422,6 +454,7 @@ export default function InfotelefonPage() {
                     label: 'anzeigen',
                     onKlick: () => {
                       setGefrorenSeiten(seitenZahl);
+                      setNachgeladen(new Map());
                       setGefroren(einfrieren(gefiltert));
                     },
                   }}

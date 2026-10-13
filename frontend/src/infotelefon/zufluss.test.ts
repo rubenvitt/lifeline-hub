@@ -23,7 +23,7 @@ describe('Zufluss der Anruf-Zeitachse (LFH-554)', () => {
   it('nimmt eine ältere Seite auf, ohne neue fremde Anrufe freizugeben (LLH-732)', () => {
     // Eingefroren: 20 und 19. „Ältere laden“ bringt den Nachtrag 30 (alter Eingang, hohe
     // Kennung) und 18; gleichzeitig ist der fremde Anruf 31 eingegangen.
-    const gefroren = erweitere(einfrieren([a(20), a(19)]), [a(30, 9), a(18)]);
+    const gefroren = erweitere(einfrieren([a(20), a(19)]), [30, 18]);
     const { sichtbar, zurueckgehalten } = teileZufluss(
       [a(31, 9), a(20), a(19), a(30, 9), a(18)],
       gefroren,
@@ -35,7 +35,7 @@ describe('Zufluss der Anruf-Zeitachse (LFH-554)', () => {
   });
 
   it('erweitert ohne eingefrorenen Stand nichts', () => {
-    expect(erweitere(null, [a(1)])).toBeNull();
+    expect(erweitere(null, [1])).toBeNull();
   });
 
   it('friert eine leere Liste nicht ein', () => {

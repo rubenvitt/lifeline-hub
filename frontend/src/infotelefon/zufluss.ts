@@ -3,8 +3,9 @@ import type { InfotelefonAnruf } from '../api/types';
 /**
  * Zufluss-Schleuse der Anruf-Zeitachse (LFH-554), nach dem Muster der ETB-Zeitachse
  * (`etb/zeitachseModell.ts`): Solange der Fokus in der Liste liegt, ist der gezeigte Stand
- * eingefroren. Seit LLH-732 ist das der geladene Ausschnitt (Seitenkette), nicht die Vollliste. Neue Anrufe ANDERER Plätze werden gezählt statt eingeschoben und erst auf
- * „anzeigen“ eingefügt; eigene stehen sofort (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
+ * eingefroren (seit LLH-732 der geladene Ausschnitt, nicht die Vollliste). Neue Anrufe ANDERER
+ * Plätze werden gezählt statt eingeschoben und erst auf „anzeigen“ eingefügt; eigene stehen
+ * sofort (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
  */
 export interface Einfrierstand {
   ids: ReadonlySet<number>;
@@ -29,10 +30,10 @@ export function einfrieren(anrufe: readonly InfotelefonAnruf[]): Einfrierstand |
  */
 export function erweitere(
   gefroren: Einfrierstand | null,
-  anrufe: readonly InfotelefonAnruf[],
+  ids: Iterable<number>,
 ): Einfrierstand | null {
   if (gefroren == null) return null;
-  return { ...gefroren, ids: new Set([...gefroren.ids, ...anrufe.map((a) => a.id)]) };
+  return { ...gefroren, ids: new Set([...gefroren.ids, ...ids]) };
 }
 
 export function teileZufluss(

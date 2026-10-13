@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
@@ -209,6 +209,47 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(ziel.style.background).not.toBe('');
   });
 
+  it('holt einen Deeplink aus der Sicht „offene Rückrufe“ für die Liste „alle“ nach', async () => {
+    // Der offene Rückruf 900 steht auf der ersten Seite von „offen“, aber nicht unter den
+    // geladenen Anrufen von „alle“: der Sprung darf nicht an der Liste der falschen Sicht hängen.
+    const alt = anruf({ id: 900, status: 'offen', rueckruf: '0171', notiz: 'alter Rückruf' });
+    vi.mocked(ladeAnrufe).mockImplementation(async (_e, seite = {}) =>
+      seite.status === 'offen' ? [alt] : ANRUFE,
+    );
+    vi.mocked(ladeAnruf).mockResolvedValue(alt);
+    function Springer() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/1/stab/infotelefon?anruf=900')}>
+          springen
+        </button>
+      );
+    }
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/stab/infotelefon"
+          element={
+            <>
+              <InfotelefonPage />
+              <Springer />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/stab/infotelefon' },
+    );
+    await screen.findByText('Sperrung B 3');
+    await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
+    await screen.findByText('alter Rückruf');
+    await userEvent.click(screen.getByRole('button', { name: 'springen' }));
+    await waitFor(() => expect(ladeAnruf).toHaveBeenCalledWith(1, 900));
+    await waitFor(() =>
+      expect(document.querySelector('[data-anruf="900"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(screen.getByText('Sperrung B 3')).toBeInTheDocument();
+  });
+
   it('filtert auf offene Rückrufe am Server', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
@@ -245,6 +286,20 @@ describe('InfotelefonPage (LFH-554)', () => {
     await waitFor(() => expect(setzeAnrufStatus).toHaveBeenCalledWith(1, 2, 'erledigt'));
   });
 
+  it('senkt nach dem Erledigen die Zahl offener Rückrufe aus der neuen Zählung', async () => {
+    setup();
+    const eintrag = (await screen.findByText('sucht Vater')).closest('li') as HTMLElement;
+    await within(kennzahl('offene Rückrufe').parentElement!).findByText('1');
+    vi.mocked(ladeAnrufZaehler).mockResolvedValue(zaehler({ offen: 0 }));
+    await userEvent.click(
+      within(eintrag).getByRole('button', { name: /^Status von Anruf Vermisstensuche / }),
+    );
+    await userEvent.click(await screen.findByRole('menuitem', { name: /erledigt/ }));
+    expect(
+      await within(kennzahl('offene Rückrufe').parentElement!).findByText('0'),
+    ).toBeInTheDocument();
+  });
+
   it('kein Zweck-Absatz unter dem Titel, kein Rechte-Hinweis mit Schreibrecht (LFH-1078)', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
@@ -262,6 +317,49 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(banner.textContent).toBe('1 neuer Anruf');
     expect(screen.queryByText(/oben einsortiert/)).toBeNull();
     expect(screen.queryByText('Keller voll')).toBeNull();
+  });
+
+  it('hält einen Nachtrag aus „Ältere laden“ nicht als neuen Anruf zurück', async () => {
+    // Fokus auf „Ältere laden“ (in der Liste) friert ein; die ältere Seite bringt einen Nachtrag
+    // eines anderen Platzes (alter Eingang, hohe Kennung). Er gehört zum Gelesenen, nicht zum
+    // Zufluss. Beide Seiten sind voll, damit der Knopf und mit ihm der Fokus stehen bleibt.
+    const seite1 = Array.from({ length: ANRUFE_SEITE }, (_, i) => anruf({ id: 1000 - i }));
+    const seite2 = [
+      anruf({ id: 5000, angelegt_von_id: 9, notiz: 'Nachtrag Keller' }),
+      ...Array.from({ length: ANRUFE_SEITE - 1 }, (_, i) => anruf({ id: 800 - i })),
+    ];
+    vi.mocked(ladeAnrufe).mockImplementation(async (_e, seite = {}) =>
+      seite.vor ? seite2 : seite1,
+    );
+    setup();
+    const knopf = await screen.findByRole('button', { name: 'Ältere laden' });
+    act(() => knopf.focus());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Nachtrag Keller')).toBeInTheDocument();
+    expect(knopf).toHaveFocus();
+    expect(screen.queryByText(/neuer Anruf/)).toBeNull();
+  });
+
+  it('hält einen fremden Nachtrag zurück, der beim Live-Nachladen in eine angehängte Seite fällt', async () => {
+    const seite1 = Array.from({ length: ANRUFE_SEITE }, (_, i) => anruf({ id: 1000 - i }));
+    const alt = Array.from({ length: ANRUFE_SEITE }, (_, i) =>
+      anruf({ id: 800 - i, notiz: i === 0 ? 'ganz alt' : undefined }),
+    );
+    let seite2 = alt;
+    vi.mocked(ladeAnrufe).mockImplementation(async (_e, seite = {}) =>
+      seite.vor ? seite2 : seite1,
+    );
+    const { client } = setup();
+    const knopf = await screen.findByRole('button', { name: 'Ältere laden' });
+    act(() => knopf.focus());
+    await userEvent.click(knopf);
+    await screen.findByText('ganz alt');
+    expect(knopf).toHaveFocus();
+    // Ein anderer Platz trägt einen alten Anruf nach; er sortiert in die angehängte Seite.
+    seite2 = [anruf({ id: 6000, angelegt_von_id: 9, notiz: 'fremder Nachtrag' }), ...alt];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) }));
+    expect(await screen.findByText('1 neuer Anruf')).toBeInTheDocument();
+    expect(screen.queryByText('fremder Nachtrag')).toBeNull();
   });
 
   it('Beobachtung liest, die Erfassung fehlt, und der Grund steht da', async () => {
