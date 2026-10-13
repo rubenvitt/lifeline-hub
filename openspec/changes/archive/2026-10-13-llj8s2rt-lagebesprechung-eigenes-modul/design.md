@@ -308,7 +308,7 @@ Entschluss an der ETB-Grenze ergäbe einen ETB-Inhalt darüber. Der Client spieg
 
 ## Migration Plan
 
-1. Migration 0183 läuft beim Start (sqlx). Sie fügt nur Zeilen hinzu, und ein Rollback ist ein
+1. Migration 0184 läuft beim Start (sqlx). Sie fügt nur Zeilen hinzu, und ein Rollback ist ein
    `DELETE … WHERE modul_key = 'lagebesprechung'`.
 2. Backend und Frontend kommen in einem Binary. Ein Übergangsweg für die alten Pfade ist nicht
    nötig.

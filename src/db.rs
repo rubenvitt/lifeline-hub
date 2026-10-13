@@ -447,10 +447,10 @@ mod tests {
         );
     }
 
-    /// LLH-1111 (`0183`): Die Rollen-Vorgabe des Stabs wandert je Einsatz und je Organisation auf
+    /// LLH-1111 (`0184`): Die Rollen-Vorgabe des Stabs wandert je Einsatz und je Organisation auf
     /// die Lagebesprechung, die Ausblendung nicht; ohne Stab-Rolle entsteht keine Zeile.
     #[tokio::test]
-    async fn migration_0183_uebernimmt_nur_die_stab_rolle() {
+    async fn migration_0184_uebernimmt_nur_die_stab_rolle() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
@@ -466,7 +466,7 @@ mod tests {
             .unwrap();
         let vorher: Vec<_> = sqlx::migrate!("./migrations")
             .iter()
-            .filter(|m| m.version < 183)
+            .filter(|m| m.version < 184)
             .cloned()
             .collect();
         Migrator {
@@ -475,7 +475,7 @@ mod tests {
         }
         .run(&pool)
         .await
-        .expect("Migrationen vor 0183");
+        .expect("Migrationen vor 0184");
         // Migrationen schalten Fremdschlüssel selbst wieder ein; die Vorgaben hier brauchen keinen
         // echten Einsatz und keine Organisation.
         sqlx::query("PRAGMA foreign_keys = OFF")
@@ -498,7 +498,7 @@ mod tests {
         .await
         .unwrap();
 
-        migrate(&pool).await.expect("0183 läuft durch");
+        migrate(&pool).await.expect("0184 läuft durch");
 
         let einsatz: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
