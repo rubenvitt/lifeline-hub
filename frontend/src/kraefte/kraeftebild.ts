@@ -10,6 +10,7 @@ import type {
   MaterialStatus,
 } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
+import { abschnittDerObersten } from './kraeftebaumKern';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -360,9 +361,12 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   const s = f.suche.trim().toLowerCase();
   const treffer = (txt: (string | null | undefined)[]) =>
     !s || txt.some((t) => t?.toLowerCase().includes(s));
-  // Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit; sonst fielen ihre
-  // Kräfte beim Abschnitts-Filter heraus.
-  const einheitErlaubt = (e: Einheit) => f.abschnittId == null || e.abschnitt_id === f.abschnittId;
+  // Eine Untereinheit zählt beim Abschnitt ihrer OBERSTEN Einheit (D11, LLH-1025; Spec
+  // `lage-verdichtung`): eine Gruppe ohne eigenen Abschnitt bleibt unter ihrem Zug, und keine
+  // Kraft steht in zwei Abschnitten. Über die ungefilterte Einheitenliste.
+  const obersterAbschnitt = abschnittDerObersten(roh.einheiten);
+  const einheitErlaubt = (e: Einheit) =>
+    f.abschnittId == null || obersterAbschnitt.get(e.id) === f.abschnittId;
   const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
   const abschnittOk = (einheit_id: number | null | undefined) =>
     f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));

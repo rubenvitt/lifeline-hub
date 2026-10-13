@@ -275,6 +275,23 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
   expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
 });
 
+it('Abschnitts-Filter behält eine Untereinheit ohne eigenen Abschnitt unter ihrem Zug (D11)', () => {
+  const abschnitte = [ab(1), ab(2)];
+  // Gr 11 ohne eigenen Abschnitt unter Zug 10 (Abschnitt 1); Gr 12 steht selbst in 2, zählt aber
+  // beim Abschnitt ihrer obersten Einheit (Spec `lage-verdichtung`).
+  const einheiten = [eh(10, 1), eh(11, null, 10), eh(12, 2, 10), eh(20, 2)];
+  const personal = [p(1, 11, 'mannschaft'), p(2, 12, 'mannschaft'), p(3, 20, 'mannschaft')];
+  const nach = (abschnittId: number) =>
+    filtereKraefte(
+      { abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
+      { traeger: null, abschnittId, kategorie: null, suche: '' },
+    );
+  expect(nach(1).einheiten.map((e) => e.id)).toEqual([10, 11, 12]);
+  expect(nach(1).personal.map((x) => x.id)).toEqual([1, 2]);
+  expect(nach(2).einheiten.map((e) => e.id)).toEqual([20]);
+  expect(nach(2).personal.map((x) => x.id)).toEqual([3]);
+});
+
 it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   // Die Fixture trägt ALLE DREI Mittelarten, sonst wäre „keine Bildzeichen" für zwei Zweige
   // nicht belegt.
