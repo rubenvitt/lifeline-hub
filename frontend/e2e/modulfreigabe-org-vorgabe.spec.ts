@@ -95,3 +95,92 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await orgVorgabe(page, null);
   }
 });
+
+// Akzeptanz LLH-1179 (Spec `modul-freigabe`): die Organisation blendet ein Modul für alle Einsätze
+// aus, der Einsatz überstimmt und nimmt den eigenen Wert zurück. Modul `nachforderungen`: kein
+// anderer e2e-Spec bedient es (nur der getrennte Bildlauf). Die Vorgabe gilt für JEDEN Einsatz der
+// e2e-Organisation, deshalb kurz und im `finally` zurückgesetzt.
+
+async function orgSichtbarkeit(page: Page, sichtbar: boolean) {
+  const antwort = await page.request.put('/api/org-modul-einstellungen/nachforderungen', {
+    data: { benoetigte_rolle: null, sichtbar },
+  });
+  expect(antwort.ok(), `Org-Sichtbarkeit: ${antwort.status()} ${await antwort.text()}`).toBe(true);
+}
+
+/** Der Eintrag „Nachforderung“ im Modul-Panel der Kategorie Kommunikation. */
+function nachforderungImPanel(page: Page) {
+  return page.getByRole('button', { name: /^Nachforderung(,|$)/ });
+}
+
+async function kommunikationOeffnen(page: Page, einsatzId: string) {
+  await page.goto(`/einsaetze/${einsatzId}/meldungen`);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Meldungen (eingehend)' }),
+  ).toBeVisible();
+}
+
+test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überstimmt und übernimmt die Vorgabe wieder', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await anmeldenAlsAdmin(page);
+  const angelegt = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Sichtbarkeit ${Date.now()}` },
+  });
+  expect(angelegt.ok(), `Einsatz: ${angelegt.status()}`).toBe(true);
+  const einsatzId = String(((await angelegt.json()) as { id: number }).id);
+
+  try {
+    // Vorbedingung: ohne Vorgabe steht das Modul in der Navigation.
+    await kommunikationOeffnen(page, einsatzId);
+    await expect(nachforderungImPanel(page)).toBeVisible();
+
+    // Verwaltung: im Paneel „Module für alle Einsätze“ ausblenden.
+    await page.goto('/admin/einstellungen/einsatz');
+    const paneel = page.getByRole('region', { name: 'Module für alle Einsätze' });
+    await expect(
+      paneel.getByText('Wirkt auf alle Einsätze ohne eigene Einstellung, auch auf laufende.'),
+    ).toBeVisible();
+    await paneel.getByLabel('Modul filtern').fill('Nachforderung');
+    const vorgabe = paneel.getByRole('switch', { name: 'Sichtbar: Nachforderung' });
+    await expect(vorgabe).toBeChecked();
+    await vorgabe.click();
+    await expect(page.getByText('Modul-Vorgabe gespeichert')).toBeVisible();
+    await expect(vorgabe).not.toBeChecked();
+
+    // Der laufende Einsatz ohne eigenen Wert folgt der Vorgabe.
+    await kommunikationOeffnen(page, einsatzId);
+    await expect(nachforderungImPanel(page)).toHaveCount(0);
+
+    // Editor „Module“: geerbt aus, mit Herkunft; Einlegen überstimmt.
+    await page.goto(`/einsaetze/${einsatzId}/einstellungen/module`);
+    await page.getByLabel('Modul filtern').fill('Nachforderung');
+    const schalter = page.getByRole('switch', { name: 'Sichtbar: Nachforderung' });
+    const zeile = page.locator('[data-modul-zeile="nachforderungen"]');
+    await expect(schalter).not.toBeChecked();
+    await expect(zeile.getByText('Vorgabe der Organisation: ausgeblendet')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Vorgabe übernehmen: Nachforderung' }),
+    ).toHaveCount(0);
+    await schalter.click();
+    await expect(schalter).toBeChecked();
+    const uebernehmen = page.getByRole('button', { name: 'Vorgabe übernehmen: Nachforderung' });
+    await expect(uebernehmen).toBeVisible();
+
+    await kommunikationOeffnen(page, einsatzId);
+    await expect(nachforderungImPanel(page)).toBeVisible();
+
+    // „Vorgabe übernehmen“ nimmt den eigenen Wert zurück: wieder ausgeblendet.
+    await page.goto(`/einsaetze/${einsatzId}/einstellungen/module`);
+    await page.getByLabel('Modul filtern').fill('Nachforderung');
+    await uebernehmen.click();
+    await expect(schalter).not.toBeChecked();
+    await expect(uebernehmen).toHaveCount(0);
+
+    await kommunikationOeffnen(page, einsatzId);
+    await expect(nachforderungImPanel(page)).toHaveCount(0);
+  } finally {
+    await orgSichtbarkeit(page, true);
+  }
+});

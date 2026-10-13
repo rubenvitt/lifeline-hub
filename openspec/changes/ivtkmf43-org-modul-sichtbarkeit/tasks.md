@@ -32,7 +32,7 @@ Frontend-Gates aus dem Frontend-Ordner über `mise exec -- pnpm …` (ohne mise:
 
 - [x] 5.1 `ModulEinstellungsListe`: optionaler Zeilenzusatz in der Modulspalte (Hinweis und Aktion) außerhalb des `<label>`; Tests in `ModulEinstellungsListe.test.tsx`: Zusatz steht unter dem Namen, ein Klick auf die Aktion legt den Schalter nicht um, Abfrage nach Modulname findet die Zeile weiter
 - [x] 5.2 `EinsatzModule.tsx`: Schalter = eigener Wert ?? Freigabe ?? Org ?? `true`; Hinweis „Vorgabe der Organisation: ausgeblendet“ (Org-Vorgabe oder hergeleitet aus Freigabe ohne eigenen Wert); „Vorgabe übernehmen“ bei eigenem Wert schickt `sichtbar: null` mit Bestandsrolle; Rollenwechsel schickt den eigenen Wert statt des wirksamen; Invalidierung von Overrides und Freigaben. `EinsatzModule.test.tsx` deckt die Szenarien der Anforderung „Der Editor ‚Module‘ zeigt den wirksamen Wert und seine Herkunft“ ab, dazu den Fall ohne Leserecht auf die Org-Vorgaben (403); grün
-- [ ] 5.3 e2e `frontend/e2e/modulfreigabe-org-vorgabe.spec.ts`: System-Admin blendet `stab` in der Verwaltung aus → Navigation eines Einsatzes ohne eigenen Wert ohne Stab; Einsatzleitung legt den Schalter ein → Stab zurück; „Vorgabe übernehmen“ → wieder weg; grün
+- [x] 5.3 e2e `frontend/e2e/modulfreigabe-org-vorgabe.spec.ts`: System-Admin blendet `stab` in der Verwaltung aus → Navigation eines Einsatzes ohne eigenen Wert ohne Stab; Einsatzleitung legt den Schalter ein → Stab zurück; „Vorgabe übernehmen“ → wieder weg; grün
 
 ## 6. Anwenderdoku
 
