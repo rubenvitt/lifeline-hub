@@ -117,7 +117,7 @@ pub struct Ablage<'a> {
 
 /// Prüft, dass das Bezugsziel zu diesem Einsatz gehört (FK-Ersatz für die Isolation);
 /// fremd/unbekannt → 400 wie `chat::bezug_setzen`.
-async fn bezug_pruefen(
+async fn check_bezug(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     bezug: Bezug,
@@ -160,7 +160,7 @@ pub async fn ablegen(
     let inhalt = format!("Dokument abgelegt ({})", ablage.kategorie.label());
     crate::write_retry!(pool, |conn| {
         if let Some(b) = ablage.bezug {
-            bezug_pruefen(conn, einsatz_id, b).await?;
+            check_bezug(conn, einsatz_id, b).await?;
         }
         let anhang_id = crate::anhang::repo::anlegen_tx(
             conn,
@@ -291,7 +291,7 @@ pub async fn aendern(
             _ => None,
         };
         if let Some(Some(b)) = aenderung.bezug {
-            bezug_pruefen(conn, einsatz_id, b).await?;
+            check_bezug(conn, einsatz_id, b).await?;
         }
 
         let titel = aenderung.titel.clone().unwrap_or_else(|| titel_alt.clone());

@@ -260,7 +260,7 @@ pub async fn aktualisieren(
     // Führer-Gültigkeit VOR jeglichem Write prüfen, damit ein ungültiger Führer
     // (Nicht-Mitglied) kein Teil-Update der übrigen Felder hinterlässt.
     if fuehrer_wechsel {
-        einheit_repo::pruefe_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
+        einheit_repo::check_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
     let nachher = einheit_repo::patche(
         &state.pool,

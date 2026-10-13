@@ -308,7 +308,7 @@ impl Element {
 
 /// Prüft, dass das Element im Einsatz besteht; sonst 422 (Bezug außerhalb des Einsatzes).
 /// Eine Funktion des Kommunikationsplans ist keine Stelle der Skizze (D2).
-async fn pruefe_im_einsatz(
+async fn check_im_einsatz(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     element: Element,
@@ -629,7 +629,7 @@ pub async fn lage_setzen(
     let schluessel = element.schluessel();
     write_retry!(pool, |conn| {
         fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        pruefe_im_einsatz(conn, einsatz_id, element).await?;
+        check_im_einsatz(conn, einsatz_id, element).await?;
         if !matches!(element, Element::Sprechgruppe(_)) && matches!(eingabe.breite, Some(Some(_))) {
             return Err(AppError::UnprocessableEntity(
                 "breite gibt es nur bei Schienen (sg-…)".into(),
@@ -968,8 +968,8 @@ pub async fn verbindung_anlegen(
     }
     write_retry!(pool, |conn| {
         fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        pruefe_im_einsatz(conn, einsatz_id, eingabe.von).await?;
-        pruefe_im_einsatz(conn, einsatz_id, eingabe.nach).await?;
+        check_im_einsatz(conn, einsatz_id, eingabe.von).await?;
+        check_im_einsatz(conn, einsatz_id, eingabe.nach).await?;
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO fernmeldeskizze_verbindung \
                 (einsatz_id, von_art, von_id, nach_art, nach_id, art, medium, status, verkehr, \

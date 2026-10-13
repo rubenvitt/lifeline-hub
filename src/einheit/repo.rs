@@ -420,7 +420,7 @@ pub async fn laden(
 /// `NotFound`, falls die Einheit nicht (mehr) zum Einsatz gehört. Eine nackte
 /// Existenz-Abfrage, weil `laden()` die Anreicherung des ganzen Einsatzes zöge.
 /// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
-async fn pruefe_gehoert_zum_einsatz(
+async fn check_gehoert_zum_einsatz(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     id: i64,
@@ -436,7 +436,7 @@ async fn pruefe_gehoert_zum_einsatz(
 
 /// `NotFound`, falls der Abschnitt nicht zum Einsatz gehört. Executor-generisch (s.
 /// [`anlegen_tx`]).
-async fn pruefe_abschnitt(
+async fn check_abschnitt(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     abschnitt_id: i64,
@@ -494,10 +494,10 @@ async fn validiere(
         }
     }
     if let Some(abschnitt) = daten.abschnitt_id {
-        pruefe_abschnitt(&mut *conn, einsatz_id, abschnitt).await?;
+        check_abschnitt(&mut *conn, einsatz_id, abschnitt).await?;
     }
     if let Some(parent) = daten.ueber_einheit_id {
-        pruefe_gehoert_zum_einsatz(&mut *conn, einsatz_id, parent).await?;
+        check_gehoert_zum_einsatz(&mut *conn, einsatz_id, parent).await?;
     }
     Ok(())
 }
@@ -588,10 +588,10 @@ async fn validiere_patch(
         }
     }
     if let Some(Some(abschnitt)) = patch.abschnitt_id {
-        pruefe_abschnitt(pool, einsatz_id, abschnitt).await?;
+        check_abschnitt(pool, einsatz_id, abschnitt).await?;
     }
     if let Some(Some(parent)) = patch.ueber_einheit_id {
-        pruefe_gehoert_zum_einsatz(pool, einsatz_id, parent).await?;
+        check_gehoert_zum_einsatz(pool, einsatz_id, parent).await?;
         if waere_zyklus(pool, self_id, parent).await? {
             return Err(AppError::Validation(
                 "Einheit darf nicht eigener Vorfahr werden".into(),
@@ -633,7 +633,7 @@ pub async fn patche(
     id: i64,
     patch: EinheitPatch<'_>,
 ) -> Result<EinheitAnzeige, AppError> {
-    pruefe_gehoert_zum_einsatz(pool, einsatz_id, id).await?;
+    check_gehoert_zum_einsatz(pool, einsatz_id, id).await?;
     validiere_patch(pool, einsatz_id, org_id, id, &patch).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_einheit SET \
@@ -799,7 +799,7 @@ pub async fn aktualisiere_position(
 /// Reine Validierung: die Einheit gehört zum Einsatz, und bei `Some(ep)` ist die Person Mitglied
 /// dieser Einheit. Wird vor jedem Write gerufen, damit ein ungültiger Führer kein Teil-Update
 /// hinterlässt.
-pub async fn pruefe_fuehrer(
+pub async fn check_fuehrer(
     pool: &SqlitePool,
     einsatz_id: i64,
     einheit_id: i64,
@@ -831,14 +831,14 @@ pub async fn pruefe_fuehrer(
 }
 
 /// Setzt (oder leert mit `None`) den Führer einer Einheit. Validiert vorab über
-/// `pruefe_fuehrer`. `NotFound`/`Validation` wie dort.
+/// `check_fuehrer`. `NotFound`/`Validation` wie dort.
 pub async fn setze_fuehrer(
     pool: &SqlitePool,
     einsatz_id: i64,
     einheit_id: i64,
     fuehrer_ep_id: Option<i64>,
 ) -> Result<(), AppError> {
-    pruefe_fuehrer(pool, einsatz_id, einheit_id, fuehrer_ep_id).await?;
+    check_fuehrer(pool, einsatz_id, einheit_id, fuehrer_ep_id).await?;
     sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(fuehrer_ep_id)
         .bind(einheit_id)
