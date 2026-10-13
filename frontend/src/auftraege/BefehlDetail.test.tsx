@@ -33,6 +33,8 @@ const kopf = (over: Partial<BefehlKopf> = {}): BefehlKopf => ({
   vorgaenger_id: null,
   vorlage: 'befehl_lad',
   zeitstand: '2026-06-11 08:30:00',
+  verteiler: [],
+  is_quittierbar: false,
   ...over,
 });
 const LAD = vorlage('befehl_lad')!;
@@ -40,7 +42,6 @@ const anzeige = (k: BefehlKopf): BefehlAnzeige => ({
   ...k,
   aktualisiert_at: k.zeitstand,
   abschnitte: [{ schluessel: LAD.abschnitte[0].schluessel, text: 'Brand im Lager' }],
-  verteiler: [],
 });
 
 function Ort() {

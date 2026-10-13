@@ -1921,6 +1921,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("extern_kategorie", G_ENUM),
             scrub("extern_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            // Quittung je Empfänger (LLH-1173), wie bei `auftrag_empfaenger`.
+            retain("quittiert_at", G_ZEIT),
+            retain("quittiert_von_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -1944,6 +1947,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("extern_kategorie", G_ENUM),
             scrub("extern_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            // Quittung je Empfänger (LLH-1173), wie bei `auftrag_empfaenger`.
+            retain("quittiert_at", G_ZEIT),
+            retain("quittiert_von_id", G_FK),
         ],
     },
     TabellenRegel {

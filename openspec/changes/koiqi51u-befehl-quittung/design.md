@@ -156,7 +156,7 @@ in derselben Transaktion. Den Satz baut eine Funktion in `befehl`, die `Dokument
 Dokumenttitel. Die Nummer des Freigabe-Eintrags verweist eindeutig auf die Fassung und überlebt die
 Schwärzung. Der Anzeigename des Empfängers ist Wortlaut des Führungsmoduls (Gruppe
 `Fuehrungsmodul`, wie bei der Freigabe). `tests/aufbewahrung_e2e.rs`, `AUSNAHMEN_SYSTEM_ETB`,
-bekommt je Schreibweg (`quittieren_tx`, `zuruecknehmen_tx`) Einträge für
+bekommt je Schreibweg (`aendern_tx`, der gemeinsame Weg beider Richtungen) Einträge für
 `befehl_verteiler.snap_anzeige`, `.funktion_text` und `.extern_bezeichnung`. Kein Test bemerkt
 einen fehlenden Eintrag (`src/AGENTS.md`), deshalb ist das eine eigene Aufgabe.
 

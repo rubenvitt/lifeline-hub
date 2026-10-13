@@ -619,6 +619,11 @@ export interface components {
             freigegeben_von_name?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Ob der Verteiler Quittungen annimmt (LLH-1173): freigegeben und keine neuere Fassung
+             *     freigegeben.
+             */
+            is_quittierbar: boolean;
             status: components["schemas"]["BefehlStatus"];
             titel: string;
             /** Format: int64 */
@@ -649,10 +654,14 @@ export interface components {
             freigegeben_von_name?: string | null;
             /** Format: int64 */
             id: number;
+            /** @description Wie [`BefehlAnzeige::is_quittierbar`]. */
+            is_quittierbar: boolean;
             status: components["schemas"]["BefehlStatus"];
             titel: string;
             /** Format: int64 */
             version: number;
+            /** @description Verteiler samt Quittung (LLH-1173), für Karte und Empfängerfilter der Liste. */
+            verteiler: components["schemas"]["VerteilerEintragAnzeige"][];
             /** Format: int64 */
             vorgaenger_id?: number | null;
             vorlage: components["schemas"]["BefehlVorlage"];
@@ -4978,6 +4987,16 @@ export interface components {
             funktion_text?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Zeitpunkt der Quittung (LLH-1173); fehlt, solange der Empfänger offen ist, und immer am
+             *     Lagebericht.
+             */
+            quittiert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer quittiert hat; fehlt wie `quittiert_at`.
+             */
+            quittiert_von_id?: number | null;
             /** @description Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person. */
             snap_anzeige: string;
         };

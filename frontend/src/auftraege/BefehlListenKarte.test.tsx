@@ -21,6 +21,8 @@ const befehlKopf = (over: Partial<BefehlKopf> = {}): BefehlKopf => ({
   vorgaenger_id: null,
   vorlage: 'befehl_lad',
   zeitstand: '2026-06-11 08:30:00',
+  verteiler: [],
+  is_quittierbar: false,
   ...over,
 });
 

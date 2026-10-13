@@ -33,6 +33,9 @@ pub struct Dokument<A> {
     pub etb_eintrag_id: Option<i64>,
     /// Verteiler in Reihenfolge (LLH-1172); leer bei einer Art ohne [`Dokumentart::VERTEILER`].
     pub verteiler: Vec<super::verteiler::VerteilerEintragAnzeige>,
+    /// Freigegeben und keine aus ihm fortgeschriebene Fassung freigegeben (LLH-1173,
+    /// [`quittierbar_column`]); nur dann nimmt der Verteiler Quittungen an.
+    pub is_quittierbar: bool,
 }
 
 /// Editierbare Felder eines Entwurfs-PATCH. `None` = unverändert.
@@ -78,6 +81,19 @@ struct Row {
     freigegeben_at: Option<String>,
     etb_eintrag_id: Option<i64>,
     verteiler: String,
+    is_quittierbar: bool,
+}
+
+/// Ob die Fassung `<alias>` die jüngste freigegebene ihrer Kette ist (LLH-1173, design.md D2):
+/// freigegeben, und keine DIREKTE Nachfolgerin ist freigegeben. Das reicht, weil eine Nachfolgerin
+/// nur aus einer freigegebenen Fassung entsteht.
+fn quittierbar_column<T: Dokumentart>(alias: &str) -> String {
+    format!(
+        "({alias}.status = '{f}' AND NOT EXISTS (SELECT 1 FROM {tab} n \
+            WHERE n.vorgaenger_id = {alias}.id AND n.status = '{f}'))",
+        f = STATUS_FREIGEGEBEN,
+        tab = T::TABELLE,
+    )
 }
 
 fn select<T: Dokumentart>() -> String {
@@ -88,11 +104,12 @@ fn select<T: Dokumentart>() -> String {
            l.ersteller_id, b1.anzeigename AS ersteller_name, \
            l.erstellt_at, l.aktualisiert_at, \
            l.freigegeben_von_id, b2.anzeigename AS freigegeben_von_name, \
-           l.freigegeben_at, l.etb_eintrag_id, {} AS verteiler \
+           l.freigegeben_at, l.etb_eintrag_id, {} AS verteiler, {} AS is_quittierbar \
     FROM {} l \
     JOIN benutzer b1 ON b1.id = l.ersteller_id \
     LEFT JOIN benutzer b2 ON b2.id = l.freigegeben_von_id",
         super::verteiler::json_column::<T>("l"),
+        quittierbar_column::<T>("l"),
         T::TABELLE
     )
 }
@@ -119,13 +136,15 @@ fn zu_dokument<T: Dokumentart>(row: Row) -> Result<Dokument<T::Abschnitt>, AppEr
         freigegeben_at: row.freigegeben_at,
         etb_eintrag_id: row.etb_eintrag_id,
         verteiler: super::verteiler::from_json(&row.verteiler)?,
+        is_quittierbar: row.is_quittierbar,
     })
 }
 
 /// Kopfdaten eines Dokuments für die Listen (LFH-931, `listen-projektion`): alle Felder von
 /// [`Dokument`] außer `abschnitte` und `aktualisiert_at`. Ohne `aktualisiert_at` ändert ein
 /// Entwurfs-PATCH, der nur Abschnitte schreibt, keinen Kopf (`nur_inhalt` im Live-Ereignis).
-#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+/// Verteiler und Quittierbarkeit (LLH-1173) gibt nur der Befehl auf dem Wire weiter.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DokumentKopf {
     pub id: i64,
     pub einsatz_id: i64,
@@ -142,6 +161,55 @@ pub struct DokumentKopf {
     pub freigegeben_von_name: Option<String>,
     pub freigegeben_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    pub verteiler: Vec<super::verteiler::VerteilerEintragAnzeige>,
+    pub is_quittierbar: bool,
+}
+
+#[derive(sqlx::FromRow)]
+struct KopfRow {
+    id: i64,
+    einsatz_id: i64,
+    vorlage: String,
+    titel: String,
+    zeitstand: String,
+    status: String,
+    version: i64,
+    vorgaenger_id: Option<i64>,
+    ersteller_id: i64,
+    ersteller_name: String,
+    erstellt_at: String,
+    freigegeben_von_id: Option<i64>,
+    freigegeben_von_name: Option<String>,
+    freigegeben_at: Option<String>,
+    etb_eintrag_id: Option<i64>,
+    verteiler: String,
+    is_quittierbar: bool,
+}
+
+impl TryFrom<KopfRow> for DokumentKopf {
+    type Error = AppError;
+
+    fn try_from(r: KopfRow) -> Result<Self, AppError> {
+        Ok(Self {
+            id: r.id,
+            einsatz_id: r.einsatz_id,
+            vorlage: r.vorlage,
+            titel: r.titel,
+            zeitstand: r.zeitstand,
+            status: r.status,
+            version: r.version,
+            vorgaenger_id: r.vorgaenger_id,
+            ersteller_id: r.ersteller_id,
+            ersteller_name: r.ersteller_name,
+            erstellt_at: r.erstellt_at,
+            freigegeben_von_id: r.freigegeben_von_id,
+            freigegeben_von_name: r.freigegeben_von_name,
+            freigegeben_at: r.freigegeben_at,
+            etb_eintrag_id: r.etb_eintrag_id,
+            verteiler: super::verteiler::from_json(&r.verteiler)?,
+            is_quittierbar: r.is_quittierbar,
+        })
+    }
 }
 
 /// Kopfdaten aller Dokumente eines Einsatzes, neueste Fortschreibung/Anlage zuerst. Liest die
@@ -150,24 +218,27 @@ pub async fn liste_koepfe<T: Dokumentart>(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<DokumentKopf>, AppError> {
-    Ok(
-        sqlx::query_as::<_, DokumentKopf>(sqlx::AssertSqlSafe(format!(
-            "\
+    sqlx::query_as::<_, KopfRow>(sqlx::AssertSqlSafe(format!(
+        "\
     SELECT l.id, l.einsatz_id, l.vorlage, l.titel, l.zeitstand, l.status, \
            l.version, l.vorgaenger_id, \
            l.ersteller_id, b1.anzeigename AS ersteller_name, l.erstellt_at, \
            l.freigegeben_von_id, b2.anzeigename AS freigegeben_von_name, \
-           l.freigegeben_at, l.etb_eintrag_id \
+           l.freigegeben_at, l.etb_eintrag_id, {} AS verteiler, {} AS is_quittierbar \
     FROM {} l \
     JOIN benutzer b1 ON b1.id = l.ersteller_id \
     LEFT JOIN benutzer b2 ON b2.id = l.freigegeben_von_id \
     WHERE l.einsatz_id = ? ORDER BY l.zeitstand DESC, l.id DESC",
-            T::TABELLE
-        )))
-        .bind(einsatz_id)
-        .fetch_all(pool)
-        .await?,
-    )
+        super::verteiler::json_column::<T>("l"),
+        quittierbar_column::<T>("l"),
+        T::TABELLE
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(DokumentKopf::try_from)
+    .collect()
 }
 
 /// Lädt ein Dokument (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
