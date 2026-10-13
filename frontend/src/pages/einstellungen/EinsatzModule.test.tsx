@@ -484,6 +484,43 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
     ).toBeInTheDocument();
   });
 
+  it('hält die Zeile gesperrt, bis Overrides und Freigaben neu geladen sind', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue({});
+    vi.mocked(ladeModulOverrides).mockResolvedValueOnce({});
+    let neuLaden!: (v: unknown) => void;
+    vi.mocked(ladeModulOverrides).mockReturnValueOnce(new Promise((r) => (neuLaden = r)) as never);
+    rendern();
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: Stab' }));
+    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalledTimes(2));
+    // Der eigene Wert ist gespeichert, der Bestand noch alt: ein Rollenwechsel schickte sonst
+    // `sichtbar: null` und nähme ihn still zurück.
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
+
+    neuLaden({ stab: { sichtbar: false, benoetigte_rolle: null } });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).not.toBeDisabled(),
+    );
+  });
+
+  it('zeigt den Schalter erst, wenn die Freigaben feststehen', async () => {
+    let freigabenDa!: (v: unknown) => void;
+    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise((r) => (freigabenDa = r)) as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    rendern();
+
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
+    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    // Overrides und Einsatz sind da; ohne Warten auf die Freigaben stünde der Schalter jetzt „an“.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.queryByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeInTheDocument();
+    freigabenDa(FREIGABE_STAB_AUS);
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+  });
+
   it('nimmt ohne Freigaben die Org-Vorgabe für den Schalter', async () => {
     vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     rendern();

@@ -232,10 +232,13 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 
 // ── Modul-Vorgaben (Rolle, Sichtbarkeit) ───────────────────────────────────
 
-/// PUT-Body für die Vorgabe eines Moduls.
+/// PUT-Body für die Vorgabe eines Moduls. Die beiden Felder verhalten sich beim Weglassen bewusst
+/// verschieden: eine fehlende Rolle heißt „frei“ (wie vor LLH-1179), eine fehlende Sichtbarkeit
+/// „unverändert“. Der eigene Client schickt immer beide.
 #[derive(Debug, serde::Deserialize)]
 pub struct ModulRolleUpdate {
-    /// `None` = freier Zugang (keine Rolle erforderlich), `Some(rolle)` = Pflichtrolle.
+    /// `None` (auch fehlend) = freier Zugang (keine Rolle erforderlich), `Some(rolle)` =
+    /// Pflichtrolle.
     pub benoetigte_rolle: Option<String>,
     /// LLH-1179: `false` blendet das Modul für alle Einsätze ohne eigenen Wert aus, `true` nimmt das
     /// zurück. Fehlt das Feld, bleibt die gespeicherte Sichtbarkeit unverändert — ein Aufrufer, der

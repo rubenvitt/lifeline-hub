@@ -132,9 +132,9 @@ Modul zusammen mit der Rollen-Vorgabe liefern. Ändern MUST nur der System-Admin
 ### Requirement: Der Editor „Module“ zeigt den wirksamen Wert und seine Herkunft
 Der Schalter „Sichtbar“ im Editor „Module“ des Einsatzes MUST den wirksamen Wert zeigen. Blendet
 die Organisation ein Modul aus, MUST darunter gedämpft „Vorgabe der Organisation: ausgeblendet“
-stehen. Umlegen MUST einen eigenen Wert des Einsatzes speichern. Trägt der Einsatz einen eigenen
-Wert, MUST die Zeile „Vorgabe übernehmen“ anbieten, das ihn zurücknimmt. Eine Rollenänderung
-MUST den eigenen Wert unverändert lassen.
+stehen; ohne Leserecht auf die Org-Vorgaben nur, solange der Einsatz keinen eigenen Wert trägt.
+Umlegen MUST einen eigenen Wert speichern, „Vorgabe übernehmen“ (bei eigenem Wert) ihn
+zurücknehmen. Eine Rollenänderung MUST den eigenen Wert unverändert lassen.
 
 #### Scenario: Geerbte Ausblendung
 - **WHEN** die Organisation `stab` ausblendet, der Einsatz keinen eigenen Wert hat und die Einsatzleitung den Editor „Module“ öffnet
@@ -147,6 +147,10 @@ MUST den eigenen Wert unverändert lassen.
 #### Scenario: Vorgabe übernehmen
 - **WHEN** die Einsatzleitung danach „Vorgabe übernehmen“ wählt
 - **THEN** speichert der Editor `sichtbar: null`, und der Schalter steht wieder aus
+
+#### Scenario: Einsatzleitung ohne Leserecht auf die Org-Vorgaben
+- **WHEN** die Organisation `stab` ausblendet, der Einsatz keinen eigenen Wert hat und eine Einsatzleitung ohne Org-Rolle den Editor „Module“ öffnet
+- **THEN** steht der Schalter von „Stab“ aus, und darunter steht „Vorgabe der Organisation: ausgeblendet“
 
 #### Scenario: Rolle ändern bei geerbter Sichtbarkeit
 - **WHEN** die Organisation `stab` ausblendet, der Einsatz keinen eigenen Wert hat und die Einsatzleitung die benötigte Rolle von „Stab“ ändert

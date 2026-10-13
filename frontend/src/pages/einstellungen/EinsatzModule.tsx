@@ -80,15 +80,24 @@ export default function EinsatzModule() {
   const overrideMutation = useMutation({
     mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
       setzeModulOverride(einsatzId, vars.modulKey, vars.update),
+    // Die Mutation endet erst mit dem neuen Bestand: bis dahin bleibt die Zeile gesperrt, sonst
+    // schickte ein schneller Rollenwechsel den alten eigenen Wert mit (LLH-1179).
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) });
-      // Die Freigaben leiten sich aus den Overrides ab; die Navigation folgt ohne Neuladen (LFH-669).
-      qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigaben(einsatzId) });
       quittiereModulGespeichert(message, 'Modul-Einstellung gespeichert');
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) }),
+        // Die Freigaben leiten sich aus den Overrides ab; die Navigation folgt ohne Neuladen
+        // (LFH-669).
+        qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigaben(einsatzId) }),
+      ]);
     },
   });
 
-  if (daten.laedt || overridesQuery.isLoading) return <SeitenSkeleton />;
+  // Auch auf die Freigaben warten: ohne sie stünde der Schalter einer geerbten Ausblendung „an“.
+  // Scheitern sie, gilt der Rückfall aus der Org-Vorgabe (`sichtbarVon`).
+  if (daten.laedt || overridesQuery.isLoading || freigabenQuery.isLoading) {
+    return <SeitenSkeleton />;
+  }
   /**
    * Ein gescheiterter Override-Abruf darf nicht in die Liste fallen: `?? {}` hieße sonst „alle
    * sichtbar, keine Rollenschranke", und der nächste Schalterklick schickte diesen erfundenen Stand

@@ -103,11 +103,16 @@ export default function EinsatzDefaults() {
   const modulMutation = useMutation({
     mutationFn: (vars: { modulKey: string; vorgabe: OrgModulEinstellungUpdate }) =>
       setzeOrgModulEinstellung(vars.modulKey, vars.vorgabe),
+    // Die Mutation endet erst mit dem neuen Bestand: bis dahin bleibt die Zeile gesperrt. Sonst
+    // schickte ein schneller zweiter Klick den alten Bestand der anderen Spalte mit und höbe etwa
+    // eine eben gesetzte Ausblendung still wieder auf (LLH-1179).
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
-      // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
-      qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() });
       quittiereModulGespeichert(message, 'Modul-Vorgabe gespeichert');
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() }),
+        // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
+        qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() }),
+      ]);
     },
   });
 

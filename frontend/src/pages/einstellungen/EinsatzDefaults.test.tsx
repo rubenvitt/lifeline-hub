@@ -474,6 +474,37 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeDisabled();
   });
 
+  it('hält die Zeile gesperrt, bis der neue Bestand geladen ist — sonst hebt der nächste Klick die Ausblendung auf', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValueOnce({
+      stab: { benoetigte_rolle: null, sichtbar: true },
+    } as never);
+    let neuLaden!: (v: unknown) => void;
+    vi.mocked(ladeOrgModulEinstellungen).mockReturnValueOnce(
+      new Promise((r) => (neuLaden = r)) as never,
+    );
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: Stab' }));
+    await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(ladeOrgModulEinstellungen).toHaveBeenCalledTimes(2));
+    // Der PUT ist durch, der Bestand noch nicht: die Rollenauswahl bleibt gesperrt.
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
+
+    neuLaden({ stab: { benoetigte_rolle: null, sichtbar: false } });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).not.toBeDisabled(),
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' }));
+    const optionen = await screen.findAllByText('Admin');
+    fireEvent.click(optionen[optionen.length - 1]);
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenLastCalledWith('stab', {
+        benoetigte_rolle: 'admin',
+        sichtbar: false,
+      }),
+    );
+  });
+
   it('lässt die Modulliste ohne geladenen Bestand nicht bedienen', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(500, 'kaputt'));
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
