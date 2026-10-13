@@ -329,6 +329,29 @@ describe('PersonalPage', () => {
   });
 
   /**
+   * Rückgängig aus dem Toast hat keinen sichtbaren Ort mehr: die Zeile ist weg, der Block
+   * „Entlassen“ eingeklappt. Der Grund steht deshalb im Seitenhinweis (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“), nicht im Block.
+   */
+  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen', () =>
+        HttpResponse.json({ ...disponiert[0], beendet_als: 'entlassen' }),
+      ),
+      http.post('/api/einsaetze/7/personal/10/reaktivieren', () =>
+        HttpResponse.json({ error: 'Person ist außer Dienst' }, { status: 422 }),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(screen.getByRole('button', { name: 'Thomas Müller entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await screen.findByText('Person ist außer Dienst');
+    expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
+    expect(hinweis.closest('.ant-alert')).not.toBeNull();
+  });
+
+  /**
    * Stornieren ist unumkehrbar: es steht im Zeilenmenü und fragt per `<Modal>` mit einem Satz zur
    * Folge nach; der Knopf nennt die Handlung (Spec `kraefte-entlassung`, „Fehldisposition
    * stornieren“). Eine Ablehnung steht an der Zeile.

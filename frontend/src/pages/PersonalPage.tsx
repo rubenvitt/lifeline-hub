@@ -61,6 +61,7 @@ import {
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
@@ -169,12 +170,27 @@ export default function PersonalPage() {
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
   });
-  // Erneut disponieren (LLH-1079): Rückgängig aus dem Toast und Aktion im Block „Entlassen“.
+  /*
+   * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): die Aktion im Block „Entlassen“ meldet an ihrem Eintrag, Rückgängig
+   * aus dem Toast im Seitenhinweis — die Zeile ist dann weg, der Block meist eingeklappt.
+   */
   const reaktivierenMutation = useMutation({
     mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
     onMutate: (epId) => zeilen.beginne(epId),
     onSuccess: invalidate,
     onError: (e, epId) => zeilen.melde(epId, e, 'Nicht erneut disponiert'),
+  });
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  const rueckgaengigMutation = useMutation({
+    mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: invalidate,
+    onError: (e) => {
+      setRueckgaengigFehler(e);
+      invalidate();
+    },
   });
   // Entlassen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast (`frontend/AGENTS.md`,
   // „Destruktiv ist nicht gleich destruktiv“, design.md D8).
@@ -183,7 +199,7 @@ export default function PersonalPage() {
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: (_, v) => {
       invalidate();
-      zeigeRueckgaengig(message, `${v.name} entlassen`, () => reaktivierenMutation.mutate(v.epId));
+      zeigeRueckgaengig(message, `${v.name} entlassen`, () => rueckgaengigMutation.mutate(v.epId));
     },
     onError: (e, v) => zeilen.melde(v.epId, e, 'Nicht entlassen'),
   });
@@ -538,10 +554,18 @@ export default function PersonalPage() {
         )
       }
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-        )
+        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {!darfSchreiben && einsatz.status !== 'aktiv' && (
+              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+            )}
+            <SeitenHinweise
+              fehler={rueckgaengigFehler}
+              fehlerTitel="Nicht erneut disponiert"
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+          </Space>
+        ) : null
       }
     >
       {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf diese Seite,
