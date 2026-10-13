@@ -62,20 +62,20 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 
 ## 4. Frontend: Befehl
 
-- [ ] 4.1 `api/befehle.ts`: `quittiereBefehlEmpfang` und `nimmBefehlQuittungZurueck`.
-- [ ] 4.2 `BefehlListenKarte`: Verteilernamen und bei freigegebenen Befehlen der
+- [x] 4.1 `api/befehle.ts`: `quittiereBefehlEmpfang` und `nimmBefehlQuittungZurueck`.
+- [x] 4.2 `BefehlListenKarte`: Verteilernamen und bei freigegebenen Befehlen der
   `Quittungsstand`. Nachweis: Komponententest für einen freigegebenen Befehl mit Verteiler
   („2 Empfänger · 1/2 quittiert“), einen Entwurf (Namen ohne Stand) und einen Befehl ohne
   Verteiler (keine Zeile).
-- [ ] 4.3 `BefehlDetail`: Block „Verteiler“ mit `EmpfaengerQuittung`, Quittieren ohne Rückfrage,
+- [x] 4.3 `BefehlDetail`: Block „Verteiler“ mit `EmpfaengerQuittung`, Quittieren ohne Rückfrage,
   `zeigeRueckgaengig` mit Rücknahme, Fehler je Zeile, Knopf nur bei `darfSchreiben &&
   is_quittierbar`. Nachweis: Komponententests für Quittieren mit Rückgängig, überholte Fassung
   ohne Knopf, Beobachter ohne Knopf und Ablehnung mit Grund am Block.
-- [ ] 4.4 `BefehlListe`: Empfängerfilter, Filter im Client, Segmentzahlen zählen das Gefundene.
+- [x] 4.4 `BefehlListe`: Empfängerfilter, Filter im Client, Segmentzahlen zählen das Gefundene.
   `pages/AuftraegePage.reiter.test.tsx` wird umgestellt: Beide Reiter tragen den
   Empfängerfilter, nur die Aufträge die Richtung. Nachweis: Test mit Filter auf einen Abschnitt.
   Bereichskopf zählt den Bestand.
-- [ ] 4.5 `pnpm lint` und `pnpm typecheck` sind grün. Der Wortlautwächter
+- [x] 4.5 `pnpm lint` und `pnpm typecheck` sind grün. Der Wortlautwächter
   (`kommunikation/wortlaut.guard.test.ts`) ist grün.
 
 ## 5. e2e und Doku (D8)
@@ -92,5 +92,6 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 
 - [ ] 6.1 `./scripts/check-all.sh --geaendert` lokal grün, soweit die Umgebung es erlaubt. Den
   vollen Lauf belegt die CI des PRs.
-- [ ] 6.2 Folgeaufgabe „Abschnittsgerät quittiert Einsatzbefehle“ auf dem Board anlegen
-  (`zunder-task-anlegen`) und hier verlinken.
+- [x] 6.2 Folgeaufgabe „Abschnittsgerät quittiert Einsatzbefehle“ auf dem Board anlegen
+  (`zunder-task-anlegen`) und hier verlinken: LLH-1190,
+  https://zunder.rubeen.dev/#/aufgabe/lxlrhstatrfr70dcomgayx43

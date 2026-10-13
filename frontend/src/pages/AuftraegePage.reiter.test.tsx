@@ -87,7 +87,7 @@ describe('AuftraegePage — beide Reiter gleich gebaut (Spec `auftraege-befehle`
     expect(within(leiste).getByRole('textbox', { name: /durchsuchen/ })).toBeInTheDocument();
   }
 
-  it('Einzelaufträge und Einsatzbefehle tragen dieselbe Leiste; Empfänger und Richtung nur bei Aufträgen', async () => {
+  it('Einzelaufträge und Einsatzbefehle tragen dieselbe Leiste mit Empfängerfilter; Richtung nur bei Aufträgen (LLH-1173)', async () => {
     const { container } = renderPage();
     await screen.findByRole('textbox', { name: 'Aufträge durchsuchen' });
     const auftragsLeiste = container.querySelector<HTMLElement>('[data-lfh="auftraege-filter"]')!;
@@ -99,7 +99,7 @@ describe('AuftraegePage — beide Reiter gleich gebaut (Spec `auftraege-befehle`
     await screen.findByRole('textbox', { name: 'Befehle durchsuchen' });
     const befehlsLeiste = container.querySelector<HTMLElement>('[data-lfh="befehle-filter"]')!;
     await pruefeLeiste(befehlsLeiste);
-    expect(within(befehlsLeiste).queryByText('Empfänger filtern')).toBeNull();
+    expect(within(befehlsLeiste).getByText('Empfänger filtern')).toBeInTheDocument();
     expect(within(befehlsLeiste).queryByText('Alle Richtungen')).toBeNull();
   });
 });

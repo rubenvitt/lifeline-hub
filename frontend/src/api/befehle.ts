@@ -57,3 +57,27 @@ export function schreibeBefehlFort(
     zeitstand,
   });
 }
+
+/** Empfang einer Verteiler-Zeile quittieren (LLH-1173); nur die jüngste freigegebene Fassung. */
+export function quittiereBefehlEmpfang(
+  einsatzId: number,
+  id: number,
+  eintragId: number,
+): Promise<BefehlAnzeige> {
+  return apiSend<BefehlAnzeige>(
+    `/api/einsaetze/${einsatzId}/befehle/${id}/verteiler/${eintragId}/quittieren`,
+    'POST',
+  );
+}
+
+/** Quittung einer Verteiler-Zeile zurücknehmen, der Rückweg zum Rückgängig-Knopf (LFH-343). */
+export function nimmBefehlQuittungZurueck(
+  einsatzId: number,
+  id: number,
+  eintragId: number,
+): Promise<BefehlAnzeige> {
+  return apiSend<BefehlAnzeige>(
+    `/api/einsaetze/${einsatzId}/befehle/${id}/verteiler/${eintragId}/zuruecknehmen`,
+    'POST',
+  );
+}

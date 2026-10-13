@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs]
 ---
 
 ## Überblick
@@ -14,7 +14,8 @@ Das Modul „Aufträge/Befehle“ hat zwei Reiter:
   Auftrag lässt sich berichtigen, solange noch niemand quittiert hat, und mit einem Grund
   aufheben, solange er nicht abgenommen ist.
 - **Einsatzbefehle** sind Dokumente nach einem Befehlsschema. Sie entstehen als Entwurf, werden
-  freigegeben und lassen sich danach nur noch in einer neuen Fassung fortschreiben.
+  freigegeben und lassen sich danach nur noch in einer neuen Fassung fortschreiben. Jede Stelle
+  im Verteiler eines freigegebenen Befehls quittiert den Empfang.
 
 Lesen dürfen alle mit Zugang zum Einsatz. Erteilen, Quittieren, Berichtigen, Aufheben,
 Entwerfen und Freigeben dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
@@ -154,15 +155,32 @@ Ein gespeicherter Entwurf öffnet sich wieder über den Reiter „Einsatzbefehle
 ### Einen Einsatzbefehl lesen
 
 1. Im Reiter „Einsatzbefehle“ die Ansicht „Entwürfe“ oder „Freigegeben“ wählen, bei Bedarf im
-   Suchfeld „Titel oder Schema“ suchen, und einen Befehl wählen. Er steht mit Schema, Zeitstand,
-   Ersteller, Verteiler, Freigabe und dem ganzen „Befehlstext“ neben bzw. unter der Liste.
+   Suchfeld „Titel oder Schema“ suchen oder „Empfänger filtern“, und einen Befehl wählen. Er
+   steht mit Schema, Zeitstand, Ersteller, Freigabe, Verteiler und dem ganzen „Befehlstext“ neben
+   bzw. unter der Liste. Bei einem freigegebenen Befehl zeigt der Verteiler, wer den Empfang
+   schon quittiert hat.
 
-   ![Einsatzbefehle mit der Liste der Befehle links und dem gewählten Befehl rechts, darin „Entwurf bearbeiten“, „Freigeben“ und der Befehlstext](../bilder/auftraege-befehle/befehl-detail.png)
+   ![Einsatzbefehle mit der Liste der freigegebenen Befehle links und dem gewählten Befehl rechts, darin „Fortschreiben“, der Verteiler mit „2 Empfänger · 1/2 quittiert“, einer quittierten Stelle mit ✓, „Quittung offen:“ mit „Quittieren“ und der Befehlstext](../bilder/auftraege-befehle/befehl-detail.png)
 
 2. „Vollansicht“ öffnet den Befehl ganzseitig. Dort führt ein freigegebener Befehl im Kopf mit
    „Zum ETB-Eintrag“ ins Tagebuch, und „Drucken / als PDF“ gibt ihn auf Papier aus (siehe
    [Drucken und Export](drucken-export.md)). „Aufträge/Befehle“ oben im Ortspfad führt zurück, der
    Befehl ist dann gewählt.
+
+### Den Empfang eines Einsatzbefehls quittieren
+
+Für Einsatzleitung und Führungspersonal, an der jüngsten freigegebenen Fassung eines Befehls:
+
+1. Im Reiter „Einsatzbefehle“ die Ansicht „Freigegeben“ wählen und den Befehl wählen. Seine Karte
+   zählt die Quittungen, etwa „2 Empfänger · 1/2 quittiert“.
+2. Im Befehl unter „Verteiler“ steht neben „Quittung offen:“ jede Stelle, die den Empfang noch
+   nicht bestätigt hat. Bei der Stelle „Quittieren“ wählen. Eine Rückfrage gibt es nicht.
+3. Ein Hinweis bietet sechs Sekunden lang „Rückgängig“: Er nimmt die Quittung zurück, die Stelle
+   steht wieder unter „Quittung offen:“.
+
+Quittierte Stellen stehen mit ✓ im Verteiler. Ein Befehlsentwurf hat noch keine Quittung, und
+eine Fassung, nach der schon eine neuere freigegeben ist, nimmt keine Quittung mehr an: Ihre
+offenen Stellen stehen ohne „Quittieren“ da, ihre Quittungen bleiben sichtbar.
 
 ### Einen Einsatzbefehl freigeben und fortschreiben
 
@@ -236,7 +254,8 @@ Schreibrecht und in jeder Phase des Auftrags.
 
 ### Einzelauftrag oder Einsatzbefehl
 
-Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Empfänger, Quittung und Vollzug.
+Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Vollzug und Abnahme; einen
+Einsatzbefehl quittieren nur die Stellen in seinem Verteiler.
 Das Schema „Einzelauftrag (EA/ZMW)“ bietet „Neuer Befehlsentwurf“ deshalb nicht mehr an.
 Befehle, die schon mit diesem Schema angelegt sind, lassen sich weiter öffnen, bearbeiten,
 freigeben, fortschreiben und drucken.
@@ -259,7 +278,19 @@ Bei der Freigabe steht der Verteiler im ETB-Eintrag als Empfänger („An“), b
 gekürzt auf „… und N weitere“, und vollständig als Abschnitt „Verteiler“ am Ende des Textes.
 Ohne Verteiler bleibt „System“ der Empfänger. Gedruckt steht der Verteiler im Kopf des Blatts,
 im Entwurf mit dem Stand im Formular, auch wenn er noch nicht gespeichert ist. Eine
-Fortschreibung übernimmt den Verteiler der freigegebenen Fassung.
+Fortschreibung übernimmt den Verteiler der freigegebenen Fassung, aber keine Quittung: In der
+neuen Fassung sind alle Stellen wieder offen.
+
+„Empfänger filtern“ wirkt in beiden Reitern gleich: Es zeigt nur Aufträge bzw. Befehle, die den
+gewählten Abschnitt oder die gewählte Einheit nennen, ohne Unterabschnitte.
+
+### Quittung eines Befehls im Einsatztagebuch
+
+Jede Quittung schreibt einen Systemeintrag „Empfang quittiert: Einsatzbefehl v2 (ETB 17)“ mit der
+quittierenden Stelle als Absender („Von“). „ETB 17“ ist die Nummer des Eintrags, mit dem die
+Fassung freigegeben wurde. Den Titel nennt der Eintrag nicht. Eine zurückgenommene Quittung
+schreibt dazu „Quittung zurückgenommen: Einsatzbefehl v2 (ETB 17)“, der Eintrag der Quittung
+bleibt stehen. Quittiert eine Stelle doppelt, entsteht kein zweiter Eintrag.
 
 ## Grundlagen und Quellen
 
