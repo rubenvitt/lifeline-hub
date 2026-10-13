@@ -5,9 +5,10 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 /**
  * Stab, Lagebesprechung und Informationstelefon am Handschirm (LFH-978).
  *
- * - **Besetzung (U67):** bei 390 px steht „Besetzung ändern" UNTER dem Inhalt des Sachgebiets,
- *   linksbündig, und der Inhalt nutzt ≥ 90 % der Eintragsbreite. Vorher quetschte der Knopf rechts
- *   die Beschreibung auf rund 190 px, die Seite maß über 5 000 px.
+ * - **Kacheln (U67, LLH-1124):** bei 390 px stehen die sechs Kacheln S1–S6 untereinander, jede
+ *   nimmt ≥ 90 % der Inhaltsbreite ein, und die Seite läuft nicht waagerecht über. „Besetzung
+ *   ändern“ steht im Kopf der Kachel, nicht neben ihrem Inhalt. Vorher (Liste) quetschte der Knopf
+ *   rechts die Beschreibung auf rund 190 px.
  * - **Sichtung (U69):** die Wertzeile der Vorbereitung bricht bei 390 und 820 px nur an „ · "
  *   um. Die Vorbereitung steht seit LLH-1111 auf der Seite Lagebesprechung, nicht mehr im Stab. Gemessen je Teil über die Zeilenkästen eines `Range`: ein Teil auf zwei Zeilen hat zwei
  *   verschiedene Oberkanten. Vorbedingung ist, dass die Zeile überhaupt umbricht, sonst wäre
@@ -63,20 +64,11 @@ async function stelleDichte(page: Page, dichte: 'komfortabel') {
   await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
 }
 
-const besetzung = (page: Page) =>
-  page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-
-/** Die sechs Sachgebietszeilen: jede trägt ihre Werkzeug-Gruppe oder ihren Titel „S…". */
-async function sachgebietsTitel(page: Page): Promise<Locator> {
-  const titel = besetzung(page).getByRole('heading', { level: 3 });
-  await expect(titel).toHaveCount(6);
-  return titel;
-}
-
-/** Wurzel eines Listeneintrags (`ListenEintrag`) und sein Inhaltsblock, vom Titel aus. */
-function eintragVon(titel: Locator) {
-  const wurzel = titel.locator('xpath=ancestor::li[1]/*[1]');
-  return { wurzel, inhalt: wurzel.locator('xpath=./*[1]') };
+/** Die sechs Kacheln S1–S6 (LLH-1124): je ein Paneel, benannt nach Kennung und Label. */
+async function kacheln(page: Page): Promise<Locator> {
+  const k = page.getByRole('region', { name: /^S\d · / });
+  await expect(k).toHaveCount(6);
+  return k;
 }
 
 async function kasten(ziel: Locator, was: string) {
@@ -85,19 +77,31 @@ async function kasten(ziel: Locator, was: string) {
   return b!;
 }
 
-/** Jede Sachgebietszeile: der Inhalt nimmt ≥ 90 % der Eintragsbreite ein. */
-async function inhaltFuelltZeilen(page: Page, rolle: string) {
-  const titel = await sachgebietsTitel(page);
+/**
+ * Jede Kachel: untereinander (eine Spalte), ≥ 90 % der Breite des Rasters, und die Seite läuft
+ * nicht waagerecht über.
+ */
+async function kachelnFuellenDieSpalte(page: Page, rolle: string) {
+  const k = await kacheln(page);
+  const raster = await kasten(k.first().locator('xpath=..'), `${rolle}: Raster`);
+  let obenVorher = -Infinity;
   for (let i = 0; i < 6; i++) {
-    const name = (await titel.nth(i).textContent())?.trim() ?? `Zeile ${i}`;
-    const { wurzel, inhalt } = eintragVon(titel.nth(i));
-    const w = await kasten(wurzel, name);
-    const c = await kasten(inhalt, name);
+    const name = `${rolle}, Kachel ${i + 1}`;
+    const b = await kasten(k.nth(i), name);
     expect(
-      c.width,
-      `${rolle}, ${name}: Inhalt ${c.width.toFixed(1)} von ${w.width.toFixed(1)} px`,
-    ).toBeGreaterThanOrEqual(w.width * INHALT_ANTEIL);
+      b.width,
+      `${name}: ${b.width.toFixed(1)} von ${raster.width.toFixed(1)} px`,
+    ).toBeGreaterThanOrEqual(raster.width * INHALT_ANTEIL);
+    expect(b.y, `${name}: unter der vorigen`).toBeGreaterThan(obenVorher);
+    obenVorher = b.y;
   }
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.scrollingElement!.scrollWidth,
+    clientWidth: document.scrollingElement!.clientWidth,
+  }));
+  expect(scrollWidth, `${rolle}: kein waagerechter Überlauf`).toBeLessThanOrEqual(
+    clientWidth + SUBPIXEL,
+  );
 }
 
 /** Die Wertzeile der Sichtung in der Vorbereitung, erst wenn sie Daten trägt. */
@@ -158,28 +162,45 @@ async function sichtungBrichtNurAmTrenner(page: Page, was: string) {
 }
 
 test.describe('Stab und Lagebesprechung am Handschirm (LFH-978)', () => {
-  test('Admin, 390 px: „Besetzung ändern" unter dem Inhalt, Sichtung der Lagebesprechung bricht nur am Trenner', async ({
+  test('Admin, 390 px: Kacheln untereinander ohne Überlauf, Sichtung der Lagebesprechung bricht nur am Trenner', async ({
     page,
   }) => {
     await page.setViewportSize(HANDSCHIRM);
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page);
+    // Eine lange Besetzung: sie bricht in der Kachel um, statt abgeschnitten zu werden (Review
+    // LLH-1124, design.md D1).
+    const lang = 'Integrierte Leitstelle Musterstadt (rückwärtige Führungsunterstützung)';
+    const besetzt = await page.request.put(`/api/einsaetze/${einsatzId}/stab/besetzung/s6`, {
+      data: { besetzung_art: 'rueckwaertig', bezeichnung: lang },
+    });
+    expect(besetzt.ok(), `Besetzung: ${besetzt.status()}`).toBe(true);
     await page.goto(`/einsaetze/${einsatzId}/stab`);
+    const s6 = page.getByRole('region', { name: /^S6 · / });
+    const chip = s6.getByText(lang, { exact: false });
+    await expect(chip).toBeVisible();
+    const kb = await kasten(s6, 'Kachel S6');
+    const cb = await kasten(chip, 'Chip S6');
+    expect(cb.x + cb.width, 'Chip S6 in der Kachel').toBeLessThanOrEqual(
+      kb.x + kb.width + SUBPIXEL,
+    );
+    expect(
+      await chip.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+      'Chip S6 nicht abgeschnitten',
+    ).toBe(true);
 
-    const knoepfe = besetzung(page).getByRole('button', { name: /^Besetzung ändern – / });
-    await expect(knoepfe).toHaveCount(6);
-    const titel = await sachgebietsTitel(page);
+    const k = await kacheln(page);
+    // „Besetzung ändern“ steht im Kopf jeder Kachel, innerhalb ihrer Breite.
     for (let i = 0; i < 6; i++) {
-      const name = (await titel.nth(i).textContent())?.trim() ?? `Zeile ${i}`;
-      const { inhalt } = eintragVon(titel.nth(i));
-      const c = await kasten(inhalt, name);
-      const k = await kasten(knoepfe.nth(i), name);
-      expect(k.y, `${name}: Knopf unter dem Inhalt`).toBeGreaterThanOrEqual(
-        c.y + c.height - SUBPIXEL,
+      const knopf = k.nth(i).getByRole('button', { name: /^Besetzung ändern – / });
+      await expect(knopf).toHaveCount(1);
+      const b = await kasten(k.nth(i), `Kachel ${i + 1}`);
+      const kb = await kasten(knopf, `Knopf ${i + 1}`);
+      expect(kb.x + kb.width, `Kachel ${i + 1}: Knopf in der Kachel`).toBeLessThanOrEqual(
+        b.x + b.width + SUBPIXEL,
       );
-      expect(Math.abs(k.x - c.x), `${name}: Knopf linksbündig mit dem Inhalt`).toBeLessThan(1);
     }
-    await inhaltFuelltZeilen(page, 'Admin');
+    await kachelnFuellenDieSpalte(page, 'Admin');
 
     const hoehe = await page.evaluate(() => document.scrollingElement!.scrollHeight);
     await test.info().attach('scrollHeight.json', {
@@ -191,7 +212,7 @@ test.describe('Stab und Lagebesprechung am Handschirm (LFH-978)', () => {
     await sichtungBrichtNurAmTrenner(page, 'Admin, 390 px');
   });
 
-  test('Beobachter, 390 px: ohne Knopf füllt der Inhalt die Zeile, Sichtung wie beim Admin', async ({
+  test('Beobachter, 390 px: ohne Knopf füllen die Kacheln die Spalte, Sichtung wie beim Admin', async ({
     page,
   }) => {
     await page.setViewportSize(HANDSCHIRM);
@@ -200,12 +221,12 @@ test.describe('Stab und Lagebesprechung am Handschirm (LFH-978)', () => {
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/stab`);
 
-    await sachgebietsTitel(page);
+    await kacheln(page);
     await expect(
-      besetzung(page).getByRole('button', { name: /^Besetzung ändern/ }),
+      page.getByRole('button', { name: /^Besetzung ändern/ }),
       'Vorbedingung: ohne Schreibrecht kein „Besetzung ändern"',
     ).toHaveCount(0);
-    await inhaltFuelltZeilen(page, 'Beobachter');
+    await kachelnFuellenDieSpalte(page, 'Beobachter');
     await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
     await sichtungBrichtNurAmTrenner(page, 'Beobachter, 390 px');
   });

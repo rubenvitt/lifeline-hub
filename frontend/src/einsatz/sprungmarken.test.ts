@@ -128,6 +128,12 @@ describe('Sprungmarken (LFH-620)', () => {
         expect(seite.pfad(7)).toBe('/einsaetze/7/fernmeldewesen');
         continue;
       }
+      // Die Sprechgruppen sind eine Darstellung des Funkplans (LLH-1124): keine eigene Marke,
+      // das Schlagwort „sprechgruppe“ führt in die Fernmeldeskizze.
+      if (seite.key === 'sprechgruppen') {
+        expect(marken, seite.key).toHaveLength(0);
+        continue;
+      }
       expect(marken, seite.key).toHaveLength(1);
       expect(marken[0].label).toBe(seite.label);
       expect(marken[0].pfad(7)).toBe(seite.pfad(7));

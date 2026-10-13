@@ -9,12 +9,14 @@ import type {
   Verbindungsstatus,
 } from '../api/types';
 import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
+import type { NetzLuecken } from './fernmeldeskizze';
+import type { FunkplanLuecken } from './funkplan';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
  * Lücken als reine Filter über bereits geladene Listen (Stab-Spec LFH-46, Entscheidung 15:
- * keine zweite Verdichtung). Wo eine Zahl auf dem Funkplan (LFH-548) und später auf der
- * Stabzeile (ST6) steht, kommt sie aus DIESER Funktion.
+ * keine zweite Verdichtung). Wo eine Zahl auf dem Funkplan (LFH-548) und an der S6-Kachel
+ * der Stab-Seite (LLH-1124) steht, kommt sie aus DIESER Datei.
  *
  * Eine Lücke ohne geladene Daten hat keine Zahl: `treffer` bleibt leer, und der Zustand sagt,
  * warum. Aufrufer zeigen dann „—" mit Grund, nie „0".
@@ -358,4 +360,23 @@ export function verbindungenOhneGemeinsameSprechgruppe(
     }
   }
   return { zustand, treffer };
+}
+
+/**
+ * Die Zahl der Lücken (LLH-1124, Spec `stab-funkplan`, „Zahl der Lücken“): Kopf des Lücken-Paneels
+ * im Funkplan UND Werkzeug „Funkplan“ der Stab-Seite, aus dieser einen Rechnung. Summe der Treffer
+ * aller Zeilen des Paneels; ein Datensatz unter zwei Lücken zählt bei jeder (die Zahl sagt, wie viel
+ * zu tun ist), die Leitstelle ohne Verbindung zählt eins. Die fehlende eigene Gegenstelle zählt
+ * nicht, sie ist ein Hinweis auf ihren Pflegeort. Fehlt auch nur eine Quelle, gibt es keine
+ * Teilsumme, sondern den schlechtesten Zustand.
+ */
+export function countLuecken(
+  luecken: FunkplanLuecken,
+  netz: NetzLuecken,
+): { zustand: AbrufZustand; anzahl: number | null } {
+  const zeilen: Luecke<unknown>[] = [...Object.values(luecken), netz.schienenMitEinemTeilnehmer];
+  const zustand = schlechtesterZustand(...zeilen.map((l) => l.zustand), netz.leitstelle.zustand);
+  if (zustand !== 'daten') return { zustand, anzahl: null };
+  const summe = zeilen.reduce((n, l) => n + l.treffer.length, 0);
+  return { zustand, anzahl: summe + (netz.leitstelle.fehlt ? 1 : 0) };
 }

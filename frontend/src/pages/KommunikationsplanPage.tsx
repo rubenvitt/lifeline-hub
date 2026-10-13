@@ -68,7 +68,7 @@ import './kommunikationsplanPrint.css';
  * Funks erreichbar ist. Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`.
  *
  * - **Ort:** Reiter „Kommunikationsplan“ des Moduls Fernmeldewesen (`kommunikationsplanPfad`,
- *   LLH-1180), Einstieg auch in der S6-Zeile. Sperre und Sichtbarkeit sind die des
+ *   LLH-1180), Einstieg auch in der S6-Kachel. Sperre und Sichtbarkeit sind die des
  *   Fernmeldewesens, fail-closed über `useModulFreigabe` (design.md D6). Der Stab liefert nur noch
  *   die Besetzung als Nebentext, mit eigener Weiche (D8): ohne ihn steht „—“ mit Grund.
  * - **Daten:** gepflegte Stellen (Funktionen und externe Stellen) vom Server; Abschnitte,

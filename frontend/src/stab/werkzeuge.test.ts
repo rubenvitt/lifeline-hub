@@ -2,7 +2,7 @@ import { IconHaus } from '../icons';
 import { describe, expect, it } from 'vitest';
 import type { ModulFreigaben } from '../api/types';
 import type { ModulEintrag } from '../einsatz/modulRegistry';
-import { werkzeugeFuer } from './werkzeuge';
+import { werkzeugState } from './werkzeuge';
 
 /**
  * Registry-STUB statt der echten Registry: es gibt kein `wip`-Modul mehr, an dem sich der
@@ -21,42 +21,73 @@ const REGISTER = [
   stub({ key: 'fertig-a', label: 'A', route: 'a' }),
   stub({ key: 'unfertig', label: 'U', route: 'u', status: 'wip' }),
   stub({ key: 'gesperrt', label: 'G', route: 'g' }),
-  stub({ key: 'fertig-b', label: 'B', route: 'b' }),
+  stub({ key: 'verweis', label: 'V', route: 'v', verweistAuf: 'ziel' }),
 ];
 /** Freigaben, wie der Server sie liefert: alle Stub-Module frei, `gesperrt` ohne Zugriff. */
 const freigabenMit = (abweichend: ModulFreigaben = {}): ModulFreigaben => ({
   'fertig-a': { sichtbar: true, zugriff: true },
   unfertig: { sichtbar: true, zugriff: true },
   gesperrt: { sichtbar: true, zugriff: false },
-  'fertig-b': { sichtbar: true, zugriff: true },
+  verweis: { sichtbar: true, zugriff: true },
+  stab: { sichtbar: true, zugriff: true },
+  fernmeldewesen: { sichtbar: true, zugriff: true },
   ...abweichend,
 });
 
-describe('werkzeugeFuer', () => {
-  it('liefert freigegebene Module in der Reihenfolge der Schlüssel', () => {
-    expect(
-      werkzeugeFuer(['fertig-b', 'fertig-a'], freigabenMit(), REGISTER).map((m) => m.key),
-    ).toEqual(['fertig-b', 'fertig-a']);
+const modul = (key: string) => ({ art: 'modul', key }) as const;
+const seite = (key: string) => ({ art: 'seite', key }) as const;
+
+describe('werkzeugState', () => {
+  it('ein freies Modul springt in seine Route, mit dem Label der Registry', () => {
+    const z = werkzeugState('s1', modul('fertig-a'), freigabenMit(), REGISTER);
+    expect(z.zustand).toBe('frei');
+    if (z.zustand === 'fehlt') return;
+    expect(z.label).toBe('A');
+    expect(z.modulKey).toBe('fertig-a');
+    expect(z.pfad(7)).toBe('/einsaetze/7/a');
   });
 
-  it('lässt unfertige, gesperrte und unbekannte Module weg', () => {
-    expect(
-      werkzeugeFuer(
-        ['unfertig', 'gesperrt', 'gibt-es-nicht', 'fertig-a'],
-        freigabenMit(),
-        REGISTER,
-      ).map((m) => m.key),
-    ).toEqual(['fertig-a']);
+  it('ein Modul mit `verweistAuf` springt in das Ziel', () => {
+    const z = werkzeugState('s1', modul('verweis'), freigabenMit(), REGISTER);
+    expect(z.zustand !== 'fehlt' && z.pfad(7)).toBe('/einsaetze/7/ziel');
   });
 
-  it('lässt ausgeblendete Module weg', () => {
+  it('ein gesperrtes Modul bleibt als gesperrtes Werkzeug stehen (design.md D2)', () => {
+    expect(werkzeugState('s1', modul('gesperrt'), freigabenMit(), REGISTER).zustand).toBe(
+      'gesperrt',
+    );
+  });
+
+  it('ein ausgeblendetes, unfertiges oder unbekanntes Modul fehlt', () => {
     const freigaben = freigabenMit({ 'fertig-a': { sichtbar: false, zugriff: true } });
-    expect(werkzeugeFuer(['fertig-a', 'fertig-b'], freigaben, REGISTER).map((m) => m.key)).toEqual([
-      'fertig-b',
-    ]);
+    expect(werkzeugState('s1', modul('fertig-a'), freigaben, REGISTER).zustand).toBe('fehlt');
+    expect(werkzeugState('s1', modul('unfertig'), freigabenMit(), REGISTER).zustand).toBe('fehlt');
+    expect(werkzeugState('s1', modul('gibt-es-nicht'), freigabenMit(), REGISTER).zustand).toBe(
+      'fehlt',
+    );
   });
 
-  it('zeigt kein Werkzeug, solange die Freigaben unbekannt sind', () => {
-    expect(werkzeugeFuer(['fertig-a', 'fertig-b'], undefined, REGISTER)).toEqual([]);
+  it('solange die Freigaben unbekannt sind, fehlt jedes Werkzeug', () => {
+    expect(werkzeugState('s1', modul('fertig-a'), undefined, REGISTER).zustand).toBe('fehlt');
+    expect(werkzeugState('s6', seite('funkplan'), undefined, REGISTER).zustand).toBe('fehlt');
+  });
+
+  it('eine Unterseite erbt Sperre und Sichtbarkeit ihres Moduls', () => {
+    const frei = werkzeugState('s6', seite('fernmeldeskizze'), freigabenMit(), REGISTER);
+    expect(frei.zustand).toBe('frei');
+    if (frei.zustand === 'fehlt') return;
+    expect(frei.label).toBe('Fernmeldeskizze');
+    expect(frei.modulKey).toBe('fernmeldewesen');
+    expect(frei.pfad(7)).toBe('/einsaetze/7/fernmeldewesen?ansicht=skizze');
+
+    const gesperrt = freigabenMit({ fernmeldewesen: { sichtbar: true, zugriff: false } });
+    expect(werkzeugState('s6', seite('funkplan'), gesperrt, REGISTER).zustand).toBe('gesperrt');
+    const aus = freigabenMit({ fernmeldewesen: { sichtbar: false, zugriff: false } });
+    expect(werkzeugState('s6', seite('funkplan'), aus, REGISTER).zustand).toBe('fehlt');
+    expect(werkzeugState('s5', seite('presse'), freigabenMit(), REGISTER).zustand).toBe('frei');
+  });
+
+  it('eine Unterseite, die das Sachgebiet nicht führt, fehlt', () => {
+    expect(werkzeugState('s1', seite('funkplan'), freigabenMit(), REGISTER).zustand).toBe('fehlt');
   });
 });

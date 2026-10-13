@@ -326,6 +326,14 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
     expect(within(lokal).getByText('DMO 999')).toBeInTheDocument();
   });
 
+  it('zeigt die Zahl der Lücken im Kopf des Paneels (LLH-1124)', async () => {
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    // 1 Abschnitt + 1 Einheit + 1 einsatzlokale + 2 mit einem Teilnehmer + 1 Leitstelle; die
+    // fehlende Gegenstelle zählt nicht (Spec `stab-funkplan`, „Zahl der Lücken“).
+    expect(within(luecken()).getByText('6 Lücken')).toBeInTheDocument();
+  });
+
   it('benennt die fehlende eigene Gegenstelle, ohne eine Zeile zu erfinden', async () => {
     const { container } = setup();
     await screen.findByText('Florian 1/42-1');
@@ -357,6 +365,8 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
       expect(within(zeile).queryByText('0')).toBeNull();
     }
     expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+    // Keine Teilsumme im Kopf, solange eine Zeile „—“ zeigt.
+    expect(within(luecken()).queryByText(/^\d+ Lücken?$/)).toBeNull();
   });
 
   it('zeigt bei gesperrtem Personal „—“ mit Grund in der Führerzelle der Fahrzeuge', async () => {

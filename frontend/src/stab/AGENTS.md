@@ -2,6 +2,20 @@
 
 Gilt für `frontend/src/stab/`, `frontend/src/fernmeldewesen/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
+**Stab-Seite** (LLH-1124, `openspec/changes/archive/2026-10-13-o5nxgqbl-stab-uebersicht/design.md`): ein Raster aus
+sechs Kacheln S1–S6 (`stab/SachgebietKachel.tsx`, eine Spalte unter `md`, zwei ab `md`, drei ab
+`xl`, `stab/stabRaster.ts`), je ein `Paneel` mit `h2` „S4 · Versorgung“ (wirksames Label), Besetzung
+als Chip und „Besetzung ändern“ im Kopf, gekürzter Aufgabenzeile mit nie gekürzter Fundstelle und
+den Werkzeugen im Fugenraster (`stab/WerkzeugZelle.tsx`). Die Kachel selbst ist kein Ziel. Werkzeuge
+nur aus `stab/sachgebiete.ts` (Modul oder Unterseite aus `stab/unterseiten.ts`, **keine Grenze ihrer
+Zahl**); ob eines fehlt, gesperrt mit Grund steht oder springt, entscheidet nur
+`stab/werkzeuge.ts:werkzeugState`, für Module und Unterseiten gleich (ausgeblendet fehlt, gesperrt
+steht). **Je Werkzeug höchstens eine Zahl, nur über `stab/werkzeugZahlen.ts` aus ihrer Heimat:**
+Modulzähler wie im Modulmenü (`bildeZaehler`), Pressearbeit aus den Kennzahlen des Presse-Logs,
+Funkplan aus `stab/luecken.ts:countLuecken` (über `stab/useFunkplanLuecken.ts`). Ohne Quelle keine
+Zahl, fehlende Quelle „—“ mit Grund; die Seite zählt nie selbst. Den Besetzungsstand trägt der
+Seitenkopf.
+
 **Fernmeldewesen** (LLH-1180, `openspec/changes/archive/2026-10-13-nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
 Kommunikationsplan; die Dateien bleiben unter `stab/`. **Die Stab-Freigabe wirkt dort nirgends**,
@@ -17,11 +31,11 @@ Altadressen `stab/funkplan` und `stab/kommunikationsplan` leiten dauerhaft um un
 Sprungmarken und Palette prüfen dessen Freigabe (`istSprungGesperrt('fernmeldewesen')`).
 
 **Funkplan S6** (LFH-548, `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`):
-Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Zeile; die Seite prüft
+Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Kachel; die Seite prüft
 die Freigabe des Fernmeldewesens selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`stab/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
-`stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
+`stab/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `countLuecken`. Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Sechste Quelle ist die eigene Führungsstelle (LFH-849, `stab/fuehrungsstelle.ts`,
 gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungsstelleErfasst`, die
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
@@ -131,8 +145,9 @@ Einsatzdaten; Nebentext Rufname und „Einsatzleiter …“, LLH-1168), sonst ke
 Quelle (auch ohne Netz, sie liegt nicht auf der Platte), steht die Zeile mit Grund.
 
 **Checkliste Arbeitsaufnahme** (LFH-551,
-`openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes
-Paneel der Stabseite (`stab/ChecklistePaneel.tsx`), sieben feste Punkte als Code-Vorlage
+`openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): Paneel
+unter dem Raster der Stabseite (`stab/ChecklistePaneel.tsx`); ist beim Öffnen alles erledigt, steht es
+eingeklappt („7/7 erledigt“, „Aufklappen“), danach klappt nur die Person (LLH-1124, D6); sieben feste Punkte als Code-Vorlage
 (`stab/checkliste.ts` ↔ `ChecklistenPunkt::ALLE`), eigene Tabelle, lazy (ein Aufruf ohne Wirkung
 legt keine Zeile an). `PUT …/stab/checkliste/{punkt}` mit Teilfeldern, jedes Bedienziel schickt
 genau SEIN Feld. Kein ETB je Haken; nur `leitstelle_gemeldet` belegt Haken **und** Rücknahme (E1).

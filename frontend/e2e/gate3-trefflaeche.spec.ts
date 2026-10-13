@@ -1170,8 +1170,8 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 
 // ── Stab ────────────────────────────────────────────────────────────────────────────
 //
-// Vitest belegt für `stabZeilenzielStil` nur den Inline-Style, nicht dass ein `<Link>` in
-// einer `Descriptions`-Zelle die Höhe im Layout ERREICHT. Gemessen werden:
+// Vitest belegt für `werkzeugZelleStil` nur den Inline-Style, nicht dass die Werkzeugzelle im
+// Fugenraster der Kachel die Höhe im Layout ERREICHT (LLH-1124). Gemessen werden:
 //  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `stab/sachgebiete.ts`
 //    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
 //  - die sechs Knöpfe „Besetzung ändern" und die Zeilen der Arbeitsaufnahme.
@@ -1182,15 +1182,15 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 // Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
 
 /**
- * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu die
- * Unterseiten aus `stab/unterseiten.ts`: „Funkplan“ und „Kommunikationsplan“ (LFH-848) in der
- * S6-Zeile (LFH-548) sowie „Pressearbeit“ und „Informationstelefon“ in der S5-Zeile (LFH-554),
- * keine Module, gleicher Stil.
+ * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `stab/sachgebiete.ts` (LLH-1124): Registry-Module, alle
+ * `fertig`, dazu die Unterseiten aus `stab/unterseiten.ts` — „Pressearbeit“ und
+ * „Informationstelefon“ in der Kachel S5 (LFH-554), Funkplan, Fernmeldeskizze, Sprechgruppen und
+ * Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in derselben Werkzeugzelle.
  */
-const STAB_WERKZEUG_LINKS = 18;
-/** Jede Zeile trägt jetzt eine Gruppe; S5 durch ihre zwei Unterseiten (LFH-554). */
+const STAB_WERKZEUG_LINKS = 19;
+/** Jede Kachel trägt eine Gruppe „Werkzeuge S…“. */
 const STAB_WERKZEUG_GRUPPEN = 6;
-/** Sechs feste Sachgebietszeilen, je ein Knopf. */
+/** Sechs feste Kacheln, je ein Knopf. */
 const STAB_BESETZUNG_KNOEPFE = 6;
 /**
  * Sieben feste Punkte der Arbeitsaufnahme (LFH-551), je ein Zeilen-Label um Box und Text. Die
@@ -1231,9 +1231,9 @@ test('Stab: Werkzeug-Links, „Besetzung ändern", Arbeitsaufnahme und der Sprun
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await stelleDichte(page, dichte);
 
-    // Anker: die Besetzung steht.
-    const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-    await expect(besetzung).toHaveCount(1);
+    // Anker: die Kacheln stehen (LLH-1124); die Locator bleiben auf die Kacheln gescopt.
+    const besetzung = page.getByRole('main');
+    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
 
     // (1) Werkzeug-Links, über ihre Gruppen gescopt.
     const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
@@ -1300,10 +1300,10 @@ test('Stab (Beobachter): Werkzeug-Links, Arbeitsaufnahme und der Sprung „Zur L
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await stelleDichte(page, dichte);
 
-    // Datenanker: die Werkzeug-Gruppen hängen an der geladenen Besetzung. Erst danach ist die
-    // Abwesenheit von „Besetzung ändern" eine Aussage.
-    const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-    await expect(besetzung).toHaveCount(1);
+    // Datenanker: die Kacheln und ihre Werkzeug-Gruppen stehen. Erst danach ist die Abwesenheit
+    // von „Besetzung ändern" eine Aussage.
+    const besetzung = page.getByRole('main');
+    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
     const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
     await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
 

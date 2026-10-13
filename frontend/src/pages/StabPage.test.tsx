@@ -9,6 +9,7 @@ import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
+import { einsatzKeys } from '../api/queryKeys';
 import StabPage from './StabPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -43,23 +44,61 @@ const label = (key: string) => modulRegistry.find((m) => m.key === key)!.label;
  * `…/lagebesprechung*` und keine Quellen der Vorbereitung: fragte die Seite sie doch an, scheiterte
  * der Abruf an `onUnhandledRequest: 'error'`.
  */
+const LEER_SKIZZE = {
+  lage: [],
+  komponenten: [],
+  verbindungen: [],
+  bereiche: [],
+  schriftfeld: {
+    herausgeber: null,
+    vs_vermerk: 'keiner',
+    gueltig_ab: null,
+    gez_name: null,
+    gez_at: null,
+  },
+  stand: null,
+};
+
 function rendere({
   einsatzObj = einsatz(),
   stab = leererStab as object,
   stabStatus = 200,
   freigaben = freigabenFixture(),
+  zaehler = {} as object | null,
+  presse = {
+    gesamt: 0,
+    offen: 0,
+    offene_anfragen: 0,
+    je_art: { anfrage: 0, abstimmung: 0, termin: 0 },
+    medien: [],
+  } as object,
   route = '/einsaetze/1/stab',
 } = {}) {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/stab', () =>
-      stabStatus === 200
-        ? HttpResponse.json(stab)
-        : HttpResponse.json({ error: 'kaputt' }, { status: stabStatus }),
+      stabStatus === 0
+        ? new Promise<never>(() => {})
+        : stabStatus === 200
+          ? HttpResponse.json(stab)
+          : HttpResponse.json({ error: 'kaputt' }, { status: stabStatus }),
     ),
     http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+    // Die Quellen der Zahlen je Werkzeug (LLH-1124, design.md D4/D5).
+    http.get('/api/einsaetze/1/modul-zaehler', () =>
+      zaehler === null
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(zaehler),
+    ),
+    http.get('/api/einsaetze/1/stab/medienkontakte/kennzahlen', () => HttpResponse.json(presse)),
+    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/stab/kommunikationsplan', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/stab/fernmeldeskizze', () => HttpResponse.json(LEER_SKIZZE)),
   );
   return renderMitProviders(
     <Routes>
@@ -69,8 +108,9 @@ function rendere({
   );
 }
 
-async function besetzungsSektion() {
-  return screen.findByRole('region', { name: 'Besetzung S1–S6' });
+/** Die Kachel eines Sachgebiets: ein Paneel, benannt nach Kennung und Label (design.md D1). */
+function kachel(kuerzel: string) {
+  return screen.findByRole('region', { name: new RegExp(`^${kuerzel} · `) });
 }
 
 describe('StabPage', () => {
@@ -90,42 +130,42 @@ describe('StabPage', () => {
       ),
     );
     rendere();
-    const sektion = await besetzungsSektion();
     expect(
-      await within(sektion).findByRole('heading', {
-        level: 3,
-        name: /S4 · Versorgung \(Logistik\)/,
-      }),
+      await screen.findByRole('heading', { level: 2, name: 'S4 · Versorgung (Logistik)' }),
+    ).toBeInTheDocument();
+    // Auch der Name der Kachelaktion trägt das Mandantenlabel.
+    expect(
+      await screen.findByRole('button', { name: 'Besetzung ändern – S4 Versorgung (Logistik)' }),
     ).toBeInTheDocument();
   });
 
-  it('zeigt sechs feste Zeilen auch ohne jede Besetzung', async () => {
+  it('zeigt sechs Kacheln in fester Reihenfolge, auch ohne jede Besetzung (LLH-1124)', async () => {
     rendere();
-    const sektion = await besetzungsSektion();
-    await waitFor(() =>
-      expect(
-        within(sektion)
-          .getAllByRole('heading', { level: 3 })
-          .map((h) => h.textContent),
-      ).toEqual([
-        expect.stringContaining('S1 · Personal'),
-        expect.stringContaining('S2 · Lage'),
-        expect.stringContaining('S3 · Einsatz'),
-        expect.stringContaining('S4 · Versorgung'),
-        expect.stringContaining('S5 · Presse- und Medienarbeit'),
-        expect.stringContaining('S6 · Information und Kommunikation'),
-      ]),
-    );
-    expect(within(sektion).getAllByText('nicht vergeben')).toHaveLength(6);
-  });
-
-  // LLH-1111: die Paneele „Lagebesprechung“ und „Vorbereitung“ sind auf die eigene Seite gezogen.
-  it('hängt die Arbeitsaufnahme als letztes Paneel UNTER die Besetzung (LFH-551, LLH-1111)', async () => {
-    rendere();
-    await screen.findByRole('region', { name: 'Arbeitsaufnahme' });
+    await kachel('S1');
+    await waitFor(() => expect(screen.getAllByText('nicht vergeben')).toHaveLength(6));
     const regionen = screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'));
     const namen = regionen.map((id) => document.getElementById(id ?? '')?.textContent);
-    expect(namen).toEqual(['Besetzung S1–S6', 'Arbeitsaufnahme']);
+    // Die Arbeitsaufnahme steht als letztes Paneel unter dem Raster (LFH-551, D6).
+    expect(namen).toEqual([
+      'S1 · Personal',
+      'S2 · Lage',
+      'S3 · Einsatz',
+      'S4 · Versorgung',
+      'S5 · Presse- und Medienarbeit',
+      'S6 · Information und Kommunikation',
+      'Arbeitsaufnahme',
+    ]);
+    for (const k of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']) {
+      expect(
+        screen.getByRole('heading', { level: 2, name: new RegExp(`^${k} · `) }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it('nennt die Fundstelle sichtbar an jeder Kachel', async () => {
+    rendere();
+    const s3 = await kachel('S3');
+    expect(within(s3).getByText('FwDV 100 Anl. 2, S. 57')).toBeInTheDocument();
   });
 
   it('sperrt die Haken der Arbeitsaufnahme ohne Schreibrecht; der Kopf nennt den Grund', async () => {
@@ -138,7 +178,7 @@ describe('StabPage', () => {
     expect(within(r).queryByText('Nur Ansicht')).toBeNull();
   });
 
-  it('nennt die Besetzung beim Wort', async () => {
+  it('nennt die Besetzung beim Wort und den Besetzungsstand im Seitenkopf', async () => {
     rendere({
       stab: {
         besetzung: [
@@ -154,161 +194,218 @@ describe('StabPage', () => {
         ],
       },
     });
-    const sektion = await besetzungsSektion();
-    expect(await within(sektion).findByText('Müller')).toBeInTheDocument();
-    expect(within(sektion).getAllByText('nicht vergeben')).toHaveLength(5);
+    const s2 = await kachel('S2');
+    expect(await within(s2).findByText('Müller')).toBeInTheDocument();
+    expect(screen.getAllByText('nicht vergeben')).toHaveLength(5);
+    expect(screen.getByText('1/6 besetzt')).toBeInTheDocument();
   });
 
   describe('Rechte-Paar', () => {
-    it('mit Schreibrecht: je Zeile „Besetzung ändern", kein Rechte-Hinweis', async () => {
+    it('mit Schreibrecht: je Kachel „Besetzung ändern", kein Rechte-Hinweis', async () => {
       rendere();
-      const sektion = await besetzungsSektion();
+      await kachel('S1');
       await waitFor(() =>
-        expect(
-          within(sektion).getAllByRole('button', { name: /^Besetzung ändern – S\d/ }),
-        ).toHaveLength(6),
+        expect(screen.getAllByRole('button', { name: /^Besetzung ändern – S\d/ })).toHaveLength(6),
       );
       expect(screen.queryByText(/können die Besetzung ändern/)).toBeNull();
     });
 
-    it('als Beobachter: keine Zeilenaktion, der Grund steht auf der Seite', async () => {
+    it('als Beobachter: keine Kachelaktion, der Grund steht auf der Seite', async () => {
       rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
-      const sektion = await besetzungsSektion();
+      await kachel('S1');
       expect(
         await screen.findByText('nur Einsatzleitung und Führungspersonal'),
       ).toBeInTheDocument();
-      expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(
-        0,
-      );
+      expect(screen.queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
     });
 
-    it('im abgeschlossenen Einsatz: keine Zeilenaktion, Hinweis nennt den Abschluss', async () => {
+    it('im abgeschlossenen Einsatz: keine Kachelaktion, Hinweis nennt den Abschluss', async () => {
       rendere({ einsatzObj: einsatz({ status: 'abgeschlossen' }) });
-      await besetzungsSektion();
+      await kachel('S1');
       expect(await screen.findByText('Einsatz abgeschlossen')).toBeInTheDocument();
       expect(screen.queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
     });
   });
 
   it('behauptet während des Ladens keine Besetzung', async () => {
-    server.use(
-      meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
-      http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})),
-      http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
-    );
-    renderMitProviders(
-      <Routes>
-        <Route path="/einsaetze/:id/stab" element={<StabPage />} />
-      </Routes>,
-      { route: '/einsaetze/1/stab' },
-    );
-    const sektion = await besetzungsSektion();
-    expect(within(sektion).getAllByRole('heading', { level: 3 })).toHaveLength(6);
-    expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
-    expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
+    // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
+    rendere({ stabStatus: 0 });
+    await kachel('S1');
+    expect(screen.getAllByRole('heading', { level: 2, name: /^S\d · / })).toHaveLength(6);
+    expect(screen.queryByText('nicht vergeben')).toBeNull();
+    expect(screen.queryByText(/besetzt$/)).toBeNull();
+    expect(screen.queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
   });
 
-  it('Fehler ist nicht leer: ein gescheiterter Abruf behauptet keine sechs leeren Zeilen', async () => {
+  it('Fehler ist nicht leer: ein gescheiterter Abruf behauptet keine sechs leeren Kacheln', async () => {
     rendere({ stabStatus: 500 });
     expect(
       await screen.findByText('Führungsorganisation konnte nicht geladen werden'),
     ).toBeInTheDocument();
     expect(screen.queryByText('nicht vergeben')).toBeNull();
+    expect(screen.queryByRole('region', { name: /^S1 · / })).toBeNull();
   });
 
-  it('Werkzeug-Links zeigen nur freigegebene Module', async () => {
-    rendere({ freigaben: freigabenFixture({ chat: { sichtbar: false } }) });
-    await besetzungsSektion();
+  it('Werkzeuge: ausgeblendet fehlt, gesperrt steht mit Grund (design.md D2)', async () => {
+    rendere({
+      freigaben: freigabenFixture({
+        verpflegung: { sichtbar: false },
+        material: { zugriff: false },
+      }),
+    });
     const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
-    expect(within(s4).getByRole('link', { name: label('nachforderungen') })).toHaveAttribute(
+    expect(await within(s4).findByRole('link', { name: label('nachforderungen') })).toHaveAttribute(
       'href',
       '/einsaetze/1/nachforderungen',
     );
-    const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
-    // Vor der Antwort der Freigaben zeigt keine Zeile ein Modul-Werkzeug (unbekannt heißt nicht
-    // frei). Erst positiv auf ein freies Werkzeug derselben Zeile warten — die Abwesenheit wäre
-    // sonst trivial.
+    expect(within(s4).queryByText(new RegExp(label('verpflegung')))).toBeNull();
     expect(
-      await within(s6).findByRole('link', { name: label('einsatzabschnitte') }),
-    ).toBeInTheDocument();
-    expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
+      within(s4).getByRole('button', { name: `${label('material')} (Keine Berechtigung)` }),
+    ).toBeDisabled();
   });
 
-  it('die S6-Zeile springt ins Fernmeldewesen, keine andere Zeile (LFH-548, LFH-848, LLH-1180)', async () => {
+  it('Nachforderungen stehen bei S1 und S4, ohne Zahl', async () => {
     rendere();
-    await besetzungsSektion();
+    for (const k of ['S1', 'S4']) {
+      const g = await screen.findByRole('group', { name: `Werkzeuge ${k}` });
+      expect(
+        await within(g).findByRole('link', { name: label('nachforderungen') }),
+      ).toHaveAttribute('href', '/einsaetze/1/nachforderungen');
+    }
+  });
+
+  it('die S6-Kachel führt die vier Einstiege des Fernmeldewesens (LLH-1180, LLH-1124)', async () => {
+    rendere();
     const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
-    expect(within(s6).getByRole('link', { name: 'Funkplan' })).toHaveAttribute(
+    expect(await within(s6).findByRole('link', { name: /^Funkplan/ })).toHaveAttribute(
       'href',
       '/einsaetze/1/fernmeldewesen',
+    );
+    expect(within(s6).getByRole('link', { name: 'Fernmeldeskizze' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/fernmeldewesen?ansicht=skizze',
+    );
+    expect(within(s6).getByRole('link', { name: 'Sprechgruppen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen',
     );
     expect(within(s6).getByRole('link', { name: 'Kommunikationsplan' })).toHaveAttribute(
       'href',
       '/einsaetze/1/fernmeldewesen/kommunikationsplan',
     );
-    expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'Kommunikationsplan' })).toHaveLength(1);
+    expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
+    expect(screen.getAllByRole('link', { name: /^Funkplan/ })).toHaveLength(1);
+  });
+
+  it('der Funkplan zählt die Lücken wie das Lücken-Paneel', async () => {
+    rendere();
+    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
+    // Ohne Daten bleibt nur die Leitstelle ohne Verbindung: eine Lücke.
+    expect(await within(s6).findByRole('link', { name: 'Funkplan, 1, Lücke' })).toBeInTheDocument();
   });
 
   // LLH-1180, Spec `fernmeldewesen`: die S6-Sprünge erben die Sperre ihres Ziels.
-  it('S6: bei gesperrtem Fernmeldewesen stehen die Sprünge gesperrt mit Grund', async () => {
+  it('S6: bei gesperrtem Fernmeldewesen stehen alle vier Sprünge gesperrt mit Grund, ohne Zahl', async () => {
     rendere({ freigaben: freigabenFixture({ fernmeldewesen: { zugriff: false } }) });
-    await besetzungsSektion();
     const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
-    expect(
-      within(s6).getByRole('button', { name: 'Funkplan (Keine Berechtigung)' }),
-    ).toBeDisabled();
-    expect(within(s6).queryByRole('link', { name: 'Kommunikationsplan' })).toBeNull();
+    for (const name of ['Funkplan', 'Fernmeldeskizze', 'Sprechgruppen', 'Kommunikationsplan']) {
+      expect(
+        await within(s6).findByRole('button', { name: `${name} (Keine Berechtigung)` }),
+      ).toBeDisabled();
+    }
+    expect(within(s6).queryByRole('link')).toBeNull();
   });
 
   it('S6: bei ausgeblendetem Fernmeldewesen fehlen die Sprünge', async () => {
     rendere({
       freigaben: freigabenFixture({ fernmeldewesen: { sichtbar: false, zugriff: false } }),
     });
-    await besetzungsSektion();
-    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
-    expect(within(s6).queryByText(/Funkplan/)).toBeNull();
-    expect(within(s6).queryByText(/Kommunikationsplan/)).toBeNull();
+    // Anker: die Freigaben sind angekommen, sobald eine andere Kachel ihr Werkzeug zeigt.
+    const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
+    await within(s4).findByRole('link', { name: label('nachforderungen') });
+    expect(screen.queryByRole('group', { name: 'Werkzeuge S6' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Funkplan/ })).toBeNull();
   });
 
-  it('die S5-Zeile führt zu Pressearbeit und Informationstelefon, keine andere Zeile (LFH-554)', async () => {
-    rendere();
-    await besetzungsSektion();
+  it('die S5-Kachel führt zu Pressearbeit und Informationstelefon, die Presse mit offenen Anfragen', async () => {
+    rendere({
+      presse: {
+        gesamt: 3,
+        offen: 2,
+        offene_anfragen: 2,
+        je_art: { anfrage: 2, abstimmung: 0, termin: 1 },
+        medien: [],
+      },
+    });
     const s5 = await screen.findByRole('group', { name: 'Werkzeuge S5' });
-    expect(within(s5).getByRole('link', { name: 'Pressearbeit' })).toHaveAttribute(
-      'href',
-      '/einsaetze/1/stab/presse',
-    );
+    expect(
+      await within(s5).findByRole('link', { name: 'Pressearbeit, 2, offene Anfragen' }),
+    ).toHaveAttribute('href', '/einsaetze/1/stab/presse');
     expect(within(s5).getByRole('link', { name: 'Informationstelefon' })).toHaveAttribute(
       'href',
       '/einsaetze/1/stab/infotelefon',
     );
-    expect(screen.getAllByRole('link', { name: 'Pressearbeit' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'Informationstelefon' })).toHaveLength(1);
   });
 
-  it('der Funkplan-Verweis bleibt, auch wenn alle Modul-Werkzeuge der S6 ausgeblendet sind', async () => {
-    rendere({
-      freigaben: freigabenFixture({
-        chat: { sichtbar: false },
-        einsatzabschnitte: { sichtbar: false },
-      }),
+  it('Aufträge zeigen die Zahl des Modulzählers, überfällige als Achtung mit Wort', async () => {
+    rendere({ zaehler: { auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 } } });
+    const s3 = await screen.findByRole('group', { name: 'Werkzeuge S3' });
+    const link = await within(s3).findByRole('link', {
+      name: `${label('auftraege')}, 2, 1 überfällig`,
     });
-    await besetzungsSektion();
-    // Anker: die Freigaben sind angekommen, sobald eine andere Zeile ihr Werkzeug zeigt.
-    const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
-    expect(within(s4).getByRole('link', { name: label('nachforderungen') })).toBeInTheDocument();
-    const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
-    expect(within(s6).queryByRole('link', { name: label('einsatzabschnitte') })).toBeNull();
-    expect(within(s6).getByRole('link', { name: 'Funkplan' })).toBeInTheDocument();
+    expect(link).toHaveAttribute('data-ton', 'achtung');
+    // Fehlt ein Feld in der Antwort, steht „—“ mit Grund, nie 0.
+    expect(
+      within(s3).getByRole('link', { name: `${label('einsatzabschnitte')}, —, nicht freigegeben` }),
+    ).toBeInTheDocument();
   });
 
-  it('„Besetzung ändern" öffnet die Maske der Zeile', async () => {
+  it('die Zahlen folgen live ihrer Quelle, ohne Neuladen der Seite (Spec `stab-uebersicht`)', async () => {
+    const { client } = rendere({
+      zaehler: { auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 0 } },
+    });
+    const s3 = await screen.findByRole('group', { name: 'Werkzeuge S3' });
+    await within(s3).findByRole('link', { name: `${label('auftraege')}, 2, keiner überfällig` });
+    const s5 = screen.getByRole('group', { name: 'Werkzeuge S5' });
+    await within(s5).findByRole('link', { name: 'Pressearbeit, 0, offene Anfragen' });
+    // Auf einem anderen Arbeitsplatz erledigt bzw. angefragt; das Live-Ereignis invalidiert.
+    server.use(
+      http.get('/api/einsaetze/1/modul-zaehler', () =>
+        HttpResponse.json({ auftraege: { offen: 1, in_arbeit: 0, ueberfaellig: 0 } }),
+      ),
+      http.get('/api/einsaetze/1/stab/medienkontakte/kennzahlen', () =>
+        HttpResponse.json({
+          gesamt: 1,
+          offen: 1,
+          offene_anfragen: 1,
+          je_art: { anfrage: 1, abstimmung: 0, termin: 0 },
+          medien: [],
+        }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(1) });
+    await client.invalidateQueries({ queryKey: einsatzKeys.medienkontaktKennzahlen(1) });
+    expect(
+      await within(s3).findByRole('link', { name: `${label('auftraege')}, 1, keiner überfällig` }),
+    ).toBeInTheDocument();
+    expect(
+      await within(s5).findByRole('link', { name: 'Pressearbeit, 1, offene Anfragen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('scheitert der Modulzähler, zeigen seine Werkzeuge einen unbekannten Stand, keine 0', async () => {
+    rendere({ zaehler: null });
+    const s3 = await screen.findByRole('group', { name: 'Werkzeuge S3' });
+    expect(
+      await within(s3).findByRole('link', { name: `${label('auftraege')}, nicht geladen` }),
+    ).toBeInTheDocument();
+    expect(within(s3).queryByText('0')).toBeNull();
+  });
+
+  it('„Besetzung ändern" öffnet die Maske der Kachel', async () => {
     rendere();
-    const sektion = await besetzungsSektion();
-    const knopf = await within(sektion).findByRole('button', {
+    const s4 = await kachel('S4');
+    const knopf = await within(s4).findByRole('button', {
       name: 'Besetzung ändern – S4 Versorgung',
     });
     await userEvent.click(knopf);
@@ -369,7 +466,7 @@ describe('StabPage · Zeile „Nächste Lagebesprechung“ (LLH-1111)', () => {
   it('trägt weder Abschluss noch Vorbereitung der Lagebesprechung', async () => {
     rendere({ einsatzObj: einsatz({ naechste_lagebesprechung_at: wireAb(25) }) });
     // Positiv zuerst: Seite und Zeile stehen — sonst wären die Abwesenheiten trivial.
-    await besetzungsSektion();
+    await kachel('S1');
     await within(await zeile()).findByRole('link', { name: 'Zur Lagebesprechung' });
     expect(screen.queryByRole('button', { name: 'Lagebesprechung abschließen' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Vorbereitung' })).toBeNull();
@@ -378,7 +475,7 @@ describe('StabPage · Zeile „Nächste Lagebesprechung“ (LLH-1111)', () => {
 
   it('öffnet mit ?neu=1 keine Maske mehr — die Schnellaktion zielt auf die eigene Seite', async () => {
     rendere({ route: '/einsaetze/1/stab?neu=1' });
-    await besetzungsSektion();
+    await kachel('S1');
     await zeile();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
