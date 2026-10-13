@@ -696,6 +696,50 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
 });
 
 /**
+ * LLH-1158: Ab `xl` hält das Ton-Wort die Breite seines längsten Wortlauts. Den Platz trägt
+ * erzeugter Inhalt aus `data-platz` (`components/Kopfleiste.css`); ob er die Breite wirklich
+ * hält, misst `e2e/kopfhoehe-tonpruefung.spec.ts`. Hier nur die Verdrahtung: jeder Zustand nennt
+ * denselben Platz, und der Text des Knopfs bleibt das sichtbare Wort.
+ */
+describe('AlarmZentrale: das Ton-Wort hält seinen Platz (LLH-1158)', () => {
+  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+
+  it('1366 px: „Ton bereit“ und „Ton stumm“ stehen im Platz von „Ton wird geprüft“', async () => {
+    setzeViewportBreite(1366);
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+
+    const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+    await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
+    const wort = bereit.querySelector('.kopf-wort-platz');
+    expect(wort).toHaveAttribute('data-platz', 'Ton wird geprüft');
+    expect(bereit.textContent).toBe('Ton bereit');
+
+    await userEvent.click(bereit);
+    const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
+    expect(stumm.querySelector('.kopf-wort-platz')).toHaveAttribute(
+      'data-platz',
+      'Ton wird geprüft',
+    );
+    expect(stumm.textContent).toBe('Ton stumm');
+  });
+
+  it('1024 px: eine Störung steht ohne Platz, die Prüfung zeigt dort kein Wort (LFH-637)', async () => {
+    setzeViewportBreite(1024);
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
+    );
+    const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
+    expect(stumm.querySelector('.kopf-wort-platz')).toHaveAttribute('data-platz', '');
+  });
+});
+
+/**
  * Führungs-Tablet zwischen `md` und `xl`: zwei Knöpfe, der RUHEZUSTAND nur als Icon, eine
  * STÖRUNG nennt ihr Wort weiter. Beide Hälften als Paar.
  */
