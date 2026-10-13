@@ -1288,7 +1288,7 @@ mod tests {
             (
                 "einsatzabschnitt",
                 "src/einsatzabschnitt/repo.rs",
-                "loese_auf_tx",
+                "aufloesen_tx",
             ),
             ("einsatz_einheit", "src/einheit/repo.rs", "loese_auf_tx"),
             (

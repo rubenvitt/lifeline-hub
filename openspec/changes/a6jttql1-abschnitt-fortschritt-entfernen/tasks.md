@@ -47,11 +47,11 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 3. Gesamtprüfung
 
-- [ ] 3.1 `grep -rni fortschritt` trifft im Abschnittskontext nichts mehr außer in
+- [x] 3.1 `grep -rni fortschritt` trifft im Abschnittskontext nichts mehr außer in
   `migrations/0109_einsatzabschnitt_lage.sql`, `openspec/changes/archive/` und
   `docs/superpowers/` (Upload-, Download- und Ladefortschritt ausgenommen). Nachweis: die
   Trefferliste im PR.
-- [ ] 3.2 `./scripts/check-all.sh` grün, `scripts/check-migrationen.sh` gegen `origin/alpha`
+- [x] 3.2 `./scripts/check-all.sh` grün, `scripts/check-migrationen.sh` gegen `origin/alpha`
   grün. Nachweis: Lauf lokal bzw. CI des PRs.
 
 ## Workflow follow-up
