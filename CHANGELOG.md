@@ -1,3 +1,49 @@
+## [1.0.0-alpha.117](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.116...v1.0.0-alpha.117) (2026-10-13)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Eine neue Migration legt Tabellen für den Verteiler von Befehlen und Lageberichten an. Bestehende Daten bleiben unverändert.
+- **Schnittstelle:** Befehle und Lageberichte haben ein neues Feld „Verteiler“. Beim Speichern ersetzt es den bisherigen Verteiler vollständig. Einsatzliste und Einsatzdetail liefern jetzt auch den Einsatzleiter mit. Gekoppelte Geräte wie Lagemonitor oder Verpflegung erhalten dieses Feld nicht.
+
+### Aufträge, Befehle und Lageberichte
+
+- **Verteiler an Befehl und Lagebericht:** Befehlsentwurf und Lageberichtsentwurf haben ein Feld „Verteiler“.
+  - Empfänger können Abschnitte, Einheiten, Führungsfunktionen und Freitext sein. Funktionen werden mit ihrer aktuellen Besetzung vorgeschlagen.
+  - Externe Stellen tragen Sie als eigene Zeilen mit Kategorie und Bezeichnung ein.
+  - Ein Verteiler hat höchstens 50 Empfänger. Ein Freitext-Eintrag darf bis zu 200 Zeichen lang sein. Zu lange Angaben werden nicht gekürzt, sondern markiert.
+  - Der Druckkopf nennt den Verteiler, im Entwurf auch mit noch nicht gespeicherten Änderungen.
+  - Bei der Freigabe stehen die Empfänger im Einsatztagebuch als Adressaten und in einem eigenen Abschnitt „Verteiler“.
+  - Wird ein Dokument fortgeschrieben, übernimmt die neue Fassung den Verteiler.
+- **Einzelauftrag drucken:** Im Detail eines Auftrags führt „Druckansicht“ zu einem eigenen Druckblatt. Der Knopf erscheint auch ohne Schreibrecht. Das Blatt hat drei Teile:
+  - den Auftrag in der Reihenfolge nach FwDV 100,
+  - die Quittung je Empfänger,
+  - die Bearbeitung mit Zeitpunkten.
+
+  Die Ansicht zeigt einen festen Stand, den Sie mit „Neu laden“ erneuern. Gedruckt werden kann erst, wenn dieser Stand geladen ist.
+
+### Stab
+
+- **Arbeitsseiten des Stabs im Modulmenü:** Pressearbeit, Informationstelefon, Funkplan, Fernmeldeskizze und Kommunikationsplan stehen als Sprungmarken unter „Stab“, nach Sachgebiet geordnet. Sperre und Sichtbarkeit richten sich nach dem Stab.
+- **Sprungpalette:** Alle Sprungmarken stehen in der neuen Gruppe „Ansichten“ und lassen sich über Schlagworte finden, zum Beispiel findet „funk“ den Funkplan. Sie erscheinen nur, wenn das Zielmodul freigegeben ist.
+- **Schnellaktion „Anruf erfassen“:** Sie öffnet das Informationstelefon und setzt den Cursor direkt in das Feld „Anliegen“.
+
+### Einsatzübersicht und Kommunikationsplan
+
+- **Einsatzleiter auf einen Blick:** Jede Einsatzkachel zeigt „EL …“ oder „EL nicht erfasst“, bei aktiven wie bei abgeschlossenen Einsätzen.
+- Im Kommunikationsplan steht in der Zeile „Führungsstelle“ nach dem Rufnamen der Einsatzleiter oder der Hinweis „Einsatzleiter nicht erfasst“. Das gilt am Bildschirm und im Druck.
+
+### Einsatzabschnitte
+
+- Ein verschobener Abschnitt lässt sich in der Gliederung wieder ziehen. Bisher reagierte sein Griff nach dem Umhängen nicht mehr. Der Griff markiert außerdem keinen Text mehr, auch nicht bei langem Druck auf dem Tablet.
+
+### Druck
+
+- In Druckblättern brechen lange Wörter ohne Trennstelle jetzt um, statt die Seite zu verbreitern. Das wirkt auch auf dem Handy und im Einsatzbericht.
+
+### Anwenderdokumentation
+
+- Neue oder überarbeitete Abschnitte gibt es in den Kapiteln Aufträge und Befehle, Lageberichte, Drucken und Export, Stab, Einsatz-Oberfläche, Funkplan, Presse/Infotelefon, Einsatzliste und Kommunikationsplan. Die zugehörigen Bilder wurden neu aufgenommen.
+
 ## [1.0.0-alpha.116](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.115...v1.0.0-alpha.116) (2026-10-12)
 
 ### Wichtige Änderungen
