@@ -42,17 +42,33 @@ export function betroffeneOrte(status: DatentraegerStatus): DatentraegerOrt[] {
   );
 }
 
-export default function DatentraegerWarnung() {
+/**
+ * Der Befund samt der Frage, ob die Verwaltung noch auf den ersten Abruf wartet (LLH-1229).
+ * Die Leiste steht ÜBER dem Seiteninhalt; käme sie nach dem Seitentitel, schöbe sie ihn bei
+ * 390 px um ihre ganze Höhe nach unten. `AdminLayout` zeigt den Inhalt deshalb erst, wenn
+ * der erste Abruf beantwortet ist. Gewartet wird nur auf den ersten Versuch und nur, solange
+ * er wirklich läuft: ein Fehler oder ein pausierter Abruf (offline) gibt den Inhalt frei,
+ * die Verwaltung hängt nie an dieser Prüfung.
+ */
+export function useDatentraeger(): { data: DatentraegerStatus | undefined; wartet: boolean } {
   const { benutzer } = useAuth();
-  const { token } = useRollen();
   const aktiv = istAdmin(benutzer);
-  const { data } = useQuery({
+  const { data, isPending, fetchStatus, failureCount } = useQuery({
     queryKey: globalKeys.datentraeger(),
     queryFn: ladeDatentraegerStatus,
     enabled: aktiv,
     staleTime: FRISCH_MS,
   });
-  if (!aktiv || !data?.warnung) return null;
+  return {
+    data: aktiv ? data : undefined,
+    wartet: aktiv && isPending && fetchStatus === 'fetching' && failureCount === 0,
+  };
+}
+
+export default function DatentraegerWarnung() {
+  const { token } = useRollen();
+  const { data } = useDatentraeger();
+  if (!data?.warnung) return null;
 
   return (
     <Alert
