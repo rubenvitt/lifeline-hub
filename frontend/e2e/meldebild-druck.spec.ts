@@ -244,7 +244,7 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
  * und Spaltenköpfe standen buchstabenweise senkrecht, 40 Kräfte füllten 21 Seiten (auf dem Stand
  * vor dem Fix 41). Gemessen wird deshalb am Text, nicht an der Mechanik:
  *   (a) die erste Spalte hält eine Mindestbreite,
- *   (b) kein Kraftname läuft über mehr als zwei Zeilen, kein Einzelwort (Kürzel „Pers.“) bricht,
+ *   (b) kein Kraftname läuft über mehr als zwei Zeilen, kein Einzelwort (Kürzel „Mtl.“) bricht,
  *       keine Zeile ist höher als {@link MAX_ZEILEN_JE_REIHE} Textzeilen,
  *   (c) kein Wort eines Spaltenkopfs bricht (ein Kopf hat höchstens so viele Zeilen wie Wörter),
  *   (d) nur Chromium: das PDF hat höchstens {@link MAX_SEITEN} Seiten, jede mit Tabellenkopf, und
@@ -261,8 +261,11 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
  * Chromium, Firefox und WebKit rot: den ganzen Abschnitt streichen (erste Spalte 85 px, im PDF
  * 41 Seiten); nur `overflow-wrap: normal` am Kopf streichen ((c): sechs Köpfe brechen im Wort);
  * den Anteil der ersten Spalte auf `auto` (208 bzw. in WebKit 227 px). In
- * `pages/KraefteuebersichtPage.tsx` `flexShrink: 0` am Mittelkürzel streichen → (b) rot in Chromium
- * und Firefox („Pers“ über „.“).
+ * `kraefte/KraeftebaumZelle.tsx` `flexShrink: 0` am Kürzel „Mtl.“ streichen → (b) rot in Chromium
+ * („Mtl“ über „.“, gemessen 13.10.2026; Firefox und WebKit nicht nachgemessen). Deshalb trägt die
+ * Einheit einen Materialposten mit langer Bezeichnung — erst sie drückt die Zelle so, dass das
+ * Kürzel schrumpfen würde. Personen tragen seit LLH-1025 kein Kürzel mehr, sondern eine
+ * Positionsmarke mit Mindestbreite.
  *
  * Zweiter Fall mit eingeblendeten Zusatzspalten (LFH-1109): so druckte Safari, und mit zehn Spalten
  * blieben der ersten 112 px. Mutationsprobe: in `KraefteuebersichtPage.tsx` den Filter über
@@ -307,7 +310,7 @@ async function lesbarkeit(page: Page) {
       return {
         text: (namensKnoten?.textContent ?? erste.textContent ?? '').trim(),
         nameZeilen: namensKnoten ? zeilenVon(namensKnoten) : 0,
-        // Ein Einzelwort (Kürzel „Pers.“) steht auf einer Zeile.
+        // Ein Einzelwort (Kürzel „Mtl.“) steht auf einer Zeile.
         wortGebrochen: textKnoten(erste)
           .filter((k) => !/\s/.test(k.textContent!.trim()))
           .some((k) => zeilenVon(k) > 1),
@@ -347,6 +350,20 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   });
   expect(einheit.ok(), `Seeding Einheit: ${einheit.status()}`).toBeTruthy();
   const einheitId = ((await einheit.json()) as { id: number }).id;
+  // Ein Materialposten der Einheit: sein Kürzel „Mtl.“ ist das Einzelwort, das (b) prüft. Die
+  // Bezeichnung ist lang (Druck auf die Zelle) und trifft das Namensmuster von (b) nicht.
+  const material = await page.request.post(`/api/einsaetze/${einsatzId}/material`, {
+    data: {
+      adhoc: { bezeichnung: 'Tauchpumpe Hochwasser-Schlauchpaket, Löschzug Nordwest 1' },
+      menge: 1,
+    },
+  });
+  expect(material.ok(), `Seeding Material: ${material.status()}`).toBeTruthy();
+  const materialId = ((await material.json()) as { id: number }).id;
+  const zuordnung = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/material/${materialId}`,
+  );
+  expect(zuordnung.ok(), `Material zuordnen: ${zuordnung.status()}`).toBeTruthy();
   const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
     data: {
       auftrag_text:
@@ -379,7 +396,8 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
     };
   });
   await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
-  await expect(zeilen, '„vorbereiten“ klappt alle Kräfte auf').toHaveCount(KRAEFTE_LESBAR + 2);
+  // Kräfte, „Ohne Einheit“, die Einheit, ihre Materialgruppe und der Posten.
+  await expect(zeilen, '„vorbereiten“ klappt alle Kräfte auf').toHaveCount(KRAEFTE_LESBAR + 4);
   await page.emulateMedia({ media: 'print' });
   await page.evaluate(() => document.fonts.ready);
 
