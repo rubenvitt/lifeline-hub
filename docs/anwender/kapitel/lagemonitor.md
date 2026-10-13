@@ -24,7 +24,7 @@ Den Monitor koppelt die Einsatzleitung mit der Ansicht „Lagemonitor“ (siehe
 2. „Anzeige starten“ wählen. Der Monitor wechselt in den Vollbildmodus und hält den Bildschirm
    wach.
 
-   ![Lagemonitor mit Lagekarte, den Kacheln Betroffene, Kräfte und Belegung der Unfallhilfsstellen und der Statusleiste](../bilder/lagemonitor/lagemonitor.png)
+   ![Lagemonitor mit Lagekarte samt Gefahrengebieten und Abschnittsfläche, den Kacheln Betroffene, Kräfte und Belegung der Unfallhilfsstellen und der Statusleiste](../bilder/lagemonitor/lagemonitor.png)
 
 Kann der Browser den Bildschirm nicht wach halten, steht über der Statusleiste: „Dieser Browser
 kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abschalten.“
