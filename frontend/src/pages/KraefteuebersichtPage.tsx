@@ -56,7 +56,7 @@ import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
-  besatzungText,
+  besatzungZeilen,
   schluesselBisStufe,
   stufeVon,
   type Ausklappstufe,
@@ -306,7 +306,7 @@ function rasterSpalten(
         z.staerke ? (
           <span style={monoStil(12)}>{staerkeText(z.staerke)}</span>
         ) : z.besatzung ? (
-          <StaerkeBesatzung text={besatzungText(z.besatzung)} />
+          <StaerkeBesatzung zeilen={besatzungZeilen(z.besatzung)} />
         ) : null,
     },
     // Kein `abBreite`: als Spalte ist der Abschnitt die Gliederung, und ein Meldeblatt auf A4
@@ -402,12 +402,19 @@ function ImEinsatzZelle({
   );
 }
 
-/** Besatzung eines Fahrzeugs in der Stärkespalte — gedämpft, umbrechend vor „Soll“. */
-function StaerkeBesatzung({ text }: { text: string }) {
+/** Besatzung eines Fahrzeugs in der Stärkespalte — gedämpft, Ist über Soll. */
+function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
   const { rollen } = useRollen();
+  // Untereinander und eine Stufe kleiner: hintereinander brach „Ist … · Soll …“ in der 100 px
+  // breiten Spalte auf vier Zeilen (Doku-Bild, LLH-1025).
   return (
-    <span data-lfh="meldebild-besatzung" style={{ ...monoStil(11), color: rollen.gedaempft }}>
-      {text}
+    <span
+      data-lfh="meldebild-besatzung"
+      style={{ ...monoStil(10), display: 'flex', flexDirection: 'column', color: rollen.gedaempft }}
+    >
+      {zeilen.map((z) => (
+        <span key={z}>{z}</span>
+      ))}
     </span>
   );
 }

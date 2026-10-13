@@ -278,14 +278,21 @@ function vergleichePersonen(a: PersonImBaum, b: PersonImBaum): number {
 // ── Texte ─────────────────────────────────────────────────────────────────────
 
 /**
- * „Ist 1/0/3//4 · Soll 1/1/7//9“ — die Besatzung eines Fahrzeugs statt einer Stärke (D4). Ein
- * Text für Schirm (`KraeftebaumZelle`) und Lagebericht (`kraeftebild.ts`).
+ * Die Besatzung eines Fahrzeugs statt einer Stärke (D4) als Zeilen: [„Ist 1/0/3//4“,
+ * „Soll 1/1/7//9“], ohne Soll nur die Ist-Zeile, ohne Kraft und Soll „Besatzung nicht erfasst“.
+ * Die Stärkespalte des Meldebilds setzt sie untereinander, {@link besatzungText} hintereinander.
+ */
+export function besatzungZeilen(b: Pick<FahrzeugImBaum, 'ist' | 'soll' | 'urteil'>): string[] {
+  if (b.urteil === 'nicht_erfasst') return ['Besatzung nicht erfasst'];
+  return [`Ist ${staerkeText(b.ist)}`, ...(b.soll ? [`Soll ${staerkeText(b.soll)}`] : [])];
+}
+
+/**
+ * „Ist 1/0/3//4 · Soll 1/1/7//9“ in einer Zeile. Ein Text für Schirm (`KraeftebaumZelle`) und
+ * Lagebericht (`kraeftebild.ts`).
  */
 export function besatzungText(b: Pick<FahrzeugImBaum, 'ist' | 'soll' | 'urteil'>): string {
-  if (b.urteil === 'nicht_erfasst') return 'Besatzung nicht erfasst';
-  return b.soll
-    ? `Ist ${staerkeText(b.ist)} · Soll ${staerkeText(b.soll)}`
-    : `Ist ${staerkeText(b.ist)}`;
+  return besatzungZeilen(b).join(' · ');
 }
 
 /** „davon 1 aus Gr 2, 2 ohne Einheit“ — die mitgezählten fremden Kräfte eines Fahrzeugs. */

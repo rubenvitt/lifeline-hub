@@ -920,7 +920,7 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
     expect(within(zeile(container, 'eh-21')!).getByText('0/0/1//1')).toBeInTheDocument();
     expect(
       zeile(container, 'ef-30')!.querySelector('[data-lfh="meldebild-besatzung"]'),
-    ).toHaveTextContent('Ist 1/0/0//1 · Soll 1/1/7//9');
+    ).toHaveTextContent('Ist 1/0/0//1Soll 1/1/7//9');
   });
 
   it('ein Materialausfall tönt die Einheit und nennt den Grund (D6)', async () => {

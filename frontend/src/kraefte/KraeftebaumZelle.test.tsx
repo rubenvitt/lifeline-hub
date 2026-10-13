@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import KraeftebaumZelle, { gruppenText } from './KraeftebaumZelle';
-import { besatzungText, fremdText } from './kraeftebaumKern';
+import { besatzungText, besatzungZeilen, fremdText } from './kraeftebaumKern';
 import { baueMeldebildRaster, type RasterZeile } from './meldebildRaster';
 import type { Einheit, EinsatzFahrzeug, EinsatzMaterial, EinsatzPersonal } from '../api/types';
 
@@ -152,6 +152,8 @@ describe('Texte des Kräftebaums', () => {
   it('Besatzung Ist/Soll statt Stärke, „nicht erfasst“ ohne Kraft', () => {
     const b = finde('ef-30').besatzung!;
     expect(besatzungText(b)).toBe('Ist 1/0/1//2 · Soll 1/1/7//9');
+    // Die Stärkespalte setzt dieselben Teile untereinander.
+    expect(besatzungZeilen(b)).toEqual(['Ist 1/0/1//2', 'Soll 1/1/7//9']);
     expect(besatzungText({ ...b, soll: null })).toBe('Ist 1/0/1//2');
     expect(besatzungText({ ...b, urteil: 'nicht_erfasst' })).toBe('Besatzung nicht erfasst');
     expect(fremdText({ ...b, fremd: [] })).toBeNull();
