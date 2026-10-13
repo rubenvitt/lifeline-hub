@@ -1196,14 +1196,15 @@ test.describe('Gate 1', () => {
 
 /*
  * KRÄFTE-LISTEN AM DESKTOP UND AM TABLET QUER (LFH-975): Personal läuft bei 1440 und 1180 nicht
- * über, „Ruhe“ und „Entfernen“ stehen ohne Querscrollen im Bild, und der Aufklapp-Auslöser
+ * über, „Ruhe“ und „Entlassen“ stehen ohne Querscrollen im Bild, und der Aufklapp-Auslöser
  * („Zeitachse“, „Besatzung“) verdoppelt die Zeilenhöhe nicht mehr.
  *
  * GEMESSEN WIRD DIE BILDLAUFFLÄCHE DER TABELLE, nicht `document.body.scrollWidth`: die
  * Katalogtabelle trägt ihren eigenen Bildlauf, das Wurzelmaß oben sieht ihren Überlauf nicht.
  *
- * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlt „Entfernen“ — Vorbedingung vor der
- * Messung —, die Messung von Überlauf, „Ruhe“ und Zeilenhöhe greift trotzdem.
+ * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlt „Entlassen“ — Vorbedingung vor der
+ * Messung —, die Messung von Überlauf, „Ruhe“ und Zeilenhöhe greift trotzdem. Seit LLH-1079
+ * entlässt die Zeile ohne Rückfrage (umkehrbar, Rückgängig-Hinweis).
  */
 const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
 /** Ein gewöhnlicher Name für die Zeilenhöhe: der lange oben darf umbrechen, dieser nicht. */
@@ -1301,9 +1302,9 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
         // Inhaltsanker, nie `networkidle` (LFH-385).
         await expect(region.getByText(KRAFT)).toBeVisible();
-        const entfernen = region.getByRole('button', { name: 'Entfernen' });
+        const entlassen = region.getByRole('button', { name: / entlassen$/ });
         // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-        await expect(entfernen).toHaveCount(rolle === 'admin' ? 2 : 0);
+        await expect(entlassen).toHaveCount(rolle === 'admin' ? 2 : 0);
 
         // Was weicht, steht im Zähler des Spaltenschalters: Träger, Fahrzeug, Einheit und die
         // voreingestellt verborgene Bemerkung, unter `xl` (1200) auch die Funktion.
@@ -1323,11 +1324,13 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
           '„Ruhe“ ohne Querscrollen',
         ).toBeInViewport({ ratio: 1 });
         if (rolle === 'admin') {
-          const erstes = entfernen.first();
-          await expect(erstes, '„Entfernen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
-          // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): die Rückfrage steht.
+          const erstes = entlassen.first();
+          await expect(erstes, '„Entlassen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+          // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): der Rückgängig-Hinweis steht.
           await erstes.click();
-          await expect(page.getByText('Aus Einsatz entfernen?')).toBeVisible();
+          await expect(
+            page.locator('.ant-message-notice').getByRole('button', { name: 'Rückgängig' }),
+          ).toBeVisible();
         }
       });
     }
