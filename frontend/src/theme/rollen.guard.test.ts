@@ -122,6 +122,7 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   alarmFlaeche: '--lfh-alarm-flaeche',
   bedienFlaeche: '--lfh-bedien-flaeche',
   auswahlFlaeche: '--lfh-auswahl-flaeche',
+  gesperrt: '--lfh-gesperrt',
   bannerGrund: '--lfh-banner-grund',
   bannerLinie: '--lfh-banner-linie',
   berichtigungZeile: '--lfh-berichtigung-zeile',
