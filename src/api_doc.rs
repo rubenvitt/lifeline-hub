@@ -139,6 +139,8 @@ use utoipa::OpenApi;
         crate::routes::lagemonitor::LagemonitorBetroffene,
         crate::routes::lagemonitor::LagemonitorKraefte,
         crate::routes::lagemonitor::LagemonitorUhs,
+        crate::routes::lagemonitor::LagemonitorZone,
+        crate::routes::lagemonitor::LagemonitorAbschnitt,
         crate::einsatz::zaehler::MengenZaehler,
         crate::einsatz::zaehler::MeldungsZaehler,
         crate::einsatz::zaehler::AuftragsZaehler,

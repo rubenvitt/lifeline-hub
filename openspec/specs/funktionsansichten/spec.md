@@ -99,6 +99,13 @@ Der Lagemonitor MUST NOT schreiben dürfen, in keinem Modul.
 - **WHEN** ein Lagemonitor die Personenliste oder eine UHS-Detailseite abruft
 - **THEN** antwortet der Server mit 403
 
+#### Scenario: Lagemonitor zeigt Gefahrenzonen und Abschnittsflächen
+
+- **WHEN** der Einsatz einen Absperrbereich, einen Evakuierungsbezirk, eine freie Skizze und einen Abschnitt mit Fläche hat
+- **THEN** zeigt die Karte des Lagemonitors den Absperrbereich und die Fläche des Abschnitts, aber weder den Bezirk noch die Skizze
+- **AND** enthält die Antwort des Servers dafür weder Beschriftung und Notiz der Zone noch Leitung und Bemerkung des Abschnitts
+- **AND** bleiben Zonenliste und Abschnittsliste für den Lagemonitor gesperrt (403), denn sie tragen Notizen und Leiternamen
+
 ### Requirement: Stellenbindung
 
 Ein Gerät mit stellengebundener Ansicht SHALL nur Daten der eigenen UHS sehen und schreiben.

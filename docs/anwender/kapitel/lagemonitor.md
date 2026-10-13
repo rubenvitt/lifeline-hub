@@ -37,7 +37,9 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    Unfallhilfsstellen arbeiten.
 3. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, die vollsten zuerst, bis zu
    sechs; der Rest steht als „+… weitere“.
-4. Die Lagekarte zeigt den Einsatzort und jede verortete UHS mit ihrer Belegung.
+4. Die Lagekarte zeigt den Einsatzort, jede verortete UHS mit ihrer Belegung, die Gefahrenzonen
+   (Gefahrengebiete, Absperrungen, Sperrgebiete) und die gezeichneten Flächen der
+   Einsatzabschnitte mit ihrer Kurzbezeichnung, ohne Kurzbezeichnung mit ihrem Namen.
 5. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
    Stand der Daten mit Alter und die Uhr.
 
@@ -62,8 +64,12 @@ laden“ im Gerätemenü baut die Seite neu auf.
 ### Was der Monitor zeigt und was nicht
 
 Der Monitor zeigt nur Zahlen und die Karte, keine Personendaten und keine Namen. Er schreibt
-nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort
-und keine verortete UHS, zeigt die Kartenkachel „Kein Einsatzort verortet“.
+nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
+keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
+
+Auf der Karte fehlen Evakuierungsbezirke und freie Skizzen, außerdem Beschriftung und Notiz der
+Gefahrenzonen sowie Leitung und Bemerkung der Abschnitte: Freitexte können Personen nennen.
+Gefahrenzonen erscheinen unabhängig von der Kartenansicht, in der sie gezeichnet wurden.
 
 ### Ende der Kopplung
 

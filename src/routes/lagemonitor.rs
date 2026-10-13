@@ -6,11 +6,17 @@
 //! `tests/geraet_kopplung.rs`. Personen-Ereignisse erreichen den Monitor im Live-Kanal nicht
 //! (`LiveEvent::Person` gehört nur `personen`); der Client holt die Zahlen deshalb zusätzlich in
 //! festem Takt (`geraet/LagemonitorPage.tsx`).
+//!
+//! Für die Kachel „Lagekarte“ liefert die Antwort auch die Gefahrenzonen und die Flächen der
+//! Einsatzabschnitte (LLH-1153), damit der Monitor bei diesem einen Abruf bleibt: `/zonen` trägt
+//! Notizen und Bezirke, `/abschnitte` den Leiternamen. Zonen kommen nur als Typ und Geometrie,
+//! Abschnitte nur mit Bezeichnung und Fläche.
 
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
+use crate::lage_zone::LageZoneTyp;
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::uhs::{UhsStatus, UhsTyp};
 use axum::extract::State;
@@ -61,6 +67,27 @@ pub struct LagemonitorUhs {
     pub kraefte: i64,
 }
 
+/// Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit
+/// und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorZone {
+    pub id: i64,
+    pub typ: LageZoneTyp,
+    /// GeoJSON-Geometrie als String, wie in der Zonenliste.
+    pub geometrie: String,
+}
+
+/// Die Fläche eines Einsatzabschnitts für die Monitorkarte, ohne Leiter und Freitexte.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorAbschnitt {
+    pub id: i64,
+    pub bezeichnung: String,
+    /// Kurzbezeichnung im Einsatz (z. B. „EA-N“), falls gesetzt.
+    pub kurzbezeichnung: Option<String>,
+    /// GeoJSON-Polygon als String.
+    pub flaeche_geojson: String,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorAnzeige {
     /// Zeitpunkt der Berechnung (UTC, SQLite-Format).
@@ -68,6 +95,10 @@ pub struct LagemonitorAnzeige {
     pub betroffene: LagemonitorBetroffene,
     pub kraefte: LagemonitorKraefte,
     pub uhs: Vec<LagemonitorUhs>,
+    /// Gefahrenzonen; Evakuierungsbezirke und freie Skizzen fehlen.
+    pub zonen: Vec<LagemonitorZone>,
+    /// Einsatzabschnitte mit gezeichneter Fläche.
+    pub abschnitte: Vec<LagemonitorAbschnitt>,
 }
 
 /// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -178,6 +209,41 @@ pub async fn lagebild(
         });
     }
 
+    // Gefahrenzonen wie beim Abschnittsgerät (`routes/lage_zone.rs`, `liste`): einsatzweit, ohne
+    // Bezirke und Skizzen.
+    let zonen_roh: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT id, typ, geometrie FROM lage_zone WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut zonen = Vec::new();
+    for (id, typ, geometrie) in zonen_roh {
+        let typ = LageZoneTyp::parse(&typ)
+            .ok_or_else(|| AppError::Internal(format!("Zonentyp {typ}")))?;
+        if typ.ist_gefahrenzone() {
+            zonen.push(LagemonitorZone { id, typ, geometrie });
+        }
+    }
+
+    let abschnitte = sqlx::query_as::<_, (i64, String, Option<String>, String)>(
+        "SELECT id, name, kurzbezeichnung, flaeche_geojson FROM einsatzabschnitt \
+         WHERE einsatz_id = ? AND flaeche_geojson IS NOT NULL ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(
+        |(id, bezeichnung, kurzbezeichnung, flaeche_geojson)| LagemonitorAbschnitt {
+            id,
+            bezeichnung,
+            kurzbezeichnung,
+            flaeche_geojson,
+        },
+    )
+    .collect();
+
     Ok(Json(LagemonitorAnzeige {
         stand_at: crate::zeit::jetzt(),
         betroffene,
@@ -187,5 +253,7 @@ pub async fn lagebild(
             staerke,
         },
         uhs,
+        zonen,
+        abschnitte,
     }))
 }

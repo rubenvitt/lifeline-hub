@@ -75,7 +75,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
-  nur für diese Ansicht); Personen-Ereignisse erreichen ihn nicht, deshalb holt
+  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
+  (Bezeichnung und Fläche) für die Karte (LLH-1153); `/zonen` und `/abschnitte` bleiben ihm
+  gesperrt, sie tragen Notizen und Leiternamen. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
