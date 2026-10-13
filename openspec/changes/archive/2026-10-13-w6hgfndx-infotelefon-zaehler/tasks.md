@@ -35,7 +35,7 @@ Frontend-Gates aus dem Frontend-Ordner über `mise exec -- pnpm …` (ohne mise:
 ## 6. Regeln, Doku, Gates
 
 - [x] 6.1 `frontend/src/stab/AGENTS.md`: Absatz zum Informationstelefon auf Fenster, Zählung, Einzelabruf und `extendEinfrierstand` umgestellt, Verweis auf diese Change; `src/AGENTS.md`: benannte Ausnahme „das Informationstelefon blättert ohne Phase“ neben der Regel zu Phasenlisten (sonst widerspräche D2 der Regel); `docs/anwender/kapitel/presse-infotelefon.md` um „Ältere laden“ ergänzt; `anwenderdoku.guard.test.ts` grün
-- [ ] 6.2 `./scripts/check-all.sh` grün (bzw. die in der Sitzung lauffähigen Bündel; was nicht lief, steht im PR)
+- [x] 6.2 Gates: lokal grün sind rustfmt, die volle Lib-Suite (2900), `infotelefon_zaehler`, `stab_infotelefon`, `stab_presse`, `openapi_spec_aktuell`, die Routen- und Extractor-Wächter, `enum_wire_kontrakt`, `aufbewahrung`, `live_feed`, dazu `tsc`, ESLint, Prettier über `frontend/` und Vitest der berührten Bereiche. `check-all.sh` selbst braucht `mise` (fehlt in der Cloud-Sitzung), die volle Rust-Suite sprengt dort das Plattenkontingent: beides belegt die CI des PRs (`check-all.sh` unverändert). Fünf Vitest-Fälle (Kartenbilder, UHS-Plan, Lageberichtvorschau, Skizzen-Schrift) sind in der Sitzung auch auf dem Basisstand rot (Node 22 statt 26, Schrift-Datei fehlt)
 
 ## Workflow follow-up
 
