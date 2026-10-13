@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { flaeche, pruefe, ruheUndZeiger } from './kontrast-kern';
+import { flaeche, pruefe, ruheUndZeiger, stehend } from './kontrast-kern';
 
 /**
  * Blauer Text auf der Hervorhebungsfläche `flaeche3` (LFH-879, Kriterium 5: Tag ≥ 7 : 1, Nacht
@@ -29,10 +29,29 @@ async function anmelden(page: Page, modus: 'light' | 'dark') {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-async function einsatz(page: Page, bezeichnung: string): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+async function einsatz(page: Page, bezeichnung: string, begonnen_at?: string): Promise<number> {
+  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung, begonnen_at } });
   expect(r.ok(), `Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   return (await r.json()).id;
+}
+
+/**
+ * Die Einsatzübersicht zeigt nur diesen einen Einsatz (LLH-1186). Sie sortiert den jüngsten
+ * Einsatz nach vorn (`EinsaetzePage`), und die Suite legt in derselben Datenbank parallel
+ * Einsätze an: über den Org-Strom lädt die Liste neu, die gemessene Kachel rückt eine Stelle
+ * weiter, und der Zeiger steht auf der Nachbarkachel. Gemessen wird dann die Ruhe, rot je nach
+ * Zeitpunkt. Interzipiert wird nur `GET /api/einsaetze` (Muster `einsatzauswahl-cls.spec.ts`);
+ * die Antwort bleibt die echte des Servers. `gelesen` sammelt die IDs jeder Liste, die die
+ * Seite abgeholt hat, damit die Störprobe auf den Neuabruf warten kann statt auf eine Frist.
+ */
+async function nurDieserEinsatz(page: Page, id: number, gelesen: Set<number>) {
+  await page.route(/\/api\/einsaetze(\?.*)?$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const antwort = await route.fetch();
+    const liste = (await antwort.json()) as { id: number }[];
+    await route.fulfill({ response: antwort, json: liste.filter((e) => e.id === id) });
+    liste.forEach((e) => gelesen.add(e.id));
+  });
 }
 
 /** Eine Rollen-Property (`--lfh-…`), vom Browser aufgelöst, als `r,g,b`. */
@@ -55,13 +74,32 @@ for (const modus of ['light', 'dark'] as const) {
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page, modus);
     const bezeichnung = `E2E 879 Kachel ${modus} ${Date.now()}`;
-    await einsatz(page, bezeichnung);
+    // Eine Stunde zurück: der Störer unten sortiert damit sicher vor diese Kachel.
+    const vorEinerStunde = new Date(Date.now() - 3_600_000).toISOString();
+    const id = await einsatz(page, bezeichnung, vorEinerStunde);
+    const gelesen = new Set<number>();
+    await nurDieserEinsatz(page, id, gelesen);
     await page.goto('/einsaetze');
 
     const kachel = page.locator('[data-lfh="einsatzkachel"]', { hasText: bezeichnung });
     const link = kachel.getByRole('link', { name: bezeichnung });
     const linie = () => link.evaluate((el) => getComputedStyle(el).textDecorationLine);
     const { ruhe, zeiger } = await ruheUndZeiger(page, link, TEXT[modus], `${modus}/Kachellink`);
+
+    // Störprobe (LLH-1186): ein anderer Worker legt einen Einsatz an, während der Zeiger steht.
+    // Erst wenn die Seite eine Liste mit ihm abgeholt und gezeichnet hat, muss der Zeigerzustand
+    // noch derselbe sein.
+    const stoerer = await einsatz(page, `E2E 879 Störer ${modus} ${Date.now()}`);
+    await expect
+      .poll(() => gelesen.has(stoerer), { message: 'Liste mit dem Störer neu abgerufen' })
+      .toBe(true);
+    await page.evaluate(
+      () => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig))),
+    );
+    expect(
+      await stehend(link, `${modus}/Kachellink nach dem Störer`),
+      'Zeiger nach dem Störer',
+    ).toEqual(zeiger);
 
     // Gemessen gegen die Hervorhebung, nicht gegen eine hellere Stufe.
     expect(rgb(zeiger.grund), 'Kachel unter dem Zeiger').toBe(await rolle(page, '--lfh-flaeche-3'));
