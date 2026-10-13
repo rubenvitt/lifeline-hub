@@ -51,7 +51,7 @@ struct Row {
     abschnittsauftrag: Option<String>,
 }
 
-fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
+fn build_anzeige(row: Row) -> EinsatzabschnittAnzeige {
     EinsatzabschnittAnzeige {
         id: row.id,
         einsatz_id: row.einsatz_id,
@@ -76,14 +76,14 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
             .as_deref()
             .and_then(AbschnittLagezustand::parse),
         abschnittsauftrag: row.abschnittsauftrag,
-        sprechgruppen: Vec::new(), // befüllt durch laden()/liste()
+        sprechgruppen: Vec::new(), // befüllt durch load()/list()
     }
 }
 
 /// Setzt die Anzeigen für Zeilen desselben Einsatzes zusammen; die Sprechgruppen kommen in EINER
-/// Abfrage für den ganzen Einsatz. Auch `laden()` nutzt diese Funktion, damit es genau eine
+/// Abfrage für den ganzen Einsatz. Auch `load()` nutzt diese Funktion, damit es genau eine
 /// Anreicherungslogik gibt.
-async fn zu_anzeige_batch(
+async fn build_anzeige_batch(
     pool: &SqlitePool,
     einsatz_id: i64,
     rows: Vec<Row>,
@@ -97,7 +97,7 @@ async fn zu_anzeige_batch(
         .into_iter()
         .map(|row| {
             let id = row.id;
-            let mut anzeige = zu_anzeige(row);
+            let mut anzeige = build_anzeige(row);
             // Jeder Abschnitt kommt im Satz genau einmal vor → entnehmen statt klonen.
             anzeige.sprechgruppen = sprechgruppen.remove(&id).unwrap_or_default();
             anzeige
@@ -106,7 +106,7 @@ async fn zu_anzeige_batch(
 }
 
 /// Alle Abschnitte eines Einsatzes (flach, aufgelöst), sortiert nach `sortier`, dann `id`.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
@@ -116,11 +116,11 @@ pub async fn liste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    zu_anzeige_batch(pool, einsatz_id, rows).await
+    build_anzeige_batch(pool, einsatz_id, rows).await
 }
 
 /// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(
+pub async fn load(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
@@ -133,7 +133,7 @@ pub async fn laden(
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::NotFound)?;
-    zu_anzeige_batch(pool, einsatz_id, vec![row])
+    build_anzeige_batch(pool, einsatz_id, vec![row])
         .await?
         .pop()
         .ok_or(AppError::NotFound)
@@ -142,8 +142,8 @@ pub async fn laden(
 /// Prüft, ob ein Abschnitt zum Einsatz gehört, sonst `NotFound` — für die Parent-Validierung
 /// und für Module, die auf einen Abschnitt zeigen (UHS, Bereitstellungsraum; LFH-735): der
 /// Fremdschlüssel allein ließe den Abschnitt eines anderen Einsatzes zu.
-/// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
-pub async fn pruefe_im_einsatz(
+/// Executor-generisch, damit [`create_tx`] auf der offenen Verbindung prüft.
+pub async fn check_im_einsatz(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     abschnitt_id: i64,
@@ -158,8 +158,8 @@ pub async fn pruefe_im_einsatz(
 }
 
 /// Prüft, ob `leiter_id` eine disponierte Person desselben Einsatzes ist. Executor-generisch
-/// (s. [`anlegen_tx`]).
-async fn pruefe_leiter(
+/// (s. [`create_tx`]).
+async fn check_leiter(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     leiter_id: i64,
@@ -180,7 +180,7 @@ async fn pruefe_leiter(
 /// Ob `kandidat` ein Nachfahre von `start` ist (oder `kandidat == start`): verhindert
 /// Zyklen beim Setzen von `ueber_abschnitt_id = kandidat` für den Knoten `start`.
 /// Läuft von `kandidat` nach oben; trifft er auf `start`, läge ein Zyklus vor.
-async fn waere_zyklus(
+async fn is_zyklus(
     pool: &SqlitePool,
     start_id: i64,
     kandidat_parent: i64,
@@ -209,46 +209,46 @@ async fn waere_zyklus(
 
 /// Validiert parent und leiter beim Anlegen auf der Verbindung des Aufrufers (so sieht die
 /// Prüfung auch Zeilen derselben offenen Transaktion). Keine Zyklenprüfung: ein neuer Knoten
-/// kann nicht eigener Vorfahr sein; beim Umhängen prüft [`validiere_patch`].
-async fn validiere(
+/// kann nicht eigener Vorfahr sein; beim Umhängen prüft [`validate_patch`].
+async fn validate(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     daten: &AbschnittDaten<'_>,
 ) -> Result<(), AppError> {
     if let Some(parent) = daten.ueber_abschnitt_id {
-        pruefe_im_einsatz(&mut *conn, einsatz_id, parent).await?;
+        check_im_einsatz(&mut *conn, einsatz_id, parent).await?;
     }
     if let Some(leiter) = daten.leiter_id {
-        pruefe_leiter(&mut *conn, einsatz_id, leiter).await?;
+        check_leiter(&mut *conn, einsatz_id, leiter).await?;
     }
     Ok(())
 }
 
-/// Legt einen Abschnitt an und liefert die aufgelöste Anzeige. Pool-Hülle um [`anlegen_tx`]
+/// Legt einen Abschnitt an und liefert die aufgelöste Anzeige. Pool-Hülle um [`create_tx`]
 /// ohne eigene Transaktion; die Anzeige wird nach Rückgabe der Verbindung über den Pool geladen.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,
     daten: AbschnittDaten<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
     let id = {
         let mut conn = pool.acquire().await?;
-        anlegen_tx(&mut conn, einsatz_id, &daten).await?
+        create_tx(&mut conn, einsatz_id, &daten).await?
     };
-    laden(pool, einsatz_id, id).await
+    load(pool, einsatz_id, id).await
 }
 
 /// Legt einen Abschnitt auf einer offenen Verbindung an, samt Prüfung von Parent, Leiter und
 /// Kurzbezeichnung auf derselben Verbindung (Demo-Import in EINER Transaktion). Öffnet und
 /// committet nichts. Liefert die `id`, weil die Anreicherung über den Pool liest.
-pub async fn anlegen_tx(
+pub async fn create_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     daten: &AbschnittDaten<'_>,
 ) -> Result<i64, AppError> {
-    validiere(&mut *conn, einsatz_id, daten).await?;
+    validate(&mut *conn, einsatz_id, daten).await?;
     if let Some(kurz) = daten.kurzbezeichnung {
-        pruefe_kurzbezeichnung_frei(&mut *conn, einsatz_id, None, kurz).await?;
+        check_kurzbezeichnung_frei(&mut *conn, einsatz_id, None, kurz).await?;
     }
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
@@ -285,40 +285,40 @@ pub struct AbschnittPatch<'a> {
     pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
     pub kurzbezeichnung: Option<Option<&'a str>>,
-    // Der Lagezustand fehlt absichtlich: `setze_lagezustand_tx` schreibt ihn samt ETB-Eintrag in
+    // Der Lagezustand fehlt absichtlich: `set_lagezustand_tx` schreibt ihn samt ETB-Eintrag in
     // derselben Transaktion.
     pub abschnittsauftrag: Option<Option<&'a str>>,
 }
 
 /// Validiert nur die gesendeten Bezugsfelder; `Some(None)` und ein fehlendes Feld bringen keinen
 /// neuen Bezug.
-async fn validiere_patch(
+async fn validate_patch(
     pool: &SqlitePool,
     einsatz_id: i64,
     self_id: i64,
     patch: &AbschnittPatch<'_>,
 ) -> Result<(), AppError> {
     if let Some(Some(parent)) = patch.ueber_abschnitt_id {
-        pruefe_im_einsatz(pool, einsatz_id, parent).await?;
-        if waere_zyklus(pool, self_id, parent).await? {
+        check_im_einsatz(pool, einsatz_id, parent).await?;
+        if is_zyklus(pool, self_id, parent).await? {
             return Err(AppError::Validation(
                 "Abschnitt darf nicht eigener Vorfahr werden".into(),
             ));
         }
     }
     if let Some(Some(leiter)) = patch.leiter_id {
-        pruefe_leiter(pool, einsatz_id, leiter).await?;
+        check_leiter(pool, einsatz_id, leiter).await?;
     }
     if let Some(Some(kurz)) = patch.kurzbezeichnung {
-        pruefe_kurzbezeichnung_frei(pool, einsatz_id, Some(self_id), kurz).await?;
+        check_kurzbezeichnung_frei(pool, einsatz_id, Some(self_id), kurz).await?;
     }
     Ok(())
 }
 
 /// Ob ein Kürzel im Einsatz noch frei ist (ohne den Abschnitt selbst), ohne Groß-/Kleinschreibung
 /// wie der UNIQUE-Index. Der Index ist das eigentliche Netz (→ 409); die Vorprüfung liefert nur
-/// die sprechende Meldung. Executor-generisch (s. [`anlegen_tx`]).
-async fn pruefe_kurzbezeichnung_frei(
+/// die sprechende Meldung. Executor-generisch (s. [`create_tx`]).
+async fn check_kurzbezeichnung_frei(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     self_id: Option<i64>,
@@ -348,15 +348,15 @@ async fn pruefe_kurzbezeichnung_frei(
 /// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und eine
 /// verschobene Bind-Kette kann gleichtypige Nachbarn (`kommunikationsmittel`↔`erreichbarkeit`)
 /// nicht still vertauschen.
-pub async fn patche(
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: AbschnittPatch<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
     // Existenz im Einsatz sichern (auch für die Zyklenprüfung).
-    laden(pool, einsatz_id, id).await?;
-    validiere_patch(pool, einsatz_id, id, &patch).await?;
+    load(pool, einsatz_id, id).await?;
+    validate_patch(pool, einsatz_id, id, &patch).await?;
     let resultat = sqlx::query(
         "UPDATE einsatzabschnitt SET \
             ueber_abschnitt_id = CASE WHEN ?1 IS NULL THEN ueber_abschnitt_id ELSE ?2 END, \
@@ -395,7 +395,7 @@ pub async fn patche(
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, id).await
+    load(pool, einsatz_id, id).await
 }
 
 /// Ein tatsächlicher Wechsel des Lagezustands: vorheriger Wert und Abschnittsname (für den
@@ -410,7 +410,7 @@ pub struct Lagewechsel {
 /// gleichem Wert). Lesen und Schreiben liegen unter derselben Schreibsperre (`write_retry!` →
 /// `BEGIN IMMEDIATE`), damit bei zwei gleichzeitigen Beurteilungen keine Entwarnung als „kein
 /// Wechsel“ verloren geht. `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
-pub async fn setze_lagezustand_tx(
+pub async fn set_lagezustand_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -446,7 +446,7 @@ pub struct FlaechePatch<'a> {
 }
 
 /// Setzt/ändert/löscht Fläche (GeoJSON) und taktische Zeichen-Felder; schreibt kein ETB.
-pub async fn aktualisiere_flaeche(
+pub async fn update_flaeche(
     pool: &SqlitePool,
     einsatz_id: i64,
     aid: i64,
@@ -473,7 +473,7 @@ pub async fn aktualisiere_flaeche(
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, aid).await
+    load(pool, einsatz_id, aid).await
 }
 
 /// Die Abschnitte, die eine Dispositionszeile leitet. Wer die Zeile löscht, fragt vorher; das
@@ -497,8 +497,8 @@ pub async fn load_geleitete_abschnitte_tx(
 /// Löst einen Abschnitt auf einer offenen Verbindung auf: Unter-Abschnitte an den Parent hängen,
 /// Einheiten `abschnitt_id = NULL`, uhs/Bereitstellungsraum freigeben, dann löschen. `NotFound`,
 /// falls nicht zum Einsatz. Öffnet keine Transaktion; die Atomarität liefert der Aufrufer
-/// (`write_retry!` bzw. [`loese_auf`]).
-pub async fn loese_auf_tx(
+/// (`write_retry!` bzw. [`aufloesen`]).
+pub async fn aufloesen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -576,11 +576,11 @@ pub async fn teilbaum(
     Ok(ids.into_iter().collect())
 }
 
-/// Löst einen Abschnitt in einer eigenen Transaktion auf (delegiert an [`loese_auf_tx`]); die
+/// Löst einen Abschnitt in einer eigenen Transaktion auf (delegiert an [`aufloesen_tx`]); die
 /// Statement-Folge muss atomar bleiben.
-pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+pub async fn aufloesen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    loese_auf_tx(&mut tx, einsatz_id, id).await?;
+    aufloesen_tx(&mut tx, einsatz_id, id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -629,7 +629,7 @@ mod tests {
     /// Org + Einsatz + ein Abschnitt; liefert (einsatz_id, abschnitt_id).
     async fn seed_abschnitt(pool: &SqlitePool) -> (i64, i64) {
         let einsatz = setup(pool).await;
-        let a = anlegen(pool, einsatz, daten("Nord", None, None))
+        let a = create(pool, einsatz, daten("Nord", None, None))
             .await
             .unwrap();
         (einsatz, a.id)
@@ -641,7 +641,7 @@ mod tests {
         let (einsatz_id, aid) = seed_abschnitt(&pool).await;
         let gj =
             r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
-        let a = aktualisiere_flaeche(
+        let a = update_flaeche(
             &pool,
             einsatz_id,
             aid,
@@ -654,7 +654,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(a.flaeche_geojson.as_deref(), Some(gj));
-        let b = aktualisiere_flaeche(
+        let b = update_flaeche(
             &pool,
             einsatz_id,
             aid,
@@ -675,7 +675,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
 
-        let a = anlegen(
+        let a = create(
             &pool,
             einsatz,
             AbschnittDaten {
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
 
         // `kommunikationsmittel` geändert, `erreichbarkeit` explizit per `Some(None)` geleert.
-        let b = patche(
+        let b = update(
             &pool,
             einsatz,
             a.id,
@@ -713,7 +713,7 @@ mod tests {
         assert_eq!(b.erreichbarkeit, None);
 
         // Gegenprobe: ein Patch OHNE die beiden Keys fasst sie nicht an.
-        let c = patche(
+        let c = update(
             &pool,
             einsatz,
             a.id,
@@ -739,12 +739,12 @@ mod tests {
         let (_dir, pool) = crate::db::test_pool_datei().await;
         let einsatz = setup(&pool).await;
         let (ober, unter) = crate::write_retry!(&pool, |conn| {
-            let ober = anlegen_tx(&mut *conn, einsatz, &daten("Nord", None, None)).await?;
-            let unter = anlegen_tx(&mut *conn, einsatz, &daten("Nord 1", Some(ober), None)).await?;
+            let ober = create_tx(&mut *conn, einsatz, &daten("Nord", None, None)).await?;
+            let unter = create_tx(&mut *conn, einsatz, &daten("Nord 1", Some(ober), None)).await?;
             Ok((ober, unter))
         })
         .unwrap();
-        let a = laden(&pool, einsatz, unter).await.unwrap();
+        let a = load(&pool, einsatz, unter).await.unwrap();
         assert_eq!(a.ueber_abschnitt_id, Some(ober));
     }
 
@@ -773,14 +773,14 @@ mod tests {
             "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Abschnittsleiter Nord') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
 
-        let oben = anlegen(&pool, einsatz, daten("Nord", None, Some(ep)))
+        let oben = create(&pool, einsatz, daten("Nord", None, Some(ep)))
             .await
             .unwrap();
-        anlegen(&pool, einsatz, daten("Nord-1", Some(oben.id), None))
+        create(&pool, einsatz, daten("Nord-1", Some(oben.id), None))
             .await
             .unwrap();
 
-        let liste = liste(&pool, einsatz).await.unwrap();
+        let liste = list(&pool, einsatz).await.unwrap();
         assert_eq!(liste.len(), 2);
         let nord = liste.iter().find(|a| a.name == "Nord").unwrap();
         assert_eq!(nord.leiter_name.as_deref(), Some("Abschnittsleiter Nord"));
@@ -798,11 +798,11 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let fremder_abschnitt = anlegen(&pool, fremd, daten("Fremd-Nord", None, None))
+        let fremder_abschnitt = create(&pool, fremd, daten("Fremd-Nord", None, None))
             .await
             .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, daten("X", Some(fremder_abschnitt.id), None))
+            create(&pool, einsatz, daten("X", Some(fremder_abschnitt.id), None))
                 .await
                 .unwrap_err(),
             AppError::NotFound
@@ -827,7 +827,7 @@ mod tests {
         .await
         .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, daten("Nord", None, Some(fremder_ep)))
+            create(&pool, einsatz, daten("Nord", None, Some(fremder_ep)))
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
@@ -838,32 +838,32 @@ mod tests {
     async fn zyklus_direkt_und_transitiv_ist_validation() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("A", None, None))
+        let a = create(&pool, einsatz, daten("A", None, None))
             .await
             .unwrap();
-        let b = anlegen(&pool, einsatz, daten("B", Some(a.id), None))
+        let b = create(&pool, einsatz, daten("B", Some(a.id), None))
             .await
             .unwrap();
-        let c = anlegen(&pool, einsatz, daten("C", Some(b.id), None))
+        let c = create(&pool, einsatz, daten("C", Some(b.id), None))
             .await
             .unwrap();
 
         // A unter sich selbst.
         assert!(matches!(
-            patche(&pool, einsatz, a.id, parent_patch(Some(a.id)))
+            update(&pool, einsatz, a.id, parent_patch(Some(a.id)))
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
         ));
         // A unter C (C ist Nachfahre von A) → transitiver Zyklus.
         assert!(matches!(
-            patche(&pool, einsatz, a.id, parent_patch(Some(c.id)))
+            update(&pool, einsatz, a.id, parent_patch(Some(c.id)))
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
         ));
         // Grenzt ab: `null` löst die Zuordnung und läuft nicht in die Zyklenprüfung.
-        assert!(patche(&pool, einsatz, b.id, parent_patch(None))
+        assert!(update(&pool, einsatz, b.id, parent_patch(None))
             .await
             .is_ok());
     }
@@ -872,13 +872,13 @@ mod tests {
     async fn aufloesen_zieht_unterabschnitte_hoch_und_loest_einheit_zuordnung() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let oben = anlegen(&pool, einsatz, daten("Nord", None, None))
+        let oben = create(&pool, einsatz, daten("Nord", None, None))
             .await
             .unwrap();
-        let mitte = anlegen(&pool, einsatz, daten("Nord-Mitte", Some(oben.id), None))
+        let mitte = create(&pool, einsatz, daten("Nord-Mitte", Some(oben.id), None))
             .await
             .unwrap();
-        let unten = anlegen(&pool, einsatz, daten("Nord-Mitte-1", Some(mitte.id), None))
+        let unten = create(&pool, einsatz, daten("Nord-Mitte-1", Some(mitte.id), None))
             .await
             .unwrap();
 
@@ -887,10 +887,10 @@ mod tests {
             "INSERT INTO einsatz_einheit (einsatz_id, abschnitt_id, name) VALUES (?, ?, 'Zug') RETURNING id",
         ).bind(einsatz).bind(mitte.id).fetch_one(&pool).await.unwrap();
 
-        loese_auf(&pool, einsatz, mitte.id).await.unwrap();
+        aufloesen(&pool, einsatz, mitte.id).await.unwrap();
 
         // 'unten' hängt jetzt direkt unter 'oben' (Parent des aufgelösten).
-        let liste = liste(&pool, einsatz).await.unwrap();
+        let liste = list(&pool, einsatz).await.unwrap();
         let unten_neu = liste.iter().find(|a| a.id == unten.id).unwrap();
         assert_eq!(unten_neu.ueber_abschnitt_id, Some(oben.id));
         // Der aufgelöste Abschnitt ist weg.
@@ -909,11 +909,11 @@ mod tests {
     async fn patche_fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("A", None, None))
+        let a = create(&pool, einsatz, daten("A", None, None))
             .await
             .unwrap();
         assert!(matches!(
-            patche(
+            update(
                 &pool,
                 999,
                 a.id,
@@ -927,7 +927,7 @@ mod tests {
             AppError::NotFound
         ));
         assert!(matches!(
-            loese_auf(&pool, 999, a.id).await.unwrap_err(),
+            aufloesen(&pool, 999, a.id).await.unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -936,7 +936,7 @@ mod tests {
     async fn abschnitt_anzeige_enthaelt_zugeordnete_sprechgruppen() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("Nord", None, None))
+        let a = create(&pool, einsatz, daten("Nord", None, None))
             .await
             .unwrap();
         let kat = crate::sprechgruppe::repo::anlegen_katalog(
@@ -962,7 +962,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let neu = laden(&pool, einsatz, a.id).await.unwrap();
+        let neu = load(&pool, einsatz, a.id).await.unwrap();
         assert_eq!(neu.sprechgruppen.len(), 1);
         assert_eq!(neu.sprechgruppen[0].bezeichnung, "412_F_DRK");
     }
@@ -1073,7 +1073,7 @@ mod tests {
         .await
         .unwrap();
 
-        loese_auf(&pool, einsatz, aid)
+        aufloesen(&pool, einsatz, aid)
             .await
             .expect("Abschnitt auflösen darf nicht am FK scheitern");
 
@@ -1113,23 +1113,23 @@ mod tests {
     async fn teilbaum_umfasst_alle_nachfahren_und_nichts_fremdes() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let nord = anlegen(&pool, einsatz, daten("Nord", None, None))
+        let nord = create(&pool, einsatz, daten("Nord", None, None))
             .await
             .unwrap()
             .id;
-        let ost = anlegen(&pool, einsatz, daten("Nord-Ost", Some(nord), None))
+        let ost = create(&pool, einsatz, daten("Nord-Ost", Some(nord), None))
             .await
             .unwrap()
             .id;
-        let tief = anlegen(&pool, einsatz, daten("Nord-Ost 1", Some(ost), None))
+        let tief = create(&pool, einsatz, daten("Nord-Ost 1", Some(ost), None))
             .await
             .unwrap()
             .id;
-        let sued = anlegen(&pool, einsatz, daten("Süd", None, None))
+        let sued = create(&pool, einsatz, daten("Süd", None, None))
             .await
             .unwrap()
             .id;
-        let sued_west = anlegen(&pool, einsatz, daten("Süd-West", Some(sued), None))
+        let sued_west = create(&pool, einsatz, daten("Süd-West", Some(sued), None))
             .await
             .unwrap()
             .id;
@@ -1146,7 +1146,7 @@ mod tests {
         );
 
         // Umgehängt: Nord-Ost unter Süd → Nord verliert den Ast, Süd gewinnt ihn.
-        patche(&pool, einsatz, ost, parent_patch(Some(sued)))
+        update(&pool, einsatz, ost, parent_patch(Some(sued)))
             .await
             .unwrap();
         assert_eq!(

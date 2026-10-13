@@ -383,7 +383,7 @@ impl Ablauf<'_> {
                     Some(s) => Some(frueher(&self.abschnitte, "Abschnitt", s)?),
                     None => None,
                 };
-                let id = crate::einsatzabschnitt::repo::anlegen_tx(
+                let id = crate::einsatzabschnitt::repo::create_tx(
                     conn,
                     self.einsatz_id,
                     &crate::einsatzabschnitt::repo::AbschnittDaten {

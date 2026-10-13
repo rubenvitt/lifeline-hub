@@ -1260,15 +1260,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/abschnitte",
-            get(routes::einsatzabschnitt::liste),
+            get(routes::einsatzabschnitt::list),
         )
         .route(
             "/api/einsaetze/{id}/abschnitte",
-            post(routes::einsatzabschnitt::anlegen),
+            post(routes::einsatzabschnitt::create),
         )
         .route(
             "/api/einsaetze/{id}/abschnitte/{aid}",
-            patch(routes::einsatzabschnitt::aktualisieren),
+            patch(routes::einsatzabschnitt::update),
         )
         .route(
             "/api/einsaetze/{id}/abschnitte/{aid}/flaeche",

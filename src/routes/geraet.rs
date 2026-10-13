@@ -167,7 +167,7 @@ async fn stelle_pruefen(
             Ok(br.bezeichnung)
         }
         Bindungsart::Einsatzabschnitt => {
-            Ok(crate::einsatzabschnitt::repo::laden(pool, einsatz_id, id)
+            Ok(crate::einsatzabschnitt::repo::load(pool, einsatz_id, id)
                 .await?
                 .name)
         }
