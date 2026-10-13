@@ -1988,9 +1988,11 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     `Lücken-Wahlknopf (${dichte})`,
     SKIZZE_LUECKEN_WAHL,
   );
-  // Reiter des Fernmeldewesens (LLH-1180) statt des Umschalters „Darstellung“.
+  // Reiter des Fernmeldewesens (LLH-1180) statt des Umschalters „Darstellung“. Gemessen wird der
+  // Knoten, der den Klick trägt (`.ant-tabs-tab`, wie in `trefflaeche-pruefflaechen`): `role="tab"`
+  // sitzt bei antd auf dem inneren Text ohne das Polster der Kopfzeile.
   const umschalter = await alleHaltenStufe(
-    page.getByRole('tablist').getByRole('tab'),
+    page.getByRole('tablist').locator('.ant-tabs-tab'),
     soll,
     `Reiter (${dichte})`,
     4,
