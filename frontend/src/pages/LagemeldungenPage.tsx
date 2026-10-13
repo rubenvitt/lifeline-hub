@@ -1,5 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Input, Spin } from 'antd';
-import { useMemo, useState } from 'react';
+import { Alert, Breadcrumb, Button, Flex, Input, Spin } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -14,6 +14,8 @@ import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { formatUhrzeit } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
@@ -71,14 +73,17 @@ const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
  *
  * Neu und gesehen (LLH-1206, Spec `lagemeldung-kenntnisnahme`): eine neue Zeile trägt die Marke
  * „Neu“, mit Schreibrecht den Knopf „Als gesehen markieren“; der Kopf markiert alle bis zur
- * jüngsten geladenen. Der Stand gilt für alle; dieselbe Zahl zeigt der Modulzähler.
+ * jüngsten geladenen. Der Stand gilt für alle; dieselbe Zahl zeigt der Modulzähler. Eine Ablehnung
+ * steht an der Zeile bzw. im Seitenhinweis, nie im Toast (`frontend/AGENTS.md`, „Rückwege und
+ * Fehler“).
  */
+const GESEHEN_FEHLER = 'Konnte nicht als gesehen markiert werden';
+
 export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { konventionen } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
-  const { message } = App.useApp();
   const queryClient = useQueryClient();
   const ohneVerbindung = useOhneVerbindung();
   const [filter, setFilter] = useState<LageFilter>(LEERER_FILTER);
@@ -96,16 +101,24 @@ export default function LagemeldungenPage() {
     void queryClient.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(einsatzId) });
     void queryClient.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(einsatzId) });
   };
+  const zeilenFehler = useZeilenFehler<number>();
   const gesehenMutation = useMutation({
     mutationFn: (lageId: number) => markLageMeldungGesehen(einsatzId, lageId),
+    onMutate: (lageId) => zeilenFehler.beginne(lageId),
     onSuccess: neuAbgleichen,
-    onError: () => void message.error('Konnte nicht als gesehen markiert werden'),
+    onError: (fehler, lageId) => zeilenFehler.melde(lageId, fehler, GESEHEN_FEHLER),
   });
   const alleGesehenMutation = useMutation({
     mutationFn: (bisId: number) => markLageMeldungenGesehen(einsatzId, bisId),
     onSuccess: neuAbgleichen,
-    onError: () => void message.error('Konnte nicht als gesehen markiert werden'),
   });
+  // Ein anderer Einsatz räumt die Gründe des vorigen.
+  const { leere } = zeilenFehler;
+  const { reset: alleGesehenReset } = alleGesehenMutation;
+  useEffect(() => {
+    leere();
+    alleGesehenReset();
+  }, [einsatzId, leere, alleGesehenReset]);
 
   const eintraege = useMemo(() => lageQuery.data ?? [], [lageQuery.data]);
   const gruppen = useMemo(
@@ -129,6 +142,26 @@ export default function LagemeldungenPage() {
   // Die jüngste geladene Lagemeldung: was danach eingeht, bleibt neu.
   const juengsteId = eintraege.reduce((max, l) => Math.max(max, l.id), 0);
   const hatNeue = eintraege.some((l) => l.is_neu);
+
+  const zeilenHinweis = (l: LageMeldung) => {
+    const ort =
+      l.lat != null && l.lon != null ? (
+        <KoordinatenAnzeige
+          lat={l.lat}
+          lon={l.lon}
+          einsatzId={l.einsatz_id}
+          exclude={`lagemeldung:${l.id}`}
+        />
+      ) : null;
+    const grund = zeilenFehler.grund(l.id);
+    if (!grund) return ort ?? undefined;
+    return (
+      <Flex vertical gap={token.marginXXS}>
+        {ort}
+        <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+      </Flex>
+    );
+  };
 
   const zeile = (l: LageMeldung) => (
     <Zeitachseneintrag
@@ -156,7 +189,6 @@ export default function LagemeldungenPage() {
       aktionen={
         l.is_neu && darfSchreiben ? (
           <Button
-            size="small"
             disabled={ohneVerbindung}
             loading={gesehenMutation.isPending && gesehenMutation.variables === l.id}
             onClick={() => gesehenMutation.mutate(l.id)}
@@ -165,16 +197,7 @@ export default function LagemeldungenPage() {
           </Button>
         ) : undefined
       }
-      hinweis={
-        l.lat != null && l.lon != null ? (
-          <KoordinatenAnzeige
-            lat={l.lat}
-            lon={l.lon}
-            einsatzId={l.einsatz_id}
-            exclude={`lagemeldung:${l.id}`}
-          />
-        ) : undefined
-      }
+      hinweis={zeilenHinweis(l)}
       verfasser={l.meldung_absender}
     >
       {l.text}
@@ -239,6 +262,9 @@ export default function LagemeldungenPage() {
           : undefined
       }
       dataUpdatedAt={lageQuery.dataUpdatedAt}
+      hinweis={
+        <SeitenHinweise fehler={alleGesehenMutation.error} fehlerFallback={GESEHEN_FEHLER} />
+      }
       breadcrumb={
         <Breadcrumb
           items={[

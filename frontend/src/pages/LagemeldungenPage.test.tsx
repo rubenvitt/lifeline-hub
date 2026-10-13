@@ -262,6 +262,35 @@ describe('LagemeldungenPage', () => {
       expect(screen.queryByRole('button', { name: 'Alle als gesehen markieren' })).toBeNull();
     });
 
+    it('eine Ablehnung steht an der Zeile, nicht im Toast', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([lage({ id: 7, is_neu: true })]);
+      markLageMeldungGesehen.mockRejectedValue(new Error('kaputt'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(
+        within(zeileMit('Brücke gesperrt')).getByRole('button', { name: 'Als gesehen markieren' }),
+      );
+      expect(
+        await within(zeileMit('Brücke gesperrt')).findByText(
+          'Konnte nicht als gesehen markiert werden',
+        ),
+      ).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('eine Ablehnung des Sammelknopfs steht im Seitenhinweis', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([lage({ id: 7, is_neu: true })]);
+      markLageMeldungenGesehen.mockRejectedValue(new Error('kaputt'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
+      expect(await screen.findByText('Konnte nicht als gesehen markiert werden')).toBeVisible();
+      expect(within(zeileMit('Brücke gesperrt')).queryByRole('alert')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
     it('ohne Netz sind die Knöpfe gesperrt', async () => {
       ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
       listeLageMeldungen.mockResolvedValue([lage({ is_neu: true })]);
