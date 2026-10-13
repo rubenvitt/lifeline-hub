@@ -1,6 +1,11 @@
 import type { Einheit, Einsatzabschnitt, Staerke } from '../api/types';
 import type { EinheitStaerkeUrteil } from '../theme/statusFarben';
-import { einheitStaerkeUrteilVon, einheitenBaum, type EinheitKnoten } from './kraeftebaumKern';
+import {
+  COLLATOR,
+  einheitStaerkeUrteilVon,
+  einheitenBaum,
+  type EinheitKnoten,
+} from './kraeftebaumKern';
 import type { TzEinheit } from './meldebildRaster';
 
 /**
@@ -37,8 +42,6 @@ export interface GliederungZeile {
   children?: GliederungZeile[];
 }
 
-const KOLLATOR = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
-
 export function buildEinheitenGliederung(
   einheiten: readonly Einheit[],
   abschnitte: readonly Einsatzabschnitt[],
@@ -72,7 +75,7 @@ export function buildEinheitenGliederung(
       abschnitt: k.abschnittId != null ? (abschnittName.get(k.abschnittId) ?? null) : null,
       fahrzeuge: (x.fahrzeug_mitglieder ?? [])
         .map((f) => f.funkrufname)
-        .sort((a, b) => KOLLATOR.compare(a, b)),
+        .sort((a, b) => COLLATOR.compare(a, b)),
       ...(kinder.length > 0 ? { children: kinder } : {}),
     };
   };
