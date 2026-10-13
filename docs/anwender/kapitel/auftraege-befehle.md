@@ -14,8 +14,8 @@ Das Modul „Aufträge/Befehle“ hat zwei Reiter:
   Auftrag lässt sich berichtigen, solange noch niemand quittiert hat, und mit einem Grund
   aufheben, solange er nicht abgenommen ist.
 - **Einsatzbefehle** sind Dokumente nach einem Befehlsschema. Sie entstehen als Entwurf, werden
-  freigegeben und lassen sich danach nur noch in einer neuen Fassung fortschreiben. Jede Stelle
-  im Verteiler eines freigegebenen Befehls quittiert den Empfang.
+  freigegeben und lassen sich danach nur noch in einer neuen Fassung fortschreiben. Für jede
+  Stelle im Verteiler eines freigegebenen Befehls wird der Empfang quittiert.
 
 Lesen dürfen alle mit Zugang zum Einsatz. Erteilen, Quittieren, Berichtigen, Aufheben,
 Entwerfen und Freigeben dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
@@ -173,13 +173,15 @@ Für Einsatzleitung und Führungspersonal, an der jüngsten freigegebenen Fassun
 
 1. Im Reiter „Einsatzbefehle“ die Ansicht „Freigegeben“ wählen und den Befehl wählen. Seine Karte
    zählt die Quittungen, etwa „2 Empfänger · 1/2 quittiert“.
-2. Im Befehl unter „Verteiler“ steht neben „Quittung offen:“ jede Stelle, die den Empfang noch
-   nicht bestätigt hat. Bei der Stelle „Quittieren“ wählen. Eine Rückfrage gibt es nicht.
+2. Im Befehl unter „Verteiler“ steht neben „Quittung offen:“ jede Stelle, deren Empfang noch
+   nicht bestätigt ist. Hat sie den Befehl erhalten, bei ihr „Quittieren“ wählen. Eine Rückfrage
+   gibt es nicht.
 3. Ein Hinweis bietet sechs Sekunden lang „Rückgängig“: Er nimmt die Quittung zurück, die Stelle
    steht wieder unter „Quittung offen:“.
 
 Quittierte Stellen stehen mit ✓ im Verteiler. Ein Befehlsentwurf hat noch keine Quittung, und
-eine Fassung, nach der schon eine neuere freigegeben ist, nimmt keine Quittung mehr an: Ihre
+eine Fassung, nach der schon eine andere Fassung desselben Befehls freigegeben wurde, nimmt keine
+Quittung mehr an: Ihre
 offenen Stellen stehen ohne „Quittieren“ da, ihre Quittungen bleiben sichtbar.
 
 ### Einen Einsatzbefehl freigeben und fortschreiben
@@ -254,8 +256,8 @@ Schreibrecht und in jeder Phase des Auftrags.
 
 ### Einzelauftrag oder Einsatzbefehl
 
-Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Vollzug und Abnahme; einen
-Einsatzbefehl quittieren nur die Stellen in seinem Verteiler.
+Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Vollzug und Abnahme. Am
+Einsatzbefehl wird nur der Empfang je Stelle im Verteiler quittiert.
 Das Schema „Einzelauftrag (EA/ZMW)“ bietet „Neuer Befehlsentwurf“ deshalb nicht mehr an.
 Befehle, die schon mit diesem Schema angelegt sind, lassen sich weiter öffnen, bearbeiten,
 freigeben, fortschreiben und drucken.
@@ -287,7 +289,7 @@ gewählten Abschnitt oder die gewählte Einheit nennen, ohne Unterabschnitte.
 ### Quittung eines Befehls im Einsatztagebuch
 
 Jede Quittung schreibt einen Systemeintrag „Empfang quittiert: Einsatzbefehl v2 (ETB 17)“ mit der
-quittierenden Stelle als Absender („Von“). „ETB 17“ ist die Nummer des Eintrags, mit dem die
+Stelle aus dem Verteiler als Absender („Von“). „ETB 17“ ist die Nummer des Eintrags, mit dem die
 Fassung freigegeben wurde. Den Titel nennt der Eintrag nicht. Eine zurückgenommene Quittung
 schreibt dazu „Quittung zurückgenommen: Einsatzbefehl v2 (ETB 17)“, der Eintrag der Quittung
 bleibt stehen. Quittiert eine Stelle doppelt, entsteht kein zweiter Eintrag.

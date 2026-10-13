@@ -80,10 +80,10 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 
 ## 5. e2e und Doku (D8)
 
-- [ ] 5.1 e2e in `e2e/auftraege-befehle-liste-detail.spec.ts`: Befehl mit Verteiler freigeben,
+- [x] 5.1 e2e in `e2e/auftraege-befehle-liste-detail.spec.ts`: Befehl mit Verteiler freigeben,
   im Detail quittieren, Karte zählt „1/1 quittiert“, Rückgängig, Karte zählt „0/1“. Nachweis:
   Die Spec ist lokal grün (`PW_PROJEKTE=chromium`).
-- [ ] 5.2 Kapitel `docs/anwender/kapitel/auftraege-befehle.md` nach D8, Bildlauf
+- [x] 5.2 Kapitel `docs/anwender/kapitel/auftraege-befehle.md` nach D8, Bildlauf
   `e2e/doku-bilder/auftraege-befehle.bilder.ts` mit Verteiler und Quittung, Bild
   `befehl-detail.png` hell und dunkel neu. Nachweis: `src/hilfe/anwenderdoku.guard.test.ts` ist
   grün.
