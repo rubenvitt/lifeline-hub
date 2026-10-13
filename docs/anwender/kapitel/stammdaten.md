@@ -86,6 +86,9 @@ deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
 5. Unter „Fahrzeuge“ ein Fahrzeug wählen und „Fahrzeug hinzufügen“ wählen.
 6. Unter „Stammbesetzung“ eine Person wählen und „Person hinzufügen“ wählen. In ihrer Zeile
    lassen sich Position und Fahrzeug wählen.
+
+   ![Paneel „Stammbesetzung“ der Vorlage „Rettungsstaffel“ mit vier Personen, je Zeile Position, Fahrzeug und „Entfernen“, darunter „Person wählen“ und „Person hinzufügen“](../bilder/stammdaten/vorlage-stammbesetzung.png)
+
 7. Nach Bedarf im Kopf „Funkrufname“, „Fachaufgabe“ und „Organisation“ des taktischen Zeichens,
    die „Soll-Stärke“ und eine „Bemerkung“ eintragen und „Speichern“ wählen.
 
