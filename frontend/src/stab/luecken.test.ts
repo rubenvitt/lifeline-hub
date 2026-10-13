@@ -23,6 +23,9 @@ import {
   einheitenOhneSprechgruppe,
   leitstelleOhneVerbindung,
   lokaleSprechgruppenOhneZuordnung,
+  lueckenAnzahl,
+  type Luecke,
+  type Verbindung,
   verbindungenOhneGemeinsameSprechgruppe,
   verbindungsurteil,
   type Quelle,
@@ -685,5 +688,67 @@ describe('lokaleSprechgruppenOhneZuordnung — externe Stellen und Komponenten (
         fehlt,
       ),
     ).toEqual({ zustand: 'daten', treffer: [] });
+  });
+});
+
+// ── Zahl der Lücken (LLH-1124, Spec `stab-funkplan`, „Zahl der Lücken“) ──────────────────────────
+
+describe('lueckenAnzahl', () => {
+  const daten = <T>(treffer: T[]): Luecke<T> => ({ zustand: 'daten', treffer });
+  const leer = {
+    abschnitteOhneSprechgruppe: daten<Einsatzabschnitt>([]),
+    einheitenOhneSprechgruppe: daten<Einheit>([]),
+    einheitenOhneErreichbarkeit: daten<Einheit>([]),
+    verbindungenOhneGemeinsameSprechgruppe: daten<Verbindung>([]),
+    lokaleSprechgruppenOhneZuordnung: daten<Sprechgruppe>([]),
+  };
+  const netzLeer = {
+    schienenMitEinemTeilnehmer: daten<Sprechgruppe>([]),
+    leitstelle: { zustand: 'daten' as const, fehlt: false, element: null },
+  };
+  const einheit = { id: 1 } as Einheit;
+
+  it('summiert die Treffer, eine Einheit unter zwei Lücken zählt bei jeder', () => {
+    const luecken = {
+      ...leer,
+      abschnitteOhneSprechgruppe: daten([{ id: 4 } as Einsatzabschnitt]),
+      einheitenOhneSprechgruppe: daten([einheit]),
+      einheitenOhneErreichbarkeit: daten([einheit]),
+    };
+    expect(lueckenAnzahl(luecken, netzLeer)).toEqual({ zustand: 'daten', anzahl: 3 });
+  });
+
+  it('ohne Lücke ist die Zahl 0, nicht leer', () => {
+    expect(lueckenAnzahl(leer, netzLeer)).toEqual({ zustand: 'daten', anzahl: 0 });
+  });
+
+  it('zählt Sprechgruppen mit einem Teilnehmer und die Leitstelle ohne Verbindung als eine Lücke', () => {
+    const netz = {
+      schienenMitEinemTeilnehmer: daten([{ id: 9 } as Sprechgruppe]),
+      leitstelle: { zustand: 'daten' as const, fehlt: true, element: null },
+    };
+    expect(lueckenAnzahl(leer, netz)).toEqual({ zustand: 'daten', anzahl: 2 });
+  });
+
+  it('eine gesperrte Quelle ergibt keine Teilsumme', () => {
+    const luecken = {
+      ...leer,
+      abschnitteOhneSprechgruppe: daten([{ id: 4 } as Einsatzabschnitt]),
+      einheitenOhneSprechgruppe: { zustand: 'gesperrt' as const, treffer: [] },
+    };
+    expect(lueckenAnzahl(luecken, netzLeer)).toEqual({ zustand: 'gesperrt', anzahl: null });
+  });
+
+  it('nimmt den schlechtesten Zustand, auch an der Leitstelle', () => {
+    const netz = {
+      ...netzLeer,
+      leitstelle: { zustand: 'fehler' as const, fehlt: false, element: null },
+    };
+    const luecken = {
+      ...leer,
+      einheitenOhneErreichbarkeit: { zustand: 'laden' as const, treffer: [] },
+    };
+    expect(lueckenAnzahl(luecken, netz).anzahl).toBeNull();
+    expect(lueckenAnzahl(leer, netz)).toEqual({ zustand: 'fehler', anzahl: null });
   });
 });

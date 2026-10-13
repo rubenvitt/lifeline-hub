@@ -9,6 +9,8 @@ import type {
   Verbindungsstatus,
 } from '../api/types';
 import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
+import type { NetzLuecken } from './fernmeldeskizze';
+import type { FunkplanLuecken } from './funkplan';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
@@ -358,4 +360,23 @@ export function verbindungenOhneGemeinsameSprechgruppe(
     }
   }
   return { zustand, treffer };
+}
+
+/**
+ * Die Zahl der Lücken (LLH-1124, Spec `stab-funkplan`, „Zahl der Lücken“): Kopf des Lücken-Paneels
+ * im Funkplan UND Werkzeug „Funkplan“ der Stab-Seite, aus dieser einen Rechnung. Summe der Treffer
+ * aller Zeilen des Paneels; ein Datensatz unter zwei Lücken zählt bei jeder (die Zahl sagt, wie viel
+ * zu tun ist), die Leitstelle ohne Verbindung zählt eins. Die fehlende eigene Gegenstelle zählt
+ * nicht, sie ist ein Hinweis auf ihren Pflegeort. Fehlt auch nur eine Quelle, gibt es keine
+ * Teilsumme, sondern den schlechtesten Zustand.
+ */
+export function lueckenAnzahl(
+  luecken: FunkplanLuecken,
+  netz: NetzLuecken,
+): { zustand: AbrufZustand; anzahl: number | null } {
+  const zeilen: Luecke<unknown>[] = [...Object.values(luecken), netz.schienenMitEinemTeilnehmer];
+  const zustand = schlechtesterZustand(...zeilen.map((l) => l.zustand), netz.leitstelle.zustand);
+  if (zustand !== 'daten') return { zustand, anzahl: null };
+  const summe = zeilen.reduce((n, l) => n + l.treffer.length, 0);
+  return { zustand, anzahl: summe + (netz.leitstelle.fehlt ? 1 : 0) };
 }

@@ -55,7 +55,8 @@ import {
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
-import type { Luecke, Verbindung } from '../stab/luecken';
+import { lueckenAnzahl, type Luecke, type Verbindung } from '../stab/luecken';
+import { anzahl } from '../anzeige/anzahl';
 import type { SkizzenAktionen } from '../stab/skizzenAktionen';
 import {
   HERKUNFT_LABEL,
@@ -771,6 +772,9 @@ export default function FunkplanPage() {
   // Lücke „Leitstelle“ (LFH-848, LFH-893): dieselbe Regel wie im Kommunikationsplan. Ohne Stellen
   // fehlt alles, sonst nur die Skizze; geladen und verbunden steht keine Zeile.
   const leitstelle = netz.luecken.leitstelle;
+  // Die Zahl im Kopf des Paneels: dieselbe Rechnung wie das Werkzeug „Funkplan“ der Stab-Seite
+  // (LLH-1124). Fehlt eine Quelle, steht keine Teilsumme da; die Zeilen nennen den Grund.
+  const lueckenZahl = lueckenAnzahl(luecken, netz.luecken).anzahl;
   const leitstelleZeigen = leitstelle.zustand !== 'daten' || leitstelle.fehlt;
   const leitstelleName =
     leitstelle.element != null
@@ -830,6 +834,7 @@ export default function FunkplanPage() {
             Listen wie die Tabelle; ohne Daten „—" mit Grund, nie „0". */}
           <Paneel
             titel="Lücken"
+            meta={lueckenZahl != null ? anzahl(lueckenZahl, 'Lücke', 'Lücken') : undefined}
             style={{
               marginBlockEnd: token.margin,
               // Nur in der Skizze: wechselt die Darstellung beim Halten, meldet niemand dessen Ende.

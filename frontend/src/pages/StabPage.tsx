@@ -1,46 +1,47 @@
-import { Breadcrumb, Button, Flex, Space, Typography, theme } from 'antd';
+import { Breadcrumb, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulZaehler } from '../api/modulZaehler';
+import { ladeMedienkontaktKennzahlen } from '../api/presse';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { Sachgebiet } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
-import { Paneel } from '../components/instrument';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
-import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
-import { istSprungGesperrt, modulZielRoute, modulName } from '../einsatz/modulRegistry';
-import { GesperrterSprung } from '../components/Sprung';
+import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { einsatzModulPfad } from '../routing/deeplinks';
 import LagebesprechungZeile from '../lagebesprechung/LagebesprechungZeile';
 import BesetzungModal from '../stab/BesetzungModal';
 import ChecklistePaneel from '../stab/ChecklistePaneel';
-import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
+import { besetzungRechteText, zeileFuer } from '../stab/besetzung';
 import { mitWirksamemLabel } from '../stab/sachgebiete';
+import SachgebietKachel from '../stab/SachgebietKachel';
+import { stabRasterStil, stabSpalten } from '../stab/stabRaster';
+import { useFunkplanLuecken } from '../stab/useFunkplanLuecken';
+import type { WerkzeugZahlQuellen } from '../stab/werkzeugZahlen';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
-import { werkzeugeFuer } from '../stab/werkzeuge';
-import { unterseitenFuer } from '../stab/unterseiten';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
 
 /**
- * Modul „Stab" (LFH-46): Führungsorganisation S1–S6.
+ * Modul „Stab" (LFH-46): Übersicht der Stabsfunktionen S1–S6 (LLH-1124,
+ * `openspec/changes/o5nxgqbl-stab-uebersicht/design.md`).
  *
- * Eine Vollseite: oben die Zeile „Nächste Lagebesprechung“ mit Sprung in das eigene Modul
- * (LLH-1111, `lagebesprechung/LagebesprechungZeile.tsx`) — Vorbereitung, Abschluss und Verlauf trägt
- * seit LLH-1111 die Seite Lagebesprechung, nicht mehr der Stab. Darunter Besetzung und
- * Arbeitsaufnahme.
+ * Oben die Zeile „Nächste Lagebesprechung“ mit Sprung in das eigene Modul (LLH-1111,
+ * `lagebesprechung/LagebesprechungZeile.tsx`). Darunter ein Raster aus sechs Kacheln
+ * (`stab/SachgebietKachel.tsx`, eine Spalte am Handy, zwei ab `md`, drei ab `xl`): Besetzung,
+ * „Besetzung ändern“, Aufgaben mit Fundstelle und die Werkzeuge des Sachgebiets, je mit einer Zahl
+ * aus ihrer Heimat (`stab/werkzeugZahlen.ts`). Den Besetzungsstand trägt der Seitenkopf.
  *
- * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile
- * ist kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
- * und ein Satz nennt den Grund.
+ * Die Zahlenquellen lädt die Seite je einmal: den Modulzähler (dieselbe Abfrage wie das
+ * Modulmenü), die Kennzahlen des Presse-Logs und die Lückenzahl des Funkplans
+ * (`stab/useFunkplanLuecken.ts`, nur mit Freigabe des Fernmeldewesens). Alle drei folgen live
+ * ihren Ereignissen.
  *
- * Das Paneel „Arbeitsaufnahme" (LFH-551) steht ganz unten: die Checkliste ist nach zehn Minuten
- * erledigt und soll dann die Besetzung nicht nach unten drücken. Eigene Abfrage, eigener Endpunkt.
+ * Das Paneel „Arbeitsaufnahme" (LFH-551) steht unter dem Raster und klappt ein, wenn beim Öffnen
+ * alles erledigt ist (D6). Eigene Abfrage, eigener Endpunkt.
  *
  * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Checkliste; den Termin der Zeile frischt
  * `einsatz` mit dem Kopf auf (LFH-555).
@@ -49,7 +50,7 @@ export default function StabPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();
-  const { istSchmal } = useViewport();
+  const { abBreite } = useViewport();
   const [offenFuer, setOffenFuer] = useState<Sachgebiet | null>(null);
 
   const einsatzQuery = useQuery({
@@ -60,18 +61,33 @@ export default function StabPage() {
     queryKey: einsatzKeys.stab(einsatzId),
     queryFn: () => ladeStab(einsatzId),
   });
-  // Modul-Freigaben vom Server (LFH-669): filtern die Werkzeuge der Zeilen und sperren den Sprung in
-  // die Lagebesprechung.
+  // Modul-Freigaben vom Server (LFH-669): entscheiden, welches Werkzeug fehlt, gesperrt steht oder
+  // springt, und sperren den Sprung in die Lagebesprechung.
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
-  // Wirksame Mandantenlabels der Zeilen (LFH-549); ohne Katalog das Standardlabel.
+  // Wirksame Mandantenlabels der Kacheln (LFH-549); ohne Katalog das Standardlabel.
   const katalogQuery = useQuery({
     queryKey: globalKeys.fuehrungsfunktionen(),
     queryFn: ladeFuehrungsfunktionen,
     staleTime: 5 * 60_000,
   });
+  // Die Quellen der Zahlen je Werkzeug (D4): eine Heimat je Zahl, hier nur gelesen.
+  const zaehlerQuery = useQuery({
+    queryKey: einsatzKeys.modulZaehler(einsatzId),
+    queryFn: () => ladeModulZaehler(einsatzId),
+  });
+  const presseQuery = useQuery({
+    queryKey: einsatzKeys.medienkontaktKennzahlen(einsatzId),
+    queryFn: () => ladeMedienkontaktKennzahlen(einsatzId),
+  });
+  const funkplan = useFunkplanLuecken(einsatzId);
+  const zahlQuellen: WerkzeugZahlQuellen = {
+    zaehler: zaehlerQuery,
+    presse: presseQuery,
+    funkplan,
+  };
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
 
@@ -87,18 +103,19 @@ export default function StabPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  // Fehler ≠ leer: ohne Daten tritt der Fehler an die Stelle der Liste — sechs „nicht vergeben"
+  // Fehler ≠ leer: ohne Daten tritt der Fehler an die Stelle des Rasters — sechs „nicht vergeben"
   // wären sonst eine Aussage über eine Menge, die nie ankam.
   const stabGescheitert = stabQuery.isError && !stabQuery.data;
   const standVeraltet = stabQuery.isError && stabQuery.data != null;
   const sachgebiete = mitWirksamemLabel(katalogQuery.data ?? []);
   const offenerEintrag = sachgebiete.find((s) => s.sachgebiet === offenFuer);
-  const vergeben = sachgebiete.filter((s) => zeileFuer(stabQuery.data, s.sachgebiet)).length;
+  const besetzt = sachgebiete.filter((s) => zeileFuer(stabQuery.data, s.sachgebiet)).length;
 
   return (
     <EinsatzSeite
       dataUpdatedAt={stabQuery.dataUpdatedAt}
       titel={modulName('stab')}
+      meta={stabQuery.data ? `${besetzt}/${sachgebiete.length} besetzt` : undefined}
       breadcrumb={
         <Breadcrumb
           items={[
@@ -121,118 +138,32 @@ export default function StabPage() {
         freigaben={freigabenQuery.data}
       />
 
-      <Paneel
-        titel="Besetzung S1–S6"
-        meta={stabQuery.data ? `${vergeben}/${sachgebiete.length} vergeben` : undefined}
-        koerperPolster
-      >
-        {stabGescheitert ? (
-          <SeitenFehler
-            text="Führungsorganisation konnte nicht geladen werden"
-            ursache={stabQuery.error}
-            onWiederholen={() => void stabQuery.refetch()}
-          />
-        ) : (
-          <>
-            {standVeraltet && (
-              <SeitenStandVeraltet onWiederholen={() => void stabQuery.refetch()} />
-            )}
-            <Liste
-              // Unter dem Paneel (h2): jedes Sachgebiet ein Gegenstand mit Besetzung und
-              // Werkzeugen darunter, sein Titel h3 (LFH-826).
-              unterEbene={2}
-              dataSource={sachgebiete}
-              rowKey={(s) => s.sachgebiet}
-              loading={stabQuery.isLoading}
-              renderItem={(s) => {
-                const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
-                const werkzeuge = werkzeugeFuer(s.werkzeuge, freigabenQuery.data);
-                // Arbeitsseiten des Sachgebiets (`stab/unterseiten.ts`): S5 als Unterroute des
-                // Stabs, S6 als Sprung ins Modul Fernmeldewesen (LLH-1180). Ein Sprung erbt Sperre
-                // und Sichtbarkeit seines Ziels: ausgeblendet fehlt er, gesperrt steht er mit
-                // Grund da (Spec `fernmeldewesen`, „Einstiege von der Stab-Seite …“).
-                const unterseiten = unterseitenFuer(s.sachgebiet).filter(
-                  (u) => freigabenQuery.data?.[u.modul]?.sichtbar !== false,
-                );
-                return (
-                  <ListenEintrag
-                    // Unter `md` steht „Besetzung ändern“ unter dem Inhalt (LFH-978): rechts
-                    // daneben blieben der Beschreibung auf 390 px rund 190 px, die Seite wurde
-                    // über 5 000 px lang.
-                    gestapelt={istSchmal}
-                    actions={
-                      // Erst mit Daten: vor dem Laden belegte die Maske „nicht vergeben" vor. Die
-                      // Tastatur erreicht den Knopf auch unter dem Ladeindikator.
-                      darfSchreiben && stabQuery.data
-                        ? [
-                            <Button
-                              key="aendern"
-                              aria-label={`Besetzung ändern – ${s.kuerzel} ${s.label}`}
-                              onClick={() => setOffenFuer(s.sachgebiet)}
-                            >
-                              Besetzung ändern
-                            </Button>,
-                          ]
-                        : undefined
-                    }
-                  >
-                    <ListenEintragMeta
-                      title={
-                        <Space wrap>
-                          {`${s.kuerzel} · ${s.label}`}
-                          {/* Solange nichts angekommen ist, wird nichts über die Besetzung
-                              behauptet — „nicht vergeben" vor dem Laden wäre eine Aussage über
-                              eine Menge, die noch nicht da ist. */}
-                          {stabQuery.data && (
-                            <StatusTag darstellung={besetzungDarstellung(zeile)} />
-                          )}
-                        </Space>
-                      }
-                      description={
-                        <Flex vertical gap={token.marginXXS}>
-                          {/* Fundstelle ist Quelle, keine Bedienerklärung: sichtbar, auch bei Touch. */}
-                          <span>
-                            {s.aufgaben}{' '}
-                            <Typography.Text type="secondary">
-                              (FwDV 100 Anl. 2, S. {s.seite})
-                            </Typography.Text>
-                          </span>
-                          {(werkzeuge.length > 0 || unterseiten.length > 0) && (
-                            <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
-                              {unterseiten.map((u) =>
-                                istSprungGesperrt(u.modul, freigabenQuery.data) ? (
-                                  <GesperrterSprung key={u.key}>{u.label}</GesperrterSprung>
-                                ) : (
-                                  <Link
-                                    key={u.key}
-                                    to={u.pfad(einsatzId)}
-                                    style={stabZeilenzielStil(token)}
-                                  >
-                                    {u.label}
-                                  </Link>
-                                ),
-                              )}
-                              {werkzeuge.map((m) => (
-                                <Link
-                                  key={m.key}
-                                  to={einsatzModulPfad(einsatzId, modulZielRoute(m))}
-                                  style={stabZeilenzielStil(token)}
-                                >
-                                  {m.label}
-                                </Link>
-                              ))}
-                            </Flex>
-                          )}
-                        </Flex>
-                      }
-                    />
-                  </ListenEintrag>
-                );
-              }}
-            />
-          </>
-        )}
-      </Paneel>
+      {stabGescheitert ? (
+        <SeitenFehler
+          text="Führungsorganisation konnte nicht geladen werden"
+          ursache={stabQuery.error}
+          onWiederholen={() => void stabQuery.refetch()}
+        />
+      ) : (
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void stabQuery.refetch()} />}
+          <div style={stabRasterStil(stabSpalten(abBreite), token.margin)}>
+            {sachgebiete.map((s) => (
+              <SachgebietKachel
+                key={s.sachgebiet}
+                einsatzId={einsatzId}
+                eintrag={s}
+                zeile={zeileFuer(stabQuery.data, s.sachgebiet)}
+                hatBesetzung={stabQuery.data != null}
+                darfSchreiben={darfSchreiben}
+                freigaben={freigabenQuery.data}
+                zahlQuellen={zahlQuellen}
+                onBesetzungAendern={() => setOffenFuer(s.sachgebiet)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       <ChecklistePaneel
         einsatzId={einsatzId}

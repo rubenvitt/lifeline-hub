@@ -3,15 +3,23 @@ import type { FuehrungsfunktionEintrag, Sachgebiet } from '../api/types';
 /**
  * Die sechs Sachgebiete als feste Zeilen.
  *
- * S1–S6 sind AUFGABENZUORDNUNGEN, keine Arbeitsplätze: eine Zeile je Sachgebiet, ein Kurztext
- * als Merkhilfe (FwDV 100 Anlage 2) und Deeplinks in die Arbeitsmodule.
+ * S1–S6 sind AUFGABENZUORDNUNGEN, keine Arbeitsplätze: eine Kachel je Sachgebiet, ein Kurztext
+ * als Merkhilfe (FwDV 100 Anlage 2) und die Werkzeuge des Sachgebiets (LLH-1124).
  * `label` ist wortgleich mit `Sachgebiet::label` in `src/stab/mod.rs` — das STANDARDlabel. Angezeigt
  * wird das wirksame Mandantenlabel aus dem Funktionskatalog ({@link mitWirksamemLabel}, LFH-549),
  * dasselbe, das der Server in den System-ETB schreibt; das Standardlabel ist nur der Rückfall,
  * solange der Katalog nicht geladen ist. `aufgaben` ist gekürzt, nicht zitiert.
- * `werkzeuge` sind Registry-SCHLÜSSEL; die Freigabe entscheidet `stab/werkzeuge.ts` zur
- * Laufzeit. Höchstens drei je Zeile, damit sie im Fükw nicht umbricht.
+ * `werkzeuge` sind Registry-Module oder Unterseiten aus `stab/unterseiten.ts`, in der Reihenfolge
+ * der Kachel; die Freigabe entscheidet `stab/werkzeuge.ts` zur Laufzeit, für beide Arten gleich.
+ * Eine Grenze für ihre Zahl gibt es nicht mehr: die Kachel bricht die Werkzeuge in ihr Raster um
+ * (`openspec/changes/o5nxgqbl-stab-uebersicht/design.md`, D2).
  */
+/** Ein Werkzeug einer Kachel: ein Registry-Modul oder eine Unterseite (`stab/unterseiten.ts`). */
+export type WerkzeugEintrag = { art: 'modul'; key: string } | { art: 'seite'; key: string };
+
+const alsModul = (key: string): WerkzeugEintrag => ({ art: 'modul', key });
+const alsSeite = (key: string): WerkzeugEintrag => ({ art: 'seite', key });
+
 export interface SachgebietEintrag {
   sachgebiet: Sachgebiet;
   kuerzel: string;
@@ -19,7 +27,7 @@ export interface SachgebietEintrag {
   aufgaben: string;
   /** Seite in FwDV 100 Anlage 2. */
   seite: number;
-  werkzeuge: readonly string[];
+  werkzeuge: readonly WerkzeugEintrag[];
 }
 
 export const SACHGEBIETE: readonly SachgebietEintrag[] = [
@@ -30,7 +38,13 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     aufgaben:
       'Kräfte anfordern und nachalarmieren, Kräfteübersicht führen, Bereitstellungsräume einrichten',
     seite: 55,
-    werkzeuge: ['personal', 'einheiten', 'bereitstellungsraeume'],
+    // Nachforderungen auch hier: S1 fordert Kräfte an (Anlage 2), S4 Einsatzmittel.
+    werkzeuge: [
+      alsModul('personal'),
+      alsModul('einheiten'),
+      alsModul('bereitstellungsraeume'),
+      alsModul('nachforderungen'),
+    ],
   },
   {
     sachgebiet: 's2',
@@ -39,7 +53,7 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     aufgaben:
       'Lage feststellen, Lagekarte und Einsatztagebuch führen, Lagebesprechungen vorbereiten',
     seite: 56,
-    werkzeuge: ['lagekarte', 'lagemeldungen', 'etb'],
+    werkzeuge: [alsModul('lagekarte'), alsModul('lagemeldungen'), alsModul('etb')],
   },
   {
     sachgebiet: 's3',
@@ -47,7 +61,7 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Einsatz',
     aufgaben: 'Lage beurteilen, Abschnitte ordnen, Lagebesprechungen durchführen, Befehle erteilen',
     seite: 57,
-    werkzeuge: ['einsatzabschnitte', 'auftraege', 'meldungen'],
+    werkzeuge: [alsModul('einsatzabschnitte'), alsModul('auftraege'), alsModul('meldungen')],
   },
   {
     sachgebiet: 's4',
@@ -55,9 +69,9 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Versorgung',
     aufgaben: 'Einsatzmittel und Verbrauchsgüter anfordern, Verpflegung und Materialerhaltung',
     seite: 58,
-    // Verpflegung statt Fahrzeuge: höchstens drei Werkzeuge, und die Verpflegung ist wörtlich
-    // Aufgabe von S4 („Verpflegung und Materialerhaltung").
-    werkzeuge: ['nachforderungen', 'verpflegung', 'material'],
+    // Verpflegung statt Fahrzeuge: die Verpflegung ist wörtlich Aufgabe von S4 („Verpflegung und
+    // Materialerhaltung"), die Fahrzeuge gehören zu den Kräften (Spec `kraefte-verpflegung`).
+    werkzeuge: [alsModul('nachforderungen'), alsModul('verpflegung'), alsModul('material')],
   },
   {
     sachgebiet: 's5',
@@ -65,7 +79,7 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Presse- und Medienarbeit',
     aufgaben: 'Presse- und Medienlage, Presseinformationen, Informationstelefone',
     seite: 59,
-    werkzeuge: [],
+    werkzeuge: [alsSeite('presse'), alsSeite('infotelefon')],
   },
   {
     sachgebiet: 's6',
@@ -73,7 +87,13 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Information und Kommunikation',
     aufgaben: 'Fernmeldeorganisation mit S3 absprechen, Kanäle aufteilen, Funkplan führen',
     seite: 60,
-    werkzeuge: ['einsatzabschnitte', 'chat'],
+    // Die Einstiege des Fernmeldewesens (LLH-1180), keine Module anderer Sachgebiete.
+    werkzeuge: [
+      alsSeite('funkplan'),
+      alsSeite('fernmeldeskizze'),
+      alsSeite('sprechgruppen'),
+      alsSeite('kommunikationsplan'),
+    ],
   },
 ];
 
