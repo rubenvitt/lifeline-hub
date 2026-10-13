@@ -88,7 +88,7 @@ mod tests {
         (
             "src/personal/disposition_repo.rs",
             1,
-            "Spurprüfung beim Stornieren: auch die Führung einer aufgelösten Einheit ist Spur",
+            "Disponieren einer Stamm-Person sucht ihre Zeile auch beendet, um sie wieder aufzunehmen",
         ),
     ];
 
@@ -103,18 +103,7 @@ mod tests {
         let mut dateien = Vec::new();
         collect_rs(&wurzel.join("src"), &mut dateien);
         let mut fehler = Vec::new();
-        let mut gezaehlt: std::collections::BTreeMap<String, Vec<String>> = Default::default();
-        for (pfad, quelle) in dateien {
-            let produktiv = quelle.split("#[cfg(test)]").next().unwrap_or("");
-            for (zeile, literal) in literals(produktiv) {
-                for tabelle in find_unfiltered_reads(&literal) {
-                    gezaehlt
-                        .entry(pfad.clone())
-                        .or_default()
-                        .push(format!("{pfad}:{zeile} ({tabelle})"));
-                }
-            }
-        }
+        let gezaehlt = scan(&dateien);
         for (datei, stellen) in &gezaehlt {
             let erlaubt = ALLOWLIST
                 .iter()
@@ -178,10 +167,106 @@ mod tests {
             pruefe("select count(*) from einsatz_einheit\n where einsatz_id = ?"),
             ["einsatz_einheit"]
         );
+        // Die Spalte nur zu nennen, filtert nicht: verlangt ist ein Prädikat.
+        assert_eq!(
+            pruefe(
+                "SELECT ep.beendet_at, ep.name FROM einsatz_personal ep WHERE ep.einsatz_id = ?"
+            ),
+            ["einsatz_personal"]
+        );
+        assert_eq!(
+            pruefe("SELECT e.aufgeloest_at AS ende FROM einsatz_einheit e WHERE e.einsatz_id = ?"),
+            ["einsatz_einheit"]
+        );
+        assert!(
+            pruefe("SELECT ep.id FROM einsatz_personal ep WHERE ep.beendet_als = 'entlassen'")
+                .is_empty()
+        );
+        assert!(pruefe(
+            "SELECT e.id FROM einsatz_einheit e WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NOT NULL"
+        )
+        .is_empty());
+        // `{KONST}` in einem format!-Literal wird aufgelöst; die Konstante allein ist Bruchstück.
+        let datei = |text: &str| vec![("src/x.rs".to_string(), text.to_string())];
+        let sel = "const SEL: &str = \"SELECT ep.beendet_at FROM einsatz_personal ep\";\n";
+        assert_eq!(
+            scan(&datei(&format!(
+                "{sel}fn a() {{ format!(\"{{SEL}} WHERE ep.einsatz_id = ?\"); }}"
+            )))
+            .into_values()
+            .flatten()
+            .collect::<Vec<_>>(),
+            ["src/x.rs:2 (einsatz_personal)"]
+        );
+        assert!(scan(&datei(&format!(
+            "{sel}fn a() {{ format!(\"{{SEL}} WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL\"); }}"
+        )))
+        .is_empty());
+        // Direkt benutzt, wird die Konstante selbst geprüft.
+        assert_eq!(
+            scan(&datei(&format!("{sel}fn a() {{ sqlx::query(SEL); }}")))
+                .into_values()
+                .flatten()
+                .collect::<Vec<_>>(),
+            ["src/x.rs:1 (einsatz_personal)"]
+        );
         let quelle = "let a = 'x'; let b = r#\"SELECT 1 FROM einsatz_einheit\"#; // \"FROM einsatz_personal\"\nlet c = \"a\\\"b\";";
         let l = literals(quelle);
         assert_eq!(l.len(), 2, "{l:?}");
         assert_eq!(l[0], (1, "SELECT 1 FROM einsatz_einheit".to_string()));
+    }
+
+    /// Ungefilterte Lesestellen je Datei (`pfad:zeile (tabelle)`) im Produktivcode, also vor
+    /// `#[cfg(test)]`.
+    fn scan(dateien: &[(String, String)]) -> std::collections::BTreeMap<String, Vec<String>> {
+        let produktiv: Vec<(&String, &str)> = dateien
+            .iter()
+            .map(|(p, q)| (p, q.split("#[cfg(test)]").next().unwrap_or("")))
+            .collect();
+        // `const NAME: &str = "…"` der Datei (sonst des Crates); als `{NAME}` eingesetzt ist sie
+        // ein Bruchstück und wird erst im zusammengesetzten Literal geprüft.
+        let mut crate_weit = std::collections::BTreeMap::new();
+        for (_, quelle) in &produktiv {
+            crate_weit.extend(str_consts(quelle));
+        }
+        let mut gezaehlt: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+        for (pfad, quelle) in produktiv {
+            let eigene = str_consts(quelle);
+            let mut konstanten = crate_weit.clone();
+            konstanten.extend(eigene.iter().cloned());
+            // Nur eingesetzt: außer Definition und `{NAME}` keine direkte Verwendung in der Datei.
+            let nur_eingesetzt = |name: &str| {
+                let eingesetzt = quelle.matches(&format!("{{{name}}}")).count();
+                let wort = quelle
+                    .match_indices(name)
+                    .filter(|(i, _)| {
+                        let vor = quelle[..*i].chars().next_back();
+                        let nach = quelle[i + name.len()..].chars().next();
+                        !vor.is_some_and(|c| c.is_alphanumeric() || c == '_')
+                            && !nach.is_some_and(|c| c.is_alphanumeric() || c == '_')
+                    })
+                    .count();
+                eingesetzt > 0 && wort == 1 + eingesetzt
+            };
+            for (zeile, roh) in literals(quelle) {
+                if eigene.iter().any(|(n, v)| *v == roh && nur_eingesetzt(n)) {
+                    continue;
+                }
+                let mut literal = roh;
+                for _ in 0..3 {
+                    for (name, wert) in &konstanten {
+                        literal = literal.replace(&format!("{{{name}}}"), wert);
+                    }
+                }
+                for tabelle in find_unfiltered_reads(&literal) {
+                    gezaehlt
+                        .entry(pfad.clone())
+                        .or_default()
+                        .push(format!("{pfad}:{zeile} ({tabelle})"));
+                }
+            }
+        }
+        gezaehlt
     }
 
     /// Tabellen, die `sql` per `FROM`/`JOIN` ohne Zustandsfilter und ohne Primärschlüssel liest.
@@ -237,7 +322,21 @@ mod tests {
                 }
                 _ => tabelle,
             };
-            if klein.contains(spalte) {
+            // Ein Prädikat auf den Lebenszustand, nicht bloß die Spalte in der Auswahl.
+            let spalte_qualifiziert = format!("{alias}.{spalte}");
+            let gefiltert = (0..tokens.len()).any(|j| {
+                let t = tokens[j].as_str();
+                let nach = tokens.get(j + 1).map(String::as_str);
+                let nach2 = tokens.get(j + 2).map(String::as_str);
+                let ist_null_test =
+                    nach == Some("is") && matches!(nach2, Some("null") | Some("not"));
+                let zustand = (t == *spalte || t == spalte_qualifiziert) && ist_null_test;
+                let als = *tabelle == "einsatz_personal"
+                    && (t == "beendet_als" || t == format!("{alias}.beendet_als"))
+                    && matches!(nach, Some("=") | Some("<>") | Some("in") | Some("is"));
+                zustand || als
+            });
+            if gefiltert {
                 continue;
             }
             let qualifiziert = format!("{alias}.id");
@@ -262,6 +361,37 @@ mod tests {
             }
         }
         treffer
+    }
+
+    /// `const NAME: &str = "…";` (auch `&'static str`) einer Quelle: Name und Literal.
+    fn str_consts(quelle: &str) -> Vec<(String, String)> {
+        let mut aus = Vec::new();
+        for (i, _) in quelle.match_indices("const ") {
+            let rest = &quelle[i + 6..];
+            let Some(doppelpunkt) = rest.find(':') else {
+                continue;
+            };
+            let name = rest[..doppelpunkt].trim();
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+            {
+                continue;
+            }
+            let typ_und_wert = &rest[doppelpunkt + 1..];
+            let Some(gleich) = typ_und_wert.find('=') else {
+                continue;
+            };
+            let typ = typ_und_wert[..gleich].replace(' ', "");
+            if typ != "&str" && typ != "&'staticstr" {
+                continue;
+            }
+            if let Some((_, wert)) = literals(&typ_und_wert[gleich + 1..]).into_iter().next() {
+                aus.push((name.to_string(), wert));
+            }
+        }
+        aus
     }
 
     /// Stringliterale (normal und roh) einer Rust-Quelle mit Zeilennummer, Kommentare

@@ -722,7 +722,8 @@ async fn find_storno_hindernis_tx(
     // Rollen und Spuren außerhalb der eigenen Zeile, in fester Reihenfolge.
     const SPUREN: [(&str, &str); 7] = [
         (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_einheit WHERE fuehrer_id = ?1 AND einsatz_id = ?2)",
+            "SELECT EXISTS(SELECT 1 FROM einsatz_einheit \
+                           WHERE fuehrer_id = ?1 AND einsatz_id = ?2 AND aufgeloest_at IS NULL)",
             "Die Person führt eine Einheit",
         ),
         (
