@@ -451,24 +451,34 @@ jobs:
           merge-multiple: true
 
       # Der Riegel gegen den stillen Teilbericht: fehlt ein Blob, wäre die Zusammenfassung
-      # eine Aussage über weniger Tests, als jemand beim Lesen annimmt.
+      # eine Aussage über weniger Tests, als jemand beim Lesen annimmt. Eine übersprungene Suite
+      # (s. „Geänderte Bereiche“) soll null Blobs hinterlassen, eine gelaufene vier. Ohne Blobs
+      # legt download-artifact das Verzeichnis nicht an; `find` scheitert dort, und unter
+      # `pipefail` beendete das den Schritt (LLH-1205) — deshalb die Prüfung mit `-d` davor.
       - name: Vollzähligkeit der Teilberichte
+        env:
+          FRONTEND: ${{ needs.aenderungen.outputs.frontend }}
+          E2E: ${{ needs.aenderungen.outputs.e2e }}
         run: |
           set -euo pipefail
-          v="$(find frontend/.vitest/blob -name 'blob-*.json' 2>/dev/null | wc -l | tr -d ' ')"
-          p="$(find frontend/all-blob-reports -name '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
-          echo "Vitest-Blobs: $v von 4 | Playwright-Blobs: $p von 4"
-          [ "$v" -eq 4 ] && [ "$p" -eq 4 ] || {
+          zaehle() { if [ -d "$1" ]; then find "$1" -name "$2" | wc -l | tr -d ' '; else echo 0; fi; }
+          soll() { if [ "$1" = false ]; then echo 0; else echo 4; fi; }
+          v="$(zaehle frontend/.vitest/blob 'blob-*.json')"
+          p="$(zaehle frontend/all-blob-reports '*.zip')"
+          v_soll="$(soll "$FRONTEND")"
+          p_soll="$(soll "$E2E")"
+          echo "Vitest-Blobs: $v von $v_soll | Playwright-Blobs: $p von $p_soll"
+          [ "$v" -eq "$v_soll" ] && [ "$p" -eq "$p_soll" ] || {
             echo "WARNUNG: nicht alle Shards haben einen Bericht hinterlassen." >&2
             echo "         Der zusammengeführte Bericht deckt dann WENIGER ab als die Suite." >&2
           }
 
       - name: Frontend-Bericht
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.aenderungen.outputs.frontend != 'false' }}
         run: mise exec -- pnpm -C frontend exec vitest run --merge-reports --reporter=default
         continue-on-error: true
       - name: e2e-Bericht
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
         run: mise exec -- pnpm -C frontend exec playwright merge-reports --reporter html ./all-blob-reports
         continue-on-error: true
       # LAUFZEITEN DER e2e-ANTEILE (LFH-1117): die Shards verteilen nach `frontend/e2e/laufzeiten.json`.
