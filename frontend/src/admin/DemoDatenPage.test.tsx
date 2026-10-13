@@ -44,6 +44,7 @@ function importiert(einsatzId: number, bezeichnung: string, zeit: string): DemoD
         { art: 'fahrzeug', angelegt: 12, mitbenutzt: 1, entfernt: 0, behalten: 0 },
         { art: 'personal', angelegt: 30, mitbenutzt: 0, entfernt: 0, behalten: 0 },
         { art: 'material', angelegt: 8, mitbenutzt: 2, entfernt: 0, behalten: 0 },
+        { art: 'einheit_vorlage', angelegt: 2, mitbenutzt: 0, entfernt: 0, behalten: 0 },
       ],
     },
   };
@@ -61,6 +62,7 @@ const ENTFERNT: DemoDatenStatus = {
       { art: 'fahrzeug', angelegt: 0, mitbenutzt: 0, entfernt: 11, behalten: 1 },
       { art: 'personal', angelegt: 0, mitbenutzt: 0, entfernt: 30, behalten: 0 },
       { art: 'material', angelegt: 0, mitbenutzt: 0, entfernt: 8, behalten: 0 },
+      { art: 'einheit_vorlage', angelegt: 0, mitbenutzt: 0, entfernt: 2, behalten: 0 },
     ],
   },
 };
@@ -311,6 +313,8 @@ describe('DemoDatenPage — importiert', () => {
     expect(within(bericht).getByText('Fahrzeuge')).toBeInTheDocument();
     expect(within(bericht).getByText('Personal')).toBeInTheDocument();
     expect(within(bericht).getByText('Material')).toBeInTheDocument();
+    expect(within(bericht).getByText('Einheiten-Vorlagen')).toBeInTheDocument();
+    expect(within(bericht).getByText('2 angelegt · 0 mitbenutzt')).toBeInTheDocument();
 
     // Keine Primäraktion im Kopf; die beiden Vorgänge stehen beim Status und sind `danger`.
     expect(document.querySelector('[data-lfh="adminpage-aktionen"]')).toBeNull();

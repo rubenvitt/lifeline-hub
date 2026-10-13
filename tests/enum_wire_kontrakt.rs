@@ -1047,6 +1047,7 @@ fn demo_bericht_enums_wire() {
         Fahrzeug => "fahrzeug",
         Personal => "personal",
         Material => "material",
+        EinheitVorlage => "einheit_vorlage",
     });
 }
 
