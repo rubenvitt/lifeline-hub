@@ -274,8 +274,8 @@ export interface AbschnittZeile {
    *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
   letzteRueckmeldung: LetzteRueckmeldung | null;
   /**
-   * Alle Aufträge an den Teilbaum; erledigt = vollzogen oder abgenommen. Eine Zählung, keine
-   * Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht sie neben der Einschätzung.
+   * Alle Aufträge an den Teilbaum; erledigt = vollzogen oder abgenommen. Eine Zählung, in der
+   * jeder Auftrag gleich wiegt; die Lage selbst trägt der Lagezustand.
    */
   auftragsbilanz: { erledigt: number; gesamt: number };
   /**
