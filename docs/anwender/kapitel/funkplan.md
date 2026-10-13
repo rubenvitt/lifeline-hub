@@ -2,7 +2,7 @@
 titel: Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -18,7 +18,7 @@ Einsatzleitung und Führungspersonal.
 
 ### Den Funkplan lesen und Lücken schließen
 
-1. „Stab“ öffnen und in der Zeile S6 „Funkplan“ wählen.
+1. In der Modulliste unter „Stab“ „Funkplan“ wählen, oder in der Sprungpalette „Funk“ tippen.
 2. In der Leiste „Darstellung“ „Tabelle“ wählen. Oben stehen die „Lücken“, darunter der Plan von
    der Führungsstelle über die Abschnitte bis zu Einheiten und Fahrzeugen.
 
@@ -38,7 +38,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Die Fernmeldeskizze bearbeiten
 
-1. Im Funkplan in der Leiste „Darstellung“ „Skizze“ wählen.
+1. Im Funkplan in der Leiste „Darstellung“ „Skizze“ wählen, oder in der Modulliste unter „Stab“
+   gleich „Fernmeldeskizze“.
 
    ![Fernmeldeskizze mit Einsatzleitung, Sprechgruppen als Schienen, Abschnitten, Einheiten und externen Stellen](../bilder/funkplan/skizze.png)
 
@@ -54,7 +55,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Eine Stelle in den Kommunikationsplan aufnehmen
 
-1. „Stab“ öffnen und in der Zeile S6 „Kommunikationsplan“ wählen.
+1. In der Modulliste unter „Stab“ „Kommunikationsplan“ wählen, oder „Stab“ öffnen und in der Zeile
+   S6 „Kommunikationsplan“ wählen.
 
    ![Kommunikationsplan mit Einsatzleitung und Stab, abgeleiteten Abschnitten und externen Stellen](../bilder/funkplan/kommunikationsplan.png)
 
@@ -101,7 +103,9 @@ neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzl
 Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
 abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
 (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
-erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist. Gepflegt werden im
+erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist, mit ihrem Rufnamen und dem
+Einsatzleiter, etwa „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ist keiner festgelegt, steht
+„Einsatzleiter nicht erfasst“. Gepflegt werden im
 Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
 einmal vor.
 

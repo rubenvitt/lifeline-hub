@@ -1448,6 +1448,7 @@ export interface components {
             begonnen_at: string;
             bezeichnung: string;
             einsatzart: components["schemas"]["Einsatzart"];
+            einsatzleiter?: components["schemas"]["EinsatzleiterAnzeige"] | null;
             einsatznummer_intern?: string | null;
             einsatzort?: string | null;
             /** Format: double */

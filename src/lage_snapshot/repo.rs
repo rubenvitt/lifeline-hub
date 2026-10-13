@@ -250,13 +250,18 @@ pub async fn erzeuge(
         stand_at: stand_at.clone(),
         org_default,
         // Der Snapshot hat keinen abfragenden Benutzer, dessen Rolle oder Sachgebiete gemeint
-        // wären.
-        einsatz: einsatz.anzeige(
-            None,
-            None,
-            Vec::new(),
-            &crate::fuehrung::Labelkarte::standard(),
-        ),
+        // wären. Den Einsatzleiter friert er nicht ein (LLH-1168, design.md D2): das Lagebild
+        // der Karte braucht ihn nicht, und ein eingefrorener Name bräuchte einen eigenen
+        // Schwärzungspfad im JSON.
+        einsatz: crate::einsatz::EinsatzAnzeige {
+            einsatzleiter: None,
+            ..einsatz.anzeige(
+                None,
+                None,
+                Vec::new(),
+                &crate::fuehrung::Labelkarte::standard(),
+            )
+        },
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // Der Stand spiegelt das sichtbare Lagebild, ohne stornierte Schäden.

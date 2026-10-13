@@ -2,12 +2,16 @@
  * Auftragsschema nach FwDV 100 (LLH-1091, Spec `auftragsschema`): der Einzelauftrag in der
  * Reihenfolge Einheit – Auftrag – Mittel – Ziel – Weg, ergänzt um die Zeit. Einheit (Empfänger)
  * und Auftrag stehen sichtbar im Formular; dieses Modul hält die Folge der Felder dahinter, die
- * Formular (`AuftragFormular`) und Lesefassung (`AuftragKarte`) teilen, damit sie nur einmal steht.
+ * Formular (`AuftragFormular`), Lesefassung (`AuftragKarte`) und Auftragsblatt (`druckFelder`,
+ * LLH-1171) teilen, damit sie nur einmal steht.
  * Herleitung: `openspec/changes/archive/2026-10-12-o5gsxa7g-auftragsschema-fwdv100/design.md`
  * (D2, D3, D5).
  */
 
-import type { AuftragSchemafeld } from '../api/types';
+import type { Auftrag, AuftragSchemafeld } from '../api/types';
+import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
+import { PRIO_META } from '../kommunikation/phase';
+import { EXTERN_KATEGORIE_LABEL } from '../fuehrung/empfaengerKern';
 
 /** Die Freitextfelder des Befehlsschemas am Auftrag (Wire-Namen, auch die der Berichtigung). */
 export type SchemaFeld = AuftragSchemafeld;
@@ -84,4 +88,55 @@ export function klappteilFuer(feld: string): Klappteil | null {
   if ((AUSFUEHRUNG_FIELDS as readonly string[]).includes(feld)) return KLAPPTEIL.ausfuehrung;
   if ((WEITERE_FIELDS as readonly string[]).includes(feld)) return KLAPPTEIL.weitere;
   return null;
+}
+
+/** Nur die gesetzten Angaben; ein Wert aus Leerzeichen fällt weg wie ein leerer. */
+export function dropEmpty(
+  angaben: { etikett: string; wert: string | null | undefined }[],
+): { etikett: string; wert: string }[] {
+  return angaben.flatMap(({ etikett, wert }) =>
+    typeof wert === 'string' && wert.trim() !== '' ? [{ etikett, wert }] : [],
+  );
+}
+
+// Etiketten der externen Stellen: eine Quelle in `fuehrung/empfaengerKern.ts`.
+export { EXTERN_KATEGORIE_LABEL };
+
+/** „Intern“ bzw. „Extern“ samt den externen Stellen unter den Empfängern. */
+function richtungText(a: Auftrag): string {
+  if (a.richtung !== 'extern') return 'Intern';
+  const stellen = a.empfaenger
+    .filter((e) => e.empfaenger_typ === 'extern')
+    .map((e) => {
+      const kategorie = e.extern_kategorie ? EXTERN_KATEGORIE_LABEL[e.extern_kategorie] : '';
+      const name = e.extern_bezeichnung ?? e.snap_anzeige;
+      return kategorie ? `${kategorie}: ${name}` : name;
+    });
+  return ['Extern', stellen.join(', ')].filter(Boolean).join(' · ');
+}
+
+/**
+ * Die Angaben des Auftragsblatts (LLH-1171, Spec `druck-dokumente`, „Das Auftragsblatt liest in der
+ * Reihenfolge der FwDV 100“): Empfänger, Auftrag, Priorität, Frist, dann die Lesefolge der Karte
+ * ({@link READ_ORDER}), dann Richtung und Erteilzeit. Leere Angaben fallen weg; Zeiten über
+ * `formatZeit` der Anzeigezone. Herleitung:
+ * `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md` (D4).
+ */
+export function druckFelder(
+  a: Auftrag,
+  formatZeit: (wire?: string | null) => string,
+): { etikett: string; wert: string }[] {
+  const felder: { etikett: string; wert: string | null | undefined }[] = [
+    {
+      etikett: 'Empfänger',
+      wert: a.empfaenger.map((e) => mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)).join(', '),
+    },
+    { etikett: 'Auftrag', wert: a.auftrag_text },
+    { etikett: 'Priorität', wert: PRIO_META[a.prioritaet]?.label ?? a.prioritaet },
+    { etikett: 'Frist', wert: a.frist_at ? formatZeit(a.frist_at) : null },
+    ...READ_ORDER.map((key) => ({ etikett: READ_LABEL[key], wert: a[key] })),
+    { etikett: 'Richtung', wert: richtungText(a) },
+    { etikett: 'Erteilt am', wert: formatZeit(a.erteilt_at) },
+  ];
+  return dropEmpty(felder);
 }

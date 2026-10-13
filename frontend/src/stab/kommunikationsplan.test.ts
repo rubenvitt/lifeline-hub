@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   Einheit,
   Einsatzabschnitt,
+  Einsatzleiter,
   Fuehrungsstelle,
   KommunikationsStelle,
   SkizzenVerbindung,
@@ -310,7 +311,7 @@ describe('baueKommunikationsplan', () => {
       art: 'fuehrungsstelle',
       schluessel: 'fs',
       kennung: 'Führungsstelle',
-      nebentext: 'Florian Bremen 11/1',
+      nebentext: 'Florian Bremen 11/1 · Einsatzleiter nicht erfasst',
       kanaele: [],
       ziel: '/einsaetze/7/einsatzdaten',
       verbindungen: [
@@ -331,8 +332,85 @@ describe('baueKommunikationsplan', () => {
       quellen({ fuehrungsstelle: fs({ sprechgruppen: [{ id: 5 } as Sprechgruppe] }) }),
     );
     expect(plan[0].zeilen).toHaveLength(1);
-    expect(plan[0].zeilen[0]).toMatchObject({ kennung: 'Führungsstelle', nebentext: null });
+    expect(plan[0].zeilen[0]).toMatchObject({
+      kennung: 'Führungsstelle',
+      nebentext: 'Einsatzleiter nicht erfasst',
+    });
     expect(plan[0].zeilen[0].verbindungen).toEqual([]);
+  });
+
+  // LLH-1168: der Einsatzleiter steht im Nebentext nach dem Rufnamen, wie die Besetzung von S1–S6.
+  describe('Einsatzleiter im Nebentext', () => {
+    const anna: Einsatzleiter = {
+      art: 'personal',
+      name: 'Anna Schulz',
+      personal_id: 17,
+      personal_noch_disponiert: true,
+      seit: '2026-10-12 12:30:00',
+    };
+    const nebentext = (p: Partial<Fuehrungsstelle>) =>
+      baueKommunikationsplan(quellen({ fuehrungsstelle: fs(p) }))[0].zeilen[0].nebentext;
+
+    it('nennt Rufname und Einsatzleiter', () => {
+      expect(nebentext({ rufname: 'Florian Kreis 10-1', einsatzleiter: anna })).toBe(
+        'Florian Kreis 10-1 · Einsatzleiter Anna Schulz',
+      );
+    });
+
+    it('ohne Rufname nur den Einsatzleiter, extern mit Zusatz', () => {
+      expect(
+        nebentext({
+          einsatzleiter: {
+            art: 'extern',
+            name: 'KBM Weber',
+            personal_noch_disponiert: false,
+            seit: anna.seit,
+          },
+        }),
+      ).toBe('Einsatzleiter KBM Weber (extern)');
+    });
+
+    it('geschwärzt und entlassen wie an der Führungsstelle', () => {
+      expect(nebentext({ einsatzleiter: { ...anna, name: undefined } })).toBe(
+        'Einsatzleiter Name geschwärzt',
+      );
+      expect(nebentext({ einsatzleiter: { ...anna, personal_noch_disponiert: false } })).toBe(
+        'Einsatzleiter Anna Schulz · nicht mehr disponiert',
+      );
+    });
+
+    it('nimmt nie die Besetzung oder eine App-Rolle als Einsatzleiter', () => {
+      const plan = baueKommunikationsplan(
+        quellen({
+          stellen: daten([
+            stelle(3, {
+              stellenart: 'funktion',
+              funktion: 's2',
+              funktion_label: 'S2',
+              bezeichnung: undefined,
+            }),
+          ]),
+          fuehrungsstelle: fs({ rufname: 'Florian Kreis 10-1' }),
+          stab: {
+            zustand: 'daten',
+            daten: stab([
+              {
+                sachgebiet: 's2',
+                besetzung_art: 'personal',
+                name: 'Max Muster',
+                personal_noch_disponiert: true,
+                gesetzt_at: '2026-10-12 12:00:00',
+                gesetzt_von_id: 1,
+              },
+            ]),
+          },
+        }),
+      );
+      const [fuehrung, s2] = plan[0].zeilen;
+      expect(fuehrung.nebentext).toBe('Florian Kreis 10-1 · Einsatzleiter nicht erfasst');
+      // Die Besetzung steht an S2, nicht an der Führungsstelle.
+      expect(s2.nebentext).toContain('Max Muster');
+    });
   });
 
   it('nennt eine nicht geladene Führungsstelle mit Grund statt sie wegzulassen', () => {

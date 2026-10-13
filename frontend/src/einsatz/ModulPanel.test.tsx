@@ -5,7 +5,7 @@ import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
 import { modulRegistry, type ModulEintrag } from './modulRegistry';
-import type { Sprungmarke } from './sprungmarken';
+import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import type { ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 
@@ -405,6 +405,7 @@ describe('ModulListe — Sprungmarken', () => {
     zielModul: 'etb',
     nach: 'auftraege',
     hinweis: 'ETB · Entscheidung',
+    schlagworte: [],
     pfad: () => '/einsaetze/1/etb?typ=entscheidung',
   };
   const fuehrung: ModulEintrag[] = [
@@ -541,6 +542,74 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
       expect(
         screen.getByRole('button', { name: m.label, description: m.beschreibung }),
       ).toBeInTheDocument();
+    }
+  });
+});
+
+/**
+ * Die Arbeitsseiten des Stabs (LLH-1127) mit der echten Registry und den echten Marken: sie
+ * stehen hinter „Stab“ und erben von ihm, nicht von ihrem Anker.
+ */
+describe('ModulListe — Stab-Marken', () => {
+  const fuehrung = modulRegistry.filter((m) => m.kategorie === 'fuehrung');
+  const STAB_MARKEN = [
+    'Pressearbeit',
+    'Informationstelefon',
+    'Funkplan',
+    'Fernmeldeskizze',
+    'Kommunikationsplan',
+  ];
+  const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
+    renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        module={fuehrung}
+        freigaben={freigaben()}
+        aktiverModulKey="stab"
+        onModulKlick={() => {}}
+        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
+        {...props}
+      />,
+    );
+
+  it('folgen „Stab“ in der Reihenfolge S5, S6 und nennen ihr Ziel', () => {
+    zeige({});
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    // Die Modulzeile trägt ihre Beschreibung als zweite Zeile im Text.
+    const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
+    expect(stab).toBeGreaterThanOrEqual(0);
+    expect(knoepfe.slice(stab + 1, stab + 6)).toEqual(STAB_MARKEN);
+    const skizze = screen.getByRole('button', {
+      name: 'Fernmeldeskizze, springt zu Funkplan · Skizze',
+    });
+    expect(skizze).not.toHaveAttribute('aria-current');
+    expect(
+      screen.getByRole('button', {
+        name: 'Informationstelefon, springt zu Stab · Informationstelefon',
+      }),
+    ).toBeEnabled();
+  });
+
+  it('sind mit gesperrtem Stab gesperrt und springen nicht (D3)', async () => {
+    const klick = vi.fn();
+    zeige({ freigaben: freigaben({ stab: { zugriff: false } }), onSprungKlick: klick });
+    for (const label of STAB_MARKEN) {
+      const knopf = screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) });
+      expect(knopf, label).toBeDisabled();
+      expect(knopf, label).toHaveAttribute('title', 'Keine Berechtigung');
+      expect(knopf.querySelector('[data-lfh-icon="schloss"]'), label).not.toBeNull();
+      await userEvent.click(knopf);
+    }
+    expect(klick).not.toHaveBeenCalled();
+  });
+
+  it('fehlen mit ausgeblendetem Stab', () => {
+    zeige({ freigaben: freigaben({ stab: { sichtbar: false, zugriff: false } }) });
+    for (const label of STAB_MARKEN) {
+      expect(
+        screen.queryByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
+        label,
+      ).not.toBeInTheDocument();
     }
   });
 });

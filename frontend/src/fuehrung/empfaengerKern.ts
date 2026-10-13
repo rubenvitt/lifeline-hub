@@ -23,13 +23,21 @@ export interface ZielOption {
   name: string;
 }
 
+/**
+ * Etiketten der externen Stellen, eine Quelle für Empfängerwahl, Verteiler und Auftragsblatt
+ * (`auftraege/auftragsschemaKern.ts`, `druckFelder`). Die Formulare bieten sie in dieser Folge an.
+ */
+export const EXTERN_KATEGORIE_LABEL: Record<AdressatKategorie, string> = {
+  leitstelle: 'Leitstelle',
+  nachbar_ea: 'Nachbar-Einsatzabschnitt',
+  uebergeordnet: 'Übergeordnete Führung',
+  andere_bos: 'Andere BOS',
+};
+
 /** Die Kategorien einer externen Stelle mit ihren sichtbaren Namen. */
-export const EXTERN_KATEGORIE_OPTIONS: { value: AdressatKategorie; label: string }[] = [
-  { value: 'leitstelle', label: 'Leitstelle' },
-  { value: 'nachbar_ea', label: 'Nachbar-Einsatzabschnitt' },
-  { value: 'uebergeordnet', label: 'Übergeordnete Führung' },
-  { value: 'andere_bos', label: 'Andere BOS' },
-];
+export const EXTERN_KATEGORIE_OPTIONS: { value: AdressatKategorie; label: string }[] = (
+  Object.entries(EXTERN_KATEGORIE_LABEL) as [AdressatKategorie, string][]
+).map(([value, label]) => ({ value, label }));
 
 /** Der Tag-Wert eines Einsatzabschnitts. */
 export function abschnittTag(id: number): string {

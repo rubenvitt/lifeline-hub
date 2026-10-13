@@ -74,6 +74,14 @@ export function befehlDetailPfad(einsatzId: number, befehlId: number): string {
   return `${einsatzModulPfad(einsatzId, 'auftraege')}/befehle/${befehlId}`;
 }
 
+/**
+ * Druckansicht eines Einzelauftrags (LLH-1171): eine eigene Seite wie die Vollseite des Befehls, auf
+ * die das Detailpaneel führt. Unter `auftraege/` erbt sie Sperre und Sichtbarkeit des Moduls.
+ */
+export function auftragDruckPfad(einsatzId: number, auftragId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'auftraege')}/${auftragId}/druck`;
+}
+
 export function personDetailPfad(einsatzId: number, personId: number): string {
   return `${einsatzModulPfad(einsatzId, 'personen')}/${personId}`;
 }
@@ -357,10 +365,17 @@ export function pressemitteilungPfad(einsatzId: number, mitteilungId: number): s
 
 /**
  * Anrufprotokoll des Informationstelefons (S5, LFH-554), Unterroute des Stabs. `?anruf=<id>`
- * rollt zu einem Anruf.
+ * rollt zu einem Anruf; `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf
+ * erfassen“, LLH-1127; apply-then-clean).
  */
-export function infotelefonPfad(einsatzId: number, opts: { anruf?: number } = {}): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, { anruf: opts.anruf });
+export function infotelefonPfad(
+  einsatzId: number,
+  opts: { anruf?: number; neu?: boolean } = {},
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, {
+    anruf: opts.anruf,
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 /**

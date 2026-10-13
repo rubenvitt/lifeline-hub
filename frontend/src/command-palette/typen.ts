@@ -223,6 +223,7 @@ export const GRUPPEN_REIHENFOLGE = [
   'schnellaktionen',
   'zuletzt',
   'module',
+  'ansichten',
   'einsaetze',
   'einstellungen',
   'navigation',
@@ -253,6 +254,11 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   schnellaktionen: 'Schnellaktionen',
   zuletzt: 'Zuletzt',
   module: 'Module',
+  /**
+   * Die Sprungmarken des Modulmenüs (`einsatz/sprungmarken.ts`, LLH-1127): gefilterte Sichten und
+   * Arbeitsseiten eines Moduls, keine Module. Unter „Module“, damit die Startansicht beides trennt.
+   */
+  ansichten: 'Ansichten',
   einsaetze: 'Einsatz wechseln',
   einstellungen: 'Einstellungen',
   navigation: 'Navigation',
@@ -279,6 +285,9 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  *  - `koordinate`/`ortssuche`: eine getippte Stelle ist kein wiederkehrender Befehl.
  *  - `ausgefuehrt`: die Kopie trägt die Meldung des ORIGINALS schon in `ausfuehren`.
  *
+ * `ansichten` ist `true` wie `navigation`: eine Marke ist kein Modul, das Modul-Gedächtnis trägt sie
+ * nicht, und der Sprung zum Funkplan wiederholt sich.
+ *
  * `navigation` ist `true` (wiederholte Sprünge), ausgenommen Abmelden über
  * {@link Befehl.nichtMerkbar}: die oberste Zeile ist vorausgewählt, `Strg/⌘+K` + Enter meldete
  * sonst ab. Die Achse am Befehl zieht nur ab.
@@ -292,6 +301,7 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
   schnellaktionen: true,
   zuletzt: false,
   module: false,
+  ansichten: true,
   einsaetze: true,
   einstellungen: true,
   navigation: true,
@@ -313,6 +323,7 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   schnellaktionen: false,
   zuletzt: true,
   module: false,
+  ansichten: false,
   einsaetze: false,
   einstellungen: false,
   navigation: false,

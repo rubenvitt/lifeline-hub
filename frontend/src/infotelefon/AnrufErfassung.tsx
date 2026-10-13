@@ -33,6 +33,9 @@ import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
  *   Formular und ohne Fehler stehen nur Anliegen und „Erfassen“ da — dasselbe Muster wie die
  *   ETB-Leiste (`etb/AGENTS.md`, Erfassung), sonst verdeckte die Leiste beim Öffnen alle Anrufe.
  *   Eingeklappt wird nur ein leeres Formular, also geht nichts verloren.
+ * - `focusRequest` (LLH-1127): jeder neue Wert legt den Fokus ins Anliegen — die Seite zählt ihn
+ *   hoch, wenn die Schnellaktion „Anruf erfassen“ (`?neu=1`) ankommt. Der Wert beim Einhängen
+ *   zählt nicht: ein Neu-Einhängen (Freigabe kurz entzogen) holt den Fokus nicht ungefragt.
  */
 interface Werte {
   anliegen?: InfotelefonAnliegen;
@@ -61,12 +64,15 @@ export default function AnrufErfassung({
   laeuft,
   fehler,
   einklappbar = false,
+  focusRequest = 0,
 }: {
   onErfassen: (eingabe: AnrufEingabe) => Promise<unknown>;
   laeuft: boolean;
   fehler: unknown;
   /** Darf die Leiste einklappen (Handschirm, Fokus außerhalb)? Siehe Kopfkommentar. */
   einklappbar?: boolean;
+  /** Zähler: jeder neue Wert fokussiert das Anliegen (Schnellaktion, Kopfkommentar). */
+  focusRequest?: number;
 }) {
   const [form] = Form.useForm<Werte>();
   const { token } = useRollen();
@@ -88,6 +94,12 @@ export default function AnrufErfassung({
   useEffect(() => {
     if (gespeichert > 0) anliegenRef.current?.focus();
   }, [gespeichert]);
+  const handledFocusRequest = useRef(focusRequest);
+  useEffect(() => {
+    if (focusRequest === handledFocusRequest.current) return;
+    handledFocusRequest.current = focusRequest;
+    anliegenRef.current?.focus();
+  }, [focusRequest]);
 
   const absenden = async (w: Werte) => {
     if (sendetRef.current || !w.anliegen) return;

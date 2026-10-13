@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs]
 ---
 
 ## Überblick
@@ -54,7 +54,7 @@ Priorität und Richtung stehen.
 1. Im Reiter „Einzelaufträge“ die Ansicht „Offen“ oder „Abgeschlossen“ wählen. Bei Bedarf im
    Suchfeld „Kennung, Text oder Empfänger“ suchen, eine Richtung wählen oder „Empfänger filtern“.
 
-   ![Einzelaufträge mit der Liste der offenen Aufträge links und dem gewählten Auftrag rechts, darin „Bearbeitung beginnen“, „Vollzug melden“, dem Menü der weiteren Aktionen und „Quittung offen:“ mit „Quittieren“](../bilder/auftraege-befehle/auftraege-liste.png)
+   ![Einzelaufträge mit der Liste der offenen Aufträge links und dem gewählten Auftrag rechts, darin „Bearbeitung beginnen“, „Vollzug melden“, dem Menü der weiteren Aktionen, „Quittung offen:“ mit „Quittieren“ und unten „Druckansicht“](../bilder/auftraege-befehle/auftraege-liste.png)
 
 2. Einen Auftrag in der Liste wählen. Auf breitem Bildschirm steht er rechts neben der Liste, auf
    schmalem klappt er unter seiner Karte auf.
@@ -115,6 +115,16 @@ Der Auftrag steht danach unter „Abgeschlossen“ mit dem Etikett „Aufgehoben
 Zeit, Person und Grund. Quittungen werden nicht mehr erwartet; Quittieren, Vollzug und Abnahme sind nicht
 mehr möglich. Das Aufheben lässt sich nicht zurücknehmen. Kam der Auftrag aus einer Meldung, lässt
 sich aus ihr wieder ein Auftrag erteilen (siehe [Meldungen](meldungen.md)).
+
+### Einen Auftrag drucken
+
+1. Den Auftrag wählen und im Auftrag unten „Druckansicht“ wählen. Die Druckansicht zeigt den
+   Druckkopf und darunter das Blatt mit den Teilen „Auftrag“, „Quittung“ und „Bearbeitung“.
+2. „Drucken / als PDF“ wählen und im Druckdialog des Browsers drucken oder als PDF speichern.
+3. „Zurück zu Aufträge/Befehle“ führt zur Liste zurück; der Auftrag ist dann gewählt.
+
+Die Druckansicht ist ein fester Stand: „Neu laden“ holt eine Quittung oder einen Vollzug, der
+inzwischen dazugekommen ist (siehe [Drucken und Export](drucken-export.md)).
 
 ### Einen Einsatzbefehl entwerfen
 
@@ -209,6 +219,21 @@ Aufträge lassen sich auch direkt aus einem ETB-Eintrag oder einer Meldung ertei
 [Einsatztagebuch](einsatztagebuch.md) und [Meldungen](meldungen.md)). Ein Auftrag aus einem
 ETB-Eintrag führt unter „Verlauf“ mit „ETB-Eintrag“ zu diesem Eintrag zurück.
 
+### Das Auftragsblatt
+
+Der Teil „Auftrag“ steht in derselben Reihenfolge wie das Formular: Empfänger, Auftrag,
+Priorität, Frist, Mittel, Ziel / Ort, Weg, Zeit, Lage, Absicht, Verbindung / Meldewege,
+Sicherheit / Besonderes, Richtung und Erteilt am. Leere Angaben fehlen. Bei einem externen
+Auftrag nennt „Richtung“ die externe Stelle mit.
+
+„Quittung“ nennt jeden Empfänger mit dem Zeitpunkt seiner Quittung oder mit „nicht quittiert“.
+„Bearbeitung“ nennt die Phase und, soweit vorhanden, „In Bearbeitung seit“, „Vollzogen am“, den
+„Vollzugsvermerk“, „Abgenommen am“ und bei einem aufgehobenen Auftrag „Aufgehoben am“, „Aufgehoben
+von“ und „Grund“.
+
+Drucken ist Lesen: Die Druckansicht steht allen offen, die Aufträge lesen dürfen, auch ohne
+Schreibrecht und in jeder Phase des Auftrags.
+
 ### Einzelauftrag oder Einsatzbefehl
 
 Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Empfänger, Quittung und Vollzug.
@@ -245,4 +270,5 @@ und eigenem Standort sowie, nur noch an bestehenden Befehlen, „Einzelauftrag (
 Einheit, Auftrag / Ziel, Mittel und Weg.
 
 Das Auftragsformular folgt dem Einzelauftrag der FwDV 100: Einheit – Auftrag – Mittel – Ziel –
-Weg, ergänzt um die Zeit. In dieser Reihenfolge wird ein Auftrag im Funk durchgegeben.
+Weg, ergänzt um die Zeit. In dieser Reihenfolge wird ein Auftrag im Funk durchgegeben, und in
+dieser Reihenfolge steht er auf dem Auftragsblatt.
