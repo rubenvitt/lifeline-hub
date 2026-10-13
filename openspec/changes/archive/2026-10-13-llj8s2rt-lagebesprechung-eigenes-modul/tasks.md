@@ -24,7 +24,7 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 
 - [x] 3.1 `LiveEvent::Lagebesprechung` (Wire `lagebesprechung`, Gate `["lagebesprechung"]`), Pin-Tabelle in `src/live/mod.rs`, `tests/enum_wire_kontrakt.rs`; Kommentar an `LiveEvent::Stab` auf Besetzung/Checkliste gekürzt
 - [x] 3.2 Abschluss und Termin verteilen `lagebesprechung` (Abschluss zusätzlich `etb`), nie `stab`; `kopf_geaendert` nur bei geändertem Termin; `tests/einsatz_live.rs`: die drei `lagebesprechung_*`-Tests auf `lagebesprechung` statt `stab` umgestellt, neu: Termin per PUT geändert → `einsatz`, unverändert → kein `einsatz`, Leser mit Stab- aber ohne Lagebesprechungs-Recht erhält nichts
-- [x] 3.3 Migration `0183_lagebesprechung_modul.sql` laut design.md D5 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `tests/lagebesprechung_migration.rs` (oder bestehendes Migrationsmuster): Stab-Rolle je Einsatz und je Org wird übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
+- [x] 3.3 Migration `0184_lagebesprechung_modul.sql` laut design.md D5 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `tests/lagebesprechung_migration.rs` (oder bestehendes Migrationsmuster): Stab-Rolle je Einsatz und je Org wird übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
 - [x] 3.4 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommittet
 
 ## 4. Frontend: Registry, Route, API, Query-Keys (D1, D2, D6)

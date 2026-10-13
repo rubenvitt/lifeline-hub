@@ -133,7 +133,7 @@ lässt einen System-Admin ohne Rolle schreiben und feuert `einsatz` auch ohne Ä
 
 ### D5 Freigaben: nur die Rolle wandert (Entscheidung Ruben, 12.10.2026)
 
-Migration `0183_lagebesprechung_modul.sql`, die Nummer zum Merge per
+Migration `0184_lagebesprechung_modul.sql`, die Nummer zum Merge per
 `scripts/check-migrationen.sh` geprüft:
 
 ```sql
