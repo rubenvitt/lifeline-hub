@@ -2,10 +2,10 @@
 
 ## 1. Backend: Lesepfad `GET /api/einsaetze/{id}/modul-vorgaben`
 
-- [ ] 1.1 Tests zuerst (rot) in `tests/modul_override.rs`: Einsatzleitung ohne Org-Rolle bekommt 200 mit Rolle und `sichtbar: false` aus der Org-Vorgabe; dieselbe Person bekommt auf `GET /api/org-modul-einstellungen` weiter 403; Nicht-Mitglied ohne Org-Rolle 403; System-Admin einer fremden Org ohne Mitgliedschaft 403; fremde Einsatzleitung (Mitglied) 200 mit den Vorgaben der Einsatz-Org; Admin der Org bekommt dieselbe Antwort wie am Org-Endpunkt. Prüfen: `cargo test --test modul_override modul_vorgaben` scheitert am fehlenden Pfad.
-- [ ] 1.2 Handler `modul_vorgaben_laden` in `src/routes/einsatz.rs` (`EinsatzLesezugriff`, zusätzliches Gate aus design.md D2, `modul_einstellung::laden_alle(einsatz.org_id)`), Route in `src/app.rs`, `PFAD_KEY`-Eintrag modul-los in `src/einsatz/modul.rs`, Pfad in `src/api_doc.rs`. Prüfen: die Tests aus 1.1 sind grün, der `PFAD_KEY`-Guard ebenso.
-- [ ] 1.3 Gerät: Test, dass ein gekoppeltes Gerät 403 bekommt (Muster der Geräte-Tests). Prüfen: `cargo test` des betreffenden Testmoduls grün.
-- [ ] 1.4 `scripts/check-typ-codegen.sh` laufen lassen und die generierten Dateien mitcommitten, falls sie sich ändern. Prüfen: das Skript ist grün.
+- [x] 1.1 Tests zuerst (rot) in `tests/modul_override.rs`: Einsatzleitung ohne Org-Rolle bekommt 200 mit Rolle und `sichtbar: false` aus der Org-Vorgabe; dieselbe Person bekommt auf `GET /api/org-modul-einstellungen` weiter 403; Nicht-Mitglied ohne Org-Rolle 403; System-Admin einer fremden Org ohne Mitgliedschaft 403; fremde Einsatzleitung (Mitglied) 200 mit den Vorgaben der Einsatz-Org; Admin der Org bekommt dieselbe Antwort wie am Org-Endpunkt. Prüfen: `cargo test --test modul_override modul_vorgaben` scheitert am fehlenden Pfad.
+- [x] 1.2 Handler `modul_vorgaben_laden` in `src/routes/einsatz.rs` (`EinsatzLesezugriff`, zusätzliches Gate aus design.md D2, `modul_einstellung::laden_alle(einsatz.org_id)`), Route in `src/app.rs`, `PFAD_KEY`-Eintrag modul-los in `src/einsatz/modul.rs` (`src/api_doc.rs` registriert nur Schemas, `OrgModulEinstellung` steht schon dort). Prüfen: die Tests aus 1.1 sind grün, der `PFAD_KEY`-Guard ebenso.
+- [x] 1.3 Gerät: Test, dass ein gekoppeltes Gerät 403 bekommt (Muster der Geräte-Tests). Prüfen: `cargo test` des betreffenden Testmoduls grün.
+- [x] 1.4 `scripts/check-typ-codegen.sh` laufen lassen und die generierten Dateien mitcommitten, falls sie sich ändern. Prüfen: das Skript ist grün.
 
 ## 2. Frontend: Editor „Module“ liest die Vorgaben am Einsatz
 

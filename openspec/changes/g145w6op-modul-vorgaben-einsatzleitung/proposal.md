@@ -41,8 +41,8 @@ Keine.
 ## Impact
 
 - **Backend:** `src/routes/einsatz.rs` (neuer Handler), `src/app.rs` (Route),
-  `src/einsatz/modul.rs` (`PFAD_KEY`, modul-los), `src/api_doc.rs`; Tests in
-  `tests/modul_override.rs` bzw. `tests/org_einstellungen.rs`.
+  `src/einsatz/modul.rs` (`PFAD_KEY`, modul-los); Tests in `tests/modul_override.rs` und
+  `tests/geraet_kopplung.rs`.
 - **Frontend:** `api/einsaetze.ts`, `api/queryKeys.ts` (neuer Einsatz-Key, Liste „nicht live“),
   `pages/einstellungen/EinsatzModule.tsx`, `pages/einstellungen/EinsatzDefaults.tsx`
   (Invalidierung), Tests daneben.

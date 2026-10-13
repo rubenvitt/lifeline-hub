@@ -106,3 +106,11 @@ für die Overrides.
 
 Keine Datenänderung. Der neue Pfad ist rein additiv; ein älterer Client nutzt weiter den
 Org-Endpunkt und bekommt dort, was er heute bekommt.
+
+## Freigabe
+
+Ruben hat am 13.10.2026 freigegeben, wie empfohlen:
+
+- Eigener einsatzbezogener Lesepfad `GET /api/einsaetze/{id}/modul-vorgaben` (D1) statt A oder B.
+- Lesekreis nach D2: alle Mitglieder des Einsatzes einschließlich Beobachter sowie Angehörige der
+  Einsatz-Organisation; ein System-Admin einer fremden Organisation ohne Mitgliedschaft nicht.

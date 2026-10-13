@@ -1280,3 +1280,150 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     assert!(gelesen.contains("event: person"), "{gelesen:?}");
     assert!(!gelesen.contains("event: etb"), "{gelesen:?}");
 }
+
+// ----------------------------- LLH-1183: Modul-Vorgaben am Einsatz -----------------------------
+
+/// Org-Vorgaben für die Tests: `stab` ausgeblendet, `lagemeldungen` nur für die Führung im
+/// Einsatz.
+async fn org_vorgaben_setzen(app: &axum::Router, admin: &str) {
+    for (pfad, body) in [
+        (
+            "/api/org-modul-einstellungen/stab",
+            r#"{"benoetigte_rolle":null,"sichtbar":false}"#,
+        ),
+        (
+            "/api/org-modul-einstellungen/lagemeldungen",
+            r#"{"benoetigte_rolle":"einsatzfuehrung","sichtbar":true}"#,
+        ),
+    ] {
+        let (status, v) = anfrage(app, "PUT", pfad, admin, Some(body)).await;
+        assert!(status.is_success(), "{pfad}: {status} {v:?}");
+    }
+}
+
+async fn modul_vorgaben_laden(app: &axum::Router, cookie: &str, eid: i64) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/modul-vorgaben"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn einsatzleitung_ohne_org_rolle_liest_die_modul_vorgaben_ihres_einsatzes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    org_vorgaben_setzen(&app, &admin).await;
+    let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
+    rolle_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
+    let lotta = login_cookie(&app, "lotta", "lottapw1").await;
+
+    let (status, v) = modul_vorgaben_laden(&app, &lotta, eid).await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(v["stab"]["sichtbar"], false, "{v}");
+    assert_eq!(
+        v["lagemeldungen"]["benoetigte_rolle"], "einsatzfuehrung",
+        "{v}"
+    );
+    assert_eq!(v["lagemeldungen"]["sichtbar"], true, "{v}");
+}
+
+#[tokio::test]
+async fn modul_vorgaben_oeffnen_kein_org_weites_leserecht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
+    rolle_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
+    let lotta = login_cookie(&app, "lotta", "lottapw1").await;
+
+    assert_eq!(
+        modul_vorgaben_laden(&app, &lotta, eid).await.0,
+        StatusCode::OK
+    );
+    for pfad in ["/api/org-modul-einstellungen", "/api/org-einstellungen"] {
+        assert_eq!(
+            get_status(&app, &lotta, pfad).await,
+            StatusCode::FORBIDDEN,
+            "{pfad}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn beobachter_liest_die_modul_vorgaben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    org_vorgaben_setzen(&app, &admin).await;
+    let bid = benutzer_anlegen(&app, &admin, "bruno", "keine").await;
+    rolle_setzen(&app, &admin, eid, bid, "beobachter").await;
+    let bruno = login_cookie(&app, "bruno", "brunopw1").await;
+
+    let (status, v) = modul_vorgaben_laden(&app, &bruno, eid).await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(v["stab"]["sichtbar"], false, "{v}");
+}
+
+#[tokio::test]
+async fn modul_vorgaben_fuer_nicht_mitglied_sind_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    benutzer_anlegen(&app, &admin, "fremd", "keine").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+
+    assert_eq!(
+        modul_vorgaben_laden(&app, &fremd, eid).await.0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn admin_einer_fremden_org_liest_die_modul_vorgaben_nicht() {
+    // Die Overrides darf er serverweit lesen (`admin_einer_fremden_org_setzt_keinen_override`),
+    // die Vorgaben einer fremden Organisation nicht (design.md D2).
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    org_vorgaben_setzen(&app, &admin).await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    assert_eq!(overrides_laden(&app, &fremd, eid).await.0, StatusCode::OK);
+    let (status, v) = modul_vorgaben_laden(&app, &fremd, eid).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{v}");
+}
+
+#[tokio::test]
+async fn einsatzleitung_aus_fremder_org_liest_die_vorgaben_der_einsatz_org() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    org_vorgaben_setzen(&app, &admin).await;
+    fremde_org_anlegen(&pool, "Fremd", "gerda", "gerdapw12", "keine").await;
+    mitglied_per_sql(&pool, eid, "gerda", "einsatzleitung").await;
+    let gerda = login_cookie(&app, "gerda", "gerdapw12").await;
+
+    let (status, v) = modul_vorgaben_laden(&app, &gerda, eid).await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(v["stab"]["sichtbar"], false, "Vorgabe der Einsatz-Org: {v}");
+}
+
+#[tokio::test]
+async fn modul_vorgaben_gleichen_dem_org_endpunkt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    org_vorgaben_setzen(&app, &admin).await;
+
+    let (s_einsatz, am_einsatz) = modul_vorgaben_laden(&app, &admin, eid).await;
+    let (s_org, an_der_org) =
+        anfrage(&app, "GET", "/api/org-modul-einstellungen", &admin, None).await;
+    assert_eq!(s_einsatz, StatusCode::OK);
+    assert_eq!(s_org, StatusCode::OK);
+    assert_eq!(am_einsatz, an_der_org);
+}

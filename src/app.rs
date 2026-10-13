@@ -300,6 +300,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz::modul_freigaben_laden),
         )
         .route(
+            "/api/einsaetze/{id}/modul-vorgaben",
+            get(routes::einsatz::modul_vorgaben_laden),
+        )
+        .route(
             "/api/einsaetze/{id}/modul-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
