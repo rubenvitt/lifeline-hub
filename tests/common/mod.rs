@@ -515,6 +515,28 @@ pub async fn recv_until_tag(
     }
 }
 
+/// Die Objekt-Ereignisse, die seit dem letzten Lesen am Abo anstehen, als `(Wire-Tag, Kennung)` in
+/// Ankunftsfolge. Nur die gesuchten Ereignisse zählen, je mit dem Schlüssel ihrer Kennung
+/// (`einheit` → `einheit_id`); alles andere wird verworfen. Für „das Fremd-Ereignis kommt genau
+/// dann, wenn die andere Ansicht sich ändert“ (LLH-1182).
+pub fn objekt_ereignisse(
+    rx: &mut Receiver<LiveNachricht>,
+    gesucht: &[(&str, &str)],
+) -> Vec<(String, i64)> {
+    let mut treffer = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        let tag = n.event.as_str();
+        if let Some((_, schluessel)) = gesucht.iter().find(|(t, _)| *t == tag) {
+            let data: Value = serde_json::from_str(&n.data).unwrap();
+            let id = data[*schluessel]
+                .as_i64()
+                .unwrap_or_else(|| panic!("`{tag}` ohne `{schluessel}`: {data}"));
+            treffer.push((tag.to_string(), id));
+        }
+    }
+    treffer
+}
+
 /// Öffnet `/live` für `cookie` und liefert die Response (Body bleibt offen).
 pub async fn live_oeffnen(app: &axum::Router, cookie: &str, eid: i64) -> axum::response::Response {
     let resp = app

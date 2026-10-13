@@ -75,6 +75,24 @@ pub async fn gib_besatzung_frei_tx(
     Ok(name)
 }
 
+/// Die Besatzung eines Fahrzeugs (`einsatz_personal.id`). Wer das Fahrzeug entfernt, fragt
+/// vorher; die Freigabe ändert die Zeilen der Personalliste, das Ereignis `personal` muss der
+/// Aufrufer melden (LLH-1182).
+pub async fn load_besatzung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar(
+        "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND fahrzeug_id = ? ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(ef_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(ids)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

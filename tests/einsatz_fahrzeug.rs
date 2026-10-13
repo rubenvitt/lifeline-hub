@@ -735,3 +735,175 @@ async fn status_seit_nur_bei_echtem_statuswechsel() {
     let seit = j["status_seit"].as_str().unwrap();
     assert!(seit > alt, "echter Wechsel setzt „Seit“ neu, war {seit}");
 }
+
+// ---------- Fremd-Ereignisse (LLH-1182) ----------
+
+const FREMD: &[(&str, &str)] = &[
+    ("einheit", "einheit_id"),
+    ("personal", "personal_id"),
+    ("bereitstellungsraum", "br_id"),
+];
+
+fn ereignis(tag: &str, id: i64) -> (String, i64) {
+    (tag.to_string(), id)
+}
+
+async fn in_einheit(app: &axum::Router, cookie: &str, einsatz: i64, ef: i64) -> i64 {
+    let einheit = einheit_bilden(app, cookie, einsatz, "1. Zug").await;
+    let (s, _) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/fahrzeug/{ef}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Fahrzeug der Einheit zuordnen");
+    einheit
+}
+
+/// Das Entfernen nimmt der Einheit ein Mitglied (und ändert ihren abgeleiteten Status), löst die
+/// Besatzung (`fahrzeug_id` → NULL in der Personalliste) und nimmt das Fahrzeug aus dem Detail
+/// seines Bereitstellungsraums. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
+/// nicht und invalidiert das BR-Detail nicht; `einheit`, je Kraft `personal` und
+/// `bereitstellungsraum` tragen es, aber nur, wenn das Fahrzeug dort stand.
+#[tokio::test]
+async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let im_zug = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
+    let besetzt = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 3").await;
+    let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Maschinist").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{besetzt}/besatzung/{ep}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Besatzung zuordnen");
+    let im_br = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 4").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Nord"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let br = json["id"].as_i64().unwrap();
+    for (pfad, body) in [
+        ("status".to_string(), r#"{"status":"aktiv"}"#.to_string()),
+        (
+            "belegung".to_string(),
+            format!(r#"{{"objekt_typ":"fahrzeug","objekt_id":{im_br},"art":"eintritt"}}"#),
+        ),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/{pfad}"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert!(s.is_success(), "{pfad}: {s} {json}");
+    }
+
+    let mut rx = live.abonniere(einsatz);
+    let entfernen = |ef: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(entfernen(frei).await, StatusCode::NO_CONTENT);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
+    assert_eq!(entfernen(im_zug).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Mitglied der Einheit"
+    );
+    assert_eq!(entfernen(besetzt).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("personal", ep)],
+        "Besatzung gelöst"
+    );
+    assert_eq!(entfernen(im_br).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("bereitstellungsraum", br)],
+        "Fahrzeug im Bereitstellungsraum"
+    );
+}
+
+/// Der Status einer Einheit leitet sich aus ihren Fahrzeugen ab, und ihre Mitgliederliste zeigt
+/// den Status jedes Fahrzeugs (LFH-609). Ein Statuswechsel meldet `einheit` genau dann, wenn das
+/// Fahrzeug in einer Einheit steht und sich der Status ändert, nicht bei der Bemerkung.
+#[tokio::test]
+async fn statuswechsel_feuert_einheit_nur_fuer_fahrzeug_einer_einheit() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let im_zug = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
+    let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let am_einsatzort = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == "4 – Am Einsatzort")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+
+    let mut rx = live.abonniere(einsatz);
+    let patch = |ef: i64, body: String| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                Some(&body),
+            )
+            .await
+            .0
+        }
+    };
+    let status = format!(r#"{{"status_id":{am_einsatzort}}}"#);
+
+    assert_eq!(patch(frei, status.clone()).await, StatusCode::OK);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "freies Fahrzeug");
+    assert_eq!(patch(im_zug, status.clone()).await, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Status eines Einheitsfahrzeugs"
+    );
+    assert_eq!(patch(im_zug, status).await, StatusCode::OK);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "gleicher Status");
+    assert_eq!(
+        patch(im_zug, r#"{"bemerkung":"Pumpe defekt"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "nur Bemerkung");
+}

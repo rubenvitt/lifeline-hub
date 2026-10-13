@@ -363,6 +363,25 @@ pub async fn laden_tx(
     .ok_or(AppError::NotFound)
 }
 
+/// Die Schäden, die eine Dispositionszeile als geschädigte Einsatzkraft tragen. Wer die Zeile
+/// löscht, fragt vorher; ON DELETE SET NULL nimmt dem Schaden Kennung und Namen, das Ereignis
+/// `schaden` muss der Aufrufer melden (LLH-1182).
+pub async fn load_geschaedigt_durch_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar(
+        "SELECT id FROM einsatz_schaden WHERE einsatz_id = ? AND geschaedigt_personal_id = ? \
+         ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(ids)
+}
+
 /// Legt einen Schaden an INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
 /// atomar mit dem System-ETB-Eintrag). Liefert `(id, registrier_nr)` — die registrier_nr
 /// wird für die ETB-Spur gebraucht und ist erst nach dem INSERT (COALESCE(MAX)+1) bekannt.

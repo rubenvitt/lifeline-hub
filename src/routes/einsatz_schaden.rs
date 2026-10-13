@@ -23,7 +23,7 @@ use serde::Deserialize;
 // ---------- ETB-/SSE-Helfer ----------
 
 /// Verteilt `LiveEvent::Schaden` mit `{einsatz_id, schaden_id}`.
-fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
+pub(super) fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Schaden, "schaden_id", schaden_id);

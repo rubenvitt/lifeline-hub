@@ -173,7 +173,6 @@ pub async fn aktualisieren(
         }
     }
 
-    let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm.
@@ -181,17 +180,18 @@ pub async fn aktualisieren(
     let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Update + (bedingter) System-ETB atomar in EINER Tx. Der ETB-Text
-    // braucht die frische Anzeige (neues Status-Label) → In-Tx-Reload. Der Vorzustand
-    // (status_id/-label) stammt aus dem Vorlade-`vorher`. SSE erst nach dem Commit.
-    let vorher_status_id = vorher.status_id;
-    let vorher_status_label = vorher.status_label.clone();
+    // braucht die frische Anzeige (neues Status-Label) → In-Tx-Reload. Auch den Vorzustand
+    // (status_id/-label) liest die Tx selbst, sonst verschluckte ein paralleler Wechsel zurück
+    // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let nachher = crate::write_retry!(&state.pool, |conn| {
+    let (nachher, has_status_changed) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
             .await?;
         let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        if vorher_status_id != nachher.status_id {
+        let has_status_changed = vorher.status_id != nachher.status_id;
+        if has_status_changed {
             // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
             // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung). Das Live-Event
             // `fahrzeug` lädt die Zeitachse im Client mit neu.
@@ -213,15 +213,22 @@ pub async fn aktualisieren(
                 startwert,
                 &crate::fahrzeug::etb_text_status_wechsel(
                     &nachher.funkrufname,
-                    vorher_status_label.as_deref(),
+                    vorher.status_label.as_deref(),
                     nachher.status_label.as_deref(),
                 ),
             )
             .await?;
         }
-        Ok(nachher)
+        Ok((nachher, has_status_changed))
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
+    // Die Einheit zeigt den Status ihrer Fahrzeuge und leitet ihren eigenen daraus ab (LFH-609);
+    // `fahrzeug` erreicht ihre Leser ohne Fahrzeugrecht nicht (LLH-1182).
+    if has_status_changed {
+        if let Some(einheit_id) = nachher.einheit_id {
+            super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+        }
+    }
     Ok(Json(nachher))
 }
 
@@ -240,17 +247,31 @@ pub async fn entfernen(
         anzeige.funkrufname
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let trug_fuehrungsstelle = crate::write_retry!(&state.pool, |conn| {
+    let (trug_fuehrungsstelle, entfernt, besatzung) = crate::write_retry!(&state.pool, |conn| {
         let trug = crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
+        let entfernt = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let besatzung = besatzung_repo::load_besatzung_tx(conn, einsatz_id, ef_id).await?;
         disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(trug)
+        Ok((trug, entfernt, besatzung))
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     // Die Kaskade hat die Zuordnung an der Führungsstelle gelöst (LFH-1106): deren Leser hängen
-    // am Ereignis `einsatz`.
+    // am Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
+    // nicht: die Einheit verliert ein Mitglied, die Besatzung ihr Fahrzeug. Das Detail des
+    // Bereitstellungsraums listet seine Fahrzeuge und hängt nur an `bereitstellungsraum`
+    // (LLH-1182).
     if trug_fuehrungsstelle {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    if let Some(br_id) = entfernt.aktueller_br_id {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+    }
+    if let Some(einheit_id) = entfernt.einheit_id {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    for ep_id in besatzung {
+        sse_personal(&state, einsatz_id, ep_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }

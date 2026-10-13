@@ -1,3 +1,4 @@
+use super::einsatz_uhs::sse_uhs;
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -174,7 +175,6 @@ pub async fn aktualisieren(
         None => None,
     };
 
-    let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
@@ -182,11 +182,13 @@ pub async fn aktualisieren(
     let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu zwei) System-ETB-Einträge atomar in
-    // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload (`nachher`) liefert die frischen
-    // Werte für ETB-Texte UND Response; ein Menge-Wechsel und ein Status-Wechsel schreiben je
-    // einen Eintrag (eine reine Bemerkungsänderung keinen). SSE erst nach dem Commit.
+    // EINER Tx (BEGIN IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload
+    // (`nachher`) liefert die frischen Werte für ETB-Texte UND Response; ein Menge-Wechsel und
+    // ein Status-Wechsel schreiben je einen Eintrag (eine reine Bemerkungsänderung keinen). SSE
+    // erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let nachher = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::aktualisiere_tx(
             conn,
             einsatz_id,
@@ -226,9 +228,29 @@ pub async fn aktualisieren(
             )
             .await?;
         }
-        Ok(nachher)
+        Ok((vorher, nachher))
     })?;
     sse_material(&state, einsatz_id, em_id);
+    // `material` erreicht Einheiten- und UHS-Leser ohne Materialrecht nicht (LLH-1182). Die
+    // Einheit zeigt Menge und Status ihres Materials, das UHS-Detail die ganze Zeile des dort
+    // verorteten Materials (LFH-892); beim Umverorten ändern sich alte und neue UHS.
+    if let Some(einheit_id) = nachher.einheit_id {
+        if vorher.menge != nachher.menge || vorher.status != nachher.status {
+            super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+        }
+    }
+    let has_row_changed = vorher.menge != nachher.menge
+        || vorher.status != nachher.status
+        || vorher.bemerkung != nachher.bemerkung
+        || vorher.uhs_id != nachher.uhs_id;
+    if has_row_changed {
+        if let Some(uhs_id) = vorher.uhs_id {
+            sse_uhs(&state, einsatz_id, uhs_id);
+        }
+        if let Some(uhs_id) = nachher.uhs_id.filter(|u| Some(*u) != vorher.uhs_id) {
+            sse_uhs(&state, einsatz_id, uhs_id);
+        }
+    }
     Ok(Json(nachher))
 }
 
@@ -249,11 +271,20 @@ pub async fn entfernen(
         anzeige.bezeichnung
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let entfernt = crate::write_retry!(&state.pool, |conn| {
+        let entfernt = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::entferne_tx(conn, einsatz_id, em_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        Ok(entfernt)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    // Einheit und UHS-Detail zeigen das Material; `material` erreicht ihre Leser ohne
+    // Materialrecht nicht (LLH-1182).
+    if let Some(einheit_id) = entfernt.einheit_id {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    if let Some(uhs_id) = entfernt.uhs_id {
+        sse_uhs(&state, einsatz_id, uhs_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
