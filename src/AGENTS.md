@@ -221,6 +221,11 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - **Das Presse-Log trennt nach Phase wie die Meldungen** (LFH-1075), Ordnung und Cursor über
   `eingang_at`; offen ist nur `offen`. `…/medienkontakte/kennzahlen` trägt Zahlen und Namen der
   Medien, nie Personenbezug.
+- **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
+  gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
+  `…/infotelefon` liefert immer eine Seite (`kommunikation::seite`, Cursor `eingang_at` + `id`),
+  `status` ist Filter, nicht Phase; `…/infotelefon/zaehler` zählt über dieselbe
+  `filter_bedingung` (Parität in `tests/infotelefon_zaehler.rs`).
 - **Eine Liste mit wählbarer Sortierung blättert über Schlüssel und Nummer** (LFH-1075,
   `schaden::repo::SortSpalte`): `sortierung=<spalte>_<ab|auf>`, Cursor `vor_wert` + `vor_nr`,
   Gleichstand über die Registriernummer in derselben Richtung; Sortierung oder Cursor ohne

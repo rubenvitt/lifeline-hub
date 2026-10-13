@@ -6596,6 +6596,49 @@
           "sonstiges"
         ]
       },
+      "InfotelefonAnliegenZaehler": {
+        "type": "object",
+        "description": "Zahl der Anrufe je Anliegen. Jedes Anliegen ist Pflichtfeld: eines ohne Anruf steht als 0 da\nund fehlt nie.",
+        "required": [
+          "vermisstensuche",
+          "auskunft_lage",
+          "hinweis",
+          "hilfeangebot",
+          "beschwerde",
+          "presse",
+          "sonstiges"
+        ],
+        "properties": {
+          "auskunft_lage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beschwerde": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hilfeangebot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hinweis": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "presse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sonstiges": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vermisstensuche": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "InfotelefonAnrufAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung eines Anrufs.",
@@ -6679,6 +6722,30 @@
           "offen",
           "erledigt"
         ]
+      },
+      "InfotelefonZaehler": {
+        "type": "object",
+        "description": "Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.",
+        "required": [
+          "gesamt",
+          "offen",
+          "je_anliegen"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl aller Anrufe, die zum Filter passen; per Konstruktion die Summe über `je_anliegen`."
+          },
+          "je_anliegen": {
+            "$ref": "#/components/schemas/InfotelefonAnliegenZaehler"
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon im Status `offen` (Rückruf steht aus)."
+          }
+        }
       },
       "JetztAktualisierenAntwort": {
         "type": "object",

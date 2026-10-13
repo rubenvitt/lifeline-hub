@@ -5,11 +5,11 @@ import { Form, Input } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { ladeMedienkontakte, ladePressemitteilungen } from '../api/presse';
-import { ladeAnrufe } from '../api/infotelefon';
+import { ladeAnrufZaehler } from '../api/infotelefon';
 import { ApiError } from '../api/client';
 import type { Medienkontakt } from '../api/types';
 import MedienlageUebernahme from './MedienlageUebernahme';
-import { freigabenFixture } from '../test/fixtures';
+import { ANRUF_ZAEHLER_LEER, freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/presse', async () => {
@@ -21,7 +21,7 @@ vi.mock('../api/presse', async () => {
     ladePressemitteilungen: vi.fn(),
   };
 });
-vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
+vi.mock('../api/infotelefon', () => ({ ladeAnrufZaehler: vi.fn() }));
 
 const KONTAKT = {
   id: 1,
@@ -57,7 +57,7 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladeMedienkontakte).mockResolvedValue([KONTAKT]);
   vi.mocked(ladePressemitteilungen).mockResolvedValue([]);
-  vi.mocked(ladeAnrufe).mockResolvedValue([]);
+  vi.mocked(ladeAnrufZaehler).mockResolvedValue(ANRUF_ZAEHLER_LEER);
 });
 
 describe('MedienlageUebernahme (LFH-554)', () => {
@@ -92,7 +92,7 @@ describe('MedienlageUebernahme (LFH-554)', () => {
   });
 
   it('nennt eine gesperrte Quelle mit Grund statt 0', async () => {
-    vi.mocked(ladeAnrufe).mockRejectedValue(new ApiError(403, 'verboten'));
+    vi.mocked(ladeAnrufZaehler).mockRejectedValue(new ApiError(403, 'verboten'));
     renderMitProviders(<Probe />);
     await userEvent.click(await screen.findByRole('button', { name: 'Aus S5 übernehmen' }));
     await waitFor(() =>

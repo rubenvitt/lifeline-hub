@@ -142,9 +142,11 @@ und Abhilfe stehen unter Risks.
   mindestens einem Anruf, in `ANLIEGEN_REIHENFOLGE`.
 - **Zufluss-Schleuse:** `teileZufluss` arbeitet unverändert auf dem geladenen Fenster. Neu ist
   `erweitere(gefroren, anrufe)`: Es nimmt Kennungen in den eingefrorenen Stand auf und lässt die
-  Wassermarke stehen. „Ältere laden“ ruft es mit der neuen Seite, sobald sie da ist. Sonst würde
-  ein nachgetragener Anruf (alter Eingang, hohe Kennung) aus einer älteren Seite als „neuer
-  Anruf“ zurückgehalten, solange der Fokus im Knopf liegt.
+  Wassermarke stehen. Die Seite merkt sich beim Einfrieren die Zahl der geladenen Seiten und
+  nimmt beim Rendern jede danach angehängte Seite über `erweitere` auf. Sonst würde ein
+  nachgetragener Anruf (alter Eingang, hohe Kennung) aus einer älteren Seite als „neuer Anruf“
+  zurückgehalten, solange der Fokus im Knopf liegt. Beim Rendern statt nach dem Abruf, damit das
+  Banner nicht für einen Frame aufblitzt.
 
 ### D7 Medienlage und Presseseite lesen die Zählung
 
@@ -160,6 +162,8 @@ braucht.
 - `frontend/src/stab/AGENTS.md`: Den Satz „Informationstelefon: Vollliste … (serverseitig
   LFH-862)“ ersetzt der neue Stand: Fenster, Zählung, Einzelabruf, `erweitere`, mit Verweis auf
   diese Change.
+- `src/AGENTS.md` verlangt für wachsende Listen die Trennung nach Phase. D2 weicht bewusst davon
+  ab, deshalb steht dort neben der Regel eine benannte Ausnahme für das Informationstelefon.
 - `docs/anwender/kapitel/presse-infotelefon.md` bekommt einen Satz zu „Ältere laden“. Die
   Kennzahlen zählen weiterhin alle Anrufe. Das Bild bleibt, denn mit den Bilddaten (unter 100
   Anrufe) ändert sich die Ansicht nicht.

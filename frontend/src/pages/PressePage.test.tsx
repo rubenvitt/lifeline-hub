@@ -12,10 +12,10 @@ import {
   legeMedienkontaktAn,
   setzeMedienkontaktStatus,
 } from '../api/presse';
-import { ladeAnrufe } from '../api/infotelefon';
+import { ladeAnrufZaehler } from '../api/infotelefon';
 import type { EinsatzAnzeige, Medienkontakt, Pressemitteilung } from '../api/types';
 import PressePage, { statusOptionen } from './PressePage';
-import { freigabenFixture } from '../test/fixtures';
+import { ANRUF_ZAEHLER_LEER, freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 // Die Lesewege des Presse-Logs leitet die Attrappe aus der Vollliste ab (LFH-1075).
@@ -34,7 +34,7 @@ vi.mock('../api/presse', async (orig) => {
     setzeMedienkontaktStatus: vi.fn(),
   };
 });
-vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
+vi.mock('../api/infotelefon', () => ({ ladeAnrufZaehler: vi.fn() }));
 
 const EINSATZ = {
   id: 1,
@@ -92,7 +92,7 @@ beforeEach(() => {
     kontakt({ id: 2, art: 'termin', medium: 'RTL', thema: 'Dreh', status: 'erledigt' }),
   ]);
   vi.mocked(ladePressemitteilungen).mockResolvedValue([PM]);
-  vi.mocked(ladeAnrufe).mockResolvedValue([]);
+  vi.mocked(ladeAnrufZaehler).mockResolvedValue(ANRUF_ZAEHLER_LEER);
   vi.mocked(legeMedienkontaktAn)
     .mockReset()
     .mockResolvedValue(kontakt({ id: 3 }));

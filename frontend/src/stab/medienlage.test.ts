@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { InfotelefonAnruf, MedienkontaktKennzahlen, Pressemitteilung } from '../api/types';
+import type { InfotelefonZaehler, MedienkontaktKennzahlen, Pressemitteilung } from '../api/types';
 import { baueMedienlage, rendereMedienlageMarkdown, type MedienlageQuellen } from './medienlage';
 
 /**
@@ -19,29 +19,27 @@ const KENNZAHLEN = {
   kontakt_erreichbarkeit: '+49 511 1234567',
 } as MedienkontaktKennzahlen;
 
-const ANRUFE: InfotelefonAnruf[] = [
-  {
-    id: 1,
-    einsatz_id: 7,
-    anliegen: 'vermisstensuche',
-    notiz: 'sucht Vater Klaus',
-    anrufer_name: 'Klaus Meyer',
-    rueckruf: '0171 7654321',
-    status: 'offen',
-    eingang_at: '2026-09-30 10:00:00',
-    angelegt_von_id: 1,
-    angelegt_at: '2026-09-30 10:00:00',
+/**
+ * Die Zählung des Informationstelefons, wie der Server sie über den ganzen Bestand rechnet
+ * (LLH-732): zwei Anrufe, ein offener Rückruf. Dazu Felder mit Personenbezug, die ein Aufrufer
+ * versehentlich mitgeben könnte.
+ */
+const ZAEHLER = {
+  gesamt: 2,
+  offen: 1,
+  je_anliegen: {
+    vermisstensuche: 1,
+    auskunft_lage: 1,
+    hinweis: 0,
+    hilfeangebot: 0,
+    beschwerde: 0,
+    presse: 0,
+    sonstiges: 0,
   },
-  {
-    id: 2,
-    einsatz_id: 7,
-    anliegen: 'auskunft_lage',
-    status: 'erledigt',
-    eingang_at: '2026-09-30 10:05:00',
-    angelegt_von_id: 1,
-    angelegt_at: '2026-09-30 10:05:00',
-  },
-];
+  notiz: 'sucht Vater Klaus',
+  anrufer_name: 'Klaus Meyer',
+  rueckruf: '0171 7654321',
+} as InfotelefonZaehler;
 
 const PM = {
   id: 4,
@@ -55,7 +53,7 @@ function quellen(teil: Partial<MedienlageQuellen> = {}): MedienlageQuellen {
   return {
     kontakte: { zustand: 'daten', daten: KENNZAHLEN },
     mitteilungen: { zustand: 'daten', daten: [PM, { ...PM, id: 5, status: 'entwurf' }] },
-    anrufe: { zustand: 'daten', daten: ANRUFE },
+    anrufe: { zustand: 'daten', daten: ZAEHLER },
     ...teil,
   };
 }
@@ -85,6 +83,32 @@ describe('Medienlage (LFH-554)', () => {
     expect(m.anrufe.zustand === 'daten' && m.anrufe.werte.offeneRueckrufe).toBe(1);
   });
 
+  it('nennt die Anrufe des ganzen Bestands, nicht die einer geladenen Seite (LLH-732)', () => {
+    const text = rendereMedienlageMarkdown(
+      baueMedienlage(
+        quellen({
+          anrufe: {
+            zustand: 'daten',
+            daten: {
+              ...ZAEHLER,
+              gesamt: 2000,
+              offen: 200,
+              je_anliegen: { ...ZAEHLER.je_anliegen, vermisstensuche: 1500, auskunft_lage: 500 },
+            },
+          },
+        }),
+      ),
+      zeit,
+    );
+    expect(text).toContain('2000 Anrufe, davon 200 Rückrufe offen');
+    expect(text).toContain('Vermisstensuche 1500, Auskunft zur Lage 500');
+  });
+
+  it('nennt ohne Antwort der Zählung den Grund, nie eine 0', () => {
+    const m = baueMedienlage(quellen({ anrufe: { zustand: 'daten', daten: null } }));
+    expect(m.anrufe).toEqual({ zustand: 'fehler' });
+  });
+
   it('trägt keinen Personenbezug in den Text — weder Namen noch Nummern noch Notizen oder Themen', () => {
     const text = rendereMedienlageMarkdown(baueMedienlage(quellen()), zeit);
     for (const pii of [
@@ -110,7 +134,7 @@ describe('Medienlage (LFH-554)', () => {
     const text = rendereMedienlageMarkdown(
       baueMedienlage(
         quellen({
-          anrufe: { zustand: 'gesperrt', daten: [] },
+          anrufe: { zustand: 'gesperrt', daten: null },
           kontakte: { zustand: 'fehler', daten: null },
         }),
       ),

@@ -3,7 +3,7 @@ import type { InfotelefonAnruf } from '../api/types';
 /**
  * Zufluss-Schleuse der Anruf-Zeitachse (LFH-554), nach dem Muster der ETB-Zeitachse
  * (`etb/zeitachseModell.ts`): Solange der Fokus in der Liste liegt, ist der gezeigte Stand
- * eingefroren. Neue Anrufe ANDERER Plätze werden gezählt statt eingeschoben und erst auf
+ * eingefroren. Seit LLH-732 ist das der geladene Ausschnitt (Seitenkette), nicht die Vollliste. Neue Anrufe ANDERER Plätze werden gezählt statt eingeschoben und erst auf
  * „anzeigen“ eingefügt; eigene stehen sofort (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
  */
 export interface Einfrierstand {
@@ -19,6 +19,20 @@ export function einfrieren(anrufe: readonly InfotelefonAnruf[]): Einfrierstand |
     ids: new Set(anrufe.map((a) => a.id)),
     wassermarke: Math.max(...anrufe.map((a) => a.id)),
   };
+}
+
+/**
+ * Nimmt nachgeladene Anrufe in den eingefrorenen Stand auf (LLH-732): „Ältere laden“ hängt eine
+ * Seite an, während der Fokus in der Liste liegt. Die Wassermarke bleibt, sonst gäbe sie neue
+ * fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen Nachtrag (alter Eingang, hohe
+ * Kennung) aus der älteren Seite als „neuen Anruf“ zurück.
+ */
+export function erweitere(
+  gefroren: Einfrierstand | null,
+  anrufe: readonly InfotelefonAnruf[],
+): Einfrierstand | null {
+  if (gefroren == null) return null;
+  return { ...gefroren, ids: new Set([...gefroren.ids, ...anrufe.map((a) => a.id)]) };
 }
 
 export function teileZufluss(

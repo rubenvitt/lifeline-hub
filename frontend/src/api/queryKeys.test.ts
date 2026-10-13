@@ -449,6 +449,15 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.pressemitteilungen(1)).toEqual(['einsatz-presse', 1, 'mitteilungen']);
     expect(einsatzKeys.pressemitteilung(1, 4)).toEqual(['einsatz-presse', 1, 'mitteilung', 4]);
     expect(einsatzKeys.infotelefon(1)).toEqual(['einsatz-infotelefon', 1]);
+    // Informationstelefon (LLH-732): Seitenkette, Zählung und Einzelabruf unter EINEM Prefix.
+    expect(einsatzKeys.infotelefonListe(1, 'offen')).toEqual([
+      'einsatz-infotelefon',
+      1,
+      'liste',
+      'offen',
+    ]);
+    expect(einsatzKeys.infotelefonZaehler(1)).toEqual(['einsatz-infotelefon', 1, 'zaehler']);
+    expect(einsatzKeys.infotelefonAnruf(1, 4)).toEqual(['einsatz-infotelefon', 1, 'anruf', 4]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // Lesemarke UNTER dem ETB-Prefix: das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
@@ -765,6 +774,8 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
     expect(ziele('lagebericht', { einsatz_id: 7 })).toBeNull();
     expect(ziele('schaden', { einsatz_id: 7 })).toBeNull();
     expect(ziele('presse', { einsatz_id: 7 })).toBeNull();
+    // Das Informationstelefon gleicht immer über den Prefix ab: Liste, Zählung, Einzelabruf.
+    expect(EINSATZ_STREAM_ZIELE.infotelefon).toBeUndefined();
   });
 
   it('ein Medienkontakt gleicht seine Zeile ab, eine Pressemitteilung nie das Presse-Log', () => {

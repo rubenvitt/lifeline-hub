@@ -2520,6 +2520,26 @@ export interface components {
          * @enum {string}
          */
         InfotelefonAnliegen: "vermisstensuche" | "auskunft_lage" | "hinweis" | "hilfeangebot" | "beschwerde" | "presse" | "sonstiges";
+        /**
+         * @description Zahl der Anrufe je Anliegen. Jedes Anliegen ist Pflichtfeld: eines ohne Anruf steht als 0 da
+         *     und fehlt nie.
+         */
+        InfotelefonAnliegenZaehler: {
+            /** Format: int64 */
+            auskunft_lage: number;
+            /** Format: int64 */
+            beschwerde: number;
+            /** Format: int64 */
+            hilfeangebot: number;
+            /** Format: int64 */
+            hinweis: number;
+            /** Format: int64 */
+            presse: number;
+            /** Format: int64 */
+            sonstiges: number;
+            /** Format: int64 */
+            vermisstensuche: number;
+        };
         /** @description Öffentliche Darstellung eines Anrufs. */
         InfotelefonAnrufAnzeige: {
             angelegt_at: string;
@@ -2545,6 +2565,20 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
+        /** @description Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`. */
+        InfotelefonZaehler: {
+            /**
+             * Format: int64
+             * @description Zahl aller Anrufe, die zum Filter passen; per Konstruktion die Summe über `je_anliegen`.
+             */
+            gesamt: number;
+            je_anliegen: components["schemas"]["InfotelefonAnliegenZaehler"];
+            /**
+             * Format: int64
+             * @description Davon im Status `offen` (Rückruf steht aus).
+             */
+            offen: number;
+        };
         JetztAktualisierenAntwort: {
             phase: components["schemas"]["JetztPhase"];
         };

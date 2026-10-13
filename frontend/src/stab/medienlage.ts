@@ -1,7 +1,7 @@
 import type { AbrufZustand } from '../api/abrufZustand';
 import type {
   InfotelefonAnliegen,
-  InfotelefonStatus,
+  InfotelefonZaehler,
   MedienkontaktArt,
   MedienkontaktKennzahlen,
   PressemitteilungStatus,
@@ -22,9 +22,10 @@ import {
  * Lagevortrags (DRK RLP, Punkt III).
  *
  * **Datenschutz strukturell:** `baueMedienlage` kopiert aus jeder Quelle NUR die freigegebenen
- * Felder (Zahlen und Medien der Kontakte; Titel, Version, Freigabezeit; Anliegen, Status). Die
+ * Felder (Zahlen und Medien der Kontakte; Titel, Version, Freigabezeit; Zahlen der Anrufe). Die
  * Kontakte kommen seit LFH-1075 als Kennzahlen vom Server, über den ganzen Bestand, auch wenn
- * die Presseseite die erledigten nur seitenweise lädt. Ansprechperson,
+ * die Presseseite die erledigten nur seitenweise lädt; die Anrufe seit LLH-732 ebenso aus
+ * `…/infotelefon/zaehler`, auch wenn das Protokoll nur ein Fenster lädt. Ansprechperson,
  * Erreichbarkeit, Anrufername, Rückrufnummer, Notiz und Thema erreichen die Ableitung nie — auch
  * dann nicht, wenn der Aufrufer das volle DTO übergibt. Der Test pinnt ihre Abwesenheit.
  *
@@ -43,15 +44,16 @@ interface MitteilungEingang {
   status: PressemitteilungStatus;
   freigegeben_at?: string | null;
 }
+/** Die Zählung des Informationstelefons (`…/infotelefon/zaehler`); `null` ohne Antwort. */
 interface AnrufEingang {
-  anliegen: InfotelefonAnliegen;
-  status: InfotelefonStatus;
+  zustand: AbrufZustand;
+  daten: Pick<InfotelefonZaehler, 'gesamt' | 'offen' | 'je_anliegen'> | null;
 }
 
 export interface MedienlageQuellen {
   kontakte: KontaktEingang;
   mitteilungen: Quelle<MitteilungEingang>;
-  anrufe: Quelle<AnrufEingang>;
+  anrufe: AnrufEingang;
 }
 
 type Teil<T> =
@@ -96,6 +98,17 @@ function kontakteTeil(q: KontaktEingang): Medienlage['kontakte'] {
   return { zustand: 'daten', werte: { gesamt: k.gesamt, offen: k.offen, jeArt, medien } };
 }
 
+function anrufeTeil(q: AnrufEingang): Medienlage['anrufe'] {
+  if (q.zustand !== 'daten') return { zustand: q.zustand };
+  if (!q.daten) return { zustand: 'fehler' };
+  const jeAnliegen = nullen(ANLIEGEN_REIHENFOLGE);
+  for (const anliegen of ANLIEGEN_REIHENFOLGE) jeAnliegen[anliegen] = q.daten.je_anliegen[anliegen];
+  return {
+    zustand: 'daten',
+    werte: { gesamt: q.daten.gesamt, offeneRueckrufe: q.daten.offen, jeAnliegen },
+  };
+}
+
 export function baueMedienlage(q: MedienlageQuellen): Medienlage {
   return {
     kontakte: kontakteTeil(q.kontakte),
@@ -105,15 +118,7 @@ export function baueMedienlage(q: MedienlageQuellen): Medienlage {
         .map((m) => ({ titel: m.titel, version: m.version, freigegebenAt: m.freigegeben_at! }))
         .sort((a, b) => a.freigegebenAt.localeCompare(b.freigegebenAt)),
     })),
-    anrufe: teil(q.anrufe, (daten) => {
-      const jeAnliegen = nullen(ANLIEGEN_REIHENFOLGE);
-      let offeneRueckrufe = 0;
-      for (const a of daten) {
-        jeAnliegen[a.anliegen] += 1;
-        if (a.status === 'offen') offeneRueckrufe += 1;
-      }
-      return { gesamt: daten.length, offeneRueckrufe, jeAnliegen };
-    }),
+    anrufe: anrufeTeil(q.anrufe),
   };
 }
 

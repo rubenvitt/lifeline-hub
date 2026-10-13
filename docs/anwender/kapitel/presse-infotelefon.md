@@ -93,6 +93,13 @@ Mitteilung die aktuelle Fassung und die Zahl der früheren Fassungen.
 Medienkontakte und Anrufe schreiben nichts ins Einsatztagebuch; Presse-Log und Anrufprotokoll sind
 selbst der Nachweis.
 
+### Viele Anrufe
+
+Das Anrufprotokoll zeigt zuerst die jüngsten 100 Anrufe. „Ältere laden“ am Ende der Liste holt die
+nächsten. Die Zahlen „Anrufe“ und „offene Rückrufe“ und die Aufgliederung „Nach Anliegen“ zählen
+immer alle Anrufe des Einsatzes, auch die noch nicht geladenen. Ein Link auf einen älteren Anruf
+zeigt ihn hervorgehoben am Ende der Liste.
+
 ### Medienlage
 
 Die „Medienlage“ fasst Presse-Log, Pressemitteilungen und Informationstelefon in Zahlen zusammen,

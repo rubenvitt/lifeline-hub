@@ -4,17 +4,27 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
-import { erfasseAnruf, ladeAnrufe, setzeAnrufStatus } from '../api/infotelefon';
+import {
+  ANRUFE_SEITE,
+  erfasseAnruf,
+  ladeAnruf,
+  ladeAnrufe,
+  ladeAnrufZaehler,
+  setzeAnrufStatus,
+} from '../api/infotelefon';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import type { EinsatzAnzeige, InfotelefonAnruf } from '../api/types';
+import type { EinsatzAnzeige, InfotelefonAnruf, InfotelefonZaehler } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
-vi.mock('../api/infotelefon', () => ({
+vi.mock('../api/infotelefon', async (original) => ({
+  ...(await original<typeof import('../api/infotelefon')>()),
   ladeAnrufe: vi.fn(),
+  ladeAnrufZaehler: vi.fn(),
+  ladeAnruf: vi.fn(),
   erfasseAnruf: vi.fn(),
   setzeAnrufStatus: vi.fn(),
 }));
@@ -51,6 +61,30 @@ const ANRUFE = [
   anruf({ id: 1, notiz: 'Sperrung B 3' }),
 ];
 
+function zaehler(teil: Partial<InfotelefonZaehler> = {}): InfotelefonZaehler {
+  return {
+    gesamt: 2,
+    offen: 1,
+    je_anliegen: {
+      vermisstensuche: 1,
+      auskunft_lage: 1,
+      hinweis: 0,
+      hilfeangebot: 0,
+      beschwerde: 0,
+      presse: 0,
+      sonstiges: 0,
+    },
+    ...teil,
+  };
+}
+
+/** Der Server filtert und blättert; der Mock filtert nur nach Status. */
+function liefere(anrufe: InfotelefonAnruf[]) {
+  vi.mocked(ladeAnrufe).mockImplementation(async (_e, seite = {}) =>
+    seite.status ? anrufe.filter((a) => a.status === seite.status) : anrufe,
+  );
+}
+
 function setup(route = '/einsaetze/1/stab/infotelefon') {
   return renderMitProviders(
     <Routes>
@@ -66,7 +100,10 @@ const kennzahl = (titel: string) =>
 beforeEach(() => {
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-  vi.mocked(ladeAnrufe).mockResolvedValue(ANRUFE);
+  vi.mocked(ladeAnrufe).mockReset();
+  liefere(ANRUFE);
+  vi.mocked(ladeAnrufZaehler).mockReset().mockResolvedValue(zaehler());
+  vi.mocked(ladeAnruf).mockReset();
   vi.mocked(erfasseAnruf)
     .mockReset()
     .mockResolvedValue(anruf({ id: 3 }));
@@ -76,23 +113,83 @@ beforeEach(() => {
 });
 
 describe('InfotelefonPage (LFH-554)', () => {
-  it('zählt Anrufe und offene Rückrufe aus derselben Liste wie die Zeitachse', async () => {
+  it('zählt Anrufe und offene Rückrufe aus der Zählung, nicht aus dem Fenster (LLH-732)', async () => {
+    // Geladen sind zwei Anrufe, der Bestand hat 2 000: jede Zahl muss vom Server kommen.
+    vi.mocked(ladeAnrufZaehler).mockResolvedValue(
+      zaehler({
+        gesamt: 2000,
+        offen: 200,
+        je_anliegen: { ...zaehler().je_anliegen, vermisstensuche: 1500, auskunft_lage: 500 },
+      }),
+    );
     setup();
     const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
     await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(2));
-    expect(within(kennzahl('Anrufe').parentElement!).getByText('2')).toBeInTheDocument();
-    expect(within(kennzahl('offene Rückrufe').parentElement!).getByText('1')).toBeInTheDocument();
+    expect(await within(kennzahl('Anrufe').parentElement!).findByText('2000')).toBeInTheDocument();
+    expect(within(kennzahl('offene Rückrufe').parentElement!).getByText('200')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Nach Anliegen' })).toHaveTextContent(
-      /Vermisstensuche1Auskunft zur Lage1/,
+      /Vermisstensuche1500Auskunft zur Lage500/,
     );
   });
 
-  it('zeigt ohne geladene Liste keine Zahl', async () => {
+  it('zeigt ohne Zählung keine Zahl, auch nicht die des geladenen Fensters', async () => {
+    vi.mocked(ladeAnrufZaehler).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() => expect(ladeAnrufZaehler).toHaveBeenCalled());
+    // Beide Kennzahlen im Fehlerzustand (Zeichen mit Titel), keine trägt eine Ziffer.
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-lfh="kennzahl-wert"] b[title]')).toHaveLength(2),
+    );
+    for (const wert of document.querySelectorAll('[data-lfh="kennzahl-wert"]')) {
+      expect(wert.textContent).not.toMatch(/\d/);
+    }
+    expect(screen.queryByRole('region', { name: 'Nach Anliegen' })).toBeNull();
+    expect(screen.queryByText('2')).toBeNull();
+  });
+
+  it('zeigt ohne geladene Liste den Fehler', async () => {
     vi.mocked(ladeAnrufe).mockRejectedValue(new ApiError(500, 'kaputt'));
     setup();
     expect(await screen.findByText('Anrufe konnten nicht geladen werden')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Nach Anliegen' })).toBeNull();
-    expect(screen.queryByText('2')).toBeNull();
+  });
+
+  it('lädt ein Fenster und hängt mit „Ältere laden“ die nächste Seite an', async () => {
+    const seite1 = Array.from({ length: ANRUFE_SEITE }, (_, i) =>
+      anruf({ id: 1000 - i, notiz: `neu ${1000 - i}` }),
+    );
+    const seite2 = [anruf({ id: 5, notiz: 'ganz alt' })];
+    vi.mocked(ladeAnrufe).mockImplementation(async (_e, seite = {}) =>
+      seite.vor ? seite2 : seite1,
+    );
+    setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(ANRUFE_SEITE));
+    expect(screen.queryByText('ganz alt')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Ältere laden' }));
+    expect(await screen.findByText('ganz alt')).toBeInTheDocument();
+    expect(ladeAnrufe).toHaveBeenLastCalledWith(1, {
+      status: undefined,
+      vor: { zeit: '2026-09-30 10:00:00', id: 901 },
+    });
+    // Die zweite Seite ist kürzer als eine volle: es gibt nichts Älteres mehr.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull());
+  });
+
+  it('holt einen per ?anruf= angesteuerten Anruf außerhalb des Fensters einzeln', async () => {
+    vi.mocked(ladeAnruf).mockResolvedValue(anruf({ id: 77, notiz: 'alter Anruf' }));
+    setup('/einsaetze/1/stab/infotelefon?anruf=77');
+    await waitFor(() => expect(ladeAnruf).toHaveBeenCalledWith(1, 77));
+    const ziel = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-anruf="77"]');
+      expect(el).toHaveClass('zeile-hervorgehoben');
+      return el!;
+    });
+    expect(ziel).toHaveTextContent('alter Anruf');
+    // Hinten angehängt: er ist älter als alles Geladene.
+    const zeilen = document.querySelectorAll('[data-anruf]');
+    expect(zeilen[zeilen.length - 1]).toBe(ziel);
   });
 
   it('hebt den per ?anruf= angesprungenen Anruf mit Fläche hervor, nicht nur mit der Klasse (LFH-698)', async () => {
@@ -112,12 +209,13 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(ziel.style.background).not.toBe('');
   });
 
-  it('filtert auf offene Rückrufe', async () => {
+  it('filtert auf offene Rückrufe am Server', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
     await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
     await waitFor(() => expect(screen.queryByText('Sperrung B 3')).toBeNull());
     expect(screen.getByText('sucht Vater')).toBeInTheDocument();
+    expect(ladeAnrufe).toHaveBeenCalledWith(1, { status: 'offen', vor: undefined });
   });
 
   it('führt bei Vermisstensuche zu den Vermissten — nur mit Freigabe der Personen', async () => {
@@ -158,10 +256,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     const { client } = setup();
     const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
     (await within(liste).findAllByRole('button', { name: /^Status von Anruf / }))[0].focus();
-    vi.mocked(ladeAnrufe).mockResolvedValue([
-      anruf({ id: 3, angelegt_von_id: 9, notiz: 'Keller voll' }),
-      ...ANRUFE,
-    ]);
+    liefere([anruf({ id: 3, angelegt_von_id: 9, notiz: 'Keller voll' }), ...ANRUFE]);
     await client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) });
     const banner = await screen.findByText('1 neuer Anruf');
     expect(banner.textContent).toBe('1 neuer Anruf');

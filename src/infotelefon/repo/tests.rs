@@ -63,6 +63,46 @@ async fn setze(w: &Welt, e: i64, id: i64, ziel: InfotelefonStatus) -> Result<(),
     write_retry!(&w.pool, |conn| { status_tx(conn, e, id, w.b, ziel).await })
 }
 
+/// Blättert die Liste mit `limit` vollständig durch, wie der Client es tut.
+async fn alle_seiten(
+    w: &Welt,
+    e: i64,
+    filter: &AnrufFilter,
+    limit: i64,
+) -> Vec<InfotelefonAnrufAnzeige> {
+    let mut alle: Vec<InfotelefonAnrufAnzeige> = Vec::new();
+    let mut vor = None;
+    loop {
+        let seite = crate::kommunikation::Seite { vor, limit };
+        let teil = liste_seite(&w.pool, e, filter, &seite).await.unwrap();
+        let ende = (teil.len() as i64) < limit;
+        vor = teil.last().map(|a| crate::kommunikation::ZeitCursor {
+            zeit: a.eingang_at.clone(),
+            id: a.id,
+        });
+        alle.extend(teil);
+        if ende {
+            return alle;
+        }
+    }
+}
+
+async fn ids(w: &Welt, e: i64, filter: &AnrufFilter) -> Vec<i64> {
+    alle_seiten(w, e, filter, 100)
+        .await
+        .iter()
+        .map(|a| a.id)
+        .collect()
+}
+
+const OHNE: AnrufFilter = AnrufFilter { status: None };
+const OFFEN: AnrufFilter = AnrufFilter {
+    status: Some(InfotelefonStatus::Offen),
+};
+const ERLEDIGT: AnrufFilter = AnrufFilter {
+    status: Some(InfotelefonStatus::Erledigt),
+};
+
 fn code(r: Result<impl std::fmt::Debug, AppError>) -> StatusCode {
     r.unwrap_err().status()
 }
@@ -90,7 +130,7 @@ async fn rueckruf_ohne_nummer_ist_422_und_legt_nichts_an() {
         let r = anlegen(&w, w.e, anruf(InfotelefonAnliegen::Hinweis, nummer, true)).await;
         assert_eq!(code(r), StatusCode::UNPROCESSABLE_ENTITY);
     }
-    assert!(liste(&w.pool, w.e).await.unwrap().is_empty());
+    assert!(ids(&w, w.e, &OHNE).await.is_empty());
 }
 
 #[tokio::test]
@@ -165,11 +205,134 @@ async fn liste_juengste_zuerst_und_nur_eigener_einsatz() {
     anlegen(&w, w.e2, anruf(InfotelefonAnliegen::Hinweis, None, false))
         .await
         .unwrap();
-    let ids: Vec<i64> = liste(&w.pool, w.e)
+    assert_eq!(ids(&w, w.e, &OHNE).await, vec![spaet, frueh]);
+}
+
+#[tokio::test]
+async fn gleicher_eingang_ordnet_hoehere_kennung_zuerst() {
+    let w = welt().await;
+    let a = anlegen(&w, w.e, anruf(InfotelefonAnliegen::Hinweis, None, false))
         .await
-        .unwrap()
-        .iter()
-        .map(|a| a.id)
-        .collect();
-    assert_eq!(ids, vec![spaet, frueh]);
+        .unwrap();
+    let b = anlegen(&w, w.e, anruf(InfotelefonAnliegen::Hinweis, None, false))
+        .await
+        .unwrap();
+    assert_eq!(ids(&w, w.e, &OHNE).await, vec![b, a]);
+}
+
+#[tokio::test]
+async fn blaettern_liefert_jeden_anruf_genau_einmal() {
+    let w = welt().await;
+    // Gleichstände über Seitengrenzen: je drei Anrufe teilen einen Eingang, dazu ein
+    // nachgetragener Anruf mit frühem Eingang und hoher Kennung.
+    for i in 0..9 {
+        let mut a = anruf(InfotelefonAnliegen::AuskunftLage, None, false);
+        a.eingang_at = format!("2026-09-30 1{}:00:00", i / 3);
+        anlegen(&w, w.e, a).await.unwrap();
+    }
+    let mut nachtrag = anruf(InfotelefonAnliegen::Hinweis, None, false);
+    nachtrag.eingang_at = "2026-09-30 07:00:00".into();
+    let nachtrag = anlegen(&w, w.e, nachtrag).await.unwrap();
+
+    let ganz = ids(&w, w.e, &OHNE).await;
+    assert_eq!(ganz.len(), 10);
+    assert_eq!(*ganz.last().unwrap(), nachtrag, "frühester Eingang zuletzt");
+    for limit in [1, 2, 3, 4, 7] {
+        let geblaettert: Vec<i64> = alle_seiten(&w, w.e, &OHNE, limit)
+            .await
+            .iter()
+            .map(|a| a.id)
+            .collect();
+        assert_eq!(geblaettert, ganz, "limit {limit}");
+    }
+}
+
+#[tokio::test]
+async fn seite_haelt_das_limit() {
+    let w = welt().await;
+    for _ in 0..5 {
+        anlegen(&w, w.e, anruf(InfotelefonAnliegen::Hinweis, None, false))
+            .await
+            .unwrap();
+    }
+    let seite = crate::kommunikation::Seite {
+        vor: None,
+        limit: 2,
+    };
+    assert_eq!(
+        liste_seite(&w.pool, w.e, &OHNE, &seite)
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn filter_nach_status() {
+    let w = welt().await;
+    let offen = anlegen(
+        &w,
+        w.e,
+        anruf(InfotelefonAnliegen::Hinweis, Some("1"), true),
+    )
+    .await
+    .unwrap();
+    let erledigt = anlegen(&w, w.e, anruf(InfotelefonAnliegen::Hinweis, None, false))
+        .await
+        .unwrap();
+    anlegen(
+        &w,
+        w.e2,
+        anruf(InfotelefonAnliegen::Hinweis, Some("2"), true),
+    )
+    .await
+    .unwrap();
+    assert_eq!(ids(&w, w.e, &OFFEN).await, vec![offen]);
+    assert_eq!(ids(&w, w.e, &ERLEDIGT).await, vec![erledigt]);
+    assert_eq!(ids(&w, w.e, &OHNE).await, vec![erledigt, offen]);
+}
+
+#[tokio::test]
+async fn zaehlung_gleicht_der_liste_je_filter() {
+    let w = welt().await;
+    for (anliegen, nummer, noetig) in [
+        (InfotelefonAnliegen::AuskunftLage, None, false),
+        (InfotelefonAnliegen::AuskunftLage, None, false),
+        (InfotelefonAnliegen::AuskunftLage, Some("1"), true),
+        (InfotelefonAnliegen::Hinweis, None, false),
+        (InfotelefonAnliegen::Vermisstensuche, Some("2"), true),
+    ] {
+        anlegen(&w, w.e, anruf(anliegen, nummer, noetig))
+            .await
+            .unwrap();
+    }
+    anlegen(
+        &w,
+        w.e2,
+        anruf(InfotelefonAnliegen::Presse, Some("3"), true),
+    )
+    .await
+    .unwrap();
+
+    let z = zaehlen(&w.pool, w.e, &OHNE).await.unwrap();
+    assert_eq!((z.gesamt, z.offen), (5, 2));
+    assert_eq!(z.je_anliegen.auskunft_lage, 3);
+    assert_eq!(z.je_anliegen.presse, 0, "anderer Einsatz zählt nicht mit");
+
+    let z = zaehlen(&w.pool, w.e, &OFFEN).await.unwrap();
+    assert_eq!((z.gesamt, z.offen), (2, 2));
+    assert_eq!(z.je_anliegen.auskunft_lage, 1);
+    assert_eq!(z.je_anliegen.vermisstensuche, 1);
+
+    for filter in [OHNE, OFFEN, ERLEDIGT] {
+        let z = zaehlen(&w.pool, w.e, &filter).await.unwrap();
+        let liste = alle_seiten(&w, w.e, &filter, 2).await;
+        assert_eq!(z.gesamt, liste.len() as i64, "{filter:?}");
+        let offen = liste
+            .iter()
+            .filter(|a| a.status == InfotelefonStatus::Offen)
+            .count();
+        assert_eq!(z.offen, offen as i64, "{filter:?}");
+    }
 }

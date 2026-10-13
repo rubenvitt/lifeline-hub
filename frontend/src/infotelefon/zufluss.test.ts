@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InfotelefonAnruf } from '../api/types';
-import { einfrieren, teileZufluss, zuflussText } from './zufluss';
+import { einfrieren, erweitere, teileZufluss, zuflussText } from './zufluss';
 
 const a = (id: number, von = 1) =>
   ({ id, angelegt_von_id: von, anliegen: 'hinweis', status: 'erledigt' }) as InfotelefonAnruf;
@@ -18,6 +18,24 @@ describe('Zufluss der Anruf-Zeitachse (LFH-554)', () => {
     const { sichtbar, zurueckgehalten } = teileZufluss([a(4, 9), a(3, 7), a(2), a(1)], gefroren, 7);
     expect(sichtbar.map((x) => x.id)).toEqual([3, 2, 1]);
     expect(zurueckgehalten).toBe(1);
+  });
+
+  it('nimmt eine ältere Seite auf, ohne neue fremde Anrufe freizugeben (LLH-732)', () => {
+    // Eingefroren: 20 und 19. „Ältere laden“ bringt den Nachtrag 30 (alter Eingang, hohe
+    // Kennung) und 18; gleichzeitig ist der fremde Anruf 31 eingegangen.
+    const gefroren = erweitere(einfrieren([a(20), a(19)]), [a(30, 9), a(18)]);
+    const { sichtbar, zurueckgehalten } = teileZufluss(
+      [a(31, 9), a(20), a(19), a(30, 9), a(18)],
+      gefroren,
+      7,
+    );
+    expect(sichtbar.map((x) => x.id)).toEqual([20, 19, 30, 18]);
+    expect(zurueckgehalten).toBe(1);
+    expect(gefroren?.wassermarke).toBe(20);
+  });
+
+  it('erweitert ohne eingefrorenen Stand nichts', () => {
+    expect(erweitere(null, [a(1)])).toBeNull();
   });
 
   it('friert eine leere Liste nicht ein', () => {
