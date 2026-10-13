@@ -35,20 +35,7 @@ fn parse_lagezustand(s: &str) -> Result<AbschnittLagezustand, AppError> {
     })
 }
 
-/// Fortschritt außerhalb 0–100 → 400, nicht 422: der Wert scheitert am Feld selbst, nicht
-/// am Zusammenhang (Trennlinie LFH-267). Die 422 der Koordinaten-Ranges in
-/// `einsatz_uhs.rs` ist gewachsener Bestand, keine Regel für Neues.
-fn pruefe_fortschritt(wert: i64) -> Result<i64, AppError> {
-    if (0..=100).contains(&wert) {
-        Ok(wert)
-    } else {
-        Err(AppError::Validation(
-            "Fortschritt muss zwischen 0 und 100 Prozent liegen".into(),
-        ))
-    }
-}
-
-fn pruefe_kurzbezeichnung(kurz: &str) -> Result<(), AppError> {
+fn check_kurzbezeichnung(kurz: &str) -> Result<(), AppError> {
     if kurz.chars().count() > KURZBEZEICHNUNG_MAX {
         return Err(AppError::Validation(format!(
             "Kurzbezeichnung darf höchstens {KURZBEZEICHNUNG_MAX} Zeichen lang sein"
@@ -63,12 +50,12 @@ fn lage_wort(l: Option<AbschnittLagezustand>) -> &'static str {
 }
 
 /// GET /api/einsaetze/{id}/abschnitte — flache Liste (Baum baut das FE). Nur Lesezugriff.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Einsatzabschnitte>,
 ) -> Result<Json<Vec<EinsatzabschnittAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let mut liste = abschnitt_repo::liste(&state.pool, einsatz_id).await?;
+    let mut liste = abschnitt_repo::list(&state.pool, einsatz_id).await?;
     // Ein Abschnittsgerät (LFH-1043) sieht nur seinen Teilbaum.
     if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|a| b.abschnitte.contains(&a.id));
@@ -93,11 +80,10 @@ pub struct AbschnittBody {
     /// Wert eine sprechende 400 bekommt statt der Extractor-Meldung.
     pub lagezustand: Option<String>,
     pub abschnittsauftrag: Option<String>,
-    pub fortschritt: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
     JsonBody(body): JsonBody<AbschnittBody>,
@@ -115,15 +101,14 @@ pub async fn anlegen(
     let erreichbar = trimme(body.erreichbarkeit);
     let kurz = trimme(body.kurzbezeichnung);
     if let Some(k) = &kurz {
-        pruefe_kurzbezeichnung(k)?;
+        check_kurzbezeichnung(k)?;
     }
     let lagezustand = trimme(body.lagezustand)
         .as_deref()
         .map(parse_lagezustand)
         .transpose()?;
     let abschnittsauftrag = trimme(body.abschnittsauftrag);
-    let fortschritt = body.fortschritt.map(pruefe_fortschritt).transpose()?;
-    let mut anzeige = abschnitt_repo::anlegen(
+    let mut anzeige = abschnitt_repo::create(
         &state.pool,
         einsatz_id,
         AbschnittDaten {
@@ -137,7 +122,6 @@ pub async fn anlegen(
             kurzbezeichnung: kurz.as_deref(),
             lagezustand,
             abschnittsauftrag: abschnittsauftrag.as_deref(),
-            fortschritt,
         },
     )
     .await?;
@@ -150,7 +134,7 @@ pub async fn anlegen(
             &ids,
         )
         .await?;
-        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
+        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, anzeige.id).await?;
     }
     super::etb_system_degradiert(
         &state,
@@ -190,15 +174,13 @@ pub struct AbschnittPatchBody {
     pub lagezustand: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnittsauftrag: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub fortschritt: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid} — echter Teil-Patch (LFH-306).
 /// Kein ETB-Eintrag für Korrekturen — AUSSER beim Wechsel des Lagezustands (LFH-608):
 /// „Abschnitt Nord ist kritisch" ist eine Lagemeldung, keine Stammdatenpflege, und gehört
 /// mit Zeitpunkt und Urheber ins Tagebuch.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
@@ -223,7 +205,7 @@ pub async fn aktualisieren(
     let erreichbar = trimme_tri(body.erreichbarkeit);
     let kurz = trimme_tri(body.kurzbezeichnung);
     if let Some(Some(k)) = &kurz {
-        pruefe_kurzbezeichnung(k)?;
+        check_kurzbezeichnung(k)?;
     }
     let lagezustand = match trimme_tri(body.lagezustand) {
         Some(Some(s)) => Some(Some(parse_lagezustand(&s)?)),
@@ -231,11 +213,7 @@ pub async fn aktualisieren(
         None => None,
     };
     let abschnittsauftrag = trimme_tri(body.abschnittsauftrag);
-    let fortschritt = match body.fortschritt {
-        Some(Some(w)) => Some(Some(pruefe_fortschritt(w)?)),
-        andere => andere,
-    };
-    let mut anzeige = abschnitt_repo::patche(
+    let mut anzeige = abschnitt_repo::update(
         &state.pool,
         einsatz_id,
         aid,
@@ -249,7 +227,6 @@ pub async fn aktualisieren(
             sortier: body.sortier,
             kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
             abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
-            fortschritt,
         },
     )
     .await?;
@@ -259,7 +236,7 @@ pub async fn aktualisieren(
     if let Some(neu) = lagezustand {
         let startwert = etb_startwert(&state.pool, einsatz_id).await?;
         let etb_id = crate::write_retry!(&state.pool, |conn| {
-            match abschnitt_repo::setze_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
+            match abschnitt_repo::set_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
                 Some(wechsel) => {
                     let text = format!(
                         "Lage Abschnitt «{}»: {} → {}",
@@ -285,7 +262,7 @@ pub async fn aktualisieren(
             // Live erst nach dem Commit (Reinheits-Kontrakt wie beim Auflösen).
             state.live.publiziere(einsatz_id, etb_id);
         }
-        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
     }
     if let Some(ids) = sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
@@ -296,7 +273,7 @@ pub async fn aktualisieren(
             &ids,
         )
         .await?;
-        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
     }
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(Json(anzeige))
@@ -309,7 +286,7 @@ pub async fn aufloesen(
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+    let vorher = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
     // F06/LFH-244 Tier-A: Auflösen (Reparenting + Freigaben + DELETE) + System-ETB-Eintrag
     // atomar in EINER Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus dem VOR der Tx geladenen
     // `vorher` (Name unverändert). SSE erst nach dem Commit (Reinheits-Kontrakt).
@@ -321,7 +298,7 @@ pub async fn aufloesen(
     let widerrufen = crate::write_retry!(&state.pool, |conn| {
         let geraete =
             crate::geraet::repo::widerrufe_am_abschnitt(conn, einsatz_id, aid, von).await?;
-        abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
+        abschnitt_repo::aufloesen_tx(conn, einsatz_id, aid).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
         for (_, anzeigename) in &geraete {
             let geraet_text = format!(
@@ -409,7 +386,7 @@ pub async fn flaeche(
         crate::lage_zone::pruefe_geometrie_struktur(&v, "flaeche_geojson")?;
     }
 
-    let nachher = abschnitt_repo::aktualisiere_flaeche(
+    let nachher = abschnitt_repo::update_flaeche(
         &state.pool,
         einsatz_id,
         aid,

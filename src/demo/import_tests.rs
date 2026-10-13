@@ -509,7 +509,7 @@ async fn einzige_mitgliedschaft_ist_der_admin_und_benutzer_bleiben_zeilengleich(
 // Drehbuch
 // ---------------------------------------------------------------------------------------------
 
-/// Abschnitte nach D9: vier, EA 1.1 unter EA 1, Lagezustand gemischt, Fortschritt teils leer.
+/// Abschnitte nach D9: vier, EA 1.1 unter EA 1, Lagezustand gemischt.
 /// Einheiten mit Typ aus dem Katalog, je einem Abschnitt zugeordnet.
 #[tokio::test]
 async fn abschnitte_und_einheiten_nach_dem_drehbuch() {
@@ -517,47 +517,27 @@ async fn abschnitte_und_einheiten_nach_dem_drehbuch() {
     let o = org_mit_admin(&pool, 1).await;
     let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
 
-    let abschnitte: Vec<(String, String, Option<String>, Option<String>, Option<i64>)> =
-        sqlx::query_as(
-            "SELECT a.kurzbezeichnung, a.name, u.kurzbezeichnung, a.lagezustand, a.fortschritt \
-             FROM einsatzabschnitt a LEFT JOIN einsatzabschnitt u ON u.id = a.ueber_abschnitt_id \
-             WHERE a.einsatz_id = ? ORDER BY a.id",
-        )
-        .bind(erg.einsatz_id)
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let abschnitte: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT a.kurzbezeichnung, a.name, u.kurzbezeichnung, a.lagezustand \
+         FROM einsatzabschnitt a LEFT JOIN einsatzabschnitt u ON u.id = a.ueber_abschnitt_id \
+         WHERE a.einsatz_id = ? ORDER BY a.id",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
     let s = |x: &str| x.to_string();
     assert_eq!(
         abschnitte,
         vec![
-            (
-                s("EA 1"),
-                s("Sanitätsdienst"),
-                None,
-                Some(s("angespannt")),
-                Some(40)
-            ),
-            (
-                s("EA 2"),
-                s("Betreuung"),
-                None,
-                Some(s("planmaessig")),
-                None
-            ),
-            (
-                s("EA 3"),
-                s("Logistik"),
-                None,
-                Some(s("planmaessig")),
-                Some(70)
-            ),
+            (s("EA 1"), s("Sanitätsdienst"), None, Some(s("angespannt"))),
+            (s("EA 2"), s("Betreuung"), None, Some(s("planmaessig"))),
+            (s("EA 3"), s("Logistik"), None, Some(s("planmaessig"))),
             (
                 s("EA 1.1"),
                 s("UHS Turnhalle"),
                 Some(s("EA 1")),
-                Some(s("kritisch")),
-                Some(25)
+                Some(s("kritisch"))
             ),
         ]
     );

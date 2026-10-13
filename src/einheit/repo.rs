@@ -1097,7 +1097,7 @@ mod tests {
         let (_dir, pool) = crate::db::test_pool_datei().await;
         let (einsatz, b) = setup(&pool).await;
         let (abschnitt, einheit, trupp) = crate::write_retry!(&pool, |conn| {
-            let abschnitt = crate::einsatzabschnitt::repo::anlegen_tx(
+            let abschnitt = crate::einsatzabschnitt::repo::create_tx(
                 &mut *conn,
                 einsatz,
                 &crate::einsatzabschnitt::repo::AbschnittDaten {
@@ -1111,7 +1111,6 @@ mod tests {
                     kurzbezeichnung: None,
                     lagezustand: None,
                     abschnittsauftrag: None,
-                    fortschritt: None,
                 },
             )
             .await?;

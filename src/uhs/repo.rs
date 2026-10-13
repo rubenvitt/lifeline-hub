@@ -113,7 +113,7 @@ pub async fn anlegen_tx(
     daten: &NeueDaten<'_>,
 ) -> Result<UhsAnzeige, AppError> {
     if let Some(abschnitt) = daten.abschnitt_id {
-        crate::einsatzabschnitt::repo::pruefe_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
+        crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
     }
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO uhs \
@@ -159,7 +159,7 @@ pub async fn aktualisiere(
     daten: PatchDaten<'_>,
 ) -> Result<UhsAnzeige, AppError> {
     if let Some(Some(abschnitt)) = daten.abschnitt_id {
-        crate::einsatzabschnitt::repo::pruefe_im_einsatz(pool, einsatz_id, abschnitt).await?;
+        crate::einsatzabschnitt::repo::check_im_einsatz(pool, einsatz_id, abschnitt).await?;
     }
     let mut sql = String::from(
         "UPDATE uhs \

@@ -442,7 +442,6 @@ describe('UeberblickPage', () => {
           kurzbezeichnung: 'EA-N',
           lagezustand: 'kritisch',
           abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
-          fortschritt: 72,
         } as Daten['abschnitte'][number],
       ],
     });
@@ -457,8 +456,8 @@ describe('UeberblickPage', () => {
     // Der feste Auftrag steht vorn; der offene Einzelauftrag bleibt als kleine Zeile.
     expect(zeile).toHaveTextContent('Deichsicherung km 3,8 – 5,4');
     expect(zeile).toHaveTextContent('1 offen · Trupps verlegen');
-    // Den Arbeitsstand trägt die Auftragszählung; der Altwert 72 bleibt ohne Balken und Zahl
-    // (LFH-1208).
+    // Den Arbeitsstand trägt die Auftragszählung; einen Fortschritt mit Balken und Zahl gibt es
+    // nicht (LFH-1208, LLH-1170).
     expect(zeile.querySelector('[data-lfh="abschnitt-fortschritt"]')).toBeNull();
     expect(zeile).not.toHaveTextContent('%');
     expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');

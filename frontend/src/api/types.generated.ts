@@ -1714,11 +1714,6 @@ export interface components {
             einsatz_id: number;
             erreichbarkeit?: string | null;
             flaeche_geojson?: string | null;
-            /**
-             * Format: int64
-             * @description Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt.
-             */
-            fortschritt?: number | null;
             /** Format: int64 */
             id: number;
             kommunikationsmittel?: string | null;

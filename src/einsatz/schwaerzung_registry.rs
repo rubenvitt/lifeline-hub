@@ -937,7 +937,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("kurzbezeichnung", G_OP_LABEL),
             retain("lagezustand", G_ENUM),
             scrub("abschnittsauftrag", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext
-            retain("fortschritt", G_ZAEHLER),
             // Rhythmus-Vorgabe der Ablösung in Minuten.
             retain("abloesung_rhythmus_minuten", G_KONFIG),
         ],

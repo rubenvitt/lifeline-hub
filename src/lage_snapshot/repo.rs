@@ -281,7 +281,7 @@ pub async fn erzeuge(
             pool, einsatz_id,
         )
         .await?,
-        abschnitte: crate::einsatzabschnitt::repo::liste(pool, einsatz_id).await?,
+        abschnitte: crate::einsatzabschnitt::repo::list(pool, einsatz_id).await?,
         zonen: crate::lage_zone::repo::liste(pool, einsatz_id, None).await?,
         freie_zeichen: crate::freies_zeichen::repo::liste(pool, einsatz_id, None).await?,
         gefahrengebiete: crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?,

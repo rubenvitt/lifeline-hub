@@ -1,5 +1,6 @@
-//! LFH-608: Lagezustand, Abschnittsauftrag, Fortschritt und Kurzbezeichnung je
-//! Einsatzabschnitt — die Datenquelle für die Abschnittszeile im Führungs-Überblick.
+//! LFH-608: Lagezustand, Abschnittsauftrag und Kurzbezeichnung je Einsatzabschnitt — die
+//! Datenquelle für die Abschnittszeile im Führungs-Überblick. Einen Fortschritt trägt der
+//! Abschnitt nicht mehr (LLH-1170).
 
 use axum::http::StatusCode;
 use serde_json::Value;
@@ -53,7 +54,7 @@ async fn system_texte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Str
 }
 
 #[tokio::test]
-async fn anlegen_traegt_alle_vier_felder() {
+async fn anlegen_traegt_kuerzel_lage_und_auftrag() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -62,13 +63,12 @@ async fn anlegen_traegt_alle_vier_felder() {
         &admin,
         einsatz,
         r#"{"name":"Abschnitt Nord","kurzbezeichnung":"  EA-N ","lagezustand":"angespannt",
-            "abschnittsauftrag":"Deichsicherung km 3,8 – 5,4","fortschritt":72}"#,
+            "abschnittsauftrag":"Deichsicherung km 3,8 – 5,4"}"#,
     )
     .await;
     assert_eq!(json["kurzbezeichnung"], "EA-N");
     assert_eq!(json["lagezustand"], "angespannt");
     assert_eq!(json["abschnittsauftrag"], "Deichsicherung km 3,8 – 5,4");
-    assert_eq!(json["fortschritt"], 72);
 }
 
 #[tokio::test]
@@ -80,12 +80,7 @@ async fn ohne_angaben_fehlen_die_felder_statt_null() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let json = anlegen(&app, &admin, einsatz, r#"{"name":"Süd"}"#).await;
     let obj = json.as_object().unwrap();
-    for feld in [
-        "kurzbezeichnung",
-        "lagezustand",
-        "abschnittsauftrag",
-        "fortschritt",
-    ] {
+    for feld in ["kurzbezeichnung", "lagezustand", "abschnittsauftrag"] {
         assert!(!obj.contains_key(feld), "{feld} darf nicht gesendet werden");
     }
 }
@@ -112,33 +107,45 @@ async fn unbekannter_lagezustand_ist_400() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
+/// LLH-1170: Ein veralteter Client (alter Tab, Offline-Warteschlange von vor LFH-1208) darf
+/// noch `fortschritt` schicken. Der Wert wird verworfen, die übrigen Angaben gelten — auch ein
+/// Wert außerhalb 0–100 ist kein Grund mehr für eine 400.
 #[tokio::test]
-async fn fortschritt_ausserhalb_0_bis_100_ist_400_grenzen_gelten() {
+async fn mitgeschickter_fortschritt_wird_verworfen_nicht_abgelehnt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    for wert in ["-1", "101"] {
-        let (s, _) = anfrage(
-            &app,
-            "POST",
-            &pfad(einsatz),
-            &admin,
-            Some(&format!(r#"{{"name":"Nord","fortschritt":{wert}}}"#)),
-        )
-        .await;
-        assert_eq!(s, StatusCode::BAD_REQUEST, "POST fortschritt={wert}");
+    let json = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"name":"Nord","kurzbezeichnung":"EA-N","fortschritt":72}"#,
+    )
+    .await;
+    assert_eq!(json["name"], "Nord");
+    assert!(!json.as_object().unwrap().contains_key("fortschritt"));
+    let aid = json["id"].as_i64().unwrap();
+
+    for body in [
+        r#"{"fortschritt":40}"#,
+        r#"{"fortschritt":250}"#,
+        r#"{"fortschritt":null}"#,
+    ] {
+        let (s, json) = patch(&app, &admin, einsatz, aid, body).await;
+        assert_eq!(s, StatusCode::OK, "PATCH {body}: {json}");
+        assert!(!json.as_object().unwrap().contains_key("fortschritt"));
+        assert_eq!(json["kurzbezeichnung"], "EA-N");
     }
-    let aid = anlegen(&app, &admin, einsatz, r#"{"name":"Nord","fortschritt":0}"#).await["id"]
-        .as_i64()
-        .unwrap();
-    let (s, json) = patch(&app, &admin, einsatz, aid, r#"{"fortschritt":100}"#).await;
+    let (s, json) = patch(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        r#"{"bemerkung":"Deich hält","fortschritt":10}"#,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(json["fortschritt"], 100);
-    let (s, _) = patch(&app, &admin, einsatz, aid, r#"{"fortschritt":250}"#).await;
-    assert_eq!(s, StatusCode::BAD_REQUEST);
-    // `null` löscht die Einschätzung — „nicht eingeschätzt" ist nicht 0 %.
-    let (s, json) = patch(&app, &admin, einsatz, aid, r#"{"fortschritt":null}"#).await;
-    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["bemerkung"], "Deich hält");
     assert!(!json.as_object().unwrap().contains_key("fortschritt"));
 }
 
@@ -152,15 +159,14 @@ async fn patch_eines_feldes_laesst_die_anderen_stehen() {
         &admin,
         einsatz,
         r#"{"name":"Nord","kurzbezeichnung":"EA-N","lagezustand":"planmaessig",
-            "abschnittsauftrag":"Deich halten","fortschritt":10}"#,
+            "abschnittsauftrag":"Deich halten"}"#,
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let (s, json) = patch(&app, &admin, einsatz, aid, r#"{"fortschritt":40}"#).await;
+    let (s, json) = patch(&app, &admin, einsatz, aid, r#"{"kurzbezeichnung":"EA-S"}"#).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(json["fortschritt"], 40);
-    assert_eq!(json["kurzbezeichnung"], "EA-N");
+    assert_eq!(json["kurzbezeichnung"], "EA-S");
     assert_eq!(json["lagezustand"], "planmaessig");
     assert_eq!(json["abschnittsauftrag"], "Deich halten");
     assert_eq!(json["name"], "Nord");
@@ -169,7 +175,7 @@ async fn patch_eines_feldes_laesst_die_anderen_stehen() {
     let (s, json) = patch(&app, &admin, einsatz, aid, r#"{"abschnittsauftrag":"  "}"#).await;
     assert_eq!(s, StatusCode::OK);
     assert!(!json.as_object().unwrap().contains_key("abschnittsauftrag"));
-    assert_eq!(json["fortschritt"], 40);
+    assert_eq!(json["kurzbezeichnung"], "EA-S");
 }
 
 #[tokio::test]
@@ -241,7 +247,7 @@ async fn wechsel_des_lagezustands_schreibt_genau_einen_etb_eintrag() {
 
     // Derselbe Wert noch einmal und ein Patch ohne das Feld: KEIN Eintrag.
     patch(&app, &admin, einsatz, aid, r#"{"lagezustand":"kritisch"}"#).await;
-    patch(&app, &admin, einsatz, aid, r#"{"fortschritt":30}"#).await;
+    patch(&app, &admin, einsatz, aid, r#"{"bemerkung":"Deich hält"}"#).await;
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher + 1);
 
     // Zurücknehmen der Beurteilung ist ebenfalls ein Wechsel.

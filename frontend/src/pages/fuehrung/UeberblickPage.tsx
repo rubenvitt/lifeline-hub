@@ -121,8 +121,8 @@ import './ueberblick.css';
  * entfallen gesperrt still. Eine Liste, der eine gesperrte Quelle fehlt, sagt das, statt „keine"
  * zu behaupten (`ohneFreigabeHinweis`): die Marken immer, das Abschnittspaneel im Leerzustand.
  *
- * Keine erfundenen Daten: Lagezustand, Kürzel, fester Auftrag und Fortschritt kommen aus dem
- * Abschnitt selbst und fehlen, solange sie dort nicht gepflegt sind.
+ * Keine erfundenen Daten: Lagezustand, Kürzel und fester Auftrag kommen aus dem Abschnitt selbst
+ * und fehlen, solange sie dort nicht gepflegt sind.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -1049,9 +1049,9 @@ const NUR_VORLESER: CSSProperties = {
 };
 
 /**
- * Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester Auftrag mit
- * Fortschritt (sonst jüngster offener Auftrag) und letzte Rückmeldung · Stärke und Einheiten je
- * Statuskategorie. Die ganze Zeile ist der Link auf den Abschnitt.
+ * Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester Auftrag
+ * (sonst jüngster offener Auftrag) mit Auftragszählung und letzte Rückmeldung · Stärke und
+ * Einheiten je Statuskategorie. Die ganze Zeile ist der Link auf den Abschnitt.
  */
 function AbschnittEintrag({
   zeile,
