@@ -36,7 +36,7 @@ import {
   lagekartePfad,
   personenPfad,
   schaedenPfad,
-  stabPfad,
+  lagebesprechungPfad,
   tierePfad,
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
@@ -127,10 +127,12 @@ export const SCHNELLAKTIONEN: {
   },
   {
     // Ans ENDE: eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden.
-    // Leser: `pages/StabPage.tsx`.
-    modulKey: 'stab',
+    // Leser: `pages/LagebesprechungPage.tsx`. Träger seit LLH-1111 das eigene Modul; `kennung`
+    // hält die Bestands-Id `aktion:stab`, damit „Zuletzt ausgeführt“ die Zeile behält.
+    modulKey: 'lagebesprechung',
+    kennung: 'stab',
     parameter: 'neu',
-    pfad: (id) => stabPfad(id, { neu: true }),
+    pfad: (id) => lagebesprechungPfad(id, { neu: true }),
     label: 'Lagebesprechung abschließen',
     schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
   },

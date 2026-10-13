@@ -412,7 +412,7 @@ const WJ = '\u2060';
  * sucht sie erst NACH dem Auflösen der Escapes im fertigen Textknoten (`www\.x.de` wird trotzdem
  * ein Link). Deshalb steht dort ein {@link WJ} zwischen `www` und `.`, zwischen `:` und `//` und
  * vor dem `@`: die Muster greifen nicht mehr, sichtbar bleibt derselbe Text.
- * Auch die Vorbereitung der Lagebesprechung (`stab/vorbereitung.ts`) und das Organigramm
+ * Auch die Vorbereitung der Lagebesprechung (`lagebesprechung/vorbereitung.ts`) und das Organigramm
  * (`pages/einsatzabschnitte/fuehrungsorganisation.ts`) maskieren hierüber.
  */
 export function md(text: string): string {

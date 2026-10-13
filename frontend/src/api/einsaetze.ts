@@ -99,8 +99,8 @@ interface Kopfdaten {
   anzahl_betroffene_initial: number | null;
   /** Alarmzeit im SQLite-Format 'YYYY-MM-DD HH:mm:ss'. */
   begonnen_at: string;
-  /** Expliziter UTC-Termin; null löscht die optionale Angabe. */
-  naechste_lagebesprechung_at?: string | null;
+  // Kein Termin der nächsten Lagebesprechung: den setzt seit LLH-1111 das Modul Lagebesprechung,
+  // der Server weist den Schlüssel im PATCH mit 400 ab.
 }
 
 /**

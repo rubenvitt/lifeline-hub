@@ -105,7 +105,8 @@ Steuerhöhe erreicht. Ein erledigter Punkt SHALL die Uhrzeit des Hakens zeigen. 
 inline bearbeitbar sein und im leeren Zustand sagen, dass man sie schreiben kann. Scheitert das
 Speichern, MUST der Fehler an der Zeile stehen, nicht als Toast, und der Haken MUST den
 Serverstand zeigen. Scheitert das Laden, MUST ein Fehler mit Wiederholen statt offener Punkte
-stehen. Besetzung und Lagebesprechung MUST unverändert bleiben.
+stehen. Die Besetzung MUST unverändert bleiben. Die Lagebesprechung trägt die Stabseite nicht mehr
+selbst; sie steht dort nur als Termin-Zeile mit Sprung in das Modul Lagebesprechung.
 
 #### Scenario: Tipp auf den Text
 - **WHEN** eine Person mit Schreibrecht auf den Text einer Zeile tippt

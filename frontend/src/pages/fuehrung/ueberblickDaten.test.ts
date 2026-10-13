@@ -32,7 +32,7 @@ import {
   warnstufeNotiz,
   zeitpunkt,
 } from './ueberblickDaten';
-import { lagebesprechungZustand } from '../../stab/lagebesprechungZustand';
+import { lagebesprechungZustand } from '../../lagebesprechung/lagebesprechungZustand';
 
 dayjs.extend(utc);
 

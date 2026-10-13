@@ -61,7 +61,7 @@ import {
   kraefteuebersichtPfad,
   lageberichtePfad,
   personenPfad,
-  stabPfad,
+  lagebesprechungPfad,
   abloesungPfad,
   pegelZielPfad,
   wetterPegelPfad,
@@ -319,7 +319,7 @@ export default function UeberblickPage() {
   const lageberichtGesperrt = istSprungGesperrt('lageberichte', freigaben);
   const etbSprungGesperrt = istSprungGesperrt('etb', freigaben);
   const meldebildGesperrt = istSprungGesperrt('kraefteuebersicht', freigaben);
-  const stabGesperrt = istSprungGesperrt('stab', freigaben);
+  const lagebesprechungGesperrt = istSprungGesperrt('lagebesprechung', freigaben);
 
   const personenQ = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
@@ -537,7 +537,7 @@ export default function UeberblickPage() {
   const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
   const auftraegeFehlen = auftraegeFrei && auftraegeQ.isError;
 
-  /** Ziel einer Marke; die Lagebesprechung führt nur in einen freien Stab (LFH-888). */
+  /** Ziel einer Marke; die Lagebesprechung führt nur in ein freies Modul (LFH-888, LLH-1111). */
   const markenZiel = (m: Marke): string | undefined =>
     m.art === 'auftrag'
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
@@ -549,9 +549,9 @@ export default function UeberblickPage() {
             ? abloesungPfad(einsatzId)
             : m.art === 'unwetter'
               ? wetterPegelPfad(einsatzId)
-              : stabGesperrt
+              : lagebesprechungGesperrt
                 ? undefined
-                : stabPfad(einsatzId);
+                : lagebesprechungPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 

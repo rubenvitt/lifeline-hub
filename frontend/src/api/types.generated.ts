@@ -2911,7 +2911,7 @@ export interface components {
          *     Der Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile
          *     trägt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.
          *     `naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt
-         *     `einsatz.naechste_lagebesprechung_at` (Entscheidung 11).
+         *     `einsatz.naechste_lagebesprechung_at` (LFH-46, Entscheidung 11).
          */
         LagebesprechungAnzeige: {
             abgehalten_at: string;
@@ -2928,6 +2928,19 @@ export interface components {
             /** Format: int64 */
             lfd_nr: number;
             naechste_at?: string | null;
+        };
+        /**
+         * @description Stand der Lagebesprechung eines Einsatzes: nächster Termin, Zahl und letzte Besprechung.
+         *
+         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**. Kein zweiter
+         *     Speicherort: ändert sich der Termin, frischt das Live-Ereignis `einsatz` Kopf und diesen
+         *     Stand gemeinsam auf (LFH-555).
+         */
+        LagebesprechungStand: {
+            /** Format: int64 */
+            anzahl_lagebesprechungen: number;
+            letzte_lagebesprechung?: components["schemas"]["LagebesprechungAnzeige"] | null;
+            naechste_lagebesprechung_at?: string | null;
         };
         /**
          * @description Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.
@@ -3041,7 +3054,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -4486,18 +4499,11 @@ export interface components {
          *
          *     `besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen
          *     Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
-         *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
-         *
-         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**
-         *     (Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das
-         *     Live-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).
+         *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden. Termin und Lagebesprechungen
+         *     trägt seit LLH-1111 das Modul Lagebesprechung (`lagebesprechung::LagebesprechungStand`).
          */
         StabAnzeige: {
-            /** Format: int64 */
-            anzahl_lagebesprechungen: number;
             besetzung: components["schemas"]["StabsfunktionAnzeige"][];
-            letzte_lagebesprechung?: components["schemas"]["LagebesprechungAnzeige"] | null;
-            naechste_lagebesprechung_at?: string | null;
         };
         /**
          * @description Eine belegte Sachgebietszeile.

@@ -37,7 +37,7 @@ fn anzahl(nachrichten: &[LiveNachricht], event: LiveEvent) -> usize {
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/lagebesprechungen")
+    format!("/api/einsaetze/{einsatz}/lagebesprechungen")
 }
 
 /// Schliesst eine Lagebesprechung mit dem gegebenen Rumpf ab (Vorbedingung: 201).
@@ -67,7 +67,7 @@ async fn patch_der_kopfdaten_feuert_einsatz_nur_mit_der_kennung() {
         "PATCH",
         &format!("/api/einsaetze/{einsatz}"),
         &admin,
-        Some(r#"{"naechste_lagebesprechung_at":"2026-09-30 18:00:00","sachverhalt":"Geheim"}"#),
+        Some(r#"{"stichwort":"H1","sachverhalt":"Geheim"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
@@ -305,7 +305,7 @@ async fn wiederherstellen_meldet_den_audit_eintrag_im_etb() {
 // ---------- Lagebesprechung (design.md D3) ----------
 
 #[tokio::test]
-async fn lagebesprechung_mit_neuem_termin_feuert_einsatz_neben_stab_und_etb() {
+async fn lagebesprechung_mit_neuem_termin_feuert_einsatz_neben_lagebesprechung_und_etb() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -320,7 +320,12 @@ async fn lagebesprechung_mit_neuem_termin_feuert_einsatz_neben_stab_und_etb() {
     .await;
 
     let alle = eingegangen(&mut rx);
-    assert_eq!(anzahl(&alle, LiveEvent::Stab), 1);
+    assert_eq!(anzahl(&alle, LiveEvent::Lagebesprechung), 1);
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Stab),
+        0,
+        "kein `stab` mehr (design.md D6)"
+    );
     assert_eq!(anzahl(&alle, LiveEvent::Etb), 1);
     assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 1, "{alle:?}");
 }
@@ -348,11 +353,15 @@ async fn lagebesprechung_ohne_terminaenderung_feuert_kein_einsatz() {
     )
     .await;
     let alle = eingegangen(&mut rx);
-    assert_eq!(anzahl(&alle, LiveEvent::Stab), 1, "Vorbedingung: {alle:?}");
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Lagebesprechung),
+        1,
+        "Vorbedingung: {alle:?}"
+    );
     assert_eq!(
         anzahl(&alle, LiveEvent::Einsatz),
         0,
-        "derselbe Termin verrät Kopf-Lesern ohne Stab-Recht keine Besprechung: {alle:?}"
+        "derselbe Termin verrät Kopf-Lesern ohne Lagebesprechungs-Recht keine Besprechung: {alle:?}"
     );
 
     // (b) Ohne den Schlüssel `naechste_at`: der Termin bleibt, kein Kopf-Ereignis.
@@ -364,7 +373,11 @@ async fn lagebesprechung_ohne_terminaenderung_feuert_kein_einsatz() {
     )
     .await;
     let alle = eingegangen(&mut rx);
-    assert_eq!(anzahl(&alle, LiveEvent::Stab), 1, "Vorbedingung: {alle:?}");
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Lagebesprechung),
+        1,
+        "Vorbedingung: {alle:?}"
+    );
     assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 0, "{alle:?}");
 
     // Der Termin steht unverändert am Einsatz.
@@ -411,6 +424,69 @@ async fn lagebesprechung_die_den_termin_aufhebt_feuert_einsatz() {
     )
     .await;
     assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 0);
+}
+
+/// Termin ohne Abschluss (LLH-1111, design.md D3): `einsatz` nur bei echter Änderung, daneben
+/// `lagebesprechung`; kein `etb`, weil kein ETB-Eintrag entsteht.
+#[tokio::test]
+async fn termin_setzen_feuert_einsatz_nur_bei_aenderung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/lagebesprechung/termin");
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &pfad,
+        &admin,
+        Some(r#"{"naechste_at":"2099-01-01 10:00:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let alle = eingegangen(&mut rx);
+    let kopf = kopf_events(&alle);
+    assert_eq!(kopf.len(), 1, "{alle:?}");
+    assert_eq!(kopf[0].data, format!(r#"{{"einsatz_id":{einsatz}}}"#));
+    assert_eq!(anzahl(&alle, LiveEvent::Lagebesprechung), 1, "{alle:?}");
+    assert_eq!(anzahl(&alle, LiveEvent::Etb), 0, "{alle:?}");
+
+    // Derselbe Zeitpunkt in anderer Schreibweise: keine Änderung, kein Ereignis.
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &pfad,
+        &admin,
+        Some(r#"{"naechste_at":"2099-01-01T10:00:00Z"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(eingegangen(&mut rx).is_empty());
+
+    // Abgelehnt (unlesbar): nichts.
+    let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(r#"{"naechste_at":"x"}"#)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(eingegangen(&mut rx).is_empty());
+}
+
+/// Der alte Weg über die Kopfdaten ist zu (400) und feuert nichts.
+#[tokio::test]
+async fn kopf_patch_mit_termin_feuert_nichts() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}"),
+        &admin,
+        Some(r#"{"naechste_lagebesprechung_at":"2099-01-01 10:00:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(kopf_events(&eingegangen(&mut rx)).is_empty());
 }
 
 // ---------- Bewusst nicht live (design.md D5) ----------

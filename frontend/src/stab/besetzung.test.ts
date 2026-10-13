@@ -23,7 +23,7 @@ function zeile(over: Partial<Stabsfunktion> = {}): Stabsfunktion {
 
 describe('zeileFuer', () => {
   it('findet die belegte Zeile und liefert undefined für eine nicht vergebene', () => {
-    const stab = { anzahl_lagebesprechungen: 0, besetzung: [zeile()] };
+    const stab = { besetzung: [zeile()] };
     expect(zeileFuer(stab, 's2')?.name).toBe('Müller');
     expect(zeileFuer(stab, 's4')).toBeUndefined();
     expect(zeileFuer(undefined, 's2')).toBeUndefined();

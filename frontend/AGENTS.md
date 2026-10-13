@@ -12,15 +12,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 `_ds/…/tokens/*.css` ist alt). Bei Konflikten gewinnt das Design — **außer bei der Sichtung**
 (BBK). Umgekehrte Altregeln tragen „Neuentwurf 22.09.2026".
 
-- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026): Bei etwas wirklich Größerem
-  (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem Feld oder Knopf)
-  bietet der Agent an, den Entwurf in Claude Design zu machen, und gibt Ruben den fertigen
-  Prompt. Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht auf
-  antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
-  (Inline-Styles maßgeblich). Ändert ein PR Rollen, `schriftskala`, Dichten, Bausteine oder
-  Textregeln, sagt der Agent, dass das Design System nachgezogen werden muss. Eine
-  Cloud-Sitzung erreicht Claude Design nicht (`DesignSync` braucht `/design-login` aus einer
-  interaktiven Sitzung); dann Prompt statt Zugriff.
+- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026, geändert 12.10.2026): Bei etwas
+  wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem
+  Feld oder Knopf) entwirft der Agent selbst in Claude Design, **wenn er Zugriff hat**
+  (`DesignSync`). Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht
+  auf antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
+  (Inline-Styles maßgeblich). Ohne Zugriff (etwa in einer Cloud-Sitzung, `DesignSync` braucht
+  `/design-login` aus einer interaktiven Sitzung) baut er direkt nach dieser Gestaltungssprache:
+  kein Angebot, kein Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Ändert ein PR Rollen,
+  `schriftskala`, Dichten, Bausteine oder Textregeln, sagt der Agent, dass das Design System
+  nachgezogen werden muss.
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
@@ -116,7 +117,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`. Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
-  nur `anzeige/staerke.ts:staerkeText`. Dashboard und Stab-Vorbereitung teilen `useLagebild` +
+  nur `anzeige/staerke.ts:staerkeText`. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
 
@@ -181,7 +182,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   gezeigten Zeilen, ihr Wechsel kein Zufluss. Nachladen per „Ältere laden“ unter der Sicht,
   Zahlen aus `…/kennzahlen` (Vorbild `pages/SchaedenPage.tsx`).
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
-  (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).
+  (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`); geschrieben nur im Modul
+  Lagebesprechung (`frontend/src/lagebesprechung/AGENTS.md`).
 - **Fließende Spalte** (LFH-523): trägt genau EINE Spalte `mindestBreite` und alle übrigen eine
   Zahlbreite, setzt `KatalogTabelle` `scroll.x = Σ(width) + mindestBreite` und **nur dann**
   `tableLayout="auto"` (sonst kippt `@rc-component/table` still auf `fixed`); sonst
@@ -296,9 +298,11 @@ Name und Pfad aus `stab/unterseiten.ts`, dazu die Fernmeldeskizze als Funkplan-A
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
 `frontend/src/command-palette/AGENTS.md`) und trägt dafür `schlagworte`.
 
-**Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung, Presse und
-Medienarbeit S5; auch `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten, `src/stab/`,
-`src/presse/`, `src/infotelefon/`): `frontend/src/stab/AGENTS.md`.
+**Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch
+`pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten, `src/stab/`, `src/presse/`,
+`src/infotelefon/`): `frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
+Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/lagebesprechung/`):
+`frontend/src/lagebesprechung/AGENTS.md`.
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
 `src/fuehrung/`): `frontend/src/fuehrung/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
@@ -788,8 +792,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 - **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
   Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
   `einsatz` und `lagged` zu, Guard `ungegatet_sind_nur_lagged_und_einsatz`), invalidiert Kopf und
-  Stab-Anzeige. Es feuern PATCH, Abschluss, Frist und die Lagebesprechung **nur bei geändertem
-  Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
+  Stand der Lagebesprechung. Es feuern PATCH, Abschluss, Frist und Termin oder Abschluss der
+  Lagebesprechung **nur bei geändertem Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Einsatzliste und Stammdaten sind live** (LFH-734, Spec `org-live`): `globalKeys` sind wie die
   Einsatz-Keys genau einmal klassifiziert — live über `ORG_STREAM_EVENTS` (Ereignisse
   `einsatzliste`, `stammdaten`) oder `NICHT_LIVE_GLOBAL_KEYS` (Guard (g)). **Ein Tab, eine

@@ -169,6 +169,7 @@ describe('modulRegistry', () => {
       'einsatzdaten',
       'einsatzabschnitte',
       'auftraege',
+      'lagebesprechung',
       'stab',
       'dokumente',
     ]);

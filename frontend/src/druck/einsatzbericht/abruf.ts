@@ -9,7 +9,8 @@ import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeEtbZaehler } from '../../api/etb';
 import { listeEinheitenPerioden, listePersonalPerioden } from '../../api/kraefteZeitachse';
 import { ladeLagebericht, listeLageberichte } from '../../api/lageberichte';
-import { ladeLagebesprechungen, ladeStab } from '../../api/stab';
+import { fetchLagebesprechungen } from '../../api/lagebesprechung';
+import { ladeStab } from '../../api/stab';
 import { ladeVerpflegung } from '../../api/verpflegung';
 import { ladeEtbVollstaendig } from '../../etb/druckAbruf';
 import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } from './quellen';
@@ -39,7 +40,7 @@ const ABRUF = {
   einsatz: ladeEinsatz,
   fuehrungsstelle: ladeFuehrungsstelle,
   stab: ladeStab,
-  lagebesprechungen: ladeLagebesprechungen,
+  lagebesprechungen: fetchLagebesprechungen,
   einheiten: listeEinheiten,
   einheitenPerioden: listeEinheitenPerioden,
   personal: listeEinsatzPersonal,

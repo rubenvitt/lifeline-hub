@@ -70,6 +70,7 @@ import TierePage from './pages/TierePage';
 import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
+import LagebesprechungPage from './pages/LagebesprechungPage';
 import StabPage from './pages/StabPage';
 import FunkplanPage from './pages/FunkplanPage';
 import KommunikationsplanPage from './pages/KommunikationsplanPage';
@@ -152,6 +153,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   personal: <PersonalPage />,
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
+  lagebesprechung: <LagebesprechungPage />,
   stab: <StabPage />,
   dokumente: <DokumentePage />,
   abloesung: <AbloesungPage />,

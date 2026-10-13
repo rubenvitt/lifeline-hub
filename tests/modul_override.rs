@@ -523,13 +523,17 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),
     ("dokumente", "dokumente"),
+    ("lagebesprechung", "lagebesprechung"),
+    ("lagebesprechung", "lagebesprechungen"),
+    // Stab stand bis LLH-1111 irrtümlich unter `OHNE_EIGENE_ROUTEN`, obwohl er eigene Routen hat.
+    ("stab", "stab"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
 /// kein Guard-Pfad möglich, daher legitim NICHT in MODUL_GET_PFADE.
 /// `ueberblick` (Neuentwurf 22.09.2026) verdichtet nur Einsatz-, Abschnitts-, Auftrags-,
 /// ETB- und Erinnerungsdaten anderer Module.
-const OHNE_EIGENE_ROUTEN: &[&str] = &["stab", "lage-dashboard", "kraefteuebersicht", "ueberblick"];
+const OHNE_EIGENE_ROUTEN: &[&str] = &["lage-dashboard", "kraefteuebersicht", "ueberblick"];
 /// ETB ist das exemplarisch zuerst gegatete Modul mit eigenem dedizierten Guard-Test.
 const SEPARAT_GETESTET: &[&str] = &["etb"];
 
@@ -691,11 +695,12 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
 }
 
 /// Der Einsatzkopf gehört keinem Modul (LFH-555, design.md D2/D3): `einsatz` erreicht auch
-/// ein Mitglied ohne Stab-Recht. Eine Lagebesprechung ohne Terminänderung verrät ihm nichts
-/// (weder `stab` noch `einsatz`); ändert sie den Termin, erfährt es genau das, was der
-/// Kopf-GET ohnehin zeigt, und `stab` bleibt draußen.
+/// ein Mitglied ohne Freigabe der Lagebesprechung (LLH-1111). Eine Lagebesprechung ohne
+/// Terminänderung verrät ihm nichts (weder `lagebesprechung` noch `einsatz`); ändert sie den
+/// Termin, erfährt es genau das, was der Kopf-GET ohnehin zeigt, und `lagebesprechung` bleibt
+/// draußen.
 #[tokio::test]
-async fn einsatzkopf_erreicht_auch_mitglieder_ohne_stab_recht() {
+async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
@@ -703,15 +708,20 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_stab_recht() {
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
     assert_eq!(
-        override_setzen(&app, &admin, eid, "stab", false, None).await,
+        override_setzen(&app, &admin, eid, "lagebesprechung", false, None).await,
         StatusCode::OK
     );
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/stab")).await,
+        get_status(
+            &app,
+            &frieda,
+            &format!("/api/einsaetze/{eid}/lagebesprechung")
+        )
+        .await,
         StatusCode::FORBIDDEN,
-        "Vorbedingung: Frieda sieht den Stab nicht"
+        "Vorbedingung: Frieda sieht die Lagebesprechung nicht"
     );
-    let besprechungen = format!("/api/einsaetze/{eid}/stab/lagebesprechungen");
+    let besprechungen = format!("/api/einsaetze/{eid}/lagebesprechungen");
     admin_post(
         &app,
         &admin,
@@ -734,7 +744,7 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_stab_recht() {
     // Positivkontrolle: der Feed liefert Frieda überhaupt etwas (den ETB-Beleg der Besprechung).
     // Ohne sie wäre die Abwesenheit unten auch bei einem stummen Feed grün.
     assert!(gelesen.contains("event: etb"), "Vorbedingung: {gelesen:?}");
-    assert!(!gelesen.contains("event: stab"), "{gelesen:?}");
+    assert!(!gelesen.contains("event: lagebesprechung"), "{gelesen:?}");
     assert!(
         !gelesen.contains("event: einsatz"),
         "ohne neuen Termin verrät der Kopf keine Besprechung: {gelesen:?}"
@@ -759,11 +769,11 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_stab_recht() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
-    assert!(!gelesen.contains("event: stab"), "{gelesen:?}");
+    assert!(!gelesen.contains("event: lagebesprechung"), "{gelesen:?}");
     assert_eq!(
         gelesen.matches("event: einsatz\n").count(),
         2,
-        "Termin aus dem Stab und PATCH erreichen den Kopf-Leser: {gelesen:?}"
+        "Termin aus der Besprechung und PATCH erreichen den Kopf-Leser: {gelesen:?}"
     );
 }
 
@@ -804,7 +814,7 @@ async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
         "PATCH",
         &format!("/api/einsaetze/{eid}"),
         &admin,
-        Some(r#"{"naechste_lagebesprechung_at":"2026-09-30 18:00:00"}"#),
+        Some(r#"{"stichwort":"H 3"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::OK);

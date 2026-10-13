@@ -40,6 +40,8 @@ wire_enum! {
         Etb => "etb",
         Befehl => "befehl",
         Stab => "stab",
+        /// Termin, Abschluss und Verlauf der Lagebesprechung (LLH-1111).
+        Lagebesprechung => "lagebesprechung",
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",
@@ -116,14 +118,17 @@ impl LiveEvent {
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
-            // Nur `stab`: Besetzung und Lagebesprechungen sind Datenobjekte des Stab-Moduls.
-            // NICHT `einsatzdaten`, obwohl der Lagebesprechungs-Abschluss
-            // `einsatz.naechste_lagebesprechung_at` mitschreibt (Entscheidung 11): ein
-            // `einsatzdaten`-Leser ohne Stab-Recht erführe sonst, DASS eine Besprechung
-            // stattgefunden hat. Den neuen Termin erfährt jeder Kopf-Leser über das eigene
-            // `einsatz`-Event — und das feuert nur, wenn sich der Termin TATSÄCHLICH ändert
-            // (LFH-555, design.md D3): mehr als der Kopf-GET ohnehin zeigt, verrät es nicht.
+            // Nur `stab`: Besetzung und Checkliste sind Datenobjekte des Stab-Moduls. Die
+            // Lagebesprechung hat seit LLH-1111 ihr eigenes Ereignis.
             LiveEvent::Stab => &["stab"],
+            // Nur `lagebesprechung`: Abschluss und Termin sind Datenobjekte dieses Moduls. NICHT
+            // `einsatzdaten`, obwohl beide `einsatz.naechste_lagebesprechung_at` schreiben
+            // (LFH-46, Entscheidung 11): ein `einsatzdaten`-Leser ohne dieses Recht erführe sonst,
+            // DASS eine Besprechung stattgefunden hat. Den neuen Termin erfährt jeder Kopf-Leser
+            // über das eigene `einsatz`-Event — und das feuert nur, wenn sich der Termin
+            // TATSÄCHLICH ändert (LFH-555, design.md D3). NICHT `stab` (design.md D6): sonst
+            // erführen Stab-Leser ohne dieses Recht von jeder Besprechung.
+            LiveEvent::Lagebesprechung => &["lagebesprechung"],
             // Nur `dokumente`: das Dokument ist ein Datenobjekt der Dokumentenablage; der
             // ETB-Nachweis läuft über das eigene `etb`-Ereignis.
             LiveEvent::Dokument => &["dokumente"],
@@ -771,6 +776,7 @@ mod tests {
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
             (LiveEvent::Stab, &["stab"]),
+            (LiveEvent::Lagebesprechung, &["lagebesprechung"]),
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::Betreuung, &["betreuung"]),

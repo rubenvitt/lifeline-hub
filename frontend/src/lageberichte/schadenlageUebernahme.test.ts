@@ -9,7 +9,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, PegelAnzeige, Person, Schaden, WetterAnzeige } from '../api/types';
 import { ladeWetter } from '../api/wetter';
 import { baueLagebild, kennzahlReihe, type Rohdaten } from '../pages/lage-dashboard/lagebild';
-import { ausKennzahl, sichtungText, warnstufeAngabe } from '../stab/vorbereitung';
+import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
 import { freigabenFixture } from '../test/fixtures';
 import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 

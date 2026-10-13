@@ -632,10 +632,10 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
     },
     {
-      // Stab mit der Vorbereitung der Lagebesprechung (LFH-550). Anker ist die Sichtungszeile,
-      // sobald ihre Quelle feststeht — ihr Wert ist die längste Zeile und muss auf 390 px
-      // umbrechen.
-      pfad: `/einsaetze/${einsatzId}/stab`,
+      // Lagebesprechung (LLH-1111) mit Termin, Vorbereitung (LFH-550) und Verlauf. Anker ist die
+      // Sichtungszeile der Vorbereitung, sobald ihre Quelle feststeht — ihr Wert ist die längste
+      // Zeile und muss auf 390 px umbrechen.
+      pfad: `/einsaetze/${einsatzId}/lagebesprechung`,
       anker: (p: Page) =>
         p.locator(
           '[data-lfh="vorbereitung-zeile"][data-schluessel="sichtung"]:not([data-zustand="laden"])',
@@ -769,9 +769,10 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
-      // Stab mit der Arbeitsaufnahme (LFH-551): die sieben Zeilen tragen die längsten Texte der
-      // Seite (Punkt + Quelle + Bemerkung). Datenanker ist die letzte Zeile — sie steht erst,
-      // wenn die Checkliste geladen ist.
+      // Stab mit der Zeile „Nächste Lagebesprechung“ (LLH-1111) und der Arbeitsaufnahme
+      // (LFH-551): die sieben Zeilen tragen die längsten Texte der Seite (Punkt + Quelle +
+      // Bemerkung). Datenanker ist die letzte Zeile — sie steht erst, wenn die Checkliste geladen
+      // ist.
       pfad: `/einsaetze/${einsatzId}/stab`,
       anker: (p: Page) =>
         p

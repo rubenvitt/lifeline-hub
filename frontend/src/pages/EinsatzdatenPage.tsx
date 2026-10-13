@@ -1333,21 +1333,6 @@ export default function EinsatzdatenPage() {
                   </span>
                 ),
               },
-              {
-                // Bis die Lagebesprechung eine eigene Verwaltung hat (LFH-1251).
-                etikett: 'Nächste Lagebesprechung',
-                wert: (
-                  <span style={monoStil(13)}>
-                    <ZeitpunktAngabe
-                      etikett="Nächste Lagebesprechung"
-                      wire={einsatz.naechste_lagebesprechung_at}
-                      darfSchreiben={darfBearbeiten}
-                      speichern={feldSpeichern}
-                      zuPatch={(wire) => ({ naechste_lagebesprechung_at: wire })}
-                    />
-                  </span>
-                ),
-              },
             ]}
           />
         </Paneel>

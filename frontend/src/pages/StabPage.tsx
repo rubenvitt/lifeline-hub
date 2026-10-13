@@ -1,8 +1,7 @@
-import { App, Breadcrumb, Button, Flex, Skeleton, Space, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Flex, Space, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { abrufZustand } from '../api/abrufZustand';
+import { useState } from 'react';
+import { Link, useParams } from 'react-router';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
@@ -17,13 +16,9 @@ import { useViewport } from '../components/useViewport';
 import { modulZielRoute, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad } from '../routing/deeplinks';
+import LagebesprechungZeile from '../lagebesprechung/LagebesprechungZeile';
 import BesetzungModal from '../stab/BesetzungModal';
 import ChecklistePaneel from '../stab/ChecklistePaneel';
-import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
-import LagebesprechungModal from '../stab/LagebesprechungModal';
-import LagebesprechungStand from '../stab/LagebesprechungStand';
-import VorbereitungPaneel from '../stab/VorbereitungPaneel';
-import { zeigeAbschlussToast } from '../stab/abschlussToast';
 import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
 import { mitWirksamemLabel } from '../stab/sachgebiete';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
@@ -32,39 +27,29 @@ import { unterseitenFuer } from '../stab/unterseiten';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 
 /**
- * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
+ * Modul „Stab" (LFH-46): Führungsorganisation S1–S6.
  *
- * Eine Vollseite, vier Sektionen, zwei Masken. Reihenfolge: Lagebesprechung, Vorbereitung,
- * Besetzung, Arbeitsaufnahme.
- *
- * Die Vorbereitung der Lagebesprechung (LFH-550, `stab/VorbereitungPaneel.tsx`) steht direkt unter
- * der Lagebesprechung: der Lagestand aus denselben Zahlen wie das Lage-Dashboard, mit Quelle je
- * Zeile; sie speichert nichts.
+ * Eine Vollseite: oben die Zeile „Nächste Lagebesprechung“ mit Sprung in das eigene Modul
+ * (LLH-1111, `lagebesprechung/LagebesprechungZeile.tsx`) — Vorbereitung, Abschluss und Verlauf trägt
+ * seit LLH-1111 die Seite Lagebesprechung, nicht mehr der Stab. Darunter Besetzung und
+ * Arbeitsaufnahme.
  *
  * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile
  * ist kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
  * und ein Satz nennt den Grund.
  *
- * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen". Sie öffnet ein Modal und
- * gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da, und `neueZeile` der
- * Kommandopalette trägt denselben Riegel.
+ * Das Paneel „Arbeitsaufnahme" (LFH-551) steht ganz unten: die Checkliste ist nach zehn Minuten
+ * erledigt und soll dann die Besetzung nicht nach unten drücken. Eigene Abfrage, eigener Endpunkt.
  *
- * Das Paneel „Arbeitsaufnahme" (LFH-551) steht ganz unten: die Checkliste
- * ist nach zehn Minuten erledigt und soll dann weder Lagebesprechung noch Besetzung nach unten
- * drücken. Eigene Abfrage, eigener Endpunkt — die Stab-Antwort bleibt unberührt.
- *
- * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie und Checkliste.
+ * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Checkliste; den Termin der Zeile frischt
+ * `einsatz` mit dem Kopf auf (LFH-555).
  */
 export default function StabPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
-  const { message } = App.useApp();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [offenFuer, setOffenFuer] = useState<Sachgebiet | null>(null);
-  const [abschlussOffen, setAbschlussOffen] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -74,8 +59,8 @@ export default function StabPage() {
     queryKey: einsatzKeys.stab(einsatzId),
     queryFn: () => ladeStab(einsatzId),
   });
-  // Modul-Freigaben vom Server (LFH-669): filtern die Werkzeuge der Zeilen und die Übernahme der
-  // Vorbereitung in einen Lagebericht.
+  // Modul-Freigaben vom Server (LFH-669): filtern die Werkzeuge der Zeilen und sperren den Sprung in
+  // die Lagebesprechung.
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
@@ -87,40 +72,7 @@ export default function StabPage() {
     staleTime: 5 * 60_000,
   });
 
-  // Vor den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht, bevor
-  // der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false.
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
-  const stabDa = stabQuery.data != null;
-  // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden schickte
-  // `naechste_at: null` und löschte ihn.
-  const abschlussErlaubt = darfSchreiben && stabDa;
-  const oeffneAbschluss = useCallback(() => setAbschlussOffen(true), []);
-
-  // Fällt das Recht (oder der Stand) bei offener Maske weg, hängt der Render sie aus — der Merker
-  // bliebe aber stehen, und kämen die Rechte zurück, stünde die Maske ungefragt wieder auf. Deshalb
-  // auch den Merker räumen.
-  useEffect(() => {
-    if (abschlussOffen && !abschlussErlaubt) setAbschlussOffen(false);
-  }, [abschlussOffen, abschlussErlaubt]);
-
-  // Schnellaktion: ?neu=1 öffnet den Abschluss der Lagebesprechung (Kommandopalette). Das Literal
-  // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` ordnet
-  // den Leser über den Dateinamen dem Modul zu. Warten, bis Einsatz und Stand geladen sind;
-  // Parameter immer räumen (apply-then-clean), die Maske nur mit Schreibrecht und Stand öffnen.
-  useEffect(() => {
-    if (searchParams.get('neu') !== '1') return;
-    if (einsatzQuery.isLoading || stabQuery.isLoading) return;
-    if (darfSchreiben && stabDa) setAbschlussOffen(true);
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [
-    searchParams,
-    setSearchParams,
-    einsatzQuery.isLoading,
-    stabQuery.isLoading,
-    darfSchreiben,
-    stabDa,
-  ]);
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -155,14 +107,6 @@ export default function StabPage() {
           ]}
         />
       }
-      // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
-      aktionen={
-        <Button type="primary" disabled={!abschlussErlaubt} onClick={oeffneAbschluss}>
-          Lagebesprechung abschließen
-        </Button>
-      }
-      // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
-      neueZeile={abschlussErlaubt ? oeffneAbschluss : undefined}
       // Bedingt übergeben, nicht über `sichtbar` allein: `EinsatzSeite` rendert den Slot, sobald er
       // truthy ist — ein JSX-Element ist das immer, auch wenn es `null` zurückgibt, und hinterließe
       // ein leeres `div` mit Außenabstand.
@@ -170,36 +114,10 @@ export default function StabPage() {
         !darfSchreiben && <RechteHinweis sichtbar text={besetzungRechteText(einsatz.status)} />
       }
     >
-      {/* Paneele statt Sektionskopf + `<section>`: das Paneel ist die benannte Region
-          (`aria-labelledby` auf seine Augenbraue). */}
-      <Paneel titel="Lagebesprechung" koerperPolster style={{ marginBottom: token.margin }}>
-        <Flex vertical gap={token.margin}>
-          {stabGescheitert ? (
-            <SeitenFehler
-              text="Stand der Lagebesprechung konnte nicht geladen werden"
-              ursache={stabQuery.error}
-              onWiederholen={() => void stabQuery.refetch()}
-            />
-          ) : stabQuery.data ? (
-            <LagebesprechungStand einsatzId={einsatzId} stab={stabQuery.data} />
-          ) : (
-            // Vor dem Laden wird kein Termin behauptet.
-            <Skeleton title={false} paragraph={{ rows: 3 }} />
-          )}
-          <LagebesprechungHistorie
-            einsatzId={einsatzId}
-            leerAusgesagt={stabQuery.data?.anzahl_lagebesprechungen === 0}
-          />
-        </Flex>
-      </Paneel>
-
-      <VorbereitungPaneel
+      <LagebesprechungZeile
         einsatzId={einsatzId}
-        einsatz={einsatz}
+        termin={einsatz.naechste_lagebesprechung_at}
         freigaben={freigabenQuery.data}
-        stab={stabQuery.data}
-        stabZustand={abrufZustand(stabQuery)}
-        stabStand={stabQuery.dataUpdatedAt}
       />
 
       <Paneel
@@ -321,19 +239,6 @@ export default function StabPage() {
           eintrag={offenerEintrag}
           zeile={zeileFuer(stabQuery.data, offenerEintrag.sachgebiet)}
           onSchliessen={() => setOffenFuer(null)}
-        />
-      )}
-      {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
-          Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
-          dieser Seite — `<AntApp>` liegt außerhalb des Routers. */}
-      {abschlussOffen && darfSchreiben && stabQuery.data && (
-        <LagebesprechungModal
-          einsatzId={einsatzId}
-          stab={stabQuery.data}
-          onAbgeschlossen={(eigene) =>
-            zeigeAbschlussToast(message, { einsatzId, eigene, navigate })
-          }
-          onSchliessen={() => setAbschlussOffen(false)}
         />
       )}
     </EinsatzSeite>

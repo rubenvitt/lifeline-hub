@@ -124,20 +124,9 @@ legt keine Zeile an). `PUT …/stab/checkliste/{punkt}` mit Teilfeldern, jedes B
 genau SEIN Feld. Kein ETB je Haken; nur `leitstelle_gemeldet` belegt Haken **und** Rücknahme (E1).
 Mutation je Zeile und Bedienziel, überlappende Antworten über `useChecklistenAbgleich`.
 
-**Vorbereitung der Lagebesprechung** (LFH-550, `stab/VorbereitungPaneel.tsx`, `stab/vorbereitung.ts`):
-Paneel der Stab-Seite, rechnet keine Zahl selbst (Lagebild wie das Dashboard, Aufträge/Meldungen
-vom Modulzähler), Quelle je Zeile, Rechteweiche je Quelle („—“ mit Grund, nie 0). Reihenfolge wie
-das Dashboard, **kein Vortragsschema** (LFH-46 §2.3), nichts wird eingefroren; ein fester Stand
-nur über „In Lagebericht übernehmen“ (EIN Aufruf, Freitext).
-
-**Überfälliger Besprechungstermin** (LFH-859,
-`openspec/changes/archive/2026-10-04-lfh-859-lagebesprechung-ein-warnton/design.md`): ein erreichter oder
-verstrichener Termin trägt `achtung`, nie `alarm` (keine Gefahr, Alarmbudget EEMUA 191), mit dem
-Wort „jetzt fällig“ bzw. „seit 5 min überfällig“. Ton und Wort nur aus
-`stab/lagebesprechungZustand.ts:lagebesprechungUeberfaellig`; die Stab-Seite und die Marke
-„Lagebesprechung“ der Fristenliste im Überblick (`markenBewertung`) lesen beide dort.
-Überfällige Aufträge und Erinnerungen dort bleiben `alarm`, das „knapp“ unter 30 min bleibt der
-Fristenliste.
+**Lagebesprechung** (LLH-1111): eigenes Modul, Regeln in `frontend/src/lagebesprechung/AGENTS.md`.
+Die Stab-Seite trägt nur die Zeile „Nächste Lagebesprechung“ mit Sprung dorthin
+(`lagebesprechung/LagebesprechungZeile.tsx`), weder Vorbereitung noch Abschluss noch Verlauf.
 
 **Presse und Medienarbeit S5** (LFH-554, `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md`):
 Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/presse/mitteilungen/:id`,

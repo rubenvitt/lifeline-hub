@@ -513,8 +513,8 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
     },
     Ausnahme {
-        datei: "src/stab/repo.rs",
-        funktion: "lagebesprechung_abschliessen",
+        datei: "src/lagebesprechung/repo.rs",
+        funktion: "abschliessen",
         spalte: "einsatz_lagebesprechung.entschluss",
         gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Entschluss im ETB-Eintrag (Entscheidung) der Lagebesprechung",

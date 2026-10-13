@@ -40,18 +40,12 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Lagebesprechung ${Date.now()}`);
     await seedeEintrag(page, einsatzId);
-    await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
-    // Die Zeile (LFH-1170: das Vollformular ist entfallen).
-    await page
-      .getByRole('button', { name: 'Nächste Lagebesprechung eintragen', exact: true })
-      .click();
-    const termin = page.getByRole('textbox', { name: 'Nächste Lagebesprechung', exact: true });
-    await termin.fill('2099-09-09 15:17:43');
-    // Enter übernimmt den Pickerwert und sendet die Zeile (wie die Alarmzeit, LFH-472).
-    await termin.press('Enter');
-    await expect(
-      page.getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true }),
-    ).toBeVisible();
+    // Der Termin kommt aus dem Modul Lagebesprechung (LLH-1111): der eine Schreibweg ohne
+    // Abschluss. Gesät mit Sekunden, damit die Wiedervorlage ihn nachweislich ungerundet übernimmt.
+    const gesetzt = await page.request.put(`/api/einsaetze/${einsatzId}/lagebesprechung/termin`, {
+      data: { naechste_at: '2099-09-09T13:17:43Z' },
+    });
+    expect(gesetzt.ok(), `Termin setzen: ${gesetzt.status()}`).toBeTruthy();
     let einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
       string,
       unknown
@@ -81,21 +75,20 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     expect(antwort.ok()).toBeTruthy();
     expect(antwort.request().postDataJSON().faellig_at).toBe('2099-09-09 13:17:43');
 
-    await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
-    await page
-      .getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true })
-      .click();
-    const picker = page
-      .locator('.ant-picker')
-      .filter({ has: page.getByRole('textbox', { name: 'Nächste Lagebesprechung', exact: true }) });
-    await picker.hover();
-    await picker.locator('.ant-picker-clear').click();
-    await page
-      .getByRole('button', { name: 'Nächste Lagebesprechung speichern', exact: true })
-      .click();
-    await expect(
-      page.getByRole('button', { name: 'Nächste Lagebesprechung eintragen', exact: true }),
-    ).toBeVisible();
+    // Gelöscht wird über „kein Termin“ im Paneel „Termin“ der Seite Lagebesprechung.
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+    const terminPaneel = page.getByRole('region', { name: 'Termin', exact: true });
+    const keinTermin = terminPaneel.getByRole('button', { name: 'kein Termin', exact: true });
+    // Frei erst mit geladenem Stand UND gesetztem Termin.
+    await expect(keinTermin).toBeEnabled();
+    const geloescht = page.waitForResponse(
+      (antwort) =>
+        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/lagebesprechung/termin`) &&
+        antwort.request().method() === 'PUT',
+    );
+    await keinTermin.click();
+    expect((await geloescht).ok()).toBeTruthy();
+    await expect(keinTermin).toBeDisabled();
     einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
       string,
       unknown

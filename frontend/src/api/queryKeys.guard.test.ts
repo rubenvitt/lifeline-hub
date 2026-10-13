@@ -149,12 +149,13 @@ describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => 
 
 describe('queryKeys-Guard (e): der Einsatzkopf ist live (LFH-555)', () => {
   // Literale, nicht die Factory: der Wire-Name `einsatz` und die drei Prefixe sind der Vertrag.
-  // Die eigene Führungsstelle (LFH-849) feuert dasselbe Ereignis wie der Kopf.
-  it('einsatz-Event invalidiert Kopf, Stab-Anzeige und eigene Führungsstelle', () => {
+  // Die eigene Führungsstelle (LFH-849) feuert dasselbe Ereignis wie der Kopf. Den Termin der
+  // Lagebesprechung trägt seit LLH-1111 ihr eigenes Modul, nicht mehr die Stab-Anzeige.
+  it('einsatz-Event invalidiert Kopf, Lagebesprechung und eigene Führungsstelle', () => {
     expect(EINSATZ_STREAM_EVENTS).toHaveProperty('einsatz');
     expect((EINSATZ_STREAM_EVENTS as Record<string, readonly string[]>).einsatz).toEqual([
       'einsatz',
-      'einsatz-stab',
+      'einsatz-lagebesprechung',
       'einsatz-fuehrungsstelle',
     ]);
   });

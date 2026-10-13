@@ -45,7 +45,7 @@ Stromlisten MUST der Titel keine Überschrift sein. Dort trägt der Listenpunkt 
 Ein Titel, der ein Bedienelement enthält (etwa ein Eingabefeld), MUST NOT eine Überschrift sein.
 
 #### Scenario: Stab und Presse
-- **WHEN** die Stab-Seite die Besetzung S1–S6 und die abgeschlossenen Lagebesprechungen zeigt und die Presse-Seite die Pressemitteilungen, jeweils in einem Paneel mit Überschrift `h2`
+- **WHEN** die Stab-Seite die Besetzung S1–S6, die Seite Lagebesprechung den Verlauf der abgeschlossenen Lagebesprechungen und die Presse-Seite die Pressemitteilungen zeigt, jeweils in einem Paneel mit Überschrift `h2`
 - **THEN** ist jeder Eintragstitel dort eine Überschrift der Ebene 3
 
 #### Scenario: Chat

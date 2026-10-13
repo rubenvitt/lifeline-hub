@@ -1,0 +1,134 @@
+import type { QueryClient } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
+import { server } from '../test/server';
+import { renderMitProviders } from '../test/utils';
+import LagebesprechungHistorie from './LagebesprechungHistorie';
+
+const eintrag = (lfd_nr: number, over: object = {}) => ({
+  id: lfd_nr,
+  einsatz_id: 1,
+  lfd_nr,
+  abgehalten_at: `2026-09-13 0${lfd_nr}:00:00`,
+  entschluss: `Entschluss ${lfd_nr}`,
+  etb_eintrag_id: 70 + lfd_nr,
+  erfasst_von_id: 1,
+  erfasst_at: `2026-09-13 0${lfd_nr}:00:01`,
+  ...over,
+});
+const LEER = 'Noch keine Lagebesprechung abgeschlossen';
+
+const FEHLER = 'Verlauf der Lagebesprechungen konnte nicht geladen werden';
+const VERALTET = /Aktualisierung fehlgeschlagen/;
+
+function zeige(antwort: () => Response | Promise<Response>) {
+  server.use(http.get('/api/einsaetze/1/lagebesprechungen', antwort));
+  return renderMitProviders(<LagebesprechungHistorie einsatzId={1} />);
+}
+
+/** Stellt den Handler auf 500 um und lädt über den Client des Renders neu. */
+async function neuladenScheitert(client: QueryClient) {
+  server.use(
+    http.get('/api/einsaetze/1/lagebesprechungen', () =>
+      HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+    ),
+  );
+  await act(() => client.invalidateQueries({ queryKey: einsatzKeys.lagebesprechungen(1) }));
+}
+
+describe('LagebesprechungHistorie', () => {
+  it('zeigt die Einträge in Serverreihenfolge mit Beleg-Link und Termin-Snapshot', async () => {
+    zeige(() =>
+      HttpResponse.json([eintrag(2, { naechste_at: '2026-09-13 04:00:00' }), eintrag(1)]),
+    );
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    const [zwei, eins] = screen.getAllByRole('listitem');
+    expect(within(zwei).getByRole('heading', { level: 3 })).toHaveTextContent(/^Nr\. 2 · /);
+    expect(within(eins).getByRole('heading', { level: 3 })).toHaveTextContent(/^Nr\. 1 · /);
+    expect(
+      within(zwei).getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 2' }),
+    ).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=72');
+    // Snapshot: Nr. 2 trug einen Termin, Nr. 1 keinen.
+    expect(within(zwei).queryByText(/kein Termin/)).toBeNull();
+    expect(within(eins).getByText(/kein Termin/)).toBeInTheDocument();
+  });
+
+  // LLH-1111 (design.md D7): die Seite gehört dem Verlauf, die Begrenzung auf drei fällt.
+  it('zeigt alle Einträge, neueste zuerst, ohne Expander', async () => {
+    zeige(() => HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(5));
+    expect(
+      screen
+        .getAllByRole('listitem')
+        .map((li) => within(li).getByRole('heading', { level: 3 }).textContent),
+    ).toEqual([5, 4, 3, 2, 1].map((n) => expect.stringMatching(new RegExp(`^Nr\\. ${n} · `))));
+    expect(screen.queryByRole('button', { name: /Frühere Lagebesprechungen/ })).toBeNull();
+  });
+
+  it('kürzt einen langen Entschluss und zeigt ihn auf Wunsch ganz', async () => {
+    const lang = `Anfang ${'Wort '.repeat(60)}Ende`;
+    zeige(() => HttpResponse.json([eintrag(1, { entschluss: lang })]));
+    const knopf = await screen.findByRole('button', {
+      name: 'Entschluss von Lagebesprechung Nr. 1 ganz zeigen',
+    });
+    expect(screen.queryByText(/Ende$/)).toBeNull();
+    await userEvent.click(knopf);
+    expect(screen.getByText(/Ende$/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Entschluss von Lagebesprechung Nr. 1 kürzen' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('kurzer Entschluss: kein Umschalter (Gegenfall)', async () => {
+    zeige(() => HttpResponse.json([eintrag(1)]));
+    await screen.findByText('Entschluss 1');
+    expect(screen.queryByRole('button', { name: /Entschluss von/ })).toBeNull();
+  });
+
+  it('leer: sagt es beim Wort, ohne Fehler zu behaupten', async () => {
+    zeige(() => HttpResponse.json([]));
+    expect(await screen.findByText(LEER)).toBeInTheDocument();
+    expect(screen.queryByText(/nicht geladen werden/)).toBeNull();
+  });
+
+  it('Fehler ist nicht leer', async () => {
+    zeige(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
+    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
+    expect(screen.queryByText(LEER)).toBeNull();
+  });
+
+  /**
+   * Fehler ≠ leer auch NACH einer ersten Antwort: `[]` ist truthy, eine Prüfung auf den
+   * Wahrheitswert zeigte „Stand veraltet" über dem Leer-Text.
+   */
+  it('leer geladen, dann scheitert das Neuladen → Fehler, kein Leer-Text', async () => {
+    const { client } = zeige(() => HttpResponse.json([]));
+    expect(await screen.findByText(LEER)).toBeInTheDocument();
+
+    await neuladenScheitert(client);
+    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
+    expect(screen.queryByText(LEER)).toBeNull();
+    expect(screen.queryByText(VERALTET)).toBeNull();
+  });
+
+  it('befüllt geladen, dann scheitert das Neuladen → Stand veraltet, Zeilen bleiben (Gegenfall)', async () => {
+    const { client } = zeige(() => HttpResponse.json([eintrag(2), eintrag(1)]));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+
+    await neuladenScheitert(client);
+    expect(await screen.findByText(VERALTET)).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByText(FEHLER)).toBeNull();
+  });
+
+  it('behauptet während des Ladens weder leer noch Fehler', async () => {
+    zeige(() => new Promise<never>(() => {}));
+    // Positiv abwarten, dass die Liste steht (Spinner), sonst wäre das `null` unten trivial.
+    await waitFor(() => expect(document.querySelector('.ant-spin-spinning')).not.toBeNull());
+    expect(screen.queryByText(LEER)).toBeNull();
+    expect(screen.queryByText(/nicht geladen werden/)).toBeNull();
+  });
+});

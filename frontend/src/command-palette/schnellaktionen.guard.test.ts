@@ -38,8 +38,8 @@ import { unterseitenFuer } from '../stab/unterseiten';
  * STAB-UNTERSEITEN (LLH-1127): Pressearbeit, Informationstelefon, Funkplan, Kommunikationsplan sind
  * kein Modul, sondern Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger
  * `stab` (`InfotelefonPage.tsx` → `stab`). Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
- * der Leser in GENAU dieser Seite stehen: der Leser der Stab-Seite (Lagebesprechung) deckte sie
- * sonst, und die Aktion liefe ins Leere.
+ * der Leser in GENAU dieser Seite stehen: ein Leser auf der Stab-Seite selbst deckte sie sonst, und
+ * die Aktion liefe ins Leere. (Die Lagebesprechung hat seit LLH-1111 ein eigenes Modul.)
  */
 
 /** Eine Fundstelle `X.get('<parameter>')` / `X.has('<parameter>')`. */
@@ -145,7 +145,7 @@ export function findStabUnterseite(modulKey: string, ziel: string, basis: string
 /**
  * Die Leser-Dateien eines Trägermoduls, die einen Eintrag DECKEN (Kopfkommentar, Stab-Unterseiten):
  * zeigt das Ziel auf eine Stab-Unterseite, nur deren Seite; zeigt es auf den Stab selbst, nur
- * Dateien, die keine Unterseite sind — sonst deckte das Informationstelefon die Lagebesprechung.
+ * Dateien, die keine Unterseite sind — sonst deckte das Informationstelefon die Stab-Seite.
  */
 export function findCoveringFiles(
   modulKey: string,

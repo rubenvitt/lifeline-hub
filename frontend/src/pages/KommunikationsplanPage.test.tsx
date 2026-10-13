@@ -158,7 +158,6 @@ const EINHEITEN = [
 ] as Einheit[];
 
 const STAB = {
-  anzahl_lagebesprechungen: 0,
   besetzung: [
     {
       sachgebiet: 's2',

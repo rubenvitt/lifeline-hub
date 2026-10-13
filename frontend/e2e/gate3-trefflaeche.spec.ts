@@ -32,8 +32,8 @@ import {
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
  * Einsatzauswahl, Einheiten-Detailroute, Einsatz-Navigationsrahmen, Kräfteübersicht mit
- * Verdichtungszeile und Stab-Route. Alle Blöcke teilen die Helfer aus `trefflaeche-kern.ts`
- * (LFH-724); wer etwas anhängt, nimmt dieselben Helfer statt einer Kopie.
+ * Verdichtungszeile, Stab- und Lagebesprechungs-Route. Alle Blöcke teilen die Helfer aus
+ * `trefflaeche-kern.ts` (LFH-724); wer etwas anhängt, nimmt dieselben Helfer statt einer Kopie.
  *
  * Browser statt Vitest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout. Ein
  * überschriebenes `min-height`, ein `display: inline` oder ein Wrapper ohne Staffel wären
@@ -1172,16 +1172,15 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 //
 // Vitest belegt für `stabZeilenzielStil` nur den Inline-Style, nicht dass ein `<Link>` in
 // einer `Descriptions`-Zelle die Höhe im Layout ERREICHT. Gemessen werden:
-//  - die ETB-Links: „Letzte" plus je ein Link pro Historien-Eintrag. ZWEI gesäte
-//    Lagebesprechungen → genau drei Links, damit die Historie als Schleife belegt ist.
 //  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `stab/sachgebiete.ts`
 //    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
-//  - die sechs Knöpfe „Besetzung ändern" und die Kopfaktion „Lagebesprechung abschließen".
+//  - die sechs Knöpfe „Besetzung ändern" und die Zeilen der Arbeitsaufnahme.
+//  - der Sprung „Zur Lagebesprechung" in der Zeile „Nächste Lagebesprechung" (LLH-1111): Termin,
+//    Vorbereitung, Abschluss und Verlauf trägt seit LLH-1111 die Seite Lagebesprechung (Block
+//    darunter); die Stab-Seite hat keine Kopfaktion mehr.
 // Der Boden ist für alle die Staffel. Die Locator sind gescopt, sonst zögen Breadcrumb und
 // Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
 
-/** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
-const STAB_ETB_LINKS = 3;
 /**
  * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu die
  * Unterseiten aus `stab/unterseiten.ts`: „Funkplan“ und „Kommunikationsplan“ (LFH-848) in der
@@ -1206,25 +1205,25 @@ function checklistenZeilen(page: Page): Locator {
     .locator('label.ant-checkbox-wrapper');
 }
 
-test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arbeitsaufnahme folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+/**
+ * Der Sprung in die Lagebesprechung (`SprungKnopf`, ein antd-`Button` mit `href`, also ein Link).
+ * Der Beobachter liest die Lagebesprechung ebenfalls; für ihn steht der Sprung frei wie für den
+ * Admin.
+ */
+function lagebesprechungSprung(page: Page): Locator {
+  return page
+    .getByRole('group', { name: 'Nächste Lagebesprechung', exact: true })
+    .getByRole('link', { name: 'Zur Lagebesprechung', exact: true });
+}
+
+test('Stab: Werkzeug-Links, „Besetzung ändern", Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
-  // Drei Stufen mit je einem Neuladen und 24 gemessenen Knoten je Stufe.
+  // Drei Stufen mit je einem Neuladen und 32 gemessenen Knoten je Stufe.
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung`);
-
-  // Ohne abgeschlossene Lagebesprechung gäbe es keinen ETB-Link zu messen.
-  for (const nr of [1, 2]) {
-    await anlegen(
-      page,
-      einsatzId,
-      'stab/lagebesprechungen',
-      { entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})` },
-      `Lagebesprechung ${nr}`,
-    );
-  }
 
   const gemessen: string[] = [];
 
@@ -1232,25 +1231,11 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arb
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await stelleDichte(page, dichte);
 
-    // Anker: beide Sektionen stehen, der Stand ist geladen und die Historie trägt zwei Einträge.
-    const lage = page.getByRole('region', { name: 'Lagebesprechung', exact: true });
+    // Anker: die Besetzung steht.
     const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-    await expect(lage).toHaveCount(1);
     await expect(besetzung).toHaveCount(1);
-    const etbLinks = lage.getByRole('link', { name: /^ETB-Eintrag zu Lagebesprechung Nr\. \d+$/ });
-    await expect(etbLinks).toHaveCount(STAB_ETB_LINKS);
-    await expect(
-      lage.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
-    ).toHaveCount(1);
 
-    // (1) ETB-Links; sie müssen auch ins ETB zeigen.
-    const etb = await alleHaltenStufe(etbLinks, soll, `ETB-Link (${dichte})`, STAB_ETB_LINKS);
-    await expect(etbLinks.first()).toHaveAttribute(
-      'href',
-      new RegExp(`^/einsaetze/${einsatzId}/etb\\?eintrag=\\d+$`),
-    );
-
-    // (2) Werkzeug-Links, über ihre Gruppen gescopt.
+    // (1) Werkzeug-Links, über ihre Gruppen gescopt.
     const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
     await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
     const werkzeugLinks = gruppen.getByRole('link');
@@ -1262,7 +1247,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arb
       STAB_WERKZEUG_LINKS,
     );
 
-    // (3) „Besetzung ändern" — der zugängliche Name trägt die Zeilenkennung.
+    // (2) „Besetzung ändern" — der zugängliche Name trägt die Zeilenkennung.
     const aendern = besetzung.getByRole('button', { name: /^Besetzung ändern – S\d / });
     await expect(aendern).toHaveCount(STAB_BESETZUNG_KNOEPFE);
     const knopf = await alleHaltenStufe(
@@ -1272,14 +1257,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arb
       STAB_BESETZUNG_KNOEPFE,
     );
 
-    // (4) Die Kopfaktion: erst freigegeben, dann gemessen — gesperrt stünde sie ebenso hoch da.
-    const kopfaktion = page
-      .locator('[data-lfh="seitenkopf-aktionen"]')
-      .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true });
-    await expect(kopfaktion).toBeEnabled();
-    const kopf = await haeltStufe(kopfaktion, soll, `Kopfaktion (${dichte})`);
-
-    // (5) Die Zeilen der Arbeitsaufnahme (LFH-551): erst bedienbar, dann gemessen.
+    // (3) Die Zeilen der Arbeitsaufnahme (LFH-551): erst bedienbar, dann gemessen.
     const zeilen = checklistenZeilen(page);
     await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
     await expect(zeilen.getByRole('checkbox').first()).toBeEnabled();
@@ -1290,42 +1268,30 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arb
       STAB_CHECKLISTE_ZEILEN,
     );
 
-    // (6) Die Übernahme der Vorbereitung (LFH-550): erst freigegeben (alle Quellen geladen).
-    const uebernahme = page
-      .getByRole('region', { name: 'Vorbereitung', exact: true })
-      .getByRole('button', { name: 'In Lagebericht übernehmen', exact: true });
-    await expect(uebernahme).toBeEnabled();
-    const vorbereitung = await haeltStufe(uebernahme, soll, `Übernahme (${dichte})`);
+    // (4) Der Sprung in die Lagebesprechung (LLH-1111); er muss auch dorthin zeigen.
+    const sprungZiel = lagebesprechungSprung(page);
+    await expect(sprungZiel).toHaveAttribute('href', `/einsaetze/${einsatzId}/lagebesprechung`);
+    const sprung = await haeltStufe(sprungZiel, soll, `„Zur Lagebesprechung" (${dichte})`);
 
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, ` +
-        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}, Arbeitsaufnahme-Zeile ${checkliste}, ` +
-        `Übernahme ${vorbereitung}`,
+      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, Besetzung ändern ${knopf}, ` +
+        `Arbeitsaufnahme-Zeile ${checkliste}, Zur Lagebesprechung ${sprung}`,
     );
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion folgen der Staffel', async ({
+test('Stab (Beobachter): Werkzeug-Links, Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Staffel', async ({
   page,
 }) => {
-  // LFH-435: im Nur-Lese-Zweig des Stabs fehlt „Besetzung ändern" (versteckt), die Kopfaktion
-  // „Lagebesprechung abschließen" steht GESPERRT, darüber der Rechtehinweis. Gemessen wird, was
-  // bleibt: Lese-Links und die gesperrte Primäraktion.
+  // LFH-435: im Nur-Lese-Zweig des Stabs fehlt „Besetzung ändern" (versteckt), darüber steht der
+  // Rechtehinweis. Gemessen wird, was bleibt: Lese-Links, die gesperrte Arbeitsaufnahme und der
+  // Sprung in die Lagebesprechung, die der Beobachter lesen darf.
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung Lesend`);
-  for (const nr of [1, 2]) {
-    await anlegen(
-      page,
-      einsatzId,
-      'stab/lagebesprechungen',
-      { entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})` },
-      `Lagebesprechung ${nr}`,
-    );
-  }
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
@@ -1334,14 +1300,12 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await stelleDichte(page, dichte);
 
-    // Datenanker: die ETB-Links hängen am geladenen Stand — derselbe Stand gibt im Schreibzweig
-    // „Besetzung ändern" frei. Erst danach ist dessen Abwesenheit eine Aussage.
-    const lage = page.getByRole('region', { name: 'Lagebesprechung', exact: true });
+    // Datenanker: die Werkzeug-Gruppen hängen an der geladenen Besetzung. Erst danach ist die
+    // Abwesenheit von „Besetzung ändern" eine Aussage.
     const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-    await expect(lage).toHaveCount(1);
     await expect(besetzung).toHaveCount(1);
-    const etbLinks = lage.getByRole('link', { name: /^ETB-Eintrag zu Lagebesprechung Nr\. \d+$/ });
-    await expect(etbLinks).toHaveCount(STAB_ETB_LINKS);
+    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
+    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
 
     // ── VORBEDINGUNGEN: Rechtehinweis steht, „Besetzung ändern" fehlt.
     await rechteHinweisSteht(page);
@@ -1351,9 +1315,6 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
     ).toHaveCount(0);
 
     // ── Was bleibt.
-    const etb = await alleHaltenStufe(etbLinks, soll, `ETB-Link (${dichte})`, STAB_ETB_LINKS);
-    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
-    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
     const werkzeugLinks = gruppen.getByRole('link');
     await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
     const werkzeug = await alleHaltenStufe(
@@ -1361,13 +1322,6 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
       soll,
       `Werkzeug-Link (${dichte})`,
       STAB_WERKZEUG_LINKS,
-    );
-    const kopf = await gesperrtHaeltStufe(
-      page
-        .locator('[data-lfh="seitenkopf-aktionen"]')
-        .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true }),
-      soll,
-      `Kopfaktion gesperrt (${dichte})`,
     );
 
     // Die Arbeitsaufnahme (LFH-551) steht lesend da: Vorbedingung gesperrte Boxen, dann die
@@ -1384,9 +1338,199 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
       STAB_CHECKLISTE_ZEILEN,
     );
 
+    const sprung = await haeltStufe(
+      lagebesprechungSprung(page),
+      soll,
+      `„Zur Lagebesprechung" (${dichte})`,
+    );
+
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, Kopfaktion gesperrt ${kopf}, ` +
-        `Arbeitsaufnahme-Zeile gesperrt ${checkliste}`,
+      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, ` +
+        `Arbeitsaufnahme-Zeile gesperrt ${checkliste}, Zur Lagebesprechung ${sprung}`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Lagebesprechung (LLH-1111) ──────────────────────────────────────────────────────
+//
+// Die Teile, die bis LLH-1111 auf der Stab-Seite standen. Gemessen werden:
+//  - die ETB-Links des Verlaufs, einer je Besprechung. ZWEI gesäte Lagebesprechungen → genau
+//    zwei Links, damit der Verlauf als Schleife belegt ist.
+//  - die Schnellwahl im Paneel „Termin" („+30 min", „+1 h", „+2 h", „kein Termin") und das Feld
+//    „Termin wählen"; die zweite Besprechung setzt einen Termin, damit auch „kein Termin"
+//    freigegeben ist.
+//  - die Kopfaktion „Lagebesprechung abschließen" und die Übernahme der Vorbereitung (LFH-550).
+
+/** Zwei abgeschlossene Lagebesprechungen → zwei Einträge im Verlauf. */
+const LAGEBESPRECHUNG_ETB_LINKS = 2;
+/** „+30 min", „+1 h", „+2 h" und „kein Termin" (`lagebesprechung/TerminPaneel.tsx`). */
+const TERMIN_KNOEPFE = 4;
+
+async function lagebesprechungenSaeen(page: Page, einsatzId: string) {
+  for (const nr of [1, 2]) {
+    await anlegen(
+      page,
+      einsatzId,
+      'lagebesprechungen',
+      {
+        entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})`,
+        ...(nr === 2 ? { naechste_at: new Date(Date.now() + 60 * 60_000).toISOString() } : {}),
+      },
+      `Lagebesprechung ${nr}`,
+    );
+  }
+}
+
+/**
+ * Anker der Seite: Verlauf mit beiden Einträgen; liefert ETB-Links, Schnellwahl und die Hülle des
+ * Felds „Termin wählen". Die Schnellwahl ist über ihre Namen gezählt: das Löschkreuz des Felds
+ * („Zurücksetzen") steht in derselben Gruppe und ist benannt ausgenommen — das Feld selbst ist
+ * das gleichwertige Ziel (wie in `trefflaeche-pruefflaechen.spec.ts`).
+ */
+async function lagebesprechungSteht(page: Page) {
+  const verlauf = page.getByRole('region', { name: 'Verlauf', exact: true });
+  await expect(verlauf).toHaveCount(1);
+  const etbLinks = verlauf.getByRole('link', {
+    name: /^ETB-Eintrag zu Lagebesprechung Nr\. \d+$/,
+  });
+  await expect(etbLinks).toHaveCount(LAGEBESPRECHUNG_ETB_LINKS);
+  await expect(
+    verlauf.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
+  ).toHaveCount(1);
+  const gruppe = page
+    .getByRole('region', { name: 'Termin', exact: true })
+    .getByRole('group', { name: 'Termin setzen', exact: true });
+  const schnellwahl = gruppe.getByRole('button', { name: /^(\+30 min|\+1 h|\+2 h|kein Termin)$/ });
+  await expect(schnellwahl).toHaveCount(TERMIN_KNOEPFE);
+  const terminFeld = gruppe
+    .locator('.ant-picker')
+    .filter({ has: page.getByRole('textbox', { name: 'Termin wählen', exact: true }) });
+  return { etbLinks, schnellwahl, terminFeld };
+}
+
+const lagebesprechungKopfaktion = (page: Page) =>
+  page
+    .locator('[data-lfh="seitenkopf-aktionen"]')
+    .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true });
+
+test('Lagebesprechung: ETB-Links, Schnellwahl, Kopfaktion und Übernahme folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Besprechung`);
+  await lagebesprechungenSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+    await stelleDichte(page, dichte);
+    const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
+
+    // (1) ETB-Links; sie müssen auch ins ETB zeigen.
+    const etb = await alleHaltenStufe(
+      etbLinks,
+      soll,
+      `ETB-Link (${dichte})`,
+      LAGEBESPRECHUNG_ETB_LINKS,
+    );
+    await expect(etbLinks.first()).toHaveAttribute(
+      'href',
+      new RegExp(`^/einsaetze/${einsatzId}/etb\\?eintrag=\\d+$`),
+    );
+
+    // (2) Die Schnellwahl im Paneel „Termin": erst freigegeben (Stand geladen, Termin gesetzt).
+    for (const k of await schnellwahl.all()) await expect(k).toBeEnabled();
+    const termin = await alleHaltenStufe(
+      schnellwahl,
+      soll,
+      `Schnellwahl (${dichte})`,
+      TERMIN_KNOEPFE,
+    );
+    const feld = await haeltStufe(terminFeld, soll, `Feld „Termin wählen" (${dichte})`);
+
+    // (3) Die Kopfaktion: erst freigegeben, dann gemessen — gesperrt stünde sie ebenso hoch da.
+    const kopfaktion = lagebesprechungKopfaktion(page);
+    await expect(kopfaktion).toBeEnabled();
+    const kopf = await haeltStufe(kopfaktion, soll, `Kopfaktion (${dichte})`);
+
+    // (4) Die Übernahme der Vorbereitung (LFH-550): erst freigegeben (alle Quellen geladen).
+    const uebernahme = page
+      .getByRole('region', { name: 'Vorbereitung', exact: true })
+      .getByRole('button', { name: 'In Lagebericht übernehmen', exact: true });
+    await expect(uebernahme).toBeEnabled();
+    const vorbereitung = await haeltStufe(uebernahme, soll, `Übernahme (${dichte})`);
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Schnellwahl ${termin}, ` +
+        `Termin wählen ${feld}, Kopfaktion ${kopf}, Übernahme ${vorbereitung}`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperrte Kopfaktion folgen der Staffel', async ({
+  page,
+}) => {
+  // LFH-435: im Nur-Lese-Zweig steht „Lagebesprechung abschließen" GESPERRT, die Schnellwahl
+  // ebenso, darüber der Rechtehinweis; die Übernahme der Vorbereitung fehlt. Gemessen wird, was
+  // bleibt: Lese-Links und die gesperrten Ziele.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Besprechung Lesend`);
+  await lagebesprechungenSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+    await stelleDichte(page, dichte);
+    // Datenanker: der Verlauf trägt beide Einträge, erst danach sind Sperren eine Aussage.
+    const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
+
+    // ── VORBEDINGUNGEN: Rechtehinweis steht, Schnellwahl gesperrt, keine Übernahme.
+    await rechteHinweisSteht(page);
+    for (const k of await schnellwahl.all()) {
+      await expect(
+        k,
+        'Vorbedingung: ohne Schreibrecht ist die Schnellwahl gesperrt',
+      ).toBeDisabled();
+    }
+    await expect(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+      'Vorbedingung: ohne Schreibrecht keine Übernahme',
+    ).toHaveCount(0);
+
+    // ── Was bleibt.
+    const etb = await alleHaltenStufe(
+      etbLinks,
+      soll,
+      `ETB-Link (${dichte})`,
+      LAGEBESPRECHUNG_ETB_LINKS,
+    );
+    const termin = await alleHaltenStufe(
+      schnellwahl,
+      soll,
+      `Schnellwahl gesperrt (${dichte})`,
+      TERMIN_KNOEPFE,
+    );
+    const feld = await haeltStufe(terminFeld, soll, `Feld „Termin wählen" gesperrt (${dichte})`);
+    const kopf = await gesperrtHaeltStufe(
+      lagebesprechungKopfaktion(page),
+      soll,
+      `Kopfaktion gesperrt (${dichte})`,
+    );
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Schnellwahl gesperrt ${termin}, ` +
+        `Termin wählen gesperrt ${feld}, Kopfaktion gesperrt ${kopf}`,
     );
   }
 

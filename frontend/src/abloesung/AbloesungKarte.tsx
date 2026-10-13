@@ -7,7 +7,7 @@ import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
-import { dauerText } from '../stab/lagebesprechungZustand';
+import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { abloesungZeit, einstufungVon, rhythmusText } from './einstufung';

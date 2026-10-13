@@ -9,12 +9,13 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 31] = [
+pub const MODUL_KEYS: [&str; 32] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
     "einsatzabschnitte",
     "auftraege",
+    "lagebesprechung",
     "stab",
     "dokumente",
     // Kräfte & Mittel (Meldebild = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
@@ -113,6 +114,7 @@ modul_marker! {
     Meldungen => "meldungen",
     Lagemeldungen => "lagemeldungen",
     Auftraege => "auftraege",
+    Lagebesprechung => "lagebesprechung",
     Lagekarte => "lagekarte",
     Stab => "stab",
     Dokumente => "dokumente",
@@ -146,6 +148,16 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/lage/meldungen", Some("lagemeldungen")),
     ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
+    // LLH-1111: Stand und Termin unter `…/lagebesprechung`, Verlauf und Abschluss unter
+    // `…/lagebesprechungen` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
+    (
+        "/api/einsaetze/{id}/lagebesprechung",
+        Some("lagebesprechung"),
+    ),
+    (
+        "/api/einsaetze/{id}/lagebesprechungen",
+        Some("lagebesprechung"),
+    ),
     ("/api/einsaetze/{id}/stab", Some("stab")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
@@ -315,6 +327,7 @@ mod tests {
         assert_eq!(Meldungen::KEY, Some("meldungen"));
         assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
         assert_eq!(Auftraege::KEY, Some("auftraege"));
+        assert_eq!(Lagebesprechung::KEY, Some("lagebesprechung"));
         assert_eq!(Stab::KEY, Some("stab"));
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
@@ -349,6 +362,15 @@ mod tests {
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen"),
             Some(Some("verpflegung"))
+        );
+        // Lagebesprechung (LLH-1111): eigener Key, nicht `stab`; beide Präfixe.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/lagebesprechung/termin"),
+            Some(Some("lagebesprechung"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/lagebesprechungen"),
+            Some(Some("lagebesprechung"))
         );
         // Modul-lose Route: registriert, aber kein Key.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));

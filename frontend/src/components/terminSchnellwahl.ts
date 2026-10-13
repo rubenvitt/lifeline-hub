@@ -37,7 +37,7 @@ export function schnellwahlAuswahl(minuten: readonly number[]): SchnellwahlEintr
 /**
  * Termin = Bezug + Minuten. Der Bezug ist Sache des Aufrufers: die Wiedervorlage rechnet ab
  * jetzt, der Abschluss der Lagebesprechung ab dem Zeitpunkt der Besprechung — sonst lehnte das
- * Backend `naechste_at ≤ abgehalten_at` mit 422 ab (`src/routes/stab.rs:240-246`).
+ * Backend `naechste_at ≤ abgehalten_at` mit 422 ab (`src/routes/lagebesprechung.rs`, `abschliessen`).
  */
 export function schnellwahlTermin(bezug: Dayjs, minuten: number): Dayjs {
   return bezug.add(minuten, 'minute');

@@ -254,35 +254,15 @@ function serverStand(einsatz: Partial<EinsatzAnzeige> = {}) {
 }
 
 describe('EinsatzdatenPage', () => {
-  it('LFH-463: zeigt den Besprechungstermin lokal; derselbe Instant gilt als unverändert', async () => {
+  // LLH-1111: den Termin der Lagebesprechung pflegt nur noch die Seite Lagebesprechung
+  // (`PUT …/lagebesprechung/termin`); der Kopf-PATCH lehnt das Feld ab.
+  it('zeigt keinen Besprechungstermin mehr, auch wenn der Einsatzkopf einen trägt (LLH-1111)', async () => {
     setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
-    const { bodies } = serverStand({ naechste_lagebesprechung_at: '2026-09-09 13:17:43' });
-    const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole('button', { name: 'Nächste Lagebesprechung bearbeiten' }),
-    );
-    expect(screen.getByRole('textbox', { name: 'Nächste Lagebesprechung' })).toHaveValue(
-      dayjs.utc('2026-09-09 13:17:43').local().format('YYYY-MM-DD HH:mm:ss'),
-    );
-    await user.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung speichern' }));
-    expect(
-      await screen.findByRole('button', { name: 'Nächste Lagebesprechung bearbeiten' }),
-    ).toBeVisible();
-    expect(bodies).toEqual([]);
-  });
-
-  it('LFH-463: leeren des Besprechungstermins sendet explizit null', async () => {
-    setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
-    const { bodies } = serverStand({ naechste_lagebesprechung_at: '2026-09-09 13:17:43' });
-    const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole('button', { name: 'Nächste Lagebesprechung bearbeiten' }),
-    );
-    const feld = screen.getByRole('textbox', { name: 'Nächste Lagebesprechung' });
-    // jsdom aktiviert den CSS-Hoverzustand des Clear-Buttons nicht; hier zählt der onClear-Pfad.
-    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
-    await user.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ naechste_lagebesprechung_at: null }]));
+    // Positiv zuerst: das Paneel steht mit seinen Angaben — sonst wäre die Abwesenheit trivial.
+    const einsatz = within(await screen.findByRole('region', { name: 'Einsatz' }));
+    expect(einsatz.getByText('Angelegt')).toBeInTheDocument();
+    expect(screen.queryByText('Nächste Lagebesprechung')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Nächste Lagebesprechung/ })).toBeNull();
   });
 
   it('zeigt Kopfdaten im Lesemodus; eine leere lesende Angabe als —', async () => {
@@ -409,14 +389,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-1170)', () => {
   it('ordnet die Angaben den Paneelen zu, jede genau einmal', async () => {
     setup();
     const paneele = {
-      Einsatz: [
-        'Bezeichnung',
-        'Einsatzart',
-        'Einsatznummer',
-        'Leitstellen-Nr.',
-        'Angelegt',
-        'Nächste Lagebesprechung',
-      ],
+      Einsatz: ['Bezeichnung', 'Einsatzart', 'Einsatznummer', 'Leitstellen-Nr.', 'Angelegt'],
       Einsatzort: ['Adresse', 'Koordinate'],
       Erstmeldung: ['Meldende Stelle', 'Sachverhalt / Meldebild', 'Anzahl Betroffene (initial)'],
     };
@@ -864,16 +837,18 @@ describe('EinsatzdatenPage · Live-Refetch des Kopfs (LFH-555)', () => {
     };
   }
 
-  it('zeigt einen fremd gesetzten Termin nach dem Ereignis ohne Neuladen der Seite', async () => {
+  it('zeigt eine fremd gesetzte Angabe nach dem Ereignis ohne Neuladen der Seite', async () => {
     const { client, fremdAendern, abrufe } = setupMitFremdAenderung();
-    await screen.findByText('Nächste Lagebesprechung');
+    expect(
+      await screen.findByRole('button', { name: 'Leitstellen-Nr. eintragen' }),
+    ).toBeInTheDocument();
     const vorher = abrufe();
-    fremdAendern({ naechste_lagebesprechung_at: '2026-09-30 16:00:00' });
+    fremdAendern({ leitstellen_nr: 'LS-9' });
     await act(() => client.invalidateQueries({ queryKey: ['einsatz', 7] }));
     await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
     expect(
-      await screen.findByRole('button', { name: /^Nächste Lagebesprechung bearbeiten/ }),
-    ).toBeInTheDocument();
+      await screen.findByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }),
+    ).toHaveAccessibleDescription('LS-9');
   });
 
   it('eine offene Zeile „Sachverhalt / Meldebild“ behält ihren Text, der Rest zeigt den neuen Stand', async () => {

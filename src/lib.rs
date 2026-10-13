@@ -44,6 +44,7 @@ pub mod kommunikation;
 pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
+pub mod lagebesprechung;
 pub mod live;
 pub mod log_drossel;
 pub mod material;

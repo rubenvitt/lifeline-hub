@@ -615,15 +615,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
             post(routes::verpflegung::ausgabe_zuruecknehmen),
         )
+        // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
+        .route(
+            "/api/einsaetze/{id}/lagebesprechung",
+            get(routes::lagebesprechung::load),
+        )
+        .route(
+            "/api/einsaetze/{id}/lagebesprechung/termin",
+            put(routes::lagebesprechung::set_termin),
+        )
+        .route(
+            "/api/einsaetze/{id}/lagebesprechungen",
+            get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
+        )
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
             put(routes::stab::besetzung_setzen).delete(routes::stab::besetzung_entfernen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/lagebesprechungen",
-            get(routes::stab::lagebesprechungen_liste)
-                .post(routes::stab::lagebesprechung_abschliessen),
         )
         // LFH-554: Presse- und Medienarbeit S5; Stab-Sperre per Präfix (`PFAD_KEY`).
         .route(

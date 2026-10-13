@@ -63,10 +63,11 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/fuehrungsstelle — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
   // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
   { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
-  // GET …/stab — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs:122).
+  // GET …/stab — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs, `laden`).
   { schluessel: 'stab', bloecke: nur('fuehrung'), modul: 'stab' },
-  // GET …/stab/lagebesprechungen — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs:192).
-  { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'stab' },
+  // GET …/lagebesprechungen — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
+  // `list`), seit LLH-1111 nicht mehr am Stab.
+  { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'lagebesprechung' },
   // GET …/einheiten — `EinsatzLesezugriff<Einheiten>` (src/routes/einsatz_einheit.rs:44).
   // Die Personal-Anlage liest daraus den Namen der Einheit je Kraft (LFH-902).
   {

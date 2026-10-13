@@ -102,9 +102,13 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(einsatzKeys.stabKommunikationsplan(7))).toBe(true);
     expect(istLagebildOfflineKey(einsatzKeys.stab(7))).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.stabCheckliste(7))).toBe(false);
-    expect(istLagebildOfflineKey(einsatzKeys.stabLagebesprechungen(7))).toBe(false);
     // Die Fernmeldeskizze (LFH-893) bleibt draußen: bearbeitet wird sie nur mit Server.
     expect(istLagebildOfflineKey(einsatzKeys.stabFernmeldeskizze(7))).toBe(false);
+  });
+
+  it('nimmt die Lagebesprechung nicht offline (LLH-1111)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.lagebesprechung(7))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.lagebesprechungen(7))).toBe(false);
   });
 
   it('verlangt an Stelle 1 eine Einsatz-ID', () => {

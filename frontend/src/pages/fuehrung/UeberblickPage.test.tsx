@@ -561,7 +561,7 @@ describe('UeberblickPage', () => {
     expect(marken[0]).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=22');
     expect(marken[1]).toHaveTextContent('Lagebericht an Kreisstab');
     expect(marken[1]).toHaveAttribute('href', '/einsaetze/1/erinnerungen');
-    expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/stab');
+    expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/lagebesprechung');
   });
 
   describe('Nächste Marken: offene Pegel-Prognose (LFH-628), Ziel nach LFH-633', () => {
@@ -1358,19 +1358,22 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
     );
   });
 
-  it('gesperrter Stab: die Marke „Lagebesprechung“ steht ohne Link', async () => {
-    mitFreigaben({ stab: { zugriff: false } });
+  it('gesperrte Lagebesprechung: die Marke steht ohne Link', async () => {
+    mitFreigaben({ lagebesprechung: { zugriff: false } });
     rendern();
     const p = await waitFor(() => paneel('Nächste Marken'));
     const marke = await within(p).findByText('Lagebesprechung');
     await waitFor(() => expect(marke.closest('a')).toBeNull());
   });
 
-  it('freier Stab: die Marke „Lagebesprechung“ führt in den Stab', async () => {
-    mitFreigaben({});
+  // LLH-1111: die Marke hängt an der Lagebesprechung, nicht mehr am Stab.
+  it('gesperrter Stab, freie Lagebesprechung: die Marke führt in das Modul', async () => {
+    mitFreigaben({ stab: { zugriff: false } });
     rendern();
     const p = await waitFor(() => paneel('Nächste Marken'));
     const marke = await within(p).findByText('Lagebesprechung');
-    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/stab');
+    await waitFor(() =>
+      expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/lagebesprechung'),
+    );
   });
 });

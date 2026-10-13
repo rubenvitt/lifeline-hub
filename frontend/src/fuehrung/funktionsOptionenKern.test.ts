@@ -118,7 +118,6 @@ describe('Besetzung', () => {
           gesetzt_at: 'x',
         },
       ],
-      anzahl_lagebesprechungen: 0,
     });
     expect([...karte]).toEqual([
       ['s2', 'Müller'],

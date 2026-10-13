@@ -12,19 +12,17 @@ import {
 } from './kern';
 
 /**
- * Bilder des Kapitels „Stab, Checkliste und Lagebesprechung“ (`docs/anwender/kapitel/stab.md`).
+ * Bilder des Kapitels „Stab und Checkliste“ (`docs/anwender/kapitel/stab.md`). Vorbereitung und
+ * Abschluss der Lagebesprechung zeigt seit LLH-1111 das eigene Kapitel (`lagebesprechung.bilder.ts`).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep stab`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   besetzung.png           frontend/src/stab/BesetzungModal.tsx
- *   vorbereitung.png        frontend/src/stab/VorbereitungPaneel.tsx
- *   lagebesprechung.png     frontend/src/stab/LagebesprechungModal.tsx
  *   arbeitsaufnahme.png     frontend/src/stab/ChecklistePaneel.tsx
  *
- * Füllung (D3): der Demo-Einsatz hat keinen Stab. Vier Sachgebiete werden besetzt, drei Punkte
- * der Arbeitsaufnahme abgehakt und eine Lagebesprechung abgeschlossen, jeweils nur, wenn es noch
- * fehlt (ein Lauf aller Kapitel teilt eine Datenbank; die Besetzung setzt der Server
- * idempotent).
+ * Füllung (D3): der Demo-Einsatz hat keinen Stab. Vier Sachgebiete werden besetzt und drei
+ * Punkte der Arbeitsaufnahme abgehakt (ein Lauf aller Kapitel teilt eine Datenbank; Besetzung und
+ * Checkliste setzt der Server idempotent).
  */
 
 const KAPITEL = 'stab';
@@ -64,14 +62,6 @@ test.describe(KAPITEL, () => {
     });
     // Der erste Punkt zeigt den Standort der Führungsstelle (LFH-1181).
     await fuehrungsstelleOrtFuellen(api, id);
-    const stand = (await (await api.get(stab)).json()) as { anzahl_lagebesprechungen: number };
-    if (stand.anzahl_lagebesprechungen === 0) {
-      await fuelle(api, 'post', `${stab}/lagebesprechungen`, {
-        entschluss: 'Evakuierung Ortsteil Nord fortführen, UHS Turnhalle verstärken',
-        abgehalten_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-        naechste_at: new Date(Date.now() + 60 * 60_000).toISOString(),
-      });
-    }
     await api.dispose();
   });
 
@@ -97,36 +87,6 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect(dialog.getByRole('button', { name: 'Übernehmen' })).toBeVisible();
     await fotografiere(dialog, KAPITEL, 'besetzung');
-  });
-
-  test('Paneel „Vorbereitung“', async ({ page }) => {
-    await anmelden(page);
-    const demo = await demoEinsatz(page);
-    await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab`);
-    const paneel = page.getByRole('region', { name: 'Vorbereitung' });
-    await expect(paneel.getByText('Letzte Lagebesprechung')).toBeVisible();
-    await expect(paneel.getByText('Nr. 1').first()).toBeVisible();
-    await fotografiere(paneel, KAPITEL, 'vorbereitung');
-  });
-
-  test('Dialog „Lagebesprechung abschließen“', async ({ page }) => {
-    await anmelden(page);
-    const demo = await demoEinsatz(page);
-    await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab`);
-    await expect(page.getByRole('region', { name: 'Lagebesprechung' })).toBeVisible();
-    await page.getByRole('button', { name: 'Lagebesprechung abschließen' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Lagebesprechung abschließen' });
-    await dialog
-      .getByLabel('Entschluss')
-      .fill('Lage unverändert, Sandsackverbau am Nordufer bis 18 Uhr abschließen');
-    const schnellwahl = dialog.getByRole('button', { name: '+1 h' });
-    await schnellwahl.click();
-    // Fokus und Zeiger stünden sonst auf der Schnellwahl (hervorgehoben im Bild).
-    await schnellwahl.blur();
-    await page.mouse.move(0, 0);
-    await fotografiere(dialog, KAPITEL, 'lagebesprechung');
   });
 
   test('Paneel „Arbeitsaufnahme“', async ({ page }) => {

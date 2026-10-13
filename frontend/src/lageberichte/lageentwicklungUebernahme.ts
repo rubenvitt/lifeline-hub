@@ -1,8 +1,8 @@
 import type { AbrufZustand } from '../api/abrufZustand';
 import { listeEtb } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeStab } from '../api/stab';
-import type { EtbEintragAnzeige, EtbTyp, ModulFreigaben, Stab } from '../api/types';
+import { fetchLagebesprechungStand } from '../api/lagebesprechung';
+import type { EtbEintragAnzeige, EtbTyp, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { DRUCK_SEITE } from '../etb/druckAbruf';
@@ -24,7 +24,8 @@ const GEZAEHLT: readonly EtbTyp[] = [
 
 const MODUL = {
   etb: { key: 'etb', name: 'ETB' },
-  stab: { key: 'stab', name: 'Stab' },
+  // Seit LLH-1111 ein eigenes Modul, nicht mehr der Stab.
+  lagebesprechung: { key: 'lagebesprechung', name: 'Lagebesprechung' },
 } as const;
 
 const frei = (m: keyof typeof MODUL, freigaben: ModulFreigaben) =>
@@ -91,7 +92,7 @@ export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
   unterzeile: 'Anzahl je Typ seit letzter Lagebesprechung',
   ersetzenTitel: 'Lageentwicklung ersetzen?',
   ersetzenText: 'Vorhandener Text wird ersetzt.',
-  // Ohne Stab keine Grenze, ohne ETB nichts zu zählen: beide sind nötig.
+  // Ohne Lagebesprechung keine Grenze, ohne ETB nichts zu zählen: beide sind nötig.
   verfuegbar: (freigaben) => {
     const fehlend = (Object.keys(MODUL) as (keyof typeof MODUL)[]).filter(
       (m) => !frei(m, freigaben),
@@ -104,13 +105,18 @@ export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
         };
   },
   erzeuge: async ({ qc, einsatzId, freigaben, dtg }) => {
-    const stab: Geladen<Stab | null> = frei('stab', freigaben)
-      ? await ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
+    const besprechung: Geladen<LagebesprechungStand | null> = frei('lagebesprechung', freigaben)
+      ? await ladeListe(
+          qc,
+          einsatzKeys.lagebesprechung(einsatzId),
+          () => fetchLagebesprechungStand(einsatzId),
+          null,
+        )
       : gesperrt(null);
-    const letzte = stab.daten?.letzte_lagebesprechung ?? null;
+    const letzte = besprechung.daten?.letzte_lagebesprechung ?? null;
     const grenzeId = letzte?.etb_eintrag_id ?? null;
     const etb: Geladen<Neuerungen | null> =
-      stab.zustand === 'daten' && frei('etb', freigaben)
+      besprechung.zustand === 'daten' && frei('etb', freigaben)
         ? await ladeListe(
             qc,
             // Unter dem ETB-Präfix: ein neuer Eintrag macht auch diesen Stand ungültig.
@@ -121,14 +127,14 @@ export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
         : gesperrt(null);
 
     const kopf =
-      stab.zustand !== 'daten'
+      besprechung.zustand !== 'daten'
         ? '**Neu im ETB seit der letzten Lagebesprechung**'
         : letzte && etb.daten?.grenzeGefunden !== false
           ? `**Neu im ETB seit der Lagebesprechung Nr. ${letzte.lfd_nr} (${dtg(letzte.abgehalten_at)})**`
           : '**Neu im ETB seit Einsatzbeginn**';
 
     const teile = ((): string[] => {
-      if (stab.zustand !== 'daten') return [kopf, fehlt(stab.zustand)];
+      if (besprechung.zustand !== 'daten') return [kopf, fehlt(besprechung.zustand)];
       if (etb.zustand !== 'daten' || !etb.daten) {
         return [kopf, fehlt(etb.zustand === 'daten' ? 'fehler' : etb.zustand)];
       }
@@ -156,7 +162,7 @@ export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
       return [kopf, ...hinweis, ...zahlen, '', '**Entscheidungen**', ...liste];
     })();
 
-    const stand = gemeinsamerDatenstand(stab.stand, etb.stand) || Date.now();
+    const stand = gemeinsamerDatenstand(besprechung.stand, etb.stand) || Date.now();
     return [`**Stand:** ${dtg(new Date(stand).toISOString())}`, '', ...teile, ''].join('\n');
   },
 };

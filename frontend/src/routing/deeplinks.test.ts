@@ -28,6 +28,7 @@ import {
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
+  lagebesprechungPfad,
   stabPfad,
   funkplanPfad,
   kommunikationsplanPfad,
@@ -439,9 +440,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
     expect(parseFunkplanAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
-  it('stabPfad mit neu hängt ?neu=1 an', () => {
-    expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');
-    expect(stabPfad(E, { neu: false })).toBe('/einsaetze/5/stab');
+  it('lagebesprechungPfad ohne und mit neu', () => {
+    expect(lagebesprechungPfad(E)).toBe('/einsaetze/5/lagebesprechung');
+    expect(lagebesprechungPfad(E, { neu: true })).toBe('/einsaetze/5/lagebesprechung?neu=1');
   });
   it('etbPfad mit ?eintrag=', () => {
     expect(etbPfad(E, { eintrag: 7 })).toBe('/einsaetze/5/etb?eintrag=7');

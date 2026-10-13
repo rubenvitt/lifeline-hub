@@ -1023,6 +1023,9 @@ pub struct KopfdatenPatch {
     pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Alarmzeit (ISO-8601/RFC3339 oder SQLite-Format).
     pub begonnen_at: Option<String>,
+    /// Nur noch angenommen, um es abzulehnen (LLH-1111, design.md D3): den Termin schreibt das
+    /// Modul Lagebesprechung. Ohne das Feld verwürfe serde es still, und ein alter Tab oder die
+    /// Schreib-Warteschlange (LFH-705) hielte den Termin für gesetzt.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub naechste_lagebesprechung_at: Option<Option<String>>,
 }
@@ -1042,6 +1045,11 @@ pub async fn aktualisieren(
     if req.einsatznummer_intern.is_some() {
         return Err(AppError::Validation(
             "Die Einsatznummer vergibt das System, sie ist nicht änderbar".into(),
+        ));
+    }
+    if req.naechste_lagebesprechung_at.is_some() {
+        return Err(AppError::Validation(
+            "Den Termin der nächsten Lagebesprechung setzt das Modul Lagebesprechung".into(),
         ));
     }
 
@@ -1071,9 +1079,6 @@ pub async fn aktualisieren(
     };
 
     let stichwort = support::trimme_tri(req.stichwort);
-    let naechste_lagebesprechung_at = support::trimme_tri(req.naechste_lagebesprechung_at)
-        .map(|zeit| zeit.map(|z| crate::etb::normalisiere_zeit(&z)).transpose())
-        .transpose()?;
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
     if let Some(Some(ort)) = &einsatzort {
@@ -1106,7 +1111,6 @@ pub async fn aktualisieren(
             sachverhalt: sachverhalt.as_ref().map(|v| v.as_deref()),
             anzahl_betroffene_initial: req.anzahl_betroffene_initial,
             begonnen_at: begonnen_at.as_deref(),
-            naechste_lagebesprechung_at: naechste_lagebesprechung_at.as_ref().map(|v| v.as_deref()),
         },
     )
     .await?;

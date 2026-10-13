@@ -3,13 +3,13 @@ import { randKontrast } from './kontrast-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
- * Stab und Informationstelefon am Handschirm (LFH-978).
+ * Stab, Lagebesprechung und Informationstelefon am Handschirm (LFH-978).
  *
  * - **Besetzung (U67):** bei 390 px steht „Besetzung ändern" UNTER dem Inhalt des Sachgebiets,
  *   linksbündig, und der Inhalt nutzt ≥ 90 % der Eintragsbreite. Vorher quetschte der Knopf rechts
  *   die Beschreibung auf rund 190 px, die Seite maß über 5 000 px.
  * - **Sichtung (U69):** die Wertzeile der Vorbereitung bricht bei 390 und 820 px nur an „ · "
- *   um. Gemessen je Teil über die Zeilenkästen eines `Range`: ein Teil auf zwei Zeilen hat zwei
+ *   um. Die Vorbereitung steht seit LLH-1111 auf der Seite Lagebesprechung, nicht mehr im Stab. Gemessen je Teil über die Zeilenkästen eines `Range`: ein Teil auf zwei Zeilen hat zwei
  *   verschiedene Oberkanten. Vorbedingung ist, dass die Zeile überhaupt umbricht, sonst wäre
  *   „kein Teil zerrissen" trivial wahr.
  * - **Notizfeld (U70):** im Informationstelefon trägt das Notizfeld bei 390 px einen sichtbaren
@@ -157,8 +157,8 @@ async function sichtungBrichtNurAmTrenner(page: Page, was: string) {
   }
 }
 
-test.describe('Stab am Handschirm (LFH-978)', () => {
-  test('Admin, 390 px: „Besetzung ändern" unter dem Inhalt, Sichtung bricht nur am Trenner', async ({
+test.describe('Stab und Lagebesprechung am Handschirm (LFH-978)', () => {
+  test('Admin, 390 px: „Besetzung ändern" unter dem Inhalt, Sichtung der Lagebesprechung bricht nur am Trenner', async ({
     page,
   }) => {
     await page.setViewportSize(HANDSCHIRM);
@@ -180,13 +180,15 @@ test.describe('Stab am Handschirm (LFH-978)', () => {
       expect(Math.abs(k.x - c.x), `${name}: Knopf linksbündig mit dem Inhalt`).toBeLessThan(1);
     }
     await inhaltFuelltZeilen(page, 'Admin');
-    await sichtungBrichtNurAmTrenner(page, 'Admin, 390 px');
 
     const hoehe = await page.evaluate(() => document.scrollingElement!.scrollHeight);
     await test.info().attach('scrollHeight.json', {
       body: JSON.stringify({ breite: HANDSCHIRM.width, scrollHeight: hoehe }),
       contentType: 'application/json',
     });
+
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+    await sichtungBrichtNurAmTrenner(page, 'Admin, 390 px');
   });
 
   test('Beobachter, 390 px: ohne Knopf füllt der Inhalt die Zeile, Sichtung wie beim Admin', async ({
@@ -204,6 +206,7 @@ test.describe('Stab am Handschirm (LFH-978)', () => {
       'Vorbedingung: ohne Schreibrecht kein „Besetzung ändern"',
     ).toHaveCount(0);
     await inhaltFuelltZeilen(page, 'Beobachter');
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
     await sichtungBrichtNurAmTrenner(page, 'Beobachter, 390 px');
   });
 
@@ -217,7 +220,7 @@ test.describe('Stab am Handschirm (LFH-978)', () => {
     await stelleDichte(page, 'komfortabel');
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, []);
-    await page.goto(`/einsaetze/${einsatzId}/stab`);
+    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
     await sichtungBrichtNurAmTrenner(page, 'Admin, 820 px, komfortabel');
   });

@@ -48,10 +48,11 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Kräfte | [Verpflegung](kapitel/verpflegung.md) | Führung |
 | Stab | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
 | Stab | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
-| Stab | [Stab, Checkliste und Lagebesprechung](kapitel/stab.md) | Führung |
+| Stab | [Stab und Checkliste](kapitel/stab.md) | Führung |
 | Stab | [Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
 | Stab | [Presse und Infotelefon](kapitel/presse-infotelefon.md) | Führung |
 | Stab | [Dokumente](kapitel/dokumente.md) | Führung |
+| Stab | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
 | Betroffene | [Betroffene und Sichtung](kapitel/betroffene.md) | Alle, Führung |
 | Betroffene | [Unfallhilfsstellen](kapitel/unfallhilfsstellen.md) | Alle, Führung |
 | Betroffene | [Betreuung und Evakuierung](kapitel/betreuung.md) | Alle, Führung |
