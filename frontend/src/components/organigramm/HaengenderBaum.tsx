@@ -32,8 +32,8 @@ import './haengenderBaumPrint.css';
  * (`baumSchleuse.ts`); der Inhalt fließt, außer bei einem umgehängten Knoten am alten Ort. Neu,
  * umgehängt, umsortiert und entfallen wartet im Sammelbanner der
  * Standzeile fester Höhe zwischen Kopf und erster Ebene. Entfallenes bleibt als Platzhalter ohne
- * Link stehen, der Kopf steht still (eine neue Stabszeile schöbe sonst den ganzen Baum). Der
- * Bereich ist die ganze `section` samt Standzeile: der Weg zum Banner taut nicht auf. Touch zählt
+ * Link stehen, der Kopf steht still (eine neue Stabszeile schöbe sonst den ganzen Baum), außer
+ * solange eine seiner Quellen lädt (`kopfLaedt`, LLH-1166). Der Bereich ist die ganze `section` samt Standzeile: der Weg zum Banner taut nicht auf. Touch zählt
  * nur über den Fokus. Im Druck gilt die Schleuse nicht (`useDruckModus`).
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`
@@ -64,6 +64,12 @@ interface Props<K extends BaumKnoten<K>> {
   lfh?: string;
   /** Der Wurzelbereich über der ersten Ebene (Einsatzleitung, ggf. Stabsstelle). */
   kopf: ReactNode;
+  /**
+   * Eine Quelle des Kopfs lädt noch (LLH-1166). Dann hält die Schleuse den Kopf nicht: aus „lädt“
+   * werden Daten, und ein ruhender Zeiger hielte sonst „lädt“ fest, bis er den Bereich verlässt.
+   * Ist die Quelle fertig, hält sie den dann gezeigten Kopf wie bisher.
+   */
+  kopfLaedt?: boolean;
   wurzeln: readonly K[];
   /** Gemerkt werden die ZUGEklappten Schlüssel: alles startet offen, Neues steht offen da. */
   zugeklappt: ReadonlySet<string>;
@@ -77,7 +83,7 @@ interface Props<K extends BaumKnoten<K>> {
 }
 
 export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>) {
-  const { bezeichnung, lfh, kopf, wurzeln } = props;
+  const { bezeichnung, lfh, kopf, kopfLaedt = false, wurzeln } = props;
   const { token, rollen } = useRollen();
   const druckt = useDruckModus();
   const bereichRef = useRef<HTMLElement>(null);
@@ -86,12 +92,21 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
   // ── Schleuse (LFH-867) ─────────────────────────────────────────────────────────────
   // `gehalten === null`: offen. Geschlossen wird mit dem gerade gezeigten Stand — bei offener
   // Schleuse ist das der frische.
-  const [gehalten, setGehalten] = useState<{ wurzeln: readonly K[]; kopf: ReactNode } | null>(null);
-  const frischRef = useRef({ wurzeln, kopf });
+  const [gehalten, setGehalten] = useState<{
+    wurzeln: readonly K[];
+    kopf: ReactNode;
+    kopfLaedt: boolean;
+  } | null>(null);
+  const frischRef = useRef({ wurzeln, kopf, kopfLaedt });
   // Erst nach dem Commit: ein verworfener Render darf „anzeigen“ keinen nie gezeigten Stand geben.
   useLayoutEffect(() => {
-    frischRef.current = { wurzeln, kopf };
+    frischRef.current = { wurzeln, kopf, kopfLaedt };
   });
+  // Geschlossen, während der Kopf lud: er lief live mit. Sind seine Quellen fertig, hält die
+  // Schleuse ab jetzt den Kopf, der gerade steht (LLH-1166).
+  useLayoutEffect(() => {
+    if (gehalten?.kopfLaedt && !kopfLaedt) setGehalten({ ...gehalten, kopf, kopfLaedt });
+  }, [gehalten, kopf, kopfLaedt]);
   const bedingungRef = useRef({ zeiger: false, fokus: false });
   const setzeBedingung = (art: 'zeiger' | 'fokus', wert: boolean) => {
     const b = { ...bedingungRef.current, [art]: wert };
@@ -146,7 +161,7 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
     () => schleuse(offen ? null : gehalten.wurzeln, wurzeln),
     [offen, gehalten, wurzeln],
   );
-  const gezeigterKopf = offen ? kopf : gehalten.kopf;
+  const gezeigterKopf = offen || gehalten.kopfLaedt ? kopf : gehalten.kopf;
   const wartet = wartendText(stand.wartend);
 
   /**

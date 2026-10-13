@@ -9,7 +9,8 @@ import { anmelden, einsatzAnlegen, organigramm, post } from './fuehrungsorganisa
  * der Weg durch Browser, Server und Live-Strom.
  *
  * Mutationsprobe: in `stab/funkplan.ts:fuehrungsstelleZeile` `leitung: { art: 'leer' }` setzen →
- * der Funkplan-Nachweis wird rot.
+ * der Funkplan-Nachweis wird rot. In `HaengenderBaum.tsx` `gezeigterKopf` ohne `kopfLaedt` →
+ * der Organigramm-Kopf bleibt auf „Leitung: lädt“ (LLH-1166).
  */
 
 test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im ETB', async ({
@@ -37,14 +38,25 @@ test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im 
   await expect(kopf).toHaveText(/BI Krause \(extern\)/);
 
   await post(page, einsatzId, 'abschnitte', { name: 'EA Nord' });
+  // Die Führungsstelle antwortet erst, wenn der Zeiger über dem Organigramm ruht: die Schleuse
+  // (LFH-867) hält die Knoten, lässt den ladenden Kopf aber zu Daten werden (LLH-1166).
+  let antworten = () => {};
+  const freigabe = new Promise<void>((r) => (antworten = r));
+  const fsPfad = `**/api/einsaetze/${einsatzId}/fuehrungsstelle`;
+  await page.route(fsPfad, async (route) => {
+    await freigabe;
+    await route.continue();
+  });
   await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
-  // Der Zeiger darf nicht über dem Organigramm ruhen: die Schleuse hielte den Kopf mit dem Stand
-  // beim Betreten (LFH-867), wie in `fuehrungsorganisation-kern.ts:oeffneOrganigramm`.
-  await page.mouse.move(0, 0);
-  await expect(organigramm(page).getByRole('link', { name: 'EA Nord' })).toBeVisible();
-  await expect(organigramm(page).getByRole('group', { name: 'Einsatzleitung' })).toContainText(
-    'BI Krause (extern)',
-  );
+  const bild = organigramm(page);
+  const wurzel = bild.getByRole('group', { name: 'Einsatzleitung' });
+  await bild.getByRole('link', { name: 'EA Nord' }).hover();
+  await expect(bild.locator('[data-lfh="org-stand"]')).toHaveText('Live pausiert');
+  await expect(wurzel).toContainText('Leitung: lädt');
+  antworten();
+  await expect(wurzel).toContainText('BI Krause (extern)');
+  await expect(bild.locator('[data-lfh="org-stand"]')).toHaveText('Live pausiert');
+  await page.unroute(fsPfad);
 
   await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
   await expect(page.locator('tr[data-row-key="fs"]')).toContainText('BI Krause (extern)');
