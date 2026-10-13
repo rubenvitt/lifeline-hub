@@ -99,6 +99,11 @@ interface ZeileBasis {
   /** Nebentext unter der Kennung (Besetzung, Art der Stelle), `null` = keiner. */
   nebentext: string | null;
   /**
+   * Warum der Nebentext nur „—“ zeigt (LLH-1180, design.md D8): die Besetzung kommt vom Stab, und
+   * der ist für die Person nicht frei. Fehlt, wenn der Nebentext für sich spricht.
+   */
+  nebentextGrund?: string;
+  /**
    * Kanäle einer externen Stelle als Nebentext (LFH-893), z. B. „TMO SL AS (geplant)“; gepflegt
    * in der Fernmeldeskizze. Führungsstelle, Funktionen, Abschnitte und Einheiten: leer (ihre
    * Sprechgruppen stehen im Funkplan).
@@ -176,15 +181,25 @@ function abgeleiteteVerbindung(
   ];
 }
 
-/** Nebentext einer Funktionszeile: die Besetzung der Sachgebiete S1–S6, sonst keiner. */
+/** Grund am „—“ der Besetzung, wenn der Stab nicht frei ist (LLH-1180, design.md D8). */
+export const STAB_NICHT_FREI_GRUND = 'Stab nicht freigegeben';
+
+/**
+ * Nebentext einer Funktionszeile: die Besetzung der Sachgebiete S1–S6, sonst keiner. Ist der Stab
+ * für die Person nicht frei, steht „—“ mit Grund: die Verbindung gehört der Stelle (Spec
+ * `stab-kommunikationsplan`), nur ihre Besetzung fehlt.
+ */
 function besetzungsText(
   stelle: KommunikationsStelle,
   stab: KommunikationsplanQuellen['stab'],
-): string | null {
+): { nebentext: string | null; nebentextGrund?: string } {
   const f = stelle.funktion;
-  if (f !== 's1' && f !== 's2' && f !== 's3' && f !== 's4' && f !== 's5' && f !== 's6') return null;
-  if (stab.zustand !== 'daten') return `Besetzung ${ZUSTAND_GRUND[stab.zustand]}`;
-  return besetzungDarstellung(zeileFuer(stab.daten, f)).label;
+  if (f !== 's1' && f !== 's2' && f !== 's3' && f !== 's4' && f !== 's5' && f !== 's6') {
+    return { nebentext: null };
+  }
+  if (stab.zustand === 'gesperrt') return { nebentext: '—', nebentextGrund: STAB_NICHT_FREI_GRUND };
+  if (stab.zustand !== 'daten') return { nebentext: `Besetzung ${ZUSTAND_GRUND[stab.zustand]}` };
+  return { nebentext: besetzungDarstellung(zeileFuer(stab.daten, f)).label };
 }
 
 /** Ein Kanal als Text: Bedingungszeichen wie in der Skizze, „geplant“ als Wort (D7). */
@@ -206,7 +221,9 @@ function gepflegteZeile(
     art: 'gepflegt',
     schluessel,
     kennung,
-    nebentext: istFunktion ? besetzungsText(stelle, stab) : STELLENART_LABEL[stelle.stellenart],
+    ...(istFunktion
+      ? besetzungsText(stelle, stab)
+      : { nebentext: STELLENART_LABEL[stelle.stellenart] }),
     kanaele: istFunktion ? [] : stelle.sprechgruppen.map(kanalText),
     stelle,
     verbindungen: stelle.verbindungen.map((v) => ({

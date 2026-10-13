@@ -20,7 +20,7 @@ geräteseitig vorhalten und nach einem Neuladen ohne Netz anzeigen:
 - **Betroffene** mit Personen und Unfallhilfsstellen
 - **Aufträge** mit Aufträgen und Befehlen
 - **Lagekarte** mit den Datenebenen des Einsatzes
-- **Kommunikationsplan** mit den gepflegten Stellen und Verbindungen des Stabs
+- **Kommunikationsplan** mit den gepflegten Stellen und Verbindungen des Fernmeldewesens
 
 Dazu SHALL das System die Rahmendaten vorhalten, ohne die diese Ansichten nicht darstellbar
 sind: Einsatzkopf, Modulfreigaben, Einsatzeinstellungen, Modulzähler, Einsatzliste,
@@ -54,6 +54,12 @@ Person zuvor mit Netz tatsächlich geladen hat.
 #### Scenario: Kommunikationsplan ohne Netz
 
 - **WHEN** eine Person den Kommunikationsplan mit Netz geöffnet hat und ohne Netz neu lädt
+- **THEN** zeigt er die zuletzt geladenen Stellen und Verbindungen
+
+#### Scenario: Kommunikationsplan ohne Stab
+
+- **WHEN** der Stab im Einsatz ausgeblendet ist und eine Person den Kommunikationsplan mit Netz
+  geöffnet hat und ohne Netz neu lädt
 - **THEN** zeigt er die zuletzt geladenen Stellen und Verbindungen
 
 ### Requirement: Nur die Allowlist wird geräteseitig gespeichert

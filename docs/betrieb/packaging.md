@@ -234,8 +234,10 @@ Die Ausgaben unter macOS und Windows sind aus Beispielen abgeleitet. Was nicht p
 „unbekannt“, nie „verschlüsselt“.
 
 **Docker/Hetzner:** Ein Volume auf einem LUKS-Host erkennt die Prüfung oft auch im Container.
-Den Swap des Hosts sieht sie dort aber nicht, das Ergebnis ist dann „unbekannt“. Liegt die
-Verschlüsselung beim Host, wird
+Eine Swap-Partition des Hosts (`/dev/dm-1`, `/dev/mapper/…`) findet sie über `/sys/class/block`,
+auch wenn die Gerätedatei im Container fehlt; dafür muss sysfs im Container lesbar sein (bei
+Docker und Podman Vorgabe). Eine Swap-**Datei** des Hosts sieht sie nicht, das Ergebnis ist dann
+„unbekannt“. Liegt die Verschlüsselung beim Host, wird
 `--datentraeger-verschluesselung-extern` (`LIFELINE_DATENTRAEGER_VERSCHLUESSELUNG_EXTERN=true`)
 gesetzt. Dann warnt „unbekannt“ nicht mehr. Ein erkannter unverschlüsselter Datenträger warnt
 weiter, die Zusicherung verdeckt keinen Befund.

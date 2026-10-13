@@ -79,7 +79,7 @@ import type { Herkunft } from './sprechgruppenplan';
 export const EINSATZLEITUNG = 'Einsatzleitung';
 
 /** Das Recht, das ein Element am Datensatz braucht (D5, D8). */
-export type Rechtsquelle = 'einsatzabschnitte' | 'einheiten' | 'verwaltung' | 'stab';
+export type Rechtsquelle = 'einsatzabschnitte' | 'einheiten' | 'verwaltung' | 'fernmeldewesen';
 
 /** Welche Rechte die Person im Einsatz hat; fehlt eines, ist es nicht da. */
 export type NetzRechte = Partial<Record<Rechtsquelle, boolean>>;
@@ -587,8 +587,8 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
       bezeichnung: st.bezeichnung?.trim() || STELLENART_LABEL[st.stellenart],
       rufname: null,
       ziel: kommunikationsplanPfad(q.einsatzId),
-      recht: 'stab',
-      schreibbar: schreibbar('stab'),
+      recht: 'fernmeldewesen',
+      schreibbar: schreibbar('fernmeldewesen'),
       luecken: [],
       stellenart: st.stellenart,
     });
@@ -601,8 +601,8 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
       bezeichnung: ko.bezeichnung?.trim() || komponentenartWort(ko.art),
       rufname: null,
       ziel: null,
-      recht: 'stab',
-      schreibbar: schreibbar('stab'),
+      recht: 'fernmeldewesen',
+      schreibbar: schreibbar('fernmeldewesen'),
       luecken: [],
       komponentenart: ko.art,
     });

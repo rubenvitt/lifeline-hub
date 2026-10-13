@@ -8,7 +8,7 @@ import FernmeldeskizzeBild from './FernmeldeskizzeBild';
 import { ZUSTAND_GRUND } from './funkplan';
 import { skizzeAlsPng } from './skizze/skizzeAlsBild';
 import { useNetzQuellen } from './useNetzQuellen';
-import { useStabFreigabe } from './useStabFreigabe';
+import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 
 /** Die Skizze als Bild mit dem Zeitpunkt, der darin als „Stand“ steht. */
 export interface SkizzenBild {
@@ -28,8 +28,8 @@ interface Props {
  * Nimmt die Fernmeldeskizze als Bild auf (LFH-1028), für die Anlage an Lagebericht oder Befehl.
  * Lädt beim Einhängen dieselben Quellen wie der Funkplan (`useNetzQuellen`), zeichnet die Skizze
  * außerhalb des Sichtbereichs in der Druckform und hell wie Papier (eigenes antd-Theme, Grund der
- * Fläche aus `farbenHell`) und meldet das PNG genau einmal. Fehlt die Fläche (Stab gesperrt,
- * Abschnitte nicht geladen), meldet sie den Grund; die übrigen fehlenden Quellen nennt die Skizze
+ * Fläche aus `farbenHell`) und meldet das PNG genau einmal. Fehlt die Fläche (Fernmeldewesen
+ * gesperrt, Abschnitte nicht geladen), meldet sie den Grund; die übrigen fehlenden Quellen nennt die Skizze
  * selbst wie auf dem Funkplan. Die Seite hängt den Baustein nur für die Dauer einer Aufnahme ein.
  */
 export default function SkizzenAufnahme({
@@ -38,9 +38,9 @@ export default function SkizzenAufnahme({
   onBild,
   onFehler,
 }: Props) {
-  const stabFreigabe = useStabFreigabe(einsatzId);
+  const freigabe = useModulFreigabe(einsatzId, 'fernmeldewesen');
   const ohneVerbindung = useOhneVerbindung();
-  const q = useNetzQuellen(einsatzId, stabFreigabe, ohneVerbindung);
+  const q = useNetzQuellen(einsatzId, freigabe, ohneVerbindung);
   const {
     abschnitte,
     einheiten,
@@ -83,7 +83,7 @@ export default function SkizzenAufnahme({
     ],
   );
   const laedt =
-    stabFreigabe.zustand === 'laden' ||
+    freigabe.zustand === 'laden' ||
     [
       abschnitte,
       einheiten,
@@ -95,9 +95,9 @@ export default function SkizzenAufnahme({
       skizze,
     ].some((x) => x.zustand === 'laden');
   const grund =
-    stabFreigabe.zustand === 'gesperrt'
-      ? 'Stab nicht freigegeben'
-      : stabFreigabe.zustand === 'fehler'
+    freigabe.zustand === 'gesperrt'
+      ? 'Fernmeldewesen nicht freigegeben'
+      : freigabe.zustand === 'fehler'
         ? 'Freigaben nicht geladen'
         : !laedt && abschnitte.zustand !== 'daten'
           ? `Abschnitte ${ZUSTAND_GRUND[abschnitte.zustand]}`

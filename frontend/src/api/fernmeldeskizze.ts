@@ -19,7 +19,8 @@ import type {
  * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D5, D14).
  *
  * - **Skizzendaten** (Lage, Schriftfeld, Komponenten, Verbindungen, Bereiche) unter
- *   `…/stab/fernmeldeskizze`, Recht des Stabs, Live über das `stab`-Ereignis.
+ *   `…/stab/fernmeldeskizze`, Recht des Fernmeldewesens (LLH-1180), Live über das
+ *   `fernmeldewesen`-Ereignis.
  * - **Einzel-Zuordnungen** (D5): eine Sprechgruppe an genau EINEN Datensatz setzen oder davon
  *   lösen, idempotent, am Pfad des Datensatzes und mit dessen Recht. Der PATCH mit
  *   `sprechgruppe_ids` (ganze Menge) bleibt den Formularen.

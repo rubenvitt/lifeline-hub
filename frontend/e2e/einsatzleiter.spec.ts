@@ -46,7 +46,7 @@ test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im 
     'BI Krause (extern)',
   );
 
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
   await expect(page.locator('tr[data-row-key="fs"]')).toContainText('BI Krause (extern)');
 
   const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);

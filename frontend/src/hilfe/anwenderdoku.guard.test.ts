@@ -15,7 +15,8 @@ import { leseKapitel, type Kapitel } from './kapitel';
  * verwaist liegt oder ohne Alt-Text steht, fiele sonst erst beim Lesen auf.
  *
  * ── Was er prüft ───────────────────────────────────────────────────────────────
- *   • Kopf vollständig und lesbar (`leseKapitel`), Reihenfolge eindeutig;
+ *   • Kopf vollständig und lesbar (`leseKapitel`), Reihenfolge eindeutig; der Titel ohne „: “ und
+ *     „ #“, denn die Website liest den Kopf als YAML (Astro bricht sonst den Bau ab);
  *   • jeder Pfad unter `quellen:` existiert;
  *   • Links auf `*.md` treffen ein Kapitel und tragen keine Sprungmarke;
  *   • nur reines GFM: kein HTML, keine MDX-Importe — Codeblöcke und Inline-Code ausgenommen;
@@ -233,6 +234,8 @@ describe('Anwenderdokumentation', () => {
     expect(kapitel.length).toBeGreaterThan(0);
     const folge = kapitel.map((k) => k.reihenfolge);
     expect(new Set(folge).size, `Reihenfolge doppelt: ${folge.join(', ')}`).toBe(folge.length);
+    const kaputt = kapitel.filter((k) => /: | #/.test(k.titel)).map((k) => k.slug);
+    expect(kaputt, 'Titel mit „: “ oder „ #“ ist kein YAML-Wert').toEqual([]);
   });
 
   it('Quellen, Links und Form stimmen', () => {

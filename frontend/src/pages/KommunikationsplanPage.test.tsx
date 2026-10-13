@@ -223,9 +223,12 @@ afterEach(() => setzeOnline(true));
 function setup() {
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/stab/kommunikationsplan" element={<KommunikationsplanPage />} />
+      <Route
+        path="/einsaetze/:id/fernmeldewesen/kommunikationsplan"
+        element={<KommunikationsplanPage />}
+      />
     </Routes>,
-    { route: '/einsaetze/1/stab/kommunikationsplan' },
+    { route: '/einsaetze/1/fernmeldewesen/kommunikationsplan' },
   );
 }
 
@@ -237,7 +240,7 @@ describe('KommunikationsplanPage — Anzeige', () => {
   it('zeigt Gruppen, Stellen, Besetzung und Verbindungen mit wählbarer Nummer', async () => {
     const { container } = setup();
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Kommunikationsplan' }),
+      await screen.findByRole('heading', { level: 1, name: 'Fernmeldewesen' }),
     ).toBeInTheDocument();
     await screen.findByText('Polizei PI Nord');
     for (const titel of ['Einsatzleitung und Stab', 'Abschnitte', 'Einheiten', 'Externe Stellen']) {
@@ -496,7 +499,7 @@ describe('KommunikationsplanPage — Fernmeldeskizze (LFH-893)', () => {
   });
 });
 
-describe('KommunikationsplanPage — Sperre des Stabs', () => {
+describe('KommunikationsplanPage — Sperre des Fernmeldewesens', () => {
   it('zeigt nichts, solange die Freigabe offen ist, und fragt den Plan nicht an', async () => {
     vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise(() => {}));
     const { container } = setup();
@@ -508,18 +511,33 @@ describe('KommunikationsplanPage — Sperre des Stabs', () => {
   it('zeigt bei Fehler der Freigabe einen Fehler mit Wiederholen', async () => {
     vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     setup();
-    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Freigabe des Moduls Fernmeldewesen nicht ermittelbar/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Erneut/ })).toBeInTheDocument();
     expect(ladeKommunikationsplan).not.toHaveBeenCalled();
   });
 
-  it('ist nicht erreichbar, wenn der Stab ausgeblendet ist', async () => {
+  it('ist nicht erreichbar, wenn das Fernmeldewesen ausgeblendet ist', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: false } }),
+      freigabenFixture({ fernmeldewesen: { sichtbar: false } }),
     );
     setup();
-    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(ladeKommunikationsplan).not.toHaveBeenCalled();
+  });
+
+  // LLH-1180, design.md D8: der Stab ist nur noch die Quelle der Besetzung.
+  it('ohne Stab: Verbindungen und Schreiben bleiben, die Besetzung steht als „—“ mit Grund', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    );
+    const { container } = setup();
+    expect(await screen.findByText('0170 1234567')).toBeInTheDocument();
+    const s2 = zeile(container, 'st-1');
+    expect(within(s2).getByTitle('Stab nicht freigegeben')).toHaveTextContent('—');
+    expect(screen.getByRole('button', { name: 'Stelle hinzufügen' })).toBeEnabled();
+    expect(ladeStab).not.toHaveBeenCalled();
   });
 });
 
