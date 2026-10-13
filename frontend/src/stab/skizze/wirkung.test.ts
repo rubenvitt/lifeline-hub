@@ -16,7 +16,12 @@ const BN_BOS = sg(1, 'TMO', 'BN_BOS');
 const F314 = sg(2, 'DMO', '314_F*');
 const SL_AS = sg(3, 'TMO', 'SL AS');
 
-const ALLE: NetzRechte = { einsatzabschnitte: true, einheiten: true, verwaltung: true, stab: true };
+const ALLE: NetzRechte = {
+  einsatzabschnitte: true,
+  einheiten: true,
+  verwaltung: true,
+  fernmeldewesen: true,
+};
 const PULT: Bedienkontext = { aktionen: true, mobil: false };
 
 function netz(rechte: NetzRechte = ALLE) {
@@ -70,7 +75,7 @@ describe('Ablegen nach dem Ziehen (5.2, 6.2, 7.3)', () => {
   });
 
   it('Stelle ohne Recht an ihrem Datensatz auf eine Schiene: abgelehnt mit Grund, kein Verschieben', () => {
-    const { n, plaetze, kontext } = aufbau({ stab: true, einsatzabschnitte: true });
+    const { n, plaetze, kontext } = aufbau({ fernmeldewesen: true, einsatzabschnitte: true });
     const w = ablageWirkung(n, plaetze, kontext, {
       daten: { art: 'stelle', key: 'eh-10' },
       ende: aufSchiene(plaetze, 'sg-1'),
@@ -174,7 +179,7 @@ describe('Ablegen nach dem Ziehen (5.2, 6.2, 7.3)', () => {
         ende: { x: ab.x + 4, y: ab.y + 4 },
         weg: { x: 0, y: 0 },
       }),
-    ).toEqual({ art: 'abgelehnt', element: 'eh-10', grund: 'Stab: kein Schreibrecht' });
+    ).toEqual({ art: 'abgelehnt', element: 'eh-10', grund: 'Fernmeldewesen: kein Schreibrecht' });
   });
 
   it('Stichleitung von der Schiene weggezogen: lösen; nah an der Schiene: nichts', () => {
@@ -342,7 +347,7 @@ describe('Tasten am Element (5.3, 6.3)', () => {
     expect(tastenWirkung(n, plaetze, PULT, { art: 'verschiebe', dx: 1, dy: 0 }, 'eh-10')).toEqual({
       art: 'abgelehnt',
       element: 'eh-10',
-      grund: 'Stab: kein Schreibrecht',
+      grund: 'Fernmeldewesen: kein Schreibrecht',
     });
   });
 });

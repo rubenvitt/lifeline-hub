@@ -83,7 +83,7 @@ async function seede(page: Page, einsatzId: string) {
 const tabelle = (page: Page) => page.getByRole('region', { name: 'Kommunikationsplan' });
 
 async function oeffne(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/stab/kommunikationsplan`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`);
   // Datenanker: die Nummer steht erst, wenn der gepflegte Plan geladen ist.
   await expect(tabelle(page).getByRole('link', { name: NUMMER })).toBeVisible();
   await expect(tabelle(page).getByText(ABSCHNITT)).toBeVisible();

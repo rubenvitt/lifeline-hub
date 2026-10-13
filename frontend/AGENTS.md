@@ -294,13 +294,15 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
 Die Arbeitsseiten des Stabs (LLH-1127) sind Marken hinter „Stab“ (Ziel `stab`, nach Sachgebiet;
-Name und Pfad aus `stab/unterseiten.ts`, dazu die Fernmeldeskizze als Funkplan-Ansicht). Gesperrt
+Name und Pfad aus `stab/unterseiten.ts`); Fernmeldeskizze und Kommunikationsplan sind Marken
+hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Funkplan“ gibt es nicht. Gesperrt
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
 `frontend/src/command-palette/AGENTS.md`) und trägt dafür `schlagworte`.
 
-**Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch
-`pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten, `src/stab/`, `src/presse/`,
-`src/infotelefon/`): `frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
+**Stab und Fernmeldewesen** (Fernmeldewesen mit Funkplan, Skizze und Kommunikationsplan,
+Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch `pages/StabPage.tsx`,
+`pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, `fernmeldewesen/`, die S5-Seiten,
+`src/stab/`, `src/presse/`, `src/infotelefon/`): `frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
 Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/lagebesprechung/`):
 `frontend/src/lagebesprechung/AGENTS.md`.
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
@@ -705,7 +707,8 @@ Spec `bedien-arbeitsplatz`).
   jede Route in ein gesperrtes Modul ab (`ModulGesperrt`, LFH-888,
   `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`) und wartet
   beim Kaltstart auf die Freigaben; die Zielseite prüft weiter ihren Datensatz. Verweise in
-  Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen S1–S6 ebenso (LFH-46).
+  Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen und Fernmeldewesen ebenso
+  (LFH-46, LLH-1180).
 - **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
   (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
   Palette führt „Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.

@@ -295,7 +295,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     const strom = tabelle.waitForResponse(
       (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
     );
-    await tabelle.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+    await tabelle.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
     await strom;
     const zeile = tabelle
       .getByRole('region', { name: 'Funkplan' })
@@ -501,7 +501,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   ).toHaveCount(0);
 
   expect(await zaehle(), 'kein Abschnitt, keine Einheit hinzugekommen').toEqual(vorher);
-  await page.goto(`/einsaetze/${einsatzId}/stab/kommunikationsplan`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`);
   const plan = page.getByRole('region', { name: 'Kommunikationsplan' });
   const zeile = plan.locator('tr').filter({ hasText: 'ILS Musterhausen' });
   await expect(zeile).toHaveCount(1);

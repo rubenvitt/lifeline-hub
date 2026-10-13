@@ -7,37 +7,53 @@ Bedingungszeichen, Stellen als Führungsstellen-Kästen und Einheiten als taktis
 externe Stellen, Punkt-zu-Punkt-Verbindungen, Komponenten, rückwärtiger Bereich und Schriftfeld.
 Zuordnungen und Rufnamen stehen in den Datensätzen der Stellen; nur was es dort nicht gibt
 (Lage, Verbindungen, Komponenten, Bereiche, Schriftfeld) speichert die Skizze selbst. Das
-Bearbeiten regelt `stab-fernmeldeskizze-bearbeitung`.
+Bearbeiten regelt `stab-fernmeldeskizze-bearbeitung`. Die Skizze gehört zum Modul Fernmeldewesen
+(Fähigkeit `fernmeldewesen`).
 
 ## Requirements
 
 ### Requirement: Zweite Darstellung des Funkplans
 
-Die Fernmeldeskizze SHALL als zweite Darstellung der Funkplan-Seite erreichbar sein. Ein Umschalter
-„Tabelle | Skizze | Sprechgruppen“ steht auf der Seite. Die Sichtvorgabe `?ansicht=skizze` öffnet die Skizze, danach
-wird der Parameter aus der Adresse entfernt, ein unbrauchbarer Wert ebenso. Die Skizze MUST NOT als
-eigenes Modul erscheinen. Sie MUST die Stab-Freigabe der Funkplan-Seite erben.
+Die Fernmeldeskizze SHALL als zweite Darstellung der Funkplan-Seite im Modul Fernmeldewesen
+erreichbar sein, als Reiter „Fernmeldeskizze“ neben „Funkplan“, „Sprechgruppen“ und
+„Kommunikationsplan“. Die Sichtvorgabe `?ansicht=skizze` öffnet die Skizze, danach wird der
+Parameter aus der Adresse entfernt, ein unbrauchbarer Wert ebenso. Die Skizze MUST NOT als eigenes
+Modul erscheinen. Sie MUST Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben, nicht die des
+Stabs.
 
 #### Scenario: Umschalten
 
-- **WHEN** eine Person mit Leserecht auf den Stab den Funkplan öffnet und „Skizze“ wählt
+- **WHEN** eine Person mit Leserecht auf das Fernmeldewesen den Funkplan öffnet und den Reiter
+  „Fernmeldeskizze“ wählt
 - **THEN** zeigt die Seite die Fernmeldeskizze statt der Tabelle, und das Lücken-Paneel bleibt
   stehen
 
 #### Scenario: Sichtvorgabe aus einem Link
 
+- **WHEN** eine Person `/einsaetze/:id/fernmeldewesen?ansicht=skizze` öffnet
+- **THEN** steht die Darstellung auf „Fernmeldeskizze“, und `ansicht` ist aus der Adresse entfernt
+
+#### Scenario: Sichtvorgabe über die alte Adresse
+
 - **WHEN** eine Person `/einsaetze/:id/stab/funkplan?ansicht=skizze` öffnet
-- **THEN** steht die Darstellung auf „Skizze“, und `ansicht` ist aus der Adresse entfernt
+- **THEN** landet sie im Modul Fernmeldewesen in der Darstellung „Fernmeldeskizze“
 
 #### Scenario: Unbrauchbarer Wert
 
 - **WHEN** eine Person `?ansicht=quatsch` öffnet
-- **THEN** bleibt die Darstellung „Tabelle“, und der Parameter ist aus der Adresse entfernt
+- **THEN** bleibt die Darstellung „Funkplan“, und der Parameter ist aus der Adresse entfernt
 
 #### Scenario: Stab gesperrt
 
-- **WHEN** das Stab-Modul für die Person gesperrt ist und sie `?ansicht=skizze` öffnet
-- **THEN** sieht sie weder Tabelle noch Skizze, sondern dieselbe Sperranzeige wie beim Funkplan
+- **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist und das
+  Fernmeldewesen frei
+- **THEN** zeigt die Skizze alle Elemente, und eine Person mit Schreibrecht kann sie bearbeiten
+
+#### Scenario: Fernmeldewesen gesperrt
+
+- **WHEN** das Modul Fernmeldewesen für die Person gesperrt ist und sie `?ansicht=skizze` öffnet
+- **THEN** sieht sie weder Tabelle noch Skizze, sondern den einheitlichen Hinweis für
+  „Fernmeldewesen“
 
 ### Requirement: Knoteninhalt ohne erfundene Angaben
 
@@ -118,7 +134,7 @@ Sind die Abschnitte gesperrt oder nicht geladen, SHALL die Skizze statt der Flä
 und MUST NOT Einheiten ohne Abschnitt zeigen. Fehlen nur die Einheiten, die Fahrzeuge, die
 Stab-Besetzung, die externen Stellen oder die Daten der Skizze, SHALL die Skizze das Übrige zeigen
 und je fehlender Quelle den Grund nennen. Eine fehlende Quelle MUST NOT als leerer Bestand
-erscheinen.
+erscheinen. Die Stab-Besetzung SHALL die Skizze nur abrufen, wenn der Stab für die Person frei ist.
 
 #### Scenario: Abschnitte gesperrt
 
@@ -142,6 +158,13 @@ erscheinen.
 - **WHEN** das Modul Fahrzeuge für die Person gesperrt ist
 - **THEN** zeigt die Skizze alle Kästen ohne Führungsmittel und den Hinweis „Fahrzeuge: nicht
   freigegeben“
+
+#### Scenario: Stab nicht frei
+
+- **WHEN** das Fernmeldewesen frei ist, der Stab aber ausgeblendet oder gesperrt
+- **THEN** zeigt der Kasten „Einsatzleitung“ keine Sachgebietszeichen, die Skizze nennt
+  „Stab-Besetzung: nicht freigegeben“, alles Übrige steht vollständig, und es geht keine Anfrage
+  an den Stab
 
 ### Requirement: Lesbar ohne waagerechtes Scrollen
 

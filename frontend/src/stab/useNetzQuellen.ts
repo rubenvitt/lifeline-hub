@@ -14,7 +14,7 @@ import type { EinsatzFahrzeug, ModulFreigaben, Stabsfunktion } from '../api/type
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import type { KanalQuellen, Quelle, SkizzenQuelle } from './luecken';
-import type { StabFreigabe } from './useStabFreigabe';
+import type { ModulFreigabe } from '../einsatz/useModulFreigabe';
 
 /**
  * Eine Liste als Quelle des Funkplans, identitätsstabil je Daten und Zustand. Ein Fehler MIT
@@ -85,7 +85,7 @@ export interface NetzQuellen extends KanalQuellen {
   fahrzeuge: Quelle<EinsatzFahrzeug>;
   /** Stab-Besetzung: die besetzten Sachgebiete im Kasten der Einsatzleitung (LFH-1029). */
   besetzung: Quelle<Stabsfunktion>;
-  /** Die Modul-Freigaben, solange der Stab frei ist. */
+  /** Die Modul-Freigaben, solange das Fernmeldewesen frei ist. */
   freigaben: ModulFreigaben | undefined;
   /** Cache-Zeitstempel der gezeigten Quellen, für `gemeinsamerDatenstand`. */
   zeitstempel: readonly (number | undefined)[];
@@ -96,17 +96,20 @@ export interface NetzQuellen extends KanalQuellen {
  * eigene Führungsstelle, Stab-Besetzung, Stellen des Kommunikationsplans und Daten der Skizze,
  * jede mit eigener Weiche.
  * Der Funkplan liest sie für Tabelle, Skizze und Sprechgruppen, Lagebericht und Befehl für die
- * Skizze als Anlage (LFH-1028). Die Sperre des Stabs gilt für alle: eine Liste läuft erst, wenn
- * der Stab frei ist UND der Server ihr Modul freigibt (LFH-669, Keys nach `PFAD_KEY`).
+ * Skizze als Anlage (LFH-1028). Die Sperre des Fernmeldewesens gilt für alle (LLH-1180): eine
+ * Liste läuft erst, wenn das Fernmeldewesen frei ist UND der Server ihr Modul freigibt (LFH-669,
+ * Keys nach `PFAD_KEY`). Die Stab-Besetzung hat ihre eigene Weiche auf `stab` (design.md D8): ohne
+ * Stab fehlen nur die Sachgebiete im Kasten, mit Grund.
  */
 export function useNetzQuellen(
   einsatzId: number,
-  stabFreigabe: StabFreigabe,
+  freigabe: ModulFreigabe,
   ohneVerbindung: boolean,
 ): NetzQuellen {
-  const stabFrei = stabFreigabe.zustand === 'frei';
-  const freigaben = stabFrei ? stabFreigabe.freigaben : undefined;
-  const frei = (key: string) => stabFrei && istKeyFreigegeben(key, stabFreigabe.freigaben);
+  const modulFrei = freigabe.zustand === 'frei';
+  const freigaben = modulFrei ? freigabe.freigaben : undefined;
+  const frei = (key: string) => modulFrei && istKeyFreigegeben(key, freigabe.freigaben);
+  const stabFrei = frei('stab');
   const abschnitteFrei = frei('einsatzabschnitte');
   const einheitenFrei = frei('einheiten');
   const fahrzeugeFrei = frei('fahrzeuge');
@@ -137,16 +140,16 @@ export function useNetzQuellen(
     queryFn: () => ladeFuehrungsstelle(einsatzId),
   });
   // LFH-893: die Stellen des Kommunikationsplans (offline lesbar) und die Daten der Skizze (nicht
-  // offline), beide am Stab, live über `stab`.
+  // offline), beide am Fernmeldewesen (LLH-1180), live über `fernmeldewesen`.
   const stellenQuery = useQuery({
-    queryKey: einsatzKeys.stabKommunikationsplan(einsatzId),
+    queryKey: einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId),
     queryFn: () => ladeKommunikationsplan(einsatzId),
-    enabled: stabFrei,
+    enabled: modulFrei,
   });
   const skizzeQuery = useQuery({
-    queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId),
+    queryKey: einsatzKeys.fernmeldewesenSkizze(einsatzId),
     queryFn: () => ladeFernmeldeskizze(einsatzId),
-    enabled: stabFrei,
+    enabled: modulFrei,
   });
   // LFH-1029: die Stab-Besetzung für die Sachgebiete im Kasten der Einsatzleitung, live über `stab`.
   const stabQuery = useQuery({
@@ -161,8 +164,8 @@ export function useNetzQuellen(
   const fahrzeuge = useQuelle(fahrzeugeQuery, fahrzeugeFrei);
   const sprechgruppen = useQuelle(sprechgruppenQuery);
   const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
-  const stellen = useQuelle(stellenQuery, stabFrei, ohneVerbindung);
-  const skizze = useSkizzenQuelle(skizzeQuery, stabFrei, ohneVerbindung);
+  const stellen = useQuelle(stellenQuery, modulFrei, ohneVerbindung);
+  const skizze = useSkizzenQuelle(skizzeQuery, modulFrei, ohneVerbindung);
   const besetzung = useQuelle(stabQuery, stabFrei, ohneVerbindung);
 
   return {
@@ -184,7 +187,7 @@ export function useNetzQuellen(
       fuehrungsstelleQuery.dataUpdatedAt,
       stellenQuery.dataUpdatedAt,
       skizzeQuery.dataUpdatedAt,
-      stabQuery.dataUpdatedAt,
+      stabFrei ? stabQuery.dataUpdatedAt : undefined,
     ],
   };
 }

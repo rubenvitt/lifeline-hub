@@ -146,7 +146,7 @@ const RECHT_WORT: Record<Rechtsquelle, string> = {
   einsatzabschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
   verwaltung: 'Einsatzverwaltung',
-  stab: 'Stab',
+  fernmeldewesen: 'Fernmeldewesen',
 };
 
 /** Wortlaut für ein fehlendes Recht, z. B. „Einheiten: kein Schreibrecht“. */
@@ -169,12 +169,14 @@ export function griffGrund(netz: Fernmeldenetz, key: string, k: Bedienkontext): 
   if (flaeche) return flaeche;
   const stelle = netz.stellen.find((s) => s.key === key);
   if (stelle) return stelle.schreibbar ? null : rechtGrund(stelle.recht);
-  return netz.rechte.stab === true ? null : rechtGrund('stab');
+  return netz.rechte.fernmeldewesen === true ? null : rechtGrund('fernmeldewesen');
 }
 
 /** Warum nichts verschoben, angelegt oder entfernt werden kann (Skizzeneigenes braucht Stab). */
 export function lageGrund(netz: Fernmeldenetz, k: Bedienkontext): string | null {
-  return flaechenGrund(k) ?? (netz.rechte.stab === true ? null : rechtGrund('stab'));
+  return (
+    flaechenGrund(k) ?? (netz.rechte.fernmeldewesen === true ? null : rechtGrund('fernmeldewesen'))
+  );
 }
 
 // ── „Verbinden mit …“ ───────────────────────────────────────────────────────────────────────
@@ -225,7 +227,7 @@ export function verbindenZiele(
         .filter((z) => passt(z.label))
     : [];
   const stellen: VerbindenZiel[] =
-    netz.rechte.stab === true
+    netz.rechte.fernmeldewesen === true
       ? netz.stellen
           .filter((s) => s.key !== quelle && passt(s.bezeichnung, s.rufname))
           .map((s) => ({

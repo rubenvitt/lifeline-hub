@@ -29,6 +29,7 @@ describe('EINSATZ_KEYS', () => {
     // Konstante gegen sich selbst. Ein geänderter Query-Key trifft still ein anderes Cache-Fach.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
     expect(EINSATZ_KEYS.lagebesprechung).toBe('einsatz-lagebesprechung');
+    expect(EINSATZ_KEYS.fernmeldewesen).toBe('einsatz-fernmeldewesen');
     expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
@@ -189,6 +190,18 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz-fuehrungsstelle',
     ]);
     expect(EINSATZ_STREAM_EVENTS.einsatz).not.toContain('einsatz-stab');
+  });
+
+  // LLH-1180: Kommunikationsplan und Skizze gehören dem Fernmeldewesen. Sein Ereignis trifft nur
+  // den eigenen Prefix; `stab` behält Besetzung samt Auflösung (Aufträge, Erinnerungen).
+  it('bildet fernmeldewesen auf das eigene Modul ab, stab nicht mehr auf Kommunikationsplan und Skizze', () => {
+    expect(EINSATZ_STREAM_EVENTS.fernmeldewesen).toEqual(['einsatz-fernmeldewesen']);
+    expect(EINSATZ_STREAM_EVENTS.stab).toEqual([
+      'einsatz-stab',
+      'einsatz-auftraege',
+      'einsatz-erinnerungen',
+      'einsatz-modul-zaehler',
+    ]);
   });
 
   it('mappt jedes Wire-Event auf mindestens einen Key', () => {
@@ -380,6 +393,13 @@ describe('einsatzKeys (Factory-Output)', () => {
     // das `lagebesprechung`-Ereignis invalidiert beide.
     expect(einsatzKeys.lagebesprechung(1)).toEqual(['einsatz-lagebesprechung', 1]);
     expect(einsatzKeys.lagebesprechungen(1)).toEqual(['einsatz-lagebesprechung', 1, 'verlauf']);
+    // Fernmeldewesen (LLH-1180): Kommunikationsplan und Skizze unter EINEM eigenen Prefix.
+    expect(einsatzKeys.fernmeldewesenKommunikationsplan(1)).toEqual([
+      'einsatz-fernmeldewesen',
+      1,
+      'kommunikationsplan',
+    ]);
+    expect(einsatzKeys.fernmeldewesenSkizze(1)).toEqual(['einsatz-fernmeldewesen', 1, 'skizze']);
     // LFH-551: unter demselben Prefix — das `stab`-Ereignis zieht die Checkliste mit.
     expect(einsatzKeys.stabCheckliste(1)).toEqual(['einsatz-stab', 1, 'checkliste']);
     // Liste und Vorgaben UNTER dem Ablösungs-Prefix: das `abloesung`-Ereignis trifft beide.

@@ -199,9 +199,9 @@ export function ablageWirkung(
         daten.key,
       );
       if (!nach) return NICHTS;
-      return netz.rechte.stab === true
+      return netz.rechte.fernmeldewesen === true
         ? { art: 'verbinden', von: daten.key, nach }
-        : { art: 'abgelehnt', element: daten.key, grund: rechtGrund('stab') };
+        : { art: 'abgelehnt', element: daten.key, grund: rechtGrund('fernmeldewesen') };
     }
     case 'stich': {
       const platz = plaetze.get(daten.schiene);

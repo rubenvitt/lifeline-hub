@@ -47,25 +47,28 @@ Besetzung und Checkliste bedienen Einsatzleitung und Führungspersonal, solange 
 Wer das nicht darf, sieht den Grund unter dem Seitenkopf. Einzelheiten stehen in
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
-Ist das Modul Stab für den Einsatz nicht freigegeben, sind auch seine Unterseiten (Funkplan,
-Kommunikationsplan, Pressearbeit, Informationstelefon) gesperrt: „… nicht verfügbar“, „Modul Stab
-nicht freigegeben“. Die Lagebesprechung hat ihre eigene Freigabe; ist sie gesperrt, steht
-„Zur Lagebesprechung (Keine Berechtigung)“ gesperrt da.
+Ist das Modul Stab für den Einsatz nicht freigegeben, sind auch seine Unterseiten (Pressearbeit,
+Informationstelefon) gesperrt: „… nicht verfügbar“, „Modul Stab nicht freigegeben“. Die
+Lagebesprechung und das Fernmeldewesen (Funkplan, Fernmeldeskizze, Kommunikationsplan) haben ihre
+eigene Freigabe und bleiben nutzbar, wenn der Stab ausgeblendet ist; ist eines davon gesperrt,
+steht der Verweis dorthin gesperrt da, etwa „Funkplan (Keine Berechtigung)“.
 
 ### Die Zeilen der Besetzung
 
 Jede Zeile nennt das Sachgebiet mit der Bezeichnung der Organisation, seine Aufgaben mit der
 Fundstelle in der FwDV 100 und die Werkzeuge des Sachgebiets als Verweise, etwa „Personal“ und
 „Einheiten“ bei S1, „Lagekarte“ und „ETB“ bei S2, „Pressearbeit“ und
-„Informationstelefon“ bei S5, „Funkplan“ und „Kommunikationsplan“ bei S6. Ein Verweis auf ein
-gesperrtes Modul fehlt. Eine Besetzung wird überschrieben; die App führt keine Historie, der
+„Informationstelefon“ bei S5, „Funkplan“ und „Kommunikationsplan“ bei S6; die beiden S6-Verweise
+springen in das Modul Fernmeldewesen (siehe
+[Fernmeldewesen](funkplan.md)). Ein Verweis auf ein gesperrtes Werkzeug-Modul fehlt. Eine Besetzung wird überschrieben; die App führt keine Historie, der
 Verlauf steht im Einsatztagebuch.
 
 ### Ohne Umweg über die Stab-Seite
 
-Pressearbeit, Informationstelefon, Funkplan, Fernmeldeskizze und Kommunikationsplan stehen auch in
-der Modulliste direkt unter „Stab“, in dieser Reihenfolge, und in der Sprungpalette unter
-„Ansichten“: „Funk“ findet den Funkplan, „Bürgertelefon“ das Informationstelefon. „Anruf erfassen“
+Pressearbeit und Informationstelefon stehen auch in der Modulliste direkt unter „Stab“, in dieser
+Reihenfolge, und in der Sprungpalette unter „Ansichten“: „Bürgertelefon“ findet das
+Informationstelefon. Fernmeldeskizze und Kommunikationsplan stehen unter „Fernmeldewesen“ in der
+Kategorie „Kommunikation“; „Funk“ findet das Fernmeldewesen. „Anruf erfassen“
 in der Palette öffnet das Informationstelefon mit dem Cursor in der Erfassung. Ist der Stab
 gesperrt, stehen die Einträge in der Modulliste mit Schloss und fehlen in der Palette; ist er
 ausgeblendet, fehlen sie überall.

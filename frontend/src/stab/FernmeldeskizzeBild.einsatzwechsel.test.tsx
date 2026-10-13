@@ -16,7 +16,12 @@ import type { SkizzenAktionen } from './skizzenAktionen';
  * Befehlsstapel, Wahl), darf im nächsten nicht weiterleben.
  */
 
-const ALLE: NetzRechte = { einsatzabschnitte: true, einheiten: true, verwaltung: true, stab: true };
+const ALLE: NetzRechte = {
+  einsatzabschnitte: true,
+  einheiten: true,
+  verwaltung: true,
+  fernmeldewesen: true,
+};
 
 function netz(einsatzId: number): Fernmeldenetz {
   return baueFernmeldenetz({
