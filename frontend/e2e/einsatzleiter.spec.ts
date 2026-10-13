@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { anmelden, einsatzAnlegen, organigramm, post } from './fuehrungsorganisation-kern';
+import { doppelteSchluesselVerbieten } from './react-schluessel-kern';
 
 /**
  * Einsatzleiter an der eigenen Führungsstelle (LFH-1199, Spec `einsatz-fuehrungsstelle`): über
@@ -11,6 +12,8 @@ import { anmelden, einsatzAnlegen, organigramm, post } from './fuehrungsorganisa
  * Mutationsprobe: in `stab/funkplan.ts:fuehrungsstelleZeile` `leitung: { art: 'leer' }` setzen →
  * der Funkplan-Nachweis wird rot.
  */
+
+doppelteSchluesselVerbieten();
 
 test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im ETB', async ({
   page,

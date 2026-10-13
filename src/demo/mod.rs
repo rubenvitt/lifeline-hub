@@ -56,7 +56,8 @@ pub struct DemoImportKopf {
     pub einsatz_bezeichnung: String,
 }
 
-/// Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.
+/// Ergebnis eines Imports oder eines Entfernens, je Stammdatenart (Fahrzeug, Personal, Material,
+/// Einheiten-Vorlage).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DemoBericht {
     pub vorgang: DemoVorgang,
@@ -96,6 +97,7 @@ wire_enum! {
         Fahrzeug => "fahrzeug",
         Personal => "personal",
         Material => "material",
+        EinheitVorlage => "einheit_vorlage",
     }
 }
 

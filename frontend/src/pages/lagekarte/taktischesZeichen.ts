@@ -76,6 +76,30 @@ export type FachaufgabeId =
   | 'versorgung-elektrizitaet'
   | 'fuehrung';
 
+/**
+ * Auswahl der Fachaufgabe eines taktischen Zeichens: Override im Inspector der Lagekarte und
+ * Zeichen einer Einheiten-Vorlage (LLH-1042). Eine Teilmenge von {@link FachaufgabeId}.
+ */
+export const FACHAUFGABE_OPTIONS: { value: FachaufgabeId; label: string }[] = [
+  { value: 'rettungswesen', label: 'Rettungswesen/Sanität' },
+  { value: 'aerztliche-versorgung', label: 'Ärztliche Versorgung' },
+  { value: 'betreuung', label: 'Betreuung' },
+  { value: 'verpflegung', label: 'Verpflegung' },
+  { value: 'fuehrung', label: 'Führung' },
+  { value: 'bergung', label: 'Bergung' },
+  { value: 'wasserrettung', label: 'Wasserrettung' },
+];
+
+/** Auswahl der Organisation eines taktischen Zeichens (Inspector, Einheiten-Vorlage). */
+export const ORGANISATION_OPTIONS: { value: OrganisationId; label: string }[] = [
+  { value: 'feuerwehr', label: 'Feuerwehr' },
+  { value: 'thw', label: 'THW' },
+  { value: 'hilfsorganisation', label: 'Hilfsorganisation' },
+  { value: 'polizei', label: 'Polizei' },
+  { value: 'bundeswehr', label: 'Bundeswehr' },
+  { value: 'zivil', label: 'Zivil' },
+];
+
 /** Einheitsgrößen aus dem Typ-Label einer Einheit. */
 export type EinheitId = 'trupp' | 'staffel' | 'gruppe' | 'zug' | 'zugtrupp';
 

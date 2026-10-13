@@ -1,3 +1,30 @@
+## [1.0.0-alpha.123](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.122...v1.0.0-alpha.123) (2026-10-13)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Beim Update wird die Datenbank automatisch erweitert, damit Lagemeldungen den Stand „gesehen“ mit Zeitpunkt und Person speichern können. Alle bereits vorhandenen Lagemeldungen gelten danach als gesehen und erscheinen nicht als neu.
+
+### Meldungen
+
+- **Neue Lagemeldungen sind erkennbar:** Eine übergebene Lagemeldung trägt die Marke „Neu“, bis jemand mit Schreibrecht im Modul sie als gesehen markiert. Dieser Stand gilt für alle Nutzer gleich, und es zählt die erste Kenntnisnahme.
+- Jede Zeile hat den Knopf „Als gesehen markieren“, im Seitenkopf gibt es „Alle als gesehen markieren“. Bei einer gesehenen Meldung steht, wann und von wem sie als gesehen markiert wurde.
+- Wird eine Lagemeldung mit geändertem Text erneut übergeben, gilt sie wieder als neu.
+- Klappt das Markieren nicht, steht der Hinweis direkt an der betroffenen Zeile. Scheitert „Alle als gesehen markieren“, erscheint der Hinweis oben auf der Seite.
+
+### Führung
+
+- **Zähler für neue Lagemeldungen:** Das Modulmenü und die Kachel S2 auf der Stab-Seite zeigen die Zahl der neuen Lagemeldungen, beide mit demselben Wert wie die Liste. Ohne Freigabe für das Modul wird kein Zähler angezeigt.
+
+### Einsatzübersicht
+
+- **Kacheln bleiben beim Bedienen stehen:** Steht der Mauszeiger oder der Fokus in der Übersicht, springen neue Einsätze aus anderen Sitzungen nicht mehr zwischen die Kacheln. Eine Leiste meldet sie stattdessen, etwa „1 neuer Einsatz“ mit „anzeigen“. Die neuen Einsätze werden eingeordnet, sobald Zeiger und Fokus die Übersicht verlassen. „anzeigen“ setzt den Fokus auf die vorderste Kachel.
+- Die Leiste verdeckt keine Kacheltitel. Passt die Übersicht ins Fenster, steht sie unter den Kacheln, sonst am unteren Fensterrand.
+- Das Suchfeld taucht nicht mehr plötzlich auf und verschwindet nicht, während jemand darin tippt oder mit dem Zeiger über der Übersicht steht.
+
+### Dokumentation
+
+- Die Anwenderdokumentation zu den Lagemeldungen und zur Einsatzübersicht ist auf dem neuen Stand, die Bilder zu den Lagemeldungen sind neu erzeugt.
+
 ## [1.0.0-alpha.122](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.121...v1.0.0-alpha.122) (2026-10-13)
 
 ### Gekoppelte Geräte
