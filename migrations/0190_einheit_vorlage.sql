@@ -66,7 +66,7 @@ CREATE INDEX idx_einheit_vorlage_personal_fahrzeug ON einheit_vorlage_personal(f
 -- Demo-Marke für Vorlagen: `demo_herkunft.tabelle` kennt per CHECK nur drei Arten, SQLite ändert
 -- einen CHECK nur per Neubau. `demo_herkunft` ist Blatt (keine Tabelle verweist darauf), das DROP
 -- löst also keine Kaskade aus. Schema = 0123 1:1, einzige Änderung ist der CHECK (Wire-Werte von
--- `demo::DemoStammdatenArt`). Abgesichert von db::tests::migration_0189_*.
+-- `demo::DemoStammdatenArt`). Abgesichert von db::tests::migration_0190_*.
 CREATE TABLE demo_herkunft_neu (
     import_id    INTEGER NOT NULL REFERENCES demo_import(id) ON DELETE CASCADE,
     tabelle      TEXT    NOT NULL CHECK (tabelle IN ('fahrzeug', 'personal', 'material', 'einheit_vorlage')),

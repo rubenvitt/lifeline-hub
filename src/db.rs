@@ -5702,11 +5702,11 @@ mod tests {
         assert_eq!(rest, 0, "ON DELETE CASCADE über etb_eintrag");
     }
 
-    // --- LLH-1042: Einheiten-Vorlagen (0189) ---
+    // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
     /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem
-    /// Stand vor 0189.
-    async fn bild_vor_0189(pool: &SqlitePool) {
+    /// Stand vor 0190.
+    async fn bild_vor_0190(pool: &SqlitePool) {
         sqlx::raw_sql(
             "INSERT INTO organisation (id, name) VALUES (1, 'Orga'); \
              INSERT INTO einheit_typ (id, org_id, label) VALUES (1, 1, 'Zug'); \
@@ -5724,16 +5724,16 @@ mod tests {
     /// `demo_herkunft` wird für die vierte Art neu gebaut: Zeilen, Spalten, Schlüssel und die
     /// Kaskade an `demo_import` bleiben, nur der CHECK kennt `einheit_vorlage` dazu.
     #[tokio::test]
-    async fn migration_0189_baut_demo_herkunft_mit_vierter_art_neu() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 188).await;
-        bild_vor_0189(&pool).await;
+    async fn migration_0190_baut_demo_herkunft_mit_vierter_art_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 189).await;
+        bild_vor_0190(&pool).await;
         let alle = "SELECT import_id, tabelle, datensatz_id FROM demo_herkunft \
                     ORDER BY tabelle, datensatz_id";
         let vorher: Vec<(i64, String, i64)> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         let schema_vorher = schema_von(&pool, "demo_herkunft").await;
         let ddl_vorher = ddl_ohne_namen(&pool, "demo_herkunft").await;
 
-        migriere_bis(&pool, 189).await;
+        migriere_bis(&pool, 190).await;
 
         let nachher: Vec<(i64, String, i64)> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(nachher, vorher, "jede Marke übersteht den Neubau");
@@ -5780,10 +5780,10 @@ mod tests {
     /// oder keiner, Position nur aus dem Bestand; die Kindtabellen kaskadieren an der Vorlage,
     /// jeder andere Verweis hält fest (NO ACTION).
     #[tokio::test]
-    async fn migration_0189_legt_vorlagen_mit_ihren_regeln_an() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 188).await;
-        bild_vor_0189(&pool).await;
-        migriere_bis(&pool, 189).await;
+    async fn migration_0190_legt_vorlagen_mit_ihren_regeln_an() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 189).await;
+        bild_vor_0190(&pool).await;
+        migriere_bis(&pool, 190).await;
 
         let vorlage = |name: &'static str, ueber: Option<i64>| {
             sqlx::query_scalar::<_, i64>(
