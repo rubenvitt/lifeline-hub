@@ -1,8 +1,9 @@
 //! Modulzähler des Einsatz-Navigationsrahmens (LFH-612).
 //!
 //! Gezählt wird nur, wo die Bedeutung belegt ist: die Gesamtmengen von ETB, Betroffenen,
-//! Einheiten, Einsatzabschnitten und Dokumenten (LFH-666) sowie die Handlungsmengen der vier
-//! Kommunikationsmodule. Ein weiteres Modul braucht eine eigene Entscheidung.
+//! Einheiten, Einsatzabschnitten und Dokumenten (LFH-666), die Handlungsmengen der vier
+//! Kommunikationsmodule und die neuen Lagemeldungen (LLH-1206). Ein weiteres Modul braucht eine
+//! eigene Entscheidung.
 //!
 //! **Fehlt ≠ 0.** Jedes Feld fehlt, wenn der Benutzer das Modul nicht sehen darf
 //! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
@@ -13,7 +14,8 @@
 //! einmal als SQL-Fragment im Repo ihres Moduls; Listen-SELECT und Zählabfrage setzen sich
 //! daraus zusammen, ein zweites Prädikat gibt es nicht. Gezählt wird je Modul mit EINER Abfrage
 //! ohne Listen zu laden (`meldung::repo::zaehlen`, `auftrag::repo::zaehlen`,
-//! `erinnerung::repo::faellige_offene`, `chat::repo::ungelesen_gesamt`): Meldungen und Aufträge
+//! `erinnerung::repo::faellige_offene`, `chat::repo::ungelesen_gesamt`,
+//! `meldung::repo::count_lage_neu`): Meldungen und Aufträge
 //! gruppiert nach ihren Merkmalen, gezählt mit den reinen Regeln unten.
 //!
 //! **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard und Führungsüberblick zeigen Aufträge und
@@ -153,6 +155,13 @@ pub struct ChatZaehler {
     pub ungelesen: i64,
 }
 
+/// Lagemeldungen: noch von niemandem als gesehen gekennzeichnet (LLH-1206). Für alle Benutzer
+/// gleich, anders als der Chat.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LagemeldungsZaehler {
+    pub neu: i64,
+}
+
 /// Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
 /// (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
@@ -175,6 +184,8 @@ pub struct ModulZaehlerAnzeige {
     pub chat: Option<ChatZaehler>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dokumente: Option<MengenZaehler>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lagemeldungen: Option<LagemeldungsZaehler>,
 }
 
 /// Zählt eine Tabelle je Einsatz. `sql` ist ein festes Literal (kein Nutzereingang).
@@ -272,6 +283,11 @@ pub async fn berechne(
             .await?,
         );
     }
+    if erlaubt.contains("lagemeldungen") {
+        z.lagemeldungen = Some(LagemeldungsZaehler {
+            neu: crate::meldung::repo::count_lage_neu(pool, einsatz_id).await?,
+        });
+    }
     Ok(z)
 }
 
@@ -300,10 +316,11 @@ mod tests {
             erinnerungen: Some(ErinnerungsZaehler { faellig: 1 }),
             chat: Some(ChatZaehler { ungelesen: 1 }),
             dokumente: Some(MengenZaehler { gesamt: 1 }),
+            lagemeldungen: Some(LagemeldungsZaehler { neu: 1 }),
         };
         let v = serde_json::to_value(&voll).unwrap();
         let felder = v.as_object().unwrap();
-        assert_eq!(felder.len(), 9, "{v:?}");
+        assert_eq!(felder.len(), 10, "{v:?}");
         for feld in felder.keys() {
             assert!(
                 MODUL_KEYS.contains(&feld.as_str()),

@@ -53,6 +53,18 @@ describe('Modul-Zähler', () => {
     });
   });
 
+  // LLH-1206: die neuen, für alle gleich; der Bestand steht im Seitenkopf, nicht im Menü.
+  it('bildet die neuen Lagemeldungen ab', () => {
+    expect(bildeZaehler({ lagemeldungen: { neu: 2 } })).toEqual({
+      lagemeldungen: { wert: 2, beschreibung: '2 neue Lagemeldungen' },
+    });
+    expect(bildeZaehler({ lagemeldungen: { neu: 1 } })).toEqual({
+      lagemeldungen: { wert: 1, beschreibung: '1 neue Lagemeldung' },
+    });
+    // Fehlt das Feld (Modul nicht erlaubt), fehlt auch der Zähler, nie 0.
+    expect(bildeZaehler({ etb: { gesamt: 4 } })).not.toHaveProperty('lagemeldungen');
+  });
+
   it('zählt Ablösungen in der Vorwarnzeit oder überfällig (LFH-635)', () => {
     const schicht = (id: number, faellig_at: string) => ({
       id,

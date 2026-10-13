@@ -71,6 +71,10 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
     wert: gesamt,
     beschreibung: anzahl(gesamt, 'abgelegtes Dokument', 'abgelegte Dokumente'),
   }),
+  lagemeldungen: ({ neu }) => ({
+    wert: neu,
+    beschreibung: anzahl(neu, 'neue Lagemeldung', 'neue Lagemeldungen'),
+  }),
 };
 
 /** Alle Quellen, die der Server zählt — die Schlüssel der Abbildung, nicht eine zweite Liste. */
@@ -91,6 +95,7 @@ export const ZAEHLER_LISTEN_KEYS: Record<ServerZaehlerQuelle, EinsatzKey> = {
   erinnerungen: EINSATZ_KEYS.erinnerungen,
   chat: EINSATZ_KEYS.chatKanaele,
   dokumente: EINSATZ_KEYS.dokumente,
+  lagemeldungen: EINSATZ_KEYS.lagemeldungen,
 };
 
 /** Bildet die Serverantwort auf die Anzeige ab. Ein fehlendes Feld (Modul nicht erlaubt)

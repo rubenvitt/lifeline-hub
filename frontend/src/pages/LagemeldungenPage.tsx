@@ -1,9 +1,13 @@
-import { Alert, Breadcrumb, Button, Input, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Spin } from 'antd';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { listeLageMeldungen } from '../api/meldungen';
+import {
+  listeLageMeldungen,
+  markLageMeldungenGesehen,
+  markLageMeldungGesehen,
+} from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LageMeldung } from '../api/types';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
@@ -14,10 +18,13 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
   Segmentleiste,
+  StatusChip,
   useRollen,
   Zeitachseneintrag,
   type SegmentOption,
 } from '../components/instrument';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { meldungenPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import {
@@ -61,12 +68,19 @@ const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
  *
  * Typkante und Typwort sind die des ETB-Typs „Lage" (`etbTyp.lage`): eine übergebene Lagemeldung
  * ist ein Lageeintrag, eine zweite Farbe wäre erfunden.
+ *
+ * Neu und gesehen (LLH-1206, Spec `lagemeldung-kenntnisnahme`): eine neue Zeile trägt die Marke
+ * „Neu“, mit Schreibrecht den Knopf „Als gesehen markieren“; der Kopf markiert alle bis zur
+ * jüngsten geladenen. Der Stand gilt für alle; dieselbe Zahl zeigt der Modulzähler.
  */
 export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { konventionen } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const ohneVerbindung = useOhneVerbindung();
   const [filter, setFilter] = useState<LageFilter>(LEERER_FILTER);
 
   const einsatzQuery = useQuery({
@@ -76,6 +90,21 @@ export default function LagemeldungenPage() {
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
+  });
+
+  const neuAbgleichen = () => {
+    void queryClient.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(einsatzId) });
+    void queryClient.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(einsatzId) });
+  };
+  const gesehenMutation = useMutation({
+    mutationFn: (lageId: number) => markLageMeldungGesehen(einsatzId, lageId),
+    onSuccess: neuAbgleichen,
+    onError: () => void message.error('Konnte nicht als gesehen markiert werden'),
+  });
+  const alleGesehenMutation = useMutation({
+    mutationFn: (bisId: number) => markLageMeldungenGesehen(einsatzId, bisId),
+    onSuccess: neuAbgleichen,
+    onError: () => void message.error('Konnte nicht als gesehen markiert werden'),
   });
 
   const eintraege = useMemo(() => lageQuery.data ?? [], [lageQuery.data]);
@@ -96,6 +125,10 @@ export default function LagemeldungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const gefiltert = gruppen.reduce((n, g) => n + g.zeilen.length, 0);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Die jüngste geladene Lagemeldung: was danach eingeht, bleibt neu.
+  const juengsteId = eintraege.reduce((max, l) => Math.max(max, l.id), 0);
+  const hatNeue = eintraege.some((l) => l.is_neu);
 
   const zeile = (l: LageMeldung) => (
     <Zeitachseneintrag
@@ -107,11 +140,30 @@ export default function LagemeldungenPage() {
       meta={
         // Deeplink zur Quellmeldung — der einzige Weg zurück zum Vorgang.
         <>
+          {l.is_neu && <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: 8 }} />}
           {'aus '}
           <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             Meldung #{l.meldung_lfd_nr}
           </KennungsLink>
+          {!l.is_neu && l.gesehen_at && (
+            <>
+              {` · gesehen ${formatUhrzeit(l.gesehen_at, konventionen)}`}
+              {l.gesehen_von_name && ` · ${l.gesehen_von_name}`}
+            </>
+          )}
         </>
+      }
+      aktionen={
+        l.is_neu && darfSchreiben ? (
+          <Button
+            size="small"
+            disabled={ohneVerbindung}
+            loading={gesehenMutation.isPending && gesehenMutation.variables === l.id}
+            onClick={() => gesehenMutation.mutate(l.id)}
+          >
+            Als gesehen markieren
+          </Button>
+        ) : undefined
       }
       hinweis={
         l.lat != null && l.lon != null ? (
@@ -197,6 +249,19 @@ export default function LagemeldungenPage() {
         />
       }
     >
+      {hatNeue && darfSchreiben && (
+        <div
+          style={{ display: 'flex', justifyContent: 'flex-end', marginBlockEnd: token.marginSM }}
+        >
+          <Button
+            disabled={ohneVerbindung}
+            loading={alleGesehenMutation.isPending}
+            onClick={() => alleGesehenMutation.mutate(juengsteId)}
+          >
+            Alle als gesehen markieren
+          </Button>
+        </div>
+      )}
       {eintraege.length > 0 && (
         <div
           role="search"
