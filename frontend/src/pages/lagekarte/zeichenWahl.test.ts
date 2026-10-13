@@ -267,6 +267,21 @@ describe('zeichenName', () => {
       zeichenName({ kind: 'pictogram', pictogram: 'capability.rescue-aerial-ladder' }),
     ).toMatch(/Drehleiter/);
   });
+
+  it('benennt eine Bewegung aus einer Altzeile mit dem Titel ihres Pfeils (LLH-1159)', () => {
+    expect(
+      zeichenName({
+        kind: 'movement',
+        movement: 'movement-both-directions',
+        path: {
+          points: [
+            [2, 16],
+            [30, 16],
+          ],
+        },
+      }),
+    ).toBe('Bewegung in zwei Richtungen');
+  });
 });
 
 // Eigenschaftstest (Aufgabe 5.1): jede angebotene Option zeichnet, angewandt auf den Entwurf, ohne

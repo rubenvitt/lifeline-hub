@@ -37,7 +37,9 @@ import {
   type CapabilityId,
   type Drawing,
   type FreestandingSpec,
+  type MovementId,
   type PictogramId,
+  type Point,
   type StateId,
   type SymbolSpec,
   type TechnicalBodyMarkId,
@@ -174,8 +176,9 @@ const EINHEIT: Record<string, Teil> = {
 // Alt-Symbol → Nutzlast (Grundlage: Abgleich vom 10.10.2026, `mapping.mjs`). Im Grundzeichen wird
 // eine Fähigkeit randbündig, dann als Box versucht; freistehend ist sie das Kapitel-4-Piktogramm.
 // Ein Zustand hängt an `states` bzw. steht als `state` (Personen- und Tierzustände nach
-// `freestandingRedirect`). Eine technische Körpermarke gibt es nur im Grundzeichen, ein Körper
-// und ein Anhang-J-Piktogramm nur freistehend („Grundzeichen im Grundzeichen“ entfällt, D5).
+// `freestandingRedirect`). Eine technische Körpermarke gibt es nur im Grundzeichen, ein Körper,
+// ein Anhang-J-Piktogramm und eine Bewegung aus 5.2 nur freistehend („Grundzeichen im
+// Grundzeichen“ entfällt, D5).
 // Mehrdeutige Symbole sind bildtreu übersetzt, also wie das Altpaket sie zeichnete.
 type SymbolNutzlast =
   | { faehigkeit: CapabilityId }
@@ -183,14 +186,22 @@ type SymbolNutzlast =
   | { tendenz: TendencyId }
   | { marke: TechnicalBodyMarkId }
   | { koerper: SymbolSpec }
-  | { piktogramm: PictogramId; leitergebunden?: true };
+  | { piktogramm: PictogramId; leitergebunden?: true }
+  | { bewegung: MovementId };
+
+// Fester waagerechter Verlauf über die Zeichenfläche, wie ihn die Bibliothek für 5.2 freistehend
+// vermisst (`blocks/parametric.ts`); ein Punktzeichen hat keinen eigenen Verlauf.
+const BEWEGUNG_VERLAUF: [Point, Point] = [
+  [2, 16],
+  [30, 16],
+];
 
 const kommunikation = (id: string, leitergebunden = false): SymbolNutzlast =>
   leitergebunden
     ? { piktogramm: `comms.${id}` as PictogramId, leitergebunden: true }
     : { piktogramm: `comms.${id}` as PictogramId };
 
-// Ohne Nachfolger und deshalb nicht in der Tabelle: sichten, fernschreiben(-funk),
+// Ohne Nachfolger und deshalb nicht in der Tabelle: fernschreiben(-funk),
 // festbilduebertragung(-funk), drohne.
 const SYMBOL: Record<string, SymbolNutzlast> = {
   drehleiter: { faehigkeit: 'rescue-aerial-ladder' },
@@ -226,6 +237,9 @@ const SYMBOL: Record<string, SymbolNutzlast> = {
   warnung: { faehigkeit: 'loudspeaker-warning' },
   // Bildtreu: Dreieck mit gekreuzten Stangen (4.8.16).
   zelt: { faehigkeit: 'frame-tent' },
+  // SKK 2010, 7.5 „Bewegung in zwei Richtungen (z. B. Sichten, Ordnen, Verteilen)“ → 5.2.4
+  // (einsatzzeichen, Entscheidung vom 13.10.2026 zu ESZ-138). Im Grundzeichen nicht belegt.
+  sichten: { bewegung: 'movement-both-directions' },
   sammeln: { marke: 'circle-collection-arrow' },
   // Bildtreu F.3.12: Doppelpfeil, Stiel, V.
   'sammelplatz-betroffene': { marke: 'circle-double-arrow-lower-v' },
@@ -400,6 +414,9 @@ function symbolFrei(n: SymbolNutzlast): AnySpec | null {
     return n.leitergebunden
       ? { kind: 'pictogram', pictogram: n.piktogramm, variant: 'alternative' }
       : { kind: 'pictogram', pictogram: n.piktogramm };
+  }
+  if ('bewegung' in n) {
+    return { kind: 'movement', movement: n.bewegung, path: { points: BEWEGUNG_VERLAUF } };
   }
   return null;
 }

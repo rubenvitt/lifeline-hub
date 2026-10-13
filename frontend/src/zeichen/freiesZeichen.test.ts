@@ -204,7 +204,21 @@ const SYMBOLE: Record<string, SymbolErwartung> = {
   warnung: faehig('loudspeaker-warning', true),
   // Bildtreu: das Altpaket zeichnete ein Dreieck mit gekreuzten Stangen (4.8.16).
   zelt: faehig('frame-tent', true),
-  sichten: ohneNachfolger,
+  // SKK 2010, 7.5 → 5.2.4 „Bewegung in zwei Richtungen“, fester Verlauf; im Grundzeichen nicht
+  // belegt (einsatzzeichen, Entscheidung vom 13.10.2026 zu ESZ-138).
+  sichten: {
+    frei: {
+      kind: 'movement',
+      movement: 'movement-both-directions',
+      path: {
+        points: [
+          [2, 16],
+          [30, 16],
+        ],
+      },
+    },
+    imKoerper: null,
+  },
   // Technische Körpermarke F.3.6; freistehend nur als Pfeil mit Verlauf (gehört zum Zeichnen).
   sammeln: { frei: null, imKoerper: { bodyMarks: ['circle-collection-arrow'] } },
   // Bildtreu F.3.12 (Doppelpfeil, Stiel, V).

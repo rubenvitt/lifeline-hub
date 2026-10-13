@@ -30,6 +30,7 @@ import {
   drawAnySpec,
   freestandingRedirect,
   freestandingVocabulary,
+  parametricBlock,
   parseAnySpec,
   serializeAnySpec,
   symbolKindChoiceLabel,
@@ -683,6 +684,9 @@ export function waermeVokabularAuf(planen: Planer = leerlaufPlaner): () => void 
 
 /** Der Name des Symbols eines Zeichens (Piktogrammtitel), oder `null` ohne Symbol. */
 export function symbolName(spec: AnySpec): string | null {
+  // Eine Bewegung aus 5.2 kommt nur aus einer Altzeile (`sichten`, LLH-1159); der Picker bietet
+  // sie nicht als Kachel an, benannt wird sie trotzdem.
+  if (spec.kind === 'movement') return parametricBlock(`arrow/${spec.movement}`)?.title ?? null;
   const id = symbolVon(spec);
   if (!id) return null;
   const { art, wert, zweite } = zerlegeSymbol(id);
