@@ -3,8 +3,8 @@ use serde_json::Value;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    setup_mit_live, system_etb_anzahl,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, objekt_ereignisse,
+    rolle_setzen, setup, setup_mit_live, system_etb_anzahl,
 };
 
 // ---------- Zusatz-Helfer ----------
@@ -737,4 +737,217 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
         "absentes Feld lässt die Bemerkung unverändert"
     );
     assert_eq!(unberuehrt["menge"], 3);
+}
+
+// ---------- Fremd-Ereignisse (LLH-1182) ----------
+
+const FREMD: &[(&str, &str)] = &[("einheit", "einheit_id"), ("uhs", "uhs_id")];
+
+fn ereignis(tag: &str, id: i64) -> (String, i64) {
+    (tag.to_string(), id)
+}
+
+async fn material_disponieren(app: &axum::Router, admin: &str, einsatz: i64, bez: &str) -> i64 {
+    let mat = material_anlegen(app, admin, bez).await;
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        cookie,
+        Some(&format!(
+            r#"{{"typ":"behandlungsplatz","bezeichnung":"{bez}"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn in_einheit(app: &axum::Router, cookie: &str, einsatz: i64, em: i64) -> i64 {
+    let einheit = einheit_bilden(app, cookie, einsatz, "1. Zug").await;
+    let (s, _) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/material/{em}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Material der Einheit zuordnen");
+    einheit
+}
+
+/// Das Entfernen nimmt der Einheit ein Mitglied und dem UHS-Detail das dort verortete Material
+/// (LFH-892). `material` erreicht Einheiten- und UHS-Leser ohne Materialrecht nicht; `einheit`
+/// bzw. `uhs` tragen es, aber nur, wenn das Material dort stand.
+#[tokio::test]
+async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = material_disponieren(&app, &admin, einsatz, "Wolldecke").await;
+    let im_zug = material_disponieren(&app, &admin, einsatz, "Trage").await;
+    let an_uhs = material_disponieren(&app, &admin, einsatz, "Verbandkasten").await;
+    let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS 1").await;
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{an_uhs}"),
+        &admin,
+        Some(&format!(r#"{{"uhs_id":{uhs}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "an der UHS verorten: {json}");
+
+    let mut rx = live.abonniere(einsatz);
+    let entfernen = |em: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/material/{em}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(entfernen(frei).await, StatusCode::NO_CONTENT);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
+    assert_eq!(entfernen(im_zug).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Mitglied der Einheit"
+    );
+    assert_eq!(entfernen(an_uhs).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Material der UHS"
+    );
+}
+
+/// Die Mitgliederliste der Einheit zeigt Bezeichnung, Menge und Status, das UHS-Detail die ganze
+/// Materialzeile. Der PATCH meldet `einheit` bei geänderter Menge oder geändertem Status eines
+/// Einheitsmaterials, `uhs` bei jeder Änderung an Material einer UHS, beim Umverorten für die alte
+/// und die neue UHS — und nichts, wenn sich nichts ändert.
+#[tokio::test]
+async fn aendern_feuert_einheit_und_uhs_nur_wenn_deren_ansicht_sich_aendert() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = material_disponieren(&app, &admin, einsatz, "Wolldecke").await;
+    let im_zug = material_disponieren(&app, &admin, einsatz, "Trage").await;
+    let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
+    let uhs_a = uhs_anlegen(&app, &admin, einsatz, "UHS A").await;
+    let uhs_b = uhs_anlegen(&app, &admin, einsatz, "UHS B").await;
+
+    let mut rx = live.abonniere(einsatz);
+    let patch = |em: i64, body: String| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/material/{em}"),
+                &admin,
+                Some(&body),
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(patch(frei, r#"{"menge":2}"#.into()).await, StatusCode::OK);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "freies Material");
+    assert_eq!(patch(im_zug, r#"{"menge":3}"#.into()).await, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Menge eines Einheitsmaterials"
+    );
+    assert_eq!(
+        patch(im_zug, r#"{"status":"defekt"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Status eines Einheitsmaterials"
+    );
+    assert_eq!(patch(im_zug, r#"{"menge":3}"#.into()).await, StatusCode::OK);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "gleiche Menge");
+    assert_eq!(
+        patch(im_zug, r#"{"bemerkung":"Gurt fehlt"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "die Einheit zeigt keine Bemerkung"
+    );
+
+    assert_eq!(
+        patch(frei, format!(r#"{{"uhs_id":{uhs_a}}}"#)).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs_a)],
+        "an der UHS verortet"
+    );
+    assert_eq!(
+        patch(frei, r#"{"bemerkung":"Regal 2"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs_a)],
+        "Bemerkung an Material der UHS"
+    );
+    assert_eq!(
+        patch(frei, r#"{"bemerkung":"Regal 2"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "gleiche Bemerkung"
+    );
+    assert_eq!(
+        patch(frei, format!(r#"{{"uhs_id":{uhs_b}}}"#)).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs_a), ereignis("uhs", uhs_b)],
+        "umverortet: alte und neue UHS"
+    );
+    assert_eq!(
+        patch(frei, r#"{"uhs_id":null}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs_b)],
+        "von der UHS gelöst"
+    );
 }
