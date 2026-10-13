@@ -2,7 +2,7 @@
 
 Gilt für `frontend/src/stab/`, `frontend/src/fernmeldewesen/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
-**Fernmeldewesen** (LLH-1180, `openspec/changes/nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
+**Fernmeldewesen** (LLH-1180, `openspec/changes/archive/2026-10-13-nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
 Kommunikationsplan; die Dateien bleiben unter `stab/`. **Die Stab-Freigabe wirkt dort nirgends**,
 außer an Stab-Daten selbst: die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten

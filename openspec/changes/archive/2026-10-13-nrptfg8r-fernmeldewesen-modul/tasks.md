@@ -59,8 +59,17 @@ Code). Backend-Tests mit `cargo test --test <datei>`, Frontend-Gates aus dem Fro
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Typ-Codegen, Migrationsnummern, Prettier/rustfmt, Vitest, Rust-Tests, e2e
-- [ ] 9.2 Am laufenden System (Backend `cargo run --features dev-seeds`, Vite): Stab ausblenden → Fernmeldewesen voll nutzbar; Verbindung auf zweitem Tab live; Fernmeldewesen sperren → Hinweis, auch über den alten Link
+- [x] 9.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Typ-Codegen, Migrationsnummern, Prettier/rustfmt, Vitest, Rust-Tests, e2e
+  - Lauf 13.10.2026 in der Cloud-Sitzung: Bündel `schnell` grün (Schritt 12 nach Nachbessern des
+    `mise`-Ersatzes der Sitzung), Vitest voll grün (882 Dateien, 13.572 Tests), Rust-Workspace grün,
+    Schritt 15 (Dev-Seed) grün, die 16 betroffenen e2e-Specs grün (`pruefliste.md`). Nicht lokal:
+    Desktop-Hülle (`gdk-3.0` fehlt im Container) und die volle e2e-Suite; beide fährt die CI im PR.
+- [x] 9.2 Am laufenden System (Backend `cargo run --features dev-seeds`, Vite): Stab ausblenden → Fernmeldewesen voll nutzbar; Verbindung auf zweitem Tab live; Fernmeldewesen sperren → Hinweis, auch über den alten Link
+  - Nachgeklickt per Probelauf (Playwright gegen Backend und Vite, nicht committet): Stab ausgeblendet,
+    Führungspersonal; eine Verbindung aus Tab 1 erscheint in Tab 2 ohne Neuladen; Fernmeldewesen
+    ausgeblendet → `…/stab/kommunikationsplan` und `…/stab/funkplan?ansicht=skizze` zeigen den
+    Hinweis „Fernmeldewesen · Keine Berechtigung · In diesem Einsatz ausgeblendet“. Der Rahmen
+    fängt die Sperre vor der Umleitung ab, die alte Adresse bleibt dann in der Leiste stehen.
 
 ## Workflow follow-up
 

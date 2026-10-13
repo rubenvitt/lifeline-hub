@@ -31,13 +31,11 @@ Kommunikationsplan“).
 - **THEN** nennt er sie als „Informationstelefon, springt zu Stab · Informationstelefon“
 
 ### Requirement: Die Arbeitsseiten von Stab und Fernmeldewesen stehen als Sprungmarken unter ihrem Modul
-Das Modulmenü SHALL direkt hinter „Stab“ die Marken Pressearbeit und Informationstelefon führen, in
-dieser Reihenfolge, und direkt hinter „Fernmeldewesen“ die Marken Fernmeldeskizze und
-Kommunikationsplan, in dieser Reihenfolge. Eine Marke „Funkplan“ MUST NOT es geben, denn das Modul
-Fernmeldewesen öffnet den Funkplan selbst. Jede Marke MUST auf dieselbe Seite springen wie der
-entsprechende Einstieg auf der Stab-Seite bzw. der Reiter des Moduls; „Fernmeldeskizze“ MUST den
-Funkplan in der Darstellung „Fernmeldeskizze“ öffnen. Das gilt im Modulpanel am Fükw und am Tablet
-und im Navigations-Drawer.
+Das Modulmenü SHALL direkt hinter „Stab“ die Marken Pressearbeit und Informationstelefon führen
+und direkt hinter „Fernmeldewesen“ die Marken Fernmeldeskizze und Kommunikationsplan, je in dieser
+Reihenfolge; eine Marke „Funkplan“ MUST NOT es geben. Jede Marke MUST dorthin springen, wohin der
+Einstieg der Stab-Seite bzw. der Reiter des Moduls führt. Das gilt im Modulpanel am Fükw und am
+Tablet und im Navigations-Drawer.
 
 #### Scenario: Reihenfolge im Panel
 - **WHEN** jemand mit Stab-Freigabe die Kategorie „Führung“ öffnet

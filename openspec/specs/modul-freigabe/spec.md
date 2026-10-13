@@ -117,7 +117,11 @@ oder ruht er ohne Netz, MUST der Rahmen die Modulseite unverändert rendern.
 - **THEN** zeigt der Inhaltsbereich den Hinweis mit „Lagemeldungen“ und „Keine Berechtigung“, es geht keine Anfrage an die Liste der Lagemeldungen, und die Navigation steht daneben
 
 #### Scenario: Unterroute eines gesperrten Moduls
-- **WHEN** das Modul `stab` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/stab/funkplan` aufruft
+- **WHEN** das Modul `fernmeldewesen` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/fernmeldewesen/kommunikationsplan` aufruft
+- **THEN** zeigt der Rahmen denselben Hinweis für „Fernmeldewesen“
+
+#### Scenario: Unterroute eines gesperrten Stabs
+- **WHEN** das Modul `stab` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/stab/presse` aufruft
 - **THEN** zeigt der Rahmen denselben Hinweis für „Stab“
 
 #### Scenario: Ausgeblendetes Modul

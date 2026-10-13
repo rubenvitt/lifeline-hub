@@ -4,29 +4,51 @@
 Der Kommunikationsplan des Sachgebiets S6: wer im Einsatz über welche Verbindung außerhalb des
 Funks erreichbar ist (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder). Er führt die Verbindungen
 der Führungsfunktionen und externen Stellen und zeigt die vorhandenen Angaben der Abschnitte und
-Einheiten, ohne sie doppelt zu pflegen.
+Einheiten, ohne sie doppelt zu pflegen. Er gehört zum Modul Fernmeldewesen (Fähigkeit
+`fernmeldewesen`).
 
 ## Requirements
 
-### Requirement: Eigene Adresse unter dem Stab mit Einstieg aus der S6-Zeile
-Der Kommunikationsplan SHALL unter einer eigenen, als Lesezeichen tauglichen Adresse unter dem
-Stab-Modul eines Einsatzes erreichbar sein, mit dem Stab-Modul als aktiv in der Navigation. Die
-S6-Zeile der Stabseite SHALL einen Verweis „Kommunikationsplan“ tragen. Er MUST NOT als eigenes
-Modul erscheinen und erbt Sichtbarkeit und Sperre des Stabs. Solange die Stab-Freigabe nicht
-ermittelt ist, MUST die Seite keine Daten zeigen.
+### Requirement: Eigene Adresse im Modul Fernmeldewesen
+Der Kommunikationsplan SHALL unter `/einsaetze/:id/fernmeldewesen/kommunikationsplan` als
+Lesezeichen tauglich erreichbar sein, als Reiter „Kommunikationsplan“ des Moduls Fernmeldewesen und
+mit diesem Modul als aktiv in der Navigation. Er SHALL Sichtbarkeit und Sperre des Moduls
+Fernmeldewesen erben, nicht die des Stabs; den Fall ohne Zugriff fängt der Einsatzrahmen ab
+(Capability `modul-freigabe`). Die alte Adresse `/einsaetze/:id/stab/kommunikationsplan` SHALL auf
+die neue umleiten. Die S6-Zeile der Stabseite SHALL einen Verweis „Kommunikationsplan“ tragen,
+gesperrt, solange das Fernmeldewesen für die Person gesperrt ist. Solange die Freigabe des
+Fernmeldewesens nicht ermittelt ist, MUST die Seite keine Daten zeigen.
 
 #### Scenario: Einstieg aus der Stabseite
-- **WHEN** eine Person mit Leserecht auf den Stab in der Zeile S6 auf „Kommunikationsplan“ tippt
-- **THEN** öffnet sich der Kommunikationsplan des Einsatzes unter seiner eigenen Adresse, und das
-  Stab-Modul ist in der Navigation als aktiv markiert
+- **WHEN** eine Person mit Leserecht auf Stab und Fernmeldewesen in der Zeile S6 auf
+  „Kommunikationsplan“ tippt
+- **THEN** öffnet sich der Kommunikationsplan unter seiner Adresse im Modul Fernmeldewesen, und das
+  Modul ist in der Navigation als aktiv markiert
 
-#### Scenario: Stab gesperrt
-- **WHEN** das Stab-Modul für die Person ausgeblendet oder für ihre Rolle gesperrt ist
-- **THEN** ist der Kommunikationsplan nicht erreichbar, und der Server lehnt das Lesen mit 403 ab
+#### Scenario: Altes Lesezeichen
+- **WHEN** eine Person `/einsaetze/:id/stab/kommunikationsplan` aufruft
+- **THEN** landet sie auf `/einsaetze/:id/fernmeldewesen/kommunikationsplan`
+
+#### Scenario: Altes Lesezeichen bei ausgeblendetem Stab
+- **WHEN** der Stab im Einsatz ausgeblendet ist und eine Person `/einsaetze/:id/stab/kommunikationsplan`
+  aufruft
+- **THEN** landet sie im Kommunikationsplan des Moduls Fernmeldewesen, nicht beim Hinweis „Stab
+  ausgeblendet“
 
 #### Scenario: Freigabe nicht ermittelbar
 - **WHEN** der Abruf der Modulfreigaben scheitert
 - **THEN** zeigt die Seite einen Fehler mit Wiederholen und keine Verbindungen
+
+#### Scenario: Stab gesperrt
+- **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist und das Fernmeldewesen
+  frei
+- **THEN** zeigt der Kommunikationsplan alle Stellen und Verbindungen, und eine Person mit
+  Schreibrecht kann sie anlegen, ändern und entfernen
+
+#### Scenario: Fernmeldewesen gesperrt
+- **WHEN** das Modul Fernmeldewesen für die Person ausgeblendet oder für ihre Rolle gesperrt ist
+- **THEN** zeigt der Rahmen den einheitlichen Hinweis für „Fernmeldewesen“, und der Server lehnt
+  das Lesen unter `…/stab/kommunikationsplan` mit 403 ab, auch wenn der Stab frei ist
 
 ### Requirement: Stellen in festen Gruppen
 Der Kommunikationsplan SHALL eine Zeile je Stelle zeigen, in dieser Reihenfolge der Gruppen:
@@ -45,7 +67,7 @@ Bildlauf stehen bleiben.
 - **THEN** steht die Einsatzleitung vor S4
 
 ### Requirement: Gepflegte Stellen aus Funktionskatalog oder extern
-Personen mit Schreibrecht auf den Stab SHALL Stellen anlegen, umbenennen und entfernen können. Eine
+Personen mit Schreibrecht auf das Fernmeldewesen SHALL Stellen anlegen, umbenennen und entfernen können. Eine
 Stelle ist entweder eine Führungsfunktion aus dem Katalog oder eine externe Stelle der Art
 Leitstelle, Behörde, Verbindungsperson oder sonstige. Eine Führungsfunktion MUST je Einsatz
 höchstens einmal vorkommen; Führungshilfspersonal und Fachberater MUST eine Bezeichnung tragen und
@@ -76,7 +98,7 @@ Bezeichnung tragen.
 Eine gepflegte Stelle SHALL beliebig viele Verbindungen tragen, in der Reihenfolge ihrer Anlage.
 Jede Verbindung hat ein Mittel aus der Liste Festnetz, Mobil, Fax, E-Mail, Messenger, Melder,
 sonstiges, einen Wert (Rufnummer, Adresse oder Beschreibung, Pflicht, höchstens 200 Zeichen) und
-einen optionalen Hinweis (höchstens 200 Zeichen). Personen mit Schreibrecht auf den Stab SHALL
+einen optionalen Hinweis (höchstens 200 Zeichen). Personen mit Schreibrecht auf das Fernmeldewesen SHALL
 Verbindungen anlegen, ändern und entfernen können.
 
 #### Scenario: Zwei Verbindungen einer Stelle
@@ -127,14 +149,20 @@ MUST NOT eine zweite Datenhaltung entstehen.
 
 ### Requirement: Rechteweiche je Quelle
 Der Kommunikationsplan SHALL Abschnitte, Einheiten, Besetzung des Stabs und die gepflegten Stellen
-einzeln laden. Ist eine Quelle gesperrt (403) oder nicht geladen, MUST die Seite das an ihrer
-Gruppe mit Grund sagen („nicht freigegeben“, „nicht geladen“) und die übrigen Gruppen weiter
-zeigen. Eine fehlende Quelle MUST NOT als leere Gruppe erscheinen.
+einzeln laden. Die Besetzung des Stabs SHALL er nur abrufen, wenn der Stab für die Person frei ist.
+Ist eine Quelle gesperrt (403 oder Modul nicht frei) oder nicht geladen, MUST die Seite das an ihrer
+Gruppe bzw. Zeile mit Grund sagen („nicht freigegeben“, „nicht geladen“) und die übrigen Gruppen
+weiter zeigen. Eine fehlende Quelle MUST NOT als leere Gruppe erscheinen.
 
 #### Scenario: Einheiten gesperrt
 - **WHEN** die Einheitenliste mit 403 abgelehnt wird
 - **THEN** steht bei der Gruppe Einheiten „nicht freigegeben“, und die Gruppen Einsatzleitung und
   Stab, Abschnitte und externe Stellen bleiben vollständig
+
+#### Scenario: Stab nicht frei
+- **WHEN** das Fernmeldewesen frei ist, der Stab aber ausgeblendet oder gesperrt
+- **THEN** zeigen die Zeilen der Führungsfunktionen ihre Verbindungen, ihr Nebentext zur Besetzung
+  lautet „—“ mit dem Grund „Stab nicht freigegeben“, und es geht keine Anfrage an den Stab
 
 ### Requirement: Verbindung an der Stelle, Besetzung nur als Nebentext
 Eine Verbindung SHALL der Stelle gehören, nicht einer Person. Die Zeile einer Führungsfunktion
@@ -183,18 +211,23 @@ schon eine Verbindung belegen, sonst „—“ mit Grund.
 
 ### Requirement: Live und ohne Schreibrecht nur lesend
 Änderungen an Stellen und Verbindungen SHALL bei anderen geöffneten Kommunikationsplänen desselben
-Einsatzes ohne Neuladen erscheinen. Ohne Schreibrecht auf den Stab MUST die Seite keine
+Einsatzes ohne Neuladen erscheinen. Ohne Schreibrecht auf das Fernmeldewesen MUST die Seite keine
 Bearbeitungsmöglichkeit zeigen, und der Server MUST jede Änderung mit 403 ablehnen. Ein Ändern
 erzeugt keinen ETB-Eintrag.
 
 #### Scenario: Beobachter
-- **WHEN** eine Person mit Leserecht, aber ohne Schreibrecht auf den Stab den Kommunikationsplan
-  öffnet
+- **WHEN** eine Person mit Leserecht, aber ohne Schreibrecht auf das Fernmeldewesen den
+  Kommunikationsplan öffnet
 - **THEN** sieht sie alle Verbindungen, aber keinen Knopf zum Anlegen, Ändern oder Entfernen
 
 #### Scenario: Zweite Person sieht die Änderung
 - **WHEN** zwei Personen den Kommunikationsplan geöffnet haben und eine eine Verbindung anlegt
 - **THEN** erscheint die Verbindung bei der anderen ohne Neuladen
+
+#### Scenario: Stab-Leser ohne Fernmeldewesen
+- **WHEN** eine Person den Stab lesen darf, das Fernmeldewesen aber nicht, und eine andere eine
+  Verbindung anlegt
+- **THEN** erhält die erste Person dazu kein Live-Ereignis
 
 ### Requirement: Druck als eigenes Druckstück
 Der Kommunikationsplan SHALL über „Drucken / als PDF“ als eigenes Druckstück mit der Dokumentart
