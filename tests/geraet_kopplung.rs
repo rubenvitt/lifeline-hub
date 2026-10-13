@@ -3697,7 +3697,14 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     for wort in ["Muster", "Leitmann"] {
         assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
     }
-    for schluessel in ["label", "notiz", "leiter_id", "leiter_name", "bemerkung", "name"] {
+    for schluessel in [
+        "label",
+        "notiz",
+        "leiter_id",
+        "leiter_name",
+        "bemerkung",
+        "name",
+    ] {
         assert!(
             !text.contains(&format!("\"{schluessel}\"")),
             "Feld {schluessel} in der Antwort: {text}"

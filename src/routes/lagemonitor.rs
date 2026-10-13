@@ -211,12 +211,11 @@ pub async fn lagebild(
 
     // Gefahrenzonen wie beim Abschnittsgerät (`routes/lage_zone.rs`, `liste`): einsatzweit, ohne
     // Bezirke und Skizzen.
-    let zonen_roh: Vec<(i64, String, String)> = sqlx::query_as(
-        "SELECT id, typ, geometrie FROM lage_zone WHERE einsatz_id = ? ORDER BY id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let zonen_roh: Vec<(i64, String, String)> =
+        sqlx::query_as("SELECT id, typ, geometrie FROM lage_zone WHERE einsatz_id = ? ORDER BY id")
+            .bind(einsatz_id)
+            .fetch_all(pool)
+            .await?;
     let mut zonen = Vec::new();
     for (id, typ, geometrie) in zonen_roh {
         let typ = LageZoneTyp::parse(&typ)
