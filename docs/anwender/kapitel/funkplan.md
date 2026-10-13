@@ -124,6 +124,9 @@ Das Paneel „Lücken“ nennt Abschnitte und Einheiten ohne Sprechgruppe, Einhe
 Erreichbarkeit, Verbindungen ohne gemeinsame Sprechgruppe, einsatzlokale Sprechgruppen ohne
 Zuordnung, Sprechgruppen mit nur einem Teilnehmer, eine fehlende Verbindung zur Leitstelle und
 eine nicht erfasste eigene Führungsstelle. Fehlt eine Quelle, steht „—“ mit Grund statt einer 0.
+Der Kopf des Paneels zählt alle Lücken zusammen, etwa „6 Lücken“; eine Einheit ohne Sprechgruppe
+und ohne Erreichbarkeit zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
+Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am Werkzeug „Funkplan“.
 
 ### Was nicht vorkommt
 

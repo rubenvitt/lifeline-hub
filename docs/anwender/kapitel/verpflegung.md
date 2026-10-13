@@ -138,5 +138,5 @@ bei offener Seite aus, lässt sich eine Ausgabe trotzdem erfassen: Sie steht als
 ## Grundlagen und Quellen
 
 Die Verpflegung gehört zu den Versorgungsaufgaben des Sachgebiets S4 „Versorgung“ nach FwDV 100,
-Anlage 2. Im Stab führt die Zeile S4 die Verpflegung deshalb als Werkzeug, zusammen mit
+Anlage 2. Im Stab führt die Kachel S4 die Verpflegung deshalb als Werkzeug, zusammen mit
 Nachforderungen und Material.

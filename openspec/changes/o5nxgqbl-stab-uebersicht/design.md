@@ -285,5 +285,5 @@ von PR #726 wird `alpha` in den Branch gemergt und `check-all.sh` erneut gefahre
 
 ## Open Questions
 
-- Nachzug: Zunder-Aufgabe „Lagemeldungen mit Status neu/gesehen und Zähler“, falls Ruben die
-  Kachel S2 mit Zahl will. Wird am Freigabe-Checkpoint gefragt, ändert diese Change nicht.
+- Keine. Der Nachzug „Lagemeldungen mit Status neu/gesehen und Zähler“ ist als LLH-1206 angelegt
+  (Freigabe 13.10.2026); er ändert diese Change nicht.

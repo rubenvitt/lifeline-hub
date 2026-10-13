@@ -81,3 +81,49 @@ test('Arbeitsaufnahme: Tipp auf den Zeilentext hakt ab, übersteht das Neuladen,
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.getByText(GEMELDET)).toHaveCount(1);
 });
+
+/**
+ * LLH-1124 (design.md D6): der siebte Haken klappt nicht unter der Hand ein; nach dem Neuladen
+ * steht das Paneel eingeklappt mit „7/7 erledigt“ und klappt per Knopf wieder auf.
+ */
+test('Arbeitsaufnahme: bei 7/7 nach dem Neuladen eingeklappt, „Aufklappen“ zeigt die Punkte', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Arbeitsaufnahme 7/7 ${Date.now()}`);
+  for (const punkt of [
+    'aufstellort',
+    'einweisung',
+    'lageskizze',
+    'funkarbeitsplaetze',
+    'sprechgruppen',
+    'etb_eroeffnet',
+  ]) {
+    const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/stab/checkliste/${punkt}`, {
+      data: { erledigt: true },
+    });
+    expect(antwort.ok(), `${punkt}: ${antwort.status()}`).toBe(true);
+  }
+
+  await page.goto(`/einsaetze/${einsatzId}/stab`);
+  const paneel = page.getByRole('region', { name: 'Arbeitsaufnahme', exact: true });
+  await expect(paneel.getByText('6/7 erledigt')).toBeVisible();
+  await paneel.getByText('Einsatzbereitschaft an die Leitstelle gemeldet', { exact: true }).click();
+  await expect(paneel.getByText('7/7 erledigt')).toBeVisible();
+  // Der letzte Haken klappt nicht ein: die Punkte bleiben stehen.
+  await expect(paneel.getByRole('checkbox')).toHaveCount(7);
+
+  await page.reload();
+  await expect(paneel.getByText('7/7 erledigt')).toBeVisible();
+  const auf = paneel.getByRole('button', { name: 'Aufklappen', exact: true });
+  await expect(auf).toHaveAttribute('aria-expanded', 'false');
+  await expect(paneel.getByRole('checkbox')).toHaveCount(0);
+  await auf.click();
+  await expect(paneel.getByRole('checkbox')).toHaveCount(7);
+  await expect(paneel.getByRole('button', { name: 'Einklappen', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+});

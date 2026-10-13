@@ -9,8 +9,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Farbachsen; Spec `textkontrast-rollen`, „Linkfarbe ist die Textrolle Bedien").
  *
  * SCHRANKEN (Literale, nicht aus dem Produkt): Tag ≥ 7 : 1, Nacht ≥ 5 : 1 — in Ruhe UND unter
- * dem Zeiger, gegen den Grund, auf dem der Link wirklich steht (geteilter Messkern
- * `kontrast-kern.ts`). Unter dem Zeiger unterscheidet die Unterstreichung, nicht der Ton.
+ * dem Zeiger, gegen den Grund, auf dem der Name wirklich steht (geteilter Messkern
+ * `kontrast-kern.ts`). Unter dem Zeiger tönt die Werkzeugzelle ihren Grund (LLH-1124).
  *
  * Gemessen wird JEDER Link der Gruppen „Werkzeuge S…", nicht nur S4: die Zeilen teilen eine
  * Darstellung, und ein Link mit eigenem Stil fiele sonst durch.
@@ -32,11 +32,15 @@ for (const modus of ['light', 'dark'] as const) {
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
 
-    const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
-    const s4 = besetzung.getByRole('group', { name: 'Werkzeuge S4', exact: true });
+    const s4 = page.getByRole('group', { name: 'Werkzeuge S4', exact: true });
     // Anker: die Befundzeile steht vollständig, in der Reihenfolge der Prüfliste.
     await expect(s4.getByRole('link')).toHaveText(['Nachforderung', 'Verpflegung', 'Material']);
-    const links = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ }).getByRole('link');
+    // Gemessen wird der Name in der Werkzeugzelle (LLH-1124): er trägt das Bedien-Blau, die Zahl
+    // daneben steht in der Textrolle wie jede Kennzahl.
+    const links = page
+      .getByRole('group', { name: /^Werkzeuge S\d$/ })
+      .getByRole('link')
+      .locator('[data-lfh="werkzeug-name"]');
     const anzahl = await links.count();
     expect(anzahl, 'Werkzeug-Links gefunden').toBeGreaterThan(3);
 
@@ -61,10 +65,12 @@ for (const modus of ['light', 'dark'] as const) {
     for (let i = 0; i < anzahl; i++) await messe('ruhe', i);
 
     for (let i = 0; i < anzahl; i++) {
-      const link = links.nth(i);
-      await link.hover();
-      // Erst messen, wenn der Zeigerzustand gegriffen hat: die Unterstreichung ist sein Zeichen.
-      await expect(link).toHaveCSS('text-decoration-line', 'underline');
+      const name = links.nth(i);
+      const zelle = name.locator('xpath=ancestor::a[1]');
+      await zelle.hover();
+      // Erst messen, wenn der Zeigerzustand gegriffen hat: die Werkzeugzelle tönt ihren Grund
+      // (`.lfh-kennzahl__ziel:hover`), der Name steht dann auf `flaeche-3`.
+      await zelle.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
       await messe('zeiger', i);
     }
 

@@ -72,7 +72,8 @@ Trefffläche der Dichtestufe halten. Die Werkzeuge sind:
 - S5: Pressearbeit, Informationstelefon
 - S6: Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan
 
-Die Zahl der Werkzeuge je Kachel ist nicht begrenzt. Ein Werkzeug MUST die Freigabe seines Ziels
+Ein Werkzeug trägt den Namen seines Moduls bzw. seiner Unterseite, wie Modulmenü und Sprungpalette
+ihn zeigen. Die Zahl der Werkzeuge je Kachel ist nicht begrenzt. Ein Werkzeug MUST die Freigabe seines Ziels
 übernehmen: Ist das Ziel für die Person ausgeblendet, MUST das Werkzeug fehlen. Ist es gesperrt,
 MUST das Werkzeug gesperrt mit sichtbarem Grund stehen, ohne zu springen und ohne Zahl. Solange die
 Freigaben nicht ermittelt sind, MUST kein Werkzeug als Sprung erscheinen.

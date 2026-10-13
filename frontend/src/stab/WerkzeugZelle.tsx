@@ -100,6 +100,7 @@ export default function WerkzeugZelle({
       >
         <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
           <span
+            data-lfh="werkzeug-name"
             style={{
               ...EINZEILIG,
               flex: '1 1 auto',

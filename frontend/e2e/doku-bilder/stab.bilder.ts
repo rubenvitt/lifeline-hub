@@ -17,6 +17,8 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep stab`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
+ *   uebersicht.png          frontend/src/pages/StabPage.tsx, frontend/src/stab/SachgebietKachel.tsx,
+ *                           frontend/src/stab/WerkzeugZelle.tsx (LLH-1124)
  *   besetzung.png           frontend/src/stab/BesetzungModal.tsx
  *   arbeitsaufnahme.png     frontend/src/stab/ChecklistePaneel.tsx
  *
@@ -63,6 +65,23 @@ test.describe(KAPITEL, () => {
     // Der erste Punkt zeigt den Standort der Führungsstelle (LFH-1181).
     await fuehrungsstelleOrtFuellen(api, id);
     await api.dispose();
+  });
+
+  test('Seite „Stab“ mit sechs Kacheln', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/stab`);
+    // Anker: Besetzung und eine Zahl aus dem Modulzähler stehen.
+    await expect(page.getByText('4/6 besetzt')).toBeVisible();
+    await expect(
+      page
+        .getByRole('group', { name: 'Werkzeuge S3' })
+        .locator('[data-lfh="werkzeug-wert"]')
+        .first(),
+    ).not.toHaveText('····');
+    await page.mouse.move(0, 0);
+    await fotografiere(page, KAPITEL, 'uebersicht');
   });
 
   test('Dialog „Besetzung S4 · …“', async ({ page }) => {

@@ -15,8 +15,8 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
  * Lücken als reine Filter über bereits geladene Listen (Stab-Spec LFH-46, Entscheidung 15:
- * keine zweite Verdichtung). Wo eine Zahl auf dem Funkplan (LFH-548) und später auf der
- * Stabzeile (ST6) steht, kommt sie aus DIESER Funktion.
+ * keine zweite Verdichtung). Wo eine Zahl auf dem Funkplan (LFH-548) und an der S6-Kachel
+ * der Stab-Seite (LLH-1124) steht, kommt sie aus DIESER Datei.
  *
  * Eine Lücke ohne geladene Daten hat keine Zahl: `treffer` bleibt leer, und der Zustand sagt,
  * warum. Aufrufer zeigen dann „—" mit Grund, nie „0".
