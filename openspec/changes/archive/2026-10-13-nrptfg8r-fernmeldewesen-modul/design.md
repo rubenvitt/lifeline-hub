@@ -121,7 +121,7 @@ Fernmeldewesens von jeder Besetzungsänderung und Stab-Leser von jeder Skizzenä
 
 ### D4 Freigaben: nur die Rolle wandert
 
-Migration `0185_fernmeldewesen_modul.sql`, gebaut wie `0184`, mit `'fernmeldewesen'` statt
+Migration `0186_fernmeldewesen_modul.sql`, gebaut wie `0184`, mit `'fernmeldewesen'` statt
 `'lagebesprechung'`:
 
 ```sql
