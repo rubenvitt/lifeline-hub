@@ -1,5 +1,5 @@
 //! Integrationstests der Quittung je Verteiler-Empfänger am Einsatzbefehl (LLH-1173, Spec
-//! `befehl-quittung`, Herleitung `openspec/changes/koiqi51u-befehl-quittung/design.md`) über
+//! `befehl-quittung`, Herleitung `openspec/changes/archive/2026-10-13-koiqi51u-befehl-quittung/design.md`) über
 //! `POST /api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/{quittieren|zuruecknehmen}`:
 //! Quittung und Rücknahme samt ETB, Fassungsregel, Rechte, Liste und Live-Ereignis.
 

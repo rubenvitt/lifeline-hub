@@ -90,8 +90,11 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert` lokal grün, soweit die Umgebung es erlaubt. Den
-  vollen Lauf belegt die CI des PRs.
+- [x] 6.1 `./scripts/check-all.sh --geaendert` lokal grün, soweit die Umgebung es erlaubt. Den
+  vollen Lauf belegt die CI des PRs. Lokal (Cloud-Sitzung ohne mise, Node 22): rustfmt, Prettier,
+  ESLint, Typecheck, Typ-Codegen, Migrationen und Schreibweisen grün; 16 betroffene
+  Rust-Suiten grün; Vitest 13561 grün, 17 rot in 6 fremden Dateien, auf `origin/alpha` identisch
+  rot (Node 22 statt 26); e2e der Aufträge/Befehle, Geräte und Wortlaut grün (Chromium).
 - [x] 6.2 Folgeaufgabe „Abschnittsgerät quittiert Einsatzbefehle“ auf dem Board anlegen
   (`zunder-task-anlegen`) und hier verlinken: LLH-1190,
   https://zunder.rubeen.dev/#/aufgabe/lxlrhstatrfr70dcomgayx43

@@ -3,7 +3,7 @@
 -- Tabellen bekommen die Spalten, damit der gemeinsame Kern (`vorlagendokument::verteiler`) sein
 -- SQL weiter aus der Tabellenkonstante baut; am Lagebericht schreibt sie keine Route. Das
 -- Fortschreiben kopiert sie nicht: eine neue Fassung beginnt offen.
--- Herleitung: `openspec/changes/koiqi51u-befehl-quittung/design.md` (D1).
+-- Herleitung: `openspec/changes/archive/2026-10-13-koiqi51u-befehl-quittung/design.md` (D1).
 ALTER TABLE befehl_verteiler ADD COLUMN quittiert_at TEXT;
 ALTER TABLE befehl_verteiler ADD COLUMN quittiert_von_id INTEGER REFERENCES benutzer(id);
 ALTER TABLE lagebericht_verteiler ADD COLUMN quittiert_at TEXT;
