@@ -54,8 +54,13 @@ import {
 } from '../kraefte/meldebildRaster';
 import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
-import KraeftebaumZelle, { besatzungText, type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
-import { schluesselBisStufe, stufeVon, type Ausklappstufe } from '../kraefte/kraeftebaumKern';
+import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
+import {
+  besatzungText,
+  schluesselBisStufe,
+  stufeVon,
+  type Ausklappstufe,
+} from '../kraefte/kraeftebaumKern';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -914,6 +919,12 @@ export default function KraefteuebersichtPage() {
         gefiltertRoh.personal,
         gefiltertRoh.fahrzeuge,
         gefiltertRoh.material,
+        // Ungefiltert wie am Schirm: „fährt auf“ und Besatzung Ist (D4, D10).
+        {
+          einheiten: einheitenQuery.data ?? [],
+          personal: personalQuery.data ?? [],
+          fahrzeuge: fahrzeugeQuery.data ?? [],
+        },
       );
       const md = rendereMeldebildMarkdown(bild, stand);
       // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das

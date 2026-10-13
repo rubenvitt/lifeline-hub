@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
-import KraeftebaumZelle, { besatzungText, fremdText, gruppenText } from './KraeftebaumZelle';
+import KraeftebaumZelle, { gruppenText } from './KraeftebaumZelle';
+import { besatzungText, fremdText } from './kraeftebaumKern';
 import { baueMeldebildRaster, type RasterZeile } from './meldebildRaster';
 import type { Einheit, EinsatzFahrzeug, EinsatzMaterial, EinsatzPersonal } from '../api/types';
 

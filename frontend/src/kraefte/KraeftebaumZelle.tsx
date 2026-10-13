@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import type { StaerkePosition } from '../api/types';
-import { kraefteText, staerkeText } from '../anzeige/staerke';
+import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
 import { Augenbraue, monoStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
-import type { BesatzungAnzeige, PersonAnzeige, RasterZeile } from './meldebildRaster';
+import { fremdText } from './kraeftebaumKern';
+import type { PersonAnzeige, RasterZeile } from './meldebildRaster';
 
 /**
  * Die Zeilenbausteine der ersten Spalte des Kräftebaums (LLH-1025, Spec `kraeftebaum`): Einheit,
@@ -82,24 +83,6 @@ export function PositionsMarken({ person }: { person: PersonAnzeige }) {
       {person.istFuehrer && <Marke text="EF" titel="Einheitsführer" />}
     </>
   );
-}
-
-/** „Ist 1/0/3//4 · Soll 1/1/7//9“ — die Besatzung eines Fahrzeugs statt einer Stärke (D4). */
-export function besatzungText(b: BesatzungAnzeige): string {
-  if (b.urteil === 'nicht_erfasst') return 'Besatzung nicht erfasst';
-  return b.soll
-    ? `Ist ${staerkeText(b.ist)} · Soll ${staerkeText(b.soll)}`
-    : `Ist ${staerkeText(b.ist)}`;
-}
-
-/** „davon 1 aus Gr 2, 2 ohne Einheit“ — die mitgezählten fremden Kräfte eines Fahrzeugs. */
-export function fremdText(b: BesatzungAnzeige): string | null {
-  if (b.fremd.length === 0) return null;
-  return `davon ${b.fremd
-    .map((f) =>
-      f.einheit === 'ohne Einheit' ? `${f.anzahl} ohne Einheit` : `${f.anzahl} aus ${f.einheit}`,
-    )
-    .join(', ')}`;
 }
 
 /** Die Zeile einer Gruppe: „Material · 3 Posten · 1 Ausfall“, „Ohne Fahrzeug · 2 Kräfte“. */

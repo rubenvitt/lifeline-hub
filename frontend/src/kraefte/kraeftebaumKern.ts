@@ -8,6 +8,7 @@ import type {
   Staerke,
   StaerkePosition,
 } from '../api/types';
+import { staerkeText } from '../anzeige/staerke';
 import { materialStatus, type BesatzungsUrteil } from '../theme/statusFarben';
 import type { StaerkeSumme } from './kraeftebild';
 
@@ -274,6 +275,29 @@ function vergleichePersonen(a: PersonImBaum, b: PersonImBaum): number {
   return rang(a) - rang(b) || KOLLATOR.compare(a.person.name, b.person.name);
 }
 
+// ── Texte ─────────────────────────────────────────────────────────────────────
+
+/**
+ * „Ist 1/0/3//4 · Soll 1/1/7//9“ — die Besatzung eines Fahrzeugs statt einer Stärke (D4). Ein
+ * Text für Schirm (`KraeftebaumZelle`) und Lagebericht (`kraeftebild.ts`).
+ */
+export function besatzungText(b: Pick<FahrzeugImBaum, 'ist' | 'soll' | 'urteil'>): string {
+  if (b.urteil === 'nicht_erfasst') return 'Besatzung nicht erfasst';
+  return b.soll
+    ? `Ist ${staerkeText(b.ist)} · Soll ${staerkeText(b.soll)}`
+    : `Ist ${staerkeText(b.ist)}`;
+}
+
+/** „davon 1 aus Gr 2, 2 ohne Einheit“ — die mitgezählten fremden Kräfte eines Fahrzeugs. */
+export function fremdText(b: Pick<FahrzeugImBaum, 'fremd'>): string | null {
+  if (b.fremd.length === 0) return null;
+  return `davon ${b.fremd
+    .map((f) =>
+      f.einheit === 'ohne Einheit' ? `${f.anzahl} ohne Einheit` : `${f.anzahl} aus ${f.einheit}`,
+    )
+    .join(', ')}`;
+}
+
 /** Der Knoten „Ohne Fahrzeug“ entsteht nur, wenn die Einheit Fahrzeuge UND Personal ohne hat (D5). */
 export function brauchtOhneFahrzeugKnoten(m: MittelDerEinheit): boolean {
   return m.fahrzeuge.length > 0 && m.ohneFahrzeug.length > 0;
@@ -364,20 +388,22 @@ function vollQuelle(
 }
 
 /**
- * Die Mittel EINER Einheit (Einheit-Ansicht LLH-1036): Fahrzeuge mit Besatzung, Personal ohne
- * Fahrzeug, Material. `quelle` sind die ungefilterten Listen; ohne sie gelten die übergebenen.
+ * Die Mittel EINER Einheit (Einheit-Ansicht LLH-1036, Lagebericht-Text): Fahrzeuge mit
+ * Besatzung, Personal ohne Fahrzeug, Material. `einheitId: null` ordnet die Mittel ohne
+ * `einheit_id`. `quelle` sind die ungefilterten Listen; ohne sie gelten die übergebenen.
  */
 export function mittelDerEinheit(
-  einheitId: number,
+  einheitId: number | null,
   roh: MittelListen & { einheiten: readonly Einheit[] },
   quelle: Partial<MittelQuelle> = {},
 ): MittelDerEinheit {
-  const einheit = roh.einheiten.find((e) => e.id === einheitId);
+  const einheit = einheitId != null ? roh.einheiten.find((e) => e.id === einheitId) : undefined;
+  const hier = (x: { einheit_id?: number | null }) => (x.einheit_id ?? null) === einheitId;
   return ordneMittel(
     {
-      personal: roh.personal.filter((x) => x.einheit_id === einheitId),
-      fahrzeuge: roh.fahrzeuge.filter((x) => x.einheit_id === einheitId),
-      material: roh.material.filter((x) => x.einheit_id === einheitId),
+      personal: roh.personal.filter(hier),
+      fahrzeuge: roh.fahrzeuge.filter(hier),
+      material: roh.material.filter(hier),
     },
     einheit?.fuehrer_id ?? null,
     vollQuelle(roh, quelle),

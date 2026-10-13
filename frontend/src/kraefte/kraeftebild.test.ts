@@ -315,6 +315,41 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
 });
 
+it('der Lagebericht-Text folgt dem Kräftebaum: Fahrzeug mit Besatzung, „Ohne Fahrzeug“, Material verdichtet (D10)', () => {
+  // Zug 10 mit Fahrzeug F1 (Soll 1/1/7), Führer P1 darauf, P2 ohne Fahrzeug, defektes Material;
+  // Gruppe 20 darunter mit P3 auf F1 — sie „fährt auf“ und zählt in der Besatzung Ist mit.
+  const zug = { ...eh(10, 1), typ_label: 'Zug', fuehrer_id: 1 };
+  const fahrzeug = { ...fz(1, 10), soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 7 } };
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [zug, eh(20, null, 10)],
+    [
+      { ...p(1, 10, 'fuehrer'), fahrzeug_id: 1 },
+      p(2, 10, 'mannschaft'),
+      { ...p(3, 20, 'mannschaft'), fahrzeug_id: 1 },
+    ],
+    [fahrzeug],
+    [mat(1, 10, 'defekt'), mat(2, 10, 'einsatzbereit')],
+  );
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  const teil = md.slice(
+    md.indexOf('- **E10**'),
+    md.lastIndexOf('fährt auf F1') + 'fährt auf F1'.length,
+  );
+  expect(teil.split('\n')).toEqual([
+    '- **E10** (Zug) — Stärke: 1/0/2//3',
+    '  - Fzg. F1 (LF) [2] — Besatzung Ist 1/0/1//2 · Soll 1/1/7//9, davon 1 aus E20',
+    '    - Pers. P1 (EF) [gebunden]',
+    '  - Ohne Fahrzeug: 1 Kraft',
+    '    - Pers. P2 [gebunden]',
+    '  - Material: 2 Posten, 1 Ausfall',
+    '    - Mtl. M1 ×1 [defekt]',
+    '    - Mtl. M2 ×1 [einsatzbereit]',
+    '  - **E20** (Gruppe) — Stärke: 0/0/1//1',
+    '    - Pers. P3 [gebunden] — fährt auf F1',
+  ]);
+});
+
 it('Kennzahlen des Lagebilds stehen in der Anzeige je in eigenem Block (LFH-1153)', () => {
   // Markdown ohne harte Umbrüche: Zeilen ohne Leerzeile dazwischen liefen zu EINEM Absatz zusammen
   // — im Lagebericht stand „Gesamtstärke … Fahrzeuge … Material …“ in einer Zeile.

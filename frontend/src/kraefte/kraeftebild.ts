@@ -9,8 +9,17 @@ import type {
   StaerkePosition,
   MaterialStatus,
 } from '../api/types';
-import { staerkeText } from '../anzeige/staerke';
-import { abschnittDerObersten } from './kraeftebaumKern';
+import { kraefteText, staerkeText } from '../anzeige/staerke';
+import {
+  abschnittDerObersten,
+  besatzungText,
+  brauchtOhneFahrzeugKnoten,
+  fremdText,
+  mittelDerEinheit,
+  type MittelDerEinheit,
+  type MittelQuelle,
+  type PersonImBaum,
+} from './kraeftebaumKern';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -25,7 +34,8 @@ export interface StatusVerteilung {
   ohne: number;
 }
 export type ZeilenArt = 'abschnitt' | 'einheit' | 'mittel';
-export type MittelArt = 'fahrzeug' | 'person' | 'material';
+/** `ohne-fahrzeug` und `material-gruppe` sind Gruppenzeilen des Kräftebaums (D5, D6). */
+export type MittelArt = 'fahrzeug' | 'person' | 'material' | 'ohne-fahrzeug' | 'material-gruppe';
 
 /** Eine Zeile im Meldebild-Baum (antd-Table `children`-fähig). */
 export interface MeldebildZeile {
@@ -41,6 +51,8 @@ export interface MeldebildZeile {
   menge: number | null;
   personalVerteilung: StatusVerteilung | null;
   fahrzeugVerteilung: StatusVerteilung | null;
+  /** Nachsatz im Text: Besatzung am Fahrzeug, „fährt auf …“ an der Person. */
+  zusatz?: string | null;
   children?: MeldebildZeile[];
 }
 
@@ -130,6 +142,102 @@ function addSoll(acc: StaerkeSumme | null, add: StaerkeSumme): StaerkeSumme {
   };
 }
 
+// ── Mittel über den Kern (D10) ────────────────────────────────────────────────
+
+/** Liefert die geordneten Mittel eines Zweigs; `null` sind die Mittel ohne Einheit. */
+type MittelVon = (einheitId: number | null) => MittelDerEinheit;
+
+const leereMittelZeile = (): Omit<
+  MeldebildZeile,
+  'key' | 'mittelArt' | 'bezeichnung' | 'detail'
+> => ({
+  art: 'mittel',
+  staerke: leereStaerke(),
+  soll: null,
+  statusKategorie: null,
+  statusLabel: null,
+  menge: null,
+  personalVerteilung: null,
+  fahrzeugVerteilung: null,
+});
+
+function personMittelZeile(x: PersonImBaum): MeldebildZeile {
+  const ep = x.person;
+  const ps = leereStaerke();
+  addPosition(ps, ep.staerke_position);
+  return {
+    ...leereMittelZeile(),
+    key: `ep-${ep.id}`,
+    mittelArt: 'person',
+    bezeichnung: ep.name,
+    detail: [x.istFuehrer ? 'EF' : null, ep.funktion].filter(Boolean).join(' · ') || null,
+    staerke: ps,
+    statusKategorie: ep.status_kategorie ?? null,
+    statusLabel: ep.status_label ?? null,
+    zusatz: x.faehrtAuf ? `fährt auf ${x.faehrtAuf}` : null,
+  };
+}
+
+/**
+ * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit ihrer Besatzung als
+ * Unterpunkten → „Ohne Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen direkt) →
+ * Material als Gruppe mit Posten und Ausfall (D6). Dieselbe Gliederung wie das Raster am Schirm
+ * (`meldebildRaster.ts`), damit Lagebericht und Meldebild nicht zwei Lesarten zeigen.
+ */
+function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
+  const zeilen: MeldebildZeile[] = m.fahrzeuge.map((f) => {
+    const ef = f.fahrzeug;
+    const besatzung = f.besatzung.map(personMittelZeile);
+    const ist = f.urteil === 'nicht_erfasst' ? besatzungText(f) : `Besatzung ${besatzungText(f)}`;
+    return {
+      ...leereMittelZeile(),
+      key: `ef-${ef.id}`,
+      mittelArt: 'fahrzeug',
+      bezeichnung: ef.funkrufname,
+      detail: ef.fahrzeugtyp ?? null,
+      statusKategorie: ef.status_kategorie ?? null,
+      statusLabel: ef.status_label ?? null,
+      zusatz: [ist, fremdText(f)].filter(Boolean).join(', '),
+      children: besatzung.length > 0 ? besatzung : undefined,
+    };
+  });
+  const personen = m.ohneFahrzeug.map(personMittelZeile);
+  if (brauchtOhneFahrzeugKnoten(m)) {
+    zeilen.push({
+      ...leereMittelZeile(),
+      key: `ofz-${zweig}`,
+      mittelArt: 'ohne-fahrzeug',
+      bezeichnung: 'Ohne Fahrzeug',
+      detail: kraefteText(personen.length),
+      children: personen,
+    });
+  } else {
+    zeilen.push(...personen);
+  }
+  if (m.material.length > 0) {
+    zeilen.push({
+      ...leereMittelZeile(),
+      key: `mtl-${zweig}`,
+      mittelArt: 'material-gruppe',
+      bezeichnung: 'Material',
+      detail: [
+        `${m.material.length} Posten`,
+        ...(m.materialAusfall > 0 ? [`${m.materialAusfall} Ausfall`] : []),
+      ].join(', '),
+      children: m.material.map((em) => ({
+        ...leereMittelZeile(),
+        key: `em-${em.id}`,
+        mittelArt: 'material' as const,
+        bezeichnung: em.bezeichnung,
+        detail: null,
+        statusLabel: em.status,
+        menge: em.menge,
+      })),
+    });
+  }
+  return zeilen;
+}
+
 // ── Aggregation ───────────────────────────────────────────────────────────────
 
 interface EinheitResult {
@@ -147,72 +255,21 @@ function baueEinheitZeile(
   childrenByEinheit: Map<number, Einheit[]>,
   personalByEinheit: Map<number | null, EinsatzPersonal[]>,
   fahrzeugeByEinheit: Map<number | null, EinsatzFahrzeug[]>,
-  materialByEinheit: Map<number | null, EinsatzMaterial[]>,
+  mittelVon: MittelVon,
 ): EinheitResult {
   const staerke = leereStaerke();
   const personalVert = leereVert();
   const fahrzeugVert = leereVert();
 
-  const children: MeldebildZeile[] = [];
+  // Die Zeilen der eigenen Mittel kommen aus dem Kern; gezählt wird weiter über die Listen.
+  const children: MeldebildZeile[] = mittelZeilen(mittelVon(einheit.id), String(einheit.id));
 
-  const ownPersonal = personalByEinheit.get(einheit.id) ?? [];
-  for (const ep of ownPersonal) {
-    const ps = leereStaerke();
-    addPosition(ps, ep.staerke_position);
+  for (const ep of personalByEinheit.get(einheit.id) ?? []) {
     addPosition(staerke, ep.staerke_position);
     addKategorie(personalVert, ep.status_kategorie);
-    const detail = ep.funktion ?? null;
-    children.push({
-      key: `ep-${ep.id}`,
-      art: 'mittel',
-      mittelArt: 'person',
-      bezeichnung: ep.name,
-      detail,
-      staerke: ps,
-      soll: null,
-      statusKategorie: ep.status_kategorie ?? null,
-      statusLabel: ep.status_label ?? null,
-      menge: null,
-      personalVerteilung: null,
-      fahrzeugVerteilung: null,
-    });
   }
-
-  const ownFahrzeuge = fahrzeugeByEinheit.get(einheit.id) ?? [];
-  for (const ef of ownFahrzeuge) {
+  for (const ef of fahrzeugeByEinheit.get(einheit.id) ?? []) {
     addKategorie(fahrzeugVert, ef.status_kategorie);
-    children.push({
-      key: `ef-${ef.id}`,
-      art: 'mittel',
-      mittelArt: 'fahrzeug',
-      bezeichnung: ef.funkrufname,
-      detail: ef.fahrzeugtyp ?? null,
-      staerke: leereStaerke(),
-      soll: null,
-      statusKategorie: ef.status_kategorie ?? null,
-      statusLabel: ef.status_label ?? null,
-      menge: null,
-      personalVerteilung: null,
-      fahrzeugVerteilung: null,
-    });
-  }
-
-  const ownMaterial = materialByEinheit.get(einheit.id) ?? [];
-  for (const em of ownMaterial) {
-    children.push({
-      key: `em-${em.id}`,
-      art: 'mittel',
-      mittelArt: 'material',
-      bezeichnung: em.bezeichnung,
-      detail: null,
-      staerke: leereStaerke(),
-      soll: null,
-      statusKategorie: null,
-      statusLabel: em.status,
-      menge: em.menge,
-      personalVerteilung: null,
-      fahrzeugVerteilung: null,
-    });
   }
 
   let gesammeltesSoll: StaerkeSumme | null = null;
@@ -224,7 +281,7 @@ function baueEinheitZeile(
       childrenByEinheit,
       personalByEinheit,
       fahrzeugeByEinheit,
-      materialByEinheit,
+      mittelVon,
     );
     addStaerke(staerke, kindResult.zeile.staerke);
     addVerteilung(personalVert, kindResult.zeile.personalVerteilung ?? leereVert());
@@ -272,7 +329,7 @@ function baueAbschnittZeile(
   childrenByEinheit: Map<number, Einheit[]>,
   personalByEinheit: Map<number | null, EinsatzPersonal[]>,
   fahrzeugeByEinheit: Map<number | null, EinsatzFahrzeug[]>,
-  materialByEinheit: Map<number | null, EinsatzMaterial[]>,
+  mittelVon: MittelVon,
 ): { zeile: MeldebildZeile; gesammeltesSoll: StaerkeSumme | null } {
   const staerke = leereStaerke();
   const personalVert = leereVert();
@@ -289,7 +346,7 @@ function baueAbschnittZeile(
       childrenByEinheit,
       personalByEinheit,
       fahrzeugeByEinheit,
-      materialByEinheit,
+      mittelVon,
     );
     addStaerke(staerke, result.zeile.staerke);
     addVerteilung(personalVert, result.zeile.personalVerteilung ?? leereVert());
@@ -310,7 +367,7 @@ function baueAbschnittZeile(
       childrenByEinheit,
       personalByEinheit,
       fahrzeugeByEinheit,
-      materialByEinheit,
+      mittelVon,
     );
     addStaerke(staerke, result.zeile.staerke);
     addVerteilung(personalVert, result.zeile.personalVerteilung ?? leereVert());
@@ -418,6 +475,11 @@ const MITTEL_MARKE = { person: 'Pers.', fahrzeug: 'Fzg.', material: 'Mtl.' } as 
 
 function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): string {
   const zeilen: string[] = [];
+  // Ein Einzug für Einheiten und Mittel: zwei Leerzeichen je Ebene unter dem Abschnitt, damit
+  // Untereinheit, Fahrzeug und Besatzung als verschachtelte Liste lesbar bleiben.
+  const einzug = '  '.repeat(Math.max(0, tiefe - 1));
+  const klammer = zeile.detail ? ` (${zeile.detail})` : '';
+  const nachsatz = zeile.zusatz ? ` — ${zeile.zusatz}` : '';
 
   if (zeile.art === 'abschnitt') {
     // Abschnitte tragen keinen Einzug — die Tiefe steckt in der Heading-Hierarchie (## / ###).
@@ -425,32 +487,23 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
     zeilen.push(`${prefix} ${zeile.bezeichnung}`);
     zeilen.push(`Stärke (F/UF/M//Ges): ${staerkeText(zeile.staerke)}`);
   } else if (zeile.art === 'einheit') {
-    const einzug = '  '.repeat(Math.max(0, tiefe - 1));
-    const detail = zeile.detail ? ` (${zeile.detail})` : '';
     zeilen.push(
-      `${einzug}- **${zeile.bezeichnung}**${detail} — Stärke: ${staerkeText(zeile.staerke)}`,
+      `${einzug}- **${zeile.bezeichnung}**${klammer} — Stärke: ${staerkeText(zeile.staerke)}`,
+    );
+  } else if (zeile.mittelArt === 'ohne-fahrzeug' || zeile.mittelArt === 'material-gruppe') {
+    // Gruppenzeile: „Ohne Fahrzeug: 2 Kräfte“, „Material: 3 Posten, 1 Ausfall“.
+    zeilen.push(`${einzug}- ${zeile.bezeichnung}${zeile.detail ? `: ${zeile.detail}` : ''}`);
+  } else if (zeile.mittelArt === 'person' || zeile.mittelArt === 'fahrzeug') {
+    const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
+    zeilen.push(
+      `${einzug}- ${MITTEL_MARKE[zeile.mittelArt]} ${zeile.bezeichnung}${klammer}${status ? ` [${status}]` : ''}${nachsatz}`,
     );
   } else {
-    const einzug = '  '.repeat(Math.max(0, tiefe - 1));
-    if (zeile.mittelArt === 'person') {
-      const detail = zeile.detail ? ` (${zeile.detail})` : '';
-      const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(
-        `${einzug}  - ${MITTEL_MARKE.person} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`,
-      );
-    } else if (zeile.mittelArt === 'fahrzeug') {
-      const detail = zeile.detail ? ` (${zeile.detail})` : '';
-      const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(
-        `${einzug}  - ${MITTEL_MARKE.fahrzeug} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`,
-      );
-    } else {
-      const menge = zeile.menge != null ? ` ×${zeile.menge}` : '';
-      const status = zeile.statusLabel ?? '';
-      zeilen.push(
-        `${einzug}  - ${MITTEL_MARKE.material} ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`,
-      );
-    }
+    const menge = zeile.menge != null ? ` ×${zeile.menge}` : '';
+    const status = zeile.statusLabel ?? '';
+    zeilen.push(
+      `${einzug}- ${MITTEL_MARKE.material} ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`,
+    );
   }
 
   if (zeile.children) {
@@ -566,7 +619,15 @@ export function baueKraeftebild(
   personal: EinsatzPersonal[],
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
+  /**
+   * Ungefilterte Listen (Namen für „fährt auf“, Besatzung Ist, D4); ohne sie gelten die
+   * übergebenen. Die Seite übergibt sie, die Übernahme „Eigene Lage“ ist ungefiltert.
+   */
+  quelle: Partial<MittelQuelle> = {},
 ): Kraeftebild {
+  const roh = { einheiten, personal, fahrzeuge, material };
+  const mittelVon: MittelVon = (einheitId) => mittelDerEinheit(einheitId, roh, quelle);
+
   // ── Index nach einheit_id ─────────────────────────────────────────────────
   const personalByEinheit = new Map<number | null, EinsatzPersonal[]>();
   for (const ep of personal) {
@@ -580,13 +641,6 @@ export function baueKraeftebild(
     const key = ef.einheit_id ?? null;
     if (!fahrzeugeByEinheit.has(key)) fahrzeugeByEinheit.set(key, []);
     fahrzeugeByEinheit.get(key)!.push(ef);
-  }
-
-  const materialByEinheit = new Map<number | null, EinsatzMaterial[]>();
-  for (const em of material) {
-    const key = em.einheit_id ?? null;
-    if (!materialByEinheit.has(key)) materialByEinheit.set(key, []);
-    materialByEinheit.get(key)!.push(em);
   }
 
   // ── Einheiten-Index ───────────────────────────────────────────────────────
@@ -639,7 +693,7 @@ export function baueKraeftebild(
       childrenByEinheit,
       personalByEinheit,
       fahrzeugeByEinheit,
-      materialByEinheit,
+      mittelVon,
     );
     if (result.gesammeltesSoll !== null) {
       gesammeltesSoll = addSoll(gesammeltesSoll, result.gesammeltesSoll);
@@ -652,7 +706,7 @@ export function baueKraeftebild(
   // Mittel ohne `einheit_id`: Pseudo-Einheit „Ohne Einheit".
   const ohneEinheitPersonal = personalByEinheit.get(null) ?? [];
   const ohneEinheitFahrzeuge = fahrzeugeByEinheit.get(null) ?? [];
-  const ohneEinheitMaterial = materialByEinheit.get(null) ?? [];
+  const ohneEinheitMaterial = material.filter((em) => em.einheit_id == null);
 
   const hasOhne =
     ohneAbschnittEinheiten.length > 0 ||
@@ -674,7 +728,7 @@ export function baueKraeftebild(
         childrenByEinheit,
         personalByEinheit,
         fahrzeugeByEinheit,
-        materialByEinheit,
+        mittelVon,
       );
       addStaerke(ohneAbschnittStaerke, result.zeile.staerke);
       addVerteilung(ohneAbschnittPersonalVert, result.zeile.personalVerteilung ?? leereVert());
@@ -693,62 +747,14 @@ export function baueKraeftebild(
       const ohneEinheitStaerke = leereStaerke();
       const ohneEinheitPersonalVert = leereVert();
       const ohneEinheitFahrzeugVert = leereVert();
-      const ohneEinheitChildren: MeldebildZeile[] = [];
+      const ohneEinheitChildren = mittelZeilen(mittelVon(null), 'ohne');
 
       for (const ep of ohneEinheitPersonal) {
-        const ps = leereStaerke();
-        addPosition(ps, ep.staerke_position);
         addPosition(ohneEinheitStaerke, ep.staerke_position);
         addKategorie(ohneEinheitPersonalVert, ep.status_kategorie);
-        ohneEinheitChildren.push({
-          key: `ep-${ep.id}`,
-          art: 'mittel',
-          mittelArt: 'person',
-          bezeichnung: ep.name,
-          detail: ep.funktion ?? null,
-          staerke: ps,
-          soll: null,
-          statusKategorie: ep.status_kategorie ?? null,
-          statusLabel: ep.status_label ?? null,
-          menge: null,
-          personalVerteilung: null,
-          fahrzeugVerteilung: null,
-        });
       }
-
       for (const ef of ohneEinheitFahrzeuge) {
         addKategorie(ohneEinheitFahrzeugVert, ef.status_kategorie);
-        ohneEinheitChildren.push({
-          key: `ef-${ef.id}`,
-          art: 'mittel',
-          mittelArt: 'fahrzeug',
-          bezeichnung: ef.funkrufname,
-          detail: ef.fahrzeugtyp ?? null,
-          staerke: leereStaerke(),
-          soll: null,
-          statusKategorie: ef.status_kategorie ?? null,
-          statusLabel: ef.status_label ?? null,
-          menge: null,
-          personalVerteilung: null,
-          fahrzeugVerteilung: null,
-        });
-      }
-
-      for (const em of ohneEinheitMaterial) {
-        ohneEinheitChildren.push({
-          key: `em-${em.id}`,
-          art: 'mittel',
-          mittelArt: 'material',
-          bezeichnung: em.bezeichnung,
-          detail: null,
-          staerke: leereStaerke(),
-          soll: null,
-          statusKategorie: null,
-          statusLabel: em.status,
-          menge: em.menge,
-          personalVerteilung: null,
-          fahrzeugVerteilung: null,
-        });
       }
 
       addStaerke(ohneAbschnittStaerke, ohneEinheitStaerke);
