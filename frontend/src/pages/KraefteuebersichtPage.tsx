@@ -657,6 +657,8 @@ export default function KraefteuebersichtPage() {
    * Als `null` statt einer berechneten Liste, weil das Raster beim ersten Bild noch leer ist.
    */
   const [expandedKeys, setExpandedKeys] = useState<React.Key[] | null>(null);
+  /** Die zuletzt gewählte Stufe: bei gleichen Schlüsselmengen gewinnt sie (`stufeVon`). */
+  const [gewaehlteStufe, setGewaehlteStufe] = useState<Ausklappstufe | null>(null);
   const [filterOffen, setFilterOffen] = useState(false);
 
   const einsatzQuery = useQuery({
@@ -955,6 +957,7 @@ export default function KraefteuebersichtPage() {
   // die Einheitenzeile trägt Stärke, Verteilung und Auftrag schon selbst.
   useEffect(() => {
     setExpandedKeys(null);
+    setGewaehlteStufe(null);
     setFilter(LEERER_FILTER);
   }, [einsatzId]);
 
@@ -984,7 +987,7 @@ export default function KraefteuebersichtPage() {
    * benannte Zwischenvariable, nicht inline im `value` — `datensicht.guard.test.ts` liest aus dem
    * Schalter-Attribut eine „Reiterachse"; hier liest der Schalter die Daten, nicht umgekehrt.
    */
-  const stufe = stufeVon(raster, offeneSchluessel);
+  const stufe = stufeVon(raster, offeneSchluessel, gewaehlteStufe);
 
   const abschnittName = (aid: number) =>
     (abschnitteQuery.data ?? []).find((a) => a.id === aid)?.name ?? `Abschnitt ${aid}`;
@@ -1205,7 +1208,10 @@ export default function KraefteuebersichtPage() {
           <Segmentleiste<Ausklappstufe>
             beschriftung="Ausklappstufe des Kräftebaums"
             wert={stufe}
-            onWechsel={(wert) => setExpandedKeys(schluesselBisStufe(raster, wert))}
+            onWechsel={(wert) => {
+              setGewaehlteStufe(wert);
+              setExpandedKeys(schluesselBisStufe(raster, wert));
+            }}
             optionen={[
               { wert: 'einheiten', label: 'Einheiten' },
               { wert: 'fahrzeuge', label: 'mit Fahrzeugen' },
@@ -1224,7 +1230,12 @@ export default function KraefteuebersichtPage() {
           )}
           {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
               löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf vorbereiten={() => setExpandedKeys(schluesselBisStufe(raster, 'alles'))} />
+          <DruckKnopf
+            vorbereiten={() => {
+              setGewaehlteStufe('alles');
+              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+            }}
+          />
         </div>
         {uebernehmen.error != null && (
           <div className="kraefte-no-print" style={{ marginBlockEnd: token.margin }}>

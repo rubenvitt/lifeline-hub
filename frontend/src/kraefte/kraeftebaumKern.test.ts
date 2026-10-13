@@ -463,4 +463,23 @@ describe('schluesselBisStufe / stufeVon', () => {
     // Ein einzeln zugeklapptes Fahrzeug fällt auf die nächste vollständige Stufe zurück.
     expect(stufeVon(zeilen, ['eh-1', 'eh-2', 'eh-ohne', 'mtl-1'])).toBe('fahrzeuge');
   });
+
+  it('bei gleichen Schlüsselmengen gilt die gewählte Stufe, solange sie genau passt', () => {
+    // Zug mit einer Gruppe ohne Mittel: alle drei Stufen öffnen nur den Zug.
+    const flach: StufenZeile[] = [
+      {
+        key: 'eh-1',
+        art: 'einheit',
+        children: [{ key: 'eh-2', art: 'einheit' }],
+      },
+    ];
+    for (const s of ['einheiten', 'fahrzeuge', 'alles'] as const) {
+      expect(schluesselBisStufe(flach, s)).toEqual(['eh-1']);
+      expect(stufeVon(flach, ['eh-1'], s)).toBe(s);
+    }
+    expect(stufeVon(flach, ['eh-1'])).toBe('einheiten');
+    // Passt die gewählte Stufe nicht mehr (Zeile von Hand zugeklappt), gilt die abgeleitete.
+    expect(stufeVon(zeilen, ['eh-1'], 'alles')).toBe('einheiten');
+    expect(stufeVon(zeilen, ['eh-1', 'eh-2', 'eh-ohne', 'mtl-1'], 'alles')).toBe('fahrzeuge');
+  });
 });

@@ -547,16 +547,24 @@ export function schluesselBisStufe(zeilen: readonly StufenZeile[], stufe: Auskla
 }
 
 /**
- * Die Stufe zu offenen Schlüsseln: genau „Einheiten“, sonst die weiteste vollständig offene
- * Stufe. Ein einzeln zugeklappter Knoten fällt auf die nächste vollständige Stufe zurück.
+ * Die Stufe zu offenen Schlüsseln: zuerst die zuletzt GEWÄHLTE, solange ihre Schlüssel genau
+ * offen stehen — sonst zeigten gleiche Schlüsselmengen (ein Zug mit einer Gruppe ohne Mittel)
+ * nach einem Klick auf „alles“ weiter „Einheiten“, der Klick wirkte tot. Dann genau „Einheiten“,
+ * sonst die weiteste vollständig offene Stufe. Ein einzeln zugeklappter Knoten fällt auf die
+ * nächste vollständige Stufe zurück.
  */
 export function stufeVon(
   zeilen: readonly StufenZeile[],
   offen: readonly (string | number | bigint)[],
+  gewaehlt: Ausklappstufe | null = null,
 ): Ausklappstufe {
   const ist = new Set(offen.map(String));
-  const einheiten = schluesselBisStufe(zeilen, 'einheiten');
-  if (einheiten.length === ist.size && einheiten.every((k) => ist.has(k))) return 'einheiten';
+  const genau = (stufe: Ausklappstufe) => {
+    const soll = schluesselBisStufe(zeilen, stufe);
+    return soll.length === ist.size && soll.every((k) => ist.has(k));
+  };
+  if (gewaehlt && genau(gewaehlt)) return gewaehlt;
+  if (genau('einheiten')) return 'einheiten';
   const umfasst = (stufe: Ausklappstufe) =>
     schluesselBisStufe(zeilen, stufe).every((k) => ist.has(k));
   if (umfasst('alles')) return 'alles';

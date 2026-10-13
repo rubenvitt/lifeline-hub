@@ -912,6 +912,20 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
     expect(screen.getByRole('radio', { name: 'alles' })).toBeChecked();
   });
 
+  it('bei gleichen Schlüsselmengen bleibt die gewählte Stufe stehen (kein toter Klick)', async () => {
+    // Zug mit einer Gruppe ohne Mittel: alle drei Stufen öffnen nur den Zug.
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      { ...EINHEIT_E10, typ_label: 'Zug' },
+      { ...EINHEIT_E10, id: 21, name: '1. Gruppe', typ_label: 'Gruppe', ueber_einheit_id: 20 },
+    ]);
+    const { container } = setup();
+    await waitFor(() => expect(zeile(container, 'eh-21')).not.toBeNull());
+    for (const name of ['alles', 'mit Fahrzeugen', 'Einheiten']) {
+      fireEvent.click(screen.getByRole('radio', { name }));
+      await waitFor(() => expect(screen.getByRole('radio', { name })).toBeChecked());
+    }
+  });
+
   it('die Elternzeile zeigt die kumulierte Stärke, das Fahrzeug seine Besatzung Ist/Soll', async () => {
     mitBaum();
     const { container } = setup();
