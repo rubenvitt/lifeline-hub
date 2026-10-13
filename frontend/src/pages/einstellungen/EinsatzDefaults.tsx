@@ -112,6 +112,8 @@ export default function EinsatzDefaults() {
         qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() }),
         // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
         qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() }),
+        // Der Editor „Module“ jedes Einsatzes liest dieselbe Vorgabe am Einsatz (LLH-1183).
+        qc.invalidateQueries({ queryKey: einsatzKeys.modulVorgabenAlle() }),
       ]);
     },
   });

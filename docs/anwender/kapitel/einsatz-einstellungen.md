@@ -119,6 +119,8 @@ selbst aussperrt.
 - „Allgemein“, „Verhalten & Automatik“ und die Aufbewahrungs-Dauer ändern die Einsatzleitung,
   das Führungspersonal und System-Admins der Organisation des Einsatzes.
 - „Module“ ändern nur die Einsatzleitung und System-Admins der Organisation des Einsatzes.
+  Die Hinweise „Vorgabe der Organisation: …“ in „Module“ sieht jede Person, die den Einsatz
+  öffnen kann, auch ohne Rolle in der Organisation.
 - „Zugriff“ bedient nur die Einsatzleitung eines laufenden Einsatzes, auch ein System-Admin nur
   mit dieser Rolle.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.

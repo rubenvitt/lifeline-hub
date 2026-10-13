@@ -97,6 +97,8 @@ export const EINSATZ_KEYS = {
   mitgliedAuswahl: 'einsatz-mitglieder-auswahl',
   sprechgruppen: 'einsatz-sprechgruppen',
   modulOverrides: 'einsatz-modul-overrides',
+  // Modul-Vorgaben der Einsatz-Org (LLH-1183), für den Editor „Module“.
+  modulVorgaben: 'einsatz-modul-vorgaben',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
@@ -400,6 +402,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
+ * - `modulVorgaben` (LLH-1183): Org-Vorgaben ohne LiveEvent wie `orgModulEinstellungen`; die
+ *   eigene Änderung in der Verwaltung invalidiert sie für alle Einsätze.
  * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
  *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
@@ -442,6 +446,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.mitgliedAuswahl,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
+  EINSATZ_KEYS.modulVorgaben,
   EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
@@ -522,6 +527,10 @@ export const einsatzKeys = {
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
+  /** Modul-Vorgaben der Einsatz-Org (LLH-1183), nicht live. */
+  modulVorgaben: (einsatzId: number) => [EINSATZ_KEYS.modulVorgaben, einsatzId] as const,
+  // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe gilt für jeden Einsatz der Org.
+  modulVorgabenAlle: () => [EINSATZ_KEYS.modulVorgaben] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
@@ -1119,7 +1128,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Org-Einstellungs- und Admin-Keys, die eigene
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Org-Einstellungs- und Admin-Keys samt der
+ * Modul-Vorgaben am Einsatz (LLH-1183, nur der Editor liest sie, wie die Overrides), die eigene
  * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), die externen
  * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), dazu S5

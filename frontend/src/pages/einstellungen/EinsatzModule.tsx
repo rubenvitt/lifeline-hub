@@ -6,12 +6,16 @@ import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
 import { quittiereModulGespeichert } from './modulQuittung';
-import { ladeModulFreigaben, ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
-import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
+import {
+  ladeModulFreigaben,
+  ladeModulOverrides,
+  ladeModulVorgaben,
+  setzeModulOverride,
+} from '../../api/einsaetze';
 import { orgVorgabe } from '../../components/vorgabeText';
 import { rollenName } from './optionen';
 import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';
-import { einsatzKeys, globalKeys } from '../../api/queryKeys';
+import { einsatzKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
@@ -40,10 +44,11 @@ const RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
  * Sichtbarkeit (LLH-1179, design.md D4 der Change
  * `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`): der Schalter zeigt den wirksamen Wert —
  * eigener Wert des Einsatzes, sonst die Freigabe des Servers (dort ist die Org-Vorgabe schon
- * aufgelöst, auch für eine Einsatzleitung, die die Vorgaben nicht lesen darf), sonst die
- * Org-Vorgabe, sonst sichtbar. Umlegen setzt einen eigenen Wert; „Vorgabe
- * übernehmen“ nimmt ihn zurück (`sichtbar: null`). Ein Rollenwechsel schickt den eigenen Wert mit,
- * nie den wirksamen — sonst würde eine geerbte Ausblendung nebenbei festgeschrieben.
+ * aufgelöst), sonst die Org-Vorgabe, sonst sichtbar. Die Herkunft zeigen die Vorgaben am Einsatz
+ * (`…/modul-vorgaben`, LLH-1183), die auch eine Einsatzleitung ohne Org-Rolle lesen darf.
+ * Umlegen setzt einen eigenen Wert; „Vorgabe übernehmen“ nimmt ihn zurück (`sichtbar: null`). Ein
+ * Rollenwechsel schickt den eigenen Wert mit, nie den wirksamen — sonst würde eine geerbte
+ * Ausblendung nebenbei festgeschrieben.
  *
  * Keine Speicher-Leiste: die Liste speichert je Zeile sofort; ein Speichern-Knopf darüber beträfe
  * sie nicht.
@@ -66,10 +71,11 @@ export default function EinsatzModule() {
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
-  // Org-Modul-Vorgaben (optional, nicht-blockierend; ohne Org-Rolle 403).
+  // Org-Modul-Vorgaben am Einsatz (LLH-1183): lesbar auch ohne Org-Rolle, anders als
+  // `GET /api/org-modul-einstellungen`. Nicht blockierend; scheitert der Abruf, fehlen nur Hinweise.
   const orgModulQuery = useQuery({
-    queryKey: globalKeys.orgModulEinstellungen(),
-    queryFn: () => ladeOrgModulEinstellungen(),
+    queryKey: einsatzKeys.modulVorgaben(einsatzId),
+    queryFn: () => ladeModulVorgaben(einsatzId),
   });
   // Dieselben Freigaben wie die Navigation: der wirksame Sichtbarkeitswert, vom Server aufgelöst.
   const freigabenQuery = useQuery({
@@ -127,7 +133,7 @@ export default function EinsatzModule() {
     orgModulDefaults[modulKey]?.sichtbar ??
     true;
   /**
-   * Blendet die Organisation aus? Aus der Vorgabe, oder — ohne Leserecht darauf — aus der Freigabe:
+   * Blendet die Organisation aus? Aus der Vorgabe, oder — scheitert ihr Abruf — aus der Freigabe:
    * ohne eigenen Wert kann nur die Organisation ausgeblendet haben.
    */
   const orgBlendetAus = (modulKey: string) =>

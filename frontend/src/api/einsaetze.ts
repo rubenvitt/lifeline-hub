@@ -13,6 +13,7 @@ import type {
   ModulFreigaben,
   ModulOverrides,
   ModulOverrideUpdate,
+  OrgModulEinstellungen,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -147,6 +148,15 @@ export function speichereEinstellungen(
 /** Modul-Overrides eines Einsatzes laden (LFH-132); Map modul_key→Override (leer = Defaults). */
 export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
   return apiGet<ModulOverrides>(`/api/einsaetze/${id}/modul-overrides`);
+}
+
+/**
+ * Modul-Vorgaben der Organisation des Einsatzes (LLH-1183), Form wie
+ * `GET /api/org-modul-einstellungen`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
+ * Org-Rolle; daraus zeigt der Editor „Module“ die Herkunft von Rolle und Sichtbarkeit.
+ */
+export function ladeModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
+  return apiGet<OrgModulEinstellungen>(`/api/einsaetze/${id}/modul-vorgaben`);
 }
 
 /**

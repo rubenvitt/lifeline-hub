@@ -279,6 +279,8 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.modulOverrides(1)).toEqual(['einsatz-modul-overrides', 1]);
     // null wie bei `einsatz`: die Kommandopalette lädt nur im Einsatzkontext.
     expect(einsatzKeys.modulOverrides(null)).toEqual(['einsatz-modul-overrides', null]);
+    expect(einsatzKeys.modulVorgaben(1)).toEqual(['einsatz-modul-vorgaben', 1]);
+    expect(einsatzKeys.modulVorgabenAlle()).toEqual(['einsatz-modul-vorgaben']);
     expect(einsatzKeys.modulFreigaben(1)).toEqual(['einsatz-modul-freigaben', 1]);
     expect(einsatzKeys.modulFreigaben(null)).toEqual(['einsatz-modul-freigaben', null]);
     // Prefix über alle Einsätze: Invalidierung nach einer Org-Vorgabe (LFH-669).
