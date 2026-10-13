@@ -18,7 +18,31 @@ Begründung). Was aus einem geteilten Baustein und seinen Messungen geschlossen 
 
 ## Die Nachweise
 
-NACHWEISE
+Lauf am 13.10.2026 in der Cloud-Sitzung (Chromium, Backend `target/debug`, `PW_WORKERS=2`):
+186 Tests aus 16 betroffenen Spec-Dateien, 180 grün, 1 übersprungen, 5 rot. Die 5 einzeln
+nachgeprüft:
+
+- **`funkplan.spec.ts` „Einzug bleibt beim Umbruch erhalten“ (admin, beobachter):** im Sammellauf
+  Zeitüberschreitung mit „session closed“ (Browser unter Last), allein grün.
+- **`gate3-trefflaeche.spec.ts` „Profil: Kopieraktion …“:** fremde Seite, allein grün.
+- **`gate3-trefflaeche.spec.ts` „Fernmeldeskizze“ (schreibend, Beobachter):** echter Testfehler.
+  Gemessen wurde `role="tab"`, bei antd der innere Text ohne Polster (21,5 px). Jetzt wird der
+  klickbare Knoten `.ant-tabs-tab` gemessen, wie in `trefflaeche-pruefflaechen`. Danach grün.
+
+**Messwerte der Reiter** (Gate 3, Fükw 1366 × 768, Annotation `messwert`):
+
+| Stufe | Soll | Reiter | Werkzeug | Segment | Palette | Paneel | Lücken-Wahl | Drucken |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| kompakt | ≥ 30 | 35,5 | 30 | 30 | 30 | 30 | 35,5 | 30 |
+| komfortabel | ≥ 48 | 48 | 48 | 48 | 48 | 48 | 48 | 48 |
+| handschuh | ≥ 72 | 72 | 72 | 72 | 72 | 72 | 72 | 72 |
+
+**Neue Spec `fernmeldewesen.spec.ts`** (3 Tests, grün):
+
+- Stab ausgeblendet: alle vier Reiter nutzbar, Besetzung „—“ mit Grund „Stab nicht freigegeben“.
+- Die alte Adresse `stab/funkplan?ansicht=skizze` landet in der Skizze.
+- „Fernmeldeskizze anfügen“ am Befehl gelingt ohne Stab.
+- Handy (390 px): Reiter ohne Querlauf.
 
 ---
 
@@ -26,7 +50,7 @@ NACHWEISE
 
 | Nr. | Kriterium | Verdikt | Beleg / Begründung | Zielticket |
 | --- | --- | --- | --- | --- |
-| 1 | **Treffläche** | **erfüllt** | Die vier Reiter in `gate3-trefflaeche` (Funkplan-Bereich) je Dichtestufe gemessen; antd `Tabs` erreichen die Steuerhöhe über `kopfzeilenMasse` (LFH-724) | — |
+| 1 | **Treffläche** | **erfüllt** | Die vier Reiter in `gate3-trefflaeche` („Fernmeldeskizze“, schreibend und Beobachter) je Dichtestufe am klickbaren Knoten gemessen: 35,5 / 48 / 72 px (Nachweise oben); antd `Tabs` erreichen die Steuerhöhe über `kopfzeilenMasse` (LFH-724) | — |
 | 2 | **Handschuh-Modus** | **erfüllt** | dieselbe Spec, Stufe `handschuh` (72 px Kopfzeile, `tokens.test.ts`) | — |
 | 3 | **Rückmeldung vor der Serverantwort** | **nicht anwendbar** | Reiter wechseln ohne Serveraufruf; die Schreibwege der Seiten sind unverändert | — |
 | 4 | **Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Keine neue Aktion; Entfernen im Kommunikationsplan und in der Skizze unverändert | — |
