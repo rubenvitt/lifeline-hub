@@ -22,3 +22,8 @@ export function orgVorgabe(wert: string): string {
 export function abschnittVorgabe(wert: string): string {
   return `${wert} (Vorgabe Abschnitt)`;
 }
+
+/** Hinweis unter einem leeren Feld, für das der Einheitstyp einen Wert setzt (LLH-1042). */
+export function typVorgabe(wert: string): string {
+  return `Vorgabe des Einheitstyps: ${wert}`;
+}

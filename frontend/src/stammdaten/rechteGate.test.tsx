@@ -14,6 +14,7 @@ import QualifikationenTab from './QualifikationenTab';
 import PersonalStatusTab from './PersonalStatusTab';
 import EtbBausteineTab from './EtbBausteineTab';
 import EinheitTypenTab from './EinheitTypenTab';
+import EinheitVorlagenTab from './EinheitVorlagenTab';
 import OrganisationTab from './OrganisationTab';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
@@ -23,9 +24,9 @@ import { adminFixture, benutzerFixture } from '../test/fixtures';
  * Stammdaten-Sektion öffnet, erfährt den Grund, statt eine Tabelle ohne Handlungsmöglichkeit
  * zu sehen.
  *
- * Der Test steht bewusst QUER zu den zwölf Dateien: die Aussage ist „KEINE Sektion fehlt", und
- * die lässt sich nur an der vollständigen Menge treffen. Ein dreizehnter Tab ohne Hinweis fiele
- * hier auf, in zwölf Einzeltests nicht.
+ * Der Test steht bewusst QUER zu den dreizehn Dateien: die Aussage ist „KEINE Sektion fehlt",
+ * und die lässt sich nur an der vollständigen Menge treffen. Ein vierzehnter Tab ohne Hinweis
+ * fiele hier auf, in dreizehn Einzeltests nicht.
  */
 const nichtAdmin = benutzerFixture({
   id: 2,
@@ -35,7 +36,7 @@ const nichtAdmin = benutzerFixture({
 const admin = adminFixture({ org_rolle: 'fuehrungskraft' });
 
 /**
- * Alle Abrufe der zwölf Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
+ * Alle Abrufe der dreizehn Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
  * (test/setup.ts) macht eine fehlende Route zum Fehler statt zum stillen Leerlauf.
  * Leere Kataloge genügen: der Hinweis hängt am Recht, nicht an den Daten.
  */
@@ -55,6 +56,7 @@ function handler(benutzer: typeof admin) {
     http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
+    http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
@@ -65,7 +67,7 @@ function handler(benutzer: typeof admin) {
 }
 
 /**
- * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sechs Sektionen der
+ * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sieben Sektionen der
  * Knopf im `aktionen`-Slot, bei fünf der Anlegen-Knopf ihrer `SchnellAnlegen`-Zeile, bei
  * `Organisation` der Speichern-Knopf ihres Formulars. Dass „Status anlegen" zweimal
  * vorkommt, ist unschädlich: je Durchlauf steht genau eine Sektion im Baum.
@@ -80,15 +82,16 @@ const SEKTIONEN = [
   { name: 'Personal-Status', Komp: PersonalStatusTab, aktion: 'Status anlegen' },
   { name: 'ETB-Schnellbausteine', Komp: EtbBausteineTab, aktion: 'Baustein anlegen' },
   { name: 'Einheitstypen', Komp: EinheitTypenTab, aktion: 'Typ anlegen' },
+  { name: 'Einheiten-Vorlagen', Komp: EinheitVorlagenTab, aktion: 'Vorlage anlegen' },
   { name: 'Organisation', Komp: OrganisationTab, aktion: 'Speichern' },
   { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },
   { name: 'Externe Stellen', Komp: ExterneStellenTab, aktion: 'Externe Stelle anlegen' },
 ];
 
 describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
-  it('deckt alle zwölf Sektionen ab', () => {
+  it('deckt alle dreizehn Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei halber Menge grün.
-    expect(SEKTIONEN).toHaveLength(12);
+    expect(SEKTIONEN).toHaveLength(13);
   });
 
   it.each(SEKTIONEN)('$name nennt ohne Admin-Recht den Grund', async ({ Komp }) => {
@@ -109,7 +112,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       renderMitProviders(<Komp />, { datenRouter: true });
       // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
       await screen.findByText(STAMMDATEN_RECHTE_TEXT);
-      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der zwölf
+      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der dreizehn
       // Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die nichts zu.
       // `waitFor` maskiert nichts: ein Knopf, der nie gesperrt wird, läuft in die Zeitüberschreitung.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
@@ -130,7 +133,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
       expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
       // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
-      // unentdeckt: zwölf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
+      // unentdeckt: dreizehn `toBeDisabled` wären dann grün, und die Seite unbedienbar.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
     },
   );

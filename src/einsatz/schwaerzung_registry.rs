@@ -592,7 +592,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
             // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
             // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`. Altzeilen
-            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0190 (LLH-1160): Katalog-Kennungen des
+            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0191 (LLH-1160): Katalog-Kennungen des
             // Altpakets und eine Hexfarbe, ebenfalls kein Freitext.
             retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
@@ -2327,7 +2327,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("import_id", G_FK),
             retain(
                 "tabelle",
-                "Stammdatenart der Marke (CHECK auf fahrzeug/personal/material, kein Personenbezug)",
+                "Stammdatenart der Marke (CHECK auf fahrzeug/personal/material/einheit_vorlage, \
+                 kein Personenbezug)",
             ),
             retain(
                 "datensatz_id",
@@ -2902,6 +2903,11 @@ mod tests {
             "fahrzeug",
             "material",
             "einheit_typ",
+            // Einheiten-Vorlagen (LLH-1042): Org-Stammdaten; ein künftiger Verweis aus dem
+            // Einsatz (Herkunft einer gebildeten Einheit) bleibt NO ACTION und zieht sie nie mit.
+            "einheit_vorlage",
+            "einheit_vorlage_fahrzeug",
+            "einheit_vorlage_personal",
             "qualifikation",
             "karte_registry",
             // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung

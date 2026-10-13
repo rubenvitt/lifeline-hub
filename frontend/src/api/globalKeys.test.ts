@@ -78,6 +78,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.externeStellen()).toEqual(['externe-stellen']);
     expect(globalKeys.externeStellenListe('aktiv')).toEqual(['externe-stellen', 'aktiv']);
     expect(globalKeys.externeStellenListe('alle')).toEqual(['externe-stellen', 'alle']);
+    // Einheiten-Vorlagen (LLH-1042): der Prefix invalidiert beide Fächer.
+    expect(globalKeys.einheitVorlagen()).toEqual(['einheit-vorlagen']);
+    expect(globalKeys.einheitVorlagenListe('aktiv')).toEqual(['einheit-vorlagen', 'aktiv']);
+    expect(globalKeys.einheitVorlagenListe('alle')).toEqual(['einheit-vorlagen', 'alle']);
   });
 
   it('Betrieb: Datenträgerprüfung (LFH-1100)', () => {
@@ -123,10 +127,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 32 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 33 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(32);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(32);
+    expect(werte).toHaveLength(33);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(33);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

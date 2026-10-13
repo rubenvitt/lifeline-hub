@@ -3101,7 +3101,7 @@
       },
       "DemoBericht": {
         "type": "object",
-        "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.",
+        "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart (Fahrzeug, Personal, Material,\nEinheiten-Vorlage).",
         "required": [
           "vorgang",
           "zeitpunkt",
@@ -3227,7 +3227,8 @@
         "enum": [
           "fahrzeug",
           "personal",
-          "material"
+          "material",
+          "einheit_vorlage"
         ]
       },
       "DemoVorgang": {
@@ -3824,6 +3825,204 @@
           "sortier": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "EinheitVorlage": {
+        "type": "object",
+        "description": "Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;\ndie Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der\nVerwaltung“).",
+        "required": [
+          "id",
+          "name",
+          "typ_id",
+          "typ_label",
+          "soll_eigen",
+          "sortier",
+          "aktiv",
+          "ist_demo",
+          "fahrzeuge",
+          "personal"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitVorlageFahrzeug"
+            }
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (Spec `demo-daten`)? Live aus `demo_herkunft`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitVorlagePersonal"
+            }
+          },
+          "soll": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Staerke",
+                "description": "Wirksames Soll: das eigene, sonst das des Einheitstyps; fehlt, wenn keins gilt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "soll_eigen": {
+            "type": "boolean",
+            "description": "Ob [`Self::soll`] das eigene Soll der Vorlage ist (sonst das des Typs)."
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typ_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typ_label": {
+            "type": "string"
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fachaufgabe des taktischen Zeichens (Schlüssel wie `einsatz_einheit.tz_fachaufgabe`)."
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Organisation des taktischen Zeichens."
+          },
+          "ueber_vorlage_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Übergeordnete Vorlage; fehlt bei einer Wurzel."
+          }
+        }
+      },
+      "EinheitVorlageFahrzeug": {
+        "type": "object",
+        "description": "Ein Stamm-Fahrzeug einer Vorlage.",
+        "required": [
+          "fahrzeug_id",
+          "funkrufname",
+          "dienststatus",
+          "ist_demo",
+          "auch_in"
+        ],
+        "properties": {
+          "auch_in": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Andere aktive Vorlagen, in denen das Fahrzeug ebenfalls steht (abgeleitet beim Lesen)."
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus",
+            "description": "Dienststatus im Stamm; ein später außer Dienst gestelltes Fahrzeug bleibt in der Vorlage."
+          },
+          "fahrzeug_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "ist_demo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EinheitVorlagePersonal": {
+        "type": "object",
+        "description": "Eine Person der Stammbesetzung.",
+        "required": [
+          "personal_id",
+          "name",
+          "dienststatus",
+          "ist_demo",
+          "auch_in"
+        ],
+        "properties": {
+          "auch_in": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Andere aktive Vorlagen, in denen die Person ebenfalls steht."
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus"
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug der Vorlage, auf dem die Person sitzt; fehlt ohne Bindung."
+          },
+          "ist_demo": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "staerke_position": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StaerkePosition",
+                "description": "Position in der Vorlage; fehlt, wenn die Stamm-Vorgabe der Person gilt."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -5970,7 +6169,7 @@
           },
           "zeichen_spec": {
             "type": "string",
-            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0190, LLH-1160), bis es das nächste Mal geändert wird."
+            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0191, LLH-1160), bis es das nächste Mal geändert wird."
           }
         }
       },

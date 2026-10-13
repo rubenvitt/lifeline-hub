@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  einheitVorlageDetailPath,
+  einheitVorlageListPath,
   fahrzeugDetailPfad,
   fahrzeugListePfad,
   personalDetailPfad,
@@ -7,7 +9,7 @@ import {
 } from './stammdatenDetail';
 
 /**
- * Der Vertrag dieser Datei sind die vier Pfade.
+ * Der Vertrag dieser Datei sind die Pfade.
  *
  * `parseRouteId` wird hier bewusst NICHT geprüft: die Funktion lebt in `routing/deeplinks.ts`
  * und ist dort gepinnt; hier ein zweites Mal gemessen, behauptete sie einen eigenen Vertrag,
@@ -29,5 +31,7 @@ describe('stammdatenDetail — Admin-Detailpfade', () => {
     expect(personalListePfad()).toBe('/admin/stammdaten/personal');
     expect(fahrzeugDetailPfad(1).startsWith(`${fahrzeugListePfad()}/`)).toBe(true);
     expect(personalDetailPfad(1).startsWith(`${personalListePfad()}/`)).toBe(true);
+    expect(einheitVorlageListPath()).toBe('/admin/stammdaten/einheiten');
+    expect(einheitVorlageDetailPath(3)).toBe('/admin/stammdaten/einheiten/3');
   });
 });

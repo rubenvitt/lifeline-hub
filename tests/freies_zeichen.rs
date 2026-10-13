@@ -3,7 +3,7 @@
 //! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Teil-Patch-Semantik (LFH-306: absentes Feld
 //! unverändert, `null` leert, lat/lon unverändert), Zeichenbeschreibung `zeichen_spec` (LFH-836;
 //! seit LLH-1160 die einzige Form: fehlend, leer oder ungültig 400, alter Body 400, Altzeilen als
-//! Hülle aus Migration 0190), 404 für fremden Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET
+//! Hülle aus Migration 0191), 404 für fremden Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET
 //! braucht Lesezugriff+Modul; POST/PATCH/DELETE Schreibrecht+aktiv+Modul; Org-Isolation),
 //! SSE-Event `freies_zeichen` (Wire-Tag + Payload load-bearing für das Frontend).
 //!
@@ -264,7 +264,7 @@ async fn altes_format_ist_400() {
 }
 
 /// Spec „Unbekannter Wert“ und „Beschriftung in der Beschreibung“: 400 mit Pfad, kein Zeichen;
-/// beim PATCH bleibt die gespeicherte Beschreibung. Die Hülle der Altzeilen (Migration 0190)
+/// beim PATCH bleibt die gespeicherte Beschreibung. Die Hülle der Altzeilen (Migration 0191)
 /// nimmt der Server von außen nicht an.
 #[tokio::test]
 async fn ungueltige_spec_ist_400() {
@@ -318,7 +318,7 @@ async fn ungueltige_spec_ist_400() {
     );
 }
 
-/// Spec „Altzeichen wird geändert“ (LLH-1160): eine Altzeile trägt nach Migration 0190 ihre
+/// Spec „Altzeichen wird geändert“ (LLH-1160): eine Altzeile trägt nach Migration 0191 ihre
 /// Altwerte als Hülle in `zeichen_spec` und kommt so beim Lesen zurück. Eine Umbenennung lässt
 /// die Hülle stehen, erst eine neue Zeichenbeschreibung ersetzt sie; Bezeichnung und Position
 /// bleiben.

@@ -586,7 +586,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
 
 // ---------- LFH-836: Zeichenbeschreibung freier Zeichen im Stand ----------
 
-/// Ein neuer Stand friert `zeichen_spec` ein (eine Altzeile mit ihrer Hülle aus Migration 0190,
+/// Ein neuer Stand friert `zeichen_spec` ein (eine Altzeile mit ihrer Hülle aus Migration 0191,
 /// LLH-1160); ein Stand von vor LFH-836 — freie Zeichen nur mit Altfeldern, ohne `zeichen_spec` —
 /// bleibt über die Route lesbar und kommt unverändert zurück. Den Altbestand übersetzt erst der
 /// Client (design.md D5).
@@ -614,7 +614,7 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
-    // Eine Altzeile, wie Migration 0190 sie hinterlässt.
+    // Eine Altzeile, wie Migration 0191 sie hinterlässt.
     const HUELLE: &str = r#"{"v":1,"alt":{"grundzeichen":"person"}}"#;
     sqlx::query(
         "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, erstellt_von) \

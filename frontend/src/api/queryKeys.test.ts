@@ -738,6 +738,7 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'sprechgruppen',
         'qualifikationen',
         'einheit-typen',
+        'einheit-vorlagen',
         'etb-bausteine',
         'stichwort-vorschlaege',
         'externe-stellen',
