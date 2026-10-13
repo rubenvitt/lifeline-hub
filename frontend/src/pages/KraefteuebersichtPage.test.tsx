@@ -954,6 +954,26 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
     expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
   });
 
+  it('eine Untereinheit trägt ihre eigene Rückmeldung und Tönung (D12)', async () => {
+    mitBaum();
+    // Zug in der Frist, Gruppe überfällig: nur die Gruppenzeile zeigt das Urteil.
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30), rueckmeldungVon(21, -1)],
+    });
+    const { container } = setup();
+    const zelle = await waitFor(() => {
+      const z = zeile(container, 'eh-21')?.querySelector(
+        '[data-lfh="meldebild-rueckmeldung"]',
+      ) as HTMLElement | null;
+      expect(z).toHaveAttribute('data-zustand', 'ueberfaellig');
+      return z!;
+    });
+    expect(zelle.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
+    expect(zeile(container, 'eh-21')).toHaveClass('meldebild-problemzeile');
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
   it('der Einheitenname springt in die Einheit-Ansicht', async () => {
     mitBaum();
     setup();
