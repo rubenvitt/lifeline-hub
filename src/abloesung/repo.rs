@@ -20,6 +20,12 @@ use crate::etb::repo::EintragDaten;
 use crate::etb::{TYP_BERICHTIGUNG, TYP_ENTSCHEIDUNG, TYP_MELDUNG};
 use crate::kommunikation::{OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_VORWARNUNG};
 use crate::write_retry;
+use crate::zeitachse::repo::Beruehrt;
+
+/// Was Vollzug oder Rücknahme an der Zeitachse geändert haben: die abgelöste Einheit samt den
+/// per Fan-out berührten Personen, `None` ohne Änderung. Die Route meldet danach `einheit` und
+/// `personal` (LLH-1189).
+pub type Zeitachsenwirkung = Option<(i64, Beruehrt)>;
 
 /// Eingabe „Schicht beginnen" — von der Route validiert (Zeit normalisiert, Rhythmus im
 /// Wertebereich).
@@ -692,9 +698,9 @@ pub async fn vollziehen(
     vollzogen_at: &str,
     abloesende_einheit_id: Option<i64>,
     jetzt: &str,
-) -> Result<(AbloesungVollzugAnzeige, i64), AppError> {
+) -> Result<(AbloesungVollzugAnzeige, i64, Zeitachsenwirkung), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
-    let (folge_id, etb_id) = write_retry!(pool, |conn| {
+    let (folge_id, etb_id, zeitachse) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
             return Err(AppError::UnprocessableEntity(
@@ -730,7 +736,7 @@ pub async fn vollziehen(
         schliesse_fristen_tx(conn, id, jetzt).await?;
         // LFH-552: der Vollzug beendet die Einsatzperiode der abgelösten Einheit (samt Fan-out);
         // ohne offene Periode bleibt die Zeitachse unberührt.
-        crate::zeitachse::repo::abloesung_vollzogen_tx(
+        let zeitachse = crate::zeitachse::repo::abloesung_vollzogen_tx(
             conn,
             einsatz_id,
             benutzer_id,
@@ -786,7 +792,7 @@ pub async fn vollziehen(
             .bind(id)
             .execute(&mut *conn)
             .await?;
-        Ok((folge_id, etb_id))
+        Ok((folge_id, etb_id, zeitachse))
     })?;
     let abgeloest = laden(pool, einsatz_id, id, jetzt).await?;
     let folgeschicht = match folge_id {
@@ -799,6 +805,7 @@ pub async fn vollziehen(
             folgeschicht,
         },
         etb_id,
+        zeitachse,
     ))
 }
 
@@ -809,9 +816,9 @@ pub async fn zuruecknehmen(
     id: i64,
     benutzer_id: i64,
     jetzt: &str,
-) -> Result<(AbloesungAnzeige, i64), AppError> {
+) -> Result<(AbloesungAnzeige, i64, Zeitachsenwirkung), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
-    let etb_id = write_retry!(pool, |conn| {
+    let (etb_id, zeitachse) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Abgeloest {
             return Err(AppError::UnprocessableEntity(
@@ -845,16 +852,19 @@ pub async fn zuruecknehmen(
             )));
         }
         // LFH-552: das Ablösungsereignis der Zeitachse streichen, die Periode ist wieder offen.
-        if let Some(vollzogen_at) = &roh.vollzogen_at {
-            crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
-                conn,
-                einsatz_id,
-                benutzer_id,
-                roh.einheit_id,
-                vollzogen_at,
-            )
-            .await?;
-        }
+        let zeitachse = match &roh.vollzogen_at {
+            Some(vollzogen_at) => {
+                crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+                    conn,
+                    einsatz_id,
+                    benutzer_id,
+                    roh.einheit_id,
+                    vollzogen_at,
+                )
+                .await?
+            }
+            None => None,
+        };
         sqlx::query(
             "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \
                 vollzogen_von_id = NULL, etb_vollzug_id = NULL WHERE id = ?",
@@ -886,9 +896,9 @@ pub async fn zuruecknehmen(
             },
         )
         .await?;
-        Ok(etb_id)
+        Ok((etb_id, zeitachse))
     })?;
-    Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id))
+    Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, zeitachse))
 }
 
 #[cfg(test)]

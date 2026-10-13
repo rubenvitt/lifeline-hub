@@ -442,15 +442,16 @@ pub async fn offenes_eintreffen_tx(
 }
 
 /// Vollzug einer Ablösung: Ereignis `abloesung` an der abgelösten Einheit samt Fan-out. Ohne
-/// offene Periode wird es ausgelassen, der Vollzug gelingt trotzdem.
+/// offene Periode wird es ausgelassen (`None`), der Vollzug gelingt trotzdem. Sonst die
+/// Einheit und die per Fan-out berührten Personen — für die Live-Events.
 pub async fn abloesung_vollzogen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
     vollzogen_at: &str,
-) -> Result<(), AppError> {
-    schreibe_tx(
+) -> Result<Option<(i64, Beruehrt)>, AppError> {
+    let (r, beruehrt) = schreibe_tx(
         conn,
         einsatz_id,
         benutzer_id,
@@ -463,7 +464,10 @@ pub async fn abloesung_vollzogen_tx(
         },
     )
     .await?;
-    Ok(())
+    Ok(match r {
+        Schreibergebnis::Geschrieben(_) => Some((einheit_id, beruehrt)),
+        Schreibergebnis::Ausgelassen(_) => None,
+    })
 }
 
 /// Grund der Streichung bei der Rücknahme eines Vollzugs.
@@ -472,14 +476,14 @@ pub const GRUND_ABLOESUNG_ZURUECK: &str = "Ablösung zurückgenommen";
 /// Rücknahme eines Vollzugs: streicht das Ablösungsereignis zum Vollzugszeitpunkt samt
 /// Fan-out. Gefunden wird es über Einheit, Quelle und Zeitpunkt — eindeutig, weil je Einheit
 /// höchstens eine Schicht läuft (design.md D5). Gibt es keins (Vollzug ohne Periode), passiert
-/// nichts.
+/// nichts (`None`). Sonst die Einheit und die Personen, deren Kopie gestrichen wurde.
 pub async fn abloesung_zurueckgenommen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
     vollzogen_at: &str,
-) -> Result<(), AppError> {
+) -> Result<Option<(i64, Beruehrt)>, AppError> {
     let id: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM einsatz_kraft_zeitachse \
          WHERE einheit_id = ? AND quelle = 'abloesung' AND art = 'abloesung' \
@@ -490,19 +494,20 @@ pub async fn abloesung_zurueckgenommen_tx(
     .bind(vollzogen_at)
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some(id) = id {
-        streiche_tx(
-            conn,
-            einsatz_id,
-            benutzer_id,
-            Kraft::Einheit(einheit_id),
-            id,
-            GRUND_ABLOESUNG_ZURUECK,
-            true,
-        )
-        .await?;
-    }
-    Ok(())
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    let g = streiche_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        Kraft::Einheit(einheit_id),
+        id,
+        GRUND_ABLOESUNG_ZURUECK,
+        true,
+    )
+    .await?;
+    Ok(Some((einheit_id, g.beruehrt)))
 }
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
