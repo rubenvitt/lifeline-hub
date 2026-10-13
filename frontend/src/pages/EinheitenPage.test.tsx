@@ -416,6 +416,7 @@ describe('EinheitenPage', () => {
       const unten = await zeileVon('Gruppe Deich');
       const zelle = unten.querySelector('[data-lfh="kraeftebaum-zelle"]');
       expect(zelle).toHaveAttribute('data-art', 'einheit');
+      expect(zelle!.querySelector('[data-lfh="einheit-zeichen"]')).not.toBeNull();
       expect(within(unten).getByRole('link', { name: 'Gruppe Deich' })).toHaveAttribute(
         'href',
         '/einsaetze/1/einheiten/11',
