@@ -103,9 +103,10 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
 // OHNE Org-weiten Zustand auf dem Server: eine Sichtbarkeits-Vorgabe gälte für jeden Einsatz der
 // einen e2e-Organisation, und jedes Modul wird von einem parallel laufenden Spec angesprochen
 // (`e2e/AGENTS.md`, LFH-820: keine Org-Vorgabe säen). Die Vorgabe lebt deshalb nur in diesem
-// Browser: `page.route` beantwortet die Org-Vorgaben und legt sie über die echten Freigaben, so wie
-// der Server rechnet (eigener Wert des Einsatzes ?? Vorgabe). Die Serverregel selbst belegen
-// `tests/modul_freigaben.rs` und `tests/org_einstellungen.rs`.
+// Browser: `page.route` beantwortet die Org-Vorgaben (an der Organisation und am Einsatz) und legt
+// sie über die echten Freigaben, so wie der Server rechnet (eigener Wert des Einsatzes ?? Vorgabe).
+// Die Serverregel selbst belegen `tests/modul_freigaben.rs`, `tests/org_einstellungen.rs` und
+// `tests/modul_override.rs`.
 
 const MODUL = 'nachforderungen';
 
@@ -124,11 +125,15 @@ async function kommunikationOeffnen(page: Page, einsatzId: string) {
 /** Org-Vorgabe nur im Browser; liefert die PUT-Bodies der Verwaltung zur Prüfung. */
 async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   const zustand = { orgAus: false, eigen: null as boolean | null, puts: [] as unknown[] };
+  const vorgaben = () =>
+    zustand.orgAus ? { [MODUL]: { benoetigte_rolle: null, sichtbar: false } } : {};
   await page.route('**/api/org-modul-einstellungen', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
-    await route.fulfill({
-      json: zustand.orgAus ? { [MODUL]: { benoetigte_rolle: null, sichtbar: false } } : {},
-    });
+    await route.fulfill({ json: vorgaben() });
+  });
+  // Dieselben Vorgaben am Einsatz: daraus liest der Editor „Module“ die Herkunft (LLH-1183).
+  await page.route(`**/api/einsaetze/${einsatzId}/modul-vorgaben`, async (route) => {
+    await route.fulfill({ json: vorgaben() });
   });
   await page.route(`**/api/org-modul-einstellungen/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar?: boolean };
@@ -198,6 +203,9 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
   await schalter.click();
   await expect(schalter).toBeChecked();
   await expect(uebernehmen).toBeVisible();
+  // Mit eigenem Wert bleibt die Herkunft stehen; sie kommt jetzt nur noch aus den Vorgaben am
+  // Einsatz, nicht mehr aus den Freigaben (LLH-1183).
+  await expect(zeile.getByText('Vorgabe der Organisation: ausgeblendet')).toBeVisible();
 
   await kommunikationOeffnen(page, einsatzId);
   await expect(nachforderungImPanel(page)).toBeVisible();

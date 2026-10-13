@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -119,6 +119,8 @@ selbst aussperrt.
 - „Allgemein“, „Verhalten & Automatik“ und die Aufbewahrungs-Dauer ändern die Einsatzleitung,
   das Führungspersonal und System-Admins der Organisation des Einsatzes.
 - „Module“ ändern nur die Einsatzleitung und System-Admins der Organisation des Einsatzes.
+  Die Hinweise „Vorgabe der Organisation: …“ in „Module“ sieht jede Person, die im Einsatz
+  mitarbeitet oder zur Organisation des Einsatzes gehört, auch ohne Rolle in der Organisation.
 - „Zugriff“ bedient nur die Einsatzleitung eines laufenden Einsatzes, auch ein System-Admin nur
   mit dieser Rolle.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.

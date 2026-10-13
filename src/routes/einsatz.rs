@@ -14,6 +14,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::org::einsatzliste_melden;
 use crate::live::LiveEvent;
+use crate::org::modul_einstellung::{self as org_modul_einstellung, OrgModulEinstellung};
 use crate::routes::support::{self, pflicht};
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -764,6 +765,30 @@ pub async fn modul_overrides_laden(
 ) -> Result<Json<HashMap<String, modul_override::EinsatzModulOverride>>, AppError> {
     let id = ctx.einsatz.id;
     Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
+}
+
+/// GET /api/einsaetze/{id}/modul-vorgaben — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
+/// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-modul-einstellungen`.
+/// Damit sieht der Editor „Module“ die Herkunft auch bei einer Einsatzleitung ohne Org-Rolle.
+///
+/// Gate (design.md D2 der Change `archive/2026-10-13-g145w6op-modul-vorgaben-einsatzleitung`):
+/// Lesezugriff und dazu Mitgliedschaft im Einsatz oder Zugehörigkeit zu seiner Organisation. Der
+/// Lesezugriff allein ließe jeden System-Admin serverweit durch, die Vorgaben einer Organisation
+/// gingen so an Admins fremder Organisationen.
+pub async fn load_modul_vorgaben(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff,
+) -> Result<Json<HashMap<String, OrgModulEinstellung>>, AppError> {
+    if ctx.rolle.is_none() && ctx.benutzer.org_id != ctx.einsatz.org_id {
+        return Err(AppError::Forbidden);
+    }
+    let vorgaben = org_modul_einstellung::laden_alle(&state.pool, ctx.einsatz.org_id).await?;
+    Ok(Json(
+        vorgaben
+            .into_iter()
+            .map(|(key, vorgabe)| (key, vorgabe.into()))
+            .collect(),
+    ))
 }
 
 /// GET /api/einsaetze/{id}/modul-freigaben — die effektive Freigabe jedes Moduls für den

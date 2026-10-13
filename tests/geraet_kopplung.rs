@@ -1219,6 +1219,7 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
     for (methode, uri) in [
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
         ("GET", format!("/api/einsaetze/{einsatz}/geraete")),
+        ("GET", format!("/api/einsaetze/{einsatz}/modul-vorgaben")),
         ("GET", "/api/einsaetze".to_string()),
         ("GET", "/api/benutzer".to_string()),
         ("POST", format!("/api/einsaetze/{einsatz}/abschliessen")),

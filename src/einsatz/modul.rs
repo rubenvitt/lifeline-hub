@@ -242,6 +242,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
     ("/api/einsaetze/{id}/einstellungen", None),
     ("/api/einsaetze/{id}/modul-overrides", None),
+    // Modul-Vorgaben der Einsatz-Org (LLH-1183): modul-los wie die Overrides, die Antwort
+    // beschreibt die Modulregeln selbst.
+    ("/api/einsaetze/{id}/modul-vorgaben", None),
     ("/api/einsaetze/{id}/mitglieder", None),
     // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
     ("/api/einsaetze/{id}/fuehrungsstelle", None),

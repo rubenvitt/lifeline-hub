@@ -321,6 +321,23 @@ describe('EinsatzDefaults', () => {
     expect(client.getQueryState(['einsatz-modul-overrides', 7])?.isInvalidated).toBe(false);
   });
 
+  it('invalidiert nach einer Modul-Vorgabe die Vorgaben am Einsatz ALLER Einsätze (LLH-1183)', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({} as never);
+    const client = new QueryClient();
+    // Literale Keys, nicht die Factory.
+    client.setQueryData(['einsatz-modul-vorgaben', 7], {});
+    client.setQueryData(['einsatz-modul-vorgaben', 8], {});
+    renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    fireEvent.click(await screen.findByText('Admin'));
+
+    await waitFor(() =>
+      expect(client.getQueryState(['einsatz-modul-vorgaben', 7])?.isInvalidated).toBe(true),
+    );
+    expect(client.getQueryState(['einsatz-modul-vorgaben', 8])?.isInvalidated).toBe(true);
+  });
+
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
       etb: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
