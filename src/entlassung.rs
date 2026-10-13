@@ -71,4 +71,301 @@ mod tests {
         }
         assert_eq!(BeendetAls::parse("geloescht"), None);
     }
+
+    /// Erlaubte ungefilterte Lesestellen: Datei, Anzahl, Grund. Alles andere liest nur aktive
+    /// Kräfte (`beendet_at IS NULL`, `aufgeloest_at IS NULL`) oder eine Zeile per Primärschlüssel.
+    const ALLOWLIST: &[(&str, usize, &str)] = &[
+        (
+            "src/aufbewahrung/suche.rs",
+            1,
+            "Auskunft und Schwärzung finden jede Kraft des Einsatzes, auch beendete",
+        ),
+        (
+            "src/einheit/repo.rs",
+            1,
+            "Spurprüfung vor dem echten Löschen zählt jede Personalzeile der Einheit",
+        ),
+        (
+            "src/personal/disposition_repo.rs",
+            1,
+            "Spurprüfung beim Stornieren: auch die Führung einer aufgelösten Einheit ist Spur",
+        ),
+    ];
+
+    /// Wächter (design.md D6): Jede SQL-Zeichenkette im Produktivcode, die `einsatz_personal` oder
+    /// `einsatz_einheit` per `FROM`/`JOIN` liest, prüft den Lebenszustand der Zeile oder greift
+    /// per Primärschlüssel auf genau eine Zeile zu (Namensauflösung eines Bezugs). Ausnahmen
+    /// stehen mit Grund in [`ALLOWLIST`]; die Zahl muss genau stimmen, damit eine neue Stelle
+    /// in einer gelisteten Datei auffällt und eine erledigte Ausnahme verschwindet.
+    #[test]
+    fn jede_abfrage_der_kraeftetabellen_prueft_den_zustand() {
+        let wurzel = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut dateien = Vec::new();
+        sammle(&wurzel.join("src"), &mut dateien);
+        let mut fehler = Vec::new();
+        let mut gezaehlt: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+        for (pfad, quelle) in dateien {
+            let produktiv = quelle.split("#[cfg(test)]").next().unwrap_or("");
+            for (zeile, literal) in literale(produktiv) {
+                for tabelle in ungefilterte_lesungen(&literal) {
+                    gezaehlt
+                        .entry(pfad.clone())
+                        .or_default()
+                        .push(format!("{pfad}:{zeile} ({tabelle})"));
+                }
+            }
+        }
+        for (datei, stellen) in &gezaehlt {
+            let erlaubt = ALLOWLIST
+                .iter()
+                .find(|(d, _, _)| datei.ends_with(d))
+                .map_or(0, |(_, n, _)| *n);
+            if stellen.len() != erlaubt {
+                fehler.push(format!(
+                    "{datei}: {} ungefilterte Lesestelle(n), gelistet {erlaubt}:\n    {}",
+                    stellen.len(),
+                    stellen.join("\n    ")
+                ));
+            }
+        }
+        for (datei, n, _) in ALLOWLIST {
+            if !gezaehlt.keys().any(|k| k.ends_with(datei)) {
+                fehler.push(format!(
+                    "{datei}: gelistet {n}, gefunden 0 — Eintrag entfernen"
+                ));
+            }
+        }
+        assert!(
+            fehler.is_empty(),
+            "Lesestellen ohne Zustandsfilter (`beendet_at IS NULL` / `aufgeloest_at IS NULL`, \
+             sonst Primärschlüssel oder Eintrag in ALLOWLIST mit Grund):\n{}",
+            fehler.join("\n")
+        );
+    }
+
+    #[test]
+    fn waechter_erkennt_filter_primaerschluessel_und_luecke() {
+        let pruefe = |sql: &str| ungefilterte_lesungen(sql);
+        assert_eq!(
+            pruefe("SELECT id FROM einsatz_personal WHERE einsatz_id = ?"),
+            ["einsatz_personal"]
+        );
+        assert!(pruefe(
+            "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND beendet_at IS NULL"
+        )
+        .is_empty());
+        assert!(pruefe("SELECT name FROM einsatz_personal WHERE id = ?1").is_empty());
+        assert!(
+            pruefe("SELECT ep.name FROM x JOIN einsatz_personal ep ON ep.id = x.personal_id")
+                .is_empty()
+        );
+        assert!(pruefe("SELECT e.name FROM einsatz_einheit AS e WHERE e.id IN (1)").is_empty());
+        assert_eq!(
+            pruefe(
+                "SELECT 1 FROM einsatz_einheit e JOIN einsatz_personal ep ON ep.einheit_id = e.id \
+                    WHERE e.aufgeloest_at IS NULL"
+            ),
+            ["einsatz_personal"]
+        );
+        assert_eq!(
+            pruefe(
+                "SELECT id FROM einsatz WHERE id = ?1 UNION ALL SELECT id FROM einsatz_einheit \
+                 WHERE einsatz_id = ?1"
+            ),
+            ["einsatz_einheit"]
+        );
+        assert_eq!(
+            pruefe("select count(*) from einsatz_einheit\n where einsatz_id = ?"),
+            ["einsatz_einheit"]
+        );
+        let quelle = "let a = 'x'; let b = r#\"SELECT 1 FROM einsatz_einheit\"#; // \"FROM einsatz_personal\"\nlet c = \"a\\\"b\";";
+        let l = literale(quelle);
+        assert_eq!(l.len(), 2, "{l:?}");
+        assert_eq!(l[0], (1, "SELECT 1 FROM einsatz_einheit".to_string()));
+    }
+
+    /// Tabellen, die `sql` per `FROM`/`JOIN` ohne Zustandsfilter und ohne Primärschlüssel liest.
+    fn ungefilterte_lesungen(sql: &str) -> Vec<&'static str> {
+        const TABELLEN: &[(&str, &str)] = &[
+            ("einsatz_personal", "beendet_at"),
+            ("einsatz_einheit", "aufgeloest_at"),
+        ];
+        const KEIN_ALIAS: &[&str] = &[
+            "where",
+            "on",
+            "join",
+            "left",
+            "inner",
+            "cross",
+            "set",
+            "order",
+            "group",
+            "limit",
+            "union",
+            "and",
+            "or",
+            "using",
+            "having",
+            "returning",
+            "values",
+        ];
+        let klein = sql.to_lowercase();
+        let tokens: Vec<String> = klein
+            .replace(['(', ')', ',', ';'], " ")
+            .replace('=', " = ")
+            .split_whitespace()
+            .map(str::to_string)
+            .collect();
+        let mut treffer = Vec::new();
+        for i in 0..tokens.len().saturating_sub(1) {
+            if tokens[i] != "from" && tokens[i] != "join" {
+                continue;
+            }
+            let Some((tabelle, spalte)) = TABELLEN.iter().find(|(t, _)| tokens[i + 1] == *t) else {
+                continue;
+            };
+            let mut alias = tokens.get(i + 2).map(String::as_str);
+            if alias == Some("as") {
+                alias = tokens.get(i + 3).map(String::as_str);
+            }
+            let alias = match alias {
+                Some(a)
+                    if !KEIN_ALIAS.contains(&a)
+                        && a.chars().all(|c| c.is_alphanumeric() || c == '_') =>
+                {
+                    a
+                }
+                _ => tabelle,
+            };
+            if klein.contains(spalte) {
+                continue;
+            }
+            let qualifiziert = format!("{alias}.id");
+            // Ein unqualifiziertes `id` gehört zur Tabelle nur bis zur nächsten Quelle.
+            let abschnitt_ende = (i + 2..tokens.len())
+                .find(|&k| matches!(tokens[k].as_str(), "from" | "join" | "union"))
+                .unwrap_or(tokens.len());
+            let per_schluessel = (0..tokens.len()).any(|j| {
+                let t = tokens[j].as_str();
+                let vor = j.checked_sub(1).map(|k| tokens[k].as_str());
+                let nach = tokens.get(j + 1).map(String::as_str);
+                let vergleich = matches!(nach, Some("=") | Some("in")) || vor == Some("=");
+                (t == qualifiziert && vergleich)
+                    || (t == "id"
+                        && j > i + 1
+                        && j < abschnitt_ende
+                        && matches!(vor, Some("where") | Some("and"))
+                        && vergleich)
+            });
+            if !per_schluessel {
+                treffer.push(*tabelle);
+            }
+        }
+        treffer
+    }
+
+    /// Stringliterale (normal und roh) einer Rust-Quelle mit Zeilennummer, Kommentare
+    /// übersprungen. Fortsetzungszeilen (`\` am Zeilenende) und Leerraum sind zusammengezogen.
+    fn literale(quelle: &str) -> Vec<(usize, String)> {
+        let b = quelle.as_bytes();
+        let mut aus = Vec::new();
+        let mut i = 0;
+        let mut zeile = 1;
+        let zaehle = |von: usize, bis: usize| b[von..bis].iter().filter(|&&c| c == b'\n').count();
+        while i < b.len() {
+            match b[i] {
+                b'\n' => {
+                    zeile += 1;
+                    i += 1;
+                }
+                b'/' if b.get(i + 1) == Some(&b'/') => {
+                    while i < b.len() && b[i] != b'\n' {
+                        i += 1;
+                    }
+                }
+                b'/' if b.get(i + 1) == Some(&b'*') => {
+                    let ende = quelle[i + 2..]
+                        .find("*/")
+                        .map_or(b.len(), |e| i + 2 + e + 2);
+                    zeile += zaehle(i, ende);
+                    i = ende;
+                }
+                b'\'' => {
+                    // Zeichenliteral ('x', '\n', '"') oder Lebensdauer ('a).
+                    if b.get(i + 1) == Some(&b'\\') {
+                        i += 2;
+                        while i < b.len() && b[i] != b'\'' {
+                            i += 1;
+                        }
+                        i += 1;
+                    } else if b.get(i + 2) == Some(&b'\'') {
+                        i += 3;
+                    } else {
+                        i += 1;
+                    }
+                }
+                b'r' if (b.get(i + 1) == Some(&b'"') || b.get(i + 1) == Some(&b'#'))
+                    && (i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_')) =>
+                {
+                    let mut j = i + 1;
+                    while b.get(j) == Some(&b'#') {
+                        j += 1;
+                    }
+                    if b.get(j) != Some(&b'"') {
+                        i += 1;
+                        continue;
+                    }
+                    let schluss = format!("\"{}", "#".repeat(j - i - 1));
+                    let start = j + 1;
+                    let ende = quelle[start..]
+                        .find(&schluss)
+                        .map_or(b.len(), |e| start + e);
+                    aus.push((zeile, normalisiere(&quelle[start..ende])));
+                    zeile += zaehle(i, ende);
+                    i = (ende + schluss.len()).min(b.len());
+                }
+                b'"' => {
+                    let start = i + 1;
+                    let mut j = start;
+                    while j < b.len() && b[j] != b'"' {
+                        j += if b[j] == b'\\' { 2 } else { 1 };
+                    }
+                    let ende = j.min(b.len());
+                    aus.push((zeile, normalisiere(&quelle[start..ende])));
+                    zeile += zaehle(i, ende);
+                    i = ende + 1;
+                }
+                _ => i += 1,
+            }
+        }
+        aus
+    }
+
+    fn normalisiere(s: &str) -> String {
+        s.replace("\\\n", " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn sammle(dir: &std::path::Path, funde: &mut Vec<(String, String)>) {
+        for eintrag in std::fs::read_dir(dir).unwrap() {
+            let pfad = eintrag.unwrap().path();
+            if pfad.is_dir() {
+                sammle(&pfad, funde);
+            } else if pfad.extension().is_some_and(|e| e == "rs")
+                && pfad
+                    .file_name()
+                    .is_some_and(|n| !n.to_string_lossy().ends_with("tests.rs"))
+            {
+                let text = std::fs::read_to_string(&pfad).unwrap();
+                let rel = pfad
+                    .strip_prefix(env!("CARGO_MANIFEST_DIR"))
+                    .unwrap_or(&pfad)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                funde.push((rel.trim_start_matches('/').to_string(), text));
+            }
+        }
+    }
 }
