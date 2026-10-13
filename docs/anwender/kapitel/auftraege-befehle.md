@@ -180,6 +180,9 @@ Für Einsatzleitung und Führungspersonal, an der jüngsten freigegebenen Fassun
 3. Ein Hinweis bietet sechs Sekunden lang „Rückgängig“: Er nimmt die Quittung zurück, die Stelle
    steht wieder unter „Quittung offen:“.
 
+Ein Tablet im Einsatzabschnitt quittiert die Stellen seines Abschnitts selbst (siehe
+[Einsatzabschnitt am Gerät](geraet-einsatzabschnitt.md)); die Quittung erscheint dann hier.
+
 Quittierte Stellen stehen mit ✓ im Verteiler. Ein Befehlsentwurf hat noch keine Quittung, und
 eine Fassung, nach der schon eine andere Fassung desselben Befehls freigegeben wurde, nimmt keine
 Quittung mehr an: Ihre

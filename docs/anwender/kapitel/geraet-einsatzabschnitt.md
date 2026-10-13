@@ -2,16 +2,17 @@
 titel: Einsatzabschnitt am Gerät
 gruppen: [geraete]
 reihenfolge: 750
-quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraetAbschnittKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraetAbschnittKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/geraet/GeraetBefehle.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/routes/befehl.rs]
 ---
 
 ## Überblick
 
 Ein Tablet im **Einsatzabschnitt** begleitet die Abschnittsleitung: Es zeigt den eigenen
-Abschnitt mit seinen Unterabschnitten und Einheiten, nimmt Aufträge an den Abschnitt entgegen,
-meldet ihren Vollzug und schickt Meldungen an die Einsatzleitung. Es ist an genau einen
-Abschnitt gekoppelt (siehe [Geräte koppeln](geraete-koppeln.md)) und sieht dessen **Teilbaum**:
-den Abschnitt selbst und alle Abschnitte darunter.
+Abschnitt mit seinen Unterabschnitten und Einheiten, nimmt Aufträge und Einsatzbefehle an den
+Abschnitt entgegen, meldet den Vollzug der Aufträge und schickt Meldungen an die
+Einsatzleitung. Es ist an genau einen Abschnitt gekoppelt (siehe
+[Geräte koppeln](geraete-koppeln.md)) und sieht dessen **Teilbaum**: den Abschnitt selbst und alle
+Abschnitte darunter.
 
 Die Navigation unten führt zu „Abschnitt“, „Aufträge“, „Melden“ und „Karte“. Die Bedienung des
 Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
@@ -48,6 +49,19 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 3. „Vollzug melden“ wählen. Der Auftrag verlässt die Liste; die Abnahme liegt bei der
    Einsatzleitung.
 
+### Einsatzbefehl quittieren
+
+1. „Aufträge“ öffnen. Unter den Aufträgen stehen bei „Einsatzbefehle“ die Befehle, in deren
+   Verteiler der Teilbaum oder eine seiner Einheiten steht.
+
+   ![Block „Einsatzbefehle“ mit einem Befehl an den eigenen Abschnitt „Sanitätsdienst“ und den Abschnitt „Betreuung“, „Quittieren“ nur beim eigenen, darunter „Befehlstext“](../bilder/geraet-einsatzabschnitt/befehl.png)
+
+2. „Befehlstext“ wählen, um den Befehl zu lesen.
+3. Bei „Quittung offen:“ neben dem eigenen Empfänger „Quittieren“ wählen. Eine Rückfrage gibt es
+   nicht.
+4. Der Hinweis „Empfang quittiert“ bietet sechs Sekunden lang „Rückgängig“: Er nimmt die Quittung
+   zurück, der Empfänger steht wieder unter „Quittung offen:“.
+
 ### Meldung an die Einsatzleitung
 
 1. Unten „Melden“ wählen.
@@ -70,6 +84,13 @@ Das Tablet sieht nur seinen Teilbaum: die Einheiten und Aufträge benachbarter A
 erscheinen nicht. Quittieren kann es nur Empfängerzeilen aus dem eigenen Teilbaum. Aufträge
 erteilen oder abnehmen, Abschnitte oder Einheiten ändern, das Einsatztagebuch lesen und Personen
 erfassen gehen am Gerät nicht.
+
+Von den Einsatzbefehlen sieht das Tablet nur die geltende Fassung, also die zuletzt freigegebene,
+und nur, wenn der Teilbaum oder eine seiner Einheiten im Verteiler steht. Entwürfe und überholte
+Fassungen erscheinen nicht. Die Quittung trägt das Einsatztagebuch wie jede andere ein, mit dem
+Empfänger als Absender; an der Einsatzleitung steht sie im Verteiler des Befehls (siehe
+[Aufträge und Befehle](auftraege-befehle.md)). Befehle entwerfen, freigeben, fortschreiben und
+ihre Anlagen öffnen gehen am Gerät nicht.
 
 Ein Ziel unten erscheint nur, wenn das Modul dahinter im Einsatz freigegeben ist: Ohne Aufträge,
 Meldungen oder Lagekarte fehlen „Aufträge“, „Melden“ oder „Karte“.
