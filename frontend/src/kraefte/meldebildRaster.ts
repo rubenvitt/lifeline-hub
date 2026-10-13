@@ -5,10 +5,11 @@ import type {
   EinsatzFahrzeug,
   EinsatzMaterial,
   EinsatzPersonal,
-  Einsatzabschnitt,
   FahrzeugStatus,
   LetzteRueckmeldung,
   Rueckmeldungen,
+  Staerke,
+  StaerkePosition,
   StatusKategorie,
   StatusWert,
 } from '../api/types';
@@ -20,22 +21,42 @@ import {
   type RueckmeldungZustand,
 } from '../meldungen/rueckmeldung';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
-import { materialStatus, statusKategorie } from '../theme/statusFarben';
+import { materialStatus, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
+import {
+  brauchtOhneFahrzeugKnoten,
+  kraeftebaum,
+  kumuliere,
+  schluesselBisStufe,
+  type FremdeBesatzung,
+  type KraeftebaumKnoten,
+  type MittelDerEinheit,
+  type MittelQuelle,
+  type PersonImBaum,
+} from './kraeftebaumKern';
 import { KATEGORIE_REIHENFOLGE, OHNE_STATUS, type KategorieOderOhne } from './statusAchse';
 
 /**
- * Das Meldebild als STATUSRASTER — reine Ableitungen.
+ * Das Meldebild als STATUSRASTER über dem KRÄFTEBAUM — reine Ableitungen.
  *
  * Die Frage ist „Wie steht jede Einheit da?": eine Zeile je Einheit, verglichen über Abschnitt,
- * Stärke, Status und Auftrag. Die Mittel (Fahrzeuge, Personal, Material) hängen als
- * aufklappbare Kinder an ihrer Einheit; der Abschnitt ist eine SPALTE, keine Baumebene, damit
- * Einheiten verschiedener Abschnitte untereinander stehen.
+ * Stärke, Status und Auftrag. Seit LLH-1025 ist das Raster ein Baum aus EINER Baumlogik
+ * (`kraeftebaumKern.ts`): Untereinheiten hängen als echte Kinder unter ihrer Einheit, darunter
+ * die eigenen Mittel als Zeilenarten — Fahrzeug mit Besatzung, „Ohne Fahrzeug“ (nur neben
+ * Fahrzeugen), Material als Gruppenzeile. Der Abschnitt bleibt eine SPALTE, keine Baumebene,
+ * damit Einheiten verschiedener Abschnitte untereinander stehen.
  *
- * KEINE KRAFT DARF VERSCHWINDEN: jede Einheit ist eine eigene Zeile, auch Untereinheiten, mit
- * EIGENEN Mitteln und EIGENER Stärke — kumuliert wird nichts, sonst zählte eine Kraft doppelt
- * und „Stärke" summierte sich nicht auf den Seitenkopf. Mittel ohne `einheit_id` sammelt die
- * Zeile „Ohne Einheit". Der Test „jede Kraft genau einmal" pinnt beides.
+ * KEINE KRAFT DARF VERSCHWINDEN, KEINE DOPPELT ZÄHLEN: jede Kraft steht genau einmal im Baum,
+ * Mittel ohne bekannte Einheit unter der letzten Wurzel „Ohne Einheit". Die STÄRKE der
+ * Elternzeile ist KUMULIERT (eigen + Σ Untereinheiten, Lesart wie Lagebericht und Soll der
+ * Einheit: „Zug 1/3/18//22“); jedes Kind zeigt seine eigene Teilsumme. Damit summieren sich die
+ * WURZELN, nicht alle Zeilen, auf den Seitenkopf. Gerechnet über die GEFILTERTEN Listen
+ * (`verdichte`), weil `ist_kumuliert` des Servers den Filter nicht kennt. Fahrzeug-, Personen- und
+ * Gruppenzeilen tragen keine Stärke; ein Fahrzeug trägt seine Besatzung Ist/Soll. Die Tests
+ * „jede Kraft genau einmal" und „Σ Wurzeln = Kopf" pinnen beides.
+ *
+ * MITTELVERTEILUNG UND TÖNUNG BLEIBEN EIGEN (D3): sonst trügen Zug und Gruppe denselben Ausfall
+ * doppelt. Die Vorgabestufe „Einheiten“ hält die Problemzeile der Gruppe sichtbar.
  *
  * STATUSTON NUR AUS DER KATEGORIE: der FMS-Katalog ist mandantengepflegt und `fms_anker`
  * nullable; eine Abbildung Anker → Rolle wäre eine harte Tabelle über fremde Daten und färbte
@@ -43,7 +64,13 @@ import { KATEGORIE_REIHENFOLGE, OHNE_STATUS, type KategorieOderOhne } from './st
  * `achtung`, nicht verfügbar `alarm`; `S<fms_anker>` ist reine Beschriftung.
  */
 
-export type RasterArt = 'einheit' | 'fahrzeug' | 'person' | 'material';
+export type RasterArt =
+  | 'einheit'
+  | 'fahrzeug'
+  | 'person'
+  | 'material'
+  | 'ohne-fahrzeug'
+  | 'material-gruppe';
 
 /** Verdichtete Mittelverteilung einer Einheit (Fahrzeuge + Personal, ohne Material). */
 export interface MittelVerteilung {
@@ -78,6 +105,30 @@ export interface TzEinheit {
   organisation: string | null;
 }
 
+/** Eingaben für das taktische Zeichen eines Fahrzeugs (Grundzeichen aus dem Typ, LFH-1120). */
+export interface TzFahrzeug {
+  fahrzeugtyp: string | null;
+  traegerorganisation: string | null;
+  opta: string | null;
+  fachaufgabe: string | null;
+  organisation: string | null;
+}
+
+/** Besatzung einer Fahrzeugzeile (D4): Ist über alle Kräfte mit dieser `fahrzeug_id`. */
+export interface BesatzungAnzeige {
+  ist: Staerke;
+  soll: Staerke | null;
+  urteil: BesatzungsUrteil;
+  fremd: FremdeBesatzung[];
+}
+
+/** Angaben einer Personenzeile: Positionsmarke, „EF“ und „fährt auf“. */
+export interface PersonAnzeige {
+  position: StaerkePosition | null;
+  istFuehrer: boolean;
+  faehrtAuf: string | null;
+}
+
 export interface RasterZeile {
   key: string;
   art: RasterArt;
@@ -107,6 +158,17 @@ export interface RasterZeile {
   seit: string | null;
   auftrag: AuftragKurz | null;
   tz: TzEinheit | null;
+  /** Kennung des Mittels (Fahrzeug, Person, Material) für den Sprung; sonst `null`. */
+  mittelId: number | null;
+  /** Nur Fahrzeugzeilen. */
+  fahrzeugTz: TzFahrzeug | null;
+  besatzung: BesatzungAnzeige | null;
+  /** Nur Personenzeilen. */
+  person: PersonAnzeige | null;
+  /** Nur Gruppenzeilen („Ohne Fahrzeug“, „Material“): Anzahl und Ausfall. */
+  gruppe: { anzahl: number; ausfall: number } | null;
+  /** Nur Einheitenzeilen: Materialausfall der EIGENEN Posten (D6, tönt die Zeile). */
+  materialAusfall: number;
   children?: RasterZeile[];
 }
 
@@ -264,19 +326,8 @@ export function einheitFunkrufname(einheit: {
 
 // ── Aufbau ────────────────────────────────────────────────────────────────────
 
-function gruppiere<T extends { einheit_id?: number | null }>(liste: readonly T[]) {
-  const m = new Map<number | null, T[]>();
-  for (const x of liste) {
-    const k = x.einheit_id ?? null;
-    const l = m.get(k);
-    if (l) l.push(x);
-    else m.set(k, [x]);
-  }
-  return m;
-}
-
-function verteilungAus(personal: EinsatzPersonal[], fahrzeuge: EinsatzFahrzeug[]) {
-  const v = verdichte(personal, fahrzeuge, []);
+function verteilungAus(personal: readonly EinsatzPersonal[], fahrzeuge: readonly EinsatzFahrzeug[]) {
+  const v = verdichte([...personal], [...fahrzeuge], []);
   const verteilung: MittelVerteilung = {
     bereit: v.personalStatus.verfuegbar + v.fahrzeugStatus.verfuegbar,
     gebunden: v.personalStatus.gebunden + v.fahrzeugStatus.gebunden,
@@ -286,75 +337,122 @@ function verteilungAus(personal: EinsatzPersonal[], fahrzeuge: EinsatzFahrzeug[]
   return { staerke: v.staerke, verteilung };
 }
 
+/** Alle Personen eines Zweigs (Besatzungen und ohne Fahrzeug). */
+function personenVon(m: MittelDerEinheit): EinsatzPersonal[] {
+  return [
+    ...m.fahrzeuge.flatMap((f) => f.besatzung.map((x) => x.person)),
+    ...m.ohneFahrzeug.map((x) => x.person),
+  ];
+}
+
+const LEER: Omit<RasterZeile, 'key' | 'art' | 'bezeichnung' | 'zusatz' | 'status'> = {
+  einheitId: null,
+  funkrufname: null,
+  abschnitt: null,
+  staerke: null,
+  verteilung: null,
+  einheitStatus: null,
+  handStatus: false,
+  seit: null,
+  auftrag: null,
+  tz: null,
+  mittelId: null,
+  fahrzeugTz: null,
+  besatzung: null,
+  person: null,
+  gruppe: null,
+  materialAusfall: 0,
+};
+
+function personZeile(x: PersonImBaum): RasterZeile {
+  const ep = x.person;
+  return {
+    ...LEER,
+    key: `ep-${ep.id}`,
+    art: 'person',
+    mittelId: ep.id,
+    bezeichnung: ep.name,
+    zusatz: ep.funktion ?? null,
+    status: personStatus(ep),
+    person: {
+      position: ep.staerke_position ?? null,
+      istFuehrer: x.istFuehrer,
+      faehrtAuf: x.faehrtAuf,
+    },
+  };
+}
+
+/**
+ * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit Besatzung → „Ohne
+ * Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen direkt) → Material als Gruppe.
+ * `zweig` macht die Schlüssel der Gruppenzeilen eindeutig (`ofz-<id>`, `mtl-<id>`).
+ */
 function mittelZeilen(
-  personal: EinsatzPersonal[],
-  fahrzeuge: EinsatzFahrzeug[],
-  material: EinsatzMaterial[],
+  m: MittelDerEinheit,
+  zweig: string,
   katalog: ReadonlyMap<number, FahrzeugStatus>,
 ): RasterZeile[] {
-  const leer = {
-    einheitId: null,
-    funkrufname: null,
-    abschnitt: null,
-    staerke: null,
-    verteilung: null,
-    einheitStatus: null,
-    handStatus: false,
-    seit: null,
-    auftrag: null,
-    tz: null,
-  };
-  return [
-    ...fahrzeuge.map((ef): RasterZeile => ({
-      ...leer,
+  const zeilen: RasterZeile[] = m.fahrzeuge.map((f): RasterZeile => {
+    const ef = f.fahrzeug;
+    const besatzung = f.besatzung.map(personZeile);
+    return {
+      ...LEER,
       key: `ef-${ef.id}`,
       art: 'fahrzeug',
+      mittelId: ef.id,
       bezeichnung: ef.funkrufname,
       zusatz: ef.fahrzeugtyp ?? null,
       status: fahrzeugStatus(ef, katalog),
       seit: ef.status_seit ?? null,
-    })),
-    ...personal.map((ep): RasterZeile => ({
-      ...leer,
-      key: `ep-${ep.id}`,
-      art: 'person',
-      bezeichnung: ep.name,
-      zusatz: ep.funktion ?? null,
-      status: personStatus(ep),
-    })),
-    ...material.map((em): RasterZeile => ({
-      ...leer,
-      key: `em-${em.id}`,
-      art: 'material',
-      bezeichnung: em.bezeichnung,
+      fahrzeugTz: {
+        fahrzeugtyp: ef.fahrzeugtyp ?? null,
+        traegerorganisation: ef.traegerorganisation ?? null,
+        opta: ef.opta ?? null,
+        fachaufgabe: ef.tz_fachaufgabe ?? null,
+        organisation: ef.tz_organisation ?? null,
+      },
+      besatzung: { ist: f.ist, soll: f.soll, urteil: f.urteil, fremd: f.fremd },
+      children: besatzung.length > 0 ? besatzung : undefined,
+    };
+  });
+  const personen = m.ohneFahrzeug.map(personZeile);
+  if (brauchtOhneFahrzeugKnoten(m)) {
+    zeilen.push({
+      ...LEER,
+      key: `ofz-${zweig}`,
+      art: 'ohne-fahrzeug',
+      bezeichnung: 'Ohne Fahrzeug',
       zusatz: null,
-      status: materialZustand(em),
-    })),
-  ];
-}
-
-/**
- * Reihenfolge der Abschnitte: Tiefensuche über `ueber_abschnitt_id`, Eltern vor Kindern, sonst
- * Eingabereihenfolge. Ein Abschnitt ohne vorhandenes Elternteil wird Wurzel.
- */
-function abschnittRang(abschnitte: readonly Einsatzabschnitt[]): Map<number, number> {
-  const ids = new Set(abschnitte.map((a) => a.id));
-  const kinder = new Map<number | null, Einsatzabschnitt[]>();
-  for (const a of abschnitte) {
-    const k =
-      a.ueber_abschnitt_id != null && ids.has(a.ueber_abschnitt_id) ? a.ueber_abschnitt_id : null;
-    const l = kinder.get(k);
-    if (l) l.push(a);
-    else kinder.set(k, [a]);
+      status: null,
+      gruppe: { anzahl: personen.length, ausfall: 0 },
+      children: personen,
+    });
+  } else {
+    zeilen.push(...personen);
   }
-  const rang = new Map<number, number>();
-  const besuche = (a: Einsatzabschnitt) => {
-    if (rang.has(a.id)) return;
-    rang.set(a.id, rang.size);
-    for (const k of kinder.get(a.id) ?? []) besuche(k);
-  };
-  for (const a of kinder.get(null) ?? []) besuche(a);
-  return rang;
+  if (m.material.length > 0) {
+    zeilen.push({
+      ...LEER,
+      key: `mtl-${zweig}`,
+      art: 'material-gruppe',
+      bezeichnung: 'Material',
+      zusatz: null,
+      status: null,
+      gruppe: { anzahl: m.material.length, ausfall: m.materialAusfall },
+      children: m.material.map(
+        (em): RasterZeile => ({
+          ...LEER,
+          key: `em-${em.id}`,
+          art: 'material',
+          mittelId: em.id,
+          bezeichnung: em.bezeichnung,
+          zusatz: null,
+          status: materialZustand(em),
+        }),
+      ),
+    });
+  }
+  return zeilen;
 }
 
 export interface RasterEingabe extends Rohdaten {
@@ -362,73 +460,49 @@ export interface RasterEingabe extends Rohdaten {
   statusKatalog: readonly FahrzeugStatus[];
   /** Aufträge mit Empfängern. Leer, wenn nicht abrufbar. */
   auftraege: readonly Auftrag[];
+  /**
+   * Ungefilterte Listen: Namen für „fährt auf“ bei weggefilterten Fahrzeugen und die Besatzung
+   * Ist (alle Kräfte auf dem Fahrzeug). Ohne sie gelten die gefilterten.
+   */
+  quelle?: Partial<MittelQuelle>;
 }
 
 export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
   const katalog = new Map(e.statusKatalog.map((s) => [s.id, s]));
-  const personalJe = gruppiere(e.personal);
-  const fahrzeugeJe = gruppiere(e.fahrzeuge);
-  const materialJe = gruppiere(e.material);
   const auftragJe = offeneAuftraegeJeEinheit(e.auftraege);
-  const rang = abschnittRang(e.abschnitte);
   const abschnittName = new Map(e.abschnitte.map((a) => [a.id, a.name]));
+  const wurzeln = kraeftebaum({ ...e, quelle: e.quelle });
 
-  const einheitIds = new Set(e.einheiten.map((x) => x.id));
-  const nachId = new Map(e.einheiten.map((x) => [x.id, x]));
-  const kinderJe = new Map<number, Einheit[]>();
-  const wurzeln: Einheit[] = [];
-  for (const x of e.einheiten) {
-    if (x.ueber_einheit_id != null && einheitIds.has(x.ueber_einheit_id)) {
-      const l = kinderJe.get(x.ueber_einheit_id);
-      if (l) l.push(x);
-      else kinderJe.set(x.ueber_einheit_id, [x]);
-    } else {
-      wurzeln.push(x);
-    }
-  }
-
-  // Abschnitt einer Einheit: der eigene, sonst der geerbte.
-  const abschnittVon = (x: Einheit): number | null => {
-    let cur: Einheit | undefined = x;
-    const gesehen = new Set<number>();
-    while (cur && !gesehen.has(cur.id)) {
-      if (cur.abschnitt_id != null) return cur.abschnitt_id;
-      gesehen.add(cur.id);
-      cur = cur.ueber_einheit_id != null ? nachId.get(cur.ueber_einheit_id) : undefined;
-    }
-    return null;
+  // Eigenstärke je Einheit über die gefilterten Listen, kumuliert über den Baum (D2).
+  const eigen = new Map<number, ReturnType<typeof verteilungAus>>();
+  const einheitKnoten = wurzeln.flatMap((w) => (w.art === 'einheit' ? [w.knoten] : []));
+  const merke = (k: KraeftebaumKnoten) => {
+    eigen.set(k.einheit.id, verteilungAus(personenVon(k.mittel), k.mittel.fahrzeuge.map((f) => f.fahrzeug)));
+    k.kinder.forEach(merke);
   };
-  const rangVon = (x: Einheit) => {
-    const a = abschnittVon(x);
-    return a != null && rang.has(a) ? rang.get(a)! : Number.MAX_SAFE_INTEGER;
-  };
-  const sortierteWurzeln = wurzeln
-    .map((x, i) => ({ x, i }))
-    .sort((p, q) => rangVon(p.x) - rangVon(q.x) || p.i - q.i)
-    .map((p) => p.x);
+  einheitKnoten.forEach(merke);
+  const kumuliert = kumuliere(einheitKnoten, (x) => eigen.get(x.id)!.staerke);
 
-  const zeilen: RasterZeile[] = [];
-  const besucht = new Set<number>();
-  const besuche = (x: Einheit) => {
-    if (besucht.has(x.id)) return;
-    besucht.add(x.id);
-    const personal = personalJe.get(x.id) ?? [];
-    const fahrzeuge = fahrzeugeJe.get(x.id) ?? [];
-    const material = materialJe.get(x.id) ?? [];
-    const { staerke, verteilung } = verteilungAus(personal, fahrzeuge);
-    const aId = abschnittVon(x);
-    const ueber = x.ueber_einheit_id != null ? nachId.get(x.ueber_einheit_id) : undefined;
-    const kinder = mittelZeilen(personal, fahrzeuge, material, katalog);
-    zeilen.push({
+  const einheitZeile = (k: KraeftebaumKnoten): RasterZeile => {
+    const x = k.einheit;
+    const kinder = [
+      ...mittelZeilen(k.mittel, String(x.id), katalog),
+      ...k.kinder.map(einheitZeile),
+    ];
+    return {
+      ...LEER,
       key: `eh-${x.id}`,
       art: 'einheit',
       einheitId: x.id,
       bezeichnung: x.name,
-      zusatz: ueber ? `in ${ueber.name}` : (x.typ_label ?? null),
+      zusatz: x.typ_label ?? null,
       funkrufname: einheitFunkrufname(x),
-      abschnitt: aId != null ? (abschnittName.get(aId) ?? x.abschnitt_name ?? null) : null,
-      staerke,
-      verteilung,
+      abschnitt:
+        k.abschnittId != null
+          ? (abschnittName.get(k.abschnittId) ?? x.abschnitt_name ?? null)
+          : null,
+      staerke: kumuliert.get(x.id)!,
+      verteilung: eigen.get(x.id)!.verteilung,
       status: x.status ? einheitStatusAnzeige(x.status) : null,
       einheitStatus: x.status ?? null,
       handStatus: (x.fahrzeug_mitglieder ?? []).length === 0,
@@ -439,72 +513,71 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
         fachaufgabe: x.tz_fachaufgabe ?? null,
         organisation: x.tz_organisation ?? null,
       },
+      materialAusfall: k.mittel.materialAusfall,
       children: kinder.length > 0 ? kinder : undefined,
-    });
-    for (const k of kinderJe.get(x.id) ?? []) besuche(k);
+    };
   };
-  for (const w of sortierteWurzeln) besuche(w);
-  // Zyklen (a ↔ b) hätten keine Wurzel — sie dürfen trotzdem nicht verschwinden.
-  for (const x of e.einheiten) besuche(x);
 
-  // Mittel ohne Einheit — und Mittel, deren Einheit nicht in der Liste steht.
-  const ohneP = e.personal.filter((x) => x.einheit_id == null || !einheitIds.has(x.einheit_id));
-  const ohneF = e.fahrzeuge.filter((x) => x.einheit_id == null || !einheitIds.has(x.einheit_id));
-  const ohneM = e.material.filter((x) => x.einheit_id == null || !einheitIds.has(x.einheit_id));
-  if (ohneP.length + ohneF.length + ohneM.length > 0) {
-    const { staerke, verteilung } = verteilungAus(ohneP, ohneF);
-    zeilen.push({
+  return wurzeln.map((w): RasterZeile => {
+    if (w.art === 'einheit') return einheitZeile(w.knoten);
+    const { staerke, verteilung } = verteilungAus(
+      personenVon(w.mittel),
+      w.mittel.fahrzeuge.map((f) => f.fahrzeug),
+    );
+    return {
+      ...LEER,
       key: OHNE_EINHEIT_SCHLUESSEL,
       art: 'einheit',
-      einheitId: null,
       bezeichnung: 'Ohne Einheit',
       zusatz: 'nicht zugeordnete Mittel',
-      funkrufname: null,
-      abschnitt: null,
       staerke,
       verteilung,
       status: null,
-      einheitStatus: null,
-      handStatus: false,
-      seit: null,
-      auftrag: null,
-      tz: null,
-      children: mittelZeilen(ohneP, ohneF, ohneM, katalog),
-    });
-  }
-  return zeilen;
+      materialAusfall: w.mittel.materialAusfall,
+      children: mittelZeilen(w.mittel, 'ohne', katalog),
+    };
+  });
+}
+
+/** Alle Einheitenzeilen des Baums in Baumfolge, auch Untereinheiten und „Ohne Einheit“ (D12). */
+export function einheitZeilen(zeilen: readonly RasterZeile[]): RasterZeile[] {
+  return zeilen.flatMap((z) =>
+    z.art === 'einheit' ? [z, ...einheitZeilen(z.children ?? [])] : [],
+  );
 }
 
 /**
  * Eine Einheiten-Zeile mit Ausfall ist eine Problemzeile (Tönung + Zahl): ein Ausfall unter
- * ihren Mitteln ODER ein Einheitenstatus „nicht verfügbar“ (eine Einheit ohne Fahrzeug meldet
- * S6 nur über den Handstatus).
+ * ihren EIGENEN Mitteln — Fahrzeuge, Personal oder Material (D6) — ODER ein Einheitenstatus
+ * „nicht verfügbar“ (eine Einheit ohne Fahrzeug meldet S6 nur über den Handstatus).
  */
 export function istProblemZeile(z: RasterZeile): boolean {
-  return (z.verteilung?.ausfall ?? 0) > 0 || z.einheitStatus?.kategorie === 'nicht_verfuegbar';
+  return (
+    (z.verteilung?.ausfall ?? 0) > 0 ||
+    (z.art === 'einheit' && z.materialAusfall > 0) ||
+    z.einheitStatus?.kategorie === 'nicht_verfuegbar'
+  );
 }
 
-/** Alle Schlüssel mit Kindern — das „alles aufklappen" des Druckpfads. */
+/** Alle Schlüssel mit Kindern — das „alles aufklappen" des Druckpfads (Stufe „alles“). */
 export function aufklappbareSchluessel(zeilen: readonly RasterZeile[]): string[] {
-  return zeilen.flatMap((z) =>
-    z.children && z.children.length > 0 ? [z.key, ...aufklappbareSchluessel(z.children)] : [],
-  );
+  return schluesselBisStufe(zeilen, 'alles');
 }
 
 // ── Statusband ────────────────────────────────────────────────────────────────
 
 export interface BandZelle {
   schluessel: string;
-  /** „S4", sonst ein Kurztext der Kategorie. */
-  code: string;
+  /**
+   * FMS-Code („S4"), sonst `null` — dann steht im Statusband das Wort (keine erfundene Ziffer,
+   * kein Kürzel „Einh."/„Pers.", das nur die Gruppe wiederholt).
+   */
+  code: string | null;
   wert: number;
   /** Beschriftung unter der Zahl — der zweite Kanal. */
   wort: string;
   ton: StatusTon;
 }
-
-/** Code einer Einheitenzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
-const EINHEIT_KURZ = 'Einh.';
 
 // ── Rückmeldung je Einheit ────────────────────────────────────────────────────
 
@@ -562,6 +635,9 @@ export function toenungsGruende(
   if (ausfall > 0 && z.einheitStatus?.kategorie !== 'nicht_verfuegbar') {
     gruende.push(`${ausfall} Ausfall`);
   }
+  if (z.art === 'einheit' && z.materialAusfall > 0) {
+    gruende.push(`${z.materialAusfall} Ausfall Material`);
+  }
   if (r != null && r.zustand !== 'aktuell') gruende.push(TOENUNG_RUECKMELDUNG[r.zustand]);
   return gruende;
 }
@@ -569,18 +645,20 @@ export function toenungsGruende(
 /**
  * Die Kachel „keine Rückmeldung": Einheiten, von denen NIE eine Rückmeldung kam; überfällige
  * zählen nicht (das zeigt ihre Zeile). Gezählt über die GEFILTERTEN Zeilen wie die übrigen
- * Bandzellen. Bei 0 entfällt die Kachel — eine rote Null meldete das Gegenteil.
+ * Bandzellen, rekursiv samt Untereinheiten (D12). Bei 0 entfällt die Kachel — eine rote Null meldete das Gegenteil.
  */
 export function keineRueckmeldungZelle(
   zeilen: readonly RasterZeile[],
   daten: Rueckmeldungen,
 ): BandZelle | null {
-  const ids = zeilen.filter(istEchteEinheit).map((z) => z.einheitId);
+  const ids = einheitZeilen(zeilen)
+    .filter(istEchteEinheit)
+    .map((z) => z.einheitId);
   const anzahl = ohneRueckmeldung(ids, daten);
   if (anzahl === 0) return null;
   return {
     schluessel: 'rueckmeldung-keine',
-    code: '—',
+    code: null,
     wert: anzahl,
     wort: RUECKMELDUNG_WORT.keine,
     ton: 'alarm',
@@ -616,7 +694,7 @@ export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
       const a = statusWertAnzeige(wert);
       return {
         schluessel: `eh-${wert.status_id}`,
-        code: a.code ?? EINHEIT_KURZ,
+        code: a.code,
         wert: anzahl,
         wort: a.wort,
         ton: a.ton,
@@ -625,7 +703,7 @@ export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
   if (gemischt > 0) {
     zellen.push({
       schluessel: 'eh-gemischt',
-      code: EINHEIT_KURZ,
+      code: null,
       wert: gemischt,
       wort: 'gemischt',
       ton: 'neutral',
@@ -634,7 +712,7 @@ export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
   if (ohne > 0) {
     zellen.push({
       schluessel: 'eh-ohne',
-      code: EINHEIT_KURZ,
+      code: null,
       wert: ohne,
       wort: OHNE_STATUS.label,
       ton: 'neutral',
@@ -652,7 +730,7 @@ export function personalBand(personal: readonly EinsatzPersonal[]): BandZelle[] 
   }
   return KATEGORIE_REIHENFOLGE.filter((k) => (zaehler.get(k) ?? 0) > 0).map((k) => ({
     schluessel: `pers-${k}`,
-    code: 'Pers.',
+    code: null,
     wert: zaehler.get(k)!,
     wort: k === 'ohne' ? OHNE_STATUS.label : statusKategorie[k].label,
     ton: k === 'ohne' ? 'neutral' : tonAusKategorie(k),

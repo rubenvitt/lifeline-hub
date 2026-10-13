@@ -4,6 +4,7 @@ import {
   baueMeldebildRaster,
   einheitBand,
   einheitFunkrufname,
+  einheitZeilen,
   einheitStatusAnzeige,
   fahrzeugStatus,
   fmsWort,
@@ -155,6 +156,8 @@ const eingabe = (e: Partial<RasterEingabe>): RasterEingabe => ({
 });
 
 const alleBlaetter = (zeilen: RasterZeile[]) => zeilen.flatMap((z) => z.children ?? []);
+const alleZeilen = (zeilen: readonly RasterZeile[]): RasterZeile[] =>
+  zeilen.flatMap((z) => [z, ...alleZeilen(z.children ?? [])]);
 
 // ── Raster ────────────────────────────────────────────────────────────────────
 
@@ -171,7 +174,14 @@ describe('baueMeldebildRaster', () => {
     );
     expect(raster).toHaveLength(1);
     expect(raster[0]).toMatchObject({ key: 'eh-1', art: 'einheit', abschnitt: 'Nord' });
-    expect(raster[0].children?.map((k) => k.art)).toEqual(['fahrzeug', 'person', 'material']);
+    // Eigene Mittel als Gruppen (D5): das Fahrzeug, die Person ohne Fahrzeug, das Material.
+    expect(raster[0].children?.map((k) => k.art)).toEqual([
+      'fahrzeug',
+      'ohne-fahrzeug',
+      'material-gruppe',
+    ]);
+    expect(raster[0].children?.[1].children?.map((k) => k.key)).toEqual(['ep-1']);
+    expect(raster[0].children?.[2].children?.map((k) => k.key)).toEqual(['em-1']);
   });
 
   it('jede Kraft genau einmal — auch Untereinheiten und Kräfte ohne Einheit', () => {
@@ -184,8 +194,9 @@ describe('baueMeldebildRaster', () => {
     });
     const raster = baueMeldebildRaster(e);
 
-    // Keine Kumulation: jede Zeile trägt nur ihre EIGENEN Kräfte, die Summe der Zeilen ist die
-    // Verdichtung der Rohlisten.
+    // Die Untereinheit ist ein Kind, keine Wurzel; die Elternzeile kumuliert, also summieren
+    // sich die WURZELN auf die Verdichtung der Rohlisten (Seitenkopf).
+    expect(raster.map((z) => z.key)).toEqual(['eh-1', OHNE_EINHEIT_SCHLUESSEL]);
     const summe = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0, gesamt: 0 };
     for (const z of raster) {
       summe.fuehrer += z.staerke!.fuehrer;
@@ -195,17 +206,26 @@ describe('baueMeldebildRaster', () => {
     }
     expect(staerkeText(summe)).toBe(staerkeText(verdichte(e.personal, e.fahrzeuge, []).staerke));
 
-    const blattSchluessel = alleBlaetter(raster).map((z) => z.key);
-    expect(blattSchluessel.sort()).toEqual(
+    const blattSchluessel = alleZeilen(raster)
+      .filter((z) => z.key.startsWith('ep-') || z.key.startsWith('ef-') || z.key.startsWith('em-'))
+      .map((z) => z.key);
+    expect([...blattSchluessel].sort()).toEqual(
       ['ep-1', 'ep-2', 'ep-3', 'ep-4', 'ef-1', 'ef-2', 'ef-3', 'em-1'].sort(),
     );
     expect(new Set(blattSchluessel).size).toBe(blattSchluessel.length);
+    // Alle Schlüssel sind eindeutig, auch die der Gruppenzeilen.
+    const alle = alleZeilen(raster).map((z) => z.key);
+    expect(new Set(alle).size).toBe(alle.length);
 
     // Unzugeordnetes (auch mit verwaister einheit_id 999) sammelt „Ohne Einheit" am Ende.
     const ohne = raster[raster.length - 1];
-    expect(ohne.key).toBe(OHNE_EINHEIT_SCHLUESSEL);
     expect(ohne.einheitId).toBeNull();
-    expect(ohne.children?.map((z) => z.key).sort()).toEqual(['ef-3', 'em-1', 'ep-3', 'ep-4']);
+    expect(
+      alleZeilen(ohne.children ?? [])
+        .map((z) => z.key)
+        .filter((k) => /^e[pfm]-/.test(k))
+        .sort(),
+    ).toEqual(['ef-3', 'em-1', 'ep-3', 'ep-4']);
   });
 
   it('ohne unzugeordnete Mittel gibt es keine Zeile „Ohne Einheit"', () => {
@@ -220,10 +240,12 @@ describe('baueMeldebildRaster', () => {
         einheiten: [eh(3, null), eh(1, 11), eh(2, 20), eh(4, null, 2)],
       }),
     );
-    expect(raster.map((z) => z.key)).toEqual(['eh-2', 'eh-4', 'eh-1', 'eh-3']);
-    // Die Untereinheit erbt den Abschnitt ihrer Einheit und nennt sie im Nebentext.
-    expect(raster[1]).toMatchObject({ abschnitt: 'Süd', zusatz: 'in E2' });
-    expect(raster[3].abschnitt).toBeNull();
+    expect(raster.map((z) => z.key)).toEqual(['eh-2', 'eh-1', 'eh-3']);
+    // Die Untereinheit steht eingerückt unter ihrer Einheit und erbt deren Abschnitt; der
+    // Nebentext ist ihr Typ, die Unterstellung zeigt der Baum.
+    expect(raster[0].children?.map((z) => z.key)).toEqual(['eh-4']);
+    expect(raster[0].children?.[0]).toMatchObject({ abschnitt: 'Süd', zusatz: 'Gruppe' });
+    expect(raster[2].abschnitt).toBeNull();
   });
 
   it('verdichtet Fahrzeuge UND Personal der Einheit auf bereit / gebunden / Ausfall', () => {
@@ -278,6 +300,122 @@ describe('baueMeldebildRaster', () => {
       }),
     );
     expect(raster.map((z) => z.funkrufname)).toEqual(['Heros 3/1', 'Florian HM 1', 'Kater 7']);
+  });
+});
+
+// ── Kräftebaum (LLH-1025) ───────────────────────────────────────────────────
+
+describe('Raster als Kräftebaum', () => {
+  /** Zug 1/1/2 mit zwei Gruppen je 0/1/8. */
+  const zugMitGruppen = () => {
+    const personal = [
+      p(1, 1, 'gebunden', 'fuehrer'),
+      p(2, 1, 'gebunden', 'unterfuehrer'),
+      p(3, 1),
+      p(4, 1),
+      ...[2, 3].flatMap((g) => [
+        p(g * 100, g, 'gebunden', 'unterfuehrer'),
+        ...Array.from({ length: 8 }, (_, i) => p(g * 100 + i + 1, g)),
+      ]),
+    ];
+    return eingabe({
+      einheiten: [eh(1, null, null, { name: 'Zug 1' }), eh(2, null, 1), eh(3, null, 1)],
+      personal,
+    });
+  };
+
+  it('die Elternzeile kumuliert, Kinder tragen ihre eigene Teilsumme, Σ Wurzeln = Kopf', () => {
+    const e = zugMitGruppen();
+    const [zug] = baueMeldebildRaster(e);
+    expect(staerkeText(zug.staerke)).toBe('1/3/18//22');
+    const gruppen = zug.children!.filter((z) => z.art === 'einheit');
+    expect(gruppen.map((z) => staerkeText(z.staerke))).toEqual(['0/1/8//9', '0/1/8//9']);
+    expect(staerkeText(zug.staerke)).toBe(staerkeText(verdichte(e.personal, [], []).staerke));
+  });
+
+  it('Mittelverteilung und Tönung bleiben eigen (D3)', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null), eh(2, null, 1)],
+      personal: [p(1, 1, 'verfuegbar'), p(2, 2, 'nicht_verfuegbar')],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    expect(zug.verteilung).toEqual({ bereit: 1, gebunden: 0, ausfall: 0, ohne: 0 });
+    expect(istProblemZeile(zug)).toBe(false);
+    const gruppe = zug.children!.find((z) => z.art === 'einheit')!;
+    expect(istProblemZeile(gruppe)).toBe(true);
+  });
+
+  it('eigene Mittel vor Untereinheiten; Besatzung unter dem Fahrzeug, EF zuerst', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null, null, { fuehrer_id: 3 }), eh(2, null, 1)],
+      personal: [
+        { ...p(1, 1, 'gebunden', 'mannschaft'), fahrzeug_id: 1 },
+        { ...p(3, 1, 'gebunden', 'fuehrer'), fahrzeug_id: 1 },
+        p(4, 1),
+      ],
+      fahrzeuge: [{ ...fz(1, 1, 104), soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 } }],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    expect(zug.children!.map((z) => z.key)).toEqual(['ef-1', 'ofz-1', 'eh-2']);
+    const fahrzeug = zug.children![0];
+    expect(fahrzeug.staerke).toBeNull();
+    expect(fahrzeug.besatzung).toMatchObject({
+      ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 1 },
+      soll: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 },
+      urteil: 'unterbesetzt',
+      fremd: [],
+    });
+    expect(fahrzeug.children!.map((z) => [z.key, z.person?.istFuehrer])).toEqual([
+      ['ep-3', true],
+      ['ep-1', false],
+    ]);
+    const ohne = zug.children![1];
+    expect(ohne).toMatchObject({ art: 'ohne-fahrzeug', bezeichnung: 'Ohne Fahrzeug', staerke: null });
+    expect(ohne.gruppe).toEqual({ anzahl: 1, ausfall: 0 });
+  });
+
+  it('ohne Fahrzeug hängt das Personal direkt unter der Einheit (D5)', () => {
+    const [zug] = baueMeldebildRaster(eingabe({ einheiten: [eh(1, null)], personal: [p(1, 1)] }));
+    expect(zug.children!.map((z) => [z.key, z.art])).toEqual([['ep-1', 'person']]);
+    expect(zug.children![0].staerke).toBeNull();
+  });
+
+  it('Person auf fremdem Fahrzeug: einmal bei ihrer Einheit mit „fährt auf“', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null, null, { name: 'Gr 1' }), eh(2, null, null, { name: 'Gr 2' })],
+      personal: [{ ...p(1, 1), fahrzeug_id: 9 }, { ...p(2, 2), fahrzeug_id: 9 }],
+      fahrzeuge: [{ ...fz(9, 2, 104), funkrufname: 'Florian 2' }],
+    });
+    const raster = baueMeldebildRaster(e);
+    const gr1 = raster[0];
+    expect(gr1.children!.map((z) => z.key)).toEqual(['ep-1']);
+    expect(gr1.children![0].person).toMatchObject({ faehrtAuf: 'Florian 2' });
+    const fahrzeug = raster[1].children![0];
+    expect(fahrzeug.besatzung?.fremd).toEqual([{ einheit: 'Gr 1', anzahl: 1 }]);
+    expect(fahrzeug.children!.map((z) => z.key)).toEqual(['ep-2']);
+  });
+
+  it('Material ist eine Gruppenzeile mit Posten und Ausfall; Ausfall tönt die Einheit', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null)],
+      material: [mt(1, 1), { ...mt(2, 1), status: 'einsatzbereit' }, { ...mt(3, 1), status: 'im_einsatz' }],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    const gruppe = zug.children![0];
+    expect(gruppe).toMatchObject({ key: 'mtl-1', art: 'material-gruppe', bezeichnung: 'Material' });
+    expect(gruppe.gruppe).toEqual({ anzahl: 3, ausfall: 1 });
+    expect(gruppe.children!.map((z) => z.art)).toEqual(['material', 'material', 'material']);
+    expect(zug.materialAusfall).toBe(1);
+    expect(istProblemZeile(zug)).toBe(true);
+    expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+  });
+
+  it('die Kachel „keine Rückmeldung“ zählt auch Untereinheiten', () => {
+    const raster = baueMeldebildRaster(eingabe({ einheiten: [eh(1, null), eh(2, null, 1)] }));
+    expect(einheitZeilen(raster).map((z) => z.key)).toEqual(['eh-1', 'eh-2']);
+    expect(
+      keineRueckmeldungZelle(raster, { frist_min: 60, einheiten: [], abschnitte: [] })?.wert,
+    ).toBe(2);
   });
 });
 
@@ -439,12 +577,12 @@ describe('einheitBand', () => {
       eh(7, null, null, { status: st.fahrzeuge(S6) } as Partial<Einheit>),
     ]);
     expect(band.map((z) => [z.code, z.wert, z.wort, z.ton])).toEqual([
-      ['Einh.', 1, 'Werkstatt', 'alarm'],
+      [null, 1, 'Werkstatt', 'alarm'],
       ['S2', 1, 'Frei auf Wache', 'normal'],
       ['S4', 2, 'Am Einsatzort', 'achtung'],
       ['S6', 1, 'Nicht einsatzbereit', 'alarm'],
-      ['Einh.', 1, 'gemischt', 'neutral'],
-      ['Einh.', 1, 'ohne Status', 'neutral'],
+      [null, 1, 'gemischt', 'neutral'],
+      [null, 1, 'ohne Status', 'neutral'],
     ]);
     // Jede Einheit genau einmal — das Band summiert sich auf die Einheitenzahl.
     expect(band.reduce((s, z) => s + z.wert, 0)).toBe(7);
@@ -636,7 +774,7 @@ describe('Rückmeldung je Rasterzeile', () => {
   it('die Kachel zählt NUR nie zurückgemeldete Einheiten — überfällige nicht', () => {
     expect(keineRueckmeldungZelle(raster, DATEN)).toEqual({
       schluessel: 'rueckmeldung-keine',
-      code: '—',
+      code: null,
       wert: 1,
       wort: 'keine Rückmeldung',
       ton: 'alarm',
