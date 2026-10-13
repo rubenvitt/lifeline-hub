@@ -28,9 +28,10 @@ import EinheitVorlageFormModal from './EinheitVorlageFormModal';
 
 /**
  * Die drei Listen der Vorlagen-Detailseite (LLH-1042): Untereinheiten, Fahrzeuge,
- * Stammbesetzung. Jeder Handgriff speichert sofort die ganze Liste (PUT, design.md D5); der Grund
- * einer Ablehnung steht im Paneel, bis zum nächsten Versuch (LFH-1077). Warnungen stehen als Wort
- * am Eintrag („außer Dienst“, „auch in …“), nie nur als Farbe.
+ * Stammbesetzung. Jeder Handgriff speichert sofort die ganze Liste (PUT, Spec `einheit-vorlagen`,
+ * „Fahrzeuge und Stammbesetzung der Vorlage“); der Grund einer Ablehnung steht im Paneel, bis zum
+ * nächsten Versuch (LFH-1077). Warnungen stehen als Wort am Eintrag („außer Dienst“, „auch in …“),
+ * nie nur als Farbe.
  */
 
 interface SectionProps {

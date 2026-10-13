@@ -78,8 +78,9 @@ struct StammdatenFk {
 const MARKIERBAR: [&str; 4] = ["fahrzeug", "personal", "material", "einheit_vorlage"];
 
 /// Begründete Kaskaden auf eine markierbare Tabelle, `(tabelle, spalte, ziel)`: die Kindzeilen
-/// einer Einheiten-Vorlage (LLH-1042, design.md D7) gehören ihr allein und fallen mit ihr. Jeder
-/// andere Verweis auf eine Vorlage, auch der der Untereinheit, hält fest.
+/// einer Einheiten-Vorlage (LLH-1042, Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen
+/// entfernen“) gehören ihr allein und fallen mit ihr. Jeder andere Verweis auf eine Vorlage, auch
+/// der der Untereinheit, hält fest.
 const ERLAUBTE_KASKADEN: [(&str, &str, &str); 2] = [
     ("einheit_vorlage_fahrzeug", "vorlage_id", "einheit_vorlage"),
     ("einheit_vorlage_personal", "vorlage_id", "einheit_vorlage"),

@@ -1,6 +1,7 @@
-//! Katalog „Einheiten-Vorlagen“ (LLH-1042, design.md D5/D8). Lesen: jeder Angemeldete der
-//! Organisation (LLH-1049 liest im Einsatz); Schreiben: Admin. Kein DELETE — `aktiv` schaltet in
-//! beide Richtungen. Fahrzeuge und Stammbesetzung werden je als ganze Liste ersetzt (PUT).
+//! Katalog „Einheiten-Vorlagen“ (LLH-1042, Spec `openspec/specs/einheit-vorlagen`). Lesen: jeder
+//! Angemeldete der Organisation (LLH-1049 liest im Einsatz); Schreiben: Admin. Kein DELETE —
+//! `aktiv` schaltet in beide Richtungen. Fahrzeuge und Stammbesetzung werden je als ganze Liste
+//! ersetzt (PUT).
 //! `stammdaten` meldet die Middleware `routes::live::stammdaten_live` (Präfix in
 //! `STAMMDATEN_PFADE`).
 

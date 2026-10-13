@@ -4,7 +4,8 @@
 //!
 //! Lesen kostet unabhängig von der Zahl der Vorlagen vier Abfragen (Köpfe, Fahrzeuge,
 //! Stammbesetzung, Kanten des Baums). `auch_in` leitet sich dabei aus allen Zuordnungen der
-//! Organisation ab, nie aus einem gespeicherten Flag (design.md D3).
+//! Organisation ab, nie aus einem gespeicherten Flag (Spec `openspec/specs/einheit-vorlagen`,
+//! „Fahrzeuge und Stammbesetzung der Vorlage“).
 
 use super::{EinheitVorlage, EinheitVorlageFahrzeug, EinheitVorlagePersonal, PersonalEintrag};
 use crate::error::AppError;

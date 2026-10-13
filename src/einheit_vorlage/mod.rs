@@ -3,13 +3,15 @@
 //! Stammbesetzung. Die Vorlage ist ein Vorschlag; gebildet und disponiert wird erst im Einsatz
 //! (LLH-1049, über [`repo::load_tree_tx`]).
 //!
-//! Regeln (Spec `einheit-vorlagen`, design.md der Change `z5oi2a1x-einheiten-vorlagen`):
-//! - Untereinheiten über `ueber_vorlage_id`, beliebig tief, ohne Zyklen (422, D2).
+//! Regeln (Spec `openspec/specs/einheit-vorlagen`):
+//! - Untereinheiten über `ueber_vorlage_id`, beliebig tief, ohne Zyklen (422; Requirement
+//!   „Untereinheiten“).
 //! - Ein Fahrzeug, eine Person steht im selben Vorlagen-Baum höchstens einmal (422); über Bäume
-//!   hinweg erlaubt, die Antwort nennt die anderen aktiven Vorlagen unter `auch_in` (D3).
+//!   hinweg erlaubt, die Antwort nennt die anderen aktiven Vorlagen unter `auch_in`.
 //! - Neu zuordnen nur, was in Dienst steht (422); ein später außer Dienst gestelltes bleibt und
-//!   meldet seinen `dienststatus` (D4).
-//! - Fahrzeuge und Stammbesetzung werden je als ganze Liste ersetzt (D5).
+//!   meldet seinen `dienststatus`.
+//! - Fahrzeuge und Stammbesetzung werden je als ganze Liste ersetzt (diese drei: Requirement
+//!   „Fahrzeuge und Stammbesetzung der Vorlage“).
 
 pub mod repo;
 
@@ -39,7 +41,8 @@ pub const FAHRZEUGE_JE_VORLAGE_MAX: usize = 50;
 pub const PERSONAL_JE_VORLAGE_MAX: usize = 200;
 
 /// Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
-/// die Detailseite braucht keinen Einzel-GET (design.md D8).
+/// die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
+/// Verwaltung“).
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct EinheitVorlage {
     pub id: i64,
