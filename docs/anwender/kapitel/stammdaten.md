@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs]
 ---
 
 ## Überblick
@@ -10,8 +10,10 @@ quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.
 Stammdaten sind das, was eine Organisation über jeden Einsatz hinweg vorhält: Fahrzeuge,
 Material und Personal, dazu die Kataloge, aus denen Einsätze schöpfen (Einsatz-Stichworte,
 externe Stellen, Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
-Führungsfunktionen), sowie Name, Logo und Zeichen der Organisation. Im Einsatz werden daraus
-Kräfte disponiert und Einträge vorbelegt.
+Führungsfunktionen), sowie Name, Logo und Zeichen der Organisation. Einheiten-Vorlagen
+beschreiben stehende Einheiten wie einen Sanitätszug mit seinen Untereinheiten, Fahrzeugen und
+seiner Stammbesetzung. Im Einsatz werden aus den Stammdaten Kräfte disponiert und Einträge
+vorbelegt.
 
 Gepflegt werden die Stammdaten in der Verwaltung unter „Stammdaten“, und zwar nur von
 System-Admins. Führungskräfte der Organisation sehen sie zum Nachschlagen.
@@ -74,6 +76,22 @@ Adressaten einer Nachforderung.
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
 deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
 
+### Eine Einheiten-Vorlage anlegen
+
+1. Unter „Stammdaten“ „Einheiten-Vorlagen“ öffnen.
+2. „Vorlage anlegen“ wählen.
+3. „Name“ eintragen und den „Typ“ wählen. Für eine Untereinheit unter „Unter“ die Vorlage
+   wählen, zu der sie gehört.
+4. „Anlegen“ wählen. Die Seite der neuen Vorlage öffnet sich.
+5. Unter „Fahrzeuge“ ein Fahrzeug wählen und „Fahrzeug hinzufügen“ wählen.
+6. Unter „Stammbesetzung“ eine Person wählen und „Person hinzufügen“ wählen. In ihrer Zeile
+   lassen sich Position und Fahrzeug wählen.
+7. Nach Bedarf im Kopf „Funkrufname“, „Fachaufgabe“ und „Organisation“ des taktischen Zeichens,
+   die „Soll-Stärke“ und eine „Bemerkung“ eintragen und „Speichern“ wählen.
+
+Fahrzeuge und Stammbesetzung gelten sofort; „Speichern“ betrifft nur die Felder des Kopfes.
+Eine weitere Untereinheit entsteht auf der Seite der Vorlage mit „Untereinheit anlegen“.
+
 ### Name, Logo und Zeichen der Organisation festlegen
 
 1. Unter „Stammdaten“ „Organisation“ öffnen.
@@ -125,6 +143,25 @@ Verwaltung nicht.
   bisherigen die Markierung ab; Deaktivieren nimmt sie ebenfalls. Die zuständige Leitstelle steht
   in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
   [Nachforderung](nachforderung.md).
+
+### Einheiten-Vorlagen
+
+- Eine Vorlage hat einen Namen, einen Einheitstyp und nach Bedarf eine übergeordnete Vorlage.
+  Untereinheiten lassen sich beliebig tief schachteln; eine Vorlage lässt sich nicht unter sich
+  selbst oder unter eine ihrer eigenen Untereinheiten stellen.
+- Ein Fahrzeug und eine Person stehen in einer Vorlage samt ihren Unter- und Obereinheiten
+  höchstens einmal. In einer anderen Vorlage dürfen sie zusätzlich stehen; die Seite der Vorlage
+  nennt das am Eintrag als „auch in …“.
+- Neu zuordnen lässt sich nur, was in Dienst ist. Wird ein Fahrzeug oder eine Person später
+  außer Dienst genommen, bleibt der Eintrag in der Vorlage und trägt „außer Dienst“.
+- Wird ein Fahrzeug aus der Vorlage entfernt, verlieren die Personen darauf ihre Fahrzeugbindung.
+- Ohne eigene Soll-Stärke gilt die des Einheitstyps. Sie steht als „Vorgabe des Einheitstyps“
+  unter dem Feld und in der Liste mit „(Vorgabe)“. Ohne Position einer Person gilt die Position
+  aus ihren Stammdaten.
+- Eine Vorlage lässt sich nicht löschen. Mit dem Schalter „Aktiv“ wird sie stillgelegt und
+  wieder aktiviert. Eine stillgelegte Vorlage steht nicht mehr als Unterstellung zur Wahl, und
+  ihr Name ist für eine neue Vorlage frei; unter den aktiven Vorlagen ist jeder Name nur einmal
+  erlaubt.
 
 ### Demo-Stammdaten
 
