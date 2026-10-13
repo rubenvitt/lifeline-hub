@@ -41,7 +41,7 @@ Motivation: `proposal.md`, „Why“. Stand nach LFH-1208
 
 ### D1 · Spalte per `ALTER TABLE … DROP COLUMN` entfernen
 
-Neue Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0186`, vor dem Push
+Neue Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0187`, vor dem Push
 mit `scripts/check-migrationen.sh` prüfen):
 `ALTER TABLE einsatzabschnitt DROP COLUMN fortschritt;`
 

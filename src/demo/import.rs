@@ -397,7 +397,6 @@ impl Ablauf<'_> {
                         kurzbezeichnung: Some(v.kurzbezeichnung),
                         lagezustand: v.lagezustand,
                         abschnittsauftrag: Some(v.abschnittsauftrag),
-                        fortschritt: v.fortschritt,
                     },
                 )
                 .await?;

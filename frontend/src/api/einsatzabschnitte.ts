@@ -17,12 +17,6 @@ export interface AbschnittEingabe {
   lagezustand?: AbschnittLagezustand | null;
   /** LFH-608: fester Abschnittsauftrag (Freitext). */
   abschnittsauftrag?: string | null;
-  /**
-   * LFH-608: eingeschätzter Fortschritt 0–100; `null` = nicht eingeschätzt. Nur noch Altdaten:
-   * die Oberfläche zeigt und schreibt ihn nicht (LFH-1208), die Spalte fällt in einem
-   * Aufräum-Ticket.
-   */
-  fortschritt?: number | null;
 }
 
 export function listeAbschnitte(einsatzId: number): Promise<Einsatzabschnitt[]> {

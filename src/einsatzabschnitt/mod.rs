@@ -60,9 +60,6 @@ pub struct EinsatzabschnittAnzeige {
     /// einzelnen Aufträgen des Auftragsmoduls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnittsauftrag: Option<String>,
-    /// Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fortschritt: Option<i64>,
     /// Zugeordnete Sprechgruppen (aus Katalogeintrag oder einsatz-lokal).
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
 }

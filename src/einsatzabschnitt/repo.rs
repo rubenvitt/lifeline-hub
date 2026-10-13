@@ -18,7 +18,6 @@ pub struct AbschnittDaten<'a> {
     pub kurzbezeichnung: Option<&'a str>,
     pub lagezustand: Option<AbschnittLagezustand>,
     pub abschnittsauftrag: Option<&'a str>,
-    pub fortschritt: Option<i64>,
 }
 
 const SELECT_AUFGELOEST: &str = "\
@@ -26,7 +25,7 @@ const SELECT_AUFGELOEST: &str = "\
            p.snap_name AS leiter_name, a.bemerkung, \
            a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, \
            a.sprechgruppe_tmo, a.sprechgruppe_dmo, a.kommunikationsmittel, a.erreichbarkeit, \
-           a.sortier, a.kurzbezeichnung, a.lagezustand, a.abschnittsauftrag, a.fortschritt \
+           a.sortier, a.kurzbezeichnung, a.lagezustand, a.abschnittsauftrag \
     FROM einsatzabschnitt a \
     LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
 
@@ -50,7 +49,6 @@ struct Row {
     kurzbezeichnung: Option<String>,
     lagezustand: Option<String>,
     abschnittsauftrag: Option<String>,
-    fortschritt: Option<i64>,
 }
 
 fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
@@ -78,7 +76,6 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
             .as_deref()
             .and_then(AbschnittLagezustand::parse),
         abschnittsauftrag: row.abschnittsauftrag,
-        fortschritt: row.fortschritt,
         sprechgruppen: Vec::new(), // befüllt durch laden()/liste()
     }
 }
@@ -257,8 +254,8 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatzabschnitt \
             (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, \
              kommunikationsmittel, erreichbarkeit, sortier, \
-             kurzbezeichnung, lagezustand, abschnittsauftrag, fortschritt) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             kurzbezeichnung, lagezustand, abschnittsauftrag) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.ueber_abschnitt_id)
@@ -271,7 +268,6 @@ pub async fn anlegen_tx(
     .bind(daten.kurzbezeichnung)
     .bind(daten.lagezustand.map(|l| l.as_str()))
     .bind(daten.abschnittsauftrag)
-    .bind(daten.fortschritt)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -292,7 +288,6 @@ pub struct AbschnittPatch<'a> {
     // Der Lagezustand fehlt absichtlich: `setze_lagezustand_tx` schreibt ihn samt ETB-Eintrag in
     // derselben Transaktion.
     pub abschnittsauftrag: Option<Option<&'a str>>,
-    pub fortschritt: Option<Option<i64>>,
 }
 
 /// Validiert nur die gesendeten Bezugsfelder; `Some(None)` und ein fehlendes Feld bringen keinen
@@ -372,9 +367,8 @@ pub async fn patche(
             erreichbarkeit = CASE WHEN ?11 IS NULL THEN erreichbarkeit ELSE ?12 END, \
             sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END, \
             kurzbezeichnung = CASE WHEN ?15 IS NULL THEN kurzbezeichnung ELSE ?16 END, \
-            abschnittsauftrag = CASE WHEN ?17 IS NULL THEN abschnittsauftrag ELSE ?18 END, \
-            fortschritt = CASE WHEN ?19 IS NULL THEN fortschritt ELSE ?20 END \
-         WHERE id = ?21 AND einsatz_id = ?22",
+            abschnittsauftrag = CASE WHEN ?17 IS NULL THEN abschnittsauftrag ELSE ?18 END \
+         WHERE id = ?19 AND einsatz_id = ?20",
     )
     .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
     .bind(patch.ueber_abschnitt_id.and_then(|v| v))
@@ -394,8 +388,6 @@ pub async fn patche(
     .bind(patch.kurzbezeichnung.and_then(|v| v))
     .bind(patch.abschnittsauftrag.map(|_| 1_i64))
     .bind(patch.abschnittsauftrag.and_then(|v| v))
-    .bind(patch.fortschritt.map(|_| 1_i64))
-    .bind(patch.fortschritt.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -623,7 +615,6 @@ mod tests {
             kurzbezeichnung: None,
             lagezustand: None,
             abschnittsauftrag: None,
-            fortschritt: None,
         }
     }
 
@@ -698,7 +689,6 @@ mod tests {
                 kurzbezeichnung: None,
                 lagezustand: None,
                 abschnittsauftrag: None,
-                fortschritt: None,
             },
         )
         .await
@@ -756,6 +746,22 @@ mod tests {
         .unwrap();
         let a = laden(&pool, einsatz, unter).await.unwrap();
         assert_eq!(a.ueber_abschnitt_id, Some(ober));
+    }
+
+    /// LLH-1170: Die Migration entfernt die Spalte; ein Abschnitt trägt keinen Fortschritt.
+    #[tokio::test]
+    async fn einsatzabschnitt_hat_keine_spalte_fortschritt() {
+        let pool = crate::db::test_pool().await;
+        let spalten: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('einsatzabschnitt')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(
+            spalten.iter().any(|s| s == "abschnittsauftrag"),
+            "{spalten:?}"
+        );
+        assert!(!spalten.iter().any(|s| s == "fortschritt"), "{spalten:?}");
     }
 
     #[tokio::test]

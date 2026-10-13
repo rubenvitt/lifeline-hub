@@ -40,7 +40,7 @@ export default function AbschnittDaten({
           <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
         )}
       </Datenfeld>
-      {/* Kein Fortschritt (LFH-1208): eine geschätzte Prozentzahl ist im Einsatz nicht belastbar;
+      {/* Kein Fortschritt (LFH-1208, LLH-1170): eine geschätzte Prozentzahl ist im Einsatz nicht belastbar;
           die Lage trägt der Lagezustand, den Arbeitsstand die offenen Aufträge. */}
       {a.abschnittsauftrag && (
         <Datenfeld label="Abschnittsauftrag" breit>

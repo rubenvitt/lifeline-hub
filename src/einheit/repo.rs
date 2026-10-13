@@ -1111,7 +1111,6 @@ mod tests {
                     kurzbezeichnung: None,
                     lagezustand: None,
                     abschnittsauftrag: None,
-                    fortschritt: None,
                 },
             )
             .await?;

@@ -5,22 +5,22 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 1. Spalte und Schreibweg fallen (D1–D3)
 
-- [ ] 1.1 Integrationstests in `tests/einsatzabschnitt_lage.rs` auf das neue Verhalten
+- [x] 1.1 Integrationstests in `tests/einsatzabschnitt_lage.rs` auf das neue Verhalten
   umschreiben: Anlegen mit `"fortschritt":72` legt an, die Antwort trägt kein `fortschritt`
   (Spec-Szenario „Veralteter Client …“); PATCH mit `"fortschritt":40` ändert nichts und
   liefert 200 ohne das Feld. Die Grenztests 0–100/400 entfallen, Modulkommentar ohne
   „Fortschritt“. Nachweis: Tests rot vor 1.2–1.4.
-- [ ] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0186`):
+- [x] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0187`):
   `ALTER TABLE einsatzabschnitt DROP COLUMN fortschritt;` samt Kopfkommentar (LLH-1170,
   Herkunft `0109`). Nachweis: ein Test, dass `PRAGMA table_info('einsatzabschnitt')` keine
   Spalte `fortschritt` mehr meldet; `scripts/check-migrationen.sh` grün.
-- [ ] 1.3 `src/einsatzabschnitt/mod.rs` (DTO-Feld), `src/einsatzabschnitt/repo.rs` (SELECT,
+- [x] 1.3 `src/einsatzabschnitt/mod.rs` (DTO-Feld), `src/einsatzabschnitt/repo.rs` (SELECT,
   INSERT, PATCH-`CASE` samt Bind-Positionen, Testkonstruktoren) und
   `src/routes/einsatzabschnitt.rs` (`pruefe_fortschritt`, Felder in POST- und PATCH-Body) ohne
   Fortschritt. Nachweis: Tests aus 1.1 und die Repo-Unit-Tests grün.
-- [ ] 1.4 `src/einsatz/schwaerzung_registry.rs` ohne `retain("fortschritt", …)`. Nachweis: die
+- [x] 1.4 `src/einsatz/schwaerzung_registry.rs` ohne `retain("fortschritt", …)`. Nachweis: die
   Wächter-Tests des Registers (jede Spalte klassifiziert) grün.
-- [ ] 1.5 Demo-Daten: `src/demo/szenario.rs` (Feld und die drei Werte), `src/demo/import.rs`,
+- [x] 1.5 Demo-Daten: `src/demo/szenario.rs` (Feld und die drei Werte), `src/demo/import.rs`,
   `src/demo/import_tests.rs` (Abfrage und Erwartung, Doku-Kommentar „Fortschritt teils leer“).
   Nachweis: Demo-Import-Tests grün.
 - [ ] 1.6 Typ-Codegen: `scripts/check-typ-codegen.sh`, `api/openapi.json` und
@@ -29,13 +29,13 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 2. Frontend und Doku ziehen nach (D5, D6)
 
-- [ ] 2.1 `api/einsatzabschnitte.ts`: Feld `fortschritt` samt Vermerk aus `AbschnittEingabe`.
+- [x] 2.1 `api/einsatzabschnitte.ts`: Feld `fortschritt` samt Vermerk aus `AbschnittEingabe`.
   Fixtures in `pages/EinsatzabschnittePage.test.tsx`,
   `pages/einsatzabschnitte/AbschnittDetail.test.tsx`,
   `pages/einsatzabschnitte/AbschnittVorschau.test.tsx`, `pages/fuehrung/UeberblickPage.test.tsx`
   und `pages/fuehrung/ueberblickDaten.test.ts` ohne `fortschritt`; die Abwesenheitsprüfungen
   („kein Fortschritt“) bleiben. Nachweis: `tsc` und die genannten Vitest-Dateien grün.
-- [ ] 2.2 Kommentare in `pages/fuehrung/UeberblickPage.tsx` (Kopf „… und Fortschritt kommen aus
+- [x] 2.2 Kommentare in `pages/fuehrung/UeberblickPage.tsx` (Kopf „… und Fortschritt kommen aus
   dem Abschnitt“, `AbschnittEintrag` „fester Auftrag mit Fortschritt“) und
   `pages/einsatzabschnitte/AbschnittDaten.tsx` (Vermerk „Kein Fortschritt (LFH-1208)“) an den
   neuen Stand anpassen. Nachweis: Lint und Prettier grün.

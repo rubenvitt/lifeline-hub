@@ -518,7 +518,6 @@ describe('EinsatzabschnittePage', () => {
           kurzbezeichnung: 'EA-N',
           lagezustand: 'angespannt',
           abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
-          fortschritt: 72,
         },
       ]),
     );
@@ -531,8 +530,7 @@ describe('EinsatzabschnittePage', () => {
       }),
     ).toHaveAttribute('aria-checked', 'true');
     expect(within(detail).getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
-    // Der Altwert 72 hat keine Oberfläche mehr (LFH-1208).
-    expect(screen.queryByText('72 %')).toBeNull();
+    // Einen Fortschritt trägt der Abschnitt nicht (LFH-1208, LLH-1170).
     expect(screen.queryByText('Fortschritt')).toBeNull();
   });
 

@@ -4513,14 +4513,6 @@
               "null"
             ]
           },
-          "fortschritt": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64",
-            "description": "Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt."
-          },
           "id": {
             "type": "integer",
             "format": "int64"

@@ -654,7 +654,6 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
         kurzbezeichnung: 'EA-N',
         lagezustand: 'angespannt',
         abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
-        fortschritt: 72,
       }),
     ]);
     expect(nord.kurzbezeichnung).toBe('EA-N');

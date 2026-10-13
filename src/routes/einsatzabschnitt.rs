@@ -35,19 +35,6 @@ fn parse_lagezustand(s: &str) -> Result<AbschnittLagezustand, AppError> {
     })
 }
 
-/// Fortschritt außerhalb 0–100 → 400, nicht 422: der Wert scheitert am Feld selbst, nicht
-/// am Zusammenhang (Trennlinie LFH-267). Die 422 der Koordinaten-Ranges in
-/// `einsatz_uhs.rs` ist gewachsener Bestand, keine Regel für Neues.
-fn pruefe_fortschritt(wert: i64) -> Result<i64, AppError> {
-    if (0..=100).contains(&wert) {
-        Ok(wert)
-    } else {
-        Err(AppError::Validation(
-            "Fortschritt muss zwischen 0 und 100 Prozent liegen".into(),
-        ))
-    }
-}
-
 fn pruefe_kurzbezeichnung(kurz: &str) -> Result<(), AppError> {
     if kurz.chars().count() > KURZBEZEICHNUNG_MAX {
         return Err(AppError::Validation(format!(
@@ -93,7 +80,6 @@ pub struct AbschnittBody {
     /// Wert eine sprechende 400 bekommt statt der Extractor-Meldung.
     pub lagezustand: Option<String>,
     pub abschnittsauftrag: Option<String>,
-    pub fortschritt: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
@@ -122,7 +108,6 @@ pub async fn anlegen(
         .map(parse_lagezustand)
         .transpose()?;
     let abschnittsauftrag = trimme(body.abschnittsauftrag);
-    let fortschritt = body.fortschritt.map(pruefe_fortschritt).transpose()?;
     let mut anzeige = abschnitt_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -137,7 +122,6 @@ pub async fn anlegen(
             kurzbezeichnung: kurz.as_deref(),
             lagezustand,
             abschnittsauftrag: abschnittsauftrag.as_deref(),
-            fortschritt,
         },
     )
     .await?;
@@ -190,8 +174,6 @@ pub struct AbschnittPatchBody {
     pub lagezustand: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnittsauftrag: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub fortschritt: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid} — echter Teil-Patch (LFH-306).
@@ -231,10 +213,6 @@ pub async fn aktualisieren(
         None => None,
     };
     let abschnittsauftrag = trimme_tri(body.abschnittsauftrag);
-    let fortschritt = match body.fortschritt {
-        Some(Some(w)) => Some(Some(pruefe_fortschritt(w)?)),
-        andere => andere,
-    };
     let mut anzeige = abschnitt_repo::patche(
         &state.pool,
         einsatz_id,
@@ -249,7 +227,6 @@ pub async fn aktualisieren(
             sortier: body.sortier,
             kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
             abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
-            fortschritt,
         },
     )
     .await?;

@@ -31,7 +31,6 @@ const nord = (o: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt =>
     leiter_name: null,
     lagezustand: 'planmaessig',
     abschnittsauftrag: null,
-    fortschritt: 72,
     bemerkung: null,
     sprechgruppen: [],
     kommunikationsmittel: null,
@@ -93,7 +92,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
       'Stärke inkl. Unterabschnitte (F/UF/M//Σ)',
     ]);
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
-    expect(screen.queryByText(/Fortschritt|72 %/)).toBeNull();
+    expect(screen.queryByText(/Fortschritt/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toHaveAccessibleDescription(
       'Nord',
     );
