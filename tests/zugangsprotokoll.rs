@@ -425,7 +425,10 @@ async fn jede_org_liest_nur_ihre_spur() {
     benutzer_anlegen(&app, &admin, "agnes", "keine").await;
     benutzer_anlegen(&app, &fremdadmin, "bernd", "keine").await;
     login_cookie(&app, "agnes", "agnespw1").await;
-    login_cookie(&app, "bernd", "berndpw1").await;
+    let bernd = login_cookie(&app, "bernd", "berndpw1").await;
+    // Die Abmeldung schreibt nur `benutzer_id`, keinen Namen.
+    let (status, _) = anfrage(&app, "POST", "/api/auth/logout", &bernd, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
     fehlversuch(&app, "agnes").await;
     // Anders geschrieben als das Konto, wie der Login es annimmt.
     fehlversuch(&app, "BERND").await;
@@ -434,7 +437,10 @@ async fn jede_org_liest_nur_ihre_spur() {
     let eigene = lesen(&app, &admin, ANMELDUNGEN).await;
     assert_eq!(feld(&eigene, "benutzername"), ["niemand", "agnes", "agnes"]);
     let fremde = lesen(&app, &fremdadmin, ANMELDUNGEN).await;
-    assert_eq!(feld(&fremde, "benutzername"), ["niemand", "BERND", "bernd"]);
+    assert_eq!(
+        feld(&fremde, "benutzername"),
+        ["niemand", "BERND", "bernd", "bernd"]
+    );
 
     let eigene = lesen(&app, &admin, AENDERUNGEN).await;
     assert_eq!(feld(&eigene, "ziel"), ["agnes"]);
