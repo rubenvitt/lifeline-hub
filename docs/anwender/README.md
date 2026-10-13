@@ -49,7 +49,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Stab | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
 | Stab | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
 | Stab | [Stab und Checkliste](kapitel/stab.md) | Führung |
-| Stab | [Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
+| Stab | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
 | Stab | [Presse und Infotelefon](kapitel/presse-infotelefon.md) | Führung |
 | Stab | [Dokumente](kapitel/dokumente.md) | Führung |
 | Stab | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |

@@ -145,8 +145,9 @@ Für Einsatzleitung und Führungspersonal:
    Sekunden und beim Verlassen eines Feldes selbst; neben den Knöpfen steht „zuletzt gespeichert
    …“.
 6. Bei Bedarf „Fernmeldeskizze anfügen“ wählen. Die App nimmt die aktuelle Fernmeldeskizze als
-   Bild auf und hängt sie unter „Anlagen“ an. Das geht nur mit Verbindung und nur, wenn der Stab
-   im Einsatz freigegeben ist ([Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)).
+   Bild auf und hängt sie unter „Anlagen“ an. Das geht nur mit Verbindung und nur, wenn das
+   Fernmeldewesen im Einsatz freigegeben ist
+   ([Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)).
 
 Ein gespeicherter Entwurf öffnet sich wieder über den Reiter „Einsatzbefehle“, Ansicht
 „Entwürfe“: Befehl wählen und „Entwurf bearbeiten“.

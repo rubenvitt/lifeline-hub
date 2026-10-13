@@ -44,7 +44,7 @@ export const element = (page: Page, key: string) =>
   page.locator(`[data-lfh="skizze-element"][data-key="${key}"]`);
 export const paneel = (page: Page) => page.locator('[data-lfh="skizze-paneel"]');
 export const skizzenPfad = (einsatzId: string) =>
-  `/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`;
+  `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`;
 
 /**
  * Öffnet die Skizze und wartet auf den Live-Strom (sonst verpasst ein Test, der danach eine

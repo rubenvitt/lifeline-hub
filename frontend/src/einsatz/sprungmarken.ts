@@ -1,4 +1,10 @@
-import { etbPfad, fahrzeugePfad, funkplanPfad, personenPfad } from '../routing/deeplinks';
+import {
+  etbPfad,
+  fahrzeugePfad,
+  funkplanPfad,
+  kommunikationsplanPfad,
+  personenPfad,
+} from '../routing/deeplinks';
 import { SACHGEBIETE } from '../stab/sachgebiete';
 import { unterseitenFuer } from '../stab/unterseiten';
 import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
@@ -45,50 +51,79 @@ export interface Sprungmarke {
   pfad: (einsatzId: number) => string;
 }
 
-/** Suchworte der Stab-Unterseiten je Schlüssel aus `stab/unterseiten.ts`; das Kürzel (s5, s6) kommt dazu. */
+/** Suchworte der Stab-Unterseiten je Schlüssel aus `stab/unterseiten.ts`; das Kürzel (s5) kommt dazu. */
 const STAB_SCHLAGWORTE: Record<string, string[]> = {
   presse: ['presse', 'medien', 'pressemitteilung', 'medienlage'],
   infotelefon: ['bürgertelefon', 'anrufe', 'hotline', 'infotelefon', 'informationstelefon'],
-  funkplan: ['funk', 'sprechgruppe', 'tmo', 'dmo', 'kanal', 'rufname'],
-  kommunikationsplan: ['telefon', 'rufnummer', 'leitstelle', 'erreichbarkeit'],
 };
 
 /**
- * Die Arbeitsseiten des Stabs (LLH-1127) als Marken direkt hinter „Stab“, nach Sachgebiet.
- * Name und Adresse kommen aus `stab/unterseiten.ts`, EINE Wahrheit mit den Einstiegen der
- * Stab-Seite; nur die Fernmeldeskizze ist eine Ansicht des Funkplans und steht hier selbst.
- * Sperre und Sichtbarkeit erben sie vom Stab, wie die Seiten selbst (`useStabFreigabe`).
+ * Die Arbeitsseiten des Stabs (LLH-1127) als Marken direkt hinter „Stab“, nach Sachgebiet: nur
+ * die Unterseiten, die dem Stab gehören (S5). Name und Adresse kommen aus `stab/unterseiten.ts`,
+ * EINE Wahrheit mit den Einstiegen der Stab-Seite. Sperre und Sichtbarkeit erben sie vom Stab.
  */
 function stabMarken(): Sprungmarke[] {
   const marken: Sprungmarke[] = [];
   let nach = 'stab';
-  const append = (marke: Omit<Sprungmarke, 'kategorie' | 'zielModul' | 'nach'>) => {
-    marken.push({ ...marke, kategorie: 'fuehrung', zielModul: 'stab', nach });
-    nach = marke.key;
-  };
   for (const { sachgebiet, kuerzel } of SACHGEBIETE) {
-    const sg = kuerzel.toLowerCase();
     for (const seite of unterseitenFuer(sachgebiet)) {
-      append({
+      if (seite.modul !== 'stab') continue;
+      marken.push({
         key: seite.key,
+        kategorie: 'fuehrung',
         label: seite.label,
+        zielModul: 'stab',
+        nach,
         hinweis: `Stab · ${seite.label}`,
-        schlagworte: [...(STAB_SCHLAGWORTE[seite.key] ?? []), sg],
+        schlagworte: [...(STAB_SCHLAGWORTE[seite.key] ?? []), kuerzel.toLowerCase()],
         pfad: seite.pfad,
       });
-      if (seite.key === 'funkplan') {
-        append({
-          key: 'fernmeldeskizze',
-          label: 'Fernmeldeskizze',
-          hinweis: 'Funkplan · Skizze',
-          schlagworte: ['skizze', 'fernmeldeskizze', 'kommunikationsskizze', 'funk', sg],
-          pfad: (einsatzId) => funkplanPfad(einsatzId, { ansicht: 'skizze' }),
-        });
-      }
+      nach = seite.key;
     }
   }
   return marken;
 }
+
+/**
+ * Die Ansichten des Fernmeldewesens (LLH-1180, design.md D10) als Marken direkt hinter
+ * „Fernmeldewesen“: die Fernmeldeskizze und der Kommunikationsplan. Den Funkplan öffnet das Modul
+ * selbst, eine Marke dafür wäre doppelt. Sperre und Sichtbarkeit erben sie vom Fernmeldewesen.
+ * Die Funk-Schlagworte hängen an der Skizze, damit „tmo“ oder „sprechgruppe“ in der Palette
+ * weiter in die Fernmeldeansicht führt; „funk“ selbst nicht, das trifft das Modul über seine
+ * Beschreibung („Funkplan, …“) als ersten Treffer (Spec `sprungpalette`).
+ */
+const FERNMELDEWESEN_MARKEN: Sprungmarke[] = [
+  {
+    key: 'fernmeldeskizze',
+    kategorie: 'kommunikation',
+    label: 'Fernmeldeskizze',
+    zielModul: 'fernmeldewesen',
+    nach: 'fernmeldewesen',
+    hinweis: 'Fernmeldewesen · Skizze',
+    schlagworte: [
+      'skizze',
+      'fernmeldeskizze',
+      'kommunikationsskizze',
+      'sprechgruppe',
+      'tmo',
+      'dmo',
+      'kanal',
+      'rufname',
+      's6',
+    ],
+    pfad: (einsatzId) => funkplanPfad(einsatzId, { ansicht: 'skizze' }),
+  },
+  {
+    key: 'kommunikationsplan',
+    kategorie: 'kommunikation',
+    label: 'Kommunikationsplan',
+    zielModul: 'fernmeldewesen',
+    nach: 'fernmeldeskizze',
+    hinweis: 'Fernmeldewesen · Kommunikationsplan',
+    schlagworte: ['telefon', 'rufnummer', 'leitstelle', 'erreichbarkeit', 's6'],
+    pfad: kommunikationsplanPfad,
+  },
+];
 
 export const sprungmarken: Sprungmarke[] = [
   {
@@ -136,6 +171,7 @@ export const sprungmarken: Sprungmarke[] = [
     pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
   },
   ...stabMarken(),
+  ...FERNMELDEWESEN_MARKEN,
 ];
 
 export function sprungmarkenNachKategorie(

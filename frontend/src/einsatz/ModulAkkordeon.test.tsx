@@ -141,26 +141,32 @@ describe('ModulAkkordeon · Stab-Marken', () => {
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
     const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
     expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 6)).toEqual([
-      'Pressearbeit',
-      'Informationstelefon',
-      'Funkplan',
-      'Fernmeldeskizze',
-      'Kommunikationsplan',
-    ]);
+    expect(knoepfe.slice(stab + 1, stab + 3)).toEqual(['Pressearbeit', 'Informationstelefon']);
   });
 
-  it('sperrt sie im Drawer mit dem Stab und lässt sie mit ausgeblendetem Stab weg', () => {
-    const { unmount } = zeige({
-      offeneKategorie: 'fuehrung',
-      freigaben: freigabenFixture({ stab: { zugriff: false } }),
+  it('führt die Marken des Fernmeldewesens im Drawer hinter „Fernmeldewesen“ (LLH-1180)', () => {
+    zeige({
+      offeneKategorie: 'kommunikation',
+      aktiverModulKey: 'chat',
+      freigaben: freigabenFixture(),
     });
-    expect(screen.getByRole('button', { name: /^Funkplan, springt zu/ })).toBeDisabled();
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
+    expect(modul).toBeGreaterThanOrEqual(0);
+    expect(knoepfe.slice(modul + 1, modul + 3)).toEqual(['Fernmeldeskizze', 'Kommunikationsplan']);
+  });
+
+  it('sperrt sie im Drawer mit dem Fernmeldewesen und lässt sie mit ausgeblendetem Fernmeldewesen weg', () => {
+    const { unmount } = zeige({
+      offeneKategorie: 'kommunikation',
+      freigaben: freigabenFixture({ fernmeldewesen: { zugriff: false } }),
+    });
+    expect(screen.getByRole('button', { name: /^Kommunikationsplan, springt zu/ })).toBeDisabled();
     unmount();
     zeige({
-      offeneKategorie: 'fuehrung',
-      freigaben: freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+      offeneKategorie: 'kommunikation',
+      freigaben: freigabenFixture({ fernmeldewesen: { sichtbar: false, zugriff: false } }),
     });
-    expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Kommunikationsplan, springt zu/ })).toBeNull();
   });
 });

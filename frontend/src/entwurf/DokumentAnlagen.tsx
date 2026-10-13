@@ -18,7 +18,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { IconMuelleimer } from '../icons';
 import { useOhneVerbindung } from '../offline/verbindung';
 import SkizzenAufnahme, { type SkizzenBild } from '../stab/SkizzenAufnahme';
-import { useStabFreigabe } from '../stab/useStabFreigabe';
+import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 import './dokumentAnlagen.css';
 
 /** Höchstzahl je Dokument, wie `MAX_ANLAGEN` im Server (`vorlagendokument/anlage.rs`). */
@@ -49,8 +49,8 @@ interface Props {
  * hängt immer im DOM, damit das Bild zum Druck schon geladen ist; am Schirm blendet CSS sie aus.
  *
  * Anfügen und Entfernen gibt es nur im Entwurf; die Freigabe friert die Anlagen ein. Die
- * Fernmeldeskizze anfügen kann nur, wer den Stab sieht, und nur mit Verbindung (die Skizze ist
- * nicht offline). Ohne Anlage und ohne diese Möglichkeit steht nichts.
+ * Fernmeldeskizze anfügen kann nur, wer das Fernmeldewesen sieht (LLH-1180, nicht mehr den Stab),
+ * und nur mit Verbindung (die Skizze ist nicht offline). Ohne Anlage und ohne diese Möglichkeit steht nichts.
  */
 export default function DokumentAnlagen({
   dokument,
@@ -68,7 +68,7 @@ export default function DokumentAnlagen({
     queryKey: key,
     queryFn: () => listeDokumentAnlagen(dokument, einsatzId, dokumentId),
   });
-  const stabFreigabe = useStabFreigabe(einsatzId);
+  const fernmeldewesen = useModulFreigabe(einsatzId, 'fernmeldewesen');
   const ohneVerbindung = useOhneVerbindung();
   const [nimmtAuf, setNimmtAuf] = useState(false);
   /**
@@ -102,7 +102,7 @@ export default function DokumentAnlagen({
   });
 
   const anlagen = query.data ?? [];
-  const darfAnfuegen = schreibt && stabFreigabe.zustand === 'frei' && !ohneVerbindung;
+  const darfAnfuegen = schreibt && fernmeldewesen.zustand === 'frei' && !ohneVerbindung;
   const laeuft = nimmtAuf || ablegen.isPending;
 
   /** Ein neuer Versuch räumt den Grund des vorigen, gleich ob er beim Zeichnen oder beim Server lag. */

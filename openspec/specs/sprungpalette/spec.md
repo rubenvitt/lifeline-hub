@@ -40,8 +40,8 @@ wie ein ↵.
 - **THEN** zeigt der Tab den Datensatz bzw. die Seite angemeldet und vollständig, ohne dass der Nutzer erneut anmelden oder navigieren muss
 
 #### Scenario: Ansicht im neuen Tab
-- **WHEN** „Funkplan“ markiert ist und Strg+↵ gedrückt wird
-- **THEN** öffnet sich der Funkplan in einem neuen Tab, und die aktuelle Route bleibt unverändert
+- **WHEN** „Kommunikationsplan“ markiert ist und Strg+↵ gedrückt wird
+- **THEN** öffnet sich der Kommunikationsplan in einem neuen Tab, und die aktuelle Route bleibt unverändert
 
 ### Requirement: → öffnet eine Vorschau in der Palette
 Die Palette SHALL auf → eine Lese-Vorschau der markierten Zeile anstelle der Trefferliste
@@ -518,8 +518,8 @@ dorthin springen, wohin die Marke im Menü springt. Jede Marke MUST über ihre S
 ihr Ziel auffindbar sein.
 
 #### Scenario: Funk findet den Funkplan
-- **WHEN** jemand mit Stab-Freigabe im Einsatz „Funk“ tippt
-- **THEN** ist „Funkplan“ der erste Treffer, und ↵ öffnet den Funkplan
+- **WHEN** jemand mit Freigabe des Fernmeldewesens im Einsatz „Funk“ tippt
+- **THEN** ist „Fernmeldewesen“ der erste Treffer, und ↵ öffnet den Funkplan
 
 #### Scenario: Schlagwort ohne Namensteil
 - **WHEN** jemand „bürgertelefon“ tippt
@@ -531,7 +531,13 @@ ihr Ziel auffindbar sein.
 
 #### Scenario: Ohne Freigabe kein Eintrag
 - **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist
-- **THEN** führt die Palette weder Funkplan, Fernmeldeskizze, Kommunikationsplan, Pressearbeit noch Informationstelefon
+- **THEN** führt die Palette weder Pressearbeit noch Informationstelefon, aber Fernmeldeskizze und
+  Kommunikationsplan, wenn das Fernmeldewesen frei ist
+
+#### Scenario: Fernmeldewesen gesperrt
+- **WHEN** das Fernmeldewesen für die Person gesperrt oder im Einsatz ausgeblendet ist
+- **THEN** führt die Palette weder das Modul Fernmeldewesen noch Fernmeldeskizze oder
+  Kommunikationsplan
 
 #### Scenario: Startansicht
 - **WHEN** die Palette im Einsatz mit leerem Suchfeld geöffnet wird

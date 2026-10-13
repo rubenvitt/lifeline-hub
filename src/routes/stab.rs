@@ -1,11 +1,14 @@
 //! Routen der Führungsorganisation (LFH-46): Besetzung der Sachgebiete S1–S6 und die Checkliste
 //! Arbeitsaufnahme (LFH-551). Die Lagebesprechung hat seit LLH-1111 eigene Routen
-//! (`routes::lagebesprechung`).
+//! (`routes::lagebesprechung`). Kommunikationsplan und Fernmeldeskizze stehen hier unter
+//! `…/stab`, gehören aber dem Modul Fernmeldewesen (LLH-1180): Marker `Fernmeldewesen`,
+//! Ereignis `fernmeldewesen`.
 //!
-//! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<Stab>` (alle
-//! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<Stab>` (Einsatzleitung,
-//! Führungspersonal, System-Admin; enthält `fordere_aktiv`). Das Sachgebiet verleiht
-//! **kein** Recht (Entscheidung 12 der Spec).
+//! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<M>` (alle
+//! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<M>` (Einsatzleitung,
+//! Führungspersonal, System-Admin; enthält `fordere_aktiv`), mit `M = Stab` für Besetzung und
+//! Checkliste, `M = Fernmeldewesen` für Kommunikationsplan und Fernmeldeskizze. Das Sachgebiet
+//! verleiht **kein** Recht (Entscheidung 12 der Spec).
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -15,7 +18,7 @@ use serde::Deserialize;
 
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Stab;
+use crate::einsatz::modul::{Fernmeldewesen, Stab};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
@@ -33,6 +36,13 @@ use crate::stab::{BesetzungArt, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
 
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
+}
+
+/// Kommunikationsplan und Fernmeldeskizze gehören dem Modul Fernmeldewesen (LLH-1180).
+fn sse_fernmeldewesen(state: &AppState, einsatz_id: i64) {
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Fernmeldewesen);
 }
 
 /// Ein unbekanntes Sachgebiet im Pfad ist ein **Feld für sich** → 400 (LFH-267).
@@ -257,8 +267,9 @@ pub async fn checkliste_setzen(
 
 // ── Kommunikationsplan (LFH-848) ────────────────────────────────────────────────────────────
 //
-// Gates wie die übrigen Stab-Routen; jede wirksame Schreibaktion sendet `LiveEvent::Stab` und
-// antwortet mit dem ganzen Plan (Muster `checkliste_setzen`). Kein ETB. Design:
+// Gate ist das Modul Fernmeldewesen (LLH-1180): der Pfad bleibt unter `…/stab`, `PFAD_KEY` ordnet
+// ihn per längerem Präfix dem eigenen Modul zu. Jede wirksame Schreibaktion sendet
+// `LiveEvent::Fernmeldewesen` und antwortet mit dem ganzen Plan (Muster `checkliste_setzen`). Kein ETB. Design:
 // `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D3).
 
 #[derive(Debug, Deserialize)]
@@ -341,7 +352,7 @@ fn hinweis_aus(hinweis: Option<String>) -> Result<Option<String>, AppError> {
 /// GET /api/einsaetze/{id}/stab/kommunikationsplan — gepflegte Stellen mit Verbindungen.
 pub async fn kommunikationsplan_laden(
     State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
+    ctx: EinsatzLesezugriff<Fernmeldewesen>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
     Ok(Json(
         kommunikation::laden(&state.pool, ctx.einsatz.id).await?,
@@ -360,7 +371,7 @@ pub struct StelleAnlegenParams {
 /// Plan, mit `?antwort=stelle` nur die neue Stelle (LFH-893, Review S4).
 pub async fn kommunikationsplan_stelle_anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     Query(params): Query<StelleAnlegenParams>,
     JsonBody(req): JsonBody<KommunikationsStelleNeu>,
 ) -> Result<Response, AppError> {
@@ -428,7 +439,7 @@ pub async fn kommunikationsplan_stelle_anlegen(
     };
     let (id, plan) =
         kommunikation::stelle_anlegen(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     if !nur_stelle {
         return Ok((StatusCode::CREATED, Json(plan)).into_response());
     }
@@ -442,7 +453,7 @@ pub async fn kommunikationsplan_stelle_anlegen(
 /// PATCH /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid} — Bezeichnung ändern.
 pub async fn kommunikationsplan_stelle_aendern(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<KommunikationsStellePatch>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
@@ -455,26 +466,26 @@ pub async fn kommunikationsplan_stelle_aendern(
         req.bezeichnung.as_deref(),
     )
     .await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(plan))
 }
 
 /// DELETE /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid} — Stelle samt Verbindungen.
 pub async fn kommunikationsplan_stelle_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let plan = kommunikation::stelle_entfernen(&state.pool, einsatz_id, stelle_id).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(plan))
 }
 
 /// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen
 pub async fn kommunikationsplan_verbindung_anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<KommunikationsVerbindungNeu>,
 ) -> Result<(StatusCode, Json<Vec<kommunikation::KommunikationsStelle>>), AppError> {
@@ -492,14 +503,14 @@ pub async fn kommunikationsplan_verbindung_anlegen(
         &eingabe,
     )
     .await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(plan)))
 }
 
 /// PATCH /api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}
 pub async fn kommunikationsplan_verbindung_aendern(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, verbindung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<KommunikationsVerbindungPatch>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
@@ -525,19 +536,19 @@ pub async fn kommunikationsplan_verbindung_aendern(
         &patch,
     )
     .await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(plan))
 }
 
 /// DELETE /api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}
 pub async fn kommunikationsplan_verbindung_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, verbindung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let plan = kommunikation::verbindung_entfernen(&state.pool, einsatz_id, verbindung_id).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(plan))
 }
 
@@ -547,7 +558,7 @@ pub async fn kommunikationsplan_verbindung_entfernen(
 /// Datensätze).
 pub async fn kommunikationsplan_kanal_setzen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, stelle_id, sg)): PfadParam<(i64, i64, i64)>,
     JsonBody(req): JsonBody<KanalSetzen>,
 ) -> Result<StatusCode, AppError> {
@@ -555,7 +566,7 @@ pub async fn kommunikationsplan_kanal_setzen(
     let status = status_aus(&req.status)?;
     let org_id = ctx.einsatz.org_id;
     if kommunikation::kanal_setzen(&state.pool, org_id, einsatz_id, stelle_id, sg, status).await? {
-        sse(&state, einsatz_id);
+        sse_fernmeldewesen(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -563,12 +574,12 @@ pub async fn kommunikationsplan_kanal_setzen(
 /// DELETE …/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg} — Kanal lösen, idempotent.
 pub async fn kommunikationsplan_kanal_loesen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, stelle_id, sg)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     if kommunikation::kanal_loesen(&state.pool, einsatz_id, stelle_id, sg).await? {
-        sse(&state, einsatz_id);
+        sse_fernmeldewesen(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -581,8 +592,8 @@ pub struct KanalSetzen {
 
 // ── Fernmeldeskizze (LFH-893) ───────────────────────────────────────────────────────────────
 //
-// Gates wie die übrigen Stab-Routen; jede wirksame Schreibaktion sendet `LiveEvent::Stab`, kein
-// ETB. API-Vertrag: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D14). Die
+// Gate ist das Modul Fernmeldewesen wie beim Kommunikationsplan (LLH-1180); jede wirksame
+// Schreibaktion sendet `LiveEvent::Fernmeldewesen`, kein ETB. API-Vertrag: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D14). Die
 // Linie 400 ↔ 422 wie überall (LFH-267): unbekannter Wert, Länge, fehlendes Pflichtfeld,
 // nicht-positive Größe → 400; Endpunkte, die nicht zusammenpassen oder nicht zum Einsatz
 // gehören → 422; abweichende Version → 409 mit dem gespeichertem Stand.
@@ -667,10 +678,10 @@ fn endlich(wert: f64, feld: &str) -> Result<f64, AppError> {
     Ok(wert)
 }
 
-/// GET /api/einsaetze/{id}/stab/fernmeldeskizze — die Skizzendaten (alle mit Stab-Leserecht).
+/// GET /api/einsaetze/{id}/stab/fernmeldeskizze — die Skizzendaten (alle mit Leserecht am Fernmeldewesen).
 pub async fn fernmeldeskizze_laden(
     State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
+    ctx: EinsatzLesezugriff<Fernmeldewesen>,
 ) -> Result<Json<Fernmeldeskizze>, AppError> {
     Ok(Json(skizze::laden(&state.pool, ctx.einsatz.id).await?))
 }
@@ -694,7 +705,7 @@ pub struct LageSetzen {
 /// (`SkizzenLageKonflikt`).
 pub async fn fernmeldeskizze_lage_setzen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, element)): PfadParam<(i64, String)>,
     JsonBody(req): JsonBody<LageSetzen>,
 ) -> Result<Response, AppError> {
@@ -722,7 +733,7 @@ pub async fn fernmeldeskizze_lage_setzen(
     };
     match skizze::lage_setzen(&state.pool, einsatz_id, ctx.benutzer.id, element, &eingabe).await? {
         LageErgebnis::Gesetzt(lage) => {
-            sse(&state, einsatz_id);
+            sse_fernmeldewesen(&state, einsatz_id);
             Ok(Json::<SkizzenLage>(lage).into_response())
         }
         LageErgebnis::Konflikt(aktuell) => Ok((
@@ -748,7 +759,7 @@ pub struct LageVerwerfen {
 /// 409 mit dem gespeicherten Stand wie beim Verschieben. Ohne Zeile 204 ohne Ereignis.
 pub async fn fernmeldeskizze_lage_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, element)): PfadParam<(i64, String)>,
     JsonBody(req): JsonBody<LageVerwerfen>,
 ) -> Result<Response, AppError> {
@@ -764,7 +775,7 @@ pub async fn fernmeldeskizze_lage_entfernen(
     };
     match skizze::lage_entfernen(&state.pool, einsatz_id, element, version).await? {
         skizze::LageVerworfen::Entfernt => {
-            sse(&state, einsatz_id);
+            sse_fernmeldewesen(&state, einsatz_id);
             Ok(StatusCode::NO_CONTENT.into_response())
         }
         skizze::LageVerworfen::Unveraendert => Ok(StatusCode::NO_CONTENT.into_response()),
@@ -782,11 +793,11 @@ pub async fn fernmeldeskizze_lage_entfernen(
 /// DELETE /api/einsaetze/{id}/stab/fernmeldeskizze/lage — „Neu anordnen“: alle Lagen verwerfen.
 pub async fn fernmeldeskizze_lage_verwerfen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     if skizze::lage_verwerfen(&state.pool, einsatz_id).await? {
-        sse(&state, einsatz_id);
+        sse_fernmeldewesen(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -834,7 +845,7 @@ fn tri_zeit(wert: Option<Option<String>>) -> Result<Option<Option<String>>, AppE
 /// PUT /api/einsaetze/{id}/stab/fernmeldeskizze/schriftfeld — Teilfelder setzen (Tri-State).
 pub async fn fernmeldeskizze_schriftfeld_setzen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     JsonBody(req): JsonBody<SchriftfeldSetzen>,
 ) -> Result<Json<Schriftfeld>, AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -864,7 +875,7 @@ pub async fn fernmeldeskizze_schriftfeld_setzen(
         ));
     }
     let feld = skizze::schriftfeld_setzen(&state.pool, einsatz_id, ctx.benutzer.id, &patch).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(feld))
 }
 
@@ -889,7 +900,7 @@ pub struct KomponentePatchBody {
 /// POST /api/einsaetze/{id}/stab/fernmeldeskizze/komponenten — Komponente anlegen.
 pub async fn fernmeldeskizze_komponente_anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     JsonBody(req): JsonBody<KomponenteNeu>,
 ) -> Result<(StatusCode, Json<SkizzenKomponente>), AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -903,14 +914,14 @@ pub async fn fernmeldeskizze_komponente_anlegen(
         bezeichnung.as_deref(),
     )
     .await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(k)))
 }
 
 /// PATCH /api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}
 pub async fn fernmeldeskizze_komponente_aendern(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, kid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<KomponentePatchBody>,
 ) -> Result<Json<SkizzenKomponente>, AppError> {
@@ -926,7 +937,7 @@ pub async fn fernmeldeskizze_komponente_aendern(
     }
     let k =
         skizze::komponente_aendern(&state.pool, einsatz_id, kid, ctx.benutzer.id, &patch).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(k))
 }
 
@@ -934,25 +945,25 @@ pub async fn fernmeldeskizze_komponente_aendern(
 /// Verbindungen.
 pub async fn fernmeldeskizze_komponente_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, kid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     skizze::komponente_entfernen(&state.pool, einsatz_id, kid).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// PUT /api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}
 pub async fn fernmeldeskizze_komponente_kanal_setzen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, kid, sg)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let org_id = ctx.einsatz.org_id;
     if skizze::komponente_kanal_setzen(&state.pool, org_id, einsatz_id, kid, sg).await? {
-        sse(&state, einsatz_id);
+        sse_fernmeldewesen(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -960,12 +971,12 @@ pub async fn fernmeldeskizze_komponente_kanal_setzen(
 /// DELETE /api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}
 pub async fn fernmeldeskizze_komponente_kanal_loesen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, kid, sg)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     if skizze::komponente_kanal_loesen(&state.pool, einsatz_id, kid, sg).await? {
-        sse(&state, einsatz_id);
+        sse_fernmeldewesen(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1026,7 +1037,7 @@ pub struct VerbindungPatchBody {
 /// POST /api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen — Punkt-zu-Punkt-Verbindung.
 pub async fn fernmeldeskizze_verbindung_anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     JsonBody(req): JsonBody<VerbindungNeu>,
 ) -> Result<(StatusCode, Json<SkizzenVerbindung>), AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -1053,14 +1064,14 @@ pub async fn fernmeldeskizze_verbindung_anlegen(
         hinweis,
     };
     let v = skizze::verbindung_anlegen(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(v)))
 }
 
 /// PATCH /api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen/{vid} — ohne Endpunkte.
 pub async fn fernmeldeskizze_verbindung_aendern(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, vid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<VerbindungPatchBody>,
 ) -> Result<Json<SkizzenVerbindung>, AppError> {
@@ -1082,19 +1093,19 @@ pub async fn fernmeldeskizze_verbindung_aendern(
     }
     let v =
         skizze::verbindung_aendern(&state.pool, einsatz_id, vid, ctx.benutzer.id, &patch).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(Json(v))
 }
 
 /// DELETE /api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen/{vid}
 pub async fn fernmeldeskizze_verbindung_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, vid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     skizze::verbindung_entfernen(&state.pool, einsatz_id, vid).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1129,7 +1140,7 @@ pub struct BereichPatchBody {
 /// „Rückwärtiger Bereich“).
 pub async fn fernmeldeskizze_bereich_anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     JsonBody(req): JsonBody<BereichNeu>,
 ) -> Result<(StatusCode, Json<SkizzenBereich>), AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -1142,7 +1153,7 @@ pub async fn fernmeldeskizze_bereich_anlegen(
         hoehe: positiv(req.hoehe, "hoehe")?,
     };
     let b = skizze::bereich_anlegen(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(b)))
 }
 
@@ -1150,7 +1161,7 @@ pub async fn fernmeldeskizze_bereich_anlegen(
 /// erwarteter Version (409 mit `SkizzenBereichKonflikt`).
 pub async fn fernmeldeskizze_bereich_aendern(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, bid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BereichPatchBody>,
 ) -> Result<Response, AppError> {
@@ -1172,7 +1183,7 @@ pub async fn fernmeldeskizze_bereich_aendern(
     };
     match skizze::bereich_aendern(&state.pool, einsatz_id, bid, ctx.benutzer.id, &patch).await? {
         BereichErgebnis::Geaendert(b) => {
-            sse(&state, einsatz_id);
+            sse_fernmeldewesen(&state, einsatz_id);
             Ok(Json(b).into_response())
         }
         BereichErgebnis::Konflikt(aktuell) => Ok((
@@ -1189,12 +1200,12 @@ pub async fn fernmeldeskizze_bereich_aendern(
 /// DELETE /api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}
 pub async fn fernmeldeskizze_bereich_entfernen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
     PfadParam((_einsatz_id, bid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     skizze::bereich_entfernen(&state.pool, einsatz_id, bid).await?;
-    sse(&state, einsatz_id);
+    sse_fernmeldewesen(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -552,13 +552,8 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
  */
 describe('ModulListe — Stab-Marken', () => {
   const fuehrung = modulRegistry.filter((m) => m.kategorie === 'fuehrung');
-  const STAB_MARKEN = [
-    'Pressearbeit',
-    'Informationstelefon',
-    'Funkplan',
-    'Fernmeldeskizze',
-    'Kommunikationsplan',
-  ];
+  // S6 steht seit LLH-1180 hinter „Fernmeldewesen“ (Kommunikation), siehe unten.
+  const STAB_MARKEN = ['Pressearbeit', 'Informationstelefon'];
   const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
     renderMitProviders(
       <ModulPanel
@@ -572,17 +567,14 @@ describe('ModulListe — Stab-Marken', () => {
       />,
     );
 
-  it('folgen „Stab“ in der Reihenfolge S5, S6 und nennen ihr Ziel', () => {
+  it('folgen „Stab“ in der Reihenfolge des Sachgebiets und nennen ihr Ziel', () => {
     zeige({});
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
     // Die Modulzeile trägt ihre Beschreibung als zweite Zeile im Text.
     const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
     expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 6)).toEqual(STAB_MARKEN);
-    const skizze = screen.getByRole('button', {
-      name: 'Fernmeldeskizze, springt zu Funkplan · Skizze',
-    });
-    expect(skizze).not.toHaveAttribute('aria-current');
+    expect(knoepfe.slice(stab + 1, stab + 3)).toEqual(STAB_MARKEN);
+    expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
     expect(
       screen.getByRole('button', {
         name: 'Informationstelefon, springt zu Stab · Informationstelefon',
@@ -606,6 +598,58 @@ describe('ModulListe — Stab-Marken', () => {
   it('fehlen mit ausgeblendetem Stab', () => {
     zeige({ freigaben: freigaben({ stab: { sichtbar: false, zugriff: false } }) });
     for (const label of STAB_MARKEN) {
+      expect(
+        screen.queryByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
+        label,
+      ).not.toBeInTheDocument();
+    }
+  });
+});
+
+/**
+ * Die Ansichten des Fernmeldewesens (LLH-1180) stehen hinter „Fernmeldewesen“ in der Kategorie
+ * Kommunikation und erben dessen Sperre, nicht die des Stabs.
+ */
+describe('ModulListe — Marken des Fernmeldewesens', () => {
+  const kommunikation = modulRegistry.filter((m) => m.kategorie === 'kommunikation');
+  const MARKEN = ['Fernmeldeskizze', 'Kommunikationsplan'];
+  const zeige = (props: { freigaben?: ModulFreigaben }) =>
+    renderMitProviders(
+      <ModulPanel
+        titel="Kommunikation"
+        module={kommunikation}
+        freigaben={freigaben()}
+        aktiverModulKey="chat"
+        onModulKlick={() => {}}
+        sprungmarken={sprungmarkenNachKategorie('kommunikation')}
+        {...props}
+      />,
+    );
+
+  it('folgen „Fernmeldewesen“ und nennen ihr Ziel', () => {
+    zeige({});
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
+    expect(modul).toBeGreaterThanOrEqual(0);
+    expect(knoepfe.slice(modul + 1, modul + 3)).toEqual(MARKEN);
+    expect(
+      screen.getByRole('button', { name: 'Fernmeldeskizze, springt zu Fernmeldewesen · Skizze' }),
+    ).not.toHaveAttribute('aria-current');
+  });
+
+  it('bleiben bei ausgeblendetem Stab stehen', () => {
+    zeige({ freigaben: freigaben({ stab: { sichtbar: false, zugriff: false } }) });
+    for (const label of MARKEN) {
+      expect(
+        screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
+        label,
+      ).toBeEnabled();
+    }
+  });
+
+  it('fehlen mit ausgeblendetem Fernmeldewesen', () => {
+    zeige({ freigaben: freigaben({ fernmeldewesen: { sichtbar: false, zugriff: false } }) });
+    for (const label of MARKEN) {
       expect(
         screen.queryByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
         label,

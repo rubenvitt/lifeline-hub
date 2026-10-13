@@ -58,8 +58,8 @@ vi.mock('../api/kommunikationsplan', () => ({
 }));
 
 /** Literale statt Factory (Charakterisierung, `frontend/AGENTS.md` Query-Key-Registry). */
-const SKIZZE_KEY = ['einsatz-stab', 7, 'fernmeldeskizze'];
-const PLAN_KEY = ['einsatz-stab', 7, 'kommunikationsplan'];
+const SKIZZE_KEY = ['einsatz-fernmeldewesen', 7, 'skizze'];
+const PLAN_KEY = ['einsatz-fernmeldewesen', 7, 'kommunikationsplan'];
 const ABSCHNITTE_KEY = ['einsatz-abschnitte', 7];
 const EINHEITEN_KEY = ['einsatz-einheiten', 7];
 const FS_KEY = ['einsatz-fuehrungsstelle', 7];
@@ -334,7 +334,7 @@ describe('skizzenRechte (D5, D8)', () => {
       einsatzabschnitte: true,
       einheiten: true,
       verwaltung: true,
-      stab: true,
+      fernmeldewesen: true,
     });
   });
 
@@ -345,7 +345,7 @@ describe('skizzenRechte (D5, D8)', () => {
       einsatzabschnitte: true,
       einheiten: false,
       verwaltung: true,
-      stab: true,
+      fernmeldewesen: true,
     });
   });
 
@@ -358,8 +358,16 @@ describe('skizzenRechte (D5, D8)', () => {
       einsatzabschnitte: false,
       einheiten: false,
       verwaltung: true,
-      stab: false,
+      fernmeldewesen: false,
     });
+  });
+
+  // LLH-1180: das Skizzeneigene hängt am Fernmeldewesen, der Stab spielt keine Rolle.
+  it('Stab gesperrt: das Recht am Skizzeneigenen bleibt, Fernmeldewesen gesperrt: es fällt', () => {
+    const ohneStab = freigabenFixture({ stab: { sichtbar: false, zugriff: false } });
+    expect(skizzenRechte(aktiv, null, ohneStab).fernmeldewesen).toBe(true);
+    const ohneFmw = freigabenFixture({ fernmeldewesen: { zugriff: false } });
+    expect(skizzenRechte(aktiv, null, ohneFmw).fernmeldewesen).toBe(false);
   });
 
   it('gibt ohne Schreibrecht im Einsatz nichts frei', () => {
@@ -368,7 +376,7 @@ describe('skizzenRechte (D5, D8)', () => {
       einsatzabschnitte: false,
       einheiten: false,
       verwaltung: false,
-      stab: false,
+      fernmeldewesen: false,
     });
   });
 });

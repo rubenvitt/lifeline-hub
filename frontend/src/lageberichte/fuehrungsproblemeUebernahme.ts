@@ -22,11 +22,11 @@ import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebe
 /** Höchstens so viele Einzelzeilen je Liste; der Rest als „und n weitere“. */
 const LISTE_MAX = 20;
 
-/** Welche Module die Teile lesen; der Funkplan ist eine Stab-Unterseite (LFH-548). */
+/** Welche Module die Teile lesen; der Funkplan gehört dem Fernmeldewesen (LLH-1180). */
 const MODUL = {
   auftraege: { key: 'auftraege', name: 'Aufträge' },
   meldungen: { key: 'meldungen', name: 'Meldungen' },
-  stab: { key: 'stab', name: 'Stab' },
+  fernmeldewesen: { key: 'fernmeldewesen', name: 'Fernmeldewesen' },
 } as const;
 
 const frei = (m: keyof typeof MODUL, freigaben: ModulFreigaben) =>
@@ -120,9 +120,9 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
   erzeuge: async ({ qc, einsatzId, freigaben, dtg }) => {
     const auftraegeFrei = frei('auftraege', freigaben);
     const meldungenFrei = frei('meldungen', freigaben);
-    // Wie die Funkplan-Seite: erst der Stab, dann das Modul der Liste (LFH-669).
-    const stabFrei = frei('stab', freigaben);
-    const funkFrei = (key: string) => stabFrei && istKeyFreigegeben(key, freigaben);
+    // Wie die Funkplan-Seite: erst das Fernmeldewesen, dann das Modul der Liste (LFH-669).
+    const fernmeldewesenFrei = frei('fernmeldewesen', freigaben);
+    const funkFrei = (key: string) => fernmeldewesenFrei && istKeyFreigegeben(key, freigaben);
     const lade = <T>(
       offen: boolean,
       key: readonly unknown[],
@@ -157,10 +157,10 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
       lade(funkFrei('einheiten'), einsatzKeys.einheiten(einsatzId), () =>
         listeEinheiten(einsatzId),
       ),
-      lade(stabFrei, einsatzKeys.sprechgruppen(einsatzId), () =>
+      lade(fernmeldewesenFrei, einsatzKeys.sprechgruppen(einsatzId), () =>
         listeEinsatzSprechgruppen(einsatzId),
       ),
-      stabFrei
+      fernmeldewesenFrei
         ? ladeListe(
             qc,
             einsatzKeys.fuehrungsstelle(einsatzId),
@@ -170,13 +170,13 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
         : Promise.resolve(gesperrt(null)),
       // LFH-893: externe Stellen und Komponenten der Skizze tragen Sprechgruppen wie die
       // Struktur; dieselben Keys wie die Funkplan-Seite (gemeinsamer Cache).
-      lade(stabFrei, einsatzKeys.stabKommunikationsplan(einsatzId), () =>
+      lade(fernmeldewesenFrei, einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId), () =>
         ladeKommunikationsplan(einsatzId),
       ),
-      stabFrei
+      fernmeldewesenFrei
         ? ladeListe(
             qc,
-            einsatzKeys.stabFernmeldeskizze(einsatzId),
+            einsatzKeys.fernmeldewesenSkizze(einsatzId),
             () => ladeFernmeldeskizze(einsatzId),
             null,
           )
@@ -235,7 +235,7 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
         nurBefund: true,
       },
     );
-    const funkTeil = !stabFrei
+    const funkTeil = !fernmeldewesenFrei
       ? [fehlt('gesperrt')]
       : lueckenZeilen.length > 0
         ? lueckenZeilen

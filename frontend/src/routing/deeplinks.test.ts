@@ -415,15 +415,15 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parseRouteId(q.get('kontakt') ?? undefined)).toBe(12);
   });
 
-  it('kommunikationsplanPfad liegt unter dem Stab (LFH-848)', () => {
-    expect(kommunikationsplanPfad(E)).toBe('/einsaetze/5/stab/kommunikationsplan');
+  it('kommunikationsplanPfad liegt im Fernmeldewesen (LFH-848, LLH-1180)', () => {
+    expect(kommunikationsplanPfad(E)).toBe('/einsaetze/5/fernmeldewesen/kommunikationsplan');
   });
-  it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
-    expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
+  it('funkplanPfad ist die Modulroute des Fernmeldewesens (LFH-548, LLH-1180)', () => {
+    expect(funkplanPfad(E)).toBe('/einsaetze/5/fernmeldewesen');
   });
   it('funkplanPfad mit ?ansicht= (Fernmeldeskizze, LFH-625)', () => {
     expect(funkplanPfad(E, { ansicht: 'skizze' })).toBe(
-      '/einsaetze/5/stab/funkplan?ansicht=skizze',
+      '/einsaetze/5/fernmeldewesen?ansicht=skizze',
     );
   });
   it('parseFunkplanAnsicht liest alle drei Darstellungen und verwirft einen unbekannten Wert GANZ', () => {
@@ -434,7 +434,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       'sprechgruppen',
     );
     expect(funkplanPfad(E, { ansicht: 'sprechgruppen' })).toBe(
-      '/einsaetze/5/stab/funkplan?ansicht=sprechgruppen',
+      '/einsaetze/5/fernmeldewesen?ansicht=sprechgruppen',
     );
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=quatsch'))).toBeUndefined();
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();

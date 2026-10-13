@@ -250,7 +250,7 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
 
   it('fragt gesperrte Module nicht an und nennt sie „— (nicht freigegeben)“, nie 0', async () => {
     const text = await erzeuge(
-      freigabenFixture({ auftraege: { zugriff: false }, stab: { sichtbar: false } }),
+      freigabenFixture({ auftraege: { zugriff: false }, fernmeldewesen: { sichtbar: false } }),
     );
     expect(listeAuftraege).not.toHaveBeenCalled();
     expect(listeAbschnitte).not.toHaveBeenCalled();
@@ -258,6 +258,13 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
     expect(text).toContain('**Aufträge**\n- — (nicht freigegeben)\n');
     expect(text).toContain('**Funkplan**\n- — (nicht freigegeben)');
     expect(text).toContain('- 1 mit überfälliger Bestätigung');
+  });
+
+  it('liest die Funkplan-Lücken auch bei ausgeblendetem Stab (LLH-1180)', async () => {
+    const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false, zugriff: false } }));
+    expect(listeAbschnitte).toHaveBeenCalled();
+    expect(listeEinsatzSprechgruppen).toHaveBeenCalled();
+    expect(text).not.toContain('**Funkplan**\n- — (nicht freigegeben)');
   });
 
   it('nennt einen gescheiterten Zähler „— (nicht geladen)“', async () => {
@@ -282,10 +289,23 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
           freigabenFixture({
             auftraege: { zugriff: false },
             meldungen: { zugriff: false },
+            fernmeldewesen: { sichtbar: false },
+          }),
+        ),
+      ).toEqual({ frei: false, grund: 'Aufträge, Meldungen und Fernmeldewesen nicht freigegeben' });
+    });
+
+    // LLH-1180: der Funkplan hängt am Fernmeldewesen, nicht mehr am Stab.
+    it('ist ohne Stab frei, solange das Fernmeldewesen frei ist', () => {
+      expect(
+        FUEHRUNGSPROBLEME_QUELLE.verfuegbar(
+          freigabenFixture({
+            auftraege: { zugriff: false },
+            meldungen: { zugriff: false },
             stab: { sichtbar: false },
           }),
         ),
-      ).toEqual({ frei: false, grund: 'Aufträge, Meldungen und Stab nicht freigegeben' });
+      ).toEqual({ frei: true });
     });
   });
 });

@@ -10,6 +10,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { navGriffMass } from './EinsatzLayout';
+import AltpfadWeiterleitung from './AltpfadWeiterleitung';
 import { einsatzKennung } from './einsatzKennung';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import { leseLetztenOrt } from './letzterOrt';
@@ -970,7 +971,19 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
         <Routes>
           <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
             <Route path="lagemeldungen" element={<div>Lagemeldungen-Inhalt</div>} />
-            <Route path="stab/funkplan" element={<div>Funkplan-Inhalt</div>} />
+            <Route path="fernmeldewesen" element={<div>Funkplan-Inhalt</div>} />
+            <Route
+              path="fernmeldewesen/kommunikationsplan"
+              element={<div>Kommunikationsplan-Inhalt</div>}
+            />
+            <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />
+            <Route
+              path="stab/kommunikationsplan"
+              element={
+                <AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />
+              }
+            />
+            <Route path="stab/presse" element={<div>Presse-Inhalt</div>} />
             <Route path="einsatzdaten" element={<div>Einsatzdaten-Inhalt</div>} />
             <Route path="ueberblick" element={<div>Überblick-Inhalt</div>} />
             <Route path="etb" element={<div>ETB-Inhalt</div>} />
@@ -1040,9 +1053,48 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(await screen.findByText('Überblick-Inhalt')).toBeInTheDocument();
   });
 
-  it('Unterroute eines gesperrten Moduls (Stab › Funkplan) zeigt den Hinweis für „Stab“', async () => {
-    setupWaechter('/einsaetze/7/stab/funkplan', freigabenFixture({ stab: { zugriff: false } }));
+  it('Unterroute eines gesperrten Moduls (Fernmeldewesen › Kommunikationsplan) zeigt den Hinweis für „Fernmeldewesen“', async () => {
+    setupWaechter(
+      '/einsaetze/7/fernmeldewesen/kommunikationsplan',
+      freigabenFixture({ fernmeldewesen: { zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Fernmeldewesen/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Kommunikationsplan-Inhalt')).not.toBeInTheDocument();
+  });
+
+  it('Unterroute eines gesperrten Stabs (Stab › Pressearbeit) zeigt den Hinweis für „Stab“', async () => {
+    setupWaechter('/einsaetze/7/stab/presse', freigabenFixture({ stab: { zugriff: false } }));
     expect(await screen.findByRole('heading', { level: 1, name: /Stab/ })).toBeInTheDocument();
+    expect(screen.queryByText('Presse-Inhalt')).not.toBeInTheDocument();
+  });
+
+  // LLH-1180, design.md D7: die Altadresse gehört dem Ziel ihrer Weiterleitung.
+  it('Altadresse des Funkplans leitet bei ausgeblendetem Stab ins Fernmeldewesen, samt Darstellung', async () => {
+    setupWaechter(
+      '/einsaetze/7/stab/funkplan?ansicht=skizze',
+      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    );
+    expect(await screen.findByText('Funkplan-Inhalt')).toBeInTheDocument();
+    expect(pfad()).toBe('/einsaetze/7/fernmeldewesen');
+    expect(screen.getByTestId('pfad')).toHaveAttribute('data-suche', '?ansicht=skizze');
+  });
+
+  it('Altadresse des Kommunikationsplans leitet ins Fernmeldewesen', async () => {
+    setupWaechter('/einsaetze/7/stab/kommunikationsplan', freigabenFixture());
+    expect(await screen.findByText('Kommunikationsplan-Inhalt')).toBeInTheDocument();
+    expect(pfad()).toBe('/einsaetze/7/fernmeldewesen/kommunikationsplan');
+  });
+
+  it('Altadresse bei gesperrtem Fernmeldewesen zeigt den Hinweis für „Fernmeldewesen“, nicht „Stab“', async () => {
+    setupWaechter(
+      '/einsaetze/7/stab/funkplan',
+      freigabenFixture({ fernmeldewesen: { zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Fernmeldewesen/ }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Funkplan-Inhalt')).not.toBeInTheDocument();
   });
 

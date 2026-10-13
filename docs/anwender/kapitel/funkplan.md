@@ -1,25 +1,28 @@
 ---
-titel: Funkplan, Fernmeldeskizze und Kommunikationsplan
+titel: Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/stab/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql]
 ---
 
 ## Überblick
 
-Für das Sachgebiet S6 gibt es zwei Seiten unter „Stab“. Der **Funkplan** zeigt, wer im Einsatz
-über welche Sprechgruppen und Wege erreichbar ist, als Tabelle, als taktische
-**Fernmeldeskizze** oder als Liste der Sprechgruppen, und nennt die Lücken. Der
-**Kommunikationsplan** sammelt die Verbindungen zu Stellen außerhalb der Gliederung, etwa zur
-Leitstelle oder zu Behörden. Lesen können alle Mitglieder des Einsatzes, pflegen dürfen
+Die Werkzeuge des Sachgebiets S6 stehen im Modul **Fernmeldewesen** in der Kategorie
+„Kommunikation“, mit den Reitern „Funkplan“, „Fernmeldeskizze“, „Sprechgruppen“ und
+„Kommunikationsplan“. Der **Funkplan** zeigt, wer im Einsatz über welche Sprechgruppen und Wege
+erreichbar ist, als Tabelle, als taktische **Fernmeldeskizze** oder als Liste der Sprechgruppen,
+und nennt die Lücken. Der **Kommunikationsplan** sammelt die Verbindungen zu Stellen außerhalb der
+Gliederung, etwa zur Leitstelle oder zu Behörden. Das Modul braucht keinen Stab: Auch ein ELW 1
+ohne Stab funkt und plant damit. Lesen können alle Mitglieder des Einsatzes, pflegen dürfen
 Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
 ### Den Funkplan lesen und Lücken schließen
 
-1. In der Modulliste unter „Stab“ „Funkplan“ wählen, oder in der Sprungpalette „Funk“ tippen.
-2. In der Leiste „Darstellung“ „Tabelle“ wählen. Oben stehen die „Lücken“, darunter der Plan von
+1. In der Modulliste unter „Kommunikation“ „Fernmeldewesen“ wählen, oder in der Sprungpalette
+   „Funk“ tippen.
+2. Den Reiter „Funkplan“ wählen. Oben stehen die „Lücken“, darunter der Plan von
    der Führungsstelle über die Abschnitte bis zu Einheiten und Fahrzeugen.
 
    ![Funkplan als Tabelle mit dem Paneel „Lücken“ und der Führungsstelle in der ersten Zeile](../bilder/funkplan/tabelle.png)
@@ -38,8 +41,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Die Fernmeldeskizze bearbeiten
 
-1. Im Funkplan in der Leiste „Darstellung“ „Skizze“ wählen, oder in der Modulliste unter „Stab“
-   gleich „Fernmeldeskizze“.
+1. Im Fernmeldewesen den Reiter „Fernmeldeskizze“ wählen, oder in der Modulliste unter
+   „Fernmeldewesen“ gleich „Fernmeldeskizze“.
 
    ![Fernmeldeskizze mit Einsatzleitung, Sprechgruppen als Schienen, Abschnitten, Einheiten und externen Stellen](../bilder/funkplan/skizze.png)
 
@@ -55,8 +58,9 @@ Einsatzleitung und Führungspersonal.
 
 ### Eine Stelle in den Kommunikationsplan aufnehmen
 
-1. In der Modulliste unter „Stab“ „Kommunikationsplan“ wählen, oder „Stab“ öffnen und in der Zeile
-   S6 „Kommunikationsplan“ wählen.
+1. Im Fernmeldewesen den Reiter „Kommunikationsplan“ wählen, in der Modulliste unter
+   „Fernmeldewesen“ gleich „Kommunikationsplan“, oder „Stab“ öffnen und in der Zeile S6
+   „Kommunikationsplan“ wählen.
 
    ![Kommunikationsplan mit Einsatzleitung und Stab, abgeleiteten Abschnitten und externen Stellen](../bilder/funkplan/kommunikationsplan.png)
 
@@ -82,8 +86,13 @@ Einsatzleitung und Führungspersonal.
 
 ### Wer was darf
 
-Kommunikationsplan und Fernmeldeskizze pflegen Einsatzleitung und Führungspersonal, solange der
-Einsatz läuft. „In Lagebericht übernehmen“ braucht zusätzlich das Modul Lageberichte, „In Befehl
+Das Fernmeldewesen hat eine eigene Freigabe, unabhängig vom Stab: Ist der Stab ausgeblendet oder
+gesperrt, bleibt das Fernmeldewesen voll nutzbar; ist das Fernmeldewesen gesperrt, hilft auch ein
+freier Stab nicht. Ohne Stab fehlt nur, was vom Stab kommt: im Kommunikationsplan steht als
+Besetzung einer Führungsfunktion „—“ (Stab nicht freigegeben), und die Skizze zeigt im Kasten
+„Einsatzleitung“ keine Sachgebiete. Bei Einführung des Moduls galt die Rollen-Vorgabe des Stabs
+auch für das Fernmeldewesen, eine Ausblendung des Stabs nicht. Kommunikationsplan und
+Fernmeldeskizze pflegen Einsatzleitung und Führungspersonal, solange der Einsatz läuft. „In Lagebericht übernehmen“ braucht zusätzlich das Modul Lageberichte, „In Befehl
 übernehmen“ das Modul Aufträge. Auf schmalen Bildschirmen und ohne Netz ist die Skizze nur
 lesbar. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
@@ -129,7 +138,12 @@ eine nicht erfasste eigene Führungsstelle. Fehlt eine Quelle, steht „—“ m
 ### Skizze als Anlage
 
 Lagebericht und Befehl können die Fernmeldeskizze mit „Fernmeldeskizze anfügen“ als Bild
-mitnehmen. Gedruckt wird die Skizze mit dem Funkplan als Anlage.
+mitnehmen, wenn das Fernmeldewesen freigegeben ist. Gedruckt wird die Skizze mit dem Funkplan als Anlage.
+
+### Alte Adressen
+
+Lesezeichen auf die frühere Adresse unter „Stab“ führen weiter zum Fernmeldewesen, auch mit der
+gewählten Darstellung.
 
 ### Ohne Netz
 
