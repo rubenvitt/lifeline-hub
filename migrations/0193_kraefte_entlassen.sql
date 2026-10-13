@@ -37,7 +37,7 @@ ALTER TABLE einsatz_einheit ADD COLUMN aufgeloest_von INTEGER REFERENCES benutze
 --    umbenannt: so legt der Neubau seinen Selbstbezug unter dem endgültigen Namen an, und das
 --    DROP der alten setzt nur deren eigene Zeilen auf NULL. Schema = 0130 1:1 (keine späteren
 --    ADD COLUMN), geändert sind nur die beiden ON DELETE und der CHECK auf `quelle`.
---    Abgesichert von db::tests::migration_0191_* und zeitachse::repo::tests (Schema).
+--    Abgesichert von db::tests::migration_0193_* und zeitachse::repo::tests (Schema).
 ALTER TABLE einsatz_kraft_zeitachse RENAME TO einsatz_kraft_zeitachse_alt;
 
 CREATE TABLE einsatz_kraft_zeitachse (
