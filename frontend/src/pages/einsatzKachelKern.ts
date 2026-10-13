@@ -18,3 +18,12 @@ export function kachelKennung(
 export function einsaetzeMeta(aktiv: number, abgeschlossen: number): string {
   return `${aktiv} aktiv · ${abgeschlossen} abgeschlossen`;
 }
+
+/**
+ * Wortlaut des Sammelbanners der Einsatzübersicht (LLH-1204): „1 neuer Einsatz“ statt des
+ * allgemeinen „Eintrags“ der `Datensicht`. Ohne Wartendes `null`.
+ */
+export function einsaetzeBannerText(neu: number): string | null {
+  if (neu <= 0) return null;
+  return neu === 1 ? '1 neuer Einsatz' : `${neu} neue Einsätze`;
+}

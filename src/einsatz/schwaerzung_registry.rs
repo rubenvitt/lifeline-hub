@@ -897,6 +897,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lon", G_GEO),
             retain("erstellt_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
+            // Kenntnisnahme (LLH-1206): Zeitpunkt und Benutzer-FK, kein Freitext.
+            retain("gesehen_at", G_ZEIT),
+            retain("gesehen_von_id", G_FK),
         ],
     },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------

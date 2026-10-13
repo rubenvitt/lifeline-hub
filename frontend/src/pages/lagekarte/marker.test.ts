@@ -183,6 +183,7 @@ function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
     erstellt_at: '',
     meldung_lfd_nr: 5,
     meldung_absender: 'Florian Nord 1',
+    is_neu: false,
     ...partial,
   };
 }

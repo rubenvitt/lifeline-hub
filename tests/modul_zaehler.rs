@@ -542,6 +542,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
     let v = zaehler(&app, &admin, einsatz).await;
     assert_eq!(v["personen"], json!({ "gesamt": 0 }), "{v:?}");
     assert_eq!(v["dokumente"], json!({ "gesamt": 0 }), "{v:?}");
+    assert_eq!(v["lagemeldungen"], json!({ "neu": 0 }), "{v:?}");
     assert_eq!(
         v["meldungen"],
         json!({ "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0 }),
@@ -560,6 +561,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
             "einsatzabschnitte",
             "erinnerungen",
             "etb",
+            "lagemeldungen",
             "meldungen",
             "personen"
         ]

@@ -1,5 +1,6 @@
 import { apiGet, apiSend, type ApiSendOptionen, mitParametern } from './client';
 import type {
+  LageGesehen,
   LageMeldung,
   Meldung,
   MeldungKennzahlen,
@@ -158,4 +159,20 @@ export function erteileAuftragAusMeldung(
 /** Lageobjekte (aus lagerelevanten Meldungen) listen (LFH-95, Lage-Kategorie). */
 export function listeLageMeldungen(einsatzId: number): Promise<LageMeldung[]> {
   return apiGet<LageMeldung[]>(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+}
+
+/** Eine Lagemeldung als gesehen kennzeichnen (LLH-1206); für alle gleich, die erste gewinnt. */
+export function markLageMeldungGesehen(einsatzId: number, lageId: number): Promise<LageMeldung> {
+  return apiSend<LageMeldung>(
+    `/api/einsaetze/${einsatzId}/lage/meldungen/${lageId}/gesehen`,
+    'POST',
+    {},
+  );
+}
+
+/** Alle neuen Lagemeldungen bis einschließlich `bisId` als gesehen kennzeichnen (LLH-1206). */
+export function markLageMeldungenGesehen(einsatzId: number, bisId: number): Promise<LageGesehen> {
+  return apiSend<LageGesehen>(`/api/einsaetze/${einsatzId}/lage/meldungen/gesehen`, 'POST', {
+    bis_id: bisId,
+  });
 }

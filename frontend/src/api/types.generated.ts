@@ -2797,6 +2797,11 @@ export interface components {
             code: string;
             laeuft_ab_at: string;
         };
+        /** @description Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden. */
+        LageGesehenAnzeige: {
+            /** Format: int64 */
+            gesehen: number;
+        };
         /**
          * @description Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)
          *     per JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.
@@ -2807,8 +2812,22 @@ export interface components {
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von_id: number;
+            /** @description Zeitpunkt der ersten Kenntnisnahme (UTC); fehlt, solange neu. */
+            gesehen_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer sie zuerst als gesehen gekennzeichnet hat; fehlt auch beim Bestand vor LLH-1206.
+             */
+            gesehen_von_id?: number | null;
+            /** @description Abgeleitet: Anzeigename zu `gesehen_von_id` (JOIN benutzer). */
+            gesehen_von_name?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt
+             *     für alle Benutzer gleich; Liste und Modulzähler lesen dasselbe Prädikat (`is_neu_sql`).
+             */
+            is_neu: boolean;
             /** Format: double */
             lat?: number | null;
             /** Format: double */
@@ -3010,6 +3029,14 @@ export interface components {
          * @enum {string}
          */
         Lagekennzahl: "pegel" | "evakuiert";
+        /**
+         * @description Lagemeldungen: noch von niemandem als gesehen gekennzeichnet (LLH-1206). Für alle Benutzer
+         *     gleich, anders als der Chat.
+         */
+        LagemeldungsZaehler: {
+            /** Format: int64 */
+            neu: number;
+        };
         LagemonitorAnzeige: {
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
@@ -3410,6 +3437,7 @@ export interface components {
             einsatzabschnitte?: components["schemas"]["MengenZaehler"] | null;
             erinnerungen?: components["schemas"]["ErinnerungsZaehler"] | null;
             etb?: components["schemas"]["MengenZaehler"] | null;
+            lagemeldungen?: components["schemas"]["LagemeldungsZaehler"] | null;
             meldungen?: components["schemas"]["MeldungsZaehler"] | null;
             personen?: components["schemas"]["MengenZaehler"] | null;
         };

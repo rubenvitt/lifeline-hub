@@ -815,6 +815,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::meldung::lage_liste),
         )
         .route(
+            "/api/einsaetze/{id}/lage/meldungen/gesehen",
+            post(routes::meldung::lage_alle_gesehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lage/meldungen/{lid}/gesehen",
+            post(routes::meldung::lage_gesehen),
+        )
+        .route(
             "/api/einsaetze/{id}/ort-vorschau",
             get(routes::ort_vorschau::vorschau),
         )

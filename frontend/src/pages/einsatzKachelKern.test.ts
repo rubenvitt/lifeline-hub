@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
+import { einsaetzeBannerText, einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 
 describe('kachelKennung', () => {
   it('nimmt die interne Nummer vor der Leitstellennummer', () => {
@@ -20,5 +20,16 @@ describe('kachelKennung', () => {
 describe('einsaetzeMeta', () => {
   it('nennt beide Mengen', () => {
     expect(einsaetzeMeta(3, 12)).toBe('3 aktiv · 12 abgeschlossen');
+  });
+});
+
+describe('einsaetzeBannerText', () => {
+  it('nennt einen oder mehrere neue Einsätze', () => {
+    expect(einsaetzeBannerText(1)).toBe('1 neuer Einsatz');
+    expect(einsaetzeBannerText(3)).toBe('3 neue Einsätze');
+  });
+
+  it('ohne Wartendes kein Banner', () => {
+    expect(einsaetzeBannerText(0)).toBeNull();
   });
 });

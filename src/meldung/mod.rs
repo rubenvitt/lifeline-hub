@@ -213,6 +213,18 @@ pub struct LageMeldungAnzeige {
     pub erstellt_at: String,
     pub meldung_lfd_nr: i64,
     pub meldung_absender: String,
+    /// Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt
+    /// für alle Benutzer gleich; Liste und Modulzähler lesen dasselbe Prädikat (`is_neu_sql`).
+    pub is_neu: bool,
+    /// Zeitpunkt der ersten Kenntnisnahme (UTC); fehlt, solange neu.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gesehen_at: Option<String>,
+    /// Wer sie zuerst als gesehen gekennzeichnet hat; fehlt auch beim Bestand vor LLH-1206.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gesehen_von_id: Option<i64>,
+    /// Abgeleitet: Anzeigename zu `gesehen_von_id` (JOIN benutzer).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gesehen_von_name: Option<String>,
 }
 
 #[cfg(test)]
