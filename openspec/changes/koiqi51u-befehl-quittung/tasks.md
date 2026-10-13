@@ -50,13 +50,13 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 
 ## 3. Frontend: gemeinsame Bausteine (D7)
 
-- [ ] 3.1 `Quittungsstand({ anzahl, quittiert })` aus `AuftragQuittungsstand`. Auftragskarte und
+- [x] 3.1 `Quittungsstand({ anzahl, quittiert })` aus `AuftragQuittungsstand`. Auftragskarte und
   Auftragsdetail stellen um. Nachweis: Die bestehenden Auftragstests sind unverändert grün.
-- [ ] 3.2 `auftraege/EmpfaengerQuittung.tsx` aus dem Körper von `AuftragEmpfaenger` mit neutralen
+- [x] 3.2 `auftraege/EmpfaengerQuittung.tsx` aus dem Körper von `AuftragEmpfaenger` mit neutralen
   Zeilen und optionaler `rueckfrage`. `AuftragEmpfaenger` wird zur Hülle. Nachweis:
   `AuftragTeile`- und Gerätetests sind unverändert grün. Ein neuer Test zeigt, dass ohne
   `rueckfrage` ein Klick direkt `onQuittieren` ruft und mit `rueckfrage` erst die Bestätigung.
-- [ ] 3.3 `auftraege/EmpfaengerFilter.tsx` und `trifftEmpfaenger`, `AuftraegeListe` stellt um.
+- [x] 3.3 `auftraege/EmpfaengerFilter.tsx` und `trifftEmpfaenger`, `AuftraegeListe` stellt um.
   Nachweis: Die Tests des Empfängerfilters der Aufträge sind unverändert grün, und ein
   Unit-Test prüft `trifftEmpfaenger` für Abschnitt, Einheit, Funktion und keinen Verteiler.
 

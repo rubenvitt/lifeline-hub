@@ -12,6 +12,7 @@ import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import EmpfaengerQuittung, { Quittungsstand } from './EmpfaengerQuittung';
 import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
 /**
@@ -21,9 +22,6 @@ import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
  */
 
 const { Text } = Typography;
-
-/** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓". */
-const QUITTIERT_CHIP_GRENZE = 3;
 
 /**
  * Befehlsschema-Felder für die Read-back-Detailansicht: Folge und Etiketten aus dem Kern, den das
@@ -126,17 +124,9 @@ export function AuftragKopf({
   );
 }
 
-/** Zählzeile „n Empfänger · q/n quittiert“, die Listenkarte und Empfängerblock teilen. */
+/** Zählzeile „n Empfänger · q/n quittiert“ eines Auftrags, mit den Zahlen des Servers. */
 export function AuftragQuittungsstand({ auftrag: a }: { auftrag: Auftrag }) {
-  const { rollen } = useRollen();
-  return (
-    <Text
-      type="secondary"
-      style={{ ...monoStil(11), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
-    >
-      {a.empfaenger_anzahl} Empfänger · {a.quittiert_anzahl}/{a.empfaenger_anzahl} quittiert
-    </Text>
-  );
+  return <Quittungsstand anzahl={a.empfaenger_anzahl} quittiert={a.quittiert_anzahl} />;
 }
 
 export interface AuftragEmpfaengerProps {
@@ -151,7 +141,10 @@ export interface AuftragEmpfaengerProps {
   quittierFehlerGrund?: ZeilenGrund | null;
 }
 
-/** Quittungsstand, quittierte Chips und die Zeile „Quittung offen:“ mit ihren Knöpfen. */
+/**
+ * Empfänger eines Auftrags über den gemeinsamen Block {@link EmpfaengerQuittung}: mit Rückfrage,
+ * weil eine Auftragsquittung keinen Rückweg hat (LFH-343).
+ */
 export function AuftragEmpfaenger({
   auftrag: a,
   darfSchreiben,
@@ -161,104 +154,39 @@ export function AuftragEmpfaenger({
   darfQuittierenFuer,
   quittierFehlerGrund,
 }: AuftragEmpfaengerProps) {
-  // Der Statuschip zeigt nur QUITTIERTE Empfänger; offene stehen in der Zeile „Quittung offen:".
-  // Die Zeile hängt NICHT am Schreibrecht, nur ihr Knopf — sonst verlöre ein Beobachter den Namen
-  // des offenen Empfängers.
-  const istQuittierungZiel = (empfaengerId: number) =>
-    !!quittierungLaeuft &&
-    quittierungZiel?.auftragId === a.id &&
-    quittierungZiel.empfaengerId === empfaengerId;
-  // Der optimistische Cache markiert das Ziel sofort als quittiert. Solange der Request
-  // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen
-  // sind serialisiert und damit gesperrt.
-  const zielEmpfaenger =
-    quittierungLaeuft && quittierungZiel?.auftragId === a.id ? quittierungZiel.empfaengerId : null;
-  const [quittierteEmpf, offeneEmpf] = useMemo(
-    () => [
-      a.empfaenger.filter((e) => e.quittiert_at && e.id !== zielEmpfaenger),
-      a.empfaenger.filter((e) => !e.quittiert_at || e.id === zielEmpfaenger),
-    ],
-    [a.empfaenger, zielEmpfaenger],
+  const zeilen = useMemo(
+    () =>
+      a.empfaenger.map((e) => ({
+        id: e.id,
+        name: mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung),
+        zugaenglich: e.snap_anzeige,
+        quittiertAt: e.quittiert_at,
+      })),
+    [a.empfaenger],
   );
-  // Die Anzeigegrenze schneidet nur QUITTIERTE Chips: Quittiertes ist Lesestoff, Offenes ist
-  // Arbeit und steht immer da. Schnitte sie die ganze Liste, verlöre ein offener Empfänger seinen
-  // Knopf, und die Auto-Frist-Erinnerung schlösse nie.
-  const sichtbareQuittierte = quittierteEmpf.slice(0, QUITTIERT_CHIP_GRENZE);
-  const restQuittierte = quittierteEmpf.length - sichtbareQuittierte.length;
-  const aufgehoben = a.bearbeitungsstatus === 'aufgehoben';
   // Ein aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): kein Knopf, die Zeile
   // nennt die Unquittierten ohne „offen“.
-  const darfQuittieren = !!(darfSchreiben && onQuittieren) && !aufgehoben;
-
+  const aufgehoben = a.bearbeitungsstatus === 'aufgehoben';
   return (
-    <>
-      <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-        <AuftragQuittungsstand auftrag={a} />
-        <Space size={4} wrap>
-          {sichtbareQuittierte.map((e) => (
-            <StatusChip
-              key={e.id}
-              ton="normal"
-              wort={`${mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)} ✓`}
-            />
-          ))}
-          {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
-          {restQuittierte > 0 && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              +{restQuittierte} ✓
-            </Text>
-          )}
-        </Space>
-      </Flex>
-
-      {/* Quittungs-Aktionen in EIGENER Zeile, nicht als antippbarer Chip: derselbe Chip trägt auch den
-         reinen Statuszustand, die Bedienbarkeit hinge sonst allein an der Farbe. Wer für WEN
-         quittiert, steht im zugänglichen Namen. */}
-      {offeneEmpf.length > 0 && (
-        <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-            {aufgehoben ? 'Nicht quittiert:' : 'Quittung offen:'}
-          </Text>
-          {offeneEmpf.map((e) => (
-            <Space key={e.id} size={4}>
-              <Text style={{ fontSize: 13 }}>
-                {mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)}
-              </Text>
-              {darfQuittieren && (darfQuittierenFuer?.(e) ?? true) && (
-                <Popconfirm
-                  title="Empfang/Kenntnis quittieren?"
-                  okText="Empfang quittieren"
-                  cancelText="Abbrechen"
-                  disabled={quittierungLaeuft}
-                  onConfirm={() => {
-                    if (!quittierungLaeuft) onQuittieren?.(a.id, e.id);
-                  }}
-                >
-                  <Button
-                    aria-label={`Empfang für ${e.snap_anzeige} quittieren`}
-                    loading={istQuittierungZiel(e.id)}
-                    disabled={quittierungLaeuft}
-                  >
-                    Quittieren
-                  </Button>
-                </Popconfirm>
-              )}
-            </Space>
-          ))}
-        </Flex>
-      )}
-      {/* Grund einer abgelehnten Quittung an der Empfängerzeile (LFH-1077, `frontend/AGENTS.md`,
-         „Rückwege und Fehler“). Außerhalb der Zeile, weil sie fehlt, sobald alle quittiert sind:
-         gerade „bereits quittiert“ bliebe sonst ungesagt. */}
-      {quittierFehlerGrund && (
-        <div style={{ marginBottom: 8 }}>
-          <ZeilenFehler
-            fehler={quittierFehlerGrund.fehler}
-            fallback={quittierFehlerGrund.fallback}
-          />
-        </div>
-      )}
-    </>
+    <EmpfaengerQuittung
+      zeilen={zeilen}
+      stand={{ anzahl: a.empfaenger_anzahl, quittiert: a.quittiert_anzahl }}
+      darfQuittieren={!!(darfSchreiben && onQuittieren) && !aufgehoben}
+      darfQuittierenFuer={
+        darfQuittierenFuer
+          ? (id) => {
+              const e = a.empfaenger.find((x) => x.id === id);
+              return !!e && darfQuittierenFuer(e);
+            }
+          : undefined
+      }
+      gesperrt={!!quittierungLaeuft}
+      laeuftFuer={quittierungZiel?.auftragId === a.id ? quittierungZiel.empfaengerId : null}
+      onQuittieren={(id) => onQuittieren?.(a.id, id)}
+      rueckfrage={{ title: 'Empfang/Kenntnis quittieren?', okText: 'Empfang quittieren' }}
+      offenLabel={aufgehoben ? 'Nicht quittiert:' : 'Quittung offen:'}
+      fehlerGrund={quittierFehlerGrund}
+    />
   );
 }
 
