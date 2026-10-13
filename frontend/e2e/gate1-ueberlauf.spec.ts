@@ -1388,10 +1388,10 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
 
   /*
    * EINHEITEN-GLIEDERUNG (LLH-1029): eine Tabelle mit Baum aus dem Kräftebaum-Kern. Am Handy
-   * bleiben Einheit, Ist und Soll als Spalten, der Einzug je Ebene ist schmal, Name und Ist stehen
-   * im Bild, und die Seite läuft nicht quer. Ein überlanges Wort im Namen („Behandlungsgruppe“)
-   * hält die Einheitenspalte breit: dann rollt die TABELLE (Einheit fixiert), nicht die Seite —
-   * angepasst, nicht in Karten aufgelöst. Am Fükw (1366) läuft die volle Spaltenreihe nicht über.
+   * bleiben Einheit, Ist und Soll als Spalten, der Einzug je Ebene ist schmal, Name, Ist und Soll
+   * stehen ganz im Bild, und weder Tabelle noch Seite laufen quer — angepasst, nicht in Karten
+   * aufgelöst. Ein langes Wort im Namen („Behandlungsgruppe“) wird getrennt, statt die
+   * Einheitenspalte breit zu halten. Am Fükw (1366) läuft die volle Spaltenreihe nicht über.
    * Zwei Ebenen (Zug → Gruppe), damit der Einzug messbar ist; die Gruppe ist gegen ihr Soll aus
    * dem Typ unterbesetzt, damit das Urteil mitgemessen wird.
    */
@@ -1446,7 +1446,11 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
           const zellen = Array.from(tr.querySelectorAll('td')).map((td) =>
             td.getBoundingClientRect(),
           );
-          return { istRechts: zellen[1]?.right ?? Infinity, spalten: zellen.length };
+          return {
+            istRechts: zellen[1]?.right ?? Infinity,
+            sollRechts: zellen[2]?.right ?? Infinity,
+            spalten: zellen.length,
+          };
         });
         const box = (await link.boundingBox())!;
         return { ...r, links: box.x, linkRechts: box.x + box.width };
@@ -1458,7 +1462,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       );
       test.info().annotations.push({
         type: 'messwert',
-        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px, 390 ${schmal}px · Seite ${seite}px · Spalten ${m1.spalten}`,
+        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px, 390 ${schmal}px · Seite ${seite}px · Spalten ${m1.spalten} · Soll-Kante ${Math.round(Math.max(m1.sollRechts, m2.sollRechts))}px`,
       });
       for (const [m, name] of [
         [m1, 'Zug'],
@@ -1467,11 +1471,13 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         expect(m.spalten, `${name}: Einheit, Ist und Soll`).toBe(3);
         expect(m.linkRechts, `${name}: der Name steht im Bild`).toBeLessThanOrEqual(390);
         expect(m.istRechts, `${name}: Ist steht im Bild`).toBeLessThanOrEqual(390);
+        expect(m.sollRechts, `${name}: Soll steht ganz im Bild`).toBeLessThanOrEqual(390);
       }
       await expect(zeile(gruppe).getByText('unterbesetzt')).toBeInViewport();
       expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
       expect(m2.links - m1.links, 'die Gruppe steht eingerückt').toBeGreaterThan(0);
       expect(seite, 'Seite läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
+      expect(schmal, 'Tabelle läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
       expect(breit, 'Tabelle läuft bei 1366 px nicht quer').toBeLessThanOrEqual(1);
     });
   }

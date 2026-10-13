@@ -58,8 +58,13 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       key: 'einheit',
       immerSichtbar: true,
       mindestBreite: 140,
+      // Ein langes Wort im Namen („Behandlungsgruppe“) darf die Spalte nicht so breit halten,
+      // dass Soll am Handy aus dem Bild läuft: es wird getrennt (`lang="de"`), und wo der Browser
+      // kein Trennwörterbuch hat, bricht es notfalls im Wort. Beides erbt die Zelle.
       render: (_t, z) => (
-        <KraeftebaumZelle zeile={z} einsatzId={einsatzId} gesperrt={sprungGesperrt} />
+        <div style={{ hyphens: 'auto', overflowWrap: 'anywhere' }}>
+          <KraeftebaumZelle zeile={z} einsatzId={einsatzId} gesperrt={sprungGesperrt} />
+        </div>
       ),
     },
     {
@@ -79,7 +84,8 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
         <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
           {z.urteil === 'unterbesetzt' && (
-            <StatusTag darstellung={einheitStaerkeUrteil.unterbesetzt} />
+            // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
+            <StatusTag darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
           )}
         </span>
       ),
