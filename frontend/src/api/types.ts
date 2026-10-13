@@ -914,6 +914,7 @@ export interface NeueMeldung {
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];
+export type LageGesehen = S['LageGesehenAnzeige'];
 /** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt. */
 export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
 export type LetzteRueckmeldung = S['LetzteRueckmeldung'];

@@ -18,7 +18,8 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// SSE-Notify: Meldungen des Einsatzes haben sich geändert (Tag `meldung`).
 fn sse(state: &AppState, einsatz_id: i64) {
@@ -668,6 +669,55 @@ pub async fn lage_liste(
     Ok(Json(
         repo::liste_lage_meldungen(&state.pool, ctx.einsatz.id).await?,
     ))
+}
+
+/// POST /api/einsaetze/{id}/lage/meldungen/{lid}/gesehen — eine Lagemeldung als gesehen
+/// kennzeichnen (LLH-1206, Spec `lagemeldung-kenntnisnahme`). Für alle gleich; die erste
+/// Kenntnisnahme gewinnt, eine zweite antwortet 200 mit dem unveränderten Stand.
+pub async fn lage_gesehen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Lagemeldungen>,
+    PfadParam((einsatz_id, lage_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<crate::meldung::LageMeldungAnzeige>, AppError> {
+    let l = repo::mark_lage_gesehen(&state.pool, einsatz_id, lage_id, ctx.benutzer.id, &jetzt())
+        .await?
+        .ok_or(AppError::NotFound)?;
+    sse(&state, einsatz_id);
+    Ok(Json(l))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LageAlleGesehenReq {
+    /// Die jüngste angezeigte Lagemeldung: neuere, die währenddessen eingehen, bleiben neu.
+    pub bis_id: i64,
+}
+
+/// Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LageGesehenAnzeige {
+    pub gesehen: u64,
+}
+
+/// POST /api/einsaetze/{id}/lage/meldungen/gesehen — alle neuen Lagemeldungen bis einschließlich
+/// `bis_id` als gesehen kennzeichnen (LLH-1206, D2).
+pub async fn lage_alle_gesehen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Lagemeldungen>,
+    JsonBody(req): JsonBody<LageAlleGesehenReq>,
+) -> Result<Json<LageGesehenAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let gesehen = repo::mark_lage_alle_gesehen(
+        &state.pool,
+        einsatz_id,
+        req.bis_id,
+        ctx.benutzer.id,
+        &jetzt(),
+    )
+    .await?;
+    if gesehen > 0 {
+        sse(&state, einsatz_id);
+    }
+    Ok(Json(LageGesehenAnzeige { gesehen }))
 }
 
 #[cfg(test)]

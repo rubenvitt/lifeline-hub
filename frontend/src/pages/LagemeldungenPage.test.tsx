@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -7,17 +7,27 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import LagemeldungenPage from './LagemeldungenPage';
 import type { LageMeldung } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
+import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
+const ladeEinsatz = vi.fn();
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi
-    .fn()
-    .mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter' }),
+  ladeEinsatz: (...a: unknown[]) => ladeEinsatz(...a),
 }));
 const listeLageMeldungen = vi.fn();
+const markLageMeldungGesehen = vi.fn();
+const markLageMeldungenGesehen = vi.fn();
 vi.mock('../api/meldungen', () => ({
   listeLageMeldungen: (...a: unknown[]) => listeLageMeldungen(...a),
+  markLageMeldungGesehen: (...a: unknown[]) => markLageMeldungGesehen(...a),
+  markLageMeldungenGesehen: (...a: unknown[]) => markLageMeldungenGesehen(...a),
 }));
+const einsatz = (meine_rolle: string) => ({
+  id: 1,
+  bezeichnung: 'Lage',
+  status: 'aktiv',
+  meine_rolle,
+});
 
 const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
   id: 1,
@@ -30,6 +40,7 @@ const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
   erstellt_at: '2026-06-12 09:00:00',
   meldung_lfd_nr: 5,
   meldung_absender: 'Florian Nord 1',
+  is_neu: false,
   ...over,
 });
 
@@ -52,8 +63,10 @@ function renderPage() {
 describe('LagemeldungenPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    ladeEinsatz.mockResolvedValue(einsatz('beobachter'));
     listeLageMeldungen.mockResolvedValue([lage()]);
   });
+  afterEach(() => setzeOnline(true));
 
   it('zeigt Lageobjekte mit nachvollziehbarer Herkunft', async () => {
     renderPage();
@@ -182,5 +195,110 @@ describe('LagemeldungenPage', () => {
     expect(await screen.findByText('Lageobjekte konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut laden' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine lagerelevanten Meldungen übergeben')).toBeNull();
+  });
+
+  describe('neu und gesehen (LLH-1206)', () => {
+    const zeileMit = (text: string) =>
+      screen.getByText(text).closest('li[data-lfh-eintrag="zeitachse"]') as HTMLElement;
+
+    it('markiert neue Zeilen mit „Neu“, gesehene nennen Zeit und Person', async () => {
+      listeLageMeldungen.mockResolvedValue([
+        lage({ id: 2, text: 'Deich hält', is_neu: true }),
+        lage({
+          id: 1,
+          text: 'Brücke gesperrt',
+          gesehen_at: '2026-06-12 09:30:00',
+          gesehen_von_id: 4,
+          gesehen_von_name: 'Erika S2',
+        }),
+      ]);
+      renderPage();
+      await screen.findByText('Deich hält');
+      expect(within(zeileMit('Deich hält')).getByText('Neu')).toBeInTheDocument();
+      const gesehen = zeileMit('Brücke gesperrt');
+      expect(within(gesehen).queryByText('Neu')).toBeNull();
+      const ort = alsOrtszeit('2026-06-12 09:30:00')!.format('HH:mm');
+      expect(gesehen).toHaveTextContent(`gesehen ${ort} · Erika S2`);
+    });
+
+    it('ohne Schreibrecht: Marke ja, Knöpfe nein', async () => {
+      listeLageMeldungen.mockResolvedValue([lage({ is_neu: true })]);
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      expect(screen.getByText('Neu')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /als gesehen markieren/i })).toBeNull();
+    });
+
+    it('markiert eine Zeile als gesehen', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      listeLageMeldungen.mockResolvedValue([lage({ id: 7, is_neu: true })]);
+      markLageMeldungGesehen.mockResolvedValue(lage({ id: 7, is_neu: false }));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(
+        within(zeileMit('Brücke gesperrt')).getByRole('button', { name: 'Als gesehen markieren' }),
+      );
+      expect(markLageMeldungGesehen).toHaveBeenCalledWith(1, 7);
+    });
+
+    it('markiert alle bis zur jüngsten angezeigten als gesehen', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([
+        lage({ id: 9, text: 'Jüngste', is_neu: true }),
+        lage({ id: 4, text: 'Ältere', is_neu: true }),
+        lage({ id: 2, text: 'Gesehene', gesehen_at: '2026-06-12 09:30:00' }),
+      ]);
+      markLageMeldungenGesehen.mockResolvedValue({ gesehen: 2 });
+      renderPage();
+      await screen.findByText('Jüngste');
+      await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
+      expect(markLageMeldungenGesehen).toHaveBeenCalledWith(1, 9);
+    });
+
+    it('ohne neue Zeile kein Sammelknopf', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      expect(screen.queryByRole('button', { name: 'Alle als gesehen markieren' })).toBeNull();
+    });
+
+    it('eine Ablehnung steht an der Zeile, nicht im Toast', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([lage({ id: 7, is_neu: true })]);
+      markLageMeldungGesehen.mockRejectedValue(new Error('kaputt'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(
+        within(zeileMit('Brücke gesperrt')).getByRole('button', { name: 'Als gesehen markieren' }),
+      );
+      expect(
+        await within(zeileMit('Brücke gesperrt')).findByText(
+          'Konnte nicht als gesehen markiert werden',
+        ),
+      ).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('eine Ablehnung des Sammelknopfs steht im Seitenhinweis', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([lage({ id: 7, is_neu: true })]);
+      markLageMeldungenGesehen.mockRejectedValue(new Error('kaputt'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
+      expect(await screen.findByText('Konnte nicht als gesehen markiert werden')).toBeVisible();
+      expect(within(zeileMit('Brücke gesperrt')).queryByRole('alert')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('ohne Netz sind die Knöpfe gesperrt', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
+      listeLageMeldungen.mockResolvedValue([lage({ is_neu: true })]);
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      act(() => setzeOnline(false));
+      expect(screen.getByRole('button', { name: 'Als gesehen markieren' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Alle als gesehen markieren' })).toBeDisabled();
+    });
   });
 });

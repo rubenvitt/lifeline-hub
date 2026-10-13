@@ -58,7 +58,8 @@ export type ServerZaehlerQuelle =
   | 'auftraege'
   | 'erinnerungen'
   | 'chat'
-  | 'dokumente';
+  | 'dokumente'
+  | 'lagemeldungen';
 /**
  * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
  * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl,
@@ -419,6 +420,8 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPapierflieger,
     route: 'lagemeldungen',
     status: 'fertig',
+    // Neue, für alle gleich: noch von niemandem als gesehen gekennzeichnet (LLH-1206).
+    zaehlerQuelle: 'lagemeldungen',
     beschreibung: 'An die Lage übergebene Meldungen',
   },
   // Kommunikation

@@ -7295,6 +7295,20 @@
           }
         }
       },
+      "LageGesehenAnzeige": {
+        "type": "object",
+        "description": "Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden.",
+        "required": [
+          "gesehen"
+        ],
+        "properties": {
+          "gesehen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "LageMeldungAnzeige": {
         "type": "object",
         "description": "Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)\nper JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.",
@@ -7306,7 +7320,8 @@
           "erstellt_von_id",
           "erstellt_at",
           "meldung_lfd_nr",
-          "meldung_absender"
+          "meldung_absender",
+          "is_neu"
         ],
         "properties": {
           "einsatz_id": {
@@ -7320,9 +7335,35 @@
             "type": "integer",
             "format": "int64"
           },
+          "gesehen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der ersten Kenntnisnahme (UTC); fehlt, solange neu."
+          },
+          "gesehen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer sie zuerst als gesehen gekennzeichnet hat; fehlt auch beim Bestand vor LLH-1206."
+          },
+          "gesehen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Abgeleitet: Anzeigename zu `gesehen_von_id` (JOIN benutzer)."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "is_neu": {
+            "type": "boolean",
+            "description": "Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt\nfür alle Benutzer gleich; Liste und Modulzähler lesen dasselbe Prädikat (`is_neu_sql`)."
           },
           "lat": {
             "type": [
@@ -7859,6 +7900,19 @@
           "pegel",
           "evakuiert"
         ]
+      },
+      "LagemeldungsZaehler": {
+        "type": "object",
+        "description": "Lagemeldungen: noch von niemandem als gesehen gekennzeichnet (LLH-1206). Für alle Benutzer\ngleich, anders als der Chat.",
+        "required": [
+          "neu"
+        ],
+        "properties": {
+          "neu": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "LagemonitorAnzeige": {
         "type": "object",
@@ -8835,6 +8889,16 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/MengenZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lagemeldungen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemeldungsZaehler"
               },
               {
                 "type": "null"

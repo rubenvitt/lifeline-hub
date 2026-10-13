@@ -2,7 +2,7 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -41,6 +41,17 @@ als Marker auf der Lagekarte.
    übergeben“.
 4. Um zur ursprünglichen Meldung zu springen, „Meldung #…“ in der Zeile wählen.
 
+### Lagemeldungen als gesehen markieren
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Bereich „Lage“ „Lagemeldungen“ öffnen. Noch nicht zur Kenntnis genommene Lagemeldungen
+   tragen die Marke „Neu“.
+2. An einer Zeile „Als gesehen markieren“ wählen. Die Marke verschwindet, die Zeile nennt danach
+   „gesehen“ mit Uhrzeit und Namen.
+3. Um alle angezeigten auf einmal abzuhaken, über der Zeitachse „Alle als gesehen markieren“
+   wählen.
+
 ## Hintergrund
 
 ### Was die Übergabe bewirkt
@@ -52,6 +63,19 @@ als Marker auf der Lagekarte.
   „Lagemeldungen“ (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)).
 - Die Meldung selbst bleibt im Modul „Meldungen (eingehend)“ und wird dort weiter bearbeitet.
 
+### Neu und gesehen
+
+- „Neu“ gilt für alle gleich: Sobald eine Person eine Lagemeldung als gesehen markiert, ist sie
+  für alle gesehen. Es zählt die erste Markierung; eine zweite ändert Zeit und Namen nicht.
+- Die Zahl der neuen Lagemeldungen steht im Modulmenü am Modul „Lagemeldungen“ („2 neue
+  Lagemeldungen“) und auf der Stab-Seite in der Kachel S2, beide mit derselben Zahl. Steht keine
+  neue an, zeigt das Modulmenü keine Zahl.
+- „Alle als gesehen markieren“ erfasst nur die Lagemeldungen, die beim Wählen angezeigt waren.
+  Eine, die in diesem Moment eingeht, bleibt neu.
+- Wird eine schon gesehene Meldung mit geändertem Lage-Text erneut übergeben, ist die
+  Lagemeldung wieder neu.
+- Lagemeldungen, die vor dieser Funktion übergeben wurden, gelten als gesehen, ohne Namen.
+
 ### Leere Ansicht
 
 Ist noch nichts übergeben, steht „Noch keine Lagemeldungen“ mit dem Knopf „Zu den Meldungen“.
@@ -61,5 +85,7 @@ Passt nichts zum Filter, steht „Keine Lagemeldung passt zum Filter“ mit „F
 
 Übergeben dürfen alle, die im Modul „Meldungen (eingehend)“ schreiben dürfen: Einsatzleitung und
 Führungspersonal eines laufenden Einsatzes (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
-Die Lagemeldungen hält die App für die Arbeit ohne Netz vor (Kapitel
-[Arbeiten ohne Netz](ohne-netz.md)).
+Als gesehen markieren dürfen alle, die im Modul „Lagemeldungen“ schreiben dürfen; wer nur liest,
+sieht die Marke „Neu“, aber keinen Knopf. Die Lagemeldungen hält die App für die Arbeit ohne Netz
+vor (Kapitel [Arbeiten ohne Netz](ohne-netz.md)); als gesehen markieren geht nur mit Verbindung,
+ohne Netz sind die Knöpfe gesperrt.
