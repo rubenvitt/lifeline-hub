@@ -637,11 +637,19 @@ describe('DemoDatenPage — Invalidierung nach dem Vorgang (D13)', () => {
       globalKeys.personalVorschlaege(),
       globalKeys.materialListe('alle'),
       globalKeys.materialKategorien(),
+      // LLH-1042: der Import legt Einheiten-Vorlagen an, das Entfernen nimmt sie.
+      globalKeys.einheitVorlagenListe('alle'),
       einsatzKeys.etb(41),
       einsatzKeys.einsatz(41),
       einsatzKeys.person(41, 3),
     ];
-    const unberuehrt = [einsatzKeys.etb(99), globalKeys.benutzer(), globalKeys.qualifikationen()];
+    // Einheitstypen nutzt der Import nur mit, auch für die Vorlagen.
+    const unberuehrt = [
+      einsatzKeys.etb(99),
+      globalKeys.benutzer(),
+      globalKeys.qualifikationen(),
+      globalKeys.einheitTypen(),
+    ];
     for (const k of [...betroffen, ...unberuehrt, einsatzKeys.einsatz(52)]) {
       client.setQueryData(k, []);
     }
