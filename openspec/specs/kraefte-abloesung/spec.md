@@ -265,3 +265,13 @@ erscheinen, wenn das Modul für die Person sichtbar ist.
 #### Scenario: Zähler
 - **WHEN** eine Schicht überfällig ist, eine in 20 min fällig und eine in 3 h
 - **THEN** zeigt das Modulpanel am Modul Ablösung die Zahl 2
+
+### Requirement: Auflösen behält abgelöste Schichten
+
+Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht samt offener Fristen
+entfernen und ihre abgelösten Schichten samt Vollzug behalten. Verweist eine Schicht einer
+anderen Einheit auf die aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden.
+
+#### Scenario: Historie bleibt
+- **WHEN** eine Einheit mit zwei abgelösten und einer laufenden Schicht aufgelöst wird
+- **THEN** zeigt die Ablösung die beiden abgelösten Schichten weiter, die laufende nicht mehr

@@ -12,10 +12,10 @@ werden.
 
 Das System SHALL je Einheit und je Person eines Einsatzes ein Ereignisprotokoll führen. Ein
 Ereignis trägt Art (`alarmierung`, `eintreffen`, `abloesung` oder `entlassung`), Zeitpunkt,
-Quelle (`status`, `einheit`, `abloesung` oder `nachtrag`), optional eine Notiz, die erfassende
-Person und den Erfassungszeitpunkt. Das Protokoll MUST append-only sein: Ein Ereignis wird nie
-geändert oder gelöscht, nur gestrichen (siehe Streichung). Die Reihenfolge der Ereignisse MUST
-sich nach ihrem Zeitpunkt richten, nicht nach dem Erfassungszeitpunkt.
+Quelle (`status`, `einheit`, `abloesung`, `nachtrag` oder `disposition`), optional eine Notiz, die
+erfassende Person und den Erfassungszeitpunkt. Das Protokoll MUST append-only sein: Ein Ereignis
+wird nie geändert oder gelöscht, nur gestrichen (siehe Streichung). Die Reihenfolge der
+Ereignisse MUST sich nach ihrem Zeitpunkt richten, nicht nach dem Erfassungszeitpunkt.
 
 #### Scenario: Ereignis bleibt nach Streichung lesbar
 - **WHEN** ein Ereignis „eintreffen 06:40“ gestrichen wird
@@ -24,6 +24,10 @@ sich nach ihrem Zeitpunkt richten, nicht nach dem Erfassungszeitpunkt.
 #### Scenario: Nachtrag reiht sich nach Zeit ein
 - **WHEN** um 09:00 ein Eintreffen für 06:40 nachgetragen wird und bereits eine Alarmierung um 06:10 besteht
 - **THEN** steht das Eintreffen in der Zeitachse nach der Alarmierung
+
+#### Scenario: Entlassen aus der Disposition
+- **WHEN** eine Person über „Entlassen“ aus dem Einsatz genommen wird
+- **THEN** trägt ihre Entlassung die Quelle `disposition`
 
 ### Requirement: Einsatzperioden
 
@@ -256,3 +260,17 @@ Grund nennen und Nachtrag und Streichung gesperrt statt entfernt zeigen.
 #### Scenario: Herkunft sichtbar
 - **WHEN** ein Personen-Ereignis per Fan-out entstanden ist
 - **THEN** zeigt der Eintrag in der Zeitachse der Person das Wort „über Einheit“ mit dem Namen der Einheit
+
+### Requirement: Keine Kraft verliert ihre Zeitachse
+
+Eine Person oder Einheit mit mindestens einem Zeitachsen-Ereignis MUST NOT gelöscht werden
+können; die Datenbank MUST das Löschen ablehnen statt die Ereignisse mitzulöschen. Das Löschen
+eines ganzen Einsatzes (Aufbewahrung, Demo-Daten) MUST seine Zeitachse weiter mit entfernen.
+
+#### Scenario: Löschen scheitert
+- **WHEN** eine Anweisung die Zeile einer Person mit Zeitachse löschen will
+- **THEN** scheitert sie am Fremdschlüssel, und die Ereignisse bleiben
+
+#### Scenario: Einsatz-Purge
+- **WHEN** die Aufbewahrung einen Einsatz endgültig löscht
+- **THEN** sind auch seine Zeitachsen-Ereignisse entfernt
