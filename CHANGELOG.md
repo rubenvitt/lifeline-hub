@@ -1,3 +1,24 @@
+## [1.0.0-alpha.118](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.117...v1.0.0-alpha.118) (2026-10-13)
+
+### Wichtige Änderungen
+
+- **Die Lagebesprechung ist jetzt ein eigenes Einsatzmodul.** Sie steht unter Führung, hat eine eigene Freigabe und hängt nicht mehr am Stab.
+- **Datenbank-Migration beim Update:** Für die Lagebesprechung gilt zunächst dieselbe Rollen-Vorgabe wie für den Stab. Wer den Stab für eine Rolle ausgeblendet hatte, sieht die Lagebesprechung nach dem Update wieder. Die Sichtbarkeit sollte danach geprüft und bei Bedarf neu eingestellt werden.
+- **Geänderte Schnittstelle:** Die bisherigen Stab-Pfade für die Lagebesprechung gibt es nicht mehr. Das Modul hat eigene Endpunkte für Stand, Termin, Verlauf und Abschluss sowie ein eigenes Live-Ereignis. Wer den Termin über die Einsatzkopf-Daten setzen will, bekommt jetzt einen Fehler (400) zurück. Eigene Anbindungen müssen angepasst werden.
+- **Eine Terminänderung schreibt keinen Eintrag mehr ins Einsatztagebuch.**
+
+### Führung
+
+- Die neue Seite „Lagebesprechung“ fasst Termin, Vorbereitung, Abschluss und Verlauf zusammen. Der Termin lässt sich über eine Schnellwahl setzen.
+- Das Löschkreuz am Feld „Termin wählen“ entfernt den Termin.
+- Die Stab-Seite zeigt den Termin der Lagebesprechung in einer eigenen Zeile mit Sprung zur Seite Lagebesprechung. Ist die Lagebesprechung gesperrt, bleiben die Zeile und die Markierung trotzdem sichtbar.
+- Der Termin wird nicht mehr in den Einsatzdaten gepflegt, sondern nur noch im Modul Lagebesprechung.
+- Überblick, Sprungpalette, Lagebericht und Einsatzbericht greifen jetzt auf das neue Modul zu.
+
+### Hilfe und Dokumentation
+
+- Die Anwenderhilfe hat ein eigenes Kapitel zur Lagebesprechung. Die Kapitel Stab und Einsatzdaten sind angepasst, die Bilder wurden neu erstellt.
+
 ## [1.0.0-alpha.117](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.116...v1.0.0-alpha.117) (2026-10-13)
 
 ### Wichtige Änderungen
