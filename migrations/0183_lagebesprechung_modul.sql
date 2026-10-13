@@ -3,8 +3,8 @@
 -- eine Rolle beschränkt, beschränkt damit auch die Lagebesprechung — diese Grenze wandert mit
 -- (keine Sperre wird weicher). Eine Ausblendung (`sichtbar = 0`) wandert NICHT: wer den Stab
 -- ausgeblendet hat, bekommt die Lagebesprechung zurück, genau das ist der Zweck der Change.
--- Herleitung: openspec/changes/llj8s2rt-lagebesprechung-eigenes-modul/design.md (D5),
--- wgnb0am2-stab-abwaehlbar/design.md (D7).
+-- Herleitung: openspec/changes/archive/2026-10-13-llj8s2rt-lagebesprechung-eigenes-modul/
+-- design.md (D5), openspec/changes/archive/2026-10-12-wgnb0am2-stab-abwaehlbar/design.md (D7).
 
 INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle, geaendert_at)
 SELECT einsatz_id, 'lagebesprechung', 1, benoetigte_rolle, datetime('now')

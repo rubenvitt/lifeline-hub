@@ -5,8 +5,8 @@ Server-Gegenstück `src/lagebesprechung/`, `src/routes/lagebesprechung.rs`; erg�
 `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
 
 **Eigenes Modul** (LLH-1111,
-`openspec/changes/llj8s2rt-lagebesprechung-eigenes-modul/design.md`): Key `lagebesprechung`
-unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul,
+`openspec/changes/archive/2026-10-13-llj8s2rt-lagebesprechung-eigenes-modul/design.md`): Key
+`lagebesprechung` unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul,
 nie `stab`). Die Stab-Freigabe wirkt hier nirgends — weder auf Seite, Einstiege, Endpunkte noch
 auf Zeilen der Vorbereitung. Stab-Seite, Überblick-Marke und Palette-Schnellaktion sind nur
 Einstiege und prüfen `istSprungGesperrt('lagebesprechung')`.

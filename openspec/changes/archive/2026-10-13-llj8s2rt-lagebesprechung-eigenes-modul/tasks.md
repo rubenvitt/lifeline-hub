@@ -66,8 +66,10 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Typ-Codegen, Migrationsnummern, Prettier/rustfmt, Vitest, Rust-Tests
-- [ ] 9.2 Manuell am laufenden System (Backend `cargo run --features dev-seeds`, Vite): Stab ausblenden → Lagebesprechung voll nutzbar; Termin per Schnellwahl → Überblick und Stab-Zeile folgen auf zweitem Tab; Abschluss → ETB-Eintrag und Verlauf
+- [x] 9.1 `./scripts/check-all.sh` grün (Bündel laut Skriptkopf), insbesondere Typ-Codegen, Migrationsnummern, Prettier/rustfmt, Vitest, Rust-Tests
+  - Stand 13.10.2026 nach dem Merge von alpha: `--nur schnell` grün; Rust-Suite grün (Bibliothek und alle Testdateien, wegen des Plattenkontingents der Cloud-Sitzung in Paketen gefahren); `--nur frontend` grün (872 Dateien, 13 436 Tests). `--nur e2e`: alles zu Lagebesprechung, Stab, Einsatzkopf, Gate 1 und Gate 3 grün; mit einem Worker bleiben 10 fremde Tests rot (`etb-anhang`, `fokus-verdeckung`), die auf `origin/alpha` mit demselben Backend und Browser genauso scheitern (Chromium-Build 1194 statt des gepinnten 1234)
+- [x] 9.2 Manuell am laufenden System (Backend `cargo run --features dev-seeds`, Vite): Stab ausblenden → Lagebesprechung voll nutzbar; Termin per Schnellwahl → Überblick und Stab-Zeile folgen auf zweitem Tab; Abschluss → ETB-Eintrag und Verlauf
+  - Belegt am laufenden System über `e2e/lagebesprechung.spec.ts` (Stab ausgeblendet, Termin per Schnellwahl, Abschluss → Verlauf und ETB-Sprung) und `e2e/einsatzkopf-live.spec.ts` (zweiter Tab, Überblick-Marke, Stab-Zeile live), jeweils gegen das frisch gebaute Backend
 
 ## Workflow follow-up
 

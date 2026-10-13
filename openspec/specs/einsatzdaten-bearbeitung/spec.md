@@ -10,13 +10,14 @@ geändert werden: jede Angabe einzeln in der Leseansicht, ohne zweiten Bearbeitu
 ### Requirement: Einzelne Angabe in der Leseansicht bearbeiten
 Die Seite Einsatzdaten SHALL die folgenden Angaben einzeln in der Leseansicht bearbeitbar
 machen: Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzort (Adresse), Koordinate des
-Einsatzorts, Einsatzart, Nächste Lagebesprechung, Meldende Stelle, Sachverhalt / Meldebild,
+Einsatzorts, Einsatzart, Meldende Stelle, Sachverhalt / Meldebild,
 Anzahl Betroffene (initial) und Leitstellen-Nr. Während eine Angabe bearbeitet wird, MUST die
 Seite in der Leseansicht bleiben; alle übrigen Angaben bleiben sichtbar. Einsatzleitung,
 Einsatznummer und „Angelegt“ MUST NOT zeilenweise bearbeitbar sein. Adresse und Koordinate des
 Einsatzorts MUST in einem Paneel „Einsatzort“ bearbeitet werden; die Kopfleiste zeigt den
 Einsatzort nur an. Die Zeile ist der einzige Bearbeitungsweg der Seite; ein Formular, das die
-Leseansicht ersetzt, MUST es nicht geben.
+Leseansicht ersetzt, MUST es nicht geben. Den Termin der nächsten Lagebesprechung MUST die
+Seite weder zeigen noch bearbeiten; er gehört dem Modul Lagebesprechung.
 
 #### Scenario: Leitstellen-Nr. nachtragen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Leitstellen-Nr." die Bearbeitung öffnet, `ILS-4711` eingibt und speichert
@@ -37,6 +38,10 @@ Leseansicht ersetzt, MUST es nicht geben.
 #### Scenario: Koordinate nachtragen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Koordinate" im Paneel „Einsatzort" eine MGRS-Angabe eingibt und speichert
 - **THEN** sendet die Seite `einsatzort_lat` und `einsatzort_lon` gemeinsam, und der Kartenausschnitt zeigt den Punkt
+
+#### Scenario: Kein Termin der Lagebesprechung
+- **WHEN** eine schreibberechtigte Person die Seite eines Einsatzes mit gesetztem Termin der nächsten Lagebesprechung öffnet
+- **THEN** zeigt die Seite keine Zeile „Nächste Lagebesprechung“
 
 ### Requirement: Eine Zeile schickt nur ihr eigenes Feld
 Das Speichern einer Zeile SHALL nur die Felder ihrer Angabe an `PATCH /api/einsaetze/{id}`
@@ -96,7 +101,7 @@ und die Zeile nennt den Fehler.
 - **THEN** geht kein PATCH hinaus, die Eingabe zeigt weiter den Text, und die Zeile nennt den Fehler
 
 ### Requirement: Zeitpunkte ohne Zonenversatz
-Alarmzeit und Nächste Lagebesprechung SHALL in der Zeilenbearbeitung in der Anzeigezone
+Die Alarmzeit SHALL in der Zeilenbearbeitung in der Anzeigezone
 angezeigt werden, in der die Leseansicht sie zeigt (Fähigkeit `zeiteingabe`), und als
 UTC-Zeitpunkt (`YYYY-MM-DD HH:mm:ss`) gesendet werden. Der gesendete Zeitpunkt MUST derselbe
 absolute Zeitpunkt sein, den die Person gewählt hat, auch beidseits einer Sommerzeit-Umstellung
@@ -169,7 +174,7 @@ dem Paneel „Einsatzort“. Die Seite MUST die volle Inhaltsbreite nutzen.
 
 #### Scenario: Angaben je Paneel
 - **WHEN** eine Person die Seite öffnet
-- **THEN** trägt „Einsatz“ Bezeichnung, Einsatzart, Einsatznummer, Leitstellen-Nr., Angelegt und Nächste Lagebesprechung, „Einsatzort“ Adresse und Koordinate und „Erstmeldung“ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial)
+- **THEN** trägt „Einsatz“ Bezeichnung, Einsatzart, Einsatznummer, Leitstellen-Nr. und Angelegt, „Einsatzort“ Adresse und Koordinate und „Erstmeldung“ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial)
 
 #### Scenario: Handschirm ohne Querlauf
 - **WHEN** die Seite bei 390 px Breite geöffnet wird

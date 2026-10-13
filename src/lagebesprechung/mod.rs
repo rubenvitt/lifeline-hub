@@ -3,7 +3,7 @@
 //!
 //! Bis LLH-1111 hing alles am Modul Stab (LFH-46, `src/stab/`). Die Lagebesprechung gehört aber
 //! zum Führungsvorgang (FwDV 100, 3.3.3.2) und findet auch ohne Stab statt (Führungsstufe B/C).
-//! Herleitung: `openspec/changes/llj8s2rt-lagebesprechung-eigenes-modul/design.md`.
+//! Herleitung: `openspec/changes/archive/2026-10-13-llj8s2rt-lagebesprechung-eigenes-modul/design.md`.
 //!
 //! **Eine Terminwahrheit:** `einsatz.naechste_lagebesprechung_at`. Der Einsatzkopf liest sie für
 //! alle Mitglieder (LFH-555), geschrieben wird sie nur über dieses Modul (Termin-Endpunkt oder
