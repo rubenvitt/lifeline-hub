@@ -10,7 +10,7 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
   (Spec-Szenario „Veralteter Client …“); PATCH mit `"fortschritt":40` ändert nichts und
   liefert 200 ohne das Feld. Die Grenztests 0–100/400 entfallen, Modulkommentar ohne
   „Fortschritt“. Nachweis: Tests rot vor 1.2–1.4.
-- [x] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0187`):
+- [x] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute `0188`):
   `ALTER TABLE einsatzabschnitt DROP COLUMN fortschritt;` samt Kopfkommentar (LLH-1170,
   Herkunft `0109`). Nachweis: ein Test, dass `PRAGMA table_info('einsatzabschnitt')` keine
   Spalte `fortschritt` mehr meldet; `scripts/check-migrationen.sh` grün.
