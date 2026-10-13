@@ -1,3 +1,66 @@
+## [1.0.0-alpha.121](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.120...v1.0.0-alpha.121) (2026-10-13)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Beim Start laufen zwei neue Migrationen.
+  - Eine Migration fügt den Verteilern von Einsatzbefehlen Felder für die Quittung hinzu: Zeitpunkt und quittierende Person.
+  - Eine zweite Migration entfernt die Spalte „Fortschritt“ aus den Einsatzabschnitten. **Die vorhandenen Fortschrittswerte werden gelöscht.** Seit einiger Zeit hat keine Ansicht sie mehr gezeigt.
+- **Schnittstelle Einsatzabschnitte:** Abschnitte haben kein Feld „Fortschritt“ mehr. Ältere Clients, die den Wert noch senden, bekommen keinen Fehler. Der Wert wird verworfen.
+- **Schnittstelle Informationstelefon:** Die Anrufliste kommt immer seitenweise. Neu sind ein Zähl-Endpunkt, der denselben Filter wie die Liste nutzt, und ein Abruf für einen einzelnen Anruf.
+- **Schnittstelle Einsatzbefehle:** Neu sind Endpunkte, mit denen man den Empfang je Verteiler-Empfänger quittiert und die Quittung zurücknimmt. Die Befehlsliste enthält jetzt den Verteiler und zeigt, ob ein Befehl quittiert werden kann.
+- **Neuer Lesepfad am Einsatz:** Ein neuer Endpunkt liefert die Modul-Vorgaben der Organisation, zu der der Einsatz gehört.
+
+### Führung und Stab
+
+- **Neue Stab-Seite als Übersicht:** Statt der Besetzungsliste zeigt die Seite sechs Kacheln für die Stabsfunktionen S1 bis S6. Am Handy stehen sie untereinander, auf größeren Bildschirmen in zwei oder drei Spalten.
+- **Inhalt einer Kachel:**
+  - die Besetzung und die Schaltfläche „Besetzung ändern“
+  - eine gekürzte Zeile mit den Aufgaben des Sachgebiets, die Fundstelle bleibt sichtbar
+  - alle Werkzeuge des Sachgebiets als gleich große Schaltflächen
+- **Werkzeuge:** Die Begrenzung auf drei Werkzeuge je Kachel entfällt. Nachforderungen gibt es jetzt auch bei S1. S6 bietet Funkplan, Fernmeldeskizze, Sprechgruppen und Kommunikationsplan.
+- **Gesperrte Werkzeuge:** Ein gesperrtes Werkzeug bleibt sichtbar und nennt den Grund. Ausgeblendete Werkzeuge fehlen. Das gilt für Module und Unterseiten gleich.
+- **Zahl je Werkzeug:** Jedes Werkzeug zeigt eine Zahl aus seiner eigenen Quelle:
+  - die Modulzähler wie im Modulmenü
+  - überfällige Aufträge, als Warnung hervorgehoben
+  - offene Presseanfragen
+  - Lücken im Funkplan
+
+  Fehlt die Quelle, steht „—“ mit Grund. Ist ohne Netz kein Stand vorhanden, steht „nicht geladen“ statt einer endlosen Ladeanzeige.
+- **Besetzungsstand:** Der Seitenkopf zeigt, wie viele Funktionen besetzt sind („n/6 besetzt“).
+- **Checkliste Arbeitsaufnahme:** Sind beim Öffnen alle sieben Punkte erledigt, ist die Checkliste eingeklappt und zeigt „7/7 erledigt“. Nach dem letzten Haken klappt sie nicht sofort ein. Nimmt man einen Haken im eingeklappten Zustand zurück, klappt sie wieder auf.
+- **Funkplan:** Das Paneel „Lücken“ zeigt die Zahl der Lücken in seinem Kopf.
+
+### Aufträge und Befehle
+
+- **Quittung je Verteiler-Empfänger:** Jeder Empfänger im Verteiler eines Einsatzbefehls kann den Empfang quittieren. Die Quittung lässt sich auch zurücknehmen.
+  - Quittiert wird ohne Rückfrage. Der Hinweis danach bietet „Rückgängig“.
+  - Jede Quittung schreibt einen Eintrag ins Einsatztagebuch. Der Eintrag nennt den Empfänger als Absender sowie die Fassung und die Nummer des Freigabe-Eintrags.
+- **Nur die gültige Fassung:** Quittieren kann man nur die zuletzt freigegebene Fassung eines Befehls. Wird ein Befehl fortgeschrieben, übernimmt die neue Fassung keine Quittungen.
+- **Befehlskarte und Detail:** Die Karte nennt den Verteiler und zählt bei freigegebenen Befehlen die Quittungen. Das Detail zeigt den Verteiler zusammen mit dem Quittungsstand.
+- **Empfängerfilter:** Der Filter nach Empfänger steht jetzt im Reiter Aufträge und im Reiter Einsatzbefehle.
+
+### Kommunikation und Presse
+
+- **Informationstelefon für viele Anrufe:** Das Anrufprotokoll lädt die Anrufe seitenweise. Mit „Ältere laden“ holt man weitere.
+  - Kennzahlen und die Aufteilung „Nach Anliegen“ zählt der Server. Sie stimmen deshalb auch, wenn nicht alle Anrufe geladen sind.
+  - Medienlage und Presseseite nutzen dieselbe Zählung.
+- **Deeplinks auf einen Anruf:** Ein Link öffnet den Anruf zuverlässig, auch aus der Ansicht „offene Rückrufe“.
+- **Ältere Seiten nachladen:** Während man ältere Anrufe nachlädt, rutschen neue Anrufe anderer Nutzer nicht mehr unbemerkt in die Ansicht.
+
+### Einsatzabschnitte und Überblick
+
+- Der Fortschritt eines Einsatzabschnitts ist ganz entfernt, auch aus Demo-Daten, Import und Schwärzung. In der Anwenderdokumentation sind die Kapitel „Einsatzabschnitt“ und „Überblick“ entsprechend korrigiert.
+
+### Verwaltung
+
+- **Editor „Module“:** Eine Einsatzleitung sieht jetzt auch ohne Rolle in der Organisation, welche Vorgaben die Organisation macht. Dazu gehören der Rollen-Hinweis und die Ausblendung durch die Organisation, auch wenn ein eigener Wert gesetzt ist.
+- **Wer die Vorgaben lesen darf:** Wer im Einsatz mitarbeitet oder zur Organisation des Einsatzes gehört. System-Admins fremder Organisationen ohne Mitgliedschaft und gekoppelte Geräte haben keinen Zugriff.
+- Ändert die Verwaltung eine Modul-Vorgabe, übernehmen alle Einsätze sie.
+
+### Dokumentation
+
+- Die Anwenderdokumentation ist für die neue Stab-Seite, die Quittung von Einsatzbefehlen und das Informationstelefon ergänzt. Die Bilder der betroffenen Kapitel sind neu erzeugt.
+
 ## [1.0.0-alpha.120](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.119...v1.0.0-alpha.120) (2026-10-13)
 
 ### Wichtige Änderungen
