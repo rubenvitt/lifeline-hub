@@ -16,6 +16,7 @@ use crate::einsatzabschnitt::AbschnittLagezustand;
 use crate::gefahr::Warnstufe;
 use crate::katalog::StatusKategorie;
 use crate::person::Sichtungskategorie;
+use crate::staerke::StaerkePosition;
 use crate::uhs::{PlatzTyp, UhsTyp};
 
 /// Stamm-Fahrzeug des Szenarios. Kennung für den Abgleich ist der Funkrufname.
@@ -238,6 +239,79 @@ pub const MATERIAL: [MaterialVorlage; 4] = [
         bezeichnung: "Sanitätsrucksack",
         kategorie: "Sanität",
         bestandsnummer: "DEMO-M-004",
+    },
+];
+
+/// Eine Person der Stammbesetzung einer Demo-Vorlage: Schlüssel aus [`PERSONAL`], optional ein
+/// Fahrzeug-Schlüssel derselben Vorlage und eine Position.
+#[derive(Debug, Clone, Copy)]
+pub struct VorlagePerson {
+    pub personal: &'static str,
+    pub fahrzeug: Option<&'static str>,
+    pub position: Option<StaerkePosition>,
+}
+
+/// Stehende Einheit des Szenarios im Katalog der Einheiten-Vorlagen (LLH-1042). Kennung für den
+/// Abgleich ist der Name unter den aktiven Vorlagen. `ueber` ist der Schlüssel einer früher in
+/// der Liste stehenden Vorlage; `typ` ein Label aus dem Einheitstyp-Katalog.
+#[derive(Debug, Clone, Copy)]
+pub struct EinheitVorlageStamm {
+    pub schluessel: &'static str,
+    pub name: &'static str,
+    pub typ: &'static str,
+    pub ueber: Option<&'static str>,
+    pub tz_fachaufgabe: Option<&'static str>,
+    pub tz_organisation: Option<&'static str>,
+    /// Schlüssel aus [`FAHRZEUGE`], in Anzeigereihenfolge.
+    pub fahrzeuge: &'static [&'static str],
+    pub personal: &'static [VorlagePerson],
+    pub sortier: i64,
+}
+
+const fn vp(
+    personal: &'static str,
+    fahrzeug: Option<&'static str>,
+    position: Option<StaerkePosition>,
+) -> VorlagePerson {
+    VorlagePerson {
+        personal,
+        fahrzeug,
+        position,
+    }
+}
+
+/// Der Sanitätszug mit seiner Rettungsstaffel, so wie das Drehbuch sie im Einsatz bildet
+/// (Spec `demo-daten`, „Demo-Vorlage mit Untereinheit“). Eltern stehen vor ihren Kindern.
+pub const EINHEITEN_VORLAGEN: [EinheitVorlageStamm; 2] = [
+    EinheitVorlageStamm {
+        schluessel: "san_zug",
+        name: "Sanitätszug Musterstadt",
+        typ: "Zug",
+        ueber: None,
+        tz_fachaufgabe: Some("rettungswesen"),
+        tz_organisation: Some("hilfsorganisation"),
+        fahrzeuge: &["elw"],
+        personal: &[
+            vp("zugfuehrer", Some("elw"), Some(StaerkePosition::Fuehrer)),
+            vp("funker", Some("elw"), None),
+        ],
+        sortier: 10,
+    },
+    EinheitVorlageStamm {
+        schluessel: "rettungsstaffel",
+        name: "Rettungsstaffel",
+        typ: "Staffel",
+        ueber: Some("san_zug"),
+        tz_fachaufgabe: Some("rettungswesen"),
+        tz_organisation: Some("hilfsorganisation"),
+        fahrzeuge: &["rtw1", "rtw2"],
+        personal: &[
+            vp("notarzt", Some("rtw1"), None),
+            vp("notsan1", Some("rtw1"), None),
+            vp("rettsan1", Some("rtw2"), None),
+            vp("rettsan2", Some("rtw2"), None),
+        ],
+        sortier: 20,
     },
 ];
 
@@ -1443,13 +1517,19 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
     bedarf
 }
 
-/// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals, jede einmal, in
-/// der Reihenfolge ihres ersten Vorkommens. Fahrzeugtyp und Materialkategorie sind Freitext
-/// und brauchen keinen Katalog.
+/// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals, dann die
+/// Einheitstypen der Vorlagen, jeder einmal, in der Reihenfolge ihres ersten Vorkommens.
+/// Fahrzeugtyp und Materialkategorie sind Freitext und brauchen keinen Katalog.
 pub fn katalog_bedarf_stammdaten() -> Vec<Katalogeintrag> {
     let mut bedarf = Vec::new();
-    for label in PERSONAL.iter().flat_map(|p| p.qualifikationen.iter()) {
-        let eintrag = Katalogeintrag::Qualifikation(label);
+    let qualifikationen = PERSONAL
+        .iter()
+        .flat_map(|p| p.qualifikationen.iter())
+        .map(|label| Katalogeintrag::Qualifikation(label));
+    let typen = EINHEITEN_VORLAGEN
+        .iter()
+        .map(|v| Katalogeintrag::Einheitstyp(v.typ));
+    for eintrag in qualifikationen.chain(typen) {
         if !bedarf.contains(&eintrag) {
             bedarf.push(eintrag);
         }
@@ -1525,21 +1605,86 @@ mod tests {
     }
 
     #[test]
-    fn stammdaten_bedarf_ist_jede_qualifikation_einmal() {
+    fn stammdaten_bedarf_ist_jede_qualifikation_und_jeder_vorlagentyp_einmal() {
         let bedarf = katalog_bedarf_stammdaten();
-        let labels: Vec<&str> = bedarf
-            .iter()
-            .map(|e| match e {
-                Katalogeintrag::Qualifikation(l) => *l,
-                andere => panic!("Stammdaten brauchen nur Qualifikationen: {andere:?}"),
-            })
-            .collect();
+        let mut labels: Vec<&str> = Vec::new();
+        let mut typen: Vec<&str> = Vec::new();
+        for e in &bedarf {
+            match e {
+                Katalogeintrag::Qualifikation(l) => {
+                    assert!(typen.is_empty(), "Qualifikationen stehen vorn: {bedarf:?}");
+                    labels.push(l);
+                }
+                Katalogeintrag::Einheitstyp(t) => typen.push(t),
+                andere => panic!("Stammdaten brauchen Qualifikationen und Typen: {andere:?}"),
+            }
+        }
         alle_eindeutig(labels.iter().copied(), "Qualifikation im Bedarf");
+        alle_eindeutig(typen.iter().copied(), "Einheitstyp im Bedarf");
         for p in PERSONAL {
             for q in p.qualifikationen {
                 assert!(labels.contains(q), "{q} fehlt im Bedarf");
             }
         }
+        for v in EINHEITEN_VORLAGEN {
+            assert!(typen.contains(&v.typ), "{} fehlt im Bedarf", v.typ);
+        }
+    }
+
+    /// Die Demo-Vorlagen verweisen nur auf vorhandene Schlüssel, Eltern stehen vor ihren Kindern,
+    /// ein Fahrzeug oder eine Person steht im Baum höchstens einmal, und die Fahrzeugbindung einer
+    /// Person zeigt auf ein Fahrzeug derselben Vorlage — sonst lehnte das Repo den Import ab.
+    #[test]
+    fn demo_vorlagen_sind_in_sich_stimmig() {
+        alle_eindeutig(
+            EINHEITEN_VORLAGEN.iter().map(|v| v.schluessel),
+            "Vorlagen-Schlüssel",
+        );
+        alle_eindeutig(EINHEITEN_VORLAGEN.iter().map(|v| v.name), "Vorlagen-Name");
+        let mut frueher = BTreeSet::new();
+        for v in EINHEITEN_VORLAGEN {
+            if let Some(u) = v.ueber {
+                assert!(
+                    frueher.contains(u),
+                    "{}: {u} steht nicht davor",
+                    v.schluessel
+                );
+            }
+            frueher.insert(v.schluessel);
+            for f in v.fahrzeuge {
+                assert!(FAHRZEUGE.iter().any(|x| x.schluessel == *f), "Fahrzeug {f}");
+            }
+            for p in v.personal {
+                assert!(
+                    PERSONAL.iter().any(|x| x.schluessel == p.personal),
+                    "{}",
+                    p.personal
+                );
+                if let Some(f) = p.fahrzeug {
+                    assert!(
+                        v.fahrzeuge.contains(&f),
+                        "{}: {f} nicht in der Vorlage",
+                        p.personal
+                    );
+                }
+            }
+        }
+        // Beide Vorlagen bilden einen Baum: alles darin höchstens einmal.
+        alle_eindeutig(
+            EINHEITEN_VORLAGEN
+                .iter()
+                .flat_map(|v| v.fahrzeuge.iter().copied()),
+            "Fahrzeug im Vorlagen-Baum",
+        );
+        alle_eindeutig(
+            EINHEITEN_VORLAGEN
+                .iter()
+                .flat_map(|v| v.personal.iter().map(|p| p.personal)),
+            "Person im Vorlagen-Baum",
+        );
+        assert_eq!(EINHEITEN_VORLAGEN[0].name, "Sanitätszug Musterstadt");
+        assert_eq!(EINHEITEN_VORLAGEN[1].name, "Rettungsstaffel");
+        assert_eq!(EINHEITEN_VORLAGEN[1].ueber, Some("san_zug"));
     }
 
     /// Zeitfolge: `vor_min` fällt nicht streng, der erste Schritt liegt nicht vor dem

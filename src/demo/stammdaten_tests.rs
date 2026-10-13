@@ -77,16 +77,17 @@ fn zeile(ergebnis: &StammdatenErgebnis, art: DemoStammdatenArt) -> DemoBerichtZe
         .unwrap_or_else(|| panic!("keine Berichtszeile für {art:?}"))
 }
 
-fn erwarte_bericht(ergebnis: &StammdatenErgebnis, erwartet: [(i64, i64); 3]) {
+fn erwarte_bericht(ergebnis: &StammdatenErgebnis, erwartet: [(i64, i64); 4]) {
     let arten = [
         DemoStammdatenArt::Fahrzeug,
         DemoStammdatenArt::Personal,
         DemoStammdatenArt::Material,
+        DemoStammdatenArt::EinheitVorlage,
     ];
     assert_eq!(
         ergebnis.je_art.iter().map(|z| z.art).collect::<Vec<_>>(),
         arten.to_vec(),
-        "alle drei Arten, in Enum-Reihenfolge"
+        "alle Arten, in Enum-Reihenfolge"
     );
     for (art, (angelegt, mitbenutzt)) in arten.into_iter().zip(erwartet) {
         assert_eq!(
@@ -124,8 +125,21 @@ async fn bild_org(pool: &SqlitePool, org_id: i64) -> Vec<(&'static str, Vec<Stri
         "personal_status",
         "qualifikation",
         "einheit_typ",
+        "einheit_vorlage",
     ] {
         bild.push((tabelle, zeilen(pool, tabelle, "org_id = ?", org_id).await));
+    }
+    for tabelle in ["einheit_vorlage_fahrzeug", "einheit_vorlage_personal"] {
+        bild.push((
+            tabelle,
+            zeilen(
+                pool,
+                tabelle,
+                "vorlage_id IN (SELECT id FROM einheit_vorlage WHERE org_id = ?)",
+                org_id,
+            )
+            .await,
+        ));
     }
     bild.push((
         "personal_qualifikation",
@@ -179,6 +193,7 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
     assert_eq!(erg.fahrzeuge.len(), szenario::FAHRZEUGE.len());
@@ -261,8 +276,20 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
         assert_eq!(marke(&pool, "material", id).await, Some(a.kopf), "{bez}");
     }
 
-    let angelegt =
-        (szenario::FAHRZEUGE.len() + szenario::PERSONAL.len() + szenario::MATERIAL.len()) as i64;
+    for v in szenario::EINHEITEN_VORLAGEN {
+        let id = erg.einheit_vorlagen[v.schluessel];
+        assert_eq!(
+            marke(&pool, "einheit_vorlage", id).await,
+            Some(a.kopf),
+            "{}",
+            v.name
+        );
+    }
+
+    let angelegt = (szenario::FAHRZEUGE.len()
+        + szenario::PERSONAL.len()
+        + szenario::MATERIAL.len()
+        + szenario::EINHEITEN_VORLAGEN.len()) as i64;
     assert_eq!(
         anzahl(
             &pool,
@@ -345,6 +372,7 @@ async fn vorhandenes_fahrzeug_in_dienst_wird_mitbenutzt_unveraendert_und_unmarki
             (szenario::FAHRZEUGE.len() as i64 - 1, 1),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -417,6 +445,7 @@ async fn ausser_dienst_gestellter_namensvetter_bleibt_und_ein_neues_entsteht() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -455,6 +484,7 @@ async fn personal_gleichen_namens_mit_anderer_nummer_wird_neu_angelegt() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -537,6 +567,7 @@ async fn personal_gleicher_nummer_mitbenutzt_benutzer_und_link_unberuehrt() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64 - 1, 1),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -561,6 +592,7 @@ async fn material_gleicher_bestandsnummer_wird_mitbenutzt() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64 - 1, 1),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -591,6 +623,7 @@ async fn gleiche_kennungen_einer_fremden_org_werden_nicht_mitbenutzt() {
             (szenario::FAHRZEUGE.len() as i64, 0),
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
+            (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
         ],
     );
 }
@@ -934,7 +967,22 @@ async fn rundlauf_angelegtes_verschwindet_mitbenutztes_bleibt() {
             (DemoStammdatenArt::Fahrzeug, angelegt_f.len() as i64, 0),
             (DemoStammdatenArt::Personal, angelegt_p.len() as i64, 0),
             (DemoStammdatenArt::Material, angelegt_m.len() as i64, 0),
+            (
+                DemoStammdatenArt::EinheitVorlage,
+                szenario::EINHEITEN_VORLAGEN.len() as i64,
+                0
+            ),
         ]
+    );
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM einheit_vorlage WHERE org_id = ?",
+            a.org
+        )
+        .await,
+        0,
+        "die Demo-Vorlagen sind fort und hielten keine Fahrzeuge fest"
     );
 }
 
@@ -985,4 +1033,254 @@ async fn listen_melden_angelegtes_als_demo_und_mitbenutztes_nicht() {
         );
     }
     assert_eq!(erg.fahrzeug(szenario::FAHRZEUGE[0].schluessel).unwrap(), fz);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Einheiten-Vorlagen (LLH-1042)
+// ---------------------------------------------------------------------------------------------
+
+async fn vorlagen(pool: &SqlitePool, org_id: i64) -> Vec<crate::einheit_vorlage::EinheitVorlage> {
+    crate::einheit_vorlage::repo::list(pool, org_id, false)
+        .await
+        .unwrap()
+}
+
+async fn entfernen(pool: &SqlitePool, org_id: i64) -> super::DemoBericht {
+    crate::write_retry!(pool, |conn| { entfernen_tx(conn, org_id).await }).expect("entfernen")
+}
+
+fn entfernt_behalten(bericht: &super::DemoBericht, art: DemoStammdatenArt) -> (i64, i64) {
+    let z = bericht.je_art.iter().find(|z| z.art == art).unwrap();
+    (z.entfernt, z.behalten)
+}
+
+/// Spec `demo-daten`, „Demo-Vorlage mit Untereinheit“: der Sanitätszug steht mit der
+/// Rettungsstaffel darunter, beide markiert, mit den Demo-Fahrzeugen und der Stammbesetzung.
+#[tokio::test]
+async fn demo_vorlage_steht_mit_untereinheit_marke_und_fahrzeugen() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+
+    let liste = vorlagen(&pool, a.org).await;
+    assert_eq!(liste.len(), 2);
+    let zug = liste
+        .iter()
+        .find(|v| v.name == "Sanitätszug Musterstadt")
+        .unwrap();
+    let staffel = liste.iter().find(|v| v.name == "Rettungsstaffel").unwrap();
+    assert_eq!(zug.id, erg.einheit_vorlagen["san_zug"]);
+    assert_eq!(staffel.ueber_vorlage_id, Some(zug.id));
+    assert!(zug.ist_demo && staffel.ist_demo);
+    assert_eq!(zug.typ_label, "Zug");
+    assert_eq!(staffel.typ_label, "Staffel");
+    assert_eq!(staffel.tz_fachaufgabe.as_deref(), Some("rettungswesen"));
+    assert_eq!(
+        staffel
+            .fahrzeuge
+            .iter()
+            .map(|f| f.fahrzeug_id)
+            .collect::<Vec<_>>(),
+        vec![erg.fahrzeug("rtw1").unwrap(), erg.fahrzeug("rtw2").unwrap()]
+    );
+    assert!(staffel.fahrzeuge.iter().all(|f| f.ist_demo));
+    let zugfuehrer = zug
+        .personal
+        .iter()
+        .find(|p| p.personal_id == erg.personal("zugfuehrer").unwrap())
+        .unwrap();
+    assert_eq!(zugfuehrer.fahrzeug_id, Some(erg.fahrzeug("elw").unwrap()));
+    assert_eq!(
+        zugfuehrer.staerke_position,
+        Some(crate::staerke::StaerkePosition::Fuehrer)
+    );
+    assert_eq!(staffel.personal.len(), 4);
+    assert_eq!(
+        marke(&pool, "einheit_vorlage", staffel.id).await,
+        Some(a.kopf)
+    );
+}
+
+/// Konfliktregel: eine aktive Vorlage gleichen Namens wird mitbenutzt, unverändert und ohne
+/// Marke. Die Untereinheit des Szenarios entsteht dann ohne Unterstellung, damit sie nicht in
+/// einen fremden Baum gerät.
+#[tokio::test]
+async fn vorhandene_vorlage_gleichen_namens_wird_mitbenutzt() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let zug_typ: i64 =
+        sqlx::query_scalar("SELECT id FROM einheit_typ WHERE org_id = ? AND label = 'Gruppe'")
+            .bind(a.org)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let eigen = crate::einheit_vorlage::repo::create(
+        &pool,
+        a.org,
+        crate::einheit_vorlage::repo::NeueVorlage {
+            name: "Sanitätszug Musterstadt",
+            typ_id: zug_typ,
+            ueber_vorlage_id: None,
+            funkrufname: None,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+            soll: None,
+            bemerkung: None,
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    let vorher = zeilen(&pool, "einheit_vorlage", "id = ?", eigen.id).await;
+
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+
+    assert_eq!(erg.einheit_vorlagen["san_zug"], eigen.id);
+    assert_eq!(
+        zeile(&erg, DemoStammdatenArt::EinheitVorlage),
+        DemoBerichtZeile {
+            art: DemoStammdatenArt::EinheitVorlage,
+            angelegt: 1,
+            mitbenutzt: 1,
+            entfernt: 0,
+            behalten: 0,
+        }
+    );
+    assert_eq!(
+        zeilen(&pool, "einheit_vorlage", "id = ?", eigen.id).await,
+        vorher
+    );
+    assert_eq!(marke(&pool, "einheit_vorlage", eigen.id).await, None);
+    let liste = vorlagen(&pool, a.org).await;
+    let eigen_nachher = liste.iter().find(|v| v.id == eigen.id).unwrap();
+    assert!(eigen_nachher.fahrzeuge.is_empty() && eigen_nachher.personal.is_empty());
+    let staffel = liste.iter().find(|v| v.name == "Rettungsstaffel").unwrap();
+    assert_eq!(staffel.ueber_vorlage_id, None);
+    assert!(staffel.ist_demo);
+
+    let bericht = entfernen(&pool, a.org).await;
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::EinheitVorlage),
+        (1, 0)
+    );
+    assert_eq!(
+        zeilen(&pool, "einheit_vorlage", "id = ?", eigen.id).await,
+        vorher,
+        "die mitbenutzte Vorlage bleibt"
+    );
+}
+
+/// Spec `demo-daten`, „Eigene Untereinheit unter der Demo-Vorlage“: die Demo-Vorlage bleibt ohne
+/// Marke stehen und zählt als behalten; ihre Stamm-Fahrzeuge und -Personen hält sie fest.
+#[tokio::test]
+async fn eigene_untereinheit_haelt_die_demo_vorlage() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let zug = erg.einheit_vorlagen["san_zug"];
+    let typ: i64 = sqlx::query_scalar("SELECT typ_id FROM einheit_vorlage WHERE id = ?")
+        .bind(zug)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    crate::einheit_vorlage::repo::create(
+        &pool,
+        a.org,
+        crate::einheit_vorlage::repo::NeueVorlage {
+            name: "Eigene Gruppe",
+            typ_id: typ,
+            ueber_vorlage_id: Some(zug),
+            funkrufname: None,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+            soll: None,
+            bemerkung: None,
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    let bericht = entfernen(&pool, a.org).await;
+
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::EinheitVorlage),
+        (1, 1),
+        "die Staffel fällt, der Zug bleibt"
+    );
+    let liste = vorlagen(&pool, a.org).await;
+    let zug_nachher = liste.iter().find(|v| v.id == zug).expect("Zug bleibt");
+    assert!(!zug_nachher.ist_demo, "ohne Marke");
+    assert!(liste.iter().all(|v| v.name != "Rettungsstaffel"));
+    // Der Zug hält ELW, Zugführer und Funker; die Fahrzeuge der Staffel sind fort.
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::Fahrzeug),
+        (szenario::FAHRZEUGE.len() as i64 - 1, 1)
+    );
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::Personal),
+        (szenario::PERSONAL.len() as i64 - 2, 2)
+    );
+}
+
+/// Eine Demo-Vorlage, die ein Admin unter eine eigene Vorlage gestellt hat, bleibt ebenfalls
+/// stehen (Spec: „als Untereinheit oder Obereinheit“).
+#[tokio::test]
+async fn demo_vorlage_unter_eigener_obereinheit_bleibt() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let zug = erg.einheit_vorlagen["san_zug"];
+    let staffel = erg.einheit_vorlagen["rettungsstaffel"];
+    let typ: i64 = sqlx::query_scalar("SELECT typ_id FROM einheit_vorlage WHERE id = ?")
+        .bind(zug)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let verband = crate::einheit_vorlage::repo::create(
+        &pool,
+        a.org,
+        crate::einheit_vorlage::repo::NeueVorlage {
+            name: "Eigener Verband",
+            typ_id: typ,
+            ueber_vorlage_id: None,
+            funkrufname: None,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+            soll: None,
+            bemerkung: None,
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    crate::einheit_vorlage::repo::update(
+        &pool,
+        a.org,
+        staffel,
+        crate::einheit_vorlage::repo::VorlagePatch {
+            ueber_vorlage_id: Some(Some(verband.id)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    let bericht = entfernen(&pool, a.org).await;
+
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::EinheitVorlage),
+        (1, 1)
+    );
+    let ids: Vec<i64> = vorlagen(&pool, a.org).await.iter().map(|v| v.id).collect();
+    assert!(ids.contains(&staffel) && !ids.contains(&zug), "{ids:?}");
+    assert_eq!(marke(&pool, "einheit_vorlage", staffel).await, None);
 }

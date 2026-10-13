@@ -460,7 +460,7 @@ async fn status_vorher_nachher_und_409_paare() {
     );
     assert_eq!(importiert["bericht"]["vorgang"], "importiert");
     let je_art = importiert["bericht"]["je_art"].as_array().unwrap();
-    assert_eq!(je_art.len(), 3, "{importiert}");
+    assert_eq!(je_art.len(), 4, "{importiert}");
     for zeile in je_art {
         assert!(zeile["angelegt"].as_i64().unwrap() > 0, "{zeile}");
     }
@@ -1122,6 +1122,23 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
         "/api/material".into(),
         r#"{"bezeichnung":"Vorhandenes Material","kategorie":"Betreuung","bestandsnummer":"DEMO-M-001"}"#
             .into(),
+    )
+    .await;
+    let (status, typen) = common::anfrage(app, "GET", "/api/einheit-typen", admin, None).await;
+    assert!(
+        status.is_success(),
+        "GET /api/einheit-typen: {status} {typen}"
+    );
+    let zug = typen
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["label"] == "Zug")
+        .expect("Einheitstyp Zug der Startliste")["id"]
+        .clone();
+    post(
+        "/api/einheit-vorlagen".into(),
+        format!(r#"{{"name":"Sanitätszug Musterstadt","typ_id":{zug}}}"#),
     )
     .await;
 }
