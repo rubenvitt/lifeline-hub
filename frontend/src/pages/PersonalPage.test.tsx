@@ -382,7 +382,10 @@ describe('PersonalPage', () => {
     // Der Name über `aria-labelledby` trägt in jsdom nicht: `useId` liefert hier überall „test-id“.
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Thomas Müller stornieren?');
-    expect(dialog).toHaveTextContent('in keiner Liste und keinem Nachweis');
+    // Ein kurzer Satz zur Folge, kein Bedienhinweis (LFH-1078).
+    expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
+      /^Die Person erscheint danach in keiner Liste und keinem Nachweis\.$/,
+    );
     expect(gesendet).toBe(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Stornieren' }));
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;

@@ -718,8 +718,7 @@ export default function PersonalPage() {
           </Space>
         }
       >
-        Die Disposition war ein Fehler: die Person erscheint danach in keiner Liste und keinem
-        Nachweis, ihre Zeitachse wird gestrichen. Wer im Einsatz war, wird entlassen.
+        Die Person erscheint danach in keiner Liste und keinem Nachweis.
       </Modal>
 
       {/* Person aus dem Stamm disponieren, im Serienmodus wie die Ad-hoc-Kette. */}

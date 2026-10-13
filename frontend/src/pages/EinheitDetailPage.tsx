@@ -599,7 +599,7 @@ export default function EinheitDetailPage() {
                   </Button>
                   <Popconfirm
                     title="Einheit auflösen?"
-                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch. Die Einheit bleibt mit Zeitachse und Tagebuch im Nachweis."
+                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
                     okText="Einheit auflösen"
                     okButtonProps={{ danger: true }}
                     onConfirm={() => {
