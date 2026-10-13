@@ -800,3 +800,101 @@ async fn staerke_position_aendern_feuert_einheit_und_uhs_nur_bei_wirksamer_aende
         "Position einer UHS-Kraft geleert"
     );
 }
+
+/// Die wirksame Position ist der Override vor dem Stamm-Default. Ein Override auf den Stamm-Wert
+/// und ein Statuswechsel ändern die Einheit nicht; ein abweichender Override und sein Löschen
+/// (zurück auf den Stamm-Wert) ändern sie.
+#[tokio::test]
+async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(r#"{"name":"Stamm Mannschaft","staerke_position":"mannschaft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let pid = json["id"].as_i64().unwrap();
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(
+        json["staerke_position"], "mannschaft",
+        "Stamm-Default wirkt"
+    );
+    let ep = json["id"].as_i64().unwrap();
+    let einheit = einheit_mit(&app, &admin, einsatz, ep).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let im_einsatz = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == "im Einsatz")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+
+    let mut rx = live.abonniere(einsatz);
+    let patch = |body: String| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &admin,
+                Some(&body),
+            )
+            .await
+            .0
+        }
+    };
+
+    assert_eq!(
+        patch(r#"{"staerke_position":"mannschaft"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "Override gleich Stamm-Wert"
+    );
+    assert_eq!(
+        patch(format!(r#"{{"status_id":{im_einsatz}}}"#)).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "nur Status");
+    assert_eq!(
+        patch(r#"{"staerke_position":"fuehrer"}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "abweichender Override"
+    );
+    assert_eq!(
+        patch(r#"{"staerke_position":null}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Override gelöscht, Stamm-Wert wirkt wieder"
+    );
+    assert_eq!(
+        patch(r#"{"staerke_position":null}"#.into()).await,
+        StatusCode::OK
+    );
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "schon gelöscht");
+}

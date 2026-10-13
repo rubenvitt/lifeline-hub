@@ -738,7 +738,11 @@ async fn status_seit_nur_bei_echtem_statuswechsel() {
 
 // ---------- Fremd-Ereignisse (LLH-1182) ----------
 
-const FREMD: &[(&str, &str)] = &[("einheit", "einheit_id"), ("personal", "personal_id")];
+const FREMD: &[(&str, &str)] = &[
+    ("einheit", "einheit_id"),
+    ("personal", "personal_id"),
+    ("bereitstellungsraum", "br_id"),
+];
 
 fn ereignis(tag: &str, id: i64) -> (String, i64) {
     (tag.to_string(), id)
@@ -758,10 +762,11 @@ async fn in_einheit(app: &axum::Router, cookie: &str, einsatz: i64, ef: i64) -> 
     einheit
 }
 
-/// Das Entfernen nimmt der Einheit ein Mitglied (und ändert ihren abgeleiteten Status) und löst
-/// die Besatzung (`fahrzeug_id` → NULL in der Personalliste). `fahrzeug` erreicht Einheiten- und
-/// Personalleser ohne Fahrzeugrecht nicht; `einheit` bzw. je Kraft `personal` tragen es, aber nur,
-/// wenn das Fahrzeug dort stand.
+/// Das Entfernen nimmt der Einheit ein Mitglied (und ändert ihren abgeleiteten Status), löst die
+/// Besatzung (`fahrzeug_id` → NULL in der Personalliste) und nimmt das Fahrzeug aus dem Detail
+/// seines Bereitstellungsraums. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
+/// nicht und invalidiert das BR-Detail nicht; `einheit`, je Kraft `personal` und
+/// `bereitstellungsraum` tragen es, aber nur, wenn das Fahrzeug dort stand.
 #[tokio::test]
 async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     let (app, live) = setup_mit_live().await;
@@ -781,6 +786,34 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "Besatzung zuordnen");
+    let im_br = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 4").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Nord"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let br = json["id"].as_i64().unwrap();
+    for (pfad, body) in [
+        ("status".to_string(), r#"{"status":"aktiv"}"#.to_string()),
+        (
+            "belegung".to_string(),
+            format!(r#"{{"objekt_typ":"fahrzeug","objekt_id":{im_br},"art":"eintritt"}}"#),
+        ),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/{pfad}"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert!(s.is_success(), "{pfad}: {s} {json}");
+    }
 
     let mut rx = live.abonniere(einsatz);
     let entfernen = |ef: i64| {
@@ -811,6 +844,12 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("personal", ep)],
         "Besatzung gelöst"
+    );
+    assert_eq!(entfernen(im_br).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("bereitstellungsraum", br)],
+        "Fahrzeug im Bereitstellungsraum"
     );
 }
 

@@ -239,11 +239,11 @@ pub async fn aktualisieren(
             super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
         }
     }
-    let zeile_geaendert = vorher.menge != nachher.menge
+    let has_row_changed = vorher.menge != nachher.menge
         || vorher.status != nachher.status
         || vorher.bemerkung != nachher.bemerkung
         || vorher.uhs_id != nachher.uhs_id;
-    if zeile_geaendert {
+    if has_row_changed {
         if let Some(uhs_id) = vorher.uhs_id {
             sse_uhs(&state, einsatz_id, uhs_id);
         }

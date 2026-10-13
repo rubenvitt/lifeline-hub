@@ -761,7 +761,7 @@ async fn material_disponieren(app: &axum::Router, admin: &str, einsatz: i64, bez
     json["id"].as_i64().unwrap()
 }
 
-async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -> i64 {
+async fn create_uhs(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
@@ -802,7 +802,7 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
     let im_zug = material_disponieren(&app, &admin, einsatz, "Trage").await;
     let an_uhs = material_disponieren(&app, &admin, einsatz, "Verbandkasten").await;
     let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
-    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS 1").await;
+    let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
     let (s, json) = anfrage(
         &app,
         "PATCH",
@@ -857,8 +857,8 @@ async fn aendern_feuert_einheit_und_uhs_nur_wenn_deren_ansicht_sich_aendert() {
     let frei = material_disponieren(&app, &admin, einsatz, "Wolldecke").await;
     let im_zug = material_disponieren(&app, &admin, einsatz, "Trage").await;
     let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
-    let uhs_a = uhs_anlegen(&app, &admin, einsatz, "UHS A").await;
-    let uhs_b = uhs_anlegen(&app, &admin, einsatz, "UHS B").await;
+    let uhs_a = create_uhs(&app, &admin, einsatz, "UHS A").await;
+    let uhs_b = create_uhs(&app, &admin, einsatz, "UHS B").await;
 
     let mut rx = live.abonniere(einsatz);
     let patch = |em: i64, body: String| {
@@ -949,5 +949,50 @@ async fn aendern_feuert_einheit_und_uhs_nur_wenn_deren_ansicht_sich_aendert() {
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("uhs", uhs_b)],
         "von der UHS gelöst"
+    );
+}
+
+/// Material in einer Einheit und zugleich an einer UHS: ein Statuswechsel ändert beide Ansichten,
+/// eine Bemerkung nur das UHS-Detail.
+#[tokio::test]
+async fn material_in_einheit_und_an_uhs_meldet_beide_ansichten() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = material_disponieren(&app, &admin, einsatz, "Trage").await;
+    let einheit = in_einheit(&app, &admin, einsatz, em).await;
+    let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/material/{em}");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"uhs_id":{uhs}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"status":"defekt"}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit), ereignis("uhs", uhs)],
+        "Status: Einheit und UHS"
+    );
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"bemerkung":"Gurt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Bemerkung: nur UHS"
     );
 }

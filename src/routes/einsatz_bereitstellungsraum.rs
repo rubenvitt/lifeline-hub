@@ -44,7 +44,7 @@ pub struct BrFahrzeugKurz {
 
 // ---------- ETB-/SSE-Helfer ----------
 
-fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
+pub(super) fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Bereitstellungsraum, "br_id", br_id);
