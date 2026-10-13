@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::vorlagendokument::anlage::AnlagenTabelle;
+use crate::vorlagendokument::verteiler::VerteilerTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
 /// Lagebericht-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `LageberichtVorlageKey`).
@@ -134,6 +135,10 @@ impl Dokumentart for Lagebericht {
     const IM_NOMEN: &'static str = "im Bericht";
     const ANLAGEN: Option<&'static AnlagenTabelle> = Some(&AnlagenTabelle {
         tabelle: "lagebericht_anlage",
+        dokument_spalte: "lagebericht_id",
+    });
+    const VERTEILER: Option<&'static VerteilerTabelle> = Some(&VerteilerTabelle {
+        tabelle: "lagebericht_verteiler",
         dokument_spalte: "lagebericht_id",
     });
 }

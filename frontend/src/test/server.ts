@@ -177,4 +177,12 @@ export const server = setupServer(
   http.get('/api/einsaetze/:einsatzId/stab', () =>
     HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
   ),
+  /**
+   * Abschnitte, Einheiten und externe Stellen — leer als Default. Der Verteiler im Entwurf von
+   * Befehl und Lagebericht (LLH-1172) fragt sie als Optionen ab; Tests mit Optionen überschreiben
+   * per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/einheiten', () => HttpResponse.json([])),
+  http.get('/api/externe-stellen', () => HttpResponse.json([])),
 );

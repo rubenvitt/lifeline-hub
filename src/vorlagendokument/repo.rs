@@ -31,6 +31,8 @@ pub struct Dokument<A> {
     pub freigegeben_von_name: Option<String>,
     pub freigegeben_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    /// Verteiler in Reihenfolge (LLH-1172); leer bei einer Art ohne [`Dokumentart::VERTEILER`].
+    pub verteiler: Vec<super::verteiler::VerteilerEintragAnzeige>,
 }
 
 /// Editierbare Felder eines Entwurfs-PATCH. `None` = unverändert.
@@ -39,6 +41,9 @@ pub struct Patch<'a, A> {
     pub titel: Option<&'a str>,
     pub zeitstand: Option<&'a str>,
     pub abschnitte: Option<&'a [A]>,
+    /// Ersetzt den Verteiler ganz (LLH-1172), geprüft von `auftrag::eingabe::validate_verteiler`;
+    /// leer leert ihn.
+    pub verteiler: Option<&'a [crate::auftrag::repo::EmpfaengerEingabe]>,
 }
 
 // Von Hand statt per derive: das derive verlangte `A: Default`.
@@ -48,6 +53,7 @@ impl<A> Default for Patch<'_, A> {
             titel: None,
             zeitstand: None,
             abschnitte: None,
+            verteiler: None,
         }
     }
 }
@@ -71,6 +77,7 @@ struct Row {
     freigegeben_von_name: Option<String>,
     freigegeben_at: Option<String>,
     etb_eintrag_id: Option<i64>,
+    verteiler: String,
 }
 
 fn select<T: Dokumentart>() -> String {
@@ -81,10 +88,11 @@ fn select<T: Dokumentart>() -> String {
            l.ersteller_id, b1.anzeigename AS ersteller_name, \
            l.erstellt_at, l.aktualisiert_at, \
            l.freigegeben_von_id, b2.anzeigename AS freigegeben_von_name, \
-           l.freigegeben_at, l.etb_eintrag_id \
+           l.freigegeben_at, l.etb_eintrag_id, {} AS verteiler \
     FROM {} l \
     JOIN benutzer b1 ON b1.id = l.ersteller_id \
     LEFT JOIN benutzer b2 ON b2.id = l.freigegeben_von_id",
+        super::verteiler::json_column::<T>("l"),
         T::TABELLE
     )
 }
@@ -110,6 +118,7 @@ fn zu_dokument<T: Dokumentart>(row: Row) -> Result<Dokument<T::Abschnitt>, AppEr
         freigegeben_von_name: row.freigegeben_von_name,
         freigegeben_at: row.freigegeben_at,
         etb_eintrag_id: row.etb_eintrag_id,
+        verteiler: super::verteiler::from_json(&row.verteiler)?,
     })
 }
 
@@ -249,16 +258,18 @@ pub async fn anlegen_tx<T: Dokumentart>(
     laden::<T>(&mut *conn, einsatz_id, id).await
 }
 
-/// Pool-Hülle um [`aktualisiere_tx`]: ohne eigene Transaktion, UPDATE und Rücklesen laufen
-/// im Autocommit einer geliehenen Verbindung.
+/// Pool-Hülle um [`aktualisiere_tx`] in `write_retry!`: UPDATE, Ersetzen des Verteilers und
+/// Rücklesen gelingen zusammen oder gar nicht (LLH-1172, design.md D2). Eine Freigabe dazwischen
+/// kann den Verteiler so nicht mehr verändern.
 pub async fn aktualisiere<T: Dokumentart>(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: Patch<'_, T::Abschnitt>,
 ) -> Result<Dokument<T::Abschnitt>, AppError> {
-    let mut conn = pool.acquire().await?;
-    aktualisiere_tx::<T>(&mut conn, einsatz_id, id, &patch).await
+    crate::write_retry!(pool, |conn| {
+        aktualisiere_tx::<T>(conn, einsatz_id, id, &patch).await
+    })
 }
 
 /// Partielles Update eines Entwurfs (Titel/Zeitstand/Abschnitte) auf einer offenen
@@ -298,6 +309,10 @@ pub async fn aktualisiere_tx<T: Dokumentart>(
     .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
+    }
+    // Nach dem UPDATE mit Status-Guard: steht der Entwurf nicht mehr, ist hier schon abgebrochen.
+    if let Some(verteiler) = patch.verteiler {
+        super::verteiler::replace_tx::<T>(&mut *conn, einsatz_id, id, verteiler).await?;
     }
     laden::<T>(&mut *conn, einsatz_id, id).await
 }
@@ -345,6 +360,10 @@ pub async fn freigeben_tx<T: Dokumentart>(
     let mut render = render_snapshot(v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
     // LFH-1028: die Anlagen stehen im selben Snapshot, gelesen in derselben Transaktion.
     render.push_str(&super::anlage::snapshot_abschnitt::<T>(&mut *conn, einsatz_id, id).await?);
+    // LLH-1172: der Verteiler nach den Anlagen und als `an`; ohne Verteiler bleibt beides wie
+    // vorher (kein Abschnitt, `an` = „System“).
+    render.push_str(&super::verteiler::render_abschnitt(&dok.verteiler));
+    let an = super::verteiler::build_an(&dok.verteiler);
     snapshot_freigeben_tx::<T>(
         &mut *conn,
         einsatz_id,
@@ -352,6 +371,7 @@ pub async fn freigeben_tx<T: Dokumentart>(
         freigeber_id,
         &render,
         &dok.zeitstand,
+        an.as_deref(),
     )
     .await?;
     laden::<T>(&mut *conn, einsatz_id, id).await
@@ -369,6 +389,7 @@ async fn snapshot_freigeben_tx<T: Dokumentart>(
     freigeber_id: i64,
     render: &str,
     zeitstand: &str,
+    an: Option<&str>,
 ) -> Result<i64, AppError> {
     let etb_startwert =
         crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
@@ -383,7 +404,7 @@ async fn snapshot_freigeben_tx<T: Dokumentart>(
             typ: T::ETB_TYP,
             inhalt: render,
             von: None,
-            an: None,
+            an,
             meldeweg: None,
             veranlassung: None,
             ereigniszeit: Some(zeitstand),
@@ -482,6 +503,8 @@ async fn fortschreiben_tx<T: Dokumentart>(
     .fetch_one(&mut *conn)
     .await?;
     super::anlage::kopieren_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
+    // LLH-1172: eigene Verteiler-Zeilen je Fassung (design.md D5, D5a).
+    super::verteiler::copy_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
     laden::<T>(&mut *conn, einsatz_id, neu_id).await
 }
 
@@ -574,6 +597,7 @@ mod tests {
                 freigeber_id,
                 render,
                 "2026-06-02 10:00:00",
+                None,
             )
             .await?;
             Ok(())
@@ -701,6 +725,7 @@ mod tests {
                 titel: Some("Neu"),
                 zeitstand: None,
                 abschnitte: Some(&neu),
+                verteiler: None,
             },
         )
         .await
@@ -733,6 +758,7 @@ mod tests {
                 titel: Some("Hack"),
                 zeitstand: None,
                 abschnitte: Some(&nachtrag),
+                verteiler: None,
             },
         )
         .await

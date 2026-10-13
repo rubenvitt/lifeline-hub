@@ -127,6 +127,8 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     assert_eq!(e["id"], etb_id);
     assert_eq!(e["befehl_id"], bid);
     assert_eq!(e["ereigniszeit"], "2026-06-02 10:00:00");
+    // Ohne Verteiler (LLH-1172) bleibt der Empfänger die feste Kennung.
+    assert_eq!(e["an"], "System");
     assert_eq!(
         e["inhalt"],
         "# Befehl 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Lage\nHochwasser steigt.\n\n## Auftrag\nDeich sichern.\n\n## Durchführung\n_(keine Angabe)_\n"

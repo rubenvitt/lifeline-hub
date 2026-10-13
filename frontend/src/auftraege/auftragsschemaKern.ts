@@ -8,9 +8,10 @@
  * (D2, D3, D5).
  */
 
-import type { AdressatKategorie, Auftrag, AuftragSchemafeld } from '../api/types';
+import type { Auftrag, AuftragSchemafeld } from '../api/types';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { PRIO_META } from '../kommunikation/phase';
+import { EXTERN_KATEGORIE_LABEL } from '../fuehrung/empfaengerKern';
 
 /** Die Freitextfelder des Befehlsschemas am Auftrag (Wire-Namen, auch die der Berichtigung). */
 export type SchemaFeld = AuftragSchemafeld;
@@ -98,13 +99,8 @@ export function dropEmpty(
   );
 }
 
-/** Etiketten der externen Stellen; das Formular bietet sie in dieser Folge an. */
-export const EXTERN_KATEGORIE_LABEL: Record<AdressatKategorie, string> = {
-  leitstelle: 'Leitstelle',
-  nachbar_ea: 'Nachbar-Einsatzabschnitt',
-  uebergeordnet: 'Übergeordnete Führung',
-  andere_bos: 'Andere BOS',
-};
+// Etiketten der externen Stellen: eine Quelle in `fuehrung/empfaengerKern.ts`.
+export { EXTERN_KATEGORIE_LABEL };
 
 /** „Intern“ bzw. „Extern“ samt den externen Stellen unter den Empfängern. */
 function richtungText(a: Auftrag): string {

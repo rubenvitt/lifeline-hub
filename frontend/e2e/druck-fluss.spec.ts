@@ -533,6 +533,43 @@ test('Befehl (Entwurf) druckt im normalen Fluss, Abschnittstitel bleibt beim Tex
   await pruefeDruckImFluss(page, 'Befehl Entwurf');
 });
 
+/**
+ * LLH-1172: der Verteiler steht auf Papier im Druckkopf, das Auswahlfeld des Entwurfs nicht.
+ * Unter Druckmedium in allen drei Engines (`DRUCK_SPECS`).
+ */
+test('Befehl (Entwurf) mit Verteiler: Druckkopf nennt ihn, das Feld fällt im Druck weg', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Verteiler ${Date.now()}`);
+  const id = await befehlSaeen(page, einsatzId, false);
+  const patch = await mitWiederholung(() =>
+    page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${id}`, {
+      data: {
+        verteiler: [
+          {
+            empfaenger_typ: 'extern',
+            extern_kategorie: 'leitstelle',
+            extern_bezeichnung: 'ILS Druckprobe',
+          },
+        ],
+      },
+    }),
+  );
+  expect(patch.ok(), await patch.text()).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
+  const feld = page.locator('[data-lfh="verteiler-feld"]');
+  await expect(feld).toBeVisible();
+  await page.emulateMedia({ media: 'print' });
+  const kopf = page.locator('[data-lfh="druckkopf"]');
+  await expect(kopf).toBeVisible();
+  await expect(kopf).toContainText('Verteiler');
+  await expect(kopf).toContainText('ILS Druckprobe');
+  await expect(feld).toBeHidden();
+  await page.emulateMedia({ media: 'screen' });
+});
+
 test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Befehl ${Date.now()}`);

@@ -1,5 +1,11 @@
 import { apiGet, apiSend } from './client';
-import type { BefehlAbschnitt, BefehlAnzeige, BefehlKopf, BefehlVorlageKey } from './types';
+import type {
+  BefehlAbschnitt,
+  BefehlAnzeige,
+  BefehlKopf,
+  BefehlVorlageKey,
+  NeuerEmpfaenger,
+} from './types';
 
 /** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
 export function listeBefehle(einsatzId: number): Promise<BefehlKopf[]> {
@@ -26,6 +32,8 @@ interface BefehlPatch {
   titel?: string;
   zeitstand?: string;
   abschnitte?: BefehlAbschnitt[];
+  /** Ersetzt den Verteiler ganz (LLH-1172); leer leert ihn, fehlt = unverändert. */
+  verteiler?: NeuerEmpfaenger[];
 }
 
 export function aktualisiereBefehl(

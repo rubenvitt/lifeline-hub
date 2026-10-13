@@ -1,6 +1,7 @@
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import type { Auftrag, AuftragPatch, AuftragSchemafeld } from '../api/types';
-import { kodiere, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
+import { toEmpfaengerTags } from '../fuehrung/empfaengerKern';
+import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { alleEmpfaenger, type FormWerte } from './auftragFormularKern';
 
 /**
@@ -29,26 +30,20 @@ const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
  */
 export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAenderbar: boolean } {
   let aenderbar = true;
-  const tags: string[] = [];
+  // Abschnitt, Einheit und Funktion trägt das Empfängerfeld; der Rest steht unten.
+  const tags = toEmpfaengerTags(a.empfaenger);
   let extern: { kategorie: FormWerte['externKategorie']; bezeichnung: string } | null = null;
   for (const e of a.empfaenger) {
     switch (e.empfaenger_typ) {
       case 'abschnitt':
+        // Ein seit dem Erteilen aufgelöster Abschnitt hat keinen Tag mehr (`toEmpfaengerTags`).
         if (e.abschnitt_id == null) aenderbar = false;
-        else tags.push(`abschnitt:${e.abschnitt_id}`);
         break;
       case 'einheit':
         if (e.einheit_id == null) aenderbar = false;
-        else tags.push(`einheit:${e.einheit_id}`);
         break;
-      case 'funktion': {
-        const wert = kodiere({
-          funktion: e.funktion ?? undefined,
-          text: e.funktion_text ?? undefined,
-        });
-        if (wert) tags.push(wert);
+      case 'funktion':
         break;
-      }
       case 'extern':
         if (extern || !e.extern_kategorie) aenderbar = false;
         else extern = { kategorie: e.extern_kategorie, bezeichnung: e.extern_bezeichnung ?? '' };

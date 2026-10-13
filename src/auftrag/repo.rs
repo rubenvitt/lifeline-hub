@@ -789,7 +789,7 @@ pub async fn erteile_aus_etb_tx(
 /// Katalogfunktion (LFH-549) → „S3 Einsatz“/„Fachberater: THW“ mit wirksamem Label, **nie**
 /// der Name der Person, die die Funktion gerade besetzt: der Snapshot steht im ETB der
 /// Anordnung, die Besetzung wechselt — sie kommt zur Lesezeit (`fuehrung::aufloesung`).
-async fn snap_anzeige_fuer(
+pub(crate) async fn snap_anzeige_fuer(
     tx: &mut sqlx::SqliteConnection,
     e: &EmpfaengerEingabe,
     karte: &crate::fuehrung::Labelkarte,

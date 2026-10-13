@@ -4,6 +4,7 @@ import type {
   LageberichtAnzeige,
   LageberichtKopf,
   LageberichtVorlageKey,
+  NeuerEmpfaenger,
 } from './types';
 
 /** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
@@ -37,6 +38,8 @@ interface LageberichtPatch {
   titel?: string;
   zeitstand?: string;
   abschnitte?: LageberichtAbschnitt[];
+  /** Ersetzt den Verteiler ganz (LLH-1172); leer leert ihn, fehlt = unverändert. */
+  verteiler?: NeuerEmpfaenger[];
 }
 
 export function aktualisiereLagebericht(
