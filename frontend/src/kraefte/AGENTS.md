@@ -8,7 +8,9 @@ zu `frontend/src/`, sofern nicht `src/…` (Server).
 **Kräfte-Zeitachse** (LFH-552, `openspec/changes/archive/2026-09-30-lfh-552-kraefte-zeitachse/design.md`,
 Spec `kraefte-zeitachse`): Alarmierung/Eintreffen/Ablösung/Entlassung je Einheit und Person in
 `einsatz_kraft_zeitachse` (append-only, Streichung mit Grund statt Löschen; Guard
-`repo_ist_append_only`), nie als Spalten an den Dispositionstabellen. Einziger Schreibpfad
+`repo_ist_append_only`); Zeitpunkte der Zeitachse stehen nie als Spalten an den
+Dispositionstabellen. Der Lebenszustand einer Zeile (`beendet_*`, `aufgeloest_*`, LLH-1079) ist
+keine Zeitachse: Dauer und Perioden rechnen nur aus der Zeitachse. Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog
 (Bestand ohne Marke, nie aus dem Label raten), ein Einheit-Ereignis gilt per Fan-out für die
