@@ -5702,14 +5702,14 @@ mod tests {
         assert_eq!(rest, 0, "ON DELETE CASCADE über etb_eintrag");
     }
 
-    // --- Migration 0190: Kräfte entlassen statt löschen (LLH-1079) ---
+    // --- Migration 0191: Kräfte entlassen statt löschen (LLH-1079) ---
 
     /// Der Neubau der Zeitachse übernimmt den Bestand Zeile für Zeile (samt Fan-out-Bezug und
     /// Streichung), verweist auf Person und Einheit ohne `ON DELETE` und kennt die Quelle
     /// `disposition`. Die Dispositionstabellen tragen den Lebenszustand, der Bestand bleibt aktiv.
     #[tokio::test]
-    async fn migration_0190_baut_die_zeitachse_ohne_kaskade_und_uebernimmt_den_bestand() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 189).await;
+    async fn migration_0191_baut_die_zeitachse_ohne_kaskade_und_uebernimmt_den_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 190).await;
         let (e, b) = bild_grundlage(&pool).await;
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
@@ -5784,7 +5784,7 @@ mod tests {
         };
         let vorher = lies(pool.clone()).await;
 
-        migriere_bis(&pool, 190).await;
+        migriere_bis(&pool, 191).await;
 
         assert_eq!(lies(pool.clone()).await, vorher, "Bestand Zeile für Zeile");
         let fks: Vec<(String, String, String)> = sqlx::query_as(
