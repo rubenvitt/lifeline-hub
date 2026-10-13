@@ -73,7 +73,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
     {
       title: 'Ist',
       key: 'ist',
-      width: 104,
+      width: 88,
       // Kumuliert (Server), dazu das Urteil gegen das Soll: nur „unterbesetzt“ steht da, als Wort
       // neben der Farbe (WCAG 1.4.1). „Soll erfüllt“ bliebe ein Grün-Teppich.
       render: (_t, z) => (
@@ -88,7 +88,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
     {
       title: 'Soll',
       key: 'soll',
-      width: 96,
+      width: 88,
       render: (_t, z) => <span style={monoStil(12)}>{staerkeText(z.soll)}</span>,
     },
     {
