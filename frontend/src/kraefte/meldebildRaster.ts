@@ -65,12 +65,7 @@ import { KATEGORIE_REIHENFOLGE, OHNE_STATUS, type KategorieOderOhne } from './st
  */
 
 export type RasterArt =
-  | 'einheit'
-  | 'fahrzeug'
-  | 'person'
-  | 'material'
-  | 'ohne-fahrzeug'
-  | 'material-gruppe';
+  'einheit' | 'fahrzeug' | 'person' | 'material' | 'ohne-fahrzeug' | 'material-gruppe';
 
 /** Verdichtete Mittelverteilung einer Einheit (Fahrzeuge + Personal, ohne Material). */
 export interface MittelVerteilung {
@@ -326,7 +321,10 @@ export function einheitFunkrufname(einheit: {
 
 // ── Aufbau ────────────────────────────────────────────────────────────────────
 
-function verteilungAus(personal: readonly EinsatzPersonal[], fahrzeuge: readonly EinsatzFahrzeug[]) {
+function verteilungAus(
+  personal: readonly EinsatzPersonal[],
+  fahrzeuge: readonly EinsatzFahrzeug[],
+) {
   const v = verdichte([...personal], [...fahrzeuge], []);
   const verteilung: MittelVerteilung = {
     bereit: v.personalStatus.verfuegbar + v.fahrzeugStatus.verfuegbar,
@@ -439,17 +437,15 @@ function mittelZeilen(
       zusatz: null,
       status: null,
       gruppe: { anzahl: m.material.length, ausfall: m.materialAusfall },
-      children: m.material.map(
-        (em): RasterZeile => ({
-          ...LEER,
-          key: `em-${em.id}`,
-          art: 'material',
-          mittelId: em.id,
-          bezeichnung: em.bezeichnung,
-          zusatz: null,
-          status: materialZustand(em),
-        }),
-      ),
+      children: m.material.map((em): RasterZeile => ({
+        ...LEER,
+        key: `em-${em.id}`,
+        art: 'material',
+        mittelId: em.id,
+        bezeichnung: em.bezeichnung,
+        zusatz: null,
+        status: materialZustand(em),
+      })),
     });
   }
   return zeilen;
@@ -477,7 +473,13 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
   const eigen = new Map<number, ReturnType<typeof verteilungAus>>();
   const einheitKnoten = wurzeln.flatMap((w) => (w.art === 'einheit' ? [w.knoten] : []));
   const merke = (k: KraeftebaumKnoten) => {
-    eigen.set(k.einheit.id, verteilungAus(personenVon(k.mittel), k.mittel.fahrzeuge.map((f) => f.fahrzeug)));
+    eigen.set(
+      k.einheit.id,
+      verteilungAus(
+        personenVon(k.mittel),
+        k.mittel.fahrzeuge.map((f) => f.fahrzeug),
+      ),
+    );
     k.kinder.forEach(merke);
   };
   einheitKnoten.forEach(merke);

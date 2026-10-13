@@ -29,7 +29,13 @@ import type {
 // ── Fixtures (nur die gelesenen Felder zählen) ───────────────────────────────
 
 const ab = (id: number, ueber: number | null = null) =>
-  ({ id, einsatz_id: 1, ueber_abschnitt_id: ueber, name: `A${id}`, sortier: id }) as Einsatzabschnitt;
+  ({
+    id,
+    einsatz_id: 1,
+    ueber_abschnitt_id: ueber,
+    name: `A${id}`,
+    sortier: id,
+  }) as Einsatzabschnitt;
 
 const eh = (
   id: number,
@@ -195,7 +201,12 @@ describe('mittelDerEinheit', () => {
     const alle = [fz(30, 1, 'Florian 1')];
     const m = mittelDerEinheit(
       1,
-      { einheiten: [eh(1, null)], personal: [p(1, 1, 'mannschaft', 30)], fahrzeuge: [], material: [] },
+      {
+        einheiten: [eh(1, null)],
+        personal: [p(1, 1, 'mannschaft', 30)],
+        fahrzeuge: [],
+        material: [],
+      },
       { fahrzeuge: alle },
     );
     expect(m.ohneFahrzeug[0].faehrtAuf).toBe('Florian 1');

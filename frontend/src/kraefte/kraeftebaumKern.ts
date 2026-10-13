@@ -289,7 +289,8 @@ function ordneMittel(
   quelle: MittelQuelle,
 ): MittelDerEinheit {
   const fahrzeugName = new Map(quelle.fahrzeuge.map((f) => [f.id, f.funkrufname]));
-  for (const f of eigene.fahrzeuge) if (!fahrzeugName.has(f.id)) fahrzeugName.set(f.id, f.funkrufname);
+  for (const f of eigene.fahrzeuge)
+    if (!fahrzeugName.has(f.id)) fahrzeugName.set(f.id, f.funkrufname);
   const einheitName = new Map(quelle.einheiten.map((e) => [e.id, e.name]));
   const eigeneFahrzeuge = new Set(eigene.fahrzeuge.map((f) => f.id));
 
@@ -397,8 +398,7 @@ export interface KraeftebaumKnoten {
  * Einheit“ steht als letzte Wurzel und nur, wenn sie etwas trägt.
  */
 export type KraeftebaumWurzel =
-  | { art: 'einheit'; knoten: KraeftebaumKnoten }
-  | { art: 'ohne-einheit'; mittel: MittelDerEinheit };
+  { art: 'einheit'; knoten: KraeftebaumKnoten } | { art: 'ohne-einheit'; mittel: MittelDerEinheit };
 
 export interface KraeftebaumEingabe extends MittelListen {
   abschnitte: readonly Einsatzabschnitt[];
@@ -499,10 +499,7 @@ export interface StufenZeile {
  * Einheit-Kindern, „mit Fahrzeugen“ jeden Einheitenknoten mit Kindern (auch „Ohne Einheit“),
  * „alles“ jeden Knoten mit Kindern. Die Stufe filtert nie, sie klappt nur.
  */
-export function schluesselBisStufe(
-  zeilen: readonly StufenZeile[],
-  stufe: Ausklappstufe,
-): string[] {
+export function schluesselBisStufe(zeilen: readonly StufenZeile[], stufe: Ausklappstufe): string[] {
   const offen = (z: StufenZeile): boolean => {
     const kinder = z.children ?? [];
     if (kinder.length === 0) return false;
@@ -527,7 +524,8 @@ export function stufeVon(
   const ist = new Set(offen.map(String));
   const einheiten = schluesselBisStufe(zeilen, 'einheiten');
   if (einheiten.length === ist.size && einheiten.every((k) => ist.has(k))) return 'einheiten';
-  const umfasst = (stufe: Ausklappstufe) => schluesselBisStufe(zeilen, stufe).every((k) => ist.has(k));
+  const umfasst = (stufe: Ausklappstufe) =>
+    schluesselBisStufe(zeilen, stufe).every((k) => ist.has(k));
   if (umfasst('alles')) return 'alles';
   if (umfasst('fahrzeuge')) return 'fahrzeuge';
   return 'einheiten';

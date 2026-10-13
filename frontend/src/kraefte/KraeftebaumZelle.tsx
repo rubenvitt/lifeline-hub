@@ -87,14 +87,18 @@ export function PositionsMarken({ person }: { person: PersonAnzeige }) {
 /** „Ist 1/0/3//4 · Soll 1/1/7//9“ — die Besatzung eines Fahrzeugs statt einer Stärke (D4). */
 export function besatzungText(b: BesatzungAnzeige): string {
   if (b.urteil === 'nicht_erfasst') return 'Besatzung nicht erfasst';
-  return b.soll ? `Ist ${staerkeText(b.ist)} · Soll ${staerkeText(b.soll)}` : `Ist ${staerkeText(b.ist)}`;
+  return b.soll
+    ? `Ist ${staerkeText(b.ist)} · Soll ${staerkeText(b.soll)}`
+    : `Ist ${staerkeText(b.ist)}`;
 }
 
 /** „davon 1 aus Gr 2, 2 ohne Einheit“ — die mitgezählten fremden Kräfte eines Fahrzeugs. */
 export function fremdText(b: BesatzungAnzeige): string | null {
   if (b.fremd.length === 0) return null;
   return `davon ${b.fremd
-    .map((f) => (f.einheit === 'ohne Einheit' ? `${f.anzahl} ohne Einheit` : `${f.anzahl} aus ${f.einheit}`))
+    .map((f) =>
+      f.einheit === 'ohne Einheit' ? `${f.anzahl} ohne Einheit` : `${f.anzahl} aus ${f.einheit}`,
+    )
     .join(', ')}`;
 }
 
@@ -191,7 +195,14 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       const [anzahl, ausfall] = gruppenText(z);
       return huelle(
         null,
-        <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: token.marginXS }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            flexWrap: 'wrap',
+            alignItems: 'baseline',
+            gap: token.marginXS,
+          }}
+        >
           <Augenbraue style={{ fontSize: 11 }}>{z.bezeichnung}</Augenbraue>
           <span style={{ fontSize: 11, color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (

@@ -66,7 +66,9 @@ describe('FahrzeugZeichen', () => {
 
   it('leitet Grundzeichen und Organisation aus Typ und Träger ab, wie die Lagekarte', () => {
     renderMitProviders(
-      <FahrzeugZeichen tz={{ ...tz, fahrzeugtyp: 'HLF 20', traegerorganisation: 'FF Musterstadt' }} />,
+      <FahrzeugZeichen
+        tz={{ ...tz, fahrzeugtyp: 'HLF 20', traegerorganisation: 'FF Musterstadt' }}
+      />,
     );
     expect(beschreibung()).toMatch(/Organisation: Feuerwehr/);
     expect(beschreibung()).toMatch(/Brandbekämpfung/);

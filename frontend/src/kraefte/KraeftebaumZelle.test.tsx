@@ -52,7 +52,11 @@ function baum(): RasterZeile[] {
   return baueMeldebildRaster({
     abschnitte: [],
     einheiten: [EINHEIT, GRUPPE],
-    personal: [person(2, 1, 'fuehrer', 30), person(4, 1, null, null), person(5, 3, 'mannschaft', 30)],
+    personal: [
+      person(2, 1, 'fuehrer', 30),
+      person(4, 1, null, null),
+      person(5, 3, 'mannschaft', 30),
+    ],
     fahrzeuge: [FAHRZEUG],
     material: MATERIAL,
     statusKatalog: [],
@@ -66,7 +70,9 @@ const finde = (key: string) => alle(baum()).find((z) => z.key === key)!;
 const offen = () => false;
 
 function zeige(key: string, gesperrt: (m: string) => boolean = offen) {
-  return renderMitProviders(<KraeftebaumZelle zeile={finde(key)} einsatzId={7} gesperrt={gesperrt} />);
+  return renderMitProviders(
+    <KraeftebaumZelle zeile={finde(key)} einsatzId={7} gesperrt={gesperrt} />,
+  );
 }
 
 describe('KraeftebaumZelle', () => {
@@ -113,10 +119,14 @@ describe('KraeftebaumZelle', () => {
 
   it('Personen tragen Positionsmarke und „EF“; ohne Position „–“, kein erfundenes „M“', () => {
     const { container } = zeige('ep-2');
-    expect([...container.querySelectorAll('[data-lfh="kraeftebaum-marke"]')].map((m) => m.textContent)).toEqual(['F', 'EF']);
+    expect(
+      [...container.querySelectorAll('[data-lfh="kraeftebaum-marke"]')].map((m) => m.textContent),
+    ).toEqual(['F', 'EF']);
     expect(screen.getByText(/Zugführer/)).toBeInTheDocument();
     const { container: ohne } = zeige('ep-4');
-    expect([...ohne.querySelectorAll('[data-lfh="kraeftebaum-marke"]')].map((m) => m.textContent)).toEqual(['–']);
+    expect(
+      [...ohne.querySelectorAll('[data-lfh="kraeftebaum-marke"]')].map((m) => m.textContent),
+    ).toEqual(['–']);
   });
 
   it('eine Person auf dem Fahrzeug einer anderen Einheit „fährt auf“ es', () => {

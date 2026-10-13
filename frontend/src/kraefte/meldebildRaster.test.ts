@@ -353,7 +353,9 @@ describe('Raster als Kräftebaum', () => {
         { ...p(3, 1, 'gebunden', 'fuehrer'), fahrzeug_id: 1 },
         p(4, 1),
       ],
-      fahrzeuge: [{ ...fz(1, 1, 104), soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 } }],
+      fahrzeuge: [
+        { ...fz(1, 1, 104), soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 } },
+      ],
     });
     const [zug] = baueMeldebildRaster(e);
     expect(zug.children!.map((z) => z.key)).toEqual(['ef-1', 'ofz-1', 'eh-2']);
@@ -370,7 +372,11 @@ describe('Raster als Kräftebaum', () => {
       ['ep-1', false],
     ]);
     const ohne = zug.children![1];
-    expect(ohne).toMatchObject({ art: 'ohne-fahrzeug', bezeichnung: 'Ohne Fahrzeug', staerke: null });
+    expect(ohne).toMatchObject({
+      art: 'ohne-fahrzeug',
+      bezeichnung: 'Ohne Fahrzeug',
+      staerke: null,
+    });
     expect(ohne.gruppe).toEqual({ anzahl: 1, ausfall: 0 });
   });
 
@@ -383,7 +389,10 @@ describe('Raster als Kräftebaum', () => {
   it('Person auf fremdem Fahrzeug: einmal bei ihrer Einheit mit „fährt auf“', () => {
     const e = eingabe({
       einheiten: [eh(1, null, null, { name: 'Gr 1' }), eh(2, null, null, { name: 'Gr 2' })],
-      personal: [{ ...p(1, 1), fahrzeug_id: 9 }, { ...p(2, 2), fahrzeug_id: 9 }],
+      personal: [
+        { ...p(1, 1), fahrzeug_id: 9 },
+        { ...p(2, 2), fahrzeug_id: 9 },
+      ],
       fahrzeuge: [{ ...fz(9, 2, 104), funkrufname: 'Florian 2' }],
     });
     const raster = baueMeldebildRaster(e);
@@ -398,7 +407,11 @@ describe('Raster als Kräftebaum', () => {
   it('Material ist eine Gruppenzeile mit Posten und Ausfall; Ausfall tönt die Einheit', () => {
     const e = eingabe({
       einheiten: [eh(1, null)],
-      material: [mt(1, 1), { ...mt(2, 1), status: 'einsatzbereit' }, { ...mt(3, 1), status: 'im_einsatz' }],
+      material: [
+        mt(1, 1),
+        { ...mt(2, 1), status: 'einsatzbereit' },
+        { ...mt(3, 1), status: 'im_einsatz' },
+      ],
     });
     const [zug] = baueMeldebildRaster(e);
     const gruppe = zug.children![0];

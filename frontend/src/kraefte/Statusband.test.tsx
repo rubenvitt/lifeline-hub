@@ -22,7 +22,11 @@ describe('Statusband (Kennzahl mit Aufgliederung, LLH-1025)', () => {
   it('die Zahl führt: Einheiten der Auswahl, aufgegliedert je FMS-Status', () => {
     renderMitProviders(
       <Statusband
-        einheiten={[zelle('s3', 'achtung', 2), zelle('s4', 'achtung', 1), zelle('x', 'neutral', 1, null)]}
+        einheiten={[
+          zelle('s3', 'achtung', 2),
+          zelle('s4', 'achtung', 1),
+          zelle('x', 'neutral', 1, null),
+        ]}
         personal={[]}
         zustand="daten"
       />,
@@ -30,21 +34,21 @@ describe('Statusband (Kennzahl mit Aufgliederung, LLH-1025)', () => {
     const k = kennzahl('Einheiten je Status');
     expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^4$/);
     // Ein Bild mit Wortlaut, die Legende sagt dasselbe fürs Auge; ohne Code steht das Wort.
-    expect(screen.getByRole('img', { name: 'Einheiten nach Status: S3 2, S4 1, Wort x 1' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Einheiten nach Status: S3 2, S4 1, Wort x 1' }),
+    ).toBeInTheDocument();
     expect(k).toHaveTextContent('S3 2 · S4 1 · Wort x 1');
   });
 
   it('Personal als Zahl mit Aufgliederung je Zustand', () => {
     renderMitProviders(
-      <Statusband
-        einheiten={[]}
-        personal={[zelle('p1', 'achtung', 12, null)]}
-        zustand="daten"
-      />,
+      <Statusband einheiten={[]} personal={[zelle('p1', 'achtung', 12, null)]} zustand="daten" />,
     );
     const k = kennzahl('Personal je Status');
     expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^12$/);
-    expect(screen.getByRole('img', { name: 'Personal nach Status: Wort p1 12' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Personal nach Status: Wort p1 12' }),
+    ).toBeInTheDocument();
   });
 
   it.each([1440, 1024, 390])('bei %i px keine Füllkachel, auch bei wenigen Status', (breite) => {

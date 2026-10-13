@@ -80,7 +80,10 @@ export default function Statusband({
               titel="Einheiten"
               wert={summe(einheiten)}
               groesse="klein"
-              aufgliederung={{ segmente: bandSegmente(einheiten, rollen), titel: 'Einheiten nach Status' }}
+              aufgliederung={{
+                segmente: bandSegmente(einheiten, rollen),
+                titel: 'Einheiten nach Status',
+              }}
               notiz={
                 einheitenHinweis ? (
                   <span data-lfh="statusband-hinweis">{einheitenHinweis}</span>
@@ -95,7 +98,10 @@ export default function Statusband({
               titel="Personal"
               wert={summe(personal)}
               groesse="klein"
-              aufgliederung={{ segmente: bandSegmente(personal, rollen), titel: 'Personal nach Status' }}
+              aufgliederung={{
+                segmente: bandSegmente(personal, rollen),
+                titel: 'Personal nach Status',
+              }}
             />
           </Gruppe>
         )}
