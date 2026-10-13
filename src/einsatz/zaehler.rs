@@ -236,7 +236,8 @@ pub async fn berechne(
         z.einheiten = Some(
             menge(
                 pool,
-                "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?",
+                "SELECT COUNT(*) FROM einsatz_einheit \
+                 WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
                 einsatz_id,
             )
             .await?,

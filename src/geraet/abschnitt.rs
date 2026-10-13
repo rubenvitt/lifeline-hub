@@ -31,7 +31,8 @@ impl Abschnittsbereich {
             crate::einsatzabschnitt::repo::teilbaum(pool, einsatz_id, abschnitt_id).await?;
         let einheiten: Vec<i64> = sqlx::query_scalar(
             "SELECT id FROM einsatz_einheit \
-             WHERE einsatz_id = ? AND abschnitt_id IN (SELECT value FROM json_each(?))",
+             WHERE einsatz_id = ? AND aufgeloest_at IS NULL \
+               AND abschnitt_id IN (SELECT value FROM json_each(?))",
         )
         .bind(einsatz_id)
         .bind(json_liste(&abschnitte))

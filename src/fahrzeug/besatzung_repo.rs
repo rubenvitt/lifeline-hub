@@ -86,7 +86,8 @@ pub async fn load_besatzung_tx(
     ef_id: i64,
 ) -> Result<Vec<i64>, AppError> {
     let ids = sqlx::query_scalar(
-        "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND fahrzeug_id = ? ORDER BY id",
+        "SELECT id FROM einsatz_personal \
+         WHERE einsatz_id = ? AND fahrzeug_id = ? AND beendet_at IS NULL ORDER BY id",
     )
     .bind(einsatz_id)
     .bind(ef_id)

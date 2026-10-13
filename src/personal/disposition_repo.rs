@@ -874,7 +874,8 @@ pub async fn liste_fuehrungskraefte(
                 ep.lat, ep.lon, ep.tz_fachaufgabe, ep.tz_organisation, \
                 ep.snap_funktion AS funktion, \
                 EXISTS(SELECT 1 FROM einsatz_einheit e \
-                       WHERE e.einsatz_id = ep.einsatz_id AND e.fuehrer_id = ep.id) AS ist_einheitsfuehrer, \
+                       WHERE e.einsatz_id = ep.einsatz_id AND e.fuehrer_id = ep.id \
+                         AND e.aufgeloest_at IS NULL) AS ist_einheitsfuehrer, \
                 EXISTS(SELECT 1 FROM einsatzabschnitt a \
                        WHERE a.einsatz_id = ep.einsatz_id AND a.leiter_id = ep.id) AS ist_abschnittsleiter \
          FROM einsatz_personal ep \

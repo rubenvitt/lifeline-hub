@@ -283,7 +283,8 @@ pub async fn aktive_belegungen_tx(
 ) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT \
-            (SELECT COUNT(*) FROM einsatz_einheit  WHERE aktueller_br_id = ?) + \
+            (SELECT COUNT(*) FROM einsatz_einheit \
+               WHERE aktueller_br_id = ? AND aufgeloest_at IS NULL) + \
             (SELECT COUNT(*) FROM einsatz_fahrzeug WHERE aktueller_br_id = ?)",
     )
     .bind(br_id)

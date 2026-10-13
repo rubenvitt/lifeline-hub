@@ -37,11 +37,12 @@ async fn einheit_namen(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<HashMap<i64, String>, AppError> {
-    let zeilen: Vec<(i64, String)> =
-        sqlx::query_as("SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_all(pool)
-            .await?;
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
     Ok(zeilen.into_iter().collect())
 }
 

@@ -66,7 +66,7 @@ pub async fn aufloesen(
 pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Bestaetiger>, AppError> {
     Ok(sqlx::query_as::<_, Bestaetiger>(
         "SELECT id, snap_name AS name, snap_funktion AS funktion FROM einsatz_personal \
-         WHERE einsatz_id = ? ORDER BY snap_name COLLATE NOCASE, id",
+         WHERE einsatz_id = ? AND beendet_at IS NULL ORDER BY snap_name COLLATE NOCASE, id",
     )
     .bind(einsatz_id)
     .fetch_all(pool)

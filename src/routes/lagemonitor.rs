@@ -111,17 +111,18 @@ pub async fn lagebild(
     .fetch_one(pool)
     .await?;
 
-    let einheiten: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_one(pool)
-            .await?;
+    let einheiten: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await?;
     // Wie die Verdichtung der Kräfte-Seiten (`kraefte/kraeftebild.ts`, `verdichte`): jedes
-    // disponierte Personal, auch ohne Einheit.
+    // aktive Personal, auch ohne Einheit; entlassene und stornierte zählen nicht (LLH-1079).
     let positionen: Vec<Option<String>> = sqlx::query_scalar(
         "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE ep.einsatz_id = ?",
+         WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -153,7 +154,8 @@ pub async fn lagebild(
                    AND pl.typ <> 'wartebereich'), \
                (SELECT COUNT(*) FROM einsatz_personal ep \
                  LEFT JOIN personal sp ON sp.id = ep.personal_id \
-                 WHERE ep.uhs_id = u.id AND COALESCE(ep.staerke_position, sp.staerke_position) \
+                 WHERE ep.uhs_id = u.id AND ep.beendet_at IS NULL \
+                   AND COALESCE(ep.staerke_position, sp.staerke_position) \
                    IN ('fuehrer', 'unterfuehrer', 'mannschaft')) \
              FROM uhs u \
              WHERE u.einsatz_id = ? AND u.storniert_at IS NULL AND u.status <> 'aufgeloest' \
