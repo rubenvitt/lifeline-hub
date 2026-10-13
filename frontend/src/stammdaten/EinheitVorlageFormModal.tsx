@@ -29,7 +29,7 @@ export default function EinheitVorlageFormModal({
   onCreated,
 }: {
   open: boolean;
-  /** Alle geladenen Vorlagen; als Unterstellung stehen nur die aktiven zur Wahl. */
+  /** Alle geladenen Vorlagen; als Unterstellung stehen die aktiven und die vorbelegte zur Wahl. */
   vorlagen: readonly EinheitVorlage[];
   /** Vorbelegte Unterstellung („Untereinheit anlegen“ auf der Detailseite). */
   parentId?: number;
@@ -58,10 +58,14 @@ export default function EinheitVorlageFormModal({
   });
 
   const typOptions = (typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }));
-  const ueberOptions = orderAsTree(vorlagen.filter((v) => v.aktiv)).map(({ vorlage }) => ({
-    value: vorlage.id,
-    label: vorlage.name,
-  }));
+  // Die vorbelegte Unterstellung bleibt wählbar, auch inaktiv; sonst stünde nur ihre id im Feld
+  // (wie die aktuelle auf der Detailseite).
+  const ueberOptions = orderAsTree(vorlagen.filter((v) => v.aktiv || v.id === parentId)).map(
+    ({ vorlage }) => ({
+      value: vorlage.id,
+      label: vorlage.name,
+    }),
+  );
 
   return (
     <ErfassungsModal<FormValues>
