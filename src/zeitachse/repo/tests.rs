@@ -766,7 +766,7 @@ async fn check_kennt_nur_bekannte_arten_und_marken() {
 async fn einheit_loeschen_laesst_personen_zeitachse_stehen() {
     let w = welt().await;
     schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await;
-    // Wie `einheit::repo::loese_auf_tx`: erst die Mitglieder lösen, dann löschen.
+    // Wie `einheit::repo::aufloesen_tx`: erst die Mitglieder lösen, dann löschen.
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(w.f1)
         .execute(&w.pool)

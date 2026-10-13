@@ -528,7 +528,7 @@ impl Ablauf<'_> {
                     StatusKategorie::Gebunden,
                 ))?;
                 let personal_id = self.stamm.personal(personal)?;
-                let ep_id = crate::personal::disposition_repo::disponiere_stamm_tx(
+                let ep_id = crate::personal::disposition_repo::disponieren_stamm_tx(
                     conn,
                     self.einsatz_id,
                     self.org_id,
@@ -538,7 +538,7 @@ impl Ablauf<'_> {
                 )
                 .await?;
                 self.personal.insert(personal, ep_id);
-                let anzeige = crate::personal::disposition_repo::laden_anzeige_tx(
+                let anzeige = crate::personal::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ep_id,
@@ -576,7 +576,7 @@ impl Ablauf<'_> {
                 let uhs_id = frueher(&self.uhs, "UHS", uhs)?;
                 crate::uhs::kraefte::setze_uhs_tx(conn, self.einsatz_id, ep_id, Some(uhs_id))
                     .await?;
-                let kraft = crate::personal::disposition_repo::laden_anzeige_tx(
+                let kraft = crate::personal::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ep_id,

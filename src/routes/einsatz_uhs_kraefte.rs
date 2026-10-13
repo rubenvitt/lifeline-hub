@@ -87,7 +87,7 @@ pub async fn zuordnen(
             return Err(AppError::Forbidden);
         }
         kraefte::setze_uhs_tx(conn, einsatz_id, ep_id, Some(uhs_id)).await?;
-        let kraft = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let kraft = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let text = kraefte::etb_text_zugeordnet(
             &etb_bezeichnung(&kraft.name, kraft.funktion.as_deref()),
             &uhs.bezeichnung,
@@ -145,7 +145,7 @@ pub async fn adhoc(
         &uhs.bezeichnung,
     );
     let (ep_id, etb_id) = crate::write_retry!(&state.pool, |conn| {
-        let ep_id = disposition_repo::disponiere_adhoc_tx(
+        let ep_id = disposition_repo::disponieren_adhoc_tx(
             conn,
             einsatz_id,
             ctx.einsatz.org_id,
@@ -205,7 +205,7 @@ pub async fn loesen(
         if kraefte::uhs_der_kraft_tx(conn, einsatz_id, ep_id).await? != Some(uhs_id) {
             return Err(AppError::NotFound);
         }
-        let kraft = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let kraft = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         kraefte::setze_uhs_tx(conn, einsatz_id, ep_id, None).await?;
         let text = kraefte::etb_text_geloest(
             &etb_bezeichnung(&kraft.name, kraft.funktion.as_deref()),

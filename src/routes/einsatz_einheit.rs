@@ -356,7 +356,7 @@ pub async fn aufloesen(
     // atomar in EINER Tx. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        einheit_repo::loese_auf_tx(conn, einsatz_id, eid).await?;
+        einheit_repo::aufloesen_tx(conn, einsatz_id, eid).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,

@@ -737,7 +737,7 @@ async fn aufgeloeste_einheit_hinterlaesst_keine_frist() {
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
-    crate::einheit::repo::loese_auf(&w.pool, w.e, w.f1)
+    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f1)
         .await
         .unwrap();
     assert!(offene_fristen(&w.pool, a.id).await.is_empty());

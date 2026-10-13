@@ -155,7 +155,7 @@ pub async fn liste_je_uhs(
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden_anzeige(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     einsatz_id: i64,
     ep_id: i64,
@@ -172,9 +172,9 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
+/// Wie [`load_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
 /// Transaktion beim atomaren Status-Update.
-pub async fn laden_anzeige_tx(
+pub async fn load_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
@@ -196,8 +196,8 @@ pub async fn laden_anzeige_tx(
 /// `staerke_position` ist der optionale Override. `NotFound` bei fremder/unbekannter Person,
 /// `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition. Liefert die `ep_id`.
 ///
-/// Pool-Hülle um [`disponiere_stamm_tx`] ohne eigene Transaktion.
-pub async fn disponiere_stamm(
+/// Pool-Hülle um [`disponieren_stamm_tx`] ohne eigene Transaktion.
+pub async fn disponieren_stamm(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
@@ -206,7 +206,7 @@ pub async fn disponiere_stamm(
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_stamm_tx(
+    disponieren_stamm_tx(
         &mut conn,
         einsatz_id,
         org_id,
@@ -220,8 +220,8 @@ pub async fn disponiere_stamm(
 /// Disponiert eine Stamm-Person auf einer offenen Verbindung (Demo-Import in EINER
 /// Transaktion). Person, Funktionstext und Status werden auf derselben Verbindung gelesen und
 /// sehen so auch gerade angelegte Stammdaten. Öffnet und committet nichts; Fehler wie
-/// [`disponiere_stamm`].
-pub async fn disponiere_stamm_tx(
+/// [`disponieren_stamm`].
+pub async fn disponieren_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
@@ -276,8 +276,8 @@ pub async fn disponiere_stamm_tx(
 /// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die eigentlichen
 /// Daten. Initialstatus ist der erste `gebunden`. Liefert die `ep_id`.
 ///
-/// Pool-Hülle um [`disponiere_adhoc_tx`] ohne eigene Transaktion.
-pub async fn disponiere_adhoc(
+/// Pool-Hülle um [`disponieren_adhoc_tx`] ohne eigene Transaktion.
+pub async fn disponieren_adhoc(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
@@ -285,12 +285,12 @@ pub async fn disponiere_adhoc(
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
+    disponieren_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
 }
 
-/// Wie [`disponiere_adhoc`] auf einer offenen Verbindung (LFH-552: die Route schreibt die
+/// Wie [`disponieren_adhoc`] auf einer offenen Verbindung (LFH-552: die Route schreibt die
 /// Zeitachse des Initialstatus in derselben Transaktion).
-pub async fn disponiere_adhoc_tx(
+pub async fn disponieren_adhoc_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
@@ -321,7 +321,7 @@ pub async fn disponiere_adhoc_tx(
 /// unverändert). `staerke_position` und `bemerkung` sind Tri-State: `None` = unverändert,
 /// `Some(None)` = NULL, `Some(Some(x))` = setzen. Getrimmt wird in der Route. `NotFound`, falls
 /// die Zeile nicht zum Einsatz gehört.
-pub async fn aktualisiere_tx(
+pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
@@ -352,7 +352,7 @@ pub async fn aktualisiere_tx(
 }
 
 /// Pool-Wrapper mit eigener Transaktion.
-pub async fn aktualisiere(
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     ep_id: i64,
@@ -361,7 +361,7 @@ pub async fn aktualisiere(
     bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    aktualisiere_tx(
+    update_tx(
         &mut conn,
         einsatz_id,
         ep_id,
@@ -377,7 +377,7 @@ pub async fn aktualisiere(
 /// Vor dem DELETE werden die Führungsrollen freigegeben (`fuehrer_id`/`leiter_id` → NULL),
 /// sonst blockierte der FK. `auftrag_empfaenger.person_id` räumt ON DELETE SET NULL ab. Ein
 /// `NotFound` rollt die Freigabe mit zurück.
-pub async fn entferne_tx(
+pub async fn delete_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
@@ -407,11 +407,11 @@ pub async fn entferne_tx(
     Ok(())
 }
 
-/// Pool-Wrapper: Freigabe und DELETE in EINER Transaktion. Der Handler nutzt [`entferne_tx`]
+/// Pool-Wrapper: Freigabe und DELETE in EINER Transaktion. Der Handler nutzt [`delete_tx`]
 /// direkt in `write_retry!`, um den System-ETB-Eintrag in dieselbe Transaktion zu ziehen.
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
+pub async fn delete(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    entferne_tx(&mut tx, einsatz_id, ep_id).await?;
+    delete_tx(&mut tx, einsatz_id, ep_id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -450,7 +450,7 @@ pub struct PositionPatch<'a> {
 
 /// Aktualisiert lat/lon/tz_* einer Person des Einsatzes (s. `PositionPatch`); `NotFound`, falls
 /// die Zeile nicht zum Einsatz gehört. Liefert die frische Karten-Sicht.
-pub async fn aktualisiere_position(
+pub async fn update_position(
     pool: &SqlitePool,
     einsatz_id: i64,
     ep_id: i64,
@@ -612,7 +612,7 @@ mod tests {
                 crate::personal::repo::anlegen_tx(&mut *conn, 7, &p_daten("Anna Import"), &[quali])
                     .await?;
             let ep_id =
-                disponiere_stamm_tx(&mut *conn, einsatz, 7, personal.id, None, benutzer).await?;
+                disponieren_stamm_tx(&mut *conn, einsatz, 7, personal.id, None, benutzer).await?;
             Ok((ep_id, status_id))
         })
         .unwrap();
@@ -654,7 +654,7 @@ mod tests {
         assert!(!f3.ist_einheitsfuehrer && !f3.ist_abschnittsleiter);
 
         // Auch eine Nicht-Führungskraft ist verortbar.
-        aktualisiere_position(
+        update_position(
             &pool,
             einsatz_id,
             p3,
@@ -685,10 +685,10 @@ mod tests {
             .await
             .unwrap();
 
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.name, "Thomas Müller");
         assert_eq!(a.funktion.as_deref(), Some("Sanitäter, Gruppenführer"));
         assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
@@ -707,10 +707,10 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap(); // Stamm = fuehrer
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(
             a.staerke_position.as_deref(),
             Some("mannschaft"),
@@ -725,11 +725,11 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap();
-        disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
                 .await
                 .unwrap_err(),
             AppError::Conflict(_)
@@ -751,7 +751,7 @@ mod tests {
         .await
         .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fremd, None, benutzer)
+            disponieren_stamm(&pool, einsatz, 1, fremd, None, benutzer)
                 .await
                 .unwrap_err(),
             AppError::NotFound
@@ -769,7 +769,7 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
@@ -781,7 +781,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         for name in ["Notarzt Extern", "Helfer Extern"] {
-            disponiere_adhoc(
+            disponieren_adhoc(
                 &pool,
                 einsatz,
                 1,
@@ -809,7 +809,7 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas Müller"), &[])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
 
@@ -819,12 +819,12 @@ mod tests {
             .unwrap();
         // Aktiver Einsatz → Live (neuer Name).
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
+            load_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
             "Thomas NEU"
         );
         // Abgeschlossen → Snapshot (alter Name).
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, false).await.unwrap().name,
+            load_anzeige(&pool, einsatz, ep, false).await.unwrap().name,
             "Thomas Müller"
         );
         // Außer Dienst → auch bei aktivem Einsatz Snapshot.
@@ -832,7 +832,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
+            load_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
             "Thomas Müller"
         );
     }
@@ -845,11 +845,11 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true)
+            load_anzeige(&pool, einsatz, ep, true)
                 .await
                 .unwrap()
                 .staerke_position
@@ -864,7 +864,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true)
+            load_anzeige(&pool, einsatz, ep, true)
                 .await
                 .unwrap()
                 .staerke_position
@@ -889,15 +889,15 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[gf.id, san.id])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
 
-        let live = laden_anzeige(&pool, einsatz, ep, true)
+        let live = load_anzeige(&pool, einsatz, ep, true)
             .await
             .unwrap()
             .funktion;
-        let snap = laden_anzeige(&pool, einsatz, ep, false)
+        let snap = load_anzeige(&pool, einsatz, ep, false)
             .await
             .unwrap()
             .funktion;
@@ -916,13 +916,13 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
 
         // Frisch disponiert → keiner Einheit zugeordnet.
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true)
+            load_anzeige(&pool, einsatz, ep, true)
                 .await
                 .unwrap()
                 .einheit_id,
@@ -944,7 +944,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ep, true)
+            load_anzeige(&pool, einsatz, ep, true)
                 .await
                 .unwrap()
                 .einheit_id,
@@ -959,7 +959,7 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
             .unwrap();
         let neuer = status_repo::anlegen(
@@ -976,7 +976,7 @@ mod tests {
         .await
         .unwrap();
 
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             ep,
@@ -986,16 +986,16 @@ mod tests {
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.status_id, Some(neuer.id));
         assert_eq!(a.staerke_position.as_deref(), Some("mannschaft"));
         assert_eq!(a.bemerkung.as_deref(), Some("vor Ort"));
 
         // status_id None → bleibt; position None → bleibt; nur Bemerkung leeren.
-        aktualisiere(&pool, einsatz, ep, None, None, Some(None))
+        update(&pool, einsatz, ep, None, None, Some(None))
             .await
             .unwrap();
-        let b = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer.id), "Status unverändert");
         assert_eq!(
             b.staerke_position.as_deref(),
@@ -1004,9 +1004,9 @@ mod tests {
         );
         assert!(b.bemerkung.is_none(), "Bemerkung geleert (Spalte auf NULL)");
 
-        entferne(&pool, einsatz, ep).await.unwrap();
+        delete(&pool, einsatz, ep).await.unwrap();
         assert!(matches!(
-            laden_anzeige(&pool, einsatz, ep, true).await.unwrap_err(),
+            load_anzeige(&pool, einsatz, ep, true).await.unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -1020,7 +1020,7 @@ mod tests {
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
             .await
             .unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
             .await
             .unwrap();
 
@@ -1034,9 +1034,7 @@ mod tests {
         assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"));
 
         // None = unverändert.
-        aktualisiere(&pool, einsatz, ep, None, None, None)
-            .await
-            .unwrap();
+        update(&pool, einsatz, ep, None, None, None).await.unwrap();
         assert_eq!(
             roh(&pool, ep).await.as_deref(),
             Some("mannschaft"),
@@ -1044,7 +1042,7 @@ mod tests {
         );
 
         // Some(Some(x)) = setzen.
-        aktualisiere(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None)
+        update(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None)
             .await
             .unwrap();
         assert_eq!(
@@ -1054,7 +1052,7 @@ mod tests {
         );
 
         // Some(None) = explizit auf NULL.
-        aktualisiere(&pool, einsatz, ep, None, Some(None), None)
+        update(&pool, einsatz, ep, None, Some(None), None)
             .await
             .unwrap();
         assert_eq!(
@@ -1094,14 +1092,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            laden_anzeige(&pool, einsatz, frei, true)
+            load_anzeige(&pool, einsatz, frei, true)
                 .await
                 .unwrap()
                 .fahrzeug_id,
             None
         );
         assert_eq!(
-            laden_anzeige(&pool, einsatz, crew, true)
+            load_anzeige(&pool, einsatz, crew, true)
                 .await
                 .unwrap()
                 .fahrzeug_id,
@@ -1140,7 +1138,7 @@ mod tests {
         .unwrap();
 
         // p1 = Einheitsführer + Empfänger → Entfernen darf nicht am FK scheitern.
-        entferne(&pool, einsatz, p1)
+        delete(&pool, einsatz, p1)
             .await
             .expect("Führer entfernen darf nicht am FK scheitern");
         let fuehrer: Option<i64> =
@@ -1163,7 +1161,7 @@ mod tests {
         assert_eq!(snap, "Anton Abel", "snap_anzeige bleibt erhalten");
 
         // p2 = Abschnittsleiter → Entfernen gibt leiter_id frei.
-        entferne(&pool, einsatz, p2)
+        delete(&pool, einsatz, p2)
             .await
             .expect("Leiter entfernen darf nicht am FK scheitern");
         let leiter: Option<i64> = sqlx::query_scalar(
@@ -1195,10 +1193,10 @@ mod tests {
         // Erst das echte, dann das Demo-Stück disponieren: so trägt die Disposition des
         // Demo-Stücks eine andere ID als sein Stamm, und `datensatz_id = ep.id` statt
         // `ep.personal_id` fiele auf.
-        let ep_echt = disponiere_stamm(&pool, einsatz, 1, echt.id, None, benutzer)
+        let ep_echt = disponieren_stamm(&pool, einsatz, 1, echt.id, None, benutzer)
             .await
             .unwrap();
-        let ep_adhoc = disponiere_adhoc(
+        let ep_adhoc = disponieren_adhoc(
             &pool,
             einsatz,
             1,
@@ -1212,7 +1210,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let ep_demo = disponiere_stamm(&pool, einsatz, 1, demo.id, None, benutzer)
+        let ep_demo = disponieren_stamm(&pool, einsatz, 1, demo.id, None, benutzer)
             .await
             .unwrap();
         assert_ne!(ep_demo, demo.id, "Vorbedingung: IDs entkoppelt");
@@ -1225,7 +1223,7 @@ mod tests {
             assert!(!marke(ep_adhoc), "einsatz_aktiv={einsatz_aktiv}");
         }
         assert!(
-            laden_anzeige(&pool, einsatz, ep_demo, true)
+            load_anzeige(&pool, einsatz, ep_demo, true)
                 .await
                 .unwrap()
                 .ist_demo

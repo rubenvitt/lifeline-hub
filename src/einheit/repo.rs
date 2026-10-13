@@ -826,7 +826,7 @@ pub async fn setze_fuehrer(
 /// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB): Mitglieder
 /// freigeben (`einheit_id = NULL` an Personal, Fahrzeug, Material), Unter-Einheiten an den
 /// Parent hängen, dann löschen. `NotFound`, falls nicht zum Einsatz.
-pub async fn loese_auf_tx(
+pub async fn aufloesen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -873,9 +873,9 @@ pub async fn loese_auf_tx(
 }
 
 /// Pool-Wrapper mit eigener Transaktion.
-pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+pub async fn aufloesen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    loese_auf_tx(&mut tx, einsatz_id, id).await?;
+    aufloesen_tx(&mut tx, einsatz_id, id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -1645,7 +1645,7 @@ mod tests {
             .await
             .unwrap();
 
-        loese_auf(&pool, einsatz, gruppe.id).await.unwrap();
+        aufloesen(&pool, einsatz, gruppe.id).await.unwrap();
 
         // Mitglied frei.
         let einheit_id: Option<i64> =
@@ -1722,7 +1722,7 @@ mod tests {
             "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge) VALUES (?, ?, 'Wolldecke', 50) RETURNING id",
         ).bind(einsatz).bind(gruppe.id).fetch_one(&pool).await.unwrap();
 
-        loese_auf(&pool, einsatz, gruppe.id).await.unwrap();
+        aufloesen(&pool, einsatz, gruppe.id).await.unwrap();
         let einheit_id: Option<i64> =
             sqlx::query_scalar("SELECT einheit_id FROM einsatz_material WHERE id = ?")
                 .bind(em)
@@ -1951,7 +1951,7 @@ mod tests {
         .await
         .unwrap();
 
-        loese_auf(&pool, einsatz, einheit)
+        aufloesen(&pool, einsatz, einheit)
             .await
             .expect("Einheit auflösen darf nicht am FK scheitern");
         let emp: Option<i64> =

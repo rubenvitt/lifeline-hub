@@ -349,7 +349,7 @@ async fn loesche_fristen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), 
 }
 
 /// Entfernt die Auto-Fristen aller Schichten einer Einheit (LFH-635). Für
-/// `einheit::repo::loese_auf_tx`: der CASCADE entfernt die Schichten, die Fristen hängen ohne
+/// `einheit::repo::aufloesen_tx`: der CASCADE entfernt die Schichten, die Fristen hängen ohne
 /// FK daran und liefen sonst als Geister weiter.
 pub async fn loesche_fristen_der_einheit_tx(
     conn: &mut SqliteConnection,

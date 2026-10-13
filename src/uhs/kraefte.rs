@@ -79,7 +79,7 @@ pub async fn laden(
     ep_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<UhsKraft, AppError> {
-    let a = disposition_repo::laden_anzeige(pool, einsatz_id, ep_id, einsatz_aktiv).await?;
+    let a = disposition_repo::load_anzeige(pool, einsatz_id, ep_id, einsatz_aktiv).await?;
     let einheiten = einheit_namen(pool, einsatz_id).await?;
     Ok(zu_kraft(a, &einheiten))
 }

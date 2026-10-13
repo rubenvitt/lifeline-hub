@@ -1290,7 +1290,7 @@ mod tests {
                 "src/einsatzabschnitt/repo.rs",
                 "aufloesen_tx",
             ),
-            ("einsatz_einheit", "src/einheit/repo.rs", "loese_auf_tx"),
+            ("einsatz_einheit", "src/einheit/repo.rs", "aufloesen_tx"),
             (
                 "einsatz_kommunikation_stelle",
                 "src/stab/kommunikation.rs",

@@ -118,7 +118,7 @@ pub async fn disponieren(
     let ep_id = crate::write_retry!(&state.pool, |conn| {
         let ep_id = match &vorbereitet {
             Vorbereitet::Stamm(personal_id) => {
-                disposition_repo::disponiere_stamm_tx(
+                disposition_repo::disponieren_stamm_tx(
                     conn,
                     einsatz_id,
                     ctx.einsatz.org_id,
@@ -134,7 +134,7 @@ pub async fn disponieren(
                 traeger,
                 position,
             } => {
-                disposition_repo::disponiere_adhoc_tx(
+                disposition_repo::disponieren_adhoc_tx(
                     conn,
                     einsatz_id,
                     ctx.einsatz.org_id,
@@ -168,7 +168,7 @@ pub async fn disponieren(
         Ok(ep_id)
     })?;
 
-    let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
+    let anzeige = disposition_repo::load_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     super::etb_system_degradiert(
         &state,
         einsatz_id,
@@ -224,8 +224,8 @@ pub async fn aktualisieren(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        disposition_repo::aktualisiere_tx(
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        disposition_repo::update_tx(
             conn,
             einsatz_id,
             ep_id,
@@ -234,7 +234,7 @@ pub async fn aktualisieren(
             bemerkung,
         )
         .await?;
-        let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         if vorher.status_id != nachher.status_id {
             // LFH-552: ein markierter Status schreibt die Zeitachse mit; ein Verstoß gegen die
             // Perioden-Regeln wird verschluckt, der Statuswechsel gelingt immer.
@@ -284,7 +284,7 @@ pub async fn entfernen(
     PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
+    let anzeige = disposition_repo::load_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     // F06/LFH-244 Tier-A: Führungsrollen-Freigabe + DELETE + System-ETB-Eintrag atomar in EINER
     // Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus der VOR der Tx geladenen Anzeige; SSE erst
     // nach dem Commit.
@@ -312,7 +312,7 @@ pub async fn entfernen(
             schaeden: crate::schaden::repo::load_geschaedigt_durch_tx(conn, einsatz_id, ep_id)
                 .await?,
         };
-        disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
+        disposition_repo::delete_tx(conn, einsatz_id, ep_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(betroffen)
     })?;
@@ -387,7 +387,7 @@ pub async fn position(
     let eff_lon = body.lon.unwrap_or(vorher.1);
     pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
-    let nachher = disposition_repo::aktualisiere_position(
+    let nachher = disposition_repo::update_position(
         &state.pool,
         einsatz_id,
         ep_id,

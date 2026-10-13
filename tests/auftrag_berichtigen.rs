@@ -510,7 +510,7 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     )
     .await;
     let aid = a["id"].as_i64().unwrap();
-    lifeline_hub::einheit::repo::loese_auf(&pool, e, eid)
+    lifeline_hub::einheit::repo::aufloesen(&pool, e, eid)
         .await
         .unwrap();
     let (_, gelesen) = anfrage(
@@ -588,7 +588,7 @@ async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
         .as_i64()
         .unwrap();
     for eid in [eins, zwei] {
-        lifeline_hub::einheit::repo::loese_auf(&pool, e, eid)
+        lifeline_hub::einheit::repo::aufloesen(&pool, e, eid)
             .await
             .unwrap();
     }
