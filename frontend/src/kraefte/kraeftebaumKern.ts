@@ -52,12 +52,12 @@ export function abschnittRang(abschnitte: readonly Einsatzabschnitt[]): Map<numb
     else kinder.set(k, [a]);
   }
   const rang = new Map<number, number>();
-  const besuche = (a: Einsatzabschnitt) => {
+  const visit = (a: Einsatzabschnitt) => {
     if (rang.has(a.id)) return;
     rang.set(a.id, rang.size);
-    for (const k of kinder.get(a.id) ?? []) besuche(k);
+    for (const k of kinder.get(a.id) ?? []) visit(k);
   };
-  for (const a of kinder.get(null) ?? []) besuche(a);
+  for (const a of kinder.get(null) ?? []) visit(a);
   return rang;
 }
 
@@ -171,7 +171,7 @@ export function besatzungsStaerke(crew: readonly EinsatzPersonal[]): Staerke {
 }
 
 /** Soll gilt als erfüllt, wenn Ist in JEDER Position (F/UF/M) ≥ Soll ist (Überbesetzung zählt mit). */
-function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
+function isSollErfuellt(ist: Staerke, soll: Staerke): boolean {
   return (
     ist.fuehrer >= soll.fuehrer &&
     ist.unterfuehrer >= soll.unterfuehrer &&
@@ -191,7 +191,7 @@ export function besatzungsUrteilVon(
 ): BesatzungsUrteil {
   if (anzahlKraefte === 0) return 'nicht_erfasst';
   if (!soll) return 'kein_soll';
-  return istSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
+  return isSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
 }
 
 // ── Material ──────────────────────────────────────────────────────────────────
