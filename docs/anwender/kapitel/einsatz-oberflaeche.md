@@ -37,6 +37,10 @@ Ab acht laufenden Einsätzen steht über den Kacheln das Suchfeld „Einsätze d
 sucht in Bezeichnung, Ort und Stichwort. Abgeschlossene Einsätze stehen kleiner darunter unter
 „Abgeschlossen“.
 
+Legt jemand anderes einen Einsatz an, während der Zeiger über den Kacheln steht oder eine Kachel
+den Fokus hat, rückt keine Kachel. Unter den Kacheln steht dann „1 neuer Einsatz“; „anzeigen“
+holt ihn in die Liste. Sonst ordnet er sich ein, sobald Zeiger und Fokus die Kacheln verlassen.
+
 ### Einen Einsatz anlegen
 
 Für System-Admins und Führungskräfte der Organisation:

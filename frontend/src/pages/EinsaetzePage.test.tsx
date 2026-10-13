@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
@@ -529,6 +529,11 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
     await nutzer.type(feld, 'kein-treffer-xyz');
     expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
+    // Der Nutzer ist woanders: wer im Feld tippt, dem verschwindet es nicht (LLH-1204).
+    fireEvent.pointerLeave(document.querySelector('[data-lfh="einsaetze-bereich"]')!, {
+      pointerType: 'mouse',
+    });
+    act(() => feld.blur());
 
     // Die Liste schrumpft unter SUCHE_AB — der Suchbegriff trifft weiterhin nichts.
     server.use(
@@ -1056,5 +1061,176 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
     for (const feld of ['einsatzort', 'einsatzort_lat', 'einsatzort_lon']) {
       expect(rumpfe[0]).not.toHaveProperty(feld);
     }
+  });
+});
+
+describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
+  const e = (over: Partial<EinsatzAnzeige>): EinsatzAnzeige =>
+    ({
+      id: 1,
+      bezeichnung: 'Alt',
+      stichwort: null,
+      status: 'aktiv',
+      einsatzart: 'realeinsatz',
+      begonnen_at: '2026-06-01 08:00:00',
+      angelegt_at: '2026-06-01 08:00:00',
+      einsatzort: null,
+      org_id: 1,
+      org_name: 'THW Musterstadt',
+      meine_rolle: 'einsatzleitung',
+      ...over,
+    }) as EinsatzAnzeige;
+
+  const alt = e({ id: 1, bezeichnung: 'Alt', begonnen_at: '2026-06-01 08:00:00' });
+  const mitte = e({ id: 2, bezeichnung: 'Mitte', begonnen_at: '2026-06-05 08:00:00' });
+  const neu = e({ id: 3, bezeichnung: 'Neu von woanders', begonnen_at: '2026-06-09 08:00:00' });
+
+  /** Die Liste liegt in einer Variablen; `liefere` tauscht sie und lädt neu wie das Org-Ereignis. */
+  function aufbau(start: EinsatzAnzeige[]) {
+    let liste = start;
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json(liste)),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+    const { client } = renderMitProviders(<EinsaetzePage />);
+    const liefere = async (naechste: EinsatzAnzeige[]) => {
+      liste = naechste;
+      await client.invalidateQueries({ queryKey: globalKeys.einsaetze() });
+    };
+    return { liefere };
+  }
+
+  const titel = () =>
+    within(screen.getByTestId('einsaetze-raster'))
+      .getAllByRole('link')
+      .map((l) => l.textContent);
+  const bereich = () => document.querySelector<HTMLElement>('[data-lfh="einsaetze-bereich"]')!;
+
+  it('ohne Zeiger und Fokus rückt ein neuer Einsatz sofort nach vorn, ohne Banner', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    await liefere([alt, mitte, neu]);
+    await waitFor(() => expect(titel()).toEqual(['Neu von woanders', 'Mitte', 'Alt']));
+    expect(screen.queryByText(/neuer Einsatz/)).not.toBeInTheDocument();
+  });
+
+  it('unter dem Zeiger hält das Raster seine Folge, der neue Einsatz wartet im Sammelbanner', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    fireEvent.pointerMove(screen.getByRole('link', { name: 'Mitte' }), { pointerType: 'mouse' });
+    await liefere([alt, mitte, neu]);
+    const banner = await screen.findByText('1 neuer Einsatz');
+    expect(titel()).toEqual(['Mitte', 'Alt']);
+    // Das Banner steht im Bereich: der Weg dorthin taut nicht auf.
+    expect(bereich()).toContainElement(banner);
+
+    await userEvent.click(screen.getByRole('button', { name: 'anzeigen' }));
+    expect(titel()).toEqual(['Neu von woanders', 'Mitte', 'Alt']);
+    expect(screen.queryByText('1 neuer Einsatz')).not.toBeInTheDocument();
+    // Der Knopf ist weg; der Fokus steht auf dem neuen Einsatz, statt auf `body` zu fallen.
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Neu von woanders' }));
+  });
+
+  it('verlässt der Zeiger den Bereich, sortiert sich der neue Einsatz ein', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    fireEvent.pointerMove(screen.getByRole('link', { name: 'Alt' }), { pointerType: 'mouse' });
+    await liefere([alt, mitte, neu]);
+    await screen.findByText('1 neuer Einsatz');
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(titel()).toEqual(['Neu von woanders', 'Mitte', 'Alt']);
+    expect(screen.queryByText('1 neuer Einsatz')).not.toBeInTheDocument();
+  });
+
+  it('der Fokus auf einer Kachel hält ebenso; erst ein Fokus außerhalb taut', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    const link = screen.getByRole('link', { name: 'Alt' });
+    act(() => link.focus());
+    await liefere([alt, mitte, neu]);
+    await screen.findByText('1 neuer Einsatz');
+    expect(titel()).toEqual(['Mitte', 'Alt']);
+    expect(document.activeElement).toBe(link);
+
+    fireEvent.blur(link, { relatedTarget: document.body });
+    expect(titel()).toEqual(['Neu von woanders', 'Mitte', 'Alt']);
+  });
+
+  it('Touch hält nicht an: der Tipp betritt und verlässt den Bereich', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    fireEvent.pointerMove(screen.getByRole('link', { name: 'Alt' }), { pointerType: 'touch' });
+    await liefere([alt, mitte, neu]);
+    await waitFor(() => expect(titel()).toEqual(['Neu von woanders', 'Mitte', 'Alt']));
+  });
+
+  it('ein abgeschlossener Einsatz bleibt unter dem Zeiger an seinem Platz, der Inhalt fließt', async () => {
+    const { liefere } = aufbau([alt, mitte]);
+    await screen.findByText('Alt');
+    fireEvent.pointerMove(screen.getByRole('link', { name: 'Alt' }), { pointerType: 'mouse' });
+    await liefere([alt, { ...mitte, status: 'abgeschlossen' }]);
+    await waitFor(() => expect(screen.getAllByText('Abgeschlossen').length).toBeGreaterThan(0));
+    expect(titel()).toEqual(['Mitte', 'Alt']);
+    expect(screen.queryByRole('heading', { name: 'Abgeschlossen' })).not.toBeInTheDocument();
+  });
+
+  it('trifft der achte Einsatz unter dem Zeiger ein, erscheint das Suchfeld erst nach dem Verlassen', async () => {
+    const sieben = Array.from({ length: 7 }, (_, i) =>
+      e({ id: 10 + i, bezeichnung: `Einsatz ${i + 1}`, begonnen_at: `2026-06-0${i + 1} 08:00:00` }),
+    );
+    const { liefere } = aufbau(sieben);
+    await screen.findByText('Einsatz 1');
+    fireEvent.pointerMove(screen.getByRole('link', { name: 'Einsatz 3' }), {
+      pointerType: 'mouse',
+    });
+    await liefere([...sieben, neu]);
+    await screen.findByText('1 neuer Einsatz');
+    // Das Feld stünde über dem Raster und schöbe jede Kachel eine Zeile tiefer.
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(screen.getByRole('searchbox', { name: /Einsätze durchsuchen/ })).toBeInTheDocument();
+    expect(titel()[0]).toBe('Neu von woanders');
+  });
+
+  it('die eigene Suche ordnet sofort, auch unter gehaltener Schleuse; nichts wartet im Banner', async () => {
+    const neun = Array.from({ length: 9 }, (_, i) =>
+      e({ id: 10 + i, bezeichnung: `Einsatz ${i + 1}`, begonnen_at: `2026-06-0${i + 1} 08:00:00` }),
+    );
+    aufbau(neun);
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await userEvent.type(feld, 'Einsatz 4');
+    expect(titel()).toEqual(['Einsatz 4']);
+    // Weg und zurück: jetzt hält die Schleuse die GEFILTERTE Menge.
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    act(() => feld.blur());
+    act(() => feld.focus());
+    await userEvent.clear(feld);
+    expect(titel()).toHaveLength(9);
+    expect(screen.queryByText(/neue Einsätze/)).not.toBeInTheDocument();
+  });
+
+  it('das Suchfeld verschwindet nicht, solange darin getippt wird', async () => {
+    const neun = Array.from({ length: 9 }, (_, i) =>
+      e({ id: 10 + i, bezeichnung: `Einsatz ${i + 1}`, begonnen_at: `2026-06-0${i + 1} 08:00:00` }),
+    );
+    const { liefere } = aufbau(neun);
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await userEvent.type(feld, 'Einsatz');
+    await liefere(neun.slice(0, 3));
+    await waitFor(() => expect(titel()).toEqual(['Einsatz 3', 'Einsatz 2', 'Einsatz 1']));
+    expect(screen.getByRole('searchbox', { name: /Einsätze durchsuchen/ })).toBe(feld);
+    expect(document.activeElement).toBe(feld);
+    // Weitertippen ordnet neu (Zwischenschritt `neu`); der Begriff bleibt stehen.
+    await userEvent.type(feld, ' 2');
+    expect(feld).toHaveValue('Einsatz 2');
+    expect(titel()).toEqual(['Einsatz 2']);
+
+    // Erst wer das Feld verlässt, sieht den neuen Stand; der Filter fällt mit dem Feld.
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    act(() => feld.blur());
+    await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
+    expect(titel()).toEqual(['Einsatz 3', 'Einsatz 2', 'Einsatz 1']);
   });
 });
