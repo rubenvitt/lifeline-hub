@@ -50,8 +50,8 @@ import type { SkizzenAktionen } from './skizzenAktionen';
  * - **Cache wie beim Kommunikationsplan:** Antworten mit Datensatz (Lage, Komponente, Verbindung,
  *   Bereich, Schriftfeld, Führungsstelle, Plan) setzt der Hook per `setQueryData`; Antworten ohne
  *   Körper (Zuordnungen, Entfernen) invalidieren die Liste des Datensatzes. Das Live-Ereignis des
- *   Servers (`abschnitt`, `einheit`, `einsatz`, `stab`) erreicht dieselben Keys in jedem anderen
- *   Tab; die Skizzendaten hängen unter dem Stab-Prefix.
+ *   Servers (`abschnitt`, `einheit`, `einsatz`, `fernmeldewesen`) erreicht dieselben Keys in jedem
+ *   anderen Tab; die Skizzendaten hängen unter dem Prefix des Fernmeldewesens (LLH-1180).
  * - **Zuordnung am Datensatz** (D5): `ab-`, `eh-`, `fs`, `ks-`, `ko-` am Pfad des Datensatzes;
  *   Rufname und Kommunikationsmittel über dessen PATCH (Abschnitt `kurzbezeichnung`, Einheit
  *   `funkrufname`, Führungsstelle `rufname`), je nur das eine Feld.

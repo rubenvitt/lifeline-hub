@@ -4,10 +4,11 @@
 //! `…/stab`, gehören aber dem Modul Fernmeldewesen (LLH-1180): Marker `Fernmeldewesen`,
 //! Ereignis `fernmeldewesen`.
 //!
-//! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<Stab>` (alle
-//! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<Stab>` (Einsatzleitung,
-//! Führungspersonal, System-Admin; enthält `fordere_aktiv`). Das Sachgebiet verleiht
-//! **kein** Recht (Entscheidung 12 der Spec).
+//! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<M>` (alle
+//! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<M>` (Einsatzleitung,
+//! Führungspersonal, System-Admin; enthält `fordere_aktiv`), mit `M = Stab` für Besetzung und
+//! Checkliste, `M = Fernmeldewesen` für Kommunikationsplan und Fernmeldeskizze. Das Sachgebiet
+//! verleiht **kein** Recht (Entscheidung 12 der Spec).
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
