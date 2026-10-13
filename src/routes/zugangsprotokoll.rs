@@ -7,7 +7,8 @@
 //!
 //! Filter: `von`, `bis` (ISO-8601, einschließlich), `konto` (Teil des Benutzernamens), `ereignis` bzw.
 //! `aktion`; Cursor `vor_id`, Seitengröße `limit`. Nur System-Admin (`AdminUser`): die Spuren
-//! sind Personen- und Beschäftigtendaten ohne Einsatzbezug. **Das Lesen schreibt keine Spur**
+//! sind Personen- und Beschäftigtendaten ohne Einsatzbezug. Er liest nur die Einträge seiner Org
+//! und die serverweiten (LLH-1151). **Das Lesen schreibt keine Spur**
 //! (wie die Einsicht ins Personen-Zugriffsprotokoll); Herleitung in
 //! `/mnt/project-files/lfh-1097/design.md` (D1–D4).
 
@@ -79,7 +80,7 @@ fn leer_als_none(wert: Option<&str>) -> Option<&str> {
 /// GET /api/zugangsprotokoll/anmeldungen — Anmeldespur, neueste zuerst.
 pub async fn anmeldungen(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
     Query(params): Query<SpurParams>,
 ) -> Result<Json<Vec<AnmeldeEintragAnzeige>>, AppError> {
     let ereignis = parse_enum_opt(
@@ -88,13 +89,13 @@ pub async fn anmeldungen(
         "Unbekanntes Ereignis im Filter",
     )?;
     let filter = spur_filter(&params)?;
-    Ok(Json(audit::liste(&state.pool, &filter, ereignis).await?))
+    Ok(Json(audit::liste(&state.pool, admin.org_id, &filter, ereignis).await?))
 }
 
 /// GET /api/zugangsprotokoll/zugangsaenderungen — Admin-Spur, neueste zuerst.
 pub async fn zugangsaenderungen(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
     Query(params): Query<SpurParams>,
 ) -> Result<Json<Vec<ZugangsaenderungAnzeige>>, AppError> {
     let aktion = parse_enum_opt(
@@ -104,6 +105,6 @@ pub async fn zugangsaenderungen(
     )?;
     let filter = spur_filter(&params)?;
     Ok(Json(
-        admin_audit::liste(&state.pool, &filter, aktion).await?,
+        admin_audit::liste(&state.pool, admin.org_id, &filter, aktion).await?,
     ))
 }
