@@ -123,19 +123,27 @@ Leerzustand und die Schnellaktion der Sprungpalette (`?neu=1`) MUST dieselbe Erf
 - **WHEN** der Server das Anlegen ablehnt
 - **THEN** bleibt die Erfassung mit den eingegebenen Werten offen, und der Grund steht in ihr
 
-### Requirement: Fortschritt erscheint nicht
-Die Oberfläche MUST keinen Fortschritt eines Abschnitts zeigen oder erfragen: weder beim Anlegen
-noch im Detail, in der Abschnittsvorschau der Sprungpalette, in der Funktionsansicht
-Einsatzabschnitt oder im Führungsüberblick. Ein gespeicherter Wert aus älteren Einsätzen MUST
-erhalten bleiben; das Bearbeiten einer anderen Angabe MUST ihn nicht verändern.
+### Requirement: Ein Abschnitt trägt keinen Fortschritt
+Ein Einsatzabschnitt MUST keinen Fortschritt tragen. Die Oberfläche MUST keinen Fortschritt
+zeigen oder erfragen, weder beim Anlegen noch im Detail, in der Abschnittsvorschau der
+Sprungpalette, in der Funktionsansicht Einsatzabschnitt oder im Führungsüberblick. Der Server
+MUST keinen Fortschritt speichern oder ausliefern. Schickt ein Client noch ein Feld
+`fortschritt`, MUST der Server den Wert verwerfen, ohne die übrigen Angaben abzulehnen.
 
-#### Scenario: Abschnitt mit Altwert
-- **WHEN** ein Abschnitt den gespeicherten Fortschritt 72 trägt
-- **THEN** zeigen weder Detail noch Führungsüberblick „72 %“ oder einen Fortschrittsbalken
+#### Scenario: Abschnitt ohne Fortschritt
+- **WHEN** ein Abschnitt geladen wird
+- **THEN** enthält die Antwort kein Feld `fortschritt`
+- **AND** zeigen weder Detail noch Führungsüberblick eine Prozentzahl oder einen
+  Fortschrittsbalken
 
-#### Scenario: Altwert bleibt beim Bearbeiten
-- **WHEN** an diesem Abschnitt die Bemerkung gespeichert wird
+#### Scenario: Bearbeiten sendet keinen Fortschritt
+- **WHEN** an einem Abschnitt die Bemerkung gespeichert wird
 - **THEN** enthält die gesendete Änderung kein Feld `fortschritt`
+
+#### Scenario: Veralteter Client schickt noch einen Fortschritt
+- **WHEN** ein Client einen Abschnitt mit Name „Nord“ und `fortschritt` 72 anlegt
+- **THEN** legt der Server den Abschnitt „Nord“ an
+- **AND** enthält die Antwort kein Feld `fortschritt`
 
 ### Requirement: Auflösen bleibt abgesetzt und rückgefragt
 Mit Schreibrecht SHALL das Detail „Auflösen“ abgesetzt von den Angaben anbieten, als rot
