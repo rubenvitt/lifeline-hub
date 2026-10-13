@@ -66,7 +66,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   (`useOfflineSync` in der Hülle).
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
-  Datenstand. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
+  Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
+  geführten Abfrage der Stelle, `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
+  einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü.
 - **Lagemonitor (Großbild):** feste Kachelung ohne Bildlauf bei 1920 × 1080, Kacheln und Karte
