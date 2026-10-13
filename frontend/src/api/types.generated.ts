@@ -1436,7 +1436,8 @@ export interface components {
         };
         /**
          * @description Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
-         *     die Detailseite braucht keinen Einzel-GET (design.md D8).
+         *     die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
+         *     Verwaltung“).
          */
         EinheitVorlage: {
             aktiv: boolean;

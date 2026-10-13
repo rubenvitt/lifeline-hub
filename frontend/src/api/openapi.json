@@ -3830,7 +3830,7 @@
       },
       "EinheitVorlage": {
         "type": "object",
-        "description": "Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;\ndie Detailseite braucht keinen Einzel-GET (design.md D8).",
+        "description": "Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;\ndie Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der\nVerwaltung“).",
         "required": [
           "id",
           "name",
