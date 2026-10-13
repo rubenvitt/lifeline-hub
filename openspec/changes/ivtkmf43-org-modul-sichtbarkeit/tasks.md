@@ -36,8 +36,8 @@ Frontend-Gates aus dem Frontend-Ordner über `mise exec -- pnpm …` (ohne mise:
 
 ## 6. Anwenderdoku
 
-- [ ] 6.1 `docs/anwender/kapitel/verwaltung.md`: Ablauf „Module für alle Einsätze ausblenden oder auf eine Rolle beschränken“ mit Paneelname, Spalte „Sichtbar“ und Hinweis auf laufende Einsätze; `einsatz-einstellungen.md`: „Woher ein Wert kommt“ und „Was ‚Sichtbar‘ und ‚Benötigte Rolle‘ bewirken“ um die Org-Vorgabe der Sichtbarkeit, den Hinweis und „Vorgabe übernehmen“ ergänzt; `quellen` der Köpfe nachgezogen; `anwenderdoku.guard.test.ts` grün
-- [ ] 6.2 Bilder: `frontend/e2e/doku-bilder/verwaltung.bilder.ts` auf das Paneel „Module für alle Einsätze“ (Bild umbenannt, mit ausgeblendetem Modul), `einsatz-einstellungen.bilder.ts` mit einer geerbten Ausblendung samt Hinweis; erzeugt mit `pnpm doku:bilder --grep "verwaltung|einsatz-einstellungen"`, hell und dunkel, jedes Bild ≤ 300 KB. Gelingt der Lauf in der Sitzung nicht, steht das im PR, und die Aufgabe bleibt offen
+- [x] 6.1 `docs/anwender/kapitel/verwaltung.md`: Ablauf „Module für alle Einsätze ausblenden oder auf eine Rolle beschränken“ mit Paneelname, Spalte „Sichtbar“ und Hinweis auf laufende Einsätze; `einsatz-einstellungen.md`: „Woher ein Wert kommt“ und „Was ‚Sichtbar‘ und ‚Benötigte Rolle‘ bewirken“ um die Org-Vorgabe der Sichtbarkeit, den Hinweis und „Vorgabe übernehmen“ ergänzt; `quellen` der Köpfe nachgezogen; `anwenderdoku.guard.test.ts` grün
+- [x] 6.2 Bilder: `frontend/e2e/doku-bilder/verwaltung.bilder.ts` auf das Paneel „Module für alle Einsätze“ (Bild umbenannt, mit ausgeblendetem Modul), `einsatz-einstellungen.bilder.ts` mit einer geerbten Ausblendung samt Hinweis; erzeugt mit `pnpm doku:bilder --grep "verwaltung|einsatz-einstellungen"`, hell und dunkel, jedes Bild ≤ 300 KB. Gelingt der Lauf in der Sitzung nicht, steht das im PR, und die Aufgabe bleibt offen
 
 ## 7. Integration
 
