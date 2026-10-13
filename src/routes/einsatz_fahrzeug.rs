@@ -185,18 +185,19 @@ pub async fn aktualisieren(
     // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (nachher, has_status_changed) = crate::write_retry!(&state.pool, |conn| {
+    let (nachher, has_status_changed, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
             .await?;
         let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let has_status_changed = vorher.status_id != nachher.status_id;
+        let mut beruehrt = Vec::new();
         if has_status_changed {
             // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
             // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung). Das Live-Event
             // `fahrzeug` lädt die Zeitachse im Client mit neu.
             if let Some(sid) = nachher.status_id {
-                crate::zeitachse::repo::aus_fahrzeugstatus_tx(
+                if let Some((_, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,
@@ -204,7 +205,10 @@ pub async fn aktualisieren(
                     sid,
                     &jetzt,
                 )
-                .await?;
+                .await?
+                {
+                    beruehrt = b.personen;
+                }
             }
             crate::etb::system_audit_tx(
                 conn,
@@ -219,7 +223,7 @@ pub async fn aktualisieren(
             )
             .await?;
         }
-        Ok((nachher, has_status_changed))
+        Ok((nachher, has_status_changed, beruehrt))
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     // Die Einheit zeigt den Status ihrer Fahrzeuge und leitet ihren eigenen daraus ab (LFH-609);
@@ -228,6 +232,11 @@ pub async fn aktualisieren(
         if let Some(einheit_id) = nachher.einheit_id {
             super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
         }
+    }
+    // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
+    // Personalrecht erreicht weder `fahrzeug` noch `einheit` (LLH-1185).
+    for ep_id in beruehrt {
+        sse_personal(&state, einsatz_id, ep_id);
     }
     Ok(Json(nachher))
 }
