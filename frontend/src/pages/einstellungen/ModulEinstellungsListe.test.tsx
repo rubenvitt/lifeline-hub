@@ -95,6 +95,55 @@ describe('ModulEinstellungsListe', () => {
     expect(screen.getByText('Vorgabe der Organisation: Führungskraft')).toBeInTheDocument();
   });
 
+  it('zeigt den Zeilenzusatz in der Modulspalte unter dem Namen, außerhalb der Beschriftung (LLH-1179)', () => {
+    renderMitProviders(
+      <ModulEinstellungsListe
+        {...einsatzProps()}
+        zusatzVon={(key) =>
+          key === 'stab' ? <span>Vorgabe der Organisation: ausgeblendet</span> : undefined
+        }
+      />,
+    );
+
+    const zusatz = screen.getByText('Vorgabe der Organisation: ausgeblendet');
+    const zeile = zusatz.closest('[data-modul-zeile]') as HTMLElement;
+    expect(zeile.getAttribute('data-modul-zeile')).toBe('stab');
+    // Nicht im Label des Schalters (ein Klick darin legte ihn sonst um), aber in derselben Zelle
+    // wie der Name — nicht unter der Rollenauswahl.
+    expect(zusatz.closest('label')).toBeNull();
+    const zelle = zeile.firstElementChild as HTMLElement;
+    expect(within(zelle).getByText('Stab')).toBeInTheDocument();
+    expect(within(zelle).getByText('Vorgabe der Organisation: ausgeblendet')).toBeInTheDocument();
+    expect(within(zelle).queryByRole('combobox')).toBeNull();
+  });
+
+  it('legt mit einem Knopf im Zeilenzusatz den Schalter nicht um', async () => {
+    const props = einsatzProps();
+    const aufZusatz = vi.fn();
+    renderMitProviders(
+      <ModulEinstellungsListe
+        {...props}
+        zusatzVon={(key) =>
+          key === 'stab' ? (
+            <button type="button" onClick={aufZusatz}>
+              Vorgabe übernehmen
+            </button>
+          ) : undefined
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vorgabe übernehmen' }));
+
+    expect(aufZusatz).toHaveBeenCalledTimes(1);
+    expect(props.sichtbarSpalte.aufSichtbar).not.toHaveBeenCalled();
+    // Der Klick auf den Namen schaltet weiter.
+    fireEvent.click(screen.getByText('Stab'));
+    await waitFor(() =>
+      expect(props.sichtbarSpalte.aufSichtbar).toHaveBeenCalledWith('stab', false),
+    );
+  });
+
   it('zeigt den aktuellen Wert je Modul an (Rolle und Sichtbarkeit kommen von außen)', () => {
     renderMitProviders(
       <ModulEinstellungsListe

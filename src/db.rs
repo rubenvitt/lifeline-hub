@@ -498,7 +498,20 @@ mod tests {
         .await
         .unwrap();
 
-        migrate(&pool).await.expect("0184 läuft durch");
+        // Nur bis 0184: 0185 deutet die gespeicherte `1` danach zu „erbt“ (NULL) um.
+        Migrator {
+            migrations: Cow::Owned(
+                sqlx::migrate!("./migrations")
+                    .iter()
+                    .filter(|m| m.version <= 184)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("0184 läuft durch");
 
         let einsatz: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
@@ -525,14 +538,14 @@ mod tests {
         assert_eq!(org, [(1, Some("fuehrungskraft".to_string()))]);
     }
 
-    /// LLH-1180 (`0185`): Die Rollen-Vorgabe des Stabs wandert je Einsatz und je Organisation auf
-    /// das Fernmeldewesen, die Ausblendung nicht; ohne Stab-Rolle entsteht keine Zeile.
+    /// LLH-1179 (`0185`): Eine gespeicherte `1` im Einsatz-Override wird zu „erbt“ (`NULL`), denn
+    /// bisher gab es keine Ebene darüber; eine `0` bleibt eine Ausblendung, die Rolle bleibt.
+    /// Org-Vorgaben tragen danach eine leere Sichtbarkeit (= sichtbar).
     #[tokio::test]
-    async fn migration_0185_uebernimmt_nur_die_stab_rolle() {
+    async fn migration_0185_macht_die_sichtbarkeit_erblich() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
-        // Ohne `foreign_keys`: die Vorgaben brauchen hier keinen echten Einsatz.
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -554,6 +567,131 @@ mod tests {
         .run(&pool)
         .await
         .expect("Migrationen vor 0185");
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override \
+                (einsatz_id, modul_key, sichtbar, benoetigte_rolle, geaendert_at, geaendert_von) \
+             VALUES (1, 'stab', 1, 'fuehrungskraft', '2026-10-01 10:00:00', 7), \
+                    (1, 'meldungen', 0, NULL, NULL, NULL), \
+                    (2, 'etb', 0, 'admin', NULL, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, benoetigte_rolle) \
+             VALUES (1, 'stab', 'fuehrungskraft')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Genau bis 0185: spätere Migrationen (0186 kopiert die Stab-Rolle auf das Fernmeldewesen)
+        // träfen die Vorgaben ohne echten Einsatz bei eingeschalteten Fremdschlüsseln.
+        let bis: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version <= 185)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(bis),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("0185 läuft durch");
+
+        let einsatz: Vec<(
+            i64,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+        )> = sqlx::query_as(
+            "SELECT einsatz_id, modul_key, sichtbar, benoetigte_rolle, geaendert_at, \
+                        geaendert_von \
+                 FROM einsatz_modul_override ORDER BY einsatz_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, "meldungen".into(), Some(0), None, None, None),
+                (
+                    1,
+                    "stab".into(),
+                    None,
+                    Some("fuehrungskraft".into()),
+                    Some("2026-10-01 10:00:00".into()),
+                    Some(7)
+                ),
+                (2, "etb".into(), Some(0), Some("admin".into()), None, None),
+            ]
+        );
+        let org: Vec<(String, Option<i64>)> =
+            sqlx::query_as("SELECT modul_key, sichtbar FROM org_modul_einstellung")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(org, [("stab".to_string(), None)]);
+
+        // Eine neue Zeile ohne Sichtbarkeit erbt: kein DEFAULT 1 mehr. Die Migration schaltet die
+        // Fremdschlüssel wieder ein; Einsatz 3 gibt es hier nicht.
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, benoetigte_rolle) \
+             VALUES (3, 'chat', 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let neu: Option<i64> =
+            sqlx::query_scalar("SELECT sichtbar FROM einsatz_modul_override WHERE einsatz_id = 3")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(neu, None);
+    }
+
+    /// LLH-1180 (`0186`): Die Rollen-Vorgabe des Stabs wandert je Einsatz und je Organisation auf
+    /// das Fernmeldewesen, die Ausblendung nicht; ohne Stab-Rolle entsteht keine Zeile. Die neue
+    /// Zeile erbt die Sichtbarkeit (`NULL`, LLH-1179): eine `1` überstimmte eine spätere
+    /// Ausblendung durch die Organisation.
+    #[tokio::test]
+    async fn migration_0186_uebernimmt_nur_die_stab_rolle() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 186)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0186");
         // Migrationen schalten Fremdschlüssel selbst wieder ein; die Vorgaben hier brauchen keinen
         // echten Einsatz und keine Organisation.
         sqlx::query("PRAGMA foreign_keys = OFF")
@@ -562,23 +700,24 @@ mod tests {
             .unwrap();
         sqlx::query(
             "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
-             VALUES (1, 'stab', 1, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
-                    (3, 'stab', 0, 'admin'), (4, 'etb', 1, 'admin')",
+             VALUES (1, 'stab', NULL, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
+                    (3, 'stab', 0, 'admin'), (4, 'etb', NULL, 'admin')",
         )
         .execute(&pool)
         .await
         .unwrap();
         sqlx::query(
-            "INSERT INTO org_modul_einstellung (org_id, modul_key, benoetigte_rolle) \
-             VALUES (1, 'stab', 'fuehrungskraft'), (2, 'stab', NULL), (3, 'etb', 'admin')",
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', NULL, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
+                    (3, 'etb', NULL, 'admin'), (4, 'stab', 0, 'admin')",
         )
         .execute(&pool)
         .await
         .unwrap();
 
-        migrate(&pool).await.expect("0185 läuft durch");
+        migrate(&pool).await.expect("0186 läuft durch");
 
-        let einsatz: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
+        let einsatz: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
              WHERE modul_key = 'fernmeldewesen' ORDER BY einsatz_id",
         )
@@ -588,19 +727,25 @@ mod tests {
         assert_eq!(
             einsatz,
             [
-                (1, 1, Some("fuehrungskraft".to_string())),
-                // Stab war ausgeblendet UND beschränkt: die Rolle wandert, sichtbar wird 1.
-                (3, 1, Some("admin".to_string())),
+                (1, None, Some("fuehrungskraft".to_string())),
+                // Stab war ausgeblendet UND beschränkt: die Rolle wandert, die Sichtbarkeit erbt.
+                (3, None, Some("admin".to_string())),
             ]
         );
-        let org: Vec<(i64, Option<String>)> = sqlx::query_as(
-            "SELECT org_id, benoetigte_rolle FROM org_modul_einstellung \
+        let org: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, sichtbar, benoetigte_rolle FROM org_modul_einstellung \
              WHERE modul_key = 'fernmeldewesen' ORDER BY org_id",
         )
         .fetch_all(&pool)
         .await
         .unwrap();
-        assert_eq!(org, [(1, Some("fuehrungskraft".to_string()))]);
+        assert_eq!(
+            org,
+            [
+                (1, None, Some("fuehrungskraft".to_string())),
+                (4, None, Some("admin".to_string())),
+            ]
+        );
     }
 
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.

@@ -16,7 +16,7 @@ Code). Backend-Tests mit `cargo test --test <datei>`, Frontend-Gates aus dem Fro
 
 - [x] 2.1 `LiveEvent::Fernmeldewesen` (Wire `fernmeldewesen`, Gate `["fernmeldewesen"]` mit Begründung), `gate_mengen_sind_gepinnt`, `tests/enum_wire_kontrakt.rs`; Kommentar an `LiveEvent::Stab` auf Besetzung und Checkliste gekürzt
 - [x] 2.2 Live-Tests: `tests/stab_kommunikationsplan.rs` (`jede_schreibaktion_sendet_*`) und `tests/stab_fernmeldeskizze.rs` (`zaehle`, `jede_skizzenaenderung_sendet_*`) zählen `fernmeldewesen` und kein `stab`; `tests/sprechgruppe_einzelzuordnung.rs` (`Ziel::Stelle` → `Fernmeldewesen`); neu: Leser mit Stab-, aber ohne Fernmeldewesen-Recht erhält nichts; Besetzung ändern sendet kein `fernmeldewesen`
-- [x] 2.3 Migration `0186_fernmeldewesen_modul.sql` nach design.md D4 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `migration_0185_uebernimmt_nur_die_stab_rolle` in `src/db.rs` nach dem Muster von 0184: Stab-Rolle je Einsatz und je Org übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
+- [x] 2.3 Migration `0186_fernmeldewesen_modul.sql` nach design.md D4 (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft); Test `migration_0186_uebernimmt_nur_die_stab_rolle` in `src/db.rs` nach dem Muster von 0184: Stab-Rolle je Einsatz und je Org übernommen, Stab-Ausblendung nicht, ohne Stab-Vorgabe keine Zeile
 - [x] 2.4 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommittet; `liveEvent.contract.test.ts` grün
 
 ## 3. Frontend: Freigabe-Hook, Query-Keys, Live (D3, D6)

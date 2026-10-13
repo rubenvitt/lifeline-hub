@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -57,7 +57,10 @@ Für die Einsatzleitung:
 3. In der Zeile des Moduls „Sichtbar“ ausschalten, um es auszublenden, oder unter „Benötigte
    Rolle“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „Admin“ wählen.
 
-   ![Liste „Modul-Sichtbarkeit & Berechtigungen“, gefiltert auf „Lage“: Lageberichte ausgeblendet, Lagemeldungen nur für die Führung im Einsatz](../bilder/einsatz-einstellungen/module.png)
+   ![Liste „Modul-Sichtbarkeit & Berechtigungen“, gefiltert auf „Lage“: Lagebild von der Organisation ausgeblendet, Lageberichte im Einsatz ausgeblendet, Lagemeldungen nur für die Führung im Einsatz](../bilder/einsatz-einstellungen/module.png)
+
+4. Um einen eigenen Wert für „Sichtbar“ zurückzunehmen, in der Zeile „Vorgabe übernehmen“ wählen.
+   Das Modul folgt dann wieder der Organisation.
 
 Jede Änderung gilt sofort, ohne „Speichern“. Die App meldet „Modul-Einstellung gespeichert“.
 
@@ -67,7 +70,8 @@ Jede Änderung gilt sofort, ohne „Speichern“. Die App meldet „Modul-Einste
 
 Jede Einstellung gilt in der Reihenfolge Einsatz, Organisation, System. Steht unter einem Feld
 „Vorgabe der Organisation: …“, hat die Verwaltung dafür einen eigenen Wert gesetzt; das Kapitel
-[Verwaltung](verwaltung.md) beschreibt diese Vorgaben. Ohne beide gelten: Einstiegsmodul
+[Verwaltung](verwaltung.md) beschreibt diese Vorgaben. Das gilt auch für „Sichtbar“ und
+„Benötigte Rolle“ der Module. Ohne beide gelten: Einstiegsmodul
 „Überblick“, Gerätezeit, 24 Stunden, metrisch, WGS84 dezimal, Bestätigungsfrist 5 Minuten, keine
 Quittierfrist, Rückmeldefrist 60 Minuten, automatische ETB-Einträge an. Als Einstiegsmodul
 stehen nur fertige Module zur Wahl. Die Fristen nehmen 1 bis 10080 Minuten (sieben Tage).
@@ -102,7 +106,11 @@ was ins Einsatztagebuch gehört, trägt dann jemand selbst ein.
 - **„Admin“** lässt nur System-Admins in das Modul.
 - **„Frei (alle)“** schränkt nichts ein; es gelten die Rollen im Einsatz.
 
-Eine Rolle ohne eigenen Wert im Einsatz folgt der „Rollen-Vorgabe je Modul“ der Organisation.
+Ohne eigenen Wert im Einsatz folgen „Sichtbar“ und „Benötigte Rolle“ den „Modulen für alle
+Einsätze“ der Organisation, auch während der Einsatz läuft. Blendet die Organisation ein Modul aus,
+steht der Schalter aus und darunter „Vorgabe der Organisation: ausgeblendet“. Wer ihn einschaltet,
+setzt einen eigenen Wert: Das Modul bleibt in diesem Einsatz sichtbar, bis jemand „Vorgabe
+übernehmen“ wählt. Eine geänderte Rolle ändert die Sichtbarkeit nicht.
 „Einsatzdaten“ und „Einstellungen“ sind „immer sichtbar, nicht ausblendbar“, damit sich niemand
 selbst aussperrt.
 

@@ -60,6 +60,14 @@ pub fn effektive_modul_rolle(
     einsatz_override.or(org_default).map(str::to_owned)
 }
 
+/// Effektive Modul-Sichtbarkeit (LLH-1179): Einsatz-Override ?? Org-Vorgabe ?? sichtbar.
+///
+/// `None` heißt auf beiden Ebenen „kein eigener Wert“; über der Organisation liegt nur der feste
+/// Rückfall „sichtbar“. Ob ein Modul überhaupt ausblendbar ist, prüft der Aufrufer.
+pub fn effektiv_sichtbar(einsatz_override: Option<bool>, org_vorgabe: Option<bool>) -> bool {
+    einsatz_override.or(org_vorgabe).unwrap_or(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +259,29 @@ mod tests {
     #[test]
     fn modul_rolle_beide_none_ist_none() {
         assert_eq!(effektive_modul_rolle(None, None), None);
+    }
+
+    // ── effektiv_sichtbar ─────────────────────────────────────────────────────
+
+    #[test]
+    fn sichtbar_einsatz_an_schlaegt_org_aus() {
+        assert!(effektiv_sichtbar(Some(true), Some(false)));
+    }
+
+    #[test]
+    fn sichtbar_einsatz_aus_schlaegt_org_ohne_vorgabe() {
+        assert!(!effektiv_sichtbar(Some(false), None));
+        assert!(!effektiv_sichtbar(Some(false), Some(true)));
+    }
+
+    #[test]
+    fn sichtbar_ohne_einsatzwert_folgt_der_org() {
+        assert!(!effektiv_sichtbar(None, Some(false)));
+        assert!(effektiv_sichtbar(None, Some(true)));
+    }
+
+    #[test]
+    fn sichtbar_ohne_beide_ist_sichtbar() {
+        assert!(effektiv_sichtbar(None, None));
     }
 }

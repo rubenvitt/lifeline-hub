@@ -1,8 +1,8 @@
 import type {
-  BenoetigteRolle,
   OrgEinstellungen,
   OrgEinstellungenUpdate,
   OrgModulEinstellungen,
+  OrgModulEinstellungUpdate,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -20,21 +20,20 @@ export function speichereOrgEinstellungen(
   return apiSend<OrgEinstellungen>('/api/org-einstellungen', 'PUT', update);
 }
 
-/** Alle Modul-Rollen-Defaults laden (GET /api/org-modul-einstellungen).
+/** Alle Modul-Vorgaben laden (GET /api/org-modul-einstellungen).
  *  Berechtigung: admin oder fuehrungskraft.
- *  Antwort: sparse Map — fehlt ein Key = kein Org-Default (frei). */
+ *  Antwort: sparse Map — fehlt ein Key = keine Vorgabe (sichtbar, frei). */
 export function ladeOrgModulEinstellungen(): Promise<OrgModulEinstellungen> {
   return apiGet<OrgModulEinstellungen>('/api/org-modul-einstellungen');
 }
 
-/** Rollen-Default für ein Modul setzen (PUT /api/org-modul-einstellungen/:modulKey, 204).
+/** Vorgabe für ein Modul setzen (PUT /api/org-modul-einstellungen/:modulKey).
  *  Berechtigung: nur system_rolle=admin (sonst 403).
- *  `rolle = null` = kein Rollen-Zwang (frei). */
+ *  `benoetigte_rolle = null` = kein Rollen-Zwang (frei); `sichtbar = false` blendet das Modul für
+ *  alle Einsätze ohne eigenen Wert aus (LLH-1179). */
 export function setzeOrgModulEinstellung(
   modulKey: string,
-  rolle: BenoetigteRolle | null,
+  vorgabe: OrgModulEinstellungUpdate,
 ): Promise<void> {
-  return apiSend<void>(`/api/org-modul-einstellungen/${modulKey}`, 'PUT', {
-    benoetigte_rolle: rolle,
-  });
+  return apiSend<void>(`/api/org-modul-einstellungen/${modulKey}`, 'PUT', vorgabe);
 }

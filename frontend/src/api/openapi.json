@@ -4284,11 +4284,10 @@
       },
       "EinsatzModulOverride": {
         "type": "object",
-        "description": "Override-Zeile wie in der DB abgelegt. `sichtbar` aus INTEGER (0/1) dekodiert;\n`benoetigte_rolle` ist `None` (= frei) oder ein gültiger Rollen-String.",
+        "description": "Override-Zeile wie in der DB abgelegt. `sichtbar` ist der eigene Wert des Einsatzes, `None` =\nerbt (Organisation ?? sichtbar, LLH-1179); `benoetigte_rolle` ist `None` (= erbt bzw. frei)\noder ein gültiger Rollen-String.",
         "required": [
           "einsatz_id",
-          "modul_key",
-          "sichtbar"
+          "modul_key"
         ],
         "properties": {
           "benoetigte_rolle": {
@@ -4318,7 +4317,10 @@
             "type": "string"
           },
           "sichtbar": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         }
       },
@@ -8680,7 +8682,7 @@
         "properties": {
           "sichtbar": {
             "type": "boolean",
-            "description": "Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares\nModul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`)."
+            "description": "Das Modul erscheint in der Navigation. `false` nur, wenn ein ausblendbares Modul\nausgeblendet ist — vom Einsatz oder, ohne eigenen Wert des Einsatzes, von der Organisation\n(LLH-1179) —, auch für System-Admins, die es dennoch erreichen (`zugriff`)."
           },
           "zugriff": {
             "type": "boolean",
@@ -9553,6 +9555,25 @@
           "sha256": {
             "type": "string",
             "description": "Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`."
+          }
+        }
+      },
+      "OrgModulEinstellung": {
+        "type": "object",
+        "description": "Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).\n`sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.",
+        "required": [
+          "sichtbar"
+        ],
+        "properties": {
+          "benoetigte_rolle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "'admin' | 'fuehrungskraft' | 'einsatzfuehrung' | null (= frei)."
+          },
+          "sichtbar": {
+            "type": "boolean"
           }
         }
       },

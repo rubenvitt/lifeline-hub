@@ -212,6 +212,7 @@ use utoipa::OpenApi;
         crate::nachforderung::NachforderungAnzeige,
         crate::nachforderung::NachforderungStatus,
         crate::org::einstellungen::OrgEinstellungenAnzeige,
+        crate::org::modul_einstellung::OrgModulEinstellung,
         crate::org::aufbewahrung_kategorie::KategorieVorgabe,
         crate::org::einstellungen::OrgEinstellungenHinweis,
         crate::person::AbgleichStatus,

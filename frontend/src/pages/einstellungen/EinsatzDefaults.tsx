@@ -24,7 +24,11 @@ import {
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
-import type { BenoetigteRolle, OrgEinstellungenUpdate } from '../../api/types';
+import type {
+  BenoetigteRolle,
+  OrgEinstellungenUpdate,
+  OrgModulEinstellungUpdate,
+} from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
@@ -48,8 +52,9 @@ export function einsatznummerVorschau(praefix: string | null | undefined, jahr: 
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen, Auto-ETB +
- * Modul-Rollen-Default. Bearbeiten nur `system_rolle=admin`. Der PUT ist Vollersatz (Payload aus
- * geladenen Daten + eigenen Feldern). Die Modul-Rollen-Selects speichern sofort (eigene Mutation).
+ * Modul-Vorgaben (Sichtbarkeit und Rolle, LLH-1179). Bearbeiten nur `system_rolle=admin`. Der PUT ist
+ * Vollersatz (Payload aus geladenen Daten + eigenen Feldern). Die Modul-Liste speichert je Zeile
+ * sofort (eigene Mutation) und schickt dabei immer beide Felder der Zeile.
  *
  * Die ungespeicherte Fassung führt der Verlassen-Schutz der Formularseiten
  * (`components/useFormularVerlassenSchutz.ts`, LFH-979): Rückfrage vor dem Verlassen und Warnung
@@ -96,13 +101,18 @@ export default function EinsatzDefaults() {
   });
 
   const modulMutation = useMutation({
-    mutationFn: (vars: { modulKey: string; rolle: BenoetigteRolle | null }) =>
-      setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
+    mutationFn: (vars: { modulKey: string; vorgabe: OrgModulEinstellungUpdate }) =>
+      setzeOrgModulEinstellung(vars.modulKey, vars.vorgabe),
+    // Die Mutation endet erst mit dem neuen Bestand: bis dahin bleibt die Zeile gesperrt. Sonst
+    // schickte ein schneller zweiter Klick den alten Bestand der anderen Spalte mit und höbe etwa
+    // eine eben gesetzte Ausblendung still wieder auf (LLH-1179).
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
-      // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
-      qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() });
       quittiereModulGespeichert(message, 'Modul-Vorgabe gespeichert');
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() }),
+        // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
+        qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() }),
+      ]);
     },
   });
 
@@ -121,6 +131,20 @@ export default function EinsatzDefaults() {
 
   const einstellungen = einstellungenQuery.data;
   const orgModul = modulQuery.data ?? {};
+  /**
+   * Ohne geladenen Bestand bleibt die Liste gesperrt: der PUT schickt beide Felder einer Zeile, und
+   * ein erfundener Bestand (sichtbar, frei) höbe sonst eine Ausblendung oder Rolle still auf.
+   */
+  const modulVerwaltbar = istAdmin && !modulQuery.isError;
+  /** Die Zeile mit einem geänderten Feld, das andere aus dem Bestand. */
+  const modulVorgabe = (
+    modulKey: string,
+    aenderung: Partial<OrgModulEinstellungUpdate>,
+  ): OrgModulEinstellungUpdate => ({
+    benoetigte_rolle: (orgModul[modulKey]?.benoetigte_rolle ?? null) as BenoetigteRolle | null,
+    sichtbar: orgModul[modulKey]?.sichtbar ?? true,
+    ...aenderung,
+  });
 
   function absenden(daten: OrgEinstellungenUpdate) {
     const fassung = schutz.fassung();
@@ -263,26 +287,39 @@ export default function EinsatzDefaults() {
         </div>
       </Form>
 
-      {/* ── Rollen-Vorgabe je Modul (Sofort-Speichern, kein Form-Feld) ── */}
+      {/* ── Module für alle Einsätze (Sofort-Speichern, kein Form-Feld) ── */}
       <div style={{ marginTop: token.marginXL }}>
-        <Formularpaneel titel="Rollen-Vorgabe je Modul">
+        <Formularpaneel titel="Module für alle Einsätze">
           {/* Die Ablehnung der Liste steht bei der Liste, nicht im Seitenkopf; mit der
               Zeilenmarke (`fehlerKey`) zeigen Text und Rand auf dieselbe Zeile. */}
           <div style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={modulMutation.error} />
           </div>
+          {/* Die Folge, die keine Oberfläche zeigt: ein laufender Einsatz ändert sich mit
+              (Herleitung LLH-1116, Risiken). */}
+          <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>
+            Wirkt auf alle Einsätze ohne eigene Einstellung, auch auf laufende.
+          </Typography.Paragraph>
 
           <ModulEinstellungsListe
             rollenSpalte="Benötigte Rolle (Vorgabe)"
-            rolleVon={(key) => orgModul[key] ?? ''}
+            rolleVon={(key) => orgModul[key]?.benoetigte_rolle ?? ''}
             aufRolle={(modulKey, val) =>
               modulMutation.mutate({
                 modulKey,
-                rolle: (val || null) as BenoetigteRolle | null,
+                vorgabe: modulVorgabe(modulKey, {
+                  benoetigte_rolle: (val || null) as BenoetigteRolle | null,
+                }),
               })
             }
-            darfVerwalten={istAdmin}
-            rechteGrund={NUR_ADMIN}
+            sichtbarSpalte={{
+              titel: 'Sichtbar',
+              sichtbarVon: (key) => orgModul[key]?.sichtbar ?? true,
+              aufSichtbar: (modulKey, sichtbar) =>
+                modulMutation.mutate({ modulKey, vorgabe: modulVorgabe(modulKey, { sichtbar }) }),
+            }}
+            darfVerwalten={modulVerwaltbar}
+            rechteGrund={istAdmin ? 'Vorgaben nicht ladbar' : NUR_ADMIN}
             // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert. `variables`
             // trägt die laufende bzw. zuletzt gescheiterte Zeile.
             laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}

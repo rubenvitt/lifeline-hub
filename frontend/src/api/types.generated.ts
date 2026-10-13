@@ -1612,8 +1612,9 @@ export interface components {
             uhs_id?: number | null;
         };
         /**
-         * @description Override-Zeile wie in der DB abgelegt. `sichtbar` aus INTEGER (0/1) dekodiert;
-         *     `benoetigte_rolle` ist `None` (= frei) oder ein gültiger Rollen-String.
+         * @description Override-Zeile wie in der DB abgelegt. `sichtbar` ist der eigene Wert des Einsatzes, `None` =
+         *     erbt (Organisation ?? sichtbar, LLH-1179); `benoetigte_rolle` ist `None` (= erbt bzw. frei)
+         *     oder ein gültiger Rollen-String.
          */
         EinsatzModulOverride: {
             benoetigte_rolle?: string | null;
@@ -1623,7 +1624,7 @@ export interface components {
             /** Format: int64 */
             geaendert_von?: number | null;
             modul_key: string;
-            sichtbar: boolean;
+            sichtbar?: boolean | null;
         };
         /**
          * @description Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel (Live aus dem
@@ -3328,8 +3329,9 @@ export interface components {
          */
         ModulFreigabe: {
             /**
-             * @description Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
-             *     Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+             * @description Das Modul erscheint in der Navigation. `false` nur, wenn ein ausblendbares Modul
+             *     ausgeblendet ist — vom Einsatz oder, ohne eigenen Wert des Einsatzes, von der Organisation
+             *     (LLH-1179) —, auch für System-Admins, die es dennoch erreichen (`zugriff`).
              */
             sichtbar: boolean;
             /**
@@ -3665,6 +3667,15 @@ export interface components {
             mime: string;
             /** @description Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`. */
             sha256: string;
+        };
+        /**
+         * @description Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).
+         *     `sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.
+         */
+        OrgModulEinstellung: {
+            /** @description 'admin' | 'fuehrungskraft' | 'einsatzfuehrung' | null (= frei). */
+            benoetigte_rolle?: string | null;
+            sichtbar: boolean;
         };
         /**
          * @description Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.

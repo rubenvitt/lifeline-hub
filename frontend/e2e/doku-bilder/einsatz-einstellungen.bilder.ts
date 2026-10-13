@@ -40,13 +40,16 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const pfad = (modul: string) => `/api/einsaetze/${demo.id}/modul-overrides/${modul}`;
-    // Nur für die Aufnahme: zwei Module verändert, danach zurückgesetzt. Andere Kapitel brauchen
-    // den Demo-Einsatz unverändert.
+    const orgPfad = '/api/org-modul-einstellungen/lage-dashboard';
+    // Nur für die Aufnahme: zwei Module im Einsatz verändert und eines von der Organisation
+    // ausgeblendet (LLH-1179), danach zurückgesetzt. Andere Kapitel brauchen den Demo-Einsatz
+    // unverändert.
     await fuelle(page, 'put', pfad('lageberichte'), { sichtbar: false, benoetigte_rolle: null });
     await fuelle(page, 'put', pfad('lagemeldungen'), {
-      sichtbar: true,
+      sichtbar: null,
       benoetigte_rolle: 'einsatzfuehrung',
     });
+    await fuelle(page, 'put', orgPfad, { benoetigte_rolle: null, sichtbar: false });
     try {
       await uhrAnhalten(page);
       await page.goto(`/einsaetze/${demo.id}/einstellungen/module`);
@@ -55,10 +58,12 @@ test.describe(KAPITEL, () => {
       await paneel.getByLabel('Modul filtern').blur();
       await expect(paneel.getByText('Lagemeldungen')).toBeVisible();
       await expect(paneel.getByText('Überblick')).toBeHidden();
+      await expect(paneel.getByText('Vorgabe der Organisation: ausgeblendet')).toBeVisible();
       await fotografiere(paneel, KAPITEL, 'module');
     } finally {
-      await fuelle(page, 'put', pfad('lageberichte'), { sichtbar: true, benoetigte_rolle: null });
-      await fuelle(page, 'put', pfad('lagemeldungen'), { sichtbar: true, benoetigte_rolle: null });
+      await fuelle(page, 'put', pfad('lageberichte'), { sichtbar: null, benoetigte_rolle: null });
+      await fuelle(page, 'put', pfad('lagemeldungen'), { sichtbar: null, benoetigte_rolle: null });
+      await fuelle(page, 'put', orgPfad, { benoetigte_rolle: null, sichtbar: true });
     }
   });
 });

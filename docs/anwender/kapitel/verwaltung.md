@@ -2,14 +2,14 @@
 titel: Verwaltung
 gruppen: [administration]
 reihenfolge: 630
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, frontend/src/pages/einstellungen/AnzeigeEinstellungen.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/Anmeldeverfahren.tsx, frontend/src/einsatz/schreibrecht.ts, src/einsatz/effektiv.rs, src/einsatz/berechtigung.rs, src/auth/provider/registry.rs, src/routes/ort_vorschau.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, frontend/src/pages/einstellungen/AnzeigeEinstellungen.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/Anmeldeverfahren.tsx, frontend/src/einsatz/schreibrecht.ts, src/einsatz/effektiv.rs, src/einsatz/berechtigung.rs, src/org/modul_einstellung.rs, src/auth/provider/registry.rs, src/routes/ort_vorschau.rs]
 ---
 
 ## Überblick
 
 Unter „Einstellungen“ in der Verwaltung legt die Organisation fest, was für alle ihre Einsätze
 gilt, solange ein Einsatz nichts Eigenes einstellt: die Darstellung, Nummern und Fristen, welche
-Module eine Rolle verlangen und auf welchen Wegen sich Personen anmelden. Die Einstellungen
+Module erscheinen und welche eine Rolle verlangen und auf welchen Wegen sich Personen anmelden. Die Einstellungen
 eines einzelnen Einsatzes beschreibt das Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md).
 
@@ -45,15 +45,16 @@ Unter dem Präfix der Einsatznummer zeigt „Neue Einsätze: …“, wie die nä
 Paneele „Aufbewahrung“ und „Aufbewahrung je Datenkategorie“ auf derselben Seite beschreibt das
 Kapitel [Aufbewahrung](aufbewahrung.md).
 
-### Module für alle Einsätze auf eine Rolle beschränken
+### Module für alle Einsätze ausblenden oder auf eine Rolle beschränken
 
 1. Unter „Einstellungen“ „Einsatz-Vorgaben“ wählen.
-2. Im Paneel „Rollen-Vorgabe je Modul“ unter „Modul filtern“ einen Teil des Modulnamens
+2. Im Paneel „Module für alle Einsätze“ unter „Modul filtern“ einen Teil des Modulnamens
    eintippen.
-3. Unter „Benötigte Rolle (Vorgabe)“ „Führung im Einsatz“, „Führungskraft der Organisation“
-   oder „Admin“ wählen, zum Aufheben „Frei (alle)“.
+3. In der Zeile des Moduls „Sichtbar“ ausschalten, um es auszublenden, oder unter „Benötigte
+   Rolle (Vorgabe)“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „Admin“ wählen,
+   zum Aufheben „Frei (alle)“.
 
-   ![Paneel „Rollen-Vorgabe je Modul“, gefiltert auf „Lage“, alle Module frei](../bilder/verwaltung/rollen-vorgabe.png)
+   ![Paneel „Module für alle Einsätze“, gefiltert auf „Lage“: Lageberichte ausgeblendet, alle Module frei](../bilder/verwaltung/module-vorgabe.png)
 
 Jede Wahl gilt sofort, ohne „Speichern“. Die App meldet „Modul-Vorgabe gespeichert“.
 
@@ -72,6 +73,11 @@ Jede Vorgabe gilt für alle Einsätze der Organisation, die keinen eigenen Wert 
 auch für laufende. Ein Einsatz mit eigenem Wert behält ihn. Fehlt auch die Vorgabe, gilt die des
 Systems; die Felder zeigen sie mit dem Zusatz „(Vorgabe)“. Im Einsatz erscheint ein Wert der
 Organisation als „Vorgabe der Organisation: …“.
+
+Für die Module heißt das: Ein ausgeblendetes Modul verschwindet aus jedem Einsatz, der dafür keinen
+eigenen Wert hat, auch aus einem laufenden. Die Einsatzleitung kann es in ihrem Einsatz wieder
+einblenden, und System-Admins erreichen es weiter über seine Adresse. „Einsatzdaten“ und
+„Einstellungen“ lassen sich nicht ausblenden.
 
 Das „Präfix Einsatznummer“ gilt nur für neue Einsätze; vergebene Einsatznummern bleiben.
 

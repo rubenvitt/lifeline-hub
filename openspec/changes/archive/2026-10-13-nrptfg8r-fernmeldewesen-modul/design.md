@@ -126,7 +126,7 @@ Migration `0186_fernmeldewesen_modul.sql`, gebaut wie `0184`, mit `'fernmeldewes
 
 ```sql
 INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle, geaendert_at)
-SELECT einsatz_id, 'fernmeldewesen', 1, benoetigte_rolle, datetime('now')
+SELECT einsatz_id, 'fernmeldewesen', NULL, benoetigte_rolle, datetime('now')
 FROM einsatz_modul_override
 WHERE modul_key = 'stab' AND benoetigte_rolle IS NOT NULL;
 
@@ -136,7 +136,9 @@ FROM org_modul_einstellung
 WHERE modul_key = 'stab' AND benoetigte_rolle IS NOT NULL;
 ```
 
-- Den Test `migration_0185_uebernimmt_nur_die_stab_rolle` gibt es neben dem von 0184 in
+- Die Sichtbarkeit der neuen Einsatz-Zeile erbt (`NULL`): Seit `0185` (LLH-1179) heißt eine `1`
+  „ausdrücklich sichtbar“ und überstimmte eine spätere Ausblendung durch die Organisation.
+- Den Test `migration_0186_uebernimmt_nur_die_stab_rolle` gibt es neben dem von 0184 in
   `src/db.rs`, mit demselben Datensatz. Wird die Nummer beim Merge umgelegt (LFH-1014), ziehen
   Name und Filter `version < N` mit.
 - Versionshinweis: Der `feat`-Commit nennt in Betreff und Text „Wer den Stab ausgeblendet hat,
