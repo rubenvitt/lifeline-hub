@@ -9,9 +9,10 @@ quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/Gerae
 
 Ein Tablet im **Einsatzabschnitt** begleitet die Abschnittsleitung: Es zeigt den eigenen
 Abschnitt mit seinen Unterabschnitten und Einheiten, nimmt Aufträge und Einsatzbefehle an den
-Abschnitt entgegen, meldet den Vollzug der Aufträge und schickt Meldungen an die Einsatzleitung. Es ist an genau einen
-Abschnitt gekoppelt (siehe [Geräte koppeln](geraete-koppeln.md)) und sieht dessen **Teilbaum**:
-den Abschnitt selbst und alle Abschnitte darunter.
+Abschnitt entgegen, meldet den Vollzug der Aufträge und schickt Meldungen an die
+Einsatzleitung. Es ist an genau einen Abschnitt gekoppelt (siehe
+[Geräte koppeln](geraete-koppeln.md)) und sieht dessen **Teilbaum**: den Abschnitt selbst und alle
+Abschnitte darunter.
 
 Die Navigation unten führt zu „Abschnitt“, „Aufträge“, „Melden“ und „Karte“. Die Bedienung des
 Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
@@ -53,7 +54,7 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 1. „Aufträge“ öffnen. Unter den Aufträgen stehen bei „Einsatzbefehle“ die Befehle, in deren
    Verteiler der Teilbaum oder eine seiner Einheiten steht.
 
-   ![Block „Einsatzbefehle“ mit einem Befehl an EA 1 und einen Nachbarabschnitt, im Verteiler „Quittung offen:“ mit „Quittieren“ nur bei EA 1 und darunter „Befehlstext“](../bilder/geraet-einsatzabschnitt/befehl.png)
+   ![Block „Einsatzbefehle“ mit einem Befehl an den eigenen Abschnitt „Sanitätsdienst“ und den Abschnitt „Betreuung“, „Quittieren“ nur beim eigenen, darunter „Befehlstext“](../bilder/geraet-einsatzabschnitt/befehl.png)
 
 2. „Befehlstext“ wählen, um den Befehl zu lesen.
 3. Bei „Quittung offen:“ neben dem eigenen Empfänger „Quittieren“ wählen. Eine Rückfrage gibt es
