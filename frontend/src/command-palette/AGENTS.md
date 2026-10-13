@@ -62,7 +62,7 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   LFH-1170). Liegt das Ziel in einer Sektion der Einstellungen, liest das Layout
   `EinsatzEinstellungenPage.tsx` den Parameter (Zuordnung über den Dateinamen) und reicht ihn per
   `Outlet`-Context weiter.
-  Stab-Unterseiten (`stab/unterseiten.ts`) gehören zum Träger `stab`; zeigt eine Zeile auf
-  `…/stab/<unterseite>`, muss genau diese Seite den Parameter lesen, nicht die Stab-Seite
-  („Anruf erfassen“ → `InfotelefonPage.tsx`, LLH-1127); ein Ziel auf den Stab selbst deckt nur
-  `StabPage.tsx`.
+  Unterseiten aus `stab/unterseiten.ts` gehören zum Modul, das ihr Eintrag nennt (S5 `stab`,
+  S6 `fernmeldewesen`, LLH-1180); zeigt eine Zeile auf `…/stab/<unterseite>`, muss genau diese
+  Seite den Parameter lesen, nicht die Stab-Seite („Anruf erfassen“ → `InfotelefonPage.tsx`,
+  LLH-1127); ein Ziel auf den Stab selbst deckt nur `StabPage.tsx`.

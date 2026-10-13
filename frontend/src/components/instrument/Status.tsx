@@ -18,7 +18,7 @@ import { statusFlaeche, type StatusTon } from './statusFlaeche';
  */
 
 /** Visuell verborgen, für Vorleser da — die übliche Clip-Bauform. */
-const NUR_VORLESER: CSSProperties = {
+export const NUR_VORLESER: CSSProperties = {
   position: 'absolute',
   width: 1,
   height: 1,

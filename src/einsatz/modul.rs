@@ -9,7 +9,7 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 32] = [
+pub const MODUL_KEYS: [&str; 33] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
@@ -46,6 +46,7 @@ pub const MODUL_KEYS: [&str; 32] = [
     "erinnerungen",
     "meldungen",
     "nachforderungen",
+    "fernmeldewesen",
     // Einstellungen
     "einsatz-einstellungen",
 ];
@@ -117,6 +118,7 @@ modul_marker! {
     Lagebesprechung => "lagebesprechung",
     Lagekarte => "lagekarte",
     Stab => "stab",
+    Fernmeldewesen => "fernmeldewesen",
     Dokumente => "dokumente",
     Abloesung => "abloesung",
     Betreuung => "betreuung",
@@ -159,6 +161,17 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         Some("lagebesprechung"),
     ),
     ("/api/einsaetze/{id}/stab", Some("stab")),
+    // LLH-1180: Kommunikationsplan und Fernmeldeskizze behalten ihre Pfade unter `…/stab`, gehören
+    // aber dem Modul Fernmeldewesen (Herleitung `wgnb0am2-stab-abwaehlbar`, D4) — der längere
+    // Präfix gewinnt.
+    (
+        "/api/einsaetze/{id}/stab/kommunikationsplan",
+        Some("fernmeldewesen"),
+    ),
+    (
+        "/api/einsaetze/{id}/stab/fernmeldeskizze",
+        Some("fernmeldewesen"),
+    ),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
@@ -329,6 +342,7 @@ mod tests {
         assert_eq!(Auftraege::KEY, Some("auftraege"));
         assert_eq!(Lagebesprechung::KEY, Some("lagebesprechung"));
         assert_eq!(Stab::KEY, Some("stab"));
+        assert_eq!(Fernmeldewesen::KEY, Some("fernmeldewesen"));
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
         assert_eq!(Betreuung::KEY, Some("betreuung"));
@@ -371,6 +385,30 @@ mod tests {
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/lagebesprechungen"),
             Some(Some("lagebesprechung"))
+        );
+        // Fernmeldewesen (LLH-1180): die S6-Pfade bleiben unter `…/stab`, gehören aber dem
+        // eigenen Modul; der Rest des Stabs bleibt `stab`.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/kommunikationsplan"),
+            Some(Some("fernmeldewesen"))
+        );
+        assert_eq!(
+            key_fuer_pfad(
+                "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}"
+            ),
+            Some(Some("fernmeldewesen"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}"),
+            Some(Some("fernmeldewesen"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/besetzung/{sachgebiet}"),
+            Some(Some("stab"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/checkliste"),
+            Some(Some("stab"))
         );
         // Modul-lose Route: registriert, aber kein Key.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));

@@ -17,7 +17,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -32,7 +32,6 @@ import {
   befehlDetailPfad,
   lageberichtDetailPfad,
   parseFunkplanAnsicht,
-  stabPfad,
   type FunkplanAnsicht,
 } from '../routing/deeplinks';
 import { baueFernmeldenetz, type Fernmeldenetz } from '../stab/fernmeldeskizze';
@@ -69,7 +68,9 @@ import {
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { skizzenRechte, useSkizzenAktionen } from '../stab/useSkizzenAktionen';
 import { useNetzQuellen, useQuelle } from '../stab/useNetzQuellen';
-import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
+import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
+import { modulName } from '../einsatz/modulRegistry';
+import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import './funkplanPrint.css';
 
 /**
@@ -77,8 +78,9 @@ import './funkplanPrint.css';
  * Bestand abgeleitete Tabelle Abschnitt → Einheit → Fahrzeug. Herleitung:
  * `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`.
  *
- * - **Ort:** Unterroute des Stabs (`funkplanPfad`), Einstieg in der S6-Zeile der Stabseite. Kein
- *   eigenes Modul; Sperre und Sichtbarkeit erbt die Seite vom Stab (D1).
+ * - **Ort:** Startseite des Moduls Fernmeldewesen (`funkplanPfad`, LLH-1180), Reiter „Funkplan“,
+ *   „Fernmeldeskizze“ und „Sprechgruppen“ (`fernmeldewesen/FernmeldewesenReiter.tsx`). Sperre und
+ *   Sichtbarkeit sind die des Fernmeldewesens, nicht mehr die des Stabs (LFH-548 D1 abgelöst).
  * - **Daten:** fünf bestehende Listen, jede mit eigener Rechteweiche. Eine gesperrte Liste ist
  *   kein leerer Bestand: ihre Ebene fehlt, und der Grund steht oberhalb der Tabelle (D2). Eine
  *   Liste eines fremden Moduls läuft nur bei Freigabe des Servers (LFH-669, Spec
@@ -427,12 +429,6 @@ function leerTextFuer(quellen: FunkplanQuellen): string {
 /** Was der Seitenkopf zählt; eine gesperrte Liste zählt nicht mit (keine „0"). */
 const FUNKPLAN_SEITE = { titel: 'Funkplan', mitArtikel: 'der Funkplan' };
 
-const DARSTELLUNG_OPTIONEN = [
-  { wert: 'tabelle', label: 'Tabelle' },
-  { wert: 'skizze', label: 'Skizze' },
-  { wert: 'sprechgruppen', label: 'Sprechgruppen' },
-] as const satisfies readonly { wert: FunkplanAnsicht; label: string }[];
-
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
   { quelle: 'abschnitte', wort: 'Abschnitte' },
   { quelle: 'einheiten', wort: 'Einheiten' },
@@ -507,14 +503,15 @@ export default function FunkplanPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  // Die Sperre des Stabs gilt auch hier (D1): die Listen des Funkplans hängen an ANDEREN Modulen,
-  // kein Endpunkt dieser Seite prüft den Stab. Fail-closed über `useStabFreigabe`.
-  const stabFreigabe = useStabFreigabe(einsatzId);
-  // Modulgrenze (LFH-669): eine Liste läuft erst, wenn der Stab frei ist (sonst zeigt die Seite
-  // ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`. Die Quellen des
+  // Die Sperre des Fernmeldewesens (LLH-1180, design.md D6): die Listen des Funkplans hängen an
+  // ANDEREN Modulen, kein Endpunkt der Tabelle prüft das Fernmeldewesen, und der Rahmen rendert die
+  // Seite bei gescheitertem Freigabeabruf. Fail-closed über `useModulFreigabe`.
+  const freigabe = useModulFreigabe(einsatzId, 'fernmeldewesen');
+  // Modulgrenze (LFH-669): eine Liste läuft erst, wenn das Fernmeldewesen frei ist (sonst zeigt die
+  // Seite ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`. Die Quellen des
   // Netzes teilt die Seite mit der Skizze als Anlage (`stab/useNetzQuellen.ts`).
   const ohneVerbindung = useOhneVerbindung();
-  const netzQuellen = useNetzQuellen(einsatzId, stabFreigabe, ohneVerbindung);
+  const netzQuellen = useNetzQuellen(einsatzId, freigabe, ohneVerbindung);
   const {
     abschnitte,
     einheiten,
@@ -527,7 +524,7 @@ export default function FunkplanPage() {
   } = netzQuellen;
   const skizzenDaten = netzQuellen.skizze;
   const frei = (key: string) =>
-    stabFreigabe.zustand === 'frei' && istKeyFreigegeben(key, stabFreigabe.freigaben);
+    freigabe.zustand === 'frei' && istKeyFreigegeben(key, freigabe.freigaben);
   const personalFrei = frei('personal');
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
@@ -696,19 +693,19 @@ export default function FunkplanPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  // Fail-closed: kein Endpunkt dieser Seite prüft den Stab, die Freigabe ist die einzige Sperre.
-  // Ohne ermittelte Freigabe wird nichts gezeigt (Review LFH-548).
-  if (stabFreigabe.zustand !== 'frei') {
-    return stabFreigabeAnzeige(stabFreigabe, FUNKPLAN_SEITE, einsatzId);
+  // Fail-closed: kein Endpunkt der Tabelle prüft das Fernmeldewesen, die Freigabe ist die einzige
+  // Sperre. Ohne ermittelte Freigabe wird nichts gezeigt (Review LFH-548).
+  if (freigabe.zustand !== 'frei') {
+    return modulFreigabeAnzeige(freigabe, 'fernmeldewesen', FUNKPLAN_SEITE, einsatzId);
   }
   // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND das Modul Lageberichte
   // freigegeben (Freigaben vom Server, LFH-669). Solange eine Quelle lädt, stünde „lädt“ im
   // unveränderlichen Bericht.
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', freigabe.freigaben);
   // Befehle hängen am Modul Aufträge (`src/routes/befehl.rs`, `MODUL_KEY`).
   const darfInBefehl =
-    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('auftraege', stabFreigabe.freigaben);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('auftraege', freigabe.freigaben);
   const quellenLaden = [...Object.values(quellen), stellen, skizzenDaten].some(
     (q) => q.zustand === 'laden',
   );
@@ -784,7 +781,7 @@ export default function FunkplanPage() {
     // Druckwurzel (LFH-22): Mechanik in `druck/druck.css`, Eigenheiten in `funkplanPrint.css`.
     <div className="funkplan-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
-        titel="Funkplan"
+        titel={modulName('fernmeldewesen')}
         meta={umfang || undefined}
         dataUpdatedAt={datenstand}
         breadcrumb={
@@ -792,21 +789,19 @@ export default function FunkplanPage() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={stabPfad(einsatzId)}>Stab</Link> },
-              { title: 'Funkplan' },
+              { title: modulName('fernmeldewesen') },
             ]}
           />
         }
-        aktionen={
-          // Auch ohne Schreibrecht: lesen kann jeder alle Darstellungen.
-          <Segmentleiste<FunkplanAnsicht>
-            beschriftung="Darstellung"
-            optionen={DARSTELLUNG_OPTIONEN}
-            wert={ansicht}
-            onWechsel={setzeAnsicht}
-          />
-        }
       >
+        {/* Die Reiter ersetzen die Segmentleiste „Darstellung“ (LLH-1180, design.md D5). Auch ohne
+            Schreibrecht: lesen kann jeder alle Darstellungen. */}
+        <FernmeldewesenReiter
+          einsatzId={einsatzId}
+          aktiv={ansicht}
+          onDarstellung={setzeAnsicht}
+          className="funkplan-no-print"
+        />
         {/* Das Blatt: Druckkopf, Lücken und Darstellung. In der Skizze trägt es die Klasse des
             Papierformats (A3/A4 quer, `stab/skizze/skizzeDruck.css`); die Anlage steht dahinter. */}
         <div

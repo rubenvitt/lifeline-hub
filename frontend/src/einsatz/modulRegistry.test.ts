@@ -180,6 +180,14 @@ describe('modulRegistry', () => {
     expect(kraefte[0].route).toBe('kraefteuebersicht');
     expect(moduleNachKategorie('lage').map((m) => m.key)).not.toContain('kraefteuebersicht');
     expect(moduleNachKategorie('kommunikation').map((m) => m.key)).not.toContain('auftraege');
+    // Fernmeldewesen (LLH-1180) steht am Ende der Kategorie; der Chat bleibt ihr Kopf.
+    expect(moduleNachKategorie('kommunikation').map((m) => m.key)).toEqual([
+      'chat',
+      'erinnerungen',
+      'meldungen',
+      'nachforderungen',
+      'fernmeldewesen',
+    ]);
   });
 
   it('Kategorien: Kurzetikett je Kategorie, nur Einstellungen steht am Rail-Fuß', () => {
@@ -353,9 +361,17 @@ describe('modulZuRoute / modulAusPfad', () => {
 
   it('liest das Modul-Segment aus dem Pfad, auch auf einer Sub-Route', () => {
     expect(modulAusPfad('/einsaetze/7/etb')?.key).toBe('etb');
-    // Die Unterroute des Funkplans markiert den Stab (LFH-548), sie ist kein eigenes Modul.
-    expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('stab');
-    expect(modulAusPfad('/einsaetze/7/stab/kommunikationsplan')?.key).toBe('stab');
+    // Fernmeldewesen (LLH-1180): neue Modulroute und Unterroute.
+    expect(modulAusPfad('/einsaetze/7/fernmeldewesen')?.key).toBe('fernmeldewesen');
+    expect(modulAusPfad('/einsaetze/7/fernmeldewesen/kommunikationsplan')?.key).toBe(
+      'fernmeldewesen',
+    );
+    // Die Altpfade unter dem Stab gehören dem Ziel ihrer Weiterleitung (design.md D7): sonst
+    // finge der Rahmen sie bei ausgeblendetem Stab ab, bevor sie umleiten.
+    expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('fernmeldewesen');
+    expect(modulAusPfad('/einsaetze/7/stab/kommunikationsplan')?.key).toBe('fernmeldewesen');
+    expect(modulAusPfad('/einsaetze/7/stab/funkplanung')?.key).toBe('stab');
+    expect(modulAusPfad('/einsaetze/7/stab/presse')?.key).toBe('stab');
     // Der Einsatzbericht (LFH-726) erbt die Einsatzdaten: nie ausgeblendet, nie gesperrt.
     expect(modulAusPfad('/einsaetze/7/einsatzdaten/bericht')?.key).toBe('einsatzdaten');
     // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.

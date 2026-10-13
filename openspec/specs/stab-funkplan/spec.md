@@ -3,37 +3,56 @@
 ## Purpose
 Der Funkplan des Sachgebiets S6 nach FwDV 100 Anlage 5: eine schreibgeschützte Tabelle, die aus
 den erfassten Abschnitten, Einheiten, Fahrzeugen und Sprechgruppen abgeleitet wird. Sie zeigt
-auch, was im Funkplan fehlt.
+auch, was im Funkplan fehlt. Er gehört zum Modul Fernmeldewesen (Fähigkeit `fernmeldewesen`).
 
 ## Requirements
 
-### Requirement: Eigene Adresse unter dem Stab mit Einstieg aus der S6-Zeile
-Der Funkplan SHALL unter einer eigenen, als Lesezeichen tauglichen Adresse unter dem Stab-Modul
-eines Einsatzes erreichbar sein. Die Navigation MUST dort das Stab-Modul als aktiv zeigen. Die
-Sachgebietszeile S6 der Stabseite SHALL einen Verweis „Funkplan“ auf diese Adresse tragen. Der
-Funkplan MUST NOT als eigenes Modul in Rail, Modulpanel oder Modulfreigabe erscheinen. Er erbt die
-Sichtbarkeit und Sperre des Stab-Moduls.
+### Requirement: Startseite des Moduls Fernmeldewesen
+Der Funkplan SHALL die Startseite des Moduls Fernmeldewesen sein, unter dessen Modulroute
+`/einsaetze/:id/fernmeldewesen` als Lesezeichen tauglich erreichbar, mit dem Modul Fernmeldewesen
+als aktiv in der Navigation. Er SHALL Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben, nicht
+die des Stabs; den Fall ohne Zugriff fängt der Einsatzrahmen ab (Capability `modul-freigabe`). Die
+alte Adresse `/einsaetze/:id/stab/funkplan` SHALL samt `?ansicht=` auf die neue umleiten. Die
+Sachgebietszeile S6 der Stabseite SHALL einen Verweis „Funkplan“ auf diese Adresse tragen, gesperrt,
+solange das Fernmeldewesen für die Person gesperrt ist.
 
 #### Scenario: Einstieg aus der Stabseite
-- **WHEN** eine Person mit Leserecht auf den Stab in der Zeile S6 auf „Funkplan“ tippt
-- **THEN** öffnet sich der Funkplan des Einsatzes unter seiner eigenen Adresse, und das Stab-Modul
-  ist in der Navigation als aktiv markiert
+- **WHEN** eine Person mit Leserecht auf Stab und Fernmeldewesen in der Zeile S6 auf „Funkplan“ tippt
+- **THEN** öffnet sich der Funkplan unter `/einsaetze/:id/fernmeldewesen`, und das Modul
+  Fernmeldewesen ist in der Navigation als aktiv markiert
 
 #### Scenario: Direkter Aufruf als Lesezeichen
 - **WHEN** die Adresse des Funkplans direkt aufgerufen wird
 - **THEN** erscheint der Funkplan ohne Umweg über die Stabseite
 
-Weil keine Quelle des Funkplans den Stab selbst prüft, MUST die Seite die Freigabe des Stabs
-ermitteln, bevor sie Daten zeigt. Solange sie nicht ermittelt ist, zeigt die Seite keine Daten.
-Scheitert die Ermittlung, zeigt sie einen Fehler mit Wiederholen, nicht den Funkplan.
+#### Scenario: Altes Lesezeichen
+- **WHEN** eine Person `/einsaetze/:id/stab/funkplan` aufruft
+- **THEN** landet sie auf `/einsaetze/:id/fernmeldewesen` und sieht den Funkplan
 
 #### Scenario: Stab gesperrt
-- **WHEN** das Stab-Modul für die Person ausgeblendet oder für ihre Rolle gesperrt ist
-- **THEN** ist auch der Funkplan nicht erreichbar, so wie jede andere Seite des Moduls
+- **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist und das Fernmeldewesen
+  frei
+- **THEN** zeigt der Funkplan Tabelle, Skizze und Sprechgruppen wie mit Stab
+
+#### Scenario: Fernmeldewesen gesperrt
+- **WHEN** das Modul Fernmeldewesen für die Person ausgeblendet oder für ihre Rolle gesperrt ist
+- **THEN** zeigt der Rahmen den einheitlichen Hinweis für „Fernmeldewesen“ statt des Funkplans,
+  auch wenn der Stab frei ist
+
+Weil die Quellen des Funkplans (Abschnitte, Einheiten, Fahrzeuge, Personal, Sprechgruppen) das
+Fernmeldewesen nicht selbst prüfen, MUST die Seite dessen Freigabe ermittelt haben, bevor sie Daten
+zeigt, auch wenn der Rahmen bei gescheitertem Freigabeabruf die Seite rendert. Scheitert die
+Ermittlung, zeigt sie einen Fehler mit Wiederholen, nicht den Funkplan. Ohne Netz gilt der zuletzt
+geladene Stand der Freigaben.
 
 #### Scenario: Freigabe nicht ermittelbar
 - **WHEN** der Abruf der Modulfreigaben scheitert
-- **THEN** zeigt die Seite einen Fehler mit Wiederholen und weder Tabelle noch Übernahme
+- **THEN** zeigt die Seite einen Fehler mit Wiederholen und weder Tabelle, Skizze noch Übernahme
+
+#### Scenario: Altes Lesezeichen bei ausgeblendetem Stab
+- **WHEN** der Stab im Einsatz ausgeblendet ist und eine Person `/einsaetze/:id/stab/funkplan`
+  aufruft
+- **THEN** landet sie im Funkplan des Moduls Fernmeldewesen, nicht beim Hinweis „Stab ausgeblendet“
 
 ### Requirement: Zeilen als Baum Abschnitt → Einheit → Fahrzeug
 Der Funkplan SHALL eine Tabelle mit einer Zeile je Abschnitt, je Einheit und je Fahrzeug im
@@ -366,8 +385,12 @@ auch die Führungsstelle, MUST die Zelle „unvollständig“ bzw. den Grund tra
   habe keine Teilnehmer, wenn sie nur an einer gesperrten Quelle hängen könnte
 
 #### Scenario: Sichtvorgabe aus einem Link
-- **WHEN** eine Person `/einsaetze/:id/stab/funkplan?ansicht=sprechgruppen` öffnet
+- **WHEN** eine Person `/einsaetze/:id/fernmeldewesen?ansicht=sprechgruppen` öffnet
 - **THEN** steht die Darstellung auf „Sprechgruppen“, und `ansicht` ist aus der Adresse entfernt
+
+#### Scenario: Sichtvorgabe über die alte Adresse
+- **WHEN** eine Person `/einsaetze/:id/stab/funkplan?ansicht=sprechgruppen` öffnet
+- **THEN** landet sie im Modul Fernmeldewesen in der Darstellung „Sprechgruppen“
 
 #### Scenario: Druck der Darstellung
 - **WHEN** eine Person in der Darstellung „Sprechgruppen“ druckt

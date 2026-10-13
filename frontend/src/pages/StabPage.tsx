@@ -13,7 +13,8 @@ import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
-import { modulZielRoute, modulName } from '../einsatz/modulRegistry';
+import { istSprungGesperrt, modulZielRoute, modulName } from '../einsatz/modulRegistry';
+import { GesperrterSprung } from '../components/Sprung';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import LagebesprechungZeile from '../lagebesprechung/LagebesprechungZeile';
@@ -146,11 +147,13 @@ export default function StabPage() {
               renderItem={(s) => {
                 const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
                 const werkzeuge = werkzeugeFuer(s.werkzeuge, freigabenQuery.data);
-                // Arbeitsergebnisse als Unterroute des Stabs, kein Modul (S6 Funkplan LFH-548,
-                // S5 Pressearbeit und Informationstelefon LFH-554). Deshalb nicht über
-                // `werkzeugeFuer`, und sie bleiben stehen, wenn die Modul-Werkzeuge der Zeile
-                // ausgeblendet sind; die Sperre erben sie vom Stab selbst.
-                const unterseiten = unterseitenFuer(s.sachgebiet);
+                // Arbeitsseiten des Sachgebiets (`stab/unterseiten.ts`): S5 als Unterroute des
+                // Stabs, S6 als Sprung ins Modul Fernmeldewesen (LLH-1180). Ein Sprung erbt Sperre
+                // und Sichtbarkeit seines Ziels: ausgeblendet fehlt er, gesperrt steht er mit
+                // Grund da (Spec `fernmeldewesen`, „Einstiege von der Stab-Seite …“).
+                const unterseiten = unterseitenFuer(s.sachgebiet).filter(
+                  (u) => freigabenQuery.data?.[u.modul]?.sichtbar !== false,
+                );
                 return (
                   <ListenEintrag
                     // Unter `md` steht „Besetzung ändern“ unter dem Inhalt (LFH-978): rechts
@@ -196,15 +199,19 @@ export default function StabPage() {
                           </span>
                           {(werkzeuge.length > 0 || unterseiten.length > 0) && (
                             <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
-                              {unterseiten.map((u) => (
-                                <Link
-                                  key={u.key}
-                                  to={u.pfad(einsatzId)}
-                                  style={stabZeilenzielStil(token)}
-                                >
-                                  {u.label}
-                                </Link>
-                              ))}
+                              {unterseiten.map((u) =>
+                                istSprungGesperrt(u.modul, freigabenQuery.data) ? (
+                                  <GesperrterSprung key={u.key}>{u.label}</GesperrterSprung>
+                                ) : (
+                                  <Link
+                                    key={u.key}
+                                    to={u.pfad(einsatzId)}
+                                    style={stabZeilenzielStil(token)}
+                                  >
+                                    {u.label}
+                                  </Link>
+                                ),
+                              )}
                               {werkzeuge.map((m) => (
                                 <Link
                                   key={m.key}

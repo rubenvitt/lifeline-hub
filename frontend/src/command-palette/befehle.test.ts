@@ -946,7 +946,9 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
 });
 
 describe('baueBefehle — Ansichten (LLH-1127)', () => {
-  const STAB = ['presse', 'infotelefon', 'funkplan', 'fernmeldeskizze', 'kommunikationsplan'];
+  const STAB = ['presse', 'infotelefon'];
+  // LLH-1180: die Ansichten des Fernmeldewesens hängen an dessen Freigabe, nicht am Stab.
+  const FERNMELDEWESEN = ['fernmeldeskizze', 'kommunikationsplan'];
   const ansichten = (k: BefehlKontext) => baueBefehle(k).filter((b) => b.gruppe === 'ansichten');
   const suche = (k: BefehlKontext, q: string) =>
     ordneTreffer(filtereBefehle(baueBefehle(k), q), q).map((b) => b.label);
@@ -964,7 +966,7 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
       expect(zeile.ziel, marke.key).toBe(marke.pfad(5));
     }
     zeilen.find((b) => b.id === 'ansicht:fernmeldeskizze')!.ausfuehren();
-    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/stab/funkplan?ansicht=skizze');
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/fernmeldewesen?ansicht=skizze');
   });
 
   it('bietet keine Marke an, deren Zielmodul gesperrt oder ausgeblendet ist', () => {
@@ -976,14 +978,29 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
         gesperrt.some((b) => b.id === `ansicht:${key}`),
         key,
       ).toBe(false);
-    // Gegenprobe: die übrigen Marken bleiben, die Sperre trifft nur den Stab.
+    // Gegenprobe: die übrigen Marken bleiben, die Sperre trifft nur den Stab — auch die des
+    // Fernmeldewesens (LLH-1180).
     expect(gesperrt.some((b) => b.id === 'ansicht:entscheidungen')).toBe(true);
+    for (const key of FERNMELDEWESEN)
+      expect(
+        gesperrt.some((b) => b.id === `ansicht:${key}`),
+        key,
+      ).toBe(true);
+
+    const ohneFernmeldewesen = ansichten(
+      kontext({ freigaben: freigabenFixture({ fernmeldewesen: { zugriff: false } }) }),
+    );
+    for (const key of FERNMELDEWESEN)
+      expect(
+        ohneFernmeldewesen.some((b) => b.id === `ansicht:${key}`),
+        key,
+      ).toBe(false);
 
     const ausgeblendet = ansichten(
       kontext({ freigaben: freigabenFixture({ etb: { sichtbar: false } }) }),
     );
     expect(ausgeblendet.some((b) => b.id === 'ansicht:entscheidungen')).toBe(false);
-    expect(ausgeblendet.some((b) => b.id === 'ansicht:funkplan')).toBe(true);
+    expect(ausgeblendet.some((b) => b.id === 'ansicht:kommunikationsplan')).toBe(true);
   });
 
   it('fehlt ohne Einsatz und solange die Freigaben laden', () => {
@@ -991,12 +1008,14 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     expect(ansichten(kontext({ freigaben: undefined }))).toEqual([]);
   });
 
-  it('findet die Arbeitsseiten des Stabs über Namen und Schlagworte', () => {
+  it('findet die Arbeitsseiten von Stab und Fernmeldewesen über Namen und Schlagworte', () => {
     const k = kontext();
-    expect(suche(k, 'Funk')[0]).toBe('Funkplan');
+    // LLH-1180: „Funk“ trifft das Modul über seine Beschreibung, nicht mehr eine Marke.
+    expect(suche(k, 'Funk')[0]).toBe('Fernmeldewesen');
     expect(suche(k, 'bürgertelefon')).toContain('Informationstelefon');
     expect(suche(k, 'Info')).toContain('Informationstelefon');
-    expect(suche(k, 'sprechgruppe')[0]).toBe('Funkplan');
+    expect(suche(k, 'sprechgruppe')[0]).toBe('Fernmeldeskizze');
+    expect(suche(k, 'Kommunikationsplan')[0]).toBe('Kommunikationsplan');
     expect(suche(k, 'presse')).toContain('Pressearbeit');
     expect(suche(k, 'entscheid')).toContain('Entscheidungen');
   });
@@ -1007,8 +1026,8 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     );
     const k = kontext({ merkeBefehl: vi.fn() });
     baueBefehle(k)
-      .find((b) => b.id === 'ansicht:funkplan')!
+      .find((b) => b.id === 'ansicht:kommunikationsplan')!
       .ausfuehren();
-    expect(k.merkeBefehl).toHaveBeenCalledWith('ansicht:funkplan');
+    expect(k.merkeBefehl).toHaveBeenCalledWith('ansicht:kommunikationsplan');
   });
 });

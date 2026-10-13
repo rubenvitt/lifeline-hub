@@ -98,7 +98,7 @@ impl Ziel {
             Ziel::Abschnitt(_) => LiveEvent::Abschnitt,
             Ziel::Einheit(_) => LiveEvent::Einheit,
             Ziel::Fuehrungsstelle => LiveEvent::Einsatz,
-            Ziel::Stelle(_) => LiveEvent::Stab,
+            Ziel::Stelle(_) => LiveEvent::Fernmeldewesen,
         }
     }
 

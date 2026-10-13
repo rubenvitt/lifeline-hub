@@ -118,8 +118,8 @@ bleibt „System“ der Empfänger. Auf dem Papier steht er im Kopf des Blatts.
 
 ### Anlagen
 
-Im Entwurf lässt sich mit „Fernmeldeskizze anfügen“ die Fernmeldeskizze des Stabs als Anlage
-anhängen; das geht nur mit Verbindung und für Personen, die den Stab sehen. Im Druck steht jede
+Im Entwurf lässt sich mit „Fernmeldeskizze anfügen“ die Fernmeldeskizze als Anlage anhängen; das
+geht nur mit Verbindung und für Personen, die das Fernmeldewesen sehen. Im Druck steht jede
 Anlage auf einem eigenen Blatt.
 
 ### Rechte und ohne Netz

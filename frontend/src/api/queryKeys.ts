@@ -67,6 +67,8 @@ export const EINSATZ_KEYS = {
   stab: 'einsatz-stab',
   // Lagebesprechung (LLH-1111): Stand und Verlauf unter EINEM Prefix, eigenes Ereignis.
   lagebesprechung: 'einsatz-lagebesprechung',
+  // Fernmeldewesen (LLH-1180): Kommunikationsplan und Skizze unter EINEM Prefix, eigenes Ereignis.
+  fernmeldewesen: 'einsatz-fernmeldewesen',
   // Modulzähler des Navigationsrahmens: hängt an jedem Ereignis, das die Liste eines gezählten
   // Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
   modulZaehler: 'einsatz-modul-zaehler',
@@ -264,8 +266,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // „Für den Einsatz speichern“ aktualisiert den Ansichts-Switcher aller Betrachter.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
-  // Führungsorganisation (Besetzung S1–S6, Checkliste, Kommunikationsplan, Skizze unter EINEM
-  // Prefix). Die Lagebesprechung hat seit LLH-1111 ihr eigenes Ereignis.
+  // Führungsorganisation (Besetzung S1–S6 und Checkliste unter EINEM Prefix). Die Lagebesprechung
+  // (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes Ereignis.
   // Aufträge und Erinnerungen an ein Sachgebiet lösen zur Lesezeit auf die Besetzung auf
   // (LFH-549): ein Besetzungswechsel ändert ihre Anzeige. Beide sind gezählte Listen, deshalb geht
   // der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn sich die Zahl hier nicht ändert.
@@ -278,6 +280,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Lagebesprechung (LLH-1111): Stand und Verlauf unter EINEM Prefix. Kein Modulzähler (das Modul
   // zählt nichts); der ETB-Nachweis des Abschlusses kommt über das eigene `etb`-Ereignis.
   lagebesprechung: [EINSATZ_KEYS.lagebesprechung],
+  // Fernmeldewesen (LLH-1180): Kommunikationsplan und Skizze. Kein Modulzähler (das Modul zählt
+  // nichts); die Besetzung im Nebentext kommt über `stab`.
+  fernmeldewesen: [EINSATZ_KEYS.fernmeldewesen],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
@@ -719,19 +724,20 @@ export const einsatzKeys = {
   /** Checkliste Arbeitsaufnahme (LFH-551), ebenfalls unter dem Stab-Prefix: kein eigenes Ereignis. */
   stabCheckliste: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId, 'checkliste'] as const,
   /**
-   * Kommunikationsplan (LFH-848), unter dem Stab-Prefix: das `stab`-Ereignis trifft ihn mit. Als
-   * einziger Stab-Key ohne Netz lesbar (`LAGEBILD_OFFLINE.einsatzUnterKeys`, design.md D9).
+   * Kommunikationsplan (LFH-848), unter dem Prefix des Fernmeldewesens (LLH-1180): das
+   * `fernmeldewesen`-Ereignis trifft ihn mit. Als einziger Key des Moduls ohne Netz lesbar
+   * (`LAGEBILD_OFFLINE.einsatzUnterKeys`, LFH-848 design.md D9).
    */
-  stabKommunikationsplan: (einsatzId: number) =>
-    [EINSATZ_KEYS.stab, einsatzId, 'kommunikationsplan'] as const,
+  fernmeldewesenKommunikationsplan: (einsatzId: number) =>
+    [EINSATZ_KEYS.fernmeldewesen, einsatzId, 'kommunikationsplan'] as const,
   /**
-   * Daten der taktischen Fernmeldeskizze (LFH-893), unter dem Stab-Prefix: das `stab`-Ereignis
-   * trifft sie mit, jede Schreibaktion des Servers sendet es. Nicht ohne Netz lesbar (fehlt in
-   * `LAGEBILD_OFFLINE.einsatzUnterKeys`): bearbeitet wird die Skizze nur mit Server, und der
-   * Funkplan nennt sie ohne Netz als „nicht geladen“.
+   * Daten der taktischen Fernmeldeskizze (LFH-893), unter dem Prefix des Fernmeldewesens: das
+   * `fernmeldewesen`-Ereignis trifft sie mit, jede Schreibaktion des Servers sendet es. Nicht ohne
+   * Netz lesbar (fehlt in `LAGEBILD_OFFLINE.einsatzUnterKeys`): bearbeitet wird die Skizze nur mit
+   * Server, und der Funkplan nennt sie ohne Netz als „nicht geladen“.
    */
-  stabFernmeldeskizze: (einsatzId: number) =>
-    [EINSATZ_KEYS.stab, einsatzId, 'fernmeldeskizze'] as const,
+  fernmeldewesenSkizze: (einsatzId: number) =>
+    [EINSATZ_KEYS.fernmeldewesen, einsatzId, 'skizze'] as const,
 
   // Dokumentenablage.
   dokumente: (einsatzId: number) => [EINSATZ_KEYS.dokumente, einsatzId] as const,
@@ -1185,8 +1191,9 @@ export const LAGEBILD_OFFLINE = {
   einsatzUnterKeys: [
     [EINSATZ_KEYS.meldungen, 'rueckmeldungen'],
     // Kommunikationsplan (LFH-848, design.md D9): die Telefonliste wird gebraucht, wenn der Server
-    // weg ist. Besetzung und Lagebesprechungen unter demselben Prefix bleiben draußen.
-    [EINSATZ_KEYS.stab, 'kommunikationsplan'],
+    // weg ist. Die Skizze unter demselben Prefix bleibt draußen (LLH-1180: Prefix des
+    // Fernmeldewesens; der Stab hat nichts mehr offline).
+    [EINSATZ_KEYS.fernmeldewesen, 'kommunikationsplan'],
   ],
   global: [
     GLOBAL_KEYS.einsaetze,

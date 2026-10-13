@@ -108,6 +108,7 @@ import {
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
+import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 import {
@@ -155,6 +156,9 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einsatzabschnitte: <EinsatzabschnittePage />,
   lagebesprechung: <LagebesprechungPage />,
   stab: <StabPage />,
+  // LLH-1180: die Modulroute des Fernmeldewesens zeigt den Funkplan (Reiter Funkplan,
+  // Fernmeldeskizze, Sprechgruppen); der Kommunikationsplan ist die Unterroute daneben.
+  fernmeldewesen: <FunkplanPage />,
   dokumente: <DokumentePage />,
   abloesung: <AbloesungPage />,
   'wetter-pegel': <WetterPegelPage />,
@@ -383,12 +387,16 @@ export const appRouten = createRoutesFromElements(
           {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
               gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
           <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
-          {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
-              Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
-          <Route path="stab/funkplan" element={<FunkplanPage />} />
-          {/* Kommunikationsplan S6 (LFH-848): Unterroute des Stabs wie der Funkplan. */}
-          <Route path="stab/kommunikationsplan" element={<KommunikationsplanPage />} />
-          {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs wie der Funkplan. */}
+          {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
+          <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
+          {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
+              (LLH-1180, design.md D7). `modulAusPfad` gatet sie nach dem Fernmeldewesen. */}
+          <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />
+          <Route
+            path="stab/kommunikationsplan"
+            element={<AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />}
+          />
+          {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs, kein eigenes Modul. */}
           <Route path="stab/presse" element={<PressePage />} />
           <Route
             path="stab/presse/mitteilungen/:mitteilungId"

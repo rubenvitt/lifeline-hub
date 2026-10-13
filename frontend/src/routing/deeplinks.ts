@@ -320,12 +320,12 @@ export function lagebesprechungPfad(einsatzId: number, opts: { neu?: boolean } =
 }
 
 /**
- * Funkplan des Sachgebiets S6 (LFH-548): eine Unterroute des Stabs, kein eigenes Modul. Die
- * Navigation markiert den Stab (`modulAusPfad` liest das Segment nach der Einsatz-ID), Sperre und
- * Sichtbarkeit erbt die Seite vom Stab.
+ * Funkplan des Sachgebiets S6 (LFH-548): die Startseite des Moduls Fernmeldewesen (LLH-1180),
+ * Sperre und Sichtbarkeit erbt die Seite von diesem Modul, nicht vom Stab. Die Altadresse
+ * `…/stab/funkplan` leitet hierher (`einsatz/AltpfadWeiterleitung.tsx`).
  */
 export function funkplanPfad(einsatzId: number, opts: { ansicht?: FunkplanAnsicht } = {}): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/funkplan`, { ansicht: opts.ansicht });
+  return mitQuery(einsatzModulPfad(einsatzId, 'fernmeldewesen'), { ansicht: opts.ansicht });
 }
 
 /**
@@ -351,15 +351,16 @@ export function parseFunkplanAnsicht(params: URLSearchParams): FunkplanAnsicht |
 
 /**
  * Kommunikationsplan des Sachgebiets S6 (LFH-848): Verbindungen außerhalb des Funks je Stelle.
- * Unterroute des Stabs wie der Funkplan.
+ * Unterroute des Moduls Fernmeldewesen (LLH-1180); die Altadresse `…/stab/kommunikationsplan`
+ * leitet hierher.
  */
 export function kommunikationsplanPfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'stab')}/kommunikationsplan`;
+  return `${einsatzModulPfad(einsatzId, 'fernmeldewesen')}/kommunikationsplan`;
 }
 
 /**
- * Pressearbeit des Sachgebiets S5 (LFH-554): Presse-Log, Pressemitteilungen und Medienlage. Wie
- * der Funkplan eine Unterroute des Stabs, kein eigenes Modul. `?kontakt=<id>` rollt zu einem
+ * Pressearbeit des Sachgebiets S5 (LFH-554): Presse-Log, Pressemitteilungen und Medienlage. Eine
+ * Unterroute des Stabs, kein eigenes Modul. `?kontakt=<id>` rollt zu einem
  * Medienkontakt (Auslesen über `parseRouteId`).
  */
 export function pressePfad(einsatzId: number, opts: { kontakt?: number } = {}): string {

@@ -33,14 +33,13 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { stabPfad } from '../routing/deeplinks';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import {
   BezeichnungModal,
@@ -58,7 +57,9 @@ import {
   type VerbindungsAnzeige,
 } from '../stab/kommunikationsplan';
 import { leitstelleOhneVerbindung, type Quelle } from '../stab/luecken';
-import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
+import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
+import { modulName } from '../einsatz/modulRegistry';
+import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import './kommunikationsplanPrint.css';
 
@@ -66,9 +67,10 @@ import './kommunikationsplanPrint.css';
  * Kommunikationsplan des Sachgebiets S6 (LFH-848): wer über welche Verbindung außerhalb des
  * Funks erreichbar ist. Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`.
  *
- * - **Ort:** Unterroute des Stabs (`kommunikationsplanPfad`) neben dem Funkplan, Einstieg in der
- *   S6-Zeile. Sperre und Sichtbarkeit erbt die Seite vom Stab, fail-closed über
- *   `useStabFreigabe` (D1).
+ * - **Ort:** Reiter „Kommunikationsplan“ des Moduls Fernmeldewesen (`kommunikationsplanPfad`,
+ *   LLH-1180), Einstieg auch in der S6-Zeile. Sperre und Sichtbarkeit sind die des
+ *   Fernmeldewesens, fail-closed über `useModulFreigabe` (design.md D6). Der Stab liefert nur noch
+ *   die Besetzung als Nebentext, mit eigener Weiche (D8): ohne ihn steht „—“ mit Grund.
  * - **Daten:** gepflegte Stellen (Funktionen und externe Stellen) vom Server; Abschnitte,
  *   Einheiten und die eigene Führungsstelle (LFH-1148) abgeleitet aus ihren eigenen Angaben,
  *   gepflegt wird dort (D4, D7). Die Besetzung ist nur Nebentext, Kontaktangaben des Personals
@@ -236,7 +238,13 @@ function planSpalten(
       width: 180,
       render: (_t, p) =>
         p.zeile && istFunktion(p.zeile) && p.zeile.nebentext ? (
-          <span style={{ overflowWrap: 'anywhere' }}>{p.zeile.nebentext}</span>
+          // Ohne Stab (LLH-1180, D8): „—“ mit Grund am Zeiger und für Vorleser.
+          <span style={{ overflowWrap: 'anywhere' }} title={p.zeile.nebentextGrund}>
+            {p.zeile.nebentext}
+            {p.zeile.nebentextGrund && (
+              <span style={NUR_VORLESER}>{` (${p.zeile.nebentextGrund})`}</span>
+            )}
+          </span>
         ) : null,
     },
     {
@@ -307,17 +315,19 @@ export default function KommunikationsplanPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const stabFreigabe = useStabFreigabe(einsatzId);
-  const stabFrei = stabFreigabe.zustand === 'frei';
-  const frei = (key: string) => stabFrei && istKeyFreigegeben(key, stabFreigabe.freigaben);
+  const freigabe = useModulFreigabe(einsatzId, 'fernmeldewesen');
+  const modulFrei = freigabe.zustand === 'frei';
+  const frei = (key: string) => modulFrei && istKeyFreigegeben(key, freigabe.freigaben);
   const abschnitteFrei = frei('einsatzabschnitte');
   const einheitenFrei = frei('einheiten');
+  // Eigene Weiche (design.md D8): ohne Stab fehlt nur die Besetzung im Nebentext.
+  const stabFrei = frei('stab');
 
-  const planKey = einsatzKeys.stabKommunikationsplan(einsatzId);
+  const planKey = einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId);
   const stellenQuery = useQuery({
     queryKey: planKey,
     queryFn: () => ladeKommunikationsplan(einsatzId),
-    enabled: stabFrei,
+    enabled: modulFrei,
   });
   // Nur für den Nebentext der Sachgebiete; ohne Netz nicht gespeichert (D9) → „nicht geladen“.
   const stabQuery = useQuery({
@@ -346,9 +356,9 @@ export default function KommunikationsplanPage() {
   // Die Verbindungen der Fernmeldeskizze (LFH-893), eigene Quelle mit Weiche. Nicht auf der
   // Platte: ohne Netz pausiert die Abfrage, dann gilt sie als nicht geladen wie die Besetzung.
   const skizzeQuery = useQuery({
-    queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId),
+    queryKey: einsatzKeys.fernmeldewesenSkizze(einsatzId),
     queryFn: () => ladeFernmeldeskizze(einsatzId),
-    enabled: stabFrei,
+    enabled: modulFrei,
   });
   const skizzeZustand: AbrufZustand =
     skizzeQuery.data != null ? 'daten' : ohneVerbindung ? 'fehler' : abrufZustand(skizzeQuery);
@@ -363,8 +373,13 @@ export default function KommunikationsplanPage() {
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
   // Ohne Netz pausiert die Abfrage und bliebe für immer „lädt“; die Besetzung ist dann schlicht
   // nicht geladen (D9: der Stab außer dem Plan liegt nicht auf der Platte).
-  const stabZustand: AbrufZustand =
-    stabQuery.data != null ? 'daten' : ohneVerbindung ? 'fehler' : abrufZustand(stabQuery);
+  const stabZustand: AbrufZustand = !stabFrei
+    ? 'gesperrt'
+    : stabQuery.data != null
+      ? 'daten'
+      : ohneVerbindung
+        ? 'fehler'
+        : abrufZustand(stabQuery);
   const fuehrungsstelleZustand: AbrufZustand =
     fuehrungsstelleQuery.data != null
       ? 'daten'
@@ -438,7 +453,7 @@ export default function KommunikationsplanPage() {
     onSuccess: (neu: KommunikationsStelle[]) => {
       queryClient.setQueryData(planKey, neu);
       // Der Server räumt die Verbindungen der Stelle in der Skizze mit (LFH-893 D3).
-      void queryClient.invalidateQueries({ queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId) });
+      void queryClient.invalidateQueries({ queryKey: einsatzKeys.fernmeldewesenSkizze(einsatzId) });
     },
   });
   const verbindungAnlegen = useMutation({
@@ -511,7 +526,9 @@ export default function KommunikationsplanPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  if (stabFreigabe.zustand !== 'frei') return stabFreigabeAnzeige(stabFreigabe, SEITE, einsatzId);
+  if (freigabe.zustand !== 'frei') {
+    return modulFreigabeAnzeige(freigabe, 'fernmeldewesen', SEITE, einsatzId);
+  }
 
   const datenstand = gemeinsamerDatenstand(
     stellenQuery.dataUpdatedAt,
@@ -532,7 +549,7 @@ export default function KommunikationsplanPage() {
     // `kommunikationsplanPrint.css`.
     <div className="kommunikationsplan-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
-        titel="Kommunikationsplan"
+        titel={modulName('fernmeldewesen')}
         meta={umfang}
         dataUpdatedAt={datenstand}
         breadcrumb={
@@ -540,8 +557,7 @@ export default function KommunikationsplanPage() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={stabPfad(einsatzId)}>Stab</Link> },
-              { title: 'Kommunikationsplan' },
+              { title: modulName('fernmeldewesen') },
             ]}
           />
         }
@@ -558,6 +574,11 @@ export default function KommunikationsplanPage() {
           ) : undefined
         }
       >
+        <FernmeldewesenReiter
+          einsatzId={einsatzId}
+          aktiv="kommunikationsplan"
+          className="kommunikationsplan-no-print"
+        />
         <Druckkopf
           dokumentart="Kommunikationsplan"
           einsatz={einsatz}

@@ -655,7 +655,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
     {
       // Funkplan S6 (LFH-548). Datenanker ist die gesäte Einheit mit langem Namen IN der Tabelle
       // (sie steht auch in den Lücken, deshalb auf die Sicht verengt); der Baum startet offen.
-      pfad: `/einsaetze/${einsatzId}/stab/funkplan`,
+      pfad: `/einsaetze/${einsatzId}/fernmeldewesen`,
       anker: (p: Page) =>
         p.getByRole('region', { name: 'Funkplan' }).getByRole('link', {
           name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
@@ -674,7 +674,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
     },
     {
       // Kommunikationsplan S6 (LFH-848). Datenanker ist die gesäte Behörde IN der Tabelle.
-      pfad: `/einsaetze/${einsatzId}/stab/kommunikationsplan`,
+      pfad: `/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`,
       anker: (p: Page) =>
         p.getByRole('region', { name: 'Kommunikationsplan' }).getByText(KOMMUNIKATION_STELLE),
       lesend: {
@@ -691,7 +691,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // nicht mobil; ab `xxl` ohnehin offen) und die gesäte Einheit mit langem Namen gewählt,
       // also Werkzeugleiste, Palette, Fläche und Eigenschaftspaneel nebeneinander bzw. darunter.
       // Datenanker ist der Titel des Paneels mit ihrem Namen.
-      pfad: `/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`,
+      pfad: `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`,
       vorbereiten: async (p: Page) => {
         const einheit = p
           .getByRole('group', { name: 'Fernmeldeskizze', exact: true })

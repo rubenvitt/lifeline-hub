@@ -42,6 +42,8 @@ wire_enum! {
         Stab => "stab",
         /// Termin, Abschluss und Verlauf der Lagebesprechung (LLH-1111).
         Lagebesprechung => "lagebesprechung",
+        /// Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen (LLH-1180).
+        Fernmeldewesen => "fernmeldewesen",
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",
@@ -119,8 +121,14 @@ impl LiveEvent {
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
             // Nur `stab`: Besetzung und Checkliste sind Datenobjekte des Stab-Moduls. Die
-            // Lagebesprechung hat seit LLH-1111 ihr eigenes Ereignis.
+            // Lagebesprechung (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes
+            // Ereignis.
             LiveEvent::Stab => &["stab"],
+            // Nur `fernmeldewesen`: Kommunikationsplan und Skizze sind Datenobjekte dieses Moduls,
+            // auch wenn ihre Pfade unter `…/stab` liegen (LLH-1180, design.md D3). NICHT `stab`:
+            // sonst erführen Stab-Leser ohne dieses Recht von jeder Skizzenänderung, und
+            // Fernmeldewesen-Leser ohne Stab blieben ohne Ereignis.
+            LiveEvent::Fernmeldewesen => &["fernmeldewesen"],
             // Nur `lagebesprechung`: Abschluss und Termin sind Datenobjekte dieses Moduls. NICHT
             // `einsatzdaten`, obwohl beide `einsatz.naechste_lagebesprechung_at` schreiben
             // (LFH-46, Entscheidung 11): ein `einsatzdaten`-Leser ohne dieses Recht erführe sonst,
@@ -777,6 +785,7 @@ mod tests {
             (LiveEvent::Befehl, &["auftraege"]),
             (LiveEvent::Stab, &["stab"]),
             (LiveEvent::Lagebesprechung, &["lagebesprechung"]),
+            (LiveEvent::Fernmeldewesen, &["fernmeldewesen"]),
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::Betreuung, &["betreuung"]),

@@ -116,17 +116,18 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     });
     expect(v.ok(), await v.text()).toBeTruthy();
 
-    const pfad = `/einsaetze/${einsatzId}/stab/kommunikationsplan`;
+    const pfad = `/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`;
     await page.goto(pfad);
     const tabelle = page.getByRole('region', { name: 'Kommunikationsplan' });
     await expect(tabelle.getByRole('link', { name: NUMMER })).toBeVisible();
 
-    // (1) Vorbedingung: der Plan liegt auf der Platte, der übrige Stab nicht.
-    const planKey = `einsatz-stab/${einsatzId}/kommunikationsplan`;
+    // (1) Vorbedingung: der Plan liegt auf der Platte (Präfix des Fernmeldewesens, LLH-1180), der
+    // übrige Stab nicht.
+    const planKey = `einsatz-fernmeldewesen/${einsatzId}/kommunikationsplan`;
     await expect.poll(() => vorgehalteneKeys(page), { timeout: 20_000 }).toContain(planKey);
-    expect((await vorgehalteneKeys(page)).filter((k) => k.startsWith('einsatz-stab/'))).toEqual([
-      planKey,
-    ]);
+    const keys = await vorgehalteneKeys(page);
+    expect(keys.filter((k) => k.startsWith('einsatz-fernmeldewesen/'))).toEqual([planKey]);
+    expect(keys.filter((k) => k.startsWith('einsatz-stab/'))).toEqual([]);
 
     // (2) Netz weg — und nachweislich weg.
     await page.context().setOffline(true);

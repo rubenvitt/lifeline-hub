@@ -46,7 +46,12 @@ const SL_AS = sg(3, 'TMO', 'SL AS');
 /** Im Katalog, aber an keiner Stelle: steht nur in der Palette. */
 const DMO505 = sg(4, 'DMO', '505');
 
-const ALLE: NetzRechte = { einsatzabschnitte: true, einheiten: true, verwaltung: true, stab: true };
+const ALLE: NetzRechte = {
+  einsatzabschnitte: true,
+  einheiten: true,
+  verwaltung: true,
+  fernmeldewesen: true,
+};
 
 function netz(
   rechte: NetzRechte = ALLE,
@@ -944,7 +949,7 @@ describe('Fernmeldeskizze — Rechte und Geräte (6.5)', () => {
 
   it('Recht auf Stab, nicht auf Einheiten: „1. Zug“ ohne Griff, das Paneel nennt den Grund', async () => {
     const user = userEvent.setup();
-    bild(netz({ stab: true, einsatzabschnitte: true, verwaltung: true }));
+    bild(netz({ fernmeldewesen: true, einsatzabschnitte: true, verwaltung: true }));
     await user.click(element('eh-10')!);
     expect(document.querySelector('[data-lfh="skizze-griff"]')).toBeNull();
     expect(within(paneel()).getByText('Einheiten: kein Schreibrecht')).toBeInTheDocument();

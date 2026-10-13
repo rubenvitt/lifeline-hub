@@ -110,16 +110,18 @@ async fn verbindung(app: &axum::Router, cookie: &str, einsatz: i64, body: Value)
     json
 }
 
+/// Zählt (Fernmeldewesen, ETB). Die Skizze gehört dem Fernmeldewesen (LLH-1180): `stab` kommt nie.
 fn zaehle(rx: &mut Receiver<LiveNachricht>) -> (usize, usize) {
-    let (mut stab, mut etb) = (0, 0);
+    let (mut fernmeldewesen, mut etb) = (0, 0);
     while let Ok(n) = rx.try_recv() {
         match n.event {
-            LiveEvent::Stab => stab += 1,
+            LiveEvent::Fernmeldewesen => fernmeldewesen += 1,
             LiveEvent::Etb => etb += 1,
+            LiveEvent::Stab => panic!("Fernmeldeskizze sendet nie `stab`"),
             _ => {}
         }
     }
-    (stab, etb)
+    (fernmeldewesen, etb)
 }
 
 // ---------- Lesen ----------
@@ -150,7 +152,7 @@ async fn neue_skizze_ist_leer_mit_vorgaben_im_schriftfeld() {
 }
 
 #[tokio::test]
-async fn ohne_stab_recht_ist_lesen_und_schreiben_403() {
+async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -169,6 +171,7 @@ async fn ohne_stab_recht_ist_lesen_und_schreiben_403() {
     .await;
     assert_eq!(status, StatusCode::OK);
 
+    // LLH-1180: eine Sperre am Stab trifft die Skizze nicht mehr …
     let (status, _) = anfrage(
         &app,
         "PUT",
@@ -179,7 +182,27 @@ async fn ohne_stab_recht_ist_lesen_und_schreiben_403() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let (status, _) = anfrage(&app, "GET", &basis(einsatz), &frieda, None).await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "Stab gesperrt → 403");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Stab gesperrt → Skizze bleibt lesbar"
+    );
+    // … eine am Fernmeldewesen schon.
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/fernmeldewesen"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = anfrage(&app, "GET", &basis(einsatz), &frieda, None).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "Fernmeldewesen gesperrt → 403"
+    );
     let (status, _) = senden(
         &app,
         &frieda,
@@ -485,7 +508,11 @@ async fn einzelne_lage_verwerfen_mit_version() {
     // Passende Version: genau diese Zeile ist weg, die übrigen bleiben.
     let (status, _) = senden(&app, &admin, "DELETE", &pfad, Some(json!({"version": 1}))).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    assert_eq!(zaehle(&mut rx), (1, 0), "ein stab-Ereignis, kein ETB");
+    assert_eq!(
+        zaehle(&mut rx),
+        (1, 0),
+        "ein fernmeldewesen-Ereignis, kein ETB"
+    );
     let s = skizze(&app, &admin, einsatz).await;
     let lage: Vec<&str> = s["lage"]
         .as_array()
@@ -516,7 +543,7 @@ async fn einzelne_lage_verwerfen_mit_version() {
 
 /// Review O3: dasselbe Recht wie das Verschieben.
 #[tokio::test]
-async fn einzelne_lage_verwerfen_braucht_stab_recht() {
+async fn einzelne_lage_verwerfen_braucht_schreibrecht_am_fernmeldewesen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -957,7 +984,7 @@ async fn bereich_aufziehen_mit_version() {
 // ---------- Live, ETB, Lebenszyklus ----------
 
 #[tokio::test]
-async fn jede_skizzenaenderung_sendet_stab_und_nie_etb() {
+async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;

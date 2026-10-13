@@ -94,7 +94,7 @@ test('Sprechgruppen im Druck bei A4-Breite: Druckkopf, Bedienung aus, nichts rag
   const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen Druck ${Date.now()}`);
   await seedeSprechgruppen(page, einsatzId);
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=sprechgruppen`);
   await expect(sgZeile(page, SG_LANG).getByRole('link', { name: EINHEIT_ZWEI })).toBeVisible();
 
   await page.evaluate(() => {
@@ -116,14 +116,13 @@ test('Sprechgruppen im Druck bei A4-Breite: Druckkopf, Bedienung aus, nichts rag
       zellenRechts: Math.max(...zellen.map((z) => z.getBoundingClientRect().right)),
       ueberhang: koerper.scrollWidth - koerper.clientWidth,
       werkzeuge: getComputedStyle(document.querySelector('.funkplan-no-print')!).display,
-      umschalterKaesten: document
-        .querySelector('[role="radiogroup"][aria-label="Darstellung"]')!
-        .getClientRects().length,
+      // Die Reiter des Fernmeldewesens (LLH-1180) sind Bedienung, kein Papier.
+      umschalterKaesten: document.querySelector('[role="tablist"]')!.getClientRects().length,
       kopf: document.querySelector('[data-lfh="druckkopf"]')!.textContent!,
     };
   });
   expect(lage.werkzeuge, 'Werkzeugzeile im Druck aus').toBe('none');
-  expect(lage.umschalterKaesten, 'Umschalter im Druck aus').toBe(0);
+  expect(lage.umschalterKaesten, 'Reiter im Druck aus').toBe(0);
   expect(lage.kopf, 'Druckkopf nennt die Darstellung').toContain('Funkplan – Sprechgruppen');
   expect(lage.ueberhang, `nichts im Bildlauf verborgen (${lage.ueberhang}px)`).toBeLessThanOrEqual(
     1,
