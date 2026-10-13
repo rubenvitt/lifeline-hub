@@ -60,7 +60,7 @@ Nicht enthalten:
 
 ## Impact
 
-- **Backend:** neue Migration `0186` mit `quittiert_at` und `quittiert_von_id` an
+- **Backend:** neue Migration `0187` mit `quittiert_at` und `quittiert_von_id` an
   `befehl_verteiler` und `lagebericht_verteiler`. Erweitert werden `src/vorlagendokument/verteiler.rs`
   (Lesen der Quittung, Quittieren, Zurücknehmen, Kopieren ohne Quittung) und
   `src/vorlagendokument/repo.rs` (Verteiler im Listenkopf, Fassungsprüfung). Neue Routen in

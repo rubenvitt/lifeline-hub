@@ -51,7 +51,7 @@ freigegebene Fassung, nur am Befehl, keine Geräte.
 
 ### D1 Zwei Spalten an beiden Verteilertabellen
 
-Migration `0186_verteiler_quittung.sql` fügt an `befehl_verteiler` und `lagebericht_verteiler`
+Migration `0187_verteiler_quittung.sql` fügt an `befehl_verteiler` und `lagebericht_verteiler`
 per `ALTER TABLE … ADD COLUMN` diese Spalten an:
 
 - `quittiert_at TEXT`
@@ -258,6 +258,6 @@ auftraege-befehle` neu erzeugt, mit einem Befehl mit Verteiler und einer Quittun
 
 ## Migration Plan
 
-`0186` ist rein additiv (zwei nullable Spalten je Tabelle). Bestand und Demo-Daten sind danach
+`0187` (nach dem Merge mit alpha umgelegt von 0186) ist rein additiv (zwei nullable Spalten je Tabelle). Bestand und Demo-Daten sind danach
 unquittiert. Ein Rollback des Codes lässt die Spalten unbenutzt. Vor dem Push wird mit
-`scripts/check-migrationen.sh` gegen `origin/alpha` geprüft, ob `0186` noch frei ist.
+`scripts/check-migrationen.sh` gegen `origin/alpha` geprüft, ob `0187` noch frei ist.

@@ -9,7 +9,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/koiqi51
 ## 1. Backend: Spalten und Lesen (D1, D2, D6)
 
 - [x] 1.1 Nummer prüfen mit `git fetch origin alpha && scripts/check-migrationen.sh`. Dann
-  `migrations/0186_verteiler_quittung.sql` anlegen: `quittiert_at` und `quittiert_von_id` an
+  `migrations/0187_verteiler_quittung.sql` anlegen: `quittiert_at` und `quittiert_von_id` an
   `befehl_verteiler` und `lagebericht_verteiler`, im Kopfkommentar LLH-1173 und diese Change.
   Nachweis: `scripts/check-migrationen.sh` meldet keinen Konflikt.
 - [x] 1.2 Schwärzung: In `src/einsatz/schwaerzung_registry.rs` behalten beide Tabellen
