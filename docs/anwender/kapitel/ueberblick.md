@@ -22,8 +22,8 @@ Modulen selbst.
    „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, die höchste „Warnstufe“ der Gefahrengebiete,
    „Offene Aufträge“ und die Zahl der „Einsatzabschnitte“.
 3. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
-   „kritisch“), den festen Auftrag, den Fortschritt, die letzte Rückmeldung und die Einheiten nach
-   Status lesen.
+   „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
+   letzte Rückmeldung und die Einheiten nach Status lesen.
 
    ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Aufträgen, Entscheidungen der letzten Stunde und nächsten Marken](../bilder/ueberblick/ueberblick.png)
 

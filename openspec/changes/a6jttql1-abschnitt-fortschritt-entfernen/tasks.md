@@ -23,7 +23,7 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
 - [x] 1.5 Demo-Daten: `src/demo/szenario.rs` (Feld und die drei Werte), `src/demo/import.rs`,
   `src/demo/import_tests.rs` (Abfrage und Erwartung, Doku-Kommentar „Fortschritt teils leer“).
   Nachweis: Demo-Import-Tests grün.
-- [ ] 1.6 Typ-Codegen: `scripts/check-typ-codegen.sh`, `api/openapi.json` und
+- [x] 1.6 Typ-Codegen: `scripts/check-typ-codegen.sh`, `api/openapi.json` und
   `api/types.generated.ts` neu erzeugt, ohne `fortschritt` am Abschnitt. Nachweis: Skript grün,
   beide Dateien im Diff.
 
@@ -39,7 +39,7 @@ Frontend-Pfade ohne Präfix sind relativ zu `frontend/src/`.
   dem Abschnitt“, `AbschnittEintrag` „fester Auftrag mit Fortschritt“) und
   `pages/einsatzabschnitte/AbschnittDaten.tsx` (Vermerk „Kein Fortschritt (LFH-1208)“) an den
   neuen Stand anpassen. Nachweis: Lint und Prettier grün.
-- [ ] 2.3 Anwenderdoku: `docs/anwender/kapitel/geraet-einsatzabschnitt.md` und
+- [x] 2.3 Anwenderdoku: `docs/anwender/kapitel/geraet-einsatzabschnitt.md` und
   `docs/anwender/kapitel/ueberblick.md` nennen „Fortschritt“ nicht mehr; die Bilder
   `geraet-einsatzabschnitt/abschnitt*.png` und `ueberblick/ueberblick*.png` prüfen und, falls
   sie den Fortschritt noch zeigen, nach `docs/anwender/AGENTS.md` neu erzeugen. Nachweis: die
