@@ -24,9 +24,14 @@ die Lifeline Hub bedienen.
 1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung, sonst führt „lifeline-hub“ links
    oben in der Kopfzeile dorthin.
 2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Deine
-   Rolle: …“) und, soweit erfasst, Ort, Einsatznummer, Beginn („seit …“) und Stichwort.
+   Rolle: …“), den Einsatzleiter („EL …“, sonst „EL nicht erfasst“) und, soweit erfasst, Ort,
+   Einsatznummer, Beginn („seit …“) und Stichwort.
 
-   ![Einsatzliste unter der Kopfzeile: die Kachel „Neuer Einsatz“ und die Kachel eines laufenden Übungseinsatzes mit „Deine Rolle: Einsatzleitung“](../bilder/einsatz-oberflaeche/einsatzliste.png)
+   ![Einsatzliste unter der Kopfzeile: die Kachel „Neuer Einsatz“ und die Kachel eines laufenden Übungseinsatzes mit „Deine Rolle: Einsatzleitung“ und „EL nicht erfasst“](../bilder/einsatz-oberflaeche/einsatzliste.png)
+
+„Deine Rolle: Einsatzleitung“ nennt nur die eigenen Rechte im Einsatz. Wer den Einsatz führt,
+steht unter „EL“; festgelegt wird er bei der Führungsstelle (siehe
+[Einsatzdaten und Führungsstelle](einsatzdaten.md)).
 
 Ab acht laufenden Einsätzen steht über den Kacheln das Suchfeld „Einsätze durchsuchen“; es
 sucht in Bezeichnung, Ort und Stichwort. Abgeschlossene Einsätze stehen kleiner darunter unter

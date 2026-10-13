@@ -101,7 +101,9 @@ neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzl
 Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
 abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
 (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
-erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist. Gepflegt werden im
+erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist, mit ihrem Rufnamen und dem
+Einsatzleiter, etwa „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ist keiner festgelegt, steht
+„Einsatzleiter nicht erfasst“. Gepflegt werden im
 Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
 einmal vor.
 

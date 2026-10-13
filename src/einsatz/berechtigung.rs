@@ -447,6 +447,7 @@ mod tests {
             anzahl_betroffene_initial: None,
             retention_bis: None,
             geloescht_at: None,
+            einsatzleiter: Default::default(),
         }
     }
 

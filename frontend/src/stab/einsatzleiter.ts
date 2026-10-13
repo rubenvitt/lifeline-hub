@@ -6,7 +6,8 @@ import { md, ZUSTAND_GRUND } from './funkplan';
 /**
  * Der Einsatzleiter nach FwDV 100, gerechnet an EINER Stelle (LFH-1199). Kopfleiste der
  * Einsatzdaten, Wurzel des Organigramms, Funkplan-Zeile der Führungsstelle, die Lagebericht-
- * Übernahmen und der Einsatzbericht lesen ihn aus der Führungsstelle und formen ihn hier. Nie aus
+ * Übernahmen und der Einsatzbericht lesen ihn aus der Führungsstelle und formen ihn hier, ebenso der
+ * Kommunikationsplan und die Einsatzliste (LLH-1168, diese aus `EinsatzAnzeige`). Nie aus
  * der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten: das wäre eine erfundene Leitung
  * (`frontend/AGENTS.md`, „Keine erfundenen Daten“).
  *
@@ -25,7 +26,16 @@ export function einsatzleiterName(e: Einsatzleiter): string {
 
 export function einsatzleiterDarstellung(quelle: FuehrungsstelleQuelle): EinsatzleiterDarstellung {
   if (quelle.zustand !== 'daten') return { art: 'zustand', grund: ZUSTAND_GRUND[quelle.zustand] };
-  const e = quelle.daten?.einsatzleiter;
+  return einsatzleiterAusAngabe(quelle.daten?.einsatzleiter);
+}
+
+/**
+ * Die Angabe selbst, wo sie ohne die Quelle der Führungsstelle kommt: die Einsatzliste trägt sie an
+ * `EinsatzAnzeige` (LLH-1168). Fehlt sie, ist kein Einsatzleiter erfasst.
+ */
+export function einsatzleiterAusAngabe(
+  e: Einsatzleiter | null | undefined,
+): EinsatzleiterDarstellung {
   if (!e) return { art: 'nicht-erfasst' };
   return {
     art: 'erfasst',

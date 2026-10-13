@@ -190,6 +190,11 @@ pub async fn detail(
         anzeige.meldende_stelle = None;
         anzeige.einsatzort = None;
     }
+    // Den Einsatzleiter bekommt keine Gerätesitzung (LLH-1168, design.md D3b): er gehört der
+    // Führungsstelle, und die liest kein Gerät.
+    if ctx.geraet.is_some() {
+        anzeige.einsatzleiter = None;
+    }
     Ok(Json(anzeige))
 }
 
@@ -453,9 +458,10 @@ fn etb_eintraege_melden(state: &AppState, einsatz_id: i64, etb_eintrag_ids: &[i6
 
 /// Der Frist-PUT hat bewusst kein Lesegate (eine abgelaufene Frist soll reaktiv verlängert
 /// werden können). Seine Antwort darf an einem für diese Person gesperrten Einsatz deshalb
-/// nicht mehr zeigen als die Archivakte (LFH-23): Einsatzort samt Koordinate, meldende Stelle
-/// und Sachverhalt fallen weg. Maßgeblich ist der Stand NACH der Änderung — wer die Frist in
-/// die Zukunft verlegt, liest den Einsatz danach wieder regulär.
+/// nicht mehr zeigen als die Archivakte (LFH-23): Einsatzort samt Koordinate, meldende Stelle,
+/// Sachverhalt und der Einsatzleiter (LLH-1168, design.md D3) fallen weg. Maßgeblich ist der
+/// Stand NACH der Änderung — wer die Frist in die Zukunft verlegt, liest den Einsatz danach
+/// wieder regulär.
 fn ohne_kopf_pii_wenn_gesperrt(
     mut anzeige: EinsatzAnzeige,
     einsatz: &crate::einsatz::Einsatz,
@@ -478,6 +484,7 @@ fn ohne_kopf_pii_wenn_gesperrt(
         anzeige.einsatzort_lon = None;
         anzeige.meldende_stelle = None;
         anzeige.sachverhalt = None;
+        anzeige.einsatzleiter = None;
     }
     anzeige
 }

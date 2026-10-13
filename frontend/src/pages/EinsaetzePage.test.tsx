@@ -604,6 +604,66 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     expect(kachel.style.opacity).toBe('');
   });
 
+  // LLH-1168: der Einsatzleiter der Führungsstelle, nie die App-Rolle (Spec
+  // `einsatz-fuehrungsstelle`, „Einsatzleiter in der Einsatzliste“).
+  describe('Einsatzleiter', () => {
+    const anna = {
+      art: 'personal',
+      name: 'Anna Schulz',
+      personal_id: 17,
+      personal_noch_disponiert: true,
+      seit: '2026-10-12 12:30:00',
+    } as const;
+    const zeileVon = async (bezeichnung: string) => {
+      const titel = await screen.findByText(bezeichnung);
+      const kachel = titel.closest<HTMLElement>('[data-lfh="einsatzkachel"]')!;
+      return kachel.querySelector<HTMLElement>('[data-lfh="einsatzleiter"]');
+    };
+
+    it('nennt den erfassten Einsatzleiter, aktiv wie abgeschlossen', async () => {
+      mockEinsaetze([
+        e({ id: 1, bezeichnung: 'Hochwasser', einsatzleiter: anna }),
+        e({
+          id: 2,
+          bezeichnung: 'Vorbei',
+          status: 'abgeschlossen',
+          einsatzleiter: {
+            art: 'extern',
+            name: 'KBM Weber',
+            personal_noch_disponiert: false,
+            seit: anna.seit,
+          },
+        }),
+      ]);
+      render();
+      expect(await zeileVon('Hochwasser')).toHaveTextContent(/^EL Anna Schulz$/);
+      expect(await zeileVon('Vorbei')).toHaveTextContent(/^EL KBM Weber \(extern\)$/);
+      expect(screen.getAllByTitle('Einsatzleiter')).toHaveLength(2);
+    });
+
+    it('ohne Angabe „nicht erfasst“, nie die eigene App-Rolle', async () => {
+      mockEinsaetze([e({ bezeichnung: 'Hochwasser', meine_rolle: 'einsatzleitung' })]);
+      render();
+      expect(await zeileVon('Hochwasser')).toHaveTextContent(/^EL nicht erfasst$/);
+    });
+
+    it('geschwärzt und entlassen wie an der Führungsstelle', async () => {
+      mockEinsaetze([
+        e({ id: 1, bezeichnung: 'Geschwärzt', einsatzleiter: { ...anna, name: undefined } }),
+        e({
+          id: 2,
+          bezeichnung: 'Entlassen',
+          einsatzleiter: { ...anna, personal_noch_disponiert: false },
+        }),
+      ]);
+      render();
+      expect(await zeileVon('Geschwärzt')).toHaveTextContent(/^EL Name geschwärzt$/);
+      expect(await zeileVon('Entlassen')).toHaveTextContent(
+        /^EL Anna Schulz · nicht mehr disponiert$/,
+      );
+    });
+  });
+
   it('der Seitenkopf nennt beide Mengen in Mono-Meta', async () => {
     mockEinsaetze([e({ id: 1 }), e({ id: 2, bezeichnung: 'Alt', status: 'abgeschlossen' })]);
     render();

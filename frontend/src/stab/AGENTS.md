@@ -18,8 +18,11 @@ eine Angabe der eigenen Führungsstelle (Person aus dem disponierten Personal od
 „seit“), gepflegt in deren Paneel auf Einsatzdaten; ein Wechsel schreibt der Server als Übergabe
 ins ETB. Dargestellt wird er nur über `stab/einsatzleiter.ts` (`einsatzleiterDarstellung`):
 Kopfleiste der Einsatzdaten, Wurzel des Organigramms, Spalte Leiter/Führer der Zeile `fs`, die
-Lagebericht-Übernahmen und der Einsatzbericht. **Nie aus der App-Rolle `einsatzleitung` oder der
-Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
+Lagebericht-Übernahmen, der Einsatzbericht, der Nebentext der Zeile `fs` im Kommunikationsplan und
+die Einsatzkachel („EL …“, aus `EinsatzAnzeige.einsatzleiter` über `einsatzleiterAusAngabe`;
+LLH-1168,
+`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`).
+**Nie aus der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
 Fernmeldeskizze steht kein Name (Regel unten).
 
 **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;
@@ -110,8 +113,8 @@ Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“. Schreibantwo
 Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
 Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
 „Einsatzleitung und Stab“ (Rufname, Verbindung aus Kommunikationsmittel und Erreichbarkeit, führt zu
-Einsatzdaten), sonst keine Zeile; fehlt ihre Quelle (auch ohne Netz, sie liegt nicht auf der Platte),
-steht die Zeile mit Grund.
+Einsatzdaten; Nebentext Rufname und „Einsatzleiter …“, LLH-1168), sonst keine Zeile; fehlt ihre
+Quelle (auch ohne Netz, sie liegt nicht auf der Platte), steht die Zeile mit Grund.
 
 **Checkliste Arbeitsaufnahme** (LFH-551,
 `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes
