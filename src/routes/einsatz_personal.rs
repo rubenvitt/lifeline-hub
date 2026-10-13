@@ -281,23 +281,40 @@ pub async fn entfernen(
         person_bezeichnung(&anzeige)
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (was_einsatzleiter, was_besetzt) = crate::write_retry!(&state.pool, |conn| {
-        let el =
-            crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(conn, einsatz_id, ep_id).await?;
-        let stab = crate::stab::repo::is_besetzt_tx(conn, einsatz_id, ep_id).await?;
-        disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok((el, stab))
-    })?;
+    let (was_einsatzleiter, was_besetzt, einheiten, abschnitte) =
+        crate::write_retry!(&state.pool, |conn| {
+            let el = crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(conn, einsatz_id, ep_id)
+                .await?;
+            let stab = crate::stab::repo::is_besetzt_tx(conn, einsatz_id, ep_id).await?;
+            let einheiten = crate::einheit::mitglied_repo::load_betroffene_einheiten_tx(
+                conn, einsatz_id, ep_id,
+            )
+            .await?;
+            let abschnitte = crate::einsatzabschnitt::repo::load_geleitete_abschnitte_tx(
+                conn, einsatz_id, ep_id,
+            )
+            .await?;
+            disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+            Ok((el, stab, einheiten, abschnitte))
+        })?;
     sse_personal(&state, einsatz_id, ep_id);
     // `personal` erreicht nur Leser mit Personal- oder Kartenrecht. Den Vermerk „nicht mehr
     // disponiert“ (ON DELETE SET NULL) lesen Führungsstelle und Stab mit eigenem Gate; sie hängen
-    // an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in LFH-1106).
+    // an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in LFH-1106). Ebenso tragen
+    // Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person (LLH-1178).
     if was_einsatzleiter {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
     }
     if was_besetzt {
         state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
+    }
+    for einheit_id in einheiten {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    for abschnitt_id in abschnitte {
+        super::einsatzabschnitt::sse_abschnitt(&state, einsatz_id, abschnitt_id);
     }
     Ok(StatusCode::NO_CONTENT)
 }
