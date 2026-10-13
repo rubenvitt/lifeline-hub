@@ -525,6 +525,84 @@ mod tests {
         assert_eq!(org, [(1, Some("fuehrungskraft".to_string()))]);
     }
 
+    /// LLH-1180 (`0185`): Die Rollen-Vorgabe des Stabs wandert je Einsatz und je Organisation auf
+    /// das Fernmeldewesen, die Ausblendung nicht; ohne Stab-Rolle entsteht keine Zeile.
+    #[tokio::test]
+    async fn migration_0185_uebernimmt_nur_die_stab_rolle() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        // Ohne `foreign_keys`: die Vorgaben brauchen hier keinen echten Einsatz.
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 185)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0185");
+        // Migrationen schalten Fremdschlüssel selbst wieder ein; die Vorgaben hier brauchen keinen
+        // echten Einsatz und keine Organisation.
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', 1, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
+                    (3, 'stab', 0, 'admin'), (4, 'etb', 1, 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, benoetigte_rolle) \
+             VALUES (1, 'stab', 'fuehrungskraft'), (2, 'stab', NULL), (3, 'etb', 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.expect("0185 läuft durch");
+
+        let einsatz: Vec<(i64, i64, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
+             WHERE modul_key = 'fernmeldewesen' ORDER BY einsatz_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, 1, Some("fuehrungskraft".to_string())),
+                // Stab war ausgeblendet UND beschränkt: die Rolle wandert, sichtbar wird 1.
+                (3, 1, Some("admin".to_string())),
+            ]
+        );
+        let org: Vec<(i64, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, benoetigte_rolle FROM org_modul_einstellung \
+             WHERE modul_key = 'fernmeldewesen' ORDER BY org_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(org, [(1, Some("fuehrungskraft".to_string()))]);
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.

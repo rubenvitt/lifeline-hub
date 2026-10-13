@@ -116,7 +116,7 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     });
     expect(v.ok(), await v.text()).toBeTruthy();
 
-    const pfad = `/einsaetze/${einsatzId}/stab/kommunikationsplan`;
+    const pfad = `/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`;
     await page.goto(pfad);
     const tabelle = page.getByRole('region', { name: 'Kommunikationsplan' });
     await expect(tabelle.getByRole('link', { name: NUMMER })).toBeVisible();

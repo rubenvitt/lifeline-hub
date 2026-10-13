@@ -1716,7 +1716,7 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
     await stelleDichte(page, dichte);
     const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
     const luecken = page.getByRole('region', { name: 'Lücken', exact: true });
@@ -1770,7 +1770,7 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
     await stelleDichte(page, dichte);
     const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
     await expect(tabelle.getByRole('link', { name: 'Florian 1/42-1' })).toHaveCount(1);
@@ -1886,7 +1886,7 @@ for (const schreibend of [true, false]) {
 
     const gemessen: string[] = [];
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/stab/kommunikationsplan`);
+      await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`);
       await stelleDichte(page, dichte);
       gemessen.push(await messeKommunikationsplan(page, soll, dichte, schreibend));
     }
@@ -1988,11 +1988,12 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     `Lücken-Wahlknopf (${dichte})`,
     SKIZZE_LUECKEN_WAHL,
   );
+  // Reiter des Fernmeldewesens (LLH-1180) statt des Umschalters „Darstellung“.
   const umschalter = await alleHaltenStufe(
-    page.getByRole('radiogroup', { name: 'Darstellung' }).getByRole('radio'),
+    page.getByRole('tablist').getByRole('tab'),
     soll,
-    `Umschalter (${dichte})`,
-    3,
+    `Reiter (${dichte})`,
+    4,
   );
   const druck = await haeltStufe(
     page.getByRole('button', { name: /Drucken/ }),
@@ -2017,10 +2018,10 @@ test('Fernmeldeskizze: Werkzeugleiste, Palette, Paneel, Lücken-Wahl und Umschal
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     await stelleDichte(page, dichte);
     // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, true));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -2038,9 +2039,9 @@ test('Fernmeldeskizze (Beobachter): Werkzeugleiste, Paneel, Lücken-Wahl und Ums
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     await stelleDichte(page, dichte);
-    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, false));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

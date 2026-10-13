@@ -138,9 +138,9 @@ Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
 (Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
-(Fahrzeuge) sowie unter „Stab“ dessen Arbeitsseiten „Pressearbeit“, „Informationstelefon“,
-„Funkplan“, „Fernmeldeskizze“ und „Kommunikationsplan“. Eine Sprungmarke ist gesperrt oder fehlt,
-wenn ihr Zielmodul gesperrt ist oder fehlt.
+(Fahrzeuge), unter „Stab“ dessen Arbeitsseiten „Pressearbeit“ und „Informationstelefon“ sowie
+unter „Fernmeldewesen“ (Kategorie „Kommunikation“) „Fernmeldeskizze“ und „Kommunikationsplan“.
+Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt.
 
 Wer aus einem Einsatz ins Profil oder in die Verwaltung wechselt, findet dort „Zurück zu …“: Es
 führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft.
@@ -149,7 +149,7 @@ führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft
 
 Ohne Eingabe stehen oben die zuletzt ausgeführten Befehle und die zuletzt geöffneten Module.
 Mit Eingabe sucht die Palette in Modulen, Ansichten (den Sprungmarken der Modulliste, etwa
-„Funkplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
+„Kommunikationsplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
 „Anruf erfassen“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
 Einsatzes: Personen, Fahrzeuge, Personal, Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene

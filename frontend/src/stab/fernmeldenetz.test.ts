@@ -335,7 +335,7 @@ describe('baueFernmeldenetz · Stellen', () => {
       art: 'extern',
       stellenart: 'leitstelle',
       bezeichnung: 'ILS Musterhausen',
-      recht: 'stab',
+      recht: 'fernmeldewesen',
     });
     expect(netz.schienen[0].teilnehmer).toEqual([{ element: 'ks-2', status: 'geplant' }]);
     expect(JSON.stringify(netz)).not.toContain('0421');
@@ -353,7 +353,7 @@ describe('baueFernmeldenetz · Stellen', () => {
       art: 'komponente',
       komponentenart: 'repeater',
       bezeichnung: 'Repeater',
-      recht: 'stab',
+      recht: 'fernmeldewesen',
     });
     expect(netz.schienen[0].teilnehmer).toEqual([{ element: 'ko-3', status: 'bestehend' }]);
   });
@@ -405,7 +405,7 @@ describe('baueFernmeldenetz · Stellen', () => {
         abschnitte: daten([abschnitt(1)]),
         einheiten: daten([einheit(10, { abschnitt_id: 1 })]),
         stellen: daten([stelle(5, 'leitstelle')]),
-        rechte: { einheiten: true, stab: true },
+        rechte: { einheiten: true, fernmeldewesen: true },
       }),
     );
     expect(netz.stellen.map((s) => [s.key, s.schreibbar])).toEqual([
@@ -745,10 +745,10 @@ describe('baueFernmeldenetz · Angaben für die Fläche (LFH-893 2.5)', () => {
     const lokal = sg(9, 'TMO', 'LOKAL', true);
     const netz = baueFernmeldenetz({
       ...quellen({ sprechgruppen: daten([F314, SL_AS, lokal]) }),
-      rechte: { stab: true },
+      rechte: { fernmeldewesen: true },
     });
     expect(netz.einsatzId).toBe(7);
-    expect(netz.rechte).toEqual({ stab: true });
+    expect(netz.rechte).toEqual({ fernmeldewesen: true });
     expect(netz.sprechgruppen.map((s) => s.id)).toEqual([3, 9, 2]);
   });
 

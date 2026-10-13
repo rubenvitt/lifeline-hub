@@ -527,6 +527,9 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagebesprechung", "lagebesprechungen"),
     // Stab stand bis LLH-1111 irrtümlich unter `OHNE_EIGENE_ROUTEN`, obwohl er eigene Routen hat.
     ("stab", "stab"),
+    // LLH-1180: die S6-Pfade bleiben unter `…/stab`, gehören aber dem Fernmeldewesen.
+    ("fernmeldewesen", "stab/kommunikationsplan"),
+    ("fernmeldewesen", "stab/fernmeldeskizze"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):

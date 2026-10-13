@@ -75,7 +75,8 @@ export function skizzenRechte(
     // `EinsatzVerwaltungszugriff`: Schreibrecht oder Admin der Einsatz-Org im aktiven Einsatz, kein
     // Modul (LFH-1066).
     verwaltung: darfEinsatzVerwalten(einsatz, benutzer),
-    stab: frei('stab'),
+    // Das Skizzeneigene und die externen Stellen gehören dem Fernmeldewesen (LLH-1180).
+    fernmeldewesen: frei('fernmeldewesen'),
   };
 }
 
@@ -96,7 +97,7 @@ function aendereSkizze(
   einsatzId: number,
   aenderung: (alt: Fernmeldeskizze) => Fernmeldeskizze,
 ): void {
-  qc.setQueryData<Fernmeldeskizze>(einsatzKeys.stabFernmeldeskizze(einsatzId), (alt) =>
+  qc.setQueryData<Fernmeldeskizze>(einsatzKeys.fernmeldewesenSkizze(einsatzId), (alt) =>
     alt ? aenderung(alt) : alt,
   );
 }
@@ -117,7 +118,7 @@ export function useSkizzenAktionen(
 ): SkizzenAktionen | null {
   const qc = useQueryClient();
   const aktionen = useMemo<SkizzenAktionen>(() => {
-    const skizzeKey = einsatzKeys.stabFernmeldeskizze(einsatzId);
+    const skizzeKey = einsatzKeys.fernmeldewesenSkizze(einsatzId);
     const holeSkizze = () => qc.invalidateQueries({ queryKey: skizzeKey });
     /** Bei einer abweichenden Version gilt der Stand des Servers (D4). */
     const beiKonflikt = async <T>(aufruf: Promise<T>): Promise<T> => {
@@ -140,7 +141,9 @@ export function useSkizzenAktionen(
         case 'stelle':
           // Die Kanäle externer Stellen zählen zum Stand der Skizze.
           return Promise.all([
-            qc.invalidateQueries({ queryKey: einsatzKeys.stabKommunikationsplan(einsatzId) }),
+            qc.invalidateQueries({
+              queryKey: einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId),
+            }),
             holeSkizze(),
           ]);
         case 'komponente':
@@ -277,13 +280,15 @@ export function useSkizzenAktionen(
         // Die Antwort nennt genau die neue Stelle (`?antwort=stelle`, Review S4): „neu“ wird nicht
         // aus dem Cache des Plans erraten, der leer oder veraltet sein kann.
         const neu = await legeKommunikationsStelleEinzelnAn(einsatzId, { stellenart, bezeichnung });
-        await qc.invalidateQueries({ queryKey: einsatzKeys.stabKommunikationsplan(einsatzId) });
+        await qc.invalidateQueries({
+          queryKey: einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId),
+        });
         return neu;
       },
       async entferneExterneStelle(id) {
         const plan = await beiKonflikt(entferneKommunikationsStelle(einsatzId, id));
         qc.setQueryData<KommunikationsStelle[]>(
-          einsatzKeys.stabKommunikationsplan(einsatzId),
+          einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId),
           plan,
         );
         // Der Server räumt Lage und Verbindungen der Stelle mit (D3): den Rest holt der Abruf.

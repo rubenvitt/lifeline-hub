@@ -144,12 +144,13 @@ WHERE modul_key = 'stab' AND benoetigte_rolle IS NOT NULL;
 
 ### D5 Modulseite: eine Hülle, vier Reiter, Darstellung bleibt Sichtvorgabe
 
-- Neue Hülle `fernmeldewesen/FernmeldewesenSeite.tsx` mit `EinsatzSeite`, h1 `modulName`
-  („Fernmeldewesen“) und einer Reiterleiste Funkplan · Fernmeldeskizze · Sprechgruppen ·
-  Kommunikationsplan. Ortspfad: Einsatz › Fernmeldewesen. Die Reiter sind antd `Tabs` wie in
-  `pages/AuftraegePage.tsx`, kein neuer Baustein.
-- `FunkplanPage` und `KommunikationsplanPage` werden zu Inhalten der Hülle. Die `Segmentleiste`
-  „Darstellung“ entfällt, weil die Reiter sie ersetzen. Die Druckköpfe nennen weiter die
+- Beide Seiten tragen h1 `modulName('fernmeldewesen')` („Fernmeldewesen“), Ortspfad Einsatz ›
+  Fernmeldewesen, und darunter die Reiterleiste `fernmeldewesen/FernmeldewesenReiter.tsx`
+  (Funkplan · Fernmeldeskizze · Sprechgruppen · Kommunikationsplan). Die Reiter sind antd `Tabs`
+  wie in `pages/AuftraegePage.tsx`, nur die Leiste: Druckwurzel und Seitenkopf bleiben bei der
+  Seite, die Leiste geht nicht aufs Papier. Eine eigene Hüllen-Seite entfällt, weil
+  `EinsatzSeite` schon Kopf und Ortspfad trägt.
+- Die `Segmentleiste` „Darstellung“ des Funkplans entfällt, weil die Reiter sie ersetzen. Die Druckköpfe nennen weiter die
   Darstellung („Funkplan“, „Fernmeldeskizze“, „Sprechgruppen“, „Kommunikationsplan“).
 - Routen: `MODUL_ELEMENTE.fernmeldewesen` zeigt den Funkplan. Unterroute
   `fernmeldewesen/kommunikationsplan`. Die drei Darstellungen bleiben ein Seitenzustand mit
@@ -307,6 +308,7 @@ Route-Ebene neben dem Rahmen wäre ein Sonderweg.
 
 ## Open Questions
 
-- **Icon des Moduls.** Kandidaten aus Icons8 iOS 27 Outlined (etwa „Radio Tower“,
-  „Walkie Talkie“, „Antenna“) werden während der Umsetzung als PNG vorgelegt. Das SVG kommt erst
-  nach Rubens Wahl. Specs und Aufgabenschnitt hängen nicht davon ab.
+- **Icon des Moduls.** Vorgelegt am 13.10.2026: Funkmast (radio-tower, 2309), Handfunkgerät
+  (walkie-talkie, 1548), Fahrzeugfunk (marine-radio, 1553). Umgesetzt ist die Empfehlung Funkmast
+  (`scripts/icons/quellen/funkmast.svg`); wählt Ruben ein anderes, tauscht ein Commit Quelle und
+  Register.

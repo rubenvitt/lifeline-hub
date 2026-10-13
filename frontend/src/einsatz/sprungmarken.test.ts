@@ -22,10 +22,10 @@ describe('Sprungmarken (LFH-620)', () => {
       'patienten',
       'vermisste',
       'fms-tableau',
-      // Arbeitsseiten des Stabs (LLH-1127), nach Sachgebiet S5, S6.
+      // Arbeitsseiten des Stabs (LLH-1127), Sachgebiet S5.
       'presse',
       'infotelefon',
-      'funkplan',
+      // Ansichten des Fernmeldewesens (LLH-1180); den Funkplan öffnet das Modul selbst.
       'fernmeldeskizze',
       'kommunikationsplan',
     ]);
@@ -41,9 +41,8 @@ describe('Sprungmarken (LFH-620)', () => {
       'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
       presse: '/einsaetze/7/stab/presse',
       infotelefon: '/einsaetze/7/stab/infotelefon',
-      funkplan: '/einsaetze/7/stab/funkplan',
-      fernmeldeskizze: '/einsaetze/7/stab/funkplan?ansicht=skizze',
-      kommunikationsplan: '/einsaetze/7/stab/kommunikationsplan',
+      fernmeldeskizze: '/einsaetze/7/fernmeldewesen?ansicht=skizze',
+      kommunikationsplan: '/einsaetze/7/fernmeldewesen/kommunikationsplan',
     });
   });
 
@@ -77,10 +76,18 @@ describe('Sprungmarken (LFH-620)', () => {
       'stab',
       '↗presse',
       '↗infotelefon',
-      '↗funkplan',
+      'dokumente',
+    ]);
+    expect(
+      folge(moduleNachKategorie('kommunikation'), sprungmarkenNachKategorie('kommunikation')),
+    ).toEqual([
+      'chat',
+      'erinnerungen',
+      'meldungen',
+      'nachforderungen',
+      'fernmeldewesen',
       '↗fernmeldeskizze',
       '↗kommunikationsplan',
-      'dokumente',
     ]);
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
       [
@@ -107,7 +114,7 @@ describe('Sprungmarken (LFH-620)', () => {
     ]);
   });
 
-  it('führt jede Unterseite der Stab-Seite genau einmal, mit deren Namen und Adresse (LLH-1127)', () => {
+  it('führt jede Unterseite der Stab-Seite genau einmal, mit deren Namen, Adresse und Modul (LLH-1127)', () => {
     // Eine Wahrheit: benennt die Stab-Seite eine Unterseite um, zieht das Menü mit.
     const seiten = (['s1', 's2', 's3', 's4', 's5', 's6'] as const).flatMap((s) =>
       unterseitenFuer(s),
@@ -115,10 +122,16 @@ describe('Sprungmarken (LFH-620)', () => {
     expect(seiten.length).toBeGreaterThan(0);
     for (const seite of seiten) {
       const marken = sprungmarken.filter((m) => m.key === seite.key);
+      // Der Funkplan ist die Modulroute des Fernmeldewesens (LLH-1180): keine eigene Marke.
+      if (seite.key === 'funkplan') {
+        expect(marken, seite.key).toHaveLength(0);
+        expect(seite.pfad(7)).toBe('/einsaetze/7/fernmeldewesen');
+        continue;
+      }
       expect(marken, seite.key).toHaveLength(1);
       expect(marken[0].label).toBe(seite.label);
       expect(marken[0].pfad(7)).toBe(seite.pfad(7));
-      expect(marken[0].zielModul).toBe('stab');
+      expect(marken[0].zielModul).toBe(seite.modul);
     }
   });
 
@@ -127,9 +140,8 @@ describe('Sprungmarken (LFH-620)', () => {
     expect(hinweise).toMatchObject({
       presse: 'Stab · Pressearbeit',
       infotelefon: 'Stab · Informationstelefon',
-      funkplan: 'Stab · Funkplan',
-      fernmeldeskizze: 'Funkplan · Skizze',
-      kommunikationsplan: 'Stab · Kommunikationsplan',
+      fernmeldeskizze: 'Fernmeldewesen · Skizze',
+      kommunikationsplan: 'Fernmeldewesen · Kommunikationsplan',
     });
   });
 
@@ -138,8 +150,8 @@ describe('Sprungmarken (LFH-620)', () => {
       expect(marke.schlagworte.length, marke.key).toBeGreaterThan(0);
     }
     const worte = (key: string) => sprungmarken.find((m) => m.key === key)!.schlagworte;
-    expect(worte('funkplan')).toEqual(
-      expect.arrayContaining(['funk', 'sprechgruppe', 'tmo', 'dmo', 's6']),
+    expect(worte('fernmeldeskizze')).toEqual(
+      expect.arrayContaining(['sprechgruppe', 'tmo', 'dmo', 's6']),
     );
     expect(worte('kommunikationsplan')).toEqual(
       expect.arrayContaining(['telefon', 'rufnummer', 'leitstelle', 's6']),

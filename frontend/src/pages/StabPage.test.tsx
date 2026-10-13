@@ -236,20 +236,41 @@ describe('StabPage', () => {
     expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
   });
 
-  it('die S6-Zeile führt zu Funkplan und Kommunikationsplan, keine andere Zeile (LFH-548, LFH-848)', async () => {
+  it('die S6-Zeile springt ins Fernmeldewesen, keine andere Zeile (LFH-548, LFH-848, LLH-1180)', async () => {
     rendere();
     await besetzungsSektion();
     const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
     expect(within(s6).getByRole('link', { name: 'Funkplan' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/stab/funkplan',
+      '/einsaetze/1/fernmeldewesen',
     );
     expect(within(s6).getByRole('link', { name: 'Kommunikationsplan' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/stab/kommunikationsplan',
+      '/einsaetze/1/fernmeldewesen/kommunikationsplan',
     );
     expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
     expect(screen.getAllByRole('link', { name: 'Kommunikationsplan' })).toHaveLength(1);
+  });
+
+  // LLH-1180, Spec `fernmeldewesen`: die S6-Sprünge erben die Sperre ihres Ziels.
+  it('S6: bei gesperrtem Fernmeldewesen stehen die Sprünge gesperrt mit Grund', async () => {
+    rendere({ freigaben: freigabenFixture({ fernmeldewesen: { zugriff: false } }) });
+    await besetzungsSektion();
+    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
+    expect(
+      within(s6).getByRole('button', { name: 'Funkplan (Keine Berechtigung)' }),
+    ).toBeDisabled();
+    expect(within(s6).queryByRole('link', { name: 'Kommunikationsplan' })).toBeNull();
+  });
+
+  it('S6: bei ausgeblendetem Fernmeldewesen fehlen die Sprünge', async () => {
+    rendere({
+      freigaben: freigabenFixture({ fernmeldewesen: { sichtbar: false, zugriff: false } }),
+    });
+    await besetzungsSektion();
+    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
+    expect(within(s6).queryByText(/Funkplan/)).toBeNull();
+    expect(within(s6).queryByText(/Kommunikationsplan/)).toBeNull();
   });
 
   it('die S5-Zeile führt zu Pressearbeit und Informationstelefon, keine andere Zeile (LFH-554)', async () => {

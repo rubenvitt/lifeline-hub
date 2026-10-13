@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import * as anlagenApi from '../api/dokumentAnlagen';
 import type { DokumentAnlage } from '../api/types';
-import type { StabFreigabe } from '../stab/useStabFreigabe';
+import type { ModulFreigabe } from '../einsatz/useModulFreigabe';
 import { renderMitProviders } from '../test/utils';
 import DokumentAnlagen, { MAX_ANLAGEN } from './DokumentAnlagen';
 
@@ -16,8 +16,13 @@ vi.mock('../api/dokumentAnlagen', async (original) => ({
   entferneDokumentAnlage: vi.fn(),
 }));
 
-let stab: StabFreigabe = { zustand: 'frei', freigaben: {} as never };
-vi.mock('../stab/useStabFreigabe', () => ({ useStabFreigabe: () => stab }));
+/** Freigabe je Modul-Key; „Fernmeldeskizze anfügen“ fragt das Fernmeldewesen (LLH-1180). */
+const FREI: ModulFreigabe = { zustand: 'frei', freigaben: {} as never };
+const GESPERRT: ModulFreigabe = { zustand: 'gesperrt', freigaben: {} as never };
+let freigabeJe: Record<string, ModulFreigabe> = {};
+vi.mock('../einsatz/useModulFreigabe', () => ({
+  useModulFreigabe: (_einsatzId: number, key: string) => freigabeJe[key] ?? FREI,
+}));
 let ohneNetz = false;
 vi.mock('../offline/verbindung', async (original) => ({
   ...(await original<typeof import('../offline/verbindung')>()),
@@ -74,7 +79,7 @@ function zeige(schreibt: boolean) {
 }
 
 beforeEach(() => {
-  stab = { zustand: 'frei', freigaben: {} as never };
+  freigabeJe = {};
   ohneNetz = false;
   aufnahme = { art: 'bild' };
 });
@@ -110,7 +115,7 @@ describe('DokumentAnlagen (LFH-1028)', () => {
 
   it.each([
     ['ohne Schreibrecht oder nach der Freigabe', () => {}, false],
-    ['ohne Stab', () => (stab = { zustand: 'gesperrt', freigaben: {} as never }), true],
+    ['ohne Fernmeldewesen', () => (freigabeJe = { fernmeldewesen: GESPERRT }), true],
     ['ohne Verbindung', () => (ohneNetz = true), true],
   ])('ohne Anlage steht %s nichts', async (_, vorher, schreibt) => {
     vorher();
@@ -119,6 +124,16 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     await waitFor(() => expect(anlagenApi.listeDokumentAnlagen).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Fernmeldeskizze anfügen' })).toBeNull();
     expect(screen.queryByText('Anlagen')).toBeNull();
+  });
+
+  // LLH-1180: der Stab ist für die Skizze keine Voraussetzung mehr.
+  it('bietet „Fernmeldeskizze anfügen“ auch ohne Stab an, wenn das Fernmeldewesen frei ist', async () => {
+    freigabeJe = { stab: GESPERRT };
+    vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue([]);
+    zeige(true);
+    expect(
+      await screen.findByRole('button', { name: 'Fernmeldeskizze anfügen' }),
+    ).toBeInTheDocument();
   });
 
   it('zeigt eine eingefrorene Anlage nur lesbar und druckt sie auf eigenem Blatt', async () => {

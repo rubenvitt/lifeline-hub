@@ -14,12 +14,14 @@ import {
 } from './kern';
 
 /**
- * Bilder des Kapitels „Funkplan, Fernmeldeskizze und Kommunikationsplan“
- * (`docs/anwender/kapitel/funkplan.md`).
+ * Bilder des Kapitels „Fernmeldewesen: Funkplan, Fernmeldeskizze und Kommunikationsplan“
+ * (`docs/anwender/kapitel/funkplan.md`). Seit LLH-1180 liegen die Seiten im Modul Fernmeldewesen
+ * (Reiter unter dem h1), die Altadressen unter „Stab“ leiten um.
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep funkplan`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   tabelle.png             frontend/src/pages/FunkplanPage.tsx (Tabelle, Lücken)
+ *   tabelle.png             frontend/src/pages/FunkplanPage.tsx (Tabelle, Lücken),
+ *                           frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx
  *   skizze.png              frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/FernmeldeskizzeBild.tsx
  *   kommunikationsplan.png  frontend/src/pages/KommunikationsplanPage.tsx
  *   verbindung.png          frontend/src/stab/KommunikationsplanDialoge.tsx
@@ -164,7 +166,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab/funkplan`);
+    await page.goto(`/einsaetze/${demo.id}/fernmeldewesen`);
     await expect(page.getByRole('region', { name: 'Lücken' })).toBeVisible();
     await expect(page.getByText('Florian Musterstadt 11-1').first()).toBeVisible();
     await expect(page.getByText('UHS Turnhalle').first()).toBeVisible();
@@ -179,7 +181,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab/funkplan?ansicht=skizze`);
+    await page.goto(`/einsaetze/${demo.id}/fernmeldewesen?ansicht=skizze`);
     const blatt = page.locator('[data-lfh="funkplan-blatt"]');
     await expect(blatt.locator('svg text').filter({ hasText: '311_F_SAN' }).first()).toBeVisible();
     await page.mouse.move(0, 0);
@@ -190,7 +192,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab/kommunikationsplan`);
+    await page.goto(`/einsaetze/${demo.id}/fernmeldewesen/kommunikationsplan`);
     await expect(page.getByText('0561 7000 112')).toBeVisible();
     await expect(page.getByText('presse@musterstadt.example')).toBeVisible();
     await expect(page.getByText('Sanitätsdienst · EA 1')).toBeVisible();
@@ -203,7 +205,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab/kommunikationsplan`);
+    await page.goto(`/einsaetze/${demo.id}/fernmeldewesen/kommunikationsplan`);
     await page
       .getByRole('button', { name: /^Verbindung zu .*Ordnungsamt Musterstadt.* hinzufügen$/ })
       .click();

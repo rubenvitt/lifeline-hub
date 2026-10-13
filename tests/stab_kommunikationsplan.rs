@@ -716,23 +716,25 @@ async fn fremde_ids_sind_404() {
 // ---------- Live ----------
 
 #[tokio::test]
-async fn jede_schreibaktion_sendet_stab_und_nie_etb() {
+async fn jede_schreibaktion_sendet_fernmeldewesen_und_nie_stab_oder_etb() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let vor = system_etb_anzahl(&app, &admin, einsatz).await;
 
     let zaehle = |rx: &mut tokio::sync::broadcast::Receiver<_>| {
-        let (mut stab, mut etb) = (0, 0);
+        // LLH-1180: der Kommunikationsplan gehört dem Fernmeldewesen; `stab` kommt nie.
+        let (mut fernmeldewesen, mut etb) = (0, 0);
         while let Ok(n) = rx.try_recv() {
             let n: lifeline_hub::live::LiveNachricht = n;
             match n.event.as_str() {
-                "stab" => stab += 1,
+                "fernmeldewesen" => fernmeldewesen += 1,
                 "etb" => etb += 1,
+                "stab" => panic!("Kommunikationsplan sendet nie `stab`"),
                 _ => {}
             }
         }
-        (stab, etb)
+        (fernmeldewesen, etb)
     };
 
     let mut rx = live.abonniere(einsatz);
@@ -775,7 +777,7 @@ async fn jede_schreibaktion_sendet_stab_und_nie_etb() {
     assert_eq!(
         zaehle(&mut rx),
         (6, 0),
-        "sechs Schreibaktionen, sechs Stab-Ereignisse, kein ETB"
+        "sechs Schreibaktionen, sechs Fernmeldewesen-Ereignisse, kein ETB"
     );
     assert_eq!(
         system_etb_anzahl(&app, &admin, einsatz).await,

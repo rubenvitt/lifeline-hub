@@ -35,9 +35,10 @@ import { unterseitenFuer } from '../stab/unterseiten';
  *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
  *     nicht zugeordnet.
  *
- * STAB-UNTERSEITEN (LLH-1127): Pressearbeit, Informationstelefon, Funkplan, Kommunikationsplan sind
- * kein Modul, sondern Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger
- * `stab` (`InfotelefonPage.tsx` → `stab`). Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
+ * STAB-UNTERSEITEN (LLH-1127): Pressearbeit und Informationstelefon sind kein Modul, sondern
+ * Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger `stab`
+ * (`InfotelefonPage.tsx` → `stab`); Funkplan und Kommunikationsplan zählen zum Fernmeldewesen
+ * (LLH-1180), dem Modul, das ihre Unterseite in `stab/unterseiten.ts` nennt. Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
  * der Leser in GENAU dieser Seite stehen: ein Leser auf der Stab-Seite selbst deckte sie sonst, und
  * die Aktion liefe ins Leere. (Die Lagebesprechung hat seit LLH-1111 ein eigenes Modul.)
  */
@@ -125,9 +126,17 @@ const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const fileBase = (pfad: string): string =>
   normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
 
-/** Die Schlüssel der Stab-Unterseiten in Vergleichsform. */
+/** Schlüssel jeder Unterseite der Stab-Seite (Vergleichsform) → das Modul, das sie trägt. */
+const UNTERSEITE_MODUL = new Map(
+  SACHGEBIETE.flatMap(({ sachgebiet }) => unterseitenFuer(sachgebiet)).map((u) => [
+    normal(u.key),
+    u.modul,
+  ]),
+);
+
+/** Die Schlüssel der Unterseiten, die unter `…/stab/` liegen (Vergleichsform). */
 const STAB_UNTERSEITEN = new Set(
-  SACHGEBIETE.flatMap(({ sachgebiet }) => unterseitenFuer(sachgebiet)).map((u) => normal(u.key)),
+  [...UNTERSEITE_MODUL].filter(([, modul]) => modul === 'stab').map(([key]) => key),
 );
 
 /**
@@ -167,7 +176,8 @@ export function findCoveringFiles(
 export function modulZuLeserDatei(pfad: string): string[] {
   const basis = fileBase(pfad);
   if (!basis) return [];
-  if (STAB_UNTERSEITEN.has(basis)) return ['stab'];
+  const unterseitenModul = UNTERSEITE_MODUL.get(basis);
+  if (unterseitenModul) return [unterseitenModul];
   return modulRegistry
     .filter((m) => [m.key, m.route, modulZielRoute(m)].some((s) => normal(s) === basis))
     .map((m) => m.key);
@@ -229,9 +239,9 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(findeLeser('/src/synthetisch.ts', quelle, 'zeichnen').map((l) => l.zeile)).toEqual([9]);
   });
 
-  it('ordnet die Seiten der Stab-Unterseiten dem Stab zu und erkennt ihre Ziele (LLH-1127)', () => {
+  it('ordnet die Seiten der Unterseiten ihrem Modul zu und erkennt die Ziele unter dem Stab (LLH-1127, LLH-1180)', () => {
     expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['stab']);
-    expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['stab']);
+    expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['fernmeldewesen']);
     expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual(['stab']);
     const basis = '/einsaetze/1/stab';
     expect(findStabUnterseite('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
@@ -244,7 +254,7 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     const stabSeite = '/src/pages/StabPage.tsx';
     const infotelefon = '/src/pages/InfotelefonPage.tsx';
     expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [infotelefon])).toEqual([]);
-    expect(findCoveringFiles('stab', `${basis}/funkplan?neu=1`, basis, [stabSeite])).toEqual([]);
+    expect(findCoveringFiles('stab', `${basis}/presse?neu=1`, basis, [stabSeite])).toEqual([]);
     expect(
       findCoveringFiles('stab', `${basis}/infotelefon?neu=1`, basis, [stabSeite, infotelefon]),
     ).toEqual([infotelefon]);

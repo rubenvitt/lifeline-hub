@@ -1,10 +1,24 @@
-# Stab — Regeln
+# Stab und Fernmeldewesen — Regeln
 
-Gilt für `frontend/src/stab/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+Gilt für `frontend/src/stab/`, `frontend/src/fernmeldewesen/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+
+**Fernmeldewesen** (LLH-1180, `openspec/changes/nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
+Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
+Kommunikationsplan; die Dateien bleiben unter `stab/`. **Die Stab-Freigabe wirkt dort nirgends**,
+außer an Stab-Daten selbst: die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten
+„Einsatzleitung“) hat eine eigene Weiche auf `stab` und fehlt ohne sie mit Grund
+(`stab/useNetzQuellen.ts`, `stab/kommunikationsplan.ts:STAB_NICHT_FREI_GRUND`), nie die ganze Seite.
+Seiten prüfen `useModulFreigabe(einsatzId, 'fernmeldewesen')` fail-closed (der Rahmen rendert bei
+gescheitertem Freigabeabruf). Die API-Pfade bleiben `…/stab/kommunikationsplan…` und
+`…/stab/fernmeldeskizze…` (Marker `Fernmeldewesen`, `PFAD_KEY`), live über `fernmeldewesen`, Keys
+unter `einsatzKeys.fernmeldewesen*`. Reiter nur über `fernmeldewesen/FernmeldewesenReiter.tsx`. Die
+Altadressen `stab/funkplan` und `stab/kommunikationsplan` leiten dauerhaft um und gehören über
+`ALTPFAD_MODUL` (`einsatz/modulRegistry.ts`) dem Fernmeldewesen; Einstiege von der Stab-Seite,
+Sprungmarken und Palette prüfen dessen Freigabe (`istSprungGesperrt('fernmeldewesen')`).
 
 **Funkplan S6** (LFH-548, `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`):
-Unterroute `stab/funkplan` (`funkplanPfad`), kein Modul, Einstieg in der S6-Zeile und als Sprungmarke; die Seite
-prüft die Stab-Freigabe selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
+Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Zeile; die Seite prüft
+die Freigabe des Fernmeldewesens selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`stab/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
@@ -27,7 +41,7 @@ Fernmeldeskizze steht kein Name (Regel unten).
 
 **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;
 Vorgänger LFH-625): taktische Skizze nach BBK-Anhang J.5 als zweite Darstellung des Funkplans
-(`?ansicht=skizze`), kein Modul, keine Route. **Ein Modell:** `stab/fernmeldeskizze.ts:
+(Reiter „Fernmeldeskizze“ des Fernmeldewesens, `?ansicht=skizze`), keine eigene Route. **Ein Modell:** `stab/fernmeldeskizze.ts:
 baueFernmeldenetz` (Stellen `fs`/`ab-`/`eh-`/`ks-`/`ko-`, Schienen `sg-` aus
 `luecken.ts:kanalbelegung`, Verbindungen, Bereiche, Lücken je Element) speist Bild, Lücken-Paneel,
 Druck und Übernahme; Lücken nur über `stab/luecken.ts` (Bild zählt wie das Paneel). Je
@@ -40,7 +54,7 @@ Kommunikationsskizze `sketch.*`, LFH-1033), keine eigene Geometrie; 1 mm des Pak
 die Einzel-Endpunkte in die Datensätze (Abschnitt, Einheit, Führungsstelle, Kommunikationsstelle),
 externe Stellen sind die des Kommunikationsplans; die Skizze speichert nur Lage, Komponenten,
 Verbindungen, Bereiche, Schriftfeld (`src/stab/fernmeldeskizze.rs`, Bezüge polymorph, jeder
-Löschpfad ruft `vergiss`). Schreibwege der Fläche nur über `stab/skizzenAktionen.ts`
+Löschpfad ruft `vergiss`); Recht am Skizzeneigenen ist `fernmeldewesen` (`Rechtsquelle`). Schreibwege der Fläche nur über `stab/skizzenAktionen.ts`
 (umgesetzt in `stab/useSkizzenAktionen.ts`), Rückgängig über `stab/skizzenBefehle.ts`; Lage mit
 `version` (409 statt stillem Überschreiben). Rechte je Element nach dem Datensatz, mobil und ohne
 Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Personennamen, kein Fahrzeug
@@ -89,8 +103,8 @@ Netzes kommt dorthin, nie in eine Seite), Druckform außerhalb des Sichtbereichs
 „Stand“ im Schriftfeld ist der Zeitpunkt der Aufnahme. Gerastert wird in
 `stab/skizze/skizzeAlsBild.ts` (Stile inline aufgelöst, Schriften als Daten-URL eingebettet).
 
-**Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans („Tabelle | Skizze |
-Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
+**Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans (Reiter „Sprechgruppen“,
+`?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
 Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
 Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Spalte „Bedingung“ statt „Betriebsart“
@@ -100,16 +114,16 @@ ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, st
 
 **Kommunikationsplan S6** (LFH-848,
 `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`): Unterroute
-`stab/kommunikationsplan` (`kommunikationsplanPfad`), zweiter S6-Eintrag in `stab/unterseiten.ts`,
-`useStabFreigabe` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
+`fernmeldewesen/kommunikationsplan` (`kommunikationsplanPfad`), Reiter des Moduls und zweiter
+S6-Eintrag in `stab/unterseiten.ts`, `useModulFreigabe('fernmeldewesen')` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
 dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/stab/kommunikation.rs`,
 zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
 abgeleitet** (Kommunikationsmittel/Erreichbarkeit, Zeile führt zum Datensatz, keine zweite
 Datenhaltung). Die Besetzung ist nur Nebentext, **Kontaktangaben des Personals kommen nie vor**.
 Kern `stab/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `stab/luecken.ts`. `tel:` nur
 Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
-Aktionsspalte). **Offline lesbar** als einziger Stab-Unter-Key in `LAGEBILD_OFFLINE`; ohne Netz
-Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“. Schreibantworten tragen den ganzen
+Aktionsspalte). **Offline lesbar** als einziger Unter-Key des Fernmeldewesens in `LAGEBILD_OFFLINE` (der Stab hat
+keinen); ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“, ohne Stab „—“. Schreibantworten tragen den ganzen
 Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
 Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
 „Einsatzleitung und Stab“ (Rufname, Verbindung aus Kommunikationsmittel und Erreichbarkeit, führt zu
@@ -132,7 +146,7 @@ Die Stab-Seite trägt nur die Zeile „Nächste Lagebesprechung“ mit Sprung do
 Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/presse/mitteilungen/:id`,
 `stab/infotelefon`, kein Modul; Einstiege über `stab/unterseiten.ts` (Stab-Seite, Sprungmarken und
 Palette lesen dieselbe Tabelle, LLH-1127), jede Seite prüft
-`useStabFreigabe` selbst (auch Funkplan). Die Pressemitteilung ist die dritte `Dokumentart`
+`useStabFreigabe` selbst. Die Pressemitteilung ist die dritte `Dokumentart`
 (Snapshot, Fortschreibung, ETB `meldung`), **freigeben darf nur die Einsatzleitung**
 (`EinsatzLeitungszugriff<Stab>`, Paar-Test gegen Lagebericht/Befehl), die Seite ist Zwilling von
 `LageberichtDetailPage`. Personenbezug (Ansprechperson, Erreichbarkeit, Anrufer, Rückruf, Notiz)
