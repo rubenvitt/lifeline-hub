@@ -140,6 +140,28 @@ pub fn phase_und_seite(
         phase.map(str::trim).filter(|p| !p.is_empty()),
         "Ungültige Phase",
     )?;
+    let s = parse_page(vor_zeit, vor_id, limit)?;
+    if phase != Some(ListenPhase::Abgeschlossen) {
+        if s.vor.is_some() || limit.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Blättern nur mit phase=abgeschlossen".into(),
+            ));
+        }
+        return Ok((phase, None));
+    }
+    Ok((phase, Some(s)))
+}
+
+/// Liest Cursor und Seitengröße einer immer geblätterten Liste (LLH-732, Informationstelefon).
+///
+/// Ein halber Cursor → 422; ein leerer Zeitwert zählt als fehlend. Ohne `limit` gilt
+/// [`SEITE_STANDARD`], sonst wird es auf `[1, SEITE_MAX]` geklemmt. [`phase_und_seite`] liest
+/// damit die Seite einer abgeschlossenen Phase.
+pub fn parse_page(
+    vor_zeit: Option<&str>,
+    vor_id: Option<i64>,
+    limit: Option<i64>,
+) -> Result<Seite, crate::error::AppError> {
     let vor_zeit = vor_zeit.map(str::trim).filter(|z| !z.is_empty());
     let vor = match (vor_zeit, vor_id) {
         (Some(zeit), Some(id)) => Some(ZeitCursor {
@@ -148,21 +170,13 @@ pub fn phase_und_seite(
         }),
         (None, None) => None,
         _ => {
-            return Err(AppError::UnprocessableEntity(
+            return Err(crate::error::AppError::UnprocessableEntity(
                 "vor_zeit und vor_id gehören zusammen".into(),
             ))
         }
     };
-    if phase != Some(ListenPhase::Abgeschlossen) {
-        if vor.is_some() || limit.is_some() {
-            return Err(AppError::UnprocessableEntity(
-                "Blättern nur mit phase=abgeschlossen".into(),
-            ));
-        }
-        return Ok((phase, None));
-    }
     let limit = limit.unwrap_or(SEITE_STANDARD).clamp(1, SEITE_MAX);
-    Ok((phase, Some(Seite { vor, limit })))
+    Ok(Seite { vor, limit })
 }
 
 /// Geteilter Status eines Objekts: beide Achsen getrennt. `quittiert_at` ist die
@@ -230,6 +244,43 @@ mod tests {
                 zeit: "2026-10-01 10:00:00".into(),
                 id: 7
             })
+        );
+    }
+
+    #[test]
+    fn parse_page_prueft_cursor_und_klemmt_das_limit() {
+        use crate::error::AppError;
+        assert_eq!(
+            parse_page(None, None, None).unwrap(),
+            Seite {
+                vor: None,
+                limit: SEITE_STANDARD
+            }
+        );
+        assert!(matches!(
+            parse_page(Some("2026-10-01 10:00:00"), None, None),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            parse_page(None, Some(7), None),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(parse_page(None, None, Some(5000)).unwrap().limit, SEITE_MAX);
+        assert_eq!(parse_page(None, None, Some(0)).unwrap().limit, 1);
+        // Leerer Zeitwert zählt als fehlend: mit Kennung ist der Cursor halb.
+        assert!(matches!(
+            parse_page(Some("  "), Some(7), None),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(
+            parse_page(Some("2026-10-01 10:00:00"), Some(7), Some(20)).unwrap(),
+            Seite {
+                vor: Some(ZeitCursor {
+                    zeit: "2026-10-01 10:00:00".into(),
+                    id: 7
+                }),
+                limit: 20
+            }
         );
     }
 

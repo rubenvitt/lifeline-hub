@@ -10,10 +10,10 @@ import {
   ladeMedienkontakte,
   ladePressemitteilungen,
 } from '../api/presse';
-import { ladeAnrufe } from '../api/infotelefon';
+import { loadAnrufZaehler } from '../api/infotelefon';
 import type { EinsatzAnzeige, Medienkontakt } from '../api/types';
 import PressePage from './PressePage';
-import { freigabenFixture } from '../test/fixtures';
+import { ANRUF_ZAEHLER_EMPTY, freigabenFixture } from '../test/fixtures';
 
 /**
  * Presse-Log mit vielen erledigten Kontakten (LFH-1075, Spec `stab-presse-log`): offene
@@ -40,7 +40,7 @@ vi.mock('../api/presse', async (orig) => {
     setzeMedienkontaktStatus: vi.fn(),
   };
 });
-vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
+vi.mock('../api/infotelefon', () => ({ loadAnrufZaehler: vi.fn() }));
 
 const EINSATZ = {
   id: 1,
@@ -94,7 +94,7 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladeMedienkontakte).mockResolvedValue(BESTAND);
   vi.mocked(ladePressemitteilungen).mockResolvedValue([]);
-  vi.mocked(ladeAnrufe).mockResolvedValue([]);
+  vi.mocked(loadAnrufZaehler).mockResolvedValue(ANRUF_ZAEHLER_EMPTY);
   vi.mocked(ladeErledigteMedienkontakte).mockClear();
   vi.mocked(ladeMedienkontakt).mockClear();
 });

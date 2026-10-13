@@ -11,10 +11,14 @@ import BefehlDetail from './BefehlDetail';
 const ladeBefehl = vi.fn();
 const gibBefehlFrei = vi.fn();
 const schreibeBefehlFort = vi.fn();
+const quittiereBefehlEmpfang = vi.fn();
+const nimmBefehlQuittungZurueck = vi.fn();
 vi.mock('../api/befehle', () => ({
   ladeBefehl: (...a: unknown[]) => ladeBefehl(...a),
   gibBefehlFrei: (...a: unknown[]) => gibBefehlFrei(...a),
   schreibeBefehlFort: (...a: unknown[]) => schreibeBefehlFort(...a),
+  quittiereBefehlEmpfang: (...a: unknown[]) => quittiereBefehlEmpfang(...a),
+  nimmBefehlQuittungZurueck: (...a: unknown[]) => nimmBefehlQuittungZurueck(...a),
 }));
 
 const kopf = (over: Partial<BefehlKopf> = {}): BefehlKopf => ({
@@ -33,14 +37,25 @@ const kopf = (over: Partial<BefehlKopf> = {}): BefehlKopf => ({
   vorgaenger_id: null,
   vorlage: 'befehl_lad',
   zeitstand: '2026-06-11 08:30:00',
+  verteiler: [],
+  is_quittierbar: false,
   ...over,
 });
 const LAD = vorlage('befehl_lad')!;
+const VERTEILER: BefehlKopf['verteiler'] = [
+  {
+    id: 1,
+    empfaenger_typ: 'abschnitt',
+    abschnitt_id: 3,
+    snap_anzeige: 'EA Süd',
+    quittiert_at: '2026-06-11 08:45:00',
+  },
+  { id: 2, empfaenger_typ: 'funktion', funktion: 's3', snap_anzeige: 'S3 Einsatz' },
+];
 const anzeige = (k: BefehlKopf): BefehlAnzeige => ({
   ...k,
   aktualisiert_at: k.zeitstand,
   abschnitte: [{ schluessel: LAD.abschnitte[0].schluessel, text: 'Brand im Lager' }],
-  verteiler: [],
 });
 
 function Ort() {
@@ -74,20 +89,74 @@ describe('BefehlDetail (Spec `auftraege-befehle`, „Einsatzbefehl im Detail“)
     expect(ladeBefehl).toHaveBeenCalledWith(5, 7);
   });
 
-  it('nennt den Verteiler des Befehls (LLH-1172)', async () => {
-    const b = kopf({ status: 'freigegeben', freigegeben_at: '2026-06-11 08:40:00' });
-    ladeBefehl.mockResolvedValue({
-      ...anzeige(b),
-      verteiler: [
-        { id: 1, empfaenger_typ: 'abschnitt', abschnitt_id: 3, snap_anzeige: 'EA Süd' },
-        { id: 2, empfaenger_typ: 'funktion', funktion: 's3', snap_anzeige: 'S3 Einsatz' },
-      ],
-    });
-    renderMitProviders(<BefehlDetail befehl={b} einsatzId={5} darfSchreiben />, {
-      route: '/einsaetze/5/auftraege',
-    });
+  it('ein Entwurf nennt den Verteiler ohne Quittungsstand (LLH-1172)', async () => {
+    rendern(kopf({ verteiler: VERTEILER }));
     expect(await screen.findByText('EA Süd, S3 Einsatz')).toBeInTheDocument();
     expect(screen.getByText('Verteiler')).toBeInTheDocument();
+    expect(screen.queryByText(/quittiert/)).toBeNull();
+  });
+
+  describe('Quittung je Empfänger (LLH-1173, Spec `befehl-quittung`)', () => {
+    const frei = (over: Partial<BefehlKopf> = {}) =>
+      kopf({
+        status: 'freigegeben',
+        freigegeben_at: '2026-06-11 08:40:00',
+        is_quittierbar: true,
+        verteiler: VERTEILER,
+        ...over,
+      });
+
+    it('zeigt Quittungsstand, Quittierte mit ✓ und Offene mit Knopf', async () => {
+      rendern(frei());
+      expect(await screen.findByText('2 Empfänger · 1/2 quittiert')).toBeInTheDocument();
+      expect(screen.getByText('EA Süd ✓')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Empfang für S3 Einsatz quittieren' }),
+      ).toBeInTheDocument();
+    });
+
+    it('quittiert ohne Rückfrage, Rückgängig nimmt die Quittung zurück', async () => {
+      const b = frei();
+      const quittiert = {
+        ...anzeige(b),
+        verteiler: VERTEILER.map((e) => ({ ...e, quittiert_at: '2026-06-11 08:50:00' })),
+      };
+      quittiereBefehlEmpfang.mockResolvedValue(quittiert);
+      nimmBefehlQuittungZurueck.mockResolvedValue(anzeige(b));
+      rendern(b);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Empfang für S3 Einsatz quittieren' }),
+      );
+      await waitFor(() => expect(quittiereBefehlEmpfang).toHaveBeenCalledWith(5, 7, 2));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(await screen.findByText('2 Empfänger · 2/2 quittiert')).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+      await waitFor(() => expect(nimmBefehlQuittungZurueck).toHaveBeenCalledWith(5, 7, 2));
+    });
+
+    it('eine überholte Fassung zeigt ihre offenen Empfänger ohne Knopf', async () => {
+      rendern(frei({ is_quittierbar: false }));
+      expect(await screen.findByText('S3 Einsatz')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /quittieren/ })).toBeNull();
+    });
+
+    it('ohne Schreibrecht Verteiler und Stand, aber kein Knopf', async () => {
+      rendern(frei(), false);
+      expect(await screen.findByText('2 Empfänger · 1/2 quittiert')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /quittieren/ })).toBeNull();
+    });
+
+    it('eine abgelehnte Quittung nennt den Grund am Verteiler', async () => {
+      quittiereBefehlEmpfang.mockRejectedValue(
+        new ApiError(422, 'Eine neuere Fassung ist freigegeben; quittiert wird nur die jüngste'),
+      );
+      rendern(frei());
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Empfang für S3 Einsatz quittieren' }),
+      );
+      const block = document.querySelector('[data-lfh="befehl-verteiler"]') as HTMLElement;
+      expect(await within(block).findByText(/neuere Fassung ist freigegeben/)).toBeInTheDocument();
+    });
   });
 
   it('ohne Verteiler steht keine Zeile „Verteiler“', async () => {

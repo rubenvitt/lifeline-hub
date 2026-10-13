@@ -17,6 +17,8 @@ fn eintrag(snap: &str) -> VerteilerEintragAnzeige {
         extern_kategorie: None,
         extern_bezeichnung: None,
         snap_anzeige: snap.into(),
+        quittiert_at: None,
+        quittiert_von_id: None,
     }
 }
 
@@ -82,6 +84,7 @@ fn json_wird_mit_typ_und_kategorie_gelesen() {
     assert_eq!(v[0].empfaenger_typ, EmpfaengerTyp::Extern);
     assert_eq!(v[0].extern_kategorie, Some(AdressatKategorie::Leitstelle));
     assert_eq!(v[1].funktion.as_deref(), Some("s3"));
+    assert_eq!(v[0].quittiert_at, None);
     assert_eq!(from_json("[]").unwrap(), vec![]);
 }
 
@@ -94,4 +97,34 @@ fn unbekannter_typ_im_json_ist_ein_datenfehler() {
     assert!(from_json(json).is_ok());
     let kaputt = json.replace("\"person\"", "\"zug\"");
     assert!(matches!(from_json(&kaputt), Err(AppError::Internal(_))));
+}
+
+#[test]
+fn json_traegt_die_quittung() {
+    let json = r#"[{"id":7,"empfaenger_typ":"abschnitt","abschnitt_id":3,"einheit_id":null,
+        "funktion":null,"funktion_text":null,"extern_kategorie":null,
+        "extern_bezeichnung":null,"snap_anzeige":"EA Süd",
+        "quittiert_at":"2026-06-02 10:05:00","quittiert_von_id":1}]"#;
+    let v = from_json(json).unwrap();
+    assert_eq!(v[0].quittiert_at.as_deref(), Some("2026-06-02 10:05:00"));
+    assert_eq!(v[0].quittiert_von_id, Some(1));
+}
+
+#[test]
+fn quittung_traegt_nur_der_befehl() {
+    assert_eq!(Befehl::QUITTUNG, Some("Einsatzbefehl"));
+    assert_eq!(Lagebericht::QUITTUNG, None);
+    assert_eq!(Pressemitteilung::QUITTUNG, None);
+}
+
+#[test]
+fn etb_text_nennt_fassung_und_freigabe_nummer() {
+    assert_eq!(
+        quittung_inhalt(QuittungsAktion::Quittieren, "Einsatzbefehl", 2, 17),
+        "Empfang quittiert: Einsatzbefehl v2 (ETB 17)"
+    );
+    assert_eq!(
+        quittung_inhalt(QuittungsAktion::Zuruecknehmen, "Einsatzbefehl", 1, 3),
+        "Quittung zurückgenommen: Einsatzbefehl v1 (ETB 3)"
+    );
 }

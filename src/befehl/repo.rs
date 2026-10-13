@@ -32,6 +32,9 @@ pub struct BefehlAnzeige {
     pub etb_eintrag_id: Option<i64>,
     /// An wen das Dokument geht, in Reihenfolge (LLH-1172); leer, solange niemand gewählt ist.
     pub verteiler: Vec<crate::vorlagendokument::verteiler::VerteilerEintragAnzeige>,
+    /// Ob der Verteiler Quittungen annimmt (LLH-1173): freigegeben und keine neuere Fassung
+    /// freigegeben.
+    pub is_quittierbar: bool,
 }
 
 impl From<Dokument<Abschnitt>> for BefehlAnzeige {
@@ -55,6 +58,7 @@ impl From<Dokument<Abschnitt>> for BefehlAnzeige {
             freigegeben_at: d.freigegeben_at,
             etb_eintrag_id: d.etb_eintrag_id,
             verteiler: d.verteiler,
+            is_quittierbar: d.is_quittierbar,
         }
     }
 }
@@ -80,6 +84,10 @@ pub struct BefehlKopf {
     pub freigegeben_von_name: Option<String>,
     pub freigegeben_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    /// Verteiler samt Quittung (LLH-1173), für Karte und Empfängerfilter der Liste.
+    pub verteiler: Vec<crate::vorlagendokument::verteiler::VerteilerEintragAnzeige>,
+    /// Wie [`BefehlAnzeige::is_quittierbar`].
+    pub is_quittierbar: bool,
 }
 
 impl From<DokumentKopf> for BefehlKopf {
@@ -100,6 +108,8 @@ impl From<DokumentKopf> for BefehlKopf {
             freigegeben_von_name: k.freigegeben_von_name,
             freigegeben_at: k.freigegeben_at,
             etb_eintrag_id: k.etb_eintrag_id,
+            verteiler: k.verteiler,
+            is_quittierbar: k.is_quittierbar,
         }
     }
 }

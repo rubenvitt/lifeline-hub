@@ -12,7 +12,7 @@ import { taktischeDtgVoll } from '../anzeige/format';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz } from '../api/einsaetze';
-import { ladeAnrufe } from '../api/infotelefon';
+import { loadAnrufZaehler } from '../api/infotelefon';
 import type { AbschlussCursor } from '../api/meldungen';
 import {
   eingangCursor,
@@ -193,10 +193,10 @@ export default function PressePage() {
     queryFn: () => ladePressemitteilungen(einsatzId),
     enabled: frei,
   });
-  // Nur für die Medienlage; das Protokoll selbst steht auf seiner eigenen Seite.
-  const anrufeQuery = useQuery({
-    queryKey: einsatzKeys.infotelefon(einsatzId),
-    queryFn: () => ladeAnrufe(einsatzId),
+  // Nur für die Medienlage: die Zählung über den ganzen Bestand, ohne Personenbezug (LLH-732).
+  const anrufZaehlerQuery = useQuery({
+    queryKey: einsatzKeys.infotelefonZaehler(einsatzId),
+    queryFn: () => loadAnrufZaehler(einsatzId),
     enabled: frei,
   });
 
@@ -304,7 +304,7 @@ export default function PressePage() {
   const medienlage = baueMedienlage({
     kontakte: { zustand: abrufZustand(kennzahlenQuery), daten: kennzahlen ?? null },
     mitteilungen: { zustand: abrufZustand(mitteilungenQuery), daten: mitteilungen },
-    anrufe: { zustand: abrufZustand(anrufeQuery), daten: anrufeQuery.data ?? [] },
+    anrufe: { zustand: abrufZustand(anrufZaehlerQuery), daten: anrufZaehlerQuery.data ?? null },
   });
   const medienlageText = rendereMedienlageMarkdown(medienlage, (w) =>
     taktischeDtgVoll(w, konventionen),

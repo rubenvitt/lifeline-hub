@@ -10,14 +10,17 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   auftraege-liste.png    frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx,
  *                          frontend/src/components/ListeDetail.tsx,
  *                          frontend/src/auftraege/AuftragListenKarte.tsx,
- *                          frontend/src/auftraege/AuftragDetail.tsx
+ *                          frontend/src/auftraege/AuftragDetail.tsx,
+ *                          frontend/src/auftraege/EmpfaengerQuittung.tsx
  *   auftrag-erteilen.png   frontend/src/auftraege/AuftragErteilenDialog.tsx,
  *                          frontend/src/auftraege/AuftragFormular.tsx,
  *                          frontend/src/auftraege/auftragsschemaKern.ts
  *   auftrag-aufheben.png   frontend/src/auftraege/AuftragAufhebenDialog.tsx
  *   befehl-detail.png      frontend/src/auftraege/BefehlListe.tsx,
  *                          frontend/src/auftraege/BefehlListenKarte.tsx,
- *                          frontend/src/auftraege/BefehlDetail.tsx
+ *                          frontend/src/auftraege/BefehlDetail.tsx,
+ *                          frontend/src/auftraege/EmpfaengerQuittung.tsx,
+ *                          frontend/src/auftraege/EmpfaengerFilter.tsx
  *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx,
  *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/fuehrung/EmpfaengerWahl.tsx,
@@ -65,10 +68,10 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'auftrag-erteilen');
   });
 
-  test('Einsatzbefehle: Liste und gewählter Entwurf', async ({ page }) => {
+  test('Einsatzbefehle: Liste und gewählter Befehl mit Quittungen', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/befehle`, {
+    const befehl = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${demo.id}/befehle`, {
       vorlage: 'befehl_lad',
       titel: 'Befehl an Logistiktrupp: Sicherung Lindenstraße',
       abschnitte: [
@@ -80,12 +83,38 @@ test.describe(KAPITEL, () => {
           schluessel: 'auftrag',
           text: 'Logistiktrupp sichert die Keller Lindenstraße 4 bis 8 mit Sandsäcken.',
         },
+        {
+          schluessel: 'durchfuehrung',
+          text: 'Anfahrt über Mühlbachweg, Sandsäcke vom Bereitstellungsraum.',
+        },
       ],
     });
+    // Verteiler (LLH-1172) und eine Quittung (LLH-1173): ein Abschnitt des Demo-Einsatzes und S4.
+    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/abschnitte`);
+    expect(antwort.ok()).toBe(true);
+    const abschnitte = (await antwort.json()) as { id: number }[];
+    expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);
+    await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/befehle/${befehl.id}`, {
+      verteiler: [
+        { empfaenger_typ: 'abschnitt', abschnitt_id: abschnitte[0].id },
+        { empfaenger_typ: 'funktion', funktion: 's4' },
+      ],
+    });
+    const frei = await fuelle<{ verteiler: { id: number }[] }>(
+      page,
+      'post',
+      `/api/einsaetze/${demo.id}/befehle/${befehl.id}/freigeben`,
+    );
+    await fuelle(
+      page,
+      'post',
+      `/api/einsaetze/${demo.id}/befehle/${befehl.id}/verteiler/${frei.verteiler[0].id}/quittieren`,
+    );
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/auftraege?reiter=befehle`);
+    await page.goto(`/einsaetze/${demo.id}/auftraege?reiter=befehle&befehl=${befehl.id}`);
     const detail = page.locator('[data-lfh="liste-detail-detail"]');
-    await expect(detail.getByRole('button', { name: 'Freigeben' })).toBeVisible();
+    await expect(detail.getByRole('button', { name: 'Fortschreiben' })).toBeVisible();
+    await expect(detail.getByText('2 Empfänger · 1/2 quittiert')).toBeVisible();
     await expect(detail.getByText('Logistiktrupp sichert die Keller')).toBeVisible();
     await fokusWeg(page);
     await fotografiere(page.locator('[data-lfh="liste-detail"]'), KAPITEL, 'befehl-detail');

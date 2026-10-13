@@ -140,6 +140,55 @@ for (const kontext of [
   });
 }
 
+test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-1173)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatz(page);
+  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+    data: { name: 'EA Süd' },
+  });
+  expect(abschnitt.ok(), `Abschnitt: ${abschnitt.status()}`).toBe(true);
+  const abschnittId = ((await abschnitt.json()) as { id: number }).id;
+  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
+    data: {
+      vorlage: 'befehl_lad',
+      titel: 'Befehl an EA Süd',
+      abschnitte: [
+        { schluessel: 'lage', text: 'L' },
+        { schluessel: 'auftrag', text: 'A' },
+        { schluessel: 'durchfuehrung', text: 'D' },
+      ],
+    },
+  });
+  expect(angelegt.ok(), `Befehl: ${angelegt.status()}`).toBe(true);
+  const befehlId = ((await angelegt.json()) as { id: number }).id;
+  const verteiler = await page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${befehlId}`, {
+    data: { verteiler: [{ empfaenger_typ: 'abschnitt', abschnitt_id: abschnittId }] },
+  });
+  expect(verteiler.ok(), `Verteiler: ${verteiler.status()}`).toBe(true);
+  const frei = await page.request.post(`/api/einsaetze/${einsatzId}/befehle/${befehlId}/freigeben`);
+  expect(frei.ok(), `Freigabe: ${frei.status()}`).toBe(true);
+
+  await page.goto(`/einsaetze/${einsatzId}/auftraege?reiter=befehle&befehl=${befehlId}`);
+  const karte = page.locator(`[data-befehl-id="${befehlId}"]`);
+  await expect(karte).toContainText('1 Empfänger · 0/1 quittiert');
+  await expect(karte).toContainText('EA Süd');
+
+  // Ein Klick quittiert, ohne Rückfrage (LFH-343: der Server hat einen Rückweg).
+  await detail(page).getByRole('button', { name: 'Empfang für EA Süd quittieren' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(karte).toContainText('1/1 quittiert');
+  await expect(detail(page).getByText('EA Süd ✓')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Rückgängig' }).click();
+  await expect(karte).toContainText('0/1 quittiert');
+  await expect(
+    detail(page).getByRole('button', { name: 'Empfang für EA Süd quittieren' }),
+  ).toBeVisible();
+});
+
 test('ab lg bleibt das Detail beim Scrollen der Liste im Blick (Fükw)', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenAlsAdmin(page);

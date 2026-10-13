@@ -138,8 +138,14 @@ async fn beobachter_liest_aber_erfasst_nicht() {
     rolle_setzen(&app, &admin, e, bid, "beobachter").await;
     let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
 
-    let (s, _) = anfrage(&app, "GET", &pfad(e), &beob, None).await;
-    assert_eq!(s, StatusCode::OK);
+    for uri in [
+        pfad(e),
+        format!("{}/zaehler", pfad(e)),
+        format!("{}/{id}", pfad(e)),
+    ] {
+        let (s, _) = anfrage(&app, "GET", &uri, &beob, None).await;
+        assert_eq!(s, StatusCode::OK, "{uri}");
+    }
     let (s, _) = anfrage(&app, "POST", &pfad(e), &beob, Some(RUECKRUF)).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, _) = anfrage(
@@ -186,5 +192,50 @@ async fn live_ereignis_nur_mit_kennungen() {
     assert_eq!(v["anruf_id"], a["id"]);
     for pii in ["Meyer", "0171", "Vater"] {
         assert!(!n.data.contains(pii), "{pii} im Ereignis: {}", n.data);
+    }
+}
+
+/// Spec „Einzelner Anruf“: für den Deeplink außerhalb der geladenen Seiten.
+#[tokio::test]
+async fn einzelner_anruf_und_fremder_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    let id = a["id"].as_i64().unwrap();
+
+    let (s, d) = anfrage(&app, "GET", &format!("{}/{id}", pfad(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{d:?}");
+    assert_eq!(d, a, "dieselbe Darstellung wie beim Erfassen");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/{id}", pfad(anderer)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Spec „Das Protokoll wird seitenweise geladen“: Statuscodes der Parameter.
+#[tokio::test]
+async fn parameter_der_liste() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for (query, erwartet) in [
+        ("?status=unsinn", StatusCode::BAD_REQUEST),
+        (
+            "?vor_zeit=2026-10-01%2010:00:00",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        ("?vor_id=3", StatusCode::UNPROCESSABLE_ENTITY),
+        ("?status=offen&limit=5", StatusCode::OK),
+        ("?status=", StatusCode::OK),
+    ] {
+        let (s, v) = anfrage(&app, "GET", &format!("{}{query}", pfad(e)), &admin, None).await;
+        assert_eq!(s, erwartet, "{query}: {v:?}");
     }
 }

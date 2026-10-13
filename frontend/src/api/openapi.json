@@ -1695,7 +1695,8 @@
           "ersteller_name",
           "erstellt_at",
           "aktualisiert_at",
-          "verteiler"
+          "verteiler",
+          "is_quittierbar"
         ],
         "properties": {
           "abschnitte": {
@@ -1751,6 +1752,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "is_quittierbar": {
+            "type": "boolean",
+            "description": "Ob der Verteiler Quittungen annimmt (LLH-1173): freigegeben und keine neuere Fassung\nfreigegeben."
+          },
           "status": {
             "$ref": "#/components/schemas/BefehlStatus"
           },
@@ -1796,7 +1801,9 @@
           "version",
           "ersteller_id",
           "ersteller_name",
-          "erstellt_at"
+          "erstellt_at",
+          "verteiler",
+          "is_quittierbar"
         ],
         "properties": {
           "einsatz_id": {
@@ -1843,6 +1850,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "is_quittierbar": {
+            "type": "boolean",
+            "description": "Wie [`BefehlAnzeige::is_quittierbar`]."
+          },
           "status": {
             "$ref": "#/components/schemas/BefehlStatus"
           },
@@ -1852,6 +1863,13 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "verteiler": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerteilerEintragAnzeige"
+            },
+            "description": "Verteiler samt Quittung (LLH-1173), für Karte und Empfängerfilter der Liste."
           },
           "vorgaenger_id": {
             "type": [
@@ -6588,6 +6606,49 @@
           "sonstiges"
         ]
       },
+      "InfotelefonAnliegenZaehler": {
+        "type": "object",
+        "description": "Zahl der Anrufe je Anliegen. Jedes Anliegen ist Pflichtfeld: eines ohne Anruf steht als 0 da\nund fehlt nie.",
+        "required": [
+          "vermisstensuche",
+          "auskunft_lage",
+          "hinweis",
+          "hilfeangebot",
+          "beschwerde",
+          "presse",
+          "sonstiges"
+        ],
+        "properties": {
+          "auskunft_lage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beschwerde": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hilfeangebot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hinweis": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "presse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sonstiges": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vermisstensuche": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "InfotelefonAnrufAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung eines Anrufs.",
@@ -6671,6 +6732,30 @@
           "offen",
           "erledigt"
         ]
+      },
+      "InfotelefonZaehler": {
+        "type": "object",
+        "description": "Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.",
+        "required": [
+          "gesamt",
+          "offen",
+          "je_anliegen"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl aller Anrufe, die zum Filter passen; per Konstruktion die Summe über `je_anliegen`."
+          },
+          "je_anliegen": {
+            "$ref": "#/components/schemas/InfotelefonAnliegenZaehler"
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon im Status `offen` (Rückruf steht aus)."
+          }
+        }
       },
       "JetztAktualisierenAntwort": {
         "type": "object",
@@ -12994,6 +13079,21 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "quittiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der Quittung (LLH-1173); fehlt, solange der Empfänger offen ist, und immer am\nLagebericht."
+          },
+          "quittiert_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer quittiert hat; fehlt wie `quittiert_at`."
           },
           "snap_anzeige": {
             "type": "string",

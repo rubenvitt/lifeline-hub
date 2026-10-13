@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
+  InfotelefonZaehler,
   MeAntwort,
   ModulFreigabe,
   ModulFreigaben,
@@ -99,3 +100,18 @@ export function freigabenFixture(
   }
   return freigaben;
 }
+
+/** Zählung eines Informationstelefons ohne Anrufe (LLH-732). */
+export const ANRUF_ZAEHLER_EMPTY: InfotelefonZaehler = {
+  gesamt: 0,
+  offen: 0,
+  je_anliegen: {
+    vermisstensuche: 0,
+    auskunft_lage: 0,
+    hinweis: 0,
+    hilfeangebot: 0,
+    beschwerde: 0,
+    presse: 0,
+    sonstiges: 0,
+  },
+};
