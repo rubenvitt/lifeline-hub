@@ -39,13 +39,13 @@ Code). Frontend-Gates aus `frontend/` über `mise exec -- pnpm …` (ohne mise: 
 
 ## 6. e2e und Prüfliste
 
-- [ ] 6.1 `e2e/gate3-trefflaeche.spec.ts` (Stab): Konstanten auf 19 Werkzeuge, 6 Gruppen, 6 Knöpfe; Anker Gruppen `Werkzeuge S\d` statt Region „Besetzung S1–S6“; Beobachter-Test mit 0 Knöpfen; grün in `kompakt`, `komfortabel`, `handschuh`
-- [ ] 6.2 `e2e/stab-schmal.spec.ts` neu: 390 × 844, Kacheln untereinander, keine Kachel schmaler als 90 % der Inhaltsbreite, kein waagerechter Überlauf, Admin und Beobachter; grün
-- [ ] 6.3 `e2e/stab-kontrast.spec.ts`, `e2e/stab-checkliste.spec.ts` (Einklappen nach 7/7 und Neuladen), `e2e/gate1-ueberlauf.spec.ts` (Stab-Route), `e2e/lagebesprechung.spec.ts` und `e2e/einsatzkopf-live.spec.ts` (Stab-Zeile) nachgezogen und grün
-- [ ] 6.4 `pruefliste.md` dieser Change: Prüfliste Einsatztauglichkeit (15 Kriterien, Festlegung 7 der Bedien-Leitlinie) mit Verdikt und Beleg je Zeile für `/einsaetze/:id/stab` und das Paneel „Lücken“ des Funkplans
+- [x] 6.1 `e2e/gate3-trefflaeche.spec.ts` (Stab): Konstanten auf 19 Werkzeuge, 6 Gruppen, 6 Knöpfe; Anker Gruppen `Werkzeuge S\d` statt Region „Besetzung S1–S6“; Beobachter-Test mit 0 Knöpfen; grün in `kompakt`, `komfortabel`, `handschuh`
+- [x] 6.2 `e2e/stab-schmal.spec.ts` neu: 390 × 844, Kacheln untereinander, keine Kachel schmaler als 90 % der Inhaltsbreite, kein waagerechter Überlauf, Admin und Beobachter; grün
+- [x] 6.3 `e2e/stab-kontrast.spec.ts`, `e2e/stab-checkliste.spec.ts` (Einklappen nach 7/7 und Neuladen), `e2e/gate1-ueberlauf.spec.ts` (Stab-Route), `e2e/lagebesprechung.spec.ts` und `e2e/einsatzkopf-live.spec.ts` (Stab-Zeile) nachgezogen und grün
+- [x] 6.4 `pruefliste.md` dieser Change: Prüfliste Einsatztauglichkeit (15 Kriterien, Festlegung 7 der Bedien-Leitlinie) mit Verdikt und Beleg je Zeile für `/einsaetze/:id/stab` und das Paneel „Lücken“ des Funkplans
 
 ## 7. Abschluss
 
-- [ ] 7.1 Nach dem Merge von PR #726: `alpha` in den Branch mergen, Konflikte in `stab/`, `StabPage.tsx`, `stab/AGENTS.md` lösen, Vitest der berührten Dateien grün
+- [x] 7.1 Nach dem Merge von PR #726: `alpha` in den Branch mergen, Konflikte in `stab/`, `StabPage.tsx`, `stab/AGENTS.md` lösen, Vitest der berührten Dateien grün
 - [ ] 7.2 `./scripts/check-all.sh` grün (Bündel `schnell` und `frontend`, e2e der Stab-Specs; Lauf im PR belegt den Rest)
 - [ ] 7.3 `/opsx:archive o5nxgqbl-stab-uebersicht` im selben Branch (Spec-Sync, neue Fähigkeit `stab-uebersicht`, Verweise auf den Change-Pfad in `stab/AGENTS.md` und Code-Kommentaren nachgezogen), dann PR gegen `alpha` mit Hinweis „Design System nachziehen (Werkzeugzelle, Kachel)“

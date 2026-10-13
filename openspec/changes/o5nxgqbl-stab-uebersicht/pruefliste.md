@@ -25,10 +25,10 @@ Gefahren in der Cloud-Sitzung vom 13.10.2026 gegen das frisch gebaute Backend (D
 | Nachweis | Ergebnis |
 | --- | --- |
 | `e2e/gate3-trefflaeche.spec.ts` (Stab, Admin und Beobachter) | 19 Werkzeugzellen, 6 „Besetzung ändern“, 7 Zeilen der Arbeitsaufnahme, „Zur Lagebesprechung“ — in `kompakt`, `komfortabel`, `handschuh` je ≥ 30 / 48 / 72 px — 2/2 grün |
-| `e2e/stab-schmal.spec.ts` | 390 px Admin und Beobachter: sechs Kacheln untereinander, je ≥ 90 % der Rasterbreite, kein waagerechter Überlauf, „Besetzung ändern“ innerhalb der Kachel — grün (6/6 der Datei) |
+| `e2e/stab-schmal.spec.ts` | 390 px Admin und Beobachter: sechs Kacheln untereinander, je ≥ 90 % der Rasterbreite, kein waagerechter Überlauf, „Besetzung ändern“ innerhalb der Kachel, eine lange Besetzung („Integrierte Leitstelle Musterstadt (rückwärtige Führungsunterstützung)“) bricht in der Kachel um — grün (6/6 der Datei) |
 | `e2e/stab-kontrast.spec.ts` | Name jeder Werkzeugzelle hell und dunkel, in Ruhe und unter dem Zeiger ≥ 7 : 1 bzw. ≥ 5 : 1 — 2/2 grün |
 | `e2e/stab-checkliste.spec.ts` | Klickweg Arbeitsaufnahme; neu: siebter Haken klappt nicht ein, nach dem Neuladen eingeklappt mit „7/7 erledigt“, „Aufklappen“ zeigt die Punkte — 2/2 grün |
-| `e2e/fernmeldeskizze.spec.ts`, `e2e/fernmeldewesen.spec.ts`, `e2e/fuehrungsfunktionen.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`, `e2e/lagebesprechung.spec.ts`, `e2e/einsatzkopf-live.spec.ts` | siehe Abschnitt „Lauf der berührten Specs“ unten |
+| `e2e/fernmeldeskizze.spec.ts`, `e2e/fernmeldewesen.spec.ts`, `e2e/fuehrungsfunktionen.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`, `e2e/lagebesprechung.spec.ts`, `e2e/einsatzkopf-live.spec.ts` | 78/78 grün (14,1 min) |
 | Vitest | `StabPage.test.tsx`, `SachgebietKachel.test.tsx`, `WerkzeugZelle.test.tsx`, `werkzeugZahlen.test.ts`, `werkzeuge.test.ts`, `sachgebiete.test.ts`, `unterseiten.test.ts`, `stabRaster.test.ts`, `useFunkplanLuecken.test.tsx`, `luecken.test.ts`, `ChecklistePaneel.test.tsx`, `FunkplanPage.test.tsx`, `sprungmarken.test.ts` — grün |
 | Doku-Bilder | `docs/anwender/bilder/stab/uebersicht.png` hell und dunkel, 1440 × 900, kompakt |
 
@@ -64,4 +64,6 @@ Gefahren in der Cloud-Sitzung vom 13.10.2026 gegen das frisch gebaute Backend (D
 
 ## Lauf der berührten Specs
 
-Wird nach dem Lauf eingetragen.
+Alle Specs, die die Stab-Seite öffnen oder ihre Einstiege nutzen (Grep nach `/stab` in
+`frontend/e2e/`), liefen am 13.10.2026 grün: die vier Stab-Specs (12/12) und die sechs übrigen
+(78/78). Die volle e2e-Suite fährt die CI des PRs.
