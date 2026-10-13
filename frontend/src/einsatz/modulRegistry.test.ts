@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { auftragDruckPfad } from '../routing/deeplinks';
 import {
   modulRegistry,
   kategorien,
@@ -359,6 +360,11 @@ describe('modulZuRoute / modulAusPfad', () => {
     // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.
     expect(modulAusPfad('/einsaetze/7/unfallhilfsstellen/liste')?.key).toBe('unfallhilfsstellen');
     expect(modulAusPfad('/einsaetze/7/personen/12')?.key).toBe('personen');
+    // Die Druckansicht eines Auftrags (LLH-1171) erbt Sperre und Sichtbarkeit von Aufträge/Befehle.
+    expect(modulAusPfad(auftragDruckPfad(7, 31))?.key).toBe(
+      modulAusPfad('/einsaetze/7/auftraege')?.key,
+    );
+    expect(modulAusPfad(auftragDruckPfad(7, 31))).not.toBeNull();
   });
 
   it('liefert null ausserhalb eines Einsatz-Moduls', () => {

@@ -1,4 +1,4 @@
-/* Druckansichten am Bildschirm (LFH-956): Einsatzbericht und ETB-Druck dienen am Handy der
+/* Druckansichten am Bildschirm (LFH-956): Einsatzbericht, ETB-Druck und Auftrag dienen am Handy der
    Kontrolle vor dem PDF. Ohne diese Regeln weitete eine Tabelle dort den Layout-Viewport
    (Einsatzbericht 418 px, ETB-Druck 588 px bei 390 px Gerätebreite).
 
@@ -12,6 +12,13 @@
   .druckansicht-bildlauf {
     max-width: 100%;
     overflow-x: auto;
+  }
+
+  /* Der Wert einer Etikett-Wert-Liste (`druck/ZeilenListe.tsx`) bricht auch mitten im Wort:
+     ein Wort ohne Umbruchstelle weitete am Handy den Layout-Viewport (Auftragsblatt 874 px bei
+     390 px, LLH-1171, `e2e/auftrag-druck.spec.ts`). Auf Papier dasselbe in `druck.css`. */
+  [data-lfh='druckwurzel'] dd {
+    overflow-wrap: anywhere;
   }
 }
 

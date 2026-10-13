@@ -2,7 +2,8 @@ import { theme, type GlobalToken } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import Markdown from '../../components/Markdown';
 import { monoStil } from '../../components/instrument';
-import type { Abschnitt, Einsatzbericht, Inhalt, Zeile } from './verdichtung';
+import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
+import { BEGINNT_MIT_ZIFFER, Titelfolge, ZeilenListe, type Titel } from '../ZeilenListe';
 import '../druckansichtSchmal.css';
 
 /**
@@ -21,6 +22,7 @@ import '../druckansichtSchmal.css';
  * des Lageberichtstexts (über `Markdown titel`) oder, nur in Firefox, eine kurze Tabelle ganz. Eine
  * lange Tabelle wanderte ganz mit und ließe davor eine fast leere Seite; vor ihr stehen die Titel
  * mit Kopf und erster Zeile in einem Deckel ({@link Deckel}, LFH-1124).
+ * Titel und Etikett-Wert-Liste teilt der Auftragsdruck; sie stehen in `druck/ZeilenListe.tsx`.
  *
  * Tabellen sind schlichtes HTML wie im ETB-Druck (`etb/EtbDruckTabelle.tsx`, benannte Ausnahme):
  * ein Vordruck ohne Sortierung, Filter oder Zeilenaktion, kein Bedienort. Am schmalen Schirm
@@ -28,8 +30,6 @@ import '../druckansichtSchmal.css';
  * Seite (`druck/druckansichtSchmal.css`, LFH-956).
  */
 
-/** Ziffern vorn (Zahl, Zeit, Stärke, Dauer) setzen Mono mit Tabellenziffern (`frontend/AGENTS.md`). */
-const BEGINNT_MIT_ZIFFER = /^\d/;
 /** Reine Nummer, Datum oder Uhrzeit bricht nicht um; Freitext (auch ein Titel) immer. */
 const NUR_ZAHL_ODER_ZEIT = /^[\d.: ]+$/;
 /**
@@ -37,37 +37,6 @@ const NUR_ZAHL_ODER_ZEIT = /^[\d.: ]+$/;
  * Seite. Mehr hielte er nicht zusammen, ohne davor eine halbe Seite leer zu lassen.
  */
 export const KURZE_TABELLE = 12;
-
-/** Ein Titel vor dem Inhalt; die Abstände braucht der Titelblock einer Liste einzeln. */
-interface Titel {
-  ebene: 3 | 4 | 5;
-  text: string;
-  stil: CSSProperties;
-  oben: number;
-  unten: number;
-}
-
-function TitelZeile({ titel, oben, unten }: { titel: Titel; oben: number; unten: number }) {
-  const { token } = theme.useToken();
-  const Tag = `h${titel.ebene}` as const;
-  // Die Zeilenhöhe ausdrücklich: im Titelplatz des Markdowns erbte der Titel sonst dessen 1,65.
-  return (
-    <Tag style={{ lineHeight: token.lineHeight, ...titel.stil, margin: `${oben}px 0 ${unten}px` }}>
-      {titel.text}
-    </Tag>
-  );
-}
-
-/** Titel im Fluss: jeder mit seinen Abständen, die Ränder fallen zusammen wie ohne Hülle. */
-function Titelfolge({ titel }: { titel: readonly Titel[] }) {
-  return (
-    <>
-      {titel.map((t, i) => (
-        <TitelZeile key={`${t.text}-${i}`} titel={t} oben={t.oben} unten={t.unten} />
-      ))}
-    </>
-  );
-}
 
 /**
  * Titel im Fluss vor dem Inhalt in einer Hülle, die `druck/druck.css` nicht brechen lässt. Ohne
@@ -91,84 +60,6 @@ function Titelblock({
     <div data-lfh={tabelle ? 'titelblock-tabelle' : 'titelblock'}>
       <Titelfolge titel={titel} />
       {children}
-    </div>
-  );
-}
-
-function ZeilenEintraege({ zeilen }: { zeilen: Zeile[] }) {
-  const { token } = theme.useToken();
-  return (
-    <>
-      {zeilen.map((z, i) => (
-        <div key={`${z.etikett}-${i}`} style={{ display: 'contents' }}>
-          <dt style={{ color: token.colorTextSecondary }}>{z.etikett}</dt>
-          <dd
-            style={{
-              margin: 0,
-              whiteSpace: 'pre-wrap',
-              ...(BEGINNT_MIT_ZIFFER.test(z.wert) ? monoStil(token.fontSize) : {}),
-            }}
-          >
-            {z.wert}
-          </dd>
-        </div>
-      ))}
-    </>
-  );
-}
-
-/**
- * Eine Liste aus Etikett und Wert. Mit Titeln stehen sie mit der ersten Zeile im Titelblock; die
- * übrigen Zeilen folgen in einer zweiten Liste. Beide sind Subgrids desselben Rasters, damit die
- * Etikettspalte über die Trennung hinweg gleich breit bleibt. Im Raster fallen Ränder nicht
- * zusammen: die Abstände der Titel sind hier ausgerechnet, der erste und der letzte sitzen am
- * Raster selbst, damit sie wie im Fluss mit den Nachbarn zusammenfallen.
- */
-function ZeilenListe({ titel, zeilen }: { titel: readonly Titel[]; zeilen: Zeile[] }) {
-  const { token } = theme.useToken();
-  const raster: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(10em, max-content) 1fr',
-    columnGap: token.marginSM,
-    rowGap: 2,
-  };
-  if (titel.length === 0 || zeilen.length === 0) {
-    return (
-      <>
-        <Titelfolge titel={titel} />
-        <dl style={{ ...raster, margin: `0 0 ${token.marginXS}px` }}>
-          <ZeilenEintraege zeilen={zeilen} />
-        </dl>
-      </>
-    );
-  }
-  const teil: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'subgrid',
-    gridColumn: '1 / -1',
-    margin: 0,
-  };
-  return (
-    <div style={{ ...raster, margin: `${titel[0].oben}px 0 ${token.marginXS}px` }}>
-      <div data-lfh="titelblock" style={teil}>
-        {titel.map((t, i) => (
-          <div key={`${t.text}-${i}`} style={{ gridColumn: '1 / -1' }}>
-            <TitelZeile
-              titel={t}
-              oben={i === 0 ? 0 : Math.max(titel[i - 1].unten, t.oben)}
-              unten={i === titel.length - 1 ? t.unten : 0}
-            />
-          </div>
-        ))}
-        <dl style={teil}>
-          <ZeilenEintraege zeilen={zeilen.slice(0, 1)} />
-        </dl>
-      </div>
-      {zeilen.length > 1 && (
-        <dl style={{ ...teil, rowGap: 2 }}>
-          <ZeilenEintraege zeilen={zeilen.slice(1)} />
-        </dl>
-      )}
     </div>
   );
 }

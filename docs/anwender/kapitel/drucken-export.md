@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 150
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx]
 ---
 
 ## Überblick
@@ -15,6 +15,7 @@ Gedruckt werden können unter anderem:
 
 - das Einsatztagebuch, als eigene Druckansicht,
 - die Listen der Betroffenen, Tiere und Schäden, ebenfalls als Druckansicht,
+- einzelne Aufträge, als Druckansicht,
 - Einsatzbefehle, Lageberichte und Pressemitteilungen,
 - Meldebild, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
 - der Einsatzbericht („Einsatzbericht drucken“ in den Einsatzdaten),
@@ -53,6 +54,16 @@ Zeitachse zurück.
 Die Druckansicht der Betroffenen zeigt „Zugriff wird protokolliert.“: Jeder Abruf steht im
 Zugriffsprotokoll der Betroffenen.
 
+### Einen Auftrag drucken
+
+1. Unter „Aufträge/Befehle“ im Reiter „Einzelaufträge“ den Auftrag wählen und im Auftrag unten
+   „Druckansicht“ wählen.
+2. Warten, bis das Blatt steht; bis dahin ist „Drucken / als PDF“ gesperrt.
+3. „Drucken / als PDF“ wählen.
+
+Wie beim Einsatztagebuch ist die Druckansicht ein fester Stand, den „Neu laden“ erneuert. Den
+Aufbau des Blatts beschreibt [Aufträge und Befehle](auftraege-befehle.md).
+
 ### Eine Liste als CSV exportieren
 
 1. In „Betroffene“ oder „Tiere“ im Kopf der Seite „CSV exportieren“ wählen; auf schmalen
@@ -86,8 +97,8 @@ Name und Logo stehen ab dem nächsten Druck im Druckkopf ([Stammdaten](stammdate
 
 ### Was der Druckkopf zeigt
 
-Der Druckkopf trägt Name und Logo der Organisation, die Dokumentart (etwa „Einsatztagebuch“ oder
-„Betroffenenliste“), den Einsatz mit Nummer und je nach Druckstück Auswahl, Umfang und Stand,
+Der Druckkopf trägt Name und Logo der Organisation, die Dokumentart (etwa „Einsatztagebuch“,
+„Betroffenenliste“ oder „Auftrag“ mit der Kennung), den Einsatz mit Nummer und je nach Druckstück Auswahl, Umfang und Stand,
 dazu „Gedruckt von“ und „Gedruckt am“. Die Fußzeile „Seite … von …“ druckt nur ein
 Chromium-Browser (Chrome, Edge).
 
