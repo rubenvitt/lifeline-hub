@@ -229,13 +229,16 @@ pub struct ModulFreigabe {
 /// 3. Ausblenden: effektive Sichtbarkeit = Einsatz-Override ?? Org-Vorgabe ?? sichtbar
 ///    ([`effektiv_sichtbar`], LLH-1179); `false` → kein Zugriff.
 /// 4. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default. `admin` → nur
-///    System-Admin (oben schon durch); `fuehrungskraft` → System-Admin oder org-weite
-///    Führungskraft (`ist_hoehere_berechtigung`); `einsatzfuehrung` → dieselben oder
-///    `einsatz_rolle` Einsatzleitung/Führungspersonal (LFH-1150). `None` → frei; ein unbekannter
-///    Wert sperrt (nur System-Admin), damit eine künftige Stufe nie als „frei“ gelesen wird.
+///    System-Admin (oben schon durch); `fuehrungskraft` → System-Admin oder Führungskraft der
+///    Einsatz-Org (`darf_fremdeinsatz_lesen(einsatz_org_id)`, LLH-1157); `einsatzfuehrung` →
+///    dieselben oder `einsatz_rolle` Einsatzleitung/Führungspersonal (LFH-1150). `None` → frei;
+///    ein unbekannter Wert sperrt (nur System-Admin), damit eine künftige Stufe nie als „frei“
+///    gelesen wird.
 ///
-/// `einsatz_rolle` ist die Rolle der Person im Einsatz; ein gekoppeltes Gerät gibt `None`
-/// ([`super::kontext::EinsatzKontext::modul_rolle`], design.md D4 der Change LFH-1150).
+/// `einsatz_org_id` ist die Organisation des Einsatzes: eine Führungskraft einer fremden
+/// Organisation, die im Einsatz etwa als Beobachter Mitglied ist, zählt nicht als Führungskraft
+/// (LLH-1157). `einsatz_rolle` ist die Rolle der Person im Einsatz; ein gekoppeltes Gerät gibt
+/// `None` ([`super::kontext::EinsatzKontext::modul_rolle`], design.md D4 der Change LFH-1150).
 ///
 /// `sichtbar` hängt bewusst NICHT am Admin: ein ausgeblendetes Modul steht auch für ihn in
 /// keiner Navigation (das bisherige Client-Verhalten), erreichbar bleibt es über `zugriff`.
@@ -244,6 +247,7 @@ pub fn modul_freigabe(
     org_defaults: &HashMap<String, OrgModulVorgabe>,
     modul_key: &str,
     benutzer: &Benutzer,
+    einsatz_org_id: i64,
     einsatz_rolle: Option<EinsatzRolle>,
 ) -> ModulFreigabe {
     if !ist_ausblendbar(modul_key) {
@@ -272,11 +276,14 @@ pub fn modul_freigabe(
     }
     let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
     let org_default = org_vorgabe.and_then(|v| v.benoetigte_rolle.as_deref());
+    // Dieselbe Grenze wie beim Lesen ohne Mitgliedschaft: System-Admin oder Führungskraft der
+    // Einsatz-Org, nie die einer fremden Organisation (LLH-1157).
+    let fuehrungskraft_der_einsatz_org = benutzer.darf_fremdeinsatz_lesen(einsatz_org_id);
     let zugriff = match effektive_modul_rolle(einsatz_override_rolle, org_default).as_deref() {
         None => true,
-        Some("fuehrungskraft") => benutzer.ist_hoehere_berechtigung(),
+        Some("fuehrungskraft") => fuehrungskraft_der_einsatz_org,
         Some("einsatzfuehrung") => {
-            benutzer.ist_hoehere_berechtigung()
+            fuehrungskraft_der_einsatz_org
                 || einsatz_rolle.is_some_and(|r| r.gehoert_zur_fuehrung())
         }
         // `admin` und jeder unbekannte Wert: nur System-Admin, und der ist oben bereits durch.
@@ -292,9 +299,19 @@ pub fn fordere_modul_zugriff(
     org_defaults: &HashMap<String, OrgModulVorgabe>,
     modul_key: &str,
     benutzer: &Benutzer,
+    einsatz_org_id: i64,
     einsatz_rolle: Option<EinsatzRolle>,
 ) -> Result<(), AppError> {
-    if modul_freigabe(overrides, org_defaults, modul_key, benutzer, einsatz_rolle).zugriff {
+    if modul_freigabe(
+        overrides,
+        org_defaults,
+        modul_key,
+        benutzer,
+        einsatz_org_id,
+        einsatz_rolle,
+    )
+    .zugriff
+    {
         Ok(())
     } else {
         Err(AppError::Forbidden)
@@ -349,7 +366,7 @@ pub async fn gesperrt_fuer_geraet(
     Ok(module
         .iter()
         .copied()
-        .filter(|m| !modul_freigabe(&overrides, &org_defaults, m, &mitglied, None).zugriff)
+        .filter(|m| !modul_freigabe(&overrides, &org_defaults, m, &mitglied, org_id, None).zugriff)
         .collect())
 }
 
@@ -369,6 +386,7 @@ pub async fn fordere_modul_zugriff_laden(
         &org_defaults,
         modul_key,
         benutzer,
+        org_id,
         einsatz_rolle,
     )
 }
@@ -389,7 +407,14 @@ pub async fn modul_freigaben(
         .map(|key| {
             (
                 *key,
-                modul_freigabe(&overrides, &org_defaults, key, benutzer, einsatz_rolle),
+                modul_freigabe(
+                    &overrides,
+                    &org_defaults,
+                    key,
+                    benutzer,
+                    org_id,
+                    einsatz_rolle,
+                ),
             )
         })
         .collect())
@@ -469,6 +494,17 @@ mod tests {
             org_rolle: OrgRolle::parse(org_rolle).unwrap(),
             aktiv: true,
             erstellt_at: "2026-05-23".into(),
+        }
+    }
+
+    /// Organisation der Einsätze in den Modul-Tests; `benutzer_mit` gehört zu ihr.
+    const EINSATZ_ORG: i64 = 1;
+
+    /// Derselbe Benutzer in einer anderen Organisation als der des Einsatzes (LLH-1157).
+    fn aus_fremder_org(benutzer: Benutzer) -> Benutzer {
+        Benutzer {
+            org_id: EINSATZ_ORG + 1,
+            ..benutzer
         }
     }
 
@@ -1041,7 +1077,15 @@ mod tests {
     fn modul_zugriff_ohne_override_ist_frei() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer = HashMap::new();
-        assert!(fordere_modul_zugriff(&leer, &leere_org_defaults(), "etb", &normal, None).is_ok());
+        assert!(fordere_modul_zugriff(
+            &leer,
+            &leere_org_defaults(),
+            "etb",
+            &normal,
+            EINSATZ_ORG,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1049,7 +1093,15 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("etb", false, None)]);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &normal, None).unwrap_err(),
+            fordere_modul_zugriff(
+                &ov,
+                &leere_org_defaults(),
+                "etb",
+                &normal,
+                EINSATZ_ORG,
+                None
+            )
+            .unwrap_err(),
             AppError::Forbidden
         ));
     }
@@ -1059,7 +1111,15 @@ mod tests {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         // Selbst bei versteckt + admin-Rolle erforderlich: Admin-Mindest-Guard.
         let ov = overrides_mit(vec![override_zeile("etb", false, Some("admin"))]);
-        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &admin, None).is_ok());
+        assert!(fordere_modul_zugriff(
+            &ov,
+            &leere_org_defaults(),
+            "etb",
+            &admin,
+            EINSATZ_ORG,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1067,11 +1127,22 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("etb", true, Some("fuehrungskraft"))]);
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &normal, None).unwrap_err(),
+            fordere_modul_zugriff(
+                &ov,
+                &leere_org_defaults(),
+                "etb",
+                &normal,
+                EINSATZ_ORG,
+                None
+            )
+            .unwrap_err(),
             AppError::Forbidden
         ));
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
-        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk, None).is_ok());
+        assert!(
+            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk, EINSATZ_ORG, None)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -1079,7 +1150,8 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk, None).unwrap_err(),
+            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk, EINSATZ_ORG, None)
+                .unwrap_err(),
             AppError::Forbidden
         ));
     }
@@ -1092,7 +1164,8 @@ mod tests {
         for key in ["einsatzdaten", "einsatz-einstellungen"] {
             let ov = overrides_mit(vec![override_zeile(key, false, None)]);
             assert!(
-                fordere_modul_zugriff(&ov, &leere_org_defaults(), key, &normal, None).is_ok(),
+                fordere_modul_zugriff(&ov, &leere_org_defaults(), key, &normal, EINSATZ_ORG, None)
+                    .is_ok(),
                 "{key} darf nicht versteckt werden"
             );
         }
@@ -1114,6 +1187,7 @@ mod tests {
             &leere_org_defaults(),
             "einsatz-einstellungen",
             &normal,
+            EINSATZ_ORG,
             None
         )
         .is_ok());
@@ -1129,12 +1203,12 @@ mod tests {
         let leer = HashMap::new();
         let org = org_defaults_mit("etb", Some("fuehrungskraft"));
         assert!(matches!(
-            fordere_modul_zugriff(&leer, &org, "etb", &normal, None).unwrap_err(),
+            fordere_modul_zugriff(&leer, &org, "etb", &normal, EINSATZ_ORG, None).unwrap_err(),
             AppError::Forbidden
         ));
         // Führungskraft kommt durch.
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
-        assert!(fordere_modul_zugriff(&leer, &org, "etb", &fk, None).is_ok());
+        assert!(fordere_modul_zugriff(&leer, &org, "etb", &fk, EINSATZ_ORG, None).is_ok());
     }
 
     #[test]
@@ -1145,7 +1219,7 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
         let org = org_defaults_mit("etb", Some("fuehrungskraft"));
         assert!(matches!(
-            fordere_modul_zugriff(&ov, &org, "etb", &fk, None).unwrap_err(),
+            fordere_modul_zugriff(&ov, &org, "etb", &fk, EINSATZ_ORG, None).unwrap_err(),
             AppError::Forbidden
         ));
     }
@@ -1155,7 +1229,15 @@ mod tests {
         // Weder Einsatz-Override noch Org-Default → frei.
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
-        assert!(fordere_modul_zugriff(&leer, &leere_org_defaults(), "etb", &normal, None).is_ok());
+        assert!(fordere_modul_zugriff(
+            &leer,
+            &leere_org_defaults(),
+            "etb",
+            &normal,
+            EINSATZ_ORG,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1164,7 +1246,7 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
         let org = org_defaults_mit("etb", None); // NULL in DB: Some(None) in Map
-        assert!(fordere_modul_zugriff(&leer, &org, "etb", &normal, None).is_ok());
+        assert!(fordere_modul_zugriff(&leer, &org, "etb", &normal, EINSATZ_ORG, None).is_ok());
     }
 
     #[test]
@@ -1175,7 +1257,15 @@ mod tests {
         let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
         let org = org_defaults_mit("einsatz-einstellungen", Some("fuehrungskraft"));
         assert!(
-            fordere_modul_zugriff(&leer, &org, "einsatz-einstellungen", &normal, None).is_ok(),
+            fordere_modul_zugriff(
+                &leer,
+                &org,
+                "einsatz-einstellungen",
+                &normal,
+                EINSATZ_ORG,
+                None
+            )
+            .is_ok(),
             "Org-Default darf nicht-ausblendbares Modul nicht sperren"
         );
     }
@@ -1191,7 +1281,14 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer = overrides_mit(vec![]);
         assert_eq!(
-            modul_freigabe(&leer, &leere_org_defaults(), "schaeden", &normal, None),
+            modul_freigabe(
+                &leer,
+                &leere_org_defaults(),
+                "schaeden",
+                &normal,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(true, true)
         );
     }
@@ -1202,7 +1299,7 @@ mod tests {
         let leer = overrides_mit(vec![]);
         let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
         assert_eq!(
-            modul_freigabe(&leer, &org, "schaeden", &normal, None),
+            modul_freigabe(&leer, &org, "schaeden", &normal, EINSATZ_ORG, None),
             freigabe(true, false)
         );
     }
@@ -1213,7 +1310,7 @@ mod tests {
         let leer = overrides_mit(vec![]);
         let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
         assert_eq!(
-            modul_freigabe(&leer, &org, "schaeden", &fk, None),
+            modul_freigabe(&leer, &org, "schaeden", &fk, EINSATZ_ORG, None),
             freigabe(true, true)
         );
     }
@@ -1224,7 +1321,7 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("schaeden", true, Some("admin"))]);
         let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
         assert_eq!(
-            modul_freigabe(&ov, &org, "schaeden", &fk, None),
+            modul_freigabe(&ov, &org, "schaeden", &fk, EINSATZ_ORG, None),
             freigabe(true, false)
         );
     }
@@ -1236,7 +1333,7 @@ mod tests {
             let ov = overrides_mit(vec![override_zeile(key, false, Some("admin"))]);
             let org = org_defaults_mit(key, Some("admin"));
             assert_eq!(
-                modul_freigabe(&ov, &org, key, &normal, None),
+                modul_freigabe(&ov, &org, key, &normal, EINSATZ_ORG, None),
                 freigabe(true, true),
                 "{key} ist nie sperrbar"
             );
@@ -1248,7 +1345,14 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("meldungen", false, None)]);
         assert_eq!(
-            modul_freigabe(&ov, &leere_org_defaults(), "meldungen", &normal, None),
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "meldungen",
+                &normal,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(false, false)
         );
     }
@@ -1258,7 +1362,14 @@ mod tests {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("meldungen", false, None)]);
         assert_eq!(
-            modul_freigabe(&ov, &leere_org_defaults(), "meldungen", &admin, None),
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "meldungen",
+                &admin,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(false, true)
         );
     }
@@ -1283,6 +1394,7 @@ mod tests {
                 &leere_org_defaults(),
                 "schaeden",
                 &normal,
+                EINSATZ_ORG,
                 Some(EinsatzRolle::Einsatzleitung)
             ),
             freigabe(true, true)
@@ -1299,6 +1411,7 @@ mod tests {
                 &leere_org_defaults(),
                 "schaeden",
                 &normal,
+                EINSATZ_ORG,
                 Some(EinsatzRolle::Fuehrungspersonal)
             )
             .zugriff
@@ -1316,6 +1429,7 @@ mod tests {
                     &leere_org_defaults(),
                     "schaeden",
                     &normal,
+                    EINSATZ_ORG,
                     einsatz_rolle
                 ),
                 freigabe(true, false),
@@ -1328,7 +1442,17 @@ mod tests {
     fn einsatzfuehrung_laesst_org_fuehrungskraft_ohne_mitgliedschaft_durch() {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         let ov = einsatzfuehrung_auf("schaeden");
-        assert!(modul_freigabe(&ov, &leere_org_defaults(), "schaeden", &fk, None).zugriff);
+        assert!(
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "schaeden",
+                &fk,
+                EINSATZ_ORG,
+                None
+            )
+            .zugriff
+        );
     }
 
     #[test]
@@ -1336,7 +1460,7 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let org = org_defaults_mit("schaeden", Some("einsatzfuehrung"));
         let leer = overrides_mit(vec![]);
-        let mit = |r| modul_freigabe(&leer, &org, "schaeden", &normal, r).zugriff;
+        let mit = |r| modul_freigabe(&leer, &org, "schaeden", &normal, EINSATZ_ORG, r).zugriff;
         assert!(mit(Some(EinsatzRolle::Einsatzleitung)));
         assert!(!mit(Some(EinsatzRolle::Beobachter)));
     }
@@ -1355,10 +1479,92 @@ mod tests {
                 &leere_org_defaults(),
                 "schaeden",
                 &normal,
+                EINSATZ_ORG,
                 Some(EinsatzRolle::Einsatzleitung)
             )
             .zugriff
         );
+    }
+
+    // --- Führungskraft einer fremden Organisation (LLH-1157) ---
+
+    #[test]
+    fn fuehrungskraft_fremder_org_passiert_die_stufe_fuehrungskraft_nicht() {
+        let fk = aus_fremder_org(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT));
+        let ov = overrides_mit(vec![override_zeile(
+            "schaeden",
+            true,
+            Some("fuehrungskraft"),
+        )]);
+        for einsatz_rolle in [Some(EinsatzRolle::Beobachter), None] {
+            assert_eq!(
+                modul_freigabe(
+                    &ov,
+                    &leere_org_defaults(),
+                    "schaeden",
+                    &fk,
+                    EINSATZ_ORG,
+                    einsatz_rolle
+                ),
+                freigabe(true, false),
+                "{einsatz_rolle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn fuehrungskraft_fremder_org_als_beobachter_passiert_einsatzfuehrung_nicht() {
+        let fk = aus_fremder_org(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT));
+        let org = org_defaults_mit("schaeden", Some("einsatzfuehrung"));
+        assert_eq!(
+            modul_freigabe(
+                &HashMap::new(),
+                &org,
+                "schaeden",
+                &fk,
+                EINSATZ_ORG,
+                Some(EinsatzRolle::Beobachter)
+            ),
+            freigabe(true, false)
+        );
+    }
+
+    #[test]
+    fn fremde_org_zaehlt_bei_einsatzfuehrung_ueber_die_einsatzrolle() {
+        // Die Org-Rolle trägt nur in der eigenen Org; die Rolle im Einsatz trägt immer.
+        let fk = aus_fremder_org(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT));
+        let ov = einsatzfuehrung_auf("schaeden");
+        assert!(
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "schaeden",
+                &fk,
+                EINSATZ_ORG,
+                Some(EinsatzRolle::Einsatzleitung)
+            )
+            .zugriff
+        );
+    }
+
+    #[test]
+    fn system_admin_fremder_org_bleibt_durch() {
+        let admin = aus_fremder_org(benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE));
+        for rolle in ["fuehrungskraft", "einsatzfuehrung", "admin"] {
+            let ov = overrides_mit(vec![override_zeile("schaeden", true, Some(rolle))]);
+            assert!(
+                modul_freigabe(
+                    &ov,
+                    &leere_org_defaults(),
+                    "schaeden",
+                    &admin,
+                    EINSATZ_ORG,
+                    None
+                )
+                .zugriff,
+                "{rolle}"
+            );
+        }
     }
 
     #[test]
@@ -1368,14 +1574,27 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         let el = Some(EinsatzRolle::Einsatzleitung);
-        assert!(!modul_freigabe(&ov, &leere_org_defaults(), "schaeden", &fk, el).zugriff);
-        assert!(modul_freigabe(&ov, &leere_org_defaults(), "schaeden", &admin, None).zugriff);
+        assert!(
+            !modul_freigabe(&ov, &leere_org_defaults(), "schaeden", &fk, EINSATZ_ORG, el).zugriff
+        );
+        assert!(
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "schaeden",
+                &admin,
+                EINSATZ_ORG,
+                None
+            )
+            .zugriff
+        );
     }
 
     /// Unabhängige Referenz: die Entscheidung von `fordere_modul_zugriff` vor LFH-669, Wort für
     /// Wort aus dem alten Rumpf (Admin → nicht ausblendbar → versteckt → Rolle aus Einsatz-Override,
-    /// sonst Org-Vorgabe). `fordere_modul_zugriff` delegiert heute an `modul_freigabe`; ein
-    /// Vergleich damit wäre tautologisch.
+    /// sonst Org-Vorgabe), seit LLH-1157 mit der Org des Einsatzes für die Führungskraft.
+    /// `fordere_modul_zugriff` delegiert heute an `modul_freigabe`; ein Vergleich damit wäre
+    /// tautologisch.
     fn alte_entscheidung(
         overrides: &HashMap<String, EinsatzModulOverride>,
         org_defaults: &HashMap<String, OrgModulVorgabe>,
@@ -1398,7 +1617,7 @@ mod tests {
             .and_then(|v| v.benoetigte_rolle.as_deref());
         match ov.or(org) {
             Some("admin") => false,
-            Some("fuehrungskraft") => b.ist_hoehere_berechtigung(),
+            Some("fuehrungskraft") => b.ist_hoehere_berechtigung() && b.org_id == EINSATZ_ORG,
             _ => true,
         }
     }
@@ -1411,6 +1630,7 @@ mod tests {
             benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE),
             benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT),
             benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE),
+            aus_fremder_org(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT)),
         ];
         let rollen = [None, Some("fuehrungskraft"), Some("admin")];
         let einsatz_rollen = [
@@ -1436,15 +1656,23 @@ mod tests {
                             for einsatz_rolle in einsatz_rollen {
                                 let fall = format!("{fall} einsatz={einsatz_rolle:?}");
                                 let zugriff =
-                                    modul_freigabe(&ovs, &org, key, b, einsatz_rolle).zugriff;
+                                    modul_freigabe(&ovs, &org, key, b, EINSATZ_ORG, einsatz_rolle)
+                                        .zugriff;
                                 assert_eq!(
                                     zugriff,
                                     alte_entscheidung(&ovs, &org, key, b),
                                     "{fall}"
                                 );
                                 assert_eq!(
-                                    fordere_modul_zugriff(&ovs, &org, key, b, einsatz_rolle)
-                                        .is_ok(),
+                                    fordere_modul_zugriff(
+                                        &ovs,
+                                        &org,
+                                        key,
+                                        b,
+                                        EINSATZ_ORG,
+                                        einsatz_rolle
+                                    )
+                                    .is_ok(),
                                     zugriff,
                                     "{fall}"
                                 );
@@ -1467,6 +1695,7 @@ mod tests {
                 &org_blendet_aus("stab"),
                 "stab",
                 &normal,
+                EINSATZ_ORG,
                 None
             ),
             freigabe(false, false)
@@ -1478,7 +1707,14 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("stab", true, None)]);
         assert_eq!(
-            modul_freigabe(&ov, &org_blendet_aus("stab"), "stab", &normal, None),
+            modul_freigabe(
+                &ov,
+                &org_blendet_aus("stab"),
+                "stab",
+                &normal,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(true, true)
         );
     }
@@ -1488,7 +1724,14 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("stab", false, None)]);
         assert_eq!(
-            modul_freigabe(&ov, &leere_org_defaults(), "stab", &normal, None),
+            modul_freigabe(
+                &ov,
+                &leere_org_defaults(),
+                "stab",
+                &normal,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(false, false)
         );
     }
@@ -1498,7 +1741,14 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         let ov = overrides_mit(vec![override_nur_rolle("stab", Some("fuehrungskraft"))]);
         assert_eq!(
-            modul_freigabe(&ov, &org_blendet_aus("stab"), "stab", &fk, None),
+            modul_freigabe(
+                &ov,
+                &org_blendet_aus("stab"),
+                "stab",
+                &fk,
+                EINSATZ_ORG,
+                None
+            ),
             freigabe(false, false)
         );
     }
@@ -1512,6 +1762,7 @@ mod tests {
                 &org_blendet_aus("stab"),
                 "stab",
                 &admin,
+                EINSATZ_ORG,
                 None
             ),
             freigabe(false, true)
@@ -1523,7 +1774,14 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         for key in ["einsatzdaten", "einsatz-einstellungen"] {
             assert_eq!(
-                modul_freigabe(&HashMap::new(), &org_blendet_aus(key), key, &normal, None),
+                modul_freigabe(
+                    &HashMap::new(),
+                    &org_blendet_aus(key),
+                    key,
+                    &normal,
+                    EINSATZ_ORG,
+                    None
+                ),
                 freigabe(true, true),
                 "{key}"
             );
@@ -1563,16 +1821,19 @@ mod tests {
         // Normaler Benutzer → 403.
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(matches!(
-            fordere_modul_zugriff(&leer, &org_defaults, "etb", &normal, None).unwrap_err(),
+            fordere_modul_zugriff(&leer, &org_defaults, "etb", &normal, EINSATZ_ORG, None)
+                .unwrap_err(),
             AppError::Forbidden
         ));
 
         // Führungskraft → OK.
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
-        assert!(fordere_modul_zugriff(&leer, &org_defaults, "etb", &fk, None).is_ok());
+        assert!(fordere_modul_zugriff(&leer, &org_defaults, "etb", &fk, EINSATZ_ORG, None).is_ok());
 
         // Admin → OK (Mindest-Guard).
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
-        assert!(fordere_modul_zugriff(&leer, &org_defaults, "etb", &admin, None).is_ok());
+        assert!(
+            fordere_modul_zugriff(&leer, &org_defaults, "etb", &admin, EINSATZ_ORG, None).is_ok()
+        );
     }
 }

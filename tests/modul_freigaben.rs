@@ -8,7 +8,10 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, fremde_org_anlegen, login_cookie, rolle_setzen,
+    setup, setup_mit_pool,
+};
 
 fn uri(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/modul-freigaben")
@@ -278,6 +281,53 @@ async fn fuehrungskraft_sperrt_einsatzleitung_ohne_org_rolle_weiter() {
         liste_status(&app, &leitung, einsatz, "schaeden").await,
         StatusCode::FORBIDDEN
     );
+}
+
+/// Eine Führungskraft einer fremden Organisation, die im Einsatz nur Beobachter ist, zählt nicht
+/// als Führungskraft (LLH-1157): weder „Führungskraft der Organisation“ noch „Führung im Einsatz“
+/// lassen sie ins Modul. Der Mitglieder-Schreibweg nimmt niemanden aus einer fremden Org auf; die
+/// Mitgliedschaft entsteht deshalb direkt in der Datenbank, damit die Modulregel für sich steht.
+#[tokio::test]
+async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, fremd_id) =
+        fremde_org_anlegen(&pool, "Nachbar", "fremd", "fremdpw12", "fuehrungskraft").await;
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         VALUES (?, ?, 'beobachter')",
+    )
+    .bind(einsatz)
+    .bind(fremd_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
+
+    for (modul, rolle) in [
+        ("schaeden", "fuehrungskraft"),
+        ("auftraege", "einsatzfuehrung"),
+    ] {
+        modul_override(
+            &app,
+            &admin,
+            einsatz,
+            modul,
+            &format!(r#"{{"sichtbar":true,"benoetigte_rolle":"{rolle}"}}"#),
+        )
+        .await;
+        assert_eq!(
+            freigaben(&app, &fremd, einsatz).await[modul],
+            json!({ "sichtbar": true, "zugriff": false }),
+            "{modul} auf {rolle}"
+        );
+        assert_eq!(
+            liste_status(&app, &fremd, einsatz, modul).await,
+            StatusCode::FORBIDDEN,
+            "{modul} auf {rolle}"
+        );
+    }
 }
 
 // ── Sichtbarkeits-Vorgabe der Organisation (LLH-1179) ─────────────────────────
