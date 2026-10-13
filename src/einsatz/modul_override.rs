@@ -8,20 +8,21 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-/// Override-Zeile wie in der DB abgelegt. `sichtbar` aus INTEGER (0/1) dekodiert;
-/// `benoetigte_rolle` ist `None` (= frei) oder ein gültiger Rollen-String.
+/// Override-Zeile wie in der DB abgelegt. `sichtbar` ist der eigene Wert des Einsatzes, `None` =
+/// erbt (Organisation ?? sichtbar, LLH-1179); `benoetigte_rolle` ist `None` (= erbt bzw. frei)
+/// oder ein gültiger Rollen-String.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct EinsatzModulOverride {
     pub einsatz_id: i64,
     pub modul_key: String,
-    pub sichtbar: bool,
+    pub sichtbar: Option<bool>,
     pub benoetigte_rolle: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
 
-/// Alle Overrides eines Einsatzes als Map `modul_key → Override`; leer heißt alle Module
-/// sichtbar, keine Rollen-Schranke.
+/// Alle Overrides eines Einsatzes als Map `modul_key → Override`; leer heißt: der Einsatz erbt
+/// Sichtbarkeit und Rolle jedes Moduls.
 pub async fn laden_alle(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -39,12 +40,13 @@ pub async fn laden_alle(
         .collect())
 }
 
-/// UPSERT auf (einsatz_id, modul_key) mit Audit-Feldern. Key und Rolle prüft der Handler.
+/// UPSERT auf (einsatz_id, modul_key) mit Audit-Feldern; `sichtbar = None` schreibt NULL (erbt).
+/// Key und Rolle prüft der Handler.
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     modul_key: &str,
-    sichtbar: bool,
+    sichtbar: Option<bool>,
     benoetigte_rolle: Option<&str>,
     erfasser_id: i64,
 ) -> Result<EinsatzModulOverride, AppError> {
@@ -117,34 +119,45 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (eid, bid) = fixture(&pool).await;
 
-        let o = setzen(&pool, eid, "chat", false, None, bid).await.unwrap();
+        let o = setzen(&pool, eid, "chat", Some(false), None, bid)
+            .await
+            .unwrap();
         assert_eq!(o.modul_key, "chat");
-        assert!(!o.sichtbar);
+        assert_eq!(o.sichtbar, Some(false));
         assert_eq!(o.benoetigte_rolle, None);
         assert!(o.geaendert_at.is_some());
         assert_eq!(o.geaendert_von, Some(bid));
 
-        // Zweites Modul mit Rollen-Schranke.
-        setzen(&pool, eid, "etb", true, Some("fuehrungskraft"), bid)
+        // Zweites Modul nur mit Rollen-Schranke: die Sichtbarkeit bleibt offen (erbt).
+        setzen(&pool, eid, "etb", None, Some("fuehrungskraft"), bid)
             .await
             .unwrap();
 
         let map = laden_alle(&pool, eid).await.unwrap();
         assert_eq!(map.len(), 2);
-        assert!(!map["chat"].sichtbar);
+        assert_eq!(map["chat"].sichtbar, Some(false));
+        assert_eq!(map["etb"].sichtbar, None);
         assert_eq!(
             map["etb"].benoetigte_rolle.as_deref(),
             Some("fuehrungskraft")
         );
 
         // Upsert: gleiches (einsatz, modul) überschreibt dieselbe Zeile.
-        setzen(&pool, eid, "chat", true, Some("admin"), bid)
+        setzen(&pool, eid, "chat", Some(true), Some("admin"), bid)
             .await
             .unwrap();
         let map2 = laden_alle(&pool, eid).await.unwrap();
         assert_eq!(map2.len(), 2, "Upsert darf keine zweite Zeile anlegen");
-        assert!(map2["chat"].sichtbar);
+        assert_eq!(map2["chat"].sichtbar, Some(true));
         assert_eq!(map2["chat"].benoetigte_rolle.as_deref(), Some("admin"));
+
+        // Eigenen Wert zurücknehmen: NULL, die Rolle bleibt.
+        setzen(&pool, eid, "chat", None, Some("admin"), bid)
+            .await
+            .unwrap();
+        let map3 = laden_alle(&pool, eid).await.unwrap();
+        assert_eq!(map3["chat"].sichtbar, None);
+        assert_eq!(map3["chat"].benoetigte_rolle.as_deref(), Some("admin"));
     }
 
     #[tokio::test]
@@ -158,7 +171,7 @@ mod tests {
         .await
         .unwrap();
 
-        setzen(&pool, eid_a, "chat", false, None, bid)
+        setzen(&pool, eid_a, "chat", Some(false), None, bid)
             .await
             .unwrap();
 

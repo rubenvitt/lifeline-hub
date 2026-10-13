@@ -756,7 +756,8 @@ pub async fn einstellungen_setzen(
 
 /// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes
 /// (LFH-132), als Map `modul_key → Override`. Lesezugriff gemäß DSGVO-Lese-Policy;
-/// existieren keine Overrides, ist die Map leer (= alle Module sichtbar, frei).
+/// existieren keine Overrides, ist die Map leer (= der Einsatz erbt alles). `sichtbar: null` =
+/// kein eigener Wert (LLH-1179); den wirksamen Wert liefert `…/modul-freigaben`.
 pub async fn modul_overrides_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -790,13 +791,15 @@ pub async fn modul_freigaben_laden(
 
 #[derive(Debug, Deserialize)]
 pub struct ModulOverrideUpdate {
-    pub sichtbar: bool,
+    /// Eigener Wert des Einsatzes; `null` oder fehlend = erbt (Organisation ?? sichtbar, LLH-1179).
+    #[serde(default)]
+    pub sichtbar: Option<bool>,
     /// 'admin' | 'fuehrungskraft' | 'einsatzfuehrung' | null (= frei); Spec `modul-freigabe`.
     pub benoetigte_rolle: Option<String>,
 }
 
 /// PUT /api/einsaetze/{id}/modul-overrides/{modul_key} — Sichtbarkeit + benötigte
-/// Rolle eines Moduls überschreiben (LFH-132). Gate: Einsatzleitung ODER System-Admin der
+/// Rolle eines Moduls überschreiben (LFH-132); `sichtbar: null` = erbt (LLH-1179). Gate: Einsatzleitung ODER System-Admin der
 /// Einsatz-Org (fremde Org → 403, LFH-995), plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
 /// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
 /// (Selbst-Aussperr-Schutz) → 400. Ungültige `benoetigte_rolle` → 400.
@@ -823,7 +826,9 @@ pub async fn modul_override_setzen(
     // rollen-beschränkt werden (beide Dimensionen, sonst Aussperrung aus den
     // Einstellungen möglich).
     let benoetigte_rolle = bereinige(req.benoetigte_rolle);
-    if !modul::ist_ausblendbar(&modul_key) && (!req.sichtbar || benoetigte_rolle.is_some()) {
+    if !modul::ist_ausblendbar(&modul_key)
+        && (req.sichtbar == Some(false) || benoetigte_rolle.is_some())
+    {
         return Err(AppError::Validation(
             "Dieses Modul kann nicht ausgeblendet oder rollen-beschränkt werden".into(),
         ));

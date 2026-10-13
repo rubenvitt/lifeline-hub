@@ -184,3 +184,11 @@ und ein Klick „aus“ hätte keine sichtbare Wirkung. Verworfen.
   bei jeder Migration hier: Ein älteres Binary liest `sichtbar` als `bool` und scheitert an
   `NULL`. Zurück geht es nur über die Sicherung von vor dem Update.
 - Bis die erste Organisation eine Vorgabe setzt, verhält sich jeder Einsatz wie vorher.
+
+## Freigabe
+
+Ruben hat am 13.10.2026 freigegeben, wie empfohlen:
+
+- Fehlt im Org-PUT das Feld `sichtbar`, bleibt die gespeicherte Sichtbarkeit unverändert (D3).
+- Der Schalter im Einsatz zeigt den wirksamen Wert aus den Freigaben des Servers (D4).
+- „Vorgabe übernehmen“ erscheint bei jedem eigenen Wert des Einsatzes (D4).

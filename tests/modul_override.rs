@@ -1191,3 +1191,92 @@ async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
         "Admin muss trotz Org-Default durchkommen"
     );
 }
+
+// ----------------------------- LLH-1179: Sichtbarkeit erbt -----------------------------
+
+/// `sichtbar: null` speichert „kein eigener Wert“; das GET liefert ihn als `null`, die Rolle
+/// bleibt stehen.
+#[tokio::test]
+async fn override_ohne_eigene_sichtbarkeit_speichert_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/modul-overrides/schaeden"),
+        &admin,
+        Some(r#"{"sichtbar":null,"benoetigte_rolle":"einsatzfuehrung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{v:?}");
+    assert_eq!(v["sichtbar"], Value::Null);
+
+    let (_, json) = overrides_laden(&app, &admin, eid).await;
+    assert_eq!(json["schaeden"]["sichtbar"], Value::Null);
+    assert_eq!(json["schaeden"]["benoetigte_rolle"], "einsatzfuehrung");
+}
+
+/// Ein abgewiesener Versuch, ein nicht ausblendbares Modul auszublenden, legt keine Zeile an.
+#[tokio::test]
+async fn nicht_ausblendbares_modul_verstecken_speichert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "einsatzdaten", false, None).await,
+        StatusCode::BAD_REQUEST
+    );
+    let (_, json) = overrides_laden(&app, &admin, eid).await;
+    assert!(json.get("einsatzdaten").is_none(), "{json:?}");
+}
+
+/// Die Sichtbarkeits-Vorgabe der Organisation filtert den Live-Feed wie das GET: dieselbe
+/// Auswertung (`erlaubte_module`) für Gate und Filter.
+#[tokio::test]
+async fn org_ausblendung_wirkt_auch_im_live_feed() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/org-modul-einstellungen/etb",
+        &admin,
+        Some(r#"{"benoetigte_rolle":null,"sichtbar":false}"#),
+    )
+    .await;
+    assert!(status.is_success(), "{status} {v:?}");
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: die Org-Ausblendung muss den GET sperren"
+    );
+
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Muster","vorname":"Max"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Ausgeblendet"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(gelesen.contains("event: person"), "{gelesen:?}");
+    assert!(!gelesen.contains("event: etb"), "{gelesen:?}");
+}

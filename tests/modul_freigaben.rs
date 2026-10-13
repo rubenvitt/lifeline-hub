@@ -279,3 +279,144 @@ async fn fuehrungskraft_sperrt_einsatzleitung_ohne_org_rolle_weiter() {
         StatusCode::FORBIDDEN
     );
 }
+
+// ── Sichtbarkeits-Vorgabe der Organisation (LLH-1179) ─────────────────────────
+
+async fn org_sichtbarkeit(app: &axum::Router, admin: &str, modul: &str, sichtbar: bool) {
+    let (status, v) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/org-modul-einstellungen/{modul}"),
+        admin,
+        Some(&format!(
+            r#"{{"benoetigte_rolle":null,"sichtbar":{sichtbar}}}"#
+        )),
+    )
+    .await;
+    assert!(
+        status.is_success(),
+        "Org-Sichtbarkeit {modul}: {status} {v:?}"
+    );
+}
+
+#[tokio::test]
+async fn org_ausblendung_wirkt_auf_laufenden_einsatz_ohne_eigenen_wert() {
+    let (app, admin, einsatz) = aufbau().await;
+    let erika = mitglied(&app, &admin, einsatz, "erika", "keine").await;
+    assert_eq!(
+        freigaben(&app, &erika, einsatz).await["meldungen"],
+        json!({ "sichtbar": true, "zugriff": true }),
+        "Gegenprobe vor der Vorgabe"
+    );
+
+    org_sichtbarkeit(&app, &admin, "meldungen", false).await;
+
+    let v = freigaben(&app, &erika, einsatz).await;
+    assert_eq!(
+        v["meldungen"],
+        json!({ "sichtbar": false, "zugriff": false })
+    );
+    assert_eq!(
+        liste_status(&app, &erika, einsatz, "meldungen").await,
+        StatusCode::FORBIDDEN
+    );
+    // Die Zähler folgen derselben Auswertung: das Feld fehlt statt 0.
+    let (status, z) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &erika,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{z:?}");
+    assert!(!z.as_object().unwrap().contains_key("meldungen"), "{z:?}");
+    // Der System-Admin erreicht es weiter, sieht es aber nicht.
+    assert_eq!(
+        freigaben(&app, &admin, einsatz).await["meldungen"],
+        json!({ "sichtbar": false, "zugriff": true })
+    );
+
+    // Wieder einblenden hebt die Vorgabe auf.
+    org_sichtbarkeit(&app, &admin, "meldungen", true).await;
+    assert_eq!(
+        freigaben(&app, &erika, einsatz).await["meldungen"],
+        json!({ "sichtbar": true, "zugriff": true })
+    );
+}
+
+#[tokio::test]
+async fn einsatz_ueberstimmt_die_org_ausblendung() {
+    let (app, admin, einsatz) = aufbau().await;
+    let erika = mitglied(&app, &admin, einsatz, "erika", "keine").await;
+    org_sichtbarkeit(&app, &admin, "meldungen", false).await;
+    modul_override(
+        &app,
+        &admin,
+        einsatz,
+        "meldungen",
+        r#"{"sichtbar":true,"benoetigte_rolle":null}"#,
+    )
+    .await;
+
+    assert_eq!(
+        freigaben(&app, &erika, einsatz).await["meldungen"],
+        json!({ "sichtbar": true, "zugriff": true })
+    );
+    assert_eq!(
+        liste_status(&app, &erika, einsatz, "meldungen").await,
+        StatusCode::OK
+    );
+
+    // Eigenen Wert zurücknehmen: die Vorgabe greift wieder.
+    modul_override(
+        &app,
+        &admin,
+        einsatz,
+        "meldungen",
+        r#"{"sichtbar":null,"benoetigte_rolle":null}"#,
+    )
+    .await;
+    assert_eq!(
+        freigaben(&app, &erika, einsatz).await["meldungen"],
+        json!({ "sichtbar": false, "zugriff": false })
+    );
+}
+
+#[tokio::test]
+async fn override_nur_mit_rolle_uebergeht_die_org_ausblendung_nicht() {
+    let (app, admin, einsatz) = aufbau().await;
+    let fk = mitglied(&app, &admin, einsatz, "fritz", "fuehrungskraft").await;
+    org_sichtbarkeit(&app, &admin, "meldungen", false).await;
+    modul_override(
+        &app,
+        &admin,
+        einsatz,
+        "meldungen",
+        r#"{"sichtbar":null,"benoetigte_rolle":"fuehrungskraft"}"#,
+    )
+    .await;
+
+    assert_eq!(
+        freigaben(&app, &fk, einsatz).await["meldungen"],
+        json!({ "sichtbar": false, "zugriff": false })
+    );
+}
+
+#[tokio::test]
+async fn einsatz_blendet_aus_ohne_org_vorgabe() {
+    let (app, admin, einsatz) = aufbau().await;
+    let erika = mitglied(&app, &admin, einsatz, "erika", "keine").await;
+    modul_override(
+        &app,
+        &admin,
+        einsatz,
+        "meldungen",
+        r#"{"sichtbar":false,"benoetigte_rolle":null}"#,
+    )
+    .await;
+    assert_eq!(
+        freigaben(&app, &erika, einsatz).await["meldungen"],
+        json!({ "sichtbar": false, "zugriff": false })
+    );
+}

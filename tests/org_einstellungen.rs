@@ -293,8 +293,8 @@ async fn modul_put_als_admin_gueltig_persistiert() {
     assert_eq!(get_status, StatusCode::OK);
     assert_eq!(
         get_body["etb"],
-        Value::String("fuehrungskraft".to_string()),
-        "Map muss etb→fuehrungskraft enthalten; body={get_body}"
+        serde_json::json!({"benoetigte_rolle": "fuehrungskraft", "sichtbar": true}),
+        "Map muss etb→fuehrungskraft enthalten, sichtbar ohne Vorgabe; body={get_body}"
     );
 }
 
@@ -362,7 +362,10 @@ async fn modul_put_einsatzfuehrung_ist_gueltig() {
         None,
     )
     .await;
-    assert_eq!(get_body["schaeden"], "einsatzfuehrung", "body={get_body}");
+    assert_eq!(
+        get_body["schaeden"]["benoetigte_rolle"], "einsatzfuehrung",
+        "body={get_body}"
+    );
 }
 
 /// GET /api/org-einstellungen als Benutzer mit org_rolle=keine → 403.
@@ -454,6 +457,122 @@ async fn modul_put_nicht_ausblendbar_key_ist_erlaubt() {
         StatusCode::OK,
         "NICHT_AUSBLENDBAR-Key muss als Rollen-Default setzbar sein; body={body}"
     );
+}
+
+// ─── Sichtbarkeits-Vorgabe je Modul (LLH-1179) ───────────────────────────────
+
+async fn modul_vorgaben(app: &axum::Router, cookie: &str) -> Value {
+    let (status, body) = anfrage(app, "GET", "/api/org-modul-einstellungen", cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    body
+}
+
+/// Ausblenden, nur die Rolle ändern (Ausblendung bleibt), wieder einblenden.
+#[tokio::test]
+async fn modul_sichtbarkeit_setzen_rolle_allein_und_zuruecknehmen() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "stab",
+        serde_json::json!({"benoetigte_rolle": null, "sichtbar": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    assert_eq!(
+        modul_vorgaben(&app, &admin_cookie).await["stab"],
+        serde_json::json!({"benoetigte_rolle": null, "sichtbar": false})
+    );
+
+    // Ein Aufruf nur mit der Rolle hebt die Ausblendung nicht auf.
+    let (status, _) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "stab",
+        serde_json::json!({"benoetigte_rolle": "admin"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        modul_vorgaben(&app, &admin_cookie).await["stab"],
+        serde_json::json!({"benoetigte_rolle": "admin", "sichtbar": false})
+    );
+
+    let (status, _) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "stab",
+        serde_json::json!({"benoetigte_rolle": "admin", "sichtbar": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        modul_vorgaben(&app, &admin_cookie).await["stab"]["sichtbar"],
+        true
+    );
+}
+
+/// Die Führungskraft liest, ändert aber nichts: 403, die Vorgabe bleibt.
+#[tokio::test]
+async fn modul_sichtbarkeit_als_fuehrungskraft_ist_403() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin_cookie, "fk4", "fkpw3456", "fuehrungskraft").await;
+    let fk_cookie = login_cookie(&app, "fk4", "fkpw3456").await;
+
+    let (status, _) = put_modul_einstellung(
+        &app,
+        &fk_cookie,
+        "stab",
+        serde_json::json!({"benoetigte_rolle": null, "sichtbar": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(modul_vorgaben(&app, &fk_cookie).await.get("stab").is_none());
+}
+
+/// Ein Nicht-Boolean wird abgewiesen, ohne etwas zu speichern.
+#[tokio::test]
+async fn modul_sichtbarkeit_ungueltiger_wert_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "stab",
+        serde_json::json!({"benoetigte_rolle": null, "sichtbar": "nein"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(modul_vorgaben(&app, &admin_cookie)
+        .await
+        .get("stab")
+        .is_none());
+}
+
+/// Selbst-Aussperr-Schutz: ein nicht ausblendbares Modul lässt sich nicht ausblenden.
+#[tokio::test]
+async fn modul_sichtbarkeit_nicht_ausblendbar_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    for key in ["einsatzdaten", "einsatz-einstellungen"] {
+        let (status, _) = put_modul_einstellung(
+            &app,
+            &admin_cookie,
+            key,
+            serde_json::json!({"benoetigte_rolle": null, "sichtbar": false}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{key}");
+        assert!(
+            modul_vorgaben(&app, &admin_cookie).await.get(key).is_none(),
+            "{key}"
+        );
+    }
 }
 
 // ─── Einsatznummer-Präfix (LFH-617) ─────────────────────────────────────────

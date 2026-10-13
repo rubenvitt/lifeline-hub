@@ -16,14 +16,14 @@ use crate::einsatz::einstellungen::{
     ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
 };
 use crate::einsatz::modul::{
-    ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
+    ist_ausblendbar, ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::org::aufbewahrung_kategorie::{self, KategorieVorgabeEingabe};
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
-use crate::org::modul_einstellung;
+use crate::org::modul_einstellung::{self, OrgModulEinstellung};
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
@@ -230,32 +230,43 @@ fn bereinige(feld: Option<String>) -> Option<String> {
     feld.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-// ── Modul-Rollen-Defaults ──────────────────────────────────────────────────
+// ── Modul-Vorgaben (Rolle, Sichtbarkeit) ───────────────────────────────────
 
-/// PUT-Body für einen Modul-Rollen-Default.
+/// PUT-Body für die Vorgabe eines Moduls.
 #[derive(Debug, serde::Deserialize)]
 pub struct ModulRolleUpdate {
     /// `None` = freier Zugang (keine Rolle erforderlich), `Some(rolle)` = Pflichtrolle.
     pub benoetigte_rolle: Option<String>,
+    /// LLH-1179: `false` blendet das Modul für alle Einsätze ohne eigenen Wert aus, `true` nimmt das
+    /// zurück. Fehlt das Feld, bleibt die gespeicherte Sichtbarkeit unverändert — ein Aufrufer, der
+    /// nur die Rolle setzt, hebt keine Ausblendung auf (design.md D3 der Change
+    /// `ivtkmf43-org-modul-sichtbarkeit`).
+    #[serde(default)]
+    pub sichtbar: Option<bool>,
 }
 
-/// GET /api/org-modul-einstellungen — Alle Modul-Rollen-Defaults lesen.
+/// GET /api/org-modul-einstellungen — Alle Modul-Vorgaben lesen.
 /// Berechtigung: system_rolle=admin ODER org_rolle=fuehrungskraft.
-/// Antwort: `{ <modul_key>: <rolle|null> }` — sparse (nur gesetzte Keys).
+/// Antwort: `{ <modul_key>: { benoetigte_rolle, sichtbar } }` — sparse (nur Keys mit Zeile).
 pub async fn modul_einstellungen_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-) -> Result<Json<HashMap<String, Option<String>>>, AppError> {
+) -> Result<Json<HashMap<String, OrgModulEinstellung>>, AppError> {
     if !benutzer.darf_admin_bereich() {
         return Err(AppError::Forbidden);
     }
     let map = modul_einstellung::laden_alle(&state.pool, benutzer.org_id).await?;
-    Ok(Json(map))
+    Ok(Json(
+        map.into_iter()
+            .map(|(key, vorgabe)| (key, vorgabe.into()))
+            .collect(),
+    ))
 }
 
-/// PUT /api/org-modul-einstellungen/:modul_key — Rollen-Default für ein Modul setzen.
+/// PUT /api/org-modul-einstellungen/:modul_key — Vorgabe für ein Modul setzen.
 /// Berechtigung: nur system_rolle=admin (fuehrungskraft → 403).
-/// Validierung: modul_key muss bekannt sein; benoetigte_rolle None (frei) oder gültige Rolle.
+/// Validierung: modul_key muss bekannt sein; benoetigte_rolle None (frei) oder gültige Rolle;
+/// `sichtbar: false` nur für ausblendbare Module (Selbst-Aussperr-Schutz).
 pub async fn modul_einstellung_setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -280,11 +291,18 @@ pub async fn modul_einstellung_setzen(
         }
     }
 
+    if req.sichtbar == Some(false) && !ist_ausblendbar(&modul_key) {
+        return Err(AppError::Validation(
+            "Dieses Modul kann nicht ausgeblendet werden".into(),
+        ));
+    }
+
     modul_einstellung::setzen(
         &state.pool,
         benutzer.org_id,
         &modul_key,
         rolle.as_deref(),
+        req.sichtbar,
         benutzer.id,
     )
     .await?;

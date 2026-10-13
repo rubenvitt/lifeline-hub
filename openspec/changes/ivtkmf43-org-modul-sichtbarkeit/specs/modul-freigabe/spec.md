@@ -107,7 +107,7 @@ Modul zusammen mit der Rollen-Vorgabe liefern. Ändern MUST nur der System-Admin
 
 #### Scenario: Vorgabe setzen
 - **WHEN** ein System-Admin die Vorgabe des Moduls `stab` mit `sichtbar: false` speichert
-- **THEN** antwortet das System mit HTTP 204, und der nächste Abruf der Vorgaben liefert für `stab` `sichtbar: false`
+- **THEN** antwortet das System mit HTTP 200, und der nächste Abruf der Vorgaben liefert für `stab` `sichtbar: false`
 
 #### Scenario: Ohne Vorgabe
 - **WHEN** die Organisation für `etb` nichts vorgibt
