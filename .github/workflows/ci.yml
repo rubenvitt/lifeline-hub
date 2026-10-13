@@ -423,8 +423,8 @@ jobs:
   berichte:
     name: Testberichte zusammenführen
     needs: [aenderungen, frontend, e2e]
-    # Ein Bericht über null Teilläufe hilft niemandem; läuft nur eine der beiden Suiten, warnt die
-    # Vollzähligkeit unten über die fehlenden Blobs der anderen.
+    # Ein Bericht über null Teilläufe hilft niemandem. Läuft nur eine der beiden Suiten, erwartet
+    # die Vollzähligkeit unten von der anderen keine Blobs, und deren Berichtsschritte entfallen.
     if: >-
       ${{ !cancelled() && (needs.aenderungen.outputs.frontend != 'false'
       || needs.aenderungen.outputs.e2e != 'false') }}
@@ -489,7 +489,7 @@ jobs:
       # nur `report-k.zip` auf oberster Ebene: der HTML-Bericht davor entpackt die Traces roter
       # Tests als `resources/*.zip` in dasselbe Verzeichnis.
       - name: e2e-Laufzeiten
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -506,7 +506,7 @@ jobs:
           path: laufzeiten.json
           retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
         with:
           name: playwright-report-versuch-${{ github.run_attempt }}
           path: frontend/playwright-report
