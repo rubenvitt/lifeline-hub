@@ -132,7 +132,7 @@ describe('Tastatur (D6)', () => {
 
 describe('Rechte am Element (D8, Spec „Bearbeiten nur mit Recht am Datensatz“)', () => {
   it('Nur Leserecht: ohne Aktionen nichts, mit Grund', () => {
-    const n = netz({ stab: true, einheiten: true });
+    const n = netz({ fernmeldewesen: true, einheiten: true });
     expect(griffGrund(n, 'eh-10', { aktionen: false, mobil: false })).toBe(
       'Kein Schreibrecht im Einsatz',
     );
@@ -140,7 +140,7 @@ describe('Rechte am Element (D8, Spec „Bearbeiten nur mit Recht am Datensatz�
   });
 
   it('Recht auf Stab, nicht auf Einheiten: 1. Zug ohne Griff, Grund „Einheiten: kein Schreibrecht“', () => {
-    const n = netz({ stab: true });
+    const n = netz({ fernmeldewesen: true });
     expect(griffGrund(n, 'eh-10', { aktionen: true, mobil: false })).toBe(
       'Einheiten: kein Schreibrecht',
     );
@@ -155,7 +155,7 @@ describe('Rechte am Element (D8, Spec „Bearbeiten nur mit Recht am Datensatz�
   });
 
   it('Mobil: mit Schreibrecht nur lesen', () => {
-    const n = netz({ stab: true, einheiten: true });
+    const n = netz({ fernmeldewesen: true, einheiten: true });
     expect(griffGrund(n, 'eh-10', { aktionen: true, mobil: true })).toBe(
       'Am schmalen Bildschirm nur lesen',
     );
@@ -164,14 +164,19 @@ describe('Rechte am Element (D8, Spec „Bearbeiten nur mit Recht am Datensatz�
 
   it('ohne Stab-Recht keine Lage', () => {
     expect(lageGrund(netz({ einheiten: true }), { aktionen: true, mobil: false })).toBe(
-      'Stab: kein Schreibrecht',
+      'Fernmeldewesen: kein Schreibrecht',
     );
   });
 });
 
 describe('„Verbinden mit …“ (Spec „Verbinden ohne Ziehen“)', () => {
   it('Schienen ohne die schon zugeordneten, dann Stellen ohne sich selbst; Suche über Zeichen und Namen', () => {
-    const n = netz({ stab: true, einheiten: true, einsatzabschnitte: true, verwaltung: true });
+    const n = netz({
+      fernmeldewesen: true,
+      einheiten: true,
+      einsatzabschnitte: true,
+      verwaltung: true,
+    });
     const ziele = verbindenZiele(n, 'ab-1', '');
     expect(ziele.map((z) => z.key)).toEqual(['sg-2', 'fs', 'eh-10', 'ks-5', 'ko-3']);
     expect(verbindenZiele(n, 'eh-10', '314').map((z) => z.key)).toEqual(['sg-2']);
@@ -185,7 +190,7 @@ describe('„Verbinden mit …“ (Spec „Verbinden ohne Ziehen“)', () => {
         sprechgruppen: daten([BN_BOS, F314]),
         abschnitte: daten([abschnitt(1, { name: 'EA 1' })]),
       }),
-      rechte: { einsatzabschnitte: true, stab: true },
+      rechte: { einsatzabschnitte: true, fernmeldewesen: true },
     });
     expect(verbindenZiele(n, 'ab-1', '').map((z) => [z.key, z.art])).toEqual([
       ['sg-1', 'schiene'],
@@ -195,7 +200,7 @@ describe('„Verbinden mit …“ (Spec „Verbinden ohne Ziehen“)', () => {
   });
 
   it('ohne Recht am Datensatz keine Schienen, ohne Stab keine Stellen', () => {
-    const n = netz({ stab: true });
+    const n = netz({ fernmeldewesen: true });
     expect(verbindenZiele(n, 'eh-10', '').every((z) => z.art === 'stelle')).toBe(true);
     const ohneStab = netz({ einheiten: true });
     expect(verbindenZiele(ohneStab, 'eh-10', '').every((z) => z.art === 'schiene')).toBe(true);

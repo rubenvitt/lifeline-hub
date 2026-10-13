@@ -613,13 +613,14 @@ pub async fn status_setzen(
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let beruehrt = crate::write_retry!(&state.pool, |conn| {
+        let mut beruehrt = Vec::new();
         if let Some(w) =
             einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
         {
             // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
             if let Some(sid) = status_id {
-                crate::zeitachse::repo::aus_einheit_handstatus_tx(
+                if let Some((_, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,
@@ -627,7 +628,10 @@ pub async fn status_setzen(
                     sid,
                     &jetzt,
                 )
-                .await?;
+                .await?
+                {
+                    beruehrt = b.personen;
+                }
             }
             crate::etb::system_audit_tx(
                 conn,
@@ -643,9 +647,14 @@ pub async fn status_setzen(
             )
             .await?;
         }
-        Ok(())
+        Ok(beruehrt)
     })?;
     sse_einheit(&state, einsatz_id, eid);
+    // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
+    // Personalrecht erreicht `einheit` nicht (LLH-1185).
+    for ep_id in beruehrt {
+        sse_personal(&state, einsatz_id, ep_id);
+    }
     Ok(Json(
         einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
     ))

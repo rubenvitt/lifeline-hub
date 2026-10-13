@@ -182,6 +182,28 @@ describe('baueKommunikationsplan', () => {
       }),
     );
     expect(plan[0].zeilen[0].nebentext).toBe('Besetzung nicht geladen');
+    expect(plan[0].zeilen[0].nebentextGrund).toBeUndefined();
+  });
+
+  // LLH-1180, design.md D8: ohne Stab-Freigabe ein „—“ mit Grund, die Verbindungen bleiben.
+  it('ohne Stab-Freigabe steht „—“ mit dem Grund, die Verbindung der Stelle bleibt', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(1, {
+            stellenart: 'funktion',
+            funktion: 's2',
+            funktion_label: 'S2 Lage',
+            bezeichnung: undefined,
+            verbindungen: [{ id: 9, mittel: 'mobil', wert: '0170 111', hinweis: null }],
+          }),
+        ]),
+        stab: { zustand: 'gesperrt', daten: undefined },
+      }),
+    );
+    expect(plan[0].zeilen[0].nebentext).toBe('—');
+    expect(plan[0].zeilen[0].nebentextGrund).toBe('Stab nicht freigegeben');
+    expect(plan[0].zeilen[0].verbindungen.map((v) => v.wert)).toEqual(['0170 111']);
   });
 
   it('übernimmt keine Telefonnummer aus dem Personal', () => {

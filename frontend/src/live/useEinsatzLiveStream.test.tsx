@@ -261,6 +261,27 @@ describe('useEinsatzLiveStream', () => {
     expect(calls).not.toContainEqual(['einsatz-stab', 3]);
   });
 
+  // LLH-1180: Kommunikationsplan und Skizze gehören dem Fernmeldewesen, nicht dem Stab.
+  it('invalidiert Kommunikationsplan und Skizze bei fernmeldewesen-Event, den Stab nicht (LLH-1180)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('fernmeldewesen', JSON.stringify({ einsatz_id: 3 }));
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      // Der Prefix trifft Kommunikationsplan und Skizze (`…, 'kommunikationsplan'|'skizze'`).
+      expect(calls).toContainEqual(['einsatz-fernmeldewesen', 3]);
+    });
+    const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(calls).not.toContainEqual(['einsatz-stab', 3]);
+    expect(calls).not.toContainEqual(['einsatz-modul-zaehler', 3]);
+  });
+
   it('nimmt den Einsatzkopf in den lagged-Vollabgleich auf (LFH-555)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

@@ -7,6 +7,10 @@
 //! (`slaves`) durchweg verschlüsselt ist (LVM auf LUKS, RAID über LUKS). Eine Partition gilt
 //! wie ihr Elterngerät. Die Logik bekommt mountinfo, swaps und sysfs als Eingabe
 //! ([`Blockgeraete`]), damit sie sich mit Beispieldaten prüfen lässt.
+//!
+//! Im Container nennen `/proc/swaps` und mountinfo Gerätedateien des Hosts (`/dev/dm-1`), die es
+//! dort nicht gibt. sysfs zeigt aber auch im Container die Blockgeräte des Hosts; die
+//! Gerätenummer kommt dann über den Namen aus `/sys/class/block` ([`geraet_aus_datei`]).
 
 // Die reine Logik baut überall mit, damit ihre Tests auf jedem Rechner laufen.
 #![cfg_attr(not(target_os = "linux"), allow(dead_code, unused_imports))]
@@ -138,6 +142,12 @@ pub trait Blockgeraete {
     fn elterngeraet(&self, g: Geraet) -> io::Result<Option<Geraet>>;
     /// Gerätenummer einer Gerätedatei (`stat().st_rdev`), etwa `/dev/mapper/root`.
     fn geraet_von(&self, pfad: &Path) -> io::Result<Geraet>;
+    /// Gerätenummer zu einem Kernelnamen (`dm-1`, `sda3`) aus `/sys/class/block/<name>/dev`;
+    /// `None`, wenn es den Namen nicht gibt.
+    fn geraet_nach_name(&self, name: &str) -> io::Result<Option<Geraet>>;
+    /// Gerätenummer des dm-Geräts mit diesem `dm/name` (`/dev/mapper/<name>`); `None`, wenn es
+    /// keines gibt.
+    fn geraet_nach_dm_name(&self, dm_name: &str) -> io::Result<Option<Geraet>>;
     /// Ob `g` ein loop-Gerät ist (`loop/backing_file`).
     fn ist_loop(&self, g: Geraet) -> io::Result<bool>;
     /// Alle Geräte des btrfs-Dateisystems, zu dem `g` gehört (`/sys/fs/btrfs/*/devices`);
@@ -145,6 +155,35 @@ pub trait Blockgeraete {
     fn btrfs_geraete(&self, g: Geraet) -> io::Result<Vec<Geraet>>;
     /// Ob eine Datei hier existiert (Swapdatei aus `/proc/swaps`, im Container ein Host-Pfad).
     fn existiert(&self, pfad: &Path) -> bool;
+}
+
+/// Gerätenummer einer Gerätedatei. Fehlt die Datei, wird ihr Name in sysfs gesucht: `/dev/<name>`
+/// als Kernelname, `/dev/mapper/<name>` als dm-Name. Gerätenummern und sysfs gelten für den
+/// ganzen Rechner, ein Name des Hosts trifft im Container also dasselbe Gerät. Andere Pfade
+/// (`/dev/disk/by-id/…`, `..`) werden nicht gesucht; dann bleibt der Fehler von `stat`.
+pub fn geraet_aus_datei(bg: &dyn Blockgeraete, pfad: &Path) -> io::Result<Geraet> {
+    let fehler = match bg.geraet_von(pfad) {
+        Ok(g) => return Ok(g),
+        Err(e) => e,
+    };
+    let einzelner_name = |rest: &Path| {
+        let mut teile = rest.components();
+        match (teile.next(), teile.next()) {
+            (Some(std::path::Component::Normal(n)), None) => n.to_str().map(str::to_owned),
+            _ => None,
+        }
+    };
+    let gefunden = if let Ok(rest) = pfad.strip_prefix("/dev/mapper") {
+        einzelner_name(rest).map(|n| bg.geraet_nach_dm_name(&n))
+    } else if let Ok(rest) = pfad.strip_prefix("/dev") {
+        einzelner_name(rest).map(|n| bg.geraet_nach_name(&n))
+    } else {
+        None
+    };
+    match gefunden {
+        Some(Ok(Some(g))) => Ok(g),
+        _ => Err(fehler),
+    }
 }
 
 /// Prüft die Gerätekette ab `g`.
@@ -206,7 +245,7 @@ pub fn pruefe_pfad(mounts: &[Mount], bg: &dyn Blockgeraete, pfad: &Path) -> Befu
         m.geraet
     } else if m.quelle.starts_with("/dev/") {
         // btrfs meldet eine anonyme Gerätenummer `0:x`; das Blockgerät steht in der Quelle.
-        match bg.geraet_von(Path::new(&m.quelle)) {
+        match geraet_aus_datei(bg, Path::new(&m.quelle)) {
             Ok(g) => g,
             Err(_) => return Befund::Unbekannt(Grund::KeinZugriff),
         }
@@ -274,7 +313,7 @@ pub fn pruefe_swaps(
                 Befund::Unbekannt(Grund::KeinZugriff)
             }
         } else {
-            match bg.geraet_von(Path::new(&s.pfad)) {
+            match geraet_aus_datei(bg, Path::new(&s.pfad)) {
                 Ok(g) => pruefe_geraet(bg, g),
                 Err(_) => Befund::Unbekannt(Grund::KeinZugriff),
             }
@@ -364,6 +403,27 @@ impl Blockgeraete for Sysfs {
         Ok(zerlege_dev(meta.rdev()))
     }
 
+    fn geraet_nach_name(&self, name: &str) -> io::Result<Option<Geraet>> {
+        match Self::lies_dev(&Path::new("/sys/class/block").join(name).join("dev")) {
+            Ok(g) => Ok(Some(g)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn geraet_nach_dm_name(&self, dm_name: &str) -> io::Result<Option<Geraet>> {
+        for eintrag in std::fs::read_dir("/sys/class/block")? {
+            let dir = eintrag?.path();
+            // Nur dm-Geräte haben `dm/name`; die übrigen fallen hier weg.
+            if let Ok(name) = std::fs::read_to_string(dir.join("dm/name")) {
+                if name.trim_end() == dm_name {
+                    return Self::lies_dev(&dir.join("dev")).map(Some);
+                }
+            }
+        }
+        Ok(None)
+    }
+
     fn ist_loop(&self, g: Geraet) -> io::Result<bool> {
         Ok(Self::dir(g).join("loop/backing_file").exists())
     }
@@ -451,6 +511,9 @@ mod tests {
         slaves: HashMap<Geraet, Vec<Geraet>>,
         eltern: HashMap<Geraet, Geraet>,
         dateien: HashMap<&'static str, Geraet>,
+        /// Kernelnamen und dm-Namen in sysfs, ohne Gerätedatei (wie im Container).
+        namen: HashMap<&'static str, Geraet>,
+        dm_namen: HashMap<&'static str, Geraet>,
         unlesbar: Vec<Geraet>,
         loops: Vec<Geraet>,
         btrfs: Vec<Vec<Geraet>>,
@@ -475,6 +538,12 @@ mod tests {
                 .get(pfad.to_str().unwrap())
                 .copied()
                 .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+        }
+        fn geraet_nach_name(&self, name: &str) -> io::Result<Option<Geraet>> {
+            Ok(self.namen.get(name).copied())
+        }
+        fn geraet_nach_dm_name(&self, dm_name: &str) -> io::Result<Option<Geraet>> {
+            Ok(self.dm_namen.get(dm_name).copied())
         }
         fn ist_loop(&self, g: Geraet) -> io::Result<bool> {
             Ok(self.loops.contains(&g))
@@ -772,6 +841,75 @@ mod tests {
             pruefe_swaps(&swaps("/dev/dm-9 partition 1 0 -2\n"), &m, &lvm_auf_luks()),
             Some(("/dev/dm-9".into(), Befund::Unbekannt(Grund::KeinZugriff)))
         );
+    }
+
+    #[test]
+    fn swap_partition_des_hosts_wird_im_container_ueber_sysfs_gefunden() {
+        // Docker auf einem LUKS-Host: /proc/swaps nennt /dev/dm-2 des Hosts, die Gerätedatei
+        // fehlt im Container, sysfs kennt dm-2 aber.
+        let mut bg = lvm_auf_luks();
+        bg.dateien.clear();
+        bg.uuid.insert((253, 2), "CRYPT-PLAIN-swap");
+        bg.slaves.insert((253, 2), vec![(8, 3)]);
+        bg.eltern.insert((8, 3), SDA);
+        bg.namen.insert("dm-2", (253, 2));
+        bg.namen.insert("sda3", (8, 3));
+        let m = parse_mountinfo(MOUNTINFO);
+        assert_eq!(
+            pruefe_swaps(&swaps("/dev/dm-2 partition 8388604 0 -2\n"), &m, &bg),
+            Some(("/dev/dm-2".into(), Befund::Verschluesselt))
+        );
+        // Eine nackte Swap-Partition des Hosts bleibt erkennbar unverschlüsselt.
+        assert_eq!(
+            pruefe_swaps(&swaps("/dev/sda3 partition 8388604 0 -2\n"), &m, &bg),
+            Some(("/dev/sda3".into(), Befund::Unverschluesselt))
+        );
+    }
+
+    #[test]
+    fn mapper_name_des_hosts_wird_ueber_dm_name_gefunden() {
+        let mut bg = lvm_auf_luks();
+        bg.dateien.clear();
+        bg.dm_namen.insert("luks-root", DM0);
+        // btrfs meldet `0:x`, die Quelle /dev/mapper/luks-root fehlt im Container.
+        assert_eq!(
+            pruefe_pfad(
+                &parse_mountinfo(MOUNTINFO),
+                &bg,
+                Path::new("/srv/btrfs/daten")
+            ),
+            Befund::Verschluesselt
+        );
+        assert_eq!(
+            pruefe_swaps(
+                &swaps("/dev/mapper/luks-root partition 1 0 -2\n"),
+                &parse_mountinfo(MOUNTINFO),
+                &bg
+            ),
+            Some(("/dev/mapper/luks-root".into(), Befund::Verschluesselt))
+        );
+    }
+
+    #[test]
+    fn nur_einfache_namen_unter_dev_werden_in_sysfs_gesucht() {
+        let mut bg = lvm_auf_luks();
+        bg.dateien.clear();
+        bg.namen.insert("dm-0", DM0);
+        bg.dm_namen.insert("dm-0", DM0);
+        assert_eq!(geraet_aus_datei(&bg, Path::new("/dev/dm-0")).unwrap(), DM0);
+        for pfad in [
+            "/dev/mapper/../dm-0",
+            "/dev/disk/by-id/dm-0",
+            "/srv/dm-0",
+            "/dev",
+            "/dev/mapper",
+        ] {
+            assert_eq!(
+                geraet_aus_datei(&bg, Path::new(pfad)).unwrap_err().kind(),
+                io::ErrorKind::NotFound,
+                "{pfad}"
+            );
+        }
     }
 
     #[test]

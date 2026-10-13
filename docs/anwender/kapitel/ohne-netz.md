@@ -55,7 +55,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Aufträge und Befehle
 - Betroffene, Unfallhilfsstellen, Betreuung
 - Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden
-- Rückmeldungen und Kommunikationsplan
+- Rückmeldungen und der Kommunikationsplan des Fernmeldewesens
 
 Nicht vorgehalten werden unter anderem die übrigen Meldungen, die Besetzung des Stabs und die
 Lagebesprechungen.

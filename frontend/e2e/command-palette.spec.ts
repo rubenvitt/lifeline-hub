@@ -195,7 +195,9 @@ test('Schnellaktion „Mitglied aufnehmen“ öffnet den Zugriff mit offener Per
   await expect(auswahl).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('„Funk“ findet den Funkplan als ersten Treffer, ↵ öffnet ihn (LLH-1127)', async ({ page }) => {
+test('„Funk“ findet das Fernmeldewesen als ersten Treffer, ↵ öffnet den Funkplan (LLH-1127, LLH-1180)', async ({
+  page,
+}) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Ansichten ${Date.now()}`);
   await zumModul(page, id, 'etb');
@@ -205,11 +207,15 @@ test('„Funk“ findet den Funkplan als ersten Treffer, ↵ öffnet ihn (LLH-11
   await paletteInput(page).fill('Funk');
   const erster = page.getByRole('option').first();
   await expect(erster).toHaveAttribute('aria-selected', 'true');
-  await expect(erster).toHaveAccessibleName(/^Funkplan/);
+  await expect(erster).toHaveAccessibleName(/^Fernmeldewesen/);
   await page.keyboard.press('Enter');
 
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/stab/funkplan$`));
-  await expect(page.getByRole('heading', { name: 'Funkplan', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/fernmeldewesen$`));
+  await expect(page.getByRole('heading', { name: 'Fernmeldewesen', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Funkplan' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 });
 
 test('Schnellaktion „Anruf erfassen“ öffnet das Informationstelefon mit Fokus im Anliegen (LLH-1127)', async ({

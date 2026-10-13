@@ -1104,6 +1104,7 @@ fn live_event_wire() {
         Befehl => "befehl",
         Stab => "stab",
         Lagebesprechung => "lagebesprechung",
+        Fernmeldewesen => "fernmeldewesen",
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",

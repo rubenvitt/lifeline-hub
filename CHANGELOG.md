@@ -1,3 +1,39 @@
+## [1.0.0-alpha.120](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.119...v1.0.0-alpha.120) (2026-10-13)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release spielt zwei Migrationen ein. Beim ersten Start werden sie automatisch angewendet.
+  - Die Einstellungen der Organisation je Modul haben jetzt auch eine Sichtbarkeit. Die Sichtbarkeit am Einsatz kann jetzt leer sein; leer heißt, der Einsatz übernimmt die Vorgabe der Organisation. Hatte ein Einsatz ein Modul gespeichert auf „sichtbar“, übernimmt er danach die Vorgabe der Organisation. Ein ausgeblendetes Modul bleibt ausgeblendet.
+  - Das neue Modul „Fernmeldewesen“ übernimmt aus dem Stab nur die Rollen-Vorgabe, nicht die Ausblendung. **Wer den Stab ausgeblendet hat, sieht das Fernmeldewesen nach dem Update wieder.**
+- **Schnittstelle der Modul-Einstellungen:** Die Organisations-Vorgaben liefern je Modul jetzt die benötigte Rolle und die Sichtbarkeit. Beim Speichern ist die Sichtbarkeit optional; fehlt sie, bleibt der Wert unverändert. Am Einsatz bedeutet eine leere Sichtbarkeit „von der Organisation übernehmen“. Module, die man nicht ausblenden kann, lehnt der Server auf jeder Ebene ab.
+- **Neue Adressen in der Oberfläche:** Funkplan, Fernmeldeskizze, Sprechgruppen und Kommunikationsplan liegen jetzt unter „Fernmeldewesen“ statt unter „Stab“. Alte Lesezeichen leiten weiter. Die Pfade der Programmierschnittstelle bleiben gleich.
+
+### Kommunikation
+
+- **Fernmeldewesen ist ein eigenes Modul** (Kategorie Kommunikation) mit eigener Freigabe. Funkplan, Fernmeldeskizze, Sprechgruppen und Kommunikationsplan erreichen Sie dort über Reiter. So kann z. B. ein ELW 1 ohne Stab funken, Sprechgruppen planen und den Kommunikationsplan pflegen, auch wenn der Stab ausgeblendet ist.
+- Ob die Skizze angefügt werden kann, ob der Lagebericht Inhalte übernimmt, der Offline-Betrieb, die Sprungpalette und die S6-Zeile auf der Stab-Seite richten sich nach der Freigabe des Fernmeldewesens.
+- In der Besetzung des Stabs zeigt die S6-Zeile „—“ mit einer Begründung, wenn das Fernmeldewesen nicht verfügbar ist.
+- Das Modul hat ein eigenes Symbol (Funkmast). Die Anwenderdokumentation und ihre Bilder sind aktualisiert.
+
+### Verwaltung
+
+- **Module für alle Einsätze ausblenden:** Das Paneel „Rollen-Vorgabe je Modul“ heißt jetzt „Module für alle Einsätze“ und hat die neue Spalte „Sichtbar“. Eine Vorgabe der Organisation gilt auch für laufende Einsätze.
+- **Ein Einsatz kann die Vorgabe überstimmen:** Im Editor „Module“ zeigt der Schalter, was am Einsatz tatsächlich gilt. Darunter steht, woher der Wert kommt, z. B. „Vorgabe der Organisation: ausgeblendet“. Ein am Einsatz gesetzter Wert lässt sich mit „Vorgabe übernehmen“ zurücksetzen.
+- Ein schneller zweiter Klick kann eine eben gesetzte Ausblendung nicht mehr aus Versehen aufheben. Eine Zeile bleibt gesperrt, bis die neuen Daten geladen sind.
+
+### Kräfte und Mittel
+
+Mehr Änderungen erscheinen jetzt bei allen Nutzern sofort, ohne die Seite neu zu laden:
+
+- **Personal:** Wird eine Kraft entlassen, aktualisieren sich die Stärke ihrer UHS und der zugehörige Schaden. Eine geänderte Stärke-Position aktualisiert die Einheit und die UHS.
+- **Fahrzeuge:** Wird ein Fahrzeug entfernt, aktualisieren sich seine Einheit, die bisherige Besatzung und der Bereitstellungsraum, in dem es stand. Ein Statuswechsel aktualisiert die Einheit und ihren Status. Zwei Statuswechsel zur gleichen Zeit verschlucken keinen ETB-Eintrag und keinen Zeitachsen-Eintrag mehr.
+- **Material:** Entfernen und Ändern aktualisieren die Einheit und die UHS, an der das Material steht. Wird es an eine andere UHS verlegt, aktualisieren sich die alte und die neue UHS.
+- **Zeitachse der Personen:** Ändert sich der Status eines Fahrzeugs oder einer Einheit, erscheint der neue Eintrag sofort in der Zeitachse der betroffenen Personen. Das gilt auch für Nutzer, die nur das Recht für Personal haben.
+
+### Betrieb und Installation
+
+- **Prüfung der Verschlüsselung im Docker-Container:** Ist der Host vollständig verschlüsselt, erkennt die Prüfung jetzt auch dessen Swap-Partition und die Quelle eines btrfs-Mounts. Bisher meldete die Verwaltung hier fälschlich „Verschlüsselung unbekannt“. Eine Swap-Datei des Hosts bleibt im Container weiterhin „unbekannt“.
+
 ## [1.0.0-alpha.119](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.118...v1.0.0-alpha.119) (2026-10-13)
 
 ### Kräfte und Mittel

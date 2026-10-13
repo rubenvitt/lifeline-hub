@@ -341,13 +341,17 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen ${Date.now()}`);
   const { einheit } = await seedeSprechgruppen(page, einsatzId);
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
   await expect(tabelle(page).getByRole('link', { name: EINHEIT })).toBeVisible();
   await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
 
-  const umschalter = page.getByRole('radiogroup', { name: 'Darstellung' });
-  await umschalter.getByRole('radio', { name: 'Sprechgruppen' }).click();
-  await expect(umschalter.getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
+  // Reiter des Fernmeldewesens statt des Umschalters „Darstellung“ (LLH-1180).
+  const reiter = page.getByRole('tablist');
+  await reiter.getByRole('tab', { name: 'Sprechgruppen' }).click();
+  await expect(reiter.getByRole('tab', { name: 'Sprechgruppen' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(tabelle(page)).toHaveCount(0);
 
   // Datenanker: die Zeile der langen TMO-Gruppe mit beiden Einheiten und dem Abschnitt.
@@ -458,7 +462,7 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   });
   expect(fs.ok(), `Seeding Führungsstelle: ${fs.status()}`).toBeTruthy();
 
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=sprechgruppen`);
   const zeile = sgZeile(page, NUR_FS);
   await expect(zeile.getByRole('link', { name: 'Führungsstelle' })).toBeVisible();
   await expect(zeile).toContainText('Florian Musterstadt 10/1');
@@ -475,7 +479,7 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
       ? route.fulfill({ status: 403, json: { error: 'verboten' } })
       : route.continue(),
   );
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=sprechgruppen`);
   await expect(sgZeile(page, LOKAL)).toContainText('Führungsstelle nicht freigegeben');
   await expect(sgZeile(page, LOKAL)).not.toContainText('keine');
   await expect(sgZeile(page, NUR_FS)).toContainText('Führungsstelle nicht freigegeben');

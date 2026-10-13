@@ -25,7 +25,8 @@ Design unter `/mnt/project-files/lfh-1127/design.md`, D1–D8).
   ```
 
   `gruppen` aus `alle`, `fuehrung`, `administration`, `geraete` (`hilfe/gruppen.ts`);
-  `reihenfolge` global eindeutig, in Zehnerschritten, im Block des Pakets (unten); `quellen`
+  `reihenfolge` global eindeutig, in Zehnerschritten, im Block des Pakets (unten); `titel` ohne
+  „: “ und „ #“ (die Website liest den Kopf als YAML, die App nicht); `quellen`
   nennt die Code-Pfade, deren Verhalten das Kapitel beschreibt. Fachquellen (Vorschriften,
   Normen) stehen im Text, nicht im Kopf.
 - **Nur reines GFM:** kein HTML, keine MDX-Importe; Bilder nur in der Form unten. Alle Renderer

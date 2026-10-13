@@ -232,9 +232,9 @@ function leitstelle(p: Partial<KommunikationsStelle> = {}): KommunikationsStelle
 function setup() {
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
     </Routes>,
-    { route: '/einsaetze/1/stab/funkplan' },
+    { route: '/einsaetze/1/fernmeldewesen' },
   );
 }
 
@@ -245,7 +245,9 @@ const lueckenZeile = (titel: string) =>
 describe('FunkplanPage — Tabelle', () => {
   it('zeigt den Baum als Tabelle mit menschenlesbarer Stelle und allen Funkspalten', async () => {
     const { container } = setup();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Funkplan' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Fernmeldewesen' }),
+    ).toBeInTheDocument();
     await screen.findByText('Florian 1/42-1');
     const kopf = [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
     expect(kopf.slice(0, 6)).toEqual([
@@ -453,9 +455,9 @@ describe('FunkplanPage — Übernahme in den Befehl (LFH-1027)', () => {
   it('steht in jeder Darstellung', async () => {
     renderMitProviders(
       <Routes>
-        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
       </Routes>,
-      { route: '/einsaetze/1/stab/funkplan?ansicht=skizze' },
+      { route: '/einsaetze/1/fernmeldewesen?ansicht=skizze' },
     );
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     expect(screen.getByRole('button', { name: /In Befehl übernehmen/ })).toBeInTheDocument();
@@ -502,24 +504,37 @@ describe('FunkplanPage — Baum', () => {
   });
 });
 
-describe('FunkplanPage — Sperre des Stabs', () => {
-  it('ist nicht erreichbar, wenn der Stab im Einsatz ausgeblendet ist', async () => {
+describe('FunkplanPage — Sperre des Fernmeldewesens', () => {
+  // LLH-1180: der Stab sperrt den Funkplan nicht mehr.
+  it('ist voll da, wenn der Stab ausgeblendet ist und das Fernmeldewesen frei', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: false } }),
+      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    );
+    setup();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Fernmeldewesen' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Florian 1/42-1')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Funkplan' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('ist nicht erreichbar, wenn das Fernmeldewesen im Einsatz ausgeblendet ist', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ fernmeldewesen: { sichtbar: false } }),
     );
     const { container } = setup();
-    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
   });
 
-  it('ist gesperrt, wenn der Server den Zugriff auf den Stab verweigert', async () => {
+  it('ist gesperrt, wenn der Server den Zugriff auf das Fernmeldewesen verweigert', async () => {
     // Etwa weil der Stab eine Rolle verlangt, die die Person nicht hat: das rechnet der Server.
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: true, zugriff: false } }),
+      freigabenFixture({ fernmeldewesen: { sichtbar: true, zugriff: false } }),
     );
     const { container } = setup();
-    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
   });
 
@@ -547,7 +562,9 @@ describe('FunkplanPage — Sperre des Stabs', () => {
   it('zeigt nichts, solange die Freigabe nicht ermittelt ist, und bei deren Fehler einen Fehler', async () => {
     vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     const { container } = setup();
-    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Freigabe des Moduls Fernmeldewesen nicht ermittelbar/),
+    ).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
@@ -640,9 +657,9 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
     client.setQueryData(['einsatz-einheiten', 1], EINHEITEN);
     renderMitProviders(
       <Routes>
-        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
       </Routes>,
-      { route: '/einsaetze/1/stab/funkplan', client },
+      { route: '/einsaetze/1/fernmeldewesen', client },
     );
     await screen.findByText('Florian ELW 1');
     expect(screen.queryByText('1. Zug')).toBeNull();
@@ -660,14 +677,18 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
   it('fragt keine Liste an, wenn die Freigaben scheitern, und zeigt den Fehler', async () => {
     vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     setup();
-    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Freigabe des Moduls Fernmeldewesen nicht ermittelbar/),
+    ).toBeInTheDocument();
     for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
   });
 
-  it('fragt keine Liste an, wenn der Stab gesperrt ist', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+  it('fragt keine Liste an, wenn das Fernmeldewesen gesperrt ist', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ fernmeldewesen: { zugriff: false } }),
+    );
     setup();
-    await screen.findByText(/Modul Stab nicht freigegeben/);
+    await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/);
     for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
   });
 
@@ -689,11 +710,11 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   function SuchAnzeige() {
     return <span data-testid="suche">{useLocation().search}</span>;
   }
-  function rendereMit(route = '/einsaetze/1/stab/funkplan') {
+  function rendereMit(route = '/einsaetze/1/fernmeldewesen') {
     return renderMitProviders(
       <>
         <Routes>
-          <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+          <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
         </Routes>
         <SuchAnzeige />
       </>,
@@ -708,9 +729,12 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     const { container } = rendereMit();
     await screen.findByText('Florian 1/42-1');
-    const umschalter = screen.getByRole('radiogroup', { name: 'Darstellung' });
-    expect(within(umschalter).getByRole('radio', { name: 'Tabelle' })).toBeChecked();
-    await userEvent.click(within(umschalter).getByRole('radio', { name: 'Skizze' }));
+    const umschalter = screen.getByRole('tablist');
+    expect(within(umschalter).getByRole('tab', { name: 'Funkplan' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await userEvent.click(within(umschalter).getByRole('tab', { name: 'Fernmeldeskizze' }));
     expect(within(skizze()).getByText('Abschnitt Nord')).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     // Fahrzeuge sind keine Knoten der Skizze.
@@ -719,30 +743,30 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 
   it('?ansicht=skizze öffnet die Skizze und räumt den Parameter', async () => {
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     expect(await screen.findByRole('region', { name: 'Fernmeldeskizze' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     expect(
-      within(screen.getByRole('radiogroup', { name: 'Darstellung' })).getByRole('radio', {
-        name: 'Skizze',
+      within(screen.getByRole('tablist')).getByRole('tab', {
+        name: 'Fernmeldeskizze',
       }),
-    ).toBeChecked();
+    ).toHaveAttribute('aria-selected', 'true');
   });
 
   it('ein unbrauchbarer Wert wird nur geräumt, die Darstellung bleibt Tabelle', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=quatsch');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=quatsch');
     await screen.findByText('Florian 1/42-1');
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     expect(container.querySelector('.ant-table')).not.toBeNull();
     expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
   });
 
-  it('zeigt bei gesperrtem Stab auch mit ?ansicht=skizze nur die Sperre', async () => {
+  it('zeigt bei gesperrtem Fernmeldewesen auch mit ?ansicht=skizze nur die Sperre', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: false } }),
+      freigabenFixture({ fernmeldewesen: { sichtbar: false } }),
     );
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
-    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
+    expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
   });
 
@@ -751,14 +775,14 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     await screen.findByText('Florian 1/42-1');
     expect(druckkopf(container)).toHaveTextContent('Funkplan');
     expect(druckkopf(container)).not.toHaveTextContent('Fernmeldeskizze');
-    await userEvent.click(screen.getByRole('radio', { name: 'Skizze' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Fernmeldeskizze' }));
     expect(druckkopf(container)).toHaveTextContent('Fernmeldeskizze');
     expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
   });
 
   // Spec „Druck als eigenes Druckstück“: die Funkplan-Tabelle folgt als Anlage ab neuer Seite.
   it('hängt im Druck der Skizze die ganze Funkplan-Tabelle als Anlage an', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() => expect(within(skizze()).getByText('1. Zug')).toBeInTheDocument());
     // Am Bildschirm keine Anlage.
@@ -795,7 +819,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 
   it('übernimmt auch aus der Skizze den Funkplan mit genau einem Aufruf', async () => {
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
@@ -809,7 +833,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 
   it('zeigt mit ?ansicht=skizze die Tabelle nie, auch nicht im ersten Bild', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     const tabellen: number[] = [];
     const beobachter = new MutationObserver(() =>
       tabellen.push(container.querySelectorAll('.ant-table').length),
@@ -821,17 +845,17 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 
   it('zählt im Umfang der Skizze keine Fahrzeuge, die sie nicht zeigt', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     expect(druckkopf(container)).toHaveTextContent('2 Abschnitte · 1 Einheiten');
     expect(druckkopf(container)).not.toHaveTextContent('Fahrzeuge');
-    await userEvent.click(screen.getByRole('radio', { name: 'Tabelle' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Funkplan' }));
     expect(druckkopf(container)).toHaveTextContent('2 Fahrzeuge');
   });
 
   it('nennt bei gesperrten Abschnitten den Grund statt eines Sammelknotens', async () => {
     vi.mocked(listeAbschnitte).mockRejectedValue(new ApiError(403, 'verboten'));
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     expect(
       await screen.findByText('Keine Skizze darstellbar — Abschnitte: nicht freigegeben'),
     ).toBeInTheDocument();
@@ -844,7 +868,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ einsatzabschnitte: { zugriff: false } }),
     );
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     expect(
       await screen.findByText('Keine Skizze darstellbar — Abschnitte: nicht freigegeben'),
     ).toBeInTheDocument();
@@ -854,7 +878,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
 
   it('nennt bei fehlenden Einheiten den Grund und zeigt die Abschnitte', async () => {
     vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(500, 'kaputt'));
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     const region = await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     expect(within(region).getByText('Abschnitt Nord')).toBeInTheDocument();
     // Über der Fläche nennt den Grund nur das Bild aus `netz.fehlend` (`skizze-fehlend`); die
@@ -881,11 +905,11 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   function SuchAnzeige() {
     return <span data-testid="suche">{useLocation().search}</span>;
   }
-  function rendereMit(route = '/einsaetze/1/stab/funkplan') {
+  function rendereMit(route = '/einsaetze/1/fernmeldewesen') {
     return renderMitProviders(
       <>
         <Routes>
-          <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+          <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
         </Routes>
         <SuchAnzeige />
       </>,
@@ -921,14 +945,17 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     rendereMit();
     await screen.findByText('Florian 1/42-1');
-    const umschalter = screen.getByRole('radiogroup', { name: 'Darstellung' });
+    const umschalter = screen.getByRole('tablist');
     expect(
       within(umschalter)
-        .getAllByRole('radio')
+        .getAllByRole('tab')
         .map((r) => r.textContent),
-    ).toEqual(['Tabelle', 'Skizze', 'Sprechgruppen']);
-    await userEvent.click(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' }));
-    expect(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
+    ).toEqual(['Funkplan', 'Fernmeldeskizze', 'Sprechgruppen', 'Kommunikationsplan']);
+    await userEvent.click(within(umschalter).getByRole('tab', { name: 'Sprechgruppen' }));
+    expect(within(umschalter).getByRole('tab', { name: 'Sprechgruppen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     const kopf = [...plan().querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
     expect(kopf).toEqual(['Sprechgruppe', 'Bedingung', 'Hinweis', 'Herkunft', 'Teilnehmer']);
     // Die Funkplan-Tabelle ist weg, Fahrzeuge sind keine Teilnehmer.
@@ -945,7 +972,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   });
 
   it('nennt je Sprechgruppe die Teilnehmer mit Rufnamen, jede führt zu ihrem Datensatz', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() => expect(zeile(container, 1)).not.toBeNull());
     const tmo = zeile(container, 1);
     await waitFor(() => expect(within(tmo).getByRole('link', { name: '1. Zug' })).toBeVisible());
@@ -968,7 +995,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   });
 
   it('zeigt eine einsatzlokale Sprechgruppe ohne Zuordnung mit „keine“ Teilnehmer', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() => expect(zeile(container, 9)).not.toBeNull());
     // Erst mit geladenen Abschnitten und Einheiten ist „keine“ belegt (vorher „lädt“).
     await waitFor(() => expect(within(zeile(container, 9)).getByText('keine')).toBeInTheDocument());
@@ -976,7 +1003,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   });
 
   it('?ansicht=sprechgruppen öffnet die Darstellung, räumt den Parameter, nie zuerst die Tabelle', async () => {
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     const tabellen: number[] = [];
     const beobachter = new MutationObserver(() =>
       tabellen.push(container.querySelectorAll('[aria-label="Funkplan"]').length),
@@ -986,14 +1013,17 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     beobachter.disconnect();
     expect(Math.max(0, ...tabellen)).toBe(0);
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
-    expect(screen.getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Sprechgruppen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   it('nennt im Druckkopf die Darstellung „Sprechgruppen“ und zählt keine Fahrzeuge', async () => {
     const { container } = rendereMit();
     await screen.findByText('Florian 1/42-1');
     expect(druckkopf(container)).not.toHaveTextContent('Sprechgruppen');
-    await userEvent.click(screen.getByRole('radio', { name: 'Sprechgruppen' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Sprechgruppen' }));
     expect(druckkopf(container)).toHaveTextContent('Funkplan – Sprechgruppen');
     expect(druckkopf(container)).toHaveTextContent('3 Sprechgruppen · 2 Abschnitte · 1 Einheiten');
     expect(druckkopf(container)).not.toHaveTextContent('Fahrzeuge');
@@ -1002,7 +1032,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
 
   it('Einheiten gesperrt: „—“ mit Grund statt „keine“, bekannte Teilnehmer „unvollständig“', async () => {
     vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(403, 'verboten'));
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() =>
       expect(
         within(zeile(container, 1)).getByRole('link', { name: 'Abschnitt Nord' }),
@@ -1024,7 +1054,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
 
   it('nennt die fehlende Sprechgruppenliste, statt lokale ohne Zuordnung still wegzulassen', async () => {
     vi.mocked(listeEinsatzSprechgruppen).mockRejectedValue(new ApiError(500, 'kaputt'));
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() => expect(zeile(container, 1)).not.toBeNull());
     expect(zeile(container, 9)).toBeNull();
     expect(
@@ -1033,7 +1063,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   });
 
   it('übernimmt auch aus dieser Darstellung den Funkplan mit genau einem Aufruf', async () => {
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await screen.findByRole('region', { name: 'Sprechgruppen' });
     const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
@@ -1043,12 +1073,12 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].titel).toMatch(/^Funkplan /);
   });
 
-  it('zeigt bei gesperrtem Stab auch mit ?ansicht=sprechgruppen nur die Sperre', async () => {
+  it('zeigt bei gesperrtem Fernmeldewesen auch mit ?ansicht=sprechgruppen nur die Sperre', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: false } }),
+      freigabenFixture({ fernmeldewesen: { sichtbar: false } }),
     );
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
-    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
+    expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
   });
 });
@@ -1176,10 +1206,10 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
  * Skizzendaten als eigene Quellen, das Netz EINMAL für Skizze, Lücken-Paneel und Übernahme.
  */
 describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
-  function rendereMit(route = '/einsaetze/1/stab/funkplan') {
+  function rendereMit(route = '/einsaetze/1/fernmeldewesen') {
     return renderMitProviders(
       <Routes>
-        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
       </Routes>,
       { route },
     );
@@ -1216,7 +1246,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     const z = await waitFor(() => lueckenZeile('Leitstelle: keine Verbindung erfasst'));
     expect(within(z).getByRole('link', { name: 'im Kommunikationsplan erfassen' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/stab/kommunikationsplan',
+      '/einsaetze/1/fernmeldewesen/kommunikationsplan',
     );
   });
 
@@ -1280,8 +1310,8 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     vi.mocked(ladeKommunikationsplan).mockResolvedValue([leitstelle()]);
     rendereMit();
     await screen.findByText('Florian 1/42-1');
-    for (const ansicht of ['Tabelle', 'Skizze', 'Sprechgruppen']) {
-      await userEvent.click(screen.getByRole('radio', { name: ansicht }));
+    for (const ansicht of ['Funkplan', 'Fernmeldeskizze', 'Sprechgruppen']) {
+      await userEvent.click(screen.getByRole('tab', { name: ansicht }));
       for (const titel of LUECKEN_NEU) {
         await waitFor(() => expect(lueckenZeile(titel)).not.toBeNull());
       }
@@ -1289,7 +1319,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
   });
 
   it('Klick im Paneel wählt in der Skizze das Element; in der Tabelle bleibt es ein Verweis', async () => {
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     const einheiten = lueckenZeile('Einheiten ohne Sprechgruppe');
     await waitFor(() => expect(within(einheiten).getByText('1')).toBeInTheDocument());
@@ -1307,36 +1337,36 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     // Die Fläche meldet ihre Wahl zurück (Klick ins Leere).
     act(() => bild.props?.onWahl?.(null));
     expect(screen.getByTestId('gewaehlt')).toHaveTextContent(/^$/);
-    await userEvent.click(screen.getByRole('radio', { name: 'Tabelle' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Funkplan' }));
     expect(
       within(lueckenZeile('Einheiten ohne Sprechgruppe')).getByRole('link', { name: '1. Zug' }),
     ).toHaveAttribute('href', '/einsaetze/1/einheiten/10');
   });
 
   it('gibt der Skizze Netz, Einsatzbezeichnung und Aktionen; ohne Schreibrecht keine Aktionen', async () => {
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() => expect(bild.props?.netz.darstellbar).toBe(true));
     expect(bild.props?.einsatzbezeichnung).toBe('Hochwasser Nord');
     expect(bild.props?.netz.einsatzId).toBe(1);
     expect(bild.props?.aktionen).not.toBeNull();
-    expect(bild.props?.netz.rechte.stab).toBe(true);
+    expect(bild.props?.netz.rechte.fernmeldewesen).toBe(true);
   });
 
   it('Beobachter: die Skizze ist schreibgeschützt', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() => expect(bild.props?.netz.darstellbar).toBe(true));
     expect(bild.props?.aktionen).toBeNull();
-    expect(bild.props?.netz.rechte.stab).not.toBe(true);
+    expect(bild.props?.netz.rechte.fernmeldewesen).not.toBe(true);
   });
 
   it('Leitstelle als Teilnehmer: mit „geplant“ und Verweis auf den Kommunikationsplan', async () => {
     vi.mocked(ladeKommunikationsplan).mockResolvedValue([
       leitstelle({ sprechgruppen: [{ sprechgruppe: SL_AS, status: 'geplant' }] }),
     ]);
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() =>
       expect(
         container.querySelector('[aria-label="Sprechgruppen"] tr[data-row-key="sg-31"]'),
@@ -1347,7 +1377,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     ) as HTMLElement;
     expect(within(z).getByRole('link', { name: 'ILS Musterhausen' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/stab/kommunikationsplan',
+      '/einsaetze/1/fernmeldewesen/kommunikationsplan',
     );
     expect(within(z).getByText('geplant')).toBeInTheDocument();
   });
@@ -1365,7 +1395,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
         ],
       }),
     );
-    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     await waitFor(() =>
       expect(
         within(
@@ -1419,12 +1449,14 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
   });
 
-  it('fragt Kommunikationsplan und Skizze nicht an, wenn der Stab gesperrt ist', async () => {
+  it('fragt Kommunikationsplan und Skizze nicht an, wenn das Fernmeldewesen gesperrt ist', async () => {
     vi.mocked(ladeKommunikationsplan).mockClear();
     vi.mocked(ladeFernmeldeskizze).mockClear();
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ fernmeldewesen: { zugriff: false } }),
+    );
     rendereMit();
-    await screen.findByText(/Modul Stab nicht freigegeben/);
+    await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/);
     expect(vi.mocked(ladeKommunikationsplan)).not.toHaveBeenCalled();
     expect(vi.mocked(ladeFernmeldeskizze)).not.toHaveBeenCalled();
   });
@@ -1435,7 +1467,7 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
   function rendereMit(route: string) {
     return renderMitProviders(
       <Routes>
-        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
       </Routes>,
       { route },
     );
@@ -1469,7 +1501,7 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
         },
       ],
     });
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() => expect(ausstattung('fs')).toEqual(['S2']));
     await waitFor(() => expect(ausstattung('ab-1')).toEqual(['EAL', 'ELW 1']));
@@ -1482,7 +1514,7 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
       ABSCHNITTE[1],
     ]);
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
-    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() =>
       expect(bild.props?.netz.fehlend).toContainEqual(

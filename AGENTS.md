@@ -23,7 +23,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
 | `frontend/src/entwurf/AGENTS.md` | Entwürfe, Lagebericht-Akkordeon |
 | `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
-| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Kommunikationsplan S6, Checkliste Arbeitsaufnahme |
+| `frontend/src/stab/AGENTS.md` | Stab und Fernmeldewesen: eigenes Modul für Funkplan, Skizze und Kommunikationsplan (S6), Stab-Weiche, Checkliste Arbeitsaufnahme, Presse S5 |
 | `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server |
 | `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Client und Server |

@@ -35,6 +35,7 @@ import {
   IconSprechblase,
   IconSprechblaseGefuellt,
   IconSprechblaseRund,
+  IconFunkmast,
   IconWarndreieck,
   IconZahnrad,
   IconZahnradGefuellt,
@@ -460,6 +461,17 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Kräfte und Mittel, Leitstelle',
   },
+  // LLH-1180: S6 als eigenes Modul, unabhängig von der Stab-Freigabe (ELW 1 ohne Stab). Die
+  // Beschreibung trägt „Funkplan“ vorn, damit „Funk“ in der Palette trifft (40 Zeichen, D1).
+  {
+    key: 'fernmeldewesen',
+    kategorie: 'kommunikation',
+    label: 'Fernmeldewesen',
+    icon: IconFunkmast,
+    route: 'fernmeldewesen',
+    status: 'fertig',
+    beschreibung: 'Funkplan, Skizze, Kommunikationsplan',
+  },
   // Einstellungen
   {
     key: 'einsatz-einstellungen',
@@ -520,8 +532,22 @@ export function modulAusPfad(
   const teile = pathname.split('/').filter(Boolean); // z. B. ['einsaetze','5','etb']
   // Der Präfix wird mitgeprüft: sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
   if (teile[0] !== 'einsaetze') return null;
+  const altpfad = ALTPFAD_MODUL[`${teile[2]}/${teile[3]}`];
+  if (altpfad) return modulZuRoute(altpfad, register);
   return modulZuRoute(teile[2], register);
 }
+
+/**
+ * Altpfade, die auf ein anderes Modul umleiten (LLH-1180, design.md D7): Sie gehören dem Ziel der
+ * Weiterleitung, damit der Rahmen sie nach dessen Freigabe gatet. Sonst finge ein ausgeblendeter
+ * Stab `stab/funkplan` ab, bevor die Weiterleitung ins Fernmeldewesen läuft. Spiegel von
+ * `PFAD_KEY` im Backend (`src/einsatz/modul.rs`), wo dieselben Pfade per längstem Präfix
+ * `fernmeldewesen` gehören.
+ */
+const ALTPFAD_MODUL: Readonly<Record<string, string>> = {
+  'stab/funkplan': 'fernmeldewesen',
+  'stab/kommunikationsplan': 'fernmeldewesen',
+};
 
 /** Module, die nicht ausgeblendet werden dürfen (Spiegel von `NICHT_AUSBLENDBAR` im Backend). */
 const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;

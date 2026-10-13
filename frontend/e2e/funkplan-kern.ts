@@ -80,7 +80,7 @@ export async function seede(page: Page, einsatzId: string) {
 export const tabelle = (page: Page) => page.getByRole('region', { name: 'Funkplan' });
 
 export async function oeffne(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+  await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
   // Datenanker: das Fahrzeug steht erst, wenn Abschnitt, Einheit und Fahrzeug geladen sind.
   await expect(tabelle(page).getByText(FAHRZEUG)).toBeVisible();
 }
