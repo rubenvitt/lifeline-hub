@@ -23,12 +23,13 @@ dürfen Einsatzleitung und Führungspersonal.
 1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen.
 2. In der Tabelle „Gliederung“ je Einheit „Einheitsführer“, „Ist“, „Soll“, „Abschnitt“ und
    „Fahrzeuge“ lesen. Unterstellte Einheiten stehen eingerückt unter ihrer Über-Einheit; das Plus-
-   bzw. Minuszeichen vor einer Einheit klappt ihre Untereinheiten auf und zu.
+   bzw. Minuszeichen vor einer Einheit klappt ihre Untereinheiten auf und zu. Am Handy stehen
+   nur Einheit, „Ist“ und „Soll“; die übrigen Spalten holt der Knopf „Spalten · 3 ausgeblendet“
+   zurück.
 
    ![Tabelle „Gliederung“ mit dem Sanitätszug, der eingerückten Rettungsstaffel samt Einheitsführerin und weiteren Einheiten, je mit Ist- und Soll-Stärke, Abschnitt und Fahrzeugen](../bilder/einheiten/gliederung.png)
 
-3. Am Handy stehen nur Einheit, „Ist“ und „Soll“; die übrigen Spalten holt „Spalten“ zurück.
-4. Den Namen einer Einheit wählen, um ihre Seite zu öffnen.
+3. Den Namen einer Einheit wählen, um ihre Seite zu öffnen.
 
 ### Eine Einheit bilden
 
