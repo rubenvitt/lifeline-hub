@@ -147,6 +147,8 @@ use utoipa::OpenApi;
         crate::einsatz::zaehler::AuftragsZaehler,
         crate::einsatz::zaehler::ErinnerungsZaehler,
         crate::einsatz::zaehler::ChatZaehler,
+        crate::einsatz::zaehler::LagemeldungsZaehler,
+        crate::routes::meldung::LageGesehenAnzeige,
         crate::routes::etb::EtbAnzahlAnzeige,
         crate::etb::EtbTyp,
         crate::etb::MeldeWeg,

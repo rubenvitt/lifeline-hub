@@ -1,3 +1,15 @@
+## [1.0.0-alpha.122](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.121...v1.0.0-alpha.122) (2026-10-13)
+
+### Gekoppelte Geräte
+
+- **Abschnittsgeräte quittieren Einsatzbefehle:** Das Tablet eines Einsatzabschnitts zeigt auf der Seite „Aufträge“ einen neuen Block „Einsatzbefehle“. Dort stehen die geltenden Fassungen der Einsatzbefehle, deren Verteiler einen Eintrag für diesen Abschnitt enthält. Das Gerät kann den Befehlstext öffnen, seinen Eintrag selbst quittieren und die Quittung wieder zurücknehmen. Das geht auch, wenn die Leitung die Quittung gesetzt hat.
+- Entwürfe, überholte Fassungen und Einträge anderer Abschnitte sieht das Gerät nicht. An fremden Zeilen gibt es keinen Knopf zum Quittieren.
+- Das Anwenderkapitel zum Abschnittsgerät beschreibt die Befehlsquittung und hat ein neues Bild dazu.
+
+### Kräfte und Mittel
+
+- **Ablösungen erscheinen ohne Neuladen:** Wird eine Ablösung vollzogen oder zurückgenommen, sehen andere Nutzer die Änderung an der Einheit und an ihren Personen jetzt sofort. Bisher sahen Nutzer, die nur Einheiten oder nur Personal sehen dürfen, die Änderung erst nach dem Neuladen der Seite.
+
 ## [1.0.0-alpha.121](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.120...v1.0.0-alpha.121) (2026-10-13)
 
 ### Wichtige Änderungen

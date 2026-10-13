@@ -24,9 +24,9 @@ use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, setup_mit
 static STATEMENTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 const MESSPUNKT: &str = "SELECT 'messpunkt-lfh-935'";
 
-/// Was die Listen laden und eine Zählung nie braucht: Meldungstext, Erinnerungstitel,
-/// Kanalname, die gebündelten Auftragsempfänger.
-const LISTENSPALTEN: [&str; 4] = ["m.inhalt", "e.titel", "k.name", "json_each"];
+/// Was die Listen laden und eine Zählung nie braucht: Meldungstext, Text der Lagemeldung,
+/// Erinnerungstitel, Kanalname, die gebündelten Auftragsempfänger.
+const LISTENSPALTEN: [&str; 5] = ["m.inhalt", "lm.text", "e.titel", "k.name", "json_each"];
 
 /// Sammelt die Statements von sqlx (volles SQL, sonst die Zusammenfassung), ohne den Messpunkt.
 struct StatementSammler;
@@ -88,6 +88,7 @@ async fn statements_von_berechne(
         "erinnerungen",
         "chat",
         "dokumente",
+        "lagemeldungen",
     ]
     .into_iter()
     .collect();
@@ -119,9 +120,9 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         .unwrap();
     let basis = format!("/api/einsaetze/{einsatz}");
 
-    // Neun Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
+    // Zehn Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
     let leer = statements_von_berechne(&pool, einsatz, &admin).await.len();
-    assert_eq!(leer, 9, "leerer Einsatz: {leer} Statements");
+    assert_eq!(leer, 10, "leerer Einsatz: {leer} Statements");
 
     // Bestand: Aufträge mit je drei Empfängern (der frühere Listenpfad lud sie mit), Meldungen,
     // Erinnerungen und Chat-Nachrichten eines anderen Benutzers.
@@ -149,13 +150,24 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
             "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
             "inhalt": format!("Meldung {i}"), "ereigniszeit": "2026-06-12 09:00:00"
         });
-        post(
+        let m = post(
             &app,
             &cookie,
             &format!("{basis}/meldungen"),
             &body.to_string(),
         )
         .await;
+        // Jede dritte Meldung an die Lage übergeben (LLH-1206).
+        if i % 3 == 0 {
+            let mid = m["id"].as_i64().unwrap();
+            post(
+                &app,
+                &cookie,
+                &format!("{basis}/meldungen/{mid}/lagerelevant"),
+                "{}",
+            )
+            .await;
+        }
     }
     for i in 0..50 {
         let body = json!({ "titel": format!("Erinnerung {i}"), "faellig_at": "2026-06-11 10:00" });

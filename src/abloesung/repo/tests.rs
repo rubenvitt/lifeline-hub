@@ -496,7 +496,7 @@ async fn vollzug_mit_abloesender_einheit_legt_folgeschicht_an() {
         .await
         .unwrap();
     let jetzt = "2026-09-22 15:40:00";
-    let (v, etb_id) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+    let (v, etb_id, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
         .await
         .unwrap();
     assert_eq!(v.abgeloest.status, AbloesungStatus::Abgeloest);
@@ -549,7 +549,7 @@ async fn vollzug_ohne_abloesende_einheit() {
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
-    let (v, _) = vollziehen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:40:00", None, T0)
+    let (v, _, _) = vollziehen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:40:00", None, T0)
         .await
         .unwrap();
     assert!(v.folgeschicht.is_none());
@@ -640,12 +640,12 @@ async fn ruecknahme_direkt_nach_vollzug() {
             .await
             .unwrap();
     }
-    let (v, vollzug_etb) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+    let (v, vollzug_etb, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
         .await
         .unwrap();
     let folge = v.folgeschicht.unwrap();
 
-    let (r, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:41:00")
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:41:00")
         .await
         .unwrap();
     assert_eq!(r.status, AbloesungStatus::Laufend);
@@ -691,7 +691,7 @@ async fn ruecknahme_nach_vollzug_der_folgeschicht_ist_422() {
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
-    let (v, _) = vollziehen(
+    let (v, _, _) = vollziehen(
         &w.pool,
         w.e,
         a.id,

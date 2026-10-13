@@ -24,6 +24,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
   nicht); Fremdes ist 404, ein fremder Meldungsabsender 403, ohne Angabe meldet der Abschnitt.
   Quittiert wird nur die eigene Empfängerzeile (`darfQuittierenFuer` an `AuftragKarte`).
+  Einsatzbefehle (LLH-1190) liest und quittiert das Gerät über die geteilten Befehlsrouten, aber
+  nur die geltende Fassung mit einem eigenen Verteiler-Eintrag (`routes/befehl.rs`,
+  `is_sichtbar_im_bereich`); Entwurf, überholte Fassung und fremder Eintrag sind 404. Im Client
+  stehen sie unter den Aufträgen (`geraet/GeraetBefehle.tsx`), „Quittieren“ nur an eigenen
+  Einträgen.
   Gefahrenzonen zeigt das Gerät einsatzweit, Bezirke und Skizzen nicht. Einsatzweite Zähler
   (`modul_zaehler.rs`) bekommt es nicht. Die Karte kommt ohne gespeicherte Kartenansicht aus,
   die steht in keiner Routenliste.

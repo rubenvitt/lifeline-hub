@@ -1,7 +1,7 @@
 import { IconOrtsmarke, IconPlus } from '../icons';
 import { Alert, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
@@ -34,8 +34,13 @@ import { einsatzStatus } from '../theme/statusFarben';
 // Ausfall wäre in keinem Test sichtbar.
 import '../theme/sprache.css';
 import './EinsaetzePage.css';
-import { monoStil, useRollen } from '../components/instrument';
-import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
+import { monoStil, Sammelbanner, useRollen } from '../components/instrument';
+import {
+  flachZufluss,
+  useZuflussSchleuse,
+  useZuflussSteuerung,
+} from '../components/useZuflussSchleuse';
+import { einsaetzeBannerText, einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
@@ -148,6 +153,10 @@ function KachelSkelett() {
   );
 }
 
+/** Schlüssel und Gruppe der Zuflussschleuse (LLH-1204); außerhalb, damit sie stabil bleiben. */
+const einsatzSchluessel = (e: EinsatzAnzeige) => e.id;
+const einsatzGruppe = (e: EinsatzAnzeige) => e.status;
+
 /**
  * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
  * Zeitzone der Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
@@ -247,6 +256,9 @@ function EinsaetzeInhalt() {
   });
 
   const [suche, setSuche] = useState('');
+  // Zuflussschleuse der Kacheln (LLH-1204), Erklärung unten bei `useZuflussSchleuse`.
+  const zufluss = useZuflussSteuerung<EinsatzAnzeige>();
+  const { nachBenutzeraktion } = zufluss;
 
   // Der jüngste Einsatz zuerst: gesucht wird meist der, der gerade läuft. Der Wirestring
   // (`YYYY-MM-DD HH:mm:ss`) ist direkt sortierbar.
@@ -262,7 +274,61 @@ function EinsaetzeInhalt() {
       (f ?? '').toLowerCase().includes(suchbegriff),
     );
   const sichtbareAktive = aktive.filter(passt);
-  const sucheZeigen = aktive.length >= SUCHE_AB;
+
+  /**
+   * ZUFLUSS (LLH-1204, `frontend/AGENTS.md`, „Layout und Live“): legt jemand anderes einen Einsatz
+   * an, lädt das Org-Ereignis `einsatzliste` die Liste neu, und der jüngste rückt vorn ein. Ohne
+   * Schleuse stünde der Zeiger danach auf der Nachbarkachel, ein Klick öffnete einen anderen
+   * Einsatz. Deshalb dieselbe Schleuse wie die `Datensicht` (`components/useZuflussSchleuse.ts`):
+   * Zeiger (ohne Touch) oder Fokus im Bereich halten Menge, Folge und Sektion der Kacheln, der
+   * Inhalt fließt, Entfallenes fällt weg. Neues nennt der Sammelbanner; verlassen Zeiger und Fokus
+   * den Bereich, sortiert es sich ein.
+   *
+   * Der Bereich umfasst Suchfeld, beide Raster und die Sektion „Abgeschlossen“: ein Zuwachs oben
+   * schöbe sonst die abgeschlossenen Kacheln unter dem Zeiger weg, und der Weg zum Banner taute
+   * nicht auf. Die Gruppe (`status`) friert mit ein: ein Einsatz, der woanders abgeschlossen wird,
+   * wechselt nicht unter dem Zeiger die Sektion.
+   */
+  const bereichRef = useRef<HTMLDivElement>(null);
+  const frisch = [...sichtbareAktive, ...abgeschlossene];
+  const zuflussBereich = useZuflussSchleuse(zufluss, {
+    zeilen: frisch,
+    schluessel: einsatzSchluessel,
+    aktiv: true,
+    gruppeVon: einsatzGruppe,
+    mitGerippe: false,
+    wurzel: bereichRef,
+  });
+  const gehalten = zufluss.stand.art === 'gefroren' ? zufluss.stand : null;
+  const gezeigt = gehalten
+    ? flachZufluss(gehalten.folge, frisch, einsatzSchluessel).zeilen
+    : frisch;
+  const gruppe = (e: EinsatzAnzeige) => gehalten?.gruppeVon.get(e.id) ?? e.status;
+  const gezeigteAktive = gezeigt.filter((e) => gruppe(e) === 'aktiv');
+  const gezeigteAbgeschlossene = gezeigt.filter((e) => gruppe(e) === 'abgeschlossen');
+  const gehalteneMenge = new Set(gehalten?.folge ?? []);
+  const wartend = gehalten ? frisch.filter((e) => !gehalteneMenge.has(e.id)).length : 0;
+  const bannerText = einsaetzeBannerText(wartend);
+  // Höhe des Sammelbanners (Knopf `controlHeight` + Innenabstand + Rand, wie im `HaengenderBaum`);
+  // um sie hält der klebende Anker Abstand zum unteren Fensterrand.
+  const bannerHoehe = token.controlHeight + 2 * token.paddingXS + 2;
+
+  /**
+   * Das Suchfeld steht über dem Raster; sein Erscheinen schiebt die Kacheln um eine Zeile. Unter
+   * gehaltener Schleuse gilt deshalb der Stand beim Einfrieren: steht ein Suchbegriff, stand das
+   * Feld schon, sonst zählt die gehaltene Menge (ohne Suchbegriff ungefiltert). So erscheint das
+   * Feld nicht, wenn der achte Einsatz unter dem Zeiger eintrifft, und es verschwindet nicht, während
+   * jemand darin tippt.
+   */
+  const gehalteneAktive = gehalten
+    ? [...gehalten.gruppeVon.values()].filter((g) => g === 'aktiv').length
+    : 0;
+  // Auch im Zwischenschritt `neu` (eine Benutzeraktion ordnet gerade neu) bleibt ein Feld mit
+  // Suchbegriff stehen; sonst räumte der Effekt unten den Begriff mitten im Tippen.
+  const sucheZeigen =
+    zufluss.stand.art === 'offen'
+      ? aktive.length >= SUCHE_AB
+      : suche !== '' || (gehalten ? gehalteneAktive : aktive.length) >= SUCHE_AB;
 
   // Fällt die Zahl aktiver Einsätze unter SUCHE_AB, während ein Suchbegriff steht (etwa nach einem
   // Refetch bei Fensterfokus), verschwindet das Suchfeld samt `allowClear`. `suche` wird dann
@@ -276,6 +342,24 @@ function EinsaetzeInhalt() {
   // Filtert die Suche alle aktiven Einsätze weg, ist `leer` weiterhin false (es gibt Einsätze);
   // ohne diesen Zweig stünde eine stumme Fläche da.
   const keineTreffer = sucheZeigen && suchbegriff !== '' && sichtbareAktive.length === 0;
+
+  /**
+   * „anzeigen“ ordnet neu, und der Knopf verschwindet mit dem Banner. Der Fokus geht danach auf
+   * die vorderste Kachel, also den neuen Einsatz, statt auf `body` zu fallen (WCAG 2.4.3; Muster
+   * `ErfassungsAnhaenge`). Er bleibt damit im Bereich, und die Schleuse hält mit der neuen Folge.
+   */
+  const fokusAufErste = useRef(false);
+  const zeigeWartende = () => {
+    fokusAufErste.current = true;
+    nachBenutzeraktion();
+  };
+  useLayoutEffect(() => {
+    if (!fokusAufErste.current || bannerText !== null) return;
+    fokusAufErste.current = false;
+    bereichRef.current
+      ?.querySelector<HTMLElement>('[data-lfh="einsatzkachel"] a')
+      ?.focus({ preventScroll: true });
+  });
 
   /**
    * Die Einsatzkachel: Fläche + Haarlinie statt antd-Card. Kopf: Status-Punkt und der Titel-Link
@@ -390,65 +474,93 @@ function EinsaetzeInhalt() {
         </div>
       )}
 
-      {!isPending && sucheZeigen && (
-        <div style={{ marginBottom: abstand.md, maxWidth: flaeche.kachelMin * 2 }}>
-          <Input.Search
-            aria-label="Einsätze durchsuchen"
-            placeholder="Bezeichnung, Ort oder Stichwort"
-            allowClear
-            value={suche}
-            onChange={(ev) => setSuche(ev.target.value)}
-          />
-        </div>
-      )}
-
-      {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
-          heraus ist das `allowClear` am Suchfeld darüber. */}
-      {!isPending && keineTreffer && (
-        <div style={{ marginBottom: abstand.lg }}>
-          <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
-        </div>
-      )}
-
-      {/* Ein Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe Abstand,
-          dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
-      <div
-        data-testid="einsaetze-raster"
-        style={rasterStil(flaeche.kachelMin, abstand.md)}
-        aria-busy={isPending || undefined}
-        aria-label={isPending ? 'Einsätze werden geladen' : undefined}
-      >
-        {isPending ? (
-          <>
-            <KachelSkelett />
-            <KachelSkelett />
-            <KachelSkelett />
-          </>
-        ) : (
-          <>
-            {darfAnlegen && (
-              <Button
-                type="dashed"
-                icon={<IconPlus />}
-                onClick={() => setDialogOffen(true)}
-                style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
-              >
-                Neuer Einsatz
-              </Button>
-            )}
-            {sichtbareAktive.map((e: EinsatzAnzeige) => renderKarte(e))}
-          </>
-        )}
-      </div>
-
-      {abgeschlossene.length > 0 && (
-        <div style={{ marginTop: abstand.lg }}>
-          <SektionHeader titel="Abgeschlossen" />
-          <div style={rasterStil(flaeche.kachelMinKlein, abstand.md)}>
-            {abgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
+      <div ref={bereichRef} data-lfh="einsaetze-bereich" {...zuflussBereich}>
+        {!isPending && sucheZeigen && (
+          <div style={{ marginBottom: abstand.md, maxWidth: flaeche.kachelMin * 2 }}>
+            <Input.Search
+              aria-label="Einsätze durchsuchen"
+              placeholder="Bezeichnung, Ort oder Stichwort"
+              allowClear
+              value={suche}
+              onChange={(ev) => {
+                setSuche(ev.target.value);
+                // Die eigene Suche ordnet sofort neu, sie ist kein Zufluss.
+                nachBenutzeraktion();
+              }}
+            />
           </div>
+        )}
+
+        {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
+            heraus ist das `allowClear` am Suchfeld darüber. */}
+        {!isPending && keineTreffer && (
+          <div style={{ marginBottom: abstand.lg }}>
+            <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
+          </div>
+        )}
+
+        {/* Ein Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe Abstand,
+            dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
+        <div
+          data-testid="einsaetze-raster"
+          style={rasterStil(flaeche.kachelMin, abstand.md)}
+          aria-busy={isPending || undefined}
+          aria-label={isPending ? 'Einsätze werden geladen' : undefined}
+        >
+          {isPending ? (
+            <>
+              <KachelSkelett />
+              <KachelSkelett />
+              <KachelSkelett />
+            </>
+          ) : (
+            <>
+              {darfAnlegen && (
+                <Button
+                  type="dashed"
+                  icon={<IconPlus />}
+                  onClick={() => setDialogOffen(true)}
+                  style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
+                >
+                  Neuer Einsatz
+                </Button>
+              )}
+              {gezeigteAktive.map((e: EinsatzAnzeige) => renderKarte(e))}
+            </>
+          )}
         </div>
-      )}
+
+        {gezeigteAbgeschlossene.length > 0 && (
+          <div style={{ marginTop: abstand.lg }}>
+            <SektionHeader titel="Abgeschlossen" />
+            <div style={rasterStil(flaeche.kachelMinKlein, abstand.md)}>
+              {gezeigteAbgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
+            </div>
+          </div>
+        )}
+
+        {/* Überlagerung mit Nullhöhe am Ende des Bereichs (Muster `ErfassungsAnhaenge`,
+            `InfotelefonPage`): der Banner nimmt keinen Platz im Fluss und verschiebt keine Kachel.
+            Unten statt oben: oben deckte er die Titel der ersten Reihe, also genau das, worauf der
+            Zeiger zielt. Passt der Bereich ins Fenster, steht der Banner unter den Kacheln und
+            deckt nichts; reicht er darüber hinaus, klebt er am unteren Fensterrand. Er schließt ohne
+            Lücke an: ein Spalt läge außerhalb des Bereichs, und der Weg zum Banner taute auf. */}
+        <div style={{ position: 'sticky', bottom: bannerHoehe, height: 0, zIndex: 5 }}>
+          {bannerText !== null && (
+            <Sammelbanner
+              aktion={{ label: 'anzeigen', onKlick: zeigeWartende }}
+              style={{
+                position: 'absolute',
+                insetInline: 0,
+                height: bannerHoehe,
+                boxSizing: 'border-box',
+              }}
+            >
+              {bannerText}
+            </Sammelbanner>
+          )}
+        </div>
+      </div>
 
       {!isPending && demoHinweis && (
         <div data-lfh="demo-hinweis" style={{ marginTop: abstand.lg }}>

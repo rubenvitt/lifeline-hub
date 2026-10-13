@@ -13,6 +13,8 @@ import { FakeEventSource } from '../test/eventSource';
 import type {
   Auftrag,
   AuftragEmpfaenger,
+  BefehlAnzeige,
+  BefehlKopf,
   Einheit,
   Einsatzabschnitt,
   GeraetAnzeige,
@@ -20,7 +22,7 @@ import type {
 } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { ordneEinheiten } from './GeraetAbschnittPage';
-import { istEigenerEmpfaenger } from './GeraetAuftraegePage';
+import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
 
@@ -126,6 +128,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
       quittiert.push(`${params.aid}/${params.eid}`);
       return HttpResponse.json(auftrag);
     }),
+    http.get('/api/einsaetze/7/befehle', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
     http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
       gesendet.push(await request.json());
@@ -256,6 +259,140 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
     // Kein Absenderbezug vom Gerät: den setzt der Server auf den gebundenen Abschnitt.
     expect(gesendet[0]).not.toHaveProperty('abschnitt_id');
     expect(gesendet[0]).not.toHaveProperty('einheit_id');
+  });
+});
+
+/** Ein geltender Befehl an UA Nord-Ost (eigen) und EA Süd (fremd). */
+function befehlKopf(quittiertOst: string | null = null): BefehlKopf {
+  return {
+    id: 51,
+    einsatz_id: 7,
+    vorlage: 'befehl_lad',
+    titel: 'Deichverteidigung Nord',
+    zeitstand: '2026-10-04 09:00:00',
+    status: 'freigegeben',
+    version: 2,
+    vorgaenger_id: 50,
+    ersteller_id: 1,
+    ersteller_name: 'Einsatzleiter',
+    erstellt_at: '2026-10-04 08:50:00',
+    freigegeben_von_id: 1,
+    freigegeben_von_name: 'Einsatzleiter',
+    freigegeben_at: '2026-10-04 09:05:00',
+    etb_eintrag_id: 17,
+    is_quittierbar: true,
+    verteiler: [
+      {
+        id: 81,
+        empfaenger_typ: 'abschnitt',
+        abschnitt_id: 21,
+        snap_anzeige: 'UA Nord-Ost',
+        quittiert_at: quittiertOst,
+      },
+      { id: 82, empfaenger_typ: 'abschnitt', abschnitt_id: 30, snap_anzeige: 'EA Süd' },
+    ],
+  } as BefehlKopf;
+}
+
+function befehlAnzeige(quittiertOst: string | null = null): BefehlAnzeige {
+  return {
+    ...befehlKopf(quittiertOst),
+    aktualisiert_at: '2026-10-04 09:05:00',
+    abschnitte: [
+      { schluessel: 'lage', text: 'Pegel steigt' },
+      { schluessel: 'auftrag', text: 'Deich halten' },
+      { schluessel: 'durchfuehrung', text: 'Sandsäcke' },
+    ],
+  } as BefehlAnzeige;
+}
+
+/** Befehle am Gerät: Liste, Quittung und Rücknahme mitschreiben. */
+function befehleBereit() {
+  const aufrufe: string[] = [];
+  let quittiert: string | null = null;
+  server.use(
+    http.get('/api/einsaetze/7/befehle', () => HttpResponse.json([befehlKopf(quittiert)])),
+    http.get('/api/einsaetze/7/befehle/51', () => {
+      aufrufe.push('detail');
+      return HttpResponse.json(befehlAnzeige(quittiert));
+    }),
+    http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/quittieren', ({ params }) => {
+      aufrufe.push(`quittieren ${params.bid}/${params.vid}`);
+      quittiert = '2026-10-04 09:30:00';
+      return HttpResponse.json(befehlAnzeige(quittiert));
+    }),
+    http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/zuruecknehmen', ({ params }) => {
+      aufrufe.push(`zuruecknehmen ${params.bid}/${params.vid}`);
+      quittiert = null;
+      return HttpResponse.json(befehlAnzeige(null));
+    }),
+  );
+  return aufrufe;
+}
+
+describe('Abschnittsgerät — Einsatzbefehle (LLH-1190)', () => {
+  it('ohne Befehl an den Bereich fehlt der Block', async () => {
+    stelleBereit();
+    renderApp('/geraet/7/auftraege');
+    expect(await screen.findByText('Deich Nord sichern')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Einsatzbefehle' })).toBeNull();
+  });
+
+  it('quittiert nur den eigenen Eintrag, ohne Rückfrage, und „Rückgängig“ nimmt zurück', async () => {
+    stelleBereit();
+    const aufrufe = befehleBereit();
+    renderApp('/geraet/7/auftraege');
+    const block = (await screen.findByRole('heading', { level: 2, name: 'Einsatzbefehle' }))
+      .parentElement!;
+    const karte = within(block).getByText('Deichverteidigung Nord').closest('article')!;
+    expect(within(karte).getByText('v2')).toBeVisible();
+    // Der fremde Empfänger steht offen da, aber ohne Knopf.
+    expect(within(karte).getByText('EA Süd')).toBeVisible();
+    const knopf = await within(karte).findByRole('button', {
+      name: 'Empfang für UA Nord-Ost quittieren',
+    });
+    expect(
+      within(karte).queryByRole('button', { name: 'Empfang für EA Süd quittieren' }),
+    ).toBeNull();
+
+    const user = userEvent.setup();
+    await user.click(knopf);
+    await waitFor(() => expect(aufrufe).toContain('quittieren 51/81'));
+    await user.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toContain('zuruecknehmen 51/81'));
+    expect(
+      await within(karte).findByRole('button', { name: 'Empfang für UA Nord-Ost quittieren' }),
+    ).toBeVisible();
+  });
+
+  it('lädt den Befehlstext erst beim Aufklappen', async () => {
+    stelleBereit();
+    const aufrufe = befehleBereit();
+    renderApp('/geraet/7/auftraege');
+    const knopf = await screen.findByRole('button', { name: 'Befehlstext' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(aufrufe).not.toContain('detail');
+    const user = userEvent.setup();
+    await user.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Deich halten')).toBeVisible();
+  });
+
+  it('eine abgelehnte Quittung steht an der Karte', async () => {
+    stelleBereit();
+    befehleBereit();
+    server.use(
+      http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/quittieren', () =>
+        HttpResponse.json({ error: 'Eine neuere Fassung ist freigegeben' }, { status: 422 }),
+      ),
+    );
+    renderApp('/geraet/7/auftraege');
+    const karte = (await screen.findByText('Deichverteidigung Nord')).closest('article')!;
+    const user = userEvent.setup();
+    await user.click(
+      await within(karte).findByRole('button', { name: 'Empfang für UA Nord-Ost quittieren' }),
+    );
+    expect(await within(karte).findByText('Eine neuere Fassung ist freigegeben')).toBeVisible();
   });
 });
 
@@ -410,14 +547,14 @@ describe('Bausteine', () => {
     expect(liste.map((e) => e.name)).toEqual(['Z', 'C', 'A', 'B']);
   });
 
-  it('istEigenerEmpfaenger: Abschnitt des Teilbaums oder eigene Einheit', () => {
+  it('isEigenerEmpfaenger: Abschnitt des Teilbaums oder eigene Einheit', () => {
     const a = new Set([20, 21]);
     const e = new Set([4]);
-    expect(istEigenerEmpfaenger({ abschnitt_id: 21, einheit_id: null }, a, e)).toBe(true);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 4 }, a, e)).toBe(true);
-    expect(istEigenerEmpfaenger({ abschnitt_id: 30, einheit_id: null }, a, e)).toBe(false);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 9 }, a, e)).toBe(false);
-    expect(istEigenerEmpfaenger({ abschnitt_id: null, einheit_id: null }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: 21, einheit_id: null }, a, e)).toBe(true);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 4 }, a, e)).toBe(true);
+    expect(isEigenerEmpfaenger({ abschnitt_id: 30, einheit_id: null }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: 9 }, a, e)).toBe(false);
+    expect(isEigenerEmpfaenger({ abschnitt_id: null, einheit_id: null }, a, e)).toBe(false);
   });
 
   it('navigationZeigt: unbekannt offen, gesperrt oder ausgeblendet zu, fehlendes Modul zu', () => {

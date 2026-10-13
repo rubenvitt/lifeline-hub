@@ -700,3 +700,184 @@ async fn handstatus_meldet_personal_fuer_den_fan_out() {
         "Einheit trägt das Eintreffen schon"
     );
 }
+
+// ── Ablösung ────────────────────────────────────────────────────────────────────────────────
+
+const EINHEIT_UND_PERSONAL: &[(&str, &str)] =
+    &[("einheit", "einheit_id"), ("personal", "personal_id")];
+
+/// Welt für den Vollzug: die Einheit ist eingetroffen (Fan-out auf Anna und Carla), Carla danach
+/// per eigenem Status entlassen — ihre Kopie der Ablösung wird ausgelassen. Bert gehört zu keiner
+/// Einheit. Liefert `(carla, bert, schicht)`.
+async fn abloesung_bereit(w: &Welt) -> (i64, i64, i64) {
+    let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let carla = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Carla").await;
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("{}/personal/{carla}", w.einheit_pfad()),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let jetzt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let (s, json) = w
+        .nachtrag(
+            &w.einheit_pfad(),
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{jetzt}"}}"#),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    let entlassen = status_anlegen(
+        &w.app,
+        &w.admin,
+        "personal-status",
+        r#"{"label":"entlassen","kategorie":"gebunden","zeitachse_marke":"entlassung"}"#,
+    )
+    .await;
+    let (s, _) = anfrage(
+        &w.app,
+        "PATCH",
+        &format!("/api/einsaetze/{}/personal/{carla}", w.e),
+        &w.admin,
+        Some(&format!(r#"{{"status_id":{entlassen}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, schicht) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/abloesungen", w.e),
+        &w.admin,
+        Some(&format!(
+            r#"{{"einheit_id":{},"rhythmus_minuten":480}}"#,
+            w.einheit
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{schicht:?}");
+    (carla, bert, schicht["id"].as_i64().unwrap())
+}
+
+async fn vollziehen(w: &Welt, schicht: i64) {
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/abloesungen/{schicht}/vollzug", w.e),
+        &w.admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+}
+
+/// Schicht einer zweiten Einheit ohne Personen und ohne Zeitachse: ihr Vollzug trifft keine
+/// offene Periode.
+async fn schicht_ohne_periode(w: &Welt) -> i64 {
+    let einheit = einheit_bilden(&w.app, &w.admin, w.e, "Florian 2").await;
+    let (s, schicht) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/abloesungen", w.e),
+        &w.admin,
+        Some(&format!(
+            r#"{{"einheit_id":{einheit},"beginn_at":"{}","rhythmus_minuten":480}}"#,
+            vor(2, 0)
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{schicht:?}");
+    schicht["id"].as_i64().unwrap()
+}
+
+async fn zuruecknehmen(w: &Welt, schicht: i64) {
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{}/abloesungen/{schicht}/vollzug/zuruecknehmen",
+            w.e
+        ),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+}
+
+/// Der Vollzug schreibt die Ablösung an die Einheit und per Fan-out an ihre Personen; Leser
+/// nur mit Einheiten- oder Personalrecht erreicht `abloesung` nicht, also meldet er `einheit`
+/// und `personal` genau für die Kräfte, deren Zeitachse sich ändert (LLH-1189). Carla (Kopie
+/// ausgelassen), Bert (keine Einheit) und ein Vollzug ohne offene Periode melden nichts davon.
+#[tokio::test]
+async fn vollzug_meldet_einheit_und_personal() {
+    let (app, live) = setup_mit_live().await;
+    let w = welt_in(app).await;
+    let (carla, bert, schicht) = abloesung_bereit(&w).await;
+    let ohne = schicht_ohne_periode(&w).await;
+
+    let mut rx = live.abonniere(w.e);
+    vollziehen(&w, schicht).await;
+    assert_eq!(
+        objekt_ereignisse(&mut rx, EINHEIT_UND_PERSONAL),
+        vec![
+            ("einheit".to_string(), w.einheit),
+            ("personal".to_string(), w.ep)
+        ],
+        "nicht für {carla} (ausgelassen) und {bert}"
+    );
+    let (_, z) = zeitachse(
+        &w.app,
+        &w.admin,
+        &format!("/api/einsaetze/{}/personal/{carla}", w.e),
+    )
+    .await;
+    assert!(
+        !arten(&z).contains(&paar("abloesung", "einheit")),
+        "Carlas Kopie ist ausgelassen: {z:?}"
+    );
+
+    vollziehen(&w, ohne).await;
+    assert_eq!(
+        objekt_ereignisse(&mut rx, EINHEIT_UND_PERSONAL),
+        vec![],
+        "ohne offene Periode bleibt die Zeitachse unberührt"
+    );
+}
+
+/// Die Rücknahme streicht die Ablösung der Einheit samt ihren Fan-out-Kopien und meldet
+/// `einheit` und `personal` genau für diese Kräfte (LLH-1189); Carla hatte keine Kopie, und
+/// die Rücknahme eines Vollzugs ohne offene Periode meldet nichts davon.
+#[tokio::test]
+async fn ruecknahme_meldet_einheit_und_personal() {
+    let (app, live) = setup_mit_live().await;
+    let w = welt_in(app).await;
+    let (carla, bert, schicht) = abloesung_bereit(&w).await;
+    vollziehen(&w, schicht).await;
+    let ohne = schicht_ohne_periode(&w).await;
+    vollziehen(&w, ohne).await;
+
+    let mut rx = live.abonniere(w.e);
+    zuruecknehmen(&w, schicht).await;
+    assert_eq!(
+        objekt_ereignisse(&mut rx, EINHEIT_UND_PERSONAL),
+        vec![
+            ("einheit".to_string(), w.einheit),
+            ("personal".to_string(), w.ep)
+        ],
+        "nicht für {carla} (keine Kopie) und {bert}"
+    );
+    let (_, z) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
+    assert!(
+        !arten(&z).contains(&paar("abloesung", "einheit")),
+        "Annas Kopie ist gestrichen: {z:?}"
+    );
+
+    zuruecknehmen(&w, ohne).await;
+    assert_eq!(
+        objekt_ereignisse(&mut rx, EINHEIT_UND_PERSONAL),
+        vec![],
+        "ohne Ablösungsereignis bleibt die Zeitachse unberührt"
+    );
+}

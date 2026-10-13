@@ -22,6 +22,7 @@ const ZAEHLER: ModulZaehler = {
   meldungen: { offen: 3, ungesehen: 2, bestaetigung_ueberfaellig: 0 },
   einheiten: { gesamt: 0 },
   etb: { gesamt: 47 },
+  lagemeldungen: { neu: 4 },
 };
 const PRESSE = { offene_anfragen: 2 } as MedienkontaktKennzahlen;
 /** Der Wert einer Zahl im Zustand `daten`, sonst `undefined`. */
@@ -62,9 +63,18 @@ describe('werkzeugZahl (design.md D4)', () => {
     expect(wertVon(werkzeugZahl(werkzeug('einheiten'), quellen()))).toBe('0');
   });
 
+  // LLH-1206: dieselbe Zahl und derselbe Wortlaut wie im Modulmenü.
+  it('Lagemeldungen zeigen die neuen wie das Modulmenü', () => {
+    expect(werkzeugZahl(werkzeug('lagemeldungen'), quellen())).toMatchObject({
+      zustand: 'daten',
+      wert: '4',
+      beschreibung: '4 neue Lagemeldungen',
+      ton: 'neutral',
+    });
+  });
+
   it('ein Modul ohne Zähler zeigt keine Zahl', () => {
     expect(werkzeugZahl(werkzeug('nachforderungen'), quellen())).toBeNull();
-    expect(werkzeugZahl(werkzeug('lagemeldungen'), quellen())).toBeNull();
     expect(werkzeugZahl(werkzeug('infotelefon', 'stab'), quellen())).toBeNull();
   });
 
