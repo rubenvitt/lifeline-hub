@@ -6,8 +6,9 @@
  *
  * - **`zeichen_spec` gesetzt:** `parseAnySpec`, dann zeichnen. Lehnt die Bibliothek ab (etwa nach
  *   einem Upgrade mit neuer Sperrregel), läuft die Kaskade über die Felder der Spec.
- * - **Sonst die Altspalten** (Kennungen des Altpakets taktische-zeichen, als `string`, denn sie
- *   sind Eingabe): Körper, Organisations-Alias, Stärke und Fachaufgaben aus `fachobjektZeichen`
+ * - **Altform** (Kennungen des Altpakets taktische-zeichen, als `string`, denn sie sind Eingabe):
+ *   bei einer DB-Zeile seit LLH-1160 als Hülle `{"v":1,"alt":{…}}` in `zeichen_spec` (Migration
+ *   0190), in Lage-Snapshots von vorher und alten Offline-Ständen als eigene Felder. Übersetzt: Körper, Organisations-Alias, Stärke und Fachaufgaben aus `fachobjektZeichen`
  *   (LFH-835), dazu die Symboltabelle unten. Was das Altpaket an einem Grundzeichen nicht zeichnete
  *   (`accepts` des Altkatalogs), bleibt auch hier weg; so zeigte es der Hub bisher.
  * - **Kaskade** (Spec `lagekarte-taktische-zeichen`): Symbol → Fachaufgabe → Einheitsgröße →
@@ -286,6 +287,43 @@ const SYMBOL: Record<string, SymbolNutzlast> = {
 
 const PUNKT: SymbolSpec = { kind: 'point' };
 
+/** Die Felder der Altform in der Reihenfolge, in der die Alt-Kennung sie nennt. */
+export const ALT_FELDER = [
+  'grundzeichen',
+  'organisation',
+  'fachaufgabe',
+  'symbol',
+  'einheit',
+  'funktion',
+  'farbe',
+] as const;
+
+/**
+ * Die Altform eines freien Zeichens, sonst `null`: die Altwerte aus der Hülle
+ * `{"v":1,"alt":{…}}`, die Migration 0190 an Altzeilen in `zeichen_spec` geschrieben hat
+ * (LLH-1160), oder — ohne `zeichen_spec`, bei Lage-Snapshots von vorher — die eigenen Felder.
+ * Nur Zeichenketten zählen; die Hülle stammt aus der DB, sie ist trotzdem Eingabe.
+ */
+export function altform(e: FreiesZeichenEingabe): FreiesZeichenEingabe | null {
+  if (!e.zeichen_spec) return e.grundzeichen || e.symbol ? e : null;
+  // Vorprüfung: eine echte Beschreibung wird nicht zweimal geparst.
+  if (!e.zeichen_spec.includes('"alt"')) return null;
+  let huelle: unknown;
+  try {
+    huelle = JSON.parse(e.zeichen_spec);
+  } catch {
+    return null;
+  }
+  const alt = (huelle as { alt?: unknown } | null)?.alt;
+  if (!alt || typeof alt !== 'object' || Array.isArray(alt)) return null;
+  const werte: FreiesZeichenEingabe = {};
+  for (const feld of ALT_FELDER) {
+    const wert = (alt as Record<string, unknown>)[feld];
+    if (typeof wert === 'string') werte[feld] = wert;
+  }
+  return werte;
+}
+
 function hexRgb(hex: string): [number, number, number] | null {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return null;
@@ -537,6 +575,8 @@ function eingangsSchluessel(e: FreiesZeichenEingabe): string {
 
 function uebersetze(e: FreiesZeichenEingabe): FreiesZeichenBild {
   if (e.zeichen_spec) {
+    const huelle = altform(e);
+    if (huelle) return ausAltspalten(huelle, false);
     let spec: AnySpec | null = null;
     try {
       spec = parseAnySpec(e.zeichen_spec);

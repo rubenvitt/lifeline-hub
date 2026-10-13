@@ -1,12 +1,11 @@
 //! LFH-170 Freie taktische Zeichen — Backend-Integrationstests.
 //!
 //! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Teil-Patch-Semantik (LFH-306: absentes Feld
-//! unverändert, `null` leert, lat/lon unverändert), Zeichenbeschreibung `zeichen_spec` und
-//! Übergang mit altem Body (LFH-836: genau eine Form, sonst 400; ungültige Beschreibung 400;
-//! Altfelder ohne Grundzeichen an einem Spec-Zeichen 422), 404 für fremden
-//! Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET braucht Lesezugriff+Modul; POST/PATCH/
-//! DELETE Schreibrecht+aktiv+Modul; Org-Isolation), SSE-Event `freies_zeichen` (Wire-Tag +
-//! Payload load-bearing für das Frontend).
+//! unverändert, `null` leert, lat/lon unverändert), Zeichenbeschreibung `zeichen_spec` (LFH-836;
+//! seit LLH-1160 die einzige Form: fehlend, leer oder ungültig 400, alter Body 400, Altzeilen als
+//! Hülle aus Migration 0190), 404 für fremden Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET
+//! braucht Lesezugriff+Modul; POST/PATCH/DELETE Schreibrecht+aktiv+Modul; Org-Isolation),
+//! SSE-Event `freies_zeichen` (Wire-Tag + Payload load-bearing für das Frontend).
 //!
 //! Harness aus tests/common; `setup_mit_live()` liefert zusätzlich den LiveHub-Klon
 //! (teilt den inneren Arc mit dem AppState), damit der SSE-Test direkt mithören kann.
@@ -21,6 +20,23 @@ use common::{
     recv_until_tag, setup_mit_live, setup_mit_pool, standard_ansicht_id,
 };
 
+/// Ausgaben von `serializeAnySpec` aus `@einsatzzeichen/core` 5.2.0 (per Node erzeugt).
+const STELLE_SANITAET: &str =
+    r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
+const DREHLEITER: &str =
+    r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"capability.rescue-aerial-ladder"}}"#;
+
+/// Die Altspalten vor LLH-1160; seitdem stehen sie in keiner Antwort mehr.
+const ALTFELDER: [&str; 7] = [
+    "grundzeichen",
+    "organisation",
+    "fachaufgabe",
+    "symbol",
+    "einheit",
+    "funktion",
+    "farbe",
+];
+
 /// Fremder Nutzer ohne Einsatz-Mitgliedschaft und ohne höhere Berechtigung (org_rolle="keine").
 async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
     benutzer_anlegen(app, admin, "fremd", "keine").await;
@@ -28,12 +44,50 @@ async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
 }
 
 fn neu_body() -> String {
-    json!({
-        "lat": 50.1, "lon": 8.6, "grundzeichen": "einheit",
-        "organisation": "feuerwehr", "fachaufgabe": "brandbekaempfung",
-        "einheit": "zug", "farbe": "#ff0000", "label": "A"
-    })
-    .to_string()
+    json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "label": "A"}).to_string()
+}
+
+/// Ein PATCH-Body, der nur die Zeichenbeschreibung ändert.
+fn spec_patch() -> String {
+    json!({"zeichen_spec": DREHLEITER}).to_string()
+}
+
+async fn anzahl_zeichen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+    liste(app, cookie, einsatz).await.as_array().unwrap().len()
+}
+
+async fn liste(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
+    let (status, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{liste:?}");
+    liste
+}
+
+/// Legt ein Zeichen mit Zeichenbeschreibung an und liefert die Antwort.
+async fn spec_zeichen_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, spec: &str) -> Value {
+    let (status, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        cookie,
+        Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec, "label": "BHP"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    z
+}
+
+/// Keine Antwort trägt mehr ein Feld der Altform.
+fn ohne_altfelder(z: &Value) {
+    for feld in ALTFELDER {
+        assert!(z.get(feld).is_none(), "{feld} entfallen: {z:?}");
+    }
 }
 
 #[tokio::test]
@@ -51,31 +105,22 @@ async fn anlegen_und_liste() {
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{z:?}");
-    assert_eq!(z["grundzeichen"], "einheit");
-    assert_eq!(z["organisation"], "feuerwehr");
+    assert_eq!(z["zeichen_spec"], STELLE_SANITAET);
+    assert_eq!(z["label"], "A");
     assert_eq!(z["lat"], 50.1);
     assert_eq!(z["lon"], 8.6);
-    assert!(z.get("zeichen_spec").is_none_or(Value::is_null), "{z:?}");
+    ohne_altfelder(&z);
 
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
+    let liste = liste(&app, &admin, einsatz).await;
     assert_eq!(liste.as_array().unwrap().len(), 1);
+    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET);
 }
 
-/// Ein Zeichen ohne jede Form ist ein FORMALER Fehler → 400 (LFH-267/F22, Spec
-/// `lagekarte-freie-zeichen`). Statuscode-Referenz: das Gegenstück im Zusammenhang ist
-/// `altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422`.
+/// Ein Zeichen ohne Zeichenbeschreibung ist ein FORMALER Fehler → 400 (LFH-267/F22, Spec
+/// `lagekarte-freie-zeichen`): der Body beschreibt für sich kein Zeichen.
 ///
-/// Umbenannt aus `fehlendes_grundzeichen_ist_400` (LFH-836): seit der Zeichenbeschreibung ist
-/// `grundzeichen` nur noch eine der zwei Formen und strukturell optional, der Body scheitert
-/// deshalb nicht mehr am Extractor, sondern an der Handler-Prüfung „genau eine Form“ — weiterhin
-/// mit 400, weil der Body für sich kein Zeichen beschreibt. Overlays allein sind keine Form.
+/// Umbenannt aus `fehlendes_grundzeichen_ist_400` (LFH-836). Seit LLH-1160 ist `zeichen_spec`
+/// die einzige Form; `null` gilt wie nicht gesendet.
 #[tokio::test]
 async fn ohne_zeichenform_ist_400() {
     let (app, _live) = setup_mit_live().await;
@@ -84,7 +129,7 @@ async fn ohne_zeichenform_ist_400() {
 
     for body in [
         json!({"lat": 50.1, "lon": 8.6}),
-        json!({"lat": 50.1, "lon": 8.6, "organisation": "feuerwehr", "label": "A"}),
+        json!({"lat": 50.1, "lon": 8.6, "label": "A"}),
         json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": null, "grundzeichen": null}),
     ] {
         let (status, v) = anfrage(
@@ -96,103 +141,55 @@ async fn ohne_zeichenform_ist_400() {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
-        assert!(
-            v["error"].as_str().unwrap().contains("zeichen_spec"),
-            "Meldung nennt das Feld: {v:?}"
-        );
+        assert_eq!(v["error"], "zeichen_spec fehlt", "{body}");
     }
     assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
 }
 
-/// Auch eine vorhandene, aber leere Form ist ein FORMALER Fehler → 400 (F22-B), für beide
-/// Formen. Umbenannt aus `leeres_grundzeichen_ist_400` (LFH-836).
+/// Auch eine vorhandene, aber leere Zeichenbeschreibung ist ein FORMALER Fehler → 400 (F22-B),
+/// beim Anlegen wie beim Ändern. Umbenannt aus `leeres_grundzeichen_ist_400` (LFH-836).
 ///
 /// Der Body ist strukturell gültig, der Extractor lässt ihn durch; erst die
-/// Handler-Validierung lehnt den Whitespace-only-Wert ab. 422 bliebe der Fall, in dem erst der
-/// ZUSAMMENHANG die Aktion verbietet (Objekt-Zustand), nicht das Feld für sich.
+/// Handler-Validierung lehnt den Whitespace-only-Wert ab.
 #[tokio::test]
 async fn leere_zeichenform_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    for (body, feld) in [
-        (
-            json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "   "}),
-            "grundzeichen",
-        ),
-        (
-            json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": "  "}),
-            "zeichen_spec",
-        ),
-    ] {
-        let (status, v) = anfrage(
-            &app,
-            "POST",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-            &admin,
-            Some(&body.to_string()),
-        )
-        .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
-        assert_eq!(v["error"], format!("{feld} darf nicht leer sein"));
-    }
-    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
-}
-
-// ===== LFH-836: Zeichenbeschreibung und Übergang =====
-
-/// Ausgaben von `serializeAnySpec` aus `@einsatzzeichen/core` 5.2.0 (per Node erzeugt).
-const STELLE_SANITAET: &str =
-    r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
-const DREHLEITER: &str =
-    r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"capability.rescue-aerial-ladder"}}"#;
-
-async fn anzahl_zeichen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
-    let (status, liste) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        cookie,
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{liste:?}");
-    liste.as_array().unwrap().len()
-}
-
-/// Legt ein Zeichen mit Zeichenbeschreibung an und liefert die Antwort.
-async fn spec_zeichen_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, spec: &str) -> Value {
-    let (status, z) = anfrage(
-        app,
+    let (status, v) = anfrage(
+        &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        cookie,
-        Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec, "label": "BHP"}).to_string()),
+        &admin,
+        Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": "  "}).to_string()),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED, "{z:?}");
-    z
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
+    assert_eq!(v["error"], "zeichen_spec darf nicht leer sein");
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
+
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"zeichen_spec": "  "}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
+    assert_eq!(
+        liste(&app, &admin, einsatz).await[0]["zeichen_spec"],
+        STELLE_SANITAET
+    );
 }
 
-/// Die Altform eines Zeichens ist leer: weder Grundzeichen noch Overlays (Schlüssel fehlt oder
-/// ist `null`).
-fn altform_leer(z: &Value) {
-    for feld in [
-        "grundzeichen",
-        "organisation",
-        "fachaufgabe",
-        "symbol",
-        "einheit",
-        "funktion",
-        "farbe",
-    ] {
-        assert!(z.get(feld).is_none_or(Value::is_null), "{feld} leer: {z:?}");
-    }
-}
+// ===== LFH-836: Zeichenbeschreibung, LLH-1160: Ende des Übergangs =====
 
 /// Spec „Zeichen mit Grundzeichen anlegen“ und „Freistehendes Piktogramm anlegen“: die
-/// Beschreibung kommt beim Lesen unverändert zurück, die Altspalten bleiben leer.
+/// Beschreibung kommt beim Lesen unverändert zurück.
 #[tokio::test]
 async fn spec_anlegen_und_lesen() {
     let (app, _live) = setup_mit_live().await;
@@ -203,54 +200,29 @@ async fn spec_anlegen_und_lesen() {
         let z = spec_zeichen_anlegen(&app, &admin, einsatz, spec).await;
         assert_eq!(z["zeichen_spec"], spec, "{z:?}");
         assert_eq!(z["label"], "BHP");
-        altform_leer(&z);
+        ohne_altfelder(&z);
     }
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
+    let liste = liste(&app, &admin, einsatz).await;
     let liste = liste.as_array().unwrap();
     assert_eq!(liste.len(), 2);
     assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET);
     assert_eq!(liste[1]["zeichen_spec"], DREHLEITER);
 }
 
-/// Spec „Veralteter Client legt an“: der alte Body bleibt gültig und trägt keine
-/// Zeichenbeschreibung.
+/// Spec „Veralteter Client sendet das alte Format“ (LLH-1160): Grundzeichen oder ein Overlay-Wert
+/// der Altform → 400 mit Hinweis, allein oder neben einer Zeichenbeschreibung, beim Anlegen wie
+/// beim Ändern. Es entsteht nichts und es ändert sich nichts; nichts wird still verworfen.
 #[tokio::test]
-async fn altformat_anlegen_bleibt_moeglich() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-
-    let (status, z) = anfrage(
-        &app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        Some(&json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "person"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "{z:?}");
-    assert_eq!(z["grundzeichen"], "person");
-    assert!(z.get("zeichen_spec").is_none_or(Value::is_null), "{z:?}");
-}
-
-/// Spec „Beide Formate zugleich“: Zeichenbeschreibung und Altform in einem Body → 400, beim
-/// Anlegen wie beim Ändern; es entsteht nichts und es ändert sich nichts.
-#[tokio::test]
-async fn beide_formen_ist_400() {
+async fn altes_format_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
     for body in [
+        json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "person"}),
         json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "grundzeichen": "person"}),
         json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "organisation": "thw"}),
+        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "farbe": "#ff0000"}),
     ] {
         let (status, v) = anfrage(
             &app,
@@ -261,43 +233,39 @@ async fn beide_formen_ist_400() {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
+        assert!(
+            v["error"].as_str().unwrap().contains("alte Format"),
+            "Meldung nennt den Grund: {v:?}"
+        );
     }
     assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
 
     let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
     let zid = z["id"].as_i64().unwrap();
-    let (status, v) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"zeichen_spec": DREHLEITER, "grundzeichen": "person"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
-    // Auch Spec plus ein Overlay-Wert der Altform ist „beide Formen“ (Review LFH-836).
-    let (status, v) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"zeichen_spec": DREHLEITER, "organisation": "thw"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
+    for body in [
+        json!({"grundzeichen": "fahrzeug", "organisation": "thw"}),
+        json!({"organisation": "thw", "label": "X"}),
+        json!({"zeichen_spec": DREHLEITER, "grundzeichen": "person"}),
+        json!({"symbol": "kran"}),
+    ] {
+        let (status, v) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
+    }
+    let liste = liste(&app, &admin, einsatz).await;
     assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
+    assert_eq!(liste[0]["label"], "BHP", "auch die Bezeichnung nicht");
 }
 
 /// Spec „Unbekannter Wert“ und „Beschriftung in der Beschreibung“: 400 mit Pfad, kein Zeichen;
-/// beim PATCH bleibt die gespeicherte Beschreibung.
+/// beim PATCH bleibt die gespeicherte Beschreibung. Die Hülle der Altzeilen (Migration 0190)
+/// nimmt der Server von außen nicht an.
 #[tokio::test]
 async fn ungueltige_spec_ist_400() {
     let (app, _live) = setup_mit_live().await;
@@ -315,6 +283,7 @@ async fn ungueltige_spec_ist_400() {
         ),
         (r#"{"v":2,"spec":{"kind":"post"}}"#, "$.v"),
         ("kein json", "kein gültiges JSON"),
+        (r#"{"v":1,"alt":{"grundzeichen":"person"}}"#, "$.alt"),
     ] {
         let (status, v) = anfrage(
             &app,
@@ -342,25 +311,49 @@ async fn ungueltige_spec_ist_400() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
-    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
+    assert_eq!(
+        liste(&app, &admin, einsatz).await[0]["zeichen_spec"],
+        STELLE_SANITAET,
+        "unverändert"
+    );
 }
 
-/// Spec „Altzeichen wird geändert“: ein PATCH mit Zeichenbeschreibung an einer Altzeile schreibt
-/// die Beschreibung und leert die Altspalten; Bezeichnung und Ansicht bleiben.
+/// Spec „Altzeichen wird geändert“ (LLH-1160): eine Altzeile trägt nach Migration 0190 ihre
+/// Altwerte als Hülle in `zeichen_spec` und kommt so beim Lesen zurück. Eine Umbenennung lässt
+/// die Hülle stehen, erst eine neue Zeichenbeschreibung ersetzt sie; Bezeichnung und Position
+/// bleiben.
 #[tokio::test]
-async fn patch_altzeile_mit_spec_schreibt_spec_und_leert_altspalten() {
-    let (app, _live) = setup_mit_live().await;
+async fn altzeile_bleibt_huelle_bis_zur_neuen_beschreibung() {
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
+    let huelle =
+        r##"{"v":1,"alt":{"grundzeichen":"fahrzeug","organisation":"thw","farbe":"#ff0000"}}"##;
+    let zid: i64 = sqlx::query_scalar(
+        "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von) \
+         VALUES (?, 50.1, 8.6, ?, 'A', (SELECT id FROM benutzer LIMIT 1)) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(huelle)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let z = &liste(&app, &admin, einsatz).await[0];
+    assert_eq!(z["zeichen_spec"], huelle, "Hülle kommt unverändert zurück");
+    ohne_altfelder(z);
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"label": "B"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["zeichen_spec"], huelle, "Umbenennung lässt die Hülle");
+    assert_eq!(n["label"], "B");
 
     let (status, n) = anfrage(
         &app,
@@ -372,39 +365,12 @@ async fn patch_altzeile_mit_spec_schreibt_spec_und_leert_altspalten() {
     .await;
     assert_eq!(status, StatusCode::OK, "{n:?}");
     assert_eq!(n["zeichen_spec"], STELLE_SANITAET);
-    altform_leer(&n);
-    assert_eq!(n["label"], "A", "Bezeichnung bleibt");
+    assert_eq!(n["label"], "B", "Bezeichnung bleibt");
     assert_eq!(n["lat"], 50.1);
 }
 
-/// Umgekehrt: ein alter Body mit Grundzeichen an einem Spec-Zeichen schreibt die Altform und
-/// leert die Zeichenbeschreibung (Übergang, design.md D4).
-#[tokio::test]
-async fn patch_spec_zeichen_mit_altem_body_schreibt_altform() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
-    let zid = z["id"].as_i64().unwrap();
-
-    let (status, n) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"grundzeichen": "fahrzeug", "organisation": "thw"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert_eq!(n["grundzeichen"], "fahrzeug");
-    assert_eq!(n["organisation"], "thw");
-    assert!(n.get("zeichen_spec").is_none_or(Value::is_null), "{n:?}");
-    assert_eq!(n["label"], "BHP");
-}
-
-/// Ein PATCH ohne Zeichenfelder (nur Bezeichnung oder Ansicht) lässt die gespeicherte Form
-/// unberührt — auch der Ganz-Body eines veralteten Clients, der an einem Spec-Zeichen
-/// `grundzeichen: null` und lauter `null`-Overlays mitschickt.
+/// Ein PATCH ohne Zeichenbeschreibung (nur Bezeichnung oder Ansicht) lässt die gespeicherte Form
+/// unberührt — auch ein Body, der die Altfelder als `null` mitschickt (gilt als nicht gesendet).
 #[tokio::test]
 async fn patch_nur_bezeichnung_laesst_form_unberuehrt() {
     let (app, _live) = setup_mit_live().await;
@@ -415,16 +381,17 @@ async fn patch_nur_bezeichnung_laesst_form_unberuehrt() {
     let aid = standard_ansicht_id(&app, &admin, einsatz).await;
 
     for (body, label) in [
-        (json!({"label": "DLK 23"}), "DLK 23"),
-        (json!({"ansicht_id": aid}), "DLK 23"),
+        (json!({"label": "DLK 23"}), Some("DLK 23")),
+        (json!({"ansicht_id": aid}), Some("DLK 23")),
         (
             json!({
                 "grundzeichen": null, "organisation": null, "fachaufgabe": null,
                 "symbol": null, "einheit": null, "funktion": null, "farbe": null,
                 "label": "DLK 1"
             }),
-            "DLK 1",
+            Some("DLK 1"),
         ),
+        (json!({"label": null}), None),
     ] {
         let (status, n) = anfrage(
             &app,
@@ -436,50 +403,15 @@ async fn patch_nur_bezeichnung_laesst_form_unberuehrt() {
         .await;
         assert_eq!(status, StatusCode::OK, "{body}: {n:?}");
         assert_eq!(n["zeichen_spec"], DREHLEITER, "Form unberührt: {body}");
-        assert_eq!(n["label"], label);
-        altform_leer(&n);
+        assert_eq!(n["label"].as_str(), label, "{body}");
+        ohne_altfelder(&n);
     }
 }
 
-/// Statuscode-Referenz (Zusammenhang, `src/AGENTS.md`): ein Overlay-Wert ohne Grundzeichen an
-/// einem Zeichen, das als Zeichenbeschreibung gespeichert ist, ist für sich ein gültiges Feld —
-/// erst der Zustand des Zeichens verbietet ihn → 422, und nichts ändert sich. Gegenstück zu
-/// `ohne_zeichenform_ist_400`.
+/// Migriert von `crud_whole_spec_haelt_lat_lon` (LFH-306): ein Teil-PATCH fasst nur die
+/// gesendeten Felder an. lat/lon bleiben unverschiebbar.
 #[tokio::test]
-async fn altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
-    let zid = z["id"].as_i64().unwrap();
-
-    let (status, v) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"organisation": "thw", "label": "X"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{v:?}");
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
-    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
-    assert_eq!(liste[0]["label"], "BHP", "auch die Bezeichnung nicht");
-    altform_leer(&liste[0]);
-}
-
-/// Migriert von `crud_whole_spec_haelt_lat_lon` (LFH-306): derselbe Teil-Body, invertierte
-/// Zusage. Vor LFH-306 nullte ein PATCH ohne `organisation`/`fachaufgabe`/… diese Overlays
-/// still mit; jetzt fasst er nur die gesendeten Felder an. lat/lon bleiben unverschiebbar.
-#[tokio::test]
-async fn crud_teil_patch_haelt_lat_lon_und_overlays() {
+async fn crud_teil_patch_haelt_lat_lon() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -494,24 +426,18 @@ async fn crud_teil_patch_haelt_lat_lon_und_overlays() {
     .await;
     let zid = z["id"].as_i64().unwrap();
 
-    // Teil-PATCH: nur grundzeichen + symbol; alle anderen Overlays bleiben stehen.
-    let patch = json!({"grundzeichen": "fahrzeug", "symbol": "kran"}).to_string();
+    // Teil-PATCH: nur die Beschreibung; die Bezeichnung bleibt stehen.
     let (status, n) = anfrage(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
         &admin,
-        Some(&patch),
+        Some(&spec_patch()),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert_eq!(n["grundzeichen"], "fahrzeug");
-    assert_eq!(n["symbol"], "kran");
-    assert_eq!(n["organisation"], "feuerwehr", "nicht gesendet → bleibt");
-    assert_eq!(n["fachaufgabe"], "brandbekaempfung");
-    assert_eq!(n["einheit"], "zug");
-    assert_eq!(n["farbe"], "#ff0000");
-    assert_eq!(n["label"], "A");
+    assert_eq!(n["zeichen_spec"], DREHLEITER);
+    assert_eq!(n["label"], "A", "nicht gesendet → bleibt");
     // lat/lon nicht verschiebbar.
     assert_eq!(n["lat"], 50.1);
     assert_eq!(n["lon"], 8.6);
@@ -526,150 +452,7 @@ async fn crud_teil_patch_haelt_lat_lon_und_overlays() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let (_, liste) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        &admin,
-        None,
-    )
-    .await;
-    assert_eq!(liste.as_array().unwrap().len(), 0);
-}
-
-// ===== LFH-306: Teil-Patch — absent ≠ null =====
-
-/// Anlege-Body mit ALLEN sieben Overlay-Feldern gesetzt (für die Teil-Patch-Tests).
-fn neu_body_alle_overlays() -> String {
-    json!({
-        "lat": 50.1, "lon": 8.6, "grundzeichen": "einheit",
-        "organisation": "feuerwehr", "fachaufgabe": "brandbekaempfung",
-        "symbol": "kran", "einheit": "zug", "funktion": "zugtrupp",
-        "farbe": "#ff0000", "label": "A"
-    })
-    .to_string()
-}
-
-/// Legt ein Zeichen mit allen sieben Overlays an und liefert dessen id.
-async fn zeichen_mit_allen_overlays(app: &axum::Router, admin: &str, einsatz: i64) -> i64 {
-    let (status, z) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
-        admin,
-        Some(&neu_body_alle_overlays()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "{z:?}");
-    z["id"].as_i64().unwrap()
-}
-
-/// Der Kern von LFH-306: ein Patch, der nur `label` schickt, lässt alle sieben Overlays
-/// stehen. Gegen HEAD fällt das hart durch — der Whole-Spec-Overwrite nullte sie mit.
-///
-/// Zwei Runden: erst MIT `grundzeichen` im Body (gegen HEAD deserialisierbar, damit die
-/// Rotfärbung wirklich vom Overwrite kommt und nicht vom Extractor), dann der minimale
-/// Body `{"label": …}` allein — der ist überhaupt erst seit LFH-306 zulässig.
-#[tokio::test]
-async fn patch_nur_label_laesst_overlays_stehen() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
-
-    let (status, n) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"grundzeichen": "einheit", "label": "X"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert_eq!(n["label"], "X");
-    assert_eq!(n["organisation"], "feuerwehr", "Overlay unberührt: {n:?}");
-    assert_eq!(n["fachaufgabe"], "brandbekaempfung");
-    assert_eq!(n["symbol"], "kran");
-    assert_eq!(n["einheit"], "zug");
-    assert_eq!(n["funktion"], "zugtrupp");
-    assert_eq!(n["farbe"], "#ff0000");
-    assert_eq!(n["grundzeichen"], "einheit");
-
-    // Minimalster Teil-Patch: nur `label`, ohne jedes weitere Feld.
-    let (status, n) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"label": "Y"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert_eq!(n["label"], "Y");
-    assert_eq!(n["organisation"], "feuerwehr");
-    assert_eq!(n["funktion"], "zugtrupp");
-    assert_eq!(n["farbe"], "#ff0000");
-}
-
-/// Grenzt gegen `patch_nur_label_laesst_overlays_stehen` ab: `null` ist der Leerwunsch und
-/// trifft GENAU das gesendete Feld — die übrigen sechs Overlays bleiben stehen.
-#[tokio::test]
-async fn patch_organisation_null_loescht_nur_diese() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
-
-    let (status, n) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"grundzeichen": "einheit", "organisation": null}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert!(n["organisation"].is_null(), "null leert das Feld: {n:?}");
-    assert_eq!(n["fachaufgabe"], "brandbekaempfung", "Nachbar unberührt");
-    assert_eq!(n["symbol"], "kran");
-    assert_eq!(n["einheit"], "zug");
-    assert_eq!(n["funktion"], "zugtrupp");
-    assert_eq!(n["farbe"], "#ff0000");
-    assert_eq!(n["label"], "A");
-}
-
-/// Ein Patch OHNE `grundzeichen` lässt es stehen (statt am Extractor zu scheitern), ein Patch
-/// mit LEEREM Wert bleibt 400 (Statuscode-Konvention, LFH-267/F22). Die POST-seitigen
-/// Referenztests heißen seit LFH-836 `ohne_zeichenform_ist_400`/`leere_zeichenform_ist_400`.
-#[tokio::test]
-async fn patch_ohne_grundzeichen_behaelt_grundzeichen() {
-    let (app, _live) = setup_mit_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
-
-    let (status, n) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"label": "Z"}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{n:?}");
-    assert_eq!(n["grundzeichen"], "einheit", "nicht gesendet → bleibt");
-    assert_eq!(n["label"], "Z");
-
-    // Vorhanden, aber leer → 400 (das Feld ist ISOLIERT unbrauchbar).
-    let (status, _) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
-        &admin,
-        Some(&json!({"grundzeichen": "   "}).to_string()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
 }
 
 #[tokio::test]
@@ -690,7 +473,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
     let zid = z["id"].as_i64().unwrap();
 
     // Zeichen aus A über Einsatz B ansprechen → 404.
-    let patch = json!({"grundzeichen": "fahrzeug"}).to_string();
+    let patch = spec_patch();
     assert_eq!(
         anfrage(
             &app,
@@ -779,7 +562,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
         &fremd_c,
-        Some(&json!({"grundzeichen": "fahrzeug"}).to_string()),
+        Some(&spec_patch()),
     )
     .await
     .0;
@@ -828,7 +611,7 @@ async fn sse_feuert_bei_post_patch_delete() {
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
         &admin,
-        Some(&json!({"grundzeichen": "fahrzeug"}).to_string()),
+        Some(&spec_patch()),
     )
     .await;
     recv_until_tag(&mut rx, "freies_zeichen", Duration::from_secs(1)).await;
@@ -895,7 +678,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
         &admin,
-        Some(&json!({"grundzeichen": "fahrzeug"}).to_string()),
+        Some(&spec_patch()),
     )
     .await
     .0;
@@ -929,7 +712,7 @@ async fn zeichen_anlegen(
     einsatz: i64,
     ansicht_id: Option<i64>,
 ) -> i64 {
-    let mut body = json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "einheit"});
+    let mut body = json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": DREHLEITER});
     if let Some(a) = ansicht_id {
         body["ansicht_id"] = json!(a);
     }
@@ -958,7 +741,7 @@ async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
         "POST",
         &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
         &admin,
-        Some(&json!({"lat":50.1,"lon":8.6,"grundzeichen":"einheit","ansicht_id":aid}).to_string()),
+        Some(&json!({"lat":50.1,"lon":8.6,"zeichen_spec":DREHLEITER,"ansicht_id":aid}).to_string()),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{z:?}");
@@ -1020,7 +803,7 @@ async fn fremde_ansicht_id_ist_404() {
             &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
             &admin,
             Some(
-                &json!({"lat":50.1,"lon":8.6,"grundzeichen":"einheit","ansicht_id":aid})
+                &json!({"lat":50.1,"lon":8.6,"zeichen_spec":DREHLEITER,"ansicht_id":aid})
                     .to_string(),
             ),
         )

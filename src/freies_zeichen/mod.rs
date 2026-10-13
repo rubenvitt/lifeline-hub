@@ -6,9 +6,9 @@ use utoipa::ToSchema;
 
 /// Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).
 ///
-/// Genau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit
-/// den Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client
-/// übersetzt die Altform beim Lesen (design.md D5).
+/// Die Form steht allein in `zeichen_spec` (LFH-836; seit LLH-1160 Pflicht, die Altspalten sind
+/// entfernt). Lage-Snapshots von vorher tragen noch die Altform; der Client übersetzt sie beim
+/// Lesen (design.md D5).
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct FreiesZeichenAnzeige {
     pub id: i64,
@@ -16,18 +16,9 @@ pub struct FreiesZeichenAnzeige {
     pub lat: f64,
     pub lon: f64,
     /// Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie
-    /// gesendet; fehlt bei einem Zeichen in Altform.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zeichen_spec: Option<String>,
-    /// Altform: fehlt bei einem Zeichen mit `zeichen_spec`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub grundzeichen: Option<String>,
-    pub organisation: Option<String>,
-    pub fachaufgabe: Option<String>,
-    pub symbol: Option<String>,
-    pub einheit: Option<String>,
-    pub funktion: Option<String>,
-    pub farbe: Option<String>,
+    /// gesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{"v":1,"alt":{…}}` mit den
+    /// Altwerten (Migration 0190, LLH-1160), bis es das nächste Mal geändert wird.
+    pub zeichen_spec: String,
     pub label: Option<String>,
     /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
     #[serde(skip_serializing_if = "Option::is_none")]
