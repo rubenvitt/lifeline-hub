@@ -1200,8 +1200,8 @@ export default function KraefteuebersichtPage() {
             </Button>
           </Popover>
           {/* Drei Stufen desselben Baums. Der Wert wird aus den offenen Schlüsseln abgeleitet
-              (`stufeVon`) — klappt jemand eine Zeile von Hand, zeigt die Leiste die nächstkleinere
-              Stufe, die noch ganz offen steht. */}
+              (`stufeVon`) — klappt jemand eine Zeile von Hand, zeigt die Leiste die größte Stufe,
+              die noch ganz offen steht, sonst „Einheiten“; ein Klick darauf stellt sie wieder her. */}
           <Segmentleiste<Ausklappstufe>
             beschriftung="Ausklappstufe des Kräftebaums"
             wert={stufe}
