@@ -189,6 +189,25 @@ describe('3.2 Kräfte', () => {
     expect(vermerke(a)).toContain('Zeitachse für 2 von 3 Personen erfasst');
   });
 
+  it('Entlassene zählen in „insgesamt“ und in der Abdeckung, nicht in der Stärke (LLH-1079)', () => {
+    const b = verdichteEinsatzbericht(
+      rohBericht({
+        personalEntlassen: daten([{ id: 14 }, { id: 15 }] as EinsatzPersonal[]),
+        personalPerioden: daten([
+          { personal_id: 11, perioden: [periode('2026-03-29T00:30:00', '2026-03-29T01:30:00')] },
+          { personal_id: 12, perioden: [periode('2026-03-29T01:00:00', null)] },
+          { personal_id: 14, perioden: [periode('2026-03-29T00:30:00', '2026-03-29T01:00:00')] },
+        ] as PersonPerioden[]),
+      }),
+      konv,
+    );
+    expect(wert(abschnitt(b, 'kraefte', 'Stärke zum Druckzeitpunkt'), 'Stärke')).toBe('1/2/9//12');
+    const a = abschnitt(b, 'kraefte', 'Insgesamt eingesetzt');
+    expect(wert(a, 'Personen')).toBe('3');
+    expect(wert(a, 'Helferstunden')).toBe('2 h 30');
+    expect(vermerke(a)).toContain('Zeitachse für 3 von 5 Personen erfasst');
+  });
+
   it('ohne jede Periode: „keine Zeitachse erfasst“ statt 0', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({ personalPerioden: daten([] as PersonPerioden[]), einheitenPerioden: daten([]) }),
@@ -652,6 +671,29 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
     expect(vermerke(anlage(roh))).toEqual([NICHT_GENUTZT]);
   });
 
+  it('führt eine aufgelöste Einheit mit Zeitachse weiter (LLH-1079)', () => {
+    const roh = rohBericht(
+      {
+        einsatz: sommerEinsatz(),
+        einheiten: daten([{ id: 1, name: 'Zug 1', ueber_einheit_id: null }] as Einheit[]),
+        einheitenAufgeloest: daten([
+          {
+            id: 3,
+            name: 'Gruppe Alt',
+            ueber_einheit_id: null,
+            aufgeloest_at: '2026-06-01 07:00:00',
+          },
+        ] as Einheit[]),
+        einheitenPerioden: daten([
+          { einheit_id: 1, perioden: [periode('2026-06-01T06:00:00', null)] },
+          { einheit_id: 3, perioden: [periode('2026-06-01T05:45:00', '2026-06-01T07:00:00')] },
+        ] as EinheitPerioden[]),
+      },
+      STAND_SOMMER,
+    );
+    expect(tabelle(anlage(roh)).zeilen.map((z) => z[0])).toEqual(['Gruppe Alt', 'Zug 1']);
+  });
+
   it('ohne Einheit „keine Einträge“', () => {
     const roh = rohBericht({ einheiten: daten([]), einheitenPerioden: daten([]) });
     expect(vermerke(anlage(roh))).toEqual([KEINE_EINTRAEGE]);
@@ -716,6 +758,29 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
       ['Zora Zander', 'Truppführerin', 'Zug 1', '01.06.2026 08:00', 'läuft', '6 h 32'],
       ['Frei Kraft', 'Truppführerin', '—', '—', '—', 'keine Zeitachse'],
     ]);
+  });
+
+  it('führt Entlassene mit, ohne Einheit und am Ende; Stornierte kommen nie an (LLH-1079)', () => {
+    const r = roh();
+    r.quellen.personalEntlassen = daten([
+      kraft({ id: 15, name: 'Egon Entlassen', einheit_id: null, beendet_als: 'entlassen' }),
+    ]);
+    r.quellen.personalPerioden = daten([
+      ...(r.quellen.personalPerioden as { daten: PersonPerioden[] }).daten,
+      { personal_id: 15, perioden: [periode('2026-06-01T06:00:00', '2026-06-01T06:30:00')] },
+    ]);
+    const a = anlage(verdichteEinsatzbericht(r, konv, auswahl));
+    const t = tabelle(a).zeilen;
+    expect(t[t.length - 1]).toEqual([
+      'Egon Entlassen',
+      'Truppführerin',
+      '—',
+      '01.06.2026 08:00',
+      '01.06.2026 08:30',
+      '30 min',
+    ]);
+    expect(wert(a, 'Personen')).toBe('5');
+    expect(wert(a, 'Davon entlassen')).toBe('1');
   });
 
   it('Helferstunden gleichen denen im Block Kräfte', () => {

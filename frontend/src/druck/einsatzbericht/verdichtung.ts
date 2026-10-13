@@ -255,6 +255,7 @@ function kraefte(
   einheiten: Einheit[] | null,
   einheitenPerioden: EinheitPerioden[] | null,
   personal: unknown[] | null,
+  entlassen: unknown[] | null,
   personalPerioden: PersonPerioden[] | null,
   fahrzeuge: unknown[] | null,
   bisMs: number,
@@ -302,9 +303,12 @@ function kraefte(
     },
   ];
   const insgesamtInhalt: Inhalt[] = [zeilen(insgesamt)];
-  if (personenMit != null && personal != null && personenMit.length > 0) {
+  // Geführt sind aktive und entlassene Personen, nie stornierte (LLH-1079).
+  const gefuehrt =
+    personal != null && entlassen != null ? personal.length + entlassen.length : null;
+  if (personenMit != null && gefuehrt != null && personenMit.length > 0) {
     insgesamtInhalt.push(
-      vermerk(`Zeitachse für ${personenMit.length} von ${personal.length} Personen erfasst`),
+      vermerk(`Zeitachse für ${personenMit.length} von ${gefuehrt} Personen erfasst`),
     );
   }
   return [
@@ -584,12 +588,15 @@ function einheitName(e: Einheit): string {
 }
 
 function einheitenZeiten(
-  einheiten: Einheit[] | null,
+  aktive: Einheit[] | null,
+  aufgeloeste: Einheit[] | null,
   einheitenPerioden: EinheitPerioden[] | null,
   bisMs: number,
   abgeschlossen: boolean,
   konv: AnzeigeKonventionen,
 ): Abschnitt[] {
+  // Eine aufgelöste Einheit bleibt mit ihrer Zeitachse im Nachweis (LLH-1079).
+  const einheiten = aktive != null && aufgeloeste != null ? [...aktive, ...aufgeloeste] : null;
   if (einheiten == null || einheitenPerioden == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
   if (einheiten.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
   const perioden = new Map(einheitenPerioden.map((e) => [e.einheit_id, e.perioden]));
@@ -624,27 +631,34 @@ function einheitenZeiten(
  * Status nicht. Es sind Einsatzkräfte, nie Betroffene (Spec „Anlage Personal je Kopf“).
  */
 function personalJeKopf(
-  personal: EinsatzPersonal[] | null,
+  aktive: EinsatzPersonal[] | null,
+  entlassen: EinsatzPersonal[] | null,
   personalPerioden: PersonPerioden[] | null,
   einheiten: Einheit[] | null,
   bisMs: number,
   abgeschlossen: boolean,
   konv: AnzeigeKonventionen,
 ): Abschnitt[] {
-  if (personal == null || personalPerioden == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  // Entlassene sind geführt und stehen im Helfernachweis, ohne Einheit (LLH-1079).
+  const personal = aktive != null && entlassen != null ? [...aktive, ...entlassen] : null;
+  if (personal == null || entlassen == null || personalPerioden == null)
+    return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
   if (personal.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
   const perioden = new Map(personalPerioden.map((p) => [p.personal_id, p.perioden]));
   const namen = new Map((einheiten ?? []).map((e) => [e.id, einheitName(e)]));
+  const weg = new Set(entlassen.map((k) => k.id));
   const tabellenZeilen = personal
     .map((k) => ({
       name: k.name,
       funktion: textOder(k.funktion),
       einheit: k.einheit_id != null ? namen.get(k.einheit_id) : undefined,
+      entlassen: weg.has(k.id),
       zeiten: zeitenDerKraft(perioden.get(k.id) ?? [], bisMs, abgeschlossen, konv),
     }))
-    // Nach Einheit, dann Name; Kräfte ohne (lesbare) Einheit am Ende.
+    // Nach Einheit, dann Name; Kräfte ohne (lesbare) Einheit am Ende, Entlassene ganz unten.
     .sort(
       (a, b) =>
+        Number(a.entlassen) - Number(b.entlassen) ||
         Number(a.einheit == null) - Number(b.einheit == null) ||
         (a.einheit ?? '').localeCompare(b.einheit ?? '', 'de') ||
         a.name.localeCompare(b.name, 'de'),
@@ -661,6 +675,9 @@ function personalJeKopf(
         },
         zeilen([
           { etikett: 'Personen', wert: zahl(personal.length) },
+          ...(entlassen.length > 0
+            ? [{ etikett: 'davon entlassen', wert: zahl(entlassen.length) }]
+            : []),
           {
             etikett: 'Helferstunden',
             wert:
@@ -705,6 +722,7 @@ export function verdichteEinsatzbericht(
         daten(q.einheiten),
         daten(q.einheitenPerioden),
         daten(q.personal),
+        daten(q.personalEntlassen),
         daten(q.personalPerioden),
         daten(q.fahrzeuge),
         bisMs,
@@ -728,10 +746,18 @@ export function verdichteEinsatzbericht(
     ],
     etb: () => etbAuszug(daten(q.etbZaehler), daten(q.etbEntscheidungen), konv),
     'einheiten-zeiten': () =>
-      einheitenZeiten(daten(q.einheiten), daten(q.einheitenPerioden), bisMs, abgeschlossen, konv),
+      einheitenZeiten(
+        daten(q.einheiten),
+        daten(q.einheitenAufgeloest),
+        daten(q.einheitenPerioden),
+        bisMs,
+        abgeschlossen,
+        konv,
+      ),
     'personal-kopf': () =>
       personalJeKopf(
         daten(q.personal),
+        daten(q.personalEntlassen),
         daten(q.personalPerioden),
         daten(q.einheiten),
         bisMs,
