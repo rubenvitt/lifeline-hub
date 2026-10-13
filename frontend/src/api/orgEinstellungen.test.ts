@@ -133,7 +133,10 @@ describe('speichereOrgEinstellungen', () => {
 
 describe('ladeOrgModulEinstellungen', () => {
   it('sendet GET an /api/org-modul-einstellungen und liefert die Map', async () => {
-    const map = { etb: 'admin' as const, lagekarte: 'fuehrungskraft' as const, sonstiges: null };
+    const map = {
+      etb: { benoetigte_rolle: 'admin', sichtbar: true },
+      stab: { benoetigte_rolle: null, sichtbar: false },
+    };
     server.use(http.get('/api/org-modul-einstellungen', () => HttpResponse.json(map)));
     await expect(ladeOrgModulEinstellungen()).resolves.toEqual(map);
   });
@@ -145,7 +148,7 @@ describe('ladeOrgModulEinstellungen', () => {
 });
 
 describe('setzeOrgModulEinstellung', () => {
-  it('sendet PUT an /api/org-modul-einstellungen/:modulKey mit benoetigte_rolle', async () => {
+  it('sendet PUT an /api/org-modul-einstellungen/:modulKey mit Rolle und Sichtbarkeit', async () => {
     let empfangenerBody: unknown;
     let empfangenerKey: string | undefined;
     server.use(
@@ -155,9 +158,9 @@ describe('setzeOrgModulEinstellung', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    await setzeOrgModulEinstellung('etb', 'fuehrungskraft');
+    await setzeOrgModulEinstellung('etb', { benoetigte_rolle: 'fuehrungskraft', sichtbar: false });
     expect(empfangenerKey).toBe('etb');
-    expect(empfangenerBody).toEqual({ benoetigte_rolle: 'fuehrungskraft' });
+    expect(empfangenerBody).toEqual({ benoetigte_rolle: 'fuehrungskraft', sichtbar: false });
   });
 
   it('erlaubt null als Rolle (kein Rollen-Zwang)', async () => {
@@ -168,8 +171,8 @@ describe('setzeOrgModulEinstellung', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    await setzeOrgModulEinstellung('lagekarte', null);
-    expect(empfangenerBody).toEqual({ benoetigte_rolle: null });
+    await setzeOrgModulEinstellung('lagekarte', { benoetigte_rolle: null, sichtbar: true });
+    expect(empfangenerBody).toEqual({ benoetigte_rolle: null, sichtbar: true });
   });
 
   it('gibt void zurück (204 No Content)', async () => {
@@ -179,7 +182,10 @@ describe('setzeOrgModulEinstellung', () => {
         () => new HttpResponse(null, { status: 204 }),
       ),
     );
-    const result = await setzeOrgModulEinstellung('etb', 'admin');
+    const result = await setzeOrgModulEinstellung('etb', {
+      benoetigte_rolle: 'admin',
+      sichtbar: true,
+    });
     expect(result).toBeUndefined();
   });
 });

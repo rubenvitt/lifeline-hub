@@ -2,8 +2,9 @@ use super::modul::ist_ausblendbar;
 use super::modul_override::EinsatzModulOverride;
 use super::{modul_override, Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
-use crate::einsatz::effektiv::effektive_modul_rolle;
+use crate::einsatz::effektiv::{effektiv_sichtbar, effektive_modul_rolle};
 use crate::error::AppError;
+use crate::org::modul_einstellung::OrgModulVorgabe;
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -207,8 +208,9 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 /// [`fordere_modul_zugriff`] und [`erlaubte_module`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ModulFreigabe {
-    /// Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
-    /// Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+    /// Das Modul erscheint in der Navigation. `false` nur, wenn ein ausblendbares Modul
+    /// ausgeblendet ist — vom Einsatz oder, ohne eigenen Wert des Einsatzes, von der Organisation
+    /// (LLH-1179) —, auch für System-Admins, die es dennoch erreichen (`zugriff`).
     pub sichtbar: bool,
     /// Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des
     /// Modul-Gates der Listen-Endpunkte.
@@ -224,7 +226,8 @@ pub struct ModulFreigabe {
 /// 2. Nicht-ausblendbare Module (Stammdaten, Einstellungen) sind NIE sperrbar — weder
 ///    versteckt noch rollen-beschränkt (Selbst-Aussperr-Schutz, beide Dimensionen). Ein
 ///    etwaiger Override darauf wird defensiv ignoriert.
-/// 3. Ausblenden: Override `sichtbar=false` → kein Zugriff.
+/// 3. Ausblenden: effektive Sichtbarkeit = Einsatz-Override ?? Org-Vorgabe ?? sichtbar
+///    ([`effektiv_sichtbar`], LLH-1179); `false` → kein Zugriff.
 /// 4. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default. `admin` → nur
 ///    System-Admin (oben schon durch); `fuehrungskraft` → System-Admin oder org-weite
 ///    Führungskraft (`ist_hoehere_berechtigung`); `einsatzfuehrung` → dieselben oder
@@ -238,7 +241,7 @@ pub struct ModulFreigabe {
 /// keiner Navigation (das bisherige Client-Verhalten), erreichbar bleibt es über `zugriff`.
 pub fn modul_freigabe(
     overrides: &HashMap<String, EinsatzModulOverride>,
-    org_defaults: &HashMap<String, Option<String>>,
+    org_defaults: &HashMap<String, OrgModulVorgabe>,
     modul_key: &str,
     benutzer: &Benutzer,
     einsatz_rolle: Option<EinsatzRolle>,
@@ -250,7 +253,11 @@ pub fn modul_freigabe(
         };
     }
     let ueberschreibung = overrides.get(modul_key);
-    let sichtbar = ueberschreibung.is_none_or(|o| o.sichtbar);
+    let org_vorgabe = org_defaults.get(modul_key);
+    let sichtbar = effektiv_sichtbar(
+        ueberschreibung.and_then(|o| o.sichtbar),
+        org_vorgabe.and_then(|v| v.sichtbar),
+    );
     if benutzer.ist_admin() {
         return ModulFreigabe {
             sichtbar,
@@ -264,7 +271,7 @@ pub fn modul_freigabe(
         };
     }
     let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
-    let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
+    let org_default = org_vorgabe.and_then(|v| v.benoetigte_rolle.as_deref());
     let zugriff = match effektive_modul_rolle(einsatz_override_rolle, org_default).as_deref() {
         None => true,
         Some("fuehrungskraft") => benutzer.ist_hoehere_berechtigung(),
@@ -282,7 +289,7 @@ pub fn modul_freigabe(
 /// [`modul_freigabe`] keinen Zugriff gibt.
 pub fn fordere_modul_zugriff(
     overrides: &HashMap<String, EinsatzModulOverride>,
-    org_defaults: &HashMap<String, Option<String>>,
+    org_defaults: &HashMap<String, OrgModulVorgabe>,
     modul_key: &str,
     benutzer: &Benutzer,
     einsatz_rolle: Option<EinsatzRolle>,
@@ -308,7 +315,7 @@ async fn lade_modul_regeln(
 ) -> Result<
     (
         HashMap<String, EinsatzModulOverride>,
-        HashMap<String, Option<String>>,
+        HashMap<String, OrgModulVorgabe>,
     ),
     AppError,
 > {
@@ -970,15 +977,24 @@ mod tests {
 
     // --- Modul-Zugriff-Guard (LFH-132) ---
 
+    /// Override-Zeile mit eigenem Sichtbarkeitswert; ohne eigenen Wert: [`override_nur_rolle`].
     fn override_zeile(
         modul_key: &str,
         sichtbar: bool,
         benoetigte_rolle: Option<&str>,
     ) -> EinsatzModulOverride {
         EinsatzModulOverride {
+            sichtbar: Some(sichtbar),
+            ..override_nur_rolle(modul_key, benoetigte_rolle)
+        }
+    }
+
+    /// Override-Zeile, die nur eine Rolle trägt: die Sichtbarkeit erbt (LLH-1179).
+    fn override_nur_rolle(modul_key: &str, benoetigte_rolle: Option<&str>) -> EinsatzModulOverride {
+        EinsatzModulOverride {
             einsatz_id: 1,
             modul_key: modul_key.into(),
-            sichtbar,
+            sichtbar: None,
             benoetigte_rolle: benoetigte_rolle.map(str::to_string),
             geaendert_at: None,
             geaendert_von: None,
@@ -992,13 +1008,32 @@ mod tests {
             .collect()
     }
 
-    fn leere_org_defaults() -> HashMap<String, Option<String>> {
+    fn leere_org_defaults() -> HashMap<String, OrgModulVorgabe> {
         HashMap::new()
     }
 
-    fn org_defaults_mit(modul_key: &str, rolle: Option<&str>) -> HashMap<String, Option<String>> {
+    fn org_defaults_mit(modul_key: &str, rolle: Option<&str>) -> HashMap<String, OrgModulVorgabe> {
         let mut m = HashMap::new();
-        m.insert(modul_key.to_string(), rolle.map(str::to_string));
+        m.insert(
+            modul_key.to_string(),
+            OrgModulVorgabe {
+                benoetigte_rolle: rolle.map(str::to_string),
+                sichtbar: None,
+            },
+        );
+        m
+    }
+
+    /// Org-Vorgabe, die `modul_key` für alle Einsätze ausblendet (LLH-1179).
+    fn org_blendet_aus(modul_key: &str) -> HashMap<String, OrgModulVorgabe> {
+        let mut m = HashMap::new();
+        m.insert(
+            modul_key.to_string(),
+            OrgModulVorgabe {
+                benoetigte_rolle: None,
+                sichtbar: Some(false),
+            },
+        );
         m
     }
 
@@ -1343,7 +1378,7 @@ mod tests {
     /// Vergleich damit wäre tautologisch.
     fn alte_entscheidung(
         overrides: &HashMap<String, EinsatzModulOverride>,
-        org_defaults: &HashMap<String, Option<String>>,
+        org_defaults: &HashMap<String, OrgModulVorgabe>,
         key: &str,
         b: &Benutzer,
     ) -> bool {
@@ -1354,11 +1389,13 @@ mod tests {
             return true;
         }
         let ue = overrides.get(key);
-        if ue.is_some_and(|o| !o.sichtbar) {
+        if ue.is_some_and(|o| o.sichtbar == Some(false)) {
             return false;
         }
         let ov = ue.and_then(|o| o.benoetigte_rolle.as_deref());
-        let org = org_defaults.get(key).and_then(|r| r.as_deref());
+        let org = org_defaults
+            .get(key)
+            .and_then(|v| v.benoetigte_rolle.as_deref());
         match ov.or(org) {
             Some("admin") => false,
             Some("fuehrungskraft") => b.ist_hoehere_berechtigung(),
@@ -1419,6 +1456,80 @@ mod tests {
         }
     }
 
+    // --- Sichtbarkeits-Vorgabe der Organisation (LLH-1179) ---
+
+    #[test]
+    fn org_blendet_aus_einsatz_ohne_wert_ist_ausgeblendet() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            modul_freigabe(
+                &HashMap::new(),
+                &org_blendet_aus("stab"),
+                "stab",
+                &normal,
+                None
+            ),
+            freigabe(false, false)
+        );
+    }
+
+    #[test]
+    fn org_blendet_aus_einsatz_zeigt_ist_sichtbar() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("stab", true, None)]);
+        assert_eq!(
+            modul_freigabe(&ov, &org_blendet_aus("stab"), "stab", &normal, None),
+            freigabe(true, true)
+        );
+    }
+
+    #[test]
+    fn org_ohne_vorgabe_einsatz_blendet_aus_ist_ausgeblendet() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("stab", false, None)]);
+        assert_eq!(
+            modul_freigabe(&ov, &leere_org_defaults(), "stab", &normal, None),
+            freigabe(false, false)
+        );
+    }
+
+    #[test]
+    fn override_nur_mit_rolle_uebergeht_die_org_ausblendung_nicht() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        let ov = overrides_mit(vec![override_nur_rolle("stab", Some("fuehrungskraft"))]);
+        assert_eq!(
+            modul_freigabe(&ov, &org_blendet_aus("stab"), "stab", &fk, None),
+            freigabe(false, false)
+        );
+    }
+
+    #[test]
+    fn org_ausblendung_admin_unsichtbar_aber_erreichbar() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert_eq!(
+            modul_freigabe(
+                &HashMap::new(),
+                &org_blendet_aus("stab"),
+                "stab",
+                &admin,
+                None
+            ),
+            freigabe(false, true)
+        );
+    }
+
+    #[test]
+    fn org_ausblendung_trifft_kein_nicht_ausblendbares_modul() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        for key in ["einsatzdaten", "einsatz-einstellungen"] {
+            assert_eq!(
+                modul_freigabe(&HashMap::new(), &org_blendet_aus(key), key, &normal, None),
+                freigabe(true, true),
+                "{key}"
+            );
+        }
+    }
+
     // --- Integrationstest: DB + Guard-Kette (Task 11) ---
 
     #[tokio::test]
@@ -1437,7 +1548,7 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        crate::org::modul_einstellung::setzen(&pool, 1, "etb", Some("fuehrungskraft"), bid)
+        crate::org::modul_einstellung::setzen(&pool, 1, "etb", Some("fuehrungskraft"), None, bid)
             .await
             .unwrap();
 

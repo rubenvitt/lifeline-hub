@@ -23,6 +23,7 @@ vi.mock('../../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
   ladeModulOverrides: vi.fn(),
+  ladeModulFreigaben: vi.fn(),
   setzeModulOverride: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ vi.mock('../../api/orgEinstellungen', () => ({
 import {
   ladeEinsatz,
   ladeEinstellungen,
+  ladeModulFreigaben,
   ladeModulOverrides,
   setzeModulOverride,
 } from '../../api/einsaetze';
@@ -62,6 +64,7 @@ describe('EinsatzModule', () => {
     vi.mocked(ladeModulOverrides).mockResolvedValue({});
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue({});
     benutzerRolle.wert = 'admin';
     benutzerOrg.wert = 1;
   });
@@ -95,16 +98,17 @@ describe('EinsatzModule', () => {
   it('invalidiert nach dem Speichern die Modulfreigaben dieses Einsatzes (LFH-669)', async () => {
     // `new QueryClient()`: `neuerQueryClient()` räumte unbeobachtete Einträge beim ersten await.
     const client = new QueryClient();
-    // Literale Keys, nicht die Factory.
-    client.setQueryData(['einsatz-modul-freigaben', 1], {});
+    // Literale Keys, nicht die Factory. Die Freigaben dieses Einsatzes beobachtet der Editor selbst
+    // (LLH-1179): invalidiert heißt dort „neu geladen“.
     client.setQueryData(['einsatz-modul-freigaben', 2], {});
     rendern(client);
 
-    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: ETB' }));
+    const schalter = await screen.findByRole('switch', { name: 'Sichtbar: ETB' });
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalledTimes(1));
+    fireEvent.click(schalter);
 
-    await waitFor(() =>
-      expect(client.getQueryState(['einsatz-modul-freigaben', 1])?.isInvalidated).toBe(true),
-    );
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalledTimes(2));
+    expect(ladeModulFreigaben).toHaveBeenLastCalledWith(1);
     expect(client.getQueryState(['einsatz-modul-freigaben', 2])?.isInvalidated).toBe(false);
   });
 
@@ -129,7 +133,9 @@ describe('EinsatzModule', () => {
   });
 
   it('zeigt den Org-Rollen-Hinweis im Modul-Override', async () => {
-    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'fuehrungskraft' });
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      etb: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
+    });
 
     rendern();
 
@@ -139,7 +145,9 @@ describe('EinsatzModule', () => {
   });
 
   it('nennt eine Org-Vorgabe „Führung im Einsatz“ mit diesem Namen (LFH-1150)', async () => {
-    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'einsatzfuehrung' });
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      etb: { benoetigte_rolle: 'einsatzfuehrung', sichtbar: true },
+    });
 
     rendern();
 
@@ -155,8 +163,9 @@ describe('EinsatzModule', () => {
     fireEvent.click(await screen.findByText('Führung im Einsatz'));
 
     await waitFor(() =>
+      // Ohne eigenen Wert bleibt die Sichtbarkeit geerbt (LLH-1179).
       expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
-        sichtbar: true,
+        sichtbar: null,
         benoetigte_rolle: 'einsatzfuehrung',
       }),
     );
@@ -338,5 +347,187 @@ describe('EinsatzModule · Gruppierung und Filter (LFH-346)', () => {
     const e = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(false);
+  });
+});
+
+/** Sichtbarkeits-Vorgabe der Organisation im Editor (LLH-1179). */
+describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
+  const ORG_BLENDET_STAB_AUS = { stab: { benoetigte_rolle: null, sichtbar: false } };
+  const FREIGABE_STAB_AUS = { stab: { sichtbar: false, zugriff: true } };
+
+  beforeEach(() => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue(ORG_BLENDET_STAB_AUS);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(FREIGABE_STAB_AUS);
+    benutzerRolle.wert = 'admin';
+    benutzerOrg.wert = 1;
+  });
+
+  function stabZeile() {
+    return screen
+      .getByRole('switch', { name: 'Sichtbar: Stab' })
+      .closest('[data-modul-zeile]') as HTMLElement;
+  }
+
+  it('zeigt eine geerbte Ausblendung als aus, mit Herkunft und ohne „Vorgabe übernehmen“', async () => {
+    rendern();
+
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+    expect(
+      within(stabZeile()).getByText('Vorgabe der Organisation: ausgeblendet'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Vorgabe übernehmen: Stab' }),
+    ).not.toBeInTheDocument();
+    // Ein Modul ohne Vorgabe trägt keinen Hinweis.
+    const etb = screen
+      .getByRole('switch', { name: 'Sichtbar: ETB' })
+      .closest('[data-modul-zeile]') as HTMLElement;
+    expect(within(etb).queryByText(/Vorgabe der Organisation/)).not.toBeInTheDocument();
+  });
+
+  it('überstimmt die Vorgabe mit einem eigenen Wert', async () => {
+    rendern();
+
+    const schalter = await screen.findByRole('switch', { name: 'Sichtbar: Stab' });
+    await waitFor(() => expect(schalter).not.toBeChecked());
+    fireEvent.click(schalter);
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'stab', {
+        sichtbar: true,
+        benoetigte_rolle: null,
+      }),
+    );
+  });
+
+  it('bietet bei eigenem Wert „Vorgabe übernehmen“ an, das ihn zurücknimmt und die Rolle lässt', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: true, benoetigte_rolle: 'fuehrungskraft' },
+    } as never);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue({ stab: { sichtbar: true, zugriff: true } });
+    rendern();
+
+    const knopf = await screen.findByRole('button', { name: 'Vorgabe übernehmen: Stab' });
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).toBeChecked();
+    expect(
+      within(stabZeile()).getByText('Vorgabe der Organisation: ausgeblendet'),
+    ).toBeInTheDocument();
+    fireEvent.click(knopf);
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'stab', {
+        sichtbar: null,
+        benoetigte_rolle: 'fuehrungskraft',
+      }),
+    );
+    // Der Knopf schaltet nicht nebenbei den Schalter.
+    expect(setzeModulOverride).toHaveBeenCalledTimes(1);
+  });
+
+  it('bietet „Vorgabe übernehmen“ auch bei eigenem Wert ohne Org-Vorgabe an', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue({ etb: { sichtbar: false, zugriff: true } });
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      etb: { sichtbar: false, benoetigte_rolle: null },
+    } as never);
+    rendern();
+
+    expect(
+      await screen.findByRole('button', { name: 'Vorgabe übernehmen: ETB' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Vorgabe der Organisation: ausgeblendet')).not.toBeInTheDocument();
+  });
+
+  it('lässt eine geerbte Ausblendung beim Rollenwechsel geerbt', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: null, benoetigte_rolle: null },
+    } as never);
+    rendern();
+
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' }));
+    const optionen = await screen.findAllByText('Admin');
+    fireEvent.click(optionen[optionen.length - 1]);
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'stab', {
+        sichtbar: null,
+        benoetigte_rolle: 'admin',
+      }),
+    );
+  });
+
+  it('zeigt den wirksamen Wert auch ohne Leserecht auf die Org-Vorgaben', async () => {
+    // Die Einsatzleitung ohne Org-Rolle liest die Vorgaben nicht (403); die Freigaben schon.
+    vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    rendern();
+
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+    // Ohne eigenen Wert kann nur die Organisation ausgeblendet haben.
+    expect(
+      within(stabZeile()).getByText('Vorgabe der Organisation: ausgeblendet'),
+    ).toBeInTheDocument();
+  });
+
+  it('hält die Zeile gesperrt, bis Overrides und Freigaben neu geladen sind', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue({});
+    vi.mocked(ladeModulOverrides).mockResolvedValueOnce({});
+    let neuLaden!: (v: unknown) => void;
+    vi.mocked(ladeModulOverrides).mockReturnValueOnce(new Promise((r) => (neuLaden = r)) as never);
+    rendern();
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: Stab' }));
+    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalledTimes(2));
+    // Der eigene Wert ist gespeichert, der Bestand noch alt: ein Rollenwechsel schickte sonst
+    // `sichtbar: null` und nähme ihn still zurück.
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
+
+    neuLaden({ stab: { sichtbar: false, benoetigte_rolle: null } });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).not.toBeDisabled(),
+    );
+  });
+
+  it('zeigt den Schalter erst, wenn die Freigaben feststehen', async () => {
+    let freigabenDa!: (v: unknown) => void;
+    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise((r) => (freigabenDa = r)) as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    rendern();
+
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
+    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    // Overrides und Einsatz sind da; ohne Warten auf die Freigaben stünde der Schalter jetzt „an“.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.queryByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeInTheDocument();
+    freigabenDa(FREIGABE_STAB_AUS);
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+  });
+
+  it('nimmt ohne Freigaben die Org-Vorgabe für den Schalter', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
+    rendern();
+
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked(),
+    );
+    expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeChecked();
   });
 });

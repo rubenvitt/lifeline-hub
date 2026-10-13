@@ -119,10 +119,20 @@ export interface OrgEinstellungenUpdate {
  *  typisiert das Feld als freien String und weist andere Werte mit 400 ab. */
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft' | 'einsatzfuehrung';
 
-/** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).
- *  Map modul_key → benoetigte_rolle; fehlt ein Key = kein Org-Default (frei).
- *  Kein Backend-Schema, FE-lokal. */
-export type OrgModulEinstellungen = Record<string, BenoetigteRolle | null>;
+/** Vorgabe der Organisation für ein Modul (LLH-1179): Rolle und aufgelöste Sichtbarkeit
+ *  (`false` nur, wenn die Organisation das Modul ausblendet). */
+export type OrgModulEinstellung = S['OrgModulEinstellung'];
+
+/** Org-weite Modul-Vorgaben (GET /api/org-modul-einstellungen): Map modul_key → Vorgabe; fehlt ein
+ *  Key, gibt die Organisation nichts vor (sichtbar, frei). Die Map ist FE-lokal, der Eintrag nicht. */
+export type OrgModulEinstellungen = Record<string, OrgModulEinstellung>;
+
+/** PUT-Eingabe einer Org-Modul-Vorgabe; der Client schickt immer beide Felder (design.md D5 der
+ *  Change `archive/2026-10-13-ivtkmf43-org-modul-sichtbarkeit`). Kein Backend-Schema, FE-lokal. */
+export interface OrgModulEinstellungUpdate {
+  benoetigte_rolle: BenoetigteRolle | null;
+  sichtbar: boolean;
+}
 
 export type EinsatzEinstellungen = S['EinstellungenMitOrgDefaults'];
 
@@ -167,7 +177,8 @@ export type ModulFreigaben = Record<string, ModulFreigabe>;
 
 /** PUT-Eingabe eines einzelnen Modul-Overrides. Kein Backend-Schema, FE-lokal. */
 export interface ModulOverrideUpdate {
-  sichtbar: boolean;
+  /** Eigener Wert des Einsatzes; `null` = erbt (Organisation ?? sichtbar, LLH-1179). */
+  sichtbar: boolean | null;
   benoetigte_rolle: BenoetigteRolle | null;
 }
 
