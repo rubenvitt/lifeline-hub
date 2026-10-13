@@ -446,3 +446,47 @@ async fn quittung_und_ruecknahme_gehen_live_ohne_nur_inhalt() {
         assert!(data.get("nur_inhalt").is_none(), "{wort}: {data}");
     }
 }
+
+#[tokio::test]
+async fn nach_einer_zweiten_fortschreibung_der_alten_fassung_gilt_nur_die_zuletzt_freigegebene() {
+    let u = umgebung().await;
+    let v1 = u.freigegeben().await;
+    let v2 = u.fortschreiben(id(&v1)).await;
+    let (s, _) = u.post(&format!("{}/freigeben", u.befehl(id(&v2)))).await;
+    assert_eq!(s, StatusCode::OK);
+    // Die überholte v1 wird noch einmal fortgeschrieben und freigegeben (Seitenzweig der Kette).
+    let zweig = u.fortschreiben(id(&v1)).await;
+    let (s, zweig) = u.post(&format!("{}/freigeben", u.befehl(id(&zweig)))).await;
+    assert_eq!(s, StatusCode::OK, "{zweig:?}");
+
+    assert_eq!(zweig["is_quittierbar"], true);
+    assert_eq!(u.laden(id(&v2)).await["is_quittierbar"], false);
+    assert_eq!(u.laden(id(&v1)).await["is_quittierbar"], false);
+    let (s, _) = u.quittieren(id(&v2), id_of_row(&v2, 0)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // Eine andere Kette im selben Einsatz bleibt unberührt.
+    let andere = u.freigegeben().await;
+    assert_eq!(u.laden(id(&andere)).await["is_quittierbar"], true);
+    assert_eq!(u.laden(id(&zweig)).await["is_quittierbar"], true);
+}
+
+#[tokio::test]
+async fn verteiler_im_entwurf_aendern_meldet_den_kopf_neu() {
+    let (app, live) = setup_mit_live().await;
+    let u = umgebung_mit(app).await;
+    let id = u.entwurf().await;
+    let mut rx = live.abonniere(u.einsatz);
+    let (s, j) = anfrage_json(
+        &u.app,
+        "PATCH",
+        &u.befehl(id),
+        &u.admin,
+        Some(&json!({"verteiler": [{"empfaenger_typ": "funktion", "funktion": "s3"}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let n = recv_until_tag(&mut rx, "befehl", Duration::from_secs(1)).await;
+    let data: Value = serde_json::from_str(&n.data).unwrap();
+    // Die Liste trägt den Verteiler (Karte, Empfängerfilter): kein `nur_inhalt`.
+    assert!(data.get("nur_inhalt").is_none(), "{data}");
+}

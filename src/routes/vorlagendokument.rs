@@ -256,9 +256,10 @@ pub async fn aktualisieren<T: DokumentRoute>(
         },
     )
     .await?;
-    // Titel und Zeitstand sind die einzigen Kopffelder, die ein PATCH ändern kann; bleiben sie,
-    // sieht die Liste nichts Neues (`DokumentKopf` trägt kein `aktualisiert_at`).
-    if dok.titel == vorher.titel && dok.zeitstand == vorher.zeitstand {
+    // Titel, Zeitstand und Verteiler sind die Kopffelder, die ein PATCH ändern kann; bleiben sie,
+    // sieht die Liste nichts Neues (`DokumentKopf` trägt kein `aktualisiert_at`). Den Verteiler
+    // trägt der Kopf seit LLH-1173 (Karte, Empfängerfilter): ein PATCH mit Verteiler meldet ihn.
+    if dok.titel == vorher.titel && dok.zeitstand == vorher.zeitstand && verteiler.is_none() {
         sse_nur_inhalt::<T>(state, einsatz_id, id);
     } else {
         sse::<T>(state, einsatz_id, id);

@@ -35,9 +35,10 @@ und Person der ersten Quittung, und die Antwort ist trotzdem erfolgreich.
 - **THEN** antwortet der Server mit 403
 
 ### Requirement: Nur die jüngste freigegebene Fassung ist quittierbar
-Eine freigegebene Fassung SHALL quittierbar sein, solange keine aus ihr fortgeschriebene Fassung
-freigegeben ist. Ist eine Nachfolgerin freigegeben, MUST der Server Quittieren und Zurücknehmen an
-der älteren Fassung mit 422 ablehnen, und ihre Quittungen MUST unverändert bleiben. Die Anzeige
+Eine freigegebene Fassung SHALL quittierbar sein, solange keine andere Fassung derselben Kette
+(alle Fassungen, die über das Fortschreiben zusammenhängen) später freigegeben wurde. Ist eine
+spätere Fassung freigegeben, MUST der Server Quittieren und Zurücknehmen an der älteren Fassung
+mit 422 ablehnen, und ihre Quittungen MUST unverändert bleiben. Die Anzeige
 eines Befehls in Liste und Detail MUST sagen, ob er quittierbar ist.
 
 #### Scenario: Nachfolgerin im Entwurf
@@ -47,6 +48,10 @@ eines Befehls in Liste und Detail MUST sagen, ob er quittierbar ist.
 #### Scenario: Nachfolgerin freigegeben
 - **WHEN** Fassung 2 freigegeben ist und jemand einen Eintrag von Fassung 1 quittieren will
 - **THEN** antwortet der Server mit 422, und Fassung 1 trägt weiter die Quittungen, die sie vorher hatte
+
+#### Scenario: Überholte Fassung noch einmal fortgeschrieben
+- **WHEN** Fassung 2 freigegeben ist und jemand Fassung 1 noch einmal fortschreibt und diese neue Fassung freigibt
+- **THEN** ist nur die zuletzt freigegebene Fassung quittierbar, Fassung 2 nicht mehr
 
 #### Scenario: Neue Fassung beginnt offen
 - **WHEN** in Fassung 1 alle Empfänger quittiert haben und Fassung 2 freigegeben wird

@@ -74,14 +74,14 @@ eigene Schwärzungsregeln, und sie trüge nur die zwei Spalten, die die Zeile sc
 - `json_column` liest `quittiert_at` und `quittiert_von_id` mit.
   `VerteilerEintragAnzeige` bekommt beide als optionale Felder (`skip_serializing_if` wie die
   übrigen optionalen Felder). Beim Lagebericht fehlen sie damit auf dem Wire.
-- `Dokument<A>` und `DokumentKopf` bekommen `is_quittierbar: bool`. Das SQL berechnet es:
-  ```sql
-  l.status = 'freigegeben'
-  AND NOT EXISTS (SELECT 1 FROM <tab> n WHERE n.vorgaenger_id = l.id AND n.status = 'freigegeben')
-  ```
-  „Jüngste freigegebene Fassung“ heißt also: keine **direkte** Nachfolgerin ist freigegeben. Das
-  reicht, weil eine Nachfolgerin nur aus einer freigegebenen Fassung entstehen kann. Ist v3
-  freigegeben, ist v2 freigegeben und überholt v1.
+- `Dokument<A>` und `DokumentKopf` bekommen `is_quittierbar: bool`. Das SQL berechnet es: die
+  Fassung ist freigegeben, und keine andere Fassung derselben Kette ist später freigegeben (bei
+  gleicher Sekunde entscheidet die id). Die Kette bestimmt eine rekursive CTE: erst zur Wurzel
+  über `vorgaenger_id`, dann den ganzen Baum hinab. Eine Prüfung nur der **direkten**
+  Nachfolgerin reicht nicht: Auch eine schon überholte Fassung lässt sich fortschreiben, und deren
+  Freigabe überholt alle anderen. Das hat der Review gefunden; der Test
+  `nach_einer_zweiten_fortschreibung_der_alten_fassung_gilt_nur_die_zuletzt_freigegebene` hält es
+  fest.
 - `liste_koepfe` liest den Verteiler über dieselbe `json_column`. `DokumentKopf` bekommt
   `verteiler`, `BefehlKopf` trägt `verteiler` und `is_quittierbar`. `BefehlAnzeige` trägt
   `is_quittierbar`. `LageberichtKopf` und `LageberichtAnzeige` übernehmen keines der neuen
@@ -156,7 +156,7 @@ in derselben Transaktion. Den Satz baut eine Funktion in `befehl`, die `Dokument
 Dokumenttitel. Die Nummer des Freigabe-Eintrags verweist eindeutig auf die Fassung und überlebt die
 Schwärzung. Der Anzeigename des Empfängers ist Wortlaut des Führungsmoduls (Gruppe
 `Fuehrungsmodul`, wie bei der Freigabe). `tests/aufbewahrung_e2e.rs`, `AUSNAHMEN_SYSTEM_ETB`,
-bekommt je Schreibweg (`aendern_tx`, der gemeinsame Weg beider Richtungen) Einträge für
+bekommt je Schreibweg (`update_quittung_tx`, der gemeinsame Weg beider Richtungen) Einträge für
 `befehl_verteiler.snap_anzeige`, `.funktion_text` und `.extern_bezeichnung`. Kein Test bemerkt
 einen fehlenden Eintrag (`src/AGENTS.md`), deshalb ist das eine eigene Aufgabe.
 
@@ -171,7 +171,11 @@ einen fehlenden Eintrag (`src/AGENTS.md`), deshalb ist das eine eigene Aufgabe.
 
 ### D5 Live
 
-Nach dem Commit gehen zwei Ereignisse:
+Der Kopf trägt jetzt den Verteiler. Ein Entwurfs-PATCH mit Verteiler meldet deshalb den Befehl
+ohne `nur_inhalt`, sonst behielte die Liste anderer Tabs alte Namen und der Empfängerfilter
+träfe falsch.
+
+Nach dem Commit einer Quittung gehen zwei Ereignisse:
 
 - `sse::<T>` (Objekt `befehl_id`, **ohne** `nur_inhalt`), weil sich der Kopf in der Liste ändert;
 - bei geschriebenem ETB-Eintrag zusätzlich `state.live.publiziere(einsatz_id, etb_id)`, wie bei

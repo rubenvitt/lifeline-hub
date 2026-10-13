@@ -85,12 +85,24 @@ struct Row {
 }
 
 /// Ob die Fassung `<alias>` die jüngste freigegebene ihrer Kette ist (LLH-1173, design.md D2):
-/// freigegeben, und keine DIREKTE Nachfolgerin ist freigegeben. Das reicht, weil eine Nachfolgerin
-/// nur aus einer freigegebenen Fassung entsteht.
+/// freigegeben, und keine andere Fassung derselben Kette ist später freigegeben (bei gleicher
+/// Sekunde entscheidet die id). Die Kette ist der ganze Baum über `vorgaenger_id`, nicht nur die
+/// direkte Nachfolgerin: auch eine schon überholte Fassung lässt sich fortschreiben, und deren
+/// Freigabe überholt dann alle anderen.
 fn quittierbar_column<T: Dokumentart>(alias: &str) -> String {
     format!(
-        "({alias}.status = '{f}' AND NOT EXISTS (SELECT 1 FROM {tab} n \
-            WHERE n.vorgaenger_id = {alias}.id AND n.status = '{f}'))",
+        "({alias}.status = '{f}' AND NOT EXISTS (\
+            WITH RECURSIVE wurzel(id, vorgaenger_id) AS ( \
+                SELECT x.id, x.vorgaenger_id FROM {tab} x WHERE x.id = {alias}.id \
+                UNION ALL SELECT p.id, p.vorgaenger_id FROM {tab} p \
+                    JOIN wurzel w ON p.id = w.vorgaenger_id), \
+            kette(id) AS ( \
+                SELECT id FROM wurzel WHERE vorgaenger_id IS NULL \
+                UNION ALL SELECT n.id FROM {tab} n JOIN kette k ON n.vorgaenger_id = k.id) \
+            SELECT 1 FROM {tab} m JOIN kette k ON m.id = k.id \
+            WHERE m.status = '{f}' AND m.id <> {alias}.id \
+              AND (m.freigegeben_at > {alias}.freigegeben_at \
+                   OR (m.freigegeben_at = {alias}.freigegeben_at AND m.id > {alias}.id))))",
         f = STATUS_FREIGEGEBEN,
         tab = T::TABELLE,
     )
