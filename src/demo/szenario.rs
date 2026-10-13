@@ -485,6 +485,9 @@ pub enum Vorgang {
         personal: &'static str,
         einheit: &'static str,
     },
+    /// Disponierte Kraft als Einsatzleiter der Führungsstelle setzen (LFH-1199), „seit“ =
+    /// Schrittzeit. ETB: „Einsatzleitung übernommen: …“.
+    Einsatzleiter { personal: &'static str },
     /// Disponierte Kraft an einer UHS einsetzen (Stärke der UHS, LFH-1045). ETB: „«…» an UHS
     /// «…» eingesetzt“.
     PersonalAnUhs {
@@ -933,6 +936,12 @@ pub const DREHBUCH: &[Schritt] = &[
     dispo_personal(278, "notsan1"),
     dispo_personal(278, "rettsan1"),
     dispo_personal(278, "rettsan2"),
+    s(
+        277,
+        Vorgang::Einsatzleiter {
+            personal: "zugfuehrer",
+        },
+    ),
     personal_zu(276, "zugfuehrer", "zug"),
     personal_zu(276, "notarzt", "rettung"),
     personal_zu(276, "notsan1", "rettung"),
@@ -1416,6 +1425,7 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
             | Vorgang::FahrzeugZuEinheit { .. }
             | Vorgang::PersonalZuEinheit { .. }
             | Vorgang::PersonalAnUhs { .. }
+            | Vorgang::Einsatzleiter { .. }
             | Vorgang::Gefahrengebiet(_)
             | Vorgang::Uhs(_)
             | Vorgang::Bereitstellungsraum(_)
@@ -1579,6 +1589,7 @@ mod tests {
         let mut erinnerungen = BTreeSet::new();
         let mut erledigt = BTreeSet::new();
         let mut an_uhs = BTreeSet::new();
+        let mut einsatzleiter = 0;
         for schritt in DREHBUCH {
             match schritt.vorgang {
                 Vorgang::PersonalZuEinheit {
@@ -1596,6 +1607,10 @@ mod tests {
                     assert!(personal.contains(p), "{p} nicht disponiert");
                     assert!(uhs.contains(u), "{u} vor {p}");
                     assert!(an_uhs.insert(p), "{p} doppelt an einer UHS");
+                }
+                Vorgang::Einsatzleiter { personal: p } => {
+                    assert!(personal.contains(p), "{p} nicht disponiert");
+                    einsatzleiter += 1;
                 }
                 Vorgang::Gefahrengebiet(v) => assert!(v.ring.len() >= 3, "{}", v.label),
                 Vorgang::Uhs(v) => {
@@ -1681,6 +1696,8 @@ mod tests {
                 Vorgang::Etb { inhalt, .. } => assert!(!inhalt.trim().is_empty()),
             }
         }
+        // Ein zweiter Schritt schriebe eine Übergabe statt der Übernahme (LLH-1169).
+        assert_eq!(einsatzleiter, 1, "genau ein Einsatzleiter");
     }
 
     /// Der Einsatz-Bedarf folgt dem Drehbuch: jeder Einheitstyp und jeder FMS-Anker, der

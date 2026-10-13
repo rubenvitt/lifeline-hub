@@ -73,6 +73,7 @@ async fn bild(pool: &SqlitePool) -> Vec<(&'static str, Vec<String>)> {
         "einsatz_einheit",
         "einsatz_fahrzeug",
         "einsatz_personal",
+        "einsatz_fuehrungsstelle",
         "benutzer",
         // Block 4.3: die Module des vollständigen Drehbuchs.
         "einsatz_person",
@@ -202,6 +203,10 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     einheiten[einheit],
                     personal_name(personal),
                 ),
+            ),
+            Vorgang::Einsatzleiter { personal } => eintrag(
+                "system",
+                format!("Einsatzleitung übernommen: {}", personal_name(personal)),
             ),
             Vorgang::PersonalAnUhs { personal, uhs: u } => {
                 let p = szenario::PERSONAL
@@ -652,7 +657,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
 
     let ist = etb(&pool, erg.einsatz_id).await;
     let erwartet = erwartete_etb();
-    assert_eq!(ist.len(), 134, "Zahl der ETB-Einträge des Drehbuchs");
+    assert_eq!(ist.len(), 135, "Zahl der ETB-Einträge des Drehbuchs");
     assert_eq!(
         ist.iter()
             .map(|(_, typ, inhalt, zeit, _)| (typ.clone(), inhalt.clone(), zeit.clone()))
@@ -673,7 +678,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
     assert_eq!(je_typ("entscheidung"), 6);
     assert_eq!(je_typ("meldung"), 15);
     assert_eq!(je_typ("anordnung"), 6);
-    assert_eq!(je_typ("system"), 101);
+    assert_eq!(je_typ("system"), 102);
 
     // Einzelne Wortlaute als Literal, unabhängig von den Textfunktionen.
     let inhalte: Vec<&str> = ist.iter().map(|e| e.2.as_str()).collect();
@@ -685,6 +690,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         "Einheit «Rettungsstaffel»: Fahrzeug «Musterstadt 83-2» zugeordnet",
         "Fahrzeug «Musterstadt 85-2»: Status «4 – Am Einsatzort» → «6 – Nicht einsatzbereit»",
         "Person «Max Mustermann (Zugführer, Sprechfunker)» disponiert",
+        "Einsatzleitung übernommen: Max Mustermann",
         "Einheit «Rettungsstaffel»: «Anna Probe» zugeordnet",
         "«Anna Probe (Notarzt)» an UHS «Turnhalle Musterstadt» eingesetzt",
         "Gefahrengebiet «Überflutung Unterstadt» eingerichtet",
@@ -705,6 +711,68 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         .collect();
     assert_eq!(bezirk.len(), 1);
     assert_eq!(bezirk[0].3, "2026-09-25 08:12:00");
+}
+
+/// Die eigene Führungsstelle hat den Zugführer als Einsatzleiter (LLH-1169), seit der
+/// Schrittzeit und über denselben Patch wie die Route. Führungsstelle (Organigramm, Funkplan) und
+/// Einsatzkopf (Kopfleiste) lesen ihn, das ETB hat genau einen Übernahme-Eintrag; Entfernen nimmt
+/// die Zeile mit dem Einsatz.
+#[tokio::test]
+async fn einsatzleiter_ist_der_zugfuehrer_seit_seinem_schritt() {
+    use crate::einsatz::fuehrungsstelle::EinsatzleiterArt;
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+
+    let zugfuehrer: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND snap_name = 'Max Mustermann'",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let el = crate::einsatz::fuehrungsstelle::load(&pool, erg.einsatz_id)
+        .await
+        .unwrap()
+        .einsatzleiter
+        .expect("Einsatzleiter gesetzt");
+    assert_eq!(el.art, EinsatzleiterArt::Personal);
+    assert_eq!(el.name.as_deref(), Some("Max Mustermann"));
+    assert_eq!(el.personal_id, Some(zugfuehrer));
+    assert!(el.personal_noch_disponiert);
+    assert_eq!(el.seit, zeit_vor(277));
+    let kopf = crate::einsatz::repo::laden(&pool, erg.einsatz_id)
+        .await
+        .unwrap();
+    assert_eq!(kopf.einsatzleiter.anzeige(), Some(el));
+
+    let uebergaben: Vec<_> = etb(&pool, erg.einsatz_id)
+        .await
+        .into_iter()
+        .filter(|e| {
+            e.2.starts_with("Einsatzleitung ") || e.2.starts_with("Übergabe der Einsatzleitung")
+        })
+        .map(|(_, typ, inhalt, zeit, _)| (typ, inhalt, zeit))
+        .collect();
+    assert_eq!(
+        uebergaben,
+        vec![(
+            "system".to_string(),
+            "Einsatzleitung übernommen: Max Mustermann".to_string(),
+            zeit_vor(277),
+        )]
+    );
+
+    crate::write_retry!(&pool, |conn| { entfernen_tx(conn, o.org).await }).expect("entfernen");
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?",
+            erg.einsatz_id
+        )
+        .await,
+        0
+    );
 }
 
 /// Szenariouhr (D9): jeder Eintrag trägt als Eingangszeit seine Ereigniszeit, die
