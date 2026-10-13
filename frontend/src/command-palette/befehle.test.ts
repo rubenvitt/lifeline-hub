@@ -8,6 +8,7 @@ import {
 } from './befehle';
 import { filtereBefehle, ordneTreffer } from './fuzzy';
 import { modulRegistry } from '../einsatz/modulRegistry';
+import { sprungmarken } from '../einsatz/sprungmarken';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, Koordinatenformat } from '../api/types';
@@ -139,6 +140,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:bereitstellungsraeume',
       'aktion:einsatzabschnitte',
       'aktion:lagekarte-gefahrengebiet',
+      'aktion:infotelefon-anruf',
     ]);
   });
   /**
@@ -160,6 +162,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
       ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
       ['aktion:lagekarte-gefahrengebiet', '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet'],
+      ['aktion:infotelefon-anruf', '/einsaetze/5/stab/infotelefon?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
@@ -177,6 +180,21 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(etb.kontext).toBe(modulEtb.label);
     expect(etb.icon).toBe(modulEtb.icon);
     expect(b.find((x) => x.id === 'aktion:personen')!.label).toBe('Person erfassen');
+    // Träger der Stab-Unterseite ist der Stab (LLH-1127).
+    const anruf = b.find((x) => x.id === 'aktion:infotelefon-anruf')!;
+    expect(anruf.label).toBe('Anruf erfassen');
+    expect(anruf.kontext).toBe('Stab');
+  });
+  it('führt „Anruf erfassen“ nur mit Schreibrecht und freiem Stab (LLH-1127)', () => {
+    const hat = (k: BefehlKontext) =>
+      baueBefehle(k).some((x) => x.id === 'aktion:infotelefon-anruf');
+    expect(hat(kontext())).toBe(true);
+    expect(hat(kontext({ darfSchreibenImEinsatz: false }))).toBe(false);
+    expect(hat(kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }))).toBe(false);
+    const q = 'bürgertelefon anruf';
+    expect(ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q)[0]?.id).toBe(
+      'aktion:infotelefon-anruf',
+    );
   });
   it.each([
     ['neuer etb', 'aktion:etb'],
@@ -252,12 +270,13 @@ describe('baueBefehle — Schnellaktionen', () => {
       zeile.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einstellungen/zugriff?neu=1');
     });
-    it('steht am Ende; die Bestandszeilen behalten ihre Reihenfolge', () => {
+    it('steht hinter den älteren Zeilen; die übrigen behalten ihre Reihenfolge', () => {
       const ids = baueBefehle(kontext({ darfEinsatzLeiten: true }))
         .map((x) => x.id)
         .filter((id) => id.startsWith('aktion:'));
-      expect(ids[ids.length - 1]).toBe(ID);
-      expect(ids.slice(0, -1)).toEqual(
+      // Hinter „Gefahrengebiet zeichnen“, vor der jüngeren Zeile „Anruf erfassen“ (LLH-1127).
+      expect(ids.indexOf(ID)).toBe(ids.indexOf('aktion:lagekarte-gefahrengebiet') + 1);
+      expect(ids.filter((id) => id !== ID)).toEqual(
         baueBefehle(kontext())
           .map((x) => x.id)
           .filter((id) => id.startsWith('aktion:')),
@@ -912,5 +931,73 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
         (x) => x.id === 'sprung:einsatzbericht',
       ),
     ).toBe(true);
+  });
+});
+
+describe('baueBefehle — Ansichten (LLH-1127)', () => {
+  const STAB = ['presse', 'infotelefon', 'funkplan', 'fernmeldeskizze', 'kommunikationsplan'];
+  const ansichten = (k: BefehlKontext) => baueBefehle(k).filter((b) => b.gruppe === 'ansichten');
+  const suche = (k: BefehlKontext, q: string) =>
+    ordneTreffer(filtereBefehle(baueBefehle(k), q), q).map((b) => b.label);
+
+  it('führt jede Sprungmarke mit Ziel, Icon und Namen ihres Zielmoduls', () => {
+    const k = kontext();
+    const zeilen = ansichten(k);
+    expect(zeilen.map((b) => b.id)).toEqual(sprungmarken.map((m) => `ansicht:${m.key}`));
+    for (const marke of sprungmarken) {
+      const zeile = zeilen.find((b) => b.id === `ansicht:${marke.key}`)!;
+      const ziel = modulRegistry.find((m) => m.key === marke.zielModul)!;
+      expect(zeile.label, marke.key).toBe(marke.label);
+      expect(zeile.kontext, marke.key).toBe(ziel.label);
+      expect(zeile.icon, marke.key).toBe(ziel.icon);
+      expect(zeile.ziel, marke.key).toBe(marke.pfad(5));
+    }
+    zeilen.find((b) => b.id === 'ansicht:fernmeldeskizze')!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/stab/funkplan?ansicht=skizze');
+  });
+
+  it('bietet keine Marke an, deren Zielmodul gesperrt oder ausgeblendet ist', () => {
+    const gesperrt = ansichten(
+      kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }),
+    );
+    for (const key of STAB)
+      expect(
+        gesperrt.some((b) => b.id === `ansicht:${key}`),
+        key,
+      ).toBe(false);
+    // Gegenprobe: die übrigen Marken bleiben, die Sperre trifft nur den Stab.
+    expect(gesperrt.some((b) => b.id === 'ansicht:entscheidungen')).toBe(true);
+
+    const ausgeblendet = ansichten(
+      kontext({ freigaben: freigabenFixture({ etb: { sichtbar: false } }) }),
+    );
+    expect(ausgeblendet.some((b) => b.id === 'ansicht:entscheidungen')).toBe(false);
+    expect(ausgeblendet.some((b) => b.id === 'ansicht:funkplan')).toBe(true);
+  });
+
+  it('fehlt ohne Einsatz und solange die Freigaben laden', () => {
+    expect(ansichten(kontext({ einsatzId: null }))).toEqual([]);
+    expect(ansichten(kontext({ freigaben: undefined }))).toEqual([]);
+  });
+
+  it('findet die Arbeitsseiten des Stabs über Namen und Schlagworte', () => {
+    const k = kontext();
+    expect(suche(k, 'Funk')[0]).toBe('Funkplan');
+    expect(suche(k, 'bürgertelefon')).toContain('Informationstelefon');
+    expect(suche(k, 'Info')).toContain('Informationstelefon');
+    expect(suche(k, 'sprechgruppe')[0]).toBe('Funkplan');
+    expect(suche(k, 'presse')).toContain('Pressearbeit');
+    expect(suche(k, 'entscheid')).toContain('Entscheidungen');
+  });
+
+  it('steht direkt hinter „Module“ und ist merkbar', () => {
+    expect(GRUPPEN_REIHENFOLGE.indexOf('ansichten')).toBe(
+      GRUPPEN_REIHENFOLGE.indexOf('module') + 1,
+    );
+    const k = kontext({ merkeBefehl: vi.fn() });
+    baueBefehle(k)
+      .find((b) => b.id === 'ansicht:funkplan')!
+      .ausfuehren();
+    expect(k.merkeBefehl).toHaveBeenCalledWith('ansicht:funkplan');
   });
 });

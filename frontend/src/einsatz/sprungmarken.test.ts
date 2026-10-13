@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { modulRegistry, moduleNachKategorie, type ModulEintrag } from './modulRegistry';
+import { unterseitenFuer } from '../stab/unterseiten';
 import {
   navZeilen,
   sprungmarken,
@@ -21,6 +22,12 @@ describe('Sprungmarken (LFH-620)', () => {
       'patienten',
       'vermisste',
       'fms-tableau',
+      // Arbeitsseiten des Stabs (LLH-1127), nach Sachgebiet S5, S6.
+      'presse',
+      'infotelefon',
+      'funkplan',
+      'fernmeldeskizze',
+      'kommunikationsplan',
     ]);
   });
 
@@ -32,6 +39,11 @@ describe('Sprungmarken (LFH-620)', () => {
       patienten: '/einsaetze/7/personen?filter=alle&ansicht=raster',
       vermisste: '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen',
       'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
+      presse: '/einsaetze/7/stab/presse',
+      infotelefon: '/einsaetze/7/stab/infotelefon',
+      funkplan: '/einsaetze/7/stab/funkplan',
+      fernmeldeskizze: '/einsaetze/7/stab/funkplan?ansicht=skizze',
+      kommunikationsplan: '/einsaetze/7/stab/kommunikationsplan',
     });
   });
 
@@ -62,6 +74,11 @@ describe('Sprungmarken (LFH-620)', () => {
       'auftraege',
       '↗entscheidungen',
       'stab',
+      '↗presse',
+      '↗infotelefon',
+      '↗funkplan',
+      '↗fernmeldeskizze',
+      '↗kommunikationsplan',
       'dokumente',
     ]);
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
@@ -87,6 +104,50 @@ describe('Sprungmarken (LFH-620)', () => {
       'bereitstellungsraeume',
       'abloesung',
     ]);
+  });
+
+  it('führt jede Unterseite der Stab-Seite genau einmal, mit deren Namen und Adresse (LLH-1127)', () => {
+    // Eine Wahrheit: benennt die Stab-Seite eine Unterseite um, zieht das Menü mit.
+    const seiten = (['s1', 's2', 's3', 's4', 's5', 's6'] as const).flatMap((s) =>
+      unterseitenFuer(s),
+    );
+    expect(seiten.length).toBeGreaterThan(0);
+    for (const seite of seiten) {
+      const marken = sprungmarken.filter((m) => m.key === seite.key);
+      expect(marken, seite.key).toHaveLength(1);
+      expect(marken[0].label).toBe(seite.label);
+      expect(marken[0].pfad(7)).toBe(seite.pfad(7));
+      expect(marken[0].zielModul).toBe('stab');
+    }
+  });
+
+  it('nennt das Ziel ohne Verb (LFH-1078)', () => {
+    const hinweise = Object.fromEntries(sprungmarken.map((m) => [m.key, m.hinweis]));
+    expect(hinweise).toMatchObject({
+      presse: 'Stab · Pressearbeit',
+      infotelefon: 'Stab · Informationstelefon',
+      funkplan: 'Stab · Funkplan',
+      fernmeldeskizze: 'Funkplan · Skizze',
+      kommunikationsplan: 'Stab · Kommunikationsplan',
+    });
+  });
+
+  it('trägt Schlagworte für die Sprungpalette', () => {
+    for (const marke of sprungmarken) {
+      expect(marke.schlagworte.length, marke.key).toBeGreaterThan(0);
+    }
+    const worte = (key: string) => sprungmarken.find((m) => m.key === key)!.schlagworte;
+    expect(worte('funkplan')).toEqual(
+      expect.arrayContaining(['funk', 'sprechgruppe', 'tmo', 'dmo', 's6']),
+    );
+    expect(worte('kommunikationsplan')).toEqual(
+      expect.arrayContaining(['telefon', 'rufnummer', 'leitstelle', 's6']),
+    );
+    expect(worte('presse')).toEqual(expect.arrayContaining(['presse', 'medien', 's5']));
+    expect(worte('infotelefon')).toEqual(
+      expect.arrayContaining(['bürgertelefon', 'anrufe', 'hotline', 's5']),
+    );
+    expect(worte('fernmeldeskizze')).toEqual(expect.arrayContaining(['skizze', 's6']));
   });
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {

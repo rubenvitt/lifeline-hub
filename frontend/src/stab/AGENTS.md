@@ -3,7 +3,7 @@
 Gilt für `frontend/src/stab/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
 **Funkplan S6** (LFH-548, `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`):
-Unterroute `stab/funkplan` (`funkplanPfad`), kein Modul, Einstieg in der S6-Zeile; die Seite
+Unterroute `stab/funkplan` (`funkplanPfad`), kein Modul, Einstieg in der S6-Zeile und als Sprungmarke; die Seite
 prüft die Stab-Freigabe selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`stab/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
@@ -141,7 +141,8 @@ Fristenliste.
 
 **Presse und Medienarbeit S5** (LFH-554, `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md`):
 Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/presse/mitteilungen/:id`,
-`stab/infotelefon`, kein Modul; Einstiege über `stab/unterseiten.ts`, jede Seite prüft
+`stab/infotelefon`, kein Modul; Einstiege über `stab/unterseiten.ts` (Stab-Seite, Sprungmarken und
+Palette lesen dieselbe Tabelle, LLH-1127), jede Seite prüft
 `useStabFreigabe` selbst (auch Funkplan). Die Pressemitteilung ist die dritte `Dokumentart`
 (Snapshot, Fortschreibung, ETB `meldung`), **freigeben darf nur die Einsatzleitung**
 (`EinsatzLeitungszugriff<Stab>`, Paar-Test gegen Lagebericht/Befehl), die Seite ist Zwilling von

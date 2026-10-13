@@ -2,7 +2,7 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -17,7 +17,8 @@ Führungspersonal. Eine Pressemitteilung gibt nur die Einsatzleitung frei.
 
 ### Einen Medienkontakt erfassen
 
-1. „Stab“ öffnen und in der Zeile S5 „Pressearbeit“ wählen.
+1. In der Modulliste unter „Stab“ „Pressearbeit“ wählen, oder „Stab“ öffnen und in der Zeile S5
+   „Pressearbeit“ wählen.
 2. „Medienkontakt erfassen“ wählen.
 3. „Art“ (Anfrage, Abstimmung oder Termin), „Medium“ und „Thema“ eintragen. Unter „Ansprechperson
    und Uhrzeit“ stehen „Ansprechperson“, „Erreichbarkeit“ und „Eingang“ (leer gilt jetzt).
@@ -58,7 +59,8 @@ neuen Entwurf an, der auf ihr aufbaut.
 
 ### Einen Anruf am Informationstelefon erfassen
 
-1. „Stab“ öffnen und in der Zeile S5 „Informationstelefon“ wählen.
+1. In der Sprungpalette „Anruf erfassen“ wählen: das Informationstelefon öffnet sich, der Cursor
+   steht im „Anliegen“. Ohne Palette: in der Modulliste unter „Stab“ „Informationstelefon“ wählen.
 2. In der Leiste unten das „Anliegen“ wählen und eine „Notiz zum Anruf“ eintragen.
 
    ![Informationstelefon mit Kennzahlen, Aufgliederung nach Anliegen, Anrufprotokoll und Erfassungsleiste](../bilder/presse-infotelefon/infotelefon.png)

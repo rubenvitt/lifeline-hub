@@ -1057,6 +1057,28 @@ describe('CommandPalette · Zeiger (LFH-1055)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+/** LLH-1127: Sprungmarken stehen als eigene Gruppe „Ansichten“ unter „Module“. */
+describe('CommandPalette · Ansichten (LLH-1127)', () => {
+  const korpus = (): Befehl[] => [
+    befehl('modul:stab', 'Stab', () => {}, 'module'),
+    befehl('ansicht:funkplan', 'Funkplan', () => {}, 'ansichten'),
+    befehl('ansicht:infotelefon', 'Informationstelefon', () => {}, 'ansichten'),
+    befehl('nav:profil', 'Profil', () => {}, 'navigation'),
+    befehl('ausgefuehrt:ansicht:infotelefon', 'Informationstelefon', () => {}, 'ausgefuehrt'),
+  ];
+
+  it('zeigt die Gruppe direkt unter „Module“ und nimmt eine gemerkte Marke heraus', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+    const gruppen = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
+    expect(gruppen.indexOf('Ansichten')).toBe(gruppen.indexOf('Module') + 1);
+    const ansichten = Array.from(
+      screen.getByRole('group', { name: 'Ansichten' }).querySelectorAll('[role="option"]'),
+      (o) => o.id,
+    );
+    expect(ansichten).toEqual(['cmd-ansicht:funkplan']);
+  });
+});
+
 /** LFH-1055: In der Startansicht steht jeder Befehl einmal, in der obersten Gruppe, die ihn führt. */
 describe('CommandPalette · Startansicht ohne Dubletten (LFH-1055)', () => {
   const korpus = (): Befehl[] => [

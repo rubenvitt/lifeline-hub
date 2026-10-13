@@ -357,10 +357,17 @@ export function pressemitteilungPfad(einsatzId: number, mitteilungId: number): s
 
 /**
  * Anrufprotokoll des Informationstelefons (S5, LFH-554), Unterroute des Stabs. `?anruf=<id>`
- * rollt zu einem Anruf.
+ * rollt zu einem Anruf; `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf
+ * erfassen“, LLH-1127; apply-then-clean).
  */
-export function infotelefonPfad(einsatzId: number, opts: { anruf?: number } = {}): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, { anruf: opts.anruf });
+export function infotelefonPfad(
+  einsatzId: number,
+  opts: { anruf?: number; neu?: boolean } = {},
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, {
+    anruf: opts.anruf,
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 /**
