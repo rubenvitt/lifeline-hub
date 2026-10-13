@@ -933,6 +933,35 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
         .count();
     assert_eq!((quittiert, zurueck), (1, 1), "{etb:?}");
 
+    // Eine Quittung, die die Leitung für den eigenen Eintrag gesetzt hat, nimmt das Gerät zurück
+    // wie jede Person mit Schreibrecht.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &pfad(id(&gemischt), eigene, "quittieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let e = v["verteiler"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == eigene)
+        .unwrap()
+        .clone();
+    assert!(e["quittiert_at"].is_null(), "{e}");
+
     // Alles andere an Befehlen bleibt verboten.
     for (m, p) in [
         ("POST", basis.clone()),

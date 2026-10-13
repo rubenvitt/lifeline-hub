@@ -1,8 +1,8 @@
 //! Routen der Befehle. Die Logik teilen sie mit den Lageberichten
 //! ([`crate::routes::vorlagendokument`]).
 //!
-//! Liste, Detail und Quittung erreicht auch das Abschnittsgerät (LLH-1190, Spec
-//! `funktionsansichten`, „Ansicht Einsatzabschnitt“). Diese vier Handler ziehen deshalb den
+//! Liste, Detail und Quittung erreicht auch das Abschnittsgerät (LLH-1190,
+//! `frontend/src/geraet/AGENTS.md`, „Abschnittsansicht“). Diese vier Handler ziehen deshalb den
 //! Einsatzkontext, der die Rolle eines Geräts aus seiner Ansicht nimmt, und schneiden auf den
 //! Bereich zu: das Gerät sieht nur die geltende Fassung eines Befehls mit einem Verteiler-Eintrag
 //! in seinem Bereich und quittiert nur diese Einträge; alles andere ist für es nicht vorhanden
@@ -41,8 +41,8 @@ impl DokumentRoute for Befehl {
 }
 
 /// Ob ein Abschnittsgerät mit dem Bereich `bereich` den Befehl sieht: geltende Fassung
-/// (quittierbar) mit mindestens einem eigenen Verteiler-Eintrag (LLH-1190, design.md D2).
-fn sichtbar_im_bereich(
+/// (quittierbar) mit mindestens einem eigenen Verteiler-Eintrag (LLH-1190).
+fn is_sichtbar_im_bereich(
     bereich: &Abschnittsbereich,
     is_quittierbar: bool,
     verteiler: &[VerteilerEintragAnzeige],
@@ -71,7 +71,7 @@ pub async fn liste(
     Ok(Json(match geraete_bereich(&state, &ctx).await? {
         Some(b) => alle
             .into_iter()
-            .filter(|k| sichtbar_im_bereich(&b, k.is_quittierbar, &k.verteiler))
+            .filter(|k| is_sichtbar_im_bereich(&b, k.is_quittierbar, &k.verteiler))
             .collect(),
         None => alle,
     }))
@@ -86,7 +86,7 @@ pub async fn detail(
 ) -> Result<Json<BefehlAnzeige>, AppError> {
     let befehl = kern::detail_geprueft::<Befehl>(&state, ctx.einsatz.id, bid).await?;
     if let Some(b) = geraete_bereich(&state, &ctx).await? {
-        if !sichtbar_im_bereich(&b, befehl.is_quittierbar, &befehl.verteiler) {
+        if !is_sichtbar_im_bereich(&b, befehl.is_quittierbar, &befehl.verteiler) {
             return Err(AppError::NotFound);
         }
     }
@@ -133,8 +133,10 @@ pub async fn fortschreiben(
 }
 
 /// Quittung oder Rücknahme. Ein Abschnittsgerät erreicht nur eigene Einträge eines Befehls, den
-/// es sieht; ein fremder Eintrag oder ein für es unsichtbarer Befehl ist 404 (LLH-1190, wie
-/// `routes::auftrag::fordere_im_bereich`).
+/// es sieht; ein fremder Eintrag oder ein für es unsichtbarer Befehl ist 404 (LLH-1190; die
+/// Bereichsprüfung wie `routes::auftrag::fordere_im_bereich`). Zurücknehmen darf das Gerät jede
+/// Quittung seiner Einträge, auch eine, die die Leitung für es gesetzt hat: so wie jede Person mit
+/// Schreibrecht.
 async fn quittung(
     state: &AppState,
     ctx: &EinsatzKontext,
