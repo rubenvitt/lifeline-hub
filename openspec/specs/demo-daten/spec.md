@@ -85,11 +85,12 @@ MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 
 ### Requirement: Stammdaten mit Konfliktregel
 
-Der Import SHALL die Stammdaten anlegen, die das Szenario braucht: Fahrzeuge, Personal und
-Material der Organisation. Ein vorhandener Datensatz derselben Organisation mit Dienststatus
-`in_dienst` und derselben fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die
-Kennung ist beim Fahrzeug der Funkrufname, beim Personal die Personalnummer und beim
-Material die Bestandsnummer. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
+Der Import SHALL die Stammdaten anlegen, die das Szenario braucht: Fahrzeuge, Personal,
+Material und Einheiten-Vorlagen der Organisation. Ein vorhandener Datensatz derselben
+Organisation mit Dienststatus `in_dienst` (bei Einheiten-Vorlagen: aktiv) und derselben
+fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die Kennung ist beim Fahrzeug der
+Funkrufname, beim Personal die Personalnummer, beim Material die Bestandsnummer und bei der
+Einheiten-Vorlage der Name. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
 Datensatz MUST unverändert bleiben. Kataloge (Fahrzeug- und Personalstatus, Einheitstypen,
 Qualifikationen) MUST nur mitbenutzt werden, und zwar nur aktive
 Einträge. Fehlt ein benötigter Katalogeintrag, MUST der Import mit 422 abbrechen, den
@@ -97,7 +98,7 @@ fehlenden Eintrag nennen und nichts anlegen. Der Import MUST NOT ein Benutzerkon
 und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.
 
 #### Scenario: Leere Organisation
-- **WHEN** der Admin in eine Organisation ohne eigene Fahrzeuge, Personal und Material importiert
+- **WHEN** der Admin in eine Organisation ohne eigene Fahrzeuge, Personal, Material und Einheiten-Vorlagen importiert
 - **THEN** meldet der Bericht je Art „N angelegt, 0 mitbenutzt“, und alle angelegten Zeilen tragen die Demo-Marke
 
 #### Scenario: Außer Dienst gestelltes Fahrzeug gleichen Namens
@@ -111,6 +112,10 @@ und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.
 #### Scenario: Kein Benutzerkonto
 - **WHEN** ein Import durchläuft
 - **THEN** ist die Zahl der Benutzerkonten vorher und nachher gleich
+
+#### Scenario: Demo-Vorlage mit Untereinheit
+- **WHEN** der Admin in eine Organisation ohne Vorlagen importiert
+- **THEN** steht danach die Vorlage „Sanitätszug Musterstadt“ mit der Untereinheit „Rettungsstaffel“, beide mit Demo-Marke und mit Demo-Fahrzeugen
 
 ### Requirement: Demo-Einsatz
 
@@ -292,11 +297,11 @@ verschwinden.
 
 ### Requirement: Demo-Marke in den Stammdaten-Antworten
 
-Jede Antwort, die einen Fahrzeug-, Personal- oder Material-Stammdatensatz liefert, SHALL das Feld
-`ist_demo` tragen. Das gilt für Listen und für die Antworten auf Ändern sowie auf Außer- und
-In-Dienst-Stellen. Das Feld MUST genau dann wahr sein, wenn die Zeile im Moment der Abfrage eine
-Demo-Marke trägt. Mitbenutzte Datensätze und Zeilen, die beim Entfernen ihre Marke verloren
-haben, MUST `false` melden. Das Feld MUST immer vorhanden sein.
+Jede Antwort, die einen Fahrzeug-, Personal-, Material- oder Einheiten-Vorlagen-Stammdatensatz
+liefert, SHALL das Feld `ist_demo` tragen. Das gilt für Listen und für die Antworten auf Ändern
+sowie auf Außer- und In-Dienst-Stellen. Das Feld MUST genau dann wahr sein, wenn die Zeile im
+Moment der Abfrage eine Demo-Marke trägt. Mitbenutzte Datensätze und Zeilen, die beim Entfernen
+ihre Marke verloren haben, MUST `false` melden. Das Feld MUST immer vorhanden sein.
 
 #### Scenario: Angelegtes Demo-Fahrzeug
 - **WHEN** nach einem Import die Fahrzeugliste der Organisation abgefragt wird
@@ -314,6 +319,10 @@ haben, MUST `false` melden. Das Feld MUST immer vorhanden sein.
 #### Scenario: Antwort auf eine Änderung
 - **WHEN** ein Admin ein Demo-Material ändert oder außer Dienst stellt
 - **THEN** trägt die Antwort `ist_demo: true`
+
+#### Scenario: Demo-Vorlage
+- **WHEN** nach einem Import die Einheiten-Vorlagen abgefragt werden
+- **THEN** meldet die vom Import angelegte Vorlage `ist_demo: true`
 
 ### Requirement: Demo-Marke an Einsatz-Dispositionen
 
@@ -373,3 +382,17 @@ sein und MUST NOT allein über Farbe wirken.
 #### Scenario: Disponiertes Demo-Material
 - **WHEN** im Materialmodul eines Einsatzes ein Demo-Material disponiert ist
 - **THEN** steht in seiner Zeile neben der Bezeichnung das Wort „Demo“
+
+### Requirement: Demo-Vorlagen vor den Fahrzeugen entfernen
+Beim Entfernen der Demo-Daten SHALL das System markierte Einheiten-Vorlagen vor den markierten
+Fahrzeugen und Personen löschen. Eine markierte Vorlage, auf die noch eine nicht markierte
+Vorlage als Untereinheit oder Obereinheit verweist, MUST stehen bleiben, ihre Marke verlieren und
+im Bericht als „behalten“ zählen.
+
+#### Scenario: Demo-Vorlage blockiert nicht
+- **WHEN** der Admin nach einem Import die Demo-Daten entfernt
+- **THEN** sind die Demo-Vorlage und die Demo-Fahrzeuge gelöscht, und keines erscheint unter „behalten“
+
+#### Scenario: Eigene Untereinheit unter der Demo-Vorlage
+- **WHEN** ein Admin eine eigene Vorlage unter die Demo-Vorlage gestellt hat und die Demo-Daten entfernt
+- **THEN** bleibt die Demo-Vorlage ohne Marke stehen und erscheint im Bericht unter „behalten“

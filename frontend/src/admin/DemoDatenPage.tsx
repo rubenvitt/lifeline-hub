@@ -102,6 +102,7 @@ const ART_LABEL: Record<DemoStammdatenArt, string> = {
   fahrzeug: 'Fahrzeuge',
   personal: 'Personal',
   material: 'Material',
+  einheit_vorlage: 'Einheiten-Vorlagen',
 };
 
 const VORGANG_LABEL: Record<DemoVorgang, string> = {

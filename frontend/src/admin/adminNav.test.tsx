@@ -47,10 +47,10 @@ describe('adminNav — Registry', () => {
    * Führungskraft. Die Zahl 16 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
    * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
-  it('drei Gruppen mit 18 Sektionen gesamt (Stammdaten 13), dazu vier Sonder-Einträge', () => {
+  it('drei Gruppen mit 19 Sektionen gesamt (Stammdaten 14), dazu vier Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
-    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(18);
-    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(13);
+    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(19);
+    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(14);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
     // Voreingestellte Werte heißen „Vorgabe“ (LFH-944), auch im Menü.
@@ -87,13 +87,13 @@ describe('adminNav — Registry', () => {
 /**
  * Titel-Drift: der Titel steht als `label` in der Registry (Menü) UND als `titel` in der
  * Sektion (Seitenkopf). Driftet einer, zeigt die Sidebar einen anderen Namen als die Seite.
- * Gescopt auf die zwölf Stammdaten-Sektionen; alle sechzehn zögen die Queries der Karten- und
+ * Gescopt auf die vierzehn Stammdaten-Sektionen; alle übrigen zögen die Queries der Karten- und
  * Einstellungssektionen herein und färbten den Test aus Mock-Gründen rot.
  */
 const admin = adminFixture();
 
 /**
- * Alle Abrufe der zwölf Tabs — Pflicht, weil `onUnhandledRequest: 'error'` eine fehlende Route
+ * Alle Abrufe der Stammdaten-Tabs — Pflicht, weil `onUnhandledRequest: 'error'` eine fehlende Route
  * zum Fehler macht. Leere Kataloge reichen: geprüft wird der Seitenkopf.
  */
 function stammdatenHandler() {
@@ -112,6 +112,7 @@ function stammdatenHandler() {
     http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
+    http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
@@ -125,9 +126,9 @@ function stammdatenHandler() {
 const STAMMDATEN = adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen;
 
 describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
-  it('deckt alle dreizehn Stammdaten-Sektionen ab', () => {
+  it('deckt alle vierzehn Stammdaten-Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei leerer Menge grün.
-    expect(STAMMDATEN).toHaveLength(13);
+    expect(STAMMDATEN).toHaveLength(14);
   });
 
   it.each(STAMMDATEN.map((s) => [s.label, s.element] as const))(

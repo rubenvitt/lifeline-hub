@@ -63,7 +63,7 @@ export function useDemoDatenStatus(): DemoDatenStand {
  * Nur `invalidateQueries`, kein `removeQueries`: ein offener Tab des alten Demo-Einsatzes lädt
  * neu und landet auf 404, statt still auf leerem Cache zu stehen.
  * Status-Kataloge, Qualifikationen und Einheitstypen fehlen bewusst: der Import benutzt sie nur
- * mit und legt dort nichts an.
+ * mit (auch für die Einheiten-Vorlagen) und legt dort nichts an.
  */
 export function invalidiereNachDemoVorgang(
   qc: QueryClient,
@@ -78,6 +78,8 @@ export function invalidiereNachDemoVorgang(
     globalKeys.personalVorschlaege(),
     globalKeys.material(),
     globalKeys.materialKategorien(),
+    // LLH-1042: der Import legt Einheiten-Vorlagen an, das Entfernen nimmt sie.
+    globalKeys.einheitVorlagen(),
   ];
   const ids = [...new Set(einsatzIds.filter((id): id is number => id != null))];
   return Promise.all([

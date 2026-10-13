@@ -14,6 +14,7 @@ pub mod demo_daten;
 pub mod dev;
 pub mod dokument;
 pub mod einheit_typ;
+pub mod einheit_vorlage;
 pub mod einsatz;
 pub mod einsatz_bereitstellungsraum;
 pub mod einsatz_einheit;

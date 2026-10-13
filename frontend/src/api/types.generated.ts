@@ -1165,7 +1165,10 @@ export interface components {
          * @enum {string}
          */
         DatentraegerWert: "verschluesselt" | "unverschluesselt" | "unbekannt";
-        /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
+        /**
+         * @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart (Fahrzeug, Personal, Material,
+         *     Einheiten-Vorlage).
+         */
         DemoBericht: {
             je_art: components["schemas"]["DemoBerichtZeile"][];
             vorgang: components["schemas"]["DemoVorgang"];
@@ -1220,7 +1223,7 @@ export interface components {
          * @description Stammdatenart im Bericht. Wire == `as_str()`.
          * @enum {string}
          */
-        DemoStammdatenArt: "fahrzeug" | "personal" | "material";
+        DemoStammdatenArt: "fahrzeug" | "personal" | "material" | "einheit_vorlage";
         /**
          * @description Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
          * @enum {string}
@@ -1430,6 +1433,68 @@ export interface components {
             soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
             sortier: number;
+        };
+        /**
+         * @description Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
+         *     die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
+         *     Verwaltung“).
+         */
+        EinheitVorlage: {
+            aktiv: boolean;
+            bemerkung?: string | null;
+            fahrzeuge: components["schemas"]["EinheitVorlageFahrzeug"][];
+            funkrufname?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
+            name: string;
+            personal: components["schemas"]["EinheitVorlagePersonal"][];
+            soll?: components["schemas"]["Staerke"] | null;
+            /** @description Ob [`Self::soll`] das eigene Soll der Vorlage ist (sonst das des Typs). */
+            soll_eigen: boolean;
+            /** Format: int64 */
+            sortier: number;
+            /** Format: int64 */
+            typ_id: number;
+            typ_label: string;
+            /** @description Fachaufgabe des taktischen Zeichens (Schlüssel wie `einsatz_einheit.tz_fachaufgabe`). */
+            tz_fachaufgabe?: string | null;
+            /** @description Organisation des taktischen Zeichens. */
+            tz_organisation?: string | null;
+            /**
+             * Format: int64
+             * @description Übergeordnete Vorlage; fehlt bei einer Wurzel.
+             */
+            ueber_vorlage_id?: number | null;
+        };
+        /** @description Ein Stamm-Fahrzeug einer Vorlage. */
+        EinheitVorlageFahrzeug: {
+            /** @description Andere aktive Vorlagen, in denen das Fahrzeug ebenfalls steht (abgeleitet beim Lesen). */
+            auch_in: number[];
+            /** @description Dienststatus im Stamm; ein später außer Dienst gestelltes Fahrzeug bleibt in der Vorlage. */
+            dienststatus: components["schemas"]["Dienststatus"];
+            /** Format: int64 */
+            fahrzeug_id: number;
+            fahrzeugtyp?: string | null;
+            funkrufname: string;
+            ist_demo: boolean;
+        };
+        /** @description Eine Person der Stammbesetzung. */
+        EinheitVorlagePersonal: {
+            /** @description Andere aktive Vorlagen, in denen die Person ebenfalls steht. */
+            auch_in: number[];
+            dienststatus: components["schemas"]["Dienststatus"];
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage, auf dem die Person sitzt; fehlt ohne Bindung.
+             */
+            fahrzeug_id?: number | null;
+            ist_demo: boolean;
+            name: string;
+            /** Format: int64 */
+            personal_id: number;
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
         };
         /**
          * @description Einheiten-System (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einheiten_system`.

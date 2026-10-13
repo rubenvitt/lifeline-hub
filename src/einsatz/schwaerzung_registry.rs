@@ -2332,7 +2332,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("import_id", G_FK),
             retain(
                 "tabelle",
-                "Stammdatenart der Marke (CHECK auf fahrzeug/personal/material, kein Personenbezug)",
+                "Stammdatenart der Marke (CHECK auf fahrzeug/personal/material/einheit_vorlage, \
+                 kein Personenbezug)",
             ),
             retain(
                 "datensatz_id",
@@ -2907,6 +2908,11 @@ mod tests {
             "fahrzeug",
             "material",
             "einheit_typ",
+            // Einheiten-Vorlagen (LLH-1042): Org-Stammdaten; ein künftiger Verweis aus dem
+            // Einsatz (Herkunft einer gebildeten Einheit) bleibt NO ACTION und zieht sie nie mit.
+            "einheit_vorlage",
+            "einheit_vorlage_fahrzeug",
+            "einheit_vorlage_personal",
             "qualifikation",
             "karte_registry",
             // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung

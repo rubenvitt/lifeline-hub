@@ -461,6 +461,7 @@ async fn import_legt_den_uebungseinsatz_samt_kopf_und_bericht_an() {
             zeile(DemoStammdatenArt::Fahrzeug, 8),
             zeile(DemoStammdatenArt::Personal, 12),
             zeile(DemoStammdatenArt::Material, 4),
+            zeile(DemoStammdatenArt::EinheitVorlage, 2),
         ],
     };
     assert_eq!(erg.bericht, erwartet);
