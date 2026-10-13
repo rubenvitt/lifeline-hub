@@ -70,13 +70,15 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Zeile der Person „Entlassen“ wählen. Eine Rückfrage gibt es nicht.
-2. Die Person verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
-3. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Personen mit dem Zeitpunkt.
+1. Ist die Person schon früher gegangen, zuerst in ihrer „Zeitachse“ mit „Nachtragen“ die
+   Entlassung mit der richtigen Zeit erfassen. Die App trägt dann keine zweite ein.
+2. In der Zeile der Person „Entlassen“ wählen. Eine Rückfrage gibt es nicht.
+3. Die Person verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
+4. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Personen mit dem Zeitpunkt.
 
    ![Aufgeklappter Block „Entlassen (1)“ unter der Personalliste mit einer Person, ihrer Funktion, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/personal/entlassen.png)
 
-4. Kommt die Person zurück, „Erneut disponieren“ wählen. Eine Person aus dem Personalstamm lässt
+5. Kommt die Person zurück, „Erneut disponieren“ wählen. Eine Person aus dem Personalstamm lässt
    sich auch wieder über „Person disponieren“ aufnehmen.
 
 ### Eine Fehldisposition stornieren
@@ -120,7 +122,8 @@ ihre Bindungen kommen nicht zurück.
 
 Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
 Minuten nach der Disposition und nur, solange die Person noch nichts im Einsatz hat: keine Einheit,
-kein Fahrzeug, keine Rolle, keine Ereignisse außer denen aus der Disposition. Eine stornierte Person
+kein Fahrzeug, keine Rolle, keine Ereignisse außer denen aus der Disposition. Wer einmal entlassen
+war, lässt sich auch nach dem erneuten Disponieren nicht mehr stornieren. Eine stornierte Person
 erscheint in keinem Nachweis; ihre Ereignisse sind gestrichen.
 
 An einer entlassenen oder stornierten Person lässt sich nichts mehr ändern: Zuordnen, Status setzen
