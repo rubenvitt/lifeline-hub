@@ -17,13 +17,19 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep meldebild`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   meldebild.png             frontend/src/pages/KraefteuebersichtPage.tsx,
- *                             frontend/src/kraefte/Statusband.tsx
+ *                             frontend/src/kraefte/Statusband.tsx,
+ *                             frontend/src/kraefte/KraeftebaumZelle.tsx
  *   zeitachse.png             frontend/src/kraefte/KraftZeitachse.tsx (in EinheitDetailPage.tsx)
  *   zeitachse-nachtragen.png  frontend/src/kraefte/KraftZeitachse.tsx (Dialog „Nachtragen“)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Ereignisse der Kräfte-Zeitachse. Die Spec trägt
  * für zwei Einheiten Alarmierung und Eintreffen nach und streicht ein falsches Eintreffen, damit
  * Spalte „Im Einsatz“ und die Zeitachse etwas zeigen.
+ *
+ * Demo-Lücke Kräftebaum (LLH-1025): die Demo-Daten tragen weder Unterstellung noch Besatzung. Die
+ * Spec stellt Rettungsstaffel und Sanitätsgruppe UHS unter den Sanitätszug und setzt je Fahrzeug
+ * des Zugs und der Staffel bis zu zwei Kräfte der Einheit als Besatzung, damit das Meldebild
+ * einen Baum mit Besatzung zeigt. (Die Demo-Daten selbst nachzuziehen ist eine Folgeaufgabe.)
  */
 
 const KAPITEL = 'meldebild';
@@ -31,6 +37,11 @@ const KAPITEL = 'meldebild';
 interface Einheit {
   id: number;
   name: string;
+}
+interface Mittel {
+  id: number;
+  einheit_id: number | null;
+  fahrzeug_id?: number | null;
 }
 interface Zeitachse {
   ereignisse: { id: number; art: string; zeitpunkt_at: string }[];
@@ -85,19 +96,46 @@ test.describe(KAPITEL, () => {
 
       const uhs = await einheitNamens(api, demo.id, 'Sanitätsgruppe UHS');
       await nachtrag(uhs.id, 'eintreffen', vor(jetzt, 241));
+
+      // Kräftebaum: Unterstellung unter den Zug und Besatzung der Fahrzeuge.
+      const basis = `/api/einsaetze/${demo.id}`;
+      for (const kind of [rettung, uhs]) {
+        await fuelle(api, 'patch', `${basis}/einheiten/${kind.id}`, { ueber_einheit_id: zug.id });
+      }
+      const liste = async (pfad: string) => {
+        const antwort = await api.get(`${basis}${pfad}`);
+        expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
+        return (await antwort.json()) as Mittel[];
+      };
+      const fahrzeuge = await liste('/fahrzeuge');
+      const personal = await liste('/personal');
+      for (const einheit of [zug, rettung]) {
+        const frei = personal.filter((p) => p.einheit_id === einheit.id && p.fahrzeug_id == null);
+        for (const f of fahrzeuge.filter((x) => x.einheit_id === einheit.id)) {
+          for (const p of frei.splice(0, 2)) {
+            await fuelle(api, 'put', `${basis}/fahrzeuge/${f.id}/besatzung/${p.id}`);
+          }
+        }
+      }
     } finally {
       await api.dispose();
     }
   });
 
-  test('Meldebild mit Statusband und Raster', async ({ page }) => {
+  test('Meldebild mit Statusband und Kräftebaum', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/kraefteuebersicht`);
     const raster = page.getByRole('table');
+    // Stufe „Einheiten“: die Staffel steht als Untereinheit unter dem Zug.
     await expect(raster.getByText('Rettungsstaffel')).toBeVisible();
     await expect(page.locator('[data-lfh="im-einsatz"]').first()).toBeVisible();
+    // Das Fahrzeug des Zugs aufklappen: seine Besatzung zeigt sich.
+    const fahrzeug = raster.locator('tr[data-row-key^="ef-"]').first();
+    await fahrzeug.locator('.ant-table-row-expand-icon').click();
+    await expect(raster.locator('tr[data-row-key^="ep-"]').first()).toBeVisible();
+    await page.mouse.move(0, 0);
     await fotografiere(page, KAPITEL, 'meldebild');
   });
 
