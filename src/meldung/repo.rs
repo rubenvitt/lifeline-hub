@@ -1010,12 +1010,20 @@ async fn letzte_je_bezug(
     spalte: &'static str,
 ) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
     debug_assert!(matches!(spalte, "einheit_id" | "abschnitt_id"));
+    // Eine aufgelöste Einheit erwartet keine Rückmeldung mehr; ihre Meldungen bleiben als Spur
+    // stehen (LLH-1079, Spec `kraefte-entlassung`).
+    let aktiv = if spalte == "einheit_id" {
+        "AND NOT EXISTS(SELECT 1 FROM einsatz_einheit e \
+                        WHERE e.id = m.einheit_id AND e.aufgeloest_at IS NOT NULL)"
+    } else {
+        ""
+    };
     Ok(
         sqlx::query_as::<_, super::LetzteRueckmeldung>(sqlx::AssertSqlSafe(format!(
             "SELECT m.{spalte} AS bezug_id, m.id AS meldung_id, m.lfd_nr, m.ereigniszeit, \
                     m.inhalt, m.meldeweg \
              FROM meldung m \
-             WHERE m.einsatz_id = ? AND m.{spalte} IS NOT NULL \
+             WHERE m.einsatz_id = ? AND m.{spalte} IS NOT NULL {aktiv} \
                AND m.id = (SELECT m2.id FROM meldung m2 \
                            WHERE m2.{spalte} = m.{spalte} \
                            ORDER BY m2.ereigniszeit DESC, m2.id DESC LIMIT 1) \
