@@ -398,7 +398,9 @@ async fn fehlversuch(app: &axum::Router, name: &str) {
         "POST",
         "/api/auth/login",
         "",
-        Some(&format!(r#"{{"benutzername":"{name}","passwort":"geraten123"}}"#)),
+        Some(&format!(
+            r#"{{"benutzername":"{name}","passwort":"geraten123"}}"#
+        )),
     )
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);

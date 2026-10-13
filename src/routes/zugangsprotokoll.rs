@@ -89,7 +89,9 @@ pub async fn anmeldungen(
         "Unbekanntes Ereignis im Filter",
     )?;
     let filter = spur_filter(&params)?;
-    Ok(Json(audit::liste(&state.pool, admin.org_id, &filter, ereignis).await?))
+    Ok(Json(
+        audit::liste(&state.pool, admin.org_id, &filter, ereignis).await?,
+    ))
 }
 
 /// GET /api/zugangsprotokoll/zugangsaenderungen — Admin-Spur, neueste zuerst.
