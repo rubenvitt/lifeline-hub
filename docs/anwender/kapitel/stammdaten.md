@@ -149,9 +149,10 @@ Verwaltung nicht.
 - Eine Vorlage hat einen Namen, einen Einheitstyp und nach Bedarf eine übergeordnete Vorlage.
   Untereinheiten lassen sich beliebig tief schachteln; eine Vorlage lässt sich nicht unter sich
   selbst oder unter eine ihrer eigenen Untereinheiten stellen.
-- Ein Fahrzeug und eine Person stehen in einer Vorlage samt ihren Unter- und Obereinheiten
-  höchstens einmal. In einer anderen Vorlage dürfen sie zusätzlich stehen; die Seite der Vorlage
-  nennt das am Eintrag als „auch in …“.
+- Ein Fahrzeug und eine Person stehen im ganzen Baum einer obersten Vorlage höchstens einmal:
+  in der obersten Vorlage und allen Untereinheiten darunter zusammen, also auch nicht in zwei
+  Untereinheiten nebeneinander. In einem anderen Baum dürfen sie zusätzlich stehen; die Seite der
+  Vorlage nennt das am Eintrag als „auch in …“.
 - Neu zuordnen lässt sich nur, was in Dienst ist. Wird ein Fahrzeug oder eine Person später
   außer Dienst genommen, bleibt der Eintrag in der Vorlage und trägt „außer Dienst“.
 - Wird ein Fahrzeug aus der Vorlage entfernt, verlieren die Personen darauf ihre Fahrzeugbindung.
@@ -159,9 +160,9 @@ Verwaltung nicht.
   unter dem Feld und in der Liste mit „(Vorgabe)“. Ohne Position einer Person gilt die Position
   aus ihren Stammdaten.
 - Eine Vorlage lässt sich nicht löschen. Mit dem Schalter „Aktiv“ wird sie stillgelegt und
-  wieder aktiviert. Eine stillgelegte Vorlage steht nicht mehr als Unterstellung zur Wahl, und
-  ihr Name ist für eine neue Vorlage frei; unter den aktiven Vorlagen ist jeder Name nur einmal
-  erlaubt.
+  wieder aktiviert. Eine stillgelegte Vorlage steht nicht mehr als Unterstellung zur Wahl (außer
+  über „Untereinheit anlegen“ auf ihrer eigenen Seite), und ihr Name ist für eine neue Vorlage
+  frei; unter den aktiven Vorlagen ist jeder Name nur einmal erlaubt.
 
 ### Demo-Stammdaten
 
