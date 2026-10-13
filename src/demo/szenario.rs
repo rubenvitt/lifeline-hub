@@ -290,7 +290,7 @@ pub struct AbschnittVorlage {
 /// Einheit des Drehbuchs. `typ` ist das Label aus dem Einheitstyp-Katalog, `abschnitt` der
 /// Schlüssel eines früher angelegten Abschnitts.
 #[derive(Debug, Clone, Copy)]
-pub struct EinheitVorlage {
+pub struct EinheitSchritt {
     pub schluessel: &'static str,
     pub name: &'static str,
     pub typ: &'static str,
@@ -466,7 +466,7 @@ pub enum Vorgang {
     /// Einsatzabschnitt anlegen. ETB: „Abschnitt «…» angelegt (Lage: …)“.
     Abschnitt(AbschnittVorlage),
     /// Einheit bilden. ETB: „Einheit «…» gebildet“.
-    Einheit(EinheitVorlage),
+    Einheit(EinheitSchritt),
     /// Stamm-Fahrzeug disponieren; Anfangsstatus ist der erste `gebunden`-Status der Org.
     /// ETB: „Fahrzeug «…» disponiert“.
     FahrzeugDisponieren { fahrzeug: &'static str },
@@ -608,7 +608,7 @@ const fn einheit(
 ) -> Schritt {
     s(
         vor_min,
-        Vorgang::Einheit(EinheitVorlage {
+        Vorgang::Einheit(EinheitSchritt {
             schluessel,
             name,
             typ,
