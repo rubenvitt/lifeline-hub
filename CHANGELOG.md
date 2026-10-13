@@ -1,3 +1,9 @@
+## [1.0.0-alpha.119](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.118...v1.0.0-alpha.119) (2026-10-13)
+
+### Kräfte und Mittel
+
+- **Entlassene Personen verschwinden sofort aus Einheiten und Abschnitten:** Wenn eine Person entlassen wird, sehen jetzt alle, die die betroffenen Einheiten oder Abschnitte geöffnet haben, die Änderung sofort. Das betrifft Führer, Abschnittsleiter und die Mitgliederliste der Einheit. Bisher kam die Änderung nur bei Nutzern mit Zugriff auf das Personal oder die Lagekarte sofort an. Alle anderen sahen bis zum Neuladen der Seite noch den alten Stand.
+
 ## [1.0.0-alpha.118](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.117...v1.0.0-alpha.118) (2026-10-13)
 
 ### Wichtige Änderungen
