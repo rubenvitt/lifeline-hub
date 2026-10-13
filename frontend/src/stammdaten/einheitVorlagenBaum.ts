@@ -64,3 +64,18 @@ export function subtreeIds(vorlagen: readonly EinheitVorlage[], rootId: number):
   }
   return result;
 }
+
+/** Alle Vorlagen des Baums, in dem `id` steht (Wurzel und Nachfahren): ein Fahrzeug oder eine
+ *  Person steht darin höchstens einmal (Spec `einheit-vorlagen`). */
+export function treeIds(vorlagen: readonly EinheitVorlage[], id: number): Set<number> {
+  const byId = new Map(vorlagen.map((v) => [v.id, v]));
+  const seen = new Set<number>();
+  let root = id;
+  for (;;) {
+    seen.add(root);
+    const parent = byId.get(root)?.ueber_vorlage_id;
+    if (parent == null || !byId.has(parent) || seen.has(parent)) break;
+    root = parent;
+  }
+  return subtreeIds(vorlagen, root);
+}

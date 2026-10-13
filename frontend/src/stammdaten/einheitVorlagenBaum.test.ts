@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EinheitVorlage } from '../api/types';
-import { orderAsTree, sollText, subtreeIds } from './einheitVorlagenBaum';
+import { orderAsTree, sollText, subtreeIds, treeIds } from './einheitVorlagenBaum';
 
 function vorlage(id: number, name: string, ueber?: number): EinheitVorlage {
   return {
@@ -62,5 +62,23 @@ describe('sollText (LLH-1042)', () => {
     expect(sollText({ ...vorlage(1, 'A'), soll, soll_eigen: true })).toBe('1/2/6//9');
     expect(sollText({ ...vorlage(1, 'A'), soll })).toBe('1/2/6//9 (Vorgabe)');
     expect(sollText(vorlage(1, 'A'))).toBe('—');
+  });
+});
+
+describe('treeIds (LLH-1042)', () => {
+  it('liefert den ganzen Baum ab der Wurzel, auch von einem Blatt aus', () => {
+    const liste = [
+      vorlage(1, 'Zug'),
+      vorlage(2, 'Staffel', 1),
+      vorlage(3, 'Trupp', 2),
+      vorlage(4, 'Gruppe', 1),
+      vorlage(5, 'Anderer Zug'),
+    ];
+    expect([...treeIds(liste, 3)].sort()).toEqual([1, 2, 3, 4]);
+    expect([...treeIds(liste, 5)]).toEqual([5]);
+  });
+
+  it('endet auch an einem korrupten Zyklus', () => {
+    expect([...treeIds([vorlage(1, 'A', 2), vorlage(2, 'B', 1)], 1)].sort()).toEqual([1, 2]);
   });
 });
