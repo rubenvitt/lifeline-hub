@@ -1153,8 +1153,8 @@ async fn entlassene_person_bleibt_mit_vermerk() {
     .await;
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen"),
         &admin,
         None,
     )
@@ -1196,8 +1196,8 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
                 &admin,
                 None,
             )
@@ -1205,13 +1205,13 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
             .0
         }
     };
-    assert_eq!(entlassen(bernd).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(bernd).await, StatusCode::OK);
     assert_eq!(
         kopf_events(&mut rx),
         0,
         "kein Einsatzleiter, kein Kopf-Ereignis"
     );
-    assert_eq!(entlassen(anna).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(anna).await, StatusCode::OK);
     assert_eq!(
         kopf_events(&mut rx),
         1,
@@ -1562,8 +1562,8 @@ async fn liste_traegt_den_vermerk_einer_entlassenen_person() {
     .await;
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen"),
         &admin,
         None,
     )

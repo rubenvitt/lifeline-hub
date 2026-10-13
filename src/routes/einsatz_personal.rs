@@ -10,11 +10,12 @@ use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, pflicht, pruefe_koordinate, trimme, trimme_tri,
+    deserialize_optional_field, parse_enum, pflicht, pruefe_koordinate, schalter, trimme,
+    trimme_tri,
 };
 use crate::staerke::StaerkePosition;
 use crate::zeitachse::repo as zeitachse_repo;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -29,11 +30,6 @@ pub(super) fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Personal, "personal_id", ep_id);
 }
 
-/// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.
-fn person_bezeichnung(a: &EinsatzPersonalAnzeige) -> String {
-    crate::personal::etb_bezeichnung(&a.name, a.funktion.as_deref())
-}
-
 /// Validiert eine optionale Stärke-Position gegen das Enum (leer/None erlaubt).
 fn pruefe_position(p: &Option<String>) -> Result<(), AppError> {
     if let Some(s) = p.as_deref() {
@@ -42,14 +38,28 @@ fn pruefe_position(p: &Option<String>) -> Result<(), AppError> {
     Ok(())
 }
 
-/// GET /api/einsaetze/{id}/personal — disponiertes Personal (aufgelöst). Nur Lesezugriff.
+#[derive(Debug, Deserialize)]
+pub struct ListeParams {
+    /// `1` = statt der aktiven die entlassenen Kräfte (LLH-1079, Nachweis).
+    #[serde(default)]
+    entlassene: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/personal — aktives Personal (aufgelöst), mit `?entlassene=1` das
+/// entlassene (Spec `kraefte-entlassung`). Stornierte liefert keine der beiden. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personal>,
+    Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<EinsatzPersonalAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let aktiv = ctx.einsatz.ist_aktiv();
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
+        if schalter(params.entlassene.as_deref(), "entlassene")? {
+            disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
+        } else {
+            disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
+        },
     ))
 }
 
@@ -113,10 +123,10 @@ pub async fn disponieren(
         }
     };
 
-    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx.
-    let jetzt = crate::zeit::jetzt();
-    let ep_id = crate::write_retry!(&state.pool, |conn| {
-        let ep_id = match &vorbereitet {
+    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx. Eine
+    // entlassene Stamm-Person wird wieder aufgenommen (LLH-1079, design.md D7).
+    let disponiert = crate::write_retry!(&state.pool, |conn| {
+        let disponiert = match &vorbereitet {
             Vorbereitet::Stamm(personal_id) => {
                 disposition_repo::disponieren_stamm_tx(
                     conn,
@@ -133,49 +143,37 @@ pub async fn disponieren(
                 funktion,
                 traeger,
                 position,
-            } => {
-                disposition_repo::disponieren_adhoc_tx(
-                    conn,
-                    einsatz_id,
-                    ctx.einsatz.org_id,
-                    AdhocDaten {
-                        name,
-                        funktion: funktion.as_deref(),
-                        traegerorganisation: traeger.as_deref(),
-                        staerke_position: position.as_deref(),
-                    },
-                    ctx.benutzer.id,
-                )
-                .await?
-            }
-        };
-        let status_id: Option<i64> =
-            sqlx::query_scalar("SELECT status_id FROM einsatz_personal WHERE id = ?")
-                .bind(ep_id)
-                .fetch_one(&mut *conn)
-                .await?;
-        if let Some(sid) = status_id {
-            zeitachse_repo::aus_personalstatus_tx(
+            } => disposition_repo::disponieren_adhoc_tx(
                 conn,
                 einsatz_id,
+                ctx.einsatz.org_id,
+                AdhocDaten {
+                    name,
+                    funktion: funktion.as_deref(),
+                    traegerorganisation: traeger.as_deref(),
+                    staerke_position: position.as_deref(),
+                },
                 ctx.benutzer.id,
-                ep_id,
-                sid,
-                &jetzt,
             )
+            .await
+            .map(|id| disposition_repo::Disponiert {
+                id,
+                reaktiviert: false,
+            })?,
+        };
+        disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, disponiert.id)
             .await?;
-        }
-        Ok(ep_id)
+        Ok(disponiert)
     })?;
+    let ep_id = disponiert.id;
 
     let anzeige = disposition_repo::load_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        ctx.benutzer.id,
-        &crate::personal::etb_text_disponiert(&anzeige.name, anzeige.funktion.as_deref()),
-    )
-    .await;
+    let text = if disponiert.reaktiviert {
+        crate::personal::etb_text_erneut_disponiert(&anzeige.name, anzeige.funktion.as_deref())
+    } else {
+        crate::personal::etb_text_disponiert(&anzeige.name, anzeige.funktion.as_deref())
+    };
+    super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &text).await;
     sse_personal(&state, einsatz_id, ep_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -277,23 +275,24 @@ pub async fn aktualisieren(
     Ok(Json(nachher))
 }
 
-/// DELETE /api/einsaetze/{id}/personal/{ep_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
-pub async fn entfernen(
+/// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,
+/// Spec `kraefte-entlassung`): die Zeile bleibt, Bindungen gehen, Historie bleibt, die
+/// Zeitachse bekommt die Entlassung. Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
+/// Schreibt ETB-Eintrag; eine beendete Kraft → 409. Liefert die entlassene Kraft.
+pub async fn entlassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
     PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
-) -> Result<StatusCode, AppError> {
+) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let anzeige = disposition_repo::load_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
-    // F06/LFH-244 Tier-A: Führungsrollen-Freigabe + DELETE + System-ETB-Eintrag atomar in EINER
-    // Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus der VOR der Tx geladenen Anzeige; SSE erst
-    // nach dem Commit.
-    let text = format!(
-        "Person «{}» aus dem Einsatz entfernt",
-        person_bezeichnung(&anzeige)
-    );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let betroffen = crate::write_retry!(&state.pool, |conn| {
+    let jetzt = crate::zeit::jetzt();
+    // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand, Zeitachse und System-ETB atomar in EINER
+    // Tx. Was die Person außerhalb des Personalmoduls trug, fragt die Tx vor dem Lösen; SSE erst
+    // nach dem Commit.
+    let (betroffen, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let betroffen = EntlassenBetroffen {
             einsatzleiter: crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(
                 conn, einsatz_id, ep_id,
@@ -309,49 +308,135 @@ pub async fn entfernen(
             )
             .await?,
             uhs: crate::uhs::kraefte::uhs_der_kraft_tx(conn, einsatz_id, ep_id).await?,
-            schaeden: crate::schaden::repo::load_geschaedigt_durch_tx(conn, einsatz_id, ep_id)
-                .await?,
+            fahrzeug: vorher.fahrzeug_id,
         };
-        disposition_repo::delete_tx(conn, einsatz_id, ep_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(betroffen)
+        let ergebnis =
+            disposition_repo::entlassen_tx(conn, einsatz_id, ep_id, ctx.benutzer.id, &jetzt)
+                .await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::personal::etb_text_entlassen(
+                &vorher.name,
+                vorher.funktion.as_deref(),
+                ergebnis.einheit_name.as_deref(),
+            ),
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        Ok((betroffen, anzeige))
     })?;
     sse_personal(&state, einsatz_id, ep_id);
-    // `personal` erreicht nur Leser mit Personal- oder Kartenrecht. Den Vermerk „nicht mehr
-    // disponiert“ (ON DELETE SET NULL) lesen Führungsstelle und Stab mit eigenem Gate; sie hängen
-    // an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in LFH-1106). Ebenso tragen
-    // Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person (LLH-1178), die UHS ihre
-    // Stärke und ein Schaden die geschädigte Einsatzkraft (LLH-1182).
+    melde_betroffene(&state, einsatz_id, &betroffen).await;
+    Ok(Json(anzeige))
+}
+
+/// POST /api/einsaetze/{id}/personal/{ep_id}/stornieren — Fehldisposition stornieren (LLH-1079,
+/// design.md D3): nur ohne Bindung und Spur und in den ersten 15 Minuten, sonst 422 mit dem
+/// Grund; eine beendete Kraft → 409. Streicht die Ereignisse aus der Disposition. ETB-Eintrag.
+pub async fn stornieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        disposition_repo::stornieren_tx(conn, einsatz_id, ep_id, ctx.benutzer.id, &jetzt).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::personal::etb_text_storniert(&vorher.name, vorher.funktion.as_deref()),
+        )
+        .await?;
+        Ok(())
+    })?;
+    sse_personal(&state, einsatz_id, ep_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/einsaetze/{id}/personal/{ep_id}/reaktivieren — eine entlassene oder stornierte
+/// Kraft erneut disponieren (LLH-1079, design.md D7): Block „Entlassen“ und Rückgängig nach dem
+/// Entlassen. Initialstatus und Zeitachse neu, Stärke-Position bleibt. Aktiv → 409. ETB-Eintrag.
+pub async fn reaktivieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::reaktivieren_tx(
+            conn,
+            einsatz_id,
+            ctx.einsatz.org_id,
+            ep_id,
+            None,
+            ctx.benutzer.id,
+        )
+        .await?;
+        disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, ep_id).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::personal::etb_text_erneut_disponiert(
+                &anzeige.name,
+                anzeige.funktion.as_deref(),
+            ),
+        )
+        .await?;
+        Ok(anzeige)
+    })?;
+    sse_personal(&state, einsatz_id, ep_id);
+    Ok(Json(anzeige))
+}
+
+/// Nach dem Commit des Entlassens: `personal` erreicht nur Leser mit Personal- oder
+/// Kartenrecht. Den Vermerk „nicht mehr disponiert“ lesen Führungsstelle und Stab mit eigenem
+/// Gate; sie hängen an `einsatz` bzw. `stab` (LLH-1164, wie das getragene Fahrzeug in
+/// LFH-1106). Ebenso tragen Einheiten (Mitglieder, Führer) und Abschnitte (Leiter) die Person
+/// (LLH-1178), die UHS ihre Stärke (LLH-1182) und ein Fahrzeug seine Besatzung. Schadensbezug,
+/// Auftrag und Bestätigungen bleiben unverändert und melden nichts.
+async fn melde_betroffene(state: &AppState, einsatz_id: i64, betroffen: &EntlassenBetroffen) {
     if betroffen.einsatzleiter {
-        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+        crate::routes::einsatz::kopf_geaendert(state, einsatz_id).await;
     }
     if betroffen.stab {
         state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
     }
-    for einheit_id in betroffen.einheiten {
-        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    for einheit_id in &betroffen.einheiten {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, *einheit_id);
     }
-    for abschnitt_id in betroffen.abschnitte {
-        super::einsatzabschnitt::sse_abschnitt(&state, einsatz_id, abschnitt_id);
+    for abschnitt_id in &betroffen.abschnitte {
+        super::einsatzabschnitt::sse_abschnitt(state, einsatz_id, *abschnitt_id);
     }
     if let Some(uhs_id) = betroffen.uhs {
-        super::einsatz_uhs::sse_uhs(&state, einsatz_id, uhs_id);
+        super::einsatz_uhs::sse_uhs(state, einsatz_id, uhs_id);
     }
-    for schaden_id in betroffen.schaeden {
-        super::einsatz_schaden::sse_schaden(&state, einsatz_id, schaden_id);
+    if let Some(ef_id) = betroffen.fahrzeug {
+        super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, ef_id);
     }
-    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Was eine entlassene Person außerhalb des Personalmoduls trug, in der Transaktion vor dem
-/// DELETE gefragt; jede Ansicht bekommt nach dem Commit ihr eigenes Ereignis.
+/// Lösen gefragt; jede Ansicht bekommt nach dem Commit ihr eigenes Ereignis.
 struct EntlassenBetroffen {
     einsatzleiter: bool,
     stab: bool,
     einheiten: Vec<i64>,
     abschnitte: Vec<i64>,
     uhs: Option<i64>,
-    schaeden: Vec<i64>,
+    fahrzeug: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -367,7 +452,7 @@ pub struct PositionBody {
 }
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
-/// Liefert die Karten-Sicht; jede disponierte Person des Einsatzes ist verortbar (LFH-276).
+/// Liefert die Karten-Sicht; jede aktive Person des Einsatzes ist verortbar (LFH-276).
 pub async fn position(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
@@ -375,7 +460,12 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<FuehrungskraftKarte>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
+    // Eine beendete Kraft ist nicht mehr verortbar (409, LLH-1079); fremd → 404.
+    {
+        let mut conn = state.pool.acquire().await?;
+        disposition_repo::fordere_aktiv_tx(&mut conn, einsatz_id, ep_id).await?;
+    }
+    // Effektivzustand für die Paar-Validierung: vorhandene lat/lon.
     let vorher: (Option<f64>, Option<f64>) =
         sqlx::query_as("SELECT lat, lon FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
             .bind(ep_id)
@@ -403,7 +493,7 @@ pub async fn position(
     Ok(Json(nachher))
 }
 
-/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — alle disponierten Personen des Einsatzes
+/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — alle aktiven Personen des Einsatzes
 /// (Führung via `ist_einheitsfuehrer`/`ist_abschnittsleiter`-Flags kenntlich, LFH-276).
 pub async fn karte_fuehrungskraefte(
     State(state): State<AppState>,

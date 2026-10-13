@@ -879,9 +879,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personal/{ep_id}",
             patch(routes::einsatz_personal::aktualisieren),
         )
+        // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}",
-            delete(routes::einsatz_personal::entfernen),
+            "/api/einsaetze/{id}/personal/{ep_id}/entlassen",
+            post(routes::einsatz_personal::entlassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/stornieren",
+            post(routes::einsatz_personal::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/reaktivieren",
+            post(routes::einsatz_personal::reaktivieren),
         )
         .route(
             "/api/einsaetze/{id}/personal/{ep_id}/position",
@@ -1718,6 +1727,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
             delete(routes::einsatz_einheit::aufloesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
+            post(routes::einsatz_einheit::stornieren),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",

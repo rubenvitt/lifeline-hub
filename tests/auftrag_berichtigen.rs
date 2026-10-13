@@ -510,7 +510,7 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     )
     .await;
     let aid = a["id"].as_i64().unwrap();
-    lifeline_hub::einheit::repo::aufloesen(&pool, e, eid)
+    lifeline_hub::einheit::repo::aufloesen(&pool, e, eid, admin_id(&pool).await)
         .await
         .unwrap();
     let (_, gelesen) = anfrage(
@@ -522,7 +522,8 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     )
     .await;
     let bisher = gelesen["empfaenger"].clone();
-    assert!(bisher[0]["einheit_id"].is_null(), "{bisher}");
+    // Die aufgelöste Einheit bleibt als Zeile stehen; der Auftrag nennt sie weiter (LLH-1079).
+    assert_eq!(bisher[0]["einheit_id"], eid, "{bisher}");
 
     let (s, j) = patch(
         &app,
@@ -557,9 +558,30 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
 
     // Ein neu genannter, ungültiger Empfänger bleibt ein Feldfehler.
     let mut liste = bisher.as_array().unwrap().clone();
-    liste.push(json!({ "empfaenger_typ": "einheit", "einheit_id": eid }));
+    liste.push(json!({ "empfaenger_typ": "einheit", "einheit_id": 999_999 }));
     let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": liste })).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
+
+    // Eine andere, schon aufgelöste Einheit ist kein neues Ziel: Lebenszyklus, 409 (LLH-1079).
+    let zwei = einheit(&app, &admin, e, "Logistiktrupp 2").await;
+    erteilen(
+        &app,
+        &admin,
+        e,
+        json!({
+            "auftrag_text": "Deich ablaufen",
+            "frist_at": FRIST,
+            "empfaenger": [{ "empfaenger_typ": "einheit", "einheit_id": zwei }]
+        }),
+    )
+    .await;
+    lifeline_hub::einheit::repo::aufloesen(&pool, e, zwei, admin_id(&pool).await)
+        .await
+        .unwrap();
+    let mut liste = bisher.as_array().unwrap().clone();
+    liste.push(json!({ "empfaenger_typ": "einheit", "einheit_id": zwei }));
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "empfaenger": liste })).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
 }
 
 /// LLH-1176: Zwei aufgelöste Empfänger-Einheiten hinterlassen zwei gleiche Zeilen (ohne Ziel). Die
@@ -588,7 +610,7 @@ async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
         .as_i64()
         .unwrap();
     for eid in [eins, zwei] {
-        lifeline_hub::einheit::repo::aufloesen(&pool, e, eid)
+        lifeline_hub::einheit::repo::aufloesen(&pool, e, eid, admin_id(&pool).await)
             .await
             .unwrap();
     }
@@ -701,4 +723,12 @@ async fn einheitenfilter_ordnet_nach_den_empfaengern_beim_schreiben() {
         anordnungen_der_einheit(&app, &admin, e, logistik).await,
         vec![erteilung, geaendert]
     );
+}
+
+/// Benutzer-ID des Admins für Repo-Aufrufe am HTTP-Pfad vorbei.
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }

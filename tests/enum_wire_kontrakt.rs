@@ -942,7 +942,16 @@ fn zeitachse_quelle_wire() {
         Einheit => "einheit",
         Abloesung => "abloesung",
         Nachtrag => "nachtrag",
+        Disposition => "disposition",
     } in lifeline_hub::zeitachse::ZeitachseQuelle::ALLE);
+}
+
+#[test]
+fn beendet_als_wire() {
+    enum_wire!(lifeline_hub::entlassung::BeendetAls {
+        Entlassen => "entlassen",
+        Storniert => "storniert",
+    } in lifeline_hub::entlassung::BeendetAls::ALLE);
 }
 
 #[test]

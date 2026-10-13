@@ -97,6 +97,47 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
+/// Auflösen einer Einheit (LLH-1079, design.md D4): steht sie in einem Bereitstellungsraum,
+/// schreibt die Auflösung den Austritt (Notiz „Einheit aufgelöst“) und leert den Cache, statt
+/// die Belegung still verwaisen zu lassen. Liefert den verlassenen Raum.
+pub async fn austritt_bei_aufloesung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let br_id: Option<i64> = sqlx::query_scalar(
+        "SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
+    let Some(br_id) = br_id else {
+        return Ok(None);
+    };
+    insert_event(
+        &mut *conn,
+        einsatz_id,
+        br_id,
+        ObjektTyp::Einheit,
+        einheit_id,
+        &BrBelegungsArt::Austritt,
+        Some("Einheit aufgelöst"),
+        benutzer_id,
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET aktueller_br_id = NULL WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(Some(br_id))
+}
+
 // ─── Interne Helpers ────────────────────────────────────────────────────────
 
 async fn belege_einheit(

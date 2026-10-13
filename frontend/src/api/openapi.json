@@ -1663,6 +1663,14 @@
           }
         }
       },
+      "BeendetAls": {
+        "type": "string",
+        "description": "Wie eine Kraft den Einsatz verließ. Wire == `as_str()`.",
+        "enum": [
+          "entlassen",
+          "storniert"
+        ]
+      },
       "BefehlAbschnitt": {
         "type": "object",
         "description": "Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).",
@@ -3459,6 +3467,20 @@
             "format": "int64",
             "description": "BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR)."
           },
+          "aufgeloest_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur\n`GET …/einheiten?aufgeloeste=1` liefert aufgelöste."
+          },
+          "aufgeloest_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -4354,6 +4376,30 @@
           "ist_demo"
         ],
         "properties": {
+          "beendet_als": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetAls"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.\nNur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
+          },
+          "beendet_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -13764,7 +13810,8 @@
           "status",
           "einheit",
           "abloesung",
-          "nachtrag"
+          "nachtrag",
+          "disposition"
         ]
       },
       "ZeitfensterAnzeige": {

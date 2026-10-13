@@ -61,6 +61,8 @@ wire_enum! {
         Abloesung => "abloesung",
         /// Von Hand nachgetragen.
         Nachtrag => "nachtrag",
+        /// Aus dem Entlassen der Kraft (LLH-1079).
+        Disposition => "disposition",
     }
     try_from = |s| format!("Ungültige Zeitachsen-Quelle: {s}");
 }

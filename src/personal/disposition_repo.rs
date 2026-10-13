@@ -14,6 +14,7 @@ const SELECT_AUFGELOEST: &str = "\
            ep.staerke_position AS ep_staerke_position, \
            ep.snap_name, ep.snap_funktion, ep.snap_traegerorganisation, \
            ep.bemerkung, ep.disponiert_at, ep.disponiert_von, \
+           ep.beendet_at, ep.beendet_von, ep.beendet_als, \
            p.name AS live_name, p.traegerorganisation AS live_traegerorganisation, \
            p.dienststatus AS live_dienststatus, p.staerke_position AS live_staerke_position, \
            (SELECT GROUP_CONCAT(label, ', ') FROM ( \
@@ -45,6 +46,9 @@ struct Row {
     bemerkung: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
+    beendet_at: Option<String>,
+    beendet_von: Option<i64>,
+    beendet_als: Option<String>,
     live_name: Option<String>,
     live_traegerorganisation: Option<String>,
     live_dienststatus: Option<String>,
@@ -101,6 +105,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
         ist_demo: row.ist_demo,
+        beendet_at: row.beendet_at,
+        beendet_von: row.beendet_von,
+        beendet_als: row.beendet_als,
     }
 }
 
@@ -113,14 +120,16 @@ pub struct AdhocDaten<'a> {
     pub staerke_position: Option<&'a str>,
 }
 
-/// Disponiertes Personal eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit.
+/// Aktives Personal eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit. Entlassene und
+/// stornierte Kräfte fehlen (LLH-1079, Spec `kraefte-entlassung`).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzPersonalAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ? ORDER BY ep.disponiert_at, ep.id"
+        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL \
+         ORDER BY ep.disponiert_at, ep.id"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -131,7 +140,27 @@ pub async fn liste(
         .collect())
 }
 
-/// Disponiertes Personal einer UHS (`Some`) oder ohne UHS (`None`), aufgelöst und nach Namen
+/// Entlassenes Personal eines Einsatzes (aufgelöst), zuletzt entlassene zuerst — der Nachweis
+/// hinter `GET …/personal?entlassene=1` (LLH-1079). Stornierte erscheinen nie.
+pub async fn list_entlassene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<Vec<EinsatzPersonalAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ? AND ep.beendet_als = 'entlassen' \
+         ORDER BY ep.beendet_at DESC, ep.id DESC"
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
+}
+
+/// Aktives Personal einer UHS (`Some`) oder ohne UHS (`None`), aufgelöst und nach Namen
 /// sortiert (LFH-1045, Spec `uhs-staerke`).
 pub async fn liste_je_uhs(
     pool: &SqlitePool,
@@ -140,7 +169,8 @@ pub async fn liste_je_uhs(
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzPersonalAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ?1 AND ep.uhs_id IS ?2 ORDER BY ep.id"
+        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ?1 AND ep.uhs_id IS ?2 \
+         AND ep.beendet_at IS NULL ORDER BY ep.id"
     )))
     .bind(einsatz_id)
     .bind(uhs_id)
@@ -191,10 +221,20 @@ pub async fn load_anzeige_tx(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
+/// Ergebnis einer Disposition: die Zeile und ob sie eine beendete Zeile derselben Stamm-Person
+/// wieder aufgenommen hat (LLH-1079, design.md D7). Der Aufrufer wählt danach den ETB-Text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Disponiert {
+    pub id: i64,
+    pub reaktiviert: bool,
+}
+
 /// Disponiert eine Stamm-Person: prüft Org und Dienststatus, friert den Identitäts-Snapshot ein
 /// (`snap_funktion` aus den aktiven Qualifikationen) und setzt den ersten `gebunden`-Status.
 /// `staerke_position` ist der optionale Override. `NotFound` bei fremder/unbekannter Person,
-/// `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition. Liefert die `ep_id`.
+/// `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition. Eine entlassene oder
+/// stornierte Zeile derselben Person wird wieder aufgenommen statt abgelehnt (LLH-1079, D7):
+/// `UNIQUE(einsatz_id, personal_id)` lässt keine zweite Zeile zu.
 ///
 /// Pool-Hülle um [`disponieren_stamm_tx`] ohne eigene Transaktion.
 pub async fn disponieren_stamm(
@@ -204,7 +244,7 @@ pub async fn disponieren_stamm(
     personal_id: i64,
     staerke_position: Option<&str>,
     disponiert_von: i64,
-) -> Result<i64, AppError> {
+) -> Result<Disponiert, AppError> {
     let mut conn = pool.acquire().await?;
     disponieren_stamm_tx(
         &mut conn,
@@ -228,21 +268,38 @@ pub async fn disponieren_stamm_tx(
     personal_id: i64,
     staerke_position: Option<&str>,
     disponiert_von: i64,
-) -> Result<i64, AppError> {
-    let snap = sqlx::query_as::<_, (String, Option<String>, String)>(
-        "SELECT name, traegerorganisation, dienststatus FROM personal WHERE id = ? AND org_id = ?",
+) -> Result<Disponiert, AppError> {
+    let bestehend: Option<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, beendet_at FROM einsatz_personal WHERE einsatz_id = ? AND personal_id = ?",
     )
+    .bind(einsatz_id)
     .bind(personal_id)
-    .bind(org_id)
     .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    let (name, traeger, dienststatus) = snap;
-    if dienststatus != DIENSTSTATUS_IN_DIENST {
-        return Err(AppError::Validation(
-            "Person ist außer Dienst und kann nicht disponiert werden".into(),
-        ));
+    .await?;
+    match bestehend {
+        Some((_, None)) => {
+            return Err(AppError::Conflict(
+                "Person ist bereits in diesem Einsatz disponiert".into(),
+            ))
+        }
+        Some((id, Some(_))) => {
+            reaktivieren_tx(
+                conn,
+                einsatz_id,
+                org_id,
+                id,
+                Some(staerke_position),
+                disponiert_von,
+            )
+            .await?;
+            return Ok(Disponiert {
+                id,
+                reaktiviert: true,
+            });
+        }
+        None => {}
     }
+    let (name, traeger) = stamm_snapshot_tx(conn, org_id, personal_id).await?;
     let funktion = qualifikation_repo::funktion_text(&mut *conn, personal_id).await?;
     let status_id =
         status_repo::erster_der_kategorie(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
@@ -265,12 +322,39 @@ pub async fn disponieren_stamm_tx(
     .await;
 
     match ergebnis {
-        Ok(id) => Ok(id),
+        Ok(id) => Ok(Disponiert {
+            id,
+            reaktiviert: false,
+        }),
         Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
             "Person ist bereits in diesem Einsatz disponiert".into(),
         )),
         Err(e) => Err(e.into()),
     }
+}
+
+/// Name und Trägerorganisation einer Stamm-Person der Org; `NotFound` bei fremder/unbekannter,
+/// `Validation` bei außer Dienst.
+async fn stamm_snapshot_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    personal_id: i64,
+) -> Result<(String, Option<String>), AppError> {
+    let snap = sqlx::query_as::<_, (String, Option<String>, String)>(
+        "SELECT name, traegerorganisation, dienststatus FROM personal WHERE id = ? AND org_id = ?",
+    )
+    .bind(personal_id)
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let (name, traeger, dienststatus) = snap;
+    if dienststatus != DIENSTSTATUS_IN_DIENST {
+        return Err(AppError::Validation(
+            "Person ist außer Dienst und kann nicht disponiert werden".into(),
+        ));
+    }
+    Ok((name, traeger))
 }
 
 /// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die eigentlichen
@@ -320,7 +404,7 @@ pub async fn disponieren_adhoc_tx(
 /// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id` per COALESCE (`None` =
 /// unverändert). `staerke_position` und `bemerkung` sind Tri-State: `None` = unverändert,
 /// `Some(None)` = NULL, `Some(Some(x))` = setzen. Getrimmt wird in der Route. `NotFound`, falls
-/// die Zeile nicht zum Einsatz gehört.
+/// die Zeile nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079).
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -329,6 +413,7 @@ pub async fn update_tx(
     staerke_position: Option<Option<&str>>,
     bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
+    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
@@ -372,51 +457,387 @@ pub async fn update(
     .await
 }
 
-/// Entfernt eine Dispositionszeile (der Stamm bleibt); `NotFound`, falls nicht zum Einsatz.
-///
-/// Vor dem DELETE werden die Führungsrollen freigegeben (`fuehrer_id`/`leiter_id` → NULL),
-/// sonst blockierte der FK. `auftrag_empfaenger.person_id` räumt ON DELETE SET NULL ab. Ein
-/// `NotFound` rollt die Freigabe mit zurück.
-pub async fn delete_tx(
+// ── Lebenszustand (LLH-1079, Spec `kraefte-entlassung`) ──────────────────────────────────
+
+/// Jeder Schreibweg an einer Kraft fragt zuerst hier (design.md D6): `NotFound`, wenn die Zeile
+/// nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie entlassen oder
+/// storniert ist. Nur das erneute Disponieren schreibt an einer beendeten Kraft.
+pub async fn fordere_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
 ) -> Result<(), AppError> {
-    sqlx::query(
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match ende.ok_or(AppError::NotFound)?.as_deref() {
+        None => Ok(()),
+        Some("storniert") => Err(AppError::Conflict(
+            "Die Person ist storniert; erst erneut disponieren".into(),
+        )),
+        Some(_) => Err(AppError::Conflict(
+            "Die Person ist aus dem Einsatz entlassen; erst erneut disponieren".into(),
+        )),
+    }
+}
+
+/// Was das Entlassen über die Kraft selbst hinaus berührt hat.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Entlassen {
+    /// Name der Einheit, der die Person angehörte — nur für den ETB-Text (design.md D4).
+    pub einheit_name: Option<String>,
+    /// Ist die Entlassung in die Zeitachse eingegangen? Ohne offene Periode nicht.
+    pub zeitachse: bool,
+}
+
+/// Entlässt eine Person aus dem Einsatz (design.md D4/D5): die Zeile bleibt mit Zeitpunkt und
+/// entlassender Person stehen. Gelöst werden Einheit, Fahrzeug, UHS, die Führung einer Einheit,
+/// die Leitung eines Abschnitts, Stab und Einsatzleitung (Spec `einsatz-fuehrungsstelle`:
+/// „nicht mehr disponiert“). Auftragsempfänger, Schadensbezug und Bestätigungen bleiben. In die
+/// Zeitachse geht die Entlassung mit Quelle `disposition`, sofern eine Periode offen ist.
+/// `NotFound`/`Conflict` wie [`fordere_aktiv_tx`].
+pub async fn entlassen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Entlassen, AppError> {
+    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    let einheit_name: Option<String> = sqlx::query_scalar(
+        "SELECT e.name FROM einsatz_personal ep \
+         JOIN einsatz_einheit e ON e.id = ep.einheit_id \
+         WHERE ep.id = ? AND ep.einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    release_bindungen_tx(conn, einsatz_id, ep_id).await?;
+    let (ergebnis, _) = crate::zeitachse::repo::schreibe_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        crate::zeitachse::repo::Kraft::Person(ep_id),
+        crate::zeitachse::repo::Neu {
+            art: crate::zeitachse::ZeitachseArt::Entlassung,
+            zeitpunkt_at: jetzt,
+            quelle: crate::zeitachse::ZeitachseQuelle::Disposition,
+            notiz: None,
+        },
+    )
+    .await?;
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        ep_id,
+        benutzer_id,
+        jetzt,
+        crate::entlassung::BeendetAls::Entlassen,
+    )
+    .await?;
+    Ok(Entlassen {
+        einheit_name,
+        zeitachse: matches!(
+            ergebnis,
+            crate::zeitachse::repo::Schreibergebnis::Geschrieben(_)
+        ),
+    })
+}
+
+/// Löst jede Bindung einer Person (design.md D4). Führungsrollen werden ausdrücklich geleert:
+/// ohne DELETE greift kein `ON DELETE SET NULL` mehr.
+async fn release_bindungen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    for sql in [
         "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
-    )
-    .bind(ep_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?;
-    sqlx::query(
         "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
-    )
-    .bind(ep_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?;
-    let resultat = sqlx::query("DELETE FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
-        .bind(ep_id)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    if resultat.rows_affected() == 0 {
-        return Err(AppError::NotFound);
+        "UPDATE einsatz_stabsfunktion SET personal_id = NULL \
+         WHERE personal_id = ? AND einsatz_id = ?",
+        "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_personal_id = NULL \
+         WHERE einsatzleiter_personal_id = ? AND einsatz_id = ?",
+        "UPDATE einsatz_personal SET einheit_id = NULL, fahrzeug_id = NULL, uhs_id = NULL \
+         WHERE id = ? AND einsatz_id = ?",
+    ] {
+        sqlx::query(sql)
+            .bind(ep_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
     }
     Ok(())
 }
 
-/// Pool-Wrapper: Freigabe und DELETE in EINER Transaktion. Der Handler nutzt [`delete_tx`]
-/// direkt in `write_retry!`, um den System-ETB-Eintrag in dieselbe Transaktion zu ziehen.
-pub async fn delete(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
-    delete_tx(&mut tx, einsatz_id, ep_id).await?;
-    tx.commit().await?;
+/// Setzt den Endzustand genau einmal; die Bedingung `beendet_at IS NULL` steht im UPDATE, so
+/// trifft ein gleichzeitiger zweiter Versuch keine Zeile mehr (`Conflict`).
+async fn set_beendet_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    als: crate::entlassung::BeendetAls,
+) -> Result<(), AppError> {
+    let r = sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = ?, beendet_von = ?, beendet_als = ? \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(als.as_str())
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "Die Person ist bereits aus dem Einsatz genommen".into(),
+        ));
+    }
     Ok(())
 }
 
-/// Lesepfad für die Karte: ALLE disponierten Personen des Einsatzes mit Position;
+/// Storniert eine Fehldisposition (design.md D3): die Zeile endet als `storniert`, jedes nicht
+/// gestrichene Ereignis der Person wird mit [`crate::entlassung::GRUND_STORNO`] gestrichen. Nur
+/// solange die Kraft aktiv ist (sonst `Conflict`), nur Ereignisse aus der Disposition trägt,
+/// keine Bindung hat und höchstens [`crate::entlassung::STORNO_FRIST_MINUTEN`] seit der
+/// Disposition vergangen sind; sonst 422 mit dem ersten verletzten Grund als Satz.
+pub async fn stornieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    fordere_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    if let Some(grund) = find_storno_hindernis_tx(conn, einsatz_id, ep_id, jetzt).await? {
+        return Err(AppError::UnprocessableEntity(grund));
+    }
+    let ereignisse: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_kraft_zeitachse \
+         WHERE personal_id = ? AND gestrichen_at IS NULL ORDER BY zeitpunkt_at DESC, id DESC",
+    )
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in ereignisse {
+        crate::zeitachse::repo::streiche_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            crate::zeitachse::repo::Kraft::Person(ep_id),
+            id,
+            crate::entlassung::GRUND_STORNO,
+            false,
+        )
+        .await?;
+    }
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        ep_id,
+        benutzer_id,
+        jetzt,
+        crate::entlassung::BeendetAls::Storniert,
+    )
+    .await
+}
+
+/// Der erste Grund, der einen Storno verbietet (design.md D3, Regeln 2–4), oder `None`.
+async fn find_storno_hindernis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    jetzt: &str,
+) -> Result<Option<String>, AppError> {
+    let (disponiert_at, einheit, fahrzeug, uhs): (String, Option<i64>, Option<i64>, Option<i64>) =
+        sqlx::query_as(
+            "SELECT disponiert_at, einheit_id, fahrzeug_id, uhs_id FROM einsatz_personal \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let fremde_ereignisse: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_kraft_zeitachse \
+         WHERE personal_id = ? AND gestrichen_at IS NULL \
+           AND (quelle <> 'status' OR zeitpunkt_at <> ?)",
+    )
+    .bind(ep_id)
+    .bind(&disponiert_at)
+    .fetch_one(&mut *conn)
+    .await?;
+    if fremde_ereignisse > 0 {
+        return Ok(Some(
+            "Die Zeitachse der Person trägt schon mehr als die Disposition; \
+             die Person lässt sich entlassen"
+                .into(),
+        ));
+    }
+    let bindung = if einheit.is_some() {
+        Some("Die Person gehört einer Einheit an")
+    } else if fahrzeug.is_some() {
+        Some("Die Person ist Besatzung eines Fahrzeugs")
+    } else if uhs.is_some() {
+        Some("Die Person arbeitet an einer UHS")
+    } else {
+        None
+    };
+    if let Some(b) = bindung {
+        return Ok(Some(format!("{b}; erst lösen oder die Person entlassen")));
+    }
+    // Rollen und Spuren außerhalb der eigenen Zeile, in fester Reihenfolge.
+    const SPUREN: [(&str, &str); 7] = [
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_einheit WHERE fuehrer_id = ?1 AND einsatz_id = ?2)",
+            "Die Person führt eine Einheit",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatzabschnitt WHERE leiter_id = ?1 AND einsatz_id = ?2)",
+            "Die Person leitet einen Einsatzabschnitt",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_stabsfunktion \
+                           WHERE personal_id = ?1 AND einsatz_id = ?2)",
+            "Die Person besetzt eine Stabsfunktion",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_fuehrungsstelle \
+                           WHERE einsatzleiter_personal_id = ?1 AND einsatz_id = ?2)",
+            "Die Person ist Einsatzleiter",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM auftrag_empfaenger ae JOIN auftrag a ON a.id = ae.auftrag_id \
+                           WHERE ae.person_id = ?1 AND a.einsatz_id = ?2)",
+            "Die Person ist Empfänger eines Auftrags",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_schaden \
+                           WHERE geschaedigt_personal_id = ?1 AND einsatz_id = ?2)",
+            "Die Person ist an einem Schaden als geschädigt eingetragen",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM person_sichtung WHERE bestaetigt_personal_id = ?1) \
+                 OR EXISTS(SELECT 1 FROM person_verbleib WHERE bestaetigt_personal_id = ?1)",
+            "Die Person hat eine Sichtung oder einen Verbleib bestätigt",
+        ),
+    ];
+    for (sql, grund) in SPUREN {
+        let hat: bool = sqlx::query_scalar(sql)
+            .bind(ep_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        if hat {
+            return Ok(Some(format!("{grund}; die Person lässt sich entlassen")));
+        }
+    }
+    if !crate::entlassung::in_storno_frist(&disponiert_at, jetzt) {
+        return Ok(Some(crate::entlassung::storno_frist_text()));
+    }
+    Ok(None)
+}
+
+/// Nimmt eine entlassene oder stornierte Person wieder auf (design.md D7): Endzustand weg,
+/// Initialstatus und Dispositionszeit neu, die Stärke-Position nach `staerke_position`
+/// (`None` = unverändert, `Some(x)` = setzen). Eine Stamm-Person muss in Dienst sein, ihr
+/// Snapshot wird erneuert. Gestrichene Ereignisse bleiben gestrichen; die Zeitachse des
+/// Initialstatus schreibt der Aufrufer über [`start_zeitachse_tx`]. `NotFound` bei fremder
+/// Zeile, `Conflict` bei einer aktiven.
+pub async fn reaktivieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    ep_id: i64,
+    staerke_position: Option<Option<&str>>,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    let zeile: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT personal_id, beendet_at FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (personal_id, beendet_at) = zeile.ok_or(AppError::NotFound)?;
+    if beendet_at.is_none() {
+        return Err(AppError::Conflict(
+            "Person ist bereits in diesem Einsatz disponiert".into(),
+        ));
+    }
+    if let Some(pid) = personal_id {
+        let (name, traeger) = stamm_snapshot_tx(conn, org_id, pid).await?;
+        let funktion = qualifikation_repo::funktion_text(&mut *conn, pid).await?;
+        sqlx::query(
+            "UPDATE einsatz_personal SET snap_name = ?, snap_funktion = ?, \
+                 snap_traegerorganisation = ? WHERE id = ?",
+        )
+        .bind(&name)
+        .bind(&funktion)
+        .bind(&traeger)
+        .bind(ep_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    let status_id =
+        status_repo::erster_der_kategorie(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL, \
+             status_id = ?, \
+             staerke_position = CASE WHEN ? THEN ? ELSE staerke_position END, \
+             disponiert_at = datetime('now'), disponiert_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(status_id)
+    .bind(staerke_position.is_some())
+    .bind(staerke_position.flatten())
+    .bind(benutzer_id)
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Schreibt die Zeitachse des Initialstatus einer frisch (wieder) disponierten Person zum
+/// Zeitpunkt ihrer Disposition (LFH-552). Gleicher Zeitpunkt wie `disponiert_at`: daran erkennt
+/// der Storno die Ereignisse aus der Disposition (design.md D3, Regel 2).
+pub async fn start_zeitachse_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    let (status_id, disponiert_at): (Option<i64>, String) = sqlx::query_as(
+        "SELECT status_id, disponiert_at FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if let Some(sid) = status_id {
+        crate::zeitachse::repo::aus_personalstatus_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            ep_id,
+            sid,
+            &disponiert_at,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// Lesepfad für die Karte: ALLE aktiven Personen des Einsatzes mit Position;
 /// Führungsrollen als Flags (`ist_einheitsfuehrer`/`ist_abschnittsleiter`). Getrennt vom
 /// `liste`-Pfad, der kein lat/lon liefert.
 pub async fn liste_fuehrungskraefte(
@@ -432,7 +853,7 @@ pub async fn liste_fuehrungskraefte(
                 EXISTS(SELECT 1 FROM einsatzabschnitt a \
                        WHERE a.einsatz_id = ep.einsatz_id AND a.leiter_id = ep.id) AS ist_abschnittsleiter \
          FROM einsatz_personal ep \
-         WHERE ep.einsatz_id = ?1 \
+         WHERE ep.einsatz_id = ?1 AND ep.beendet_at IS NULL \
          ORDER BY ep.snap_name, ep.id",
     ).bind(einsatz_id).fetch_all(pool).await?;
     Ok(rows)
@@ -611,8 +1032,9 @@ mod tests {
             let personal =
                 crate::personal::repo::anlegen_tx(&mut *conn, 7, &p_daten("Anna Import"), &[quali])
                     .await?;
-            let ep_id =
-                disponieren_stamm_tx(&mut *conn, einsatz, 7, personal.id, None, benutzer).await?;
+            let ep_id = disponieren_stamm_tx(&mut *conn, einsatz, 7, personal.id, None, benutzer)
+                .await?
+                .id;
             Ok((ep_id, status_id))
         })
         .unwrap();
@@ -687,7 +1109,8 @@ mod tests {
 
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.name, "Thomas Müller");
         assert_eq!(a.funktion.as_deref(), Some("Sanitäter, Gruppenführer"));
@@ -709,7 +1132,8 @@ mod tests {
             .unwrap(); // Stamm = fuehrer
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(
             a.staerke_position.as_deref(),
@@ -811,7 +1235,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
 
         // Stamm nachträglich umbenennen.
         p_repo::aktualisiere(&pool, 1, person.id, p_daten("Thomas NEU"), &[])
@@ -847,7 +1272,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         assert_eq!(
             load_anzeige(&pool, einsatz, ep, true)
                 .await
@@ -891,7 +1317,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
 
         let live = load_anzeige(&pool, einsatz, ep, true)
             .await
@@ -918,7 +1345,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
 
         // Frisch disponiert → keiner Einheit zugeordnet.
         assert_eq!(
@@ -961,7 +1389,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         let neuer = status_repo::anlegen(
             &pool,
             1,
@@ -1004,10 +1433,30 @@ mod tests {
         );
         assert!(b.bemerkung.is_none(), "Bemerkung geleert (Spalte auf NULL)");
 
-        delete(&pool, einsatz, ep).await.unwrap();
+        // LLH-1079: Entlassen löscht nicht; die Zeile bleibt mit Endzustand lesbar, fällt aus
+        // der Liste und nimmt keine Änderung mehr an.
+        entlasse(&pool, einsatz, ep, benutzer, "2026-10-13 14:00:00")
+            .await
+            .unwrap();
+        let c = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
+        assert_eq!(c.beendet_at.as_deref(), Some("2026-10-13 14:00:00"));
+        assert_eq!(c.beendet_von, Some(benutzer));
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert_eq!(
+            list_entlassene(&pool, einsatz, true)
+                .await
+                .unwrap()
+                .iter()
+                .map(|a| a.id)
+                .collect::<Vec<_>>(),
+            vec![ep]
+        );
         assert!(matches!(
-            load_anzeige(&pool, einsatz, ep, true).await.unwrap_err(),
-            AppError::NotFound
+            update(&pool, einsatz, ep, None, None, Some(Some("x")))
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
         ));
     }
 
@@ -1022,7 +1471,8 @@ mod tests {
             .unwrap();
         let ep = disponieren_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
 
         async fn roh(pool: &SqlitePool, ep: i64) -> Option<String> {
             sqlx::query_scalar("SELECT staerke_position FROM einsatz_personal WHERE id = ?")
@@ -1107,11 +1557,35 @@ mod tests {
         );
     }
 
+    /// Entlassen auf eigener Verbindung (LLH-1079).
+    async fn entlasse(
+        pool: &SqlitePool,
+        einsatz: i64,
+        ep: i64,
+        benutzer: i64,
+        jetzt: &str,
+    ) -> Result<Entlassen, AppError> {
+        let mut conn = pool.acquire().await.unwrap();
+        entlassen_tx(&mut conn, einsatz, ep, benutzer, jetzt).await
+    }
+
+    /// Stornieren auf eigener Verbindung (LLH-1079).
+    async fn storniere(
+        pool: &SqlitePool,
+        einsatz: i64,
+        ep: i64,
+        benutzer: i64,
+        jetzt: &str,
+    ) -> Result<(), AppError> {
+        let mut conn = pool.acquire().await.unwrap();
+        stornieren_tx(&mut conn, einsatz, ep, benutzer, jetzt).await
+    }
+
     /// Eine Person, die Einheitsführer bzw. Abschnittsleiter und Auftrag-Empfänger ist, lässt sich
-    /// entfernen: Führungsrollen werden in der Lösch-Tx freigegeben, der Empfänger-Bezug per ON
-    /// DELETE SET NULL, `snap_anzeige` bleibt.
+    /// entlassen (LLH-1079, Spec `kraefte-entlassung` „Bindungen gelöst“, „Auftrag bleibt“): die
+    /// Führungsrollen werden geleert, der Empfänger-Bezug bleibt samt `snap_anzeige`.
     #[tokio::test]
-    async fn entferne_gibt_fuehrungsrollen_frei_und_setzt_empfaenger_null() {
+    async fn entlassen_loest_fuehrungsrollen_und_behaelt_den_auftrag() {
         let pool = crate::db::test_pool().await;
         let (einsatz, p1, p2, _p3) = seed_personal_mit_fuehrung(&pool).await;
         let bn: i64 = sqlx::query_scalar("SELECT id FROM benutzer LIMIT 1")
@@ -1136,17 +1610,35 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-
-        // p1 = Einheitsführer + Empfänger → Entfernen darf nicht am FK scheitern.
-        delete(&pool, einsatz, p1)
+        let trupp: i64 = sqlx::query_scalar("SELECT id FROM einsatz_einheit WHERE name = 'Trupp'")
+            .fetch_one(&pool)
             .await
-            .expect("Führer entfernen darf nicht am FK scheitern");
-        let fuehrer: Option<i64> =
-            sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE name = 'Trupp'")
+            .unwrap();
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(trupp)
+            .bind(p1)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let e = entlasse(&pool, einsatz, p1, bn, "2026-10-13 14:00:00")
+            .await
+            .expect("Führer entlassen");
+        assert_eq!(e.einheit_name.as_deref(), Some("Trupp"), "für den ETB-Text");
+        let (fuehrer,): (Option<i64>,) =
+            sqlx::query_as("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+                .bind(trupp)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(fuehrer, None, "fuehrer_id muss freigegeben (NULL) sein");
+        assert_eq!(fuehrer, None, "fuehrer_id geleert");
+        let einheit: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?")
+                .bind(p1)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(einheit, None, "gehört keiner Einheit mehr an");
         let (person_ref, snap): (Option<i64>, String) = sqlx::query_as(
             "SELECT person_id, snap_anzeige FROM auftrag_empfaenger WHERE auftrag_id = ?",
         )
@@ -1154,23 +1646,413 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(
-            person_ref, None,
-            "Empfänger.person_id muss NULL sein (SET NULL)"
-        );
-        assert_eq!(snap, "Anton Abel", "snap_anzeige bleibt erhalten");
+        assert_eq!(person_ref, Some(p1), "der Auftrag nennt sie weiter");
+        assert_eq!(snap, "Anton Abel");
 
-        // p2 = Abschnittsleiter → Entfernen gibt leiter_id frei.
-        delete(&pool, einsatz, p2)
+        entlasse(&pool, einsatz, p2, bn, "2026-10-13 14:00:00")
             .await
-            .expect("Leiter entfernen darf nicht am FK scheitern");
+            .expect("Leiter entlassen");
         let leiter: Option<i64> = sqlx::query_scalar(
             "SELECT leiter_id FROM einsatzabschnitt WHERE name = 'Abschnitt Nord'",
         )
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(leiter, None, "leiter_id muss freigegeben (NULL) sein");
+        assert_eq!(leiter, None, "leiter_id geleert");
+
+        assert!(
+            matches!(
+                entlasse(&pool, einsatz, p2, bn, "2026-10-13 15:00:00")
+                    .await
+                    .unwrap_err(),
+                AppError::Conflict(_)
+            ),
+            "Bereits entlassen → 409"
+        );
+    }
+
+    /// Org-Startliste: „alarmiert“ trägt die Marke Alarmierung, „im Einsatz“ Eintreffen.
+    async fn setup_mit_marken(pool: &SqlitePool) -> (i64, i64, i64) {
+        let (benutzer, einsatz) = setup(pool).await;
+        sqlx::query("UPDATE personal_status SET zeitachse_marke = 'alarmierung'")
+            .execute(pool)
+            .await
+            .unwrap();
+        let eingetroffen = status_repo::anlegen(
+            pool,
+            1,
+            StatusDaten {
+                label: "im Einsatz",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                sortier: 40,
+                zeitachse_marke: Some("eintreffen"),
+            },
+        )
+        .await
+        .unwrap();
+        (benutzer, einsatz, eingetroffen.id)
+    }
+
+    /// Disponiert eine Ad-hoc-Person samt Zeitachse des Initialstatus, wie die Route; setzt die
+    /// Dispositionszeit fest.
+    async fn disponiere_zur_zeit(
+        pool: &SqlitePool,
+        einsatz: i64,
+        benutzer: i64,
+        zeit: &str,
+    ) -> i64 {
+        let mut conn = pool.acquire().await.unwrap();
+        let ep = disponieren_adhoc_tx(
+            &mut conn,
+            einsatz,
+            1,
+            AdhocDaten {
+                name: "Helga Helfer",
+                funktion: None,
+                traegerorganisation: None,
+                staerke_position: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_personal SET disponiert_at = ? WHERE id = ?")
+            .bind(zeit)
+            .bind(ep)
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        start_zeitachse_tx(&mut conn, einsatz, benutzer, ep)
+            .await
+            .unwrap();
+        ep
+    }
+
+    async fn zeitachse_folge(
+        pool: &SqlitePool,
+        einsatz: i64,
+        ep: i64,
+    ) -> Vec<(String, String, String, bool)> {
+        crate::zeitachse::repo::laden(pool, einsatz, crate::zeitachse::repo::Kraft::Person(ep))
+            .await
+            .unwrap()
+            .ereignisse
+            .into_iter()
+            .map(|e| {
+                (
+                    e.art.as_str().to_string(),
+                    e.zeitpunkt_at,
+                    e.quelle.as_str().to_string(),
+                    e.gestrichen_at.is_some(),
+                )
+            })
+            .collect()
+    }
+
+    /// Spec `kraefte-entlassung` „Zeitachse überlebt Entlassen“: Alarmierung 06:10, Eintreffen
+    /// 06:40, entlassen 14:00 — alle drei stehen, die Entlassung mit Quelle `disposition`, und die
+    /// Person ist weiter im Einsatz geführt.
+    #[tokio::test]
+    async fn zeitachse_ueberlebt_entlassen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz, eingetroffen) = setup_mit_marken(&pool).await;
+        let ep = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 06:10:00").await;
+        {
+            let mut conn = pool.acquire().await.unwrap();
+            update_tx(&mut conn, einsatz, ep, Some(eingetroffen), None, None)
+                .await
+                .unwrap();
+            crate::zeitachse::repo::aus_personalstatus_tx(
+                &mut conn,
+                einsatz,
+                benutzer,
+                ep,
+                eingetroffen,
+                "2026-10-13 06:40:00",
+            )
+            .await
+            .unwrap();
+        }
+        let e = entlasse(&pool, einsatz, ep, benutzer, "2026-10-13 14:00:00")
+            .await
+            .unwrap();
+        assert!(e.zeitachse);
+        assert_eq!(
+            zeitachse_folge(&pool, einsatz, ep).await,
+            vec![
+                (
+                    "alarmierung".into(),
+                    "2026-10-13 06:10:00".into(),
+                    "status".into(),
+                    false
+                ),
+                (
+                    "eintreffen".into(),
+                    "2026-10-13 06:40:00".into(),
+                    "status".into(),
+                    false
+                ),
+                (
+                    "entlassung".into(),
+                    "2026-10-13 14:00:00".into(),
+                    "disposition".into(),
+                    false
+                ),
+            ]
+        );
+        assert_eq!(
+            list_entlassene(&pool, einsatz, true).await.unwrap().len(),
+            1
+        );
+    }
+
+    /// Spec „Storno direkt nach dem Disponieren“: das Alarmierungsereignis ist gestrichen, die
+    /// Person steht in keiner Liste und keinem Nachweis.
+    #[tokio::test]
+    async fn storno_streicht_die_disposition_und_blendet_aus() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz, _) = setup_mit_marken(&pool).await;
+        let ep = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 10:00:00").await;
+        storniere(&pool, einsatz, ep, benutzer, "2026-10-13 10:05:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            zeitachse_folge(&pool, einsatz, ep).await,
+            vec![(
+                "alarmierung".into(),
+                "2026-10-13 10:00:00".into(),
+                "status".into(),
+                true
+            )]
+        );
+        let grund: Option<String> = sqlx::query_scalar(
+            "SELECT streichgrund FROM einsatz_kraft_zeitachse WHERE personal_id = ?",
+        )
+        .bind(ep)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(grund.as_deref(), Some(crate::entlassung::GRUND_STORNO));
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert!(list_entlassene(&pool, einsatz, true)
+            .await
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            load_anzeige(&pool, einsatz, ep, true)
+                .await
+                .unwrap()
+                .beendet_als
+                .as_deref(),
+            Some("storniert")
+        );
+        assert!(matches!(
+            storniere(&pool, einsatz, ep, benutzer, "2026-10-13 10:06:00")
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        assert!(matches!(
+            entlasse(&pool, einsatz, ep, benutzer, "2026-10-13 10:06:00")
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    /// Spec „Storno mit Spur“ und „Frist abgelaufen“: 422 mit dem Grund als Satz, und nichts ist
+    /// gestrichen oder beendet.
+    #[tokio::test]
+    async fn storno_mit_spur_oder_nach_der_frist_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz, eingetroffen) = setup_mit_marken(&pool).await;
+
+        let eingetroffene =
+            disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 10:00:00").await;
+        {
+            let mut conn = pool.acquire().await.unwrap();
+            crate::zeitachse::repo::aus_personalstatus_tx(
+                &mut conn,
+                einsatz,
+                benutzer,
+                eingetroffene,
+                eingetroffen,
+                "2026-10-13 10:02:00",
+            )
+            .await
+            .unwrap();
+        }
+        let AppError::UnprocessableEntity(grund) = storniere(
+            &pool,
+            einsatz,
+            eingetroffene,
+            benutzer,
+            "2026-10-13 10:05:00",
+        )
+        .await
+        .unwrap_err() else {
+            panic!("422 erwartet")
+        };
+        assert!(grund.contains("mehr als die Disposition"), "{grund}");
+
+        let spaet = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 10:00:00").await;
+        let AppError::UnprocessableEntity(grund) =
+            storniere(&pool, einsatz, spaet, benutzer, "2026-10-13 10:20:00")
+                .await
+                .unwrap_err()
+        else {
+            panic!("422 erwartet")
+        };
+        assert!(
+            grund.contains("nur in den ersten 15 Minuten nach der Disposition"),
+            "{grund}"
+        );
+
+        let gebunden = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 10:00:00").await;
+        let trupp: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(trupp)
+            .bind(gebunden)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let AppError::UnprocessableEntity(grund) =
+            storniere(&pool, einsatz, gebunden, benutzer, "2026-10-13 10:05:00")
+                .await
+                .unwrap_err()
+        else {
+            panic!("422 erwartet")
+        };
+        assert!(grund.contains("Einheit"), "{grund}");
+
+        let beendet: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_personal WHERE beendet_at IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(beendet, 0, "abgelehnt heißt: nichts geschrieben");
+        let gestrichen: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_kraft_zeitachse WHERE gestrichen_at IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(gestrichen, 0);
+    }
+
+    /// Spec „Erneut disponieren“, „Stamm-Person kommt zurück“: dieselbe Zeile wird wieder aktiv
+    /// (statt 409 am UNIQUE), mit neuem Initialstatus und einer zweiten Periode.
+    #[tokio::test]
+    async fn entlassene_stamm_person_kommt_auf_dieselbe_zeile_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz, eingetroffen) = setup_mit_marken(&pool).await;
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        let erste = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
+        assert!(!erste.reaktiviert);
+        {
+            let mut conn = pool.acquire().await.unwrap();
+            sqlx::query("UPDATE einsatz_personal SET disponiert_at = '2026-10-13 06:10:00'")
+                .execute(&mut *conn)
+                .await
+                .unwrap();
+            start_zeitachse_tx(&mut conn, einsatz, benutzer, erste.id)
+                .await
+                .unwrap();
+            update_tx(&mut conn, einsatz, erste.id, Some(eingetroffen), None, None)
+                .await
+                .unwrap();
+        }
+        entlasse(&pool, einsatz, erste.id, benutzer, "2026-10-13 14:00:00")
+            .await
+            .unwrap();
+
+        let zweite = disponieren_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
+            .await
+            .unwrap();
+        assert_eq!(zweite.id, erste.id, "dieselbe Zeile");
+        assert!(zweite.reaktiviert);
+        {
+            let mut conn = pool.acquire().await.unwrap();
+            start_zeitachse_tx(&mut conn, einsatz, benutzer, zweite.id)
+                .await
+                .unwrap();
+        }
+        let a = load_anzeige(&pool, einsatz, zweite.id, true).await.unwrap();
+        assert_eq!(a.beendet_at, None);
+        assert_eq!(a.beendet_als, None);
+        assert_eq!(
+            a.status_label.as_deref(),
+            Some("alarmiert"),
+            "Initialstatus neu"
+        );
+        assert_eq!(a.staerke_position.as_deref(), Some("mannschaft"));
+        let perioden = crate::zeitachse::repo::laden(
+            &pool,
+            einsatz,
+            crate::zeitachse::repo::Kraft::Person(zweite.id),
+        )
+        .await
+        .unwrap()
+        .perioden;
+        assert_eq!(
+            perioden.len(),
+            2,
+            "zweite Periode ab der erneuten Disposition"
+        );
+        assert!(perioden[1].ende_at.is_none());
+
+        assert!(
+            matches!(
+                disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+                    .await
+                    .unwrap_err(),
+                AppError::Conflict(_)
+            ),
+            "aktiv bleibt 409"
+        );
+    }
+
+    /// Eine stornierte Ad-hoc-Kraft kommt über `reaktivieren_tx` zurück; ihre gestrichenen
+    /// Ereignisse bleiben gestrichen.
+    #[tokio::test]
+    async fn stornierte_kraft_kommt_zurueck_und_die_streichung_bleibt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz, _) = setup_mit_marken(&pool).await;
+        let ep = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 10:00:00").await;
+        storniere(&pool, einsatz, ep, benutzer, "2026-10-13 10:01:00")
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, ep, None, benutzer)
+            .await
+            .unwrap();
+        start_zeitachse_tx(&mut conn, einsatz, benutzer, ep)
+            .await
+            .unwrap();
+        assert!(matches!(
+            reaktivieren_tx(&mut conn, einsatz, 1, ep, None, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        drop(conn);
+        let folge = zeitachse_folge(&pool, einsatz, ep).await;
+        assert_eq!(folge.len(), 2);
+        assert!(folge[0].3, "die alte Alarmierung bleibt gestrichen");
+        assert!(!folge[1].3, "die neue zählt");
+        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 1);
     }
 
     /// LFH-733 (design.md D2): `ist_demo` folgt der Marke der Stamm-Person, unabhängig von der
@@ -1195,7 +2077,8 @@ mod tests {
         // `ep.personal_id` fiele auf.
         let ep_echt = disponieren_stamm(&pool, einsatz, 1, echt.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         let ep_adhoc = disponieren_adhoc(
             &pool,
             einsatz,
@@ -1212,7 +2095,8 @@ mod tests {
         .unwrap();
         let ep_demo = disponieren_stamm(&pool, einsatz, 1, demo.id, None, benutzer)
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         assert_ne!(ep_demo, demo.id, "Vorbedingung: IDs entkoppelt");
 
         for einsatz_aktiv in [true, false] {

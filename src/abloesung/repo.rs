@@ -348,21 +348,35 @@ async fn loesche_fristen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), 
     erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await
 }
 
-/// Entfernt die Auto-Fristen aller Schichten einer Einheit (LFH-635). Für
-/// `einheit::repo::aufloesen_tx`: der CASCADE entfernt die Schichten, die Fristen hängen ohne
-/// FK daran und liefen sonst als Geister weiter.
-pub async fn loesche_fristen_der_einheit_tx(
+/// Auflösen einer Einheit (LLH-1079, Spec `kraefte-abloesung` „Auflösen behält abgelöste
+/// Schichten“): ihre laufende Schicht geht samt Fristen (Planung, kein Vollzug), abgelöste
+/// bleiben mit ihrem Vollzug. Verweist eine Schicht einer anderen Einheit auf sie als ablösende,
+/// wird der Verweis geleert. Liefert, ob sich die Ablösung geändert hat.
+pub async fn release_einheit_tx(
     conn: &mut SqliteConnection,
     einheit_id: i64,
-) -> Result<(), AppError> {
-    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM einsatz_abloesung WHERE einheit_id = ?")
-        .bind(einheit_id)
-        .fetch_all(&mut *conn)
-        .await?;
-    for id in ids {
-        loesche_fristen_tx(conn, id).await?;
+) -> Result<bool, AppError> {
+    let laufend: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_abloesung WHERE einheit_id = ? AND status = 'laufend'",
+    )
+    .bind(einheit_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in &laufend {
+        loesche_fristen_tx(conn, *id).await?;
+        sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
     }
-    Ok(())
+    let geleert = sqlx::query(
+        "UPDATE einsatz_abloesung SET abloesende_einheit_id = NULL WHERE abloesende_einheit_id = ?",
+    )
+    .bind(einheit_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    Ok(!laufend.is_empty() || geleert > 0)
 }
 
 /// Legt eine laufende Schicht an und setzt ihre Fristen. Liefert die neue ID.

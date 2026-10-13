@@ -536,7 +536,8 @@ impl Ablauf<'_> {
                     None,
                     self.admin_id,
                 )
-                .await?;
+                .await?
+                .id;
                 self.personal.insert(personal, ep_id);
                 let anzeige = crate::personal::disposition_repo::load_anzeige_tx(
                     conn,

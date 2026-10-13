@@ -737,7 +737,7 @@ async fn aufgeloeste_einheit_hinterlaesst_keine_frist() {
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
-    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f1)
+    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f1, w.b)
         .await
         .unwrap();
     assert!(offene_fristen(&w.pool, a.id).await.is_empty());
@@ -749,6 +749,70 @@ async fn aufgeloeste_einheit_hinterlaesst_keine_frist() {
         "der Scheduler löst nichts mehr aus"
     );
     assert!(liste(&w.pool, w.e, None, T0).await.unwrap().is_empty());
+}
+
+/// LLH-1079 (design.md D5): Auflösen entfernt nur die Planung. Die abgelöste Schicht bleibt als
+/// Vollzug stehen, die laufende Folgeschicht der aufgelösten Einheit geht mit ihren Fristen, und
+/// eine fremde Schicht verliert die aufgelöste Einheit als geplante Ablösung.
+#[tokio::test]
+async fn aufloesen_behaelt_abgeloeste_schicht_und_leert_fremde_planung() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let folge = v.folgeschicht.unwrap();
+    // Eine dritte Einheit plant f1 als Ablösung ihrer laufenden Schicht.
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let (c, _) = beginnen(&w.pool, w.e, w.b, &beginn(f3, Some(360)), T0)
+        .await
+        .unwrap();
+    aendern(
+        &w.pool,
+        w.e,
+        c.id,
+        w.b,
+        &AenderungEingabe {
+            abloesende_einheit_id: Some(Some(w.f1)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+
+    let f1 = crate::einheit::repo::aufloesen(&w.pool, w.e, w.f1, w.b)
+        .await
+        .unwrap();
+    assert!(f1.abloesung && !f1.geloescht, "{f1:?}");
+    let status: String = sqlx::query_scalar("SELECT status FROM einsatz_abloesung WHERE id = ?")
+        .bind(a.id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "abgeloest", "der Vollzug bleibt");
+    let geplant: Option<i64> =
+        sqlx::query_scalar("SELECT abloesende_einheit_id FROM einsatz_abloesung WHERE id = ?")
+            .bind(c.id)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(geplant, None);
+
+    let f2 = crate::einheit::repo::aufloesen(&w.pool, w.e, w.f2, w.b)
+        .await
+        .unwrap();
+    assert!(f2.abloesung && !f2.geloescht, "{f2:?}");
+    let laufend: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung WHERE id = ?")
+        .bind(folge.id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(laufend, 0, "die laufende Schicht ist Planung und geht");
+    assert!(offene_fristen(&w.pool, folge.id).await.is_empty());
 }
 
 // ── Kräfte-Zeitachse (LFH-552) ──────────────────────────────────────────────────────────────

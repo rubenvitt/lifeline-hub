@@ -61,6 +61,8 @@ struct Row {
     hand_status_farbe: Option<String>,
     hand_status_fms_anker: Option<i64>,
     hand_status_sortier: Option<i64>,
+    aufgeloest_at: Option<String>,
+    aufgeloest_von: Option<i64>,
 }
 
 impl Row {
@@ -192,7 +194,8 @@ const SELECT_AUFGELOEST: &str = "\
            t.soll_mannschaft AS typ_soll_mannschaft, \
            e.status_seit, hs.id AS hand_status_id, hs.label AS hand_status_label, \
            hs.kategorie AS hand_status_kategorie, hs.farbe AS hand_status_farbe, \
-           hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier \
+           hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier, \
+           e.aufgeloest_at, e.aufgeloest_von \
     FROM einsatz_einheit e \
     LEFT JOIN einheit_typ t ON t.id = e.typ_id \
     LEFT JOIN fahrzeug_status hs ON hs.id = e.status_id \
@@ -262,11 +265,13 @@ pub fn kumuliere(
 
 /// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
 async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreicherung, AppError> {
-    let kanten: Vec<(i64, Option<i64>)> =
-        sqlx::query_as("SELECT id, ueber_einheit_id FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_all(pool)
-            .await?;
+    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
     let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
     for (id, vater) in &kanten {
         if let Some(v) = vater {
@@ -356,15 +361,35 @@ async fn zu_anzeige_batch(
             material_mitglieder,
             sprechgruppen,
             status,
+            aufgeloest_at: row.aufgeloest_at,
+            aufgeloest_von: row.aufgeloest_von,
         });
     }
     Ok(out)
 }
 
-/// Alle Einheiten eines Einsatzes (flach, aufgelöst inkl. Mitgliedern/Stärke).
+/// Alle aktiven Einheiten eines Einsatzes (flach, aufgelöst inkl. Mitgliedern/Stärke). Aufgelöste
+/// fehlen (LLH-1079).
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE e.einsatz_id = ? ORDER BY e.sortier, e.id"
+        "{SELECT_AUFGELOEST} WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NULL \
+         ORDER BY e.sortier, e.id"
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    zu_anzeige_batch(pool, einsatz_id, rows).await
+}
+
+/// Aufgelöste Einheiten eines Einsatzes, zuletzt aufgelöste zuerst — der Nachweis hinter
+/// `GET …/einheiten?aufgeloeste=1` (LLH-1079). Ohne Mitglieder: die Auflösung hat sie gelöst.
+pub async fn list_aufgeloeste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<EinheitAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NOT NULL \
+         ORDER BY e.aufgeloest_at DESC, e.id DESC"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -823,40 +848,161 @@ pub async fn setze_fuehrer(
     Ok(())
 }
 
-/// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB): Mitglieder
-/// freigeben (`einheit_id = NULL` an Personal, Fahrzeug, Material), Unter-Einheiten an den
-/// Parent hängen, dann löschen. `NotFound`, falls nicht zum Einsatz.
-pub async fn aufloesen_tx(
+/// Jeder Schreibweg an einer Einheit fragt zuerst hier (LLH-1079, design.md D6): `NotFound`,
+/// wenn sie nicht zum Einsatz gehört, `Conflict` (Lebenszyklus), wenn sie aufgelöst ist. Eine
+/// aufgelöste Einheit wird nicht wieder aktiv (design.md D5).
+pub async fn fordere_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
 ) -> Result<(), AppError> {
+    let aufgeloest: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match aufgeloest.ok_or(AppError::NotFound)? {
+        None => Ok(()),
+        Some(_) => Err(AppError::Conflict("Die Einheit ist aufgelöst".into())),
+    }
+}
+
+/// Der erste Grund, warum eine Einheit nicht spurlos gelöscht werden darf (design.md D3): eine
+/// Zeitachse, eine Schicht der Ablösung, eine ETB-Verknüpfung, eine Belegung eines
+/// Bereitstellungsraums oder eine (auch beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
+pub async fn find_spur_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> Result<Option<&'static str>, AppError> {
+    const SPUREN: [(&str, &str); 7] = [
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse WHERE einheit_id = ?)",
+            "Die Einheit hat eine Zeitachse",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung \
+                           WHERE einheit_id = ?1 OR abloesende_einheit_id = ?1)",
+            "Die Einheit steht in der Ablösung",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
+            "Einträge im Einsatztagebuch nennen die Einheit",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM br_belegung WHERE objekt_typ = 'einheit' AND objekt_id = ?)",
+            "Die Einheit war in einem Bereitstellungsraum",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_personal WHERE einheit_id = ?)",
+            "Der Einheit gehört Personal an",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_fahrzeug WHERE einheit_id = ?)",
+            "Der Einheit gehören Fahrzeuge an",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_material WHERE einheit_id = ?)",
+            "Der Einheit gehört Material an",
+        ),
+    ];
+    for (sql, grund) in SPUREN {
+        let hat: bool = sqlx::query_scalar(sql)
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+        if hat {
+            return Ok(Some(grund));
+        }
+    }
+    Ok(None)
+}
+
+/// Wie eine Einheit gehen soll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Aufloesung {
+    /// Auflösen (Normalweg): mit Spur weich, ohne Spur echt gelöscht (Spec
+    /// `kraefte-entlassung` „Leere Einheit gelöscht“).
+    Aufloesen,
+    /// Stornieren einer Fehlanlage: nur ohne Spur, echt gelöscht; mit Spur 422.
+    Stornieren,
+}
+
+/// Was das Auflösen über die Einheit hinaus berührt hat — für die Live-Ereignisse.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Aufgeloest {
+    /// Echt gelöscht (keine Spur) statt weich aufgelöst.
+    pub geloescht: bool,
+    pub personal: Vec<i64>,
+    pub fahrzeuge: Vec<i64>,
+    pub material: Vec<i64>,
+    /// Unter-Einheiten, die an die Über-Einheit gewandert sind.
+    pub kinder: Vec<i64>,
+    /// Bereitstellungsraum, aus dem die Einheit ausgetreten ist.
+    pub br: Option<i64>,
+    /// Laufende Schicht entfernt oder ein fremder Verweis auf sie geleert.
+    pub abloesung: bool,
+}
+
+/// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB, LLH-1079,
+/// design.md D5): Mitglieder freigeben (`einheit_id = NULL` an Personal, Fahrzeug, Material),
+/// Unter-Einheiten an die Über-Einheit hängen (ohne sie werden sie Wurzeln), Sprechgruppen und
+/// Skizzenbezüge lösen, laufende Schicht samt Fristen entfernen, einen Bereitstellungsraum
+/// verlassen. Mit Spur ([`find_spur_tx`]) bleibt die Zeile als aufgelöst stehen und bekommt die
+/// Entlassung in die Zeitachse (der Fan-out erreicht niemanden mehr); ohne Spur wird sie gelöscht.
+/// [`Aufloesung::Stornieren`] lehnt eine Spur mit 422 ab. `NotFound`/`Conflict` wie
+/// [`fordere_aktiv_tx`].
+pub async fn aufloesen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    art: Aufloesung,
+) -> Result<Aufgeloest, AppError> {
+    fordere_aktiv_tx(conn, einsatz_id, id).await?;
+    let spur = find_spur_tx(conn, id).await?;
+    if let (Aufloesung::Stornieren, Some(grund)) = (art, spur) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{grund}; die Einheit lässt sich nur auflösen"
+        )));
+    }
     let parent: Option<i64> = sqlx::query_scalar(
         "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
+    .fetch_one(&mut *conn)
+    .await?;
 
-    // CASCADE entfernt die Ablösungsschichten, ihre Auto-Fristen hängen aber ohne FK daran und
-    // liefen sonst als Geister im Scheduler weiter.
-    crate::abloesung::repo::loesche_fristen_der_einheit_tx(conn, id).await?;
-    sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
+    let mut ergebnis = Aufgeloest {
+        geloescht: spur.is_none(),
+        ..Aufgeloest::default()
+    };
+    for (tabelle, ziel) in [
+        ("einsatz_personal", &mut ergebnis.personal),
+        ("einsatz_fahrzeug", &mut ergebnis.fahrzeuge),
+        ("einsatz_material", &mut ergebnis.material),
+    ] {
+        *ziel = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "UPDATE {tabelle} SET einheit_id = NULL WHERE einheit_id = ? RETURNING id"
+        )))
         .bind(id)
-        .execute(&mut *conn)
+        .fetch_all(&mut *conn)
         .await?;
-    sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE einheit_id = ?")
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE einheit_id = ?")
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-    sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE ueber_einheit_id = ? AND einsatz_id = ?")
-        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *conn).await?;
+        ziel.sort_unstable();
+    }
+    ergebnis.kinder = sqlx::query_scalar(
+        "UPDATE einsatz_einheit SET ueber_einheit_id = ? \
+         WHERE ueber_einheit_id = ? AND einsatz_id = ? RETURNING id",
+    )
+    .bind(parent)
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    ergebnis.kinder.sort_unstable();
     // Polymorphe Bezüge der Fernmeldeskizze haben keinen FK (LFH-893, design.md D3).
     crate::stab::fernmeldeskizze::vergiss(
         conn,
@@ -864,20 +1010,73 @@ pub async fn aufloesen_tx(
         crate::stab::fernmeldeskizze::Element::Einheit(id),
     )
     .await?;
-    sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+    sqlx::query("DELETE FROM einsatz_einheit_sprechgruppe WHERE einheit_id = ?")
         .bind(id)
-        .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    Ok(())
+    ergebnis.abloesung = crate::abloesung::repo::release_einheit_tx(conn, id).await?;
+    ergebnis.br = crate::bereitstellungsraum::belegung_repo::austritt_bei_aufloesung_tx(
+        conn,
+        einsatz_id,
+        id,
+        benutzer_id,
+    )
+    .await?;
+
+    if ergebnis.geloescht {
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+        return Ok(ergebnis);
+    }
+    // Erst nach dem Lösen der Mitglieder: die Entlassung bleibt an der Einheit (design.md D5).
+    crate::zeitachse::repo::schreibe_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        crate::zeitachse::repo::Kraft::Einheit(id),
+        crate::zeitachse::repo::Neu {
+            art: crate::zeitachse::ZeitachseArt::Entlassung,
+            zeitpunkt_at: jetzt,
+            quelle: crate::zeitachse::ZeitachseQuelle::Disposition,
+            notiz: None,
+        },
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET aufgeloest_at = ?, aufgeloest_von = ?, fuehrer_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(ergebnis)
 }
 
-/// Pool-Wrapper mit eigener Transaktion.
-pub async fn aufloesen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+/// Pool-Wrapper mit eigener Transaktion (Auflösen als Normalweg).
+pub async fn aufloesen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+) -> Result<Aufgeloest, AppError> {
     let mut tx = pool.begin().await?;
-    aufloesen_tx(&mut tx, einsatz_id, id).await?;
+    let r = aufloesen_tx(
+        &mut tx,
+        einsatz_id,
+        id,
+        benutzer_id,
+        &crate::zeit::jetzt(),
+        Aufloesung::Aufloesen,
+    )
+    .await?;
     tx.commit().await?;
-    Ok(())
+    Ok(r)
 }
 
 #[cfg(test)]
@@ -1645,7 +1844,7 @@ mod tests {
             .await
             .unwrap();
 
-        aufloesen(&pool, einsatz, gruppe.id).await.unwrap();
+        aufloesen(&pool, einsatz, gruppe.id, b).await.unwrap();
 
         // Mitglied frei.
         let einheit_id: Option<i64> =
@@ -1663,11 +1862,18 @@ mod tests {
                 .ueber_einheit_id,
             Some(zug.id)
         );
-        // Gruppe ist weg.
-        assert!(matches!(
-            laden(&pool, einsatz, gruppe.id).await.unwrap_err(),
-            AppError::NotFound
-        ));
+        // Die Gruppe hatte ein Mitglied (eine Spur): sie bleibt als aufgelöst stehen und fehlt in
+        // der Liste (LLH-1079).
+        assert!(laden(&pool, einsatz, gruppe.id)
+            .await
+            .unwrap()
+            .aufgeloest_at
+            .is_some());
+        assert!(!liste(&pool, einsatz)
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.id == gruppe.id));
     }
 
     #[tokio::test]
@@ -1722,7 +1928,7 @@ mod tests {
             "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge) VALUES (?, ?, 'Wolldecke', 50) RETURNING id",
         ).bind(einsatz).bind(gruppe.id).fetch_one(&pool).await.unwrap();
 
-        aufloesen(&pool, einsatz, gruppe.id).await.unwrap();
+        aufloesen(&pool, einsatz, gruppe.id, b).await.unwrap();
         let einheit_id: Option<i64> =
             sqlx::query_scalar("SELECT einheit_id FROM einsatz_material WHERE id = ?")
                 .bind(em)
@@ -1730,6 +1936,144 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
+    }
+
+    // ── Auflösen und Stornieren (LLH-1079) ───────────────────────────────────────────
+
+    async fn aufloesen_als(
+        pool: &SqlitePool,
+        einsatz: i64,
+        id: i64,
+        b: i64,
+        art: Aufloesung,
+    ) -> Result<Aufgeloest, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let r = aufloesen_tx(&mut tx, einsatz, id, b, "2026-10-13 15:00:00", art).await;
+        if r.is_ok() {
+            tx.commit().await.unwrap();
+        }
+        r
+    }
+
+    async fn gibt_es(pool: &SqlitePool, id: i64) -> bool {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM einsatz_einheit WHERE id = ?)")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Spec „Leere Einheit gelöscht“: ohne jede Spur geht die Zeile, beim Auflösen wie beim
+    /// Stornieren.
+    #[tokio::test]
+    async fn leere_einheit_wird_geloescht() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        for art in [Aufloesung::Aufloesen, Aufloesung::Stornieren] {
+            let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+                .await
+                .unwrap();
+            let r = aufloesen_als(&pool, einsatz, e.id, b, art).await.unwrap();
+            assert!(r.geloescht, "{art:?}");
+            assert!(!gibt_es(&pool, e.id).await, "{art:?}");
+        }
+    }
+
+    /// Spec „Aufgelöste Einheit bleibt im Nachweis“: mit Spur bleibt die Zeile als aufgelöst, ist
+    /// aus der Liste heraus und unter `list_aufgeloeste` zu finden, verlässt ihren
+    /// Bereitstellungsraum und ihre Sprechgruppen; ein zweites Auflösen ist 409.
+    #[tokio::test]
+    async fn einheit_mit_spur_bleibt_aufgeloest_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Florian 1", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, status, erfasst_von, geaendert_von) \
+             VALUES (?1, 'BR Nord', 'aktiv', ?2, ?2) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        crate::bereitstellungsraum::belegung_repo::belege(
+            &pool, einsatz, br, "einheit", e.id, "eintritt", None, b,
+        )
+        .await
+        .unwrap();
+        let kat = crate::sprechgruppe::repo::anlegen_katalog(
+            &pool,
+            1,
+            crate::sprechgruppe::repo::KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                netz: None,
+                sicherheit: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[kat.id])
+            .await
+            .unwrap();
+
+        // Stornieren einer Einheit mit Spur ist ein Zustand: 422 mit dem Grund.
+        let err = aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Stornieren)
+            .await
+            .unwrap_err();
+        match err {
+            AppError::UnprocessableEntity(m) => {
+                assert_eq!(
+                    m,
+                    "Die Einheit war in einem Bereitstellungsraum; die Einheit lässt sich nur \
+                     auflösen"
+                )
+            }
+            e => panic!("{e:?}"),
+        }
+
+        let r = aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        assert_eq!(r.br, Some(br));
+        assert!(!r.geloescht);
+        let anzeige = laden(&pool, einsatz, e.id).await.unwrap();
+        assert_eq!(
+            anzeige.aufgeloest_at.as_deref(),
+            Some("2026-10-13 15:00:00")
+        );
+        assert_eq!(anzeige.aufgeloest_von, Some(b));
+        assert!(anzeige.sprechgruppen.is_empty());
+        assert!(liste(&pool, einsatz).await.unwrap().is_empty());
+        let aufgeloest = list_aufgeloeste(&pool, einsatz).await.unwrap();
+        assert_eq!(aufgeloest.iter().map(|e| e.id).collect::<Vec<_>>(), [e.id]);
+        let austritt: String = sqlx::query_scalar(
+            "SELECT art FROM br_belegung WHERE objekt_id = ? ORDER BY id DESC LIMIT 1",
+        )
+        .bind(e.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(austritt, "austritt");
+
+        for art in [Aufloesung::Aufloesen, Aufloesung::Stornieren] {
+            assert!(matches!(
+                aufloesen_als(&pool, einsatz, e.id, b, art)
+                    .await
+                    .unwrap_err(),
+                AppError::Conflict(_)
+            ));
+        }
     }
 
     // ── Kantenfälle der Satz-Aggregation ────────────────────────────────────────────
@@ -1951,7 +2295,7 @@ mod tests {
         .await
         .unwrap();
 
-        aufloesen(&pool, einsatz, einheit)
+        aufloesen(&pool, einsatz, einheit, bn)
             .await
             .expect("Einheit auflösen darf nicht am FK scheitern");
         let emp: Option<i64> =

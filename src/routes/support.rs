@@ -401,6 +401,18 @@ pub fn pruefe_kommunikationsmittel(wert: Option<&str>) -> Result<(), AppError> {
     }
 }
 
+/// Schalter aus der Query (`?entlassene=1`): fehlt, leer, `0` oder `false` = aus, `1` oder
+/// `true` = an, alles andere 400 mit dem Namen (LLH-1079).
+pub fn schalter(wert: Option<&str>, name: &str) -> Result<bool, AppError> {
+    match wert.map(str::trim) {
+        None | Some("") | Some("0") | Some("false") => Ok(false),
+        Some("1") | Some("true") => Ok(true),
+        Some(w) => Err(AppError::Validation(format!(
+            "{name}: unbekannter Wert '{w}' (erlaubt: 1, 0)"
+        ))),
+    }
+}
+
 /// Trimmt einen optionalen String und macht ihn bei leerem Ergebnis zu `None`
 /// (leerer/Whitespace-only-Input zählt als „nicht gesetzt").
 pub fn trimme(s: Option<String>) -> Option<String> {
