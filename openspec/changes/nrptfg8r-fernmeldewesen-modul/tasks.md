@@ -55,7 +55,7 @@ Code). Backend-Tests mit `cargo test --test <datei>`, Frontend-Gates aus dem Fro
 ## 8. Anwenderdoku (D12)
 
 - [x] 8.1 `funkplan.md` (Titel, Einstiege, „Wer was darf“, `quellen:`), `stab.md`, `einsatz-oberflaeche.md`, `lageberichte.md`, `auftraege-befehle.md`, `ohne-netz.md`, `README.md`-Zeile; `anwenderdoku.guard.test.ts` grün
-- [ ] 8.2 Bilder: `funkplan.bilder.ts` auf die neuen Adressen, `einsatz-oberflaeche.bilder.ts` und `stab.bilder.ts` geprüft; erzeugt mit `pnpm doku:bilder --grep "funkplan|einsatz-oberflaeche|stab"`, jedes Bild ≤ 300 KB; gelingt der Lauf in der Sitzung nicht, steht das im PR und die Aufgabe bleibt offen
+- [x] 8.2 Bilder: `funkplan.bilder.ts` auf die neuen Adressen, `einsatz-oberflaeche.bilder.ts` und `stab.bilder.ts` geprüft; erzeugt mit `pnpm doku:bilder --grep "funkplan|einsatz-oberflaeche|stab"`, jedes Bild ≤ 300 KB; gelingt der Lauf in der Sitzung nicht, steht das im PR und die Aufgabe bleibt offen
 
 ## 9. Integration
 
