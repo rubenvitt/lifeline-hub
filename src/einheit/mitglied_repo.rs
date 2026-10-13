@@ -101,6 +101,26 @@ pub async fn gib_personal_frei_tx(
     Ok(name)
 }
 
+/// Die Einheiten, deren Anzeige eine Dispositionszeile trägt: als Mitglied oder als Führer. Wer
+/// die Zeile löscht, fragt vorher; das Ereignis `einheit` muss der Aufrufer melden, `personal`
+/// erreicht Einheiten-Leser ohne Personalrecht nicht (LLH-1178).
+pub async fn load_betroffene_einheiten_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar(
+        "SELECT id FROM einsatz_einheit WHERE einsatz_id = ? AND (fuehrer_id = ? \
+         OR id = (SELECT einheit_id FROM einsatz_personal WHERE id = ?)) ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(ep_id)
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(ids)
+}
+
 /// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. `NotFound`
 /// analog. Liefert den Funkrufnamen.
 pub async fn ordne_fahrzeug_zu_tx(

@@ -17,7 +17,7 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Abschnitt (Fläche/Symbol) hat sich geändert.
-fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
+pub(super) fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Abschnitt, "abschnitt_id", aid);
