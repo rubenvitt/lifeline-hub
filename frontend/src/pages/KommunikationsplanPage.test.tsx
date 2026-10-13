@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, within, waitFor } from '@testing-library/react';
+import { act, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders, setzeOnline } from '../test/utils';
@@ -292,7 +292,9 @@ describe('KommunikationsplanPage — Anzeige', () => {
       'href',
       '/einsaetze/1/einsatzdaten',
     );
-    expect(within(fs).getByText('Florian Bremen 11/1')).toBeInTheDocument();
+    expect(
+      within(fs).getByText('Florian Bremen 11/1 · Einsatzleiter nicht erfasst'),
+    ).toBeInTheDocument();
     expect(within(fs).getByRole('link', { name: '0421 999' })).toHaveAttribute(
       'href',
       'tel:0421999',
@@ -303,6 +305,38 @@ describe('KommunikationsplanPage — Anzeige', () => {
       z.getAttribute('data-row-key'),
     );
     expect(schluessel.indexOf('fs')).toBe(schluessel.indexOf('gruppe-stab') + 1);
+  });
+
+  // LLH-1168: der Einsatzleiter im Nebentext der Zeile, am Schirm und im Druck.
+  it('nennt den Einsatzleiter an der Führungsstelle, auch im Druck', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
+      rufname: 'Florian Kreis 10-1',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: {
+        art: 'personal',
+        name: 'Anna Schulz',
+        personal_id: 17,
+        personal_noch_disponiert: true,
+        seit: '2026-10-12 12:30:00',
+      },
+    });
+    const { container } = setup();
+    const text = 'Florian Kreis 10-1 · Einsatzleiter Anna Schulz';
+    const fs = await waitFor(() => {
+      const z = zeile(container, 'fs');
+      expect(z).not.toBeNull();
+      return z!;
+    });
+    expect(within(fs).getByText(text)).toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(within(zeile(container, 'fs')!).getByText(text)).toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
   });
 
   it('zeigt keine Zeile für eine nicht erfasste Führungsstelle', async () => {

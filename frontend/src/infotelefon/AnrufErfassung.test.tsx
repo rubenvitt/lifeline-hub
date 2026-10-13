@@ -215,3 +215,15 @@ describe('formularLeer', () => {
     expect(formularLeer({ rueckruf: '0171' })).toBe(false);
   });
 });
+
+describe('AnrufErfassung · focusRequest (LLH-1127)', () => {
+  it('fokussiert das Anliegen nur bei einem NEUEN Wert, nicht beim Einhängen', async () => {
+    const props = { onErfassen: vi.fn(), laeuft: false, fehler: null };
+    // Eingehängt mit einem schon erledigten Wert (Freigabe kurz entzogen): kein Fokus.
+    const { rerender } = renderMitProviders(<AnrufErfassung {...props} focusRequest={1} />);
+    const anliegen = screen.getByRole('combobox', { name: 'Anliegen' });
+    expect(anliegen).not.toHaveFocus();
+    rerender(<AnrufErfassung {...props} focusRequest={2} />);
+    await waitFor(() => expect(anliegen).toHaveFocus());
+  });
+});

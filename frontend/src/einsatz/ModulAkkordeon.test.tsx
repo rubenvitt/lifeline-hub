@@ -134,3 +134,33 @@ describe('ModulAkkordeon · Dichte der Kopfzeile', () => {
     expect(zu.color).toBe(farbenDunkel.gedaempft);
   });
 });
+
+describe('ModulAkkordeon · Stab-Marken', () => {
+  it('führt die Stab-Marken auch im Navigations-Drawer hinter „Stab“ (LLH-1127)', () => {
+    zeige({ offeneKategorie: 'fuehrung', aktiverModulKey: 'stab', freigaben: freigabenFixture() });
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
+    expect(stab).toBeGreaterThanOrEqual(0);
+    expect(knoepfe.slice(stab + 1, stab + 6)).toEqual([
+      'Pressearbeit',
+      'Informationstelefon',
+      'Funkplan',
+      'Fernmeldeskizze',
+      'Kommunikationsplan',
+    ]);
+  });
+
+  it('sperrt sie im Drawer mit dem Stab und lässt sie mit ausgeblendetem Stab weg', () => {
+    const { unmount } = zeige({
+      offeneKategorie: 'fuehrung',
+      freigaben: freigabenFixture({ stab: { zugriff: false } }),
+    });
+    expect(screen.getByRole('button', { name: /^Funkplan, springt zu/ })).toBeDisabled();
+    unmount();
+    zeige({
+      offeneKategorie: 'fuehrung',
+      freigaben: freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    });
+    expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
+  });
+});

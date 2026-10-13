@@ -2256,6 +2256,15 @@ async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii
     .execute(&pool)
     .await
     .unwrap();
+    // LLH-1168: der Name des Einsatzleiters ist Kopf-PII derselben Art (design.md D3).
+    sqlx::query(
+        "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, einsatzleiter_art, einsatzleiter_name, \
+            einsatzleiter_seit) VALUES (?, 'extern', 'EL-GEHEIM', '2026-01-01 00:00:00')",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
     for body in [
         json!({ "retention_bis": "2026-01-01 00:00:00" }),
         json!({ "retention_bis": "2025-06-01 00:00:00", "bestaetigt": true }),
@@ -2274,6 +2283,7 @@ async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(v["einsatzort"], "Marktplatz-GEHEIM");
+    assert_eq!(v["einsatzleiter"]["name"], "EL-GEHEIM");
 }
 
 #[tokio::test]

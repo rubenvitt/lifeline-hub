@@ -21,6 +21,7 @@ import {
   type KategorieKey,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
+import { sprungmarken, sprungZiel } from '../einsatz/sprungmarken';
 import {
   bereitstellungsraeumeListePfad,
   dokumentePfad,
@@ -31,6 +32,7 @@ import {
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
+  infotelefonPfad,
   lagekartePfad,
   personenPfad,
   schaedenPfad,
@@ -202,6 +204,17 @@ export const SCHNELLAKTIONEN: {
     // Erfassung von Betroffenen (dort führt die Palette „Person erfassen“).
     schlagworte: ['zugriff', 'hinzufügen', 'rolle', 'benutzer', 'einsatzkraft'],
     recht: 'leitung',
+  },
+  {
+    // Ans ENDE (LLH-1127): ein Bürgeranruf geht ein, die Erfassung soll in einem Griff offen sein.
+    // Träger ist der Stab (das Informationstelefon ist seine Unterseite, kein Modul). Leser:
+    // `pages/InfotelefonPage.tsx`; der Guard verlangt den Leser auf GENAU dieser Unterseite.
+    modulKey: 'stab',
+    parameter: 'neu',
+    kennung: 'infotelefon-anruf',
+    pfad: (id) => infotelefonPfad(id, { neu: true }),
+    label: 'Anruf erfassen',
+    schlagworte: ['anruf', 'bürgertelefon', 'hotline', 'infotelefon', 'informationstelefon'],
   },
 ];
 
@@ -409,6 +422,23 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         icon: IconDokument,
         schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
         ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
+      });
+    }
+
+    // 3b. Ansichten (LLH-1127): die Sprungmarken des Modulmenüs, dieselbe Tabelle. Angeboten nur,
+    //     wenn das Zielmodul frei ist (LESEACHSE wie in 2. und 3.); eine gesperrte Marke steht im
+    //     Menü mit Schloss, hier gar nicht. Nicht im Modul-Gedächtnis: eine Marke ist kein Modul.
+    for (const marke of sprungmarken) {
+      const ziel = sprungZiel(marke);
+      if (!ziel || !istModulFreigegeben(ziel, k.freigaben)) continue;
+      befehle.push({
+        id: `ansicht:${marke.key}`,
+        gruppe: 'ansichten',
+        label: marke.label,
+        kontext: ziel.label,
+        icon: ziel.icon,
+        schlagworte: [...marke.schlagworte, marke.hinweis],
+        ...sprungZu(marke.pfad(k.einsatzId), k.navigate),
       });
     }
 

@@ -318,6 +318,17 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(r!.koerper).toMatch(/white-space:\s*pre-wrap\s*!important/);
   });
 
+  /**
+   * Der Wert einer Etikett-Wert-Liste (Einsatzbericht, Auftragsblatt, `druck/ZeilenListe.tsx`) ist
+   * Freitext bis 2 000 Zeichen. Ein Wort ohne Umbruchstelle weitete die Wertspalte über das Blatt
+   * (LLH-1171, Change `ianaw5k1-auftrag-drucken` D5).
+   */
+  it('bricht den Wert einer Etikett-Wert-Liste auch mitten im Wort um', () => {
+    const r = regelFuer(`${WURZEL} dd`);
+    expect(r, 'keine dd-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
   it('zerreißt Absätze, Listen, Zitate, Code, Zeilen, Bilder und Abbildungen nicht', () => {
     const sel = mitDeklaration(/break-inside:\s*avoid/);
     for (const el of ['p', 'ul', 'ol', 'blockquote', 'pre', 'tr', 'img', 'figure']) {

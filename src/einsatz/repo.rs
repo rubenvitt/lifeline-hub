@@ -211,6 +211,24 @@ macro_rules! teilschwaerzungen_joins {
     };
 }
 
+/// Der Einsatzleiter der eigenen Führungsstelle `e` (LLH-1168), wortgleich in `laden` und
+/// `liste_fuer` wie die Schwärzungsspalte: die Spalten hinter das SELECT, die Joins hinter
+/// `FROM einsatz e`. Eine Zeile Führungsstelle je Einsatz (Primärschlüssel `einsatz_id`), der Join
+/// vervielfacht also nichts. Gelesen über `fuehrungsstelle::EinsatzleiterSpalten`.
+macro_rules! einsatzleiter_spalten {
+    () => {
+        "elfs.einsatzleiter_art, elfs.einsatzleiter_personal_id, elfs.einsatzleiter_name, \
+         elfs.einsatzleiter_seit, elep.id IS NOT NULL AS einsatzleiter_noch_disponiert"
+    };
+}
+
+macro_rules! einsatzleiter_joins {
+    () => {
+        " LEFT JOIN einsatz_fuehrungsstelle elfs ON elfs.einsatz_id = e.id \
+          LEFT JOIN einsatz_personal elep ON elep.id = elfs.einsatzleiter_personal_id "
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
@@ -228,8 +246,11 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, ",
         teilschwaerzungen_spalte!(),
+        ", ",
+        einsatzleiter_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
+        einsatzleiter_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
     ))
@@ -345,6 +366,8 @@ pub async fn liste_fuer(
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
         teilschwaerzungen: Option<i64>,
+        #[sqlx(flatten)]
+        einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
     }
 
     // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
@@ -374,8 +397,11 @@ pub async fn liste_fuer(
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, ",
         teilschwaerzungen_spalte!(),
+        ", ",
+        einsatzleiter_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
+        einsatzleiter_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
@@ -482,6 +508,7 @@ pub async fn liste_fuer(
                     r.evakuierung_angeordnet,
                 ),
                 teilschwaerzungen: r.teilschwaerzungen,
+                einsatzleiter: r.einsatzleiter.anzeige(),
             }
         })
         .collect())

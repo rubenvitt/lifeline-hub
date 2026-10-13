@@ -2,7 +2,7 @@
 titel: Stab und Checkliste
 gruppen: [fuehrung]
 reihenfolge: 430
-quellen: [frontend/src/pages/StabPage.tsx, frontend/src/stab/BesetzungModal.tsx, frontend/src/stab/besetzung.ts, frontend/src/stab/sachgebiete.ts, frontend/src/stab/unterseiten.ts, frontend/src/stab/useStabFreigabe.tsx, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/stab/ChecklistePaneel.tsx, frontend/src/stab/checkliste.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/stab.rs, src/stab/mod.rs, src/stab/repo.rs, src/stab/checkliste.rs]
+quellen: [frontend/src/pages/StabPage.tsx, frontend/src/stab/BesetzungModal.tsx, frontend/src/stab/besetzung.ts, frontend/src/stab/sachgebiete.ts, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/stab/useStabFreigabe.tsx, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/stab/ChecklistePaneel.tsx, frontend/src/stab/checkliste.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/stab.rs, src/stab/mod.rs, src/stab/repo.rs, src/stab/checkliste.rs, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -60,6 +60,15 @@ Fundstelle in der FwDV 100 und die Werkzeuge des Sachgebiets als Verweise, etwa 
 „Informationstelefon“ bei S5, „Funkplan“ und „Kommunikationsplan“ bei S6. Ein Verweis auf ein
 gesperrtes Modul fehlt. Eine Besetzung wird überschrieben; die App führt keine Historie, der
 Verlauf steht im Einsatztagebuch.
+
+### Ohne Umweg über die Stab-Seite
+
+Pressearbeit, Informationstelefon, Funkplan, Fernmeldeskizze und Kommunikationsplan stehen auch in
+der Modulliste direkt unter „Stab“, in dieser Reihenfolge, und in der Sprungpalette unter
+„Ansichten“: „Funk“ findet den Funkplan, „Bürgertelefon“ das Informationstelefon. „Anruf erfassen“
+in der Palette öffnet das Informationstelefon mit dem Cursor in der Erfassung. Ist der Stab
+gesperrt, stehen die Einträge in der Modulliste mit Schloss und fehlen in der Palette; ist er
+ausgeblendet, fehlen sie überall.
 
 ### Was ins Einsatztagebuch geht
 

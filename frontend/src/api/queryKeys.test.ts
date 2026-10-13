@@ -568,6 +568,25 @@ describe('einsatzKeys.einsatzberichtDruck (LFH-726)', () => {
   });
 });
 
+/**
+ * Auftragsdruck (LLH-1171, design.md D2 der Change `ianaw5k1-auftrag-drucken`): ein Auftrag als
+ * Schnappschuss. Eigener Prefix außerhalb von `auftraege`, sonst zöge ihn das Ereignis `auftrag`
+ * per Präfix mit, und eine Quittung an einem anderen Gerät änderte das offene Blatt.
+ */
+describe('einsatzKeys.auftragDruck (LLH-1171)', () => {
+  it('baut den Key als [prefix, einsatzId, auftragId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.auftragDruck(5, 31)).toEqual(['einsatz-auftrag-druck', 5, 31]);
+  });
+
+  it('ist nicht live: kein Ereignis invalidiert ihn, NICHT_LIVE_KEYS führt ihn', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-auftrag-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-auftrag-druck');
+    }
+    expect(einsatzKeys.auftragDruck(5, 31)[0]).not.toBe(EINSATZ_KEYS.auftraege);
+  });
+});
+
 describe('istRueckmeldungenKey (LFH-610)', () => {
   it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
     expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);

@@ -17,6 +17,7 @@ import {
   lageberichtDetailPfad,
   lageberichtePfad,
   befehlDetailPfad,
+  auftragDruckPfad,
   personDetailPfad,
   tiereDetailPfad,
   schadenDetailPfad,
@@ -104,6 +105,9 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   });
   it('befehlDetailPfad nutzt die sprechende Route (auftraege/befehle/<id>)', () => {
     expect(befehlDetailPfad(E, 42)).toBe('/einsaetze/5/auftraege/befehle/42');
+  });
+  it('auftragDruckPfad: Druckansicht eines Auftrags unter auftraege/<id>/druck (LLH-1171)', () => {
+    expect(auftragDruckPfad(E, 31)).toBe('/einsaetze/5/auftraege/31/druck');
   });
   it('personDetailPfad', () => {
     expect(personDetailPfad(E, 10)).toBe('/einsaetze/5/personen/10');

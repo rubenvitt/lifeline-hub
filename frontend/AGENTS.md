@@ -293,6 +293,10 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 `?filter=vermisst`. Kein Registry-Eintrag, kein `verweistAuf`; Marke erbt Sichtbarkeit/Sperre,
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
+Die Arbeitsseiten des Stabs (LLH-1127) sind Marken hinter „Stab“ (Ziel `stab`, nach Sachgebiet;
+Name und Pfad aus `stab/unterseiten.ts`, dazu die Fernmeldeskizze als Funkplan-Ansicht). Gesperrt
+heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
+`frontend/src/command-palette/AGENTS.md`) und trägt dafür `schlagworte`.
 
 **Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch
 `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten, `src/stab/`, `src/presse/`,

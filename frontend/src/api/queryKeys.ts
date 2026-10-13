@@ -144,6 +144,8 @@ export const EINSATZ_KEYS = {
   schaedenDruck: 'einsatz-schaeden-druck',
   // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
   einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
+  // Auftragsdruck: ein Auftrag als Schnappschuss, eigener Prefix außerhalb von `auftraege` (LLH-1171).
+  auftragDruck: 'einsatz-auftrag-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -426,6 +428,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Auswahl lädt mit dem Dialog neu.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
+ * - `auftragDruck` (LLH-1171): derselbe Schnappschuss-Grundsatz für das Blatt eines Auftrags; eine
+ *   Quittung an einem anderen Gerät darf es nicht still ändern. Unter `auftraege` zöge ihn das
+ *   Ereignis `auftrag` per Präfix mit.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -455,6 +460,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.tiereDruck,
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
+  EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
@@ -635,6 +641,9 @@ export const einsatzKeys = {
   // Quellen und bekommt ihren eigenen Stand.
   einsatzberichtDruck: (einsatzId: number, auswahl: string) =>
     [EINSATZ_KEYS.einsatzberichtDruck, einsatzId, auswahl] as const,
+  // Auftragsdruck (LLH-1171): ein Auftrag einzeln, nicht live (siehe NICHT_LIVE_KEYS).
+  auftragDruck: (einsatzId: number, auftragId: number) =>
+    [EINSATZ_KEYS.auftragDruck, einsatzId, auftragId] as const,
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

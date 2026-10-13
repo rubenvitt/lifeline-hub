@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import type { Zeile } from '../ZeilenListe';
 import utc from 'dayjs/plugin/utc';
 import type {
   BetreuungUebersicht,
@@ -71,10 +72,8 @@ export const NICHT_GENUTZT = 'In diesem Einsatz nicht genutzt';
 const KEINE_ZEITACHSE = 'keine Zeitachse erfasst';
 const LEER = '—';
 
-export interface Zeile {
-  etikett: string;
-  wert: string;
-}
+/** Eine Angabe einer Etikett-Wert-Liste; der Typ gehört der Liste (`druck/ZeilenListe.tsx`). */
+export type { Zeile };
 
 export type Inhalt =
   /** `titel` gliedert einen Abschnitt in Gruppen („Nach Sichtung“, LFH-956). */

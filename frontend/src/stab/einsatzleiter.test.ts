@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Einsatzleiter, Fuehrungsstelle } from '../api/types';
 import {
+  einsatzleiterAusAngabe,
   einsatzleiterDarstellung,
   einsatzleiterKurz,
   einsatzleiterMarkdown,
@@ -90,6 +91,32 @@ describe('einsatzleiterDarstellung', () => {
     ['laden', 'lädt'],
   ] as const)('Quelle %s nennt den Grund', (zustand, grund) => {
     expect(einsatzleiterDarstellung({ zustand, daten: null })).toEqual({ art: 'zustand', grund });
+  });
+});
+
+describe('einsatzleiterAusAngabe', () => {
+  it('formt die Angabe selbst, ohne Quelle (Einsatzliste, LLH-1168)', () => {
+    expect(einsatzleiterAusAngabe(anna)).toEqual({
+      art: 'erfasst',
+      name: 'Anna Schulz',
+      seit: '2026-10-11 12:30:00',
+      nichtMehrDisponiert: false,
+    });
+    expect(einsatzleiterKurz(einsatzleiterAusAngabe(weber))).toBe('KBM Weber (extern)');
+  });
+
+  it('fehlt die Angabe, ist er nicht erfasst', () => {
+    expect(einsatzleiterAusAngabe(undefined)).toEqual({ art: 'nicht-erfasst' });
+    expect(einsatzleiterAusAngabe(null)).toEqual({ art: 'nicht-erfasst' });
+  });
+
+  it('geschwärzt und entlassen wie an der Führungsstelle', () => {
+    expect(einsatzleiterKurz(einsatzleiterAusAngabe({ ...anna, name: undefined }))).toBe(
+      'Name geschwärzt',
+    );
+    expect(
+      einsatzleiterKurz(einsatzleiterAusAngabe({ ...anna, personal_noch_disponiert: false })),
+    ).toBe('Anna Schulz · nicht mehr disponiert');
   });
 });
 

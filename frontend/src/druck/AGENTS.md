@@ -46,7 +46,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (Minimalprobe `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/werkzeug/`).
   Im Einsatzbericht (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`) reichen Block und Abschnitt
   ihre Titel an das erste Inhaltsstück weiter: eine Liste nimmt sie mit ihrer ersten Zeile auf
-  (zwei Subgrids desselben Rasters, die Etikettspalte bleibt gleich breit), eine Tabelle bis
+  (`druck/ZeilenListe.tsx`, auch für den Auftragsdruck; zwei Subgrids desselben Rasters, die
+  Etikettspalte bleibt gleich breit), eine Tabelle bis
   `KURZE_TABELLE` Zeilen ganz, aber nur in Firefox (`titelblock-tabelle` unter
   `@supports (-moz-appearance: none)`): Chromium hält Titel, Kopf und erste Zeile selbst
   zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Vor einer längeren steht der
@@ -86,6 +87,14 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   „alle“; gefiltert wird mit der Funktion der Liste. Keys `personenDruck`/`tiereDruck`/`schaedenDruck`
   nicht live, außerhalb des Offline-Lagebilds. Query-Felder einzeln an den Rahmen geben, nie das
   Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).
+- **Auftragsdruck** (LLH-1171, Herleitung `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md`):
+  `/einsaetze/:id/auftraege/:auftragId/druck` (`pages/AuftragDruckPage.tsx`, Pfad
+  `auftragDruckPfad`), Einstieg nur als Sprung „Druckansicht“ im Detail eines Auftrags, auch
+  ohne Schreibrecht. Gedruckt wird nie aus dem Detailpaneel, wie der Befehl nur auf seiner
+  Vollseite. Abruf über den bestehenden Einzelabruf unter dem nicht-live Key `auftragDruck`
+  (Schnappschuss, „Neu laden“). Die Feldfolge des Blatts steht im Schemakern (`druckFelder` in
+  `auftraege/auftragsschemaKern.ts`, auf `READ_ORDER` gebaut), nie als eigene Liste; das Blatt
+  (`auftraege/AuftragDruckBlatt.tsx`) setzt sie über `druck/ZeilenListe.tsx`.
 - **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
   `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache;
   Optionen aus `druck/abfrageOptionen.ts` (`retry: false`, `refetchOnMount: 'always'`,

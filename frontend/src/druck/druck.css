@@ -221,6 +221,13 @@
     overflow-wrap: anywhere;
   }
 
+  /* Werte der Etikett-Wert-Listen (`druck/ZeilenListe.tsx`: Einsatzbericht, Auftragsblatt) sind
+     Freitext. Ein Wort ohne Umbruchstelle (Kennung, Kennzeichen, kopierte Adresse) weitete die
+     Wertspalte über das Blatt (LLH-1171); am Bildschirm dasselbe in `druckansichtSchmal.css`. */
+  [data-lfh='druckwurzel'] dd {
+    overflow-wrap: anywhere;
+  }
+
   /* ── Tabellen des Primitivs (LFH-330 · B2, seit LFH-548 hier) ───────────────────────────
      `KatalogTabelle` setzt unbedingt einen waagerechten Bildlaufcontainer, eine stehende
      Kopfzeile (zwei getrennte Tabellen plus Sticky-Holder) und `position: sticky` an Spalte 0.

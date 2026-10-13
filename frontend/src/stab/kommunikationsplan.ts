@@ -13,6 +13,7 @@ import { anzahl } from '../anzeige/anzahl';
 import { kommunikationsmittelLabel } from '../components/kommunikationsmittel';
 import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
 import { besetzungDarstellung, zeileFuer } from './besetzung';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from './einsatzleiter';
 import {
   FUEHRUNGSSTELLE_STELLE,
   fuehrungsstelleErfasst,
@@ -221,7 +222,8 @@ function gepflegteZeile(
 }
 
 /**
- * Die Zeile der eigenen Führungsstelle (LFH-1148): erfasst mit Rufname als Nebentext und der
+ * Die Zeile der eigenen Führungsstelle (LFH-1148): erfasst mit Rufname und Einsatzleiter als
+ * Nebentext (LLH-1168, nur über `einsatzleiter.ts`, nie aus Besetzung oder App-Rolle) und der
  * Verbindung aus Kommunikationsmittel und Erreichbarkeit; nicht erfasst keine Zeile. Fehlt die
  * Quelle, steht die Zeile mit Grund da, denn ihr Fehlen hieße sonst „nicht erfasst“. Lädt sie
  * noch, steht nichts.
@@ -235,7 +237,8 @@ function fuehrungsstelleZeile(q: KommunikationsplanQuellen): KommunikationsZeile
     art: 'fuehrungsstelle',
     schluessel,
     kennung: FUEHRUNGSSTELLE_STELLE,
-    nebentext: zustand === 'daten' ? daten?.rufname?.trim() || null : ZUSTAND_GRUND[zustand],
+    nebentext:
+      zustand === 'daten' ? fuehrungsstelleNebentext(q.fuehrungsstelle) : ZUSTAND_GRUND[zustand],
     kanaele: [],
     ziel: einsatzdatenPfad(q.einsatzId),
     verbindungen:
@@ -243,6 +246,13 @@ function fuehrungsstelleZeile(q: KommunikationsplanQuellen): KommunikationsZeile
         ? abgeleiteteVerbindung(schluessel, daten?.kommunikationsmittel, daten?.erreichbarkeit)
         : [],
   };
+}
+
+/** „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ohne Rufname nur der Einsatzleiter. */
+function fuehrungsstelleNebentext(quelle: FuehrungsstelleQuelle): string {
+  const leiter = `Einsatzleiter ${einsatzleiterKurz(einsatzleiterDarstellung(quelle))}`;
+  const rufname = quelle.daten?.rufname?.trim();
+  return rufname ? `${rufname} · ${leiter}` : leiter;
 }
 
 function hatAngaben(x: { kommunikationsmittel?: string | null; erreichbarkeit?: string | null }) {
