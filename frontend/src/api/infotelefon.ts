@@ -17,14 +17,14 @@ import type {
 const pfad = (einsatzId: number) => `/api/einsaetze/${einsatzId}/stab/infotelefon`;
 
 /** Seitengröße der Anrufliste; der Server klemmt auf seine Obergrenze. */
-export const ANRUFE_SEITE = 100;
+export const ANRUFE_PAGE_SIZE = 100;
 
 /** Position hinter dem letzten geladenen Anruf: Eingang und Kennung (`vor_zeit`, `vor_id`). */
 export function anrufCursor(a: Pick<InfotelefonAnruf, 'id' | 'eingang_at'>): AbschlussCursor {
   return { zeit: a.eingang_at, id: a.id };
 }
 
-interface AnrufSeite {
+interface AnrufPageOptions {
   /** Fehlt = alle Anrufe. */
   status?: InfotelefonStatus;
   vor?: AbschlussCursor;
@@ -32,9 +32,9 @@ interface AnrufSeite {
 }
 
 /** Eine Seite des Protokolls, jüngster Eingang zuerst (Ordnung vom Server). */
-export function ladeAnrufe(
+export function loadAnrufe(
   einsatzId: number,
-  { status, vor, limit = ANRUFE_SEITE }: AnrufSeite = {},
+  { status, vor, limit = ANRUFE_PAGE_SIZE }: AnrufPageOptions = {},
 ): Promise<InfotelefonAnruf[]> {
   return apiGet<InfotelefonAnruf[]>(
     mitParametern(pfad(einsatzId), { status, vor_zeit: vor?.zeit, vor_id: vor?.id, limit }),
@@ -42,12 +42,12 @@ export function ladeAnrufe(
 }
 
 /** Zahlen über den ganzen Bestand: gesamt, offene Rückrufe, je Anliegen (LLH-732). */
-export function ladeAnrufZaehler(einsatzId: number): Promise<InfotelefonZaehler> {
+export function loadAnrufZaehler(einsatzId: number): Promise<InfotelefonZaehler> {
   return apiGet<InfotelefonZaehler>(`${pfad(einsatzId)}/zaehler`);
 }
 
 /** Ein Anruf, für den Deeplink auf eine nicht geladene Zeile (404 bei fremdem Einsatz). */
-export function ladeAnruf(einsatzId: number, anrufId: number): Promise<InfotelefonAnruf> {
+export function loadAnruf(einsatzId: number, anrufId: number): Promise<InfotelefonAnruf> {
   return apiGet<InfotelefonAnruf>(`${pfad(einsatzId)}/${anrufId}`);
 }
 

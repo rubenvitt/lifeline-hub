@@ -16,9 +16,9 @@ import {
 import {
   anrufCursor,
   erfasseAnruf,
-  ladeAnruf,
-  ladeAnrufe,
-  ladeAnrufZaehler,
+  loadAnruf,
+  loadAnrufe,
+  loadAnrufZaehler,
   setzeAnrufStatus,
 } from './infotelefon';
 
@@ -99,7 +99,7 @@ describe('api/presse — Pressemitteilungen', () => {
 describe('api/infotelefon', () => {
   it('liest, erfasst und setzt den Rückrufstatus', async () => {
     const a = faengeAnfragen();
-    await ladeAnrufe(7);
+    await loadAnrufe(7);
     await erfasseAnruf(7, { anliegen: 'hinweis', rueckruf: '0171', rueckruf_noetig: true });
     await setzeAnrufStatus(7, 9, 'erledigt');
     expect(a).toEqual([
@@ -122,13 +122,13 @@ describe('api/infotelefon', () => {
         return HttpResponse.json([]);
       }),
     );
-    await ladeAnrufe(7);
-    await ladeAnrufe(7, {
+    await loadAnrufe(7);
+    await loadAnrufe(7, {
       status: 'offen',
       vor: anrufCursor({ id: 41, eingang_at: '2026-10-01 10:00:00' }),
     });
-    await ladeAnrufZaehler(7);
-    await ladeAnruf(7, 41);
+    await loadAnrufZaehler(7);
+    await loadAnruf(7, 41);
     expect(urls).toEqual([
       `${B}/infotelefon?limit=100`,
       `${B}/infotelefon?status=offen&vor_zeit=2026-10-01+10%3A00%3A00&vor_id=41&limit=100`,

@@ -64,7 +64,7 @@ async fn setze(w: &Welt, e: i64, id: i64, ziel: InfotelefonStatus) -> Result<(),
 }
 
 /// Blättert die Liste mit `limit` vollständig durch, wie der Client es tut.
-async fn alle_seiten(
+async fn all_pages(
     w: &Welt,
     e: i64,
     filter: &AnrufFilter,
@@ -74,7 +74,7 @@ async fn alle_seiten(
     let mut vor = None;
     loop {
         let seite = crate::kommunikation::Seite { vor, limit };
-        let teil = liste_seite(&w.pool, e, filter, &seite).await.unwrap();
+        let teil = list_page(&w.pool, e, filter, &seite).await.unwrap();
         let ende = (teil.len() as i64) < limit;
         vor = teil.last().map(|a| crate::kommunikation::ZeitCursor {
             zeit: a.eingang_at.clone(),
@@ -88,7 +88,7 @@ async fn alle_seiten(
 }
 
 async fn ids(w: &Welt, e: i64, filter: &AnrufFilter) -> Vec<i64> {
-    alle_seiten(w, e, filter, 100)
+    all_pages(w, e, filter, 100)
         .await
         .iter()
         .map(|a| a.id)
@@ -238,7 +238,7 @@ async fn blaettern_liefert_jeden_anruf_genau_einmal() {
     assert_eq!(ganz.len(), 10);
     assert_eq!(*ganz.last().unwrap(), nachtrag, "frühester Eingang zuletzt");
     for limit in [1, 2, 3, 4, 7] {
-        let geblaettert: Vec<i64> = alle_seiten(&w, w.e, &OHNE, limit)
+        let geblaettert: Vec<i64> = all_pages(&w, w.e, &OHNE, limit)
             .await
             .iter()
             .map(|a| a.id)
@@ -260,10 +260,7 @@ async fn seite_haelt_das_limit() {
         limit: 2,
     };
     assert_eq!(
-        liste_seite(&w.pool, w.e, &OHNE, &seite)
-            .await
-            .unwrap()
-            .len(),
+        list_page(&w.pool, w.e, &OHNE, &seite).await.unwrap().len(),
         2
     );
 }
@@ -315,19 +312,19 @@ async fn zaehlung_gleicht_der_liste_je_filter() {
     .await
     .unwrap();
 
-    let z = zaehlen(&w.pool, w.e, &OHNE).await.unwrap();
+    let z = count(&w.pool, w.e, &OHNE).await.unwrap();
     assert_eq!((z.gesamt, z.offen), (5, 2));
     assert_eq!(z.je_anliegen.auskunft_lage, 3);
     assert_eq!(z.je_anliegen.presse, 0, "anderer Einsatz zählt nicht mit");
 
-    let z = zaehlen(&w.pool, w.e, &OFFEN).await.unwrap();
+    let z = count(&w.pool, w.e, &OFFEN).await.unwrap();
     assert_eq!((z.gesamt, z.offen), (2, 2));
     assert_eq!(z.je_anliegen.auskunft_lage, 1);
     assert_eq!(z.je_anliegen.vermisstensuche, 1);
 
     for filter in [OHNE, OFFEN, ERLEDIGT] {
-        let z = zaehlen(&w.pool, w.e, &filter).await.unwrap();
-        let liste = alle_seiten(&w, w.e, &filter, 2).await;
+        let z = count(&w.pool, w.e, &filter).await.unwrap();
+        let liste = all_pages(&w, w.e, &filter, 2).await;
         assert_eq!(z.gesamt, liste.len() as i64, "{filter:?}");
         let offen = liste
             .iter()

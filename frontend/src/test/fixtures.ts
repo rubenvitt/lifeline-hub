@@ -102,7 +102,7 @@ export function freigabenFixture(
 }
 
 /** Zählung eines Informationstelefons ohne Anrufe (LLH-732). */
-export const ANRUF_ZAEHLER_LEER: InfotelefonZaehler = {
+export const ANRUF_ZAEHLER_EMPTY: InfotelefonZaehler = {
   gesamt: 0,
   offen: 0,
   je_anliegen: {

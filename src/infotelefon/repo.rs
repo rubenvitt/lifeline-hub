@@ -72,7 +72,7 @@ macro_rules! anruf_select {
     };
 }
 
-/// Filter des Protokolls. Liste und Zählung lesen ihn über dieselbe [`filter_bedingung`]
+/// Filter des Protokolls. Liste und Zählung lesen ihn über dieselbe [`filter_clause`]
 /// (LLH-732, design.md D1); der Cursor gehört nicht dazu.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct AnrufFilter {
@@ -80,7 +80,7 @@ pub struct AnrufFilter {
 }
 
 /// `WHERE` über Einsatz und Filter, Alias `a` für `infotelefon_anruf`.
-fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &AnrufFilter) {
+fn filter_clause(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &AnrufFilter) {
     qb.push(" WHERE a.einsatz_id = ");
     qb.push_bind(einsatz_id);
     if let Some(status) = filter.status {
@@ -91,14 +91,14 @@ fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &Anr
 
 /// Eine Seite des Protokolls: jüngster Eingang zuerst, Gleichstand über die Kennung, ab dem
 /// Cursor `(eingang_at, id)` (ein nachgetragener Anruf hat frühen Eingang und hohe Kennung).
-pub async fn liste_seite(
+pub async fn list_page(
     pool: &SqlitePool,
     einsatz_id: i64,
     filter: &AnrufFilter,
     seite: &Seite,
 ) -> Result<Vec<InfotelefonAnrufAnzeige>, AppError> {
     let mut qb = QueryBuilder::<Sqlite>::new(anruf_select!());
-    filter_bedingung(&mut qb, einsatz_id, filter);
+    filter_clause(&mut qb, einsatz_id, filter);
     if let Some(vor) = &seite.vor {
         qb.push(" AND (a.eingang_at < ");
         qb.push_bind(vor.zeit.clone());
@@ -119,7 +119,7 @@ pub async fn liste_seite(
 }
 
 /// Zählt die Anrufe, die die Liste mit demselben Filter über alle Seiten liefert (LLH-732).
-pub async fn zaehlen(
+pub async fn count(
     pool: &SqlitePool,
     einsatz_id: i64,
     filter: &AnrufFilter,
@@ -127,10 +127,10 @@ pub async fn zaehlen(
     let mut qb = QueryBuilder::<Sqlite>::new(
         "SELECT a.anliegen, a.status, COUNT(*) FROM infotelefon_anruf a",
     );
-    filter_bedingung(&mut qb, einsatz_id, filter);
+    filter_clause(&mut qb, einsatz_id, filter);
     qb.push(" GROUP BY a.anliegen, a.status");
     let zeilen: Vec<(String, String, i64)> = qb.build_query_as().fetch_all(pool).await?;
-    InfotelefonZaehler::aus_zeilen(&zeilen)
+    InfotelefonZaehler::from_rows(&zeilen)
 }
 
 /// Lädt einen Anruf. `NotFound`, wenn er nicht zum Einsatz gehört.

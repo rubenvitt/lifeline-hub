@@ -140,7 +140,7 @@ pub fn phase_und_seite(
         phase.map(str::trim).filter(|p| !p.is_empty()),
         "Ungültige Phase",
     )?;
-    let s = seite(vor_zeit, vor_id, limit)?;
+    let s = parse_page(vor_zeit, vor_id, limit)?;
     if phase != Some(ListenPhase::Abgeschlossen) {
         if s.vor.is_some() || limit.is_some() {
             return Err(AppError::UnprocessableEntity(
@@ -157,7 +157,7 @@ pub fn phase_und_seite(
 /// Ein halber Cursor → 422; ein leerer Zeitwert zählt als fehlend. Ohne `limit` gilt
 /// [`SEITE_STANDARD`], sonst wird es auf `[1, SEITE_MAX]` geklemmt. [`phase_und_seite`] liest
 /// damit die Seite einer abgeschlossenen Phase.
-pub fn seite(
+pub fn parse_page(
     vor_zeit: Option<&str>,
     vor_id: Option<i64>,
     limit: Option<i64>,
@@ -248,32 +248,32 @@ mod tests {
     }
 
     #[test]
-    fn seite_prueft_cursor_und_klemmt_das_limit() {
+    fn parse_page_prueft_cursor_und_klemmt_das_limit() {
         use crate::error::AppError;
         assert_eq!(
-            seite(None, None, None).unwrap(),
+            parse_page(None, None, None).unwrap(),
             Seite {
                 vor: None,
                 limit: SEITE_STANDARD
             }
         );
         assert!(matches!(
-            seite(Some("2026-10-01 10:00:00"), None, None),
+            parse_page(Some("2026-10-01 10:00:00"), None, None),
             Err(AppError::UnprocessableEntity(_))
         ));
         assert!(matches!(
-            seite(None, Some(7), None),
+            parse_page(None, Some(7), None),
             Err(AppError::UnprocessableEntity(_))
         ));
-        assert_eq!(seite(None, None, Some(5000)).unwrap().limit, SEITE_MAX);
-        assert_eq!(seite(None, None, Some(0)).unwrap().limit, 1);
+        assert_eq!(parse_page(None, None, Some(5000)).unwrap().limit, SEITE_MAX);
+        assert_eq!(parse_page(None, None, Some(0)).unwrap().limit, 1);
         // Leerer Zeitwert zählt als fehlend: mit Kennung ist der Cursor halb.
         assert!(matches!(
-            seite(Some("  "), Some(7), None),
+            parse_page(Some("  "), Some(7), None),
             Err(AppError::UnprocessableEntity(_))
         ));
         assert_eq!(
-            seite(Some("2026-10-01 10:00:00"), Some(7), Some(20)).unwrap(),
+            parse_page(Some("2026-10-01 10:00:00"), Some(7), Some(20)).unwrap(),
             Seite {
                 vor: Some(ZeitCursor {
                     zeit: "2026-10-01 10:00:00".into(),

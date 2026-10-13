@@ -1,4 +1,4 @@
-import { ladeAnrufZaehler } from '../api/infotelefon';
+import { loadAnrufZaehler } from '../api/infotelefon';
 import { ladeMedienkontaktKennzahlen, ladePressemitteilungen } from '../api/presse';
 import { einsatzKeys } from '../api/queryKeys';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -39,7 +39,7 @@ export const MEDIENLAGE_QUELLE: UebernahmeQuelle = {
       ladeListe(
         qc,
         einsatzKeys.infotelefonZaehler(einsatzId),
-        () => ladeAnrufZaehler(einsatzId),
+        () => loadAnrufZaehler(einsatzId),
         null,
       ),
     ]);

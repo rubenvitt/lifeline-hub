@@ -20,7 +20,7 @@ async fn erfassen(app: &axum::Router, cookie: &str, e: i64, body: &str) {
     assert_eq!(s, StatusCode::CREATED, "erfassen: {v:?}");
 }
 
-async fn zaehler(app: &axum::Router, cookie: &str, e: i64, query: &str) -> Value {
+async fn fetch_zaehler(app: &axum::Router, cookie: &str, e: i64, query: &str) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
@@ -34,7 +34,7 @@ async fn zaehler(app: &axum::Router, cookie: &str, e: i64, query: &str) -> Value
 }
 
 /// Lädt die Liste mit `filter` (ohne führendes `&`) seitenweise vollständig.
-async fn alle_seiten(
+async fn all_pages(
     app: &axum::Router,
     cookie: &str,
     e: i64,
@@ -64,7 +64,7 @@ async fn alle_seiten(
 }
 
 /// Zwei Anliegen mit gleichem Eingang, offene und erledigte gemischt, ein Nachtrag.
-async fn bestand(app: &axum::Router, cookie: &str, e: i64) {
+async fn seed(app: &axum::Router, cookie: &str, e: i64) {
     for body in [
         r#"{"anliegen":"auskunft_lage","eingang_at":"2026-10-01T10:00:00Z"}"#,
         r#"{"anliegen":"auskunft_lage","eingang_at":"2026-10-01T10:00:00Z"}"#,
@@ -83,9 +83,9 @@ async fn ungefilterte_zaehlung_mit_allen_anliegen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    bestand(&app, &admin, e).await;
+    seed(&app, &admin, e).await;
 
-    let z = zaehler(&app, &admin, e, "").await;
+    let z = fetch_zaehler(&app, &admin, e, "").await;
     assert_eq!(z["gesamt"], 7);
     assert_eq!(z["offen"], 2);
     let je = z["je_anliegen"].as_object().unwrap();
@@ -102,7 +102,7 @@ async fn liste_und_zaehlung_stimmen_je_filter_ueberein() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    bestand(&app, &admin, e).await;
+    seed(&app, &admin, e).await;
 
     for status in ["", "offen", "erledigt"] {
         let (filter, query) = if status.is_empty() {
@@ -110,9 +110,9 @@ async fn liste_und_zaehlung_stimmen_je_filter_ueberein() {
         } else {
             (format!("&status={status}"), format!("?status={status}"))
         };
-        let z = zaehler(&app, &admin, e, &query).await;
+        let z = fetch_zaehler(&app, &admin, e, &query).await;
         for limit in [1, 2, 3, 100] {
-            let liste = alle_seiten(&app, &admin, e, &filter, limit).await;
+            let liste = all_pages(&app, &admin, e, &filter, limit).await;
             assert_eq!(
                 z["gesamt"].as_i64().unwrap(),
                 liste.len() as i64,
@@ -137,8 +137,8 @@ async fn nur_offene_zaehlen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    bestand(&app, &admin, e).await;
-    let z = zaehler(&app, &admin, e, "?status=offen").await;
+    seed(&app, &admin, e).await;
+    let z = fetch_zaehler(&app, &admin, e, "?status=offen").await;
     assert_eq!(z["gesamt"], 2);
     assert_eq!(z["offen"], 2);
     assert_eq!(z["je_anliegen"]["auskunft_lage"], 1);
@@ -150,9 +150,9 @@ async fn seitenparameter_gehoeren_nicht_zum_filter() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    bestand(&app, &admin, e).await;
-    let ohne = zaehler(&app, &admin, e, "").await;
-    let mit = zaehler(
+    seed(&app, &admin, e).await;
+    let ohne = fetch_zaehler(&app, &admin, e, "").await;
+    let mit = fetch_zaehler(
         &app,
         &admin,
         e,
@@ -161,7 +161,7 @@ async fn seitenparameter_gehoeren_nicht_zum_filter() {
     .await;
     assert_eq!(ohne, mit);
     // Ein halber Cursor ist nur an der Liste ein Fehler.
-    let halb = zaehler(&app, &admin, e, "?vor_id=1").await;
+    let halb = fetch_zaehler(&app, &admin, e, "?vor_id=1").await;
     assert_eq!(ohne, halb);
 }
 
@@ -185,9 +185,9 @@ async fn andere_einsaetze_zaehlen_nicht_mit() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let anderer = einsatz_anlegen(&app, &admin).await;
-    bestand(&app, &admin, anderer).await;
+    seed(&app, &admin, anderer).await;
     erfassen(&app, &admin, e, r#"{"anliegen":"hinweis"}"#).await;
-    let z = zaehler(&app, &admin, e, "").await;
+    let z = fetch_zaehler(&app, &admin, e, "").await;
     assert_eq!(z["gesamt"], 1);
     assert_eq!(z["offen"], 0);
 }
@@ -233,7 +233,7 @@ async fn zweitausend_anrufe_ein_fenster_und_die_volle_zahl() {
         "jüngster zuerst"
     );
 
-    let z = zaehler(&app, &admin, e, "").await;
+    let z = fetch_zaehler(&app, &admin, e, "").await;
     assert_eq!(z["gesamt"], 2000);
     assert_eq!(z["offen"], 200);
     let summe: i64 = z["je_anliegen"]
@@ -243,5 +243,5 @@ async fn zweitausend_anrufe_ein_fenster_und_die_volle_zahl() {
         .map(|v| v.as_i64().unwrap())
         .sum();
     assert_eq!(summe, 2000);
-    assert_eq!(alle_seiten(&app, &admin, e, "", 500).await.len(), 2000);
+    assert_eq!(all_pages(&app, &admin, e, "", 500).await.len(), 2000);
 }

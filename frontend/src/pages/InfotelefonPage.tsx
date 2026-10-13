@@ -7,12 +7,12 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
-  ANRUFE_SEITE,
+  ANRUFE_PAGE_SIZE,
   anrufCursor,
   erfasseAnruf,
-  ladeAnruf,
-  ladeAnrufe,
-  ladeAnrufZaehler,
+  loadAnruf,
+  loadAnrufe,
+  loadAnrufZaehler,
   setzeAnrufStatus,
   type AnrufEingabe,
 } from '../api/infotelefon';
@@ -46,7 +46,7 @@ import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
 import {
   einfrieren,
-  erweitere,
+  extendEinfrierstand,
   teileZufluss,
   zuflussText,
   type Einfrierstand,
@@ -65,8 +65,8 @@ import { infotelefonStatus } from '../theme/statusFarben';
  * „alle / offene Rückrufe“, die serverseitig filtert.
  *
  * **Fenster und Zählung** (LLH-732, Change `w6hgfndx-infotelefon-zaehler`, design.md D6): Die
- * Zeitachse lädt Seiten zu {@link ANRUFE_SEITE} Anrufen, „Ältere laden“ hängt die nächste an.
- * Kennzahlen, Meta und Aufgliederung zählen über `…/zaehler` den ganzen Bestand, nie das geladene
+ * Zeitachse lädt Seiten zu {@link ANRUFE_PAGE_SIZE} Anrufen, „Ältere laden“ hängt die nächste an.
+ * Kennzahlen, Meta und Aufgliederung zählen über `…/zaehler` den ganzen Bestand, nie das loaded
  * Fenster. Ohne Zählung steht keine Zahl da (`laden`/`fehler` an der Kennzahl). Ein per
  * `?anruf=` angesteuerter Anruf außerhalb des Fensters wird einzeln geholt und hinten angehängt.
  *
@@ -109,16 +109,16 @@ export default function InfotelefonPage() {
   const [focusRequest, setFocusRequest] = useState(0);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
-  // `gefrorenSeiten` merkt die Zahl der Seiten beim Einfrieren: was „Ältere laden“ danach anhängt,
-  // ist alt und wird über `erweitere` aufgenommen, nie als „neuer Anruf“ zurückgehalten. Die
-  // Kennungen einer angehängten Seite gelten so, wie sie ZUERST erschien (`nachgeladen`): ein
+  // `frozenPageCount` merkt die Zahl der Seiten beim Einfrieren: was „Ältere laden“ danach anhängt,
+  // ist alt und wird über `extendEinfrierstand` aufgenommen, nie als „neuer Anruf“ zurückgehalten. Die
+  // Kennungen einer angehängten Seite gelten so, wie sie ZUERST erschien (`appendedPageIds`): ein
   // Live-Nachladen derselben Seite bringt einen fremden Nachtrag sonst unbemerkt in den Stand.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
-  const [gefrorenSeiten, setGefrorenSeiten] = useState(0);
-  const [nachgeladen, setNachgeladen] = useState<ReadonlyMap<number, readonly number[]>>(
+  const [frozenPageCount, setFrozenPageCount] = useState(0);
+  const [appendedPageIds, setAppendedPageIds] = useState<ReadonlyMap<number, readonly number[]>>(
     () => new Map(),
   );
-  const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
+  const [linkedId, setLinkedId] = useState<number | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   // Die Erfassung hängt angepinnt am Fuß: ihre Höhe hält den Fokus der Zeitachse frei
   // (WCAG 2.4.11, dieselbe Regel wie im ETB, `index.css`).
@@ -131,42 +131,41 @@ export default function InfotelefonPage() {
   const anrufeQuery = useInfiniteQuery({
     queryKey: einsatzKeys.infotelefonListe(einsatzId, sicht),
     queryFn: ({ pageParam }) =>
-      ladeAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined, vor: pageParam }),
+      loadAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined, vor: pageParam }),
     initialPageParam: undefined as AbschlussCursor | undefined,
     getNextPageParam: (letzte) =>
-      letzte.length < ANRUFE_SEITE ? undefined : anrufCursor(letzte[letzte.length - 1]),
+      letzte.length < ANRUFE_PAGE_SIZE ? undefined : anrufCursor(letzte[letzte.length - 1]),
     enabled: frei,
   });
   const zaehlerQuery = useQuery({
     queryKey: einsatzKeys.infotelefonZaehler(einsatzId),
-    queryFn: () => ladeAnrufZaehler(einsatzId),
+    queryFn: () => loadAnrufZaehler(einsatzId),
     enabled: frei,
   });
-  const seiten = anrufeQuery.data?.pages;
+  const pages = anrufeQuery.data?.pages;
   // Ein Live-Nachladen verschiebt die Seitengrenzen: kein Anruf darf doppelt stehen.
-  const geladene = useMemo(() => {
+  const loaded = useMemo(() => {
     const gesehen = new Set<number>();
-    return (seiten ?? []).flat().filter((a) => {
+    return (pages ?? []).flat().filter((a) => {
       if (gesehen.has(a.id)) return false;
       gesehen.add(a.id);
       return true;
     });
-  }, [seiten]);
+  }, [pages]);
 
   useQueryParamSelektion('anruf', anrufeQuery.isSuccess, (aid) => {
     setSicht('alle');
     setGefroren(null);
     setHervorgehoben(aid);
     // Nur die Liste „alle“ zählt: unter „offene Rückrufe“ geladen heißt nicht unter „alle“ geladen.
-    setVerlinkteId(sicht === 'alle' && geladene.some((a) => a.id === aid) ? null : aid);
+    setLinkedId(sicht === 'alle' && loaded.some((a) => a.id === aid) ? null : aid);
   });
-  const verlinkteQuery = useQuery({
-    queryKey: einsatzKeys.infotelefonAnruf(einsatzId, verlinkteId ?? 0),
-    queryFn: () => ladeAnruf(einsatzId, verlinkteId ?? 0),
-    enabled: frei && verlinkteId != null,
+  const linkedQuery = useQuery({
+    queryKey: einsatzKeys.infotelefonAnruf(einsatzId, linkedId ?? 0),
+    queryFn: () => loadAnruf(einsatzId, linkedId ?? 0),
+    enabled: frei && linkedId != null,
   });
-  const verlinkte =
-    verlinkteId != null && verlinkteQuery.data?.id === verlinkteId ? verlinkteQuery.data : null;
+  const linked = linkedId != null && linkedQuery.data?.id === linkedId ? linkedQuery.data : null;
 
   // Schnellaktion „Anruf erfassen“ (LLH-1127): ?neu=1 legt den Fokus in die Erfassung. Das Literal
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` verlangt
@@ -208,25 +207,25 @@ export default function InfotelefonPage() {
   // Der Server filtert; der einzeln geholte Anruf steht hinten, er ist älter als das Fenster.
   const gefiltert = useMemo(
     () =>
-      verlinkte && sicht === 'alle' && !geladene.some((a) => a.id === verlinkte.id)
-        ? [...geladene, verlinkte]
-        : geladene,
-    [geladene, verlinkte, sicht],
+      linked && sicht === 'alle' && !loaded.some((a) => a.id === linked.id)
+        ? [...loaded, linked]
+        : loaded,
+    [loaded, linked, sicht],
   );
   // Erst springen, wenn die Zeile steht: der einzeln geholte Anruf kommt später als die Liste.
-  const hervorgehobenGeladen = gefiltert.some((a) => a.id === hervorgehoben);
+  const isHervorgehobenLoaded = gefiltert.some((a) => a.id === hervorgehoben);
   useEffect(() => {
-    if (hervorgehoben == null || !hervorgehobenGeladen) return;
+    if (hervorgehoben == null || !isHervorgehobenLoaded) return;
     document
       .querySelector(`[data-anruf="${hervorgehoben}"]`)
       ?.scrollIntoView?.({ block: 'center' });
-  }, [hervorgehoben, hervorgehobenGeladen]);
-  const seitenZahl = seiten?.length ?? 0;
+  }, [hervorgehoben, isHervorgehobenLoaded]);
+  const pageCount = pages?.length ?? 0;
   const betreten = useCallback(
     (e: FocusEvent<HTMLDivElement>) => {
       if (gefroren == null) {
-        setGefrorenSeiten(seitenZahl);
-        setNachgeladen(new Map());
+        setFrozenPageCount(pageCount);
+        setAppendedPageIds(new Map());
       }
       setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
       // Steht ein per Tastatur erreichtes Ziel schon im Fenster, rollt der Browser nicht und
@@ -241,7 +240,7 @@ export default function InfotelefonPage() {
         ziel.scrollIntoView?.({ block: 'end' });
       }
     },
-    [gefiltert, gefroren, seitenZahl],
+    [gefiltert, gefroren, pageCount],
   );
   const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
     const ziel = e.relatedTarget as Node | null;
@@ -252,22 +251,22 @@ export default function InfotelefonPage() {
   }, []);
   // Hält die Kennungen jeder nach dem Einfrieren angehängten Seite beim ersten Erscheinen fest.
   useEffect(() => {
-    if (gefroren == null || seiten == null) return;
-    const fehlend = seiten
-      .map((seite, i) => [i, seite] as const)
-      .filter(([i]) => i >= gefrorenSeiten && !nachgeladen.has(i));
-    if (fehlend.length === 0) return;
-    setNachgeladen((vorher) => {
-      const neu = new Map(vorher);
-      for (const [i, seite] of fehlend)
-        if (!neu.has(i))
-          neu.set(
+    if (gefroren == null || pages == null) return;
+    const missing = pages
+      .map((page, i) => [i, page] as const)
+      .filter(([i]) => i >= frozenPageCount && !appendedPageIds.has(i));
+    if (missing.length === 0) return;
+    setAppendedPageIds((previous) => {
+      const next = new Map(previous);
+      for (const [i, page] of missing)
+        if (!next.has(i))
+          next.set(
             i,
-            seite.map((a) => a.id),
+            page.map((a) => a.id),
           );
-      return neu;
+      return next;
     });
-  }, [gefroren, seiten, gefrorenSeiten, nachgeladen]);
+  }, [gefroren, pages, frozenPageCount, appendedPageIds]);
   const zaehler = zaehlerQuery.data;
   const jeAnliegen = useMemo(
     () =>
@@ -303,14 +302,14 @@ export default function InfotelefonPage() {
   const gesamt = zaehler?.gesamt ?? 0;
   const offen = zaehler?.offen ?? 0;
   // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
-  const angehaengt = gefroren
-    ? (seiten ?? [])
-        .slice(gefrorenSeiten)
-        .map((seite, i) => nachgeladen.get(gefrorenSeiten + i) ?? seite.map((a) => a.id))
+  const appendedIds = gefroren
+    ? (pages ?? [])
+        .slice(frozenPageCount)
+        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
     : [];
-  const stand = gefroren && erweitere(gefroren, angehaengt.flat());
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, stand, benutzer?.id);
-  const listeGeladen = anrufeQuery.isSuccess;
+  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
+  const isListeLoaded = anrufeQuery.isSuccess;
   // Unter `md` trägt die Meta die Kennzahlen; ab `md` stehen sie als Kacheln darunter.
   const anrufeText = gesamt === 1 ? '1 Anruf' : `${gesamt} Anrufe`;
   const meta =
@@ -427,7 +426,7 @@ export default function InfotelefonPage() {
             ursache={anrufeQuery.error}
             onWiederholen={() => void anrufeQuery.refetch()}
           />
-        ) : sichtbar.length === 0 && listeGeladen ? (
+        ) : sichtbar.length === 0 && isListeLoaded ? (
           <Typography.Text type="secondary">
             {sicht === 'offen' ? 'Keine offenen Rückrufe' : 'Noch keine Anrufe'}
           </Typography.Text>
@@ -453,8 +452,8 @@ export default function InfotelefonPage() {
                   aktion={{
                     label: 'anzeigen',
                     onKlick: () => {
-                      setGefrorenSeiten(seitenZahl);
-                      setNachgeladen(new Map());
+                      setFrozenPageCount(pageCount);
+                      setAppendedPageIds(new Map());
                       setGefroren(einfrieren(gefiltert));
                     },
                   }}

@@ -12,7 +12,7 @@ import { taktischeDtgVoll } from '../anzeige/format';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz } from '../api/einsaetze';
-import { ladeAnrufZaehler } from '../api/infotelefon';
+import { loadAnrufZaehler } from '../api/infotelefon';
 import type { AbschlussCursor } from '../api/meldungen';
 import {
   eingangCursor,
@@ -196,7 +196,7 @@ export default function PressePage() {
   // Nur für die Medienlage: die Zählung über den ganzen Bestand, ohne Personenbezug (LLH-732).
   const anrufZaehlerQuery = useQuery({
     queryKey: einsatzKeys.infotelefonZaehler(einsatzId),
-    queryFn: () => ladeAnrufZaehler(einsatzId),
+    queryFn: () => loadAnrufZaehler(einsatzId),
     enabled: frei,
   });
 

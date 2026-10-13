@@ -1,6 +1,6 @@
 //! Zählung der Anrufe am Informationstelefon, gesamt, offen und je Anliegen (LLH-732).
 //!
-//! Die Zählung folgt DEMSELBEN Filter wie die Liste (`repo::filter_bedingung`): Kennzahlen und
+//! Die Zählung folgt DEMSELBEN Filter wie die Liste (`repo::filter_clause`): Kennzahlen und
 //! Medienlage zählen den ganzen Bestand, nie die geladene Seite (Muster ETB-Zähler, LFH-612).
 
 use super::{InfotelefonAnliegen, InfotelefonStatus};
@@ -37,7 +37,7 @@ impl InfotelefonZaehler {
     /// Ein vollständiger `match` über [`InfotelefonAnliegen`]: ein neues Anliegen bricht den
     /// Build. Ein unbekannter Wert (den der CHECK ausschließt) ist ein 500, kein stilles
     /// Weglassen — eine zu kleine Zahl wäre der schlimmere Fehler.
-    pub fn aus_zeilen(zeilen: &[(String, String, i64)]) -> Result<Self, AppError> {
+    pub fn from_rows(zeilen: &[(String, String, i64)]) -> Result<Self, AppError> {
         let mut z = Self::default();
         for (anliegen, status, anzahl) in zeilen {
             let je = &mut z.je_anliegen;
@@ -75,16 +75,16 @@ impl InfotelefonZaehler {
 mod tests {
     use super::*;
 
-    fn zeile(anliegen: &str, status: &str, n: i64) -> (String, String, i64) {
+    fn row(anliegen: &str, status: &str, n: i64) -> (String, String, i64) {
         (anliegen.into(), status.into(), n)
     }
 
     #[test]
     fn zeilen_werden_je_anliegen_zugeordnet_und_summiert() {
-        let z = InfotelefonZaehler::aus_zeilen(&[
-            zeile("auskunft_lage", "erledigt", 2),
-            zeile("auskunft_lage", "offen", 1),
-            zeile("hinweis", "erledigt", 1),
+        let z = InfotelefonZaehler::from_rows(&[
+            row("auskunft_lage", "erledigt", 2),
+            row("auskunft_lage", "offen", 1),
+            row("hinweis", "erledigt", 1),
         ])
         .unwrap();
         assert_eq!(z.gesamt, 4);
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn leere_gruppierung_ist_null_ueberall() {
         assert_eq!(
-            InfotelefonZaehler::aus_zeilen(&[]).unwrap(),
+            InfotelefonZaehler::from_rows(&[]).unwrap(),
             InfotelefonZaehler::default()
         );
     }
@@ -111,9 +111,9 @@ mod tests {
     fn jedes_anliegen_hat_sein_feld() {
         let zeilen: Vec<_> = InfotelefonAnliegen::ALLE
             .iter()
-            .map(|a| zeile(a.as_str(), "erledigt", 1))
+            .map(|a| row(a.as_str(), "erledigt", 1))
             .collect();
-        let z = InfotelefonZaehler::aus_zeilen(&zeilen).unwrap();
+        let z = InfotelefonZaehler::from_rows(&zeilen).unwrap();
         assert_eq!(z.gesamt, 7);
         let je = serde_json::to_value(&z.je_anliegen).unwrap();
         for a in InfotelefonAnliegen::ALLE {
@@ -129,11 +129,11 @@ mod tests {
     #[test]
     fn unbekannte_werte_sind_500() {
         for z in [
-            zeile("spende", "erledigt", 1),
-            zeile("hinweis", "verschollen", 1),
+            row("spende", "erledigt", 1),
+            row("hinweis", "verschollen", 1),
         ] {
             assert!(matches!(
-                InfotelefonZaehler::aus_zeilen(&[z]),
+                InfotelefonZaehler::from_rows(&[z]),
                 Err(AppError::Internal(_))
             ));
         }

@@ -27,7 +27,7 @@ fn sse(state: &AppState, einsatz_id: i64, id: i64) {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ListenParams {
+pub struct ListParams {
     status: Option<String>,
     vor_zeit: Option<String>,
     vor_id: Option<i64>,
@@ -35,7 +35,7 @@ pub struct ListenParams {
 }
 
 /// Liest den Filter. Unbekannter Status → 400 (das Feld für sich), bei Liste und Zählung gleich.
-fn filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
+fn parse_filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
     let status = crate::routes::support::parse_enum_opt(
         InfotelefonStatus::parse,
         status.map(str::trim).filter(|s| !s.is_empty()),
@@ -46,21 +46,21 @@ fn filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
 
 /// GET /api/einsaetze/{id}/stab/infotelefon — immer eine Seite, jüngster Eingang zuerst
 /// (`status`, Cursor `vor_zeit` + `vor_id`, `limit`; LLH-732, design.md D2, Regeln über
-/// [`crate::kommunikation::seite`]).
+/// [`crate::kommunikation::parse_page`]).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
-    Query(p): Query<ListenParams>,
+    Query(p): Query<ListParams>,
 ) -> Result<Json<Vec<InfotelefonAnrufAnzeige>>, AppError> {
-    let filter = filter(p.status.as_deref())?;
-    let seite = crate::kommunikation::seite(p.vor_zeit.as_deref(), p.vor_id, p.limit)?;
+    let filter = parse_filter(p.status.as_deref())?;
+    let seite = crate::kommunikation::parse_page(p.vor_zeit.as_deref(), p.vor_id, p.limit)?;
     Ok(Json(
-        repo::liste_seite(&state.pool, ctx.einsatz.id, &filter, &seite).await?,
+        repo::list_page(&state.pool, ctx.einsatz.id, &filter, &seite).await?,
     ))
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ZaehlerParams {
+pub struct CountParams {
     status: Option<String>,
 }
 
@@ -69,11 +69,11 @@ pub struct ZaehlerParams {
 pub async fn zaehler(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
-    Query(p): Query<ZaehlerParams>,
+    Query(p): Query<CountParams>,
 ) -> Result<Json<InfotelefonZaehler>, AppError> {
-    let filter = filter(p.status.as_deref())?;
+    let filter = parse_filter(p.status.as_deref())?;
     Ok(Json(
-        repo::zaehlen(&state.pool, ctx.einsatz.id, &filter).await?,
+        repo::count(&state.pool, ctx.einsatz.id, &filter).await?,
     ))
 }
 

@@ -50,13 +50,13 @@ Migration `0185` erhoben.
 ### D1 Eine Filterbedingung für Liste und Zählung
 
 `repo.rs` bekommt `struct AnrufFilter { status: Option<InfotelefonStatus> }` und eine Funktion
-`filter_bedingung(qb, einsatz_id, &filter)` auf einem `sqlx::QueryBuilder`. Sie schreibt
+`filter_clause(qb, einsatz_id, &filter)` auf einem `sqlx::QueryBuilder`. Sie schreibt
 `WHERE a.einsatz_id = ? [AND a.status = ?]`. Zwei Abfragen verwenden sie:
 
-- `liste_seite(pool, einsatz_id, &filter, &seite)` hängt den Cursor an
+- `list_page(pool, einsatz_id, &filter, &seite)` hängt den Cursor an
   (`AND (a.eingang_at < ? OR (a.eingang_at = ? AND a.id < ?))`), dazu
   `ORDER BY a.eingang_at DESC, a.id DESC LIMIT ?`.
-- `zaehlen(pool, einsatz_id, &filter)` liest `SELECT a.anliegen, a.status, COUNT(*) … GROUP BY
+- `count(pool, einsatz_id, &filter)` liest `SELECT a.anliegen, a.status, COUNT(*) … GROUP BY
   a.anliegen, a.status`.
 
 Das Alias `a` gilt in beiden Abfragen, damit dieselbe Bedingung passt. Der Cursor gehört nicht
@@ -73,7 +73,7 @@ Seite. `limit` hat die Vorgabe `kommunikation::SEITE_STANDARD` (100) und wird au
 `SEITE_MAX` geklemmt.
 
 Das Auslesen von Cursor und Seitengröße steckt heute in `phase_und_seite` und ist dort an
-`phase=abgeschlossen` gebunden. Es wird zu `kommunikation::seite(vor_zeit, vor_id, limit) ->
+`phase=abgeschlossen` gebunden. Es wird zu `kommunikation::parse_page(vor_zeit, vor_id, limit) ->
 Result<Seite, AppError>` herausgelöst: halber Cursor → 422, Klemmen. `phase_und_seite` ruft es
 danach selbst, ihre Tests bleiben unverändert grün. Ein unbekannter `status` liefert 400 über
 `parse_enum_opt`. Ein unlesbarer Zeitwert im Cursor wird nicht geprüft: Er vergleicht sich nur
@@ -93,7 +93,7 @@ geordnet, und ein nachgetragener Anruf hat einen frühen Eingang, aber eine hohe
 ### D3 Die Zählung als eigenes DTO mit festen Feldern je Anliegen
 
 `InfotelefonZaehler { gesamt, offen, je_anliegen: InfotelefonAnliegenZaehler }` mit sieben
-`i64`-Feldern, benannt wie die Wire-Werte (`vermisstensuche` … `sonstiges`). `aus_zeilen` baut
+`i64`-Feldern, benannt wie die Wire-Werte (`vermisstensuche` … `sonstiges`). `from_rows` baut
 die Antwort mit einem vollständigen `match` über `InfotelefonAnliegen`, wie `EtbZaehlerAnzeige`.
 Ein neues Anliegen bricht so den Build, und ein unbekannter String ist ein 500, kein stilles
 Weglassen. `offen` zählt die Zeilen mit `status = 'offen'`. Beide Typen bekommen `ToSchema` und
@@ -129,7 +129,7 @@ und Abhilfe stehen unter Risks.
 ### D6 Protokollseite: Fenster, Zählung, Zufluss
 
 - **Liste:** `useInfiniteQuery` auf `infotelefonListe(e, sicht)`. Die Seite ist zu Ende, wenn sie
-  weniger als `ANRUFE_SEITE` (100) Anrufe trägt. Sonst ist der Cursor der letzte Anruf. Die
+  weniger als `ANRUFE_PAGE_SIZE` (100) Anrufe trägt. Sonst ist der Cursor der letzte Anruf. Die
   Seiten werden zusammengefügt und nach Kennung entdoppelt: Ein Live-Nachladen verschiebt die
   Grenze, und ein Anruf darf nicht doppelt stehen. Das ist dasselbe Vorgehen wie bei den
   erledigten Medienkontakten. Am Ende der Liste steht „Ältere laden“, innerhalb des
@@ -141,9 +141,9 @@ und Abhilfe stehen unter Risks.
   Seite aus der Zählung ab, nicht aus der Liste. „Nach Anliegen“ zeigt wie heute nur Anliegen mit
   mindestens einem Anruf, in `ANLIEGEN_REIHENFOLGE`.
 - **Zufluss-Schleuse:** `teileZufluss` arbeitet unverändert auf dem geladenen Fenster. Neu ist
-  `erweitere(gefroren, anrufe)`: Es nimmt Kennungen in den eingefrorenen Stand auf und lässt die
+  `extendEinfrierstand(gefroren, anrufe)`: Es nimmt Kennungen in den eingefrorenen Stand auf und lässt die
   Wassermarke stehen. Die Seite merkt sich beim Einfrieren die Zahl der geladenen Seiten und
-  nimmt beim Rendern jede danach angehängte Seite über `erweitere` auf. Sonst würde ein
+  nimmt beim Rendern jede danach angehängte Seite über `extendEinfrierstand` auf. Sonst würde ein
   nachgetragener Anruf (alter Eingang, hohe Kennung) aus einer älteren Seite als „neuer Anruf“
   zurückgehalten, solange der Fokus im Knopf liegt. Beim Rendern statt nach dem Abruf, damit das
   Banner nicht für einen Frame aufblitzt.
@@ -160,7 +160,7 @@ braucht.
 ### D8 Regeln und Anwenderdoku
 
 - `frontend/src/stab/AGENTS.md`: Den Satz „Informationstelefon: Vollliste … (serverseitig
-  LFH-862)“ ersetzt der neue Stand: Fenster, Zählung, Einzelabruf, `erweitere`, mit Verweis auf
+  LFH-862)“ ersetzt der neue Stand: Fenster, Zählung, Einzelabruf, `extendEinfrierstand`, mit Verweis auf
   diese Change.
 - `src/AGENTS.md` verlangt für wachsende Listen die Trennung nach Phase. D2 weicht bewusst davon
   ab, deshalb steht dort neben der Regel eine benannte Ausnahme für das Informationstelefon.

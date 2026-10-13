@@ -145,12 +145,12 @@ Medien kommen aus `…/medienkontakte/kennzahlen` über den ganzen Bestand, nich
 geladenen Liste (LFH-1075). Das Presse-Log lädt offene ganz, erledigte seitenweise. **Nicht offline**: die
 Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). **Informationstelefon: Fenster und Zählung** (LLH-732,
 `openspec/changes/archive/2026-10-13-w6hgfndx-infotelefon-zaehler/design.md`): die Liste lädt
-immer seitenweise (`ANRUFE_SEITE`, Cursor Eingang + Kennung, „Ältere laden“), „offene Rückrufe“
+immer seitenweise (`ANRUFE_PAGE_SIZE`, Cursor Eingang + Kennung, „Ältere laden“), „offene Rückrufe“
 filtert am Server; Kennzahlen, Meta und „Nach Anliegen“ lesen nur `…/infotelefon/zaehler`, nie
 das geladene Fenster, ebenso die Medienlage. Ein Deeplink außerhalb des Fensters holt den Anruf
 einzeln (`…/infotelefon/{aid}`) und hängt ihn hinten an. Die Zufluss-Schleuse
 (`infotelefon/zufluss.ts`) nimmt Seiten, die nach dem Einfrieren nachgeladen wurden, über
-`erweitere` auf, damit ein Nachtrag aus einer älteren Seite nicht als „neuer Anruf“ gilt.
+`extendEinfrierstand` auf, damit ein Nachtrag aus einer älteren Seite nicht als „neuer Anruf“ gilt.
 **Informationstelefon unter `md`** (LFH-1067): zuerst die Anrufe, nach dem Muster der ETB-Erfassung
 (`etb/AGENTS.md`). Die Leiste startet eingeklappt (`AnrufErfassung einklappbar`: nur Anliegen und
 „Erfassen“, solange der Fokus nicht in ihr liegt und das Formular leer ist), die Kennzahlen stehen

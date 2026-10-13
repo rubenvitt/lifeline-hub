@@ -28,7 +28,7 @@ export function einfrieren(anrufe: readonly InfotelefonAnruf[]): Einfrierstand |
  * fremde Anrufe frei. Ohne die Aufnahme hielte die Schleuse einen Nachtrag (alter Eingang, hohe
  * Kennung) aus der älteren Seite als „neuen Anruf“ zurück.
  */
-export function erweitere(
+export function extendEinfrierstand(
   gefroren: Einfrierstand | null,
   ids: Iterable<number>,
 ): Einfrierstand | null {
