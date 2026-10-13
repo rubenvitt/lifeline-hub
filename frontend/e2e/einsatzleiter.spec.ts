@@ -9,8 +9,8 @@ import { anmelden, einsatzAnlegen, organigramm, post } from './fuehrungsorganisa
  * der Weg durch Browser, Server und Live-Strom.
  *
  * Mutationsprobe: in `stab/funkplan.ts:fuehrungsstelleZeile` `leitung: { art: 'leer' }` setzen →
- * der Funkplan-Nachweis wird rot. In `HaengenderBaum.tsx` `gezeigterKopf` ohne `kopfLaedt` →
- * der Organigramm-Kopf bleibt auf „Leitung: lädt“ (LLH-1166).
+ * der Funkplan-Nachweis wird rot. In `Organigramm.tsx` `kopfLaedt={false}` an `OrganigrammBild`
+ * geben → der Organigramm-Kopf bleibt auf „Leitung: lädt“ (LLH-1166).
  */
 
 test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im ETB', async ({
