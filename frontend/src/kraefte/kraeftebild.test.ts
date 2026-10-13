@@ -503,3 +503,21 @@ it('verdichte stimmt mit der Verdichtung aus baueKraeftebild überein', () => {
   expect(v.materialStatus).toEqual(bild.verdichtung.materialStatus);
   expect(v.anzahlMaterialPositionen).toBe(bild.verdichtung.anzahlMaterialPositionen);
 });
+
+it('eine Waise und ein Zyklus stehen in der Kräftegliederung und zählen wie die Gesamtstärke', () => {
+  // E30 nennt eine Obereinheit, die nicht in der Liste steht (Waise); E40 und E41 unterstellen
+  // sich gegenseitig (Zyklus). Beide Fälle verlor der frühere eigene Baum, die Gesamtstärke
+  // zählte die Kräfte trotzdem — der Kern (`einheitenBaum`) verliert keine Einheit.
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1), eh(30, null, 99), eh(40, null, 41), eh(41, null, 40)],
+    [p(1, 10, 'fuehrer'), p(5, 30, 'mannschaft'), p(6, 40, 'mannschaft'), p(7, 41, 'mannschaft')],
+    [],
+    [],
+  );
+  const gliederung = bild.baum.reduce((s, z) => s + (z.staerke?.gesamt ?? 0), 0);
+  expect(bild.verdichtung.staerke.gesamt).toBe(4);
+  expect(gliederung).toBe(bild.verdichtung.staerke.gesamt);
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  for (const name of ['E30', 'E40', 'E41', 'P5', 'P6', 'P7']) expect(md).toContain(name);
+});

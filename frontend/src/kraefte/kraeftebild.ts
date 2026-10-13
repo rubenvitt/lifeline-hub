@@ -13,12 +13,14 @@ import { kraefteText, staerkeText } from '../anzeige/staerke';
 import {
   abschnittDerObersten,
   besatzungText,
+  einheitenBaum,
   needsOhneFahrzeugKnoten,
   fremdText,
   mittelDerEinheit,
   type MittelDerEinheit,
   type MittelQuelle,
   type PersonImBaum,
+  type EinheitKnoten,
 } from './kraeftebaumKern';
 
 export interface StaerkeSumme {
@@ -250,13 +252,12 @@ interface EinheitResult {
  * das kumulierte Soll dieser Einheit und aller Nachfahren.
  */
 function baueEinheitZeile(
-  einheit: Einheit,
-  childEinheiten: Einheit[],
-  childrenByEinheit: Map<number, Einheit[]>,
+  knoten: EinheitKnoten,
   personalByEinheit: Map<number | null, EinsatzPersonal[]>,
   fahrzeugeByEinheit: Map<number | null, EinsatzFahrzeug[]>,
   mittelVon: MittelVon,
 ): EinheitResult {
+  const einheit = knoten.einheit;
   const staerke = leereStaerke();
   const personalVert = leereVert();
   const fahrzeugVert = leereVert();
@@ -273,16 +274,8 @@ function baueEinheitZeile(
   }
 
   let gesammeltesSoll: StaerkeSumme | null = null;
-  for (const kindEinheit of childEinheiten) {
-    const kindChildren = childrenByEinheit.get(kindEinheit.id) ?? [];
-    const kindResult = baueEinheitZeile(
-      kindEinheit,
-      kindChildren,
-      childrenByEinheit,
-      personalByEinheit,
-      fahrzeugeByEinheit,
-      mittelVon,
-    );
+  for (const kind of knoten.kinder) {
+    const kindResult = baueEinheitZeile(kind, personalByEinheit, fahrzeugeByEinheit, mittelVon);
     addStaerke(staerke, kindResult.zeile.staerke);
     addVerteilung(personalVert, kindResult.zeile.personalVerteilung ?? leereVert());
     addVerteilung(fahrzeugVert, kindResult.zeile.fahrzeugVerteilung ?? leereVert());
@@ -325,8 +318,7 @@ function baueAbschnittZeile(
   abschnitt: Einsatzabschnitt,
   kindAbschnitte: Einsatzabschnitt[],
   abschnittKinderMap: Map<number, Einsatzabschnitt[]>,
-  topEinheitenByAbschnitt: Map<number | null, Einheit[]>,
-  childrenByEinheit: Map<number, Einheit[]>,
+  wurzelnByAbschnitt: Map<number | null, EinheitKnoten[]>,
   personalByEinheit: Map<number | null, EinsatzPersonal[]>,
   fahrzeugeByEinheit: Map<number | null, EinsatzFahrzeug[]>,
   mittelVon: MittelVon,
@@ -337,17 +329,8 @@ function baueAbschnittZeile(
   const children: MeldebildZeile[] = [];
   let gesammeltesSoll: StaerkeSumme | null = null;
 
-  const topEinheiten = topEinheitenByAbschnitt.get(abschnitt.id) ?? [];
-  for (const einheit of topEinheiten) {
-    const kindEinheiten = childrenByEinheit.get(einheit.id) ?? [];
-    const result = baueEinheitZeile(
-      einheit,
-      kindEinheiten,
-      childrenByEinheit,
-      personalByEinheit,
-      fahrzeugeByEinheit,
-      mittelVon,
-    );
+  for (const knoten of wurzelnByAbschnitt.get(abschnitt.id) ?? []) {
+    const result = baueEinheitZeile(knoten, personalByEinheit, fahrzeugeByEinheit, mittelVon);
     addStaerke(staerke, result.zeile.staerke);
     addVerteilung(personalVert, result.zeile.personalVerteilung ?? leereVert());
     addVerteilung(fahrzeugVert, result.zeile.fahrzeugVerteilung ?? leereVert());
@@ -363,8 +346,7 @@ function baueAbschnittZeile(
       kindAbschnitt,
       kindAbschnittKinder,
       abschnittKinderMap,
-      topEinheitenByAbschnitt,
-      childrenByEinheit,
+      wurzelnByAbschnitt,
       personalByEinheit,
       fahrzeugeByEinheit,
       mittelVon,
@@ -643,20 +625,15 @@ export function baueKraeftebild(
     fahrzeugeByEinheit.get(key)!.push(ef);
   }
 
-  // ── Einheiten-Index ───────────────────────────────────────────────────────
-  // Kinder je `ueber_einheit_id`; oberste Einheiten je Abschnitt.
-  const childrenByEinheit = new Map<number, Einheit[]>();
-  const topEinheitenByAbschnitt = new Map<number | null, Einheit[]>();
-
-  for (const e of einheiten) {
-    if (e.ueber_einheit_id != null) {
-      if (!childrenByEinheit.has(e.ueber_einheit_id)) childrenByEinheit.set(e.ueber_einheit_id, []);
-      childrenByEinheit.get(e.ueber_einheit_id)!.push(e);
-    } else {
-      const key = e.abschnitt_id ?? null;
-      if (!topEinheitenByAbschnitt.has(key)) topEinheitenByAbschnitt.set(key, []);
-      topEinheitenByAbschnitt.get(key)!.push(e);
-    }
+  // ── Einheit-Hierarchie aus dem Kern ───────────────────────────────────────
+  // `einheitenBaum` (frontend/AGENTS.md, „Eine Baumlogik der Kräfte“): eine Waise (Obereinheit
+  // nicht in der Liste) wird Wurzel, ein Zyklus verliert keine Einheit — so zählt die
+  // Kräftegliederung dieselben Kräfte wie die Gesamtstärke. Wurzeln je Abschnitt (D11).
+  const wurzelnByAbschnitt = new Map<number | null, EinheitKnoten[]>();
+  for (const knoten of einheitenBaum(einheiten, abschnitte)) {
+    const key = knoten.abschnittId;
+    if (!wurzelnByAbschnitt.has(key)) wurzelnByAbschnitt.set(key, []);
+    wurzelnByAbschnitt.get(key)!.push(knoten);
   }
 
   // ── Abschnitte-Index ──────────────────────────────────────────────────────
@@ -689,8 +666,7 @@ export function baueKraeftebild(
       abschnitt,
       kindAbschnitte,
       abschnittKinderMap,
-      topEinheitenByAbschnitt,
-      childrenByEinheit,
+      wurzelnByAbschnitt,
       personalByEinheit,
       fahrzeugeByEinheit,
       mittelVon,
@@ -702,7 +678,7 @@ export function baueKraeftebild(
   }
 
   // ── Auffangknoten „Ohne Abschnitt" ───────────────────────────────────────
-  const ohneAbschnittEinheiten = topEinheitenByAbschnitt.get(null) ?? [];
+  const ohneAbschnittEinheiten = wurzelnByAbschnitt.get(null) ?? [];
   // Mittel ohne `einheit_id`: Pseudo-Einheit „Ohne Einheit".
   const ohneEinheitPersonal = personalByEinheit.get(null) ?? [];
   const ohneEinheitFahrzeuge = fahrzeugeByEinheit.get(null) ?? [];
@@ -720,16 +696,8 @@ export function baueKraeftebild(
     const ohneAbschnittFahrzeugVert = leereVert();
     const ohneAbschnittChildren: MeldebildZeile[] = [];
 
-    for (const einheit of ohneAbschnittEinheiten) {
-      const kindEinheiten = childrenByEinheit.get(einheit.id) ?? [];
-      const result = baueEinheitZeile(
-        einheit,
-        kindEinheiten,
-        childrenByEinheit,
-        personalByEinheit,
-        fahrzeugeByEinheit,
-        mittelVon,
-      );
+    for (const knoten of ohneAbschnittEinheiten) {
+      const result = baueEinheitZeile(knoten, personalByEinheit, fahrzeugeByEinheit, mittelVon);
       addStaerke(ohneAbschnittStaerke, result.zeile.staerke);
       addVerteilung(ohneAbschnittPersonalVert, result.zeile.personalVerteilung ?? leereVert());
       addVerteilung(ohneAbschnittFahrzeugVert, result.zeile.fahrzeugVerteilung ?? leereVert());
