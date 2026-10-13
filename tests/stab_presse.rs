@@ -523,6 +523,8 @@ async fn ausgeblendeter_stab_sperrt_presse() {
         kontakte(e),
         mitteilungen(e),
         format!("/api/einsaetze/{e}/stab/infotelefon"),
+        format!("/api/einsaetze/{e}/stab/infotelefon/zaehler"),
+        format!("/api/einsaetze/{e}/stab/infotelefon/1"),
     ] {
         let (s, _) = anfrage(&app, "GET", &uri, &frieda, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{uri}");

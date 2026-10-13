@@ -1029,6 +1029,8 @@ export type PressemitteilungKopf = S['PressemitteilungKopf'];
 export type InfotelefonAnliegen = S['InfotelefonAnliegen'];
 export type InfotelefonStatus = S['InfotelefonStatus'];
 export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];
+export type InfotelefonZaehler = S['InfotelefonZaehler'];
+export type InfotelefonAnliegenZaehler = S['InfotelefonAnliegenZaehler'];
 
 // ============================== LFH-893 Taktische Fernmeldeskizze ==============================
 // API-Vertrag: openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md (D14).

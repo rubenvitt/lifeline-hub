@@ -256,9 +256,10 @@ pub async fn aktualisieren<T: DokumentRoute>(
         },
     )
     .await?;
-    // Titel und Zeitstand sind die einzigen Kopffelder, die ein PATCH ändern kann; bleiben sie,
-    // sieht die Liste nichts Neues (`DokumentKopf` trägt kein `aktualisiert_at`).
-    if dok.titel == vorher.titel && dok.zeitstand == vorher.zeitstand {
+    // Titel, Zeitstand und Verteiler sind die Kopffelder, die ein PATCH ändern kann; bleiben sie,
+    // sieht die Liste nichts Neues (`DokumentKopf` trägt kein `aktualisiert_at`). Den Verteiler
+    // trägt der Kopf seit LLH-1173 (Karte, Empfängerfilter): ein PATCH mit Verteiler meldet ihn.
+    if dok.titel == vorher.titel && dok.zeitstand == vorher.zeitstand && verteiler.is_none() {
         sse_nur_inhalt::<T>(state, einsatz_id, id);
     } else {
         sse::<T>(state, einsatz_id, id);
@@ -283,6 +284,36 @@ pub async fn freigeben<T: DokumentRoute>(
         state.live.publiziere(einsatz_id, etb_id);
     }
     sse::<T>(state, einsatz_id, id);
+    Ok(Json(dok.into()))
+}
+
+/// Quittiert eine Verteiler-Zeile (LLH-1173, Spec `befehl-quittung`) oder nimmt die Quittung
+/// zurück (`quittieren = false`). Rechte wie jeder Schreibweg des Dokuments; dieselben Prüfungen
+/// wie `EinsatzSchreibzugriff<Auftraege>` am Auftrag. Geräte erreichen keine Dokumentroute.
+pub async fn quittung<T: DokumentRoute>(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+    id: i64,
+    eintrag_id: i64,
+    quittieren: bool,
+) -> Result<Json<T::Anzeige>, AppError> {
+    fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
+    let jetzt = jetzt();
+    let (dok, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        if quittieren {
+            verteiler::quittieren_tx::<T>(conn, einsatz_id, id, eintrag_id, benutzer.id, &jetzt)
+                .await
+        } else {
+            verteiler::zuruecknehmen_tx::<T>(conn, einsatz_id, id, eintrag_id, benutzer.id).await
+        }
+    })?;
+    // Ohne Wirkung kein Ereignis: nichts hat sich geändert.
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        // Der Kopf ändert sich (Quittungsstand der Karte): ohne `nur_inhalt` (design.md D5).
+        sse::<T>(state, einsatz_id, id);
+    }
     Ok(Json(dok.into()))
 }
 

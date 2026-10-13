@@ -673,6 +673,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/stab/infotelefon/zaehler",
+            get(routes::infotelefon::zaehler),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/infotelefon/{aid}",
+            get(routes::infotelefon::detail),
+        )
+        .route(
             "/api/einsaetze/{id}/stab/infotelefon/{aid}/status",
             post(routes::infotelefon::status_setzen),
         )
@@ -1344,6 +1352,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/befehle/{bid}/fortschreiben",
             post(routes::befehl::fortschreiben),
+        )
+        // LLH-1173: Quittung je Verteiler-Empfänger.
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/quittieren",
+            post(routes::befehl::quittieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/zuruecknehmen",
+            post(routes::befehl::quittung_zuruecknehmen),
         )
         // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
         .route(

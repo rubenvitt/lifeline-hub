@@ -67,6 +67,10 @@ pub trait Dokumentart: Send + Sync + 'static {
     const ANLAGEN: Option<&'static anlage::AnlagenTabelle> = None;
     /// Verteiler-Tabelle (LLH-1172); `None` = die Art trägt keinen Verteiler.
     const VERTEILER: Option<&'static verteiler::VerteilerTabelle> = None;
+    /// Bezeichnung im ETB-Text einer Quittung je Verteiler-Empfänger (LLH-1173,
+    /// [`verteiler::quittieren_tx`]); `None` = die Art wird nicht quittiert. Setzt
+    /// [`Self::VERTEILER`] voraus.
+    const QUITTUNG: Option<&'static str> = None;
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

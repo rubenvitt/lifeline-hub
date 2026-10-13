@@ -15,6 +15,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 pub mod repo;
+pub mod zaehler;
+
+pub use zaehler::{InfotelefonAnliegenZaehler, InfotelefonZaehler};
 
 /// Höchstlänge der Notiz eines Anrufs (LFH-937, design.md D6). Spiegel:
 /// `frontend/src/api/eingabegrenzen.ts`.

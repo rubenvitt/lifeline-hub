@@ -4,10 +4,11 @@
 //! Rückrufnummer und für einen Statuswechsel auf den bestehenden Status; 404 für einen fremden
 //! Anruf. Kein ETB-Eintrag: das Protokoll ist selbst der Nachweis.
 
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 
-use super::{InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus};
+use super::{InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus, InfotelefonZaehler};
 use crate::error::AppError;
+use crate::kommunikation::Seite;
 use crate::routes::support::hoechstens;
 
 /// Eingabe „Anruf erfassen“. Anliegen und Eingang hat die Route gelesen und normalisiert.
@@ -71,21 +72,65 @@ macro_rules! anruf_select {
     };
 }
 
-/// Alle Anrufe des Einsatzes, jüngster Eingang zuerst (ein Protokoll wird gelesen).
-pub async fn liste(
+/// Filter des Protokolls. Liste und Zählung lesen ihn über dieselbe [`filter_clause`]
+/// (LLH-732, design.md D1); der Cursor gehört nicht dazu.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AnrufFilter {
+    pub status: Option<InfotelefonStatus>,
+}
+
+/// `WHERE` über Einsatz und Filter, Alias `a` für `infotelefon_anruf`.
+fn filter_clause(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &AnrufFilter) {
+    qb.push(" WHERE a.einsatz_id = ");
+    qb.push_bind(einsatz_id);
+    if let Some(status) = filter.status {
+        qb.push(" AND a.status = ");
+        qb.push_bind(status.as_str());
+    }
+}
+
+/// Eine Seite des Protokolls: jüngster Eingang zuerst, Gleichstand über die Kennung, ab dem
+/// Cursor `(eingang_at, id)` (ein nachgetragener Anruf hat frühen Eingang und hohe Kennung).
+pub async fn list_page(
     pool: &SqlitePool,
     einsatz_id: i64,
+    filter: &AnrufFilter,
+    seite: &Seite,
 ) -> Result<Vec<InfotelefonAnrufAnzeige>, AppError> {
-    sqlx::query_as::<_, Zeile>(concat!(
-        anruf_select!(),
-        "WHERE a.einsatz_id = ? ORDER BY a.eingang_at DESC, a.id DESC"
-    ))
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(TryInto::try_into)
-    .collect()
+    let mut qb = QueryBuilder::<Sqlite>::new(anruf_select!());
+    filter_clause(&mut qb, einsatz_id, filter);
+    if let Some(vor) = &seite.vor {
+        qb.push(" AND (a.eingang_at < ");
+        qb.push_bind(vor.zeit.clone());
+        qb.push(" OR (a.eingang_at = ");
+        qb.push_bind(vor.zeit.clone());
+        qb.push(" AND a.id < ");
+        qb.push_bind(vor.id);
+        qb.push("))");
+    }
+    qb.push(" ORDER BY a.eingang_at DESC, a.id DESC LIMIT ");
+    qb.push_bind(seite.limit);
+    qb.build_query_as::<Zeile>()
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect()
+}
+
+/// Zählt die Anrufe, die die Liste mit demselben Filter über alle Seiten liefert (LLH-732).
+pub async fn count(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &AnrufFilter,
+) -> Result<InfotelefonZaehler, AppError> {
+    let mut qb = QueryBuilder::<Sqlite>::new(
+        "SELECT a.anliegen, a.status, COUNT(*) FROM infotelefon_anruf a",
+    );
+    filter_clause(&mut qb, einsatz_id, filter);
+    qb.push(" GROUP BY a.anliegen, a.status");
+    let zeilen: Vec<(String, String, i64)> = qb.build_query_as().fetch_all(pool).await?;
+    InfotelefonZaehler::from_rows(&zeilen)
 }
 
 /// Lädt einen Anruf. `NotFound`, wenn er nicht zum Einsatz gehört.

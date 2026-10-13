@@ -499,6 +499,27 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Klartext der externen Stelle über den Verteiler-Snapshot (LLH-1172)",
     },
     Ausnahme {
+        datei: "src/vorlagendokument/verteiler.rs",
+        funktion: "update_quittung_tx",
+        spalte: "befehl_verteiler.snap_anzeige",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Anzeigename des Empfängers als `von` von Quittung und Rücknahme (LLH-1173)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/verteiler.rs",
+        funktion: "update_quittung_tx",
+        spalte: "befehl_verteiler.funktion_text",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Funktionsbezeichnung über den Verteiler-Snapshot im `von` von Quittung und Rücknahme (LLH-1173)",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/verteiler.rs",
+        funktion: "update_quittung_tx",
+        spalte: "befehl_verteiler.extern_bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Klartext der externen Stelle über den Verteiler-Snapshot im `von` von Quittung und Rücknahme (LLH-1173)",
+    },
+    Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "pressemitteilung.titel",

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlKopf } from '../api/types';
 import { NEW_SELECTABLE } from '../befehle/vorlagen';
@@ -19,6 +21,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
 import BefehlListenKarte from './BefehlListenKarte';
 import BefehlDetail from './BefehlDetail';
 import { befehlSchemaLabel } from './befehlTexte';
+import EmpfaengerFilter, { matchesEmpfaenger } from './EmpfaengerFilter';
 
 /**
  * Befehlsliste des Reiters „Einsatzbefehle“ im Muster „Liste + Detailpaneel“ (Spec
@@ -29,7 +32,8 @@ import { befehlSchemaLabel } from './befehlTexte';
  * der Vorgänger bleibt freigegeben liegen. Die Segmente Entwürfe/Freigegeben zerschneiden die Kette
  * bewusst: nur der Entwurf ist bearbeitbar.
  *
- * Die Befehle kommen ungeblättert; die Suche über Titel und Schema läuft deshalb im Client. Der
+ * Die Befehle kommen ungeblättert; Suche über Titel und Schema und der Empfängerfilter über den
+ * Verteiler (LLH-1173, dieselbe Komponente wie bei den Aufträgen) laufen deshalb im Client. Der
  * Bereichskopf zählt den Bestand, die Segmente das Gefundene.
  */
 
@@ -98,8 +102,23 @@ export default function BefehlListe({
   const entwuerfe = befehle.filter((b) => b.status === 'entwurf').length;
   const freigegebene = befehle.length - entwuerfe;
 
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
   const [suche, setSuche] = useState('');
-  const gefunden = useMemo(() => befehle.filter((b) => trifft(b, suche.trim())), [befehle, suche]);
+  const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
+  const gefunden = useMemo(
+    () =>
+      befehle.filter(
+        (b) => trifft(b, suche.trim()) && matchesEmpfaenger(b.verteiler ?? [], empfFilter),
+      ),
+    [befehle, suche, empfFilter],
+  );
   /*
    * Vorgabe des Segments (design.md D5): „Entwürfe“, wenn es beim ersten Datenstand einen gibt,
    * sonst „Freigegeben“. Danach schaltet nur die Person um.
@@ -124,6 +143,7 @@ export default function BefehlListe({
     const ziel = (befehleQuery.data ?? []).find((b) => b.id === id);
     if (!ziel) return;
     setSuche('');
+    setEmpfFilter(undefined);
     setSegment(ziel.status);
     setGewaehlt(id);
     sprungNr.current += 1;
@@ -208,6 +228,12 @@ export default function BefehlListe({
           style={{ width: 260, maxWidth: '100%' }}
           value={suche}
           onChange={(e) => setSuche(e.target.value)}
+        />
+        <EmpfaengerFilter
+          abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+          einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
+          value={empfFilter}
+          onChange={setEmpfFilter}
         />
       </div>
 

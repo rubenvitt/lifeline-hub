@@ -619,6 +619,11 @@ export interface components {
             freigegeben_von_name?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Ob der Verteiler Quittungen annimmt (LLH-1173): freigegeben und keine neuere Fassung
+             *     freigegeben.
+             */
+            is_quittierbar: boolean;
             status: components["schemas"]["BefehlStatus"];
             titel: string;
             /** Format: int64 */
@@ -649,10 +654,14 @@ export interface components {
             freigegeben_von_name?: string | null;
             /** Format: int64 */
             id: number;
+            /** @description Wie [`BefehlAnzeige::is_quittierbar`]. */
+            is_quittierbar: boolean;
             status: components["schemas"]["BefehlStatus"];
             titel: string;
             /** Format: int64 */
             version: number;
+            /** @description Verteiler samt Quittung (LLH-1173), für Karte und Empfängerfilter der Liste. */
+            verteiler: components["schemas"]["VerteilerEintragAnzeige"][];
             /** Format: int64 */
             vorgaenger_id?: number | null;
             vorlage: components["schemas"]["BefehlVorlage"];
@@ -2520,6 +2529,26 @@ export interface components {
          * @enum {string}
          */
         InfotelefonAnliegen: "vermisstensuche" | "auskunft_lage" | "hinweis" | "hilfeangebot" | "beschwerde" | "presse" | "sonstiges";
+        /**
+         * @description Zahl der Anrufe je Anliegen. Jedes Anliegen ist Pflichtfeld: eines ohne Anruf steht als 0 da
+         *     und fehlt nie.
+         */
+        InfotelefonAnliegenZaehler: {
+            /** Format: int64 */
+            auskunft_lage: number;
+            /** Format: int64 */
+            beschwerde: number;
+            /** Format: int64 */
+            hilfeangebot: number;
+            /** Format: int64 */
+            hinweis: number;
+            /** Format: int64 */
+            presse: number;
+            /** Format: int64 */
+            sonstiges: number;
+            /** Format: int64 */
+            vermisstensuche: number;
+        };
         /** @description Öffentliche Darstellung eines Anrufs. */
         InfotelefonAnrufAnzeige: {
             angelegt_at: string;
@@ -2545,6 +2574,20 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
+        /** @description Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`. */
+        InfotelefonZaehler: {
+            /**
+             * Format: int64
+             * @description Zahl aller Anrufe, die zum Filter passen; per Konstruktion die Summe über `je_anliegen`.
+             */
+            gesamt: number;
+            je_anliegen: components["schemas"]["InfotelefonAnliegenZaehler"];
+            /**
+             * Format: int64
+             * @description Davon im Status `offen` (Rückruf steht aus).
+             */
+            offen: number;
+        };
         JetztAktualisierenAntwort: {
             phase: components["schemas"]["JetztPhase"];
         };
@@ -4978,6 +5021,16 @@ export interface components {
             funktion_text?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Zeitpunkt der Quittung (LLH-1173); fehlt, solange der Empfänger offen ist, und immer am
+             *     Lagebericht.
+             */
+            quittiert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer quittiert hat; fehlt wie `quittiert_at`.
+             */
+            quittiert_von_id?: number | null;
             /** @description Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person. */
             snap_anzeige: string;
         };

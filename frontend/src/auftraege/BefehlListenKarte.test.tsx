@@ -21,6 +21,8 @@ const befehlKopf = (over: Partial<BefehlKopf> = {}): BefehlKopf => ({
   vorgaenger_id: null,
   vorlage: 'befehl_lad',
   zeitstand: '2026-06-11 08:30:00',
+  verteiler: [],
+  is_quittierbar: false,
   ...over,
 });
 
@@ -72,5 +74,35 @@ describe('BefehlListenKarte (Spec `auftraege-befehle`, „Karte eines Befehls“
   it('trägt keinen Knopf außer dem Auswahlziel', () => {
     renderKarte(befehlKopf({ status: 'freigegeben' }));
     expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  describe('Verteiler und Quittungsstand (LLH-1173)', () => {
+    const verteiler: BefehlKopf['verteiler'] = [
+      {
+        id: 1,
+        empfaenger_typ: 'abschnitt',
+        abschnitt_id: 3,
+        snap_anzeige: 'EA Süd',
+        quittiert_at: '2026-06-11 08:45:00',
+      },
+      { id: 2, empfaenger_typ: 'funktion', funktion: 's3', snap_anzeige: 'S3 Einsatz' },
+    ];
+
+    it('ein freigegebener Befehl nennt den Verteiler und zählt die Quittungen', () => {
+      renderKarte(befehlKopf({ status: 'freigegeben', is_quittierbar: true, verteiler }));
+      expect(screen.getByText('2 Empfänger · 1/2 quittiert')).toBeInTheDocument();
+      expect(screen.getByText('EA Süd, S3 Einsatz')).toBeInTheDocument();
+    });
+
+    it('ein Entwurf nennt den Verteiler ohne Quittungsstand', () => {
+      renderKarte(befehlKopf({ verteiler }));
+      expect(screen.getByText('EA Süd, S3 Einsatz')).toBeInTheDocument();
+      expect(screen.queryByText(/quittiert/)).toBeNull();
+    });
+
+    it('ohne Verteiler keine Zeile', () => {
+      renderKarte(befehlKopf({ status: 'freigegeben' }));
+      expect(screen.queryByText(/Empfänger/)).toBeNull();
+    });
   });
 });

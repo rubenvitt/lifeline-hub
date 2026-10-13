@@ -709,7 +709,18 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.presse, einsatzId, 'mitteilungen'] as const,
   pressemitteilung: (einsatzId: number, mitteilungId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'mitteilung', mitteilungId] as const,
+  // Informationstelefon (LLH-732): argumentlos = Invalidierungs-Prefix, das `infotelefon`-Ereignis
+  // trifft Seitenkette, Zählung und Einzelabruf zusammen.
   infotelefon: (einsatzId: number) => [EINSATZ_KEYS.infotelefon, einsatzId] as const,
+  /** Seitenkette des Protokolls je Sicht der Segmentleiste. */
+  infotelefonListe: (einsatzId: number, sicht: 'alle' | 'offen') =>
+    [EINSATZ_KEYS.infotelefon, einsatzId, 'liste', sicht] as const,
+  /** Zahlen über den ganzen Bestand: Kennzahlen, „Nach Anliegen“, Medienlage. */
+  infotelefonZaehler: (einsatzId: number) =>
+    [EINSATZ_KEYS.infotelefon, einsatzId, 'zaehler'] as const,
+  /** Ein Anruf für den Deeplink auf eine nicht geladene Zeile. */
+  infotelefonAnruf: (einsatzId: number, anrufId: number) =>
+    [EINSATZ_KEYS.infotelefon, einsatzId, 'anruf', anrufId] as const,
   /** Checkliste Arbeitsaufnahme (LFH-551), ebenfalls unter dem Stab-Prefix: kein eigenes Ereignis. */
   stabCheckliste: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId, 'checkliste'] as const,
   /**

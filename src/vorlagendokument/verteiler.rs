@@ -7,8 +7,8 @@
 //! Anzeigename kommen von den Auftragsempfängern (`auftrag::eingabe::validate_verteiler`,
 //! `auftrag::repo::snap_anzeige_fuer`). Der Anzeigename entsteht beim Speichern und bleibt; die
 //! Freigabe schreibt ihn ins ETB ([`build_an`], [`render_abschnitt`]), das Fortschreiben kopiert die
-//! Zeilen in die neue Fassung ([`copy_tx`]). Je Fassung eigene Zeilen: eine spätere Quittung
-//! je Empfänger (LLH-1173) hängt so an genau einer Fassung.
+//! Zeilen in die neue Fassung ([`copy_tx`]). Je Fassung eigene Zeilen: die Quittung je Empfänger
+//! (LLH-1173, [`quittieren_tx`], [`zuruecknehmen_tx`]) hängt so an genau einer Fassung.
 
 use super::Dokumentart;
 use crate::auftrag::repo::{snap_anzeige_fuer, EmpfaengerEingabe};
@@ -27,7 +27,7 @@ pub const VERTEILER_BEZEICHNUNG_MAX: usize = crate::auftrag::EXTERN_BEZEICHNUNG_
 
 /// Verteiler-Tabelle einer Dokumentart. Spalten: `id, einsatz_id, <dokument_spalte>,
 /// reihenfolge, empfaenger_typ, abschnitt_id, einheit_id, funktion, funktion_text,
-/// extern_kategorie, extern_bezeichnung, snap_anzeige`.
+/// extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, quittiert_von_id`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct VerteilerTabelle {
     /// Tabellenname, z. B. `befehl_verteiler`.
@@ -60,6 +60,13 @@ pub struct VerteilerEintragAnzeige {
     pub extern_bezeichnung: Option<String>,
     /// Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person.
     pub snap_anzeige: String,
+    /// Zeitpunkt der Quittung (LLH-1173); fehlt, solange der Empfänger offen ist, und immer am
+    /// Lagebericht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quittiert_at: Option<String>,
+    /// Wer quittiert hat; fehlt wie `quittiert_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quittiert_von_id: Option<i64>,
 }
 
 /// Ein Eintrag, wie ihn [`json_column`] aus SQLite liefert; die Enums prüft [`from_json`].
@@ -74,6 +81,8 @@ struct Raw {
     extern_kategorie: Option<String>,
     extern_bezeichnung: Option<String>,
     snap_anzeige: String,
+    quittiert_at: Option<String>,
+    quittiert_von_id: Option<i64>,
 }
 
 /// Unterabfrage, die den Verteiler des Dokuments `<alias>.id` als JSON-Array liefert, für die
@@ -88,7 +97,8 @@ pub(super) fn json_column<T: Dokumentart>(alias: &str) -> String {
             'id', v.id, 'empfaenger_typ', v.empfaenger_typ, 'abschnitt_id', v.abschnitt_id, \
             'einheit_id', v.einheit_id, 'funktion', v.funktion, 'funktion_text', v.funktion_text, \
             'extern_kategorie', v.extern_kategorie, 'extern_bezeichnung', v.extern_bezeichnung, \
-            'snap_anzeige', v.snap_anzeige) ORDER BY v.reihenfolge) \
+            'snap_anzeige', v.snap_anzeige, 'quittiert_at', v.quittiert_at, \
+            'quittiert_von_id', v.quittiert_von_id) ORDER BY v.reihenfolge) \
          FROM {tab} v WHERE v.{d} = {alias}.id)",
         tab = t.tabelle,
         d = t.dokument_spalte,
@@ -121,6 +131,8 @@ pub(super) fn from_json(json: &str) -> Result<Vec<VerteilerEintragAnzeige>, AppE
                 extern_kategorie,
                 extern_bezeichnung: r.extern_bezeichnung,
                 snap_anzeige: r.snap_anzeige,
+                quittiert_at: r.quittiert_at,
+                quittiert_von_id: r.quittiert_von_id,
             })
         })
         .collect()
@@ -177,7 +189,8 @@ pub async fn replace_tx<T: Dokumentart>(
 }
 
 /// Kopiert den Verteiler einer Fassung in die neue Fassung (Fortschreiben), samt Reihenfolge,
-/// Zielen und Anzeigenamen. Eine Art ohne Haken kopiert nichts.
+/// Zielen und Anzeigenamen, ohne Quittung: die neue Fassung beginnt offen (LLH-1173). Eine Art
+/// ohne Haken kopiert nichts.
 pub async fn copy_tx<T: Dokumentart>(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -202,6 +215,166 @@ pub async fn copy_tx<T: Dokumentart>(
     .execute(&mut *conn)
     .await?;
     Ok(())
+}
+
+/// Richtung einer Quittungsänderung (LLH-1173).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuittungsAktion {
+    Quittieren,
+    Zuruecknehmen,
+}
+
+/// Inhalt des ETB-Eintrags einer Quittung oder ihrer Rücknahme (Spec `befehl-quittung`). Nennt
+/// die Fassung und die laufende Nummer des Freigabe-Eintrags, nie den Titel: der ist ein
+/// Dokumenttitel, den die Schwärzung entfernt (Spec `aufbewahrung`, design.md D4).
+pub fn quittung_inhalt(
+    aktion: QuittungsAktion,
+    nomen: &str,
+    version: i64,
+    freigabe_nr: i64,
+) -> String {
+    let satz = match aktion {
+        QuittungsAktion::Quittieren => "Empfang quittiert",
+        QuittungsAktion::Zuruecknehmen => "Quittung zurückgenommen",
+    };
+    format!("{satz}: {nomen} v{version} (ETB {freigabe_nr})")
+}
+
+/// Quittiert eine Verteiler-Zeile der Fassung `dokument_id` (LLH-1173, design.md D3, D4).
+/// Liefert die frische Anzeige und die id des ETB-Eintrags, wenn einer entstanden ist.
+pub async fn quittieren_tx<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    dokument_id: i64,
+    eintrag_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
+    update_quittung_tx::<T>(
+        conn,
+        einsatz_id,
+        dokument_id,
+        eintrag_id,
+        benutzer_id,
+        Some(jetzt),
+    )
+    .await
+}
+
+/// Nimmt die Quittung einer Verteiler-Zeile zurück; Gegenstück zu [`quittieren_tx`] mit
+/// denselben Prüfungen.
+pub async fn zuruecknehmen_tx<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    dokument_id: i64,
+    eintrag_id: i64,
+    benutzer_id: i64,
+) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
+    update_quittung_tx::<T>(conn, einsatz_id, dokument_id, eintrag_id, benutzer_id, None).await
+}
+
+/// Gemeinsamer Weg beider Richtungen, auf der Transaktion des Aufrufers (`write_retry!`);
+/// `quittiert_at = Some(jetzt)` quittiert, `None` nimmt zurück.
+/// Dokument laden (404), Entwurf (422) und überholte Fassung (422) ablehnen, die Zeile im
+/// geladenen Verteiler suchen (404), dann ein bedingtes UPDATE. Nur wenn es eine Zeile ändert,
+/// entsteht der ETB-Eintrag; ein Aufruf ohne Wirkung ist erfolgreich und schreibt nichts.
+async fn update_quittung_tx<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    dokument_id: i64,
+    eintrag_id: i64,
+    benutzer_id: i64,
+    quittiert_at: Option<&str>,
+) -> Result<(super::repo::Dokument<T::Abschnitt>, Option<i64>), AppError> {
+    let t = table::<T>()?;
+    // Nur Arten mit Haken haben eine Route hierher; ohne ist es ein Fehler im Code.
+    let nomen = T::QUITTUNG.ok_or_else(|| {
+        AppError::Internal(format!("{} wird nicht quittiert", T::NOMEN_MIT_ARTIKEL))
+    })?;
+    let dok = super::repo::laden::<T>(&mut *conn, einsatz_id, dokument_id).await?;
+    if dok.status != super::STATUS_FREIGEGEBEN {
+        return Err(AppError::UnprocessableEntity(
+            "Ein Entwurf wird nicht quittiert, erst die freigegebene Fassung".into(),
+        ));
+    }
+    if !dok.is_quittierbar {
+        return Err(AppError::UnprocessableEntity(
+            "Eine neuere Fassung ist freigegeben; quittiert wird nur die jüngste".into(),
+        ));
+    }
+    let zeile = dok
+        .verteiler
+        .iter()
+        .find(|e| e.id == eintrag_id)
+        .ok_or(AppError::NotFound)?;
+    let von = zeile.snap_anzeige.clone();
+
+    let (aktion, geaendert) = match quittiert_at {
+        Some(jetzt) => (
+            QuittungsAktion::Quittieren,
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE {tab} SET quittiert_at = ?, quittiert_von_id = ? \
+             WHERE id = ? AND {d} = ? AND einsatz_id = ? AND quittiert_at IS NULL",
+                tab = t.tabelle,
+                d = t.dokument_spalte,
+            )))
+            .bind(jetzt)
+            .bind(benutzer_id),
+        ),
+        None => (
+            QuittungsAktion::Zuruecknehmen,
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE {tab} SET quittiert_at = NULL, quittiert_von_id = NULL \
+                 WHERE id = ? AND {d} = ? AND einsatz_id = ? AND quittiert_at IS NOT NULL",
+                tab = t.tabelle,
+                d = t.dokument_spalte,
+            ))),
+        ),
+    };
+    let geaendert = geaendert
+        .bind(eintrag_id)
+        .bind(dokument_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected()
+        == 1;
+
+    let mut etb_id = None;
+    if geaendert {
+        let freigabe_id = dok
+            .etb_eintrag_id
+            .ok_or_else(|| AppError::Internal("Freigabe ohne ETB-Eintrag".into()))?;
+        let freigabe_nr: i64 = sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ?")
+            .bind(freigabe_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        let inhalt = quittung_inhalt(aktion, nomen, dok.version, freigabe_nr);
+        let startwert =
+            crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
+        etb_id = Some(
+            crate::etb::repo::anlegen_tx(
+                &mut *conn,
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                crate::etb::repo::EintragDaten {
+                    typ: crate::etb::TYP_SYSTEM,
+                    inhalt: &inhalt,
+                    von: Some(&von),
+                    an: None,
+                    meldeweg: None,
+                    veranlassung: None,
+                    ereigniszeit: None,
+                    erfasst_lokal_at: None,
+                    berichtigt_eintrag_id: None,
+                },
+            )
+            .await?,
+        );
+    }
+    let neu = super::repo::laden::<T>(&mut *conn, einsatz_id, dokument_id).await?;
+    Ok((neu, etb_id))
 }
 
 /// Abschnitt „Verteiler“ für den ETB-Snapshot der Freigabe, nach den Anlagen. Ohne Verteiler

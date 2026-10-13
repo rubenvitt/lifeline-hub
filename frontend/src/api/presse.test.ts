@@ -13,7 +13,14 @@ import {
   schreibePressemitteilungFort,
   setzeMedienkontaktStatus,
 } from './presse';
-import { erfasseAnruf, ladeAnrufe, setzeAnrufStatus } from './infotelefon';
+import {
+  anrufCursor,
+  erfasseAnruf,
+  loadAnruf,
+  loadAnrufe,
+  loadAnrufZaehler,
+  setzeAnrufStatus,
+} from './infotelefon';
 
 /**
  * Clients der Presse- und Medienarbeit S5 (LFH-554). Geprüft wird, was beim Server ANKOMMT —
@@ -92,7 +99,7 @@ describe('api/presse — Pressemitteilungen', () => {
 describe('api/infotelefon', () => {
   it('liest, erfasst und setzt den Rückrufstatus', async () => {
     const a = faengeAnfragen();
-    await ladeAnrufe(7);
+    await loadAnrufe(7);
     await erfasseAnruf(7, { anliegen: 'hinweis', rueckruf: '0171', rueckruf_noetig: true });
     await setzeAnrufStatus(7, 9, 'erledigt');
     expect(a).toEqual([
@@ -103,6 +110,30 @@ describe('api/infotelefon', () => {
         body: { anliegen: 'hinweis', rueckruf: '0171', rueckruf_noetig: true },
       },
       { methode: 'POST', pfad: `${B}/infotelefon/9/status`, body: { status: 'erledigt' } },
+    ]);
+  });
+
+  it('blättert mit Filter und Cursor, zählt und holt einen Anruf einzeln (LLH-732)', async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get(`${B}/*`, ({ request }) => {
+        const url = new URL(request.url);
+        urls.push(`${url.pathname}${url.search}`);
+        return HttpResponse.json([]);
+      }),
+    );
+    await loadAnrufe(7);
+    await loadAnrufe(7, {
+      status: 'offen',
+      vor: anrufCursor({ id: 41, eingang_at: '2026-10-01 10:00:00' }),
+    });
+    await loadAnrufZaehler(7);
+    await loadAnruf(7, 41);
+    expect(urls).toEqual([
+      `${B}/infotelefon?limit=100`,
+      `${B}/infotelefon?status=offen&vor_zeit=2026-10-01+10%3A00%3A00&vor_id=41&limit=100`,
+      `${B}/infotelefon/zaehler`,
+      `${B}/infotelefon/41`,
     ]);
   });
 });
