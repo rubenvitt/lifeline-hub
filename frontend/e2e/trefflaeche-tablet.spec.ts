@@ -56,6 +56,7 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
+const FAHRZEUG = 'Florian Musterstadt-Nordwest 46-1';
 
 async function anmelden(page: Page) {
   await page.goto('/login');
@@ -79,6 +80,20 @@ async function seedeKraft(page: Page, einsatzId: string) {
   expect(
     antwort.ok(),
     `Seeding Personal: ${antwort.status()} ${await antwort.text()}`,
+  ).toBeTruthy();
+}
+
+/**
+ * Ein Fahrzeug trägt die Bestätigungsblase: Personal entlässt seit LLH-1079 ohne Rückfrage,
+ * der Zeilenknopf „Entfernen" mit `Popconfirm` steht nur noch an Fahrzeug und Material.
+ */
+async function seedeFahrzeug(page: Page, einsatzId: string) {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+    data: { adhoc: { funkrufname: FAHRZEUG } },
+  });
+  expect(
+    antwort.ok(),
+    `Seeding Fahrzeug: ${antwort.status()} ${await antwort.text()}`,
   ).toBeTruthy();
 }
 
@@ -135,21 +150,21 @@ for (const { dichte, soll } of STAFFEL) {
     // Anmelden und Anlegen am Projekt-Vorgabemaß, erst danach umstellen.
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Trefflaeche ${dichte} ${Date.now()}`);
-    await seedeKraft(page, einsatzId);
+    await seedeFahrzeug(page, einsatzId);
 
     await page.setViewportSize(TABLET);
 
     if (dichte === 'handschuh') {
       // Eine GESPEICHERTE Wahl gewinnt gegen die Zeigerart — nur so ist die Handschuh-Stufe am
       // Tablet erreichbar. `ThemeModeProvider` liest den Speicher beim Montieren.
-      await page.goto(`/einsaetze/${einsatzId}/personal`);
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
       await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
         DICHTE_SCHLUESSEL,
         dichte,
       ] as const);
       await page.reload();
     } else {
-      await page.goto(`/einsaetze/${einsatzId}/personal`);
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     }
 
     /**
@@ -193,7 +208,7 @@ for (const { dichte, soll } of STAFFEL) {
 
     // ── (c) die AKTIONSKNÖPFE einer Bestätigungsblase, nicht ihr Auslöser ─────────────
     const zeile = page.locator('tr.ant-table-row');
-    await expect(zeile, 'genau die eine geseedete Kraft').toHaveCount(1);
+    await expect(zeile, 'genau das eine geseedete Fahrzeug').toHaveCount(1);
 
     const ausloeser = zeile.getByRole('button', { name: 'Entfernen', exact: true });
     // Der Auslöser hängt an `controlHeight`, die Blasenknöpfe an `controlHeightSM` — zwei Token.
@@ -230,7 +245,7 @@ for (const { dichte, soll } of STAFFEL) {
       });
     }
 
-    // Über „Abbrechen" schließen (Bestätigen entfernte die geseedete Kraft); der Klick belegt
+    // Über „Abbrechen" schließen (Bestätigen entfernte das geseedete Fahrzeug); der Klick belegt
     // nebenbei die Bedienbarkeit.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
@@ -395,8 +410,8 @@ for (const { dichte, soll } of STAFFEL) {
     await expect(zeile, 'genau die eine geseedete Kraft').toHaveCount(1);
     await expect(zeile.getByText(KRAFT)).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Entfernen', exact: true }),
-      'Vorbedingung: ohne Schreibrecht keine Zeilenaktion „Entfernen" — sonst misst der Test den Admin-Zweig',
+      zeile.getByRole('button', { name: `${KRAFT} entlassen`, exact: true }),
+      'Vorbedingung: ohne Schreibrecht keine Zeilenaktion „Entlassen" — sonst misst der Test den Admin-Zweig',
     ).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: 'Ad-hoc-Person', exact: true }),
