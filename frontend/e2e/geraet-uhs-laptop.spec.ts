@@ -152,7 +152,7 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
     await laptop.getByRole('button', { name: 'Kraft erfassen' }).click();
     const erfassen = laptop.getByRole('dialog', { name: 'Kraft erfassen' });
     await erfassen.getByLabel('Name').fill('Bernd Berg');
-    await erfassen.getByLabel('Funktion').fill('Sanitäter');
+    await erfassen.getByLabel('Qualifikation').fill('Sanitäter');
     await waehleIn(erfassen.getByLabel('Position'), 'Mannschaft');
     await erfassen.getByRole('button', { name: 'Erfassen' }).click();
     await expect(laptop.getByTestId('uhs-staerke')).toHaveText('1/0/1//2');
