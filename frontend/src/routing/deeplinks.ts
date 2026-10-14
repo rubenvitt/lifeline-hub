@@ -143,10 +143,12 @@ export function ueberblickPfad(einsatzId: number): string {
 
 /**
  * Aggregierende Kräfteübersicht, in der Navigation „Meldebild". Der Routenschlüssel
- * `kraefteuebersicht` bleibt, damit bestehende Deeplinks tragen.
+ * `kraefteuebersicht` bleibt, damit bestehende Deeplinks tragen. `einheit` ist ein AUFTRAG
+ * (apply-then-clean, LLH-1049, Spec `kraeftebaum`, „Sprung auf eine Einheit“): Ahnen und
+ * Teilbaum der Einheit klappen auf, die Zeile wird hervorgehoben.
  */
-export function kraefteuebersichtPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
+export function kraefteuebersichtPfad(einsatzId: number, opts: { einheit?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'kraefteuebersicht'), { einheit: opts.einheit });
 }
 
 /** Tier-Liste; `?neu=1` öffnet „Tier erfassen“ (`TierePage`). */
@@ -615,6 +617,14 @@ export function einheitenPfad(einsatzId: number, opts: { einheit?: number } = {}
  */
 export function einheitDetailPfad(einsatzId: number, einheitId: number): string {
   return `${einsatzModulPfad(einsatzId, 'einheiten')}/${einheitId}`;
+}
+
+/**
+ * Seite „Einheit aus Vorlage bilden“ (LLH-1049): statisches Segment unter den Einheiten, damit sie
+ * nicht mit der Detail-ID kollidiert. Erreicht über den Dialog „Einheit bilden“.
+ */
+export function einheitAusVorlagePfad(einsatzId: number, vorlageId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'einheiten')}/aus-vorlage/${vorlageId}`;
 }
 
 /**

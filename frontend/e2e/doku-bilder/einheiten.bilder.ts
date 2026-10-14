@@ -18,7 +18,11 @@ import {
  * (`pnpm doku:bilder --grep einheiten`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gliederung.png      frontend/src/pages/EinheitenPage.tsx (Tabelle „Gliederung“,
  *                       frontend/src/kraefte/KraeftebaumZelle.tsx, components/Datensicht.tsx)
- *   einheit-bilden.png  frontend/src/pages/EinheitenPage.tsx (Dialog „Einheit bilden“)
+ *   einheit-bilden.png  frontend/src/pages/EinheitenPage.tsx (Dialog „Einheit bilden“ mit dem
+ *                       Feld „Vorlage“)
+ *   vorlage-bilden.png  frontend/src/pages/EinheitAusVorlagePage.tsx (Seite „Einheit aus Vorlage
+ *                       bilden“: Kopf, Baum der Vorlage, Aktion mit Zusammenfassung;
+ *                       frontend/src/components/Erfassung.tsx)
  *   personal.png        frontend/src/pages/EinheitDetailPage.tsx (Paneel „Personal“)
  *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)
  *
@@ -26,6 +30,10 @@ import {
  * Einheitsführer. Die Spec unterstellt die Rettungsstaffel dem Sanitätszug und setzt Anna Probe
  * als ihre Einheitsführerin. Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
  * Alarmierung (eine Spur, sonst löschte das Auflösen sie ganz) und löst sie auf (LLH-1079).
+ * Die Vorschau zeigt die Demo-Vorlage „Sanitätszug Musterstadt“ gegen den Demo-Einsatz, in dem
+ * ihre Kräfte schon den gleichnamigen Einheiten angehören: die Zeilen tragen „in «…»“ und
+ * „umhängen aus «…»“, das Namensfeld „Name schon vergeben“. Die Spec hakt RTW „Musterstadt 83-1“
+ * und Anna Probe an (LLH-1049).
  */
 
 const KAPITEL = 'einheiten';
@@ -102,6 +110,30 @@ test.describe(KAPITEL, () => {
     await dialog.getByRole('combobox', { name: 'Typ' }).blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'einheit-bilden');
+  });
+
+  test('Seite „Einheit aus Vorlage bilden“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const vorlagen = await page.request.get('/api/einheit-vorlagen');
+    expect(vorlagen.ok(), `Vorlagen: ${vorlagen.status()}`).toBe(true);
+    const zug = ((await vorlagen.json()) as { id: number; name: string }[]).find(
+      (v) => v.name === 'Sanitätszug Musterstadt',
+    );
+    expect(zug, 'Demo-Vorlage „Sanitätszug Musterstadt“').toBeDefined();
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einheiten/aus-vorlage/${zug!.id}`);
+    const formular = page.getByRole('main').locator('form');
+    await expect(formular.getByRole('heading', { name: 'Rettungsstaffel' })).toBeVisible();
+    await expect(formular.getByRole('checkbox').first()).toBeVisible();
+    // Ein RTW samt einer Person umgehängt: das Bild zeigt gesetzte Häkchen und die Zählung.
+    await formular.getByRole('checkbox', { name: /^Musterstadt 83-1/ }).check();
+    await formular.getByRole('checkbox', { name: /^Anna Probe/ }).check();
+    await expect(formular.getByText(/1 Fahrzeug, 1 Kraft$/)).toBeVisible();
+    // Ohne Fokusring im Bild.
+    await formular.getByRole('checkbox', { name: /^Anna Probe/ }).blur();
+    await page.mouse.move(0, 0);
+    await fotografiere(formular, KAPITEL, 'vorlage-bilden');
   });
 
   test('Mitglieder einer Einheit', async ({ page }) => {

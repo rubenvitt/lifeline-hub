@@ -250,7 +250,8 @@ async fn im_einsatz_fahrzeug(pool: &SqlitePool, k: Kontext, fid: i64, e: Option<
         k.benutzer_id,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .id;
     if let Some(e) = e {
         mitglied_repo::ordne_fahrzeug_zu_tx(&mut conn, k.einsatz_id, e, ef)
             .await

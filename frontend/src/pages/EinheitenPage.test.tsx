@@ -9,6 +9,8 @@ import EinheitenPage from './EinheitenPage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { einsatzFixture } from '../test/fixtures';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
+import { useLocation } from 'react-router';
 
 const tmoSprechgruppe = {
   id: 7,
@@ -79,6 +81,8 @@ function handlers(
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
+    // Ohne aktive Vorlagen zeigt der Dialog „Einheit bilden“ kein Feld „Vorlage“ (LLH-1049).
+    http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
   ];
 }
 
@@ -670,5 +674,119 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
     // Partnerhälfte, gleiches Literal: nach dem Abruf steht die Aussage da.
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Dialog „Einheit bilden“ mit Vorlage (LLH-1049, Spec `einheit-vorlagen`, „Vorlage im Dialog
+ * „Einheit bilden““, design.md D1): erstes Feld „Vorlage“ nur mit aktiven Vorlagen, mit Vorlage
+ * führt „Weiter“ auf die eigene Seite; ohne Vorlage bleibt alles wie bisher.
+ */
+describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
+  const vorlage = (id: number, name: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name,
+    typ_id: 1,
+    typ_label: 'Zug',
+    aktiv: true,
+    ist_demo: false,
+    soll_eigen: false,
+    sortier: 0,
+    fahrzeuge: [],
+    personal: [],
+    ...extra,
+  });
+  const vorlagen = [
+    vorlage(1, 'Sanitätszug Musterstadt', { ist_demo: true }),
+    vorlage(2, 'Rettungsstaffel', { ueber_vorlage_id: 1, ist_demo: true, typ_label: 'Staffel' }),
+    vorlage(3, 'Betreuungszug'),
+  ];
+
+  function Ort() {
+    const ort = useLocation();
+    return <div data-testid="ort">{ort.pathname}</div>;
+  }
+  function seite() {
+    const angelegt: unknown[] = [];
+    server.use(
+      http.get('/api/einheit-vorlagen', () => HttpResponse.json(vorlagen)),
+      ...handlers(),
+      http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
+        angelegt.push(await request.json());
+        return HttpResponse.json({ ...einheiten[0], id: 99 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+        <Route path="/einsaetze/:id/einheiten/aus-vorlage/:vorlageId" element={<Ort />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    return angelegt;
+  }
+  async function dialogMitVorlage() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('combobox', { name: 'Vorlage' });
+    return dialog;
+  }
+
+  it('„Vorlage“ ist das erste Feld; Untervorlagen mit Pfad, Demo-Vorlagen hinten', async () => {
+    seite();
+    const dialog = await dialogMitVorlage();
+    const erstes = dialog.querySelector('.ant-form-item');
+    expect(within(erstes as HTMLElement).getByRole('combobox', { name: 'Vorlage' })).toBeTruthy();
+    await oeffne('Vorlage');
+    expect(optionenVon('Vorlage')).toEqual([
+      'Betreuungszug',
+      'Sanitätszug Musterstadt',
+      'Sanitätszug Musterstadt › Rettungsstaffel',
+    ]);
+  });
+
+  it('mit Vorlage: Name und Typ weichen, „Weiter“ öffnet die Seite und legt nichts an', async () => {
+    const angelegt = seite();
+    const dialog = await dialogMitVorlage();
+    await waehle('Vorlage', 'Sanitätszug Musterstadt › Rettungsstaffel');
+    expect(within(dialog).queryByLabelText('Name')).toBeNull();
+    expect(within(dialog).queryByRole('combobox', { name: 'Typ' })).toBeNull();
+    // Feldbudget (LFH-19): ein Feld mit Vorlage; die Gegenprobe ohne Vorlage steht unten.
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(1);
+    // Enter-Struktur: ein Select schluckt Enter, also kein Fuß von antd und der Knopf im Formular.
+    const weiter = within(dialog).getByRole('button', { name: 'Weiter' });
+    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
+    expect(weiter.closest('form')).not.toBeNull();
+    await userEvent.click(weiter);
+    expect(await screen.findByTestId('ort')).toHaveTextContent(
+      '/einsaetze/1/einheiten/aus-vorlage/2',
+    );
+    expect(angelegt).toHaveLength(0);
+  });
+
+  it('ohne Vorlage bleibt der Dialog bei Name und Typ und bildet wie bisher', async () => {
+    const angelegt = seite();
+    const dialog = await dialogMitVorlage();
+    // Feldbudget drei: Vorlage, Name, Typ (Gegenprobe zum einen Feld mit Vorlage).
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+    await userEvent.type(within(dialog).getByLabelText('Name'), '2. Zug');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+    await waitFor(() => expect(angelegt).toHaveLength(1));
+    expect(angelegt[0]).toEqual({ name: '2. Zug', typ_id: null });
+  });
+
+  it('ohne aktive Vorlage fehlt das Feld', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByLabelText('Name');
+    expect(within(dialog).queryByRole('combobox', { name: 'Vorlage' })).toBeNull();
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(2);
   });
 });

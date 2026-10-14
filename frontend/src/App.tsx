@@ -62,6 +62,7 @@ import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinheitDetailPage from './pages/EinheitDetailPage';
+import EinheitAusVorlagePage from './pages/EinheitAusVorlagePage';
 import EinsatzkraftPage from './pages/EinsatzkraftPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import GefahrenPage from './pages/gefahren/GefahrenPage';
@@ -379,6 +380,8 @@ export const appRouten = createRoutesFromElements(
           {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
           <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
+          {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
+          <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />
           {/* Personenansicht einer Einsatzkraft (LLH-1060); `?personal=` bleibt Zeilenmarke der Liste. */}
           <Route path="personal/:epId" element={<EinsatzkraftPage />} />
           {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
