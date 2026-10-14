@@ -31,7 +31,7 @@ const kinds = Object.keys(GRUNDZEICHEN_NAMEN) as SymbolKind[];
 describe('grundzeichenOptionen', () => {
   it('bietet die Grundzeichenarten des Vokabulars an, jede mit deutschem Namen', () => {
     const optionen = grundzeichenOptionen();
-    expect(optionen.length).toBe(19);
+    expect(optionen.length).toBe(27);
     for (const o of optionen) {
       expect(o.label.length, o.id).toBeGreaterThan(0);
       expect(o.label).toBe(GRUNDZEICHEN_NAMEN[o.id as SymbolKind]);
@@ -93,6 +93,18 @@ describe('symbolOptionen ohne Grundzeichen', () => {
     expect(mitSymbol(null, funk.id)).toEqual({ kind: 'pictogram', pictogram: 'comms.voice' });
     expect(symbolVon(mitSymbol(null, draht.id)!)).toBe(draht.id);
     expect(zeichenName(mitSymbol(null, draht.id)!)).toBe('Sprache (Draht)');
+  });
+
+  it('bietet die Altbestände nach SKK 2010 und die Drohne mit Namen an (LLH-1159)', () => {
+    const name = (id: string) => optionen.find((o) => o.id === id)?.label;
+    expect(name('pic:comms.teleprinter-transmission')).toBe('Fernschreiben (Funk)');
+    expect(name('pic:comms.teleprinter-transmission:alternative')).toBe('Fernschreiben (Draht)');
+    expect(name('pic:comms.still-image-transmission')).toBe('Festbildübertragung (Funk)');
+    expect(name('pic:comms.still-image-transmission:alternative')).toBe(
+      'Festbildübertragung (Draht)',
+    );
+    expect(name('pic:site.affected-persons-assembly-point')).toBe('Sammelplatz für Betroffene');
+    expect(name('pic:special-form.drone')).toBe('Grundzeichen Drohne');
   });
 
   it('nennt andere zweite Darstellungen „(zweite Darstellung)“, auch an Zustand und Tierzustand', () => {

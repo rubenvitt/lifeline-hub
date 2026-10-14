@@ -26,6 +26,7 @@ import {
   drawAnySpec,
   freestandingRedirect,
   parseAnySpec,
+  referenceMovementSpec,
   serializeAnySpec,
   vocabulary,
 } from '@einsatzzeichen/core';
@@ -37,9 +38,7 @@ import {
   type CapabilityId,
   type Drawing,
   type FreestandingSpec,
-  type MovementId,
   type PictogramId,
-  type Point,
   type StateId,
   type SymbolSpec,
   type TechnicalBodyMarkId,
@@ -177,32 +176,24 @@ const EINHEIT: Record<string, Teil> = {
 // eine Fähigkeit randbündig, dann als Box versucht; freistehend ist sie das Kapitel-4-Piktogramm.
 // Ein Zustand hängt an `states` bzw. steht als `state` (Personen- und Tierzustände nach
 // `freestandingRedirect`). Eine technische Körpermarke gibt es nur im Grundzeichen, ein Körper,
-// ein Anhang-J-Piktogramm und eine Bewegung aus 5.2 nur freistehend („Grundzeichen im
-// Grundzeichen“ entfällt, D5).
+// ein Anhang-J-Piktogramm und ein fertiges Punktzeichen (`frei`, etwa ein Pfeil aus 5.2) nur
+// freistehend („Grundzeichen im Grundzeichen“ entfällt, D5). Zu einer Körpermarke kann `frei`
+// das freistehende Gegenstück nennen.
 // Mehrdeutige Symbole sind bildtreu übersetzt, also wie das Altpaket sie zeichnete.
 type SymbolNutzlast =
   | { faehigkeit: CapabilityId }
   | { zustand: StateId }
   | { tendenz: TendencyId }
-  | { marke: TechnicalBodyMarkId }
+  | { marke: TechnicalBodyMarkId; frei?: AnySpec }
   | { koerper: SymbolSpec }
   | { piktogramm: PictogramId; leitergebunden?: true }
-  | { bewegung: MovementId };
-
-// Fester waagerechter Verlauf über die Zeichenfläche, wie ihn die Bibliothek für 5.2 freistehend
-// vermisst (`blocks/parametric.ts`); ein Punktzeichen hat keinen eigenen Verlauf.
-const BEWEGUNG_VERLAUF: [Point, Point] = [
-  [2, 16],
-  [30, 16],
-];
+  | { frei: AnySpec };
 
 const kommunikation = (id: string, leitergebunden = false): SymbolNutzlast =>
   leitergebunden
     ? { piktogramm: `comms.${id}` as PictogramId, leitergebunden: true }
     : { piktogramm: `comms.${id}` as PictogramId };
 
-// Ohne Nachfolger und deshalb nicht in der Tabelle: fernschreiben(-funk),
-// festbilduebertragung(-funk), drohne.
 const SYMBOL: Record<string, SymbolNutzlast> = {
   drehleiter: { faehigkeit: 'rescue-aerial-ladder' },
   hebegeraet: { faehigkeit: 'crane-lifting' },
@@ -237,12 +228,17 @@ const SYMBOL: Record<string, SymbolNutzlast> = {
   warnung: { faehigkeit: 'loudspeaker-warning' },
   // Bildtreu: Dreieck mit gekreuzten Stangen (4.8.16).
   zelt: { faehigkeit: 'frame-tent' },
-  // SKK 2010, 7.5 „Bewegung in zwei Richtungen (z. B. Sichten, Ordnen, Verteilen)“ → 5.2.4
-  // (einsatzzeichen, Entscheidung vom 13.10.2026 zu ESZ-138). Im Grundzeichen nicht belegt.
-  sichten: { bewegung: 'movement-both-directions' },
-  sammeln: { marke: 'circle-collection-arrow' },
-  // Bildtreu F.3.12: Doppelpfeil, Stiel, V.
-  'sammelplatz-betroffene': { marke: 'circle-double-arrow-lower-v' },
+  // SKK 2010, 7.5 „Bewegung in zwei Richtungen (z. B. Sichten, Ordnen, Verteilen)“: freistehend
+  // der Pfeil 5.2.4 als Punktzeichen, im Grundzeichen nicht belegt (ESZ-138, ESZ-139).
+  sichten: { frei: referenceMovementSpec('movement-both-directions') },
+  // Im Grundzeichen die Körpermarke F.3.6, freistehend der Pfeil 5.2.6 (SKK 2010, 7.6; ESZ-139).
+  sammeln: { marke: 'circle-collection-arrow', frei: referenceMovementSpec('gathering') },
+  // Im Grundzeichen bildtreu F.3.12 (Doppelpfeil, Stiel, V), freistehend das Altzeichen
+  // SKK 2010, 10.3.23 (ESZ-139).
+  'sammelplatz-betroffene': {
+    marke: 'circle-double-arrow-lower-v',
+    frei: { kind: 'pictogram', pictogram: 'site.affected-persons-assembly-point' },
+  },
   veterinaerwesen: { faehigkeit: 'veterinary' },
   schlachten: { faehigkeit: 'slaughter-culling' },
   // Näherung: verletzt → krank (5.8.6.1).
@@ -291,11 +287,19 @@ const SYMBOL: Record<string, SymbolNutzlast> = {
   relaisfunkbetrieb: kommunikation('voice-radio-dmo-repeater'),
   richtbetrieb: kommunikation('directional-radio'),
   kabelbau: kommunikation('cable-construction'),
+  // Altzeichen SKK 2010, 8.5 und 8.6, im Raum von Anhang J (ESZ-137).
+  fernschreiben: kommunikation('teleprinter-transmission', true),
+  'fernschreiben-funk': kommunikation('teleprinter-transmission'),
+  festbilduebertragung: kommunikation('still-image-transmission', true),
+  'festbilduebertragung-funk': kommunikation('still-image-transmission'),
   vermutung: { zustand: 'suspected-situation' },
   akut: { zustand: 'acute-situation' },
   'technische-hilfeleistung': { faehigkeit: 'technical-assistance' },
   bergung: { faehigkeit: 'recovery' },
   seelsorge: { faehigkeit: 'pastoral-care' },
+  // Sonderform 3.6, freistehend (ESZ-134); im Grundzeichen gibt es sie nur als Teil eines
+  // ganzen Zeichens (Drohnentrupp), nicht an Stelle, Gefahr oder Maßnahme.
+  drohne: { piktogramm: 'special-form.drone' },
 };
 
 const PUNKT: SymbolSpec = { kind: 'point' };
@@ -415,9 +419,7 @@ function symbolFrei(n: SymbolNutzlast): AnySpec | null {
       ? { kind: 'pictogram', pictogram: n.piktogramm, variant: 'alternative' }
       : { kind: 'pictogram', pictogram: n.piktogramm };
   }
-  if ('bewegung' in n) {
-    return { kind: 'movement', movement: n.bewegung, path: { points: BEWEGUNG_VERLAUF } };
-  }
+  if ('frei' in n) return n.frei ?? null;
   return null;
 }
 
