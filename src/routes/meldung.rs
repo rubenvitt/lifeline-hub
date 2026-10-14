@@ -612,6 +612,14 @@ pub async fn auftrag_erteilen(
         validiert.daten(),
     )
     .await?;
+    crate::auftrag::benachrichtigung::erteilt(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        auftrag_id,
+        ctx.benutzer.id,
+    )
+    .await;
 
     // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board + meldung-Tag (SSE-Parität).
     if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {

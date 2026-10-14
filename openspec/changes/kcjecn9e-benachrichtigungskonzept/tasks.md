@@ -49,9 +49,9 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 6. Auftrag erteilt, quittiert, erledigt (benötigt 1, 2) · LLH-1212
 
-- [ ] 6.1 Erteilen meldet `auftrag_erteilt` an Funktions- und Personen-Empfänger; Rust-Tests „Auftrag an eine Person“, „Auftrag an eine Einheit“, „Auftrag an die eigene Funktion“
-- [ ] 6.2 Quittung und Erledigt melden an den Auftraggeber; Rust-Test „Quittung“
-- [ ] 6.3 Anwenderkapitel `auftraege` nachziehen
+- [x] 6.1 Erteilen meldet `auftrag_erteilt` an Funktions- und Personen-Empfänger; Rust-Tests „Auftrag an eine Person“, „Auftrag an eine Einheit“, „Auftrag an die eigene Funktion“
+- [x] 6.2 Quittung und Erledigt melden an den Auftraggeber; Rust-Test „Quittung“
+- [x] 6.3 Anwenderkapitel `auftraege` nachziehen
 
 ## 7. Befehl und Lagebericht im Verteiler (benötigt 1, 2) · LLH-1213
 
