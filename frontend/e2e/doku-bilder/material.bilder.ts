@@ -17,7 +17,9 @@ import {
  * (`pnpm doku:bilder --grep material`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   material.png              frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx,
  *                             frontend/src/kraefte/MaterialVerdichtung.tsx,
- *                             frontend/src/kraefte/MaterialOrt.tsx
+ *                             frontend/src/kraefte/MaterialOrt.tsx,
+ *                             frontend/src/kraefte/EinheitAngabe.tsx,
+ *                             frontend/src/kraefte/einheitAngabeKern.ts
  *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“)
  *   adhoc-material.png        frontend/src/pages/MaterialPage.tsx (Dialog „Ad-hoc-Material ohne
  *                             Stammeintrag“)

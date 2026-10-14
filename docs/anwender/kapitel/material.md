@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, migrations/0019_einsatz_material.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/einheitAngabeKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, migrations/0019_einsatz_material.sql]
 ---
 
 ## Überblick
@@ -23,12 +23,13 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
    „Meldebild“ führt ins Meldebild.
 
-   ![Materialliste mit vier Posten; darüber „2 einsatzbereit · 1 im Einsatz · 1 Ausfall“, in der Spalte „Ort“ der Sanitätsrucksack bei „Sanitätszug Musterstadt“ und „UHS Turnhalle Musterstadt“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
+   ![Materialliste mit vier Posten; darüber „2 einsatzbereit · 1 im Einsatz · 1 Ausfall“, unter jeder Bezeichnung gedämpft die Kategorie, in der Spalte „Ort“ der Sanitätsrucksack bei „Sanitätszug Musterstadt“ und „UHS Turnhalle Musterstadt“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
 
 3. Die Liste ist nach Status gruppiert. In „Bezeichnung, Kategorie, Ort“ suchen oder nach „Ort“
    und „Status“ filtern. Der Filter „Ort“ kennt „ohne Ort“, jede Einheit und jede UHS der Liste.
-4. Auf schmaleren Schirmen ist die Spalte „Kategorie“ ausgeblendet; „Spalten“ zeigt, wie viele
-   Spalten fehlen, und blendet sie wieder ein.
+4. Auf schmaleren Schirmen, auch am Fükw, ist die Spalte „Kategorie“ ausgeblendet; die Kategorie
+   steht dann gedämpft unter der Bezeichnung. „Spalten“ zeigt, wie viele Spalten fehlen, und
+   blendet sie wieder ein.
 
 ### Material aus dem Stamm disponieren
 
@@ -63,9 +64,10 @@ Für Einsatzleitung und Führungspersonal:
 1. In der Spalte „Ort“ den Einheitsnamen wählen, oder „Einheit eintragen“, wenn der Posten noch
    keiner Einheit gehört.
 2. Eine Einheit wählen, oder „keine Einheit“, um den Posten von seiner Einheit zu lösen.
-3. „Speichern“ wählen oder Enter drücken. Escape oder „Abbrechen“ lässt den Ort unverändert.
+3. „Speichern“ wählen. Escape oder „Abbrechen“ lässt den Ort unverändert.
 4. Für die UHS ebenso: den UHS-Namen oder „UHS eintragen“ wählen, eine UHS oder „keine UHS“
-   wählen und speichern. Angeboten werden geplante und aktive UHS.
+   wählen und speichern. Angeboten werden geplante und aktive UHS; eine aufgelöste UHS, an der
+   der Posten noch steht, steht gesperrt vorn in der Liste.
 
 Einheit und UHS sind zwei getrennte Angaben: Wer die Einheit wechselt, lässt die UHS stehen, und
 umgekehrt.
@@ -126,7 +128,9 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt
 
 Für Einsatzleitung und Führungspersonal, wenn ein Posten versehentlich disponiert wurde:
 
-1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Stornieren“ wählen.
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Stornieren“ wählen. Gehört der Posten
+   einer Einheit oder einer UHS, steht dort „Stornieren · zugeordnet“ gesperrt; dann zuerst den
+   Ort lösen oder den Posten aus dem Einsatz nehmen.
 2. Die Rückfrage „… stornieren?“ mit „Stornieren“ bestätigen.
 3. Lehnt die App ab, steht der Grund an der Zeile; der Posten lässt sich dann nur aus dem Einsatz
    nehmen.
