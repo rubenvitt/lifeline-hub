@@ -52,7 +52,8 @@ import { einsatzfunktionVorschlaege, funktionText } from '../kraefte/einsatzfunk
 import EinheitAngabe from '../kraefte/EinheitAngabe';
 import FahrzeugAngabe from '../kraefte/FahrzeugAngabe';
 import PositionAngabe from '../kraefte/PositionAngabe';
-import { buildEinheitGruppen, buildEinheitOptions } from '../kraefte/einteilungKern';
+import { buildEinheitGruppen } from '../kraefte/einteilungKern';
+import { buildEinheitOptions } from '../kraefte/kraeftebaumKern';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
 
 /**

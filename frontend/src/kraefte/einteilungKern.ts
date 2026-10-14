@@ -1,54 +1,19 @@
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, Einsatzabschnitt } from '../api/types';
-import { einheitenBaum, filterAktive, type EinheitKnoten } from './kraeftebaumKern';
+import { buildEinheitOptions } from './kraeftebaumKern';
 
 /**
  * Die Einteilung einer Person (LLH-1060, Spec `personal-ansicht`), rein: Gruppen der Personalliste
- * nach Einheit, Einheit- und Fahrzeugoptionen der Auswahlen, die Marke „andere Einheit“.
+ * nach Einheit, Fahrzeugoptionen der Auswahl, die Marke „andere Einheit“.
  *
  * EINE BAUMLOGIK (Regel „Eine Baumlogik der Kräfte“, `frontend/AGENTS.md`): Folge und Pfad kommen
- * aus {@link einheitenBaum} des Kräftebaums; dieser Kern bildet ihn nur ab und baut keinen eigenen.
+ * aus {@link buildEinheitOptions} des Kräftebaums, dieselben Optionen wie in der Einheit-Auswahl;
+ * dieser Kern bildet sie nur ab und baut keinen eigenen Baum.
  */
 
 /** Gruppenschlüssel der Personen ohne Einheit. */
 export const OHNE_EINHEIT = 'ohne';
 /** Gruppenschlüssel einer Person, deren Einheit nicht in der geladenen Liste steht. */
 const UNBEKANNTE_EINHEIT = 'unbekannt';
-/** Trenner im Pfad einer Untereinheit („Zug 1 › Staffel A“). */
-export const PFAD_TRENNER = ' › ';
-
-/** Eine Einheit als Auswahlwert: Pfad als Etikett, Tiefe für den Einzug. */
-export interface EinheitOption {
-  id: number;
-  name: string;
-  /** Name samt Vorfahren („Zug 1 › Staffel A“); bei einer Wurzel der Name. */
-  pfad: string;
-  /** 0 = oberste Einheit. */
-  tiefe: number;
-}
-
-/**
- * Die Einheiten in der Folge des Kräftebaums (Tiefensuche, Geschwister nach Abschnittsrang, dann
- * Eingabefolge), je mit Pfad. Ohne Abschnitte (Modul nicht freigegeben) gilt die Eingabefolge.
- * Eine aufgelöste Einheit steht nicht zur Wahl (LLH-1079).
- */
-export function buildEinheitOptions(
-  einheiten: readonly Einheit[],
-  abschnitte: readonly Einsatzabschnitt[],
-): EinheitOption[] {
-  const ergebnis: EinheitOption[] = [];
-  const visit = (knoten: EinheitKnoten, vorfahren: readonly string[]) => {
-    const pfad = [...vorfahren, knoten.einheit.name];
-    ergebnis.push({
-      id: knoten.einheit.id,
-      name: knoten.einheit.name,
-      pfad: pfad.join(PFAD_TRENNER),
-      tiefe: vorfahren.length,
-    });
-    for (const kind of knoten.kinder) visit(kind, pfad);
-  };
-  for (const wurzel of einheitenBaum(filterAktive(einheiten), abschnitte)) visit(wurzel, []);
-  return ergebnis;
-}
 
 /** Gruppenachse der `Datensicht` (Schlüssel, Etikett, feste Folge). */
 export interface EinheitGruppen {

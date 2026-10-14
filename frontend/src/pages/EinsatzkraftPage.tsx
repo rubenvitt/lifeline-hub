@@ -52,7 +52,7 @@ import EinsatzfunktionZelle from '../kraefte/EinsatzfunktionZelle';
 import FahrzeugAngabe from '../kraefte/FahrzeugAngabe';
 import KraftZeitachse from '../kraefte/KraftZeitachse';
 import PositionAngabe from '../kraefte/PositionAngabe';
-import { buildEinheitOptions } from '../kraefte/einteilungKern';
+import { buildEinheitOptions } from '../kraefte/kraeftebaumKern';
 import { einsatzfunktionVorschlaege, funktionText } from '../kraefte/einsatzfunktionKern';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';

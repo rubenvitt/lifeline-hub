@@ -3,7 +3,6 @@ import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, Einsatzabschnitt } from
 import {
   OHNE_EINHEIT,
   buildEinheitGruppen,
-  buildEinheitOptions,
   buildFahrzeugOptions,
   isFremdesFahrzeug,
 } from './einteilungKern';
@@ -74,29 +73,6 @@ describe('buildEinheitGruppen', () => {
     expect(schluessel).not.toBe(OHNE_EINHEIT);
     expect(g.etikett(schluessel, 1)).not.toMatch(/99/);
     expect(g.reihenfolge).not.toContain(schluessel);
-  });
-});
-
-// ── Einheitoptionen (D14) ────────────────────────────────────────────────────
-
-describe('buildEinheitOptions', () => {
-  it('liefert die Einheiten in Baumfolge mit Pfad und Tiefe', () => {
-    const optionen = buildEinheitOptions(
-      [einheit(3, 'Staffel A', 2), einheit(1, 'Rettungsstaffel'), einheit(2, 'Zug 1')],
-      [],
-    );
-    expect(optionen.map((o) => [o.id, o.pfad, o.tiefe])).toEqual([
-      [1, 'Rettungsstaffel', 0],
-      [2, 'Zug 1', 0],
-      [3, 'Zug 1 › Staffel A', 1],
-    ]);
-  });
-
-  it('bietet keine aufgelöste Einheit an', () => {
-    const aufgeloest = { ...einheit(4, 'Alter Zug'), aufgeloest_at: '2026-10-13T10:00:00Z' };
-    expect(
-      buildEinheitOptions([einheit(1, 'Rettungsstaffel'), aufgeloest], []).map((o) => o.id),
-    ).toEqual([1]);
   });
 });
 
