@@ -158,7 +158,7 @@ test.describe(KAPITEL, () => {
     await page.getByRole('button', { name: 'Ad-hoc-Person' }).click();
     const dialog = page.getByRole('dialog', { name: 'Ad-hoc-Person disponieren' });
     await dialog.getByLabel('Name').fill('Dr. Schmidt');
-    await dialog.getByLabel('Funktion').fill('Notarzt');
+    await dialog.getByLabel('Qualifikation').fill('Notarzt');
     await dialog.getByLabel('Trägerorganisation').fill('KV Musterstadt');
     await dialog.getByLabel('Trägerorganisation').blur();
     await page.mouse.move(0, 0);

@@ -33,6 +33,32 @@ describe('AdhocPersonModal', () => {
     expect(body).toEqual({ adhoc: expect.objectContaining({ name: 'Dr. Schmidt' }) });
   });
 
+  it('nennt das Freitextfeld „Qualifikation“ und begrenzt die Texte (LLH-1067)', async () => {
+    let body: unknown;
+    server.use(
+      http.post('/api/einsaetze/1/personal', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ id: 78, einsatz_id: 1, name: 'Dr. Schmidt' }, { status: 201 });
+      }),
+    );
+    renderMitProviders(<AdhocPersonModal offen einsatzId={1} onSchliessen={vi.fn()} />);
+
+    const name = await screen.findByLabelText('Name');
+    const qualifikation = screen.getByLabelText('Qualifikation');
+    const traeger = screen.getByLabelText('Trägerorganisation');
+    expect(screen.queryByLabelText('Funktion')).toBeNull();
+    for (const feld of [name, qualifikation, traeger]) {
+      expect(feld).toHaveAttribute('maxlength', '200');
+    }
+    await userEvent.type(name, 'Dr. Schmidt');
+    await userEvent.type(qualifikation, 'Notarzt');
+    await userEvent.click(screen.getByRole('button', { name: 'Disponieren' }));
+    // Auf dem Draht bleibt das Feld `funktion` (design.md D2).
+    await waitFor(() =>
+      expect(body).toEqual({ adhoc: expect.objectContaining({ funktion: 'Notarzt' }) }),
+    );
+  });
+
   it('bietet „Speichern und nächste" nur im Serienmodus an', async () => {
     const { unmount } = renderMitProviders(
       <AdhocPersonModal offen einsatzId={1} onSchliessen={() => {}} />,
