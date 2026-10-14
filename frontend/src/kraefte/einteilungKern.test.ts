@@ -91,6 +91,13 @@ describe('buildEinheitOptions', () => {
       [3, 'Zug 1 › Staffel A', 1],
     ]);
   });
+
+  it('bietet keine aufgelöste Einheit an', () => {
+    const aufgeloest = { ...einheit(4, 'Alter Zug'), aufgeloest_at: '2026-10-13T10:00:00Z' };
+    expect(
+      buildEinheitOptions([einheit(1, 'Rettungsstaffel'), aufgeloest], []).map((o) => o.id),
+    ).toEqual([1]);
+  });
 });
 
 // ── Fahrzeugoptionen (D5) ────────────────────────────────────────────────────

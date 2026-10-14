@@ -1,5 +1,5 @@
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, Einsatzabschnitt } from '../api/types';
-import { einheitenBaum, type EinheitKnoten } from './kraeftebaumKern';
+import { einheitenBaum, filterAktive, type EinheitKnoten } from './kraeftebaumKern';
 
 /**
  * Die Einteilung einer Person (LLH-1060, Spec `personal-ansicht`), rein: Gruppen der Personalliste
@@ -29,6 +29,7 @@ export interface EinheitOption {
 /**
  * Die Einheiten in der Folge des Kräftebaums (Tiefensuche, Geschwister nach Abschnittsrang, dann
  * Eingabefolge), je mit Pfad. Ohne Abschnitte (Modul nicht freigegeben) gilt die Eingabefolge.
+ * Eine aufgelöste Einheit steht nicht zur Wahl (LLH-1079).
  */
 export function buildEinheitOptions(
   einheiten: readonly Einheit[],
@@ -45,7 +46,7 @@ export function buildEinheitOptions(
     });
     for (const kind of knoten.kinder) besuche(kind, pfad);
   };
-  for (const wurzel of einheitenBaum(einheiten, abschnitte)) besuche(wurzel, []);
+  for (const wurzel of einheitenBaum(filterAktive(einheiten), abschnitte)) besuche(wurzel, []);
   return ergebnis;
 }
 
