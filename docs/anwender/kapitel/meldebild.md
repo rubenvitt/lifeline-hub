@@ -74,7 +74,7 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
 ### Die Zeitachse einer Kraft ansehen
 
 1. Unter „Einheiten“ eine Einheit öffnen und zum Paneel „Zeitachse“ gehen. Für eine Person unter
-   „Personal“ ihre Zeile aufklappen.
+   „Personal“ ihren Namen wählen; ihre Ansicht trägt dasselbe Paneel.
 2. Die Dauerzeile lesen, etwa „Im Einsatz 4 h 47 · seit Alarmierung 07:24 · gesamt 4 h 47“. Nach
    einer Entlassung oder Ablösung steht dort die Ruhezeit.
 
@@ -160,8 +160,9 @@ Ereignisse werden nie geändert oder gelöscht, nur gestrichen. Die Streichung i
 Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „gesamt“ addiert alle
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
 sondern „—“. Grenzwerte und Warnungen gibt es nicht; die Zahl steht neutral da. Die Dauer erscheint
-im Meldebild unter „Im Einsatz“, bei Einheiten im Paneel „Zeitachse“ und im Personal in den Spalten
-„Einsatzdauer“ und „Ruhe“. Der Stab zeigt sie nicht.
+im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im Paneel „Zeitachse“ ihrer Ansicht und
+in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“ (diese unter „Spalten“). Der Stab
+zeigt sie nicht.
 
 ### Rechte
 

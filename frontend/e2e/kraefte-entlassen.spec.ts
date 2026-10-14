@@ -2,10 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
- * Kräfte entlassen statt löschen (LLH-1079), Durchstich im Browser: „Entlassen“ an der Zeile
- * schreibt die Entlassung in die Zeitachse der Person und legt sie in den Block „Entlassen“; der
- * Rückgängig-Hinweis disponiert sie wieder, ihre Zeitachse bleibt mit der Entlassung stehen.
- * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
+ * Kräfte entlassen statt löschen (LLH-1079), Durchstich im Browser: „Entlassen“ in der
+ * Personenansicht (seit LLH-1060 nur dort) schreibt die Entlassung in die Zeitachse der Person;
+ * die Ansicht bleibt lesbar mit der Marke „entlassen“, die Liste legt die Person in den Block
+ * „Entlassen“, dessen Name zurück in die Ansicht führt. Der Rückgängig-Hinweis disponiert sie
+ * wieder, ihre Zeitachse bleibt mit der Entlassung stehen. Gewartet wird auf Inhaltsanker, nie
+ * auf `networkidle` (LFH-385).
  */
 
 const NAME = 'Entlassen, Erika';
@@ -30,32 +32,56 @@ async function seedePerson(page: Page): Promise<string> {
   return einsatzId;
 }
 
-test('Entlassen legt die Kraft in den Block „Entlassen“, Rückgängig holt sie mit Zeitachse zurück', async ({
+test('Entlassen aus der Ansicht legt die Kraft in den Block „Entlassen“, Rückgängig holt sie mit Zeitachse zurück', async ({
   page,
 }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await seedePerson(page);
   await page.goto(`/einsaetze/${einsatzId}/personal`);
   const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
-  await expect(region.getByText(NAME)).toBeVisible();
+  // Die Liste trägt keine Löschbedienung; der Name öffnet die Ansicht.
+  await expect(region.getByRole('link', { name: NAME })).toBeVisible();
+  await expect(region.getByRole('button', { name: `${NAME} entlassen` })).toHaveCount(0);
+  await region.getByRole('link', { name: NAME }).click();
+  const main = page.getByRole('main');
+  const titel = page.getByRole('heading', { level: 1 });
+  await expect(titel).toContainText(NAME);
 
   // Umkehrbar: keine Rückfrage, der Hinweis bietet „Rückgängig“.
-  await region.getByRole('button', { name: `${NAME} entlassen` }).click();
+  await main.getByRole('button', { name: `${NAME} entlassen` }).click();
   const hinweis = page.locator('.ant-message-notice').filter({ hasText: `${NAME} entlassen` });
   await expect(hinweis).toBeVisible();
-  await expect(region.getByText(NAME)).toHaveCount(0);
-  const block = page.locator('[data-lfh="entlassen-block"]');
-  await expect(block.getByText('Entlassen (1)')).toBeVisible();
-  await block.getByText('Entlassen (1)').click();
-  await expect(block.getByRole('list', { name: 'Entlassen' }).getByText(NAME)).toBeVisible();
-
-  await hinweis.getByRole('button', { name: 'Rückgängig' }).click();
-  await expect(region.getByText(NAME)).toBeVisible();
-  await expect(block).toHaveCount(0);
+  // Die Ansicht bleibt lesbar: Marke „entlassen“, „Erneut disponieren“ statt „Entlassen“.
+  await expect(titel).toContainText('entlassen');
+  await expect(main.getByRole('button', { name: 'Erneut disponieren' })).toBeVisible();
 
   // Die Zeitachse trägt die Entlassung aus der Disposition.
-  await region.getByRole('button', { name: `Zeitachse zu ${NAME}` }).click();
-  const ereignisse = region.locator('[data-lfh="zeitachse-ereignis"]');
+  const ereignisse = main.locator('[data-lfh="zeitachse-ereignis"]');
   await expect(ereignisse.filter({ hasText: 'Entlassung' })).toHaveCount(1);
   await expect(ereignisse.filter({ hasText: 'aus dem Einsatz entlassen' })).toHaveCount(1);
+
+  await hinweis.getByRole('button', { name: 'Rückgängig' }).click();
+  await expect(main.getByRole('button', { name: `${NAME} entlassen` })).toBeVisible();
+  await expect(titel).not.toContainText('entlassen');
+  // Die Zeitachse bleibt mit der Entlassung stehen.
+  await expect(ereignisse.filter({ hasText: 'Entlassung' })).toHaveCount(1);
+
+  // Erneut entlassen, dann über die Brotkrume zur Liste: dort steht der Block „Entlassen“.
+  await main.getByRole('button', { name: `${NAME} entlassen` }).click();
+  await expect(titel).toContainText('entlassen');
+  await page
+    .locator('.ant-breadcrumb')
+    .getByRole('link', { name: 'Personal', exact: true })
+    .click();
+  await expect(region.getByRole('link', { name: NAME })).toHaveCount(0);
+  const block = page.locator('[data-lfh="entlassen-block"]');
+  await block.getByText('Entlassen (1)').click();
+  const eintrag = block.getByRole('list', { name: 'Entlassen' }).getByRole('link', { name: NAME });
+  await expect(eintrag).toHaveAttribute(
+    'href',
+    new RegExp(`/einsaetze/${einsatzId}/personal/\\d+$`),
+  );
+  await eintrag.click();
+  await expect(titel).toContainText(NAME);
+  await expect(titel).toContainText('entlassen');
 });

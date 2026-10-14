@@ -50,12 +50,20 @@ async function anmelden(page: Page) {
 }
 
 /** Seeding per `page.request`: die Session ist Cookie-basiert, der Jar wird geteilt. */
-async function seede(page: Page, einsatzId: string, pfad: string, data: unknown, was: string) {
+async function seede(
+  page: Page,
+  einsatzId: string,
+  pfad: string,
+  data: unknown,
+  was: string,
+): Promise<number> {
   const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
   expect(antwort.ok(), `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return ((await antwort.json()) as { id: number }).id;
 }
 
-async function seedeAlles(page: Page, einsatzId: string) {
+/** Liefert die ID der Kraft für die Personenansicht. */
+async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
   await seede(
     page,
     einsatzId,
@@ -63,11 +71,18 @@ async function seedeAlles(page: Page, einsatzId: string) {
     { adhoc: { funkrufname: FUNKRUFNAME, fahrzeugtyp: 'LF 20' } },
     'Fahrzeug',
   );
-  await seede(
+  // Langer Träger: Funktion, Träger und Einsatzdauer stehen in der Kopfzeile der Personenansicht.
+  const kraftId = await seede(
     page,
     einsatzId,
     'personal',
-    { adhoc: { name: KRAFT, funktion: 'Abschnittsleitung' } },
+    {
+      adhoc: {
+        name: KRAFT,
+        funktion: 'Abschnittsleitung',
+        traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+      },
+    },
     'Personal',
   );
   await seede(
@@ -78,6 +93,7 @@ async function seedeAlles(page: Page, einsatzId: string) {
     'Material',
   );
   await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');
+  return kraftId;
 }
 
 /**
@@ -116,10 +132,12 @@ async function keinQuerlauf(
     .toBeLessThanOrEqual(SUBPIXEL);
 }
 
-test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async ({ page }) => {
+test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über, auch die Personenansicht nicht', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Kraefte schmal ${Date.now()}`);
-  await seedeAlles(page, einsatzId);
+  const kraftId = await seedeAlles(page, einsatzId);
 
   await page.setViewportSize(HANDSCHIRM);
 
@@ -129,6 +147,8 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
     ['personal', KRAFT],
     ['material', MATERIAL],
     ['einheiten', '1. Zug'],
+    // Die Personenansicht (LLH-1060): ihr Kopf trägt Funktion, Träger und Einsatzdauer.
+    [`personal/${kraftId}`, 'Freiwillige Feuerwehr Musterstadt-Nordwest'],
   ];
   for (const [modul, wortlaut] of routen) {
     await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut);
@@ -136,8 +156,9 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
 });
 
 /**
- * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser und
- * „Entlassen" (Material: „Aus dem Einsatz nehmen"), der Kopf seine Dispositionsfelder,
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser, die
+ * Personalkarte die Inline-Angaben der Einteilung, die Materialkarte „Aus dem Einsatz nehmen",
+ * der Kopf seine Dispositionsfelder,
  * Einheiten und Meldebild ihre Primäraktion.
  * Gemessen wird wie oben, dazu das Meldebild (`kraefteuebersicht`), das im Nur-Lese-Zweig
  * ebenfalls Knöpfe verliert.
@@ -151,7 +172,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
   test.slow();
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Kraefte schmal lesend ${Date.now()}`);
-  await seedeAlles(page, einsatzId);
+  const kraftId = await seedeAlles(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   await page.setViewportSize(HANDSCHIRM);
@@ -193,19 +214,42 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
           'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
         ).toHaveCount(0);
-        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entlassen". Einzige
-        // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552) — er steht in jeder
-        // Rolle und wird hier eigens gezählt.
+        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser und die Inline-Angaben
+        // der Einteilung. Seit LLH-1060 gibt es keinen Aufklapper der Zeitachse mehr; der Name
+        // führt in die Personenansicht, in jeder Rolle.
         await expect(
-          karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
-          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht kein schreibendes Bedienziel',
+          karte.getByRole('button'),
+          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht keinen Knopf',
         ).toHaveCount(0);
         await expect(
-          karte.getByRole('button', { name: `Zeitachse zu ${KRAFT}` }),
-          'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
+          karte.getByRole('link', { name: KRAFT }),
+          'Vorbedingung: der Name führt in die Personenansicht',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);
+      },
+    ],
+    [
+      // Die Personenansicht (LLH-1060) im Nur-Lese-Zweig: Hinweis statt Bedienung.
+      `personal/${kraftId}`,
+      'Freiwillige Feuerwehr Musterstadt-Nordwest',
+      async () => {
+        await expect(
+          hauptteil.getByText(/^Nur Ansicht/).first(),
+          'Vorbedingung: der Hinweis „Nur Ansicht“ steht',
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: `${KRAFT} entlassen` }),
+          'Vorbedingung: ohne Schreibrecht kein „Entlassen“',
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Stornieren' }),
+          'Vorbedingung: ohne Schreibrecht kein „Stornieren“',
+        ).toHaveCount(0);
+        await expect(
+          hauptteil.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
+          'Vorbedingung: keine Angabe ist bearbeitbar',
+        ).toHaveCount(0);
       },
     ],
     [

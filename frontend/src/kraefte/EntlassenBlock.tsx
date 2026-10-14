@@ -1,5 +1,6 @@
 import { Button, Collapse, Space, Typography } from 'antd';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { KennungsLink } from '../components/kennungsLink';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { abstand } from '../theme/tokens';
@@ -28,6 +29,11 @@ export interface EntlassenBlockProps {
     onKlick: (id: number) => void;
     laeuft: (id: number) => boolean;
   };
+  /**
+   * Ansicht eines Eintrags: macht den Namen zum Link (LLH-1060 D8, Personenansicht). Fehlt es,
+   * steht der Name als Text.
+   */
+  ziel?: (id: number) => string;
   /** Grund einer Ablehnung am Eintrag (`useZeilenFehler`). */
   fehler?: (id: number) => ZeilenGrund | null;
   /** Aufgeklappt erzwingen, etwa im Druck: ein eingeklappter Block fehlte auf dem Blatt. */
@@ -45,6 +51,7 @@ export default function EntlassenBlock({
   endeWort,
   eintraege,
   aktion,
+  ziel,
   fehler,
   aufgeklappt,
 }: EntlassenBlockProps) {
@@ -72,7 +79,7 @@ export default function EntlassenBlock({
                 <li key={e.id}>
                   <Space wrap size="middle">
                     <span>
-                      {e.name}
+                      {ziel ? <KennungsLink to={ziel(e.id)}>{e.name}</KennungsLink> : e.name}
                       {e.zusatz ? (
                         <Typography.Text type="secondary"> · {e.zusatz}</Typography.Text>
                       ) : null}

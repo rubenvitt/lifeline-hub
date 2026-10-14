@@ -794,9 +794,15 @@ Quelle der Wahrheit: `frontend/src/routing/deeplinks.ts` — keine Template-Lite
 Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`).
 
 - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` bei Vollseiten-Detail (uhs, br, lagebericht,
-  befehl, person, tier, schaden), sonst **Query-Param** `?<modul>=<id>` (`?einheit=`,
-  `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB
-  `?eintrag=`); `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+  befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
+  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
+  `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+- **Zwei Bestands-Params neben einer Item-Route** (LLH-1060 D2): `?einheit=` an der
+  Einheitenliste leitet auf `einheitDetailPfad` weiter (am Meldebild ist `?einheit=` ein Auftrag,
+  `kraefteuebersichtPfad`, LLH-1049). `?personal=` bleibt **Zeilenmarke** der Personalliste
+  (`personalPfad`): Lagekarte, Schaden und Meldebild springen auf die hervorgehobene Zeile, um
+  die Person im Vergleich zu zeigen; Sprungpalette, Namenslink und Block „Entlassen“ öffnen die
+  Personenansicht (`einsatzkraftPfad`), ihre Brotkrume führt auf die Zeilenmarke zurück.
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
 - **Filter gehören in die URL** (`etbPfad`/`parseEtbFilter`, `mitQuery` kodiert). Unbekannter

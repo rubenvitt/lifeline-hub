@@ -1,0 +1,10 @@
+/* Kopf-Meta der Personenansicht (LLH-1060): unter `md` steht sie auf eigener Zeile
+   (`components/EinsatzSeite.css`) und bricht dort um; Funktion, Träger und Einsatzdauer liefen
+   bei 390 px sonst quer über die Seite (gemessen 83–205 px Überlauf). Ab `md` bleibt sie in der
+   Titelzeile einzeilig: dort bräche sie beim Eintreffen der Dauer um, und alles darunter rückte
+   (CLS 0,224 bei 1280 px). Gemessen in `e2e/kraefte-schmal.spec.ts`. */
+@media (max-width: 767.98px) {
+  .lfh-personenkopf-meta {
+    white-space: normal;
+  }
+}
