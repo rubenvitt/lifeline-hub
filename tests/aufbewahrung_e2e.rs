@@ -181,6 +181,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/routes/einsatz_einheit.rs",
+        funktion: "bilden",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Besatzung, die beim Führen eines Fahrzeugs als eigene Einheit mitkommt, wenn ad-hoc extern (LLH-1073 D9/D10)",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_einheit.rs",
         funktion: "personal_zuordnen",
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,
@@ -206,6 +213,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "freigegebenes Besatzungsmitglied, wenn ad-hoc extern",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_fahrzeug.rs",
+        funktion: "besatzung_uebernehmen",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Kräfte der Einheit, in einem Schritt als Besatzung übernommen, wenn ad-hoc extern (LLH-1073 D12)",
     },
     Ausnahme {
         datei: "src/einsatz/fuehrungsstelle.rs",

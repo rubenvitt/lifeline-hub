@@ -806,7 +806,6 @@ export default function Schnellerfassung({
   const feldKnopf = (
     <Button
       ref={feldKnopfRef}
-      type="dashed"
       disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
@@ -841,7 +840,6 @@ export default function Schnellerfassung({
          den Knopf in ein zweites `role="button"` mit eigenem Tabstopp. So bleibt EIN Bedienziel,
          und die Höhe kommt aus `controlHeight`. */}
       <Button
-        type="dashed"
         disabled={!online || sendet || anGrenze}
         aria-describedby={anhangGrund != null ? anhangGrundId : undefined}
         icon={

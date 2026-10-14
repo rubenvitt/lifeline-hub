@@ -63,6 +63,7 @@ import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinheitDetailPage from './pages/EinheitDetailPage';
 import EinheitAusVorlagePage from './pages/EinheitAusVorlagePage';
+import EinsatzkraftPage from './pages/EinsatzkraftPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
@@ -384,6 +385,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
           {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
           <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />
+          {/* Personenansicht einer Einsatzkraft (LLH-1060); `?personal=` bleibt Zeilenmarke der Liste. */}
+          <Route path="personal/:epId" element={<EinsatzkraftPage />} />
           {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
           {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}

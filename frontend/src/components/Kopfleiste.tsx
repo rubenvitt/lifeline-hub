@@ -321,11 +321,11 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * Störung (VERBINDE, WARTET, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
  * Kanal (WCAG 1.4.1).
  *
- * `haeltStartPlatz` (im Einsatz-Kopf ab `xl`): das Wort hält die Breite von „VERBINDE“
- * (LLH-1158, {@link WortPlatz}). Der Verbindungsaufbau beim Start wechselt es ohne Zutun auf
- * „SYNC“, und dort hängt der Umbruch an der Breite der rechten Gruppe. Nicht zusammen mit
- * `ruheOhneWort`: dort steht „SYNC“ nur als Icon, und der Platz machte nur Störungswörter
- * breiter.
+ * `haeltStartPlatz` (im Einsatz-Kopf ab `xl`, in `handschuh` auch darunter, LLH-1232): das Wort
+ * hält die Breite von „VERBINDE“ (LLH-1158, {@link WortPlatz}). Der Verbindungsaufbau beim Start
+ * wechselt es ohne Zutun auf „SYNC“, und dort hängt der Umbruch an der Breite der rechten Gruppe.
+ * Nicht zusammen mit `ruheOhneWort`: dort steht „SYNC“ nur als Icon, und der Platz machte nur
+ * Störungswörter breiter.
  */
 export function syncZeigtWort(
   zustand: Exclude<SyncZustand, 'ruhe'>,

@@ -6,8 +6,8 @@
 //!
 //! EINE Tür (Lesezugriff auf den Einsatz) und ein **Filter je Event** nach den erlaubten
 //! Modulen — sonst läse, wer irgendeinen Stream öffnen darf, jedes Event mit, inkl. ETB- und
-//! Chat-Volltexten. Eine Benachrichtigung filtert zusätzlich nach ihren Empfängern (LLH-1207,
-//! [`crate::live::LiveNachricht::sichtbar_fuer`]).
+//! Chat-Volltexten. Eine Benachrichtigung geht zusätzlich nur an ihre Empfänger, jede Verbindung
+//! mit der Nutzlast ihres Nutzers (LLH-1207, [`crate::live::LiveNachricht::fuer`]).
 //!
 //! **Revokation = Snapshot:** die erlaubten Module werden einmal beim Verbindungsaufbau
 //! berechnet; ein Rechteentzug wirkt erst beim Reconnect. Den erzwingt die Lebensdauer jedes
@@ -69,13 +69,14 @@ pub async fn stream(
     // (bzw. `lagged` bei Ring-Overflow/Neustart). Der Filter greift auf beiden Wegen.
     // Danach die Position des Abonnements als `id:` ohne Daten (LFH-922, design.md D4).
     // Benachrichtigungen (LLH-1207, design.md D2) gehen nur an die Verbindungen ihrer Empfänger,
-    // auch im Replay: der Filter sieht die ganze Nachricht samt interner Empfängerliste.
+    // auch im Replay, je mit der Nutzlast dieses Nutzers: der Filter sieht die ganze Nachricht
+    // samt interner Empfängerliste und gibt die Fassung dieser Verbindung weiter.
     let seit = crate::routes::support::last_event_id(&headers);
     let (replay, rx, position) = state.live.abonniere_mit_position(einsatz_id, seit);
     let benutzer_id = ctx.benutzer.id;
     let einsatz_strom =
         crate::routes::support::sse_stream_mit_replay(replay, rx, position, move |n| {
-            n.sichtbar_fuer(benutzer_id, &erlaubt)
+            n.fuer(benutzer_id, &erlaubt)
         });
     // Org-Ereignisse ohne `id:` und ohne Replay (LFH-734, design.md D4); gefiltert gegen den Benutzer,
     // nicht gegen die Modulrechte des Einsatzes. Ein Gerät kennt weder Einsatzliste noch

@@ -588,8 +588,22 @@ export function parseSchaedenDruckAuswahl(params: URLSearchParams): SchaedenDruc
   };
 }
 
+/**
+ * Personalliste; `?personal=<id>` ist die ZEILENMARKE (hebt die Zeile hervor, LLH-1060 D2): Lagekarte,
+ * Schaden und die Brotkrume der Personenansicht springen hierher. Die Ansicht selbst öffnet
+ * {@link einsatzkraftPfad}.
+ */
 export function personalPfad(einsatzId: number, opts: { personal?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'personal'), { personal: opts.personal });
+}
+
+/**
+ * Personenansicht einer Einsatzkraft (LLH-1060, Spec `personal-ansicht`): Vollseite mit Einteilung,
+ * Person, Zeitachse und „Aus dem Einsatz“. Das Segment bleibt `personal`, damit `modulAusPfad` die
+ * Seite nach dem Modul Personal gatet. `epId` ist `einsatz_personal.id`.
+ */
+export function einsatzkraftPfad(einsatzId: number, epId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'personal')}/${epId}`;
 }
 
 export function einheitenPfad(einsatzId: number, opts: { einheit?: number } = {}): string {

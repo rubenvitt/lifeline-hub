@@ -25,6 +25,7 @@ import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
+import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
 import { ZeilenFehler } from './SpeicherHinweis';
@@ -293,6 +294,12 @@ export type Kartenplan<T, K extends string> =
       aktion?: PrimaerAktion<T>;
       /** Gebündelte weitere Aktionen neben der Primäraktion — siehe {@link WeitereAktionen}. */
       weitere?: WeitereAktionen<T>;
+      /**
+       * Aktionen UNTER dem Karteninhalt statt rechts daneben (`ListenEintrag` `gestapelt`). Für
+       * eine Primäraktion mit langem Etikett: „Aus dem Einsatz nehmen“ ließ dem Inhalt auf 390 px
+       * keine 60 px, der Titel brach Buchstabe für Buchstabe um (LLH-1093, Prüfliste).
+       */
+      gestapelt?: true;
     }
   | {
       art: 'eigen';
@@ -806,6 +813,23 @@ interface FensterTraeger {
  */
 const FensterKontext = createContext<FensterTraeger | null>(null);
 
+/**
+ * Die Schlüssel der Spalten, die die Tabelle gerade zeigt; `null` im Kartenzweig. Aus derselben
+ * Sichtbarkeitswahrheit wie Zähler und Häkchen (Breite UND Handwahl, `sichtbareSpalten`).
+ */
+const GezeigteSpaltenKontext = createContext<ReadonlySet<string> | null>(null);
+
+/**
+ * `true`, solange die Tabelle steht und die Spalte `key` darin ausgeblendet ist, per Breite oder
+ * von Hand. Für eine Zelle, die den Wert einer weggefallenen Spalte mitträgt (Materialliste:
+ * Kategorie als zweite Zeile unter der Bezeichnung, LLH-1093). Im Kartenzweig `false`: die Karte
+ * hat ihren eigenen Plan.
+ */
+export function useSpalteAusgeblendet(key: string): boolean {
+  const gezeigt = useContext(GezeigteSpaltenKontext);
+  return gezeigt != null && !gezeigt.has(key);
+}
+
 function Platzhalterzeile(props: {
   hoehe: number;
   spalten: number;
@@ -1048,6 +1072,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const { spalten: gezeigteSpalten } = useMemo(
     () => sichtbareSpalten({ spalten, verborgen, eingeblendet, abBreite }),
     [spalten, verborgen, eingeblendet, abBreite],
+  );
+  const gezeigteSpaltenSchluessel = useMemo(
+    () => new Set(gezeigteSpalten.map((s) => s.key as string)),
+    [gezeigteSpalten],
   );
 
   /**
@@ -1837,72 +1865,74 @@ export default function Datensicht<T extends object, const K extends string>(
     : undefined;
 
   const tabelle = (
-    <FensterKontext.Provider value={fensterTraeger}>
-      <KatalogTabelle<T>
-        columns={gemerkteSpalten}
-        dataSource={tabellenZeilen}
-        components={virtuell ? FENSTER_KOMPONENTEN : undefined}
-        rowKey={(zeile) => schluessel(zeile)}
-        loading={ladend}
-        locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
-        // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
-        // eine Seitenblätterung schnitte die Zeilenschleuse entzwei. Große Listen schneidet der
-        // Ausschnitt oben (LFH-949).
-        pagination={false}
-        rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
-        /**
-         * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
-         * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
-         * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
-         * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
-         * selbst bauen.
-         */
-        onRow={
-          zeilenKlick || zeilenImFenster
-            ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
-            : undefined
-        }
-        /**
-         * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
-         * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
-         * ließe die Tabelle für immer absteigend.
-         */
-        onChange={(_seite, _filter, sorter) => {
-          const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
-          if (einzeln == null) return;
-          const spalte = einzeln.columnKey as K | undefined;
-          if (einzeln.order == null || spalte == null) {
-            setzeSortierung(null);
-            return;
-          }
-          setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
-        }}
-        expandable={
-          baum
-            ? {
-                childrenColumnName: baum.kinder,
-                expandedRowKeys: [...baum.aufgeklappt],
-                // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
-                indentSize: 0,
-                expandIcon: () => null,
-                onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
-                // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
-                // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
-                // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
-                // Anker-Riegel (LFH-548).
-                expandRowByClick: false,
-              }
-            : aufklappen
-              ? {
-                  expandedRowKeys: [...aufgeklappt],
-                  expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
-                  // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
-                  showExpandColumn: false,
-                }
+    <GezeigteSpaltenKontext.Provider value={gezeigteSpaltenSchluessel}>
+      <FensterKontext.Provider value={fensterTraeger}>
+        <KatalogTabelle<T>
+          columns={gemerkteSpalten}
+          dataSource={tabellenZeilen}
+          components={virtuell ? FENSTER_KOMPONENTEN : undefined}
+          rowKey={(zeile) => schluessel(zeile)}
+          loading={ladend}
+          locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
+          // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
+          // eine Seitenblätterung schnitte die Zeilenschleuse entzwei. Große Listen schneidet der
+          // Ausschnitt oben (LFH-949).
+          pagination={false}
+          rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
+          /**
+           * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
+           * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
+           * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
+           * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
+           * selbst bauen.
+           */
+          onRow={
+            zeilenKlick || zeilenImFenster
+              ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
               : undefined
-        }
-      />
-    </FensterKontext.Provider>
+          }
+          /**
+           * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
+           * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
+           * ließe die Tabelle für immer absteigend.
+           */
+          onChange={(_seite, _filter, sorter) => {
+            const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
+            if (einzeln == null) return;
+            const spalte = einzeln.columnKey as K | undefined;
+            if (einzeln.order == null || spalte == null) {
+              setzeSortierung(null);
+              return;
+            }
+            setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
+          }}
+          expandable={
+            baum
+              ? {
+                  childrenColumnName: baum.kinder,
+                  expandedRowKeys: [...baum.aufgeklappt],
+                  // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
+                  indentSize: 0,
+                  expandIcon: () => null,
+                  onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
+                  // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
+                  // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
+                  // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
+                  // Anker-Riegel (LFH-548).
+                  expandRowByClick: false,
+                }
+              : aufklappen
+                ? {
+                    expandedRowKeys: [...aufgeklappt],
+                    expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
+                    // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
+                    showExpandColumn: false,
+                  }
+                : undefined
+          }
+        />
+      </FensterKontext.Provider>
+    </GezeigteSpaltenKontext.Provider>
   );
 
   // ── Kartenzweig ───────────────────────────────────────────────────────────────────
@@ -1981,13 +2011,25 @@ export default function Datensicht<T extends object, const K extends string>(
         className={zeilenKlasse?.(zeile)}
         style={{ paddingInlineStart: token.padding * Math.min(tiefe, TIEFE_DECKEL) }}
       >
-        <ListenEintrag actions={aktionen.length > 0 ? aktionen : undefined}>
+        <ListenEintrag
+          actions={aktionen.length > 0 ? aktionen : undefined}
+          gestapelt={karte.gestapelt}
+          // Gestapelt stünde die Aktionszeile mit `paddingXS` (5 / 7 px) unter dem letzten Ziel des
+          // Inhalts; die Leitlinie verlangt ≥ 8 / ≥ 16 px (Prüfliste LLH-1093, Kriterium 2).
+          style={karte.gestapelt ? { rowGap: token.padding } : undefined}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: token.marginXS,
+                // Titel-Link und Statusauslöser sind zwei Ziele nebeneinander: Zielabstand aus
+                // Kriterium 2 (`zielEinzug`, komfortabel ≥ 8, handschuh ≥ 16, LLH-1060). Gemessen
+                // in `e2e/datensicht-schmal.spec.ts`, „Trefflächen des Primitivs …“.
+                gap:
+                  ziel != null && statusBedienung
+                    ? token.marginXS + 2 * zielEinzug(token)
+                    : token.marginXS,
                 flexWrap: 'wrap',
               }}
             >

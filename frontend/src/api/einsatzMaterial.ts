@@ -8,7 +8,7 @@ export interface MaterialAdhocEingabe {
   traegerorganisation?: string | null;
 }
 
-export function listeEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
+export function listEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
   return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material`);
 }
 
@@ -32,12 +32,44 @@ export function disponiereAdhoc(
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', { adhoc, menge });
 }
 
-export function aktualisiereDisposition(
+/**
+ * Felder des Material-PATCH (LLH-1093). Fehlend heißt unverändert, `null` leert. Die vier
+ * Ad-hoc-Angaben nimmt der Server nur an einem Ad-hoc-Posten an (sonst 422 „im Stamm pflegen“);
+ * `bezeichnung` ist Pflicht und nie `null`.
+ */
+export interface MaterialPatch {
+  menge?: number;
+  status?: MaterialStatus;
+  bemerkung?: string;
+  uhs_id?: number | null;
+  bezeichnung?: string;
+  kategorie?: string | null;
+  bestandsnummer?: string | null;
+  traegerorganisation?: string | null;
+}
+
+export function updateDisposition(
   einsatzId: number,
   emId: number,
-  felder: { menge?: number; status?: MaterialStatus; bemerkung?: string; uhs_id?: number | null },
+  felder: MaterialPatch,
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material/${emId}`, 'PATCH', felder);
+}
+
+/**
+ * Einen Posten aufteilen (LLH-1093, design.md D8): `menge` geht als neue Zeile mit denselben
+ * Angaben, demselben Ort und Status ab, die Ausgangszeile behält den Rest. Antwort `[Ausgang, neu]`.
+ */
+export function teileAuf(
+  einsatzId: number,
+  emId: number,
+  menge: number,
+): Promise<[EinsatzMaterial, EinsatzMaterial]> {
+  return apiSend<[EinsatzMaterial, EinsatzMaterial]>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/aufteilen`,
+    'POST',
+    { menge },
+  );
 }
 
 /**

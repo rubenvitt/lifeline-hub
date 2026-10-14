@@ -12,6 +12,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from '../alarm/desktopAlarm';
 import { setzeViewportBreite, setzeZeigerGrob, VIEWPORT_STANDARD } from '../test/viewport';
+import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
 dayjs.extend(utc);
@@ -736,6 +737,41 @@ describe('AlarmZentrale: das Ton-Wort hält seinen Platz (LLH-1158)', () => {
     );
     const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
     expect(stumm.querySelector('.kopf-wort-platz')).toHaveAttribute('data-platz', '');
+  });
+
+  // LLH-1232: In `handschuh` ist der Kopf unter `xl` ohnehin zweizeilig; das Wort mit Platz hält
+  // ihn über Prüfung, „Ton bereit“ und „Ton blockiert“ gleich hoch.
+  it('1140 px in handschuh: auch der Ruhezustand steht mit Wort im Platz (LLH-1232)', async () => {
+    setzeViewportBreite(1140);
+    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+    stubAudioReady();
+    stubNotification('default');
+    try {
+      render(
+        <ThemeModeProvider>
+          <AntApp>
+            <MemoryRouter initialEntries={['/einsaetze/1/meldungen']}>
+              <Routes>
+                <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={false} />} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </ThemeModeProvider>,
+      );
+
+      const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+      expect(bereit.querySelector('.kopf-wort-platz')).toHaveAttribute(
+        'data-platz',
+        'Ton wird geprüft',
+      );
+      expect(bereit.textContent).toBe('Ton bereit');
+      // Die Benachrichtigung wechselt beim Start nicht von selbst und bleibt Icon (LFH-637).
+      expect(
+        screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' }).textContent,
+      ).toBe('');
+    } finally {
+      localStorage.removeItem('lifeline-hub.dichte');
+    }
   });
 });
 

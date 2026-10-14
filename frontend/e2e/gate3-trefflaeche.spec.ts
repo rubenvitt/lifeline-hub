@@ -3,7 +3,9 @@ import {
   detailBereit,
   einheitMitZuordnungen,
   kopfFelder,
+  zeilenAusloeser,
   zuordnungsKarte,
+  zuordnungsZiele,
 } from './einheit-fixture';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
@@ -406,94 +408,95 @@ test('Profil: die Kopieraktion des Schlüssels zum zweiten Faktor hält 30 / 48 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände, im Browser gemessen.
+// Zeilenauslöser, Zuordnungszeilen und Aktionsabstände, im Browser gemessen. Seit LLH-1036 hat
+// die Einheit-Ansicht kein Formular mehr: jede Angabe steht als Auslöser an ihrer Zeile, die
+// Eingaben erscheinen erst beim Öffnen und werden dann mitgemessen.
 
-test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({
+test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const { pfad } = await einheitMitZuordnungen(page);
+  const { pfad, namen } = await einheitMitZuordnungen(page);
   const messwerte: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(pfad);
     await stelleDichte(page, dichte);
     await detailBereit(page);
+    const main = page.getByRole('main');
     const ziele = kopfFelder(page).map(({ name, huelle }) => ({ name, ziel: huelle }));
-    const aktionsreihen = [];
+    const zuordnung = zuordnungsZiele(page, namen);
+    // Nachbarn auf einer Zeile: FMS-Wahl und rotes „Aus Einheit lösen“, die beiden Auswahlfelder.
+    const aktionsreihen: Locator[][] = [...zuordnung.reihen];
     let kleinsteZeile = Infinity;
     let kleinsterAbstand = Infinity;
-    for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
-      const karte = zuordnungsKarte(page, titel);
-      const entfernen = karte.getByRole('button', { name: 'Entfernen', exact: true });
-      // Die Zeile trägt minHeight; die Schaltfläche darin ist ein eigenes Bedienziel.
-      const zeile = entfernen.locator('xpath=ancestor::div[contains(@style,"space-between")][1]');
-      kleinsteZeile = Math.min(
-        kleinsteZeile,
-        await haeltStufe(zeile, soll, `${titel}-Zuordnungszeile (${dichte})`),
-      );
-      ziele.push({ name: `${titel} entfernen`, ziel: entfernen });
-      ziele.push({ name: `${titel} zuordnen`, ziel: karte.locator('.ant-select') });
-      if (titel === 'Personal') {
-        const fuehrer = karte.getByRole('button', { name: 'Als Einheitsführer' });
-        ziele.push({ name: 'Als Einheitsführer', ziel: fuehrer });
-        aktionsreihen.push([fuehrer, entfernen]);
-      }
-      if (dichte !== 'kompakt') {
-        const r = (await zeile.boundingBox())!;
-        const auswahl = (await karte.locator('.ant-select').boundingBox())!;
+    for (const { name, zeile } of zuordnung.zeilen) {
+      // Die Zeile trägt minHeight; die Schaltflächen darin sind eigene Bedienziele.
+      kleinsteZeile = Math.min(kleinsteZeile, await haeltStufe(zeile, soll, `${name} (${dichte})`));
+    }
+    for (const { name, ziel } of zuordnung.ziele) ziele.push({ name, ziel });
+    if (dichte !== 'kompakt') {
+      for (const { name, aktion, auswahl } of zuordnung.stapel) {
         // Abstand ab letzter wirklicher Trefffläche, nicht ab der gepolsterten Zeilenhülle.
-        const knopf = (await entfernen.boundingBox())!;
-        const abstand = auswahl.y - (knopf.y + knopf.height);
+        const knopf = (await aktion.boundingBox())!;
+        const feld = (await auswahl.boundingBox())!;
+        const abstand = feld.y - (knopf.y + knopf.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
-        expect(
-          abstand,
-          `${titel}: Abstand Aktion/Zuordnung ${dichte}, Zeilenhöhe ${r.height}`,
-        ).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+        expect(abstand, `${name}: Abstand Aktion/Zuordnung ${dichte}`).toBeGreaterThanOrEqual(
+          (dichte === 'handschuh' ? 16 : 8) - SUBPIXEL,
+        );
       }
     }
-    const speichern = page
-      .getByRole('main')
-      .getByRole('button', { name: 'Speichern', exact: true });
-    const aufloesen = page.getByRole('main').getByRole('button', { name: 'Auflösen', exact: true });
-    const neueSprechgruppe = page
-      .getByRole('main')
-      .getByRole('button', { name: /neue Sprechgruppe anlegen$/ });
-    ziele.push(
-      { name: 'Speichern', ziel: speichern },
-      { name: 'Auflösen', ziel: aufloesen },
-      { name: 'neue Sprechgruppe anlegen', ziel: neueSprechgruppe },
-    );
-    aktionsreihen.push([speichern, aufloesen]);
-    const felder = kopfFelder(page);
-    const staerke = ['Führer', 'Unterführer', 'Mannschaft'].map(
-      (name) => felder.find((f) => f.name === name)!.huelle,
-    );
-    aktionsreihen.push([staerke[0], staerke[1]], [staerke[1], staerke[2]]);
-    aktionsreihen.push([felder.find((f) => f.name === 'Sprechgruppen')!.huelle, neueSprechgruppe]);
+    ziele.push({
+      name: 'Einheit auflösen',
+      ziel: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
+        name: 'Einheit auflösen',
+        exact: true,
+      }),
+    });
     expect(ziele).toHaveLength(21);
     let minimum = Infinity;
-    for (const { name, ziel } of ziele) {
+    const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
       const breite = (await ziel.boundingBox())!.width;
       expect(breite, `${name} (${dichte}): Breite`).toBeGreaterThanOrEqual(soll - SUBPIXEL);
       minimum = Math.min(minimum, hoehe, breite);
-    }
-    if (dichte !== 'kompakt') {
-      for (const [links, rechts] of aktionsreihen) {
+    };
+    for (const { name, ziel } of ziele) await miss(name, ziel);
+    const checkReihen = async (reihen: Locator[][], stufe: string) => {
+      for (const [links, rechts] of reihen) {
         const a = (await links.boundingBox())!;
         const b = (await rechts.boundingBox())!;
         const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
         expect
-          .soft(abstand, `Aktionsabstand ${dichte}: ${links} → ${rechts}`)
-          .toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+          .soft(abstand, `Aktionsabstand ${stufe}: ${links} → ${rechts}`)
+          .toBeGreaterThanOrEqual((stufe === 'handschuh' ? 16 : 8) - SUBPIXEL);
       }
-    }
-    // Auch die einblendbaren Sprechgruppenfelder gehören zu dieser Formularroute.
+    };
+
+    // Geöffnete Zeilen: die drei Zahlenfelder der Soll-Stärke, Sprechgruppen samt Schnellerfassung.
+    await zeilenAusloeser(page, 'Soll-Stärke').click();
+    const staerke = ['Führer', 'Unterführer', 'Mannschaft'].map((name) =>
+      main
+        .locator('.ant-input-number')
+        .filter({ has: page.getByRole('spinbutton', { name, exact: true }) }),
+    );
+    for (const [i, feld] of staerke.entries()) await miss(`Soll-Stärke Feld ${i + 1}`, feld);
+    aktionsreihen.push([staerke[0], staerke[1]], [staerke[1], staerke[2]]);
+    if (dichte !== 'kompakt') await checkReihen(aktionsreihen.splice(0), dichte);
+    await main.getByRole('button', { name: 'Bearbeitung von Soll-Stärke abbrechen' }).click();
+
+    await zeilenAusloeser(page, 'Sprechgruppen').click();
+    const picker = main
+      .locator('.ant-select')
+      .filter({ has: page.getByRole('combobox', { name: 'Sprechgruppen', exact: true }) });
+    const neueSprechgruppe = main.getByRole('button', { name: /neue Sprechgruppe anlegen$/ });
+    await miss('Sprechgruppen-Auswahl', picker);
+    await miss('neue Sprechgruppe anlegen', neueSprechgruppe);
+    if (dichte !== 'kompakt') await checkReihen([[picker, neueSprechgruppe]], dichte);
     await neueSprechgruppe.click();
-    const main = page.getByRole('main');
     const bezeichnung = main.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
     const betriebsart = main
       .locator('.ant-select')
@@ -501,10 +504,7 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
     const anlegen = main.getByRole('button', { name: 'Anlegen', exact: true });
     const abbrechen = main.getByRole('button', { name: 'Abbrechen', exact: true });
     for (const feld of [bezeichnung, betriebsart, anlegen, abbrechen]) {
-      const hoehe = await haeltStufe(feld, soll, `Sprechgruppen-Schnellerfassung (${dichte})`);
-      const breite = (await feld.boundingBox())!.width;
-      expect(breite).toBeGreaterThanOrEqual(soll - SUBPIXEL);
-      minimum = Math.min(minimum, hoehe, breite);
+      await miss('Sprechgruppen-Schnellerfassung', feld);
     }
     if (dichte !== 'kompakt') {
       const reihe = [bezeichnung, betriebsart, anlegen, abbrechen];
@@ -520,7 +520,7 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
     }
     await abbrechen.click();
     messwerte.push(
-      `${dichte}: ${ziele.length} Grundziele + 4 Sprechgruppenfelder, kleinste Achse ${minimum.toFixed(2)}px, Zuordnungszeile ${kleinsteZeile}px${dichte !== 'kompakt' ? `, Abstand ${kleinsterAbstand}px` : ''}`,
+      `${dichte}: ${ziele.length} Grundziele + 3 Stärkefelder + 2 Sprechgruppenziele + 4 Schnellerfassungsfelder, kleinste Achse ${minimum.toFixed(2)}px, Zuordnungszeile ${kleinsteZeile}px${dichte !== 'kompakt' ? `, Abstand ${kleinsterAbstand}px` : ''}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
@@ -535,8 +535,8 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
   await page.goto(pfad);
   await stelleDichte(page, 'handschuh');
   await detailBereit(page);
-  const name = page.getByLabel('Name', { exact: true });
-  await haeltStufe(name, 72, 'Handschuhfeld vor Mutation');
+  const name = zeilenAusloeser(page, 'Name');
+  await haeltStufe(name, 72, 'Handschuhauslöser vor Mutation');
   await name.evaluate((el) => el.setAttribute('data-e2e-kompakt', 'true'));
   const mutation = await page.addStyleTag({
     content:
@@ -550,7 +550,7 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
   await expect
     .poll(async () => (await name.boundingBox())!.height)
     .toBeGreaterThanOrEqual(72 - SUBPIXEL);
-  await haeltStufe(name, 72, 'Handschuhfeld nach Wiederherstellung');
+  await haeltStufe(name, 72, 'Handschuhauslöser nach Wiederherstellung');
 });
 
 // ── Einsatz-Navigationsrahmen ───────────────────────────────────────────────────────
@@ -4383,5 +4383,136 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
   await expect(leiste.getByText('Florian BR 1')).toBeVisible();
   await expect(leiste.getByRole('button', { name: /zuweisen$/ })).toHaveCount(0);
 
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Personenansicht (LLH-1060) ──────────────────────────────────────────────────────
+//
+// Eine frisch disponierte Ad-hoc-Kraft mit Einheit: so steht jede Angabe der Ansicht als Ziel da
+// (Ad-hoc-Angaben im Paneel „Person“, „Stornieren“ in der Frist). Gemessen werden alle Ziele der
+// vier Paneele in den drei Stufen, dazu der Abstand zwischen „Entlassen“ und „Stornieren“.
+
+const KRAFT_ANSICHT = 'Messkraft Ansicht';
+
+test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entlassen und Stornieren den Abstand', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht`);
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const einheitId = await post('einheiten', { name: 'Messeinheit Ansicht' });
+  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const zu = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+  );
+  expect(zu.ok(), await zu.text()).toBeTruthy();
+
+  const main = page.getByRole('main');
+  const knopf = (name: string) => main.getByRole('button', { name, exact: true });
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
+    await stelleDichte(page, dichte);
+    // Datenanker: die Einheit steht aufgelöst, die Zeitachse geladen.
+    await expect(knopf('Einheit bearbeiten')).toHaveText(/Messeinheit Ansicht/);
+    await expect(knopf('Nachtragen')).toBeVisible();
+
+    const entlassen = knopf(`${KRAFT_ANSICHT} entlassen`);
+    const stornieren = knopf('Stornieren');
+    const ziele: [string, Locator][] = [
+      ['Status', knopf(`Status von ${KRAFT_ANSICHT} ändern`)],
+      ['Einsatzfunktion', knopf(`Funktion zu ${KRAFT_ANSICHT} eintragen`)],
+      ['Einheit', knopf('Einheit bearbeiten')],
+      ['Fahrzeug', knopf('Fahrzeug eintragen')],
+      ['Unfallhilfsstelle', knopf('Unfallhilfsstelle eintragen')],
+      ['Position', knopf('Position eintragen')],
+      ['Bemerkung', knopf('Bemerkung eintragen')],
+      ['Name', knopf('Name bearbeiten')],
+      ['Qualifikation', knopf('Qualifikation eintragen')],
+      ['Träger', knopf('Träger eintragen')],
+      ['Nachtragen', knopf('Nachtragen')],
+      ['Entlassen', entlassen],
+      ['Stornieren', stornieren],
+    ];
+    let kleinste = Number.POSITIVE_INFINITY;
+    for (const [name, ziel] of ziele) {
+      kleinste = Math.min(kleinste, await haeltStufe(ziel, soll, `${name} (${dichte})`));
+    }
+    // Die Sprünge „Meldebild“ und „Einheit“ unter der Einteilung.
+    const spruenge = main.locator('[data-lfh="inspector-sprung"]');
+    kleinste = Math.min(kleinste, await alleHaltenStufe(spruenge, soll, `Sprung (${dichte})`, 2));
+    let abstand = Number.NaN;
+    if (dichte !== 'kompakt') {
+      const a = (await entlassen.boundingBox())!;
+      const b = (await stornieren.boundingBox())!;
+      abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
+      expect(abstand, `Entlassen → Stornieren (${dichte})`).toBeGreaterThanOrEqual(
+        (dichte === 'handschuh' ? 16 : 8) - SUBPIXEL,
+      );
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ${ziele.length + 2} Ziele, kleinste ${kleinste}px${Number.isNaN(abstand) ? '' : `, Abstand ${abstand}px`}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziele fehlen', async ({
+  page,
+}) => {
+  // LLH-1060: ohne Schreibrecht steht „Nur Ansicht“; Angaben, Entlassen und Stornieren fehlen,
+  // „Nachtragen“ ist gesperrt. Ziele bleiben die Sprünge „Meldebild“ und „Einheit“.
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht Lesend`);
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const einheitId = await post('einheiten', { name: 'Messeinheit Lesend' });
+  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const zu = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+  );
+  expect(zu.ok(), await zu.text()).toBeTruthy();
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const main = page.getByRole('main');
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
+    await stelleDichte(page, dichte);
+    // Datenanker vor der Abwesenheit: die Einheit steht aufgelöst, der Hinweis steht.
+    await expect(main.getByText('Messeinheit Lesend', { exact: true })).toBeVisible();
+    await expect(main.getByText(/^Nur Ansicht/).first()).toBeVisible();
+    // „Nachtragen“ bleibt sichtbar und gesperrt, die Zeitachse nennt „Nur Ansicht“ (Bestand
+    // von `KraftZeitachse`).
+    await expect(main.getByRole('button', { name: 'Nachtragen', exact: true })).toBeDisabled();
+    for (const name of [
+      `${KRAFT_ANSICHT} entlassen`,
+      'Stornieren',
+      `Status von ${KRAFT_ANSICHT} ändern`,
+    ]) {
+      await expect(
+        main.getByRole('button', { name, exact: true }),
+        `Vorbedingung: ohne Schreibrecht kein „${name}“`,
+      ).toHaveCount(0);
+    }
+    await expect(
+      main.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
+      'Vorbedingung: keine Angabe ist bearbeitbar',
+    ).toHaveCount(0);
+    const spruenge = main.locator('[data-lfh="inspector-sprung"]');
+    const kleinste = await alleHaltenStufe(spruenge, soll, `Sprung lesend (${dichte})`, 2);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Sprünge, kleinste ${kleinste}px`);
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

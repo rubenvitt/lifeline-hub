@@ -56,8 +56,8 @@ wire_enum! {
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
-        /// Eine Benachrichtigung an genau einen Nutzer (LLH-1207, design.md D2); geht nur an die
-        /// Verbindungen ihrer Empfänger ([`LiveNachricht::empfaenger`]).
+        /// Benachrichtigungen eines `melden`-Aufrufs (LLH-1207, design.md D2): EINE Nachricht im
+        /// Ring, je Verbindung nur mit der Nutzlast ihres Nutzers ([`LiveNachricht::empfaenger`]).
         Benachrichtigung => "benachrichtigung",
         Lagged => "lagged",
     }
@@ -184,7 +184,8 @@ impl LiveEvent {
             LiveEvent::Einsatz => &[],
             // Benachrichtigung (LLH-1207, design.md D2): ungegatet, weil ihr Empfängerfilter enger
             // ist als jedes Modul. Sie erreicht nur die Verbindungen der Nutzer in
-            // `LiveNachricht::empfaenger` (Live und Replay, `LiveNachricht::sichtbar_fuer`), ohne
+            // `LiveNachricht::empfaenger`, je mit seiner Nutzlast (Live und Replay,
+            // `LiveNachricht::fuer`), ohne
             // Empfänger niemanden ([`LiveEvent::braucht_empfaenger`]). Das Modulrecht am Bezug
             // prüft die Empfängerauflösung (`benachrichtigung::aufloesung`), nicht dieses Gate.
             LiveEvent::Benachrichtigung => &[],
@@ -247,24 +248,41 @@ pub struct LiveNachricht {
     /// exhaustiver `match` über [`LiveEvent::modul_keys`] statt eines Rück-Parsens mit
     /// fail-closed-Laufzeitnetz (F01/LFH-227).
     pub event: LiveEvent,
+    /// Nutzlast für alle; leer bei einer Nachricht mit [`Self::empfaenger`].
     pub data: String,
-    /// Die einzigen Nutzer, deren Verbindungen die Nachricht erreichen darf (LLH-1207,
-    /// design.md D2); `None` = jeder, den das Modul-Gate durchlässt. Intern, nie auf dem Draht:
-    /// sonst erführe jeder die Adressaten.
-    pub empfaenger: Option<Arc<[i64]>>,
+    /// Die einzigen Nutzer, deren Verbindungen die Nachricht erreichen darf, je mit IHRER
+    /// Nutzlast (LLH-1207, design.md D2): so belegt ein `melden` mit vielen Empfängern genau
+    /// einen Platz im Ring. `None` = jeder, den das Modul-Gate durchlässt, mit [`Self::data`].
+    /// Intern, nie auf dem Draht: sonst erführe jeder die Adressaten und ihre Kennungen.
+    pub empfaenger: Option<Arc<[Zustellung]>>,
+}
+
+/// Die Nutzlast einer Nachricht für genau einen Nutzer ([`LiveNachricht::empfaenger`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Zustellung {
+    pub benutzer_id: i64,
+    pub data: Arc<str>,
 }
 
 impl LiveNachricht {
-    /// Ob die Nachricht an die Verbindung von `benutzer_id` mit den Modulen `erlaubt` gehen darf:
-    /// das Modul-Gate des Events und, wo gesetzt, die Empfängerliste. Ein Event, das Empfänger
-    /// braucht, geht ohne Liste an niemanden. Gilt für Live und Replay
+    /// Die Nachricht, wie sie an die Verbindung von `benutzer_id` mit den Modulen `erlaubt`
+    /// geht, oder `None`: das Modul-Gate des Events und, wo gesetzt, die Empfängerliste; ein
+    /// Empfänger bekommt seine eigene Nutzlast, ein Fremder nichts (auch kein leeres Ereignis).
+    /// Ein Event, das Empfänger braucht, geht ohne Liste an niemanden. Gilt für Live und Replay
     /// (`routes::support::sse_stream_mit_replay`).
-    pub fn sichtbar_fuer(&self, benutzer_id: i64, erlaubt: &HashSet<&'static str>) -> bool {
-        let empfaenger_ok = match &self.empfaenger {
-            Some(ids) => ids.contains(&benutzer_id),
-            None => !self.event.braucht_empfaenger(),
-        };
-        empfaenger_ok && self.event.sichtbar_fuer(erlaubt)
+    pub fn fuer(mut self, benutzer_id: i64, erlaubt: &HashSet<&'static str>) -> Option<Self> {
+        if !self.event.sichtbar_fuer(erlaubt) {
+            return None;
+        }
+        match self.empfaenger.take() {
+            Some(liste) => {
+                let z = liste.iter().find(|z| z.benutzer_id == benutzer_id)?;
+                self.data = z.data.to_string();
+                Some(self)
+            }
+            None if self.event.braucht_empfaenger() => None,
+            None => Some(self),
+        }
     }
 }
 
@@ -654,16 +672,14 @@ impl LiveHub {
         self.publiziere_nachricht(einsatz_id, event, data, None);
     }
 
-    /// Wie [`Self::publiziere_event`], aber nur für die Verbindungen von `empfaenger`, live und
-    /// im Replay (LLH-1207, design.md D2). Die Liste reist intern mit, nie in `data`.
-    pub fn publiziere_an(
-        &self,
-        einsatz_id: i64,
-        event: LiveEvent,
-        data: String,
-        empfaenger: Vec<i64>,
-    ) {
-        self.publiziere_nachricht(einsatz_id, event, data, Some(empfaenger.into()));
+    /// Wie [`Self::publiziere_event`], aber nur für die Verbindungen der Empfänger, je mit ihrer
+    /// eigenen Nutzlast, live und im Replay (LLH-1207, design.md D2). EINE Nachricht im Ring,
+    /// gleich wie viele Empfänger; die Liste reist intern mit, nie auf dem Draht.
+    pub fn publiziere_an(&self, einsatz_id: i64, event: LiveEvent, zustellungen: Vec<Zustellung>) {
+        if zustellungen.is_empty() {
+            return;
+        }
+        self.publiziere_nachricht(einsatz_id, event, String::new(), Some(zustellungen.into()));
     }
 
     fn publiziere_nachricht(
@@ -671,7 +687,7 @@ impl LiveHub {
         einsatz_id: i64,
         event: LiveEvent,
         data: String,
-        empfaenger: Option<Arc<[i64]>>,
+        empfaenger: Option<Arc<[Zustellung]>>,
     ) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
         let Kanaele { map, hoechste_id } = &mut *kanaele;
@@ -842,56 +858,81 @@ mod tests {
         );
     }
 
-    fn benachrichtigung_an(empfaenger: Option<&[i64]>) -> LiveNachricht {
+    fn zustellung(benutzer_id: i64, data: &str) -> Zustellung {
+        Zustellung {
+            benutzer_id,
+            data: data.into(),
+        }
+    }
+
+    fn benachrichtigung_an(empfaenger: Option<Vec<Zustellung>>) -> LiveNachricht {
         LiveNachricht {
             id: "1-1".into(),
             event: LiveEvent::Benachrichtigung,
-            data: "{}".into(),
+            data: String::new(),
             empfaenger: empfaenger.map(Into::into),
         }
     }
 
-    /// LLH-1207, design.md D2: die Benachrichtigung erreicht nur ihre Empfänger, auch ohne jedes
-    /// Modulrecht, und ein fremder Nutzer mit allen Modulen bekommt sie nicht.
+    /// LLH-1207, design.md D2: die Benachrichtigung erreicht nur ihre Empfänger, je mit ihrer
+    /// eigenen Nutzlast, auch ohne jedes Modulrecht; ein fremder Nutzer mit allen Modulen bekommt
+    /// nichts.
     #[test]
-    fn benachrichtigung_erreicht_nur_ihre_empfaenger() {
+    fn benachrichtigung_erreicht_jeden_empfaenger_mit_seiner_nutzlast() {
         let alle: HashSet<&'static str> = crate::einsatz::modul::MODUL_KEYS.into_iter().collect();
-        let n = benachrichtigung_an(Some(&[7]));
-        assert!(n.sichtbar_fuer(7, &HashSet::new()));
-        assert!(!n.sichtbar_fuer(8, &alle));
+        let n = benachrichtigung_an(Some(vec![zustellung(7, "a"), zustellung(8, "b")]));
+        let fuer_7 = n.clone().fuer(7, &HashSet::new()).expect("Empfänger 7");
+        assert_eq!(fuer_7.data, "a");
+        assert!(
+            fuer_7.empfaenger.is_none(),
+            "die Liste verlässt den Hub nicht"
+        );
+        assert_eq!(n.clone().fuer(8, &HashSet::new()).unwrap().data, "b");
+        assert!(n.fuer(9, &alle).is_none());
     }
 
     /// Ohne Empfängerliste geht eine Benachrichtigung an niemanden (fail-closed); ein gewöhnliches
-    /// Event ohne Liste bleibt beim Modul-Gate.
+    /// Event ohne Liste bleibt beim Modul-Gate und behält seine Nutzlast.
     #[test]
     fn benachrichtigung_ohne_empfaenger_erreicht_niemanden() {
         let alle: HashSet<&'static str> = crate::einsatz::modul::MODUL_KEYS.into_iter().collect();
-        assert!(!benachrichtigung_an(None).sichtbar_fuer(7, &alle));
+        assert!(benachrichtigung_an(None).fuer(7, &alle).is_none());
         let etb = LiveNachricht {
             id: "1-2".into(),
             event: LiveEvent::Etb,
             data: "{}".into(),
             empfaenger: None,
         };
-        assert!(etb.sichtbar_fuer(7, &HashSet::from(["etb"])));
-        assert!(!etb.sichtbar_fuer(7, &HashSet::new()));
+        assert_eq!(
+            etb.clone().fuer(7, &HashSet::from(["etb"])).unwrap().data,
+            "{}"
+        );
+        assert!(etb.fuer(7, &HashSet::new()).is_none());
     }
 
-    /// Die Empfängerliste reist mit in den Ring: der Replay filtert wie der Live-Weg.
+    /// Ein Aufruf mit zwei Empfängern ist EINE Nachricht: der Ring wächst um eins, und die
+    /// Empfängerliste reist mit in den Replay.
     #[tokio::test]
-    async fn replay_traegt_die_empfaengerliste() {
+    async fn publiziere_an_belegt_einen_ringplatz_fuer_alle_empfaenger() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
         hub.publiziere_event(1, LiveEvent::Etb, "vorher".into());
         let n1 = rx.recv().await.unwrap();
-        hub.publiziere_an(1, LiveEvent::Benachrichtigung, "{}".into(), vec![7]);
+        hub.publiziere_an(
+            1,
+            LiveEvent::Benachrichtigung,
+            vec![zustellung(7, "a"), zustellung(8, "b")],
+        );
         let live = rx.recv().await.unwrap();
-        assert_eq!(live.empfaenger.as_deref(), Some(&[7][..]));
+        assert_eq!(live.empfaenger.as_deref().map(<[_]>::len), Some(2));
+        assert!(rx.try_recv().is_err(), "genau eine Nachricht");
         let Replay::Events(v) = hub.abonniere_mit_replay(1, Some(n1.id)).0 else {
             panic!("die Benachrichtigung muss als Replay-Event kommen");
         };
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].empfaenger.as_deref(), Some(&[7][..]));
+        assert_eq!(v[0].clone().fuer(8, &HashSet::new()).unwrap().data, "b");
+        hub.publiziere_an(1, LiveEvent::Benachrichtigung, Vec::new());
+        assert!(rx.try_recv().is_err(), "ohne Empfänger keine Nachricht");
     }
 
     /// Pinnt die Gate-Menge JEDES Events (nicht nur „nicht leer"). Eine Verbreiterung ist

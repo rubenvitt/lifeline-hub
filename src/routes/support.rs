@@ -568,22 +568,25 @@ pub struct AnsichtFilter {
 /// einem benannten SSE-Event; ein übergelaufener (lagged) Empfänger erhält ein
 /// `lagged`/`resync`-Signal statt eines Stream-Abbruchs — der Client resynct dann per GET.
 ///
-/// `erlaubt` ist der per-Abonnent-Modul-Filter (F01/LFH-227): der LiveHub bleibt ein
-/// auth-freier Dumb-Transport, die Modul-Berechtigung wirkt hier — pro Verbindung.
-/// Kontroll-Events (lagged/resync) passieren immer, sonst hinge der Resync.
+/// `fuer` ist der per-Abonnent-Filter (F01/LFH-227, LLH-1207): er liefert die Nachricht, wie
+/// diese Verbindung sie sieht, oder `None` (Modul-Gate, Empfängerliste,
+/// [`LiveNachricht::fuer`]). Der LiveHub bleibt ein auth-freier Dumb-Transport, die
+/// Berechtigung wirkt hier — pro Verbindung. Kontroll-Events (lagged/resync) passieren immer,
+/// sonst hinge der Resync.
 pub fn sse_event_stream(
     rx: Receiver<LiveNachricht>,
-    erlaubt: impl Fn(&LiveNachricht) -> bool,
+    fuer: impl Fn(LiveNachricht) -> Option<LiveNachricht>,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     BroadcastStream::new(rx).filter_map(move |res| match res {
         // Nicht erlaubtes Modul oder fremder Empfänger → die Nachricht verlässt den Server nicht.
-        Ok(n) if !erlaubt(&n) => None,
         // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
         // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
-        Ok(n) => Some(Ok(Event::default()
-            .id(n.id)
-            .event(n.event.as_str())
-            .data(n.data))),
+        Ok(n) => fuer(n).map(|n| {
+            Ok(Event::default()
+                .id(n.id)
+                .event(n.event.as_str())
+                .data(n.data))
+        }),
         Err(_) => Some(Ok(Event::default()
             .event(LiveEvent::Lagged.as_str())
             .data("resync"))),
@@ -630,7 +633,7 @@ pub const POSITION_EREIGNIS: &str = "position";
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
 /// GET); ohne Replay (`Keine`) nur der Live-Kanal.
-/// Der Filter `erlaubt` (Modul-Gate und Empfängerliste, [`LiveNachricht::sichtbar_fuer`]) greift
+/// Der Filter `fuer` (Modul-Gate und Empfängerliste, [`LiveNachricht::fuer`]) greift
 /// auf BEIDEN Wegen — Replay-Prefix und Live-Tail. Sonst wäre ein Reconnect mit `Last-Event-ID`
 /// ein Bypass des Gates (F01/LFH-227) bzw. ein Weg zu fremden Benachrichtigungen (LLH-1207).
 ///
@@ -643,13 +646,13 @@ pub fn sse_stream_mit_replay(
     replay: Replay,
     rx: Receiver<LiveNachricht>,
     position: String,
-    erlaubt: impl Fn(&LiveNachricht) -> bool,
+    fuer: impl Fn(LiveNachricht) -> Option<LiveNachricht>,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let mut prefix: Vec<Result<Event, Infallible>> = match replay {
         Replay::Keine => Vec::new(),
         Replay::Events(nachrichten) => nachrichten
             .into_iter()
-            .filter(|n| erlaubt(n))
+            .filter_map(&fuer)
             .map(|n| {
                 Ok(Event::default()
                     .id(n.id)
@@ -665,7 +668,7 @@ pub fn sse_stream_mit_replay(
         .id(position)
         .event(POSITION_EREIGNIS)
         .data("{}")));
-    tokio_stream::iter(prefix).chain(sse_event_stream(rx, erlaubt))
+    tokio_stream::iter(prefix).chain(sse_event_stream(rx, fuer))
 }
 
 #[cfg(test)]
@@ -909,8 +912,8 @@ mod tests {
     }
 
     /// Filter, der alles durchlässt (für die Tests der Replay-Mechanik).
-    fn alles(_: &LiveNachricht) -> bool {
-        true
+    fn alles(n: LiveNachricht) -> Option<LiveNachricht> {
+        Some(n)
     }
 
     #[tokio::test]
@@ -958,7 +961,7 @@ mod tests {
         ];
         let nur_etb: Vec<_> =
             sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), "1-3".into(), |n| {
-                n.event == LiveEvent::Etb
+                (n.event == LiveEvent::Etb).then_some(n)
             })
             .collect()
             .await;
@@ -974,7 +977,7 @@ mod tests {
     #[tokio::test]
     async fn lagged_kontroll_event_passiert_jeden_filter() {
         let luecke: Vec<_> =
-            sse_stream_mit_replay(Replay::Luecke, leerer_rx(), "1-1".into(), |_| false)
+            sse_stream_mit_replay(Replay::Luecke, leerer_rx(), "1-1".into(), |_| None)
                 .collect()
                 .await;
         assert_eq!(
@@ -993,7 +996,7 @@ mod tests {
         tx.send(nachricht("1-3", LiveEvent::Chat)).unwrap();
         drop(tx);
 
-        let nur_chat: Vec<_> = sse_event_stream(rx, |n| n.event == LiveEvent::Chat)
+        let nur_chat: Vec<_> = sse_event_stream(rx, |n| (n.event == LiveEvent::Chat).then_some(n))
             .collect()
             .await;
         assert_eq!(nur_chat.len(), 2, "nur die chat-Nachrichten dürfen durch");

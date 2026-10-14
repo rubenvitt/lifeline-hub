@@ -4,6 +4,9 @@ import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
 import { groupEinheitOptions, type EinheitOption } from './kraeftebaumKern';
 
+/** Auswahlwert für „keine Einheit“; keine Einheit hat eine negative ID. */
+const OHNE = -1;
+
 export interface EinheitAngabeProps {
   /** Zeilenkennung für die zugänglichen Namen in einer Liste („Einheit zu Anna“). */
   kennung?: string;
@@ -14,6 +17,11 @@ export interface EinheitAngabeProps {
   darfSchreiben: boolean;
   /** Zusatz hinter dem Namen, etwa die Marke „Einheitsführer“. */
   marke?: ReactNode;
+  /**
+   * „Keine Einheit“ als eigene erste Wahl (LLH-1093, design.md D3): das Leeren-Kreuz der Auswahl
+   * erscheint am Touchschirm nur beim Zeigen. Ohne Angabe bleibt nur das Kreuz.
+   */
+  ohneOption?: string;
   /**
    * Übernahme mit neuem UND bisherigem Wert: den Endpunkt wählt der Aufrufer (Zuordnung einer
    * Person, eines Fahrzeugs, eines Materials). Lehnt bei Ablehnung ab, dann bleibt die Auswahl mit
@@ -41,6 +49,7 @@ export default function EinheitAngabe({
   optionen,
   darfSchreiben,
   marke,
+  ohneOption,
   onSpeichern,
 }: EinheitAngabeProps) {
   const aktuell = wert != null ? optionen.find((o) => o.id === wert) : undefined;
@@ -64,6 +73,7 @@ export default function EinheitAngabe({
           options: g.optionen.map(option),
         }))
       : optionen.map(option);
+  const ohne = ohneOption ? [{ value: OHNE, label: ohneOption }] : [];
   return (
     <InlineAngabe<number | null>
       etikett="Einheit"
@@ -83,14 +93,14 @@ export default function EinheitAngabe({
       darfSchreiben={darfSchreiben}
       onSpeichern={(neu) => onSpeichern(neu, wert)}
       eingabe={({ feld, value, onChange, popup }) => (
-        <Select<number | null>
+        <Select<number>
           {...feld}
           {...popup}
-          value={value ?? undefined}
+          value={value ?? (ohneOption ? OHNE : undefined)}
           allowClear
           placeholder="ohne Einheit"
-          onChange={(v) => onChange(v ?? null)}
-          options={auswahl}
+          onChange={(v) => onChange(v == null || v === OHNE ? null : v)}
+          options={[...ohne, ...auswahl]}
           popupMatchSelectWidth={false}
           style={{ width: '100%', minWidth: 0 }}
         />

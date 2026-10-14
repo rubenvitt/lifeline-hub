@@ -51,8 +51,6 @@ const MIT_NACHBARSCHAFT = [
   // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
   // steht nur noch hier, in der gemeinsamen Hülle.
   'stammdaten/KatalogVerwaltung.tsx',
-  // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
-  'pages/EinheitDetailPage.tsx',
   // Fuß der Rückfrage „Abschnitt … auflösen?“: Abbrechen neben dem roten „Abschnitt auflösen“
   // (LFH-1212); „Auflösen“ selbst steht im Menü „Weitere Aktionen“.
   'pages/EinsatzabschnittePage.tsx',
@@ -114,6 +112,10 @@ const BEWERTET_OHNE_SCANNER_DECKUNG = [
   // hinter dem Trenner des Menüs. Die Knöpfe stehen in `AuftragHandlungen`, die Karte der
   // Geräteansicht und das Detailpaneel setzen sie ein (Change oxgob5gk, design.md D4).
   'auftraege/AuftragTeile.tsx',
+  // LLH-1036 Teil II: Fahrzeugzeile der Einheit-Ansicht, die FMS-`StatusWahl` (kein `<Button>` im
+  // Quelltext) neben dem roten „Aus Einheit lösen“ in `<Space size="middle">`. Die Personen
+  // tragen ihre Aktionen im Menü (rot hinter dem Trenner).
+  'pages/einheit/FahrzeugeBesatzung.tsx',
 ];
 
 /**

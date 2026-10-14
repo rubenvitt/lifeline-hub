@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
@@ -22,7 +22,7 @@ import { LAGEBILD_QUELLEN, ladeLagebasis, useLagebild, type GebundeneQuelle } fr
 vi.mock('../../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
-vi.mock('../../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
+vi.mock('../../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: vi.fn() }));
 vi.mock('../../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../../api/einsatzSchaden', () => ({ listeSchadenMarker: vi.fn() }));
@@ -67,7 +67,7 @@ const ABRUF: Record<GebundeneQuelle, ReturnType<typeof vi.fn>> = {
   einheiten: vi.mocked(listeEinheiten),
   personal: vi.mocked(listeEinsatzPersonal),
   fahrzeuge: vi.mocked(listeEinsatzFahrzeuge),
-  material: vi.mocked(listeEinsatzMaterial),
+  material: vi.mocked(listEinsatzMaterial),
   abschnitte: vi.mocked(listeAbschnitte),
 };
 const PEGEL = [{ id: 11 }];
