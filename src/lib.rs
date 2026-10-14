@@ -7,6 +7,7 @@ pub mod auftrag;
 pub mod auth;
 pub mod backup;
 pub mod befehl;
+pub mod benachrichtigung;
 pub mod benutzer_einstellungen;
 pub mod bereitstellungsraum;
 pub mod betreuung;

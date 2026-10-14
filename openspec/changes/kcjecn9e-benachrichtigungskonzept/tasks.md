@@ -7,14 +7,14 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 1. Fundament Server: Speicher, Auflösung, Zustellung (D1–D4, D6) · LLH-1207
 
-- [ ] 1.1 Migration `benachrichtigung` anhängen (Nummer per `scripts/check-migrationen.sh`), Spalten klassifizieren (`klassifikation_von`), Purge mit dem Einsatz; Test `jede_archivspalte_ist_retain` und ein Purge-Test bleiben grün
-- [ ] 1.2 `BenachrichtigungArt` als `wire_enum!` mit fester Stufe je Art (D4), in `tests/enum_wire_kontrakt.rs`; Test: jede Art hat genau eine Stufe, Alarm-Arten sind genau die vier aus D4
-- [ ] 1.3 Empfängerauflösung `benachrichtigung::melden` (Funktion über Stab-Besetzung mit Ersatz Mitgliedschaft, Person, Nutzer, ModulLeser; ohne Auslöser, Gerätekonten, Nutzer ohne Modulrecht, abgeschaltete Hinweis-Arten); Rust-Tests je Szenario der Anforderungen „Der Server bestimmt die Empfänger“, „Meine Funktion“, „Eigene Aktionen benachrichtigen den Auslöser nicht“
-- [ ] 1.4 `LiveEvent::Benachrichtigung` mit internem Empfängerfilter im Stream-Builder und im Replay, `OrgLiveEvent::Benachrichtigung`; Test: fremder Nutzer erhält das Ereignis weder live noch im Replay, `LiveEvent::ALLE` und Vertragstest aktualisiert, `scripts/check-typ-codegen.sh` grün, beide generierten Dateien committet
-- [ ] 1.5 Endpunkte `GET /api/benachrichtigungen/{id}` (fremd 404), `GET /api/benachrichtigungen?offen=true` (letzte 12 h), `POST …/{id}/quittieren` (sendet das Quittier-Ereignis); Text beim Lesen aus dem Bezug gebildet; Routentests inkl. 404 und Statuscode-Konvention
-- [ ] 1.6 Schlüssel `benachrichtigungen_aus` in `benutzer_einstellungen` (Whitelist), 422 für Alarm-Arten; Test für Annahme und Ablehnung
-- [ ] 1.7 Aufräumen im Scheduler: quittierte Zeilen nach 24 h, unquittierte nach 12 h; Test mit gesetzter Uhr
-- [ ] 1.8 `src/AGENTS.md` um einen Abschnitt „Benachrichtigungen“ ergänzen (eine Stelle für Empfänger, `melden` nach dem Commit, ungegatetes Ereignis mit Empfängerfilter)
+- [x] 1.1 Migration `benachrichtigung` anhängen (Nummer per `scripts/check-migrationen.sh`), Spalten klassifizieren (`klassifikation_von`), Purge mit dem Einsatz; Test `jede_archivspalte_ist_retain` und ein Purge-Test bleiben grün
+- [x] 1.2 `BenachrichtigungArt` als `wire_enum!` mit fester Stufe je Art (D4), in `tests/enum_wire_kontrakt.rs`; Test: jede Art hat genau eine Stufe, Alarm-Arten sind genau die vier aus D4
+- [x] 1.3 Empfängerauflösung `benachrichtigung::melden` (Funktion über Stab-Besetzung mit Ersatz Mitgliedschaft, Person, Nutzer, ModulLeser; ohne Auslöser, Gerätekonten, Nutzer ohne Modulrecht, abgeschaltete Hinweis-Arten); Rust-Tests je Szenario der Anforderungen „Der Server bestimmt die Empfänger“, „Meine Funktion“, „Eigene Aktionen benachrichtigen den Auslöser nicht“
+- [x] 1.4 `LiveEvent::Benachrichtigung` mit internem Empfängerfilter im Stream-Builder und im Replay, `OrgLiveEvent::Benachrichtigung`; Test: fremder Nutzer erhält das Ereignis weder live noch im Replay, `LiveEvent::ALLE` und Vertragstest aktualisiert, `scripts/check-typ-codegen.sh` grün, beide generierten Dateien committet
+- [x] 1.5 Endpunkte `GET /api/benachrichtigungen/{id}` (fremd 404), `GET /api/benachrichtigungen?offen=true` (letzte 12 h), `POST …/{id}/quittieren` (sendet das Quittier-Ereignis); Text beim Lesen aus dem Bezug gebildet; Routentests inkl. 404 und Statuscode-Konvention
+- [x] 1.6 Schlüssel `benachrichtigungen_aus` in `benutzer_einstellungen` (Whitelist), 422 für Alarm-Arten; Test für Annahme und Ablehnung
+- [x] 1.7 Aufräumen im Scheduler: quittierte Zeilen nach 24 h, unquittierte nach 12 h; Test mit gesetzter Uhr
+- [x] 1.8 `src/AGENTS.md` um einen Abschnitt „Benachrichtigungen“ ergänzen (eine Stelle für Empfänger, `melden` nach dem Commit, ungegatetes Ereignis mit Empfängerfilter)
 
 ## 2. Fundament Client: Benachrichtigungszentrale (D5, D6) · LLH-1208
 

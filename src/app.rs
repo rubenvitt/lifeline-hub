@@ -256,6 +256,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benutzer-einstellungen/{schluessel}",
             put(routes::benutzer_einstellungen::setzen),
         )
+        // Benachrichtigungen (LLH-1207, design.md D2): nur die eigene Empfängerzeile, fremd 404.
+        .route(
+            "/api/benachrichtigungen",
+            get(routes::benachrichtigung::liste),
+        )
+        .route(
+            "/api/benachrichtigungen/{id}",
+            get(routes::benachrichtigung::lesen),
+        )
+        .route(
+            "/api/benachrichtigungen/{id}/quittieren",
+            post(routes::benachrichtigung::quittieren),
+        )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
@@ -880,6 +893,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/reaktivieren",
             post(routes::einsatz_fahrzeug::reaktivieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung",
+            post(routes::einsatz_fahrzeug::besatzung_uebernehmen),
         )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",

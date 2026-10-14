@@ -249,6 +249,20 @@ pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
 }
 
+/// Der eine System-ETB für mehrere Kräfte, die einer Einheit auf einmal zugeordnet werden
+/// (LLH-1073 D9, Wortlaut nach LLH-1100 D1): „Einheit «X»: 3 Kräfte zugeordnet: A, B, C“, bei
+/// einer Kraft der Einzelwortlaut [`etb_text_personal_zugeordnet`].
+pub fn etb_text_kraefte_zugeordnet(einheit: &str, personen: &[String]) -> String {
+    match personen {
+        [p] => etb_text_personal_zugeordnet(einheit, p),
+        alle => format!(
+            "Einheit «{einheit}»: {} Kräfte zugeordnet: {}",
+            alle.len(),
+            alle.join(", ")
+        ),
+    }
+}
+
 /// System-ETB beim Auflösen einer Einheit (LLH-1079).
 pub fn etb_text_aufgeloest(name: &str) -> String {
     format!("Einheit «{}» aufgelöst", name)

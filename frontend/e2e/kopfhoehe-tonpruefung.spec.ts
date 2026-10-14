@@ -16,12 +16,15 @@ import { einsatzAnlegen } from './einsatz-kern';
  * und es gäbe keinen Wechsel zu messen. Benachrichtigung „aus“ wie im Befund. Der
  * Verbindungsaufbau ist echt; dass er im Bild stand und endete, ist Vorbedingung.
  *
- * Nur mit Maus ab `xl`: darunter steht der Ruhezustand nur als Icon (LFH-637), eine Störung mit
- * Wort, und beide Startwechsel ändern die Breite in Gegenrichtung (gemessen 13.10.2026,
- * 1100–1180 px). Das entscheidet LLH-1232.
+ * Mit Maus. Unter `xl` stand der Ruhezustand nur als Icon (LFH-637), eine Störung mit Wort, und
+ * beide Startwechsel änderten die Breite in Gegenrichtung: bei 1120–1180 px sprang der Kopf
+ * (gemessen 13.10.2026). Seit LLH-1232 trägt `handschuh` die Wörter mit Startplatz auch unter
+ * `xl`; die Messung reicht deshalb ab 1100 px.
  */
 
-const BREITEN = [1280, 1300, 1320, 1340, 1360, 1380, 1400, 1420, 1440];
+const BREITEN = [
+  1100, 1120, 1140, 1160, 1180, 1200, 1280, 1300, 1320, 1340, 1360, 1380, 1400, 1420, 1440,
+];
 
 /** Vor der Frist (`ALARM_TON_FRIST_MS`, 2 s), damit „bereit“ nicht über „blockiert“ läuft. */
 const BEREIT_NACH_MS = 1000;
@@ -123,12 +126,12 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
   expect.soft(hoehen.size, `${fall}: Kopfhöhe über das Laden\n${verlauf.join('\n')}`).toBe(1);
 }
 
-test.describe('LLH-1158 Kopfhöhe über Tonprüfung und Verbindungsaufbau (handschuh, Maus, ab xl)', () => {
+test.describe('LLH-1158/LLH-1232 Kopfhöhe über Tonprüfung und Verbindungsaufbau (handschuh, Maus)', () => {
   for (const ton of ['bereit', 'blockiert'] as const) {
-    test(`1280–1440 px, Ton prüft → ${ton}, VERBINDE → SYNC: der Kopf springt nicht (auch als Beobachter)`, async ({
+    test(`1100–1440 px, Ton prüft → ${ton}, VERBINDE → SYNC: der Kopf springt nicht (auch als Beobachter)`, async ({
       page,
     }) => {
-      test.setTimeout(240_000);
+      test.setTimeout(420_000);
       await tonPruefungNachbilden(page, ton);
       await anmeldenAlsAdmin(page);
       const einsatzId = await einsatzAnlegen(

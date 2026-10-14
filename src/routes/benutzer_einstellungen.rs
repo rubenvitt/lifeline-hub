@@ -7,13 +7,14 @@
 //! [`CurrentUser`], nie aus Pfad oder Body. Es gibt keinen Endpunkt für ein fremdes Fach; die
 //! Trennung ist strukturell.
 //!
-//! Alle Ablehnungen bewerten ein Feld isoliert (unbekannter Schlüssel, leerer Wert, Überlänge)
-//! → jeweils 400, nie 422.
+//! Ablehnungen, die ein Feld isoliert bewerten (unbekannter Schlüssel, leerer Wert, Überlänge,
+//! unlesbarer Wert), sind 400. Einziger 422: eine Alarm-Art in `benachrichtigungen_aus` (der
+//! Zusammenhang Art und Stufe, LLH-1207).
 
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::benutzer_einstellungen::{
-    ist_gueltiger_schluessel, repo, BenutzerEinstellungenAnzeige, WERT_MAX_LAENGE,
+    ist_gueltiger_schluessel, pruefe_wert, repo, BenutzerEinstellungenAnzeige, WERT_MAX_LAENGE,
 };
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -64,6 +65,7 @@ pub async fn setzen(
         )));
     }
 
-    repo::setzen(&state.pool, benutzer.id, &schluessel, wert).await?;
+    let wert = pruefe_wert(&schluessel, wert)?;
+    repo::setzen(&state.pool, benutzer.id, &schluessel, &wert).await?;
     Ok(Json(repo::laden(&state.pool, benutzer.id).await?))
 }

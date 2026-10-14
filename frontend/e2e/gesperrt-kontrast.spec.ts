@@ -15,6 +15,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * „Hinzufügen“ (Primärknopf ohne gewählte Person) und „Entfernen“ an der einzigen Leitung
  * (Gefahrknopf, gesperrt mit Grund, LFH-966). Die Sperre ist Vorbedingung, sonst mäße der Spec
  * einen freien Knopf.
+ *
+ * Zeichen ohne Farbe (LLH-1233): dieselben Knöpfe tragen den gestrichelten Rand; freie Knöpfe und
+ * Felder daneben nicht, gesperrte Listeneinträge der Rollenwahl die Strichlinie nach innen.
+ * Geprüft wird der gerechnete Stil, also was antd und `index.css` zusammen ergeben.
  */
 
 const GESPERRT_BODEN = 4.5;
@@ -46,5 +50,42 @@ for (const modus of ['light', 'dark'] as const) {
 
     await pruefe(hinzufuegen, GESPERRT_BODEN, `${modus}/Hinzufügen`);
     await pruefe(entfernen, GESPERRT_BODEN, `${modus}/Entfernen`);
+
+    // Zeichen ohne Farbe (LLH-1233): gestrichelter Rand an jedem gesperrten Knopf.
+    for (const knopf of [hinzufuegen, entfernen]) {
+      await expect(knopf).toHaveCSS('border-top-style', 'dashed');
+      await expect(knopf).toHaveCSS('border-left-style', 'dashed');
+    }
   });
 }
+
+test('Gesperrtes trägt den gestrichelten Rand, Freies nicht (LLH-1233)', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmeldenAlsAdmin(page);
+  const id = await einsatzAnlegen(page);
+  await page.goto(einsatzEinstellungenPfad(id, 'zugriff'));
+
+  const zugriff = page.getByRole('region', { name: 'Zugriff' });
+  const zeile = zugriff.getByRole('row').filter({ hasText: LETZTE_EINSATZLEITUNG_TEXT });
+
+  // Freier Knopf (Linkknopf in derselben Zeile) und freies Feld: kein Strich.
+  const stelle = zeile.getByRole('button', { name: /^Führungsstelle für .* bearbeiten$/ });
+  await expect(stelle).toBeEnabled();
+  await expect(stelle).not.toHaveCSS('border-top-style', 'dashed');
+  const person = page.getByRole('combobox', { name: 'Person zum Aufnehmen' });
+  await expect(zugriff.getByRole('combobox', { name: 'Person zum Aufnehmen' })).toBeEnabled();
+  await expect(zugriff.locator('.ant-select').filter({ has: person })).toHaveCSS(
+    'border-top-style',
+    'solid',
+  );
+
+  // Rollenwahl der letzten Einsatzleitung: jede schwächere Rolle steht gesperrt in der Liste
+  // (LFH-966) und trägt die Strichlinie nach innen, die freie nicht.
+  await zeile.getByRole('combobox', { name: /^Rolle von / }).click();
+  const liste = page.locator('.ant-select-dropdown:visible');
+  const gesperrt = liste.locator('.ant-select-item-option-disabled');
+  const frei = liste.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)');
+  await expect(gesperrt.first()).toBeVisible();
+  await expect(gesperrt.first()).toHaveCSS('outline-style', 'dashed');
+  await expect(frei.first()).not.toHaveCSS('outline-style', 'dashed');
+});

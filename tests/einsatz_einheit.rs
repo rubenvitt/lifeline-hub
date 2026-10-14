@@ -2,8 +2,8 @@ use axum::http::StatusCode;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    stammpersonal_disponieren, system_etb_anzahl,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
+    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl,
 };
 
 #[tokio::test]
@@ -1925,4 +1925,346 @@ async fn fahrzeug_zuordnen_nennt_den_aufgeloesten_funkrufnamen() {
             .any(|t| t == "Einheit «Zug 1»: Fahrzeug «Florian 1/1» zugeordnet"),
         "{texte:?}"
     );
+}
+
+// ── Fahrzeug als eigene Einheit führen (LLH-1073 Teil II) ────────────────────────────────
+
+/// `einheit_id` und `fahrzeug_id` einer Disposition, direkt aus der Tabelle.
+async fn bezug_der_person(pool: &sqlx::SqlitePool, ep: i64) -> (Option<i64>, Option<i64>) {
+    sqlx::query_as("SELECT einheit_id, fahrzeug_id FROM einsatz_personal WHERE id = ?")
+        .bind(ep)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn einheit_des_fahrzeugs(pool: &sqlx::SqlitePool, ef: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?")
+        .bind(ef)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn zahl(pool: &sqlx::SqlitePool, sql: &'static str) -> i64 {
+    sqlx::query_scalar(sql).fetch_one(pool).await.unwrap()
+}
+
+async fn besatzung_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, ef: i64, ep: i64) {
+    let (s, json) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Einheit bilden schreibt alles oder nichts“ (design.md D9):
+/// scheitert der ETB-Eintrag, gibt es weder Einheit noch Sprechgruppen, Fahrzeug- oder
+/// Besatzungszuordnung. Ohne den Trigger gelingt dieselbe Anfrage (Gegenprobe).
+#[tokio::test]
+async fn bilden_schreibt_nichts_wenn_der_etb_scheitert() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "TMO 1", "TMO", 1).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 44/1").await;
+    let anna = kraft_anlegen(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    besatzung_zuordnen(&app, &admin, einsatz, ef, anna).await;
+    sqlx::query(
+        "CREATE TRIGGER etb_klemmt BEFORE INSERT ON etb_eintrag \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler: ETB'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let rumpf =
+        format!(r#"{{"name":"Florian 44/1","sprechgruppe_ids":[{sg}],"fahrzeug_ids":[{ef}]}}"#);
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
+    for body in [r#"{"name":"1. Zug"}"#.to_string(), rumpf.clone()] {
+        let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR, "{body}: {json}");
+        assert_eq!(zahl(&pool, "SELECT COUNT(*) FROM einsatz_einheit").await, 0);
+        assert_eq!(
+            zahl(&pool, "SELECT COUNT(*) FROM einsatz_einheit_sprechgruppe").await,
+            0
+        );
+        assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, None);
+        assert_eq!(bezug_der_person(&pool, anna).await, (None, Some(ef)));
+    }
+
+    sqlx::query("DROP TRIGGER etb_klemmt")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&rumpf)).await;
+    assert_eq!(s, StatusCode::CREATED, "Gegenprobe ohne Trigger: {json}");
+    let neu = json["id"].as_i64().unwrap();
+    assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, Some(neu));
+    assert_eq!(bezug_der_person(&pool, anna).await, (Some(neu), Some(ef)));
+    assert_eq!(namen(&json["sprechgruppen"], "bezeichnung"), ["TMO 1"]);
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Fahrzeug als eigene Einheit führen“ und „Besatzung kommt in
+/// die neue Einheit mit“ (design.md D9–D11): das Fahrzeug gehört danach der neuen Einheit, die
+/// Besatzung ohne Einheit kommt mit, wer einer anderen Einheit angehört, bleibt dort. Drei
+/// ETB-Einträge in der Transaktion, Ereignisse für Einheit, Fahrzeug und jede mitgekommene
+/// Person, keine Zeitachse aus dem Status des Fahrzeugs.
+#[tokio::test]
+async fn fahrzeug_als_eigene_einheit_nimmt_die_freie_besatzung_mit() {
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian Nachbarstadt 44/1").await;
+    let zug = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let berta = kraft_anlegen(&app, &admin, einsatz, "Berta", "mannschaft").await;
+    let anna = kraft_anlegen(&app, &admin, einsatz, "Anna", "unterfuehrer").await;
+    let carl = kraft_anlegen(&app, &admin, einsatz, "Carl", "mannschaft").await;
+    let dora = kraft_anlegen(&app, &admin, einsatz, "Dora", "mannschaft").await;
+    personal_zuordnen(&app, &admin, einsatz, zug, carl).await;
+    for ep in [berta, anna, carl] {
+        besatzung_zuordnen(&app, &admin, einsatz, ef, ep).await;
+    }
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        Some(&format!(
+            r#"{{"name":"Florian Nachbarstadt 44/1","fahrzeug_ids":[{ef},{ef}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let neu = json["id"].as_i64().unwrap();
+    assert_eq!(json["name"], "Florian Nachbarstadt 44/1");
+    assert_eq!(
+        namen(&json["fahrzeug_mitglieder"], "funkrufname"),
+        ["Florian Nachbarstadt 44/1"]
+    );
+    assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, Some(neu));
+    assert_eq!(bezug_der_person(&pool, anna).await, (Some(neu), Some(ef)));
+    assert_eq!(bezug_der_person(&pool, berta).await, (Some(neu), Some(ef)));
+    assert_eq!(bezug_der_person(&pool, carl).await, (Some(zug), Some(ef)));
+    assert_eq!(bezug_der_person(&pool, dora).await, (None, None));
+
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 3);
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    for erwartet in [
+        "Einheit «Florian Nachbarstadt 44/1» gebildet",
+        "Einheit «Florian Nachbarstadt 44/1»: Fahrzeug «Florian Nachbarstadt 44/1» zugeordnet",
+        "Einheit «Florian Nachbarstadt 44/1»: 2 Kräfte zugeordnet: Berta, Anna",
+    ] {
+        assert!(texte.iter().any(|t| t == erwartet), "{erwartet}: {texte:?}");
+    }
+
+    let mut gemeldet = common::objekt_ereignisse(
+        &mut rx,
+        &[
+            ("einheit", "einheit_id"),
+            ("fahrzeug", "fahrzeug_id"),
+            ("personal", "personal_id"),
+        ],
+    );
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("einheit".to_string(), neu),
+        ("fahrzeug".to_string(), ef),
+        ("personal".to_string(), anna),
+        ("personal".to_string(), berta),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet);
+
+    // D11: kein Ereignis aus dem aktuellen Status des Fahrzeugs.
+    let (s, z) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{neu}/zeitachse"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z}");
+    assert_eq!(z["ereignisse"], serde_json::json!([]), "{z}");
+}
+
+/// Bei genau einer mitkommenden Kraft steht der Wortlaut des Einzelwegs im ETB (LLH-1100 D1).
+#[tokio::test]
+async fn eine_mitkommende_kraft_steht_im_einzelwortlaut() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "RTW 1").await;
+    let anna = kraft_anlegen(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    besatzung_zuordnen(&app, &admin, einsatz, ef, anna).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        Some(&format!(r#"{{"name":"RTW 1","fahrzeug_ids":[{ef}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Einheit «RTW 1»: «Anna» zugeordnet"),
+        "{texte:?}"
+    );
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Fahrzeug inzwischen zugeordnet“ (design.md D9): ein schon
+/// zugeordnetes, ein entlassenes und ein unbekanntes Fahrzeug stehen je mit Grund im 422; keine
+/// Einheit entsteht, das freie Fahrzeug bleibt frei, kein ETB-Eintrag.
+#[tokio::test]
+async fn zugeordnetes_oder_beendetes_fahrzeug_ist_422_mit_grund_je_fahrzeug() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let vergeben = fahrzeug_anlegen(&app, &admin, einsatz, "83-2").await;
+    let weg = fahrzeug_anlegen(&app, &admin, einsatz, "83-3").await;
+    // Ein freies Fahrzeug eines anderen Einsatzes ist hier unbekannt, nicht zuordenbar.
+    let nachbarlage = einsatz_anlegen_mit(&app, &admin, "Nachbarlage").await;
+    let fremd = fahrzeug_anlegen(&app, &admin, nachbarlage, "83-9").await;
+    let zug2 = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, zug2, vergeben).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{weg}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        Some(&format!(
+            r#"{{"name":"83-1","fahrzeug_ids":[{frei},{vergeben},{weg},{fremd},999999]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["zeilen"],
+        serde_json::json!([
+            {"art": "fahrzeug", "id": vergeben, "grund": "gehört zu «Zug 2»"},
+            {"art": "fahrzeug", "id": weg, "grund": "entlassen"},
+            {"art": "fahrzeug", "id": fremd, "grund": "unbekannt"},
+            {"art": "fahrzeug", "id": 999999, "grund": "unbekannt"},
+        ])
+    );
+    assert_eq!(zahl(&pool, "SELECT COUNT(*) FROM einsatz_einheit").await, 1);
+    assert_eq!(einheit_des_fahrzeugs(&pool, frei).await, None);
+    assert_eq!(einheit_des_fahrzeugs(&pool, vergeben).await, Some(zug2));
+    assert_eq!(einheit_des_fahrzeugs(&pool, fremd).await, None);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+}
+
+/// Spec `eingabegrenzen`, „Fahrzeug- und Besatzungslisten sind entdoppelt und begrenzt“ und „Zu
+/// langer Name beim Führen als Einheit“: 51 Fahrzeuge (gezählt vor dem Entdoppeln) oder ein Name
+/// aus 201 Zeichen sind 400, bevor etwas geschrieben wird.
+#[tokio::test]
+async fn fahrzeugliste_und_name_sind_beim_bilden_begrenzt() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
+    let viele = vec![ef.to_string(); 51].join(",");
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"name":"83-1","fahrzeug_ids":[{viele}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert!(json["error"].as_str().unwrap().contains("50"), "{json}");
+    let lang = "F".repeat(201);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"name":"{lang}","fahrzeug_ids":[{ef}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(zahl(&pool, "SELECT COUNT(*) FROM einsatz_einheit").await, 0);
+    assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, None);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+
+    // Genau 50 (mit Dubletten) ist erlaubt: entdoppelt bleibt ein Fahrzeug.
+    let fuenfzig = vec![ef.to_string(); 50].join(",");
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"name":"83-1","fahrzeug_ids":[{fuenfzig}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["fahrzeug_mitglieder"].as_array().unwrap().len(), 1);
+}
+
+/// design.md D9, Recht: nur das Modul Einheiten. Eine Rolle, der das Modul Fahrzeuge gesperrt
+/// ist, führt ein Fahrzeug trotzdem als eigene Einheit (wie `PUT …/fahrzeug/{ef_id}`).
+#[tokio::test]
+async fn ohne_freigabe_fahrzeuge_darf_die_rolle_das_fahrzeug_als_einheit_fuehren() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/fahrzeuge"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Fahrzeuge sind ihr gesperrt");
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &frieda,
+        Some(&format!(r#"{{"name":"83-1","fahrzeug_ids":[{ef}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let neu = json["id"].as_i64().unwrap();
+    assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, Some(neu));
 }
