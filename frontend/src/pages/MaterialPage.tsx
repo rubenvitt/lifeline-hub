@@ -138,13 +138,9 @@ export default function MaterialPage() {
   const zeilen = useZeilenFehler<number>();
   // Einheiten und UHS für die Spalte „Ort“; ohne Schreibrecht nur zum Lesen der Namen. Das
   // Schreibrecht hängt am Einsatz, der hier noch laden kann: bis dahin bedient kein Teil.
-  const einsatzFuerOrt = useQuery({
-    queryKey: einsatzKeys.einsatz(einsatzId),
-    queryFn: () => ladeEinsatz(einsatzId),
-  }).data;
   const { kontext: ortKontext } = useMaterialOrtKontext(
     einsatzId,
-    einsatzFuerOrt != null && darfImEinsatzSchreiben(einsatzFuerOrt),
+    einsatzQuery.data != null && darfImEinsatzSchreiben(einsatzQuery.data),
   );
 
   const disponiereMutation = useMutation({

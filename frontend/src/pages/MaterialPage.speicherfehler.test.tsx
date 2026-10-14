@@ -62,8 +62,9 @@ function render(liste = [em, zweites]) {
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
     ),
     http.get('/api/material', () => HttpResponse.json(pool)),
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    // Namen für die Spalte „Ort“ (LLH-1093).
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -171,7 +172,9 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 
-  it('Menge: der Grund steht an der Zeile, das Feld bleibt bedienbar und sendet erneut', async () => {
+  // Die Menge speichert seit LLH-1093 (design.md D9) nur ausdrücklich, nie beim Verlassen; die
+  // Ablehnung zeigt die `InlineAngabe` selbst an der Zeile.
+  it('Menge: der Grund steht an der Zeile, das Feld bleibt offen und sendet erneut', async () => {
     const gesendet: unknown[] = [];
     server.use(
       http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
@@ -181,23 +184,31 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Wolldecke');
-    const feld = within(zeile(container, 10)).getByRole('spinbutton', { name: 'Menge Wolldecke' });
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }),
+    );
+    const feld = within(zeile(container, 10)).getByRole('spinbutton', {
+      name: 'Menge zu Wolldecke',
+    });
     fireEvent.change(feld, { target: { value: '70' } });
-    fireEvent.blur(feld);
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', { name: 'Menge zu Wolldecke speichern' }),
+    );
 
     expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
       'Menge übersteigt den Bestand',
     );
     expect(feld).toHaveValue('70');
+    expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
 
-    // Nach der Ablehnung sperrt das Feld nicht: ein neuer Wert geht hinaus.
-    fireEvent.change(feld, { target: { value: '60' } });
-    fireEvent.blur(feld);
+    // Nach der Ablehnung sperrt das Feld nicht: ein neuer Wert geht mit Enter hinaus.
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '60{Enter}');
     await waitFor(() => expect(gesendet).toEqual([{ menge: 70 }, { menge: 60 }]));
   });
 
-  it('Menge: nach einer Ablehnung schickt das Verlassen denselben Wert nicht noch einmal, Enter schon', async () => {
+  it('Menge: Verlassen sendet nie, auch nach einer Ablehnung nicht; „Speichern“ wiederholt', async () => {
     const gesendet: unknown[] = [];
     server.use(
       http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
@@ -207,21 +218,32 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Wolldecke');
-    const feld = within(zeile(container, 10)).getByRole('spinbutton', { name: 'Menge Wolldecke' });
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }),
+    );
+    const feld = within(zeile(container, 10)).getByRole('spinbutton', {
+      name: 'Menge zu Wolldecke',
+    });
     fireEvent.change(feld, { target: { value: '70' } });
     fireEvent.blur(feld);
+    await act(async () => {});
+    expect(gesendet).toEqual([]);
+
+    await userEvent.type(feld, '{Enter}');
     expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
       'Menge übersteigt den Bestand',
     );
 
-    // Erneut hinein- und hinausklicken: kein zweiter Versuch mit dem abgelehnten Wert.
+    // Erneut hinein- und hinausklicken: kein zweiter Versuch.
     fireEvent.focus(feld);
     fireEvent.blur(feld);
     await act(async () => {});
     expect(gesendet).toEqual([{ menge: 70 }]);
 
-    // Enter ist der ausdrückliche Wiederholungsweg.
-    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    // „Speichern“ ist der ausdrückliche Wiederholungsweg.
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', { name: 'Menge zu Wolldecke speichern' }),
+    );
     await waitFor(() => expect(gesendet).toEqual([{ menge: 70 }, { menge: 70 }]));
   });
 
