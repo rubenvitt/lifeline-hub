@@ -1627,9 +1627,10 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
       const zeile = region.locator('tr.ant-table-row').filter({ hasText: FAHRZEUG_SOLL });
       // Inhaltsanker: Ist UND Soll stehen in der Besatzungszelle.
       await expect(zeile.getByText(/Ist .* · Soll /)).toBeVisible();
-      const entfernen = region.getByRole('button', { name: 'Entfernen', exact: true });
+      // Der Funkrufname trägt ein Zufallssuffix; der Zeilenknopf heißt „<Funkrufname> entlassen“.
+      const entlassen = zeile.getByRole('button', { name: / entlassen$/ });
       // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-      await expect(entfernen).toHaveCount(rolle === 'admin' ? 1 : 0);
+      await expect(entlassen).toHaveCount(rolle === 'admin' ? 1 : 0);
 
       const ueber = await tabellenUeberlauf(region);
       test.info().annotations.push({
@@ -1645,10 +1646,11 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
         'Zeilenhöhe mit Ist und Soll',
       ).toBeLessThanOrEqual(48);
       if (rolle === 'admin') {
-        await expect(entfernen, '„Entfernen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
-        // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): die Rückfrage steht.
-        await entfernen.click();
-        await expect(page.getByText('Aus Einsatz entfernen?')).toBeVisible();
+        await expect(entlassen, '„Entlassen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+        // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): Entlassen fragt nicht nach, der
+        // Rückgängig-Toast steht (LLH-1079 Teil II).
+        await entlassen.click();
+        await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible();
       }
     });
 

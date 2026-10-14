@@ -55,8 +55,7 @@ const STAFFEL = [
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
-const FAHRZEUG = 'Florian Musterstadt-Nordwest 46-1';
+const EINHEIT = 'Technischer Zug Musterstadt-Nordwest 46';
 
 async function anmelden(page: Page) {
   await page.goto('/login');
@@ -66,35 +65,27 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-/** Seeding per `page.request`: die Session ist Cookie-basiert und der Jar wird geteilt. */
-async function seedeKraft(page: Page, einsatzId: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
-    data: {
-      adhoc: {
-        name: KRAFT,
-        funktion: 'Abschnittsleitung Technische Hilfeleistung',
-        traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
-      },
-    },
+/**
+ * Eine Einheit trägt die Bestätigungsblase: Personal, Fahrzeug und Material entlassen seit
+ * LLH-1079 ohne Rückfrage (Rückgängig-Toast); „Auflösen" auf der Einheit-Detailseite fragt per
+ * `Popconfirm` nach. Seeding per `page.request`: die Session ist Cookie-basiert und der Jar wird
+ * geteilt. Liefert den Pfad der Detailseite.
+ */
+async function seedeEinheit(page: Page, einsatzId: string): Promise<string> {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+    data: { name: EINHEIT },
   });
-  expect(
-    antwort.ok(),
-    `Seeding Personal: ${antwort.status()} ${await antwort.text()}`,
-  ).toBeTruthy();
+  expect(antwort.ok(), `Seeding Einheit: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  const { id } = (await antwort.json()) as { id: number };
+  return `/einsaetze/${einsatzId}/einheiten/${id}`;
 }
 
 /**
- * Ein Fahrzeug trägt die Bestätigungsblase: Personal entlässt seit LLH-1079 ohne Rückfrage,
- * der Zeilenknopf „Entfernen" mit `Popconfirm` steht nur noch an Fahrzeug und Material.
+ * Eine Modulzeile im Panel. Mit der geseedeten Einheit trägt „Einheiten" ihre Zahl im Namen
+ * („Einheiten, 1 Einheit"); der Anfang bleibt exakt, sonst träfe „Einheiten" auch eine andere Zeile.
  */
-async function seedeFahrzeug(page: Page, einsatzId: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
-    data: { adhoc: { funkrufname: FAHRZEUG } },
-  });
-  expect(
-    antwort.ok(),
-    `Seeding Fahrzeug: ${antwort.status()} ${await antwort.text()}`,
-  ).toBeTruthy();
+function modulZeile(panel: Locator, modul: string): Locator {
+  return panel.getByRole('button', { name: new RegExp(`^${modul}(, .+)?$`) });
 }
 
 /**
@@ -150,21 +141,21 @@ for (const { dichte, soll } of STAFFEL) {
     // Anmelden und Anlegen am Projekt-Vorgabemaß, erst danach umstellen.
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Trefflaeche ${dichte} ${Date.now()}`);
-    await seedeFahrzeug(page, einsatzId);
+    const einheitPfad = await seedeEinheit(page, einsatzId);
 
     await page.setViewportSize(TABLET);
 
     if (dichte === 'handschuh') {
       // Eine GESPEICHERTE Wahl gewinnt gegen die Zeigerart — nur so ist die Handschuh-Stufe am
       // Tablet erreichbar. `ThemeModeProvider` liest den Speicher beim Montieren.
-      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      await page.goto(einheitPfad);
       await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
         DICHTE_SCHLUESSEL,
         dichte,
       ] as const);
       await page.reload();
     } else {
-      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      await page.goto(einheitPfad);
     }
 
     /**
@@ -183,11 +174,7 @@ for (const { dichte, soll } of STAFFEL) {
     const panel = page.locator('[data-lfh="modul-panel"]');
     await expect(panel, 'der inline-Rahmen steht bei 1024 px').toHaveCount(1);
     for (const modul of ['Einheiten', 'Personal', 'Fahrzeuge', 'Material']) {
-      await haeltTreffflaeche(
-        panel.getByRole('button', { name: modul, exact: true }),
-        soll,
-        `Modulzeile „${modul}"`,
-      );
+      await haeltTreffflaeche(modulZeile(panel, modul), soll, `Modulzeile „${modul}"`);
     }
 
     // ── (b) die Kategorie-Ziele der IconRail ──────────────────────────────────────────
@@ -207,12 +194,12 @@ for (const { dichte, soll } of STAFFEL) {
     }
 
     // ── (c) die AKTIONSKNÖPFE einer Bestätigungsblase, nicht ihr Auslöser ─────────────
-    const zeile = page.locator('tr.ant-table-row');
-    await expect(zeile, 'genau das eine geseedete Fahrzeug').toHaveCount(1);
+    // Inhaltsanker: die geseedete Einheit steht im Seitentitel.
+    await expect(page.getByRole('heading', { name: EINHEIT, exact: true })).toBeVisible();
 
-    const ausloeser = zeile.getByRole('button', { name: 'Entfernen', exact: true });
+    const ausloeser = page.getByRole('button', { name: 'Auflösen', exact: true });
     // Der Auslöser hängt an `controlHeight`, die Blasenknöpfe an `controlHeightSM` — zwei Token.
-    await haeltTreffflaeche(ausloeser, soll, 'Auslöser „Entfernen"');
+    await haeltTreffflaeche(ausloeser, soll, 'Auslöser „Auflösen"');
     await ausloeser.click();
 
     /**
@@ -224,7 +211,7 @@ for (const { dichte, soll } of STAFFEL) {
 
     // Per `getByRole(..., { name })`: `getByText` träfe auch `sr-only`/`aria-hidden`. Der
     // Bestätigungsknopf nennt die Handlung (LFH-1090), „Abbrechen" liefert antds `de_DE`.
-    for (const etikett of ['Aus Einsatz entfernen', 'Abbrechen']) {
+    for (const etikett of ['Einheit auflösen', 'Abbrechen']) {
       const knopf = blase.getByRole('button', { name: etikett, exact: true });
       const breite = await haeltTreffflaeche(knopf, soll, `Bestätigungsknopf „${etikett}"`);
 
@@ -245,7 +232,7 @@ for (const { dichte, soll } of STAFFEL) {
       });
     }
 
-    // Über „Abbrechen" schließen (Bestätigen entfernte das geseedete Fahrzeug); der Klick belegt
+    // Über „Abbrechen" schließen (Bestätigen löste die geseedete Einheit auf); der Klick belegt
     // nebenbei die Bedienbarkeit.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
@@ -369,10 +356,11 @@ for (const { dichte, soll } of STAFFEL) {
 }
 
 /**
- * LFH-435 · Zweig „Beobachter" (weder Verwaltungs- noch Schreibrecht) auf der Personalseite.
+ * LFH-435 · Zweig „Beobachter" (weder Verwaltungs- noch Schreibrecht) auf derselben
+ * Einheit-Detailseite wie (c).
  *
- * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfallen die Aktionsspalte mit
- * „Entfernen" samt Bestätigungsblase und die Kopfaktionen (`PersonalPage.tsx`,
+ * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfällt die Aktionsleiste mit
+ * „Speichern" und „Auflösen" samt Bestätigungsblase (`EinheitDetailPage.tsx`,
  * `darfSchreiben`). Diese Ziele sind VERSTECKT, also als abwesend zugesichert statt still aus
  * der Messmenge gefallen. Was dem Beobachter bleibt, sind Modulzeilen und Kategorie-Ziele —
  * sie werden in der Stufe gemessen, damit die Messmenge nie leer ist.
@@ -388,11 +376,11 @@ for (const { dichte, soll } of STAFFEL) {
     // Gesät wird als Admin, erst dann wechselt die Sitzung im selben Kontext.
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Trefflaeche Beobachter ${dichte} ${Date.now()}`);
-    await seedeKraft(page, einsatzId);
+    const einheitPfad = await seedeEinheit(page, einsatzId);
     await wechsleZuRolle(page, 'beobachter', einsatzId);
 
     await page.setViewportSize(TABLET);
-    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    await page.goto(einheitPfad);
     if (dichte === 'handschuh') {
       await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
         DICHTE_SCHLUESSEL,
@@ -406,16 +394,14 @@ for (const { dichte, soll } of STAFFEL) {
 
     // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Erst der Inhaltsanker, sonst wäre „fehlt"
     //    auch im Ladezustand wahr.
-    const zeile = page.locator('tr.ant-table-row');
-    await expect(zeile, 'genau die eine geseedete Kraft').toHaveCount(1);
-    await expect(zeile.getByText(KRAFT)).toBeVisible();
+    await expect(page.getByRole('heading', { name: EINHEIT, exact: true })).toBeVisible();
     await expect(
-      zeile.getByRole('button', { name: `${KRAFT} entlassen`, exact: true }),
-      'Vorbedingung: ohne Schreibrecht keine Zeilenaktion „Entlassen" — sonst misst der Test den Admin-Zweig',
+      page.getByRole('button', { name: 'Auflösen', exact: true }),
+      'Vorbedingung: ohne Schreibrecht kein Auslöser „Auflösen" — sonst misst der Test den Admin-Zweig',
     ).toHaveCount(0);
     await expect(
-      page.getByRole('button', { name: 'Ad-hoc-Person', exact: true }),
-      'Vorbedingung: ohne Schreibrecht keine Kopfaktion',
+      page.getByRole('button', { name: 'Speichern', exact: true }),
+      'Vorbedingung: ohne Schreibrecht keine Aktionsleiste',
     ).toHaveCount(0);
     await expect(page.locator('.ant-popconfirm'), 'keine Bestätigungsblase im Baum').toHaveCount(0);
 
@@ -424,7 +410,7 @@ for (const { dichte, soll } of STAFFEL) {
     const panel = page.locator('[data-lfh="modul-panel"]');
     await expect(panel, 'der inline-Rahmen steht bei 1024 px').toHaveCount(1);
     for (const modul of ['Einheiten', 'Personal', 'Fahrzeuge', 'Material']) {
-      const knopf = panel.getByRole('button', { name: modul, exact: true });
+      const knopf = modulZeile(panel, modul);
       // Ohne Override ist kein Modul für den Beobachter gesperrt; ein gesperrtes Ziel wäre ein
       // anderer Zweig als der gemessene.
       await expect(knopf, `Modulzeile „${modul}" ist bedienbar`).toBeEnabled();

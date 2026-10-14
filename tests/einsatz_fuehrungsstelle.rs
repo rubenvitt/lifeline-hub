@@ -475,16 +475,56 @@ async fn entlassen_loest_die_zuordnung() {
 
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
         &admin,
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT, "Vorbedingung: entlassen");
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: entlassen");
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1["fahrzeug_ids"],
         json!([])
+    );
+}
+
+/// Ein entlassenes Fahrzeug trägt keine Führungsstelle: 409 (Lebenszyklus, `src/AGENTS.md`,
+/// Statuscode-Konvention), und zwar vor dem 422 für ein nicht disponiertes Fahrzeug derselben
+/// Liste. Gespeichert wird nichts.
+#[tokio::test]
+async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: entlassen");
+
+    for ids in [json!([elw]), json!([987_654, elw])] {
+        let (status, json) = patchen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"rufname": "Florian 10", "fahrzeug_ids": ids}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{ids}: {json:?}");
+        assert_eq!(
+            json["error"], "Das Fahrzeug ist aus dem Einsatz entlassen; erst erneut disponieren",
+            "{ids}"
+        );
+    }
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1,
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        "auch der Rufname bleibt ungespeichert"
     );
 }
 
@@ -504,8 +544,8 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
                 &admin,
                 None,
             )
@@ -513,9 +553,9 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
             .0
         }
     };
-    assert_eq!(entlassen(mtw).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(mtw).await, StatusCode::OK);
     assert_eq!(kopf_events(&mut rx), 0, "ohne Zuordnung kein Kopf-Ereignis");
-    assert_eq!(entlassen(elw).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(elw).await, StatusCode::OK);
     assert_eq!(
         kopf_events(&mut rx),
         1,

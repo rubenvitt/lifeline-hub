@@ -46,8 +46,34 @@ export function aktualisiereDisposition(
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'PATCH', felder);
 }
 
-export function entferneDisposition(einsatzId: number, efId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'DELETE');
+/** Entlassene Fahrzeuge des Einsatzes (LLH-1079 Teil II, Block „Entlassen“). */
+export function listEntlasseneFahrzeuge(einsatzId: number): Promise<EinsatzFahrzeug[]> {
+  return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge?entlassene=1`);
+}
+
+/**
+ * Aus dem Einsatz entlassen (LLH-1079): die Zeile bleibt, Besatzung, Einheit,
+ * Bereitstellungsraum und Führungsstelle gehen. Umkehrbar über {@link reaktiviereDisposition},
+ * deshalb ohne Rückfrage.
+ */
+export function entlasseDisposition(einsatzId: number, efId: number): Promise<EinsatzFahrzeug> {
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/entlassen`,
+    'POST',
+  );
+}
+
+/** Fehldisposition stornieren (LLH-1079): nur ohne Spur in den ersten 15 Minuten. */
+export function storniereDisposition(einsatzId: number, efId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/stornieren`, 'POST');
+}
+
+/** Ein entlassenes oder storniertes Fahrzeug erneut disponieren (Rückgängig, Block „Entlassen“). */
+export function reaktiviereDisposition(einsatzId: number, efId: number): Promise<EinsatzFahrzeug> {
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/reaktivieren`,
+    'POST',
+  );
 }
 
 /** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte. */

@@ -19,9 +19,13 @@ import {
  *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“)
  *   adhoc-material.png        frontend/src/pages/MaterialPage.tsx (Dialog „Ad-hoc-Material ohne
  *                             Stammeintrag“)
+ *   aus-dem-einsatz.png       frontend/src/kraefte/EntlassenBlock.tsx (Block „Aus dem Einsatz
+ *                             genommen“ unter der Liste)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen Material nur im Stamm, keines ist im Einsatz. Die Spec
- * disponiert drei Stammposten und einen Ad-hoc-Posten und setzt zwei Status.
+ * disponiert drei Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
+ * dem Einsatz genommen“ disponiert sie einen weiteren Ad-hoc-Posten und nimmt ihn wieder heraus
+ * (LLH-1079 Teil II).
  */
 
 const KAPITEL = 'material';
@@ -66,6 +70,11 @@ test.describe(KAPITEL, () => {
         bemerkung: 'Zündung defekt',
       });
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { status: 'im_einsatz' });
+      const pavillon = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
+        adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
+        menge: 2,
+      });
+      await fuelle(api, 'post', `${pfad}/${pavillon.id}/entlassen`);
     } finally {
       await api.dispose();
     }
@@ -116,5 +125,19 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'adhoc-material');
+  });
+
+  test('Block „Aus dem Einsatz genommen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/material`);
+    const block = page.locator('[data-lfh="entlassen-block"]');
+    await block.getByText('Aus dem Einsatz genommen (1)').click();
+    await expect(
+      block.getByRole('button', { name: 'Erneut disponieren: Faltpavillon 3 × 3 m' }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(block, KAPITEL, 'aus-dem-einsatz');
   });
 });

@@ -38,6 +38,15 @@ MUST alle Personen zählen, die es besetzen, auch fremde.
 - **WHEN** eine Person der Einheit A das Fahrzeug der Einheit B besetzt
 - **THEN** steht sie einmal, bei A mit „fährt auf <Funkrufname>“, und das Fahrzeug von B zählt sie in seiner Besatzung Ist
 
+Der Baum MUST nur aktive Kräfte zeigen: entlassene oder stornierte Personen und Fahrzeuge,
+herausgenommenes Material und aufgelöste Einheiten MUST NOT darin stehen, auch nicht über eine
+veraltete Bindung (Spec `kraefte-entlassung`). Eine Einheit, deren Über-Einheit aufgelöst ist,
+MUST als eigene Wurzel stehen.
+
+#### Scenario: Nur aktive Kräfte, aufgelöste Über-Einheit macht die Untereinheit zur Wurzel
+- **WHEN** die Gruppe „Gr X“ unter „Zug 1“ aufgelöst ist, ihr Trupp noch auf sie zeigt und ein Fahrzeug von „Zug 1“ entlassen ist
+- **THEN** stehen „Gr X“ und das entlassene Fahrzeug nirgends im Baum, der Trupp steht als eigene Wurzel, und jede aktive Kraft steht genau einmal
+
 ### Requirement: Stärke im Kräftebaum
 
 Die Zeile einer Einheit SHALL ihre Stärke samt aller Untereinheiten zeigen. Die Summe der Stärken

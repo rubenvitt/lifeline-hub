@@ -26,6 +26,15 @@ wire_enum! {
     try_from = |s| format!("Ungültiger Endzustand: {s}");
 }
 
+/// Ergebnis einer Disposition: die Zeile und ob sie eine beendete Zeile derselben Stamm-Kraft
+/// (Person oder Fahrzeug) wieder aufgenommen hat (design.md D7). Der Aufrufer wählt danach den
+/// ETB-Text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Disponiert {
+    pub id: i64,
+    pub reaktiviert: bool,
+}
+
 /// So lange nach der Disposition lässt sich eine Kraft stornieren (design.md D3, Regel 4).
 pub const STORNO_FRIST_MINUTEN: i64 = 15;
 
@@ -87,13 +96,18 @@ mod tests {
         ),
         (
             "src/einheit/repo.rs",
+            3,
+            "Spurprüfung vor dem echten Löschen zählt jede Personal-, Fahrzeug- und Materialzeile der Einheit",
+        ),
+        (
+            "src/fahrzeug/disposition_repo.rs",
             1,
-            "Spurprüfung vor dem echten Löschen zählt jede Personalzeile der Einheit",
+            "Disponieren eines Stamm-Fahrzeugs sucht seine Zeile auch beendet, um sie wieder aufzunehmen",
         ),
         (
             "src/kraefte_disposition.rs",
-            1,
-            "Vorprüfung der Sammel-Disposition liest auch beendete Zeilen, um „schon disponiert“ von „entlassen“ zu unterscheiden",
+            2,
+            "Vorprüfung der Sammel-Disposition (Personal und Fahrzeuge) liest auch beendete Zeilen, um „schon disponiert“ von „entlassen“ zu unterscheiden",
         ),
         (
             "src/personal/disposition_repo.rs",
@@ -102,8 +116,9 @@ mod tests {
         ),
     ];
 
-    /// Wächter (design.md D6): Jede SQL-Zeichenkette im Produktivcode, die `einsatz_personal` oder
-    /// `einsatz_einheit` per `FROM`/`JOIN` liest, prüft den Lebenszustand der Zeile oder greift
+    /// Wächter (design.md D6): Jede SQL-Zeichenkette im Produktivcode, die eine der vier
+    /// Kräftetabellen (`einsatz_personal`, `einsatz_fahrzeug`, `einsatz_material`,
+    /// `einsatz_einheit`) per `FROM`/`JOIN` liest, prüft den Lebenszustand der Zeile oder greift
     /// per Primärschlüssel auf genau eine Zeile zu (Namensauflösung eines Bezugs). Ausnahmen
     /// stehen mit Grund in [`ALLOWLIST`]; die Zahl muss genau stimmen, damit eine neue Stelle
     /// in einer gelisteten Datei auffällt und eine erledigte Ausnahme verschwindet.
@@ -173,6 +188,14 @@ mod tests {
             ),
             ["einsatz_einheit"]
         );
+        // Der Filter eines Nachbarteils der UNION zählt nicht (Lagekarten-Marker, LLH-1079).
+        assert_eq!(
+            pruefe(
+                "SELECT id FROM einsatz_fahrzeug WHERE einsatz_id = ?1 UNION ALL \
+                 SELECT id FROM einsatz_personal WHERE einsatz_id = ?1 AND beendet_at IS NULL"
+            ),
+            ["einsatz_fahrzeug"]
+        );
         assert_eq!(
             pruefe("select count(*) from einsatz_einheit\n where einsatz_id = ?"),
             ["einsatz_einheit"]
@@ -196,6 +219,23 @@ mod tests {
             "SELECT e.id FROM einsatz_einheit e WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NOT NULL"
         )
         .is_empty());
+        // Fahrzeug und Material (LLH-1079 Teil II) prüft der Wächter ebenso.
+        assert_eq!(
+            pruefe("SELECT id FROM einsatz_fahrzeug ef WHERE ef.einsatz_id = ?"),
+            ["einsatz_fahrzeug"]
+        );
+        assert_eq!(
+            pruefe("SELECT COUNT(*) FROM einsatz_material WHERE einheit_id = ?"),
+            ["einsatz_material"]
+        );
+        assert!(pruefe(
+            "SELECT em.id FROM einsatz_material em WHERE em.einsatz_id = ? AND em.beendet_at IS NULL"
+        )
+        .is_empty());
+        assert!(
+            pruefe("SELECT ef.id FROM einsatz_fahrzeug ef WHERE ef.beendet_als = 'entlassen'")
+                .is_empty()
+        );
         // `{KONST}` in einem format!-Literal wird aufgelöst; die Konstante allein ist Bruchstück.
         let datei = |text: &str| vec![("src/x.rs".to_string(), text.to_string())];
         let sel = "const SEL: &str = \"SELECT ep.beendet_at FROM einsatz_personal ep\";\n";
@@ -283,6 +323,8 @@ mod tests {
     fn find_unfiltered_reads(sql: &str) -> Vec<&'static str> {
         const TABLES: &[(&str, &str)] = &[
             ("einsatz_personal", "beendet_at"),
+            ("einsatz_fahrzeug", "beendet_at"),
+            ("einsatz_material", "beendet_at"),
             ("einsatz_einheit", "aufgeloest_at"),
         ];
         const NO_ALIAS: &[&str] = &[
@@ -332,16 +374,24 @@ mod tests {
                 }
                 _ => tabelle,
             };
-            // Ein Prädikat auf den Lebenszustand, nicht bloß die Spalte in der Auswahl.
+            // Ein Prädikat auf den Lebenszustand, nicht bloß die Spalte in der Auswahl; gesucht
+            // nur im eigenen Teil einer `UNION`, sonst filterte ein Nachbarteil mit.
             let spalte_qualifiziert = format!("{alias}.{spalte}");
-            let gefiltert = (0..tokens.len()).any(|j| {
+            let teil_anfang = (0..i)
+                .rev()
+                .find(|&k| tokens[k] == "union")
+                .map_or(0, |k| k + 1);
+            let teil_ende = (i + 1..tokens.len())
+                .find(|&k| tokens[k] == "union")
+                .unwrap_or(tokens.len());
+            let gefiltert = (teil_anfang..teil_ende).any(|j| {
                 let t = tokens[j].as_str();
                 let nach = tokens.get(j + 1).map(String::as_str);
                 let nach2 = tokens.get(j + 2).map(String::as_str);
                 let ist_null_test =
                     nach == Some("is") && matches!(nach2, Some("null") | Some("not"));
                 let zustand = (t == *spalte || t == spalte_qualifiziert) && ist_null_test;
-                let als = *tabelle == "einsatz_personal"
+                let als = *spalte == "beendet_at"
                     && (t == "beendet_als" || t == format!("{alias}.beendet_als"))
                     && matches!(nach, Some("=") | Some("<>") | Some("in") | Some("is"));
                 zustand || als

@@ -729,11 +729,12 @@ pub async fn setze_hand_status_tx(
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
-    let fahrzeuge: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einheit_id = ?")
-            .bind(id)
-            .fetch_one(&mut *conn)
-            .await?;
+    let fahrzeuge: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einheit_id = ? AND beendet_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(&mut *conn)
+    .await?;
     if alt_id == status_id {
         return Ok(None);
     }

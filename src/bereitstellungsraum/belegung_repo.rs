@@ -138,6 +138,47 @@ pub async fn austritt_bei_aufloesung_tx(
     Ok(Some(br_id))
 }
 
+/// Schreibt beim Entlassen eines Fahrzeugs den Austritt aus seinem Bereitstellungsraum und leert
+/// den Cache (LLH-1079, design.md D4), in der Transaktion des Aufrufers. Liefert den Raum, aus
+/// dem es ausgetreten ist, oder `None`, wenn es in keinem stand.
+pub async fn austritt_fahrzeug_bei_entlassung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let br_id: Option<i64> = sqlx::query_scalar(
+        "SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
+    let Some(br_id) = br_id else {
+        return Ok(None);
+    };
+    insert_event(
+        &mut *conn,
+        einsatz_id,
+        br_id,
+        ObjektTyp::Fahrzeug,
+        ef_id,
+        &BrBelegungsArt::Austritt,
+        Some("Fahrzeug entlassen"),
+        benutzer_id,
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET aktueller_br_id = NULL WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(Some(br_id))
+}
+
 // ─── Interne Helpers ────────────────────────────────────────────────────────
 
 async fn belege_einheit(
@@ -199,6 +240,9 @@ async fn belege_fahrzeug(
     notiz: Option<&str>,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
+    // Ein entlassenes oder storniertes Fahrzeug belegt keinen Raum mehr (409, LLH-1079);
+    // fremd → 404.
+    crate::fahrzeug::disposition_repo::require_aktiv_tx(&mut *conn, einsatz_id, objekt_id).await?;
     // 4 + 5. Objekt-Existenz, einheit_id (Einheit-bringt-Fahrzeuge-Regel) + aktueller_br_id
     let row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
         "SELECT einheit_id, aktueller_br_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",

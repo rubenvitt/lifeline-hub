@@ -96,7 +96,8 @@ async fn einsatz_fahrzeug(pool: &SqlitePool, k: Kontext, fid: i64, einheit: Opti
         k.benutzer_id,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .id;
     if let Some(e) = einheit {
         mitglied_repo::ordne_fahrzeug_zu_tx(&mut conn, k.einsatz_id, e, ef)
             .await
@@ -198,16 +199,36 @@ async fn vorpruefung_fahrzeuge_nennt_je_id_einen_grund() {
     ausser_dienst(&pool, "fahrzeug", ruhend).await;
     let dabei = fahrzeug(&pool, 1, "83-3").await;
     einsatz_fahrzeug(&pool, k, dabei, None).await;
-    let mut conn = pool.acquire().await.unwrap();
-    let zeilen = check_fahrzeuge_tx(&mut conn, k.einsatz_id, 1, &[frei, fremd, ruhend, dabei])
+    // LLH-1079 Teil II: ein entlassenes Fahrzeug lehnt der Sammelweg ab, ein storniertes nicht.
+    let entlassen = fahrzeug(&pool, 1, "83-4").await;
+    let storniert = fahrzeug(&pool, 1, "83-5").await;
+    for (fid, als) in [(entlassen, "entlassen"), (storniert, "storniert")] {
+        let ef = einsatz_fahrzeug(&pool, k, fid, None).await;
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET beendet_at = datetime('now'), beendet_als = ? WHERE id = ?",
+        )
+        .bind(als)
+        .bind(ef)
+        .execute(&pool)
         .await
         .unwrap();
+    }
+    let mut conn = pool.acquire().await.unwrap();
+    let zeilen = check_fahrzeuge_tx(
+        &mut conn,
+        k.einsatz_id,
+        1,
+        &[frei, fremd, ruhend, dabei, entlassen, storniert],
+    )
+    .await
+    .unwrap();
     assert_eq!(
         gruende(&zeilen),
         [
             (fremd, GRUND_UNBEKANNT),
             (ruhend, GRUND_AUSSER_DIENST),
             (dabei, GRUND_SCHON_DISPONIERT),
+            (entlassen, GRUND_ENTLASSEN),
         ]
     );
     assert!(zeilen.iter().all(|z| z.art == ZeilenArt::Fahrzeug));
@@ -393,6 +414,38 @@ async fn stornierte_person_wird_wieder_aufgenommen() {
     assert_eq!(anzahl_disponiert(&mut conn, k.einsatz_id).await, 1);
 }
 
+/// LLH-1079 Teil II: ein storniertes Fahrzeug war nie im Einsatz; der Sammelweg nimmt seine
+/// Zeile wieder auf (UNIQUE(einsatz_id, fahrzeug_id)), der ETB sagt „erneut disponiert“.
+#[tokio::test]
+async fn storniertes_fahrzeug_wird_wieder_aufgenommen() {
+    let pool = crate::db::test_pool().await;
+    let k = setup(&pool).await;
+    let f = fahrzeug(&pool, 1, "83-1").await;
+    let ef = einsatz_fahrzeug(&pool, k, f, None).await;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = datetime('now'), beendet_als = 'storniert' \
+         WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    let e = disponiere_fahrzeuge_tx(&mut conn, k, &[f], None)
+        .await
+        .unwrap();
+    assert_eq!(e.fahrzeuge[0].ef_id, ef, "dieselbe Zeile");
+    assert!(e.fahrzeuge[0].reaktiviert);
+    assert_eq!(etb_text_fahrzeuge(&e), "Fahrzeug «83-1» erneut disponiert");
+    let beendet: Option<String> =
+        sqlx::query_scalar("SELECT beendet_at FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(beendet, None);
+}
+
 #[tokio::test]
 async fn fahrzeuge_in_eine_einheit() {
     let pool = crate::db::test_pool().await;
@@ -478,6 +531,7 @@ fn etb_text_bei_einer_kraft_ist_der_einzelwortlaut() {
         fahrzeuge: vec![DisponiertesFahrzeug {
             ef_id: 1,
             funkrufname: "83-1".into(),
+            reaktiviert: false,
         }],
         einheit: None,
     };

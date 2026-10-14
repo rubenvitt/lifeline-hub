@@ -4322,6 +4322,30 @@
             "format": "int64",
             "description": "BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR)."
           },
+          "beendet_als": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetAls"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.\nNur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
+          },
+          "beendet_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -4485,6 +4509,30 @@
           "ist_demo"
         ],
         "properties": {
+          "beendet_als": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetAls"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.\nNur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene\n(`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“)."
+          },
+          "beendet_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
