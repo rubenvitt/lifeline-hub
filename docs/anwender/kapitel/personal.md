@@ -71,8 +71,9 @@ Für Einsatzleitung und Führungspersonal, in der Liste oder in der Ansicht der 
 
 1. In der Spalte „Einheit“ der Person „Einheit eintragen“ wählen, bei einer schon gesetzten
    Einheit auf ihren Namen klicken.
-2. Die Einheit wählen und „Speichern“ wählen. Erst „Speichern“ ändert etwas; Escape oder
-   „Abbrechen“ verwirft die Wahl.
+2. Die Einheit wählen und „Speichern“ wählen. Die Auswahl ist nach Abschnitt gruppiert, Einheiten
+   ohne Abschnitt stehen zuletzt unter „ohne Abschnitt“. Erst „Speichern“ ändert etwas; Escape
+   oder „Abbrechen“ verwirft die Wahl.
 
    ![Zeile einer nicht eingeteilten Person mit offener Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
 
