@@ -97,7 +97,7 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
-        funktion: "aktualisieren",
+        funktion: "update",
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name ad-hoc externer Kräfte beim Statuswechsel",

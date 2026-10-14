@@ -7,7 +7,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::kraefte_disposition;
 use crate::live::LiveEvent;
-use crate::personal::disposition_repo::{self, AdhocDaten};
+use crate::personal::disposition_repo::{self, AdhocDaten, DispositionPatch};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::routes::support::{
@@ -296,7 +296,7 @@ pub struct DispoPatchBody {
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id} — Status, Stärke-Position und/oder Bemerkung.
 /// Status-Wechsel schreibt ETB-Eintrag.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
     PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
@@ -332,9 +332,11 @@ pub async fn aktualisieren(
             conn,
             einsatz_id,
             ep_id,
-            body.status_id,
-            staerke_position,
-            bemerkung,
+            DispositionPatch {
+                status_id: body.status_id,
+                staerke_position,
+                bemerkung,
+            },
         )
         .await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;

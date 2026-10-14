@@ -405,17 +405,23 @@ pub async fn disponieren_adhoc_tx(
     Ok(id)
 }
 
-/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id` per COALESCE (`None` =
-/// unverändert). `staerke_position` und `bemerkung` sind Tri-State: `None` = unverändert,
-/// `Some(None)` = NULL, `Some(Some(x))` = setzen. Getrimmt wird in der Route. `NotFound`, falls
-/// die Zeile nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079).
+/// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
+/// `status_id`: `None` = unverändert. Die übrigen Felder sind Tri-State: `None` = unverändert,
+/// `Some(None)` = NULL, `Some(Some(x))` = setzen.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DispositionPatch<'a> {
+    pub status_id: Option<i64>,
+    pub staerke_position: Option<Option<&'a str>>,
+    pub bemerkung: Option<Option<&'a str>>,
+}
+
+/// Aktualisiert eine Dispositionszeile nach [`DispositionPatch`]. `NotFound`, falls die Zeile
+/// nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079).
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
-    status_id: Option<i64>,
-    staerke_position: Option<Option<&str>>,
-    bemerkung: Option<Option<&str>>,
+    patch: DispositionPatch<'_>,
 ) -> Result<(), AppError> {
     require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let resultat = sqlx::query(
@@ -425,11 +431,11 @@ pub async fn update_tx(
              bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(status_id)
-    .bind(staerke_position.is_some())
-    .bind(staerke_position.flatten())
-    .bind(bemerkung.is_some())
-    .bind(bemerkung.flatten())
+    .bind(patch.status_id)
+    .bind(patch.staerke_position.is_some())
+    .bind(patch.staerke_position.flatten())
+    .bind(patch.bemerkung.is_some())
+    .bind(patch.bemerkung.flatten())
     .bind(ep_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -440,25 +446,15 @@ pub async fn update_tx(
     Ok(())
 }
 
-/// Pool-Wrapper mit eigener Transaktion.
+/// Pool-Hülle um [`update_tx`] ohne eigene Transaktion.
 pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     ep_id: i64,
-    status_id: Option<i64>,
-    staerke_position: Option<Option<&str>>,
-    bemerkung: Option<Option<&str>>,
+    patch: DispositionPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(
-        &mut conn,
-        einsatz_id,
-        ep_id,
-        status_id,
-        staerke_position,
-        bemerkung,
-    )
-    .await
+    update_tx(&mut conn, einsatz_id, ep_id, patch).await
 }
 
 // ── Lebenszustand (LLH-1079, Spec `kraefte-entlassung`) ──────────────────────────────────
@@ -1458,9 +1454,11 @@ mod tests {
             &pool,
             einsatz,
             ep,
-            Some(neuer.id),
-            Some(Some("mannschaft")),
-            Some(Some("vor Ort")),
+            DispositionPatch {
+                status_id: Some(neuer.id),
+                staerke_position: Some(Some("mannschaft")),
+                bemerkung: Some(Some("vor Ort")),
+            },
         )
         .await
         .unwrap();
@@ -1470,9 +1468,17 @@ mod tests {
         assert_eq!(a.bemerkung.as_deref(), Some("vor Ort"));
 
         // status_id None → bleibt; position None → bleibt; nur Bemerkung leeren.
-        update(&pool, einsatz, ep, None, None, Some(None))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                bemerkung: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         let b = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer.id), "Status unverändert");
         assert_eq!(
@@ -1502,9 +1508,17 @@ mod tests {
             vec![ep]
         );
         assert!(matches!(
-            update(&pool, einsatz, ep, None, None, Some(Some("x")))
-                .await
-                .unwrap_err(),
+            update(
+                &pool,
+                einsatz,
+                ep,
+                DispositionPatch {
+                    bemerkung: Some(Some("x")),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -1533,7 +1547,9 @@ mod tests {
         assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"));
 
         // None = unverändert.
-        update(&pool, einsatz, ep, None, None, None).await.unwrap();
+        update(&pool, einsatz, ep, DispositionPatch::default())
+            .await
+            .unwrap();
         assert_eq!(
             roh(&pool, ep).await.as_deref(),
             Some("mannschaft"),
@@ -1541,9 +1557,17 @@ mod tests {
         );
 
         // Some(Some(x)) = setzen.
-        update(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None)
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                staerke_position: Some(Some("unterfuehrer")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(
             roh(&pool, ep).await.as_deref(),
             Some("unterfuehrer"),
@@ -1551,9 +1575,17 @@ mod tests {
         );
 
         // Some(None) = explizit auf NULL.
-        update(&pool, einsatz, ep, None, Some(None), None)
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                staerke_position: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(
             roh(&pool, ep).await,
             None,
@@ -1809,9 +1841,17 @@ mod tests {
         let ep = disponiere_zur_zeit(&pool, einsatz, benutzer, "2026-10-13 06:10:00").await;
         {
             let mut conn = pool.acquire().await.unwrap();
-            update_tx(&mut conn, einsatz, ep, Some(eingetroffen), None, None)
-                .await
-                .unwrap();
+            update_tx(
+                &mut conn,
+                einsatz,
+                ep,
+                DispositionPatch {
+                    status_id: Some(eingetroffen),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
             crate::zeitachse::repo::aus_personalstatus_tx(
                 &mut conn,
                 einsatz,
@@ -2019,9 +2059,17 @@ mod tests {
             start_zeitachse_tx(&mut conn, einsatz, benutzer, erste.id)
                 .await
                 .unwrap();
-            update_tx(&mut conn, einsatz, erste.id, Some(eingetroffen), None, None)
-                .await
-                .unwrap();
+            update_tx(
+                &mut conn,
+                einsatz,
+                erste.id,
+                DispositionPatch {
+                    status_id: Some(eingetroffen),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
         }
         entlasse(&pool, einsatz, erste.id, benutzer, "2026-10-13 14:00:00")
             .await
