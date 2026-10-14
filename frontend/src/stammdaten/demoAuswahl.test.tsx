@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { demoGroupedOptions, DEMO_GROUP } from './demoAuswahl';
+import { Select } from '../components/Select';
+import { demoGroupedOptions, DEMO_GROUP, SUCHTEXT_SUCHE } from './demoAuswahl';
 
 interface Eintrag {
   id: number;
@@ -54,5 +55,36 @@ describe('demoGroupedOptions', () => {
 
   it('liefert für eine leere Liste keine Optionen', () => {
     expect(demoGroupedOptions<Eintrag>([], label)).toEqual([]);
+  });
+});
+
+describe('demoGroupedOptions mit Suchtext (LLH-1100, D7)', () => {
+  const eintraege: (Eintrag & { traeger: string })[] = [
+    { id: 1, name: 'Anton', ist_demo: false, traeger: 'DRK' },
+    { id: 2, name: 'Berta', ist_demo: true, traeger: 'ASB' },
+  ];
+  const suchtext = (e: Eintrag & { traeger: string }) => `${e.name} ${e.traeger}`;
+
+  it('trägt den Suchtext an echten und an Demo-Einträgen', () => {
+    const optionen = demoGroupedOptions(eintraege, label, suchtext);
+    expect(optionen[0]).toEqual({ value: 1, label: 'Anton', suchtext: 'Anton DRK' });
+    const gruppe = optionen[1];
+    if (!('options' in gruppe)) throw new Error('Gruppe erwartet');
+    expect(gruppe.options[0].suchtext).toBe('Berta ASB');
+  });
+
+  it('findet über den Suchtext auch einen Demo-Eintrag', () => {
+    render(
+      <Select
+        open
+        mode="multiple"
+        aria-label="Auswahl"
+        showSearch={SUCHTEXT_SUCHE}
+        options={demoGroupedOptions(eintraege, label, suchtext)}
+      />,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'asb' } });
+    expect(screen.getByText('Berta')).toBeInTheDocument();
+    expect(screen.queryByText('Anton')).not.toBeInTheDocument();
   });
 });

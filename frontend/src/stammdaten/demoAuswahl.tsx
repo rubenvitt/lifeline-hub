@@ -8,8 +8,10 @@ import DemoMarke from '../components/DemoMarke';
  * Gruppe hinter allen echten Einträgen. Die echten Einträge behalten die Eingangsreihenfolge
  * (das Backend sortiert).
  *
- * Die Demo-Labels sind ReactNodes. Bekommt ein Feld später `showSearch`, braucht es ein
- * `optionFilterProp` auf ein Textfeld — nach dem Label kann antd dann nicht mehr filtern.
+ * Die Demo-Labels sind ReactNodes; nach dem Label kann antd sie nicht filtern. Wer sie
+ * durchsuchbar braucht, gibt `suchtext` mit und setzt `showSearch={SUCHTEXT_SUCHE}` (LLH-1100,
+ * Change `iw7x9980-sammel-disposition` D7): dann sucht das Feld über diesen Text, bei echten und
+ * Demo-Einträgen gleich, und kann mehr als das Label kennen (Träger, Qualifikation).
  */
 
 export const DEMO_GROUP = 'Demo-Daten';
@@ -30,7 +32,12 @@ const demoTextStil: CSSProperties = {
 export interface AuswahlOption {
   value: number;
   label: ReactNode;
+  /** Text, über den das Feld sucht (nur mit `suchtext`, s. Dateikopf). */
+  suchtext?: string;
 }
+
+/** Suche eines `Select` über das Feld `suchtext` der Optionen (s. Dateikopf). */
+export const SUCHTEXT_SUCHE = { optionFilterProp: 'suchtext' } as const;
 
 export interface AuswahlGroup {
   label: string;
@@ -66,16 +73,22 @@ export function splitDemo<T extends { ist_demo: boolean }>(
 export function demoGroupedOptions<T extends { id: number; ist_demo: boolean }>(
   eintraege: readonly T[],
   label: (eintrag: T) => string,
+  suchtext?: (eintrag: T) => string,
 ): (AuswahlOption | AuswahlGroup)[] {
   const { echte, demo } = splitDemo(eintraege);
-  const echteOptionen = echte.map((e) => ({ value: e.id, label: label(e) }));
+  const mitSuchtext = (e: T) => (suchtext ? { suchtext: suchtext(e) } : {});
+  const echteOptionen = echte.map((e) => ({ value: e.id, label: label(e), ...mitSuchtext(e) }));
   return demo.length
     ? [
         ...echteOptionen,
         {
           label: DEMO_GROUP,
           title: DEMO_GROUP,
-          options: demo.map((e) => ({ value: e.id, label: <DemoLabel>{label(e)}</DemoLabel> })),
+          options: demo.map((e) => ({
+            value: e.id,
+            label: <DemoLabel>{label(e)}</DemoLabel>,
+            ...mitSuchtext(e),
+          })),
         },
       ]
     : echteOptionen;
