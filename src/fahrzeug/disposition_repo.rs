@@ -650,7 +650,7 @@ async fn set_beendet_tx(
     .await?;
     if r.rows_affected() == 0 {
         return Err(AppError::Conflict(
-            "Das Fahrzeug ist bereits aus dem Einsatz genommen".into(),
+            "Das Fahrzeug ist bereits entlassen".into(),
         ));
     }
     Ok(())
@@ -1672,5 +1672,44 @@ mod tests {
         assert_eq!(a.beendet_als, None);
         assert_eq!(a.funkrufname, "FW Extern");
         assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 1);
+    }
+
+    /// Der zweite Versuch, der hinter `require_aktiv_tx` durchrutscht (gleichzeitig), trifft im
+    /// UPDATE keine Zeile mehr: 409 mit dem Wortlaut „bereits entlassen“.
+    #[tokio::test]
+    async fn set_beendet_zweimal_ist_409_bereits_entlassen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let ef = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "FW Extern",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let e = set_beendet_tx(
+            &mut conn,
+            einsatz,
+            ef,
+            benutzer,
+            JETZT,
+            BeendetAls::Entlassen,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&e, AppError::Conflict(m) if m == "Das Fahrzeug ist bereits entlassen"),
+            "{e:?}"
+        );
     }
 }
