@@ -48,6 +48,11 @@ interface RechteHinweisProps {
   text: string;
   /** Nur bei FEHLENDER Berechtigung sichtbar. */
   sichtbar: boolean;
+  /**
+   * Was fehlt, wenn nicht die ganze Fläche nur zu lesen ist (LLH-1036 D5: „Ohne Besatzung ·
+   * Modul Personal gesperrt“). Vorgabe „Nur Ansicht“.
+   */
+  marke?: string;
 }
 
 /**
@@ -59,12 +64,12 @@ interface RechteHinweisProps {
  * sind, zeigen die gesperrten Knöpfe; der Grund bleibt ohne Hover lesbar. Das Leerzeichen
  * zwischen Marke und Grund rendert im Flex nicht, trennt aber für Screenreader und `textContent`.
  */
-export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
+export function RechteHinweis({ text, sichtbar, marke = 'Nur Ansicht' }: RechteHinweisProps) {
   const { token } = theme.useToken();
   if (!sichtbar) return null;
   return (
     <Flex role="status" align="center" wrap gap={token.marginXS} data-lfh="rechte-hinweis">
-      <StatusChip ton="neutral" wort="Nur Ansicht" />{' '}
+      <StatusChip ton="neutral" wort={marke} />{' '}
       <Typography.Text type="secondary">{text}</Typography.Text>
     </Flex>
   );

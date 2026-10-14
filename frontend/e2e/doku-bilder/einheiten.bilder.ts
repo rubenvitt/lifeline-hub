@@ -27,12 +27,16 @@ import {
  *                       frontend/src/kraefte/EinheitZeichen.tsx, components/InlineAngabe.tsx)
  *   zeichen.png         frontend/src/pages/einheit/EinheitZeichenPaneel.tsx (Paneel „Taktisches
  *                       Zeichen“ mit offener Zeile „Organisation“)
- *   personal.png        frontend/src/pages/EinheitDetailPage.tsx (Paneel „Personal“)
+ *   besatzung.png       frontend/src/pages/einheit/FahrzeugeBesatzung.tsx (Paneel „Fahrzeuge und
+ *                       Besatzung“: Fahrzeugzeilen mit FMS-Status und Besatzung, Personen mit
+ *                       Marken und Menü, „Ohne Fahrzeug“; frontend/src/kraefte/KraeftebaumZelle.tsx,
+ *                       frontend/src/pages/einheit/ZuordnenAuswahl.tsx)
  *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)
  *
  * Demo-Lücke (D3): die Demo-Einheiten stehen alle auf einer Ebene und haben keinen
- * Einheitsführer. Die Spec unterstellt die Rettungsstaffel dem Sanitätszug und setzt Anna Probe
- * als ihre Einheitsführerin. Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
+ * Einheitsführer, und niemand sitzt auf einem Fahrzeug. Die Spec unterstellt die Rettungsstaffel
+ * dem Sanitätszug, setzt Anna Probe als ihre Einheitsführerin und setzt drei ihrer vier Kräfte
+ * auf ihre beiden RTW (LLH-1036 Teil II); die vierte steht unter „Ohne Fahrzeug“. Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
  * Alarmierung (eine Spur, sonst löschte das Auflösen sie ganz) und löst sie auf (LLH-1079).
  * Die Vorschau zeigt die Demo-Vorlage „Sanitätszug Musterstadt“ gegen den Demo-Einsatz, in dem
  * ihre Kräfte schon den gleichnamigen Einheiten angehören: die Zeilen tragen „in «…»“ und
@@ -49,6 +53,11 @@ interface Einheit {
 interface Person {
   id: number;
   name: string;
+  einheit_id: number | null;
+}
+interface Fahrzeug {
+  id: number;
+  einheit_id: number | null;
 }
 
 async function einheitNamens(api: APIRequestContext, einsatzId: number, name: string) {
@@ -74,6 +83,30 @@ test.describe(KAPITEL, () => {
         ueber_einheit_id: zug.id,
         fuehrer_id: anna!.id,
       });
+      // Besatzung: zwei auf den ersten RTW, eine auf den zweiten, die vierte ohne Fahrzeug.
+      const fahrzeuge = await api.get(`/api/einsaetze/${demo.id}/fahrzeuge`);
+      expect(fahrzeuge.ok(), `Fahrzeuge: ${fahrzeuge.status()}`).toBe(true);
+      const rtw = ((await fahrzeuge.json()) as Fahrzeug[])
+        .filter((f) => f.einheit_id === rettung.id)
+        .sort((a, b) => a.id - b.id);
+      const staffel = (
+        (await (await api.get(`/api/einsaetze/${demo.id}/personal`)).json()) as Person[]
+      )
+        .filter((p) => p.einheit_id === rettung.id)
+        .sort((a, b) => a.id - b.id);
+      expect(rtw, 'zwei RTW der Rettungsstaffel').toHaveLength(2);
+      expect(staffel, 'vier Kräfte der Rettungsstaffel').toHaveLength(4);
+      for (const [fz, person] of [
+        [rtw[0], staffel[0]],
+        [rtw[0], staffel[1]],
+        [rtw[1], staffel[2]],
+      ] as const) {
+        await fuelle(
+          api,
+          'put',
+          `/api/einsaetze/${demo.id}/fahrzeuge/${fz.id}/besatzung/${person.id}`,
+        );
+      }
 
       const alt = await fuelle<Einheit>(api, 'post', `/api/einsaetze/${demo.id}/einheiten`, {
         name: 'Erkundungstrupp',
@@ -140,15 +173,18 @@ test.describe(KAPITEL, () => {
     await fotografiere(formular, KAPITEL, 'vorlage-bilden');
   });
 
-  test('Mitglieder einer Einheit', async ({ page }) => {
+  test('Fahrzeuge und Besatzung einer Einheit', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const rettung = await einheitNamens(page.request, demo.id, 'Rettungsstaffel');
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einheiten/${rettung.id}`);
-    const paneel = page.getByRole('region', { name: 'Personal' });
-    await expect(paneel.getByText('Einheitsführer', { exact: true })).toBeVisible();
-    await fotografiere(paneel, KAPITEL, 'personal');
+    const paneel = page.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
+    // Datenanker: die Besatzung steht erst mit Personal- und Fahrzeugliste.
+    await expect(paneel.getByRole('group', { name: 'Fahrzeug Musterstadt 83-1' })).toBeVisible();
+    await expect(paneel.getByRole('group', { name: 'Ohne Fahrzeug' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(paneel, KAPITEL, 'besatzung');
   });
 
   test('Kopf einer Einheit', async ({ page }) => {

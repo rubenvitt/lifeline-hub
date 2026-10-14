@@ -6,6 +6,7 @@ import {
   kopfFelder,
   zeilenAusloeser,
   zuordnungsKarte,
+  zuordnungsZiele,
 } from './einheit-fixture';
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 import { einsatzAnlegen } from './einsatz-kern';
@@ -618,7 +619,7 @@ for (const { name, feld, seite } of [
  */
 async function einheitFokusBereit(page: Page, dichte: string) {
   await anmelden(page);
-  const { pfad } = await einheitMitZuordnungen(page);
+  const { pfad, namen } = await einheitMitZuordnungen(page);
   await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
   await page.goto(pfad);
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
@@ -631,18 +632,7 @@ async function einheitFokusBereit(page: Page, dichte: string) {
       exact: true,
     }),
   });
-  for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
-    const karte = zuordnungsKarte(page, titel);
-    ziele.push({
-      name: `${titel} aus Einheit lösen`,
-      fokus: karte.getByRole('button', { name: 'Aus Einheit lösen', exact: true }),
-    });
-    ziele.push({ name: `${titel} zuordnen`, fokus: karte.getByRole('combobox') });
-  }
-  ziele.push({
-    name: 'Als Einheitsführer',
-    fokus: zuordnungsKarte(page, 'Personal').getByRole('button', { name: 'Als Einheitsführer' }),
-  });
+  for (const { name, fokus } of zuordnungsZiele(page, namen).ziele) ziele.push({ name, fokus });
   for (const { name, fokus } of ziele) {
     await expect(fokus, name).toHaveCount(1);
     await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
