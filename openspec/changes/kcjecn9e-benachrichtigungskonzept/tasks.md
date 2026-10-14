@@ -73,8 +73,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 10. Status einer Nachforderung (benötigt 1, 2) · LLH-1216
 
-- [ ] 10.1 Statuswechsel meldet `nachforderung_status` an Ersteller und S4; Rust-Test „Nachforderung eingetroffen“
-- [ ] 10.2 Anwenderkapitel zu Nachforderungen nachziehen
+- [x] 10.1 Statuswechsel meldet `nachforderung_status` an Ersteller und S4; Rust-Test „Nachforderung eingetroffen“
+- [x] 10.2 Anwenderkapitel zu Nachforderungen nachziehen
 
 ## 11. Neue Gefahr (benötigt 1, 2) · LLH-1217
 

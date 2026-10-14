@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
+quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -67,6 +67,19 @@ Für Einsatzleitung und Führungspersonal:
 Eine abgelehnte Nachforderung ist abgeschlossen und lässt sich nicht wieder öffnen.
 
 ## Hintergrund
+
+### Benachrichtigungen zum Stand
+
+Wechselt eine Nachforderung auf „Zugesagt“, „Unterwegs“, „Eingetroffen“ oder „Abgelehnt“, erhalten
+die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-Besetzung, sonst
+laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
+eingetroffen“ mit „2× an Leitstelle“. Art, Bezeichnung, Adressat-Bezeichnung und Ablehnungsgrund
+stehen nie im Hinweis; er führt in das Modul „Nachforderung“. Auch ein „Rückgängig“ zurück auf
+„Zugesagt“ oder „Unterwegs“ meldet die neue Stufe. Das Absetzen selbst meldet nichts.
+
+Eigene Aktionen bleiben still: Wer den Stand selbst fortschreibt oder ablehnt, bekommt dazu
+nichts. Wer die Nachforderung angelegt hat und zugleich S4 besetzt, erhält den Hinweis einmal.
+Wer das Modul „Nachforderung“ nicht sehen darf, bekommt keinen Hinweis.
 
 ### Nachforderungen im Einsatztagebuch
 

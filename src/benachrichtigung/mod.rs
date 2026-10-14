@@ -145,6 +145,14 @@ wire_enum! {
         /// Der Termin der Lagebesprechung am Einsatz; `bezug_id` ist die Einsatzkennung.
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
+        /// Eine Nachforderung (`nachforderung.id`) mit dem Status, in den sie gewechselt ist
+        /// (`nachforderung_status`, LLH-1216). Der Status steckt im Bezug, weil die Zeile keinen
+        /// Text trägt (design.md D1) und die Nachforderung beim Lesen schon weiter sein kann; so
+        /// nennt jeder Hinweis den Status seines Wechsels.
+        NachforderungZugesagt => "nachforderung_zugesagt",
+        NachforderungUnterwegs => "nachforderung_unterwegs",
+        NachforderungEingetroffen => "nachforderung_eingetroffen",
+        NachforderungAbgelehnt => "nachforderung_abgelehnt",
         Gefahrengebiet => "gefahrengebiet",
         /// Betroffene Person (`einsatz_person.id`).
         Person => "person",
@@ -176,7 +184,11 @@ impl BenachrichtigungBezugTyp {
             BenachrichtigungBezugTyp::Erinnerung => Some("erinnerungen"),
             BenachrichtigungBezugTyp::Abloesung => Some("abloesung"),
             BenachrichtigungBezugTyp::Lagebesprechung => Some("lagebesprechung"),
-            BenachrichtigungBezugTyp::Nachforderung => Some("nachforderungen"),
+            BenachrichtigungBezugTyp::Nachforderung
+            | BenachrichtigungBezugTyp::NachforderungZugesagt
+            | BenachrichtigungBezugTyp::NachforderungUnterwegs
+            | BenachrichtigungBezugTyp::NachforderungEingetroffen
+            | BenachrichtigungBezugTyp::NachforderungAbgelehnt => Some("nachforderungen"),
             // Die Spec meldet eine neue Gefahr an die Leser der Lagekarte und springt dorthin;
             // die Karte zeigt das Gebiet (`lagekartePfad` mit `gefahrengebiet`).
             BenachrichtigungBezugTyp::Gefahrengebiet => Some("lagekarte"),
