@@ -22,6 +22,7 @@ const material = {
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-27 10:00:00',
   ist_demo: false,
+  art: 'verbrauchsgut',
 };
 
 // Voreinstellung bleibt EIN Posten: die Prüfungen unten greifen „Bearbeiten" per `getByRole`
@@ -170,8 +171,11 @@ describe('MaterialTab', () => {
     expect(zeilen()).toHaveLength(2);
 
     // Erst der Griff, dann der Klick: so meldet ein fehlender Filter sich hier statt erst am
-    // leeren Filtermenü.
-    const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
+    // leeren Filtermenü. Gegriffen im Kopf der Statusspalte: davor steht der Filter der Art.
+    const ausloeser = screen
+      .getAllByRole('columnheader')
+      .find((h) => h.textContent?.includes('Status'))
+      ?.querySelector<HTMLElement>('.ant-table-filter-trigger');
     expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
     await userEvent.click(ausloeser!);
     // Das Filtermenü hängt in einem Portal an `document.body`. Die Auswahl wird DARIN gegriffen:
@@ -187,6 +191,33 @@ describe('MaterialTab', () => {
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));
     expect(zeilen()[0].textContent).toContain('Zeltbahn');
+  });
+
+  it('zeigt die Art und filtert nach ihr (LLH-1224)', async () => {
+    const { container } = render(admin, [
+      material,
+      { ...material, id: 2, bezeichnung: 'Stromerzeuger', art: 'geraet' },
+    ]);
+    await screen.findByText('Wolldecke');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(screen.getByRole('columnheader', { name: /Art/ })).toBeInTheDocument();
+    expect(zeilen()[0].textContent).toContain('Verbrauchsgut');
+    expect(zeilen()[1].textContent).toContain('Gerät');
+    const ausloeser = screen
+      .getAllByRole('columnheader')
+      .find((h) => h.textContent?.startsWith('Art'))
+      ?.querySelector<HTMLElement>('.ant-table-filter-trigger');
+    expect(ausloeser, 'die Spalte Art trägt einen Filter').not.toBeNull();
+    await userEvent.click(ausloeser!);
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByText('Gerät'));
+    await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+    expect(zeilen()[0].textContent).toContain('Stromerzeuger');
   });
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {

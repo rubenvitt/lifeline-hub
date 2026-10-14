@@ -3,14 +3,14 @@ import { Button, Space, Form, App, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listEinsatzMaterial, updateDisposition } from '../../api/einsatzMaterial';
-import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
+import type { EinsatzMaterial, UhsDetail } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import { ErfassungsModal } from '../../components/Erfassung';
 import Datenstand from '../../components/Datenstand';
 import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
-import { materialStatus } from '../../theme/statusFarben';
+import { materialDarstellung, mengeText, ortVon } from '../../kraefte/materialPosten';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useAuthOptional } from '../../auth/AuthContext';
@@ -48,7 +48,9 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
 
   const material = materialQuery.data ?? [];
   const verortet = nurDetail ? uhs.material : material.filter((em) => em.uhs_id === uhs.id);
-  const freiVerortbar = material.filter((em) => em.uhs_id == null);
+  // Frei heißt „ohne Ort“ (LLH-1224 D6): ein Posten an einer Einheit, einem Fahrzeug oder einem
+  // Bereitstellungsraum verließe ihn sonst still.
+  const freiVerortbar = material.filter((em) => ortVon(em) === null);
   // Sperrgrund statt stummer Sperre (LFH-970, U78; `frontend/AGENTS.md`, M16): ohne freies
   // Material nennt eine Zeile neben dem Knopf den Grund und springt ins Modul Material, ein
   // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
@@ -107,20 +109,22 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       render: (v: string | null) => v ?? '—',
     },
     {
+      // Gerät „1“, Verbrauchsgut mit Ausgabe „30 von 50 übrig“ (LLH-1224 D15).
       title: 'Menge',
       dataIndex: 'menge',
       key: 'menge',
-      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+      render: (_: number, em: EinsatzMaterial) => <span style={monoStil(12)}>{mengeText(em)}</span>,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      // Farbe und Beschriftung aus `theme/statusFarben.ts` — dieselbe Quelle wie `MaterialPage`,
-      // damit dasselbe Enum nicht zwei Farbbehandlungen bekommt.
-      render: (status: MaterialStatus) => (
+      // Farbe und Beschriftung aus `theme/statusFarben.ts` über `materialDarstellung` — dieselbe
+      // Quelle wie `MaterialPage`; ein aufgebrauchtes Verbrauchsgut heißt „aufgebraucht“ statt
+      // seines Status (LLH-1224 D16).
+      render: (_: unknown, em: EinsatzMaterial) => (
         <span data-testid="material-status-zelle">
-          <StatusTag darstellung={materialStatus[status]} />
+          <StatusTag darstellung={materialDarstellung(em)} />
         </span>
       ),
     },

@@ -25,6 +25,7 @@ import {
 } from './kraeftebaumKern';
 import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
 import { funktionText } from './einsatzfunktionKern';
+import { AUFGEBRAUCHT, isAufgebraucht } from './materialPosten';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -66,7 +67,8 @@ interface Verdichtung {
   soll: StaerkeSumme | null;
   personalStatus: StatusVerteilung;
   fahrzeugStatus: StatusVerteilung;
-  materialStatus: Record<MaterialStatus, number>;
+  /** Posten je Status; ein aufgebrauchtes Verbrauchsgut zählt unter `aufgebraucht` (LLH-1224). */
+  materialStatus: Record<MaterialStatus | 'aufgebraucht', number>;
   anzahlPersonal: number;
   anzahlFahrzeuge: number;
   anzahlMaterialPositionen: number;
@@ -235,7 +237,7 @@ function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
         mittelArt: 'material' as const,
         bezeichnung: em.bezeichnung,
         detail: null,
-        statusLabel: em.status,
+        statusLabel: isAufgebraucht(em) ? AUFGEBRAUCHT : em.status,
         menge: em.menge,
       })),
     });
@@ -548,6 +550,8 @@ export function rendereMeldebildMarkdown(
       matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
     if (v.materialStatus.desinfektion_noetig > 0)
       matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
+    if (v.materialStatus.aufgebraucht > 0)
+      matTeile.push(`${AUFGEBRAUCHT}: ${v.materialStatus.aufgebraucht}`);
     if (matTeile.length > 0) material += ` (${matTeile.join(', ')})`;
   }
   zeilen.push(material);
@@ -587,12 +591,13 @@ export function verdichte(
   const staerke = leereStaerke();
   const personalStatus = leereVert();
   const fahrzeugStatus = leereVert();
-  const materialStatus: Record<MaterialStatus, number> = {
+  const materialStatus: Record<MaterialStatus | 'aufgebraucht', number> = {
     einsatzbereit: 0,
     im_einsatz: 0,
     defekt: 0,
     verbraucht: 0,
     desinfektion_noetig: 0,
+    aufgebraucht: 0,
   };
 
   for (const ep of personal) {
@@ -605,7 +610,8 @@ export function verdichte(
   }
 
   for (const em of material) {
-    materialStatus[em.status] += 1;
+    // LLH-1224, design.md D15: aufgebraucht statt unter dem Status, dieselbe Regel wie der Ausfall.
+    materialStatus[isAufgebraucht(em) ? AUFGEBRAUCHT : em.status] += 1;
   }
 
   return {

@@ -89,7 +89,9 @@ async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
     page,
     einsatzId,
     'material',
-    { adhoc: { bezeichnung: MATERIAL, menge: 12 } },
+    // Menge > 1: ein Verbrauchsgut, dessen Menge bearbeitbar ist (LLH-1224 D2; ein Gerät zeigt
+    // „1“ ohne Bearbeiten). Die Menge steht neben `adhoc`, nicht darin.
+    { adhoc: { bezeichnung: MATERIAL }, menge: 12 },
     'Material',
   );
   await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');

@@ -3,18 +3,47 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
-import type { Material } from '../api/types';
+import type { Material, MaterialArt } from '../api/types';
+import { Segmentleiste } from '../components/instrument';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
   bezeichnung: string;
+  art?: MaterialArt;
   kategorie?: string;
   bestandsnummer?: string;
   traegerorganisation?: string;
   standort?: string;
   bemerkung?: string;
+}
+
+/** Wortlaut der Art (LLH-1224 D1): ein Gerät steht je Stück im Einsatz, ein Verbrauchsgut mit Menge. */
+const ART_OPTIONEN: { wert: MaterialArt; label: string }[] = [
+  { wert: 'geraet', label: 'Gerät' },
+  { wert: 'verbrauchsgut', label: 'Verbrauchsgut' },
+];
+
+/** Vorgabe der Art: ein einzeln verfolgtes Gerät (D1). */
+const ART_VORGABE: MaterialArt = 'geraet';
+
+/** Die Segmentleiste als Formularfeld: `Form.Item` reicht `value`/`onChange` hinein. */
+function ArtFeld({
+  value,
+  onChange,
+}: {
+  value?: MaterialArt;
+  onChange?: (art: MaterialArt) => void;
+}) {
+  return (
+    <Segmentleiste<MaterialArt>
+      beschriftung="Art"
+      wert={value ?? ART_VORGABE}
+      onWechsel={(art) => onChange?.(art)}
+      optionen={ART_OPTIONEN}
+    />
+  );
 }
 
 export default function MaterialFormModal({
@@ -36,6 +65,7 @@ export default function MaterialFormModal({
     if (!offen || !material) return;
     form.setFieldsValue({
       bezeichnung: material.bezeichnung,
+      art: material.art,
       kategorie: material.kategorie ?? undefined,
       bestandsnummer: material.bestandsnummer ?? undefined,
       traegerorganisation: material.traegerorganisation ?? undefined,
@@ -48,6 +78,7 @@ export default function MaterialFormModal({
     mutationFn: (werte: FormWerte) => {
       const daten: MaterialEingabe = {
         bezeichnung: werte.bezeichnung.trim(),
+        art: werte.art ?? ART_VORGABE,
         kategorie: leerZuNull(werte.kategorie),
         bestandsnummer: leerZuNull(werte.bestandsnummer),
         traegerorganisation: leerZuNull(werte.traegerorganisation),
@@ -76,9 +107,10 @@ export default function MaterialFormModal({
       speicherung={mutation}
       // Nur im ANLEGEN-Modus — beim Bearbeiten wäre „Speichern und nächste" ein toter Knopf.
       serie={material == null}
-      // Bestandsnummer und Bezeichnung sind je Gegenstand verschieden; Träger und
+      // Bestandsnummer und Bezeichnung sind je Gegenstand verschieden; Art, Träger und
       // Standort bleiben über eine Erfassungsserie hinweg gleich.
-      uebernahme={['traegerorganisation', 'standort']}
+      uebernahme={['art', 'traegerorganisation', 'standort']}
+      initialValues={{ art: ART_VORGABE }}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen, sonst leert die Hülle die Felder
       // trotz 422.
       //
@@ -101,6 +133,15 @@ export default function MaterialFormModal({
       >
         <Input placeholder="z. B. Wolldecke, Stromerzeuger 5 kVA" />
       </Form.Item>
+      {/* Die Art entscheidet, wie der Posten im Einsatz steht (LLH-1224 D1/D16): sie gilt für neue
+          Dispositionen, nie rückwirkend. Ohne das Feld ließe sich kein Verbrauchsgut anlegen. */}
+      <Form.Item
+        label="Art"
+        name="art"
+        extra="Gerät: je Stück im Einsatz · Verbrauchsgut: mit Menge und Ausgabe"
+      >
+        <ArtFeld />
+      </Form.Item>
       <Form.Item label="Kategorie" name="kategorie">
         <AutoComplete
           options={kategorien.map((k) => ({ value: k }))}
@@ -112,7 +153,7 @@ export default function MaterialFormModal({
       <Form.Item label="Bestandsnummer" name="bestandsnummer">
         <Input placeholder="Inventarnr. (optional)" />
       </Form.Item>
-      {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Pflicht ist allein die Bezeichnung,
+      {/* FELDBUDGET: vier sichtbare Felder (mit der Art, LLH-1224), drei eingeklappt. Pflicht ist allein die Bezeichnung,
          und die steht oben — kein Pflichtfeld wandert hinter den Collapse (LFH-343).
 
          Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur so ist „im Ausgangszustand drei

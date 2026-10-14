@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { theme } from 'antd';
 import { Fragment, type ReactNode } from 'react';
+import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../api/einheiten';
+import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, Uhs } from '../api/types';
@@ -12,32 +14,33 @@ import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import { einheitDetailPfad, uhsDetailPfad } from '../routing/deeplinks';
 import EinheitAngabe from './EinheitAngabe';
 import { buildEinheitOptions, type EinheitOption } from './kraeftebaumKern';
+import {
+  OHNE_ORT,
+  ortText,
+  ortVon,
+  uhsName,
+  ZUGEORDNET,
+  type MaterialOrtArt,
+  type MaterialOrtRef,
+  type OrtNamen,
+} from './materialPosten';
 
 /**
- * Der Ort eines Material-Postens in der Materialliste (LLH-1093, design.md D1–D3, D13).
+ * Der Ort eines Material-Postens in der Materialliste (LLH-1093, design.md D1–D3, D13; LLH-1224
+ * D6/D16).
  *
- * DOPPELREGEL (Entscheidung 13.10.2026, Nr. 1): ein Posten gehört höchstens einer Einheit
- * (exklusiv, geändert über den Zuordnungsweg der Einheiten mit deren Recht) und unabhängig davon
- * höchstens einer UHS (geändert über den Material-PATCH). Die Spalte „Ort“ zeigt beides
- * („Rettungsstaffel · UHS Turnhalle“), jeder Teil ist eine eigene Angabe mit ausdrücklichem
- * Speichern. LLH-1225 tauscht diese Komponente gegen den Editor eines Standorts; der Adapter
- * {@link ortVon} ist die eine Stelle, die den Ort aus der Zeile liest.
+ * EIN ORT JE POSTEN (LLH-1224): Einheit, Fahrzeug, UHS, Bereitstellungsraum oder „ohne Ort“; der
+ * Server löst den bisherigen Ort, wenn ein neuer gesetzt wird. Bis LLH-1225 den Ort-Editor bringt,
+ * bleiben die zwei Teile aus LLH-1093: die Einheit (Zuordnungsweg der Einheiten, mit deren Recht)
+ * und die UHS (Material-PATCH), je mit ausdrücklichem Speichern. Setzt man den einen, wird der
+ * andere leer. Fahrzeug und Bereitstellungsraum setzt vorerst nur die API; die Spalte nennt sie dann
+ * mit Namen. Den Ort aus der Zeile liest nur {@link ortVon} (`materialPosten.ts`).
  *
- * NAMEN LÖST DER CLIENT AUF (D2) aus den Listen der Einheiten und UHS. Ohne Leserecht auf ein Modul
- * (Freigabe `zugriff: false`, Abruf gescheitert) steht „zugeordnet“, nie „—“: der Strich behauptete
- * „kein Ort“. Bedienbar ist ein Teil nur mit Schreibrecht im Einsatz UND Zugriff auf sein Modul;
- * der Server bleibt die Prüfung, eine Ablehnung steht am Teil (`InlineAngabe`).
+ * NAMEN LÖST DER CLIENT AUF (D2) aus den Listen der Module. Ohne Leserecht auf ein Modul (Freigabe
+ * `zugriff: false`, Abruf gescheitert) steht „zugeordnet“, nie „—“: der Strich behauptete „kein
+ * Ort“. Bedienbar ist ein Teil nur mit Schreibrecht im Einsatz UND Zugriff auf sein Modul; der
+ * Server bleibt die Prüfung, eine Ablehnung steht am Teil (`InlineAngabe`).
  */
-
-export interface MaterialOrtWert {
-  einheitId: number | null;
-  uhsId: number | null;
-}
-
-/** Der Ort aus der Zeile — einzige Lesestelle, damit LLH-1225 nur hier umstellt. */
-export function ortVon(em: Pick<EinsatzMaterial, 'einheit_id' | 'uhs_id'>): MaterialOrtWert {
-  return { einheitId: em.einheit_id ?? null, uhsId: em.uhs_id ?? null };
-}
 
 /** Was die Seite einmal lädt und jede Zeile teilt. */
 export interface MaterialOrtKontext {
@@ -57,95 +60,97 @@ export interface MaterialOrtKontext {
     bedienbar: boolean;
     liste: readonly Uhs[];
   };
+  /** Nur lesend (LLH-1224, bis LLH-1225): Funkrufname eines Einsatzfahrzeugs. */
+  fahrzeug?: { lesbar: boolean; name: (id: number) => string | undefined };
+  /** Nur lesend (LLH-1224, bis LLH-1225): Bezeichnung eines Bereitstellungsraums. */
+  bereitstellungsraum?: { lesbar: boolean; name: (id: number) => string | undefined };
 }
 
-/** Anzeigename einer UHS: „UHS Turnhalle“; heißt sie schon „UHS …“, nicht doppelt. */
-export function uhsName(u: Pick<Uhs, 'bezeichnung'>): string {
-  return /^UHS\b/i.test(u.bezeichnung) ? u.bezeichnung : `UHS ${u.bezeichnung}`;
+/** Die Namen je Ortsart für {@link ortText}; ohne Leserecht fehlt die Funktion („zugeordnet“). */
+export function ortNamen(k: MaterialOrtKontext): OrtNamen {
+  return {
+    ...(k.einheit.lesbar ? { einheit: k.einheit.name } : {}),
+    ...(k.uhs.lesbar
+      ? { uhs: (id: number) => k.uhs.liste.find((u) => u.id === id)?.bezeichnung }
+      : {}),
+    ...(k.fahrzeug?.lesbar ? { fahrzeug: k.fahrzeug.name } : {}),
+    ...(k.bereitstellungsraum?.lesbar ? { bereitstellungsraum: k.bereitstellungsraum.name } : {}),
+  };
 }
 
-const ZUGEORDNET = 'zugeordnet';
-
-function einheitText(id: number, k: MaterialOrtKontext): string {
-  return (k.einheit.lesbar && k.einheit.name(id)) || ZUGEORDNET;
+/** Der Ort als Text für Sortierung und Suche: Name, „zugeordnet“ oder „ohne Ort“. */
+export function ortSuchText(em: Parameters<typeof ortVon>[0], k: MaterialOrtKontext): string {
+  return ortText(ortVon(em), ortNamen(k));
 }
 
-function uhsText(id: number, k: MaterialOrtKontext): string {
-  const u = k.uhs.lesbar ? k.uhs.liste.find((x) => x.id === id) : undefined;
-  return u ? uhsName(u) : ZUGEORDNET;
-}
-
-/** Der Ort als Text (Sortierung, Suche): „Rettungsstaffel · UHS Turnhalle“, leer „“. */
-export function ortText(ort: MaterialOrtWert, k: MaterialOrtKontext): string {
-  return [
-    ...(ort.einheitId != null ? [einheitText(ort.einheitId, k)] : []),
-    ...(ort.uhsId != null ? [uhsText(ort.uhsId, k)] : []),
-  ].join(' · ');
-}
-
-const OHNE_ORT = 'ohne';
+const OHNE_WERT = 'ohne';
 
 /** Boden der Ortsangabe in px: ein Wort wie „Musterstadt“ steht in jeder Dichte in einer Zeile. */
 const ORT_MINDESTBREITE = 150;
 
+const ART_WORT: Record<MaterialOrtArt, string> = {
+  einheit: 'Einheit',
+  fahrzeug: 'Fahrzeug',
+  uhs: 'UHS',
+  bereitstellungsraum: 'Bereitstellungsraum',
+};
+
+/** Folge der Ortsarten im Filter. */
+const ART_FOLGE: readonly MaterialOrtArt[] = ['einheit', 'fahrzeug', 'uhs', 'bereitstellungsraum'];
+
 /**
- * Filter der Spalte „Ort“ (D13): „ohne Ort“, je Einheit, je UHS der aktuellen Liste. Ein Posten an
- * Einheit und UHS trifft beide Werte. Ohne Leserecht fasst ein Wert „Einheit zugeordnet“ bzw. „UHS
- * zugeordnet“ alle zusammen.
+ * Filter der Spalte „Ort“ (D13, LLH-1224): „ohne Ort“, je Einheit, je Fahrzeug, je UHS, je
+ * Bereitstellungsraum der aktuellen Liste. Ein Posten trifft genau einen Wert. Ohne Leserecht fasst
+ * ein Wert „Einheit zugeordnet“ usw. alle seiner Art zusammen.
  */
-export function ortFilter(
-  posten: readonly Pick<EinsatzMaterial, 'einheit_id' | 'uhs_id'>[],
-  k: MaterialOrtKontext,
-) {
-  const einheitWerte = new Map<string, string>();
-  const uhsWerte = new Map<string, string>();
+export function ortFilter(posten: readonly Parameters<typeof ortVon>[0][], k: MaterialOrtKontext) {
+  const namen = ortNamen(k);
+  const wertVon = (ort: MaterialOrtRef): { value: string; text: string } => {
+    const text = ortText(ort, namen);
+    return text === ZUGEORDNET
+      ? { value: `${ort.art}:*`, text: `${ART_WORT[ort.art]} zugeordnet` }
+      : { value: `${ort.art}:${ort.id}`, text };
+  };
+  const je = new Map<MaterialOrtArt, Map<string, string>>(ART_FOLGE.map((a) => [a, new Map()]));
   for (const p of posten) {
     const ort = ortVon(p);
-    if (ort.einheitId != null) {
-      const text = einheitText(ort.einheitId, k);
-      einheitWerte.set(
-        text === ZUGEORDNET ? 'einheit:*' : `einheit:${ort.einheitId}`,
-        text === ZUGEORDNET ? 'Einheit zugeordnet' : text,
-      );
-    }
-    if (ort.uhsId != null) {
-      const text = uhsText(ort.uhsId, k);
-      uhsWerte.set(
-        text === ZUGEORDNET ? 'uhs:*' : `uhs:${ort.uhsId}`,
-        text === ZUGEORDNET ? 'UHS zugeordnet' : text,
-      );
-    }
+    if (ort == null) continue;
+    const w = wertVon(ort);
+    je.get(ort.art)!.set(w.value, w.text);
   }
   const sortiert = (m: Map<string, string>) =>
     [...m].map(([value, text]) => ({ value, text })).sort((a, b) => a.text.localeCompare(b.text));
   return {
     werte: [
-      { value: OHNE_ORT, text: 'ohne Ort' },
-      ...sortiert(einheitWerte),
-      ...sortiert(uhsWerte),
+      { value: OHNE_WERT, text: OHNE_ORT },
+      ...ART_FOLGE.flatMap((a) => sortiert(je.get(a)!)),
     ],
-    trifft: (p: Pick<EinsatzMaterial, 'einheit_id' | 'uhs_id'>, wert: string) => {
+    trifft: (p: Parameters<typeof ortVon>[0], wert: string) => {
       const ort = ortVon(p);
-      if (wert === OHNE_ORT) return ort.einheitId == null && ort.uhsId == null;
-      if (wert === 'einheit:*')
-        return ort.einheitId != null && einheitText(ort.einheitId, k) === ZUGEORDNET;
-      if (wert === 'uhs:*') return ort.uhsId != null && uhsText(ort.uhsId, k) === ZUGEORDNET;
-      if (wert.startsWith('einheit:')) return ort.einheitId === Number(wert.slice(8));
-      if (wert.startsWith('uhs:')) return ort.uhsId === Number(wert.slice(4));
-      return false;
+      if (wert === OHNE_WERT) return ort == null;
+      return ort != null && wertVon(ort).value === wert;
     },
   };
 }
 
 /**
  * Lädt, was die Ort-Teile brauchen: Einheiten und UHS unter denselben Schlüsseln wie ihre Seiten
- * (live über die Ereignisse `einheit` und `uhs`), nur bei Zugriff auf das Modul. Unbekannte
- * Freigaben heißen offen; ein gescheiterter Abruf macht den Teil unlesbar.
+ * (live über die Ereignisse `einheit` und `uhs`), nur bei Zugriff auf das Modul. Fahrzeuge und
+ * Bereitstellungsräume nur, wenn ein Posten dort liegt (`posten`). Unbekannte Freigaben heißen
+ * offen; ein gescheiterter Abruf macht den Teil unlesbar.
  */
-export function useMaterialOrtKontext(einsatzId: number, darfSchreiben: boolean) {
+export function useMaterialOrtKontext(
+  einsatzId: number,
+  darfSchreiben: boolean,
+  posten: readonly Pick<EinsatzMaterial, 'einsatz_fahrzeug_id' | 'br_id'>[] = [],
+) {
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenZugriff = freigaben?.einheiten?.zugriff !== false;
   const uhsZugriff = freigaben?.unfallhilfsstellen?.zugriff !== false;
+  const fahrzeugZugriff = freigaben?.fahrzeuge?.zugriff !== false;
+  const brZugriff = freigaben?.bereitstellungsraeume?.zugriff !== false;
+  const brauchtFahrzeuge = posten.some((p) => p.einsatz_fahrzeug_id != null);
+  const brauchtBr = posten.some((p) => p.br_id != null);
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
@@ -156,8 +161,20 @@ export function useMaterialOrtKontext(einsatzId: number, darfSchreiben: boolean)
     queryFn: () => listeUhs(einsatzId),
     enabled: uhsZugriff,
   });
+  const fahrzeugQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugZugriff && brauchtFahrzeuge,
+  });
+  const brQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: brZugriff && brauchtBr,
+  });
   const einheiten = einheitenQuery.data;
   const nachId = new Map((einheiten ?? []).map((e) => [e.id, e.name] as const));
+  const fahrzeugNamen = new Map((fahrzeugQuery.data ?? []).map((f) => [f.id, f.funkrufname]));
+  const brNamen = new Map((brQuery.data ?? []).map((b) => [b.id, b.bezeichnung]));
   const kontext: MaterialOrtKontext = {
     einsatzId,
     einheit: {
@@ -171,6 +188,14 @@ export function useMaterialOrtKontext(einsatzId: number, darfSchreiben: boolean)
       bedienbar: darfSchreiben && uhsZugriff && uhsQuery.data != null,
       liste: uhsQuery.data ?? [],
     },
+    fahrzeug: {
+      lesbar: fahrzeugZugriff && !fahrzeugQuery.isError,
+      name: (id) => fahrzeugNamen.get(id),
+    },
+    bereitstellungsraum: {
+      lesbar: brZugriff && !brQuery.isError,
+      name: (id) => brNamen.get(id),
+    },
   };
   return { kontext };
 }
@@ -178,7 +203,8 @@ export function useMaterialOrtKontext(einsatzId: number, darfSchreiben: boolean)
 export interface MaterialOrtProps {
   /** Zeilenkennung für die zugänglichen Namen („Einheit zu Wolldecke“). */
   kennung: string;
-  ort: MaterialOrtWert;
+  /** Der eine Ort des Postens ({@link ortVon}); `null` heißt „ohne Ort“. */
+  ort: MaterialOrtRef | null;
   kontext: MaterialOrtKontext;
   darfSchreiben: boolean;
   /** Einheit ändern: der Aufrufer ordnet `neu` zu bzw. gibt `alt` frei. */
@@ -199,7 +225,15 @@ export default function MaterialOrt({
   onUhs,
 }: MaterialOrtProps) {
   const { token } = theme.useToken();
+  const namen = ortNamen(k);
+  const einheitId = ort?.art === 'einheit' ? ort.id : null;
+  const uhsId = ort?.art === 'uhs' ? ort.id : null;
   const teile: { key: string; inhalt: ReactNode }[] = [];
+
+  // Fahrzeug und Bereitstellungsraum: nur der Name, bis LLH-1225 den Ort-Editor bringt.
+  if (ort?.art === 'fahrzeug' || ort?.art === 'bereitstellungsraum') {
+    teile.push({ key: ort.art, inhalt: ortText(ort, namen) });
+  }
 
   if (darfSchreiben && k.einheit.bedienbar) {
     teile.push({
@@ -207,7 +241,7 @@ export default function MaterialOrt({
       inhalt: (
         <EinheitAngabe
           kennung={kennung}
-          wert={ort.einheitId}
+          wert={einheitId}
           optionen={k.einheit.optionen}
           darfSchreiben
           ohneOption="keine Einheit"
@@ -215,29 +249,29 @@ export default function MaterialOrt({
         />
       ),
     });
-  } else if (ort.einheitId != null) {
-    const text = einheitText(ort.einheitId, k);
+  } else if (ort?.art === 'einheit') {
+    const text = ortText(ort, namen);
     teile.push({
       key: 'einheit',
       inhalt:
         text === ZUGEORDNET ? (
           text
         ) : (
-          <KennungsLink to={einheitDetailPfad(k.einsatzId, ort.einheitId)}>{text}</KennungsLink>
+          <KennungsLink to={einheitDetailPfad(k.einsatzId, ort.id)}>{text}</KennungsLink>
         ),
     });
   }
 
   if (darfSchreiben && k.uhs.bedienbar) {
-    const aktuell = ort.uhsId != null ? k.uhs.liste.find((u) => u.id === ort.uhsId) : undefined;
+    const aktuell = uhsId != null ? k.uhs.liste.find((u) => u.id === uhsId) : undefined;
     const waehlbar = k.uhs.liste.filter(
       (u) => !u.storniert_at && (u.status === 'geplant' || u.status === 'aktiv'),
     );
     // Eine aufgelöste, stornierte oder nicht gelistete UHS ist nicht wählbar, steht aber noch am
     // Posten: als gesperrte Option vorn, damit die Auswahl ihren Namen zeigt statt der rohen ID.
     const aktuellGesperrt =
-      ort.uhsId != null && !waehlbar.some((u) => u.id === ort.uhsId)
-        ? [{ value: ort.uhsId, label: aktuell ? uhsName(aktuell) : ZUGEORDNET, disabled: true }]
+      uhsId != null && !waehlbar.some((u) => u.id === uhsId)
+        ? [{ value: uhsId, label: aktuell ? uhsName(aktuell) : ZUGEORDNET, disabled: true }]
         : [];
     teile.push({
       key: 'uhs',
@@ -245,7 +279,7 @@ export default function MaterialOrt({
         <InlineAngabe<number | null>
           etikett="UHS"
           kennung={kennung}
-          wert={ort.uhsId}
+          wert={uhsId}
           anzeige={aktuell ? uhsName(aktuell) : ZUGEORDNET}
           leer={(w) => w == null}
           darfSchreiben
@@ -268,15 +302,15 @@ export default function MaterialOrt({
         />
       ),
     });
-  } else if (ort.uhsId != null) {
-    const text = uhsText(ort.uhsId, k);
+  } else if (ort?.art === 'uhs') {
+    const text = ortText(ort, namen);
     teile.push({
       key: 'uhs',
       inhalt:
         text === ZUGEORDNET ? (
           text
         ) : (
-          <KennungsLink to={uhsDetailPfad(k.einsatzId, ort.uhsId)}>{text}</KennungsLink>
+          <KennungsLink to={uhsDetailPfad(k.einsatzId, ort.id)}>{text}</KennungsLink>
         ),
     });
   }
@@ -300,7 +334,7 @@ export default function MaterialOrt({
       }}
     >
       {teile.length === 0
-        ? '—'
+        ? OHNE_ORT
         : teile.map((t, i) => (
             <Fragment key={t.key}>
               {i > 0 && <span aria-hidden>·</span>}

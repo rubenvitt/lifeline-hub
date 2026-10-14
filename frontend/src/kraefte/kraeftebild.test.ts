@@ -203,7 +203,10 @@ const mat = (
   einheit_id: number | null,
   status: EinsatzMaterial['status'],
   menge = 1,
+  ausgegeben = 0,
 ): EinsatzMaterial => ({
+  art: menge > 1 || ausgegeben > 0 ? 'verbrauchsgut' : 'geraet',
+  ausgegeben,
   id,
   einsatz_id: 1,
   material_id: null,
@@ -233,6 +236,37 @@ it('verdichtet Material nach Status', () => {
   expect(bild.verdichtung.materialStatus.einsatzbereit).toBe(2);
   expect(bild.verdichtung.materialStatus.defekt).toBe(1);
   expect(bild.verdichtung.anzahlMaterialPositionen).toBe(3);
+});
+
+// LLH-1224, design.md D15: ein aufgebrauchtes Verbrauchsgut zählt unter „aufgebraucht“, nicht
+// unter seinem Status; der Lagebericht nennt es so, ein teilweise ausgegebenes nicht.
+it('zählt aufgebrauchte Verbrauchsgüter unter „aufgebraucht“ und nennt sie im Lagebericht', () => {
+  const bild = baueKraeftebild(
+    [],
+    [],
+    [],
+    [],
+    [
+      mat(1, null, 'einsatzbereit', 50, 50),
+      mat(2, null, 'im_einsatz', 50, 20),
+      mat(3, null, 'defekt'),
+      mat(4, null, 'einsatzbereit', 10, 10),
+    ],
+  );
+  expect(bild.verdichtung.materialStatus).toEqual({
+    einsatzbereit: 0,
+    im_einsatz: 1,
+    defekt: 1,
+    verbraucht: 0,
+    desinfektion_noetig: 0,
+    aufgebraucht: 2,
+  });
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  expect(md).toContain(
+    '- **Material (Positionen):** 4 (im Einsatz: 1, defekt: 1, aufgebraucht: 2)',
+  );
+  expect(md).toContain('- Mtl. M1 ×50 [aufgebraucht]');
+  expect(md).toContain('- Mtl. M2 ×50 [im_einsatz]');
 });
 
 it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {

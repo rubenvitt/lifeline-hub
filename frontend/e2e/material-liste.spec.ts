@@ -38,12 +38,13 @@ test.beforeEach(async ({ page }) => {
   await anmeldenAlsAdmin(page);
 });
 
-test('Ort setzen und umhängen: das ETB nennt die vorherige Einheit, die UHS bleibt', async ({
+test('Ort setzen und wechseln: ein Ort je Posten, das ETB nennt den vorherigen (LLH-1224)', async ({
   page,
 }) => {
   const einsatzId = await seede(page, 'Wolldecke', 20);
   await page.goto(`/einsaetze/${einsatzId}/material`);
   await expect(liste(page).getByText('Wolldecke')).toBeVisible();
+  const ort = liste(page).getByTestId('material-ort');
 
   // Einheit eintragen: wählen, dann „Speichern“.
   await liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }).click();
@@ -54,26 +55,34 @@ test('Ort setzen und umhängen: das ETB nennt die vorherige Einheit, die UHS ble
     liste(page).getByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }),
   ).toHaveText(/Staffel A/);
 
-  // UHS eintragen.
+  // UHS eintragen: der Posten wechselt an die UHS, die Einheit wird leer.
   await liste(page).getByRole('button', { name: 'UHS zu Wolldecke eintragen' }).click();
   await page.getByRole('combobox', { name: 'UHS zu Wolldecke' }).click();
   await page.getByRole('option', { name: 'UHS Turnhalle' }).click();
   await page.getByRole('button', { name: 'UHS zu Wolldecke speichern' }).click();
-  const ort = liste(page).getByTestId('material-ort');
-  await expect(ort).toContainText('Staffel A');
   await expect(ort).toContainText('UHS Turnhalle');
+  await expect(ort).not.toContainText('Staffel A');
+  await expect(
+    liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }),
+  ).toBeVisible();
 
-  // Umhängen von A nach B.
-  await liste(page).getByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }).click();
+  // Zurück an eine Einheit: die UHS wird leer.
+  await liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }).click();
   await page.getByRole('combobox', { name: 'Einheit zu Wolldecke' }).click();
   await page.getByRole('option', { name: 'Staffel B' }).click();
   await page.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }).click();
   await expect(ort).toContainText('Staffel B');
-  await expect(ort).toContainText('UHS Turnhalle');
+  await expect(ort).not.toContainText('Turnhalle');
 
   await expect
     .poll(() => etbInhalte(page, einsatzId))
-    .toContain('Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»');
+    .toEqual(
+      expect.arrayContaining([
+        'Material «Wolldecke» (×20): ohne Ort → Einheit «Staffel A»',
+        'Material «Wolldecke» (×20): Einheit «Staffel A» → UHS «Turnhalle»',
+        'Material «Wolldecke» (×20): UHS «Turnhalle» → Einheit «Staffel B»',
+      ]),
+    );
 });
 
 test('eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen', async ({ page }) => {

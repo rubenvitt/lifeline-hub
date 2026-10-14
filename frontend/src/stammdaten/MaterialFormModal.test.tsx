@@ -25,6 +25,7 @@ const material: Material = {
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
   ist_demo: false,
+  art: 'verbrauchsgut',
 };
 
 function handler() {
@@ -184,6 +185,7 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     await waitFor(() => expect(rumpf).not.toBeNull());
     expect(rumpf).toEqual({
       bezeichnung: 'Wolldecke groß',
+      art: 'verbrauchsgut',
       kategorie: 'Betreuung',
       bestandsnummer: 'INV-7',
       traegerorganisation: 'DRK Musterstadt',
@@ -262,29 +264,98 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.type(await screen.findByLabelText('Bezeichnung'), 'Wolldecke{Enter}');
 
     await waitFor(() => expect(rumpf).not.toBeNull());
-    expect(rumpf).toMatchObject({ bezeichnung: 'Wolldecke' });
+    expect(rumpf).toMatchObject({ bezeichnung: 'Wolldecke', art: 'geraet' });
     // Die Gegenaussage: der Bereich ist NICHT aufgeklappt — Enter hat gespeichert,
     // nicht den Klapp-Kopf ausgelöst.
     expect(screen.queryByLabelText('Standort')).toBeNull();
   });
 
+  /** LLH-1224 D16: Art als Segmente, Vorgabe Gerät; die Wahl geht mit, beim Bearbeiten steht sie. */
+  it('Art: Vorgabe Gerät, Verbrauchsgut wählbar, beim Bearbeiten vorbelegt', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/material', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...material, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    const art = await screen.findByRole('radiogroup', { name: 'Art' });
+    expect(within(art).getByRole('radio', { name: 'Gerät' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await nutzer.type(screen.getByLabelText('Bezeichnung'), 'Wolldecke');
+    await nutzer.click(within(art).getByRole('radio', { name: 'Verbrauchsgut' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(rumpf).toMatchObject({ bezeichnung: 'Wolldecke', art: 'verbrauchsgut' }),
+    );
+  });
+
+  it('Art: der Serienlauf behält die Art nur mit „Werte behalten“', async () => {
+    const rumpfe: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/material', async ({ request }) => {
+        rumpfe.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...material, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    const art = await screen.findByRole('radiogroup', { name: 'Art' });
+    const gewaehlt = (name: string) =>
+      within(screen.getByRole('radiogroup', { name: 'Art' })).getByRole('radio', { name });
+    // Ohne „Werte behalten“ beginnt das nächste Material wieder mit der Vorgabe.
+    await nutzer.type(screen.getByLabelText('Bezeichnung'), 'Wolldecke');
+    await nutzer.click(within(art).getByRole('radio', { name: 'Verbrauchsgut' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    await waitFor(() => expect(gewaehlt('Gerät')).toHaveAttribute('aria-checked', 'true'));
+
+    // Mit „Werte behalten“ bleibt die gewählte Art stehen.
+    await nutzer.type(screen.getByLabelText('Bezeichnung'), 'Rettungsdecke');
+    await nutzer.click(gewaehlt('Verbrauchsgut'));
+    await nutzer.click(screen.getByRole('checkbox', { name: /Werte behalten/ }));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(2));
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(gewaehlt('Verbrauchsgut')).toHaveAttribute('aria-checked', 'true');
+    await nutzer.type(screen.getByLabelText('Bezeichnung'), 'Wärmedecke');
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(3));
+    expect(rumpfe.map((r) => r.art)).toEqual(['verbrauchsgut', 'verbrauchsgut', 'verbrauchsgut']);
+  });
+
+  it('Art beim Bearbeiten: das Material zeigt seine Art', async () => {
+    renderMitProviders(<Harness bestand={material} />);
+    const art = await screen.findByRole('radiogroup', { name: 'Art' });
+    await waitFor(() =>
+      expect(within(art).getByRole('radio', { name: 'Verbrauchsgut' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
+    );
+  });
+
   /**
-   * Das Feldbudget (LFH-346): drei sichtbare Felder statt sechs.
+   * Das Feldbudget (LFH-346, LLH-1224): vier sichtbare Felder statt sieben.
    *
    * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist ein
    * `AutoComplete` (`combobox`). Die zweite Hälfte ist Pflicht: „höchstens drei" erfüllte auch
    * ein Dialog ohne Felder.
    */
-  it('zeigt drei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+  it('zeigt vier Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
     // Der Dialog, NICHT `container`: antds Modal hängt in einem Portal an `body`.
     const dialog = await screen.findByRole('dialog');
 
-    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(4);
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(6));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(7));
   });
 });

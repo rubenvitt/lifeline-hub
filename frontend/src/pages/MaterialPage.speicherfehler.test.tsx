@@ -26,6 +26,8 @@ const em = {
   traegerorganisation: null,
   menge: 50,
   status: 'einsatzbereit',
+  art: 'verbrauchsgut',
+  ausgegeben: 0,
   bemerkung: null,
   disponiert_at: '2026-05-27 09:00:00',
   disponiert_von: 1,
@@ -303,7 +305,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     expect(toasts()).toBe(0);
 
-    await waehle(/verbraucht/);
+    await waehle(/im Einsatz/);
     await waitFor(() => expect(within(zeile(container, 10)).queryByRole('alert')).toBeNull());
     await act(async () => zweiterVersuch.frei());
   });

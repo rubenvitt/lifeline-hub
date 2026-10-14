@@ -1,4 +1,4 @@
-import type { EinsatzMaterial, MaterialStatus } from './types';
+import type { EinsatzMaterial, MaterialArt, MaterialStatus } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface MaterialAdhocEingabe {
@@ -12,36 +12,63 @@ export function listEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[
   return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material`);
 }
 
+/**
+ * Der eine Ort eines Postens (LLH-1224, design.md D7): höchstens ein Feld mit Wert, sonst 422.
+ * Im PATCH heißt ein Wert „dorthin“ (der bisherige Ort geht), `null` „von diesem Ort lösen“.
+ */
+export interface MaterialOrtFelder {
+  einheit_id?: number | null;
+  einsatz_fahrzeug_id?: number | null;
+  uhs_id?: number | null;
+  br_id?: number | null;
+}
+
+/** Optionen beim Disponieren: ein Ort (alle Ortsarten) und bei Ad-hoc die Art (LLH-1224). */
+export interface DisponierOptionen {
+  ort?: MaterialOrtFelder;
+}
+
 export function disponiereMaterial(
   einsatzId: number,
   materialId: number,
   menge: number,
+  optionen: DisponierOptionen = {},
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
     material_id: materialId,
     menge,
+    ...optionen.ort,
   });
 }
 
-// menge wird separat übergeben, da es keine Stamm-Eigenschaft des Ad-hoc-Materials ist.
+// menge wird separat übergeben, da es keine Stamm-Eigenschaft des Ad-hoc-Materials ist. Ohne
+// `art` leitet der Server sie aus der Menge ab (Menge 1 → Gerät).
 export function disponiereAdhoc(
   einsatzId: number,
   adhoc: MaterialAdhocEingabe,
   menge: number,
+  optionen: DisponierOptionen & { art?: MaterialArt } = {},
 ): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', { adhoc, menge });
+  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
+    adhoc,
+    menge,
+    ...(optionen.art ? { art: optionen.art } : {}),
+    ...optionen.ort,
+  });
 }
 
 /**
- * Felder des Material-PATCH (LLH-1093). Fehlend heißt unverändert, `null` leert. Die vier
- * Ad-hoc-Angaben nimmt der Server nur an einem Ad-hoc-Posten an (sonst 422 „im Stamm pflegen“);
- * `bezeichnung` ist Pflicht und nie `null`.
+ * Felder des Material-PATCH (LLH-1093, LLH-1224). Fehlend heißt unverändert, `null` leert. Die
+ * vier Ad-hoc-Angaben nimmt der Server nur an einem Ad-hoc-Posten an (sonst 422 „im Stamm
+ * pflegen“); `bezeichnung` ist Pflicht und nie `null`. `ausgegeben` ist der neue Gesamtwert der
+ * Ausgabe eines Verbrauchsguts; die Regeln der Ergebniszeile prüft der Server (422 mit Grund).
  */
-export interface MaterialPatch {
+export interface MaterialPatch extends MaterialOrtFelder {
   menge?: number;
+  ausgegeben?: number;
   status?: MaterialStatus;
+  art?: MaterialArt;
   bemerkung?: string;
-  uhs_id?: number | null;
   bezeichnung?: string;
   kategorie?: string | null;
   bestandsnummer?: string | null;
@@ -81,14 +108,14 @@ export function listEntlassenesMaterial(einsatzId: number): Promise<EinsatzMater
 }
 
 /**
- * Aus dem Einsatz nehmen (LLH-1079, Wortlaut LLH-1093): die Zeile bleibt, Einheit und UHS gehen.
+ * Aus dem Einsatz nehmen (LLH-1079, Wortlaut LLH-1093): die Zeile bleibt, der Ort geht.
  * Umkehrbar über {@link reaktiviereDisposition}, deshalb ohne Rückfrage.
  */
 export function nimmAusDemEinsatz(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material/${emId}/entlassen`, 'POST');
 }
 
-/** Fehldisposition stornieren (LLH-1079): nur ohne Einheit und UHS in den ersten 15 Minuten. */
+/** Fehldisposition stornieren (LLH-1079): nur ohne Ort (LLH-1224) in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, emId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}/stornieren`, 'POST');
 }

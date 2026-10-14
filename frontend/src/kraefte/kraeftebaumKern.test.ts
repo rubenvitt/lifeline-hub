@@ -82,7 +82,16 @@ const fz = (
 ) => ({ id, einsatz_id: 1, einheit_id, funkrufname, soll_besatzung: soll }) as EinsatzFahrzeug;
 
 const mt = (id: number, einheit_id: number | null, status: EinsatzMaterial['status']) =>
-  ({ id, einsatz_id: 1, einheit_id, bezeichnung: `M${id}`, menge: 1, status }) as EinsatzMaterial;
+  ({
+    id,
+    einsatz_id: 1,
+    einheit_id,
+    bezeichnung: `M${id}`,
+    menge: 1,
+    status,
+    art: 'geraet',
+    ausgegeben: 0,
+  }) as EinsatzMaterial;
 
 const ids = (knoten: readonly EinheitKnoten[]): unknown[] =>
   knoten.map((k) => (k.kinder.length > 0 ? [k.einheit.id, ids(k.kinder)] : k.einheit.id));
@@ -391,9 +400,9 @@ describe('mittelDerEinheit', () => {
     });
     expect(m.material.map((x) => x.id)).toEqual([1, 2, 3]);
     expect(m.materialAusfall).toBe(1);
-    expect(isMaterialAusfall('verbraucht')).toBe(true);
-    expect(isMaterialAusfall('desinfektion_noetig')).toBe(true);
-    expect(isMaterialAusfall('im_einsatz')).toBe(false);
+    expect(isMaterialAusfall(mt(6, 1, 'verbraucht'))).toBe(true);
+    expect(isMaterialAusfall(mt(7, 1, 'desinfektion_noetig'))).toBe(true);
+    expect(isMaterialAusfall(mt(8, 1, 'im_einsatz'))).toBe(false);
     expect(materialAusfall([mt(4, 1, 'verbraucht'), mt(5, 1, 'einsatzbereit')])).toBe(1);
   });
 

@@ -25,7 +25,7 @@ import {
 } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeMaterial } from '../api/material';
@@ -49,18 +49,21 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
-import MaterialOrt, {
-  ortFilter,
-  ortText,
+import MaterialOrt, { ortFilter, ortSuchText, useMaterialOrtKontext } from '../kraefte/MaterialOrt';
+import {
+  AUFGEBRAUCHT,
+  isAufgebraucht,
+  materialDarstellung,
+  materialStatusOptionen,
+  mengeText,
   ortVon,
-  useMaterialOrtKontext,
-} from '../kraefte/MaterialOrt';
+} from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import { InlineAngabe } from '../components/InlineAngabe';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
+import { materialStatus } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
 import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -79,15 +82,27 @@ import { useNewGesture } from './einsatzabschnitte/useNewGesture';
  */
 const STATUS_REIHENFOLGE = Object.keys(materialStatus) as MaterialStatus[];
 
-/** Menüwerte mit `darstellung` — der Farbpunkt im Statusmenü kommt aus dem Vertrag. */
-const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((s) => ({
-  wert: s,
-  label: materialStatus[s].label,
-  darstellung: materialStatus[s],
-}));
+/**
+ * Menüwerte mit `darstellung` — der Farbpunkt im Statusmenü kommt aus dem Vertrag. Je Art nur die
+ * erlaubten Status (LLH-1224 D3): ein Verbrauchsgut kennt „verbraucht“ und „Desinfektion nötig“
+ * nicht, es wird ausgegeben.
+ */
+function statusOptionen(em: EinsatzMaterial): StatusOption<MaterialStatus>[] {
+  return materialStatusOptionen(em.art).map((s) => ({
+    wert: s,
+    label: materialStatus[s].label,
+    darstellung: materialStatus[s],
+  }));
+}
 
-function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
-  return materialStatus[em.status];
+/** Gruppe und Filterwert eines Postens: aufgebraucht vor dem Status (LLH-1224 D15). */
+type StatusGruppe = MaterialStatus | typeof AUFGEBRAUCHT;
+function statusGruppe(em: EinsatzMaterial): StatusGruppe {
+  return isAufgebraucht(em) ? AUFGEBRAUCHT : em.status;
+}
+const GRUPPEN_REIHENFOLGE: StatusGruppe[] = [...STATUS_REIHENFOLGE, AUFGEBRAUCHT];
+function gruppenEtikett(w: string): string {
+  return w === AUFGEBRAUCHT ? AUFGEBRAUCHT : (materialStatus[w as MaterialStatus]?.label ?? w);
 }
 /**
  * Bezeichnung mit Marken. Ist die Spalte „Kategorie“ ausgeblendet (unter `xxl` per Breite, oder von
@@ -123,10 +138,13 @@ function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
   );
 }
 
-/** Filterwerte auf der eigenen Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
-const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
+/**
+ * Filterwerte auf der eigenen Materialachse (fünf Status und „aufgebraucht“), nicht auf der
+ * Kräfte-Kategorie.
+ */
+const STATUS_FILTER_WERTE = GRUPPEN_REIHENFOLGE.map((s) => ({
   value: s,
-  text: materialStatus[s].label,
+  text: gruppenEtikett(s),
 }));
 
 /** Werte des Disponier-Dialogs für Stamm-Material. */
@@ -172,6 +190,14 @@ export default function MaterialPage() {
     queryKey: globalKeys.materialListe('im-dienst'),
     queryFn: () => listeMaterial(true),
   });
+  // Ein Gerät steht je Stück im Einsatz (LLH-1224 D2): ist eines gewählt, steht die Menge fest
+  // auf 1 und das Feld ist gesperrt; der Server lehnte jede andere Menge ab.
+  const gewaehltesMaterial = Form.useWatch('material_id', stammForm);
+  const isGeraetGewaehlt =
+    poolQuery.data?.find((m) => m.id === gewaehltesMaterial)?.art === 'geraet';
+  useEffect(() => {
+    if (isGeraetGewaehlt) stammForm.setFieldValue('menge', 1);
+  }, [isGeraetGewaehlt, stammForm]);
 
   /**
    * Liefert die Zusage des Listenabgleichs: eine `InlineAngabe` schließt erst, wenn der neue Wert im
@@ -190,6 +216,7 @@ export default function MaterialPage() {
   const { kontext: ortKontext } = useMaterialOrtKontext(
     einsatzId,
     einsatzQuery.data != null && darfImEinsatzSchreiben(einsatzQuery.data),
+    emQuery.data,
   );
 
   const disponiereMutation = useMutation({
@@ -228,9 +255,10 @@ export default function MaterialPage() {
     onSuccess: invalidate,
   });
   /*
-   * Ort auf der Doppelregel (LLH-1093, design.md D1): die Einheit über den Zuordnungsweg der
-   * Einheiten (Umhängen in einer Anfrage, „keine Einheit“ gibt die alte frei), die UHS über den
-   * Material-PATCH. Die Einheitenliste zählt ihr Material mit.
+   * Ort (LLH-1093 D1, LLH-1224 D6/D16): die Einheit über den Zuordnungsweg der Einheiten
+   * (Umhängen in einer Anfrage, „keine Einheit“ gibt die alte frei), die UHS über den
+   * Material-PATCH. Ein Posten hat einen Ort: setzt man den einen Teil, leert der Server den
+   * anderen; die Listen beider ziehen deshalb mit.
    */
   const einheitMutation = useMutation({
     mutationFn: (v: { emId: number; neu: number | null; alt: number | null }) =>
@@ -241,6 +269,7 @@ export default function MaterialPage() {
           : Promise.resolve(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       return invalidate();
     },
   });
@@ -249,6 +278,7 @@ export default function MaterialPage() {
       updateDisposition(einsatzId, v.emId, { uhs_id: v.uhsId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       return invalidate();
     },
   });
@@ -372,12 +402,17 @@ export default function MaterialPage() {
     em.ist_adhoc
       ? { key: 'angaben', label: 'Angaben ändern' }
       : { key: 'angaben', label: 'Angaben ändern · im Stamm pflegen', gesperrt: true },
-    em.menge > 1
-      ? { key: 'aufteilen', label: 'Aufteilen' }
-      : { key: 'aufteilen', label: 'Aufteilen · Menge 1', gesperrt: true },
-    // Der Server lehnt das Stornieren eines zugeordneten Postens sicher ab (Spec `material-liste`,
+    // Aufteilen nur aus dem Rest eines Verbrauchsguts (LLH-1224 D14); ein Gerät steht je Stück.
+    em.art === 'geraet'
+      ? { key: 'aufteilen', label: 'Aufteilen · Gerät', gesperrt: true }
+      : em.menge <= 1
+        ? { key: 'aufteilen', label: 'Aufteilen · Menge 1', gesperrt: true }
+        : em.ausgegeben >= em.menge
+          ? { key: 'aufteilen', label: `Aufteilen · ${AUFGEBRAUCHT}`, gesperrt: true }
+          : { key: 'aufteilen', label: 'Aufteilen' },
+    // Der Server lehnt das Stornieren eines Postens mit Ort sicher ab (Spec `material-liste`,
     // „Zeilenaktionen“); Frist und frühere Herausnahme prüft weiter er.
-    em.einheit_id != null || em.uhs_id != null
+    ortVon(em) != null
       ? { key: 'stornieren', label: 'Stornieren · zugeordnet', gefahr: true, gesperrt: true }
       : { key: 'stornieren', label: 'Stornieren', gefahr: true },
   ];
@@ -404,7 +439,7 @@ export default function MaterialPage() {
   const statusBedienungVon = (em: EinsatzMaterial) => {
     const laeuft = statusMutation.isPending && statusMutation.variables?.emId === em.id;
     return {
-      optionen: STATUS_OPTIONEN,
+      optionen: statusOptionen(em),
       aktuell: laeuft ? statusMutation.variables?.status : em.status,
       kennung: em.bezeichnung,
       laeuft,
@@ -506,8 +541,8 @@ export default function MaterialPage() {
       key: 'ort',
       mindestBreite: 170,
       filter: ortFilter(ems, ortKontext),
-      sortWert: (m) => ortText(ortVon(m), ortKontext),
-      suchText: (m) => ortText(ortVon(m), ortKontext),
+      sortWert: (m) => ortSuchText(m, ortKontext),
+      suchText: (m) => ortSuchText(m, ortKontext),
       render: (_, em) => (
         <MaterialOrt
           kennung={em.bezeichnung}
@@ -522,48 +557,52 @@ export default function MaterialPage() {
     {
       // Die Menge ist ein Wert, der erst auf „bearbeiten“ zum Feld wird, und speichert nur mit Enter
       // oder „Speichern“ (LLH-1093, design.md D9): auf dem Tablet änderte ein Wisch sonst die Menge
-      // und schrieb einen ETB-Eintrag.
+      // und schrieb einen ETB-Eintrag. Ein Gerät steht je Stück im Einsatz: „1“ ohne Bearbeiten;
+      // ein Verbrauchsgut zeigt mit Ausgabe den Rest („30 von 50 übrig“, LLH-1224 D15/D16).
       title: 'Menge',
       key: 'menge',
       width: 80,
       sortWert: (m) => m.menge,
-      render: (_, em) => (
-        <InlineAngabe<number | null>
-          etikett="Menge"
-          kennung={em.bezeichnung}
-          wert={em.menge}
-          // Eine Zahl bricht nicht um: im Kartenfeld (Breite nach Inhalt) stand „50“ sonst als „5“
-          // über „0“, weil der Wertknopf seine Polsterung über den Rand hinausträgt.
-          anzeige={<span style={{ whiteSpace: 'nowrap' }}>{em.menge}</span>}
-          leer={(w) => w == null}
-          pflicht
-          darfSchreiben={darfSchreiben}
-          onSpeichern={(menge) => mengeMutation.mutateAsync({ emId: em.id, menge: menge ?? 1 })}
-          eingabe={({ feld, value, onChange }) => (
-            // Die Breite trägt eine zweistellige Menge, keine Trefffläche; die Höhe zieht mit der
-            // Dichtestufe mit.
-            <MengenFeld
-              id={feld.id}
-              autoFocus={feld.autoFocus}
-              beschriftung={feld['aria-label']}
-              style={{ width: 120 }}
-              value={value}
-              onChange={(v) => onChange(v ?? null)}
-            />
-          )}
-        />
-      ),
+      render: (_, em) =>
+        em.art === 'geraet' ? (
+          <span style={{ whiteSpace: 'nowrap' }}>{mengeText(em)}</span>
+        ) : (
+          <InlineAngabe<number | null>
+            etikett="Menge"
+            kennung={em.bezeichnung}
+            wert={em.menge}
+            // Eine Zahl bricht nicht um: im Kartenfeld (Breite nach Inhalt) stand „50“ sonst als „5“
+            // über „0“, weil der Wertknopf seine Polsterung über den Rand hinausträgt.
+            anzeige={<span style={{ whiteSpace: 'nowrap' }}>{mengeText(em)}</span>}
+            leer={(w) => w == null}
+            pflicht
+            darfSchreiben={darfSchreiben}
+            onSpeichern={(menge) => mengeMutation.mutateAsync({ emId: em.id, menge: menge ?? 1 })}
+            eingabe={({ feld, value, onChange }) => (
+              // Die Breite trägt eine zweistellige Menge, keine Trefffläche; die Höhe zieht mit der
+              // Dichtestufe mit.
+              <MengenFeld
+                id={feld.id}
+                autoFocus={feld.autoFocus}
+                beschriftung={feld['aria-label']}
+                style={{ width: 120 }}
+                value={value}
+                onChange={(v) => onChange(v ?? null)}
+              />
+            )}
+          />
+        ),
     },
     {
       title: 'Status',
       key: 'status',
       width: 120,
-      filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
+      filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => statusGruppe(m) === w },
       // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
       // gespreizt — Herleitung in `FahrzeugePage.tsx`.
       render: (_, em) => (
         <StatusWahl
-          darstellung={statusDarstellung(em)}
+          darstellung={materialDarstellung(em)}
           darfSchreiben={darfSchreiben}
           {...statusBedienungVon(em)}
         />
@@ -705,16 +744,16 @@ export default function MaterialPage() {
             standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
             zeilenFehler={(em) => zeilen.grund(em.id)}
             gruppen={{
-              schluessel: (m) => m.status,
-              etikett: (w) => materialStatus[w as MaterialStatus]?.label ?? w,
-              reihenfolge: STATUS_REIHENFOLGE,
+              schluessel: statusGruppe,
+              etikett: gruppenEtikett,
+              reihenfolge: GRUPPEN_REIHENFOLGE,
               // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
               unterEbene: 1,
             }}
             karte={{
               art: 'plan',
               titel: { spalte: 'bezeichnung' },
-              status: (em) => statusDarstellung(em),
+              status: (em) => materialDarstellung(em),
               statusBedienung: (em) => (darfSchreiben ? statusBedienungVon(em) : null),
               // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt. Die
               // Kategorie bleibt in der Suche (LLH-1093, design.md D13).
@@ -836,7 +875,11 @@ export default function MaterialPage() {
         speicherFehlerTitel="Nicht disponiert"
         speicherFehlerFallback="Disponieren fehlgeschlagen"
         onErfassen={async (w) => {
-          await disponiereMutation.mutateAsync({ materialId: w.material_id, menge: w.menge });
+          const geraet = poolQuery.data?.find((m) => m.id === w.material_id)?.art === 'geraet';
+          await disponiereMutation.mutateAsync({
+            materialId: w.material_id,
+            menge: geraet ? 1 : w.menge,
+          });
         }}
         onFertig={() => setDisponierenOffen(false)}
         onAbbrechen={() => setDisponierenOffen(false)}
@@ -848,8 +891,13 @@ export default function MaterialPage() {
         >
           <Select options={poolOptionen} notFoundContent={poolInhalt} />
         </Form.Item>
-        <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
-          <MengenFeld beschriftung="Menge" style={{ width: 120 }} />
+        <Form.Item
+          label="Menge"
+          name="menge"
+          rules={[{ required: true }]}
+          extra={isGeraetGewaehlt ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
+        >
+          <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isGeraetGewaehlt} />
         </Form.Item>
       </ErfassungsModal>
 

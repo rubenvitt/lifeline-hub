@@ -32,6 +32,8 @@ const basis = {
   bestandsnummer: null,
   traegerorganisation: null,
   status: 'einsatzbereit',
+  art: 'verbrauchsgut',
+  ausgegeben: 0,
   bemerkung: null,
   disponiert_at: '2026-07-30 09:00:00',
   disponiert_von: 1,
@@ -293,6 +295,19 @@ describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
     expect(knopf).toHaveAttribute('aria-describedby', grund.id);
     const sprung = within(grund).getByRole('link', { name: /im Modul Material erfassen/ });
     expect(sprung).toHaveAttribute('href', '/einsaetze/1/material');
+  });
+
+  it('frei heißt „ohne Ort“: Material an einer Einheit oder einem Fahrzeug zählt nicht (LLH-1224 D6)', async () => {
+    render([
+      verortet,
+      { ...frei, einheit_id: 4 } as EinsatzMaterial,
+      { ...freiZwei, einsatz_fahrzeug_id: 2 } as EinsatzMaterial,
+    ]);
+    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(await screen.findByTestId('material-sperrgrund')).toHaveTextContent(
+      'Kein freies Material im Einsatz',
+    );
   });
 
   it('zeigt keinen Sperrgrund, solange freies Material da ist', async () => {

@@ -21,7 +21,8 @@ import {
   type RueckmeldungZustand,
 } from '../meldungen/rueckmeldung';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
-import { materialStatus, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
+import { statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
+import { isAufgebraucht, materialDarstellung, mengeText } from './materialPosten';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
 import {
   needsOhneFahrzeugKnoten,
@@ -262,9 +263,14 @@ function personStatus(ep: EinsatzPersonal): MittelStatus {
   return { ton: tonAusKategorie(k), wort, code: null };
 }
 
+/**
+ * Status und Menge eines Postens über `materialPosten.ts` (LLH-1224, design.md D15): „defekt ×1“,
+ * „aufgebraucht ×50“, mit Teil-Ausgabe „im Einsatz · 30 von 50 übrig“.
+ */
 function materialZustand(em: EinsatzMaterial): MittelStatus {
-  const d = materialStatus[em.status];
-  return { ton: tonVonRolle(d.rolle) ?? 'neutral', wort: `${d.label} ×${em.menge}`, code: null };
+  const d = materialDarstellung(em);
+  const menge = em.ausgegeben > 0 && !isAufgebraucht(em) ? ` · ${mengeText(em)}` : ` ×${em.menge}`;
+  return { ton: tonVonRolle(d.rolle) ?? 'neutral', wort: `${d.label}${menge}`, code: null };
 }
 
 // ── Auftragszuordnung ─────────────────────────────────────────────────────────

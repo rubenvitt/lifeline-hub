@@ -109,6 +109,8 @@ const mt = (id: number, einheit_id: number | null) =>
     bezeichnung: `M${id}`,
     menge: 2,
     status: 'defekt',
+    art: 'verbrauchsgut',
+    ausgegeben: 0,
   }) as EinsatzMaterial;
 
 /** Katalog wie im Seed: das Label trägt die Ziffer selbst. */
@@ -459,6 +461,25 @@ describe('Raster als Kräftebaum', () => {
     expect(zug.materialAusfall).toBe(1);
     expect(istProblemZeile(zug)).toBe(true);
     expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+  });
+
+  it('ein Posten zeigt Status und Menge über materialPosten; aufgebraucht ist Ausfall (LLH-1224)', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null)],
+      material: [
+        { ...mt(1, 1), status: 'einsatzbereit', menge: 50, ausgegeben: 50 },
+        { ...mt(2, 1), status: 'im_einsatz', menge: 50, ausgegeben: 20 },
+        { ...mt(3, 1), status: 'einsatzbereit', art: 'geraet', menge: 1 },
+      ],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    const posten = zug.children![0].children!;
+    expect(posten.map((z) => [z.status?.wort, z.status?.ton])).toEqual([
+      ['aufgebraucht ×50', 'alarm'],
+      ['im Einsatz · 30 von 50 übrig', 'bedien'],
+      ['einsatzbereit ×1', 'normal'],
+    ]);
+    expect(zug.materialAusfall).toBe(1);
   });
 
   it('die Kachel „keine Rückmeldung“ zählt auch Untereinheiten', () => {

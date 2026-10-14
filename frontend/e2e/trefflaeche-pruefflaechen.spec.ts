@@ -1120,10 +1120,14 @@ async function materialSaeen(page: Page, einsatzId: string) {
     adhoc: { bezeichnung: 'Wolldecke' },
     menge: 50,
   });
-  await seed(page, `${E}/material`, { adhoc: { bezeichnung: 'Feldbett' }, menge: 4 });
+  // Ein Ort je Posten (LLH-1224): die Wolldecke bei der Einheit, das Feldbett an der UHS.
+  const feldbett = await seed(page, `${E}/material`, {
+    adhoc: { bezeichnung: 'Feldbett' },
+    menge: 4,
+  });
   const zuordnung = await page.request.put(`${E}/einheiten/${einheit.id}/material/${verortet.id}`);
   expect(zuordnung.ok(), `Einheit zuordnen: ${zuordnung.status()}`).toBe(true);
-  const verortung = await page.request.patch(`${E}/material/${verortet.id}`, {
+  const verortung = await page.request.patch(`${E}/material/${feldbett.id}`, {
     data: { uhs_id: uhs.id },
   });
   expect(verortung.ok(), `UHS verorten: ${verortung.status()}`).toBe(true);

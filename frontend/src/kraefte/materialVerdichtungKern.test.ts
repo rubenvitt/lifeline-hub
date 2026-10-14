@@ -10,13 +10,26 @@ import {
 } from './materialVerdichtungKern';
 
 const STATUS = Object.keys(materialStatus) as MaterialStatus[];
-const posten = (status: MaterialStatus, menge = 1) => ({ status, menge });
+/** Ein Gerät (kennt alle fünf Status). */
+const posten = (status: MaterialStatus) => ({
+  status,
+  art: 'geraet' as const,
+  menge: 1,
+  ausgegeben: 0,
+});
+/** Ein Verbrauchsgut mit Menge und Ausgabe (LLH-1224). */
+const vorrat = (status: MaterialStatus, menge: number, ausgegeben = 0) => ({
+  status,
+  art: 'verbrauchsgut' as const,
+  menge,
+  ausgegeben,
+});
 
 describe('materialVerdichtung (LLH-1093, design.md D10)', () => {
   it('legt jeden Materialstatus in genau einen der drei Töpfe', () => {
     const toepfe: MaterialTopf[] = ['einsatzbereit', 'imEinsatz', 'ausfall'];
     for (const s of STATUS) {
-      const topf = materialTopf(s);
+      const topf = materialTopf(posten(s));
       expect(toepfe, `Status ${s} ohne Topf`).toContain(topf);
       // Genau einer: dieselbe Zählung landet in genau einem Topf.
       const v = verdichteMaterial([posten(s)]);
@@ -32,20 +45,35 @@ describe('materialVerdichtung (LLH-1093, design.md D10)', () => {
   });
 
   it('zählt Ausfall über die Rollen alarm und achtung: defekt, verbraucht, Desinfektion nötig', () => {
-    expect(isMaterialAusfall('defekt')).toBe(true);
-    expect(isMaterialAusfall('verbraucht')).toBe(true);
-    expect(isMaterialAusfall('desinfektion_noetig')).toBe(true);
-    expect(isMaterialAusfall('im_einsatz')).toBe(false);
-    expect(isMaterialAusfall('einsatzbereit')).toBe(false);
+    expect(isMaterialAusfall(posten('defekt'))).toBe(true);
+    expect(isMaterialAusfall(posten('verbraucht'))).toBe(true);
+    expect(isMaterialAusfall(posten('desinfektion_noetig'))).toBe(true);
+    expect(isMaterialAusfall(posten('im_einsatz'))).toBe(false);
+    expect(isMaterialAusfall(posten('einsatzbereit'))).toBe(false);
     expect(materialAusfall([posten('verbraucht'), posten('einsatzbereit')])).toBe(1);
+  });
+
+  it('ein aufgebrauchtes Verbrauchsgut ist Ausfall, ein teilweise ausgegebenes nicht (LLH-1224 D15)', () => {
+    expect(isMaterialAusfall(vorrat('einsatzbereit', 50, 50))).toBe(true);
+    expect(isMaterialAusfall(vorrat('im_einsatz', 50, 49))).toBe(false);
+    expect(isMaterialAusfall(vorrat('defekt', 50, 10))).toBe(true);
+    expect(materialTopf(vorrat('im_einsatz', 50, 50))).toBe('ausfall');
+    const v = verdichteMaterial([vorrat('einsatzbereit', 50, 50), vorrat('im_einsatz', 20, 5)]);
+    expect(v).toEqual({
+      gesamt: 2,
+      einsatzbereit: 0,
+      imEinsatz: 1,
+      ausfall: 1,
+      ausfallRolle: materialStatus.verbraucht.rolle,
+    });
   });
 
   it('zählt Posten, nicht Mengen: sieben einsatzbereit, drei im Einsatz, zwei Ausfall', () => {
     const liste = [
-      ...Array.from({ length: 7 }, () => posten('einsatzbereit', 50)),
-      ...Array.from({ length: 3 }, () => posten('im_einsatz', 4)),
-      posten('defekt', 10),
-      posten('verbraucht', 20),
+      ...Array.from({ length: 7 }, () => vorrat('einsatzbereit', 50)),
+      ...Array.from({ length: 3 }, () => vorrat('im_einsatz', 4)),
+      vorrat('defekt', 10),
+      posten('verbraucht'),
     ];
     expect(verdichteMaterial(liste)).toEqual({
       gesamt: 12,

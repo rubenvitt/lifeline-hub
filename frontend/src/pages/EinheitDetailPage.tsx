@@ -47,6 +47,7 @@ import EinheitKopf from './einheit/EinheitKopf';
 import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
+import { ortVon } from '../kraefte/materialPosten';
 
 /**
  * Vollseiten-Ansicht einer Einheit (LFH-339, seit LLH-1036 Spec `einheit-ansicht`): eigene Route,
@@ -307,7 +308,8 @@ function EinheitAnsicht({
   // Frei-Pool: disponierte Kräfte ohne Einheit.
   const freiesPersonal = (personalQuery.data ?? []).filter((p) => p.einheit_id == null);
   const freieFahrzeuge = (fahrzeugeQuery.data ?? []).filter((f) => f.einheit_id == null);
-  const freiesMaterial = (materialQuery.data ?? []).filter((m) => m.einheit_id == null);
+  // Frei heißt beim Material „ohne Ort“ (LLH-1224 D6): ein Posten an einer UHS ist nicht frei.
+  const freiesMaterial = (materialQuery.data ?? []).filter((m) => ortVon(m) === null);
 
   /**
    * Was ein leerer Zuordnungs-Pool bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,

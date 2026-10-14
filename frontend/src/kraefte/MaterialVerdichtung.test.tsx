@@ -5,7 +5,13 @@ import MaterialVerdichtung from './MaterialVerdichtung';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 
-const posten = (status: MaterialStatus, menge = 1) => ({ status, menge }) as EinsatzMaterial;
+const posten = (status: MaterialStatus, menge = 1) =>
+  ({
+    status,
+    menge,
+    art: menge > 1 ? 'verbrauchsgut' : 'geraet',
+    ausgegeben: 0,
+  }) as EinsatzMaterial;
 
 function setup(material: EinsatzMaterial[] | undefined) {
   return renderMitProviders(

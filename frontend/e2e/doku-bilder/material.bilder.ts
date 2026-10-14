@@ -75,10 +75,11 @@ test.describe(KAPITEL, () => {
         material_id: posten('Stromerzeuger 8 kVA'),
         menge: 1,
       });
-      await fuelle(api, 'post', pfad, { material_id: posten('Beleuchtungssatz'), menge: 2 });
+      // Stamm-Geräte stehen je Stück im Einsatz (LLH-1224 D2): Menge 1.
+      await fuelle(api, 'post', pfad, { material_id: posten('Beleuchtungssatz'), menge: 1 });
       const rucksack = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         material_id: posten('Sanitätsrucksack'),
-        menge: 4,
+        menge: 1,
       });
       const decken = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Spende-Decken', kategorie: 'Verbrauchsgut' },
@@ -89,7 +90,9 @@ test.describe(KAPITEL, () => {
         bemerkung: 'Zündung defekt',
       });
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { status: 'im_einsatz' });
-      // Ort (LLH-1093): Einheit über den Einheiten-Weg, UHS über den Material-PATCH.
+      // Ausgabe (LLH-1224 D4): 20 von 50 Decken sind ausgegeben, die Menge zeigt den Rest.
+      await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
+      // Ein Ort je Posten (LLH-1224 D6): Einheit über den Einheiten-Weg, UHS über den PATCH.
       const einheiten = (await (
         await api.get(`/api/einsaetze/${demo.id}/einheiten`)
       ).json()) as Einheit[];
@@ -100,13 +103,11 @@ test.describe(KAPITEL, () => {
         (u) => (u.status === 'geplant' || u.status === 'aktiv') && !u.storniert_at,
       );
       expect(uhs, 'Demo-UHS').toBeDefined();
-      for (const em of [rucksack, decken]) {
-        await fuelle(
-          api,
-          'put',
-          `/api/einsaetze/${demo.id}/einheiten/${einheit!.id}/material/${em.id}`,
-        );
-      }
+      await fuelle(
+        api,
+        'put',
+        `/api/einsaetze/${demo.id}/einheiten/${einheit!.id}/material/${decken.id}`,
+      );
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { uhs_id: uhs!.id });
       const pavillon = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
@@ -141,8 +142,9 @@ test.describe(KAPITEL, () => {
     const liste = await stehendeAuswahl(page);
     await liste.locator('.ant-select-item-option', { hasText: 'Feldbettensatz' }).click();
     await expect(dialog.getByText(/^Feldbettensatz/)).toBeVisible();
-    await dialog.getByRole('spinbutton', { name: 'Menge' }).fill('2');
-    await dialog.getByRole('spinbutton', { name: 'Menge' }).blur();
+    // Ein Gerät steht je Stück im Einsatz (LLH-1224 D2): die Menge bleibt 1 und gesperrt.
+    await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeDisabled();
+    await expect(dialog.getByText('Ein Gerät steht je Stück im Einsatz')).toBeVisible();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'material-disponieren');

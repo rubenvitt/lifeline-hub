@@ -10,7 +10,7 @@ function zeige(p: Partial<MaterialAufteilenModalProps> = {}) {
   const onSchliessen = p.onSchliessen ?? vi.fn();
   renderMitProviders(
     <MaterialAufteilenModal
-      posten={{ id: 10, bezeichnung: 'Wolldecke', menge: 50 }}
+      posten={{ id: 10, bezeichnung: 'Wolldecke', menge: 50, ausgegeben: 0 }}
       laeuft={false}
       speicherung={{ error: null, isPending: false, reset: () => {} }}
       {...p}
@@ -45,6 +45,28 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
     expect(await within(dialog).findByText('1 bis 49')).toBeInTheDocument();
     expect(onAufteilen).not.toHaveBeenCalled();
+  });
+
+  it('abgeteilt wird nur aus dem Rest; Ausgegebenes bleibt an der Zeile (LLH-1224 D14)', async () => {
+    const { onAufteilen } = zeige({
+      posten: { id: 10, bezeichnung: 'Wolldecke', menge: 50, ausgegeben: 20 },
+    });
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('30 von 50 übrig');
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' });
+    await userEvent.type(feld, '31');
+    expect(within(dialog).queryByTestId('aufteilen-danach')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    expect(await within(dialog).findByText('1 bis 30')).toBeInTheDocument();
+    expect(onAufteilen).not.toHaveBeenCalled();
+
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '30');
+    expect(await within(dialog).findByTestId('aufteilen-danach')).toHaveTextContent(
+      'Danach 20 + 30',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(30));
   });
 
   it('ohne Menge meldet das Feld den Grund', async () => {
