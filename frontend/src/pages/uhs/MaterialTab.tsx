@@ -54,8 +54,13 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
   // daneben. Scheitert nur ein Abgleich im Hintergrund, bleiben die alten Daten maßgeblich: ein
   // Fehlertext neben einem bedienbaren Knopf widerspräche ihm.
-  const sperrgrund: 'fehler' | 'leer' | null =
-    materialQuery.data === undefined
+  //
+  // Eine aufgelöste UHS nimmt kein Material mehr an (LLH-1093, design.md D14; der Server antwortet
+  // 422): der Grund steht am Knopf, statt erst im Dialog. Lösen bleibt.
+  const aufgeloest = uhs.status === 'aufgeloest';
+  const sperrgrund: 'aufgeloest' | 'fehler' | 'leer' | null = aufgeloest
+    ? 'aufgeloest'
+    : materialQuery.data === undefined
       ? materialQuery.isError
         ? 'fehler'
         : null
@@ -159,11 +164,16 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         <Space wrap size="small" align="center">
           <Button
             onClick={() => setZuordnenOffen(true)}
-            disabled={freiVerortbar.length === 0}
+            disabled={aufgeloest || freiVerortbar.length === 0}
             aria-describedby={sperrgrund ? sperrgrundId : undefined}
           >
             Material zuordnen
           </Button>
+          {sperrgrund === 'aufgeloest' && (
+            <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
+              UHS aufgelöst
+            </Typography.Text>
+          )}
           {sperrgrund === 'fehler' && (
             <Typography.Text type="danger" id={sperrgrundId} data-testid="material-sperrgrund">
               Material konnte nicht geladen werden – Zuordnen ist gerade nicht möglich.
