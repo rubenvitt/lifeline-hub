@@ -189,13 +189,20 @@ MUST NOT auf der Materialseite stehen.
 
 Jede Zeile der Materialliste SHALL für schreibberechtigte Personen „Aus dem Einsatz nehmen“
 sichtbar anbieten und „Angaben ändern“, „Aufteilen“ und „Stornieren“ in einem Zeilenmenü bündeln,
-dessen Name den Posten nennt. Ein gerade nicht möglicher Eintrag MUST gesperrt mit seinem Grund im
+dessen Name den Posten nennt. Am Ad-hoc-Posten MUST das Menü zusätzlich „Art ändern …“ anbieten
+(LLH-1224); ein Stamm-Posten hat den Eintrag nicht. Ein gerade nicht möglicher Eintrag MUST gesperrt mit seinem Grund im
 Etikett stehen. „Stornieren“ MUST rot hinter einem Trenner stehen und vor dem Senden in einem
 Dialog mit dem Knopf „Stornieren“ rückfragen.
 
 #### Scenario: Stamm-Posten im Menü
 - **WHEN** die Person das Zeilenmenü eines Stamm-Postens öffnet
 - **THEN** steht „Angaben ändern · im Stamm pflegen“ gesperrt darin
+
+#### Scenario: Art eines Ad-hoc-Geräts ändern
+- **WHEN** die Person am Ad-hoc-Gerät „Sandsack“ (Menge 1) „Art ändern …“ wählt, „Verbrauchsgut“
+  und die Menge 40 einträgt und speichert
+- **THEN** sendet die Oberfläche Art und Menge in einer Änderung, und ein Gerät hält die Menge
+  fest auf 1
 
 #### Scenario: Stornieren fragt im Dialog
 - **WHEN** die Person im Zeilenmenü „Stornieren“ wählt
