@@ -19,6 +19,14 @@ export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = 'nur Einsatzleitung, Führungspers
 /** Fristen ändert nur der Admin der Org, der der Einsatz gehört (LFH-753) — nicht jeder Admin. */
 export const NUR_LEITUNG_ORG_ADMIN = 'nur Einsatzleitung oder Org-Admin';
 export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';
+/**
+ * Ein Modul, dessen Freigabe der Person fehlt, an dem Ort, der es braucht (LLH-1036, Einheit-Ansicht
+ * D5/D11): die Besatzung braucht Personal und Fahrzeuge, die Zuordnung ihr Zielmodul.
+ */
+export const MODUL_PERSONAL_GESPERRT = 'Modul Personal gesperrt';
+export const MODUL_FAHRZEUGE_GESPERRT = 'Modul Fahrzeuge gesperrt';
+export const MODUL_MATERIAL_GESPERRT = 'Modul Material gesperrt';
+export const MODULE_PERSONAL_FAHRZEUGE_GESPERRT = 'Module Personal und Fahrzeuge gesperrt';
 
 /** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
 export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {

@@ -17,7 +17,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { holeRueckmeldungen } from '../api/meldungen';
@@ -53,7 +53,7 @@ import {
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
-import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
+import { handStatusOptionen, KEIN_HANDSTATUS } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
@@ -67,8 +67,8 @@ import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
-import type { FahrzeugStatus, StatusKategorie } from '../api/types';
-import StatusWahl, { type StatusOption } from '../components/StatusWahl';
+import type { StatusKategorie } from '../api/types';
+import StatusWahl from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -177,23 +177,6 @@ export function meldebildMeta(args: {
     `Stärke ${args.staerke} von ${args.staerkeGesamt}`
   );
 }
-
-/**
- * Der FMS-Katalog als Menüwerte für den Handstatus. Beschriftung wie am Chip
- * („S2 · Frei auf Wache"), Ton aus der Kategorie, Mandantenfarbe als Punkt.
- */
-export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
-  return [
-    // Dieselbe Beschriftung wie im FMS-Tableau — eine Quelle für beide Menüs.
-    ...fmsStatusOptionen(katalog),
-    // Der Handstatus muss sich auch entfernen lassen — sonst bliebe ein einmal gesetzter Wert
-    // stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
-    { wert: KEIN_HANDSTATUS, label: 'kein Status' },
-  ];
-}
-
-/** Menüwert für „Handstatus löschen" — eine Katalog-ID ist nie negativ. */
-export const KEIN_HANDSTATUS = -1;
 
 /** Breite der Auftragsspalte: gekürzt auf zwei Zeilen, der Volltext steht im `title`. */
 const AUFTRAG_BREITE = 180;
@@ -692,7 +675,7 @@ export default function KraefteuebersichtPage() {
   });
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),

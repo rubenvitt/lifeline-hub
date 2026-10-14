@@ -239,3 +239,22 @@ MUST der Server mit 400 ablehnen, bevor etwas geschrieben wird.
 #### Scenario: Zu langer Name beim Ändern
 - **WHEN** der Name einer Einheit auf 201 Zeichen geändert werden soll
 - **THEN** antwortet der Server mit 400, und der Name bleibt
+
+#### Scenario: Zu langer Name beim Führen als Einheit
+- **WHEN** ein Fahrzeug mit einem Namen aus 201 Zeichen als eigene Einheit geführt werden soll
+- **THEN** antwortet der Server mit 400, und weder Einheit noch Zuordnung entstehen
+
+### Requirement: Fahrzeug- und Besatzungslisten sind entdoppelt und begrenzt
+Die Fahrzeugliste beim Bilden einer Einheit und die Personenliste beim Übernehmen einer
+Besatzung MUST entdoppelt werden und darf höchstens 50 Einträge haben, gezählt vor dem
+Entdoppeln; eine längere Liste MUST mit 400 abgelehnt werden, bevor eine Abfrage läuft. Prüfen
+und Zuordnen MUST eine von der Listenlänge unabhängige Zahl von Datenbankanweisungen brauchen;
+ETB-Einträge MAY je Fahrzeug geschrieben werden.
+
+#### Scenario: 51 Personen
+- **WHEN** eine Besatzung mit 51 Personen übernommen werden soll
+- **THEN** antwortet der Server mit 400, und niemand ist zugeordnet
+
+#### Scenario: Dubletten
+- **WHEN** beim Übernehmen dieselbe Person zweimal genannt wird
+- **THEN** sitzt sie einmal auf dem Fahrzeug, und der ETB-Eintrag nennt sie einmal

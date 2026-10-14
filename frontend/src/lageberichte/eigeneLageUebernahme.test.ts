@@ -4,7 +4,7 @@ import { ApiError } from '../api/client';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { ladeStab } from '../api/stab';
 import { ladeFuehrungsstelle } from '../api/einsaetze';
@@ -31,7 +31,7 @@ vi.mock('../api/einsatzPersonal', () => ({
   listEntlassenesPersonal: vi.fn(),
 }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
-vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
+vi.mock('../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
 
@@ -111,7 +111,7 @@ beforeEach(() => {
   vi.mocked(listeEinsatzPersonal).mockReset().mockResolvedValue(PERSONAL);
   vi.mocked(listEntlassenesPersonal).mockReset().mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockReset().mockResolvedValue(FAHRZEUGE);
-  vi.mocked(listeEinsatzMaterial).mockReset().mockResolvedValue([]);
+  vi.mocked(listEinsatzMaterial).mockReset().mockResolvedValue([]);
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
   vi.mocked(ladeFuehrungsstelle)
     .mockReset()
@@ -177,7 +177,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
   });
 
   it('nennt eine Liste, die beim Klick scheitert, mit ihrem Grund', async () => {
-    vi.mocked(listeEinsatzMaterial).mockRejectedValue(new Error('500'));
+    vi.mocked(listEinsatzMaterial).mockRejectedValue(new Error('500'));
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
     const text = await erzeuge();
     expect(
