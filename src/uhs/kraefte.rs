@@ -22,6 +22,9 @@ pub struct UhsKraft {
     /// Qualifikationen als flacher Text, wie in der Personalliste.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub funktion: Option<String>,
+    /// Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<crate::staerke::StaerkePosition>)]
     pub staerke_position: Option<String>,
@@ -53,6 +56,7 @@ fn zu_kraft(a: EinsatzPersonalAnzeige, einheiten: &HashMap<i64, String>) -> UhsK
         einheit: a.einheit_id.and_then(|e| einheiten.get(&e).cloned()),
         name: a.name,
         funktion: a.funktion,
+        einsatzfunktion: a.einsatzfunktion,
         staerke_position: a.staerke_position,
         ist_adhoc: a.ist_adhoc,
     }

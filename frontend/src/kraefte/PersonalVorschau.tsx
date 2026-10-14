@@ -12,7 +12,7 @@ import { personalStatusDarstellung } from './mittelStatus';
  * Lese-Vorschau einer disponierten Einsatzkraft in der Sprungpalette. Daten aus dem Listenfach
  * der Palette mit `select` auf die `id`; Status als `StatusTag`, die Mandantenfarbe erzwingt
  * die Rand-Form. Einheit und Fahrzeug fehlen (nur IDs in der Liste). Leere optionale Angaben
- * fehlen ganz.
+ * fehlen ganz. Einsatzfunktion und Qualifikation stehen getrennt (LLH-1067).
  */
 export default function PersonalVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: EinsatzPersonal[]) => liste.find((p) => p.id === id), [id]);
@@ -26,7 +26,8 @@ export default function PersonalVorschau({ einsatzId, id }: { einsatzId: number;
           <Datenfeld label="Status">
             <StatusTag darstellung={personalStatusDarstellung(p)} farbe={p.status_farbe} />
           </Datenfeld>
-          {p.funktion && <Datenfeld label="Funktion">{p.funktion}</Datenfeld>}
+          {p.einsatzfunktion && <Datenfeld label="Funktion">{p.einsatzfunktion}</Datenfeld>}
+          {p.funktion && <Datenfeld label="Qualifikation">{p.funktion}</Datenfeld>}
           {p.traegerorganisation && (
             <Datenfeld label="Trägerorganisation">{p.traegerorganisation}</Datenfeld>
           )}

@@ -316,7 +316,8 @@ zum Abschluss zählen. Einheiten ohne Zeitachse MUST NOT mit einer Einsatzzeit v
 ### Requirement: Anlage Personal je Kopf
 
 Die optionale Anlage Personal je Kopf SHALL je im Einsatz geführter Einsatzkraft Name,
-Funktion, Einheit, Beginn, Ende und Einsatzzeit nennen, als Helfernachweis. Sie MUST nur Daten
+Funktion, Einheit, Beginn, Ende und Einsatzzeit nennen, als Helfernachweis. Als Funktion MUST die
+Einsatzfunktion stehen und, wenn sie leer ist, die Qualifikation. Sie MUST nur Daten
 von Einsatzkräften enthalten, keine Kontaktdaten und nie Daten Betroffener. Ist sie gedruckt,
 MUST der Druckkopf „enthält Namen von Einsatzkräften“ vermerken. Eine Kraft ohne Zeitachse
 MUST ohne Zeiten stehen statt mit 0.
@@ -337,6 +338,11 @@ MUST ohne Zeiten stehen statt mit 0.
 - **WHEN** der Bericht ohne Auswahl gedruckt wird
 - **THEN** enthält er keine Namen von Einsatzkräften außer denen der Führung (Einsatzleitung,
   Stab, freigebende Personen)
+
+#### Scenario: Einsatzfunktion statt Qualifikation
+
+- **WHEN** eine Kraft mit Qualifikation „Notfallsanitäter“ die Einsatzfunktion „Sprechfunker“ hat
+- **THEN** nennt die Anlage bei ihr die Funktion „Sprechfunker“
 
 ### Requirement: Titel bleibt bei seiner Tabelle
 

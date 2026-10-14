@@ -3708,6 +3708,13 @@
           "ist_fuehrer"
         ],
         "properties": {
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation."
+          },
           "ep_id": {
             "type": "integer",
             "format": "int64",
@@ -3717,7 +3724,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Qualifikation (Snapshot), wie `EinsatzPersonalAnzeige::funktion`."
           },
           "ist_fuehrer": {
             "type": "boolean",
@@ -4675,6 +4683,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067, Spec `personal-einsatzangaben`): was die Kraft im Einsatz gerade\ntut, getrennt von `funktion` (Qualifikation). Angezeigt wird sie vor der Qualifikation."
+          },
           "fahrzeug_id": {
             "type": [
               "integer",
@@ -4688,7 +4703,7 @@
               "string",
               "null"
             ],
-            "description": "Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot)."
+            "description": "Qualifikationen als flacher Text (Live recomposed oder Snapshot); bei Ad-hoc-Personen die\nerfasste Qualifikation. Die Einsatzfunktion steht getrennt in `einsatzfunktion`."
           },
           "id": {
             "type": "integer",
@@ -13067,6 +13082,13 @@
             ],
             "format": "int64",
             "description": "Einheit der Kraft (Kennung und Name); fehlen ohne Einheit."
+          },
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation."
           },
           "funktion": {
             "type": [

@@ -28,6 +28,7 @@ import { EINSATZART_LABELS } from '../../einsatz/einsatzart';
 import { typBilanz } from '../../etb/zeitachseModell';
 import { besetzungAusStab } from '../../fuehrung/funktionsOptionenKern';
 import { dauerText, kraftDauern } from '../../kraefte/zeitachse';
+import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { kettenKoepfe } from '../../lageberichte/ketten';
 import { vorlage } from '../../lageberichte/vorlagen';
 import {
@@ -650,7 +651,8 @@ function personalJeKopf(
   const tabellenZeilen = personal
     .map((k) => ({
       name: k.name,
-      funktion: textOder(k.funktion),
+      // Einsatzfunktion vor Qualifikation (LLH-1067, D2).
+      funktion: textOder(funktionText(k)),
       einheit: k.einheit_id != null ? namen.get(k.einheit_id) : undefined,
       entlassen: weg.has(k.id),
       zeiten: zeitenDerKraft(perioden.get(k.id) ?? [], bisMs, abgeschlossen, konv),

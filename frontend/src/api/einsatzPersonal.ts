@@ -40,10 +40,25 @@ export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise
   return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal`, 'POST', { adhoc });
 }
 
-export function aktualisiereDisposition(
+/**
+ * Felder des PATCH einer Disposition; fehlend = unverändert, `null` = leeren. `name`, `funktion`
+ * (Qualifikation) und `traegerorganisation` nur bei Ad-hoc-Personen, eine Stamm-Person lehnt der
+ * Server mit 422 ab (LLH-1067).
+ */
+export interface DispositionPatch {
+  status_id?: number;
+  staerke_position?: StaerkePosition | null;
+  bemerkung?: string;
+  einsatzfunktion?: string | null;
+  name?: string;
+  funktion?: string | null;
+  traegerorganisation?: string | null;
+}
+
+export function updateDisposition(
   einsatzId: number,
   epId: number,
-  felder: { status_id?: number; staerke_position?: StaerkePosition | null; bemerkung?: string },
+  felder: DispositionPatch,
 ): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'PATCH', felder);
 }

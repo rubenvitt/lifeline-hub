@@ -67,6 +67,25 @@ describe('InlineAngabe · Anzeige', () => {
     }
   });
 
+  // LLH-1067: in einer Liste stehen n gleiche Angaben; die Zeilenkennung trennt ihre Namen, der
+  // sichtbare Text bleibt kurz.
+  it('mit Kennung: die Namen nennen die Zeile, der sichtbare Text nicht', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="" kennung="Anna" />);
+    const leer = screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna eintragen' });
+    expect(leer).toHaveTextContent(/^Leitstellen-Nr\. eintragen$/);
+    rerender(<TextAngabe wert="ILS-1" kennung="Anna" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toHaveFocus();
+    expect(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna speichern' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. zu Anna abbrechen' }),
+    ).toBeInTheDocument();
+  });
+
   it('ohne Schreibrecht: kein Knopf, leer als „—"', () => {
     const { rerender } = renderMitProviders(<TextAngabe wert="" darfSchreiben={false} />);
     expect(screen.queryByRole('button')).toBeNull();

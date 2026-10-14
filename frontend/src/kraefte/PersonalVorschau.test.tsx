@@ -43,6 +43,16 @@ describe('PersonalVorschau (LFH-664)', () => {
     expect(screen.queryByText('Max Nachbar')).not.toBeInTheDocument();
   });
 
+  it('zeigt Einsatzfunktion und Qualifikation getrennt (LLH-1067)', async () => {
+    liefere([person({ einsatzfunktion: 'Sprechfunker' })]);
+    renderMitProviders(<PersonalVorschau einsatzId={5} id={11} />);
+    const feld = (label: string) =>
+      screen.getByText(label, { selector: 'dt' }).closest('[data-lfh="datenfeld"]');
+    expect(await screen.findByText('Sprechfunker')).toBeInTheDocument();
+    expect(feld('Funktion')).toHaveTextContent('Sprechfunker');
+    expect(feld('Qualifikation')).toHaveTextContent('Gruppenführerin');
+  });
+
   it('sagt „kein Status", wenn die Kraft keinen Status trägt', async () => {
     liefere([person({ status_label: null, status_kategorie: null })]);
     renderMitProviders(<PersonalVorschau einsatzId={5} id={11} />);

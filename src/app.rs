@@ -904,7 +904,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/personal/{ep_id}",
-            patch(routes::einsatz_personal::aktualisieren),
+            patch(routes::einsatz_personal::update),
         )
         // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(

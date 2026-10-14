@@ -389,10 +389,12 @@ pub async fn disponiere_personal_tx(
             besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, f.id, d.id).await?;
         }
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, d.id, true).await?;
+        // Die Bezeichnung im ETB nennt die Einsatzfunktion vor der Qualifikation (LLH-1067).
+        let funktion = anzeige.funktion_text().map(str::to_owned);
         kraefte.push(DisponiertePerson {
             ep_id: d.id,
             name: anzeige.name,
-            funktion: anzeige.funktion,
+            funktion,
             traegerorganisation: anzeige.traegerorganisation,
             reaktiviert: d.reaktiviert,
         });

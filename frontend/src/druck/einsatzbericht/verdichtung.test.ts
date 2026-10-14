@@ -783,6 +783,22 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
     expect(wert(a, 'Davon entlassen')).toBe('1');
   });
 
+  it('nennt die Einsatzfunktion vor der Qualifikation (LLH-1067)', () => {
+    const r = roh();
+    r.quellen.personal = daten([
+      kraft({
+        id: 11,
+        name: 'Zora Zander',
+        einheit_id: 1,
+        funktion: 'Notfallsanitäter',
+        einsatzfunktion: 'Sprechfunker',
+      }),
+    ]);
+    const t = tabelle(anlage(verdichteEinsatzbericht(r, konv, auswahl)));
+    expect(t.zeilen[0].slice(0, 2)).toEqual(['Zora Zander', 'Sprechfunker']);
+    expect(JSON.stringify(t)).not.toContain('Notfallsanitäter');
+  });
+
   it('Helferstunden gleichen denen im Block Kräfte', () => {
     const b = verdichteEinsatzbericht(roh(), konv, auswahl);
     const imKraefteblock = wert(abschnitt(b, 'kraefte', 'Insgesamt eingesetzt'), 'Helferstunden');

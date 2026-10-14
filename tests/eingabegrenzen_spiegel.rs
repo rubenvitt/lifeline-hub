@@ -35,6 +35,11 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
         ("PERSONAL_ADHOC_TEXT_MAX", personal::ADHOC_TEXT_MAX),
         (
+            "PERSONAL_EINSATZFUNKTION_MAX",
+            personal::EINSATZFUNKTION_MAX,
+        ),
+        ("PERSONAL_BEMERKUNG_MAX", personal::BEMERKUNG_MAX),
+        (
             "NACHFORDERUNG_BEZEICHNUNG_MAX",
             nachforderung::BEZEICHNUNG_MAX,
         ),

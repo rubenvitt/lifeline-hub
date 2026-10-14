@@ -79,6 +79,38 @@ describe('BemerkungZelle', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
+  it('mit `max`: Zähler ab 80 %, über der Grenze sperren Enter und Verlassen, gekürzt wird nicht (LLH-1067)', async () => {
+    /**
+     * Der Server lehnt eine zu lange Bemerkung mit 400 ab (`api/eingabegrenzen.ts`). Die Zelle
+     * zählt wie `zeichenGrenze` und schickt einen zu langen Wortlaut gar nicht erst; das Feld
+     * bleibt mit dem vollen Text offen, bis gekürzt ist.
+     */
+    const onSpeichern = vi.fn();
+    renderMitProviders(
+      <BemerkungZelle wert={null} darfSchreiben max={10} onSpeichern={onSpeichern} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Knie link');
+    expect(screen.getByText('9 / 10')).toBeInTheDocument();
+    await userEvent.type(feld, 's verletzt');
+    expect(screen.getByText('19 / 10 · zu lang')).toBeInTheDocument();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+
+    druecke(feld, ENTER);
+    fireEvent.blur(screen.getByRole('textbox'));
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox')).toHaveValue('Knie links verletzt');
+
+    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.type(screen.getByRole('textbox'), 'Knie');
+    expect(screen.queryByText(/ \/ 10/)).toBeNull();
+    druecke(screen.getByRole('textbox'), ENTER);
+    expect(onSpeichern).toHaveBeenCalledExactlyOnceWith('Knie');
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
   it('wartet auf die Antwort: bis zum Erfolg bleibt das Feld offen, ein zweites Verlassen sendet nicht (LFH-1077)', async () => {
     /**
      * Liefert `onSpeichern` eine Zusage, schließt die Zelle erst beim Erfolg (design.md D3): sonst

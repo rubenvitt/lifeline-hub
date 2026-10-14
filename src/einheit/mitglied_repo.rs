@@ -321,6 +321,7 @@ struct PersonRow {
     ep_id: i64,
     name: String,
     funktion: Option<String>,
+    einsatzfunktion: Option<String>,
     staerke_position: Option<String>,
     ist_fuehrer: i64,
 }
@@ -333,6 +334,7 @@ pub async fn personal_mitglieder(
 ) -> Result<Vec<EinheitMitgliedPerson>, AppError> {
     let rows = sqlx::query_as::<_, PersonRow>(
         "SELECT ep.id AS ep_id, ep.snap_name AS name, ep.snap_funktion AS funktion, \
+                ep.einsatzfunktion, \
                 COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
                 COALESCE(ep.id = e.fuehrer_id, 0) AS ist_fuehrer \
          FROM einsatz_personal ep \
@@ -349,6 +351,7 @@ pub async fn personal_mitglieder(
             ep_id: r.ep_id,
             name: r.name,
             funktion: r.funktion,
+            einsatzfunktion: r.einsatzfunktion,
             staerke_position: r.staerke_position,
             ist_fuehrer: r.ist_fuehrer != 0,
         })
@@ -361,6 +364,7 @@ struct PersonZeileMitEinheit {
     ep_id: i64,
     name: String,
     funktion: Option<String>,
+    einsatzfunktion: Option<String>,
     staerke_position: Option<String>,
     ist_fuehrer: i64,
 }
@@ -376,7 +380,7 @@ pub async fn personal_mitglieder_map(
 ) -> Result<HashMap<i64, Vec<EinheitMitgliedPerson>>, AppError> {
     let zeilen = sqlx::query_as::<_, PersonZeileMitEinheit>(
         "SELECT ep.einheit_id AS einheit_id, ep.id AS ep_id, ep.snap_name AS name, \
-                ep.snap_funktion AS funktion, \
+                ep.snap_funktion AS funktion, ep.einsatzfunktion, \
                 COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
                 COALESCE(ep.id = e.fuehrer_id, 0) AS ist_fuehrer \
          FROM einsatz_personal ep \
@@ -395,6 +399,7 @@ pub async fn personal_mitglieder_map(
                 ep_id: z.ep_id,
                 name: z.name,
                 funktion: z.funktion,
+                einsatzfunktion: z.einsatzfunktion,
                 staerke_position: z.staerke_position,
                 ist_fuehrer: z.ist_fuehrer != 0,
             });

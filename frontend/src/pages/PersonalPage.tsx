@@ -6,11 +6,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
+import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
+import { listeQualifikationen } from '../api/qualifikationen';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   entlasseDisposition,
   listeEinsatzPersonal,
   listEntlassenesPersonal,
@@ -57,6 +59,8 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
+import EinsatzfunktionZelle from '../kraefte/EinsatzfunktionZelle';
+import { einsatzfunktionVorschlaege, funktionText } from '../kraefte/einsatzfunktionKern';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 export default function PersonalPage() {
@@ -87,6 +91,11 @@ export default function PersonalPage() {
   const statusQuery = useQuery({
     queryKey: globalKeys.personalStatus(),
     queryFn: listePersonalStatus,
+  });
+  // Vorschläge der Einsatzfunktion (LLH-1067, D1): fehlt der Katalog, bleiben Vorgaben und Vergebenes.
+  const qualifikationenQuery = useQuery({
+    queryKey: globalKeys.qualifikationen(),
+    queryFn: listeQualifikationen,
   });
   // Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label (Gegenrichtung zur
   // Fahrzeugseite).
@@ -130,7 +139,7 @@ export default function PersonalPage() {
     { epId: number; statusId: number }
   >({
     queryKey: einsatzKeys.personal(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.epId, { status_id: v.statusId }),
     zeilenId: (v) => v.epId,
     ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
     onBeginn: (v) => zeilen.beginne(v.epId),
@@ -139,14 +148,26 @@ export default function PersonalPage() {
   });
   const positionMutation = useMutation({
     mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
-      aktualisiereDisposition(einsatzId, v.epId, { staerke_position: v.position }),
+      updateDisposition(einsatzId, v.epId, { staerke_position: v.position }),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Position nicht gespeichert'),
   });
+  // Die Zelle schließt erst, wenn der neue Wert im Cache steht (`InlineAngabe`); ihre Ablehnung
+  // zeigt sie selbst an der Eingabe.
+  const einsatzfunktionMutation = useMutation({
+    mutationFn: (v: { epId: number; einsatzfunktion: string | null }) =>
+      updateDisposition(einsatzId, v.epId, { einsatzfunktion: v.einsatzfunktion }),
+    onSuccess: (neu) => {
+      qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (alt) =>
+        alt?.map((ep) => (ep.id === neu.id ? neu : ep)),
+      );
+      invalidate();
+    },
+  });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { epId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
@@ -234,6 +255,10 @@ export default function PersonalPage() {
   const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
   const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
   const stati = statusQuery.data ?? [];
+  const vorschlaege = einsatzfunktionVorschlaege({
+    vergeben: eps.map((ep) => ep.einsatzfunktion),
+    qualifikationen: (qualifikationenQuery.data ?? []).map((q) => q.label),
+  });
 
   /**
    * Der Katalog als Menüwerte — einmal gebaut, von Tabellen- und Kartenzweig gelesen.
@@ -333,15 +358,27 @@ export default function PersonalPage() {
         </Space>
       ),
     },
+    // Einsatzfunktion inline mit Vorschlägen, die Qualifikation sichtbar darunter (LLH-1067).
+    // Sortiert wird nach der einen Funktionsangabe, gesucht in beiden.
     {
       title: 'Funktion',
-      dataIndex: 'funktion',
       key: 'funktion',
       width: 140,
       abBreite: 'xl',
-      sortWert: (ep) => ep.funktion,
-      suchText: (ep) => ep.funktion,
-      render: (t) => t ?? '—',
+      sortWert: (ep) => funktionText(ep),
+      suchText: (ep) => [ep.einsatzfunktion, ep.funktion].filter(Boolean).join(' '),
+      render: (_, ep) => (
+        <EinsatzfunktionZelle
+          name={ep.name}
+          einsatzfunktion={ep.einsatzfunktion}
+          funktion={ep.funktion}
+          vorschlaege={vorschlaege}
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(einsatzfunktion) =>
+            einsatzfunktionMutation.mutateAsync({ epId: ep.id, einsatzfunktion })
+          }
+        />
+      ),
     },
     {
       title: 'Träger',
@@ -443,6 +480,7 @@ export default function PersonalPage() {
           wert={ep.bemerkung}
           kennung={ep.name}
           darfSchreiben={darfSchreiben}
+          max={PERSONAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
           onSpeichern={(val) => bemerkungMutation.mutateAsync({ epId: ep.id, bemerkung: val })}
         />
@@ -629,7 +667,7 @@ export default function PersonalPage() {
             eintraege={entlassene.map((ep) => ({
               id: ep.id,
               name: ep.name,
-              zusatz: ep.funktion,
+              zusatz: funktionText(ep),
               beendetAt: ep.beendet_at,
             }))}
             aktion={

@@ -7,6 +7,7 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { einsatzKeys } from '../../api/queryKeys';
 import { SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
 import { grenzeText, zeichenZahl } from '../../components/zeichenGrenze';
+import { personLabel as einsatzkraftLabel } from '../../kraefte/einsatzfunktionKern';
 
 /** Strukturierter Wert der Geschädigt-Combobox. Genau eine Variante (oder null = unbekannt/öffentlich). */
 export type GeschaedigtWert =
@@ -101,7 +102,7 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
     const personalOptions: GeschaedigtOption[] = personal
       .map((ek) => ({
         value: `ek${ek.id}`,
-        label: ek.funktion ? `${ek.name} · ${ek.funktion}` : ek.name,
+        label: einsatzkraftLabel(ek),
         typ: 'personal' as const,
         refId: ek.id,
       }))
