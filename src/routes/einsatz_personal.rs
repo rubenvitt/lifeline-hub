@@ -197,10 +197,15 @@ pub async fn disponieren(
 }
 
 #[derive(Debug, Deserialize)]
+/// Body der Personal-Sammelroute. Achtung, zwei ID-Räume: `personal_ids` sind Stamm-IDs
+/// (`personal.id`), `fahrzeug_id` dagegen ist die Einsatzzeile (`einsatz_fahrzeug.id`), anders
+/// als `fahrzeug_ids` im Fahrzeug-Body (`routes::einsatz_fahrzeug::SammelBody`).
 pub struct SammelBody {
-    /// Stamm-IDs, höchstens `kraefte_disposition::SAMMEL_MAX` (vor dem Entdoppeln).
+    /// Stamm-IDs (`personal.id`), höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
     pub personal_ids: Vec<i64>,
+    /// Ziel-Einheit (`einsatz_einheit.id`).
     pub einheit_id: Option<i64>,
+    /// Ziel-Fahrzeug als Einsatzzeile (`einsatz_fahrzeug.id`), keine Stamm-ID.
     pub fahrzeug_id: Option<i64>,
 }
 

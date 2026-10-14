@@ -151,9 +151,13 @@ pub async fn disponieren(
 }
 
 #[derive(Debug, Deserialize)]
+/// Body der Fahrzeug-Sammelroute. `fahrzeug_ids` sind Stamm-IDs (`fahrzeug.id`), anders als
+/// `fahrzeug_id` im Personal-Body (`routes::einsatz_personal::SammelBody`), der die
+/// Einsatzzeile meint.
 pub struct SammelBody {
-    /// Stamm-IDs, höchstens `kraefte_disposition::SAMMEL_MAX` (vor dem Entdoppeln).
+    /// Stamm-IDs (`fahrzeug.id`), höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
     pub fahrzeug_ids: Vec<i64>,
+    /// Ziel-Einheit (`einsatz_einheit.id`).
     pub einheit_id: Option<i64>,
 }
 
