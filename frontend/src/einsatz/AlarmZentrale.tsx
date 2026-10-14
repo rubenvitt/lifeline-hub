@@ -49,6 +49,7 @@ import {
 } from '../routing/deeplinks';
 import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
 /**
@@ -169,9 +170,10 @@ type DesktopZustand = 'aus' | 'erlaubt' | 'blockiert' | 'nicht-verfuegbar';
  * Tonzustand der Anzeige (LFH-637). `prueft` gilt, bis die Audio-Prüfung zum ersten Mal
  * antwortet: „blockiert" hieße dort etwas, das niemand festgestellt hat, und das Wort brach beim
  * Start die Kopfzeile bei 1024 px um (CLS 0,46). `prueft` ist keine Störung, steht also wie der
- * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, zwischen `md` und `xl` ohne Wort. Seit
- * LFH-950 dauert es höchstens `ALARM_TON_FRIST_MS`: ohne Antwort meldet `alarmTon` danach
- * „blockiert", ein dauerhaftes „prüft" verdeckte sonst einen stummen Alarm.
+ * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, zwischen `md` und `xl` ohne Wort (außer in
+ * `handschuh`, LLH-1232). Seit LFH-950 dauert es höchstens `ALARM_TON_FRIST_MS`: ohne Antwort
+ * meldet `alarmTon` danach „blockiert", ein dauerhaftes „prüft" verdeckte sonst einen stummen
+ * Alarm.
  */
 type TonZustand = AlarmTonStatus | 'prueft';
 
@@ -731,6 +733,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const { istSchmal, abBreite, istBeruehrung } = useViewport();
   const { token } = theme.useToken();
   const knapp = !abBreite('xl');
+  const { dichte } = useDichte();
   const buendeln = istSchmal || (knapp && istBeruehrung);
 
   const desktopAktivieren = () => {
@@ -864,7 +867,11 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   // Tonprüfung beim Start wechselt den Wortlaut ohne Zutun, und an der Umbruchgrenze sprang der
   // Kopf mit dem kürzeren Wort von zwei Zeilen auf eine. Darunter steht die Prüfung nur als Icon;
   // der Platz machte „Ton blockiert“ breiter, und der Kopf brach bei 1024 px um (LFH-637).
-  const tonWort = knapp && !tonAuffaellig ? null : tonText;
+  // In `handschuh` gilt das auch unter `xl` (LLH-1232): dort ist der Kopf bei 1100 und ab
+  // 1200 px ohnehin zweizeilig, und nur das Wort mit Platz hält ihn über „Ton bereit“ und „Ton
+  // blockiert“ gleich hoch.
+  const tonHaeltPlatz = !knapp || dichte === 'handschuh';
+  const tonWort = !tonHaeltPlatz && !tonAuffaellig ? null : tonText;
 
   return (
     <>
@@ -893,7 +900,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           icon={tonIcon}
         >
           {tonWort ? (
-            <WortPlatz platz={knapp ? '' : TON_WORT_LAENGSTES}>{tonWort}</WortPlatz>
+            <WortPlatz platz={tonHaeltPlatz ? TON_WORT_LAENGSTES : ''}>{tonWort}</WortPlatz>
           ) : null}
         </Button>
       </Tooltip>
