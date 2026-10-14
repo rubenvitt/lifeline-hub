@@ -97,8 +97,16 @@ export function gruppenText(z: Pick<RasterZeile, 'art' | 'gruppe'>): string[] {
 /** Welche Module als Sprungziel gesperrt sind (`useSprungSperre`). */
 export type SprungGesperrt = (modul: 'einheiten' | 'fahrzeuge' | 'personal') => boolean;
 
+/**
+ * Was die Zelle zeichnet: eine Meldebild-Zeile oder eine reine Einheitzeile (Einheiten-Gliederung,
+ * LLH-1029), die nur trägt, was die Einheitzelle liest.
+ */
+export type KraeftebaumZelleZeile =
+  | RasterZeile
+  | ({ art: 'einheit' } & Pick<RasterZeile, 'einheitId' | 'bezeichnung' | 'zusatz' | 'tz'>);
+
 interface KraeftebaumZelleProps {
-  zeile: RasterZeile;
+  zeile: KraeftebaumZelleZeile;
   einsatzId: number;
   gesperrt: SprungGesperrt;
 }

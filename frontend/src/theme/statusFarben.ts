@@ -285,6 +285,26 @@ export const besatzungsUrteil: Record<BesatzungsUrteil, StatusDarstellung> = {
   unterbesetzt: { rolle: 'alarm', label: 'unterbesetzt' },
 };
 
+/**
+ * Urteil über die Stärke einer EINHEIT: Ist kumuliert (Server, eigen + unterstellte) gegen ihr
+ * Soll, je Achse F/UF/M (`kraefte/kraeftebaumKern.ts:einheitStaerkeUrteilVon`). Kein Domänen-Enum,
+ * das Urteil fällt im Client.
+ */
+export type EinheitStaerkeUrteil = 'kein_soll' | 'erfuellt' | 'unterbesetzt';
+
+/**
+ * Stärke-Urteil einer Einheit (LLH-1029, Entscheidung 13.10.2026): „unterbesetzt“ ist `achtung`,
+ * nicht `alarm` wie an {@link besatzungsUrteil}. Fehlt einem Zug eine Gruppe, ist das ein
+ * Führungshinweis; ein unterbesetzt ausrückendes Fahrzeug bleibt die Gefahr (Alarmbudget
+ * EEMUA 191, `frontend/AGENTS.md`, „Layout und Live“). „Soll erfüllt“ ist neutral und wird nicht
+ * gezeichnet: eine Gliederung voller grüner Marken verdeckte die eine, auf die es ankommt.
+ */
+export const einheitStaerkeUrteil: Record<EinheitStaerkeUrteil, StatusDarstellung> = {
+  kein_soll: { rolle: 'neutral', label: 'kein Soll' },
+  erfuellt: { rolle: 'neutral', label: 'Soll erfüllt' },
+  unterbesetzt: { rolle: 'achtung', label: 'unterbesetzt' },
+};
+
 /** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },
