@@ -13,12 +13,15 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   fahrzeuge-disponieren.png frontend/src/kraefte/FahrzeugeDisponierenModal.tsx
  *   fms-tableau.png  frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts
  *   entlassen.png    frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
+ *   angaben-aendern.png frontend/src/kraefte/FahrzeugAngabenDialog.tsx,
+ *                    frontend/src/kraefte/AdhocFahrzeugFelder.tsx (Zeilenmenü „Angaben ändern …“)
  *
  * Demo-Lücke (D3): die Demo-Fahrzeuge haben keine Besatzung. Die Spec setzt Anna und Paul Probe
  * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“. Für den Dialog
  * „Fahrzeuge disponieren“ legt sie zwei Stamm-Fahrzeuge an, die noch nicht im Einsatz sind
  * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert. Für den Block „Entlassen“ disponiert sie
- * zuletzt ein Ad-hoc-Fahrzeug und entlässt es (LLH-1079 Teil II); die Bilder davor zeigen es nicht.
+ * ein Ad-hoc-Fahrzeug und entlässt es (LLH-1079 Teil II); die Bilder davor zeigen es nicht. Für den
+ * Dialog „Angaben ändern“ disponiert sie zuletzt ein weiteres Ad-hoc-Fahrzeug (LLH-1073).
  */
 
 const KAPITEL = 'fahrzeuge';
@@ -139,5 +142,28 @@ test.describe(KAPITEL, () => {
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(block, KAPITEL, 'entlassen');
+  });
+
+  test('Dialog „Angaben ändern“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+      adhoc: {
+        funkrufname: 'Bereitschaft 12-1',
+        fahrzeugtyp: 'GW-San',
+        traegerorganisation: 'DRK Nachbarstadt',
+      },
+    });
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    await page.getByRole('button', { name: 'Weitere Aktionen zu Bereitschaft 12-1' }).click();
+    await page.getByRole('menuitem', { name: 'Angaben ändern …' }).click();
+    const dialog = page
+      .locator('.ant-modal')
+      .filter({ hasText: 'Angaben zu Bereitschaft 12-1 ändern' });
+    await expect(dialog.getByLabel('Funkrufname')).toHaveValue('Bereitschaft 12-1');
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'angaben-aendern');
   });
 });
