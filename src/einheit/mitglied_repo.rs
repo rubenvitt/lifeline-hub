@@ -190,7 +190,7 @@ pub struct MaterialZuordnung {
     pub bezeichnung: String,
     pub menge: i64,
     pub vorher: Option<(i64, String)>,
-    pub is_geaendert: bool,
+    pub is_changed: bool,
 }
 
 /// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
@@ -226,8 +226,8 @@ pub async fn ordne_material_zu_tx(
         }
         None => None,
     };
-    let is_geaendert = vorher_id != Some(einheit_id);
-    if is_geaendert {
+    let is_changed = vorher_id != Some(einheit_id);
+    if is_changed {
         sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
             .bind(einheit_id)
             .bind(em_id)
@@ -239,7 +239,7 @@ pub async fn ordne_material_zu_tx(
         bezeichnung,
         menge,
         vorher,
-        is_geaendert,
+        is_changed,
     })
 }
 
@@ -930,7 +930,7 @@ mod tests {
                 bezeichnung: "Wolldecke".into(),
                 menge: 50,
                 vorher: None,
-                is_geaendert: true,
+                is_changed: true,
             }
         );
         assert_eq!(material_mitglieder(&pool, a).await.unwrap().len(), 1);
@@ -938,13 +938,13 @@ mod tests {
         // Exklusiv: erneutes Zuordnen zu B wechselt und nennt A (LLH-1093, design.md D5).
         let z = ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
         assert_eq!(z.vorher, Some((a, "A".to_string())));
-        assert!(z.is_geaendert);
+        assert!(z.is_changed);
         assert!(material_mitglieder(&pool, a).await.unwrap().is_empty());
         assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
         // Dieselbe Einheit noch einmal: nichts geändert.
         let z = ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
         assert_eq!(z.vorher, Some((b, "B".to_string())));
-        assert!(!z.is_geaendert);
+        assert!(!z.is_changed);
         // Eine aufgelöste Zieleinheit ist 409, in der Transaktion geprüft.
         sqlx::query(
             "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-14 10:00:00' WHERE id = ?",
