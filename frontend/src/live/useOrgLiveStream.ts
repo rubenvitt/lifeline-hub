@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
+import { benachrichtigungListener, meldeNachreichen } from './benachrichtigungListener';
 import { beobachteEinsatzStrom, einsatzStromOffen } from './einsatzStromStore';
 import { erzeugeLiveSammler } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
@@ -28,10 +29,14 @@ export function useOrgLiveStream(angemeldet: boolean): void {
     // Org-Ereignisse haben weder Nummer noch Replay: jeder Wiederaufbau gleicht die Org-Keys ab,
     // auch einer des Browsers (`beiNachlieferung` = Vorgabe).
     const sammler = erzeugeLiveSammler(qc);
-    const abgleich = () => invalidiereOrgLiveKeys(sammler);
+    // Verlorene Org-Benachrichtigungen holt die Org-Zentrale nach (design.md D5).
+    const abgleich = () => {
+      invalidiereOrgLiveKeys(sammler);
+      meldeNachreichen();
+    };
     const schliessen = oeffneLiveVerbindung({
       url: '/api/live',
-      listeners: [...orgListener(sammler), ['lagged', abgleich]],
+      listeners: [...orgListener(sammler), ...benachrichtigungListener(true), ['lagged', abgleich]],
       beiWiederaufbau: abgleich,
       beimErstenOpen: abgleich,
     });

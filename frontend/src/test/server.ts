@@ -24,6 +24,11 @@ export const server = setupServer(
    */
   http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
   /**
+   * Offene Benachrichtigungen — keine als Default. Jede Zentrale (Einsatz- und Org-Layout) reicht
+   * beim Mount nach (design.md D5); Tests mit Benachrichtigungen überschreiben per `server.use()`.
+   */
+  http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
+  /**
    * Eigene Führungsstelle (LFH-849/LFH-1181) — nicht erfasst als Default, der echte Zustand eines
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
    * überschreiben per `server.use()`.

@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { EINSATZ_STREAM_EVENTS, ORG_STREAM_EVENTS } from './queryKeys';
 import type { OrgStreamEvent } from './queryKeys';
 import type { LiveEvent, OrgLiveEvent } from './types';
+import {
+  BENACHRICHTIGUNG_EREIGNIS,
+  ORG_BENACHRICHTIGUNG_EREIGNIS,
+  benachrichtigungListener,
+} from '../live/benachrichtigungListener';
 
 /**
  * Cross-Language-Kontrakt der Org-Ereignisse (LFH-734). Das Rust-`OrgLiveEvent` ist die
  * Wahrheitsquelle und MUSS exakt den Schlüsseln von {@link ORG_STREAM_EVENTS} entsprechen, dazu
  * `org_benachrichtigung` (LLH-1207): empfängergebunden, invalidiert keinen Cache und steht deshalb
- * nicht in der Registry.
+ * nicht in der Registry; es geht an die Benachrichtigungszentrale (`live/benachrichtigungListener.ts`).
  *
  * Beide Familien laufen auf derselben Verbindung (der Einsatz-Strom trägt die Org-Ereignisse
  * mit), ihre Wire-Namen müssen deshalb disjunkt sein. Beides prüft `tsc` (Typ-Ebene unten).
@@ -19,7 +24,7 @@ type AssertEqual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : ne
 type AssertDisjunkt<A, B> = [Extract<A, B>] extends [never] ? true : never;
 
 /** Org-Ereignisse, die der Client fest verdrahtet behandelt, ohne Registry-Eintrag. */
-const ORG_NICHT_REGISTRY = ['org_benachrichtigung'] as const;
+const ORG_NICHT_REGISTRY = [ORG_BENACHRICHTIGUNG_EREIGNIS] as const;
 
 const _kontrakt: AssertEqual<OrgLiveEvent, OrgStreamEvent | (typeof ORG_NICHT_REGISTRY)[number]> =
   true;
@@ -31,7 +36,7 @@ describe('OrgLiveEvent ↔ ORG_STREAM_EVENTS (LFH-734 Cross-Language-Kontrakt)',
   it('teilt keinen Wire-Namen mit den Einsatz-Ereignissen', () => {
     for (const ev of [...Object.keys(ORG_STREAM_EVENTS), ...ORG_NICHT_REGISTRY]) {
       expect(EINSATZ_STREAM_EVENTS).not.toHaveProperty(ev);
-      expect(['sofortmeldung', 'lagged', 'benachrichtigung']).not.toContain(ev);
+      expect(['sofortmeldung', 'lagged', BENACHRICHTIGUNG_EREIGNIS]).not.toContain(ev);
     }
   });
 
@@ -39,5 +44,12 @@ describe('OrgLiveEvent ↔ ORG_STREAM_EVENTS (LFH-734 Cross-Language-Kontrakt)',
     for (const ev of ORG_NICHT_REGISTRY) {
       expect(ORG_STREAM_EVENTS).not.toHaveProperty(ev);
     }
+  });
+
+  it('verdrahtet org_benachrichtigung am Org-Kanal und am Einsatz-Strom', () => {
+    expect(benachrichtigungListener(true).map(([ev]) => ev)).toEqual([
+      ORG_BENACHRICHTIGUNG_EREIGNIS,
+    ]);
+    expect(benachrichtigungListener().map(([ev]) => ev)).toContain(ORG_BENACHRICHTIGUNG_EREIGNIS);
   });
 });

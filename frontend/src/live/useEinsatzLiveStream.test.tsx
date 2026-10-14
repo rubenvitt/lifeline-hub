@@ -8,6 +8,10 @@ import { useEinsatzLiveStream } from './useEinsatzLiveStream';
 import { LIVE_SAMMELFENSTER_MS, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { WIEDERAUFBAU_SCHONFRIST_MS } from './liveVerbindung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
+import {
+  BENACHRICHTIGUNG_WINDOW_EVENT,
+  NACHREICHEN_WINDOW_EVENT,
+} from './benachrichtigungListener';
 
 class FakeEventSource {
   static CONNECTING = 0;
@@ -1330,5 +1334,63 @@ describe('useEinsatzLiveStream', () => {
     expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 7], 'none'));
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(spy).not.toHaveBeenCalledWith(...abgleich(['etb', 7]));
+  });
+
+  describe('Benachrichtigungen (kcjecn9e D5)', () => {
+    const ereignis = {
+      einsatz_id: 4,
+      benachrichtigung_id: 40,
+      art: 'auftrag_erteilt',
+      stufe: 'hinweis',
+      bezug_typ: 'auftrag',
+      bezug_id: 12,
+      quittiert: false,
+    };
+
+    it('reicht `benachrichtigung` und `org_benachrichtigung` an die Zentrale weiter, ohne Cache-Abgleich', () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('EventSource', FakeEventSource);
+      const client = neuerQueryClient();
+      const spy = vi.spyOn(client, 'invalidateQueries');
+      const empfangen = vi.fn();
+      window.addEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, empfangen);
+      render(
+        <QueryClientProvider client={client}>
+          <Probe id={4} />
+        </QueryClientProvider>,
+      );
+      FakeEventSource.letzte!.emit('benachrichtigung', JSON.stringify(ereignis));
+      const org = {
+        ...ereignis,
+        benachrichtigung_id: 41,
+        art: 'einsatz_neu',
+        bezug_typ: 'einsatz',
+      };
+      FakeEventSource.letzte!.emit('org_benachrichtigung', JSON.stringify(org));
+      vi.advanceTimersByTime(ZAEHLER_SAMMELFENSTER_MS);
+      window.removeEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, empfangen);
+
+      expect(empfangen.mock.calls.map((c) => (c[0] as CustomEvent).detail)).toEqual([
+        ereignis,
+        org,
+      ]);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('bittet nach `lagged` um das Nachreichen, ein gewöhnliches Ereignis nicht', () => {
+      vi.stubGlobal('EventSource', FakeEventSource);
+      const nachreichen = vi.fn();
+      window.addEventListener(NACHREICHEN_WINDOW_EVENT, nachreichen);
+      render(
+        <QueryClientProvider client={neuerQueryClient()}>
+          <Probe id={4} />
+        </QueryClientProvider>,
+      );
+      FakeEventSource.letzte!.emit('etb');
+      expect(nachreichen).not.toHaveBeenCalled();
+      FakeEventSource.letzte!.emit('lagged');
+      window.removeEventListener(NACHREICHEN_WINDOW_EVENT, nachreichen);
+      expect(nachreichen).toHaveBeenCalledOnce();
+    });
   });
 });
