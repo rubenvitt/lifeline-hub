@@ -81,6 +81,11 @@ mod tests {
             "Auskunft und Schwärzung finden jede Kraft des Einsatzes, auch beendete",
         ),
         (
+            "src/einheit/aus_vorlage.rs",
+            1,
+            "Planung der Bildung aus einer Vorlage liest auch beendete Zeilen, um „entlassen“ (erneut disponieren) von „storniert“ (neu) zu unterscheiden",
+        ),
+        (
             "src/einheit/repo.rs",
             1,
             "Spurprüfung vor dem echten Löschen zählt jede Personalzeile der Einheit",

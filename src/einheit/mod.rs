@@ -1,3 +1,4 @@
+pub mod aus_vorlage;
 pub mod mitglied_repo;
 pub mod repo;
 pub mod typ_repo;
@@ -235,6 +236,56 @@ pub fn etb_text_storniert(name: &str) -> String {
     format!("Einheit «{}» storniert (Fehlanlage)", name)
 }
 
+/// Der eine System-ETB beim Bilden aus einer Vorlage (LLH-1049, design.md D11): „Einheit «1. Zug»
+/// aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: «Rettungsstaffel»;
+/// 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, Name B; umgehängt: RTW 2 aus «2. Zug»“.
+/// Leere Teile entfallen. Systemtext: keine Grenze am Eingang (`src/AGENTS.md`, „Eingabegrenzen“).
+pub fn etb_text_aus_vorlage(
+    einheit: &str,
+    vorlage: &str,
+    untereinheiten: &[String],
+    fahrzeuge: &[String],
+    kraefte: &[String],
+    umgehaengt: &[String],
+) -> String {
+    let mut teile = vec![format!(
+        "Einheit «{einheit}» aus Vorlage «{vorlage}» gebildet"
+    )];
+    if !untereinheiten.is_empty() {
+        let wort = if untereinheiten.len() == 1 {
+            "Untereinheit"
+        } else {
+            "Untereinheiten"
+        };
+        let namen: Vec<String> = untereinheiten.iter().map(|n| format!("«{n}»")).collect();
+        teile.push(format!("{wort}: {}", namen.join(", ")));
+    }
+    if !fahrzeuge.is_empty() {
+        let wort = if fahrzeuge.len() == 1 {
+            "Fahrzeug"
+        } else {
+            "Fahrzeuge"
+        };
+        teile.push(format!(
+            "{} {wort}: {}",
+            fahrzeuge.len(),
+            fahrzeuge.join(", ")
+        ));
+    }
+    if !kraefte.is_empty() {
+        let wort = if kraefte.len() == 1 {
+            "Kraft"
+        } else {
+            "Kräfte"
+        };
+        teile.push(format!("{} {wort}: {}", kraefte.len(), kraefte.join(", ")));
+    }
+    if !umgehaengt.is_empty() {
+        teile.push(format!("umgehängt: {}", umgehaengt.join(", ")));
+    }
+    teile.join("; ")
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -254,6 +305,58 @@ mod etb_text_tests {
             etb_text_personal_zugeordnet("1. Zug", "Erika Muster"),
             "Einheit «1. Zug»: «Erika Muster» zugeordnet"
         );
+    }
+
+    #[test]
+    fn aus_vorlage_nennt_alle_teile_und_laesst_leere_weg() {
+        let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            etb_text_aus_vorlage(
+                "1. Zug",
+                "Sanitätszug Musterstadt",
+                &s(&["Rettungsstaffel", "Trupp"]),
+                &s(&["ELW 1", "RTW 1", "RTW 2"]),
+                &s(&["Name A", "Name B"]),
+                &s(&["RTW 2 aus «2. Zug»", "Name B von «83-4»"]),
+            ),
+            "Einheit «1. Zug» aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: \
+             «Rettungsstaffel», «Trupp»; 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, \
+             Name B; umgehängt: RTW 2 aus «2. Zug», Name B von «83-4»"
+        );
+        assert_eq!(
+            etb_text_aus_vorlage("Staffel", "Staffel", &[], &[], &[], &[]),
+            "Einheit «Staffel» aus Vorlage «Staffel» gebildet"
+        );
+        assert_eq!(
+            etb_text_aus_vorlage("A", "V", &[], &s(&["ELW"]), &s(&["Anna"]), &[]),
+            "Einheit «A» aus Vorlage «V» gebildet; 1 Fahrzeug: ELW; 1 Kraft: Anna"
+        );
+    }
+
+    /// Höchstfall (design.md D11): 20 Einheiten mit Namen à `NAME_MAX`, 50 Fahrzeuge
+    /// (Funkrufname à 40), 50 Personen (Name à 80), zehn davon aus Einheiten mit Namen à
+    /// `NAME_MAX` umgehängt — der Systemtext bleibt unter `etb::INHALT_MAX`.
+    #[test]
+    fn aus_vorlage_hoechstfall_bleibt_unter_der_etb_grenze() {
+        let lang = |c: char, n: usize| std::iter::repeat_n(c, n).collect::<String>();
+        let einheit = lang('E', NAME_MAX);
+        let unter: Vec<String> = (0..19).map(|_| lang('U', NAME_MAX)).collect();
+        let fahrzeuge: Vec<String> = (0..50).map(|_| lang('F', 40)).collect();
+        let kraefte: Vec<String> = (0..50).map(|_| lang('P', 80)).collect();
+        let umgehaengt: Vec<String> = (0..10)
+            .map(|_| format!("{} aus «{}»", lang('P', 80), lang('A', NAME_MAX)))
+            .collect();
+        let text = etb_text_aus_vorlage(
+            &einheit,
+            &lang('V', crate::einheit_vorlage::NAME_MAX),
+            &unter,
+            &fahrzeuge,
+            &kraefte,
+            &umgehaengt,
+        );
+        let zeichen = text.chars().count();
+        assert!(zeichen > 12_000, "{zeichen}");
+        assert!(zeichen < crate::etb::INHALT_MAX, "{zeichen}");
     }
 
     #[test]
