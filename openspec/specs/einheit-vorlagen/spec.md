@@ -98,3 +98,22 @@ nur lesen lassen und das benennen.
 #### Scenario: Warnung sichtbar
 - **WHEN** ein Fahrzeug der Vorlage auch in einer anderen Vorlage steht
 - **THEN** zeigt die Detailseite am Fahrzeug „auch in <Vorlage>“
+
+### Requirement: Vorschau im Einsatz
+Das System SHALL zu einer Vorlage im Einsatz eine Vorschau liefern: die aktiven Einheiten des
+Baums und je Fahrzeug und Person der Vorlage den Zustand im Einsatz als einen von „neu“, „frei“,
+„gebunden“ (mit Einheit oder Fahrzeug), „außer Dienst“, „entlassen“. Eine stornierte Kraft MUST
+als „neu“ gelten. Die Vorschau MUST NOT etwas schreiben; maßgeblich bleibt die Prüfung beim
+Bilden.
+
+#### Scenario: Fahrzeug in anderer Einheit
+- **WHEN** RTW 2 im Einsatz dem „2. Zug“ angehört
+- **THEN** meldet die Vorschau RTW 2 als gebunden mit „2. Zug“
+
+### Requirement: Vorschau achtet die Modulfreigabe
+Fahrzeug- und Personenzeilen der Vorschau MUST nur erscheinen, wenn das jeweilige Modul für die
+Rolle freigegeben ist; sonst MUST die Vorschau den Teil als gesperrt melden.
+
+#### Scenario: Personal gesperrt
+- **WHEN** die Rolle das Modul Personal nicht freigegeben hat
+- **THEN** enthält die Vorschau keine Personen und meldet das Personal als gesperrt

@@ -73,3 +73,100 @@ Grund je Kraft MUST im Dialog an der Kraft stehen, nicht als Toast.
 #### Scenario: Werte behalten
 - **WHEN** der Nutzer im Serienmodus mit „Werte behalten“ eine Gruppe absendet
 - **THEN** ist die Auswahl leer und die Einheit noch gewählt
+
+### Requirement: Einheit aus Vorlage bilden
+Das System SHALL aus einer aktiven Einheiten-Vorlage der eigenen Organisation in einer Anfrage
+die Einheit samt allen aktiven Untereinheiten bilden. Die gewählten Fahrzeuge und Personen der
+Vorlage MUST der Einheit ihrer Vorlage zugeordnet werden, eine Person auf dem Fahrzeug der
+Vorlage, wenn es mitkommt. Die Anfrage MUST alles oder nichts anlegen. Kräfte, die nicht in der
+Vorlage stehen, MUST NOT übernommen werden.
+
+#### Scenario: Sanitätszug mit Rettungsstaffel
+- **WHEN** die Führung aus „Sanitätszug Musterstadt“ mit allen Fahrzeugen und zwei Personen der Rettungsstaffel bildet
+- **THEN** gibt es einen Zug mit unterstellter Rettungsstaffel
+- **AND** ELW und beide RTW sind ihrer Einheit zugeordnet, und die zwei Personen sitzen auf ihrem RTW
+
+#### Scenario: Fehler in der letzten Zeile
+- **WHEN** von den gewählten Personen die letzte außer Dienst steht
+- **THEN** antwortet das System mit 422, und weder Einheit noch Disposition noch Zuordnung ist angelegt
+
+#### Scenario: Kraft außerhalb der Vorlage
+- **WHEN** die Anfrage ein Fahrzeug nennt, das nicht in der Vorlage steht
+- **THEN** antwortet das System mit 422 und nennt dieses Fahrzeug
+
+### Requirement: Kopfdaten aus der Vorlage
+Jede gebildete Einheit MUST Typ, Funkrufname und taktisches Zeichen ihrer Vorlage tragen, das
+Soll nur, wenn die Vorlage ein eigenes hat. Nur die oberste Einheit MUST den gewählten Abschnitt
+tragen und MAY einen abweichenden Namen tragen; Untereinheiten erben den Abschnitt.
+
+#### Scenario: Zeichen und Soll
+- **WHEN** die Rettungsstaffel der Vorlage ein Zeichen, aber kein eigenes Soll hat
+- **THEN** trägt die gebildete Staffel dieses Zeichen, und als Soll wirkt das ihres Einheitstyps
+
+### Requirement: Schon disponierte Kräfte zuordnen
+Eine gewählte Kraft, die schon im Einsatz und frei ist, MUST zugeordnet statt neu disponiert
+werden und ihre Stärke-Position behalten. Eine entlassene Kraft MUST erneut disponiert werden.
+
+#### Scenario: Entlassene Person
+- **WHEN** eine gewählte Person aus dem Einsatz entlassen war
+- **THEN** ist sie erneut disponiert, der neuen Einheit zugeordnet und hat einen neuen Initialstatus in der Zeitachse
+
+#### Scenario: Freies Fahrzeug
+- **WHEN** der ELW schon disponiert ist und keiner Einheit angehört
+- **THEN** wird er dem neuen Zug zugeordnet, ohne zweite Disposition
+
+### Requirement: Umhängen nur auf Wunsch
+Eine Kraft, die einer anderen Einheit angehört oder auf einem anderen Fahrzeug sitzt, MUST nur
+mit ausdrücklichem Umhängen je Zeile übernommen werden; ohne es MUST das System mit 422 und einem
+Grund an dieser Kraft ablehnen. Eine umgehängte Person, deren Fahrzeug der Vorlage nicht
+mitkommt, MUST ohne Fahrzeug in der neuen Einheit stehen.
+
+#### Scenario: Fahrzeug in einem anderen Zug
+- **WHEN** RTW 2 dem „2. Zug“ angehört und ohne Umhängen gewählt ist
+- **THEN** antwortet das System mit 422 und dem Grund „in «2. Zug»“ an RTW 2, und nichts ist angelegt
+
+#### Scenario: Umhängen gewählt
+- **WHEN** RTW 2 mit Umhängen gewählt ist
+- **THEN** gehört RTW 2 der neuen Rettungsstaffel an, und der „2. Zug“ erhält ein Live-Ereignis
+
+### Requirement: Zeitachse beim Bilden aus Vorlage
+Neu und erneut disponierte Personen MUST ihren Initialstatus in der Kräfte-Zeitachse erhalten wie
+beim Einzelweg. Zugeordnete Bestandskräfte, Fahrzeuge und die neuen Einheiten MUST NOT ein
+Ereignis erhalten; die Einsatzdauer einer neuen Einheit beginnt mit ihrem ersten Fahrzeugstatus.
+
+#### Scenario: Keine Einheitsereignisse
+- **WHEN** ein Zug aus einer Vorlage gebildet wird
+- **THEN** hat die Zeitachse Ereignisse nur für die neu disponierten Personen, keines für die Einheiten
+
+### Requirement: Ein ETB-Eintrag beim Bilden aus Vorlage
+Ein erfolgreiches Bilden aus einer Vorlage SHALL in derselben Transaktion genau einen
+ETB-Systemeintrag schreiben, der Einheit, Vorlage, Untereinheiten, Fahrzeuge, Kräfte und
+Umgehängtes nennt. Live-Ereignisse für Einheiten, Fahrzeuge und Personal MUST nach dem Commit
+folgen, auch für eine Einheit, aus der umgehängt wurde.
+
+#### Scenario: Ein Eintrag
+- **WHEN** ein Zug mit Staffel, drei Fahrzeugen und zwei Kräften gebildet wird
+- **THEN** steht im ETB genau ein neuer Systemeintrag „Einheit «…» aus Vorlage «…» gebildet“ mit allen Namen
+
+### Requirement: Bilden aus Vorlage ist gedeckelt
+Die Anfrage MUST höchstens 50 Personen und 50 Fahrzeuge annehmen, gezählt vor dem Entdoppeln, und
+eine längere Liste mit 400 ablehnen, bevor etwas gelesen oder geschrieben wird. Eine Vorlage mit
+mehr als 20 aktiven Einheiten im Baum MUST mit 422 abgelehnt werden. Die Prüfung der Kräfte MUST
+eine von ihrer Zahl unabhängige Zahl von Anweisungen brauchen; geschrieben MAY je Kraft werden.
+
+#### Scenario: 51 Personen
+- **WHEN** die Anfrage 51 Personen nennt
+- **THEN** antwortet das System mit 400, und nichts ist angelegt
+
+#### Scenario: Zu große Vorlage
+- **WHEN** der Baum der Vorlage 21 aktive Einheiten hat
+- **THEN** antworten Vorschau und Bilden mit 422
+
+### Requirement: Rechte beim Bilden aus Vorlage
+Bilden aus einer Vorlage MUST Schreibrecht am Modul Einheiten verlangen, mit Fahrzeugen zusätzlich
+das Modul Fahrzeuge, mit Personen das Modul Personal, und sonst mit 403 ablehnen, bevor etwas
+geschrieben wird. Eine fremde oder unbekannte Vorlage MUST 404, eine deaktivierte 422 ergeben.
+
+#### Scenario: Fahrzeuge gesperrt
+- **WHEN** eine Rolle ohne Freigabe des Moduls Fahrzeuge mit Fahrzeugen aus einer Vorlage bildet
+- **THEN** antwortet das System mit 403, und nichts ist angelegt
