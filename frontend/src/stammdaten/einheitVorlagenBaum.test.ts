@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EinheitVorlage } from '../api/types';
-import { orderAsTree, sollText, subtreeIds, treeIds } from './einheitVorlagenBaum';
+import { orderAsTree, sollText, subtreeIds, treeIds, vorlagePfad } from './einheitVorlagenBaum';
 
 function vorlage(id: number, name: string, ueber?: number): EinheitVorlage {
   return {
@@ -80,5 +80,15 @@ describe('treeIds (LLH-1042)', () => {
 
   it('endet auch an einem korrupten Zyklus', () => {
     expect([...treeIds([vorlage(1, 'A', 2), vorlage(2, 'B', 1)], 1)].sort()).toEqual([1, 2]);
+  });
+});
+
+describe('vorlagePfad (LLH-1049)', () => {
+  it('nennt eine Untervorlage mit ihren Eltern, eine fehlende Elternvorlage bricht den Pfad ab', () => {
+    const vorlagen = [vorlage(1, 'Zug'), vorlage(2, 'Staffel', 1), vorlage(3, 'Trupp', 2)];
+    expect(vorlagePfad(vorlagen, vorlagen[2])).toBe('Zug › Staffel › Trupp');
+    expect(vorlagePfad(vorlagen, vorlagen[0])).toBe('Zug');
+    // Deaktivierte Elternvorlage (nicht in der aktiven Liste): die Untervorlage steht allein.
+    expect(vorlagePfad([vorlagen[1]], vorlagen[1])).toBe('Staffel');
   });
 });
