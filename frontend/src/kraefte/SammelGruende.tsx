@@ -31,7 +31,7 @@ export function GruendeListe({ gruende, name, onAbwaehlen }: GruendeListeProps) 
           </li>
         ))}
       </ul>
-      <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={onAbwaehlen}>
+      <Button type="link" style={{ paddingInline: 0 }} onClick={onAbwaehlen}>
         Abgelehnte abwählen
       </Button>
     </div>
