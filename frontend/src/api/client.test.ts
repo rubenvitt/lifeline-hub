@@ -324,6 +324,43 @@ describe('ApiError — wer hat geantwortet? (LFH-723, Review Befund 4)', () => {
   });
 });
 
+describe('ApiError.zeilen — Gründe je Zeile (LLH-1100)', () => {
+  it('übernimmt die Zeilen einer 422-Antwort mit Grund je Kraft', async () => {
+    server.use(
+      http.post('/api/sammel', () =>
+        HttpResponse.json(
+          {
+            error: 'Nicht alle Kräfte lassen sich disponieren',
+            zeilen: [{ art: 'personal', id: 7, grund: 'außer Dienst' }],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const e = await apiSend('/api/sammel', 'POST', {}).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).status).toBe(422);
+    expect((e as ApiError).message).toBe('Nicht alle Kräfte lassen sich disponieren');
+    expect((e as ApiError).zeilen).toEqual([{ art: 'personal', id: 7, grund: 'außer Dienst' }]);
+  });
+
+  it('lässt zeilen ohne Feld leer und verwirft unbrauchbare Einträge', async () => {
+    server.use(
+      http.post('/api/ohne', () => HttpResponse.json({ error: 'kaputt' }, { status: 422 })),
+      http.post('/api/schief', () =>
+        HttpResponse.json(
+          { error: 'schief', zeilen: [{ art: 'personal', id: '7', grund: 1 }, null, 'x'] },
+          { status: 422 },
+        ),
+      ),
+    );
+    const ohne = (await apiSend('/api/ohne', 'POST', {}).catch((x: unknown) => x)) as ApiError;
+    expect(ohne.zeilen).toEqual([]);
+    const schief = (await apiSend('/api/schief', 'POST', {}).catch((x: unknown) => x)) as ApiError;
+    expect(schief.zeilen).toEqual([]);
+  });
+});
+
 describe('Versatz zur Serveruhr aus dem Date-Header (LFH-705)', () => {
   const SERVER = Date.parse('2026-10-01T10:00:00Z');
   const VORLAUF = 5 * 60_000;

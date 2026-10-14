@@ -193,7 +193,7 @@ pub async fn laden_anzeige_tx(
 
 /// Disponiert ein Stamm-Fahrzeug auf einer offenen Verbindung: prüft Org und Dienststatus,
 /// friert den Identitäts-Snapshot ein und setzt den ersten `gebunden`-Status. `NotFound` bei
-/// fremdem/unbekanntem Fahrzeug, `Validation` bei außer Dienst, `Conflict` bei
+/// fremdem/unbekanntem Fahrzeug, `UnprocessableEntity` bei außer Dienst, `Conflict` bei
 /// Doppel-Disposition. Liefert die `ef_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
@@ -224,7 +224,9 @@ pub async fn disponiere_stamm_tx(
 
     let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger, dienststatus) = snap;
     if dienststatus != DIENSTSTATUS_IN_DIENST {
-        return Err(AppError::Validation(
+        // Ein Zustand, also 422 wie bei der Person (`src/AGENTS.md`, Statuscode-Konvention; bis
+        // LLH-1100 war es 400).
+        return Err(AppError::UnprocessableEntity(
             "Fahrzeug ist außer Dienst und kann nicht disponiert werden".into(),
         ));
     }
@@ -616,7 +618,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn disponiere_stamm_ausser_dienst_ist_validation() {
+    async fn disponiere_stamm_ausser_dienst_ist_unprocessable() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
@@ -629,7 +631,7 @@ mod tests {
             disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
                 .await
                 .unwrap_err(),
-            AppError::Validation(_)
+            AppError::UnprocessableEntity(_)
         ));
     }
 

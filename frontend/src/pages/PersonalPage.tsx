@@ -1,18 +1,16 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Modal, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
-import { ErfassungsModal } from '../components/Erfassung';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { listePersonal, POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
+import { POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
 import {
   aktualisiereDisposition,
-  disponierePerson,
   entlasseDisposition,
   listeEinsatzPersonal,
   listEntlassenesPersonal,
@@ -30,15 +28,11 @@ import { abrufZustand } from '../api/abrufZustand';
 import { useUhr } from '../abloesung/useUhr';
 import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
+import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import {
-  nichtGefundenInhalt,
-  SeitenFehler,
-  SeitenSkeleton,
-  SeitenStandVeraltet,
-} from '../components/SeitenZustand';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
@@ -51,7 +45,6 @@ import {
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import DemoMarke from '../components/DemoMarke';
-import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
@@ -73,7 +66,6 @@ export default function PersonalPage() {
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
-  const [stammForm] = Form.useForm<{ personal_id: number }>();
   const [highlightId, setHighlightId] = useState<number | null>(null);
   /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
@@ -95,10 +87,6 @@ export default function PersonalPage() {
   const statusQuery = useQuery({
     queryKey: globalKeys.personalStatus(),
     queryFn: listePersonalStatus,
-  });
-  const poolQuery = useQuery({
-    queryKey: globalKeys.personalListe('im-dienst'),
-    queryFn: () => listePersonal(true),
   });
   // Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label (Gegenrichtung zur
   // Fahrzeugseite).
@@ -137,13 +125,6 @@ export default function PersonalPage() {
   // zeigt seinen Fehler über `speicherung` selbst.
   const zeilen = useZeilenFehler<number>();
 
-  const disponiereMutation = useMutation({
-    mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),
-    onSuccess: () => {
-      message.success('Personal disponiert');
-      invalidate();
-    },
-  });
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzPersonal,
     { epId: number; statusId: number }
@@ -281,27 +262,6 @@ export default function PersonalPage() {
       },
     };
   };
-
-  const disponierteIds = new Set(
-    eps.map((e) => e.personal_id).filter((x): x is number => x != null),
-  );
-  // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
-  const poolOptionen = demoGroupedOptions(
-    (poolQuery.data ?? []).filter((p) => !disponierteIds.has(p.id)),
-    (p) => `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
-  );
-
-  /**
-   * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
-   * filtert der Ausdruck darüber auf die leere Menge, und das Feld behauptete „Keine freien
-   * Personen". Ohne Fehler bleibt der Bestandswortlaut.
-   *
-   * Kein `kein403`: die Personal-Route ist org-lesbar ohne Admin-Schranke.
-   */
-  const poolInhalt =
-    nichtGefundenInhalt(poolQuery, {
-      allgemein: 'Personalliste konnte nicht geladen werden',
-    }) ?? 'Keine freien Personen';
 
   /**
    * Trägerfilter aus den eigenen Daten; `undefined` ohne Werte. Das Feld erscheint erst mit dem
@@ -547,7 +507,7 @@ export default function PersonalPage() {
         darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
-              Person disponieren
+              Personal disponieren
             </Button>
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
           </Space>
@@ -721,31 +681,14 @@ export default function PersonalPage() {
         Die Person erscheint danach in keiner Liste und keinem Nachweis.
       </Modal>
 
-      {/* Person aus dem Stamm disponieren, im Serienmodus wie die Ad-hoc-Kette. */}
-      <ErfassungsModal<{ personal_id: number }>
+      {/* Personal aus dem Stamm disponieren: eine Gruppe in einem Absenden, optional in Einheit
+          und Fahrzeug (LLH-1100), im Serienmodus wie die Ad-hoc-Kette. */}
+      <PersonalDisponierenModal
         offen={disponierenOffen}
-        titel="Person disponieren"
-        form={stammForm}
-        erfassenText="Disponieren"
+        einsatzId={einsatzId}
         serie
-        laeuft={disponiereMutation.isPending}
-        speicherung={disponiereMutation}
-        speicherFehlerTitel="Nicht disponiert"
-        speicherFehlerFallback="Disponieren fehlgeschlagen"
-        onErfassen={async (w) => {
-          await disponiereMutation.mutateAsync(w.personal_id);
-        }}
-        onFertig={() => setDisponierenOffen(false)}
-        onAbbrechen={() => setDisponierenOffen(false)}
-      >
-        <Form.Item
-          label="Person"
-          name="personal_id"
-          rules={[{ required: true, message: 'Person wählen' }]}
-        >
-          <Select options={poolOptionen} notFoundContent={poolInhalt} />
-        </Form.Item>
-      </ErfassungsModal>
+        onSchliessen={() => setDisponierenOffen(false)}
+      />
 
       {/* Ad-hoc-Disposition mit Serienmodus: an der Bereitstellung wird eine Helferkette am
           Stück aufgenommen. Trägerorganisation und Stärke-Position überleben das Speichern,

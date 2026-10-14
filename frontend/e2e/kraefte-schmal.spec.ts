@@ -180,7 +180,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           'Vorbedingung: der lesende Aufklapper der Besatzung steht (LFH-697)',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Fahrzeug disponieren' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Fahrzeuge disponieren' })).toHaveCount(0);
       },
     ],
     [
@@ -204,7 +204,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Person disponieren' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);
       },
     ],
     [
@@ -282,8 +282,8 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
     await page.setViewportSize(schirm);
     for (const [modul, wortlaut, knopf] of [
       ['material', MATERIAL, 'Material disponieren'],
-      ['personal', KRAFT, 'Person disponieren'],
-      ['fahrzeuge', FUNKRUFNAME, 'Fahrzeug disponieren'],
+      ['personal', KRAFT, 'Personal disponieren'],
+      ['fahrzeuge', FUNKRUFNAME, 'Fahrzeuge disponieren'],
     ] as const) {
       await page.goto(`/einsaetze/${einsatzId}/${modul}`);
       await expect(page.getByText(wortlaut).first()).toBeVisible();

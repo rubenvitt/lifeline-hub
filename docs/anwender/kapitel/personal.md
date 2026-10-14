@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -28,15 +28,27 @@ Disponieren, Status setzen und entlassen dürfen Einsatzleitung und Führungsper
 3. Unter „Spalten“ ausgeblendete Spalten wie „Träger“, „Fahrzeug“, „Einheit“ oder „Bemerkung“
    einblenden.
 
-### Eine Person disponieren
+### Personal aus dem Stamm disponieren
 
-Für Einsatzleitung und Führungspersonal:
+Für Einsatzleitung und Führungspersonal, für eine Person oder eine ganze Gruppe:
 
-1. „Person disponieren“ wählen.
-2. Unter „Person“ eine Person aus dem Personalstamm wählen.
-3. „Disponieren“ wählen, oder „Speichern und nächste“, um gleich die nächste Person aufzunehmen.
+1. „Personal disponieren“ wählen.
+2. Unter „Personen“ eine oder mehrere Personen aus dem Personalstamm wählen. Die Suche findet
+   Name, Personalnummer, Träger und Qualifikation.
+3. Bei Bedarf unter „In Einheit“ die Einheit und unter „Auf Fahrzeug“ das Fahrzeug wählen. Mit
+   gewählter Einheit stehen nur ihre Fahrzeuge zur Wahl.
 
-Steht eine Kraft nicht im Personalstamm:
+   ![Dialog „Personal disponieren“ mit zwei gewählten Personen, der Einheit „Rettungsstaffel“, dem Fahrzeug „Musterstadt 83-1 (RTW)“ und den Knöpfen „Speichern und nächste“ und „Disponieren“](../bilder/personal/personal-disponieren.png)
+
+4. „Disponieren“ wählen. Für die nächste Gruppe „Speichern und nächste“ (Strg + Enter) wählen; mit
+   „Werte behalten“ bleibt die Einheit stehen, das Fahrzeug nicht.
+5. Lässt sich eine Person nicht disponieren, nimmt die App keine der gewählten auf. Unter der
+   Auswahl steht je Person der Grund, etwa „außer Dienst“ oder „schon disponiert“. „Abgelehnte
+   abwählen“ nimmt diese Personen aus der Auswahl, danach erneut „Disponieren“ wählen.
+
+### Eine Ad-hoc-Person disponieren
+
+Für Einsatzleitung und Führungspersonal, wenn eine Kraft nicht im Personalstamm steht:
 
 1. „Ad-hoc-Person“ wählen.
 2. „Name“ eingeben, bei Bedarf „Funktion“, „Trägerorganisation“ und „Stärke-Position“.
@@ -78,8 +90,7 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Aufgeklappter Block „Entlassen (1)“ unter der Personalliste mit einer Person, ihrer Funktion, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/personal/entlassen.png)
 
-5. Kommt die Person zurück, „Erneut disponieren“ wählen. Eine Person aus dem Personalstamm lässt
-   sich auch wieder über „Person disponieren“ aufnehmen.
+5. Kommt die Person zurück, „Erneut disponieren“ wählen.
 
 ### Eine Fehldisposition stornieren
 
@@ -93,8 +104,14 @@ Für Einsatzleitung und Führungspersonal, kurz nachdem eine Person versehentlic
 
 ### Wer zur Auswahl steht
 
-„Person disponieren“ bietet die Personen des Personalstamms an, die in Dienst stehen und noch nicht
-im Einsatz sind. Ad-hoc-Kräfte gibt es nur im Einsatz; im Personalstamm erscheinen sie nicht.
+„Personal disponieren“ bietet die Personen des Personalstamms an, die in Dienst stehen und noch
+nicht im Einsatz sind. Eine entlassene Person fehlt dort; sie kommt über „Erneut disponieren“ im
+Block „Entlassen“ zurück, mit ihrer Zeitachse. Ad-hoc-Kräfte gibt es nur im Einsatz; im
+Personalstamm erscheinen sie nicht.
+
+Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steht eine Person
+inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
+nennt den Grund je Person.
 
 ### Status
 
@@ -105,7 +122,10 @@ schreiben dabei Alarmierung, Eintreffen und Entlassung in die Kräfte-Zeitachse.
 
 ### Einheit, Fahrzeug und Position
 
-Einer Einheit wird eine Person im Modul [Einheiten](einheiten.md) zugeordnet, einem Fahrzeug als
+Beim Disponieren aus dem Stamm lassen sich Einheit und Fahrzeug gleich mitgeben; die Felder „In
+Einheit“ und „Auf Fahrzeug“ stehen nur, wenn die Module Einheiten und Fahrzeuge im Einsatz
+freigegeben sind. Gehört das Fahrzeug nicht zur gewählten Einheit, lehnt die App ab. Später wird
+eine Person im Modul [Einheiten](einheiten.md) einer Einheit zugeordnet, einem Fahrzeug als
 Besatzung im Modul [Fahrzeuge und FMS](fahrzeuge.md). Die Stärke-Position bestimmt, ob die Person
 als Führer, Unterführer oder Mannschaft zählt; Einheitsführer ist ein eigenes Merkmal der Einheit.
 
@@ -132,7 +152,8 @@ und Nachtragen lehnt die App ab.
 ### Einsatztagebuch
 
 Disponieren, jeder Statuswechsel, das Entlassen, das erneute Disponieren und das Stornieren stehen
-im Einsatztagebuch. Position und Bemerkung ändern es nicht.
+im Einsatztagebuch. Eine Gruppe aus einem Absenden steht dort als ein Eintrag mit Zahl, Einheit,
+Fahrzeug und den Namen. Position und Bemerkung ändern es nicht.
 
 ### Rechte und ohne Netz
 

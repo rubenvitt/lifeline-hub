@@ -1424,3 +1424,11 @@ fn geraet_kopplung_wire() {
         Widerrufen => "widerrufen",
     });
 }
+
+#[test]
+fn zeilen_art_wire() {
+    enum_wire!(lifeline_hub::error::ZeilenArt {
+        Personal => "personal",
+        Fahrzeug => "fahrzeug",
+    } in lifeline_hub::error::ZeilenArt::ALLE);
+}

@@ -78,3 +78,5 @@ export const EINHEIT_VORLAGE_BEMERKUNG_MAX = 2_000;
 export const EINHEIT_VORLAGE_FAHRZEUGE_MAX = 50;
 /** Personen der Stammbesetzung je Einheiten-Vorlage. */
 export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;
+/** Kräfte je Sammel-Disposition im Request (LLH-1100, vor dem Entdoppeln). */
+export const SAMMEL_MAX = 50;

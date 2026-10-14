@@ -232,7 +232,7 @@ pub struct Disponiert {
 /// Disponiert eine Stamm-Person: prüft Org und Dienststatus, friert den Identitäts-Snapshot ein
 /// (`snap_funktion` aus den aktiven Qualifikationen) und setzt den ersten `gebunden`-Status.
 /// `staerke_position` ist der optionale Override. `NotFound` bei fremder/unbekannter Person,
-/// `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition. Eine entlassene oder
+/// `UnprocessableEntity` bei außer Dienst, `Conflict` bei Doppel-Disposition. Eine entlassene oder
 /// stornierte Zeile derselben Person wird wieder aufgenommen statt abgelehnt (LLH-1079, D7):
 /// `UNIQUE(einsatz_id, personal_id)` lässt keine zweite Zeile zu.
 ///
@@ -334,7 +334,7 @@ pub async fn disponieren_stamm_tx(
 }
 
 /// Name und Trägerorganisation einer Stamm-Person der Org; `NotFound` bei fremder/unbekannter,
-/// `Validation` bei außer Dienst.
+/// `UnprocessableEntity` bei außer Dienst.
 async fn stamm_snapshot_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -350,11 +350,15 @@ async fn stamm_snapshot_tx(
     .ok_or(AppError::NotFound)?;
     let (name, traeger, dienststatus) = snap;
     if dienststatus != DIENSTSTATUS_IN_DIENST {
-        return Err(AppError::Validation(
-            "Person ist außer Dienst und kann nicht disponiert werden".into(),
-        ));
+        return Err(ausser_dienst_fehler());
     }
     Ok((name, traeger))
+}
+
+/// Eine Stamm-Person außer Dienst lässt sich nicht disponieren: ein Zustand, also 422
+/// (`src/AGENTS.md`, Statuscode-Konvention; bis LLH-1100 war es 400).
+pub fn ausser_dienst_fehler() -> AppError {
+    AppError::UnprocessableEntity("Person ist außer Dienst und kann nicht disponiert werden".into())
 }
 
 /// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die eigentlichen
@@ -1226,8 +1230,9 @@ mod tests {
         ));
     }
 
+    /// Außer Dienst ist ein Zustand: 422 (LLH-1100, Statuscode-Konvention), nicht mehr 400.
     #[tokio::test]
-    async fn disponiere_stamm_ausser_dienst_ist_validation() {
+    async fn disponiere_stamm_ausser_dienst_ist_unprocessable() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
@@ -1240,7 +1245,7 @@ mod tests {
             disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
                 .await
                 .unwrap_err(),
-            AppError::Validation(_)
+            AppError::UnprocessableEntity(_)
         ));
     }
 

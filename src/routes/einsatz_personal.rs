@@ -1,10 +1,11 @@
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Lagekarte, Personal};
+use crate::einsatz::modul::{Einheiten, Fahrzeuge, Lagekarte, Personal};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
@@ -123,46 +124,63 @@ pub async fn disponieren(
         }
     };
 
-    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx. Eine
-    // entlassene Stamm-Person wird wieder aufgenommen (LLH-1079, design.md D7).
+    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx. Eine Stamm-
+    // Person läuft über den Baustein der Sammel-Disposition (LLH-1100) mit einer ID; eine
+    // entlassene wird dabei wieder aufgenommen (LLH-1079, design.md D7), die Fehler bleiben die
+    // des Einzelwegs (`als_einzelfehler`).
+    let kontext = kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
     let disponiert = crate::write_retry!(&state.pool, |conn| {
         let disponiert = match &vorbereitet {
             Vorbereitet::Stamm(personal_id) => {
-                disposition_repo::disponieren_stamm_tx(
+                let wahl = [kraefte_disposition::PersonalWahl {
+                    personal_id: *personal_id,
+                    staerke_position: body.staerke_position.clone(),
+                }];
+                let ergebnis = kraefte_disposition::disponiere_personal_tx(
                     conn,
-                    einsatz_id,
-                    ctx.einsatz.org_id,
-                    *personal_id,
-                    body.staerke_position.as_deref(),
-                    ctx.benutzer.id,
+                    kontext,
+                    &wahl,
+                    kraefte_disposition::Ziel::default(),
+                    kraefte_disposition::Regeln::EINZEL,
                 )
-                .await?
+                .await
+                .map_err(kraefte_disposition::als_einzelfehler)?;
+                let kraft = &ergebnis.kraefte[0];
+                disposition_repo::Disponiert {
+                    id: kraft.ep_id,
+                    reaktiviert: kraft.reaktiviert,
+                }
             }
             Vorbereitet::Adhoc {
                 name,
                 funktion,
                 traeger,
                 position,
-            } => disposition_repo::disponieren_adhoc_tx(
-                conn,
-                einsatz_id,
-                ctx.einsatz.org_id,
-                AdhocDaten {
-                    name,
-                    funktion: funktion.as_deref(),
-                    traegerorganisation: traeger.as_deref(),
-                    staerke_position: position.as_deref(),
-                },
-                ctx.benutzer.id,
-            )
-            .await
-            .map(|id| disposition_repo::Disponiert {
-                id,
-                reaktiviert: false,
-            })?,
+            } => {
+                let id = disposition_repo::disponieren_adhoc_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.einsatz.org_id,
+                    AdhocDaten {
+                        name,
+                        funktion: funktion.as_deref(),
+                        traegerorganisation: traeger.as_deref(),
+                        staerke_position: position.as_deref(),
+                    },
+                    ctx.benutzer.id,
+                )
+                .await?;
+                disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, id).await?;
+                disposition_repo::Disponiert {
+                    id,
+                    reaktiviert: false,
+                }
+            }
         };
-        disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, disponiert.id)
-            .await?;
         Ok(disponiert)
     })?;
     let ep_id = disponiert.id;
@@ -176,6 +194,93 @@ pub async fn disponieren(
     super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &text).await;
     sse_personal(&state, einsatz_id, ep_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+#[derive(Debug, Deserialize)]
+/// Body der Personal-Sammelroute. Achtung, zwei ID-Räume: `personal_ids` sind Stamm-IDs
+/// (`personal.id`), `fahrzeug_id` dagegen ist die Einsatzzeile (`einsatz_fahrzeug.id`), anders
+/// als `fahrzeug_ids` im Fahrzeug-Body (`routes::einsatz_fahrzeug::SammelBody`).
+pub struct SammelBody {
+    /// Stamm-IDs (`personal.id`), höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
+    pub personal_ids: Vec<i64>,
+    /// Ziel-Einheit (`einsatz_einheit.id`).
+    pub einheit_id: Option<i64>,
+    /// Ziel-Fahrzeug als Einsatzzeile (`einsatz_fahrzeug.id`), keine Stamm-ID.
+    pub fahrzeug_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/personal/sammel — mehrere Stamm-Personen in einem Schritt
+/// disponieren und optional Einheit und Fahrzeug zuordnen (LLH-1100, Spec
+/// `kraefte-disposition`). Alles oder nichts: eine nicht disponierbare Person → 422 mit Gründen
+/// je Zeile. Mit Einheit gilt auch das Recht am Modul Einheiten, mit Fahrzeug das am Modul
+/// Fahrzeuge (403 vor jedem Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion,
+/// Ereignisse nach dem Commit. Liefert die disponierten Kräfte.
+pub async fn sammel_disponieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    JsonBody(body): JsonBody<SammelBody>,
+) -> Result<(StatusCode, Json<Vec<EinsatzPersonalAnzeige>>), AppError> {
+    if body.einheit_id.is_some() {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    if body.fahrzeug_id.is_some() {
+        ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
+    }
+    let wahl: Vec<kraefte_disposition::PersonalWahl> =
+        kraefte_disposition::check_ids(&body.personal_ids)?
+            .into_iter()
+            .map(|personal_id| kraefte_disposition::PersonalWahl {
+                personal_id,
+                staerke_position: None,
+            })
+            .collect();
+    let einsatz_id = ctx.einsatz.id;
+    let kontext = kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
+    let ziel = kraefte_disposition::Ziel {
+        einheit_id: body.einheit_id,
+        fahrzeug_id: body.fahrzeug_id,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (ergebnis, etb_id, anzeigen) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = kraefte_disposition::disponiere_personal_tx(
+            conn,
+            kontext,
+            &wahl,
+            ziel,
+            kraefte_disposition::Regeln::SAMMEL,
+        )
+        .await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &kraefte_disposition::etb_text_personal(&ergebnis),
+        )
+        .await?;
+        let mut anzeigen = Vec::with_capacity(ergebnis.kraefte.len());
+        for k in &ergebnis.kraefte {
+            anzeigen
+                .push(disposition_repo::load_anzeige_tx(conn, einsatz_id, k.ep_id, true).await?);
+        }
+        Ok((ergebnis, etb_id, anzeigen))
+    })?;
+    // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
+    state.live.publiziere(einsatz_id, etb_id);
+    for k in &ergebnis.kraefte {
+        sse_personal(&state, einsatz_id, k.ep_id);
+    }
+    if let Some(e) = &ergebnis.einheit {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, e.id);
+    }
+    if let Some(f) = &ergebnis.fahrzeug {
+        super::einsatz_fahrzeug::sse_fahrzeug(&state, einsatz_id, f.id);
+    }
+    Ok((StatusCode::CREATED, Json(anzeigen)))
 }
 
 #[derive(Debug, Deserialize)]

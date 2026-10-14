@@ -1,5 +1,6 @@
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import { merkeServerzeit } from '../offline/serveruhr';
+import type { ZeilenArt, ZeilenGrund } from './types';
 
 export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -54,12 +55,40 @@ export class ApiError extends Error {
    * geantwortet (Lastabwurf, ausgefallener Upstream wie die Pegel-Vorhersage) — er ist also da.
    */
   vomAnwendungsserver: boolean;
-  constructor(status: number, message: string, { vomAnwendungsserver = false } = {}) {
+  /**
+   * Gründe je abgelehnter Zeile einer Mengen-Anfrage (LLH-1100, Sammel-Disposition: 422 mit
+   * `zeilen`). Leer, wenn die Antwort keine trägt. Der Dialog zeigt sie an der jeweiligen Kraft.
+   */
+  zeilen: ZeilenGrund[];
+  constructor(
+    status: number,
+    message: string,
+    {
+      vomAnwendungsserver = false,
+      zeilen = [] as ZeilenGrund[],
+    }: { vomAnwendungsserver?: boolean; zeilen?: ZeilenGrund[] } = {},
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.vomAnwendungsserver = vomAnwendungsserver;
+    this.zeilen = zeilen;
   }
+}
+
+const ZEILEN_ARTEN: readonly ZeilenArt[] = ['personal', 'fahrzeug'];
+
+/** Nur wohlgeformte Zeilen; ein schiefer Eintrag fällt weg, statt einen falschen Grund zu zeigen. */
+function leseZeilen(roh: unknown): ZeilenGrund[] {
+  if (!Array.isArray(roh)) return [];
+  return roh.filter(
+    (z): z is ZeilenGrund =>
+      typeof z === 'object' &&
+      z !== null &&
+      ZEILEN_ARTEN.includes((z as ZeilenGrund).art) &&
+      typeof (z as ZeilenGrund).id === 'number' &&
+      typeof (z as ZeilenGrund).grund === 'string',
+  );
 }
 
 /** Einheitlicher Fehler für nicht erreichbare bzw. abgebrochene HTTP-Verbindungen.
@@ -128,16 +157,18 @@ async function fehlerWerfen(res: Response): Promise<never> {
   if (res.status === 412) window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
   let message = `Serverfehler (${res.status})`;
   let vomAnwendungsserver = false;
+  let zeilen: ZeilenGrund[] = [];
   try {
-    const body = (await res.json()) as { error?: unknown };
+    const body = (await res.json()) as { error?: unknown; zeilen?: unknown };
     if (typeof body.error === 'string') {
       message = body.error;
       vomAnwendungsserver = true;
+      zeilen = leseZeilen(body.zeilen);
     }
   } catch {
     // keine JSON-Antwort — generische Meldung beibehalten
   }
-  throw new ApiError(res.status, message, { vomAnwendungsserver });
+  throw new ApiError(res.status, message, { vomAnwendungsserver, zeilen });
 }
 
 /** Fetch wirft bei einem Leitungsfehler `TypeError`, bei Abbruch je nach Browser

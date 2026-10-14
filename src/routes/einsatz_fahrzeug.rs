@@ -2,7 +2,7 @@ use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Fahrzeuge;
+use crate::einsatz::modul::{Einheiten, Fahrzeuge};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -10,6 +10,7 @@ use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
+use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, pflicht, pruefe_koordinate, trimme, trimme_tri,
@@ -147,6 +148,68 @@ pub async fn disponieren(
     })?;
     sse_fahrzeug(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+#[derive(Debug, Deserialize)]
+/// Body der Fahrzeug-Sammelroute. `fahrzeug_ids` sind Stamm-IDs (`fahrzeug.id`), anders als
+/// `fahrzeug_id` im Personal-Body (`routes::einsatz_personal::SammelBody`), der die
+/// Einsatzzeile meint.
+pub struct SammelBody {
+    /// Stamm-IDs (`fahrzeug.id`), höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
+    pub fahrzeug_ids: Vec<i64>,
+    /// Ziel-Einheit (`einsatz_einheit.id`).
+    pub einheit_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/sammel — mehrere Stamm-Fahrzeuge in einem Schritt
+/// disponieren und optional einer Einheit zuordnen (LLH-1100, Spec `kraefte-disposition`). Alles
+/// oder nichts wie beim Personal (422 mit Gründen je Zeile); mit Einheit gilt auch das Recht am
+/// Modul Einheiten. Keine Zeitachse (D6). Ein ETB-Sammeleintrag in der Transaktion, Ereignisse
+/// nach dem Commit. Liefert die disponierten Fahrzeuge.
+pub async fn sammel_disponieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    JsonBody(body): JsonBody<SammelBody>,
+) -> Result<(StatusCode, Json<Vec<EinsatzFahrzeugAnzeige>>), AppError> {
+    if body.einheit_id.is_some() {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    let ids = kraefte_disposition::check_ids(&body.fahrzeug_ids)?;
+    let einsatz_id = ctx.einsatz.id;
+    let kontext = kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (ergebnis, etb_id, anzeigen) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis =
+            kraefte_disposition::disponiere_fahrzeuge_tx(conn, kontext, &ids, body.einheit_id)
+                .await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &kraefte_disposition::etb_text_fahrzeuge(&ergebnis),
+        )
+        .await?;
+        let mut anzeigen = Vec::with_capacity(ergebnis.fahrzeuge.len());
+        for f in &ergebnis.fahrzeuge {
+            anzeigen
+                .push(disposition_repo::laden_anzeige_tx(conn, einsatz_id, f.ef_id, true).await?);
+        }
+        Ok((ergebnis, etb_id, anzeigen))
+    })?;
+    // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
+    state.live.publiziere(einsatz_id, etb_id);
+    for f in &ergebnis.fahrzeuge {
+        sse_fahrzeug(&state, einsatz_id, f.ef_id);
+    }
+    if let Some(e) = &ergebnis.einheit {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, e.id);
+    }
+    Ok((StatusCode::CREATED, Json(anzeigen)))
 }
 
 #[derive(Debug, Deserialize)]

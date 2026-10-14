@@ -46,6 +46,44 @@ pub enum AppError {
     /// Body über dem Limit der Route (413, LFH-1074): abgewiesen beim Lesen, vor dem Handler
     /// (`crate::extract::JsonBody`).
     PayloadTooLarge(String),
+    /// Eine Mengen-Anfrage scheitert an einzelnen Zeilen (422, LLH-1100, Change
+    /// `iw7x9980-sammel-disposition` D2): `{error, zeilen: [{art, id, grund}]}`. Additiv zum
+    /// Umschlag, damit der Client je Zeile markieren kann; nichts ist geschrieben.
+    Zeilen {
+        meldung: String,
+        zeilen: Vec<ZeilenGrund>,
+    },
+}
+
+crate::wire_enum::wire_enum! {
+    /// Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen
+    /// können kollidieren (LLH-1100, D2). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+    pub enum ZeilenArt {
+        /// Stamm-Person (`personal.id`).
+        Personal => "personal",
+        /// Stamm-Fahrzeug (`fahrzeug.id`).
+        Fahrzeug => "fahrzeug",
+    }
+    try_from = |s| format!("Ungültige Zeilenart: {s}");
+}
+
+/// Grund, warum eine Zeile einer Mengen-Anfrage abgelehnt ist (LLH-1100, D2).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct ZeilenGrund {
+    pub art: ZeilenArt,
+    /// Die ID, wie die Anfrage sie nannte (Stamm-ID).
+    pub id: i64,
+    /// Kurzgrund zum Anzeigen an der Zeile, etwa „außer Dienst“.
+    pub grund: String,
+}
+
+/// Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
+/// `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+pub struct ZeilenFehler {
+    pub error: String,
+    pub zeilen: Vec<ZeilenGrund>,
 }
 
 impl std::fmt::Display for AppError {
@@ -70,6 +108,7 @@ impl std::fmt::Display for AppError {
             AppError::ServiceUnavailable(m) => write!(f, "{m}"),
             AppError::TooManyRequests(m) => write!(f, "{m}"),
             AppError::PayloadTooLarge(m) => write!(f, "{m}"),
+            AppError::Zeilen { meldung, .. } => write!(f, "{meldung}"),
         }
     }
 }
@@ -114,6 +153,7 @@ impl AppError {
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            AppError::Zeilen { .. } => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 
@@ -160,6 +200,16 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status();
+        if let AppError::Zeilen { meldung, zeilen } = self {
+            return (
+                status,
+                Json(ZeilenFehler {
+                    error: meldung,
+                    zeilen,
+                }),
+            )
+                .into_response();
+        }
         // Server-Fehler werden geloggt, dem Client aber generisch beantwortet,
         // damit keine internen Details (SQL, Pfade) nach außen gelangen.
         let message = match &self {
@@ -420,6 +470,28 @@ mod tests {
         assert_eq!(
             AppError::UnprocessableEntity("Übergang nicht erlaubt".into()).status(),
             StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+
+    /// LLH-1100 D2: Ablehnung je Zeile ist 422 mit `zeilen` neben dem Umschlag `{error}`.
+    #[tokio::test]
+    async fn zeilen_fehler_ist_422_mit_grund_je_zeile() {
+        let resp = AppError::Zeilen {
+            meldung: "Nicht alle Kräfte lassen sich disponieren".into(),
+            zeilen: vec![ZeilenGrund {
+                art: ZeilenArt::Personal,
+                id: 7,
+                grund: "außer Dienst".into(),
+            }],
+        }
+        .into_response();
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Nicht alle Kräfte lassen sich disponieren");
+        assert_eq!(
+            json["zeilen"],
+            serde_json::json!([{"art": "personal", "id": 7, "grund": "außer Dienst"}])
         );
     }
 

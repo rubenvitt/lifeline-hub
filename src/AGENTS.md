@@ -50,7 +50,11 @@ Spec `eingabegrenzen`, Herleitung
   Abfrage läuft. **ID-Listen** brauchen zum Prüfen und Schreiben eine von N unabhängige Zahl
   von Anweisungen (`json_each(?)`, Muster `sprechgruppe::repo::ersetzen_tx`); die
   **Auftragsempfänger** bleiben je Zeile geprüft und geschrieben, gedeckelt durch
-  `auftrag::EMPFAENGER_MAX` (gezählt vor dem Entdoppeln).
+  `auftrag::EMPFAENGER_MAX` (gezählt vor dem Entdoppeln). Die **Sammel-Disposition**
+  (`kraefte_disposition`, LLH-1100) prüft ihre Menge in einer `json_each`-Abfrage je Art, schreibt
+  aber je Kraft (Disposition, Zeitachse, Einheit, Besatzung), gedeckelt durch
+  `kraefte_disposition::SAMMEL_MAX` (gezählt vor dem Entdoppeln); eine Ablehnung nennt den Grund
+  je Zeile (`AppError::Zeilen`, 422 `{error, zeilen}`) und schreibt nichts.
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,

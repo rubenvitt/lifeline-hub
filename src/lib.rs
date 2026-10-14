@@ -43,6 +43,7 @@ pub mod karte_hintergrundbild;
 pub mod karten_ansicht;
 pub mod katalog;
 pub mod kommunikation;
+pub mod kraefte_disposition;
 pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;

@@ -86,6 +86,11 @@ mod tests {
             "Spurprüfung vor dem echten Löschen zählt jede Personalzeile der Einheit",
         ),
         (
+            "src/kraefte_disposition.rs",
+            1,
+            "Vorprüfung der Sammel-Disposition liest auch beendete Zeilen, um „schon disponiert“ von „entlassen“ zu unterscheiden",
+        ),
+        (
             "src/personal/disposition_repo.rs",
             1,
             "Disponieren einer Stamm-Person sucht ihre Zeile auch beendet, um sie wieder aufzunehmen",

@@ -284,3 +284,26 @@ async fn passkey_abschluss_nimmt_mehr_als_4_kib_an() {
         );
     }
 }
+
+/// Die Ablehnung je Zeile (LLH-1100, `AppError::Zeilen`) bleibt im `{error}`-Umschlag und trägt
+/// `zeilen` zusätzlich, damit der Client die Gründe an die Zeilen schreiben kann.
+#[tokio::test]
+async fn ablehnung_je_zeile_liefert_422_im_fehler_envelope_mit_zeilen() {
+    let app = common::setup().await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = common::einsatz_anlegen(&app, &admin).await;
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/einsaetze/{einsatz}/personal/sammel"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, &admin)
+        .body(Body::from(r#"{"personal_ids":[424242]}"#))
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let json = assert_fehler_envelope(resp, "Sammel-Disposition").await;
+    assert_eq!(
+        json["zeilen"],
+        serde_json::json!([{"art": "personal", "id": 424242, "grund": "unbekannt"}])
+    );
+}

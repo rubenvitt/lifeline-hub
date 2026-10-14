@@ -13,14 +13,26 @@ export function listeEinsatzPersonal(einsatzId: number): Promise<EinsatzPersonal
   return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal`);
 }
 
-export function disponierePerson(
+/** Ziele und Auswahl einer Sammel-Disposition (LLH-1100). */
+export interface SammelPersonalEingabe {
+  personal_ids: number[];
+  einheit_id?: number | null;
+  /** `einsatz_fahrzeug.id`; mit Einheit muss es zu ihr gehören. */
+  fahrzeug_id?: number | null;
+}
+
+/**
+ * Mehrere Stamm-Personen in einem Schritt disponieren, optional in Einheit und auf Fahrzeug
+ * (LLH-1100): alles oder nichts. Eine Ablehnung trägt die Gründe je Person in `ApiError.zeilen`.
+ */
+export function disponierePersonalSammel(
   einsatzId: number,
-  personalId: number,
-  staerkePosition?: StaerkePosition | null,
-): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal`, 'POST', {
-    personal_id: personalId,
-    staerke_position: staerkePosition ?? null,
+  eingabe: SammelPersonalEingabe,
+): Promise<EinsatzPersonal[]> {
+  return apiSend<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal/sammel`, 'POST', {
+    personal_ids: eingabe.personal_ids,
+    einheit_id: eingabe.einheit_id ?? null,
+    fahrzeug_id: eingabe.fahrzeug_id ?? null,
   });
 }
 

@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { offeneAuswahl, stehendeAuswahl, waehleStehend } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -16,6 +17,8 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep personal`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   personal.png         frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx
+ *   personal-disponieren.png frontend/src/kraefte/PersonalDisponierenModal.tsx,
+ *                        frontend/src/kraefte/SammelGruende.tsx
  *   adhoc-person.png     frontend/src/kraefte/AdhocPersonModal.tsx
  *   zeitachse-person.png frontend/src/pages/PersonalPage.tsx (aufgeklappte Zeile),
  *                        frontend/src/kraefte/KraftZeitachse.tsx
@@ -24,10 +27,19 @@ import {
  * Demo-Lücke (D3): die Demo-Daten tragen keine Ereignisse der Kräfte-Zeitachse. Die Spec trägt
  * Alarmierung und Eintreffen der Rettungsstaffel nach (gilt für ihre vier Personen) und für
  * Lena Beispiel Eintreffen und Entlassung, damit „Einsatzdauer“ und „Ruhe“ etwas zeigen. Für
- * den Block „Entlassen“ disponiert sie eine Ad-hoc-Kraft und entlässt sie (LLH-1079).
+ * den Block „Entlassen“ disponiert sie eine Ad-hoc-Kraft und entlässt sie (LLH-1079). Für den
+ * Dialog „Personal disponieren“ legt sie drei Stamm-Personen an, die noch nicht im Einsatz sind
+ * (LLH-1100): die Demo-Personen sind alle disponiert.
  */
 
 const KAPITEL = 'personal';
+
+/** Stamm-Personen für den Dialog „Personal disponieren“, nicht im Demo-Einsatz. */
+const NEUE_STAMMKRAEFTE = [
+  { name: 'Jana Neumann', personalnummer: '2041', traegerorganisation: 'DRK Musterstadt' },
+  { name: 'Ole Hansen', personalnummer: '2042', traegerorganisation: 'DRK Musterstadt' },
+  { name: 'Mira Kraus', personalnummer: '2043', traegerorganisation: 'DRK Musterstadt' },
+];
 
 interface Einheit {
   id: number;
@@ -93,6 +105,8 @@ test.describe(KAPITEL, () => {
         adhoc: { name: 'Paul Muster', funktion: 'Sanitäter' },
       });
       await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personal/${weg.id}/entlassen`);
+
+      for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personal', kraft);
     } finally {
       await api.dispose();
     }
@@ -106,6 +120,34 @@ test.describe(KAPITEL, () => {
     await expect(page.getByRole('cell', { name: 'Anna Probe' }).first()).toBeVisible();
     await expect(page.getByText('4 h 47').first()).toBeVisible();
     await fotografiere(page, KAPITEL, 'personal');
+  });
+
+  test('Dialog „Personal disponieren“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/personal`);
+    await page.getByRole('button', { name: 'Personal disponieren' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Personal disponieren' });
+    const titel = dialog.locator('.ant-modal-title');
+    const personen = dialog.getByRole('combobox', { name: 'Personen' });
+    for (const kraft of NEUE_STAMMKRAEFTE.slice(0, 2)) {
+      await personen.click();
+      await personen.fill(kraft.name);
+      await waehleStehend(page, `${kraft.name} (${kraft.personalnummer})`);
+    }
+    await titel.click();
+    await expect(offeneAuswahl(page)).toHaveCount(0);
+    await dialog.getByRole('combobox', { name: 'In Einheit' }).click();
+    await waehleStehend(page, 'Rettungsstaffel');
+    // Das erste Fahrzeug der Rettungsstaffel, wie es die Demo-Daten führen.
+    await dialog.getByRole('combobox', { name: 'Auf Fahrzeug' }).click();
+    await (await stehendeAuswahl(page)).locator('.ant-select-item-option').first().click();
+    await titel.click();
+    await expect(offeneAuswahl(page)).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'personal-disponieren');
   });
 
   test('Dialog „Ad-hoc-Person disponieren“', async ({ page }) => {
