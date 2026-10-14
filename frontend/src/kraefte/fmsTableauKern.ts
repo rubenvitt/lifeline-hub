@@ -117,6 +117,24 @@ export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOpt
   }));
 }
 
+/**
+ * Der FMS-Katalog als Menüwerte für den Handstatus einer Einheit ohne Fahrzeug. Beschriftung wie
+ * am Chip („S2 · Frei auf Wache"), Ton aus der Kategorie, Mandantenfarbe als Punkt. Meldebild und
+ * Einheit-Ansicht (LLH-1036) setzen ihn über dieses eine Menü.
+ */
+export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
+  return [
+    // Dieselbe Beschriftung wie im FMS-Tableau — eine Quelle für beide Menüs.
+    ...fmsStatusOptionen(katalog),
+    // Der Handstatus muss sich auch entfernen lassen — sonst bliebe ein einmal gesetzter Wert
+    // stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
+    { wert: KEIN_HANDSTATUS, label: 'kein Status' },
+  ];
+}
+
+/** Menüwert für „Handstatus löschen" — eine Katalog-ID ist nie negativ. */
+export const KEIN_HANDSTATUS = -1;
+
 /** Was eine Ziffer auslöst. Eine Ziffer ohne Eintrag ist keinem Status zugeordnet. */
 type ZifferZiel =
   { art: 'eindeutig'; status: FahrzeugStatus } | { art: 'mehrdeutig'; anzahl: number };
