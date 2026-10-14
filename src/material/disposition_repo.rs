@@ -588,28 +588,6 @@ pub fn beendet_conflict(beendet_als: &str) -> AppError {
     })
 }
 
-/// Wie [`require_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
-/// selbst prüfen: unbekanntes Material ist hier kein Fehler, beendetes der 409 aus
-/// [`beendet_conflict`] (design.md D6).
-pub async fn require_nicht_beendet(
-    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
-    einsatz_id: i64,
-    em_id: i64,
-) -> Result<(), AppError> {
-    let ende: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT beendet_als FROM einsatz_material \
-         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NOT NULL",
-    )
-    .bind(em_id)
-    .bind(einsatz_id)
-    .fetch_optional(executor)
-    .await?;
-    match ende.flatten() {
-        None => Ok(()),
-        Some(als) => Err(beendet_conflict(&als)),
-    }
-}
-
 /// Was das Herausnehmen über die Zeile hinaus berührt hat; der Aufrufer meldet es nach dem
 /// Commit und nennt die Einheit im ETB-Text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
