@@ -11,7 +11,7 @@ import { staerkeText } from '../anzeige/staerke';
 import { type BesatzungsUrteil, type EinheitStaerkeUrteil } from '../theme/statusFarben';
 import type { StaerkeSumme } from './kraeftebild';
 // Ausfall zählt die eine Material-Zählung (LLH-1093, design.md D10), nicht der Kern.
-import { materialAusfall } from './materialVerdichtung';
+import { materialAusfall } from './materialVerdichtungKern';
 
 /**
  * Der Kräftebaum — EINE Baumlogik der Kräfte (LLH-1025, Spec `kraeftebaum`), rein.

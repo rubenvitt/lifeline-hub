@@ -7,8 +7,8 @@ import { materialStatus, type Statusrolle } from '../theme/statusFarben';
  * Gezählt werden POSTEN, nicht Mengen, in drei Töpfe nach der ROLLE des Status im Vertrag
  * `materialStatus` (`theme/statusFarben.ts`), nie nach dem Statuswert: `normal` → einsatzbereit,
  * `bedien` → im Einsatz, `alarm` oder `achtung` → Ausfall (defekt, verbraucht, Desinfektion
- * nötig). Bekommt ein Status eine andere Rolle, scheitert `materialVerdichtung.test.ts`: dann ist
- * die Regel neu zu entscheiden, nicht still zu erweitern.
+ * nötig). Bekommt ein Status eine andere Rolle, scheitert `materialVerdichtungKern.test.ts`:
+ * dann ist die Regel neu zu entscheiden, nicht still zu erweitern.
  *
  * Abnehmer: die Materialseite (`MaterialVerdichtung.tsx`) und die Material-Gruppenzeile des
  * Meldebilds über `kraeftebaumKern.ts` (LLH-1025); keiner zählt Material selbst.

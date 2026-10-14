@@ -16,7 +16,7 @@ import {
   type StufenZeile,
 } from './kraeftebaumKern';
 import { verdichte, type StaerkeSumme } from './kraeftebild';
-import { isMaterialAusfall, materialAusfall } from './materialVerdichtung';
+import { isMaterialAusfall, materialAusfall } from './materialVerdichtungKern';
 import { staerkeText } from '../anzeige/staerke';
 import type {
   Einheit,

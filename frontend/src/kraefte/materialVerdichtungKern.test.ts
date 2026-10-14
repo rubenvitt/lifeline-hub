@@ -7,7 +7,7 @@ import {
   materialTopf,
   verdichteMaterial,
   type MaterialTopf,
-} from './materialVerdichtung';
+} from './materialVerdichtungKern';
 
 const STATUS = Object.keys(materialStatus) as MaterialStatus[];
 const posten = (status: MaterialStatus, menge = 1) => ({ status, menge });
@@ -58,9 +58,9 @@ describe('materialVerdichtung (LLH-1093, design.md D10)', () => {
 
   it('nennt die Rolle des schwersten Ausfalls, ohne Ausfall keine', () => {
     expect(verdichteMaterial([posten('desinfektion_noetig')]).ausfallRolle).toBe('achtung');
-    expect(
-      verdichteMaterial([posten('desinfektion_noetig'), posten('defekt')]).ausfallRolle,
-    ).toBe('alarm');
+    expect(verdichteMaterial([posten('desinfektion_noetig'), posten('defekt')]).ausfallRolle).toBe(
+      'alarm',
+    );
     expect(verdichteMaterial([posten('einsatzbereit')]).ausfallRolle).toBeNull();
     expect(verdichteMaterial([])).toEqual({
       gesamt: 0,
