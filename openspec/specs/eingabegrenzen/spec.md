@@ -198,3 +198,17 @@ Grenze einhalten.
 #### Scenario: Andere Angabe eines Einsatzes mit Altwert
 - **WHEN** ein Einsatz eine gespeicherte meldende Stelle von 300 Zeichen hat und nur die Leitstellen-Nr. geändert wird
 - **THEN** speichert der Server die Leitstellen-Nr., und die meldende Stelle bleibt unverändert
+
+### Requirement: Sammel-Disposition ist gedeckelt
+Eine Sammel-Disposition MUST höchstens 50 Kräfte je Anfrage annehmen, gezählt vor dem
+Entdoppeln, und eine längere Liste mit 400 ablehnen, bevor etwas geschrieben wird. Die Prüfung
+der Menge MUST eine von der Listenlänge unabhängige Zahl von Anweisungen brauchen; geschrieben
+MAY je Kraft werden.
+
+#### Scenario: 51 Kräfte
+- **WHEN** eine Sammel-Disposition 51 Personen schickt
+- **THEN** antwortet der Server mit 400, und nichts ist angelegt
+
+#### Scenario: Dubletten
+- **WHEN** eine Sammel-Disposition dieselbe Person zweimal nennt
+- **THEN** ist die Person genau einmal disponiert
