@@ -850,6 +850,28 @@ mod tests {
             "Florian 1"
         );
         assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
+        // Eine aufgelöste Zieleinheit ist 409, in der Transaktion geprüft (nicht nur „gehört zum
+        // Einsatz“ wie `pruefe_einheit_tx`); das Fahrzeug bleibt ohne Einheit.
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-14 10:00:00' WHERE id = ?",
+        )
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(matches!(
+            zuordnen_fahrzeug_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ef)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        let einheit: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(einheit, None);
     }
 
     /// LFH-225/F23: Die Sammelabfragen müssen je Einheit exakt das liefern, was die
