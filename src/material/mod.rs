@@ -199,6 +199,15 @@ pub fn etb_text_erneut_disponiert(bezeichnung: &str, menge: i64) -> String {
     format!("Material «{bezeichnung}» (×{menge}) erneut disponiert")
 }
 
+/// System-ETB beim Aufteilen eines Postens (LLH-1093, design.md D8): „aufgeteilt: 50 → 30 + 20“
+/// mit Ausgangsmenge, verbleibender und abgeteilter Menge.
+pub fn etb_text_aufgeteilt(bezeichnung: &str, ausgang: i64, abgeteilt: i64) -> String {
+    format!(
+        "Material «{bezeichnung}» aufgeteilt: {ausgang} → {} + {abgeteilt}",
+        ausgang - abgeteilt
+    )
+}
+
 /// System-ETB beim Korrigieren der Angaben eines Ad-hoc-Postens (LLH-1093, design.md D6): EIN
 /// Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt (`(Angabe, alt, neu)`, leer
 /// als „—“), benannt nach der neuen Bezeichnung. Ändert sich nichts, gibt es keinen Text.
@@ -299,6 +308,14 @@ mod etb_text_tests {
             etb_text_angaben_geaendert("Decke", &[("Kategorie", Some("A"), Some("A"))]),
             None,
             "unverändert: kein Text"
+        );
+    }
+
+    #[test]
+    fn aufgeteilt_nennt_ausgang_rest_und_teil() {
+        assert_eq!(
+            etb_text_aufgeteilt("Wolldecke", 50, 20),
+            "Material «Wolldecke» aufgeteilt: 50 → 30 + 20"
         );
     }
 

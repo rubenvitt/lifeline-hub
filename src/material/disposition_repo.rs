@@ -425,6 +425,57 @@ pub async fn update(
     update_tx(&mut conn, einsatz_id, em_id, patch).await
 }
 
+/// Teilt `menge` von einem Posten ab (LLH-1093, design.md D8): die Ausgangszeile wird um `menge`
+/// gemindert, und in derselben Transaktion entsteht eine neue Zeile mit `menge`, die Stammbezug,
+/// alle `snap_*`, Status, Bemerkung, Einheit, UHS und den Dispositionszeitpunkt samt
+/// Dispositionsperson übernimmt; so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
+/// und auch eine frühere Herausnahme (`zuletzt_entlassen_at`, Migration 0195) sperrt den Storno
+/// der Teilzeile wie den der Ausgangszeile. Die neue Zeile ist aktiv. `NotFound`/`Conflict` wie
+/// [`require_aktiv_tx`], `UnprocessableEntity`, wenn `menge` nicht kleiner als die Menge ist.
+/// `menge` ≥ 1 prüft die Route (400). Liefert die ID der neuen Zeile.
+pub async fn teile_auf_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    menge: i64,
+) -> Result<i64, AppError> {
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    let ausgang: i64 =
+        sqlx::query_scalar("SELECT menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
+            .bind(em_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if menge >= ausgang {
+        return Err(AppError::UnprocessableEntity(
+            "Abzuteilende Menge muss kleiner als die Menge sein".into(),
+        ));
+    }
+    let neu: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_material \
+            (einsatz_id, material_id, einheit_id, uhs_id, menge, status, snap_bezeichnung, \
+             snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
+             disponiert_at, disponiert_von, zuletzt_entlassen_at) \
+         SELECT einsatz_id, material_id, einheit_id, uhs_id, ?, status, snap_bezeichnung, \
+                snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
+                disponiert_at, disponiert_von, zuletzt_entlassen_at \
+         FROM einsatz_material WHERE id = ? AND einsatz_id = ? \
+         RETURNING id",
+    )
+    .bind(menge)
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    sqlx::query("UPDATE einsatz_material SET menge = menge - ? WHERE id = ? AND einsatz_id = ?")
+        .bind(menge)
+        .bind(em_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(neu)
+}
+
 /// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
 /// UND `uhs_id`.
 pub async fn liste_je_uhs(
@@ -1259,6 +1310,181 @@ mod tests {
     }
 
     // ── Lebenszustand (LLH-1079 Teil II) ──────────────────────────────────────────────
+
+    async fn teile(pool: &SqlitePool, einsatz: i64, em: i64, menge: i64) -> Result<i64, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let neu = teile_auf_tx(&mut tx, einsatz, em, menge).await?;
+        tx.commit().await.unwrap();
+        Ok(neu)
+    }
+
+    /// LLH-1093, design.md D8: Summe gleich, alle Angaben, Ort und Dispositionszeitpunkt
+    /// übernommen, die Teilzeile aktiv.
+    #[tokio::test]
+    async fn aufteilen_haelt_die_summe_und_uebernimmt_alles() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let u: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_material SET einheit_id = ?, uhs_id = ?, status = 'im_einsatz', \
+             bemerkung = 'Regal 2', disponiert_at = '2026-10-14 08:00:00' WHERE id = ?",
+        )
+        .bind(einheit)
+        .bind(u)
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let neu = teile(&pool, einsatz, em, 20).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, neu, true).await.unwrap();
+        assert_ne!(neu, em);
+        assert_eq!((a.menge, b.menge), (30, 20), "Summe gleich");
+        assert_eq!(b.material_id, Some(m.id));
+        assert_eq!(
+            (b.einheit_id, b.uhs_id, b.status, b.bemerkung.as_deref()),
+            (
+                Some(einheit),
+                Some(u),
+                MaterialStatus::ImEinsatz,
+                Some("Regal 2")
+            )
+        );
+        assert_eq!(
+            (b.bezeichnung.as_str(), b.kategorie.as_deref()),
+            ("Wolldecke", Some("Betreuung"))
+        );
+        assert_eq!(
+            b.disponiert_at, "2026-10-14 08:00:00",
+            "Dispositionszeitpunkt übernommen"
+        );
+        assert_eq!(b.disponiert_von, Some(benutzer));
+        assert_eq!(b.beendet_at, None, "die Teilzeile ist aktiv");
+        let snap: (String, Option<String>) = sqlx::query_as(
+            "SELECT snap_bezeichnung, snap_kategorie FROM einsatz_material WHERE id = ?",
+        )
+        .bind(neu)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(snap, ("Wolldecke".into(), Some("Betreuung".into())));
+        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 2);
+        assert_eq!(
+            liste_je_uhs(&pool, einsatz, u, true).await.unwrap().len(),
+            2
+        );
+    }
+
+    /// LLH-1093, design.md D8: eine Menge ab der Ausgangsmenge ist 422 (deckt Menge 1 ab),
+    /// beendetes Material 409, eine fremde Zeile 404; jeweils ohne zu schreiben.
+    #[tokio::test]
+    async fn aufteilen_grenzen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Trage"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
+            .await
+            .unwrap();
+        for menge in [3, 4] {
+            assert_eq!(
+                grund(teile(&pool, einsatz, em, menge).await.unwrap_err()),
+                "Abzuteilende Menge muss kleiner als die Menge sein"
+            );
+        }
+        let eins = disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+            .await
+            .unwrap();
+        assert!(matches!(
+            teile(&pool, einsatz, eins, 1).await.unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        assert!(matches!(
+            teile(&pool, einsatz + 1, em, 1).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        assert!(matches!(
+            teile(&pool, einsatz, em, 1).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        let gesamt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_material")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(gesamt, 2, "nichts angelegt");
+        assert_eq!(
+            load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
+            3
+        );
+    }
+
+    /// LLH-1093 Aufgabe 4.4 (LLH-1079 D3): die Teilzeile hat die Storno-Frist der Ausgangszeile.
+    /// Frisch disponiert lässt sie sich stornieren; ist die Frist der Ausgangszeile abgelaufen
+    /// oder war sie schon einmal herausgenommen, nicht.
+    #[tokio::test]
+    async fn teilzeile_erbt_die_storno_frist() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Decke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 10, benutzer)
+            .await
+            .unwrap();
+        let frisch = teile(&pool, einsatz, em, 2).await.unwrap();
+        storniere(&pool, einsatz, frisch).await.unwrap();
+
+        sqlx::query(
+            "UPDATE einsatz_material SET disponiert_at = datetime('now', '-20 minutes') WHERE id = ?",
+        )
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let spaet = teile(&pool, einsatz, em, 2).await.unwrap();
+        assert!(grund(storniere(&pool, einsatz, spaet).await.unwrap_err())
+            .contains("nur in den ersten 15 Minuten nach der Disposition"));
+
+        // Herausgenommen und erneut disponiert: die Sperre geht mit (Migration 0195).
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+            .await
+            .unwrap();
+        drop(conn);
+        let nach_herausnahme = teile(&pool, einsatz, em, 1).await.unwrap();
+        assert!(grund(
+            storniere(&pool, einsatz, nach_herausnahme)
+                .await
+                .unwrap_err()
+        )
+        .starts_with("Das Material war schon einmal aus dem Einsatz genommen"));
+    }
 
     async fn nimm_heraus(
         pool: &SqlitePool,

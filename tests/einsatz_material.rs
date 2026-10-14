@@ -1552,3 +1552,131 @@ async fn uhs_verortung_prueft_das_ziel() {
     .await;
     assert_eq!(s, StatusCode::OK, "aktiv: {json}");
 }
+
+async fn aufteilen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    em: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/aufteilen"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+/// Spec `material-liste`, „Posten aufteilen“: 201 mit `[Ausgang, neu]`, beide Zeilen am selben
+/// Ort, Summe gleich, genau ein ETB-Eintrag; Einheit und UHS werden gemeldet.
+#[tokio::test]
+async fn aufteilen_legt_zweite_zeile_an_und_schreibt_einen_etb_eintrag() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 50).await;
+    let einheit = in_einheit(&app, &admin, einsatz, em).await;
+    let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
+    let (s, _) = material_patch(&app, &admin, einsatz, em, &format!(r#"{{"uhs_id":{uhs}}}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    let etb = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":20}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let zeilen = json.as_array().unwrap();
+    assert_eq!(zeilen.len(), 2);
+    assert_eq!(zeilen[0]["id"], em);
+    assert_eq!(
+        (zeilen[0]["menge"].as_i64(), zeilen[1]["menge"].as_i64()),
+        (Some(30), Some(20))
+    );
+    let neu = zeilen[1]["id"].as_i64().unwrap();
+    for z in zeilen {
+        assert_eq!(z["einheit_id"], einheit);
+        assert_eq!(z["uhs_id"], uhs);
+        assert_eq!(z["bezeichnung"], "Wolldecke");
+    }
+    assert_eq!(zeilen[0]["disponiert_at"], zeilen[1]["disponiert_at"]);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb + 1);
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Material «Wolldecke» aufgeteilt: 50 → 30 + 20"));
+    assert_eq!(
+        objekt_ereignisse(
+            &mut rx,
+            &[
+                ("material", "material_id"),
+                ("einheit", "einheit_id"),
+                ("uhs", "uhs_id")
+            ]
+        ),
+        vec![
+            ereignis("material", em),
+            ereignis("material", neu),
+            ereignis("einheit", einheit),
+            ereignis("uhs", uhs)
+        ]
+    );
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, neu).await["menge"],
+        20
+    );
+}
+
+/// Spec `material-liste`, „Grenzen des Aufteilens“: unter 1 400, ab der Menge 422 (auch bei
+/// Menge 1), aus dem Einsatz genommen 409, fremd 404; nie wird etwas geschrieben.
+#[tokio::test]
+async fn aufteilen_grenzen_400_422_409_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Decke", 5).await;
+    let eins = adhoc_disponieren(&app, &admin, einsatz, "Pumpe", 1).await;
+    let etb = system_etb_anzahl(&app, &admin, einsatz).await;
+    for (ziel, body, erwartet) in [
+        (em, r#"{"menge":0}"#, StatusCode::BAD_REQUEST),
+        (em, r#"{"menge":-3}"#, StatusCode::BAD_REQUEST),
+        (em, r#"{}"#, StatusCode::BAD_REQUEST),
+        (em, r#"{"menge":"zwei"}"#, StatusCode::BAD_REQUEST),
+        (em, r#"{"menge":5}"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (em, r#"{"menge":9}"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (eins, r#"{"menge":1}"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (999_999, r#"{"menge":1}"#, StatusCode::NOT_FOUND),
+    ] {
+        let (s, json) = aufteilen(&app, &admin, einsatz, ziel, body).await;
+        assert_eq!(s, erwartet, "{body}: {json}");
+    }
+    let (s, _) = aufteilen(&app, &admin, anderer, em, r#"{"menge":1}"#).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Zeile eines anderen Einsatzes");
+    let (s, _) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":1}"#).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(bezeichnungen(&app, &admin, einsatz, "").await, ["Pumpe"]);
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb + 1,
+        "nur das Herausnehmen schreibt"
+    );
+}
+
+/// Ohne Schreibrecht am Material kein Aufteilen (Modul `material` über `PFAD_KEY`).
+#[tokio::test]
+async fn aufteilen_braucht_schreibrecht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Decke", 5).await;
+    let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (s, _) = aufteilen(&app, &erika, einsatz, em, r#"{"menge":1}"#).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(material_zeile(&app, &admin, einsatz, em).await["menge"], 5);
+}

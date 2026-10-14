@@ -317,6 +317,61 @@ pub async fn update(
     Ok(Json(nachher))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AufteilenBody {
+    /// Die abzuteilende Menge: mindestens 1 (sonst 400) und kleiner als die Menge des Postens
+    /// (sonst 422).
+    pub menge: i64,
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/aufteilen — einen Posten auf zwei Zeilen aufteilen
+/// (LLH-1093, design.md D8): die Ausgangszeile wird um `menge` gemindert, eine neue Zeile mit
+/// `menge` übernimmt Angaben, Status, Bemerkung, Ort und Dispositionszeitpunkt. Ein ETB-Eintrag in
+/// derselben Transaktion. 400 bei `menge` < 1, 404 bei fremder Zeile, 409 bei beendetem Material,
+/// 422 bei `menge` ab der Menge des Postens. Liefert 201 mit `[Ausgang, neu]`.
+pub async fn aufteilen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<AufteilenBody>,
+) -> Result<(StatusCode, Json<Vec<EinsatzMaterialAnzeige>>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    if body.menge < 1 {
+        return Err(AppError::Validation(
+            "Abzuteilende Menge muss mindestens 1 sein".into(),
+        ));
+    }
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    // F06/LFH-244 Tier-A: Mindern, Anlegen und System-ETB atomar in EINER Tx; SSE erst nach dem
+    // Commit.
+    let (ausgang, neu) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let neu_id = disposition_repo::teile_auf_tx(conn, einsatz_id, em_id, body.menge).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_aufgeteilt(&vorher.bezeichnung, vorher.menge, body.menge),
+        )
+        .await?;
+        let ausgang = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let neu = disposition_repo::load_anzeige_tx(conn, einsatz_id, neu_id, true).await?;
+        Ok((ausgang, neu))
+    })?;
+    sse_material(&state, einsatz_id, ausgang.id);
+    sse_material(&state, einsatz_id, neu.id);
+    // Die Einheit zeigt ihr Material als Liste, das UHS-Detail die Zeilen der UHS; beide bekommen
+    // eine Zeile dazu (`material` erreicht ihre Leser ohne Materialrecht nicht, LLH-1182).
+    if let Some(einheit_id) = ausgang.einheit_id {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    if let Some(uhs_id) = ausgang.uhs_id {
+        sse_uhs(&state, einsatz_id, uhs_id);
+    }
+    Ok((StatusCode::CREATED, Json(vec![ausgang, neu])))
+}
+
 /// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
 /// Zeile bleibt, Einheit und UHS gehen. Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
