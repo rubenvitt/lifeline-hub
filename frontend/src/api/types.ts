@@ -228,6 +228,9 @@ export type Qualifikation = S['Qualifikation'];
 export type PersonalStatus = S['PersonalStatus'];
 export type EinheitTyp = S['EinheitTyp'];
 export type EinsatzPersonal = S['EinsatzPersonalAnzeige'];
+/** Grund je abgelehnter Kraft der Sammel-Disposition (LLH-1100, `ApiError.zeilen`). */
+export type ZeilenGrund = S['ZeilenGrund'];
+export type ZeilenArt = S['ZeilenArt'];
 
 // ============================== LLH-1042 Einheiten-Vorlagen ==============================
 export type EinheitVorlage = S['EinheitVorlage'];
