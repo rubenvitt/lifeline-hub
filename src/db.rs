@@ -6311,7 +6311,7 @@ mod tests {
     /// (verbrauchtes Verbrauchsgut ganz ausgegeben, Desinfektion → defekt, Einheit und UHS → UHS mit
     /// Bemerkung).
     #[tokio::test]
-    async fn migration_0196_material_modell_uebernimmt_art_ausgabe_und_einen_ort() {
+    async fn migration_0197_material_modell_uebernimmt_art_ausgabe_und_einen_ort() {
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 195).await;
         let (e, b) = bild_grundlage(&pool).await;
         let einheit: i64 = sqlx::query_scalar(
@@ -6450,7 +6450,7 @@ mod tests {
         .await
         .unwrap();
 
-        migriere_bis(&pool, 196).await;
+        migriere_bis(&pool, 197).await;
 
         let art_stamm = |id: i64| {
             let pool = pool.clone();

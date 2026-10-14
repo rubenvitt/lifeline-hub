@@ -17,7 +17,7 @@ WHERE (bestandsnummer IS NULL OR trim(bestandsnummer) = '')
 --    am Ende `art` (ohne Vorgabe: jeder INSERT nennt sie), `ausgegeben` und die Ort-Spalten
 --    `einsatz_fahrzeug_id` und `br_id`. Alle Orte ohne `ON DELETE` (NO ACTION): das Löschen des
 --    Einsatzes nimmt Material und Orte in einer Anweisung mit. Höchstens EIN Ort je Posten.
---    Abgesichert von db::tests::migration_0196_*.
+--    Abgesichert von db::tests::migration_0197_*.
 ALTER TABLE einsatz_material RENAME TO einsatz_material_alt;
 
 CREATE TABLE einsatz_material (
