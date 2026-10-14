@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -458,6 +458,16 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
 });
 
 describe('EinsatzkraftPage – entlassene Person (3.5)', () => {
+  // Die Uhr steht am Tag der Entlassung: eine Zeit vom selben Tag zeigt die Seite als Uhrzeit, eine
+  // ältere mit Tag (DTG „141400“). Nur `Date` steht still, Zeitgeber laufen weiter.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-14T15:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const entlassen = () =>
     kraft({ beendet_at: '2026-10-14T12:00:00Z', einheit_id: null, fahrzeug_id: null });
 
