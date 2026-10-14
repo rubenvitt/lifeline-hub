@@ -269,6 +269,8 @@ describe('MaterialPage', () => {
     expect(screen.getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Kategorie' })).toBeInTheDocument();
+    // Steht die Spalte, trägt die Bezeichnungszelle die Kategorie nicht ein zweites Mal.
+    expect(screen.getAllByText('Betreuung')).toHaveLength(1);
   });
 
   it('am Fükw weicht die Kategorie, im Zähler und in der Suche (LLH-1093, Prüfliste)', async () => {
@@ -281,6 +283,34 @@ describe('MaterialPage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Kategorie' })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Ort' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Aktionen' })).toBeInTheDocument();
+  });
+
+  it('solange die Kategorie ausgeblendet ist, steht sie als zweite Zeile unter der Bezeichnung', async () => {
+    setzeViewportBreite(1366);
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const bezeichnungsZelle = () =>
+      container.querySelector<HTMLElement>('tr.ant-table-row td.ant-table-cell')!;
+    expect(bezeichnungsZelle()).toHaveTextContent('WolldeckeBetreuung');
+    expect(within(bezeichnungsZelle()).getByText('Betreuung')).toHaveClass(
+      'ant-typography-secondary',
+    );
+
+    // Von Hand zurückgeholt: die Spalte steht, die zweite Zeile weicht.
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Kategorie' }));
+    expect(await screen.findByRole('columnheader', { name: 'Kategorie' })).toBeInTheDocument();
+    expect(bezeichnungsZelle()).not.toHaveTextContent('Betreuung');
+    expect(screen.getAllByText('Betreuung')).toHaveLength(1);
+  });
+
+  it('die Karte unter md trägt die Kategorie nicht im Titel (design.md D13)', async () => {
+    setzeViewportBreite(390);
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    expect(container.querySelector('[data-lfh="datensicht-karte"]')).not.toHaveTextContent(
+      'Betreuung',
+    );
   });
 
   it('unter md steht der Status als BEDIENBARES Etikett, nicht als Sekundärfeld', async () => {
@@ -1069,6 +1099,21 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(eintraege[2]).toHaveClass('ant-dropdown-menu-item-danger');
   });
 
+  it('Zeilenmenü eines zugeordneten Postens: „Stornieren · zugeordnet“ gesperrt, weiter rot', async () => {
+    render(einsatzAktiv, [
+      { ...em, einheit_id: 1 },
+      { ...em, id: 11, bezeichnung: 'Zeltbahn', uhs_id: 7 },
+    ]);
+    await screen.findByText('Wolldecke');
+    for (const name of ['Wolldecke', 'Zeltbahn']) {
+      const menue = await oeffneZeilenmenue(name);
+      const stornieren = within(menue).getByRole('menuitem', { name: 'Stornieren · zugeordnet' });
+      expect(stornieren).toHaveAttribute('aria-disabled', 'true');
+      expect(stornieren).toHaveClass('ant-dropdown-menu-item-danger');
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('Zeilenmenü bei Menge 1: „Aufteilen · Menge 1“ gesperrt', async () => {
     render(einsatzAktiv, [{ ...em, ist_adhoc: true, material_id: null, menge: 1 } as never]);
     await screen.findByText('Wolldecke');
@@ -1123,6 +1168,58 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(within(dialog).getByTestId('aufteilen-danach')).toHaveTextContent('Danach 30 + 20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
     await waitFor(() => expect(gesendet).toEqual([{ menge: 20 }]));
+  });
+
+  /**
+   * Der Dialog hält seinen Posten (`frontend/AGENTS.md`, „Rückwege und Fehler“): nimmt ein anderer
+   * Platz die Zeile live heraus, schließt er nicht, und die Ablehnung des Servers steht an ihm.
+   */
+  it('„Aufteilen“ bleibt offen, wenn die Zeile live entfällt, und trägt die 409', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/material/10/aufteilen', () =>
+        HttpResponse.json({ error: 'Material ist nicht mehr im Einsatz' }, { status: 409 }),
+      ),
+    );
+    const { client } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const menue = await oeffneZeilenmenue('Wolldecke');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen' }));
+    const dialog = await screen.findByRole('dialog');
+    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([])));
+    act(() => {
+      client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), []);
+    });
+    await waitFor(() => expect(document.querySelector('[data-row-key="10"]')).toBeNull());
+    expect(dialog).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    expect(await within(dialog).findByText(/nicht mehr im Einsatz/)).toBeInTheDocument();
+  });
+
+  it('„Angaben ändern“ bleibt offen, wenn die Zeile live entfällt, und trägt die 409', async () => {
+    const adhoc = { ...em, ist_adhoc: true, material_id: null, bezeichnung: 'Feldbeten' };
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', () =>
+        HttpResponse.json({ error: 'Material ist nicht mehr im Einsatz' }, { status: 409 }),
+      ),
+    );
+    const { client } = render(einsatzAktiv, [adhoc as never]);
+    await screen.findByText('Feldbeten');
+    const menue = await oeffneZeilenmenue('Feldbeten');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern' }));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Bezeichnung');
+    await waitFor(() => expect(feld).toHaveValue('Feldbeten'));
+    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([])));
+    act(() => {
+      client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), []);
+    });
+    await waitFor(() => expect(document.querySelector('[data-row-key="10"]')).toBeNull());
+    expect(feld).toHaveValue('Feldbeten');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Feldbetten');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    expect(await within(dialog).findByText(/nicht mehr im Einsatz/)).toBeInTheDocument();
   });
 
   it('die Maske „Ad-hoc-Material“ begrenzt die Angaben aus dem Spiegel', async () => {

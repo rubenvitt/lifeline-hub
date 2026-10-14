@@ -1,10 +1,22 @@
-import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Modal, Space, Tag } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Modal,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, { spaltenFuer, useSpalteAusgeblendet } from '../components/Datensicht';
 import {
   nichtGefundenInhalt,
   SeitenFehler,
@@ -77,6 +89,30 @@ const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((
 function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
   return materialStatus[em.status];
 }
+/**
+ * Bezeichnung mit Marken; unter `xxl` (Spalte „Kategorie“ ausgeblendet, per Breite oder von Hand)
+ * steht die Kategorie gedämpft als zweite Zeile darunter, damit sie auch am Fükw zu lesen ist
+ * (LLH-1093). Im Kartenzweig nicht: dort trägt nur die Suche sie (design.md D13).
+ */
+function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
+  const kategorieAusgeblendet = useSpalteAusgeblendet('kategorie');
+  return (
+    <>
+      {/* `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern. */}
+      <Space wrap>
+        {em.bezeichnung}
+        {em.ist_adhoc && <Tag>ad-hoc</Tag>}
+        {em.ist_demo && <DemoMarke />}
+      </Space>
+      {kategorieAusgeblendet && em.kategorie && (
+        <Typography.Text type="secondary" style={{ display: 'block', overflowWrap: 'anywhere' }}>
+          {em.kategorie}
+        </Typography.Text>
+      )}
+    </>
+  );
+}
+
 /** Filterwerte auf der eigenen Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
 const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
   value: s,
@@ -102,8 +138,11 @@ export default function MaterialPage() {
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
   /** Offene Dialoge „Angaben ändern“ und „Aufteilen“ (LLH-1093), je mit der Disposition. */
-  const [angabenFuer, setAngabenFuer] = useState<number | null>(null);
-  const [aufteilenFuer, setAufteilenFuer] = useState<number | null>(null);
+  // Der Posten beim Öffnen, nicht nur seine ID: entfällt die Zeile live (anderer Platz storniert,
+  // nimmt heraus), bleibt der Dialog offen und die Ablehnung steht an ihm (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“). Solange die Zeile da ist, gilt ihr aktueller Stand.
+  const [angabenFuer, setAngabenFuer] = useState<EinsatzMaterial | null>(null);
+  const [aufteilenFuer, setAufteilenFuer] = useState<EinsatzMaterial | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -326,19 +365,27 @@ export default function MaterialPage() {
     em.menge > 1
       ? { key: 'aufteilen', label: 'Aufteilen' }
       : { key: 'aufteilen', label: 'Aufteilen · Menge 1', gesperrt: true },
-    { key: 'stornieren', label: 'Stornieren', gefahr: true },
+    // Der Server lehnt das Stornieren eines zugeordneten Postens sicher ab (Spec `material-liste`,
+    // „Zeilenaktionen“); Frist und frühere Herausnahme prüft weiter er.
+    em.einheit_id != null || em.uhs_id != null
+      ? { key: 'stornieren', label: 'Stornieren · zugeordnet', gefahr: true, gesperrt: true }
+      : { key: 'stornieren', label: 'Stornieren', gefahr: true },
   ];
   const waehleAktion = (key: string, em: EinsatzMaterial) => {
     if (key === 'angaben') {
       angabenMutation.reset();
-      setAngabenFuer(em.id);
+      setAngabenFuer(em);
     } else if (key === 'aufteilen') {
       aufteilenMutation.reset();
-      setAufteilenFuer(em.id);
+      setAufteilenFuer(em);
     } else if (key === 'stornieren') setStornoFuer({ id: em.id, name: em.bezeichnung });
   };
-  const angabenPosten = ems.find((em) => em.id === angabenFuer) ?? null;
-  const aufteilenPosten = ems.find((em) => em.id === aufteilenFuer) ?? null;
+  const angabenPosten = angabenFuer
+    ? (ems.find((em) => em.id === angabenFuer.id) ?? angabenFuer)
+    : null;
+  const aufteilenPosten = aufteilenFuer
+    ? (ems.find((em) => em.id === aufteilenFuer.id) ?? aufteilenFuer)
+    : null;
 
   /**
    * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig (Herleitung in `FahrzeugePage.tsx`). Ohne
@@ -428,21 +475,15 @@ export default function MaterialPage() {
       width: 170,
       sortWert: (m) => m.bezeichnung,
       suchText: (m) => m.bezeichnung,
-      // `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern.
-      render: (_, em) => (
-        <Space wrap>
-          {em.bezeichnung}
-          {em.ist_adhoc && <Tag>ad-hoc</Tag>}
-          {em.ist_demo && <DemoMarke />}
-        </Space>
-      ),
+      render: (_, em) => <BezeichnungZelle em={em} />,
     },
     {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
       width: 100,
-      // Lesend, darf weichen: unter `xxl` über den Spaltenschalter, im Zähler und in der Suche.
+      // Lesend, darf weichen: unter `xxl` als zweite Zeile der Bezeichnung (`BezeichnungZelle`),
+      // über den Spaltenschalter, im Zähler und in der Suche.
       abBreite: 'xxl',
       filter: kategorieFilter,
       suchText: (m) => m.kategorie,
@@ -748,7 +789,8 @@ export default function MaterialPage() {
       </Modal>
 
       {/* „Angaben ändern“ und „Aufteilen“ (LLH-1093, design.md D12) auf der Erfassungs-Hülle,
-          außerhalb der Zeilen-`map`; sie schließen, wenn die Zeile entfällt. */}
+          außerhalb der Zeilen-`map`; entfällt die Zeile, bleiben sie offen und tragen die
+          Ablehnung. */}
       <MaterialAngabenModal
         posten={angabenPosten}
         laeuft={angabenMutation.isPending}

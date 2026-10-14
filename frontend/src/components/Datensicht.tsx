@@ -812,6 +812,23 @@ interface FensterTraeger {
  */
 const FensterKontext = createContext<FensterTraeger | null>(null);
 
+/**
+ * Die Schlüssel der Spalten, die die Tabelle gerade zeigt; `null` im Kartenzweig. Aus derselben
+ * Sichtbarkeitswahrheit wie Zähler und Häkchen (Breite UND Handwahl, `sichtbareSpalten`).
+ */
+const GezeigteSpaltenKontext = createContext<ReadonlySet<string> | null>(null);
+
+/**
+ * `true`, solange die Tabelle steht und die Spalte `key` darin ausgeblendet ist, per Breite oder
+ * von Hand. Für eine Zelle, die den Wert einer weggefallenen Spalte mitträgt (Materialliste:
+ * Kategorie als zweite Zeile unter der Bezeichnung, LLH-1093). Im Kartenzweig `false`: die Karte
+ * hat ihren eigenen Plan.
+ */
+export function useSpalteAusgeblendet(key: string): boolean {
+  const gezeigt = useContext(GezeigteSpaltenKontext);
+  return gezeigt != null && !gezeigt.has(key);
+}
+
 function Platzhalterzeile(props: {
   hoehe: number;
   spalten: number;
@@ -1054,6 +1071,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const { spalten: gezeigteSpalten } = useMemo(
     () => sichtbareSpalten({ spalten, verborgen, eingeblendet, abBreite }),
     [spalten, verborgen, eingeblendet, abBreite],
+  );
+  const gezeigteSpaltenSchluessel = useMemo(
+    () => new Set(gezeigteSpalten.map((s) => s.key as string)),
+    [gezeigteSpalten],
   );
 
   /**
@@ -1843,72 +1864,74 @@ export default function Datensicht<T extends object, const K extends string>(
     : undefined;
 
   const tabelle = (
-    <FensterKontext.Provider value={fensterTraeger}>
-      <KatalogTabelle<T>
-        columns={gemerkteSpalten}
-        dataSource={tabellenZeilen}
-        components={virtuell ? FENSTER_KOMPONENTEN : undefined}
-        rowKey={(zeile) => schluessel(zeile)}
-        loading={ladend}
-        locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
-        // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
-        // eine Seitenblätterung schnitte die Zeilenschleuse entzwei. Große Listen schneidet der
-        // Ausschnitt oben (LFH-949).
-        pagination={false}
-        rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
-        /**
-         * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
-         * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
-         * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
-         * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
-         * selbst bauen.
-         */
-        onRow={
-          zeilenKlick || zeilenImFenster
-            ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
-            : undefined
-        }
-        /**
-         * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
-         * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
-         * ließe die Tabelle für immer absteigend.
-         */
-        onChange={(_seite, _filter, sorter) => {
-          const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
-          if (einzeln == null) return;
-          const spalte = einzeln.columnKey as K | undefined;
-          if (einzeln.order == null || spalte == null) {
-            setzeSortierung(null);
-            return;
-          }
-          setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
-        }}
-        expandable={
-          baum
-            ? {
-                childrenColumnName: baum.kinder,
-                expandedRowKeys: [...baum.aufgeklappt],
-                // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
-                indentSize: 0,
-                expandIcon: () => null,
-                onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
-                // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
-                // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
-                // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
-                // Anker-Riegel (LFH-548).
-                expandRowByClick: false,
-              }
-            : aufklappen
-              ? {
-                  expandedRowKeys: [...aufgeklappt],
-                  expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
-                  // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
-                  showExpandColumn: false,
-                }
+    <GezeigteSpaltenKontext.Provider value={gezeigteSpaltenSchluessel}>
+      <FensterKontext.Provider value={fensterTraeger}>
+        <KatalogTabelle<T>
+          columns={gemerkteSpalten}
+          dataSource={tabellenZeilen}
+          components={virtuell ? FENSTER_KOMPONENTEN : undefined}
+          rowKey={(zeile) => schluessel(zeile)}
+          loading={ladend}
+          locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
+          // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
+          // eine Seitenblätterung schnitte die Zeilenschleuse entzwei. Große Listen schneidet der
+          // Ausschnitt oben (LFH-949).
+          pagination={false}
+          rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
+          /**
+           * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
+           * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
+           * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
+           * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
+           * selbst bauen.
+           */
+          onRow={
+            zeilenKlick || zeilenImFenster
+              ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
               : undefined
-        }
-      />
-    </FensterKontext.Provider>
+          }
+          /**
+           * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
+           * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
+           * ließe die Tabelle für immer absteigend.
+           */
+          onChange={(_seite, _filter, sorter) => {
+            const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
+            if (einzeln == null) return;
+            const spalte = einzeln.columnKey as K | undefined;
+            if (einzeln.order == null || spalte == null) {
+              setzeSortierung(null);
+              return;
+            }
+            setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
+          }}
+          expandable={
+            baum
+              ? {
+                  childrenColumnName: baum.kinder,
+                  expandedRowKeys: [...baum.aufgeklappt],
+                  // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
+                  indentSize: 0,
+                  expandIcon: () => null,
+                  onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
+                  // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
+                  // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
+                  // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
+                  // Anker-Riegel (LFH-548).
+                  expandRowByClick: false,
+                }
+              : aufklappen
+                ? {
+                    expandedRowKeys: [...aufgeklappt],
+                    expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
+                    // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
+                    showExpandColumn: false,
+                  }
+                : undefined
+          }
+        />
+      </FensterKontext.Provider>
+    </GezeigteSpaltenKontext.Provider>
   );
 
   // ── Kartenzweig ───────────────────────────────────────────────────────────────────
