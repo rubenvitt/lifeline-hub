@@ -5,7 +5,7 @@ import type { EinheitTyp, EinsatzPersonal, Staerke } from '../api/types';
  * und die Besatzung, die in die neue Einheit mitkommt.
  */
 
-const istGleich = (a: Staerke, b: Staerke) =>
+const isGleichesSoll = (a: Staerke, b: Staerke) =>
   a.fuehrer === b.fuehrer && a.unterfuehrer === b.unterfuehrer && a.mannschaft === b.mannschaft;
 
 /**
@@ -14,7 +14,7 @@ const istGleich = (a: Staerke, b: Staerke) =>
  */
 export function typVorgabe(typen: readonly EinheitTyp[], soll: Staerke | null): number | undefined {
   if (soll == null) return undefined;
-  const passend = typen.filter((t) => t.soll != null && istGleich(t.soll, soll));
+  const passend = typen.filter((t) => t.soll != null && isGleichesSoll(t.soll, soll));
   return passend.length === 1 ? passend[0].id : undefined;
 }
 

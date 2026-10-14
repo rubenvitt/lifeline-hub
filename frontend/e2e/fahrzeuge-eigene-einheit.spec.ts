@@ -18,7 +18,7 @@ type Saat = {
   put: (pfad: string) => Promise<void>;
 };
 
-async function seedeEinsatz(page: Page): Promise<Saat> {
+async function seedEinsatz(page: Page): Promise<Saat> {
   const post = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(pfad, { data });
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -42,7 +42,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
   page,
 }) => {
   await anmeldenAlsAdmin(page);
-  const { einsatzId, post, put } = await seedeEinsatz(page);
+  const { einsatzId, post, put } = await seedEinsatz(page);
   const funkrufname = 'Florian Nachbarstadt 44/1';
   const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname } });
   for (const [name, position] of [
@@ -103,7 +103,7 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
   });
   expect(stamm.ok(), `Stamm-Fahrzeug: ${stamm.status()} ${await stamm.text()}`).toBeTruthy();
   const stammId = ((await stamm.json()) as { id: number }).id;
-  const { einsatzId, post, put } = await seedeEinsatz(page);
+  const { einsatzId, post, put } = await seedEinsatz(page);
   const fahrzeug = await post('fahrzeuge', { fahrzeug_id: stammId });
   const einheit = await post('einheiten', { name: 'Rettungsstaffel' });
   await put(`einheiten/${einheit}/fahrzeug/${fahrzeug}`);
@@ -160,7 +160,7 @@ for (const { dichte, hoehe, abstand } of [
     page,
   }) => {
     await anmeldenAlsAdmin(page);
-    const { einsatzId, post, put } = await seedeEinsatz(page);
+    const { einsatzId, post, put } = await seedEinsatz(page);
     const funkrufname = 'RTW 83-9';
     const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname } });
     const einheit = await post('einheiten', { name: 'Rettungsstaffel' });

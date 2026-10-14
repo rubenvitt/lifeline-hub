@@ -1808,7 +1808,7 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
 const EIGENE_EINHEIT_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-1';
 const UEBERNAHME_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-2';
 
-async function seedeEigeneEinheit(page: Page): Promise<string> {
+async function seedEigeneEinheit(page: Page): Promise<string> {
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Eigene Einheit ${Date.now()}` },
   });
@@ -1876,7 +1876,7 @@ test.describe('Gate 1 · Fahrzeug als eigene Einheit (LLH-1073)', () => {
       }) => {
         await page.setViewportSize({ width: 1366, height: 768 });
         await anmelden(page);
-        const einsatzId = await seedeEigeneEinheit(page);
+        const einsatzId = await seedEigeneEinheit(page);
         if (rolle === 'fuehrungspersonal') await wechsleZuRolle(page, rolle, einsatzId);
         await page.setViewportSize({ width: pruefbreite.breite, height: pruefbreite.hoehe });
         const messwerte: string[] = [];
