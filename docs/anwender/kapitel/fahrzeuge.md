@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs]
 ---
 
 ## Überblick
@@ -29,15 +29,26 @@ und Führungspersonal.
 
 3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Status“ eine Kategorie wählen.
 
-### Ein Fahrzeug disponieren
+### Fahrzeuge aus dem Stamm disponieren
 
-Für Einsatzleitung und Führungspersonal:
+Für Einsatzleitung und Führungspersonal, für ein Fahrzeug oder mehrere:
 
-1. „Fahrzeug disponieren“ wählen.
-2. Unter „Fahrzeug“ ein Fahrzeug aus dem Stamm wählen.
-3. „Disponieren“ wählen, oder „Speichern und nächste“ für das nächste Fahrzeug.
+1. „Fahrzeuge disponieren“ wählen.
+2. Unter „Fahrzeuge“ ein oder mehrere Fahrzeuge aus dem Stamm wählen. Die Suche findet
+   Funkrufname, Typ, Kennzeichen und Träger.
+3. Bei Bedarf unter „In Einheit“ die Einheit wählen, zu der die Fahrzeuge gehören.
 
-Steht ein Fahrzeug nicht im Stamm, etwa ein Fahrzeug einer Nachbarwehr:
+   ![Dialog „Fahrzeuge disponieren“ mit zwei gewählten Fahrzeugen, der Einheit „Sanitätszug Musterstadt“ und den Knöpfen „Speichern und nächste“ und „Disponieren“](../bilder/fahrzeuge/fahrzeuge-disponieren.png)
+
+4. „Disponieren“ wählen, oder „Speichern und nächste“ für die nächste Einheit; mit „Werte
+   behalten“ bleibt die Einheit stehen.
+5. Lässt sich ein Fahrzeug nicht disponieren, nimmt die App keines der gewählten auf und nennt
+   unter der Auswahl den Grund je Fahrzeug. „Abgelehnte abwählen“ nimmt sie aus der Auswahl.
+
+### Ein Ad-hoc-Fahrzeug disponieren
+
+Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug nicht im Stamm steht, etwa ein
+Fahrzeug einer Nachbarwehr:
 
 1. „Ad-hoc-Fahrzeug“ wählen.
 2. „Funkrufname“ eingeben, bei Bedarf „Fahrzeugtyp“, „Trägerorganisation“, „Kennzeichen“ und unter
@@ -83,8 +94,11 @@ Für Einsatzleitung und Führungspersonal:
 
 ### Wer zur Auswahl steht
 
-„Fahrzeug disponieren“ bietet die Fahrzeuge des Fahrzeugstamms an, die in Dienst stehen und noch
-nicht im Einsatz sind. Ad-hoc-Fahrzeuge gibt es nur im Einsatz.
+„Fahrzeuge disponieren“ bietet die Fahrzeuge des Fahrzeugstamms an, die in Dienst stehen und noch
+nicht im Einsatz sind. Ad-hoc-Fahrzeuge gibt es nur im Einsatz. Ein Absenden nimmt höchstens 50
+Fahrzeuge auf und gilt ganz oder gar nicht. Das Feld „In Einheit“ steht nur, wenn das Modul
+Einheiten im Einsatz freigegeben ist; Personal und Besatzung bringt das Disponieren eines
+Fahrzeugs nicht mit.
 
 ### FMS-Status und Ziffern
 
@@ -100,7 +114,8 @@ einer anderen Einheit gehört; die Marke „andere Einheit“ zeigt das an. Eine
 auf einem Fahrzeug; „Kraft zur Besatzung …“ bietet nur Personen an, die noch auf keinem Fahrzeug
 sitzen. Das Soll der Besatzung kommt aus der Stärke im Fahrzeugstamm; ein Ad-hoc-Fahrzeug hat
 keines. „Besatzung nicht erfasst“ heißt: keine Person zugeordnet, das Personal läuft dann oft nur
-über die Einheit. Einer Einheit wird ein Fahrzeug im Modul [Einheiten](einheiten.md) zugeordnet.
+über die Einheit. Einer Einheit wird ein Fahrzeug beim Disponieren aus dem Stamm oder später im Modul
+[Einheiten](einheiten.md) zugeordnet.
 
 ### Status der Einheit und Zeitachse
 
@@ -116,7 +131,8 @@ ohne Fahrzeug.
 ### Einsatztagebuch
 
 Disponieren, jeder Statuswechsel, das Zuordnen und Freigeben der Besatzung und das Entfernen stehen
-im Einsatztagebuch.
+im Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
+Einheit und Funkrufnamen.
 
 ### Rechte und ohne Netz
 

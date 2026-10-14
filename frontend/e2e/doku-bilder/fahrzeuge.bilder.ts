@@ -1,4 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
+import { offeneAuswahl, waehleStehend } from '../auswahl-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -9,13 +10,22 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   fahrzeuge.png    frontend/src/pages/FahrzeugePage.tsx (Ansicht „Liste“),
  *                    frontend/src/components/Datensicht.tsx
  *   besatzung.png    frontend/src/pages/FahrzeugePage.tsx (`BesatzungsBlock`)
+ *   fahrzeuge-disponieren.png frontend/src/kraefte/FahrzeugeDisponierenModal.tsx
  *   fms-tableau.png  frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts
  *
  * Demo-Lücke (D3): die Demo-Fahrzeuge haben keine Besatzung. Die Spec setzt Anna und Paul Probe
- * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“.
+ * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“. Für den Dialog
+ * „Fahrzeuge disponieren“ legt sie zwei Stamm-Fahrzeuge an, die noch nicht im Einsatz sind
+ * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert.
  */
 
 const KAPITEL = 'fahrzeuge';
+
+/** Stamm-Fahrzeuge für den Dialog „Fahrzeuge disponieren“, nicht im Demo-Einsatz. */
+const NEUE_STAMMFAHRZEUGE = [
+  { funkrufname: 'Musterstadt 83-3', fahrzeugtyp: 'RTW', traegerorganisation: 'DRK Musterstadt' },
+  { funkrufname: 'Musterstadt 85-3', fahrzeugtyp: 'KTW', traegerorganisation: 'DRK Musterstadt' },
+];
 
 interface Fahrzeug {
   id: number;
@@ -78,5 +88,32 @@ test.describe(KAPITEL, () => {
     const tableau = page.getByRole('region', { name: 'FMS-Tableau' });
     await expect(tableau.locator('[data-lfh="fms-kachel"]').first()).toBeVisible();
     await fotografiere(tableau, KAPITEL, 'fms-tableau');
+  });
+
+  test('Dialog „Fahrzeuge disponieren“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    for (const fahrzeug of NEUE_STAMMFAHRZEUGE)
+      await fuelle(page, 'post', '/api/fahrzeuge', fahrzeug);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    await page.getByRole('button', { name: 'Fahrzeuge disponieren' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Fahrzeuge disponieren' });
+    const titel = dialog.locator('.ant-modal-title');
+    const auswahl = dialog.getByRole('combobox', { name: 'Fahrzeuge' });
+    for (const fahrzeug of NEUE_STAMMFAHRZEUGE) {
+      await auswahl.click();
+      await auswahl.fill(fahrzeug.funkrufname);
+      await waehleStehend(page, `${fahrzeug.funkrufname} (${fahrzeug.fahrzeugtyp})`);
+    }
+    await titel.click();
+    await expect(offeneAuswahl(page)).toHaveCount(0);
+    await dialog.getByRole('combobox', { name: 'In Einheit' }).click();
+    await waehleStehend(page, 'Sanitätszug Musterstadt');
+    await titel.click();
+    await expect(offeneAuswahl(page)).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'fahrzeuge-disponieren');
   });
 });
