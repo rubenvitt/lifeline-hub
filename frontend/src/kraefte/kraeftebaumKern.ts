@@ -4,17 +4,14 @@ import type {
   EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
-  MaterialStatus,
   Staerke,
   StaerkePosition,
 } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
-import {
-  materialStatus,
-  type BesatzungsUrteil,
-  type EinheitStaerkeUrteil,
-} from '../theme/statusFarben';
+import { type BesatzungsUrteil, type EinheitStaerkeUrteil } from '../theme/statusFarben';
 import type { StaerkeSumme } from './kraeftebild';
+// Ausfall zählt die eine Material-Zählung (LLH-1093, design.md D10), nicht der Kern.
+import { materialAusfall } from './materialVerdichtung';
 
 /**
  * Der Kräftebaum — EINE Baumlogik der Kräfte (LLH-1025, Spec `kraeftebaum`), rein.
@@ -224,22 +221,6 @@ export function besatzungsUrteilVon(
 export function einheitStaerkeUrteilVon(ist: Staerke, soll: Staerke | null): EinheitStaerkeUrteil {
   if (!soll) return 'kein_soll';
   return isSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
-}
-
-// ── Material ──────────────────────────────────────────────────────────────────
-
-/**
- * Ausfall eines Materialpostens (D6, Option A aus LLH-1087): die Status mit Rolle `alarm` oder
- * `achtung` im Vertrag `materialStatus` — defekt, verbraucht, Desinfektion nötig. Die eine
- * Zählfunktion, die LLH-1093 mitnutzt.
- */
-export function isMaterialAusfall(status: MaterialStatus): boolean {
-  const rolle = materialStatus[status].rolle;
-  return rolle === 'alarm' || rolle === 'achtung';
-}
-
-export function materialAusfall(material: readonly Pick<EinsatzMaterial, 'status'>[]): number {
-  return material.filter((m) => isMaterialAusfall(m.status)).length;
 }
 
 // ── Mittel einer Einheit ──────────────────────────────────────────────────────

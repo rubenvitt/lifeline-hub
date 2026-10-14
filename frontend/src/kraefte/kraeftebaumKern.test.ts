@@ -6,10 +6,8 @@ import {
   einheitStaerkeUrteilVon,
   needsOhneFahrzeugKnoten,
   einheitenBaum,
-  isMaterialAusfall,
   kraeftebaum,
   accumulateStaerke,
-  materialAusfall,
   mittelDerEinheit,
   schluesselBisStufe,
   stufeVon,
@@ -18,6 +16,7 @@ import {
   type StufenZeile,
 } from './kraeftebaumKern';
 import { verdichte, type StaerkeSumme } from './kraeftebild';
+import { isMaterialAusfall, materialAusfall } from './materialVerdichtung';
 import { staerkeText } from '../anzeige/staerke';
 import type {
   Einheit,
