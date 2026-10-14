@@ -195,8 +195,8 @@ function EinheitAnsicht({
 
   /*
    * Eine Zeile, ein Feld (D1). Die Ablehnung steht an der Zeile (InlineAngabe), kein Toast
-   * (LFH-1077); der Erfolg nennt die Angabe. Der Server schreibt Änderungen an Name, Führer,
-   * Unterstellung und Abschnitt ins Tagebuch, deshalb auch `etb`.
+   * (LFH-1077); der Erfolg nennt die Angabe. Der Server schreibt einen Wechsel des
+   * Einheitsführers und der Abschnittszuordnung ins Tagebuch, deshalb auch `etb`.
    */
   const patch = useMutation({
     mutationFn: (v: { etikett: string; patch: EinheitPatch }) =>
