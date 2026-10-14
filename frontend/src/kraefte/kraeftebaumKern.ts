@@ -574,6 +574,21 @@ export function schluesselBisStufe(zeilen: readonly StufenZeile[], stufe: Auskla
 }
 
 /**
+ * Offene Schlüssel für einen Sprung auf die Einheit `ziel` (`?einheit=`, LLH-1049, Spec
+ * `kraeftebaum`, „Sprung auf eine Einheit“): ihre Vorfahren und ihr Teilbaum bis zur Stufe „mit
+ * Fahrzeugen“, in Baumfolge. `null`, wenn keine Einheitenzeile diesen Schlüssel trägt — dann
+ * bleibt die Vorgabestufe.
+ */
+export function schluesselZumSprung(zeilen: readonly StufenZeile[], ziel: string): string[] | null {
+  for (const z of zeilen) {
+    if (z.key === ziel) return z.art === 'einheit' ? schluesselBisStufe([z], 'fahrzeuge') : null;
+    const tiefer = schluesselZumSprung(z.children ?? [], ziel);
+    if (tiefer) return [z.key, ...tiefer];
+  }
+  return null;
+}
+
+/**
  * Die Stufe zu offenen Schlüsseln: zuerst die zuletzt GEWÄHLTE, solange ihre Schlüssel genau
  * offen stehen — sonst zeigten gleiche Schlüsselmengen (ein Zug mit einer Gruppe ohne Mittel)
  * nach einem Klick auf „alles“ weiter „Einheiten“, der Klick wirkte tot. Dann genau „Einheiten“,
