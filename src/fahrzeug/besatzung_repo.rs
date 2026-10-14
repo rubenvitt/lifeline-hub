@@ -62,6 +62,96 @@ pub async fn gib_besatzung_frei_tx(
     Ok(name)
 }
 
+/// Meldung des 422, wenn beim Übernehmen nicht jede Person zugeordnet werden kann (LLH-1073 D12).
+pub const MELDUNG_PERSONEN: &str = "Nicht alle Personen lassen sich zuordnen";
+
+/// Eine Person der Menge beim Übernehmen der Besatzung: `ep_id`, Name für den ETB-Text und das
+/// Fahrzeug, auf dem sie vorher saß (für das Ereignis an das verlassene Fahrzeug).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonDerMenge {
+    pub ep_id: i64,
+    pub name: String,
+    pub vorher: Option<i64>,
+}
+
+/// Vorprüfung der Personen beim Übernehmen der Besatzung (LLH-1073, design.md D12) in **einer**
+/// Abfrage über `json_each`: unbekannt oder aus einem anderen Einsatz, beendet (`entlassen`,
+/// `storniert`). Lehnt mit [`AppError::Zeilen`] (422, `art = personal`, `einsatz_personal.id`)
+/// ab, sonst die Personen in der Reihenfolge der Eingabe. `ep_ids` ist entdoppelt.
+pub async fn check_besatzung_menge_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_ids: &[i64],
+) -> Result<Vec<PersonDerMenge>, AppError> {
+    let zeilen: Vec<(
+        i64,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+    )> = sqlx::query_as(
+        "SELECT j.value, ep.id, ep.snap_name, ep.beendet_als, ep.fahrzeug_id \
+             FROM json_each(?1) j \
+             LEFT JOIN einsatz_personal ep ON ep.id = j.value AND ep.einsatz_id = ?2 \
+             ORDER BY j.key",
+    )
+    .bind(crate::kraefte_disposition::ids_json(ep_ids))
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut personen = Vec::with_capacity(zeilen.len());
+    let mut abgelehnt = Vec::new();
+    for (id, ep, name, beendet_als, vorher) in zeilen {
+        let grund = match (ep, beendet_als) {
+            (None, _) => Some(crate::kraefte_disposition::GRUND_UNBEKANNT.to_string()),
+            (Some(_), Some(als)) => Some(als),
+            (Some(_), None) => None,
+        };
+        match grund {
+            Some(grund) => abgelehnt.push(crate::error::ZeilenGrund {
+                art: crate::error::ZeilenArt::Personal,
+                id,
+                grund,
+            }),
+            None => personen.push(PersonDerMenge {
+                ep_id: id,
+                name: name.unwrap_or_default(),
+                vorher,
+            }),
+        }
+    }
+    if abgelehnt.is_empty() {
+        Ok(personen)
+    } else {
+        Err(AppError::Zeilen {
+            meldung: MELDUNG_PERSONEN.into(),
+            zeilen: abgelehnt,
+        })
+    }
+}
+
+/// Ordnet die (vorgeprüften) Personen einem Fahrzeug als Besatzung zu, in **einer** Anweisung
+/// (LLH-1073 D12). Additiv und exklusiv wie [`ordne_besatzung_zu_tx`]: wer woanders sitzt,
+/// wechselt.
+pub async fn zuordnen_besatzung_menge_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    ep_ids: &[i64],
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_personal SET fahrzeug_id = ?1 \
+         WHERE einsatz_id = ?2 AND beendet_at IS NULL \
+           AND id IN (SELECT value FROM json_each(?3))",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .bind(crate::kraefte_disposition::ids_json(ep_ids))
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Die Besatzung eines Fahrzeugs (`einsatz_personal.id`). Wer das Fahrzeug entfernt, fragt
 /// vorher; die Freigabe ändert die Zeilen der Personalliste, das Ereignis `personal` muss der
 /// Aufrufer melden (LLH-1182).

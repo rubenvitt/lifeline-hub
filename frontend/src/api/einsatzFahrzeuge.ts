@@ -110,6 +110,21 @@ export function ordneBesatzungZu(einsatzId: number, efId: number, epId: number):
   return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'PUT');
 }
 
+/**
+ * Mehrere Kräfte (`einsatz_personal.id`) in einem Schritt als Besatzung zuordnen („Personal der
+ * Einheit übernehmen“, LLH-1073, design.md D12): alles oder nichts, ein ETB-Eintrag. Eine
+ * unbekannte oder entlassene Kraft lehnt der Server mit Grund je Person in `ApiError.zeilen` ab.
+ */
+export function zuordnenBesatzungMenge(
+  einsatzId: number,
+  efId: number,
+  epIds: number[],
+): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung`, 'POST', {
+    ep_ids: epIds,
+  });
+}
+
 /** LFH-9: Gibt eine Kraft aus der Fahrzeug-Besatzung frei. */
 export function gibBesatzungFrei(einsatzId: number, efId: number, epId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'DELETE');

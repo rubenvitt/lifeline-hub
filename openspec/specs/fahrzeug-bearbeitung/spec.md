@@ -3,8 +3,9 @@
 ## Purpose
 Legt fest, wie ein disponiertes Fahrzeug im Einsatz bearbeitet wird: Einheit, Abschnitt und
 Status-seit in der Fahrzeugliste, die Einheit in der Zeile ändern, die Angaben eines
-Ad-hoc-Fahrzeugs korrigieren, die Angaben eines Stamm-Fahrzeugs im Stamm lassen und die
-Aktionen einer Zeile ordnen.
+Ad-hoc-Fahrzeugs korrigieren, die Angaben eines Stamm-Fahrzeugs im Stamm lassen, die
+Aktionen einer Zeile ordnen, ein Fahrzeug als eigene Einheit führen und die freien Kräfte seiner
+Einheit in einem Schritt als Besatzung übernehmen.
 
 ## Requirements
 
@@ -91,14 +92,19 @@ Organisation des Einsatzes den Sprung in den Stamm anbieten.
 
 Die Tabelle der Fahrzeugliste SHALL je Zeile ein Aktionsmenü führen, dessen erster Eintrag
 „Entlassen“ ist; danach folgen die weiteren Aktionen eines Fahrzeugs (Angaben ändern, beim
-Stamm-Fahrzeug der Sprung in den Stamm), Stornieren rot hinter einem Trenner. „Entlassen“ MUST
+Stamm-Fahrzeug der Sprung in den Stamm, bei einem Fahrzeug ohne Einheit mit Freigabe des Moduls
+Einheiten „Als eigene Einheit führen …“), Stornieren rot hinter einem Trenner. „Entlassen“ MUST
 ohne Rückfrage wirken und einen Rückgängig-Hinweis zeigen. Auf der Karte (schmale Fläche) MUST
 „Entlassen“ die sichtbare Hauptaktion sein und im Menü fehlen. Das Lösen einer Person von der
 Besatzung MUST „Vom Fahrzeug lösen“ heißen und ohne Rückfrage wirken.
 
 #### Scenario: Ad-hoc-Fahrzeug in der Tabelle
-- **WHEN** das Menü eines Ad-hoc-Fahrzeugs in der Tabelle geöffnet wird
+- **WHEN** das Menü eines Ad-hoc-Fahrzeugs mit Einheit in der Tabelle geöffnet wird
 - **THEN** stehen „Entlassen“, „Angaben ändern …“, ein Trenner und rot „Stornieren“
+
+#### Scenario: Ad-hoc-Fahrzeug ohne Einheit
+- **WHEN** das Menü eines Ad-hoc-Fahrzeugs ohne Einheit in der Tabelle geöffnet wird und das Modul Einheiten freigegeben ist
+- **THEN** stehen „Entlassen“, „Angaben ändern …“, „Als eigene Einheit führen …“, ein Trenner und rot „Stornieren“
 
 #### Scenario: Entlassen aus dem Menü
 - **WHEN** im Menü „Entlassen“ gewählt wird
@@ -111,3 +117,82 @@ Besatzung MUST „Vom Fahrzeug lösen“ heißen und ohne Rückfrage wirken.
 #### Scenario: Person lösen
 - **WHEN** bei einer Person der Besatzung „Vom Fahrzeug lösen“ gewählt wird
 - **THEN** sitzt sie ohne Rückfrage auf keinem Fahrzeug mehr
+
+### Requirement: Fahrzeug als eigene Einheit führen
+
+Das System SHALL aus einem Fahrzeug ohne Einheit in einem Schritt eine Einheit bilden und das
+Fahrzeug ihr zuordnen; die Einheit trägt das Soll des Fahrzeugs. Gehört ein genanntes Fahrzeug
+schon einer Einheit an, ist es beendet oder unbekannt, MUST das System mit 422 und einem Grund je
+Fahrzeug antworten und nichts anlegen. Die neue Einheit MUST kein Zeitachsen-Ereignis aus dem
+aktuellen Status des Fahrzeugs bekommen. Der Dialog MUST den Namen mit dem Funkrufnamen und den
+Typ nur dann vorbelegen, wenn genau ein Katalogtyp dasselbe Soll hat; den Abschnitt bietet er nur
+mit Freigabe des Moduls Einsatzabschnitte an. Geschrieben wird mit dem Recht im Modul Einheiten.
+
+#### Scenario: Fremdfahrzeug kommt allein
+- **WHEN** das Ad-hoc-Fahrzeug „Florian Nachbarstadt 44/1“ als eigene Einheit geführt wird
+- **THEN** gibt es die Einheit „Florian Nachbarstadt 44/1“ mit dem Fahrzeug
+- **AND** ist die Zeitachse der neuen Einheit leer
+
+#### Scenario: Fahrzeug inzwischen zugeordnet
+- **WHEN** das Fahrzeug zwischen Öffnen und Absenden des Dialogs Zug 2 zugeordnet wurde
+- **THEN** antwortet das System mit 422, nennt das Fahrzeug mit „gehört zu «Zug 2»“, und keine Einheit ist angelegt
+
+#### Scenario: Kein Typ geraten
+- **WHEN** zwei Einheitentypen dasselbe Soll wie das Fahrzeug haben
+- **THEN** steht im Dialog kein Typ vorbelegt
+
+### Requirement: Besatzung kommt in die neue Einheit mit
+
+Wird ein Fahrzeug als eigene Einheit geführt, SHALL jede aktive Person seiner Besatzung ohne
+Einheit der neuen Einheit zugeordnet werden. Personen der Besatzung, die einer anderen Einheit
+angehören, MUST dort bleiben. Das ETB MUST die Bildung, das Fahrzeug und die mitgekommenen Kräfte
+nennen, diese in einem Eintrag.
+
+#### Scenario: Gemischte Besatzung
+- **WHEN** ein Fahrzeug mit zwei Personen ohne Einheit und einer Person aus „Zug 1“ als eigene Einheit geführt wird
+- **THEN** gehören die zwei Personen der neuen Einheit an
+- **AND** bleibt die dritte Person in Zug 1 und auf dem Fahrzeug
+- **AND** steht im ETB „Einheit «…»: 2 Kräfte zugeordnet“ mit beiden Namen
+
+### Requirement: Einheit bilden schreibt alles oder nichts
+
+Das Bilden einer Einheit SHALL Einheit, Sprechgruppen, Zuordnungen und ETB-Einträge in einer
+Transaktion schreiben; scheitert ein Teil, MUST nichts davon bestehen bleiben.
+
+#### Scenario: ETB scheitert
+- **WHEN** beim Bilden einer Einheit das Schreiben des ETB-Eintrags scheitert
+- **THEN** gibt es die Einheit nicht, und weder Fahrzeug noch Besatzung sind zugeordnet
+
+### Requirement: Besatzungsvorschlag aus der Einheit
+
+Hat ein Fahrzeug eine Einheit, SHALL die Fahrzeugliste aus den aktiven Personen dieser Einheit
+ohne Fahrzeug eine Besatzung vorschlagen: je Position bis zum Soll des Fahrzeugs, abzüglich der
+schon sitzenden Besatzung, eine Person ohne Position als Mannschaft, den Führer der Einheit
+zuerst; ohne Soll alle. Der Vorschlag MUST vor dem Übernehmen abwählbar sein. Ohne Einheit des
+Fahrzeugs MUST der Knopf „Personal der Einheit übernehmen“ fehlen.
+
+#### Scenario: Vorschlag bis zum Soll
+- **WHEN** ein RTW mit Soll 0/1/1//2 der Rettungsstaffel gehört, deren freie Kräfte eine Unterführerin und drei Personen ohne Position sind
+- **THEN** sind die Unterführerin und eine Person ohne Position vorgewählt
+
+#### Scenario: Ohne freie Kräfte
+- **WHEN** alle Personen der Einheit schon auf Fahrzeugen sitzen
+- **THEN** steht „Personal der Einheit übernehmen“ gesperrt mit „keine freien Kräfte der Einheit“
+
+### Requirement: Besatzung in einem Schritt übernehmen
+
+Das System SHALL mehrere Personen in einer Anfrage einem Fahrzeug als Besatzung zuordnen, genau
+einen ETB-Eintrag schreiben und jedes Fahrzeug live melden, das eine Person dabei verlässt. Ist
+eine genannte Person unbekannt, aus einem anderen Einsatz oder beendet, MUST das System mit 422,
+einem Grund je Person und ohne jede Zuordnung antworten; ist das Fahrzeug beendet, mit 409. Wer
+schon auf dem Fahrzeug sitzt, MUST weder einen ETB-Eintrag noch eine Meldung auslösen. Geschrieben
+wird mit dem Recht im Modul Fahrzeuge, wie beim Zuordnen einer einzelnen Person.
+
+#### Scenario: Übernehmen
+- **WHEN** drei vorgewählte Personen übernommen werden
+- **THEN** sitzen alle drei auf dem Fahrzeug, die Besatzung zeigt Ist und Soll statt „nicht erfasst“
+- **AND** steht im ETB genau ein Eintrag mit „3 Kräfte als Besatzung zugeordnet“ und den drei Namen
+
+#### Scenario: Eine Person entlassen
+- **WHEN** unter drei gewählten Personen eine inzwischen entlassen wurde
+- **THEN** antwortet das System mit 422, nennt diese Person, und keine der drei sitzt auf dem Fahrzeug

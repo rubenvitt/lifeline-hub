@@ -5535,8 +5535,9 @@ export interface components {
             zustand: components["schemas"]["WetterTeilZustand"];
         };
         /**
-         * @description Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen
-         *     können kollidieren (LLH-1100, D2). Wire == `as_str()`.
+         * @description Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
+         *     kollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im
+         *     Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
          * @enum {string}
          */
         ZeilenArt: "personal" | "fahrzeug";
@@ -5555,7 +5556,7 @@ export interface components {
             grund: string;
             /**
              * Format: int64
-             * @description Die ID, wie die Anfrage sie nannte (Stamm-ID).
+             * @description Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition).
              */
             id: number;
         };

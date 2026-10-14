@@ -20,6 +20,12 @@ export interface EinheitEingabe {
   kommunikationsmittel?: string | null;
   /** LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII). */
   erreichbarkeit?: string | null;
+  /**
+   * LLH-1073: disponierte Fahrzeuge (`EinsatzFahrzeug.id`), die der neuen Einheit angehören
+   * („Als eigene Einheit führen“); ihre Besatzung ohne Einheit kommt mit. Ein schon zugeordnetes
+   * oder beendetes Fahrzeug lehnt der Server mit Grund je Fahrzeug in `ApiError.zeilen` ab.
+   */
+  fahrzeug_ids?: number[];
 }
 
 export function listeEinheiten(einsatzId: number): Promise<Einheit[]> {

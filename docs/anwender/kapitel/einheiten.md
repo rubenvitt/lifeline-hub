@@ -137,7 +137,9 @@ Auswahlfelder bieten nur an, was noch keiner Einheit zugeordnet ist; wer in eine
 wechseln soll, wird dort zuerst entfernt. Disponiert, also in den Einsatz geholt, werden Kräfte in
 den Modulen [Personal](personal.md), [Fahrzeuge und FMS](fahrzeuge.md) und [Material](material.md).
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
-Fahrzeug dabei aus seiner bisherigen Einheit um.
+Fahrzeug dabei aus seiner bisherigen Einheit um. Ein Fahrzeug ohne Einheit lässt sich dort auch als
+eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
+[Fahrzeuge und FMS](fahrzeuge.md)).
 
 ### Stärke
 
