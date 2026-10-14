@@ -313,35 +313,43 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, daten, menge, disponiert_von).await
 }
 
-/// Aktualisiert Menge, Status und/oder Bemerkung. `menge`/`status` per COALESCE (`None` =
-/// unverändert); `bemerkung` und `uhs_id` sind Tri-State (`None` = unverändert, `Some(None)` =
-/// NULL, `Some(Some(x))` = setzen). Getrimmt wird in der Route, `status` ist bereits validiert.
-/// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
+/// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
+/// `menge`/`status`: `None` = unverändert. Die übrigen Felder sind Tri-State: `None` =
+/// unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen. Ein Struct statt
+/// Positionsparametern, damit eine neue Angabe keine Bindung still verschiebt.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MaterialPatch<'a> {
+    pub menge: Option<i64>,
+    /// Bereits validierter Wire-Wert aus [`MaterialStatus`].
+    pub status: Option<&'a str>,
+    pub bemerkung: Option<Option<&'a str>>,
+    pub uhs_id: Option<Option<i64>>,
+}
+
+/// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
+/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079).
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
-    menge: Option<i64>,
-    status: Option<&str>,
-    bemerkung: Option<Option<&str>>,
-    uhs_id: Option<Option<i64>>,
+    patch: MaterialPatch<'_>,
 ) -> Result<(), AppError> {
     // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
-         SET menge = COALESCE(?1, menge), \
-             status = COALESCE(?2, status), \
-             bemerkung = CASE WHEN ?3 IS NULL THEN bemerkung ELSE ?4 END, \
-             uhs_id = CASE WHEN ?5 IS NULL THEN uhs_id ELSE ?6 END \
-         WHERE id = ?7 AND einsatz_id = ?8",
+         SET menge = COALESCE(?, menge), \
+             status = COALESCE(?, status), \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
+             uhs_id = CASE WHEN ? THEN ? ELSE uhs_id END \
+         WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(menge)
-    .bind(status)
-    .bind(bemerkung.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
-    .bind(bemerkung.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
-    .bind(uhs_id.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
-    .bind(uhs_id.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
+    .bind(patch.menge)
+    .bind(patch.status)
+    .bind(patch.bemerkung.is_some())
+    .bind(patch.bemerkung.flatten())
+    .bind(patch.uhs_id.is_some())
+    .bind(patch.uhs_id.flatten())
     .bind(em_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -352,21 +360,15 @@ pub async fn update_tx(
     Ok(())
 }
 
-/// Pool-Wrapper um [`update_tx`].
+/// Pool-Hülle um [`update_tx`] ohne eigene Transaktion.
 pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     em_id: i64,
-    menge: Option<i64>,
-    status: Option<&str>,
-    bemerkung: Option<Option<&str>>,
-    uhs_id: Option<Option<i64>>,
+    patch: MaterialPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(
-        &mut conn, einsatz_id, em_id, menge, status, bemerkung, uhs_id,
-    )
-    .await
+    update_tx(&mut conn, einsatz_id, em_id, patch).await
 }
 
 /// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
@@ -821,10 +823,12 @@ mod tests {
             &pool,
             einsatz,
             em,
-            Some(30),
-            Some(MaterialStatus::Defekt.as_str()),
-            Some(Some("nass")),
-            None,
+            MaterialPatch {
+                menge: Some(30),
+                status: Some(MaterialStatus::Defekt.as_str()),
+                bemerkung: Some(Some("nass")),
+                ..MaterialPatch::default()
+            },
         )
         .await
         .unwrap();
@@ -838,10 +842,10 @@ mod tests {
             &pool,
             einsatz,
             em,
-            None,
-            Some(MaterialStatus::Verbraucht.as_str()),
-            None,
-            None,
+            MaterialPatch {
+                status: Some(MaterialStatus::Verbraucht.as_str()),
+                ..MaterialPatch::default()
+            },
         )
         .await
         .unwrap();
@@ -860,9 +864,17 @@ mod tests {
             1
         );
         assert!(matches!(
-            update(&pool, einsatz, em, Some(1), None, None, None)
-                .await
-                .unwrap_err(),
+            update(
+                &pool,
+                einsatz,
+                em,
+                MaterialPatch {
+                    menge: Some(1),
+                    ..MaterialPatch::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
         assert!(matches!(
@@ -892,21 +904,45 @@ mod tests {
         .await
         .unwrap();
         // Zuordnen:
-        update(&pool, einsatz, em, None, None, None, Some(Some(u)))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(Some(u)),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.uhs_id, Some(u));
         // Lösen (explizit NULL):
-        update(&pool, einsatz, em, None, None, None, Some(None))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(None),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.uhs_id.is_none());
         // liste_je_uhs:
-        update(&pool, einsatz, em, None, None, None, Some(Some(u)))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(Some(u)),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].id, em);
@@ -1152,9 +1188,17 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
             .await
             .unwrap();
-        update(&pool, einsatz, em, None, Some("defekt"), None, None)
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                status: Some("defekt"),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         let mut conn = pool.acquire().await.unwrap();
         reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)

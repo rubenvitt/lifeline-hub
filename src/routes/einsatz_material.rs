@@ -7,7 +7,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use crate::material::disposition_repo::{self, AdhocDaten};
+use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
 use crate::routes::support::{deserialize_optional_field, parse_flag, pflicht, trimme, trimme_tri};
 use axum::extract::{Query, State};
@@ -194,7 +194,12 @@ pub async fn update(
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
     let bemerkung = trimme_tri(body.bemerkung);
-    let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
+    let patch = MaterialPatch {
+        menge: body.menge,
+        status,
+        bemerkung: bemerkung.as_ref().map(|o| o.as_deref()),
+        uhs_id: body.uhs_id,
+    };
 
     // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu zwei) System-ETB-Einträge atomar in
     // EINER Tx (BEGIN IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload
@@ -204,16 +209,7 @@ pub async fn update(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        disposition_repo::update_tx(
-            conn,
-            einsatz_id,
-            em_id,
-            body.menge,
-            status,
-            bemerkung,
-            body.uhs_id,
-        )
-        .await?;
+        disposition_repo::update_tx(conn, einsatz_id, em_id, patch).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         if vorher.menge != nachher.menge {
             crate::etb::system_audit_tx(
