@@ -321,6 +321,23 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — I
       'href',
       new RegExp(`/einsaetze/${einsatzId}/personal/\\d+$`),
     );
+    // Titel-Link und Statusauslöser stehen im Kartenkopf nebeneinander: zwei Ziele, also der
+    // Zielabstand aus Kriterium 2 (komfortabel ≥ 8, handschuh ≥ 16; kompakt Spacing-Ausnahme).
+    const statusKnopf = karte.getByRole('button', { name: new RegExp(`^Status von ${KRAFT}`) });
+    await expect(statusKnopf).toHaveCount(1);
+    const [l, k] = [(await personLink.boundingBox())!, (await statusKnopf.boundingBox())!];
+    const luecke = Math.max(
+      k.x - (l.x + l.width),
+      l.x - (k.x + k.width),
+      k.y - (l.y + l.height),
+      l.y - (k.y + k.height),
+    );
+    gemessen.push(`${dichte}: Titel-Link ↔ Status ${luecke.toFixed(1)}px`);
+    const sollAbstand = { kompakt: 0, komfortabel: 8, handschuh: 16 }[dichte];
+    expect(
+      luecke,
+      `Abstand Titel-Link ↔ Statusauslöser (390 px, ${dichte}, gemessen ${luecke}px)`,
+    ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
 
     // ── Titel-Link im Kartenzweig (390 px, Tierliste)
     await page.goto(`/einsaetze/${einsatzId}/tiere`);

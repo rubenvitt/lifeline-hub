@@ -25,6 +25,7 @@ import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
+import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
 import { ZeilenFehler } from './SpeicherHinweis';
@@ -1987,7 +1988,13 @@ export default function Datensicht<T extends object, const K extends string>(
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: token.marginXS,
+                // Titel-Link und Statusauslöser sind zwei Ziele nebeneinander: Zielabstand aus
+                // Kriterium 2 (`zielEinzug`, komfortabel ≥ 8, handschuh ≥ 16, LLH-1060). Gemessen
+                // in `e2e/datensicht-schmal.spec.ts`, „Trefflächen des Primitivs …“.
+                gap:
+                  ziel != null && statusBedienung
+                    ? token.marginXS + 2 * zielEinzug(token)
+                    : token.marginXS,
                 flexWrap: 'wrap',
               }}
             >
