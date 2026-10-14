@@ -3,6 +3,7 @@ import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 import { einsatzAnlegen } from './einsatz-kern';
 import { FOTO_JPEG } from './bildFixture';
+import { seedeVorlage, type GesaeteVorlage } from './vorlage-kern';
 
 // Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
 // muss auch bei Touch gelten; Pixel prüft nur der Browser.
@@ -346,6 +347,8 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
     },
     'Verbindung',
   );
+  // Einheit aus Vorlage bilden (LLH-1049): Zug mit Staffel, Fahrzeugen und Besatzung.
+  VORLAGE.set(einsatzId, await seedeVorlage(page, 'Gate1 '));
 }
 
 /**
@@ -536,6 +539,8 @@ const ANRUF_NOTIZ =
 const PM_TITEL = 'Hochwasser Musterstadt-Nordwest: Evakuierung Deichverteidigung Nordwestring';
 /** Kennung der gesäten Pressemitteilung je Einsatz (die Detailroute braucht sie). */
 const PRESSEMITTEILUNG = new Map<string, number>();
+/** Einheiten-Vorlage je Einsatz für „Einheit aus Vorlage bilden“ (LLH-1049). */
+const VORLAGE = new Map<string, GesaeteVorlage>();
 
 type Gate1Route = {
   pfad: string;
@@ -636,6 +641,14 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // Sammelzeile „Ohne Einheit" gibt es nur, wenn eine Kraft disponiert ist.
       pfad: `/einsaetze/${einsatzId}/kraefteuebersicht`,
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
+    },
+    {
+      // Einheit aus Vorlage bilden (LLH-1049): Kopf, Baum der Vorlage mit Zustandswort je Zeile
+      // und die Zusammenfassung am Knopf. Datenanker ist das Kästchen eines Fahrzeugs der Staffel.
+      pfad: `/einsaetze/${einsatzId}/einheiten/aus-vorlage/${VORLAGE.get(einsatzId)?.vorlageId}`,
+      anker: (p: Page) =>
+        p.getByRole('checkbox', { name: VORLAGE.get(einsatzId)?.fahrzeuge.rtw2 ?? '' }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Lagebesprechung (LLH-1111) mit Termin, Vorbereitung (LFH-550) und Verlauf. Anker ist die

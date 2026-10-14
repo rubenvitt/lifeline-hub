@@ -15,6 +15,7 @@ import {
   materialAusfall,
   mittelDerEinheit,
   schluesselBisStufe,
+  schluesselZumSprung,
   stufeVon,
   type EinheitKnoten,
   type KraeftebaumKnoten,
@@ -767,5 +768,46 @@ describe('schluesselBisStufe / stufeVon', () => {
     // Passt die gewählte Stufe nicht mehr (Zeile von Hand zugeklappt), gilt die abgeleitete.
     expect(stufeVon(zeilen, ['eh-1'], 'alles')).toBe('einheiten');
     expect(stufeVon(zeilen, ['eh-1', 'eh-2', 'eh-ohne', 'mtl-1'], 'alles')).toBe('fahrzeuge');
+  });
+});
+
+// ── Sprung auf eine Einheit (LLH-1049, Spec `kraeftebaum`) ────────────────────
+
+describe('schluesselZumSprung', () => {
+  const z = (key: string, art: string, children?: StufenZeile[]): StufenZeile => ({
+    key,
+    art,
+    children,
+  });
+  const zeilen: StufenZeile[] = [
+    z('eh-1', 'einheit', [
+      z('ef-1', 'fahrzeug', [z('ep-1', 'person')]),
+      z('eh-2', 'einheit', [
+        z('ef-2', 'fahrzeug', [z('ep-2', 'person')]),
+        z('eh-3', 'einheit', [z('ef-3', 'fahrzeug', [z('ep-3', 'person')])]),
+      ]),
+    ]),
+    z('eh-4', 'einheit', [z('ef-4', 'fahrzeug'), z('eh-5', 'einheit', [z('ef-5', 'fahrzeug')])]),
+    z('eh-ohne', 'einheit', [z('ep-9', 'person')]),
+  ];
+
+  it('öffnet den Teilbaum der Einheit bis „mit Fahrzeugen“, Fahrzeuge bleiben zu', () => {
+    expect(schluesselZumSprung(zeilen, 'eh-1')).toEqual(['eh-1', 'eh-2', 'eh-3']);
+  });
+
+  it('öffnet auch die übergeordneten Einheiten einer Untereinheit', () => {
+    expect(schluesselZumSprung(zeilen, 'eh-3')).toEqual(['eh-1', 'eh-2', 'eh-3']);
+    expect(schluesselZumSprung(zeilen, 'eh-5')).toEqual(['eh-4', 'eh-5']);
+  });
+
+  it('eine unbekannte Einheit oder eine Zeile anderer Art liefert nichts', () => {
+    expect(schluesselZumSprung(zeilen, 'eh-99')).toBeNull();
+    expect(schluesselZumSprung(zeilen, 'ef-2')).toBeNull();
+    expect(schluesselZumSprung([], 'eh-1')).toBeNull();
+  });
+
+  it('eine Einheit ohne Kinder öffnet nur ihre Vorfahren', () => {
+    const flach: StufenZeile[] = [z('eh-1', 'einheit', [z('eh-2', 'einheit')])];
+    expect(schluesselZumSprung(flach, 'eh-2')).toEqual(['eh-1']);
   });
 });

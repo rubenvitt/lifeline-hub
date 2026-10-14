@@ -167,6 +167,9 @@ Verwaltung nicht.
   wieder aktiviert. Eine stillgelegte Vorlage steht nicht mehr als Unterstellung zur Wahl (außer
   über „Untereinheit anlegen“ auf ihrer eigenen Seite), und ihr Name ist für eine neue Vorlage
   frei; unter den aktiven Vorlagen ist jeder Name nur einmal erlaubt.
+- Im Einsatz bildet die Führung aus einer aktiven Vorlage eine Einheit samt Untereinheiten,
+  Fahrzeugen und Besatzung (Kapitel [Einheiten](einheiten.md)). Eine stillgelegte Vorlage steht
+  dort nicht zur Wahl.
 
 ### Demo-Stammdaten
 

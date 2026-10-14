@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { createRef, type ReactElement, type Ref } from 'react';
+import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   ErfassungsFormular,
   ErfassungsModal,
@@ -50,6 +50,7 @@ function Harness(props: {
   uebernahme?: (keyof Werte)[];
   steuerungRef?: Ref<ErfassungsFormularSteuerung>;
   onErfasst?: (werte: Werte) => void | Promise<void>;
+  zusammenfassung?: ReactNode;
 }) {
   const [form] = Form.useForm<Werte>();
   return (
@@ -62,6 +63,7 @@ function Harness(props: {
       uebernahme={props.uebernahme}
       steuerungRef={props.steuerungRef}
       onErfasst={props.onErfasst}
+      zusammenfassung={props.zusammenfassung}
     >
       <Form.Item label="Ort" name="ort">
         <Input />
@@ -908,5 +910,31 @@ describe('ErfassungsModal', () => {
     expect(container.ownerDocument.querySelector('.ant-modal-footer')).toBeNull();
     const knopf = screen.getByRole('button', { name: 'Erfassen' });
     expect(knopf.closest('form')).not.toBeNull();
+  });
+});
+
+describe('ErfassungsFormular — Zusammenfassung am Knopf (LLH-1049)', () => {
+  it('steht in der Aktionszeile und beschreibt den Primärknopf', () => {
+    renderMitProviders(
+      <Harness
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={vi.fn()}
+        zusammenfassung="1 Zug, 1 Staffel, 3 Fahrzeuge, 6 Kräfte"
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf).toHaveAccessibleDescription('1 Zug, 1 Staffel, 3 Fahrzeuge, 6 Kräfte');
+    const text = screen.getByText('1 Zug, 1 Staffel, 3 Fahrzeuge, 6 Kräfte');
+    // Dieselbe Zeile wie die Knöpfe, nicht ein Absatz darüber im Formular.
+    expect(text.closest('[data-lfh="erfassung-aktion"]')).toBe(
+      knopf.closest('[data-lfh="erfassung-aktion"]'),
+    );
+  });
+
+  it('ohne Zusammenfassung trägt der Knopf keine Beschreibung', () => {
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    expect(screen.getByRole('button', { name: 'Erfassen' })).not.toHaveAttribute(
+      'aria-describedby',
+    );
   });
 });
