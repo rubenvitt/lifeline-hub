@@ -89,6 +89,9 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    // Stamm im Dienst (Gruppe „Aus dem Stamm“, LLH-1036 Teil II): leer.
+    http.get('/api/personal', () => HttpResponse.json([])),
+    http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sprechgruppen', () =>
       HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
     ),
@@ -158,11 +161,15 @@ function zeichneAuf(
  * Gegriffen wird die `combobox`-Rolle innerhalb des Feldes.
  */
 async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
-    s.textContent?.includes(platzhalter),
-  );
-  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
-  await userEvent.click(within(feld!).getByRole('combobox'));
+  // Die Zuordnen-Auswahl erscheint erst mit den Modulfreigaben.
+  const feld = await waitFor(() => {
+    const f = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+      s.textContent?.includes(platzhalter),
+    );
+    expect(f, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
+    return f!;
+  });
+  await userEvent.click(within(feld).getByRole('combobox'));
 }
 
 async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: string) {
@@ -178,13 +185,88 @@ async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: s
 }
 
 const paneel = (titel: string) => screen.getByRole('region', { name: titel });
+const BESATZUNG = 'Fahrzeuge und Besatzung';
+/** Zeile einer Person, eines Fahrzeugs oder eines Materialpostens. */
 const zeileVon = (text: string) =>
-  screen.getByText(text, { exact: false }).closest('[data-lfh="einheit-zuordnung"]') as HTMLElement;
+  screen
+    .getByText(text, { exact: false })
+    .closest(
+      '[data-lfh="einheit-person"], [data-lfh="einheit-fahrzeug"], [data-lfh="einheit-zuordnung"]',
+    ) as HTMLElement;
+
+/**
+ * Mitglieder einer Einheit, wie sie das Einheit-DTO und die Einsatzlisten tragen (die Besatzung
+ * rechnet aus den Listen, `mittelDerEinheit`).
+ */
+interface Mitglied {
+  ep_id: number;
+  name: string;
+  staerke_position: 'fuehrer' | 'unterfuehrer' | 'mannschaft' | null;
+  ist_fuehrer: boolean;
+  fahrzeug_id?: number | null;
+}
+function mitMitgliedern(
+  personen: Mitglied[],
+  fahrzeuge: { ef_id: number; funkrufname: string; fahrzeugtyp: string | null }[] = [],
+  material: { em_id: number; bezeichnung: string; menge: number; status: string }[] = [],
+) {
+  const einheit = {
+    ...einheiten[0],
+    fuehrer_id: personen.find((p) => p.ist_fuehrer)?.ep_id ?? null,
+    personal_mitglieder: personen.map((p) => ({
+      ep_id: p.ep_id,
+      name: p.name,
+      staerke_position: p.staerke_position,
+      ist_fuehrer: p.ist_fuehrer,
+    })),
+    fahrzeug_mitglieder: fahrzeuge,
+    material_mitglieder: material,
+  };
+  return {
+    einheit,
+    handler: [
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([einheit])),
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json(
+          personen.map((p) => ({
+            id: p.ep_id,
+            name: p.name,
+            einheit_id: 10,
+            fahrzeug_id: p.fahrzeug_id ?? null,
+            staerke_position: p.staerke_position,
+          })),
+        ),
+      ),
+      http.get('/api/einsaetze/1/fahrzeuge', () =>
+        HttpResponse.json(
+          fahrzeuge.map((f) => ({
+            id: f.ef_id,
+            funkrufname: f.funkrufname,
+            fahrzeugtyp: f.fahrzeugtyp,
+            einheit_id: 10,
+          })),
+        ),
+      ),
+    ],
+  };
+}
+
+/** Das zuletzt geöffnete Menü einer Person (jede Person hat ihr eigenes Portal). */
+async function waehleImMenue(name: string, eintrag: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Person ${name}` }));
+  const menue = await waitFor(() => {
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(offen.length).toBeGreaterThan(0);
+    return offen[offen.length - 1];
+  });
+  await userEvent.click(within(menue).getByText(eintrag));
+}
 
 const PANEELE = [
   'Kopfdaten',
-  'Personal',
-  'Fahrzeuge',
+  'Fahrzeuge und Besatzung',
   'Zeitachse',
   'Material',
   'Funk und Kommunikation',
@@ -193,29 +275,17 @@ const PANEELE = [
 ];
 
 describe('EinheitDetailPage · die Route selbst', () => {
-  it('nennt die Stärke-Position in Klartext, ohne den Satz „als Führer gezählt“ (D9)', async () => {
-    const mitPersonal = [
-      {
-        ...einheiten[0],
-        personal_mitglieder: [
-          { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
-          { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
-          {
-            ep_id: 3,
-            name: 'Nora Platzhalter',
-            staerke_position: 'mannschaft',
-            ist_fuehrer: false,
-          },
-        ],
-      },
-    ];
-    const { container } = zeige(
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(mitPersonal)),
-    );
-    expect(await screen.findByText(/Max Mustermann \(Führer\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Uwe Unter \(Unterführer\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Nora Platzhalter \(Mannschaft\)/)).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(/\((fuehrer|unterfuehrer|mannschaft)\)/);
+  it('nennt die Stärke-Position als Marke, ohne den Satz „als Führer gezählt“ (D9)', async () => {
+    const { handler } = mitMitgliedern([
+      { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
+      { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
+      { ep_id: 3, name: 'Nora Platzhalter', staerke_position: 'mannschaft', ist_fuehrer: false },
+    ]);
+    zeige(...handler);
+    await screen.findByText('Max Mustermann');
+    expect(zeileVon('Max Mustermann')).toHaveTextContent(/^FMax Mustermann/);
+    expect(zeileVon('Uwe Unter')).toHaveTextContent(/^UFUwe Unter/);
+    expect(zeileVon('Nora Platzhalter')).toHaveTextContent(/^MNora Platzhalter/);
     // Die Lücke zeigt die leere Zeile „Einheitsführer eintragen“ im Kopf, nicht ein Satz je Person.
     expect(screen.queryByText(/als Führer gezählt/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Einheitsführer eintragen' })).toBeInTheDocument();
@@ -271,11 +341,12 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(screen.queryByText(/alle drei Werte/)).not.toBeInTheDocument();
   });
 
-  it('jede Zuordnung steht in einem eigenen Paneel, ohne Erklärsatz (LFH-1078)', async () => {
+  it('Besatzung und Material stehen in eigenen Paneelen, ohne Erklärsatz (LFH-1078)', async () => {
     server.use(...handlers());
     rendere();
-    await screen.findByRole('heading', { name: 'Personal', level: 2 });
-    for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
+    await screen.findByRole('heading', { name: BESATZUNG, level: 2 });
+    expect(screen.queryByRole('heading', { name: 'Personal', level: 2 })).toBeNull();
+    for (const titel of [BESATZUNG, 'Material']) {
       expect(screen.getByRole('heading', { name: titel, level: 2 })).toBeInTheDocument();
     }
     expect(screen.queryByText(/wirken sofort|nichts zu speichern/)).not.toBeInTheDocument();
@@ -347,22 +418,14 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
     ).toHaveAccessibleDescription('EA Süd');
   });
 
-  it('„Als Einheitsführer“ an der Personzeile schickt genau `{ fuehrer_id }`', async () => {
-    const mitPersonal = {
-      ...einheiten[0],
-      personal_mitglieder: [
-        { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
-      ],
-    };
-    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', mitPersonal);
-    zeige(
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitPersonal])),
-      handler,
-    );
-    await screen.findByText('Max Mustermann', { exact: false });
-    await userEvent.click(
-      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Als Einheitsführer' }),
-    );
+  it('„Als Einheitsführer“ im Menü der Person schickt genau `{ fuehrer_id }`', async () => {
+    const { einheit, handler: mitglieder } = mitMitgliedern([
+      { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
+    ]);
+    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', einheit);
+    zeige(...mitglieder, handler);
+    await screen.findByText('Max Mustermann');
+    await waehleImMenue('Max Mustermann', 'Als Einheitsführer');
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({ fuehrer_id: 1 });
   });
@@ -469,35 +532,39 @@ describe('EinheitDetailPage · Datenzustände', () => {
 });
 
 describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
-  const mitMitgliedern = {
-    ...einheiten[0],
-    personal_mitglieder: [
-      { ep_id: 1, name: 'Max Mustermann', staerke_position: null, ist_fuehrer: false },
-    ],
-  };
+  const max = () =>
+    mitMitgliedern(
+      [{ ep_id: 1, name: 'Max Mustermann', staerke_position: null, ist_fuehrer: false }],
+      [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+    ).handler;
 
   it('Beobachter: kein Stift, keine Aufforderung, keine Statuswahl, kein Lösen, kein Auflösen', async () => {
-    server.use(
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitMitgliedern])),
-      ...handlers('beobachter'),
-    );
+    server.use(...max(), ...handlers('beobachter'));
     rendere();
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     expect(screen.queryAllByRole('button', { name: /bearbeiten$/ })).toHaveLength(0);
     expect(screen.queryByText(/eintragen$/)).toBeNull();
     expect(screen.queryByRole('button', { name: /^Status von / })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Als Einheitsführer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Person/ })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull();
     expect(screen.queryByText('Person zuordnen …')).toBeNull();
+    expect(screen.queryByText('Fahrzeug zuordnen …')).toBeNull();
+    expect(screen.queryByText('Material zuordnen …')).toBeNull();
+    // Die Besatzung steht trotzdem (Leser mit Freigabe), die Namen bleiben Links.
+    expect(await screen.findByRole('link', { name: 'Max Mustermann' })).toBeInTheDocument();
   });
 
-  it('Gegenprobe: mit Schreibrecht stehen Stift, Statuswahl, Lösen und Auflösen da', async () => {
-    zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitMitgliedern])));
+  it('Gegenprobe: mit Schreibrecht stehen Stift, Statuswahl, Menü, Lösen und Auflösen da', async () => {
+    zeige(...max());
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Status von 1. Zug ändern' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Status von FW 1/44-1 ändern' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktionen zu Person Max Mustermann' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Aus Einheit lösen' })).toBeInTheDocument();
+    expect(screen.getByText('Person zuordnen …')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Einheit auflösen' })).toBeInTheDocument();
   });
 
@@ -512,6 +579,47 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
       expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull(),
     );
     expect(screen.queryAllByRole('button', { name: /bearbeiten$/ })).toHaveLength(0);
+  });
+});
+
+describe('EinheitDetailPage · Listen nur mit Freigabe (D5)', () => {
+  /** Zählt die Abrufe der drei Einsatzlisten; der Rest kommt aus `handlers`. */
+  function zaehleAbrufe(gesperrt: string[]) {
+    const abrufe: string[] = [];
+    const liste = (pfad: string) =>
+      http.get(`/api/einsaetze/1/${pfad}`, () => {
+        abrufe.push(pfad);
+        return HttpResponse.json([]);
+      });
+    zeige(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture(Object.fromEntries(gesperrt.map((k) => [k, { zugriff: false }]))),
+        ),
+      ),
+      liste('personal'),
+      liste('fahrzeuge'),
+      liste('material'),
+    );
+    return abrufe;
+  }
+
+  it('Personal und Material gesperrt: weder ihre Listen abgefragt noch die Besatzung gezeigt', async () => {
+    const abrufe = zaehleAbrufe(['personal', 'material']);
+    expect(
+      await within(await screen.findByRole('region', { name: BESATZUNG })).findByRole('status'),
+    ).toHaveTextContent('Ohne Besatzung Modul Personal gesperrt');
+    await waitFor(() => expect(abrufe).toContain('fahrzeuge'));
+    expect(abrufe).not.toContain('personal');
+    expect(abrufe).not.toContain('material');
+  });
+
+  it('Gegenprobe: mit allen Freigaben werden alle drei Listen abgefragt, kein Hinweis', async () => {
+    const abrufe = zaehleAbrufe([]);
+    await waitFor(() =>
+      expect(new Set(abrufe)).toEqual(new Set(['personal', 'fahrzeuge', 'material'])),
+    );
+    expect(within(paneel(BESATZUNG)).queryByRole('status')).toBeNull();
   });
 });
 
@@ -557,19 +665,15 @@ describe('EinheitDetailPage · Auflösen (D12)', () => {
  * Zuordnung, „Aus Einheit lösen“ und „Als Einheitsführer“ an der Personzeile. Kein Fehler-Toast.
  */
 describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
-  const mitMitgliedern = [
-    {
-      ...einheiten[0],
-      personal_mitglieder: [
+  const mitglieder = () =>
+    mitMitgliedern(
+      [
         { ep_id: 1, name: 'Max Mustermann', staerke_position: null, ist_fuehrer: false },
         { ep_id: 2, name: 'Uwe Unter', staerke_position: null, ist_fuehrer: false },
       ],
-      fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
-      material_mitglieder: [{ em_id: 40, bezeichnung: 'Tragkraftspritze', menge: 1 }],
-    },
-  ];
-  const mitglieder = () =>
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(mitMitgliedern));
+      [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+      [{ em_id: 40, bezeichnung: 'Tragkraftspritze', menge: 1, status: 'einsatzbereit' }],
+    ).handler;
   const abgelehnt =
     (text: string, status = 409) =>
     () =>
@@ -618,14 +722,14 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
 
-    expect(await within(paneel('Personal')).findByRole('alert')).toHaveTextContent(
+    expect(await within(paneel(BESATZUNG)).findByRole('alert')).toHaveTextContent(
       'Person ist einer anderen Einheit zugeordnet',
     );
-    expect(within(paneel('Fahrzeuge')).queryByRole('alert')).toBeNull();
+    expect(within(paneel('Material')).queryByRole('alert')).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
     await waehleAus(container, 'Person zuordnen …', 'Otto Frei');
-    await waitFor(() => expect(within(paneel('Personal')).queryByRole('alert')).toBeNull());
+    await waitFor(() => expect(within(paneel(BESATZUNG)).queryByRole('alert')).toBeNull());
   });
 
   /**
@@ -659,7 +763,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     await waehleAus(container, 'Person zuordnen …', 'Otto Frei');
     await act(async () => lehneAb());
 
-    expect(await within(paneel('Personal')).findByRole('alert')).toHaveTextContent(
+    expect(await within(paneel(BESATZUNG)).findByRole('alert')).toHaveTextContent(
       'Person ist einer anderen Einheit zugeordnet',
     );
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
@@ -703,13 +807,13 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Funkrufname' }), 'Heros{Enter}');
     await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
     await within(paneel('Kopfdaten')).findByRole('alert');
-    await within(paneel('Personal')).findByRole('alert');
+    await within(paneel(BESATZUNG)).findByRole('alert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Einheit' }));
     await screen.findByRole('heading', { name: '2. Zug', level: 1 });
     expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
     expect(within(paneel('Kopfdaten')).queryByRole('textbox')).toBeNull();
-    expect(within(paneel('Personal')).queryByRole('alert')).toBeNull();
+    expect(within(paneel(BESATZUNG)).queryByRole('alert')).toBeNull();
   });
 
   /**
@@ -720,7 +824,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     zeige(
-      mitglieder(),
+      ...mitglieder(),
       http.delete('/api/einsaetze/1/einheiten/10/personal/:epId', async ({ params }) => {
         if (params.epId === '1') {
           await ersteAblehnung;
@@ -730,12 +834,8 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
       }),
     );
     await screen.findByText('Max Mustermann', { exact: false });
-    await userEvent.click(
-      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Aus Einheit lösen' }),
-    );
-    await userEvent.click(
-      within(zeileVon('Uwe Unter')).getByRole('button', { name: 'Aus Einheit lösen' }),
-    );
+    await waehleImMenue('Max Mustermann', 'Aus Einheit lösen');
+    await waehleImMenue('Uwe Unter', 'Aus Einheit lösen');
     lehneAb();
 
     expect(
@@ -747,16 +847,14 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
 
   it('Als Einheitsführer: der Grund steht an der Zeile, die nächste Aktion dort räumt ihn', async () => {
     zeige(
-      mitglieder(),
+      ...mitglieder(),
       http.patch(
         '/api/einsaetze/1/einheiten/10',
         erstAblehnenDannWarten('Person ist nicht disponiert'),
       ),
     );
     await screen.findByText('Max Mustermann', { exact: false });
-    const knopf = () =>
-      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Als Einheitsführer' });
-    await userEvent.click(knopf());
+    await waehleImMenue('Max Mustermann', 'Als Einheitsführer');
 
     expect(
       await within(zeileVon('Max Mustermann')).findByText('Person ist nicht disponiert'),
@@ -765,7 +863,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
-    await userEvent.click(knopf());
+    await waehleImMenue('Max Mustermann', 'Als Einheitsführer');
     await waitFor(() =>
       expect(zeileVon('Max Mustermann').querySelector('[data-fehler]')).toBeNull(),
     );
@@ -773,7 +871,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
 
   it('Fahrzeug und Material aus der Einheit lösen: der Grund steht an ihrer Zeile', async () => {
     zeige(
-      mitglieder(),
+      ...mitglieder(),
       http.delete(
         '/api/einsaetze/1/einheiten/10/fahrzeug/30',
         abgelehnt('Fahrzeug ist im Einsatz gebunden'),
