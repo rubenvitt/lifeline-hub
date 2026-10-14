@@ -141,7 +141,7 @@ Zustand nicht prüft.
 ### Requirement: Entlassene im Nachweis
 
 Meldebild-Druck, die Übernahme des Meldebilds in einen Lagebericht und der Einsatzbericht SHALL
-entlassene Kräfte als eigenen Block „Entlassen“ führen. Stornierte Kräfte MUST in keinem
+entlassene Personen als eigenen Block „Entlassen“ führen. Stornierte Kräfte MUST in keinem
 Nachweis erscheinen.
 
 #### Scenario: Meldebild nennt Entlassene
