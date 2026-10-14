@@ -53,8 +53,8 @@ Für Einsatzleitung und Führungspersonal:
    ihrem Pfad, etwa „Sanitätszug Musterstadt › Rettungsstaffel“.
 3. Auf der Seite „Einheit aus Vorlage bilden“ den „Name“ der obersten Einheit prüfen und bei Bedarf
    einen „Abschnitt“ wählen.
-4. Im Baum der Vorlage anhaken, was mitkommt. Fahrzeuge sind angehakt, Personen nicht; jede Zeile
-   nennt rechts ihren Zustand im Einsatz.
+4. Im Baum der Vorlage anhaken, was mitkommt. Fahrzeuge, die neu oder im Einsatz frei sind, sind
+   angehakt, Personen nicht; jede Zeile nennt rechts ihren Zustand im Einsatz.
 
    ![Seite „Einheit aus Vorlage bilden“ mit Name und Abschnitt, darunter Sanitätszug und Rettungsstaffel mit ihren Fahrzeugen, der Besatzung und dem Zustand je Zeile](../bilder/einheiten/vorlage-bilden.png)
 
