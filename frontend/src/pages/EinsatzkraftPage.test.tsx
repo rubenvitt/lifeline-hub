@@ -458,8 +458,9 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
 });
 
 describe('EinsatzkraftPage – entlassene Person (3.5)', () => {
-  const entlassen = () =>
-    kraft({ beendet_at: '2026-10-14T12:00:00Z', einheit_id: null, fahrzeug_id: null });
+  // Heute 14:00 Ortszeit: an einem früheren Tag stellt die Anzeige den Tag voran.
+  const heute1400 = () => dayjs().hour(14).minute(0).second(0).utc().format('YYYY-MM-DD HH:mm:ss');
+  const entlassen = () => kraft({ beendet_at: heute1400(), einheit_id: null, fahrzeug_id: null });
 
   it('liest nur, nennt die Entlassung und bietet „Erneut disponieren“', async () => {
     renderAnsicht('/einsaetze/7/personal/10', { aktiv: [], entlassene: [entlassen()] });
