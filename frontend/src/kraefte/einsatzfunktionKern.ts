@@ -3,7 +3,7 @@
  * gerade tut (Sprechfunker, Melder), getrennt von dem, was er kann (`funktion`, Qualifikation).
  *
  * Wo eine Person mit nur einer Funktionsangabe steht (Meldebild, Lagebericht-Übernahme,
- * Druck-Anlage, Auswahllisten, Vorschau), gilt `funktionText`: die Einsatzfunktion, sonst die
+ * Druck-Anlage, Auswahllisten), gilt `funktionText`: die Einsatzfunktion, sonst die
  * Qualifikation. Spiegel von `EinsatzPersonalAnzeige::funktion_text` im Server (design.md D2).
  *
  * Die Vorschläge kommen aus einer festen Liste, den aktiven Qualifikationen und den im Einsatz

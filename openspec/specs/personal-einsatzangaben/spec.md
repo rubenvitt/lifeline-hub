@@ -50,10 +50,15 @@ nichts, MUST kein Eintrag entstehen.
 
 ### Requirement: Einsatzfunktion vor Qualifikation
 Wo eine Person mit nur einer Funktionsangabe erscheint (Meldebild, Lagebericht-Übernahme,
-Druck-Anlage Personal, Auswahllisten, Vorschau), SHALL die Einsatzfunktion stehen und, wenn sie
-leer ist, die Qualifikation. Die Personalliste MUST beide zeigen, die Qualifikation nicht nur als
-Tooltip.
+Druck-Anlage Personal, Auswahllisten), SHALL die Einsatzfunktion stehen und, wenn sie leer ist,
+die Qualifikation. Die Personalliste MUST beide zeigen, die Qualifikation nicht nur als Tooltip.
 
 #### Scenario: Meldebild
 - **WHEN** eine Notfallsanitäterin die Einsatzfunktion „Gruppenführerin“ hat
 - **THEN** steht im Meldebild „Gruppenführerin“ an ihrer Zeile
+
+#### Scenario: Vorschau zeigt Funktion und Qualifikation getrennt
+- **WHEN** die Vorschau eine Person mit der Einsatzfunktion „Sprechfunker“ und der Qualifikation
+  „Sanitäter“ zeigt
+- **THEN** steht „Sprechfunker“ im Feld „Funktion“ und „Sanitäter“ im Feld „Qualifikation“, nicht
+  zu einer Angabe zusammengezogen
