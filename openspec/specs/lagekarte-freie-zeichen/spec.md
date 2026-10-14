@@ -37,25 +37,27 @@ lässt, MUST NOT den Server zu einer anderen Antwort als 2xx oder 400 bringen.
 - **WHEN** ein Client eine Zeichenbeschreibung mit einer Bezeichnung im Zeichen sendet
 - **THEN** antwortet der Server mit 400 und verweist auf das Feld für die Bezeichnung
 
-### Requirement: Übergang für Clients mit altem Format
-In der Übergangszeit SHALL der Server beim Anlegen und Ändern zusätzlich das bisherige Format
-mit Grundzeichen und Overlay-Kennungen annehmen. Ein Schreibvorgang MUST genau eines der beiden
-Formate tragen, sonst antwortet der Server mit 400. Ein Zeichen im bisherigen Format MUST danach
-genauso angezeigt werden wie ein Altbestand.
+### Requirement: Server nimmt nur die Zeichenbeschreibung an
+Der Server SHALL beim Anlegen und Ändern nur die Zeichenbeschreibung annehmen. Er MUST mit 400
+antworten, wenn ein Schreibvorgang das bisherige Format mit Grundzeichen und Overlay-Kennungen
+trägt, allein oder neben einer Zeichenbeschreibung, und dabei nichts anlegen oder ändern. Fehlt
+die Zeichenbeschreibung beim Anlegen, MUST er ebenfalls mit 400 antworten.
 
-#### Scenario: Veralteter Client legt an
+#### Scenario: Veralteter Client sendet das alte Format
 - **WHEN** ein Client mit dem Stand vor der Umstellung ein Zeichen mit Grundzeichen „Person“ anlegt
-- **THEN** legt der Server das Zeichen an, und alle Clients zeigen es als Person
+- **THEN** antwortet der Server mit 400 und nennt das alte Format als Grund, und es entsteht kein Zeichen
 
 #### Scenario: Beide Formate zugleich
 - **WHEN** ein Client eine Zeichenbeschreibung und zugleich ein Grundzeichen sendet
 - **THEN** antwortet der Server mit 400
 
-### Requirement: Altbestand bleibt ohne Umschreiben lesbar
+### Requirement: Altbestand bleibt lesbar
 Das System SHALL freie Zeichen im bisherigen Format beim Lesen in eine Zeichenbeschreibung
-übersetzen und MUST sie dafür nicht umschreiben. Das gilt für gespeicherte Zeichen, Lage-Snapshots
-und den Offline-Stand des Geräts gleichermaßen. Ändert ein aktueller Client ein solches Zeichen,
-MUST er es als Zeichenbeschreibung speichern.
+übersetzen. Gespeicherte Altzeichen tragen ihre Altwerte unverändert in einer Hülle an der
+Stelle der Zeichenbeschreibung; Lage-Snapshots und der Offline-Stand des Geräts behalten das
+bisherige Format. Das System MUST alle drei gleich darstellen. Ändert ein aktueller Client das
+Zeichen eines Altzeichens, MUST er es als Zeichenbeschreibung speichern; eine reine Umbenennung
+MUST die Hülle stehen lassen.
 
 #### Scenario: Rückblick auf einen alten Lage-Snapshot
 - **WHEN** eine Person einen Lage-Snapshot öffnet, der vor der Umstellung eingefroren wurde

@@ -3376,4 +3376,192 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     expect(screen.queryByText('In der Ansicht gespeichert')).toBeNull();
     expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9');
   });
+
+  /** Neue Ansicht „Nord“ in A anlegen; die Antwort hält bis `gibFrei`. */
+  async function legeNordAn(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Neue Ansicht/ }));
+    const dialog = await offenerDialog('Neue Ansicht');
+    await user.type(within(dialog).getByLabelText('Ansichts-Name', { selector: 'input' }), 'Nord');
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/, hidden: true }));
+  }
+  function verzoegertesAnlegen() {
+    const lauf = { angefragt: false, gibFrei: () => {} };
+    return {
+      lauf,
+      handler: http.post('/api/einsaetze/1/karten-ansichten', async () => {
+        lauf.angefragt = true;
+        await new Promise<void>((r) => (lauf.gibFrei = r));
+        return HttpResponse.json(
+          { ...ANSICHT, id: 5, name: 'Nord', ist_standard: false },
+          { status: 201 },
+        );
+      }),
+    };
+  }
+
+  // LLH-1154: eine Anfrage aus A sperrt in B nichts. Die Mutation lebt über den Wechsel weiter, ihr
+  // `isPending` gehört aber A.
+  it('ein laufendes Anlegen aus A sperrt die Ansichtswahl in B nicht', async () => {
+    const { lauf, handler } = verzoegertesAnlegen();
+    basisHandler([...EINSATZ_B, handler]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte');
+    await legeNordAn(user);
+    await waitFor(() => expect(lauf.angefragt).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ansichts-Aktionen' })).toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+
+    await wechsleNachB();
+
+    expect(screen.getByRole('button', { name: 'Ansichts-Aktionen' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
+    expect(screen.getByRole('combobox', { name: 'Kartenansicht wählen' })).toBeEnabled();
+    await antworte(client, lauf.gibFrei);
+  });
+
+  it('ein laufendes Speichern aus A lädt in B nicht', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      ...EINSATZ_B,
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return HttpResponse.json({ ...ANSICHT, id: 1, name: 'Standard', ist_standard: true });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte');
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await wechsleNachB();
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+
+    expect(
+      await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }),
+    ).not.toHaveClass('ant-btn-loading');
+    await antworte(client, gibFrei);
+  });
+});
+
+/**
+ * Wer die Lagekarte verlässt, bevor die Antwort einer Ansichts-Handlung da ist, bleibt, wo er hin
+ * wollte (LLH-1154): das alte `setSearchParams` führte sonst zurück auf die Lagekarte. Der
+ * Einsatz-Riegel aus LFH-1138 greift hier nicht, der Einsatz ist derselbe.
+ */
+describe('LLH-1154: späte Ansichts-Antwort nach Verlassen der Lagekarte', () => {
+  const ANSICHT = { einsatz_id: 1, reihenfolge: 0, erstellt_at: '', geaendert_at: '' };
+
+  function Ort() {
+    const navigate = useNavigate();
+    const loc = useLocation();
+    return (
+      <>
+        <button type="button" onClick={() => void navigate('/einsaetze/1/etb')}>
+          Zum ETB
+        </button>
+        <div data-testid="ort">{loc.pathname + loc.search}</div>
+      </>
+    );
+  }
+  function renderMitAusgang(route: string) {
+    return renderMitProviders(
+      <>
+        <Ort />
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+          <Route path="/einsaetze/:id/etb" element={<div>ETB-Seite</div>} />
+        </Routes>
+      </>,
+      { route },
+    );
+  }
+  const ort = () => screen.getByTestId('ort').textContent;
+  async function offenerDialog(titel: string) {
+    return waitFor(() => {
+      const el = [...document.querySelectorAll<HTMLElement>('.ant-modal')].find((m) =>
+        m.textContent?.includes(titel),
+      );
+      expect(el).toBeDefined();
+      return el!;
+    });
+  }
+  async function verlasse() {
+    fireEvent.click(screen.getByRole('button', { name: 'Zum ETB' }));
+    await screen.findByText('ETB-Seite');
+  }
+  async function antworte(client: QueryClient, gibFrei: () => void) {
+    await act(async () => gibFrei());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+  }
+
+  it('eine spät angelegte Ansicht führt nicht zurück auf die Lagekarte', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      http.post('/api/einsaetze/1/karten-ansichten', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return HttpResponse.json(
+          { ...ANSICHT, id: 5, name: 'Nord', ist_standard: false },
+          { status: 201 },
+        );
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitAusgang('/einsaetze/1/lagekarte');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Neue Ansicht/ }));
+    const dialog = await offenerDialog('Neue Ansicht');
+    await user.type(within(dialog).getByLabelText('Ansichts-Name', { selector: 'input' }), 'Nord');
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/, hidden: true }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await verlasse();
+    // Ohne Riegel führte die Antwort jetzt nach `/einsaetze/1/lagekarte?ansicht=5`.
+    await antworte(client, gibFrei);
+
+    expect(ort()).toBe('/einsaetze/1/etb');
+    expect(screen.getByText('ETB-Seite')).toBeInTheDocument();
+    expect(screen.queryByText(/Ansicht „Nord" angelegt/)).toBeNull();
+  });
+
+  it('eine spät gelöschte aktive Ansicht führt nicht zurück auf die Lagekarte', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      http.get('/api/einsaetze/1/karten-ansichten', () =>
+        HttpResponse.json([
+          { ...ANSICHT, id: 1, name: 'Standard', ist_standard: true },
+          { ...ANSICHT, id: 2, name: 'Nord', reihenfolge: 1, ist_standard: false },
+        ]),
+      ),
+      http.delete('/api/einsaetze/1/karten-ansichten/2', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitAusgang('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Löschen/ }));
+    const dialog = await offenerDialog('löschen');
+    await user.click(within(dialog).getByRole('button', { name: 'Löschen', hidden: true }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await verlasse();
+    await antworte(client, gibFrei);
+
+    expect(ort()).toBe('/einsaetze/1/etb');
+    expect(screen.queryByText('Ansicht gelöscht')).toBeNull();
+  });
 });

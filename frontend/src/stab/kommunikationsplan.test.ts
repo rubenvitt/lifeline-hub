@@ -3,6 +3,7 @@ import type {
   Einheit,
   Einsatzabschnitt,
   Einsatzleiter,
+  ExterneStelle,
   Fuehrungsstelle,
   KommunikationsStelle,
   SkizzenVerbindung,
@@ -14,6 +15,10 @@ import {
   brauchtRueckfrage,
   entfernText,
   entfernUmfang,
+  katalogStellenFuer,
+  leitstellenVorschlag,
+  STELLENART_AUS_KATALOG,
+  verbindungAusRufnummer,
   verbindungsVerweis,
   type KommunikationsplanQuellen,
 } from './kommunikationsplan';
@@ -635,5 +640,74 @@ describe('entfernUmfang / entfernText (LFH-893)', () => {
     expect(
       entfernText('Polizei PI Nord', { verbindungen: 2, sprechgruppen: 0, skizzenVerbindungen: 0 }),
     ).toBe('„Polizei PI Nord“ wird aus dem Kommunikationsplan entfernt, mit 2 Verbindungen.');
+  });
+});
+
+// ── Katalog „Externe Stellen“ (LLH-1165) ──────────────────────────────────────────────────────
+
+function katalogStelle(id: number, p: Partial<ExterneStelle>): ExterneStelle {
+  return {
+    id,
+    bezeichnung: `Stelle ${id}`,
+    art: 'sonstige',
+    aktiv: true,
+    zustaendig: false,
+    ...p,
+  };
+}
+
+function planStelle(id: number, p: Partial<KommunikationsStelle>): KommunikationsStelle {
+  return { id, stellenart: 'sonstige', verbindungen: [], sprechgruppen: [], ...p };
+}
+
+describe('Katalog „Externe Stellen“ im Kommunikationsplan (LLH-1165)', () => {
+  it('bildet Polizei auf Behörde und Hilfsorganisation auf sonstige Stelle ab (LFH-1194 D2)', () => {
+    expect(STELLENART_AUS_KATALOG).toEqual({
+      leitstelle: 'leitstelle',
+      polizei: 'behoerde',
+      behoerde: 'behoerde',
+      hilfsorganisation: 'sonstige',
+      sonstige: 'sonstige',
+    });
+  });
+
+  it('schlägt je Planart nur aktive Katalogstellen vor, die als diese Art in den Plan kommen', () => {
+    const katalog = [
+      katalogStelle(1, { bezeichnung: 'ILS Nord', art: 'leitstelle' }),
+      katalogStelle(2, { bezeichnung: 'PI Nord', art: 'polizei' }),
+      katalogStelle(3, { bezeichnung: 'Ordnungsamt', art: 'behoerde' }),
+      katalogStelle(4, { bezeichnung: 'Altes Amt', art: 'behoerde', aktiv: false }),
+      katalogStelle(5, { bezeichnung: 'DLRG', art: 'hilfsorganisation' }),
+    ];
+    const namen = (art: Parameters<typeof katalogStellenFuer>[0]) =>
+      katalogStellenFuer(art, katalog).map((s) => s.bezeichnung);
+    expect(namen('leitstelle')).toEqual(['ILS Nord']);
+    expect(namen('behoerde')).toEqual(['PI Nord', 'Ordnungsamt']);
+    expect(namen('sonstige')).toEqual(['DLRG']);
+    expect(namen('verbindungsperson')).toEqual([]);
+    expect(namen('funktion')).toEqual([]);
+  });
+
+  it('bietet die zuständige Leitstelle nur an, solange der Plan keine Leitstelle führt', () => {
+    const katalog = [
+      katalogStelle(1, { bezeichnung: 'ILS Süd', art: 'leitstelle' }),
+      katalogStelle(2, { bezeichnung: 'ILS Nord', art: 'leitstelle', zustaendig: true }),
+    ];
+    expect(leitstellenVorschlag([planStelle(9, { stellenart: 'behoerde' })], katalog)?.id).toBe(2);
+    // Eine Leitstelle ohne Verbindung im Plan: die Verbindung gehört an sie, keine zweite Stelle.
+    expect(
+      leitstellenVorschlag(
+        [planStelle(9, { stellenart: 'leitstelle', bezeichnung: 'X' })],
+        katalog,
+      ),
+    ).toBeUndefined();
+    // Ohne zuständige Leitstelle im Katalog kein Vorschlag.
+    expect(leitstellenVorschlag([], [katalogStelle(1, { art: 'leitstelle' })])).toBeUndefined();
+  });
+
+  it('macht aus der Rufnummer eine Festnetz-Verbindung, ohne Nummer keine', () => {
+    expect(verbindungAusRufnummer(' 0421 112 ')).toEqual({ mittel: 'festnetz', wert: '0421 112' });
+    expect(verbindungAusRufnummer('  ')).toBeUndefined();
+    expect(verbindungAusRufnummer(null)).toBeUndefined();
   });
 });

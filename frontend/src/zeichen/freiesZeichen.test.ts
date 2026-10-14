@@ -7,6 +7,7 @@ import {
 } from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
 import {
+  altform,
   freiesZeichen,
   fuellfarbe,
   naechstesFarbtoken,
@@ -169,7 +170,18 @@ const personZustand = (s: Parameters<typeof S>[0], naeherung?: true): SymbolErwa
 // Ein Grundzeichen als Symbol: freistehend als Körper („Körper statt Piktogramm“), im
 // Grundzeichen entfällt es (Entscheidung der Bibliothek vom 10.10.2026, Punkt 5).
 const koerper = (k: SymbolSpec): SymbolErwartung => ({ frei: k, imKoerper: null, naeherung: true });
-const ohneNachfolger: SymbolErwartung = { frei: null, imKoerper: null };
+// Ein Pfeil aus 5.2 als Punktzeichen auf dem Verlauf der Referenz (`referenceMovementSpec`).
+const PFEIL = (movement: string, ende: number): AnySpec =>
+  ({
+    kind: 'movement',
+    movement,
+    path: {
+      points: [
+        [2, 16],
+        [ende, 16],
+      ],
+    },
+  }) as AnySpec;
 
 const SYMBOLE: Record<string, SymbolErwartung> = {
   drehleiter: faehig('rescue-aerial-ladder'),
@@ -204,12 +216,14 @@ const SYMBOLE: Record<string, SymbolErwartung> = {
   warnung: faehig('loudspeaker-warning', true),
   // Bildtreu: das Altpaket zeichnete ein Dreieck mit gekreuzten Stangen (4.8.16).
   zelt: faehig('frame-tent', true),
-  sichten: ohneNachfolger,
-  // Technische Körpermarke F.3.6; freistehend nur als Pfeil mit Verlauf (gehört zum Zeichnen).
-  sammeln: { frei: null, imKoerper: { bodyMarks: ['circle-collection-arrow'] } },
-  // Bildtreu F.3.12 (Doppelpfeil, Stiel, V).
+  // SKK 2010, 7.5 → Pfeil 5.2.4 auf dem Verlauf der Referenz; im Grundzeichen nicht belegt
+  // (einsatzzeichen, Entscheidungen vom 13.10.2026 zu ESZ-138 und ESZ-139).
+  sichten: { frei: PFEIL('movement-both-directions', 30), imKoerper: null },
+  // Freistehend der Pfeil 5.2.6 (SKK 2010, 7.6), im Grundzeichen die Körpermarke F.3.6.
+  sammeln: { frei: PFEIL('gathering', 26), imKoerper: { bodyMarks: ['circle-collection-arrow'] } },
+  // Freistehend das Altzeichen SKK 2010, 10.3.23; im Grundzeichen bildtreu F.3.12.
   'sammelplatz-betroffene': {
-    frei: null,
+    frei: { kind: 'pictogram', pictogram: 'site.affected-persons-assembly-point' },
     imKoerper: { bodyMarks: ['circle-double-arrow-lower-v'] },
   },
   veterinaerwesen: faehig('veterinary'),
@@ -269,10 +283,14 @@ const SYMBOLE: Record<string, SymbolErwartung> = {
   'fax-funk': { frei: COMMS('fax-transmission', false), imKoerper: null },
   fernsprechen: { frei: COMMS('voice', true), imKoerper: null },
   'fernsprechen-funk': { frei: COMMS('voice', false), imKoerper: null },
-  fernschreiben: ohneNachfolger,
-  'fernschreiben-funk': ohneNachfolger,
-  festbilduebertragung: ohneNachfolger,
-  'festbilduebertragung-funk': ohneNachfolger,
+  // Altzeichen SKK 2010, 8.5 und 8.6 im Raum von Anhang J (ESZ-137), nur freistehend.
+  fernschreiben: { frei: COMMS('teleprinter-transmission', true), imKoerper: null },
+  'fernschreiben-funk': { frei: COMMS('teleprinter-transmission', false), imKoerper: null },
+  festbilduebertragung: { frei: COMMS('still-image-transmission', true), imKoerper: null },
+  'festbilduebertragung-funk': {
+    frei: COMMS('still-image-transmission', false),
+    imKoerper: null,
+  },
   relaisfunkbetrieb: {
     frei: { kind: 'pictogram', pictogram: 'comms.voice-radio-dmo-repeater' },
     imKoerper: null,
@@ -284,7 +302,11 @@ const SYMBOLE: Record<string, SymbolErwartung> = {
   'technische-hilfeleistung': faehig('technical-assistance'),
   bergung: faehig('recovery'),
   seelsorge: faehig('pastoral-care'),
-  drohne: ohneNachfolger,
+  // Sonderform 3.6 freistehend (ESZ-134); an Stelle, Gefahr und Maßnahme nicht belegt.
+  drohne: {
+    frei: { kind: 'pictogram', pictogram: 'special-form.drone' },
+    imKoerper: null,
+  },
 };
 
 describe('freiesZeichen — Symbole frei, Grundzeichen „ohne“ (D5)', () => {
@@ -298,6 +320,22 @@ describe('freiesZeichen — Symbole frei, Grundzeichen „ohne“ (D5)', () => {
       e.frei ?? PUNKT,
       e.frei === null ? 'platzhalter' : e.naeherung ? 'naeherung' : 'exakt',
     );
+  });
+
+  // Die acht Alt-Symbole, die bis LLH-1159 auf den Platzhalter fielen: jedes hat jetzt ein Bild.
+  it.each([
+    'sichten',
+    'sammeln',
+    'sammelplatz-betroffene',
+    'fernschreiben',
+    'fernschreiben-funk',
+    'festbilduebertragung',
+    'festbilduebertragung-funk',
+    'drohne',
+  ])('zeichnet %s freistehend ohne Platzhalter', (symbol) => {
+    const z = freiesZeichen({ grundzeichen: 'ohne', symbol });
+    expect(z.spec).not.toEqual(PUNKT);
+    expect(z.vereinfacht).toBe(false);
   });
 
   it('liest ein freies Symbol auch ohne gespeichertes Grundzeichen', () => {
@@ -855,6 +893,52 @@ describe('freiesZeichen — gespeicherte Spec (zeichen_spec)', () => {
   it('nimmt null und leeren String wie fehlend', () => {
     pruefe({ zeichen_spec: null, grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
     pruefe({ zeichen_spec: '', grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
+  });
+});
+
+// LLH-1160: Migration 0192 schreibt die Altwerte einer Altzeile als Hülle in `zeichen_spec`
+// (`json_patch` lässt NULL weg). Die Hülle muss genau so zeichnen wie dieselben Altspalten.
+describe('freiesZeichen — Hülle der Altzeilen (LLH-1160)', () => {
+  const huelle = (alt: FreiesZeichenEingabe) => JSON.stringify({ v: 1, alt });
+
+  it.each<FreiesZeichenEingabe>([
+    { grundzeichen: 'person' },
+    { grundzeichen: 'gefahr', symbol: 'abc', farbe: '#cc0000' },
+    {
+      grundzeichen: 'taktische-formation',
+      organisation: 'feuerwehr',
+      fachaufgabe: 'brandbekaempfung',
+      einheit: 'zug',
+      farbe: '#ff0000',
+    },
+    { grundzeichen: 'person', funktion: 'fuehrungskraft' },
+    { grundzeichen: 'ohne', symbol: 'fernschreiben' },
+    { grundzeichen: 'gibt-es-nicht' },
+  ])('zeichnet die Hülle wie die Altspalten: %o', (alt) => {
+    const ausHuelle = freiesZeichen({ zeichen_spec: huelle(alt) });
+    const ausSpalten = freiesZeichen(alt);
+    expect(ausHuelle.schluessel).toBe(ausSpalten.schluessel);
+    expect(ausHuelle.vereinfacht).toBe(ausSpalten.vereinfacht);
+  });
+
+  it('liest die Altwerte aus der Hülle, nur Zeichenketten', () => {
+    expect(
+      altform({
+        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"gefahr","symbol":"abc","farbe":7}}',
+      }),
+    ).toEqual({ grundzeichen: 'gefahr', symbol: 'abc' });
+  });
+
+  it('liest die Altform eines Snapshots von vor LFH-836 aus den Feldern', () => {
+    const alt = { grundzeichen: 'person', organisation: null };
+    expect(altform(alt)).toBe(alt);
+  });
+
+  it('hat für eine echte, kaputte oder fehlende Beschreibung keine Altform', () => {
+    expect(altform({ zeichen_spec: serializeAnySpec({ kind: 'hazard' }) })).toBeNull();
+    expect(altform({ zeichen_spec: '{kaputt' })).toBeNull();
+    expect(altform({ zeichen_spec: '{"v":1,"alt":["person"]}' })).toBeNull();
+    expect(altform({})).toBeNull();
   });
 });
 

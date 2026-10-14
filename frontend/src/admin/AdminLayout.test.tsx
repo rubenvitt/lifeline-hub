@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
@@ -192,6 +193,73 @@ describe('AdminLayout — unter lg (Handschirm)', () => {
     expect(document.querySelector('.ant-layout-sider')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /^Verwaltung/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Fahrzeuge' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Die Warnleiste der Datenträgerprüfung steht ÜBER dem Inhalt. Käme sie nach dem Seitentitel,
+ * schöbe sie die Seite nach unten (LLH-1229); der Inhalt erscheint deshalb erst mit dem ersten
+ * Befund. Den Sprung selbst misst `e2e/verwaltung-datentraeger-cls.spec.ts`.
+ */
+describe('AdminLayout — Inhalt wartet auf den Datenträger-Befund', () => {
+  /** Hält die Antwort zurück, bis der Test sie freigibt. */
+  function haltePruefung(antwort: () => Response) {
+    let freigeben!: () => void;
+    const tor = new Promise<void>((fertig) => {
+      freigeben = fertig;
+    });
+    server.use(
+      http.get('/api/system/datentraeger', async () => {
+        await tor;
+        return antwort();
+      }),
+    );
+    return freigeben;
+  }
+
+  const WARNUNG = {
+    gesamt: 'unverschluesselt',
+    warnung: true,
+    extern_zugesichert: false,
+    geprueft_um: '2026-10-09 12:00:00',
+    orte: [{ art: 'datenbank', pfad: '/data', wert: 'unverschluesselt' }],
+  };
+
+  it.each([390, 1366])(
+    'bei %i px: Navigation sofort, Inhalt erst zusammen mit der Warnleiste',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      const freigeben = haltePruefung(() => HttpResponse.json(WARNUNG));
+      setup(admin, '/admin/stammdaten/fahrzeuge');
+      expect(await screen.findByRole('navigation', { name: 'Verwaltung' })).toBeInTheDocument();
+      // Die Seite hängt schon (sie lädt mit), steht aber nicht im Bild.
+      expect(await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge')).not.toBeVisible();
+      freigeben();
+      expect(await screen.findByRole('status')).toHaveTextContent('Datenträger unverschlüsselt');
+      expect(screen.getByText('PFAD:/admin/stammdaten/fahrzeuge')).toBeVisible();
+    },
+  );
+
+  it('ein Fehler der Prüfung gibt den Inhalt ohne Warnleiste frei', async () => {
+    const freigeben = haltePruefung(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
+    setup(admin, '/admin/stammdaten/fahrzeuge');
+    await screen.findByRole('navigation', { name: 'Verwaltung' });
+    freigeben();
+    await waitFor(() => expect(screen.getByText('PFAD:/admin/stammdaten/fahrzeuge')).toBeVisible());
+    expect(document.querySelector('[data-lfh="datentraeger-warnung"]')).toBeNull();
+  });
+
+  it('wer die Prüfung nicht abfragt, wartet auch nicht auf sie', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/system/datentraeger', () => {
+        abrufe += 1;
+        return new Promise<Response>(() => {});
+      }),
+    );
+    setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
+    expect(await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge')).toBeVisible();
+    expect(abrufe).toBe(0);
   });
 });
 

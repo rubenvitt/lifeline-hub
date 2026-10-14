@@ -420,12 +420,24 @@ export type ZoneTyp = S['LageZoneTyp'];
 export type LageZone = S['LageZoneAnzeige'];
 
 // ============================== LFH-170 Freie taktische Zeichen ==============================
-export type FreiesZeichen = S['FreiesZeichenAnzeige'];
+/** Ein freies Zeichen, wie die Route es liefert (`zeichen_spec` ist dort Pflicht, LLH-1160) oder
+ *  wie ein Lage-Snapshot von vor LFH-836 es eingefroren hat: nur die Altform, ohne
+ *  `zeichen_spec`. Der Leseadapter `zeichen/freiesZeichen.ts` nimmt beides. */
+export type FreiesZeichen = Omit<S['FreiesZeichenAnzeige'], 'zeichen_spec'> & {
+  zeichen_spec?: string | null;
+  grundzeichen?: string | null;
+  organisation?: string | null;
+  fachaufgabe?: string | null;
+  symbol?: string | null;
+  einheit?: string | null;
+  funktion?: string | null;
+  farbe?: string | null;
+};
 
 /** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt). Kein
- *  Backend-Schema, FE-lokal. Neue Clients senden nur `zeichen_spec`, die kanonische
- *  Zeichenbeschreibung von @einsatzzeichen (`serializeAnySpec`; LFH-836, design.md D1/D4); den
- *  alten Body mit Grundzeichen und Overlays nimmt der Server nur noch für veraltete Clients an. */
+ *  Backend-Schema, FE-lokal. Das Zeichen steht allein in `zeichen_spec`, der kanonischen
+ *  Zeichenbeschreibung von @einsatzzeichen (`serializeAnySpec`; LFH-836, design.md D1). Den alten
+ *  Body mit Grundzeichen und Overlays lehnt der Server seit LLH-1160 ab. */
 export interface NeuesFreiesZeichen {
   lat: number;
   lon: number;
@@ -435,12 +447,12 @@ export interface NeuesFreiesZeichen {
   ansicht_id?: number | null;
 }
 
-/** PATCH-Body (ohne lat/lon, nicht verschiebbar). `zeichen_spec` schreibt das Zeichen und leert
- *  die Altspalten; eine Altzeile wird so beim nächsten Ändern zur Spec. */
+/** PATCH-Body (ohne lat/lon, nicht verschiebbar). `zeichen_spec` schreibt das Zeichen; eine
+ *  Altzeile (Hülle aus Migration 0192) wird so beim nächsten Ändern zur Spec. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
 /** Teil-PATCH: Nur eine Umbenennung schickt bloß `label`, dann bleibt die gespeicherte Form —
- *  auch eine Altzeile mit Alt-Kennung und Alt-Farbe — unverändert (LFH-836, Review). */
+ *  auch die Hülle einer Altzeile mit Alt-Kennung und Alt-Farbe — unverändert (LFH-836, Review). */
 export type FreiesZeichenPatch = Partial<FreiesZeichenUpdate>;
 
 // ============================== LFH-319 Kartenansichten ==============================

@@ -2352,9 +2352,9 @@ export interface components {
         /**
          * @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).
          *
-         *     Genau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit
-         *     den Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client
-         *     übersetzt die Altform beim Lesen (design.md D5).
+         *     Die Form steht allein in `zeichen_spec` (LFH-836; seit LLH-1160 Pflicht, die Altspalten sind
+         *     entfernt). Lage-Snapshots von vorher tragen noch die Altform; der Client übersetzt sie beim
+         *     Lesen (design.md D5).
          */
         FreiesZeichenAnzeige: {
             /**
@@ -2362,18 +2362,12 @@ export interface components {
              * @description Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
              */
             ansicht_id?: number | null;
-            einheit?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von: number;
-            fachaufgabe?: string | null;
-            farbe?: string | null;
-            funktion?: string | null;
             geaendert_at: string;
-            /** @description Altform: fehlt bei einem Zeichen mit `zeichen_spec`. */
-            grundzeichen?: string | null;
             /** Format: int64 */
             id: number;
             label?: string | null;
@@ -2381,13 +2375,12 @@ export interface components {
             lat: number;
             /** Format: double */
             lon: number;
-            organisation?: string | null;
-            symbol?: string | null;
             /**
              * @description Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie
-             *     gesendet; fehlt bei einem Zeichen in Altform.
+             *     gesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{"v":1,"alt":{…}}` mit den
+             *     Altwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird.
              */
-            zeichen_spec?: string | null;
+            zeichen_spec: string;
         };
         /**
          * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.

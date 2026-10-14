@@ -1,6 +1,6 @@
 {
   "_erzeugt": "frontend/scripts/zeichen-werte.mjs aus @einsatzzeichen (LFH-836) — nicht von Hand ändern, neu erzeugen mit: mise exec -- pnpm -C frontend zeichen-werte",
-  "bibliothek": "5.2.0",
+  "bibliothek": "6.1.0",
   "formatVersion": 1,
   "freestanding": {
     "animal-state": {
@@ -182,10 +182,12 @@
             "comms.sds-dmo",
             "comms.sds-tmo",
             "comms.server",
+            "comms.still-image-transmission",
             "comms.switch",
             "comms.telecom-device",
             "comms.telephone-exchange",
             "comms.telephone-exchange-voip",
+            "comms.teleprinter-transmission",
             "comms.transitions",
             "comms.twisted-pair-count",
             "comms.voice",
@@ -232,6 +234,10 @@
             "leadership.staging-area",
             "leadership.staging-area-with-reporting-head",
             "leadership.technical-advisor-thw",
+            "site.affected-persons-assembly-point",
+            "special-form.drone",
+            "special-form.motorized-two-wheeler",
+            "special-form.two-wheeler",
             "state.activity-moderately-increased-outage-up-to-50-percent",
             "state.activity-significantly-increased-outage-up-to-75-percent",
             "state.activity-slightly-increased-outage-up-to-25-percent",
@@ -849,6 +855,7 @@
           "incident-subsection-commander",
           "international-relief-operation-director",
           "lead-emergency-physician",
+          "leader",
           "medical-platoon-commander",
           "operational-unit-platoon-commander",
           "organizational-incident-commander",
@@ -874,13 +881,21 @@
           "point",
           "post",
           "reduced-house",
+          "roll-off-container",
+          "roll-off-loader",
+          "roll-off-trailer",
           "spontaneous-helper",
+          "swap-body",
+          "swap-container",
+          "swap-container-carrier",
+          "swap-container-trailer",
           "swap-loader-vehicle",
           "trailer",
           "upright-rectangle",
           "vehicle-air",
           "vehicle-land",
-          "vehicle-water"
+          "vehicle-water",
+          "wheeled-container"
         ]
       },
       "labels": {

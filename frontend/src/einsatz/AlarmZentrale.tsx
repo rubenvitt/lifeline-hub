@@ -47,6 +47,7 @@ import {
   meldungenPfad,
   wetterPegelPfad,
 } from '../routing/deeplinks';
+import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
@@ -132,6 +133,9 @@ type AlarmToast = {
 };
 
 const MAX_SICHTBARE_TOASTS = 3;
+
+/** Längster Wortlaut des Ton-Knopfs; das Wort hält seine Breite (LLH-1158). */
+const TON_WORT_LAENGSTES = 'Ton wird geprüft';
 
 /** Zustand einer Sofortmeldung in Toast und OS-Meldung (LFH-1078: Zustand statt Bitte). */
 const SOFORT_ZUSTAND = 'Bestätigung ausstehend';
@@ -751,7 +755,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     : tonStatus === 'bereit'
       ? 'Ton bereit'
       : tonStatus === 'prueft'
-        ? 'Ton wird geprüft'
+        ? TON_WORT_LAENGSTES
         : 'Ton blockiert';
   const tonHandlung = gemutet
     ? 'einschalten'
@@ -856,6 +860,10 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   }
 
   const desktopWort = knapp && !desktopAuffaellig ? null : desktopText;
+  // Ab `xl` hält das Wort die Breite von „Ton wird geprüft“ (LLH-1158, `WortPlatz`): die
+  // Tonprüfung beim Start wechselt den Wortlaut ohne Zutun, und an der Umbruchgrenze sprang der
+  // Kopf mit dem kürzeren Wort von zwei Zeilen auf eine. Darunter steht die Prüfung nur als Icon;
+  // der Platz machte „Ton blockiert“ breiter, und der Kopf brach bei 1024 px um (LFH-637).
   const tonWort = knapp && !tonAuffaellig ? null : tonText;
 
   return (
@@ -884,7 +892,9 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           }}
           icon={tonIcon}
         >
-          {tonWort}
+          {tonWort ? (
+            <WortPlatz platz={knapp ? '' : TON_WORT_LAENGSTES}>{tonWort}</WortPlatz>
+          ) : null}
         </Button>
       </Tooltip>
     </>

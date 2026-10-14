@@ -147,7 +147,12 @@ fest und hängen an keinem Einsatz; die Fristen der Einsätze beschreibt
 
 - Nur System-Admins. Für Führungskräfte fehlt der Eintrag in der Verwaltung; wer die Adresse
   direkt öffnet, landet auf der ersten Seite der Verwaltung.
-- Das Protokoll umfasst alle Konten des Servers, nicht nur die der eigenen Organisation.
+- Jeder System-Admin sieht nur die Einträge der eigenen Organisation: Anmeldungen ihrer Konten,
+  auch Fehlversuche auf deren Namen, und Zugangsänderungen ihrer Admins. Anmeldeversuche mit einem
+  Namen, zu dem es auf dem Server kein Konto gibt, gehören keiner Organisation; sie sieht jeder
+  System-Admin.
+- Das Schalten eines Anmeldewegs gilt für den ganzen Server, steht aber nur bei der Organisation
+  des Admins, der geschaltet hat.
 - Das Lesen selbst hinterlässt keinen Eintrag.
 
 ### Lücken

@@ -12,7 +12,7 @@ import { FREIES_ZEICHEN_TINTE } from './marker';
 import { antdToken, farbenDunkel } from '../../theme/tokens';
 import type { FreiesZeichenPatch } from '../../api/types';
 
-/** Ein Altzeichen (Altspalten, kein `zeichen_spec`): der Bestand vor LFH-836. */
+/** Ein Altzeichen (Altfelder, kein `zeichen_spec`), wie es ein Lage-Snapshot von vor LFH-836 trägt. */
 const basis: FreiesZeichen = {
   id: 42,
   einsatz_id: 1,
@@ -480,15 +480,45 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
     expect(hinweis).toHaveTextContent('person · fuehrungskraft');
   });
 
-  it('zeigt den Platzhalter für ein Altzeichen ohne Nachfolger, mit Hinweis', () => {
+  it('zeigt den Platzhalter für ein unbekanntes Altsymbol, mit Hinweis', () => {
     renderInspector({
-      zeichen: { ...basis, ...OHNE_ALTFELDER, grundzeichen: 'ohne', symbol: 'fernschreiben' },
+      zeichen: { ...basis, ...OHNE_ALTFELDER, grundzeichen: 'ohne', symbol: 'gibt-es-nicht' },
       darfSchreiben: false,
     });
     expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toHaveTextContent(
-      'vereinfacht dargestellt · ohne · fernschreiben',
+      'vereinfacht dargestellt · ohne · gibt-es-nicht',
     );
     expect(screen.getByText('Punkt')).toBeInTheDocument();
+  });
+
+  // LLH-1160: Seit Migration 0192 kommt eine Altzeile als Hülle in `zeichen_spec`.
+  it('nennt die Alt-Kennung auch aus der Hülle einer Altzeile', () => {
+    renderInspector({
+      zeichen: {
+        ...basis,
+        ...OHNE_ALTFELDER,
+        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"person","funktion":"fuehrungskraft"}}',
+      },
+      darfSchreiben: false,
+    });
+    expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toHaveTextContent(
+      'vereinfacht dargestellt · person · fuehrungskraft',
+    );
+  });
+
+  it('eine Umbenennung lässt die Hülle einer Altzeile stehen', () => {
+    vi.useFakeTimers();
+    const zeichen: FreiesZeichen = {
+      ...basis,
+      ...OHNE_ALTFELDER,
+      zeichen_spec: '{"v":1,"alt":{"grundzeichen":"gefahr","farbe":"#cc0000"}}',
+    };
+    const { onAendern } = renderInspector({ zeichen });
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Neu' } });
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledWith({ label: 'Neu' });
   });
 
   it('zeigt keinen Hinweis bei einem vollständig dargestellten Zeichen', () => {

@@ -687,7 +687,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
     const gespeichert = (await (
       await page.request.get(`/api/einsaetze/${eid}/freie-zeichen`)
     ).json()) as { zeichen_spec?: string; grundzeichen?: string }[];
-    // Gespeichert als Zeichenbeschreibung; die Altform fehlt (DTO, design.md D4).
+    // Gespeichert als Zeichenbeschreibung; die Altform gibt es im DTO nicht mehr (LLH-1160).
     expect(gespeichert.map((z) => [z.zeichen_spec, z.grundzeichen ?? null])).toEqual([
       [spec, null],
     ]);
@@ -710,36 +710,20 @@ test.describe('Lagekarte: freie Zeichen', () => {
     expect(fehler.map((f) => f.message)).toEqual([]);
   });
 
-  test('ein Altzeichen im alten Format erscheint über den Leseadapter', async ({ page }) => {
+  test('der alte Body eines veralteten Clients wird abgelehnt', async ({ page }) => {
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
-    await einsatzortSetzen(page, eid, ORT);
-    // Der alte Body eines veralteten Clients (Übergang, design.md D4): Grundzeichen plus Hexfarbe.
+    // LLH-1160: Grundzeichen plus Hexfarbe, wie es ein Client vor LFH-836 sendet. Altzeilen aus der
+    // DB zeichnet der Leseadapter weiter (Hülle aus Migration 0192, Vitest `freiesZeichen.test.ts`).
     const r = await page.request.post(`/api/einsaetze/${eid}/freie-zeichen`, {
-      data: {
-        lat: ORT.lat + 0.0028,
-        lon: ORT.lon + 0.004,
-        grundzeichen: 'gefahr',
-        farbe: '#cc0000',
-        label: 'Altzeichen',
-      },
+      data: { lat: ORT.lat, lon: ORT.lon, grundzeichen: 'gefahr', farbe: '#cc0000' },
     });
-    expect(r.ok(), await r.text()).toBeTruthy();
-    const angelegt = (await r.json()) as { zeichen_spec?: string; grundzeichen?: string };
-    expect([angelegt.zeichen_spec ?? null, angelegt.grundzeichen]).toEqual([null, 'gefahr']);
-
-    await page.goto(`/einsaetze/${eid}/lagekarte`);
-    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
-      1,
-    );
-    // Die Hexfarbe fällt auf das nächste Palettentoken (D6): dieselbe Gefahr in Rot.
-    const bild = 'ez|{"v":1,"spec":{"kind":"hazard","technicalFill":"rot"}}';
-    await expect
-      .poll(() => freieZeichen(page, bild), {
-        timeout: 15_000,
-        message: 'Altzeichen nicht gezeichnet',
-      })
-      .toEqual({ breite: 68, gezeichnet: 1 });
+    expect(r.status(), await r.text()).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toContain('alte Format');
+    const liste = (await (
+      await page.request.get(`/api/einsaetze/${eid}/freie-zeichen`)
+    ).json()) as unknown[];
+    expect(liste).toEqual([]);
   });
 });
 

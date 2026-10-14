@@ -100,7 +100,7 @@ describe('Bedingungszeichen', () => {
     expect(lang).toBeGreaterThan(kurz);
   });
 
-  it('nimmt Breite und Höhe aus dem Paket, gemessen an Arimo', () => {
+  it('nimmt Breite und Höhe aus dem Paket, gemessen an Einsatzzeichen Sans', () => {
     const text = 'TMO BN_BOS Großschadenslage Nord';
     expect(bedingungszeichenBreite('TMO', 'BN_BOS Großschadenslage Nord')).toBeCloseTo(
       conditionSignWidth(text) * SKIZZE_EINHEITEN_JE_MM,
@@ -152,7 +152,7 @@ describe('Bedingungszeichen', () => {
     expect(Number(haupt.getAttribute('y'))).toBeGreaterThan(100);
     expect(Number(haupt.getAttribute('y'))).toBeLessThan(100 + BEDINGUNGSZEICHEN_HOEHE / 2);
     expect(haupt.getAttribute('text-anchor')).toBe('middle');
-    expect(haupt.getAttribute('style')).toContain('Arimo');
+    expect(haupt.getAttribute('style')).toContain('Einsatzzeichen Sans');
     expect(zeichen.querySelector('title')?.textContent).toBe(
       'Bedingungszeichen DMO 314_F*, Hinweis: Gesundheit',
     );

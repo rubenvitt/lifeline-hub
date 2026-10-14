@@ -310,6 +310,16 @@ describe('uhsTz', () => {
     expect(uhsTz('verletztensammelstelle')).toEqual({ grundzeichen: 'stelle', symbol: 'sammeln' });
     expect(uhsTz('sonstige')).toEqual({ grundzeichen: 'stelle', fachaufgabe: 'rettungswesen' });
   });
+
+  it('trägt die Organisation des Betreibers, ohne sie keine (LLH-1161)', () => {
+    expect(uhsTz('behandlungsplatz', 'feuerwehr')).toEqual({
+      grundzeichen: 'stelle',
+      fachaufgabe: 'aerztliche-versorgung',
+      organisation: 'feuerwehr',
+    });
+    expect(uhsTz('sonstige', null)).not.toHaveProperty('organisation');
+    expect(betreuungsstelleTz('')).not.toHaveProperty('organisation');
+  });
 });
 
 describe('Render-Integration (Library akzeptiert die Mapper-Props)', () => {

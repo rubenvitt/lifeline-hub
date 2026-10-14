@@ -21,6 +21,7 @@
  */
 import {
   ALL_PICTOGRAMS,
+  LEGACY_PICTOGRAMS,
   checkAnySpec,
   FREESTANDING_FIELD_VALUES,
   ORGANIZATION_LABELS,
@@ -30,6 +31,7 @@ import {
   drawAnySpec,
   freestandingRedirect,
   freestandingVocabulary,
+  parametricBlock,
   parseAnySpec,
   serializeAnySpec,
   symbolKindChoiceLabel,
@@ -56,7 +58,7 @@ import {
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 
 /**
- * Deutsche Namen der 19 Grundzeichenarten, wie die Lagekarte sie nennt. Eine Hub-Tabelle (D7):
+ * Deutsche Namen der 27 Grundzeichenarten, wie die Lagekarte sie nennt. Eine Hub-Tabelle (D7):
  * die Bezeichnungen der Bibliothek (`symbolKindChoiceLabel`) sind geometrisch („12-mm-Kreis“,
  * „Konkreter Punkt“) und bleiben Suchbegriff neben dem Namen.
  */
@@ -80,6 +82,14 @@ export const GRUNDZEICHEN_NAMEN: Record<SymbolKind, string> = {
   'upright-rectangle': 'Hochkantrechteck',
   'circle-12': 'Stelle',
   'reduced-house': 'Haus, reduziert',
+  'roll-off-loader': 'Wechsellader mit Abrollbehälter',
+  'swap-container-carrier': 'Kfz mit Wechselbehälter',
+  'roll-off-trailer': 'Anhänger mit Abrollbehälter',
+  'swap-container-trailer': 'Anhänger mit Wechselbehälter',
+  'roll-off-container': 'Abrollbehälter',
+  'swap-container': 'Wechselbehälter',
+  'swap-body': 'Wechselbrücke',
+  'wheeled-container': 'Rollcontainer',
 };
 
 /** Weitere Alltagsbegriffe für die Suche, wo Name und Bibliothek sie nicht tragen. */
@@ -114,10 +124,15 @@ export const START_ZEICHEN_SPEC = serializeAnySpec({ kind: 'formation' });
 const TITEL = new Map<string, string>();
 /** Titel und Register-Datei der zweiten Darstellung je Piktogramm, nur wo das Register eine führt. */
 const ZWEITE_DARSTELLUNG = new Map<string, { titel: string; datei: string }>();
-for (const p of ALL_PICTOGRAMS) {
+// Die Altbestände nach SKK 2010 (`LEGACY_PICTOGRAMS`: Fernschreiben, Festbildübertragung,
+// Sammelplatz für Betroffene) führen keine Register-Datei. Ihre zweite Darstellung ist bei den
+// Verbindungsarten wie in Anhang J die leitergebundene (ESZ-137), daher der Name „leitergebunden“.
+for (const p of [...ALL_PICTOGRAMS, ...LEGACY_PICTOGRAMS]) {
   if (p.variant === 'primary') TITEL.set(p.id, p.title);
   else if (p.variant === 'alternative') {
-    ZWEITE_DARSTELLUNG.set(p.id, { titel: p.title, datei: p.referenceAsset });
+    const datei =
+      'referenceAsset' in p ? p.referenceAsset : p.id.startsWith('comms.') ? 'leitergebunden' : '';
+    ZWEITE_DARSTELLUNG.set(p.id, { titel: p.title, datei });
   }
 }
 
@@ -683,6 +698,9 @@ export function waermeVokabularAuf(planen: Planer = leerlaufPlaner): () => void 
 
 /** Der Name des Symbols eines Zeichens (Piktogrammtitel), oder `null` ohne Symbol. */
 export function symbolName(spec: AnySpec): string | null {
+  // Eine Bewegung aus 5.2 kommt nur aus einer Altzeile (`sichten`, LLH-1159); der Picker bietet
+  // sie nicht als Kachel an, benannt wird sie trotzdem.
+  if (spec.kind === 'movement') return parametricBlock(`arrow/${spec.movement}`)?.title ?? null;
   const id = symbolVon(spec);
   if (!id) return null;
   const { art, wert, zweite } = zerlegeSymbol(id);

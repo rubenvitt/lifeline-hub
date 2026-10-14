@@ -15,8 +15,10 @@ import {
   entferneVerbindung,
   ladeKommunikationsplan,
   legeKommunikationsStelleAn,
+  legeKommunikationsStelleEinzelnAn,
   legeVerbindungAn,
 } from '../api/kommunikationsplan';
+import { fetchExterneStellen } from '../api/externeStellen';
 import { ApiError } from '../api/client';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { freigabenFixture } from '../test/fixtures';
@@ -24,6 +26,7 @@ import type {
   Einheit,
   EinsatzAnzeige,
   Einsatzabschnitt,
+  ExterneStelle,
   Fernmeldeskizze,
   FuehrungsfunktionEintrag,
   KommunikationsStelle,
@@ -42,9 +45,11 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../api/fuehrungsfunktionen', () => ({ ladeFuehrungsfunktionen: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
+vi.mock('../api/externeStellen', () => ({ fetchExterneStellen: vi.fn() }));
 vi.mock('../api/kommunikationsplan', () => ({
   ladeKommunikationsplan: vi.fn(),
   legeKommunikationsStelleAn: vi.fn(),
+  legeKommunikationsStelleEinzelnAn: vi.fn(),
   benenneKommunikationsStelleUm: vi.fn(),
   entferneKommunikationsStelle: vi.fn(),
   legeVerbindungAn: vi.fn(),
@@ -202,6 +207,7 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsfunktionen).mockResolvedValue(KATALOG);
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, POLIZEI]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
+  vi.mocked(fetchExterneStellen).mockResolvedValue([]);
   vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
     art: 'mobil',
     sprechgruppen: [],
@@ -209,6 +215,7 @@ beforeEach(() => {
   });
   for (const f of [
     legeKommunikationsStelleAn,
+    legeKommunikationsStelleEinzelnAn,
     entferneKommunikationsStelle,
     legeVerbindungAn,
     aendereVerbindung,
@@ -735,5 +742,162 @@ describe('KommunikationsplanPage — Bearbeiten', () => {
     );
     await userEvent.click(await screen.findByText('Stelle entfernen'));
     await waitFor(() => expect(entferneKommunikationsStelle).toHaveBeenCalledWith(1, 3));
+  });
+});
+
+describe('KommunikationsplanPage — Katalog „Externe Stellen“ (LLH-1165)', () => {
+  const KATALOG_STELLEN: ExterneStelle[] = [
+    {
+      id: 1,
+      bezeichnung: 'ILS Nord',
+      art: 'leitstelle',
+      rufnummer: '0421 112',
+      aktiv: true,
+      zustaendig: true,
+    },
+    {
+      id: 2,
+      bezeichnung: 'PI Nord',
+      art: 'polizei',
+      rufnummer: '0421 110',
+      funkrufname: 'Heros Nord',
+      aktiv: true,
+      zustaendig: false,
+    },
+    {
+      id: 3,
+      bezeichnung: 'DLRG Ortsgruppe',
+      art: 'hilfsorganisation',
+      aktiv: true,
+      zustaendig: false,
+    },
+  ];
+  const NEU: KommunikationsStelle = {
+    id: 7,
+    stellenart: 'behoerde',
+    bezeichnung: 'PI Nord',
+    verbindungen: [],
+    sprechgruppen: [],
+  };
+
+  beforeEach(() => {
+    vi.mocked(fetchExterneStellen).mockResolvedValue(KATALOG_STELLEN);
+  });
+
+  async function waehleArt(dialog: HTMLElement, art: string) {
+    await userEvent.click(within(dialog).getByLabelText('Art'));
+    await userEvent.click(await screen.findByTitle(art));
+  }
+
+  it('schlägt bei „Behörde“ die Polizei vor und übernimmt Bezeichnung und Rufnummer', async () => {
+    vi.mocked(legeKommunikationsStelleEinzelnAn).mockResolvedValue(NEU);
+    vi.mocked(legeVerbindungAn).mockResolvedValue([
+      S2,
+      POLIZEI,
+      { ...NEU, verbindungen: [{ id: 71, mittel: 'festnetz', wert: '0421 110' }] },
+    ]);
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Stelle hinzufügen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waehleArt(dialog, 'Behörde');
+    await userEvent.click(within(dialog).getByLabelText('Bezeichnung'));
+    // Nur was als Behörde in den Plan kommt: keine Leitstelle, keine Hilfsorganisation.
+    expect(screen.queryByTitle('ILS Nord · zuständig')).toBeNull();
+    expect(screen.queryByTitle('DLRG Ortsgruppe')).toBeNull();
+    await userEvent.click(await screen.findByTitle('PI Nord'));
+    expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('PI Nord');
+    expect(within(dialog).getByLabelText('Rufnummer')).toHaveValue('0421 110');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(legeVerbindungAn).toHaveBeenCalledWith(1, 7, { mittel: 'festnetz', wert: '0421 110' }),
+    );
+    expect(legeKommunikationsStelleEinzelnAn).toHaveBeenCalledWith(1, {
+      stellenart: 'behoerde',
+      bezeichnung: 'PI Nord',
+    });
+    expect(legeKommunikationsStelleAn).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(within(zeile(container, 'st-7')).getByRole('link', { name: '0421 110' })).toBeVisible();
+  });
+
+  it('lässt eine von Hand eingetragene Rufnummer bei der Wahl stehen', async () => {
+    setup();
+    await screen.findByText('Polizei PI Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Stelle hinzufügen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waehleArt(dialog, 'Leitstelle');
+    await userEvent.type(within(dialog).getByLabelText('Rufnummer'), '0421 999');
+    await userEvent.click(within(dialog).getByLabelText('Bezeichnung'));
+    await userEvent.click(await screen.findByTitle('ILS Nord · zuständig'));
+    expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('ILS Nord');
+    expect(within(dialog).getByLabelText('Rufnummer')).toHaveValue('0421 999');
+  });
+
+  it('bietet in der Lücke „Leitstelle“ die zuständige Leitstelle vorbelegt an', async () => {
+    vi.mocked(legeKommunikationsStelleEinzelnAn).mockResolvedValue({
+      ...NEU,
+      id: 8,
+      stellenart: 'leitstelle',
+      bezeichnung: 'ILS Nord',
+    });
+    vi.mocked(legeVerbindungAn).mockResolvedValue([S2, POLIZEI, ILS]);
+    setup();
+    const luecke = await screen.findByRole('region', { name: 'Lücken' });
+    await userEvent.click(
+      await within(luecke).findByRole('button', { name: 'ILS Nord hinzufügen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('ILS Nord');
+    expect(within(dialog).getByLabelText('Rufnummer')).toHaveValue('0421 112');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(legeKommunikationsStelleEinzelnAn).toHaveBeenCalledWith(1, {
+        stellenart: 'leitstelle',
+        bezeichnung: 'ILS Nord',
+      }),
+    );
+    expect(legeVerbindungAn).toHaveBeenCalledWith(1, 8, { mittel: 'festnetz', wert: '0421 112' });
+    await waitFor(() =>
+      expect(screen.queryByText('Leitstelle: keine Verbindung erfasst')).toBeNull(),
+    );
+  });
+
+  it('bietet keine zweite Leitstelle an, wenn der Plan schon eine führt', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([
+      S2,
+      { ...ILS, bezeichnung: 'ILS Süd', verbindungen: [] },
+    ]);
+    setup();
+    await screen.findByText('Leitstelle: keine Verbindung erfasst');
+    await waitFor(() => expect(fetchExterneStellen).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'ILS Nord hinzufügen' })).toBeNull();
+  });
+
+  it('Beobachter: kein Vorschlag in der Lücke', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
+    setup();
+    await screen.findByText('Leitstelle: keine Verbindung erfasst');
+    await waitFor(() => expect(fetchExterneStellen).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'ILS Nord hinzufügen' })).toBeNull();
+  });
+
+  it('scheitert nur die Rufnummer, schließt die Maske und nennt den Grund über dem Plan', async () => {
+    vi.mocked(legeKommunikationsStelleEinzelnAn).mockResolvedValue(NEU);
+    vi.mocked(legeVerbindungAn).mockRejectedValue(new ApiError(409, 'Einsatz ist abgeschlossen'));
+    setup();
+    await screen.findByText('Polizei PI Nord');
+    expect(ladeKommunikationsplan).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Stelle hinzufügen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waehleArt(dialog, 'Behörde');
+    await userEvent.click(within(dialog).getByLabelText('Bezeichnung'));
+    await userEvent.click(await screen.findByTitle('PI Nord'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Rufnummer nicht übernommen')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Die Stelle steht schon: der Plan wird neu geholt, statt die Maske ein zweites Mal anlegen zu lassen.
+    await waitFor(() => expect(ladeKommunikationsplan).toHaveBeenCalledTimes(2));
   });
 });
