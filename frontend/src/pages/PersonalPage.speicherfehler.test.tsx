@@ -101,7 +101,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     const zweiterVersuch = tor();
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/7/personal', async () => {
+      http.post('/api/einsaetze/7/personal/sammel', async () => {
         versuche += 1;
         if (versuche > 1) await zweiterVersuch.offen;
         return HttpResponse.json({ error: 'Person ist in einem anderen Einsatz' }, { status: 409 });
@@ -109,9 +109,9 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: 'Person disponieren' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Personal disponieren' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }));
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Personen' }));
     await userEvent.click(await screen.findByText('Uwe Stamm'));
     const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
     await userEvent.click(knopf);
@@ -127,7 +127,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Person disponieren' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Personal disponieren' }));
     expect(within(await screen.findByRole('dialog')).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
   });

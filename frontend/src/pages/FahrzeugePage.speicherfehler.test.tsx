@@ -156,7 +156,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Disponieren aus dem Bestand: der Grund steht im Dialog, kein Toast', async () => {
     server.use(
-      http.post('/api/einsaetze/7/fahrzeuge', () =>
+      http.post('/api/einsaetze/7/fahrzeuge/sammel', () =>
         HttpResponse.json({ error: 'Fahrzeug außer Dienst' }, { status: 409 }),
       ),
     );
@@ -182,9 +182,9 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
       ],
     });
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Fahrzeug disponieren' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Fahrzeuge disponieren' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fahrzeug' }));
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fahrzeuge' }));
     await userEvent.click(await screen.findByText('Florian 3 (LF 20)'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
 

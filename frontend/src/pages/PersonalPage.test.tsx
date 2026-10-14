@@ -292,7 +292,7 @@ describe('PersonalPage', () => {
   it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
-    expect(screen.getByRole('button', { name: 'Person disponieren' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Personal disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Thomas Müller entlassen' })).toBeInTheDocument();
     expect(
@@ -436,7 +436,7 @@ describe('PersonalPage', () => {
     );
     await screen.findByText('Thomas Müller');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Person disponieren' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Personal disponieren' })).not.toBeInTheDocument();
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
   });
 
@@ -942,9 +942,9 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
 
 /** Öffnet den Disponier-Dialog über den Kopfknopf und darin die Personenauswahl. */
 async function oeffnePersonalAuswahl() {
-  await userEvent.click(screen.getByRole('button', { name: 'Person disponieren' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Personal disponieren' }));
   const dialog = await screen.findByRole('dialog');
-  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }));
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Personen' }));
 }
 
 describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
@@ -1044,9 +1044,11 @@ describe('PersonalPage · Demo-Marke', () => {
   it('Auswahl: echte Personen vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/personal', async ({ request }) => {
+      http.post('/api/einsaetze/7/personal/sammel', async ({ request }) => {
         gesendet.push(await request.json());
-        return HttpResponse.json({ ...disponiert[0], id: 30, personal_id: 2, ist_demo: true });
+        return HttpResponse.json([{ ...disponiert[0], id: 30, personal_id: 2, ist_demo: true }], {
+          status: 201,
+        });
       }),
     );
     zeige([], [stamm(2, 'Dora Demo', 'DEMO-P-001', true), stamm(1, 'Erna Echt', 'P-1', false)]);
@@ -1064,7 +1066,9 @@ describe('PersonalPage · Demo-Marke', () => {
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Disponieren' }),
     );
-    await waitFor(() => expect(gesendet).toEqual([{ personal_id: 2, staerke_position: null }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ personal_ids: [2], einheit_id: null, fahrzeug_id: null }]),
+    );
   });
 
   it('Tabelle: nur die Demo-Disposition trägt „Demo“', async () => {
@@ -1093,14 +1097,14 @@ describe('PersonalPage · Disponieren im Dialog (LFH-983)', () => {
       within(kopf)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Person disponieren', 'Ad-hoc-Person']);
+    ).toEqual(['Personal disponieren', 'Ad-hoc-Person']);
 
-    await userEvent.click(within(kopf).getByRole('button', { name: 'Person disponieren' }));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Personal disponieren' }));
     const dialog = await screen.findByRole('dialog');
     const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
-    expect(await within(dialog).findByText('Person wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Mindestens eine Person wählen')).toBeInTheDocument();
   });
 });

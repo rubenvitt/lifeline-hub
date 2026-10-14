@@ -13,17 +13,6 @@ export function listeEinsatzPersonal(einsatzId: number): Promise<EinsatzPersonal
   return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal`);
 }
 
-export function disponierePerson(
-  einsatzId: number,
-  personalId: number,
-  staerkePosition?: StaerkePosition | null,
-): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal`, 'POST', {
-    personal_id: personalId,
-    staerke_position: staerkePosition ?? null,
-  });
-}
-
 /** Ziele und Auswahl einer Sammel-Disposition (LLH-1100). */
 export interface SammelPersonalEingabe {
   personal_ids: number[];

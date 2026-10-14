@@ -1,6 +1,5 @@
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Collapse,
@@ -19,13 +18,11 @@ import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
-import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
   aktualisiereDisposition,
   disponiereAdhoc,
-  disponiereFahrzeug,
   entferneDisposition,
   gibBesatzungFrei,
   listeEinsatzFahrzeuge,
@@ -66,7 +63,7 @@ import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
-import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
+import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -215,10 +212,8 @@ export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
-  const [stammForm] = Form.useForm<{ fahrzeug_id: number }>();
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
@@ -255,10 +250,6 @@ export default function FahrzeugePage() {
   const statusQuery = useQuery({
     queryKey: globalKeys.fahrzeugStatus(),
     queryFn: listeFahrzeugStatus,
-  });
-  const poolQuery = useQuery({
-    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
-    queryFn: () => listeFahrzeuge(true),
   });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
@@ -297,13 +288,6 @@ export default function FahrzeugePage() {
   const zuordnenFehler = useZeilenFehler<number>();
   const freigebenFehler = useZeilenFehler<number>();
 
-  const disponiereMutation = useMutation({
-    mutationFn: (fahrzeugId: number) => disponiereFahrzeug(einsatzId, fahrzeugId),
-    onSuccess: () => {
-      message.success('Fahrzeug disponiert');
-      invalidate();
-    },
-  });
   // Schließen und Leeren gehören der Erfassungshülle: sie schließt über `onFertig` (nur beim
   // Einzel-Erfassen) und setzt auf beiden Wegen zurück. Ein Reset hier wäre doppelt und im
   // Serienmodus falsch, weil er die übernommenen Werte mitlöschte.
@@ -430,28 +414,6 @@ export default function FahrzeugePage() {
       },
     };
   };
-  const disponierteIds = new Set(
-    efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
-  );
-  // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
-  const poolOptionen = demoGroupedOptions(
-    (poolQuery.data ?? []).filter((f) => !disponierteIds.has(f.id)),
-    (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
-  );
-
-  /**
-   * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
-   * filtert der Ausdruck darüber auf die leere Menge, und das Feld behauptete „Keine freien
-   * Fahrzeuge". `nichtGefundenInhalt` liefert nur im Fehlerfall einen Text, sonst bleibt der
-   * Bestandswortlaut.
-   *
-   * Kein `kein403`: die Fahrzeug- und Personal-Routen sind org-lesbar ohne Admin-Schranke. Ein „nur
-   * für Admins" am Fahrzeug-Pool wäre ein erfundener Fehlerfall.
-   */
-  const poolInhalt =
-    nichtGefundenInhalt(poolQuery, {
-      allgemein: 'Fahrzeugliste konnte nicht geladen werden',
-    }) ?? 'Keine freien Fahrzeuge';
   const besatzungInhalt =
     nichtGefundenInhalt(personalQuery, {
       allgemein: 'Kräfte konnten nicht geladen werden',
@@ -647,7 +609,7 @@ export default function FahrzeugePage() {
           {darfSchreiben && (
             <>
               <Button type="primary" onClick={() => setDisponierenOffen(true)}>
-                Fahrzeug disponieren
+                Fahrzeuge disponieren
               </Button>
               <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
             </>
@@ -785,31 +747,14 @@ export default function FahrzeugePage() {
         </>
       )}
 
-      {/* Fahrzeug aus dem Stamm disponieren, im Serienmodus: eine Einheit bringt mehrere. */}
-      <ErfassungsModal<{ fahrzeug_id: number }>
+      {/* Fahrzeuge aus dem Stamm disponieren: mehrere in einem Absenden, optional in eine Einheit
+          (LLH-1100), im Serienmodus: eine Einheit nach der anderen. */}
+      <FahrzeugeDisponierenModal
         offen={disponierenOffen}
-        titel="Fahrzeug disponieren"
-        form={stammForm}
-        erfassenText="Disponieren"
+        einsatzId={einsatzId}
         serie
-        laeuft={disponiereMutation.isPending}
-        speicherung={disponiereMutation}
-        speicherFehlerTitel="Nicht disponiert"
-        speicherFehlerFallback="Disponieren fehlgeschlagen"
-        onErfassen={async (w) => {
-          await disponiereMutation.mutateAsync(w.fahrzeug_id);
-        }}
-        onFertig={() => setDisponierenOffen(false)}
-        onAbbrechen={() => setDisponierenOffen(false)}
-      >
-        <Form.Item
-          label="Fahrzeug"
-          name="fahrzeug_id"
-          rules={[{ required: true, message: 'Fahrzeug wählen' }]}
-        >
-          <Select options={poolOptionen} notFoundContent={poolInhalt} />
-        </Form.Item>
-      </ErfassungsModal>
+        onSchliessen={() => setDisponierenOffen(false)}
+      />
 
       {/* Ad-hoc-Disposition als Schnellerfassung.
 

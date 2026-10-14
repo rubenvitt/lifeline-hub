@@ -242,7 +242,7 @@ describe('FahrzeugePage', () => {
   it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entfernen-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: 'Fahrzeug disponieren' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
   });
@@ -251,7 +251,7 @@ describe('FahrzeugePage', () => {
     render(einsatz({ meine_rolle: 'beobachter' }));
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Fahrzeug disponieren' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fahrzeuge disponieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     // Ein FMS-Format überall: „S3 · disponiert“ aus dem Katalog-Anker (LFH-973).
     expect(screen.getByText('S3 · disponiert')).toBeInTheDocument();
@@ -1088,9 +1088,9 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
 
 /** Öffnet den Disponier-Dialog über den Kopfknopf und darin die Fahrzeugauswahl. */
 async function oeffneStammAuswahl() {
-  await userEvent.click(screen.getByRole('button', { name: 'Fahrzeug disponieren' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Fahrzeuge disponieren' }));
   const dialog = await screen.findByRole('dialog');
-  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fahrzeug' }));
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fahrzeuge' }));
 }
 
 /** Klappt die Zeile von „Florian 1" auf — dort hängt der Besatzungsblock. */
@@ -1142,9 +1142,11 @@ describe('FahrzeugePage · Demo-Marke', () => {
   it('Auswahl: echte Fahrzeuge vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/fahrzeuge', async ({ request }) => {
+      http.post('/api/einsaetze/7/fahrzeuge/sammel', async ({ request }) => {
         gesendet.push(await request.json());
-        return HttpResponse.json({ ...ef, id: 30, fahrzeug_id: 2, ist_demo: true });
+        return HttpResponse.json([{ ...ef, id: 30, fahrzeug_id: 2, ist_demo: true }], {
+          status: 201,
+        });
       }),
     );
     zeige([], [stamm(2, 'Florian Demo', true), stamm(1, 'Florian Echt', false)]);
@@ -1162,7 +1164,7 @@ describe('FahrzeugePage · Demo-Marke', () => {
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Disponieren' }),
     );
-    await waitFor(() => expect(gesendet).toEqual([{ fahrzeug_id: 2 }]));
+    await waitFor(() => expect(gesendet).toEqual([{ fahrzeug_ids: [2], einheit_id: null }]));
   });
 
   it('Tabelle: nur die Demo-Disposition trägt „Demo“', async () => {
@@ -1188,14 +1190,14 @@ describe('FahrzeugePage · Disponieren im Dialog (LFH-983)', () => {
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     expect(within(kopf).queryByRole('combobox')).toBeNull();
     expect(within(kopf).getByRole('radiogroup', { name: 'Ansicht' })).toBeInTheDocument();
-    expect(within(kopf).getByRole('button', { name: 'Fahrzeug disponieren' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
 
-    await userEvent.click(within(kopf).getByRole('button', { name: 'Fahrzeug disponieren' }));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Fahrzeuge disponieren' }));
     const dialog = await screen.findByRole('dialog');
     const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
-    expect(await within(dialog).findByText('Fahrzeug wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Mindestens ein Fahrzeug wählen')).toBeInTheDocument();
   });
 });

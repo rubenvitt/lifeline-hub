@@ -14,15 +14,6 @@ export function listeEinsatzFahrzeuge(einsatzId: number): Promise<EinsatzFahrzeu
   return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge`);
 }
 
-export function disponiereFahrzeug(
-  einsatzId: number,
-  fahrzeugId: number,
-): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge`, 'POST', {
-    fahrzeug_id: fahrzeugId,
-  });
-}
-
 /** Auswahl und Ziel-Einheit einer Sammel-Disposition (LLH-1100). */
 export interface SammelFahrzeugEingabe {
   fahrzeug_ids: number[];

@@ -111,6 +111,8 @@ export default function PersonalDisponierenModal({
   );
   const pool = (poolQuery.data ?? []).filter((p) => !vergeben.has(p.id));
   const optionen = demoGroupedOptions(pool, personalLabel, personalSuchtext);
+  // Ein leeres Feld nennt den Ausfall, wenn die Liste nicht ankam — sonst behauptete es „Keine
+  // freien Personen“. Kein `kein403`: die Stamm-Routen sind org-lesbar ohne Admin-Schranke.
   const poolInhalt =
     nichtGefundenInhalt(poolQuery, { allgemein: 'Personalliste konnte nicht geladen werden' }) ??
     'Keine freien Personen';

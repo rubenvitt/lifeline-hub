@@ -89,6 +89,8 @@ export default function FahrzeugeDisponierenModal({
   );
   const pool = (poolQuery.data ?? []).filter((f) => !vergeben.has(f.id));
   const optionen = demoGroupedOptions(pool, fahrzeugLabel, fahrzeugSuchtext);
+  // Ein leeres Feld nennt den Ausfall, wenn die Liste nicht ankam — sonst behauptete es „Keine
+  // freien Fahrzeuge“. Kein `kein403`: die Stamm-Routen sind org-lesbar ohne Admin-Schranke.
   const poolInhalt =
     nichtGefundenInhalt(poolQuery, { allgemein: 'Fahrzeugliste konnte nicht geladen werden' }) ??
     'Keine freien Fahrzeuge';
