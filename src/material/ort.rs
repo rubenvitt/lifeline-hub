@@ -77,7 +77,7 @@ impl OrtPatch {
     }
 
     /// Nennt die Anfrage überhaupt ein Ort-Feld?
-    pub fn is_leer(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.felder().iter().all(|(f, _)| f.is_none())
     }
 
@@ -282,7 +282,7 @@ mod tests {
     fn ortpatch_ziel_nach_d7() {
         let uhs = Some(MaterialOrt::Uhs(3));
         let leer = OrtPatch::default();
-        assert!(leer.is_leer());
+        assert!(leer.is_empty());
         assert_eq!(leer.ziel(uhs), None, "fehlt = unverändert");
         let dorthin = OrtPatch {
             br_id: Some(Some(9)),

@@ -114,7 +114,7 @@ impl MaterialArt {
 
     /// Vorgabe eines Ad-hoc-Postens ohne Angabe und der Übernahme des Bestands (design.md D1,
     /// D12): über 1 Stück Verbrauchsgut, sonst Gerät.
-    pub fn aus_menge(menge: i64) -> Self {
+    pub fn from_menge(menge: i64) -> Self {
         if menge > 1 {
             MaterialArt::Verbrauchsgut
         } else {
@@ -193,7 +193,7 @@ impl EinsatzMaterialAnzeige {
 /// Ausgabe und Status (LLH-1224, design.md D2–D4, D10); die CHECKs der Tabelle sind nur das Netz.
 /// `ausgabe_geaendert` wählt den Grund, wenn die Ausgabe über der Menge läge: die Anfrage setzt die
 /// Ausgabe („Ausgabe größer als die Menge“) oder die Menge („Menge kleiner als die Ausgabe“).
-pub fn pruefe_zeile(
+pub fn check_zeile(
     art: MaterialArt,
     menge: i64,
     ausgegeben: i64,
@@ -244,34 +244,34 @@ mod tests {
     }
 
     #[test]
-    fn pruefe_zeile_je_regel() {
+    fn check_zeile_je_regel() {
         use MaterialArt::{Geraet as G, Verbrauchsgut as V};
         use MaterialStatus::*;
-        assert!(pruefe_zeile(G, 1, 0, DesinfektionNoetig, false).is_ok());
-        assert!(pruefe_zeile(V, 50, 50, Einsatzbereit, true).is_ok());
-        assert!(pruefe_zeile(V, 50, 0, Defekt, false).is_ok());
+        assert!(check_zeile(G, 1, 0, DesinfektionNoetig, false).is_ok());
+        assert!(check_zeile(V, 50, 50, Einsatzbereit, true).is_ok());
+        assert!(check_zeile(V, 50, 0, Defekt, false).is_ok());
         assert_eq!(
-            grund(pruefe_zeile(G, 2, 0, Einsatzbereit, false)),
+            grund(check_zeile(G, 2, 0, Einsatzbereit, false)),
             "Ein Gerät steht je Stück im Einsatz"
         );
         assert_eq!(
-            grund(pruefe_zeile(G, 1, 1, Einsatzbereit, true)),
+            grund(check_zeile(G, 1, 1, Einsatzbereit, true)),
             "Ausgabe gibt es nur für Verbrauchsgut"
         );
         assert_eq!(
-            grund(pruefe_zeile(V, 50, 60, Einsatzbereit, true)),
+            grund(check_zeile(V, 50, 60, Einsatzbereit, true)),
             "Ausgabe größer als die Menge"
         );
         assert_eq!(
-            grund(pruefe_zeile(V, 10, 20, Einsatzbereit, false)),
+            grund(check_zeile(V, 10, 20, Einsatzbereit, false)),
             "Menge kleiner als die Ausgabe"
         );
         assert_eq!(
-            grund(pruefe_zeile(V, 5, 0, Verbraucht, false)),
+            grund(check_zeile(V, 5, 0, Verbraucht, false)),
             "Status «verbraucht» gibt es nur für Geräte"
         );
         assert_eq!(
-            grund(pruefe_zeile(V, 5, 0, DesinfektionNoetig, false)),
+            grund(check_zeile(V, 5, 0, DesinfektionNoetig, false)),
             "Status «Desinfektion nötig» gibt es nur für Geräte"
         );
     }
@@ -296,8 +296,8 @@ mod tests {
             assert_eq!(MaterialArt::parse(s).unwrap().as_str(), s);
         }
         assert!(MaterialArt::parse("Gerät").is_none());
-        assert_eq!(MaterialArt::aus_menge(1), MaterialArt::Geraet);
-        assert_eq!(MaterialArt::aus_menge(2), MaterialArt::Verbrauchsgut);
+        assert_eq!(MaterialArt::from_menge(1), MaterialArt::Geraet);
+        assert_eq!(MaterialArt::from_menge(2), MaterialArt::Verbrauchsgut);
         assert_eq!(MaterialArt::Geraet.label(), "Gerät");
         assert_eq!(MaterialArt::Verbrauchsgut.label(), "Verbrauchsgut");
     }

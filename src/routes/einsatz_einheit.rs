@@ -829,7 +829,7 @@ pub async fn material_zuordnen(
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    material_ort_setzen(&state, &ctx, eid, em_id, Some(MaterialOrt::Einheit(eid))).await
+    set_material_ort(&state, &ctx, eid, em_id, Some(MaterialOrt::Einheit(eid))).await
 }
 
 /// DELETE .../einheiten/{eid}/material/{em_id} — Material von der Einheit lösen: danach ohne Ort
@@ -839,11 +839,11 @@ pub async fn material_freigeben(
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    material_ort_setzen(&state, &ctx, eid, em_id, None).await
+    set_material_ort(&state, &ctx, eid, em_id, None).await
 }
 
 /// Gemeinsamer Weg von PUT und DELETE: `ziel` `None` heißt „von `eid` lösen“.
-async fn material_ort_setzen(
+async fn set_material_ort(
     state: &AppState,
     ctx: &EinsatzSchreibzugriff<Einheiten>,
     eid: i64,

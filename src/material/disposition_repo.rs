@@ -1,6 +1,6 @@
 use super::ort::{self, MaterialOrt, OrtPatch};
 use super::{
-    pruefe_zeile, EinsatzMaterialAnzeige, MaterialArt, MaterialStatus, DIENSTSTATUS_IN_DIENST,
+    check_zeile, EinsatzMaterialAnzeige, MaterialArt, MaterialStatus, DIENSTSTATUS_IN_DIENST,
     GERAET_JE_STUECK,
 };
 use crate::entlassung::BeendetAls;
@@ -211,7 +211,7 @@ pub async fn disponiere_stamm_tx(
 ) -> Result<i64, AppError> {
     let ((bezeichnung, kategorie, bestandsnummer, traeger), art) =
         stamm_snapshot_tx(conn, org_id, material_id).await?;
-    pruefe_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
+    check_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
@@ -304,8 +304,8 @@ pub async fn disponiere_adhoc_tx(
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let art = art.unwrap_or(MaterialArt::aus_menge(menge));
-    pruefe_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
+    let art = art.unwrap_or(MaterialArt::from_menge(menge));
+    check_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
@@ -381,7 +381,7 @@ pub fn stamm_angaben_error() -> AppError {
 /// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
 /// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
 /// Ad-hoc-Angaben an einem Stamm-Posten und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
-/// Status verstößt ([`pruefe_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
+/// Status verstößt ([`check_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
 /// geändertem Ziel. Erst wird alles geprüft, dann geschrieben: jede Ablehnung schreibt nichts.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
@@ -406,7 +406,7 @@ pub async fn update_tx(
     patch.ort.validate()?;
     let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
     let status = MaterialStatus::try_from(status).map_err(AppError::Internal)?;
-    pruefe_zeile(
+    check_zeile(
         patch.art.unwrap_or(art),
         patch.menge.unwrap_or(menge),
         patch.ausgegeben.unwrap_or(ausgegeben),
@@ -416,7 +416,7 @@ pub async fn update_tx(
     // Der Ort zuletzt geprüft und vor der Zeile geschrieben: `set_ort_tx` prüft nur ein neues Ziel
     // (Lösen und ein unveränderter Wert gehen immer, auch an einer aufgelösten UHS) und schreibt
     // erst danach.
-    if !patch.ort.is_leer() {
+    if !patch.ort.is_empty() {
         let aktuell = ort::load_ort_tx(conn, einsatz_id, em_id).await?;
         if let Some(ziel) = patch.ort.ziel(aktuell) {
             ort::set_ort_tx(conn, einsatz_id, em_id, ziel).await?;

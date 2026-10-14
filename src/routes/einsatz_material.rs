@@ -404,7 +404,7 @@ pub async fn update(
         Ok((vorher, nachher))
     })?;
     sse_material(&state, einsatz_id, em_id);
-    melde_orte(&state, einsatz_id, &vorher, &nachher);
+    notify_orte(&state, einsatz_id, &vorher, &nachher);
     Ok(Json(nachher))
 }
 
@@ -412,7 +412,7 @@ pub async fn update(
 /// Materialrecht nicht, LLH-1182). Wechselt der Ort, gehen alter und neuer Ort. Sonst die Einheit
 /// nur bei dem, was sie zeigt (Bezeichnung, Menge, Ausgabe, Status, Art), die übrigen Orte bei
 /// jeder Änderung der Zeile (das UHS-Detail zeigt die ganze Zeile, LFH-892).
-fn melde_orte(
+fn notify_orte(
     state: &AppState,
     einsatz_id: i64,
     vorher: &EinsatzMaterialAnzeige,
