@@ -161,7 +161,9 @@ wird mit der Wahl disponiert und zugeordnet, ganz oder gar nicht: ist sie inzwis
 oder schon im Einsatz, geschieht nichts, und der Grund steht unter dem Auswahlfeld. Material kommt
 nur über das Modul [Material](material.md) in den Einsatz.
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
-Fahrzeug dabei aus seiner bisherigen Einheit um.
+Fahrzeug dabei aus seiner bisherigen Einheit um. Ein Fahrzeug ohne Einheit lässt sich dort auch als
+eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
+[Fahrzeuge und FMS](fahrzeuge.md)).
 
 ### Stärke
 

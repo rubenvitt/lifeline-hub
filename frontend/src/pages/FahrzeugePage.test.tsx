@@ -1069,7 +1069,13 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       screen.queryByRole('button', { name: 'Florian Nachbarstadt 44/1 entlassen' }),
     ).toBeNull();
     const menue = await oeffneMenue('Florian Nachbarstadt 44/1');
-    expect(eintraege(menue)).toEqual(['Entlassen', 'Angaben ändern …', '—', 'Stornieren (rot)']);
+    expect(eintraege(menue)).toEqual([
+      'Entlassen',
+      'Angaben ändern …',
+      'Als eigene Einheit führen …',
+      '—',
+      'Stornieren (rot)',
+    ]);
   });
 
   it('Stamm-Fahrzeug: „Angaben ändern · aus dem Stamm“ steht gesperrt, ohne Sprung', async () => {
@@ -1079,6 +1085,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     expect(eintraege(menue)).toEqual([
       'Entlassen',
       'Angaben ändern · aus dem Stamm (gesperrt)',
+      'Als eigene Einheit führen …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -1100,6 +1107,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       'Entlassen',
       'Angaben ändern · aus dem Stamm (gesperrt)',
       'Im Stamm ändern ↗',
+      'Als eigene Einheit führen …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -1122,7 +1130,12 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     await screen.findByText('Florian Nachbarstadt 44/1');
     const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
     const menue = await oeffneMenue('Florian Nachbarstadt 44/1', karte);
-    expect(eintraege(menue)).toEqual(['Angaben ändern …', '—', 'Stornieren (rot)']);
+    expect(eintraege(menue)).toEqual([
+      'Angaben ändern …',
+      'Als eigene Einheit führen …',
+      '—',
+      'Stornieren (rot)',
+    ]);
   });
 
   it('ohne Schreibrecht kein Auslöser', async () => {
@@ -1830,5 +1843,123 @@ describe('FahrzeugePage · Disponieren im Dialog (LFH-983)', () => {
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
     expect(await within(dialog).findByText('Mindestens ein Fahrzeug wählen')).toBeInTheDocument();
+  });
+});
+
+describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.md D9)', () => {
+  const adhoc = {
+    ...ef,
+    fahrzeug_id: null,
+    ist_adhoc: true,
+    funkrufname: 'Florian Nachbarstadt 44/1',
+  };
+  const menueTexte = async (name: string) => {
+    await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${name}` }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    return within(menue)
+      .getAllByRole('menuitem')
+      .map((e) => e.textContent);
+  };
+
+  it('fehlt im Menü eines Fahrzeugs mit Einheit', async () => {
+    render(einsatz(), [], { ...adhoc, einheit_id: 1 }, [], [{ id: 1, name: 'Zug 1' }]);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    expect(await menueTexte('Florian Nachbarstadt 44/1')).not.toContain(
+      'Als eigene Einheit führen …',
+    );
+  });
+
+  it('fehlt ohne Freigabe des Moduls Einheiten', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    render(einsatz(), [], adhoc);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    expect(await menueTexte('Florian Nachbarstadt 44/1')).toEqual([
+      'Entlassen',
+      'Angaben ändern …',
+      'Stornieren',
+    ]);
+  });
+
+  it('öffnet den Dialog vorbelegt mit dem Funkrufnamen', async () => {
+    server.use(http.get('/api/einheit-typen', () => HttpResponse.json([])));
+    render(einsatz(), [], adhoc);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    await waehleImZeilenmenue('Florian Nachbarstadt 44/1', 'Als eigene Einheit führen …');
+    // Im Seitentest tragen alle Modals dieselbe Test-ID am Titel, der Name hilft nicht.
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Florian Nachbarstadt 44/1 als eigene Einheit führen'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue(
+      'Florian Nachbarstadt 44/1',
+    );
+  });
+});
+
+describe('FahrzeugePage · Personal der Einheit übernehmen (LLH-1073 Teil II, design.md D12)', () => {
+  const mitEinheit = { ...ef, einheit_id: 1 };
+  const EINHEIT = [{ id: 1, name: 'Rettungsstaffel', fuehrer_id: null }];
+  const KNOPF = 'Personal der Einheit übernehmen';
+  async function aufklappen() {
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Besatzung zu Florian 1' }));
+  }
+
+  it('fehlt ohne Einheit des Fahrzeugs', async () => {
+    render(einsatz(), [person({ einheit_id: 1 })]);
+    await aufklappen();
+    await screen.findByText('Kraft zur Besatzung …');
+    expect(screen.queryByRole('button', { name: KNOPF })).toBeNull();
+  });
+
+  it('steht ohne freie Kräfte der Einheit gesperrt, mit dem Grund daneben', async () => {
+    render(
+      einsatz(),
+      [person({ einheit_id: 1, fahrzeug_id: 99 }), person({ id: 101, einheit_id: 2 })],
+      mitEinheit,
+      [],
+      EINHEIT,
+    );
+    await aufklappen();
+    expect(await screen.findByRole('button', { name: KNOPF })).toBeDisabled();
+    expect(screen.getByText('keine freien Kräfte der Einheit')).toBeInTheDocument();
+  });
+
+  it('übernimmt die vorgewählten Kräfte, danach zeigt die Besatzung Ist und Soll', async () => {
+    let personal: ReturnType<typeof person>[] = [
+      person({ id: 100, name: 'Ulla', einheit_id: 1, staerke_position: 'unterfuehrer' }),
+      person({ id: 101, name: 'Ali', einheit_id: 1, staerke_position: null }),
+    ];
+    const bodies: unknown[] = [];
+    render(einsatz(), personal, mitEinheit, [], EINHEIT);
+    server.use(
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
+      http.post('/api/einsaetze/7/fahrzeuge/10/besatzung', async ({ request }) => {
+        const body = (await request.json()) as { ep_ids: number[] };
+        bodies.push(body);
+        personal = personal.map((p) =>
+          body.ep_ids.includes(p.id) ? person({ ...p, fahrzeug_id: 10 }) : p,
+        );
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await aufklappen();
+    const urteil = () =>
+      document.querySelector('[data-lfh="besatzung-block"] [data-lfh="besatzung-urteil"]');
+    expect(urteil()).toHaveAttribute('data-urteil', 'nicht_erfasst');
+    await userEvent.click(await screen.findByRole('button', { name: KNOPF }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Personal der Einheit auf Florian 1')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(bodies).toEqual([{ ep_ids: [100, 101] }]));
+    await waitFor(() => expect(urteil()).not.toHaveAttribute('data-urteil', 'nicht_erfasst'));
+    expect(urteil()).toHaveTextContent('Ist');
+    expect(urteil()).toHaveTextContent('Soll');
   });
 });

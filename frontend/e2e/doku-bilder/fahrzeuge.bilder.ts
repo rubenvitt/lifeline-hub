@@ -15,13 +15,20 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   entlassen.png    frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
  *   angaben-aendern.png frontend/src/kraefte/FahrzeugAngabenDialog.tsx,
  *                    frontend/src/kraefte/AdhocFahrzeugFelder.tsx (Zeilenmenü „Angaben ändern …“)
+ *   eigene-einheit.png frontend/src/kraefte/EigeneEinheitDialog.tsx,
+ *                    frontend/src/kraefte/eigeneEinheit.ts (Zeilenmenü „Als eigene Einheit führen …“)
+ *   personal-uebernehmen.png frontend/src/kraefte/BesatzungUebernehmenDialog.tsx,
+ *                    frontend/src/kraefte/besatzungVorschlag.ts (Knopf im `BesatzungsBlock`)
  *
  * Demo-Lücke (D3): die Demo-Fahrzeuge haben keine Besatzung. Die Spec setzt Anna und Paul Probe
  * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“. Für den Dialog
  * „Fahrzeuge disponieren“ legt sie zwei Stamm-Fahrzeuge an, die noch nicht im Einsatz sind
  * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert. Für den Block „Entlassen“ disponiert sie
  * ein Ad-hoc-Fahrzeug und entlässt es (LLH-1079 Teil II); die Bilder davor zeigen es nicht. Für den
- * Dialog „Angaben ändern“ disponiert sie zuletzt ein weiteres Ad-hoc-Fahrzeug (LLH-1073).
+ * Dialog „Angaben ändern“ disponiert sie ein weiteres Ad-hoc-Fahrzeug (LLH-1073). Für den Dialog
+ * „Als eigene Einheit führen“ disponiert sie zuletzt ein Ad-hoc-Fahrzeug einer Nachbarwehr mit zwei
+ * Ad-hoc-Kräften als Besatzung (LLH-1073 Teil II). „Personal der Einheit übernehmen“ zeigt den RTW
+ * „83-2“ der Rettungsstaffel mit ihren freien Kräften, ohne weitere Füllung.
  */
 
 const KAPITEL = 'fahrzeuge';
@@ -165,5 +172,55 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'angaben-aendern');
+  });
+
+  test('Dialog „Als eigene Einheit führen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const fahrzeug = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+      adhoc: {
+        funkrufname: 'Nachbarstadt 44/1',
+        fahrzeugtyp: 'HLF 20',
+        traegerorganisation: 'FF Nachbarstadt',
+      },
+    });
+    for (const name of ['Jonas Nachbar', 'Mia Nachbar']) {
+      const kraft = await fuelle<Person>(page, 'post', `/api/einsaetze/${demo.id}/personal`, {
+        adhoc: { name, traegerorganisation: 'FF Nachbarstadt' },
+      });
+      await fuelle(
+        page,
+        'put',
+        `/api/einsaetze/${demo.id}/fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`,
+      );
+    }
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    await page.getByRole('button', { name: 'Weitere Aktionen zu Nachbarstadt 44/1' }).click();
+    await page.getByRole('menuitem', { name: 'Als eigene Einheit führen …' }).click();
+    const dialog = page
+      .locator('.ant-modal')
+      .filter({ hasText: 'Nachbarstadt 44/1 als eigene Einheit führen' });
+    await expect(dialog.getByLabel('Name')).toHaveValue('Nachbarstadt 44/1');
+    await expect(dialog.getByText('Besatzung: Jonas Nachbar, Mia Nachbar')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'eigene-einheit');
+  });
+
+  test('Dialog „Personal der Einheit übernehmen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    await page.getByRole('button', { name: /^Besatzung zu .*83-2$/ }).click();
+    await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
+    const dialog = page
+      .locator('.ant-modal')
+      .filter({ hasText: /Personal der Einheit auf .*83-2/ });
+    await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(2);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'personal-uebernehmen');
   });
 });
