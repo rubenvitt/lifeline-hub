@@ -193,8 +193,8 @@ Meldung, kein Dokument, kein Verteiler) wird beim Auflösen ganz gelöscht. An e
 ### Einsatztagebuch
 
 Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit, eine neue
-Abschnittszuordnung, einen Wechsel des Einheitsführers und jedes Zuordnen und Lösen von Personal,
-Fahrzeugen und Material. Änderungen an Name, Typ, Unterstellung, Soll-Stärke, Funkangaben und
+Abschnittszuordnung, einen Wechsel des Einheitsführers, einen Statuswechsel von Hand und jedes
+Zuordnen und Lösen von Personal, Fahrzeugen und Material. Änderungen an Name, Typ, Unterstellung, Soll-Stärke, Funkangaben und
 taktischem Zeichen stehen nicht im Einsatztagebuch.
 
 ### Aus einer Vorlage bilden
