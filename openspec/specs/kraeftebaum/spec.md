@@ -27,6 +27,16 @@ Personal direkt unter ihr stehen.
 - **WHEN** einer Einheit drei Materialposten zugeordnet sind, einer davon defekt
 - **THEN** zeigt sie eine Zeile „Material · 3 Posten · 1 Ausfall“, aufklappbar zu den Posten
 
+### Requirement: Material-Ausfall wie in der Materialliste
+
+Den Ausfall der Material-Gruppenzeile SHALL dieselbe Zählung liefern wie die Materialverdichtung
+der Materialliste (Spec `material-liste`, LLH-1093): Posten, nicht Mengen, deren Status im
+Statusvertrag die Rolle Alarm oder Achtung trägt.
+
+#### Scenario: Verbraucht und Desinfektion zählen mit
+- **WHEN** einer Einheit vier Materialposten zugeordnet sind, einer defekt, einer verbraucht und einer mit „Desinfektion nötig“
+- **THEN** nennt ihre Gruppenzeile 4 Posten und 3 Ausfall, so wie die Materialliste für dieselben Posten „3 Ausfall“ zählt
+
 ### Requirement: Jede Kraft genau einmal
 
 Jede Kraft der Auswahl SHALL genau einmal im Baum stehen. Eine Person, die ein Fahrzeug einer
