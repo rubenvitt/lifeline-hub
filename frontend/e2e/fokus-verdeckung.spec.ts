@@ -651,29 +651,26 @@ async function einheitFokusBereit(page: Page, dichte: string) {
 }
 
 /**
- * Tabulatorstopps im Inhalt NACH dem Brotkrumen „Einheiten“, dem Startpunkt des Laufs. Ohne
- * Formular ist die Route kürzer als früher; ein fester Zähler liefe über ihr Ende hinaus in den
- * Navigationsrahmen, der nicht zu dieser Route gehört (dort liegt bei 1366 × 520 handschuh der
- * Schienenknopf „Kommunikation“ unter einem klebenden Element, LLH-1241). Zu knapp gezählt fehlt
- * ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
+ * Tabulatorstopps eines ganzen Umlaufs durch das Dokument: vom Brotkrumen „Einheiten“ über das
+ * Inhaltsende hinaus durch Kopf, Rail und Modulpanel zurück in den Seitenkopf. Der Rahmen gehört
+ * mit in den Lauf, seit die Rail ihre letzte Kategorie über den klebenden Fuß rollt (LLH-1241).
+ * Zu knapp gezählt fehlt ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
  */
-async function stoppsBisInhaltsende(page: Page): Promise<number> {
-  return page.getByRole('main').evaluate((main) => {
-    const start = [...main.querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Einheiten',
-    );
-    if (!start) throw new Error('Brotkrumen „Einheiten“ fehlt');
-    return [
-      ...main.querySelectorAll<HTMLElement>('a[href], button, input, textarea, select, [tabindex]'),
-    ].filter(
-      (el) =>
-        el.tabIndex >= 0 &&
-        !(el as HTMLButtonElement).disabled &&
-        el.getClientRects().length > 0 &&
-        getComputedStyle(el).visibility !== 'hidden' &&
-        (start.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-    ).length;
-  });
+async function stoppsEinUmlauf(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          'a[href], button, input, textarea, select, [tabindex]',
+        ),
+      ].filter(
+        (el) =>
+          el.tabIndex >= 0 &&
+          !(el as HTMLButtonElement).disabled &&
+          el.getClientRects().length > 0 &&
+          getComputedStyle(el).visibility !== 'hidden',
+      ).length,
+  );
 }
 
 for (const viewport of [
@@ -691,18 +688,24 @@ for (const viewport of [
       await expect(
         page.getByRole('main').getByRole('button', { name: 'Speichern', exact: true }),
       ).toHaveCount(0);
-      const stopps = await stoppsBisInhaltsende(page);
+      const stopps = await stoppsEinUmlauf(page);
       await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
-      const befund = await pruefeFokusVerdeckung(page, stopps);
+      const befund = await pruefeFokusVerdeckung(page, stopps, 'Tab', {
+        region: 'nav[aria-label="Kategorien"]',
+      });
       expect(
         befund.besuchteZiele.sort(),
         'Jeder Zeilenauslöser und jede Zuordnungsaktion muss per Tab besucht werden',
       ).toEqual(ziele.sort());
+      // Ab `lg` steht die Rail im Rahmen; der Umlauf muss sie erreicht haben (LLH-1241).
+      if (viewport.width >= 992) {
+        expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+      }
       expect(befund.fixierteKandidaten).toBeGreaterThan(0);
       expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
       test.info().annotations.push({
         type: 'messwert',
-        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, davon ${befund.stoppsInRegion} in der Rail, ${befund.verdeckt.length} Verdeckungen`,
       });
     });
   }
@@ -877,6 +880,98 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   }
   expect(unterDemFussGestartet, 'mindestens eine Lage beginnt unter dem Fuß').toBeGreaterThan(0);
   expect(befunde, befunde.join('\n')).toEqual([]);
+});
+
+/**
+ * Rail (LLH-1241): bei 1366 × 520 in `handschuh` passen Kategorien und Fuß (Griff „Menü“,
+ * Einstellungen) nicht unter den Kopf, und die Spalte rollt in sich. Getabbt lag
+ * „Kommunikation“ ganz unter dem klebenden Fuß, weil `scroll-margin` an den Zielen die Spalte nicht
+ * rollte. Gemessen wird vorwärts vom Benutzermenü in die Rail und rückwärts wieder hinaus, und zwar
+ * strenger als der Kern: kein Kategorie-Ziel darf den Fuß auch nur überlappen.
+ *
+ * Gegenprobe im selben Test: ohne `scroll-padding` an der Spalte meldet der Kern das Ziel als
+ * verdeckt. Ohne sie bewiese ein grüner Lauf nur, dass die Spalte gerade nicht rollen musste.
+ */
+test('Rail (LLH-1241): kein Kategorie-Ziel liegt beim Tabben unter dem klebenden Fuß (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  const { pfad } = await einheitMitZuordnungen(page);
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.goto(pfad);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await detailBereit(page);
+
+  const rail = page.getByRole('navigation', { name: 'Kategorien' });
+  const spalte = rail.locator('[data-lfh="rail-spalte"]');
+  const fuss = rail.locator('[data-lfh="rail-fuss"]');
+  await expect(fuss).toHaveCSS('position', 'sticky');
+  // Vorbedingungen: die Spalte rollt, und die letzte Kategorie beginnt unter dem Fuß.
+  expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  expect(
+    await letzte.evaluate(
+      (el, f) => el.getBoundingClientRect().top >= f!.getBoundingClientRect().top,
+      await fuss.elementHandle(),
+    ),
+    'die letzte Kategorie liegt vor dem Fokus ganz unter dem Fuß',
+  ).toBe(true);
+
+  const kategorien = await rail.locator('[data-lfh="rail-haupt"] button').all();
+  const namen: string[] = [];
+  for (const k of kategorien) {
+    const name = (await k.getAttribute('aria-label'))!;
+    namen.push(name);
+    await k.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
+  }
+  const zieleImFuss = await fuss.locator('button').count();
+  const schritte = namen.length + zieleImFuss;
+  const startpunkt = page.getByRole('button', { name: 'Benutzermenü' });
+
+  /** Überlappung jedes Kategorie-Stopps mit dem Fuß in px (0 = frei). */
+  async function laufe(taste: 'Tab' | 'Shift+Tab') {
+    const ueberlappung: string[] = [];
+    const besucht = new Set<string>();
+    for (let i = 0; i < schritte; i += 1) {
+      await page.keyboard.press(taste);
+      const m = await page.evaluate(() => {
+        const f = document.activeElement;
+        const kennung = f?.getAttribute('data-e2e-fokus');
+        if (!f || !kennung) return null;
+        const fussOben = document
+          .querySelector('[data-lfh="rail-fuss"]')!
+          .getBoundingClientRect().top;
+        return { kennung, ueber: f.getBoundingClientRect().bottom - fussOben };
+      });
+      if (m == null) continue;
+      besucht.add(m.kennung);
+      if (m.ueber > 0.5) ueberlappung.push(`${m.kennung}: ${Math.round(m.ueber)} px unter dem Fuß`);
+    }
+    return { ueberlappung, besucht: [...besucht].sort() };
+  }
+
+  await startpunkt.focus();
+  const vorwaerts = await laufe('Tab');
+  expect(vorwaerts.besucht, 'vorwärts jede Kategorie besucht').toEqual([...namen].sort());
+  expect(vorwaerts.ueberlappung, vorwaerts.ueberlappung.join('\n')).toEqual([]);
+  // Rückwärts vom letzten Ziel im Fuß.
+  await fuss.locator('button').last().focus();
+  const rueckwaerts = await laufe('Shift+Tab');
+  expect(rueckwaerts.besucht, 'rückwärts jede Kategorie besucht').toEqual([...namen].sort());
+  expect(rueckwaerts.ueberlappung, rueckwaerts.ueberlappung.join('\n')).toEqual([]);
+
+  // Gegenprobe: ohne Padding an der Spalte rollt nichts, und der Kern sieht die Verdeckung.
+  await spalte.evaluate((el) => {
+    el.style.scrollPaddingBlockEnd = '0px';
+    el.scrollTop = 0;
+  });
+  await startpunkt.focus();
+  const ohne = await pruefeFokusVerdeckung(page, schritte);
+  expect(
+    ohne.verdeckt.join('\n'),
+    'ohne Padding liegt die letzte Kategorie unter dem Fuß',
+  ).toContain(namen[namen.length - 1]);
 });
 
 // ── ETB, Gefahrenmatrix, Lagekarte, Personenkarte und -liste ─────────────────────────────
