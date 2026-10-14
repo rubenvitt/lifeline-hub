@@ -1970,6 +1970,23 @@ for (const schreibend of [true, false]) {
         `Kästchen (${dichte})`,
         VORLAGE_KAESTCHEN,
       );
+      // Zielabstand (Kriterium 2): die Kästchen stehen untereinander, gemessen wird die Lücke
+      // zwischen zwei aufeinanderfolgenden; `kompakt` hat die Spacing-Ausnahme.
+      const kanten = (
+        await main
+          .locator('label.ant-checkbox-wrapper')
+          .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as DOMRect))
+      ).sort((a, b) => a.y - b.y);
+      let luecke = Infinity;
+      for (let i = 1; i < kanten.length; i += 1) {
+        luecke = Math.min(luecke, kanten[i].y - (kanten[i - 1].y + kanten[i - 1].height));
+      }
+      const abstandSoll = ZIELABSTAND[dichte];
+      if (abstandSoll != null) {
+        expect(luecke, `Abstand zwischen zwei Kästchen (${dichte})`).toBeGreaterThanOrEqual(
+          abstandSoll - SUBPIXEL,
+        );
+      }
       const knopf = schreibend
         ? await haeltStufe(bilden, soll, `Einheit bilden (${dichte})`)
         : await gesperrtHaeltStufe(bilden, soll, `Einheit bilden (${dichte})`);
@@ -1980,7 +1997,8 @@ for (const schreibend of [true, false]) {
       );
       gemessen.push(
         `${dichte} (Soll ≥ ${soll}): Name ${name}, Abschnitt ${abschnitt}, ` +
-          `Kästchen ${kaestchen} (Boden ${BODEN_KAESTCHEN[dichte]}), Einheit bilden ${knopf}, ` +
+          `Kästchen ${kaestchen} (Boden ${BODEN_KAESTCHEN[dichte]}, Abstand ${luecke}), ` +
+          `Einheit bilden ${knopf}, ` +
           `Abbrechen ${abbrechen}`,
       );
     }

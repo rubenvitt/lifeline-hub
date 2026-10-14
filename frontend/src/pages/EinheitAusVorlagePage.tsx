@@ -19,7 +19,7 @@ import type {
 } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { Paneel, monoStil, useRollen, zielEinzug } from '../components/instrument';
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
@@ -544,7 +544,15 @@ function KraftZeile({
     <div
       data-lfh="vorlage-zeile"
       data-zeile={zeilenSchluessel(art, id)}
-      style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: token.marginSM }}
+      // Zielabstand (Bedien-Leitlinie Kriterium 2): zwei Kästchen untereinander stehen
+      // 0 / 8 / 16 px auseinander, je Zeile der halbe Abstand oben und unten (`zielEinzug`).
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: token.marginSM,
+        paddingBlock: zielEinzug(token),
+      }}
     >
       <Checkbox
         checked={an}
