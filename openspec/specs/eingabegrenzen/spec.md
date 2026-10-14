@@ -212,3 +212,30 @@ MAY je Kraft werden.
 #### Scenario: Dubletten
 - **WHEN** eine Sammel-Disposition dieselbe Person zweimal nennt
 - **THEN** ist die Person genau einmal disponiert
+
+### Requirement: Ad-hoc-Fahrzeug und Fahrzeugbemerkung sind begrenzt
+Funkrufname, Typ, Kennzeichen, Trägerorganisation und OPTA eines Ad-hoc-Fahrzeugs MUST beim
+Disponieren und beim Ändern höchstens 200 Zeichen lang sein, die Bemerkung einer
+Fahrzeug-Disposition höchstens 2 000 Zeichen. Ein längerer Wert MUST mit 400 abgelehnt werden,
+bevor ein Zusammenhang geprüft oder etwas geschrieben wird. Die Masken MUST dieselben Grenzen
+tragen.
+
+#### Scenario: Zu langer Funkrufname beim Disponieren
+- **WHEN** ein Ad-hoc-Fahrzeug mit einem Funkrufnamen aus 201 Zeichen disponiert wird
+- **THEN** antwortet der Server mit 400, und weder Fahrzeug noch ETB-Eintrag entstehen
+
+#### Scenario: Grenze vor dem Zusammenhang
+- **WHEN** für ein Stamm-Fahrzeug ein Kennzeichen aus 201 Zeichen gesendet wird
+- **THEN** antwortet der Server mit 400, nicht mit 422
+
+### Requirement: Name einer Einheit ist begrenzt
+Der Name einer Einheit MUST beim Bilden und beim Ändern höchstens 200 Zeichen lang sein, sonst
+MUST der Server mit 400 ablehnen, bevor etwas geschrieben wird.
+
+#### Scenario: Zu langer Name beim Bilden
+- **WHEN** eine Einheit mit einem Namen aus 201 Zeichen gebildet werden soll
+- **THEN** antwortet der Server mit 400, und weder Einheit noch ETB-Eintrag entstehen
+
+#### Scenario: Zu langer Name beim Ändern
+- **WHEN** der Name einer Einheit auf 201 Zeichen geändert werden soll
+- **THEN** antwortet der Server mit 400, und der Name bleibt

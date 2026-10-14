@@ -253,7 +253,7 @@ async fn im_einsatz_fahrzeug(pool: &SqlitePool, k: Kontext, fid: i64, e: Option<
     .unwrap()
     .id;
     if let Some(e) = e {
-        mitglied_repo::ordne_fahrzeug_zu_tx(&mut conn, k.einsatz_id, e, ef)
+        mitglied_repo::zuordnen_fahrzeug_tx(&mut conn, k.einsatz_id, e, ef)
             .await
             .unwrap();
     }
@@ -281,7 +281,7 @@ async fn im_einsatz_person(
     .await
     .unwrap();
     if let Some(e) = e {
-        mitglied_repo::ordne_personal_zu_tx(&mut conn, k.einsatz_id, e, d.id)
+        mitglied_repo::zuordnen_personal_tx(&mut conn, k.einsatz_id, e, d.id)
             .await
             .unwrap();
     }

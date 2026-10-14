@@ -2,32 +2,35 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
-der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, FMS-Status und Besatzung;
-Typ, Kennzeichen und Träger stehen erst ab 1600 px Fensterbreite in der Liste, darunter lassen sie
-sich wie die Bemerkung unter „Spalten“ einblenden.
+der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Einheit, FMS-Status und
+Besatzung. Typ, Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger stehen
+erst ab 1600 px Fensterbreite in der Liste, darunter lassen sie sich wie die Bemerkung unter
+„Spalten“ einblenden. Ist das Modul Einheiten im Einsatz nicht freigegeben, fehlen Einheit und
+Abschnitt.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
 **FMS-Tableau** als Überblick über die ganze Flotte, in dem sich der Status mit einem Klick oder
-einer Ziffer setzen lässt. Disponieren, Status setzen, Besatzung zuordnen und entlassen dürfen
-Einsatzleitung und Führungspersonal.
+einer Ziffer setzen lässt. Disponieren, Status setzen, die Einheit wählen, Besatzung zuordnen und
+entlassen dürfen Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
 ### Die Fahrzeugliste lesen
 
 1. Unter „Kräfte & Mittel“ „Fahrzeuge“ öffnen; oben rechts steht die Ansicht „Liste“.
-2. Je Fahrzeug „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa „Besatzung nicht
-   erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
+2. Je Fahrzeug „Einheit“, „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa
+   „Besatzung nicht erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
 
-   ![Fahrzeugliste mit Funkrufname, FMS-Status, Besatzung und dem Knopf „Entlassen“ je Fahrzeug, darüber „Spalten · 4 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
+   ![Fahrzeugliste mit Funkrufname, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber „Spalten · 6 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
 
-3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Status“ eine Kategorie wählen.
+3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Einheit“ und „Status“ filtern; steht die
+   Spalte „Abschnitt“ in der Liste, auch nach Abschnitt.
 
 ### Fahrzeuge aus dem Stamm disponieren
 
@@ -56,13 +59,42 @@ Fahrzeug einer Nachbarwehr:
 3. „Disponieren“ wählen. Mit „Speichern und nächste“ und „Werte behalten“ bleiben Trägerorganisation
    und Fahrzeugtyp für das nächste Fahrzeug stehen.
 
+### Die Einheit eines Fahrzeugs ändern
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist:
+
+1. In der Zeile des Fahrzeugs unter „Einheit“ „Einheit eintragen“ wählen, oder bei einer schon
+   zugeordneten Einheit ihren Namen.
+2. Die Einheit wählen. Die Auswahl ist nach Abschnitt gegliedert, unterstellte Einheiten stehen
+   mit ihrem Pfad, etwa „Sanitätszug Musterstadt › Rettungsstaffel“. Mit dem Kreuz im Feld wird die
+   Einheit geleert.
+3. „Speichern“ wählen. Der Abschnitt daneben folgt der neuen Einheit; lehnt die App ab, steht der
+   Grund am Feld.
+
+### Angaben eines Ad-hoc-Fahrzeugs ändern
+
+Für Einsatzleitung und Führungspersonal, etwa bei einem Tippfehler im Funkrufnamen:
+
+1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Angaben ändern …“ wählen.
+2. „Funkrufname“, „Fahrzeugtyp“ oder „Trägerorganisation“ ändern; „Kennzeichen“ und „OPTA“ stehen
+   unter „Weitere Angaben“, dessen Kopf die eingetragenen Werte nennt.
+
+   ![Dialog „Angaben zu … ändern“ mit Funkrufname, Fahrzeugtyp und Trägerorganisation, darunter „Weitere Angaben“ mit Kennzeichen](../bilder/fahrzeuge/angaben-aendern.png)
+
+3. „Speichern“ wählen. Ohne Änderung schließt der Dialog, ohne etwas zu schreiben.
+
+Bei einem Fahrzeug aus dem Stamm steht der Eintrag gesperrt als „Angaben ändern · aus dem Stamm“;
+wer die Stammdaten der Organisation pflegen darf, springt mit „Im Stamm ändern ↗“ zum Fahrzeug im
+Stamm.
+
 ### Den FMS-Status im Tableau setzen
 
 Für Einsatzleitung und Führungspersonal:
 
 1. In „Fahrzeuge“ die Ansicht „FMS-Tableau“ wählen, oder in der Seitenleiste „FMS-Tableau“.
 2. Die Kacheln stehen nach Abschnitt und Einheit geordnet, nie nach Status. Jede nennt Funkrufname,
-   Status, „seit“ wann er gilt und die Einheit.
+   Status, „seit“ wann er gilt und die Einheit. Eine unterstellte Einheit ohne eigenen Abschnitt
+   steht im Abschnitt ihrer Über-Einheit.
 
    ![FMS-Tableau mit den Abschnitten Betreuung, Logistik, Sanitätsdienst und UHS Turnhalle und je einer Kachel pro Fahrzeug mit Status und Einheit](../bilder/fahrzeuge/fms-tableau.png)
 
@@ -81,13 +113,15 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Aufgeklappte Besatzung des RTW 83-1 mit „Soll erfüllt“, drei Personen, davon eine mit der Marke „andere Einheit“, und dem Auswahlfeld „Kraft zur Besatzung …“](../bilder/fahrzeuge/besatzung.png)
 
-3. Mit „Freigeben“ eine Person wieder von der Besatzung lösen.
+3. Je Person stehen Position und Funktion. Mit „Vom Fahrzeug lösen“ eine Person wieder von der
+   Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug den Einsatz verlässt:
 
-1. In der Zeile des Fahrzeugs „Entlassen“ wählen. Eine Rückfrage gibt es nicht.
+1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Entlassen“ wählen, auf dem Handy
+   „Entlassen“ auf der Karte. Eine Rückfrage gibt es nicht.
 2. Das Fahrzeug verlässt die Liste und das FMS-Tableau. Der Hinweis unten bietet einige Sekunden
    lang „Rückgängig“.
 3. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Fahrzeuge mit Typ und
@@ -130,8 +164,24 @@ einer anderen Einheit gehört; die Marke „andere Einheit“ zeigt das an. Eine
 auf einem Fahrzeug; „Kraft zur Besatzung …“ bietet nur Personen an, die noch auf keinem Fahrzeug
 sitzen. Das Soll der Besatzung kommt aus der Stärke im Fahrzeugstamm; ein Ad-hoc-Fahrzeug hat
 keines. „Besatzung nicht erfasst“ heißt: keine Person zugeordnet, das Personal läuft dann oft nur
-über die Einheit. Einer Einheit wird ein Fahrzeug beim Disponieren aus dem Stamm oder später im Modul
-[Einheiten](einheiten.md) zugeordnet.
+über die Einheit. Einer Einheit wird ein Fahrzeug beim Disponieren aus dem Stamm, in der Spalte
+„Einheit“ der Liste oder im Modul [Einheiten](einheiten.md) zugeordnet; alle drei Wege sind
+derselbe. Wechselt ein Fahrzeug von einer Einheit in eine andere, sehen beide Einheiten das sofort,
+und das Einsatztagebuch nennt die vorige Einheit. Dieselbe Einheit noch einmal zu wählen ändert
+nichts.
+
+### Abschnitt
+
+Ein Fahrzeug hat keinen eigenen Abschnitt; die Spalte „Abschnitt“ zeigt den der Einheit, und hat
+die Einheit keinen, den ihrer nächsten Über-Einheit mit Abschnitt. Das FMS-Tableau gliedert nach
+demselben Abschnitt.
+
+### Angaben aus dem Stamm
+
+Funkrufname, Typ, Kennzeichen, Trägerorganisation und OPTA eines Fahrzeugs aus dem Stamm gehören
+dem Fahrzeugstamm der Organisation und lassen sich im Einsatz nicht ändern; die App lehnt das ab.
+Im Einsatz änderbar sind sie nur bei einem Ad-hoc-Fahrzeug. Jede Angabe hat höchstens 200 Zeichen,
+die Bemerkung höchstens 2.000.
 
 ### Status der Einheit und Zeitachse
 
@@ -161,14 +211,18 @@ Bereitstellungsraum belegen lehnt die App ab.
 
 ### Einsatztagebuch
 
-Disponieren, jeder Statuswechsel, das Zuordnen und Freigeben der Besatzung, das Entlassen, das
-erneute Disponieren und das Stornieren stehen im Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
+Disponieren, jeder Statuswechsel, das Zuordnen und Lösen der Besatzung, das Zuordnen zu einer
+Einheit, das Ändern der Angaben eines Ad-hoc-Fahrzeugs (ein Eintrag, der jede Änderung mit altem
+und neuem Wert nennt), das Entlassen, das erneute Disponieren und das Stornieren stehen im
+Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
 Einheit und Funkrufnamen.
 
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schreibrecht offen.
-Disponieren, Status setzen, Besatzung zuordnen, entlassen und stornieren dürfen Einsatzleitung und
-Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
+Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen, entlassen und
+stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
+[Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit wählt nur, wer im Modul Einheiten schreiben
+darf.
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
 [Ohne Netz](ohne-netz.md)).

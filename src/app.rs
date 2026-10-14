@@ -866,7 +866,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
-            patch(routes::einsatz_fahrzeug::aktualisieren),
+            patch(routes::einsatz_fahrzeug::update),
         )
         // LLH-1079 Teil II: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
@@ -1763,7 +1763,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
-            patch(routes::einsatz_einheit::aktualisieren),
+            patch(routes::einsatz_einheit::update),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/position",

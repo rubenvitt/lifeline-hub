@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse, type HttpHandler } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -158,6 +159,13 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(
       screen.getAllByText(/als Führer gezählt, noch nicht als Einheitsführer gesetzt/),
     ).toHaveLength(1);
+  });
+
+  it('der Name nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
+    server.use(...handlers());
+    rendere();
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('1. Zug'));
+    expect(screen.getByLabelText('Name')).toHaveAttribute('maxLength', String(EINHEIT_NAME_MAX));
   });
 
   it('zeigt die Kopfdaten der adressierten Einheit', async () => {
