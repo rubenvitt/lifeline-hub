@@ -27,6 +27,7 @@ const einheiten = [
     ueber_einheit_id: null,
     typ_label: null,
     fuehrer_name: null,
+    fuehrer_id: null as number | null,
     soll: null,
   },
 ];
@@ -68,6 +69,7 @@ function render(
   einsatzObj: ReturnType<typeof einsatz>,
   personalDaten: unknown[] = disponiert,
   entlasseneDaten: unknown[] = [],
+  einheitenDaten: unknown[] = einheiten,
 ) {
   server.use(
     meHandler(admin),
@@ -78,7 +80,7 @@ function render(
         new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : personalDaten,
       ),
     ),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheitenDaten)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/personal-status', () =>
       HttpResponse.json([
@@ -139,6 +141,34 @@ describe('PersonalPage', () => {
     ]) {
       expect(within(zeile).getByRole('button', { name })).toBeInTheDocument();
     }
+  });
+
+  /**
+   * Wechselt der Einheitsführer in der Zeile die Einheit, leert der Server die Führung still
+   * (LLH-1060 D3, Prüfliste #9): die Marke steht deshalb schon vor dem Wechsel am Wert.
+   */
+  it('nennt am Einheitswert den Einheitsführer, nur bei ihm', async () => {
+    const zweite = {
+      ...disponiert[0],
+      id: 11,
+      personal_id: 6,
+      name: 'Anna Berg',
+      staerke_position: 'mannschaft',
+    };
+    const { container } = render(
+      einsatz(),
+      [disponiert[0], zweite],
+      [],
+      [{ ...einheiten[0], fuehrer_id: 10 }],
+    );
+    await bereit();
+    await bereit('Anna Berg');
+    const fuehrer = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    const andere = container.querySelector('[data-row-key="11"]') as HTMLElement;
+    expect(
+      within(fuehrer).getByRole('button', { name: 'Einheit zu Thomas Müller bearbeiten' }),
+    ).toHaveTextContent('Einheitsführer');
+    expect(within(andere).queryByText('Einheitsführer')).toBeNull();
   });
 
   /**

@@ -1298,6 +1298,12 @@ async function seedeKraefte(page: Page): Promise<string> {
   );
   await put(`fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`, 'Besatzung');
   await put(`einheiten/${einheit.id}/personal/${kraft.id}`, 'Einheit');
+  // Führer seiner Einheit: die Marke „Einheitsführer“ steht neben dem langen Einheitsnamen und
+  // ist die breiteste Einteilung der Liste (LLH-1060 D3).
+  const fuehrer = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${einheit.id}`, {
+    data: { fuehrer_id: kraft.id },
+  });
+  expect(fuehrer.ok(), `Seeding Einheitsführer: ${await fuehrer.text()}`).toBeTruthy();
   await post('personal', { adhoc: { name: KRAFT_KURZ } }, 'Personal (kurz)');
   return String(einsatzId);
 }
@@ -1342,6 +1348,10 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
           region.getByText('Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest', {
             exact: true,
           }),
+        ).toBeVisible();
+        // Die Marke „Einheitsführer“ steht am Einheitswert, auch ohne Schreibrecht.
+        await expect(
+          region.locator('tr.ant-table-row').filter({ hasText: KRAFT }).getByText('Einheitsführer'),
         ).toBeVisible();
         // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
         const einheitAngabe = region.getByRole('button', {

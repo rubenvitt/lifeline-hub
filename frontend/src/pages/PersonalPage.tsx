@@ -354,6 +354,14 @@ export default function PersonalPage() {
                 wert={ep.einheit_id ?? null}
                 optionen={einheitOptionen}
                 darfSchreiben={darfSchreiben}
+                // Wechselt der Einheitsführer die Einheit, leert der Server die Führung still
+                // (D3): die Marke steht deshalb schon vor dem Wechsel am Wert.
+                marke={
+                  ep.einheit_id != null &&
+                  einheiten.find((e) => e.id === ep.einheit_id)?.fuehrer_id === ep.id ? (
+                    <Tag>Einheitsführer</Tag>
+                  ) : undefined
+                }
                 onSpeichern={schreiben.einheit(ep.id)}
               />
             ),

@@ -84,6 +84,9 @@ Für Einsatzleitung und Führungspersonal, in der Liste oder in der Ansicht der 
    „nicht eingeteilt“ bzw. ohne Fahrzeug.
 6. Lehnt die App ab, steht der Grund an der Angabe, die Auswahl bleibt mit dem gewählten Wert offen.
 
+Führt die Person ihre Einheit, steht am Wert die Marke „Einheitsführer“: wechselt sie die Einheit,
+ist die bisherige danach ohne Führer.
+
 Wechselt eine Person die Einheit, während Maus oder Fokus in der Liste liegen, bleibt ihre Zeile
 stehen und wandert erst in die neue Gruppe, wenn beide die Liste verlassen haben.
 
@@ -212,8 +215,8 @@ unabhängig: Wechselt eine Person die Einheit, bleibt sie auf ihrem Fahrzeug. F�
 Fahrzeug einer anderen Einheit, steht daneben „andere Einheit“; das Meldebild zeigt sie unter
 „Ohne Fahrzeug“ ihrer Einheit mit „fährt auf …“. Mitfahrer sind so sichtbar, aber erlaubt.
 
-Führt eine Person ihre Einheit und wechselt die Einheit, ist die Einheit danach ohne Führer. Die
-Ansicht zeigt deshalb vor dem Wechsel die Marke „Einheitsführer“ am Wert; das Einsatztagebuch
+Führt eine Person ihre Einheit und wechselt die Einheit, ist die Einheit danach ohne Führer. Liste
+und Ansicht zeigen deshalb vor dem Wechsel die Marke „Einheitsführer“ am Wert; das Einsatztagebuch
 nennt nur die neue Zuordnung.
 
 Die Stärke-Position bestimmt, ob die Person als Führer, Unterführer oder Mannschaft zählt;
