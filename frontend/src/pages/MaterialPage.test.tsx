@@ -2,14 +2,14 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Link, Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
-import { waehle } from '../test/auswahlListe';
+import { listeVon, oeffne, waehle } from '../test/auswahlListe';
 
 const admin = adminFixture();
 
@@ -47,10 +47,15 @@ const UHS = [
   { id: 9, bezeichnung: 'Zelt Nord', status: 'aufgeloest' },
 ];
 
+/** Fahrzeuge und Bereitstellungsräume der Ort-Auswahl (LLH-1225). */
+const FAHRZEUGE = [{ id: 4, funkrufname: 'Florian 1/83-1', beendet_at: null }];
+const BR = [{ id: 6, bezeichnung: 'BR Nord', status: 'geplant', storniert_at: null }];
+
 function render(
   einsatzObj: typeof einsatzAktiv,
   materialListe: (typeof em)[],
   entlasseneDaten: unknown[] = [],
+  orte: { fahrzeuge?: unknown[]; br?: unknown[] } = {},
 ) {
   server.use(
     meHandler(admin),
@@ -66,10 +71,20 @@ function render(
     // auf `isError` (`onUnhandledRequest: 'error'`), und der Ort hieße nur „zugeordnet“.
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
+    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(orte.fahrzeuge ?? FAHRZEUGE)),
+    http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(orte.br ?? BR)),
   );
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+      <Route
+        path="/einsaetze/:id/material"
+        element={
+          <>
+            <MaterialPage />
+            <Link to="/einsaetze/2/material">Zu Einsatz 2</Link>
+          </>
+        }
+      />
     </Routes>,
     { route: '/einsaetze/1/material' },
   );
@@ -127,15 +142,16 @@ describe('MaterialPage', () => {
     ).toEqual(['einsatzbereit', 'im Einsatz', 'defekt']);
   });
 
-  it('das Mengenfeld folgt der Dichtestufe statt einer festen Kleingröße', async () => {
-    // Das Mengenfeld trägt keine Klein-Angabe; die Zeile in `dichte.guard.test.ts` ist mit dem Fix
-    // gefallen.
+  it('Mengenzelle eines Verbrauchsguts: der Wert ohne Feld, daneben „Ausgeben“ mit Zeilenname (LLH-1225 D5)', async () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }));
-    const feld = container.querySelector('[data-row-key="10"] .ant-input-number');
-    expect(feld).not.toBeNull();
-    expect(feld!.className).not.toMatch(/ant-input-number-sm\b/);
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    const knopf = within(zeile).getByRole('button', { name: 'Wolldecke ausgeben' });
+    expect(knopf).toHaveTextContent(/^Ausgeben$/);
+    // Ohne Klein-Angabe: die Höhe folgt der Dichtestufe (`dichte.guard.test.ts`).
+    expect(knopf.className).not.toMatch(/ant-btn-sm\b/);
+    expect(within(zeile).queryByRole('spinbutton')).toBeNull();
+    expect(within(zeile).queryByRole('button', { name: /Menge zu Wolldecke/ })).toBeNull();
   });
 
   /**
@@ -149,12 +165,11 @@ describe('MaterialPage', () => {
   });
 
   it('zeigt disponiertes Material mit Menge als Wert, nicht als offenes Feld', async () => {
-    render(einsatzAktiv, [em]);
+    const { container } = render(einsatzAktiv, [em]);
     expect(await screen.findByText('Wolldecke')).toBeInTheDocument();
-    // LLH-1093 D9: die Menge ist der Bearbeiten-Knopf; ein Feld gibt es erst danach.
-    expect(screen.getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' })).toHaveTextContent(
-      '50',
-    );
+    // LLH-1093 D9, LLH-1225 D5: in der Zeile nie ein Mengenfeld; die Menge ändert ein Dialog.
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(within(zeile).getByText('50')).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
 
@@ -240,8 +255,12 @@ describe('MaterialPage', () => {
      * einsatzbereit'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
      */
     const werkzeuge = document.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
-    expect(screen.getByText('einsatzbereit')).toBeInTheDocument();
-    expect(within(werkzeuge).getByText('1 einsatzbereit')).toBeInTheDocument();
+    expect(within(werkzeuge).getByText('1 ohne Ort')).toBeInTheDocument();
+    // Lesen bleibt: die Gruppierung lässt sich umschalten; bedienen lässt sich nichts.
+    expect(screen.getByRole('radio', { name: 'Nach Status' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ort zu Wolldecke/ })).toBeNull();
+    expect(screen.getByTestId('material-ort')).toHaveTextContent(/^ohne Ort$/);
   });
 
   // ── Datensicht ──
@@ -258,12 +277,68 @@ describe('MaterialPage', () => {
     status: 'defekt',
   };
 
+  it('gruppiert per Vorgabe nach Ort: Einheiten, Fahrzeuge, UHS, BR, „ohne Ort“ zuletzt (LLH-1225 D4)', async () => {
+    const { container } = render(einsatzAktiv, [
+      { ...em, id: 20, bezeichnung: 'A ohne' },
+      { ...em, id: 21, bezeichnung: 'B BR', br_id: 6 },
+      { ...em, id: 22, bezeichnung: 'C UHS', uhs_id: 7 },
+      { ...em, id: 23, bezeichnung: 'D Fahrzeug', einsatz_fahrzeug_id: 4 },
+      { ...em, id: 24, bezeichnung: 'E Staffel B', einheit_id: 2 },
+      { ...em, id: 25, bezeichnung: 'F Staffel A', einheit_id: 1 },
+    ]);
+    await screen.findByText('A ohne');
+    expect(screen.getByRole('radio', { name: 'Nach Ort' })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() =>
+      expect(
+        [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
+          r.getAttribute('data-row-key'),
+        ),
+      ).toEqual(['25', '24', '23', '22', '21', '20']),
+    );
+    const werkzeuge = container.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
+    for (const gruppe of ['Staffel A', 'Florian 1/83-1', 'UHS Turnhalle', 'BR Nord', 'ohne Ort']) {
+      expect(within(werkzeuge).getByText(`1 ${gruppe}`)).toBeInTheDocument();
+    }
+  });
+
+  it('„Nach Status“ gruppiert um, die Verdichtung bleibt dieselbe', async () => {
+    render(einsatzAktiv, [em, { ...emDefekt, einheit_id: 1 }]);
+    await screen.findByText('Wolldecke');
+    const verdichtung = (await screen.findByTestId('material-verdichtung')).textContent;
+    await userEvent.click(screen.getByRole('radio', { name: 'Nach Status' }));
+    const werkzeuge = document.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
+    expect(within(werkzeuge).getByText('1 defekt')).toBeInTheDocument();
+    expect(screen.getByTestId('material-verdichtung').textContent).toBe(verdichtung);
+  });
+
+  it('ein Einsatzwechsel nimmt die Wahl der Gruppierung nicht mit', async () => {
+    server.use(
+      http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+      http.get('/api/einsaetze/2/material', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+    render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    await userEvent.click(screen.getByRole('radio', { name: 'Nach Status' }));
+    expect(screen.getByRole('radio', { name: 'Nach Status' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+    await screen.findByText('Noch kein Material disponiert');
+    expect(screen.getByRole('radio', { name: 'Nach Ort' })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('gruppiert nach dem eigenen Materialstatus, mit Zähler im Etikett', async () => {
     // Serverordnung [11, 10]; Namensordnung ebenfalls [11 Aluleiter, 10 Wolldecke]; gerendert [10,
     // 11], weil die Statusachse führt (einsatzbereit vor defekt). Die gerenderte Folge ist weder
     // Server- noch Namensordnung.
     const { container } = render(einsatzAktiv, [emDefekt, em]);
     await screen.findByText('Wolldecke');
+    await userEvent.click(screen.getByRole('radio', { name: 'Nach Status' }));
     const werkzeuge = container.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
     expect(within(werkzeuge).getByText('1 einsatzbereit')).toBeInTheDocument();
     expect(within(werkzeuge).getByText('1 defekt')).toBeInTheDocument();
@@ -651,7 +726,8 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     // („collapsed Weitere Angaben").
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
 
-    await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 1));
+    // Trägerorganisation, Bestandsnummer und Ort (LLH-1225 D6/D7).
+    await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 3));
     expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ })).toHaveAttribute(
       'aria-expanded',
       'true',
@@ -707,6 +783,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
     await userEvent.type(within(dialog).getByLabelText('Kategorie'), 'Betreuung');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'THW');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
 
@@ -723,6 +800,71 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     // Die Menge steht wieder auf ihrem Startwert, obwohl sie kein Übernahmefeld ist:
     // `initialValues` wirkt bei jedem Zurücksetzen.
     expect(within(dialog).getByLabelText('Menge')).toHaveValue('1');
+  });
+
+  /** LLH-1225 D6: die Art folgt der Menge, bis die Person wählt; gesendet wird, was steht. */
+  it('Art: ohne eigene Wahl folgt sie der Menge; gesendet wird die angezeigte Art', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await oeffneAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+    const art = (name: string) => within(dialog).getByRole('radio', { name });
+    expect(art('Gerät')).toHaveAttribute('aria-checked', 'true');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Sandsäcke');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '200');
+    await waitFor(() => expect(art('Verbrauchsgut')).toHaveAttribute('aria-checked', 'true'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      adhoc: { bezeichnung: 'Sandsäcke' },
+      menge: 200,
+      art: 'verbrauchsgut',
+    });
+  });
+
+  it('Art: „Gerät“ setzt die Menge auf 1 und sperrt sie; eine eigene Wahl bleibt', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await oeffneAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Stromerzeuger');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '3');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Gerät' }));
+    await waitFor(() => expect(menge).toHaveValue('1'));
+    expect(menge).toBeDisabled();
+    expect(within(dialog).getByText('Ein Gerät steht je Stück im Einsatz')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ menge: 1, art: 'geraet' });
+  });
+
+  it('Ort unter „Weitere Angaben“ geht als Ort-Feld des POST mit (LLH-1225 D7)', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await oeffneAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waehleImDialog(dialog, 'Ort', 'UHS Turnhalle');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ uhs_id: 7 });
   });
 
   it('der Primär-Knopf heißt „Disponieren" und schließt den Dialog', async () => {
@@ -874,7 +1016,10 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/material', () => HttpResponse.json(ems)),
       http.get('/api/material', () => HttpResponse.json(pool)),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 40 });
@@ -964,23 +1109,76 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
     await waitFor(() => expect(gesendet).toEqual([{ material_id: 6, menge: 1 }]));
   });
 
-  it('das Mengenfeld der Zeile nennt die Position; keine englischen Stufentexte auf der Seite', async () => {
+  it('der Ort ist das dritte Feld, geht als Ort-Feld mit und bleibt im Serienlauf stehen (LLH-1225 D7)', async () => {
+    const { gesendet } = zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl();
+    await userEvent.click(await screen.findByText('Wolldecke (Betreuung)'));
+    const dialog = screen.getByRole('dialog');
+    const felder = [...dialog.querySelectorAll('.ant-form-item-label label')].map(
+      (l) => l.textContent,
+    );
+    expect(felder.slice(0, 3)).toEqual(['Material', 'Menge', 'Ort']);
+    await waehleImDialog(dialog, 'Ort', 'UHS Turnhalle');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(gesendet).toEqual([{ material_id: 5, menge: 1, uhs_id: 7 }]));
+    // Die nächste Position der Anlieferung geht an denselben Ort.
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('combobox', { name: 'Ort' }).closest('.ant-select'),
+      ).toHaveTextContent('UHS Turnhalle'),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Material disponieren' }));
+    const neu = await screen.findByRole('dialog');
+    expect(
+      within(neu).getByRole('combobox', { name: 'Ort' }).closest('.ant-select'),
+    ).toHaveTextContent('ohne Ort');
+  });
+
+  it('das Mengenfeld im Dialog nennt sich; keine englischen Stufentexte auf der Seite', async () => {
     zeige([em]);
     await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }));
-    expect(screen.getByRole('spinbutton', { name: 'Menge zu Wolldecke' })).toHaveValue('50');
-    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
-    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Menge ändern …' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('spinbutton', { name: 'Menge' })).toHaveValue('50'),
+    );
     expect(document.body.innerHTML).not.toMatch(/Increase Value|Decrease Value/);
   });
 });
 
+/**
+ * Wählt in einer Auswahl IM Dialog: beide Disponier-Dialoge tragen ein Feld „Ort“, und antd hält
+ * den geschlossenen Dialog im Baum.
+ */
+async function waehleImDialog(dialog: HTMLElement, feld: string, option: string) {
+  const eingabe = within(dialog).getByRole('combobox', { name: feld });
+  await userEvent.click(eingabe);
+  const liste = await waitFor(() => {
+    const l = document
+      .getElementById(eingabe.getAttribute('aria-controls') ?? '')
+      ?.closest<HTMLElement>('.ant-select-dropdown');
+    expect(l).toBeTruthy();
+    return l!;
+  });
+  const knoten = await waitFor(() => {
+    const k = liste.querySelector<HTMLElement>(`.ant-select-item-option[title="${option}"]`);
+    expect(k).toBeTruthy();
+    return k!;
+  });
+  await userEvent.click(knoten);
+}
+
 /** Öffnet das Zeilenmenü einer Position und liefert das offene Menü. */
 async function oeffneZeilenmenue(bezeichnung: string): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${bezeichnung}` }));
-  const menue = document.querySelector<HTMLElement>(
+  // Das zuletzt geöffnete: in jsdom endet die Schließanimation eines vorigen Menüs nie.
+  const offen = document.querySelectorAll<HTMLElement>(
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
   );
+  const menue = offen[offen.length - 1];
   if (!menue) throw new Error(`Zeilenmenü zu ${bezeichnung} ließ sich nicht öffnen`);
   return menue;
 }
@@ -1000,44 +1198,74 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(screen.getByText('4 Posten')).toBeInTheDocument();
   });
 
-  it('Menge: Verlassen sendet nichts, „Speichern“ sendet', async () => {
+  it('„Ausgeben“: der Dialog nimmt die Menge, die Zeile zeigt den Rest, der Toast nennt sie (LLH-1225 D5)', async () => {
     const gesendet: unknown[] = [];
     server.use(
       http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
-        return HttpResponse.json({ ...em, menge: 30 });
-      }),
-    );
-    render(einsatzAktiv, [em]);
-    await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }));
-    const feld = screen.getByRole('spinbutton', { name: 'Menge zu Wolldecke' });
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '30');
-    // Daneben tippen: der Wisch auf dem Tablet.
-    await userEvent.click(screen.getByRole('heading', { name: /^Material/ }));
-    expect(gesendet).toEqual([]);
-    await userEvent.click(screen.getByRole('button', { name: 'Menge zu Wolldecke speichern' }));
-    await waitFor(() => expect(gesendet).toEqual([{ menge: 30 }]));
-  });
-
-  it('Menge: Enter sendet, eine Ablehnung steht an der Zeile', async () => {
-    const gesendet: unknown[] = [];
-    server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
-        gesendet.push(await request.json());
-        return HttpResponse.json({ error: 'Material ist nicht mehr im Einsatz' }, { status: 409 });
+        return HttpResponse.json({ ...em, ausgegeben: 20 });
       }),
     );
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' }));
-    const feld = screen.getByRole('spinbutton', { name: 'Menge zu Wolldecke' });
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '12{Enter}');
-    await waitFor(() => expect(gesendet).toEqual([{ menge: 12 }]));
+    await userEvent.click(screen.getByRole('button', { name: 'Wolldecke ausgeben' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge ausgeben' }), '20');
+    expect(within(dialog).getByTestId('ausgabe-danach')).toHaveTextContent(
+      'Danach 30 von 50 übrig',
+    );
+    server.use(
+      http.get('/api/einsaetze/1/material', () => HttpResponse.json([{ ...em, ausgegeben: 20 }])),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ ausgegeben: 20 }]));
+    expect(await screen.findByText('Wolldecke: 20 ausgegeben')).toBeInTheDocument();
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(await within(zeile).findByText(/nicht mehr im Einsatz/)).toBeInTheDocument();
+    await waitFor(() => expect(within(zeile).getByText('30 von 50 übrig')).toBeInTheDocument());
+  });
+
+  it('„Ausgabe zurücknehmen …“ sendet den Stand minus n', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, ausgegeben: 15 });
+      }),
+    );
+    render(einsatzAktiv, [{ ...em, ausgegeben: 20 }]);
+    await screen.findByText('Wolldecke');
+    const menue = await oeffneZeilenmenue('Wolldecke');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Ausgabe zurücknehmen …' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByRole('spinbutton', { name: 'Menge zurücknehmen' }),
+      '5',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ ausgegeben: 15 }]));
+    expect(await screen.findByText('Wolldecke: 5 zurückgenommen')).toBeInTheDocument();
+  });
+
+  it('„Menge ändern …“ sendet die neue Gesamtmenge erst mit „Speichern“', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, menge: 80 });
+      }),
+    );
+    render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const menue = await oeffneZeilenmenue('Wolldecke');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Menge ändern …' }));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await waitFor(() => expect(feld).toHaveValue('50'));
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '80');
+    expect(gesendet).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(gesendet).toEqual([{ menge: 80 }]));
   });
 
   it('Ort: ein Posten liegt an genau einem Ort (LLH-1224 D6)', async () => {
@@ -1087,33 +1315,11 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(ort(12)).toHaveTextContent(/^ohne Ort$/);
   });
 
-  it('Ort: Umhängen geht über den Zuordnungsweg der Einheiten', async () => {
-    const aufrufe: string[] = [];
-    server.use(
-      http.put('/api/einsaetze/1/einheiten/:eid/material/10', ({ params }) => {
-        aufrufe.push(`PUT ${params.eid}`);
-        return new HttpResponse(null, { status: 204 });
-      }),
-      http.patch('/api/einsaetze/1/material/10', () => {
-        aufrufe.push('PATCH');
-        return HttpResponse.json(em);
-      }),
-    );
-    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
-    await screen.findByText('Wolldecke');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }),
-    );
-    await waehle('Einheit zu Wolldecke', 'Staffel B');
-    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }));
-    await waitFor(() => expect(aufrufe).toEqual(['PUT 2']));
-  });
-
-  it('Ort: „keine Einheit“ gibt die bisherige frei; die UHS geht über den PATCH', async () => {
+  it('Ort: Umhängen geht in EINER Anfrage über die Disposition, nie über die Einheiten (LLH-1225 D2)', async () => {
     const aufrufe: unknown[] = [];
     server.use(
-      http.delete('/api/einsaetze/1/einheiten/:eid/material/10', ({ params }) => {
-        aufrufe.push(`DELETE ${params.eid}`);
+      http.put('/api/einsaetze/1/einheiten/:eid/material/10', () => {
+        aufrufe.push('PUT Einheit');
         return new HttpResponse(null, { status: 204 });
       }),
       http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
@@ -1121,22 +1327,35 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
         return HttpResponse.json(em);
       }),
     );
-    render(einsatzAktiv, [{ ...em, einheit_id: 1, uhs_id: null }]);
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
     await screen.findByText('Wolldecke');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }),
+      await screen.findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }),
     );
-    await waehle('Einheit zu Wolldecke', 'keine Einheit');
-    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }));
-    await waitFor(() => expect(aufrufe).toEqual(['DELETE 1']));
-
-    await userEvent.click(screen.getByRole('button', { name: 'UHS zu Wolldecke eintragen' }));
-    await waehle('UHS zu Wolldecke', 'UHS Turnhalle');
-    await userEvent.click(screen.getByRole('button', { name: 'UHS zu Wolldecke speichern' }));
-    await waitFor(() => expect(aufrufe).toEqual(['DELETE 1', { uhs_id: 7 }]));
+    await waehle('Ort zu Wolldecke', 'UHS Turnhalle');
+    await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
+    await waitFor(() => expect(aufrufe).toEqual([{ uhs_id: 7 }]));
   });
 
-  it('Ort: ohne Zugriff auf das Modul Einheiten ist der Einheit-Teil nur lesbar, „zugeordnet“', async () => {
+  it('Ort: „ohne Ort“ löst über das Feld des bisherigen Orts', async () => {
+    const aufrufe: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        aufrufe.push(await request.json());
+        return HttpResponse.json(em);
+      }),
+    );
+    render(einsatzAktiv, [{ ...em, einsatz_fahrzeug_id: 4 }]);
+    await screen.findByText('Wolldecke');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }),
+    );
+    await waehle('Ort zu Wolldecke', 'ohne Ort');
+    await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
+    await waitFor(() => expect(aufrufe).toEqual([{ einsatz_fahrzeug_id: null }]));
+  });
+
+  it('Ort: ohne Zugriff auf Einheiten steht „zugeordnet“; die Angabe bleibt bedienbar, ohne Einheiten', async () => {
     server.use(
       http.get('/api/einsaetze/1/modul-freigaben', () =>
         HttpResponse.json({
@@ -1148,11 +1367,15 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const { container } = render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(
-      await within(zeile).findByRole('button', { name: 'UHS zu Wolldecke eintragen' }),
-    ).toBeInTheDocument();
-    expect(within(zeile).getByTestId('material-ort')).toHaveTextContent(/^zugeordnet·/);
-    expect(within(zeile).queryByRole('button', { name: /Einheit zu Wolldecke/ })).toBeNull();
+    const knopf = await within(zeile).findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' });
+    await waitFor(() => expect(knopf).toHaveTextContent(/^zugeordnet$/));
+    await userEvent.click(knopf);
+    await oeffne('Ort zu Wolldecke');
+    const gruppen = [
+      ...listeVon('Ort zu Wolldecke')!.querySelectorAll('.ant-select-item-group'),
+    ].map((g) => g.textContent);
+    expect(gruppen).not.toContain('Einheiten');
+    expect(gruppen).toContain('Unfallhilfsstellen');
   });
 
   it('Karte (390 px): Ort und Menge als Sekundärfelder, die Kategorie nicht', async () => {
@@ -1173,16 +1396,24 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await screen.findByText('Wolldecke');
     const menue = await oeffneZeilenmenue('Wolldecke');
     const eintraege = within(menue).getAllByRole('menuitem');
+    // Ein Stamm-Verbrauchsgut ohne Ausgabe (LLH-1225 D6); die Art trägt der Stamm.
     expect(eintraege.map((e) => e.textContent)).toEqual([
+      'Menge ändern …',
+      'Ausgabe zurücknehmen · nichts ausgegeben',
+      'Aufteilen …',
       'Angaben ändern · im Stamm pflegen',
-      'Aufteilen',
       'Stornieren',
     ]);
-    expect(eintraege[0]).toHaveAttribute('aria-disabled', 'true');
-    expect(eintraege[1]).not.toHaveAttribute('aria-disabled', 'true');
+    expect(eintraege.map((e) => e.getAttribute('aria-disabled') === 'true')).toEqual([
+      false,
+      true,
+      false,
+      true,
+      false,
+    ]);
     // Stornieren rot hinter dem Trenner.
     expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
-    expect(eintraege[2]).toHaveClass('ant-dropdown-menu-item-danger');
+    expect(eintraege[4]).toHaveClass('ant-dropdown-menu-item-danger');
   });
 
   it('Zeilenmenü eines zugeordneten Postens: „Stornieren · zugeordnet“ gesperrt, weiter rot', async () => {
@@ -1200,18 +1431,20 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     }
   });
 
-  it('Zeile eines Geräts: Menge „1“ ohne Feld, „Aufteilen · Gerät“ gesperrt (LLH-1224 D2)', async () => {
+  it('Zeile eines Geräts: Menge „1“ ohne Bedienung, das Menü ohne Mengeneinträge (LLH-1225 D6)', async () => {
     const { container } = render(einsatzAktiv, [
       { ...em, bezeichnung: 'Trage', art: 'geraet', menge: 1 },
     ]);
     await screen.findByText('Trage');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).queryByRole('button', { name: 'Menge zu Trage bearbeiten' })).toBeNull();
+    expect(within(zeile).getByText('1')).toBeInTheDocument();
+    expect(within(zeile).queryByRole('button', { name: 'Trage ausgeben' })).toBeNull();
     const menue = await oeffneZeilenmenue('Trage');
-    expect(within(menue).getByRole('menuitem', { name: 'Aufteilen · Gerät' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Angaben ändern · im Stamm pflegen', 'Stornieren']);
   });
 
   it('Ausgabe: der Rest steht an der Menge, ganz ausgegeben heißt der Posten „aufgebraucht“ (D4/D15)', async () => {
@@ -1229,22 +1462,73 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(
       within(zeile(10)).getByRole('button', { name: 'Status von Wolldecke ändern' }),
     ).toHaveTextContent('einsatzbereit');
+    // „Ausgeben“ nur, solange ein Rest bleibt.
+    expect(within(zeile(10)).getByRole('button', { name: 'Wolldecke ausgeben' })).toBeEnabled();
+    expect(within(zeile(11)).queryByRole('button', { name: 'Zeltbahn ausgeben' })).toBeNull();
     const menue = await oeffneZeilenmenue('Zeltbahn');
     expect(
       within(menue).getByRole('menuitem', { name: 'Aufteilen · aufgebraucht' }),
     ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(menue).getByRole('menuitem', { name: 'Ausgabe zurücknehmen …' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('Zeilenmenü bei Menge 1: „Aufteilen · Menge 1“ gesperrt', async () => {
+  it('Zeilenmenü eines Ad-hoc-Verbrauchsguts mit Menge 1: „Aufteilen · Rest 1“, „Als Gerät führen“', async () => {
     render(einsatzAktiv, [{ ...em, ist_adhoc: true, material_id: null, menge: 1 } as never]);
     await screen.findByText('Wolldecke');
     const menue = await oeffneZeilenmenue('Wolldecke');
-    const aufteilen = within(menue).getByRole('menuitem', { name: 'Aufteilen · Menge 1' });
-    expect(aufteilen).toHaveAttribute('aria-disabled', 'true');
-    expect(within(menue).getByRole('menuitem', { name: 'Angaben ändern' })).not.toHaveAttribute(
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual([
+      'Menge ändern …',
+      'Ausgabe zurücknehmen · nichts ausgegeben',
+      'Aufteilen · Rest 1',
+      'Als Gerät führen',
+      'Angaben ändern …',
+      'Stornieren',
+    ]);
+    expect(within(menue).getByRole('menuitem', { name: 'Aufteilen · Rest 1' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
+    expect(within(menue).getByRole('menuitem', { name: 'Als Gerät führen' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('Art wechseln ist gesperrt mit Grund, wo der Server ablehnte (LLH-1225 D6)', async () => {
+    const adhoc = { ...em, ist_adhoc: true, material_id: null };
+    render(einsatzAktiv, [
+      { ...adhoc, id: 10, bezeichnung: 'Decken' },
+      { ...adhoc, id: 11, bezeichnung: 'Kanister', menge: 1, ausgegeben: 1 },
+      { ...adhoc, id: 12, bezeichnung: 'Pumpe', art: 'geraet', menge: 1, status: 'verbraucht' },
+      {
+        ...adhoc,
+        id: 13,
+        bezeichnung: 'Trage',
+        art: 'geraet',
+        menge: 1,
+        status: 'desinfektion_noetig',
+      },
+    ] as never);
+    await screen.findByText('Decken');
+    for (const [name, eintrag] of [
+      ['Decken', 'Als Gerät führen · Menge über 1'],
+      ['Kanister', 'Als Gerät führen · Ausgabe gebucht'],
+      ['Pumpe', 'Als Verbrauchsgut führen · Status verbraucht'],
+      ['Trage', 'Als Verbrauchsgut führen · Status Desinfektion nötig'],
+    ]) {
+      const menue = await oeffneZeilenmenue(name);
+      expect(within(menue).getByRole('menuitem', { name: eintrag })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+      await userEvent.keyboard('{Escape}');
+    }
   });
 
   it('„Angaben ändern“ eines Ad-hoc-Postens schickt die geänderte Bezeichnung', async () => {
@@ -1259,7 +1543,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     render(einsatzAktiv, [adhoc as never]);
     await screen.findByText('Feldbeten');
     const menue = await oeffneZeilenmenue('Feldbeten');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern' }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern …' }));
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByLabelText('Bezeichnung');
     await waitFor(() => expect(feld).toHaveValue('Feldbeten'));
@@ -1270,11 +1554,11 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   });
 
   /**
-   * LLH-1224 D10: ein Ad-hoc-Posten mit Menge 1 entsteht als Gerät; „Art ändern …“ macht ihn zum
-   * Verbrauchsgut mit mehr Menge — Art und Menge in EINEM PATCH. Ein Stamm-Posten hat den Eintrag
-   * nicht (Liste oben, „Zeilenmenü eines Stamm-Postens“).
+   * LLH-1225 D6 (ersetzt „Art ändern …“ aus LLH-1224): ein Ad-hoc-Posten mit Menge 1 entsteht als
+   * Gerät; „Als Verbrauchsgut führen“ wechselt die Art ohne Rückfrage, danach bietet die Zeile
+   * „Ausgeben“ und „Menge ändern …“. Ein Stamm-Posten hat den Eintrag nicht.
    */
-  it('„Art ändern …“ eines Ad-hoc-Geräts schickt Art und Menge zusammen', async () => {
+  it('„Als Verbrauchsgut führen“ eines Ad-hoc-Geräts schickt nur die Art', async () => {
     const gesendet: unknown[] = [];
     const adhoc = {
       ...em,
@@ -1287,26 +1571,49 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     server.use(
       http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
-        return HttpResponse.json({ ...adhoc, art: 'verbrauchsgut', menge: 40 });
+        return HttpResponse.json({ ...adhoc, art: 'verbrauchsgut' });
       }),
     );
-    render(einsatzAktiv, [adhoc as never]);
+    const { container } = render(einsatzAktiv, [adhoc as never]);
     await screen.findByText('Sandsack');
     const menue = await oeffneZeilenmenue('Sandsack');
     expect(
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Angaben ändern', 'Art ändern …', 'Aufteilen · Gerät', 'Stornieren']);
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Art ändern …' }));
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Verbrauchsgut' }));
-    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
-    await waitFor(() => expect(menge).toBeEnabled());
-    await userEvent.clear(menge);
-    await userEvent.type(menge, '40');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(gesendet).toEqual([{ art: 'verbrauchsgut', menge: 40 }]));
+    ).toEqual(['Als Verbrauchsgut führen', 'Angaben ändern …', 'Stornieren']);
+    server.use(
+      http.get('/api/einsaetze/1/material', () =>
+        HttpResponse.json([{ ...adhoc, art: 'verbrauchsgut' }]),
+      ),
+    );
+    await userEvent.click(
+      within(menue).getByRole('menuitem', { name: 'Als Verbrauchsgut führen' }),
+    );
+    await waitFor(() => expect(gesendet).toEqual([{ art: 'verbrauchsgut' }]));
+    // Kein Dialog: der Rückweg ist „Als Gerät führen“.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(
+      await within(zeile).findByRole('button', { name: 'Sandsack ausgeben' }),
+    ).toBeInTheDocument();
+  });
+
+  it('eine Ablehnung des Artwechsels steht an der Zeile', async () => {
+    const adhoc = { ...em, ist_adhoc: true, material_id: null, art: 'geraet', menge: 1 };
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', () =>
+        HttpResponse.json({ error: 'Art passt nicht zum Status' }, { status: 422 }),
+      ),
+    );
+    const { container } = render(einsatzAktiv, [adhoc as never]);
+    await screen.findByText('Wolldecke');
+    const menue = await oeffneZeilenmenue('Wolldecke');
+    await userEvent.click(
+      within(menue).getByRole('menuitem', { name: 'Als Verbrauchsgut führen' }),
+    );
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent('Art passt nicht zum Status');
   });
 
   it('„Aufteilen“ schickt die abgeteilte Menge an den eigenen Weg', async () => {
@@ -1323,7 +1630,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const menue = await oeffneZeilenmenue('Wolldecke');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen' }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen …' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
     expect(within(dialog).getByTestId('aufteilen-danach')).toHaveTextContent('Danach 30 + 20');
@@ -1344,7 +1651,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const { client } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const menue = await oeffneZeilenmenue('Wolldecke');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen' }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen …' }));
     const dialog = await screen.findByRole('dialog');
     server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([])));
     act(() => {
@@ -1367,7 +1674,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const { client } = render(einsatzAktiv, [adhoc as never]);
     await screen.findByText('Feldbeten');
     const menue = await oeffneZeilenmenue('Feldbeten');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern' }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern …' }));
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByLabelText('Bezeichnung');
     await waitFor(() => expect(feld).toHaveValue('Feldbeten'));
