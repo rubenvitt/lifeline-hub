@@ -243,11 +243,14 @@ Das Meldebild SHALL je Einheit eine Spalte „Im Einsatz“ mit der laufenden Ei
 in Mono mit Tabellenziffern, mit dem Anker als zugänglicher Beschreibung, und ohne Periode mit
 „—“; die Spalte MUST auch im Druck erscheinen. Die Einheit-Detailseite SHALL die Zeitachse als
 Folge von Zeitachseneinträgen zeigen, gestrichene Einträge durchgestrichen mit Grund, und
-Nachtrag und Streichung anbieten. Die Personal-Seite des Einsatzes SHALL je Person Einsatzdauer
-und Ruhezeit zeigen und die Zeitachse der Person aufklappbar machen, samt Nachtrag. Die Herkunft
-eines Ereignisses (Status, über Einheit, Ablösung, nachgetragen) MUST als Wort erkennbar sein.
-Keine Angabe darf blinken oder eingefärbt eingestuft werden. Ohne Schreibrecht MUST die Seite den
-Grund nennen und Nachtrag und Streichung gesperrt statt entfernt zeigen.
+Nachtrag und Streichung anbieten. Die Personalliste des Einsatzes SHALL je Person die
+Einsatzdauer zeigen und die Ruhezeit als Spalte über den Spaltenschalter anbieten; sie MUST NOT
+die Zeitachse einer Person aufklappen. Die Personenansicht SHALL im Kopf die laufende
+Einsatzdauer bzw. die Ruhezeit zeigen und die Zeitachse der Person als eigenen Abschnitt nach
+Einteilung und Person führen, samt Nachtrag und Streichung. Die Herkunft eines Ereignisses
+(Status, über Einheit, Ablösung, nachgetragen) MUST als Wort erkennbar sein. Keine Angabe darf
+blinken oder eingefärbt eingestuft werden. Ohne Schreibrecht MUST die Seite den Grund nennen und
+Nachtrag und Streichung gesperrt statt entfernt zeigen.
 
 #### Scenario: Meldebild ohne Ereignisse
 - **WHEN** eine Einheit ohne Ereignisse im Meldebild steht
@@ -260,6 +263,14 @@ Grund nennen und Nachtrag und Streichung gesperrt statt entfernt zeigen.
 #### Scenario: Herkunft sichtbar
 - **WHEN** ein Personen-Ereignis per Fan-out entstanden ist
 - **THEN** zeigt der Eintrag in der Zeitachse der Person das Wort „über Einheit“ mit dem Namen der Einheit
+
+#### Scenario: Zeitachse in der Ansicht, nicht in der Liste
+- **WHEN** die Personalliste und danach die Personenansicht einer Person mit Alarmierung 06:10 geöffnet werden
+- **THEN** trägt die Zeile der Liste die Einsatzdauer und keinen Aufklapper „Zeitachse“, und die Ansicht zeigt die Alarmierung 06:10 im Abschnitt „Zeitachse“ mit „Nachtragen“
+
+#### Scenario: Ruhe im Spaltenschalter
+- **WHEN** die Personalliste ohne eigene Spaltenwahl geöffnet wird
+- **THEN** ist die Spalte „Ruhe“ ausgeblendet, im Zähler des Spaltenschalters mitgezählt und dort einblendbar
 
 ### Requirement: Keine Kraft verliert ihre Zeitachse
 

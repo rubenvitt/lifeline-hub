@@ -3,7 +3,7 @@ import { ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
@@ -106,7 +106,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
         listEntlassenesPersonal(einsatzId),
       ),
       lade('fahrzeuge', einsatzKeys.fahrzeuge(einsatzId), () => listeEinsatzFahrzeuge(einsatzId)),
-      lade('material', einsatzKeys.material(einsatzId), () => listeEinsatzMaterial(einsatzId)),
+      lade('material', einsatzKeys.material(einsatzId), () => listEinsatzMaterial(einsatzId)),
       stabFrei
         ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
         : Promise.resolve(null),

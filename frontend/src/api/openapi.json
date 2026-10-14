@@ -14495,7 +14495,7 @@
       },
       "ZeilenArt": {
         "type": "string",
-        "description": "Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen\nkönnen kollidieren (LLH-1100, D2). Wire == `as_str()`.",
+        "description": "Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können\nkollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im\nEinsatz die der Disposition (LLH-1073). Wire == `as_str()`.",
         "enum": [
           "personal",
           "fahrzeug"
@@ -14539,7 +14539,7 @@
           "id": {
             "type": "integer",
             "format": "int64",
-            "description": "Die ID, wie die Anfrage sie nannte (Stamm-ID)."
+            "description": "Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition)."
           }
         }
       },

@@ -1228,16 +1228,19 @@ test.describe('Gate 1', () => {
 });
 
 /*
- * KRÄFTE-LISTEN AM DESKTOP UND AM TABLET QUER (LFH-975): Personal läuft bei 1440 und 1180 nicht
- * über, „Ruhe“ und „Entlassen“ stehen ohne Querscrollen im Bild, und der Aufklapp-Auslöser
- * („Zeitachse“, „Besatzung“) verdoppelt die Zeilenhöhe nicht mehr.
+ * KRÄFTE-LISTEN AM DESKTOP UND AM TABLET QUER (LFH-975, LLH-1060): Personal läuft bei 1440 und
+ * 1180 nicht über, „Einheit“, „Fahrzeug“ und „Einsatzdauer“ stehen ohne Spaltenschalter und ohne
+ * Querscrollen im Bild — auch mit offener Einheitsangabe —, und eine gewöhnliche Zeile bleibt
+ * höchstens 48 px hoch. Die Personalliste trägt keine Zeilenaktion mehr („Entlassen“ steht in der
+ * Personenansicht); der Aufklapp-Auslöser „Besatzung“ der Fahrzeuge verdoppelt die Zeilenhöhe
+ * nicht.
  *
  * GEMESSEN WIRD DIE BILDLAUFFLÄCHE DER TABELLE, nicht `document.body.scrollWidth`: die
  * Katalogtabelle trägt ihren eigenen Bildlauf, das Wurzelmaß oben sieht ihren Überlauf nicht.
  *
- * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlt „Entlassen“ — Vorbedingung vor der
- * Messung —, die Messung von Überlauf, „Ruhe“ und Zeilenhöhe greift trotzdem. Seit LLH-1079
- * entlässt die Zeile ohne Rückfrage (umkehrbar, Rückgängig-Hinweis).
+ * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlen die Auslöser der Einteilung —
+ * Vorbedingung vor der Messung —, die Messung von Überlauf, Spalten und Zeilenhöhe greift
+ * trotzdem.
  */
 const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
 /** Ein gewöhnlicher Name für die Zeilenhöhe: der lange oben darf umbrechen, dieser nicht. */
@@ -1295,6 +1298,12 @@ async function seedeKraefte(page: Page): Promise<string> {
   );
   await put(`fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`, 'Besatzung');
   await put(`einheiten/${einheit.id}/personal/${kraft.id}`, 'Einheit');
+  // Führer seiner Einheit: die Marke „Einheitsführer“ steht neben dem langen Einheitsnamen und
+  // ist die breiteste Einteilung der Liste (LLH-1060 D3).
+  const fuehrer = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${einheit.id}`, {
+    data: { fuehrer_id: kraft.id },
+  });
+  expect(fuehrer.ok(), `Seeding Einheitsführer: ${await fuehrer.text()}`).toBeTruthy();
   await post('personal', { adhoc: { name: KRAFT_KURZ } }, 'Personal (kurz)');
   return String(einsatzId);
 }
@@ -1321,7 +1330,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
     { name: 'Tablet quer', breite: 1180, hoehe: 820, dichte: 'komfortabel' },
   ] as const) {
     for (const rolle of ['admin', 'beobachter'] as const) {
-      test(`${name} (${breite} px, ${dichte}) · ${rolle}: Personal ohne Tabellenüberlauf, „Ruhe“ und Aktion im Bild`, async ({
+      test(`${name} (${breite} px, ${dichte}) · ${rolle}: Personal ohne Tabellenüberlauf, Einteilung und Einsatzdauer im Bild`, async ({
         page,
       }) => {
         await page.setViewportSize({ width: 1366, height: 768 });
@@ -1333,44 +1342,64 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         await page.goto(`/einsaetze/${einsatzId}/personal`);
         await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
         const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
-        // Inhaltsanker, nie `networkidle` (LFH-385).
+        // Inhaltsanker, nie `networkidle` (LFH-385): die Einheit steht aufgelöst in der Zeile.
         await expect(region.getByText(KRAFT)).toBeVisible();
-        const entlassen = region.getByRole('button', { name: / entlassen$/ });
+        await expect(
+          region.getByText('Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest', {
+            exact: true,
+          }),
+        ).toBeVisible();
+        // Die Marke „Einheitsführer“ steht am Einheitswert, auch ohne Schreibrecht.
+        await expect(
+          region.locator('tr.ant-table-row').filter({ hasText: KRAFT }).getByText('Einheitsführer'),
+        ).toBeVisible();
         // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-        await expect(entlassen).toHaveCount(rolle === 'admin' ? 2 : 0);
+        const einheitAngabe = region.getByRole('button', {
+          name: `Einheit zu ${KRAFT_KURZ} eintragen`,
+        });
+        await expect(einheitAngabe).toHaveCount(rolle === 'admin' ? 1 : 0);
+        // Keine Zeilenaktion (LLH-1060 D8).
+        await expect(
+          region.getByRole('button', { name: / entlassen$|^Zeitachse zu / }),
+        ).toHaveCount(0);
 
-        // Was weicht, steht im Zähler des Spaltenschalters: Träger, Fahrzeug, Einheit und die
-        // voreingestellt verborgene Bemerkung, unter `xl` (1200) auch die Funktion.
+        // Was weicht, steht im Zähler des Spaltenschalters: Träger, Ruhe und die Bemerkung
+        // (Voreinstellung), unter `xl` (1200) auch die Funktion.
         await expect(
           region.getByRole('button', {
-            name: `Spalten · ${breite >= 1200 ? 4 : 5} ausgeblendet`,
+            name: `Spalten · ${breite >= 1200 ? 3 : 4} ausgeblendet`,
           }),
         ).toBeVisible();
         const ueber = await tabellenUeberlauf(region);
+        expect(ueber, 'Personaltabelle läuft nicht über').toBeLessThanOrEqual(1);
+        for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Einsatzdauer']) {
+          await expect(
+            region.getByRole('columnheader', { name: kopf, exact: true }),
+            `„${kopf}“ ohne Querscrollen`,
+          ).toBeInViewport({ ratio: 1 });
+        }
+        let offen = ueber;
+        if (rolle === 'admin') {
+          // Die offene Einheitsangabe (Auswahl, „Speichern“, „Abbrechen“) passt in die Spalte.
+          await einheitAngabe.click();
+          const speichern = region.getByRole('button', {
+            name: `Einheit zu ${KRAFT_KURZ} speichern`,
+          });
+          await expect(speichern).toBeVisible();
+          offen = await tabellenUeberlauf(region);
+          expect(offen, 'offene Einheitsangabe: Tabelle läuft nicht über').toBeLessThanOrEqual(1);
+          await expect(speichern, '„Speichern“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+        }
         test.info().annotations.push({
           type: 'messwert',
-          description: `Personal @${breite} ${dichte} (${rolle}): ${ueber}px Tabellenüberlauf`,
+          description: `Personal @${breite} ${dichte} (${rolle}): ${ueber}px Tabellenüberlauf, offen ${offen}px`,
         });
-        expect(ueber, 'Personaltabelle läuft nicht über').toBeLessThanOrEqual(1);
-        await expect(
-          region.getByRole('columnheader', { name: 'Ruhe', exact: true }),
-          '„Ruhe“ ohne Querscrollen',
-        ).toBeInViewport({ ratio: 1 });
-        if (rolle === 'admin') {
-          const erstes = entlassen.first();
-          await expect(erstes, '„Entlassen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
-          // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): der Rückgängig-Hinweis steht.
-          await erstes.click();
-          await expect(
-            page.locator('.ant-message-notice').getByRole('button', { name: 'Rückgängig' }),
-          ).toBeVisible();
-        }
       });
     }
   }
 
   for (const rolle of ['admin', 'beobachter'] as const) {
-    test(`Fükw-Desktop (1440 px) · ${rolle}: Auslöser neben der Kennung, Zeile höchstens 48 px`, async ({
+    test(`Fükw-Desktop (1440 px) · ${rolle}: Kennung, Marke und Einteilung in einer Zeile, Zeile höchstens 48 px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
@@ -1379,45 +1408,68 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize({ width: 1440, height: 900 });
       const messwerte: string[] = [];
-      for (const { modul, region: regionName, kennung, etikett } of [
-        {
-          modul: 'personal',
-          region: 'Personal im Einsatz',
-          kennung: KRAFT_KURZ,
-          etikett: 'Zeitachse',
-        },
-        {
-          modul: 'fahrzeuge',
-          region: 'Fahrzeuge im Einsatz',
-          kennung: KRAFT_FAHRZEUG,
-          etikett: 'Besatzung',
-        },
-      ]) {
-        await page.goto(`/einsaetze/${einsatzId}/${modul}`);
-        const region = page.getByRole('region', { name: regionName, exact: true });
-        const zeile = region.locator('tr.ant-table-row').filter({ hasText: kennung });
-        await expect(zeile).toHaveCount(1);
-        const ausloeser = zeile.getByRole('button', { name: new RegExp(etikett) });
-        await expect(ausloeser).toHaveCount(1);
-        const name = zeile.getByText(kennung, { exact: true }).first();
-        const [z, a, n] = await Promise.all([
-          zeile.boundingBox(),
-          ausloeser.boundingBox(),
-          name.boundingBox(),
-        ]);
-        messwerte.push(`${modul}: Zeile ${z!.height}px`);
-        expect(z!.height, `${modul}: Zeilenhöhe`).toBeLessThanOrEqual(48);
-        // Dieselbe Zeile: die senkrechten Mitten liegen beieinander, der Auslöser steht rechts.
-        expect(
-          Math.abs(a!.y + a!.height / 2 - (n!.y + n!.height / 2)),
-          `${modul}: Auslöser und Kennung in einer Zeile`,
-        ).toBeLessThanOrEqual(4);
-        expect(a!.x, `${modul}: Auslöser rechts der Kennung`).toBeGreaterThan(n!.x + n!.width);
-        // Bedienbar per Tastatur: Enter klappt auf.
-        await ausloeser.focus();
-        await page.keyboard.press('Enter');
-        await expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
+
+      // ── Personal: Name mit Marke „ad-hoc“ und, mit Schreibrecht, die Auslöser der Einteilung in
+      //    EINER Zeile — „Fahrzeug eintragen“ ist die längste Aufforderung (LLH-1060 D7).
+      await page.goto(`/einsaetze/${einsatzId}/personal`);
+      const personal = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+      const pZeile = personal.locator('tr.ant-table-row').filter({ hasText: KRAFT_KURZ });
+      await expect(pZeile).toHaveCount(1);
+      const pName = pZeile.getByRole('link', { name: KRAFT_KURZ });
+      const marke = pZeile.getByText('ad-hoc', { exact: true });
+      const ausloeserP = ['Einheit', 'Fahrzeug', 'Position'].map((a) =>
+        pZeile.getByRole('button', { name: `${a} zu ${KRAFT_KURZ} eintragen` }),
+      );
+      for (const a of ausloeserP) await expect(a).toHaveCount(rolle === 'admin' ? 1 : 0);
+      const [zp, np, mp] = await Promise.all([
+        pZeile.boundingBox(),
+        pName.boundingBox(),
+        marke.boundingBox(),
+      ]);
+      messwerte.push(`personal: Zeile ${zp!.height}px`);
+      expect(zp!.height, 'personal: Zeilenhöhe').toBeLessThanOrEqual(48);
+      const mitte = (k: { y: number; height: number }) => k.y + k.height / 2;
+      expect(
+        Math.abs(mitte(mp!) - mitte(np!)),
+        'personal: Marke und Kennung in einer Zeile',
+      ).toBeLessThanOrEqual(4);
+      if (rolle === 'admin') {
+        for (const a of ausloeserP) {
+          const k = (await a.boundingBox())!;
+          expect(
+            Math.abs(mitte(k) - mitte(np!)),
+            'personal: Auslöser der Einteilung in derselben Zeile',
+          ).toBeLessThanOrEqual(4);
+          // Die Aufforderung bricht nicht um: eine Textzeile hoch, nicht zwei.
+          expect(k.height, 'personal: Aufforderung einzeilig').toBeLessThanOrEqual(np!.height + 4);
+        }
       }
+
+      // ── Fahrzeuge: der Aufklapp-Auslöser „Besatzung“ neben dem Funkrufnamen.
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+      const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
+      await expect(zeile).toHaveCount(1);
+      const ausloeser = zeile.getByRole('button', { name: /Besatzung/ });
+      await expect(ausloeser).toHaveCount(1);
+      const name = zeile.getByText(KRAFT_FAHRZEUG, { exact: true }).first();
+      const [z, a, n] = await Promise.all([
+        zeile.boundingBox(),
+        ausloeser.boundingBox(),
+        name.boundingBox(),
+      ]);
+      messwerte.push(`fahrzeuge: Zeile ${z!.height}px`);
+      expect(z!.height, 'fahrzeuge: Zeilenhöhe').toBeLessThanOrEqual(48);
+      // Dieselbe Zeile: die senkrechten Mitten liegen beieinander, der Auslöser steht rechts.
+      expect(
+        Math.abs(a!.y + a!.height / 2 - (n!.y + n!.height / 2)),
+        'fahrzeuge: Auslöser und Kennung in einer Zeile',
+      ).toBeLessThanOrEqual(4);
+      expect(a!.x, 'fahrzeuge: Auslöser rechts der Kennung').toBeGreaterThan(n!.x + n!.width);
+      // Bedienbar per Tastatur: Enter klappt auf.
+      await ausloeser.focus();
+      await page.keyboard.press('Enter');
+      await expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
       test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
     });
   }
@@ -1797,4 +1849,137 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     });
     expect(ueber, 'Aufbewahrungstabelle läuft nicht über').toBeLessThanOrEqual(1);
   });
+});
+
+/*
+ * FAHRZEUG ALS EIGENE EINHEIT, PERSONAL DER EINHEIT ÜBERNEHMEN (LLH-1073 Teil II): beide Dialoge
+ * öffnen nur Schreibende, deshalb misst die Achse Admin und Führungspersonal (`e2e/AGENTS.md`,
+ * LFH-435), je Prüfbreite. Lange Funkrufnamen, Personennamen und Funktionen; weder Seite noch
+ * Dialogkörper laufen quer, der Absendeknopf wird geklickt (LFH-355).
+ */
+const EIGENE_EINHEIT_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-1';
+const UEBERNAHME_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-2';
+
+async function seedEigeneEinheit(page: Page): Promise<string> {
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Eigene Einheit ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const put = async (pfad: string) => {
+    const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/${pfad}`);
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  };
+  await post('abschnitte', {
+    name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2',
+  });
+  const ohneEinheit = await post('fahrzeuge', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });
+  const mitEinheit = await post('fahrzeuge', { adhoc: { funkrufname: UEBERNAHME_FAHRZEUG } });
+  const einheit = await post('einheiten', {
+    name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+  });
+  await put(`einheiten/${einheit}/fahrzeug/${mitEinheit}`);
+  for (const name of [
+    'Kirchgassner-Wohlfahrt, Maximiliane',
+    'Oberhauser-Brandstätter, Friedemann',
+  ]) {
+    const kraft = await post('personal', { adhoc: { name } });
+    await put(`fahrzeuge/${ohneEinheit}/besatzung/${kraft}`);
+  }
+  for (const name of ['Wohlgemuth-Kirchhoff, Annemarie', 'Brandstätter-Oberhauser, Konstantin']) {
+    const kraft = await post('personal', {
+      adhoc: {
+        name,
+        funktion: 'Abschnittsleitung Technische Hilfeleistung',
+        staerke_position: 'unterfuehrer',
+      },
+    });
+    await put(`einheiten/${einheit}/personal/${kraft}`);
+  }
+  return String(einsatzId);
+}
+
+/** Querlauf im Körper des offenen Dialogs in px (0 = passt). */
+async function dialogUeberlauf(dialog: Locator): Promise<number> {
+  return dialog.evaluate((el) => {
+    const koerper = el.querySelector<HTMLElement>('.ant-modal-body') ?? (el as HTMLElement);
+    return koerper.scrollWidth - koerper.clientWidth;
+  });
+}
+
+test.describe('Gate 1 · Fahrzeug als eigene Einheit (LLH-1073)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  for (const pruefbreite of PRUEFBREITEN) {
+    for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
+      test(`${pruefbreite.name} (${pruefbreite.breite} px) · ${rolle}: beide Dialoge ohne Querlauf`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await anmelden(page);
+        const einsatzId = await seedEigeneEinheit(page);
+        if (rolle === 'fuehrungspersonal') await wechsleZuRolle(page, rolle, einsatzId);
+        await page.setViewportSize({ width: pruefbreite.breite, height: pruefbreite.hoehe });
+        const messwerte: string[] = [];
+        const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+
+        // Dialog 1: Als eigene Einheit führen.
+        await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+        await expect(region.getByText(EIGENE_EINHEIT_FAHRZEUG, { exact: true })).toBeVisible();
+        await region
+          .getByRole('button', { name: `Weitere Aktionen zu ${EIGENE_EINHEIT_FAHRZEUG}` })
+          .click();
+        await page.getByRole('menuitem', { name: 'Als eigene Einheit führen …' }).click();
+        const eigene = page.getByRole('dialog');
+        // Vorbedingung: der Dialog steht mit allen drei Feldern und der mitkommenden Besatzung.
+        await expect(eigene.getByRole('combobox', { name: 'Abschnitt' })).toBeVisible();
+        await expect(eigene.getByText(/^Besatzung: Kirchgassner-Wohlfahrt/)).toBeVisible();
+        {
+          const seite = await ueberlauf(page);
+          const koerper = await dialogUeberlauf(eigene);
+          messwerte.push(`eigene Einheit: Seite ${seite.ueber}px, Dialog ${koerper}px`);
+          expect(
+            seite.ueber,
+            `Seite läuft quer:\n${seite.schuldige.join('\n')}`,
+          ).toBeLessThanOrEqual(1);
+          expect(koerper, 'Dialogkörper läuft quer').toBeLessThanOrEqual(1);
+        }
+        await eigene.getByRole('button', { name: 'Einheit bilden' }).click();
+        await expect(page.getByText(`Einheit «${EIGENE_EINHEIT_FAHRZEUG}» gebildet`)).toBeVisible();
+        await expect(eigene).toBeHidden();
+
+        // Dialog 2: Personal der Einheit übernehmen.
+        await region.getByRole('button', { name: `Besatzung zu ${UEBERNAHME_FAHRZEUG}` }).click();
+        await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
+        const uebernahme = page.getByRole('dialog');
+        await expect(uebernahme.getByRole('checkbox')).toHaveCount(2);
+        {
+          const seite = await ueberlauf(page);
+          const koerper = await dialogUeberlauf(uebernahme);
+          messwerte.push(`übernehmen: Seite ${seite.ueber}px, Dialog ${koerper}px`);
+          expect(
+            seite.ueber,
+            `Seite läuft quer:\n${seite.schuldige.join('\n')}`,
+          ).toBeLessThanOrEqual(1);
+          expect(koerper, 'Dialogkörper läuft quer').toBeLessThanOrEqual(1);
+        }
+        await uebernahme.getByRole('button', { name: 'Übernehmen' }).click();
+        await expect(
+          page.getByText('2 Kräfte als Besatzung zugeordnet', { exact: true }),
+        ).toBeVisible();
+        test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
+      });
+    }
+  }
 });

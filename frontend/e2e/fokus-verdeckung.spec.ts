@@ -4,6 +4,7 @@ import {
   detailBereit,
   einheitMitZuordnungen,
   kopfFelder,
+  zeilenAusloeser,
   zuordnungsKarte,
 } from './einheit-fixture';
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
@@ -610,7 +611,11 @@ for (const { name, feld, seite } of [
   }
 }
 
-/** Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
+/**
+ * Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. Seit LLH-1036
+ * hat die Einheit-Ansicht keine sticky Speicherleiste mehr: jede Angabe ist ein Zeilenauslöser,
+ * und verdecken können nur noch die festen Knoten des Rahmens.
+ */
 async function einheitFokusBereit(page: Page, dichte: string) {
   await anmelden(page);
   const { pfad } = await einheitMitZuordnungen(page);
@@ -619,18 +624,18 @@ async function einheitFokusBereit(page: Page, dichte: string) {
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
   await detailBereit(page);
   const ziele = kopfFelder(page).map(({ name, fokus }) => ({ name, fokus }));
-  for (const name of ['Speichern', 'Auflösen']) {
-    ziele.push({ name, fokus: page.getByRole('main').getByRole('button', { name, exact: true }) });
-  }
   ziele.push({
-    name: 'neue Sprechgruppe anlegen',
-    fokus: page.getByRole('main').getByRole('button', { name: /neue Sprechgruppe anlegen$/ }),
+    name: 'Einheit auflösen',
+    fokus: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
+      name: 'Einheit auflösen',
+      exact: true,
+    }),
   });
   for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
     const karte = zuordnungsKarte(page, titel);
     ziele.push({
-      name: `${titel} entfernen`,
-      fokus: karte.getByRole('button', { name: 'Entfernen', exact: true }),
+      name: `${titel} aus Einheit lösen`,
+      fokus: karte.getByRole('button', { name: 'Aus Einheit lösen', exact: true }),
     });
     ziele.push({ name: `${titel} zuordnen`, fokus: karte.getByRole('combobox') });
   }
@@ -642,15 +647,30 @@ async function einheitFokusBereit(page: Page, dichte: string) {
     await expect(fokus, name).toHaveCount(1);
     await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
   }
-  const leiste = page
-    .getByRole('button', { name: 'Speichern', exact: true })
-    .locator('xpath=ancestor::div[@style][contains(@style,"sticky")][1]');
-  await expect(leiste).toHaveCount(1);
-  await expect(leiste).toHaveCSS('position', 'sticky');
-  await leiste.evaluate((el) => el.classList.add('e2e-einheit-leiste'));
-  const reserve = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-  expect(reserve).toBeGreaterThan((await leiste.boundingBox())!.height);
-  return { ziele: ziele.map(({ name }) => name), leiste };
+  return { ziele: ziele.map(({ name }) => name) };
+}
+
+/**
+ * Tabulatorstopps eines ganzen Umlaufs durch das Dokument: vom Brotkrumen „Einheiten“ über das
+ * Inhaltsende hinaus durch Kopf, Rail und Modulpanel zurück in den Seitenkopf. Der Rahmen gehört
+ * mit in den Lauf, seit die Rail ihre letzte Kategorie über den klebenden Fuß rollt (LLH-1241).
+ * Zu knapp gezählt fehlt ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
+ */
+async function stoppsEinUmlauf(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          'a[href], button, input, textarea, select, [tabindex]',
+        ),
+      ].filter(
+        (el) =>
+          el.tabIndex >= 0 &&
+          !(el as HTMLButtonElement).disabled &&
+          el.getClientRects().length > 0 &&
+          getComputedStyle(el).visibility !== 'hidden',
+      ).length,
+  );
 }
 
 for (const viewport of [
@@ -658,27 +678,34 @@ for (const viewport of [
   { width: 390, height: 420 },
 ]) {
   for (const dichte of ['kompakt', 'handschuh']) {
-    test(`Einheit: alle Formular- und Zuordnungsziele frei bei ${viewport.width}px, ${dichte}`, async ({
+    test(`Einheit: alle Zeilen- und Zuordnungsziele frei bei ${viewport.width}px, ${dichte}`, async ({
       page,
     }) => {
       test.setTimeout(90_000);
       await page.setViewportSize(viewport);
-      const { ziele, leiste } = await einheitFokusBereit(page, dichte);
+      const { ziele } = await einheitFokusBereit(page, dichte);
+      // Keine Speicherleiste mehr, die während der Eingabe im Bild klebt (LLH-1036).
+      await expect(
+        page.getByRole('main').getByRole('button', { name: 'Speichern', exact: true }),
+      ).toHaveCount(0);
+      const stopps = await stoppsEinUmlauf(page);
       await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
-      // Die Leiste steht während der Formulareingabe tatsächlich im Viewport.
-      await page.getByLabel('Name', { exact: true }).focus();
-      await expect(leiste).toBeInViewport();
-      await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
-      const befund = await pruefeFokusVerdeckung(page, 60);
+      const befund = await pruefeFokusVerdeckung(page, stopps, 'Tab', {
+        region: 'nav[aria-label="Kategorien"]',
+      });
       expect(
         befund.besuchteZiele.sort(),
-        'Jedes benannte Feld, jede Leisten- und Zuordnungsaktion muss per Tab besucht werden',
+        'Jeder Zeilenauslöser und jede Zuordnungsaktion muss per Tab besucht werden',
       ).toEqual(ziele.sort());
+      // Ab `lg` steht die Rail im Rahmen; der Umlauf muss sie erreicht haben (LLH-1241).
+      if (viewport.width >= 992) {
+        expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+      }
       expect(befund.fixierteKandidaten).toBeGreaterThan(0);
       expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
       test.info().annotations.push({
         type: 'messwert',
-        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, davon ${befund.stoppsInRegion} in der Rail, ${befund.verdeckt.length} Verdeckungen`,
       });
     });
   }
@@ -691,6 +718,8 @@ for (const { dichte, boden, abstand } of [
   test(`Einheit: geöffnete Sprechgruppenfelder bei 390px, ${dichte}`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 420 });
     const { ziele } = await einheitFokusBereit(page, dichte);
+    // Die Zeile „Sprechgruppen“ öffnet den Picker; ihr Auslöser weicht der Eingabe.
+    await zeilenAusloeser(page, 'Sprechgruppen').click();
     await page.getByRole('button', { name: /neue Sprechgruppe anlegen$/ }).click();
     const bezeichnung = page.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
     const betriebsart = page.getByRole('combobox', { name: 'Neue Betriebsart', exact: true });
@@ -739,7 +768,7 @@ for (const { dichte, boden, abstand } of [
     const befund = await pruefeFokusVerdeckung(page, 60);
     expect(befund.besuchteZiele.sort()).toEqual(
       [
-        ...ziele.filter((name) => name !== 'neue Sprechgruppe anlegen'),
+        ...ziele.filter((name) => name !== 'Sprechgruppen'),
         ...ergaenzt.map(({ name }) => name),
       ].sort(),
     );
@@ -752,19 +781,26 @@ for (const { dichte, boden, abstand } of [
   });
 }
 
-test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste wird erkannt', async ({
+/**
+ * Selbstbeweis an einem echten klebenden Knoten der Route: seit LLH-1036 gibt es die
+ * Speicherleiste nicht mehr, also steht die Probe hinter dem Fuß des Modulpanels
+ * (`[data-lfh="modul-panel-fuss"]`, `sticky; bottom: 0`).
+ */
+test('Einheit Selbstbeweis: ein Fokusziel hinter einem echten sticky Knoten wird erkannt', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 520 });
-  const { leiste } = await einheitFokusBereit(page, 'handschuh');
-  await page.getByLabel('Name', { exact: true }).focus();
-  await expect(leiste).toBeInViewport();
-  await leiste.evaluate((el) => {
+  await einheitFokusBereit(page, 'handschuh');
+  const fuss = page.locator('[data-lfh="modul-panel-fuss"]');
+  await expect(fuss).toHaveCSS('position', 'sticky');
+  await expect(fuss).toBeInViewport();
+  await fuss.evaluate((el) => {
+    el.classList.add('e2e-einheit-verdecker');
     const r = el.getBoundingClientRect();
     const probe = document.createElement('button');
-    probe.id = 'e2e-leistenprobe';
-    probe.textContent = 'Leistenprobe';
-    probe.setAttribute('data-e2e-fokus', 'Leistenprobe');
+    probe.id = 'e2e-fussprobe';
+    probe.textContent = 'Fußprobe';
+    probe.setAttribute('data-e2e-fokus', 'Fußprobe');
     Object.assign(probe.style, {
       position: 'fixed',
       left: `${r.left + 10}px`,
@@ -773,7 +809,7 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
       height: '20px',
       zIndex: '0',
     });
-    // Geschwister, kein Kind der Leiste: Vorfahren des Fokusziels sind keine Verdecker.
+    // Geschwister, kein Kind des Fußes: Vorfahren des Fokusziels sind keine Verdecker.
     el.before(probe);
     const start = document.createElement('button');
     start.id = 'e2e-probenstart';
@@ -782,17 +818,18 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
     start.focus({ preventScroll: true });
   });
   const verdeckt = await pruefeFokusVerdeckung(page, 1);
-  expect(verdeckt.besuchteZiele).toEqual(['Leistenprobe']);
+  expect(verdeckt.besuchteZiele).toEqual(['Fußprobe']);
   expect(verdeckt.verdeckt).toHaveLength(1);
-  expect(verdeckt.verdeckt[0]).toContain('e2e-einheit-leiste');
-  // Gegenprobe am selben Ziel: die Geometrie außerhalb der Leiste muss frei sein. Gemessen ab
-  // der Rahmenkante (`--lfh-rahmen-oben`), nicht ab einer festen Zeile: in `handschuh` bricht
-  // der Kopf bei 1366 px mit gestörter Alarmzentrale auf zwei Zeilen um (LFH-1126).
-  await page.locator('#e2e-leistenprobe').evaluate((el) => {
+  expect(verdeckt.verdeckt[0]).toContain('e2e-einheit-verdecker');
+  // Gegenprobe am selben Ziel: in der Mitte des Inhalts, ab der Rahmenkante gemessen
+  // (`--lfh-rahmen-oben`), verdeckt nichts.
+  await page.locator('#e2e-fussprobe').evaluate((el) => {
     const rahmenOben = Number.parseFloat(
       getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
     );
+    const inhalt = document.querySelector('main')!.getBoundingClientRect();
     el.style.top = `${rahmenOben + 28}px`;
+    el.style.left = `${inhalt.left + inhalt.width / 2}px`;
   });
   await page.locator('#e2e-probenstart').focus();
   expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);
@@ -843,6 +880,98 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   }
   expect(unterDemFussGestartet, 'mindestens eine Lage beginnt unter dem Fuß').toBeGreaterThan(0);
   expect(befunde, befunde.join('\n')).toEqual([]);
+});
+
+/**
+ * Rail (LLH-1241): bei 1366 × 520 in `handschuh` passen Kategorien und Fuß (Griff „Menü“,
+ * Einstellungen) nicht unter den Kopf, und die Spalte rollt in sich. Getabbt lag
+ * „Kommunikation“ ganz unter dem klebenden Fuß, weil `scroll-margin` an den Zielen die Spalte nicht
+ * rollte. Gemessen wird vorwärts vom Benutzermenü in die Rail und rückwärts wieder hinaus, und zwar
+ * strenger als der Kern: kein Kategorie-Ziel darf den Fuß auch nur überlappen.
+ *
+ * Gegenprobe im selben Test: ohne `scroll-padding` an der Spalte meldet der Kern das Ziel als
+ * verdeckt. Ohne sie bewiese ein grüner Lauf nur, dass die Spalte gerade nicht rollen musste.
+ */
+test('Rail (LLH-1241): kein Kategorie-Ziel liegt beim Tabben unter dem klebenden Fuß (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  const { pfad } = await einheitMitZuordnungen(page);
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.goto(pfad);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await detailBereit(page);
+
+  const rail = page.getByRole('navigation', { name: 'Kategorien' });
+  const spalte = rail.locator('[data-lfh="rail-spalte"]');
+  const fuss = rail.locator('[data-lfh="rail-fuss"]');
+  await expect(fuss).toHaveCSS('position', 'sticky');
+  // Vorbedingungen: die Spalte rollt, und die letzte Kategorie beginnt unter dem Fuß.
+  expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  expect(
+    await letzte.evaluate(
+      (el, f) => el.getBoundingClientRect().top >= f!.getBoundingClientRect().top,
+      await fuss.elementHandle(),
+    ),
+    'die letzte Kategorie liegt vor dem Fokus ganz unter dem Fuß',
+  ).toBe(true);
+
+  const kategorien = await rail.locator('[data-lfh="rail-haupt"] button').all();
+  const namen: string[] = [];
+  for (const k of kategorien) {
+    const name = (await k.getAttribute('aria-label'))!;
+    namen.push(name);
+    await k.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
+  }
+  const zieleImFuss = await fuss.locator('button').count();
+  const schritte = namen.length + zieleImFuss;
+  const startpunkt = page.getByRole('button', { name: 'Benutzermenü' });
+
+  /** Überlappung jedes Kategorie-Stopps mit dem Fuß in px (0 = frei). */
+  async function laufe(taste: 'Tab' | 'Shift+Tab') {
+    const ueberlappung: string[] = [];
+    const besucht = new Set<string>();
+    for (let i = 0; i < schritte; i += 1) {
+      await page.keyboard.press(taste);
+      const m = await page.evaluate(() => {
+        const f = document.activeElement;
+        const kennung = f?.getAttribute('data-e2e-fokus');
+        if (!f || !kennung) return null;
+        const fussOben = document
+          .querySelector('[data-lfh="rail-fuss"]')!
+          .getBoundingClientRect().top;
+        return { kennung, ueber: f.getBoundingClientRect().bottom - fussOben };
+      });
+      if (m == null) continue;
+      besucht.add(m.kennung);
+      if (m.ueber > 0.5) ueberlappung.push(`${m.kennung}: ${Math.round(m.ueber)} px unter dem Fuß`);
+    }
+    return { ueberlappung, besucht: [...besucht].sort() };
+  }
+
+  await startpunkt.focus();
+  const vorwaerts = await laufe('Tab');
+  expect(vorwaerts.besucht, 'vorwärts jede Kategorie besucht').toEqual([...namen].sort());
+  expect(vorwaerts.ueberlappung, vorwaerts.ueberlappung.join('\n')).toEqual([]);
+  // Rückwärts vom letzten Ziel im Fuß.
+  await fuss.locator('button').last().focus();
+  const rueckwaerts = await laufe('Shift+Tab');
+  expect(rueckwaerts.besucht, 'rückwärts jede Kategorie besucht').toEqual([...namen].sort());
+  expect(rueckwaerts.ueberlappung, rueckwaerts.ueberlappung.join('\n')).toEqual([]);
+
+  // Gegenprobe: ohne Padding an der Spalte rollt nichts, und der Kern sieht die Verdeckung.
+  await spalte.evaluate((el) => {
+    el.style.scrollPaddingBlockEnd = '0px';
+    el.scrollTop = 0;
+  });
+  await startpunkt.focus();
+  const ohne = await pruefeFokusVerdeckung(page, schritte);
+  expect(
+    ohne.verdeckt.join('\n'),
+    'ohne Padding liegt die letzte Kategorie unter dem Fuß',
+  ).toContain(namen[namen.length - 1]);
 });
 
 // ── ETB, Gefahrenmatrix, Lagekarte, Personenkarte und -liste ─────────────────────────────

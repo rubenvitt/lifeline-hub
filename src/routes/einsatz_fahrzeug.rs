@@ -527,16 +527,91 @@ pub async fn besatzung_zuordnen(
             einsatz_id,
             ctx.benutzer.id,
             startwert,
-            &format!(
-                "Fahrzeug «{}»: «{}» als Besatzung zugeordnet",
-                fahrzeug.funkrufname, person
-            ),
+            &crate::fahrzeug::etb_text_besatzung_zugeordnet(&fahrzeug.funkrufname, &[person]),
         )
         .await?;
         Ok(())
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     sse_personal(&state, einsatz_id, ep_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Body von `POST …/fahrzeuge/{ef_id}/besatzung` (LLH-1073 D12).
+#[derive(Debug, Deserialize)]
+pub struct BesatzungBody {
+    /// Personen des Einsatzes (`einsatz_personal.id`); höchstens `SAMMEL_MAX`, entdoppelt.
+    pub ep_ids: Vec<i64>,
+}
+
+/// Die Personenliste beim Übernehmen: leer oder mehr als `SAMMEL_MAX` (gezählt vor dem
+/// Entdoppeln) → 400 vor jeder Abfrage (`src/AGENTS.md`, „Eingabegrenzen“).
+fn check_ep_ids(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    let max = crate::kraefte_disposition::SAMMEL_MAX;
+    if ids.is_empty() {
+        return Err(AppError::Validation("Mindestens eine Person wählen".into()));
+    }
+    if ids.len() > max {
+        return Err(AppError::Validation(format!(
+            "Höchstens {max} Personen je Besatzung"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung — mehrere Personen in einem Schritt als
+/// Besatzung zuordnen („Personal der Einheit übernehmen“, LLH-1073, design.md D12). Alles oder
+/// nichts: Fahrzeug beendet → 409, unbekannt → 404; Vorprüfung der Personen in einer Abfrage
+/// (unbekannt oder fremd, beendet → 422 mit Grund je Person), dann ein UPDATE. Additiv und
+/// exklusiv wie der Einzelweg. Genau ein ETB-Eintrag für alle, die neu aufsitzen; wer schon auf
+/// dem Fahrzeug sitzt, ändert nichts. Ereignisse für das Ziel, jedes verlassene Fahrzeug und jede
+/// Person.
+pub async fn besatzung_uebernehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<BesatzungBody>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ep_ids = check_ep_ids(&body.ep_ids)?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (neu, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let fahrzeug = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+        let personen = besatzung_repo::check_besatzung_menge_tx(conn, einsatz_id, &ep_ids).await?;
+        let neu: Vec<besatzung_repo::PersonDerMenge> = personen
+            .into_iter()
+            .filter(|p| p.vorher != Some(ef_id))
+            .collect();
+        if neu.is_empty() {
+            return Ok((neu, None));
+        }
+        let ids: Vec<i64> = neu.iter().map(|p| p.ep_id).collect();
+        besatzung_repo::zuordnen_besatzung_menge_tx(conn, einsatz_id, ef_id, &ids).await?;
+        let namen: Vec<String> = neu.iter().map(|p| p.name.clone()).collect();
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_besatzung_zugeordnet(&fahrzeug.funkrufname, &namen),
+        )
+        .await?;
+        Ok((neu, Some(etb_id)))
+    })?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        sse_fahrzeug(&state, einsatz_id, ef_id);
+    }
+    let mut verlassen: Vec<i64> = neu.iter().filter_map(|p| p.vorher).collect();
+    verlassen.sort_unstable();
+    verlassen.dedup();
+    for alt in verlassen {
+        sse_fahrzeug(&state, einsatz_id, alt);
+    }
+    for p in &neu {
+        sse_personal(&state, einsatz_id, p.ep_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

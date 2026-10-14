@@ -53,6 +53,38 @@ describe('EinheitZeichen', () => {
   });
 });
 
+// LLH-1036: die Einheit-Ansicht zeigt das Zeichen groß und mit der Vorgabe der Organisation.
+// Ohne beide Props bleibt das Meldebild, wie es ist.
+describe('EinheitZeichen · Größe und Vorgabe der Organisation (LLH-1036)', () => {
+  const rahmen = () => document.querySelector<HTMLElement>('[data-lfh="einheit-zeichen"]')!;
+  const beschreibung = () => rahmen().querySelector('svg desc')?.textContent ?? null;
+  const tz = { typLabel: 'Zug', fachaufgabe: null, organisation: null };
+
+  it('ohne Props wie bisher: 26 px, keine Organisation', () => {
+    renderMitProviders(<EinheitZeichen tz={tz} />);
+    expect(rahmen()).toHaveStyle({ width: '26px', height: '26px' });
+    expect(beschreibung()).toBe('Grundzeichen: Taktische Formation. Stärke: Zug.');
+  });
+
+  it('mit `groesse` wächst der Rahmen samt Zeichen', () => {
+    renderMitProviders(<EinheitZeichen tz={tz} groesse={64} />);
+    expect(rahmen()).toHaveStyle({ width: '64px', height: '64px' });
+    expect(rahmen().querySelector('svg')!.getAttribute('width')).toBe('60');
+  });
+
+  it('mit `orgDefault` trägt das Zeichen die Organisation', () => {
+    renderMitProviders(<EinheitZeichen tz={tz} orgDefault="thw" />);
+    expect(beschreibung()).toContain('Organisation: Technisches Hilfswerk');
+  });
+
+  it('die eigene Organisation geht der Vorgabe vor', () => {
+    renderMitProviders(
+      <EinheitZeichen tz={{ ...tz, organisation: 'feuerwehr' }} orgDefault="thw" />,
+    );
+    expect(beschreibung()).toContain('Organisation: Feuerwehr');
+  });
+});
+
 describe('FahrzeugZeichen', () => {
   const beschreibung = () =>
     document.querySelector('[data-lfh="fahrzeug-zeichen"] svg desc')?.textContent ?? null;

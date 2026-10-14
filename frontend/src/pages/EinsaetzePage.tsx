@@ -517,7 +517,6 @@ function EinsaetzeInhalt() {
             <>
               {darfAnlegen && (
                 <Button
-                  type="dashed"
                   icon={<IconPlus />}
                   onClick={() => setDialogOffen(true)}
                   style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}

@@ -177,11 +177,7 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
       { auftraege: [auftrag({ id: 7, lfd_nr: 42 })] },
       '/einsaetze/5/auftraege?auftrag=7',
     ],
-    [
-      'personal',
-      { personal: [personal({ id: 7, name: 'Nr 42' })] },
-      '/einsaetze/5/personal?personal=7',
-    ],
+    ['personal', { personal: [personal({ id: 7, name: 'Nr 42' })] }, '/einsaetze/5/personal/7'],
     ['einheiten', { einheiten: [einheit({ id: 7, name: 'SEG 42' })] }, '/einsaetze/5/einheiten/7'],
   ])('führt %s auf den Builder aus routing/deeplinks.ts', (_modul, quellen, ziel) => {
     const k = kontext({ suche: '42', quellen });

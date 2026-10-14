@@ -34,7 +34,7 @@ import type { ModulFreigaben } from '../../api/types';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { ladeGefahrengebiete } from '../../api/gefahren';
@@ -338,7 +338,7 @@ export default function UeberblickPage() {
   });
   const materialQ = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
     enabled: materialFrei,
   });
   const einheitenQ = useQuery({

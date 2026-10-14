@@ -844,6 +844,26 @@ describe('Datensicht · Kartenzweig', () => {
     expect(onKlick).toHaveBeenCalledWith(DREI[0]);
   });
 
+  it('gestapelt stellt die Aktionen unter den Inhalt, ohne Angabe stehen sie daneben (LLH-1093)', () => {
+    // Ein langes Etikett („Aus dem Einsatz nehmen“) ließ dem Inhalt auf 390 px keine 60 px.
+    setzeViewportBreite(390);
+    const aktion = { etikett: 'Aus dem Einsatz nehmen', onKlick: () => {} };
+    const leiste = (c: HTMLElement) =>
+      c.querySelector<HTMLElement>('[data-lfh="datensicht-karte"] ul')!;
+    const daneben = rendere({ karte: { ...karte, aktion } });
+    expect(leiste(daneben.container).style.flex).toBe('0 0 auto');
+    expect(leiste(daneben.container).parentElement!.style.flexWrap).toBe('');
+    // Ohne Stapel steht `padding` als Zeilenabstand; gestapelt gilt derselbe Wert, nicht das knappe
+    // `paddingXS` des Stapels (Leitlinie ≥ 8 / ≥ 16 px).
+    const abstand = leiste(daneben.container).parentElement!.style.rowGap;
+    expect(abstand).not.toBe('');
+    daneben.unmount();
+    const unten = rendere({ karte: { ...karte, aktion, gestapelt: true } });
+    expect(leiste(unten.container).style.flex).toBe('1 1 100%');
+    expect(leiste(unten.container).parentElement!.style.flexWrap).toBe('wrap');
+    expect(leiste(unten.container).parentElement!.style.rowGap).toBe(abstand);
+  });
+
   it('bestaetigungGefahr färbt NUR den OK-Knopf der Rückfrage rot, der Auslöser bleibt neutral', async () => {
     // Paar zum Fall darüber: dort bleibt der OK-Knopf ohne Opt-in neutral.
     setzeViewportBreite(390);

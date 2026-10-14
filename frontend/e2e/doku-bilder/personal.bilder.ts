@@ -17,11 +17,16 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep personal`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   personal.png         frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx,
- *                        frontend/src/kraefte/EinsatzfunktionZelle.tsx
+ *                        frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/EinheitAngabe.tsx,
+ *                        frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx,
+ *                        frontend/src/kraefte/einteilungKern.ts (Gruppen nach Einheit)
+ *   einteilen.png        frontend/src/pages/PersonalPage.tsx (Zeile), frontend/src/kraefte/EinheitAngabe.tsx,
+ *                        frontend/src/components/InlineAngabe.tsx
  *   personal-disponieren.png frontend/src/kraefte/PersonalDisponierenModal.tsx,
  *                        frontend/src/kraefte/SammelGruende.tsx
  *   adhoc-person.png     frontend/src/kraefte/AdhocPersonModal.tsx
- *   zeitachse-person.png frontend/src/pages/PersonalPage.tsx (aufgeklappte Zeile),
+ *   ansicht.png          frontend/src/pages/EinsatzkraftPage.tsx
+ *   zeitachse-person.png frontend/src/pages/EinsatzkraftPage.tsx (Paneel „Zeitachse“),
  *                        frontend/src/kraefte/KraftZeitachse.tsx
  *   entlassen.png        frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
  *
@@ -31,10 +36,14 @@ import {
  * den Block „Entlassen“ disponiert sie eine Ad-hoc-Kraft und entlässt sie (LLH-1079). Für den
  * Dialog „Personal disponieren“ legt sie drei Stamm-Personen an, die noch nicht im Einsatz sind
  * (LLH-1100): die Demo-Personen sind alle disponiert. Anna Probe bekommt die Einsatzfunktion
- * „Sprechfunker“, damit die Spalte „Funktion“ beide Angaben zeigt (LLH-1067).
+ * „Sprechfunker“, damit die Spalte „Funktion“ beide Angaben zeigt (LLH-1067). Für die Gruppe
+ * „nicht eingeteilt“ und das Einteilen disponiert sie die Ad-hoc-Kraft Tim Neu ohne Einheit
+ * (LLH-1060).
  */
 
 const KAPITEL = 'personal';
+/** Ad-hoc-Kraft ohne Einheit: trägt die Gruppe „nicht eingeteilt“ und das Bild „einteilen“. */
+const OHNE_EINHEIT = 'Tim Neu';
 
 /** Stamm-Personen für den Dialog „Personal disponieren“, nicht im Demo-Einsatz. */
 const NEUE_STAMMKRAEFTE = [
@@ -112,6 +121,9 @@ test.describe(KAPITEL, () => {
         adhoc: { name: 'Paul Muster', funktion: 'Sanitäter' },
       });
       await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personal/${weg.id}/entlassen`);
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personal`, {
+        adhoc: { name: OHNE_EINHEIT, funktion: 'Helfer' },
+      });
 
       for (const kraft of NEUE_STAMMKRAEFTE) await fuelle(api, 'post', '/api/personal', kraft);
     } finally {
@@ -124,9 +136,31 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/personal`);
-    await expect(page.getByRole('cell', { name: 'Anna Probe' }).first()).toBeVisible();
-    await expect(page.getByText('4 h 47').first()).toBeVisible();
+    const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+    await expect(region.getByRole('link', { name: 'Anna Probe' })).toBeVisible();
+    // Gruppen erst mit der Einheitenliste, Dauer erst mit den Perioden.
+    await expect(region.getByText(/nicht eingeteilt/).first()).toBeVisible();
+    await expect(region.getByText('4 h 47').first()).toBeVisible();
+    await page.mouse.move(0, 0);
     await fotografiere(page, KAPITEL, 'personal');
+  });
+
+  test('Eine Person einteilen', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/personal`);
+    const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+    await region.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} eintragen` }).click();
+    await region.getByRole('combobox', { name: `Einheit zu ${OHNE_EINHEIT}` }).click();
+    await waehleStehend(page, 'Rettungsstaffel');
+    await expect(offeneAuswahl(page)).toHaveCount(0);
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: OHNE_EINHEIT });
+    await expect(
+      zeile.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} speichern` }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(zeile, KAPITEL, 'einteilen');
   });
 
   test('Dialog „Personal disponieren“', async ({ page }) => {
@@ -174,17 +208,35 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'adhoc-person');
   });
 
-  test('Zeitachse einer Person', async ({ page }) => {
+  test('Ansicht einer Person', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/personal`);
-    await page.getByRole('button', { name: 'Zeitachse zu Lena Beispiel' }).click();
-    const ereignisse = page.locator('[data-lfh="zeitachse-ereignis"]');
-    await expect(ereignisse).toHaveCount(2);
-    const zeile = page.locator('tr', { has: ereignisse.first() });
+    await page
+      .getByRole('region', { name: 'Personal im Einsatz', exact: true })
+      .getByRole('link', { name: 'Anna Probe' })
+      .click();
+    await expect(page.getByRole('heading', { name: /Anna Probe/, level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Einheit bearbeiten' })).toBeVisible();
+    await expect(page.locator('[data-lfh="zeitachse-ereignis"]').first()).toBeVisible();
     await page.mouse.move(0, 0);
-    await fotografiere(zeile, KAPITEL, 'zeitachse-person');
+    await fotografiere(page, KAPITEL, 'ansicht');
+  });
+
+  test('Zeitachse einer Person', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    const lena = await personNamens(page.request, demo.id, 'Lena Beispiel');
+    await page.goto(`/einsaetze/${demo.id}/personal/${lena.id}`);
+    const paneel = page
+      .getByRole('main')
+      .locator('[data-lfh="paneel"]')
+      .filter({ has: page.getByRole('heading', { name: 'Zeitachse', exact: true }) });
+    await expect(paneel.locator('[data-lfh="zeitachse-ereignis"]')).toHaveCount(2);
+    await page.mouse.move(0, 0);
+    await fotografiere(paneel, KAPITEL, 'zeitachse-person');
   });
 
   test('Block „Entlassen“', async ({ page }) => {
