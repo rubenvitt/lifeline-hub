@@ -2,8 +2,8 @@ use axum::http::StatusCode;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    stammpersonal_disponieren, system_etb_anzahl,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
+    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl,
 };
 
 #[tokio::test]
@@ -2131,6 +2131,9 @@ async fn zugeordnetes_oder_beendetes_fahrzeug_ist_422_mit_grund_je_fahrzeug() {
     let frei = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
     let vergeben = fahrzeug_anlegen(&app, &admin, einsatz, "83-2").await;
     let weg = fahrzeug_anlegen(&app, &admin, einsatz, "83-3").await;
+    // Ein freies Fahrzeug eines anderen Einsatzes ist hier unbekannt, nicht zuordenbar.
+    let nachbarlage = einsatz_anlegen_mit(&app, &admin, "Nachbarlage").await;
+    let fremd = fahrzeug_anlegen(&app, &admin, nachbarlage, "83-9").await;
     let zug2 = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
     fahrzeug_zuordnen(&app, &admin, einsatz, zug2, vergeben).await;
     let (s, json) = anfrage(
@@ -2150,7 +2153,7 @@ async fn zugeordnetes_oder_beendetes_fahrzeug_ist_422_mit_grund_je_fahrzeug() {
         &format!("/api/einsaetze/{einsatz}/einheiten"),
         &admin,
         Some(&format!(
-            r#"{{"name":"83-1","fahrzeug_ids":[{frei},{vergeben},{weg},999999]}}"#
+            r#"{{"name":"83-1","fahrzeug_ids":[{frei},{vergeben},{weg},{fremd},999999]}}"#
         )),
     )
     .await;
@@ -2160,12 +2163,14 @@ async fn zugeordnetes_oder_beendetes_fahrzeug_ist_422_mit_grund_je_fahrzeug() {
         serde_json::json!([
             {"art": "fahrzeug", "id": vergeben, "grund": "gehört zu «Zug 2»"},
             {"art": "fahrzeug", "id": weg, "grund": "entlassen"},
+            {"art": "fahrzeug", "id": fremd, "grund": "unbekannt"},
             {"art": "fahrzeug", "id": 999999, "grund": "unbekannt"},
         ])
     );
     assert_eq!(zahl(&pool, "SELECT COUNT(*) FROM einsatz_einheit").await, 1);
     assert_eq!(einheit_des_fahrzeugs(&pool, frei).await, None);
     assert_eq!(einheit_des_fahrzeugs(&pool, vergeben).await, Some(zug2));
+    assert_eq!(einheit_des_fahrzeugs(&pool, fremd).await, None);
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
 }
 
