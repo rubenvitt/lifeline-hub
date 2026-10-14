@@ -115,6 +115,8 @@ describe('PersonalDisponierenModal', () => {
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('combobox', { name: 'Auf Fahrzeug' });
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+    // Ohne Ablehnung steht unter der Auswahl keine leere Zeile für die Gründe.
+    expect(dialog.querySelector('.ant-form-item-extra')).toBeNull();
     expect(within(dialog).getByRole('combobox', { name: 'Personen' })).toBeInTheDocument();
     expect(within(dialog).getByRole('combobox', { name: 'In Einheit' })).toBeInTheDocument();
     unmount();

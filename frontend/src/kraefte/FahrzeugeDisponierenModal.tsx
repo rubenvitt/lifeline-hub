@@ -136,17 +136,20 @@ export default function FahrzeugeDisponierenModal({
             message: `Höchstens ${SAMMEL_MAX} Fahrzeuge je Absenden`,
           },
         ]}
+        // Ohne Gründe kein `extra`: antd hielte sonst eine leere Zeile unter dem Feld frei.
         extra={
-          <GruendeListe
-            gruende={gruende}
-            name={name}
-            onAbwaehlen={() =>
-              form.setFieldValue(
-                'fahrzeug_ids',
-                (gewaehlt ?? []).filter((id) => !alleGruende.has(id)),
-              )
-            }
-          />
+          gruende.size > 0 ? (
+            <GruendeListe
+              gruende={gruende}
+              name={name}
+              onAbwaehlen={() =>
+                form.setFieldValue(
+                  'fahrzeug_ids',
+                  (gewaehlt ?? []).filter((id) => !alleGruende.has(id)),
+                )
+              }
+            />
+          ) : undefined
         }
       >
         <Select<number[]>

@@ -169,17 +169,20 @@ export default function PersonalDisponierenModal({
             message: `Höchstens ${SAMMEL_MAX} Personen je Absenden`,
           },
         ]}
+        // Ohne Gründe kein `extra`: antd hielte sonst eine leere Zeile unter dem Feld frei.
         extra={
-          <GruendeListe
-            gruende={gruende}
-            name={name}
-            onAbwaehlen={() =>
-              form.setFieldValue(
-                'personal_ids',
-                (gewaehlt ?? []).filter((id) => !alleGruende.has(id)),
-              )
-            }
-          />
+          gruende.size > 0 ? (
+            <GruendeListe
+              gruende={gruende}
+              name={name}
+              onAbwaehlen={() =>
+                form.setFieldValue(
+                  'personal_ids',
+                  (gewaehlt ?? []).filter((id) => !alleGruende.has(id)),
+                )
+              }
+            />
+          ) : undefined
         }
       >
         <Select<number[]>
