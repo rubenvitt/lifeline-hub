@@ -433,7 +433,7 @@ impl DispositionPatch<'_> {
 
 /// Der 422 an einer Stamm-Person, deren Name, Qualifikation oder Träger über den Einsatz geändert
 /// werden soll (LLH-1067, design.md D3).
-pub fn stamm_angaben_fehler() -> AppError {
+pub fn stamm_angaben_error() -> AppError {
     AppError::UnprocessableEntity(
         "Name, Qualifikation und Trägerorganisation einer Stamm-Person im Stamm pflegen".into(),
     )
@@ -458,7 +458,7 @@ pub async fn update_tx(
         .fetch_one(&mut *conn)
         .await?;
         if stamm.is_some() {
-            return Err(stamm_angaben_fehler());
+            return Err(stamm_angaben_error());
         }
     }
     let resultat = sqlx::query(
