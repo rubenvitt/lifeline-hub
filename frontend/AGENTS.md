@@ -115,7 +115,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig)
   nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
-  Warnstufe über `verdichteGefahrengebiete`. Stärke einer Menge nur über `summiereStaerke`
+  Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
+  Achtung) über `kraefte/materialVerdichtungKern.ts`. Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
   nur `anzeige/staerke.ts:staerkeText`. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
@@ -501,7 +502,7 @@ anwendbar), „nicht geprüft" ist keins.
   `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide ohne Lagekarten-Recht; den Punkt zeigt
   `anzeige/Kartenausschnitt.tsx`. Personenadressen bekommen keine Suche (folgt mit LFH-1248).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
-  Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
+  Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
   kommt erst nach dem Sweep.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,

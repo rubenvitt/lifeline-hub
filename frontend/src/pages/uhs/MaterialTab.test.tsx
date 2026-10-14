@@ -449,3 +449,27 @@ describe('MaterialTab · Speicherfehler am Ort (LFH-1077)', () => {
     await waitFor(() => expect(within(trage).queryByRole('alert')).toBeNull());
   });
 });
+
+/** LLH-1093, design.md D14: eine aufgelöste UHS nimmt kein Material mehr an (Server 422). */
+describe('MaterialTab · aufgelöste UHS (LLH-1093)', () => {
+  it('sperrt „Material zuordnen“ mit dem Grund „UHS aufgelöst“, Lösen bleibt', async () => {
+    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([frei, verortet])));
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <MaterialTab
+          einsatzId={1}
+          uhs={{ ...uhs, status: 'aufgeloest' } as UhsDetail}
+          schreibgeschuetzt={false}
+        />
+      </CommandPaletteProvider>,
+      { route: '/einsaetze/1/unfallhilfsstellen/3' },
+    );
+    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
+    await screen.findByText('Trage');
+    expect(knopf).toBeDisabled();
+    const grund = screen.getByTestId('material-sperrgrund');
+    expect(grund).toHaveTextContent('UHS aufgelöst');
+    expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+    expect(screen.getByRole('button', { name: 'Lösen' })).toBeEnabled();
+  });
+});

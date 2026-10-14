@@ -4,7 +4,7 @@ import { abrufZustand, schlechtesterZustand, type AbrufZustand } from '../../api
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
@@ -56,7 +56,7 @@ export const LAGEBILD_QUELLEN = {
   einheiten: quelle('einheiten', einsatzKeys.einheiten, listeEinheiten),
   personal: quelle('personal', einsatzKeys.personal, listeEinsatzPersonal),
   fahrzeuge: quelle('fahrzeuge', einsatzKeys.fahrzeuge, listeEinsatzFahrzeuge),
-  material: quelle('material', einsatzKeys.material, listeEinsatzMaterial),
+  material: quelle('material', einsatzKeys.material, listEinsatzMaterial),
   abschnitte: quelle('einsatzabschnitte', einsatzKeys.abschnitte, listeAbschnitte),
 };
 

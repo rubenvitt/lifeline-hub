@@ -13,7 +13,7 @@ import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { gibMaterialFrei, listeEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
+import { gibMaterialFrei, listEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
 import {
   gibFahrzeugFrei,
   gibPersonalFrei,
@@ -170,7 +170,7 @@ function EinheitAnsicht({
   });
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
   // Die Vorgabe der Organisation füllt ein Zeichen ohne eigene Organisation, wie auf der Karte.
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });

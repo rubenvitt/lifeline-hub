@@ -1107,3 +1107,85 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen,
     },
   ]);
 });
+
+// ── C14 · Materialliste (LLH-1093) ─────────────────────────────────────────────────────
+// Die Ort-Teile, die Menge und die Zeilenaktionen der umgebauten Materialliste (Prüfliste
+// Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
+
+async function materialSaeen(page: Page, einsatzId: string) {
+  const E = `/api/einsaetze/${einsatzId}`;
+  const einheit = await seed(page, `${E}/einheiten`, { name: 'Staffel Ost' });
+  const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
+  const verortet = await seed(page, `${E}/material`, {
+    adhoc: { bezeichnung: 'Wolldecke' },
+    menge: 50,
+  });
+  await seed(page, `${E}/material`, { adhoc: { bezeichnung: 'Feldbett' }, menge: 4 });
+  const zuordnung = await page.request.put(`${E}/einheiten/${einheit.id}/material/${verortet.id}`);
+  expect(zuordnung.ok(), `Einheit zuordnen: ${zuordnung.status()}`).toBe(true);
+  const verortung = await page.request.patch(`${E}/material/${verortet.id}`, {
+    data: { uhs_id: uhs.id },
+  });
+  expect(verortung.ok(), `UHS verorten: ${verortung.status()}`).toBe(true);
+}
+
+const materialAnker = (page: Page) =>
+  inMain(page).getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' });
+
+test('C14 · Materialliste: Ort-Teile, Menge und Zeilenaktionen halten 72 px, kompakt bleibt kleiner', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1093 Material ${Date.now()}`);
+  await materialSaeen(page, einsatzId);
+  await messeFlaechen(page, [
+    {
+      pfad: `/einsaetze/${einsatzId}/material`,
+      anker: materialAnker,
+      ziele: [
+        {
+          sorte: 'Material Ort-Teile',
+          ziele: knopf(/^(Einheit|UHS) zu (Wolldecke|Feldbett) (bearbeiten|eintragen)$/),
+          mindestens: 4,
+        },
+        { sorte: 'Material Menge', ziele: knopf(/^Menge zu .+ bearbeiten$/), mindestens: 2 },
+        {
+          sorte: 'Material aus dem Einsatz nehmen',
+          ziele: knopf(/^.+ aus dem Einsatz nehmen$/),
+          mindestens: 2,
+        },
+        {
+          sorte: 'Material Weitere Aktionen',
+          ziele: knopf(/^Weitere Aktionen zu .+$/),
+          mindestens: 2,
+          kurz: true,
+        },
+      ],
+    },
+  ]);
+});
+
+test('C14 · Materialliste (Beobachter): Schreibaktionen fehlen, die Ort-Links halten 72 px', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1093 MaterialB ${Date.now()}`);
+  await materialSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await messeImRollenzweig(page, 'beobachter', [
+    {
+      pfad: `/einsaetze/${einsatzId}/material`,
+      anker: (page) => inMain(page).getByRole('link', { name: 'Staffel Ost' }),
+      fehlt: (page) =>
+        inMain(page).getByRole('button', {
+          name: / (bearbeiten|eintragen|aus dem Einsatz nehmen)$|^Weitere Aktionen zu /,
+        }),
+      ziele: [
+        {
+          sorte: 'Material Ort-Links',
+          ziele: (page) =>
+            inMain(page).getByRole('link', { name: /^(Staffel Ost|UHS Turnhalle)$/ }),
+          mindestens: 2,
+        },
+      ],
+    },
+  ]);
+});

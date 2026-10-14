@@ -347,8 +347,13 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
     }
 
     // Material: das Mengenfeld der Zeile bzw. Karte hat einen Namen, der Dialog sein Feld „Menge".
+    // Die Menge ist erst ein Wert und wird auf „bearbeiten“ zum Feld (LLH-1093, design.md D9).
     await page.goto(`/einsaetze/${einsatzId}/material`);
-    await expect(page.getByRole('spinbutton', { name: `Menge ${MATERIAL}` })).toBeVisible();
+    await page.getByRole('button', { name: `Menge zu ${MATERIAL} bearbeiten` }).click();
+    await expect(page.getByRole('spinbutton', { name: `Menge zu ${MATERIAL}` })).toBeVisible();
+    await page
+      .getByRole('button', { name: `Bearbeitung von Menge zu ${MATERIAL} abbrechen` })
+      .click();
     await page.getByRole('button', { name: 'Material disponieren' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();

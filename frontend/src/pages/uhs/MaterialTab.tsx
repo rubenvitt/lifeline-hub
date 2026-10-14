@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Button, Space, Form, App, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
+import { listEinsatzMaterial, updateDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
@@ -42,7 +42,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
 
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
     enabled: !nurDetail,
   });
 
@@ -54,8 +54,13 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
   // daneben. Scheitert nur ein Abgleich im Hintergrund, bleiben die alten Daten maßgeblich: ein
   // Fehlertext neben einem bedienbaren Knopf widerspräche ihm.
-  const sperrgrund: 'fehler' | 'leer' | null =
-    materialQuery.data === undefined
+  //
+  // Eine aufgelöste UHS nimmt kein Material mehr an (LLH-1093, design.md D14; der Server antwortet
+  // 422): der Grund steht am Knopf, statt erst im Dialog. Lösen bleibt.
+  const aufgeloest = uhs.status === 'aufgeloest';
+  const sperrgrund: 'aufgeloest' | 'fehler' | 'leer' | null = aufgeloest
+    ? 'aufgeloest'
+    : materialQuery.data === undefined
       ? materialQuery.isError
         ? 'fehler'
         : null
@@ -76,7 +81,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const loesenZeilen = useZeilenFehler<number>();
 
   const loesenMut = useMutation({
-    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),
+    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: null }),
     onMutate: (emId) => loesenZeilen.beginne(emId),
     onSuccess: () => {
       message.success('Material gelöst');
@@ -86,7 +91,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   });
 
   const zuordnenMut = useMutation({
-    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: uhs.id }),
+    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: uhs.id }),
     onSuccess: () => {
       message.success('Material zugeordnet');
       invalidate();
@@ -159,11 +164,16 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         <Space wrap size="small" align="center">
           <Button
             onClick={() => setZuordnenOffen(true)}
-            disabled={freiVerortbar.length === 0}
+            disabled={aufgeloest || freiVerortbar.length === 0}
             aria-describedby={sperrgrund ? sperrgrundId : undefined}
           >
             Material zuordnen
           </Button>
+          {sperrgrund === 'aufgeloest' && (
+            <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
+              UHS aufgelöst
+            </Typography.Text>
+          )}
           {sperrgrund === 'fehler' && (
             <Typography.Text type="danger" id={sperrgrundId} data-testid="material-sperrgrund">
               Material konnte nicht geladen werden – Zuordnen ist gerade nicht möglich.
