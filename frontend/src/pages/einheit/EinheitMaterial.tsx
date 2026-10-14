@@ -32,7 +32,7 @@ interface EinheitMaterialProps {
   einheit: Einheit;
   rechte: EinheitRechte;
   /** Material des Einsatzes; nur mit `rechte.hasMaterialListe` abgefragt. */
-  materialListe: {
+  materialList: {
     data: readonly EinsatzMaterial[] | undefined;
     isError: boolean;
     error: unknown;
@@ -43,11 +43,11 @@ export default function EinheitMaterial({
   einsatzId,
   einheit,
   rechte,
-  materialListe,
+  materialList,
 }: EinheitMaterialProps) {
   const qc = useQueryClient();
   const { token } = useRollen();
-  const grundId = useId();
+  const reasonId = useId();
   const einheitId = einheit.id;
   const posten = einheit.material_mitglieder;
   const ausfall = materialAusfall(posten);
@@ -60,40 +60,40 @@ export default function EinheitMaterial({
     ])
       void qc.invalidateQueries({ queryKey: key });
   }
-  const zeilen = useZeilenFehler<number>();
+  const rowErrors = useZeilenFehler<number>();
   // Was gerade gelöst wird, je Posten: die Rückmeldung steht am Knopf vor der Antwort.
-  const [laufend, setLaufend] = useState<ReadonlySet<number>>(() => new Set());
-  const markiere = (emId: number, an: boolean) =>
-    setLaufend((alt) => {
-      const neu = new Set(alt);
-      if (an) neu.add(emId);
-      else neu.delete(emId);
-      return neu;
+  const [pending, setPending] = useState<ReadonlySet<number>>(() => new Set());
+  const markPending = (emId: number, on: boolean) =>
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(emId);
+      else next.delete(emId);
+      return next;
     });
-  const zuordnenFehler = useZeilenFehler<'zuordnen'>();
-  const frei = useMutation({
+  const zuordnenErrors = useZeilenFehler<'zuordnen'>();
+  const loesen = useMutation({
     mutationFn: (emId: number) => gibMaterialFrei(einsatzId, einheitId, emId),
     onMutate: (emId) => {
-      zeilen.beginne(emId);
-      markiere(emId, true);
+      rowErrors.beginne(emId);
+      markPending(emId, true);
     },
     onSuccess: invalidate,
-    onError: (e, emId) => zeilen.melde(emId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, emId) => markiere(emId, false),
+    onError: (e, emId) => rowErrors.melde(emId, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, emId) => markPending(emId, false),
   });
-  const zu = useMutation({
+  const zuordnen = useMutation({
     mutationFn: (emId: number) => ordneMaterialZu(einsatzId, einheitId, emId),
-    onMutate: () => zuordnenFehler.beginne('zuordnen'),
+    onMutate: () => zuordnenErrors.beginne('zuordnen'),
     onSuccess: invalidate,
-    onError: (e) => zuordnenFehler.melde('zuordnen', e),
+    onError: (e) => zuordnenErrors.melde('zuordnen', e),
   });
 
-  const freiePosten = filterAktive(materialListe.data ?? []).filter((m) => m.einheit_id == null);
-  const leerInhalt =
-    nichtGefundenInhalt(materialListe, { allgemein: 'Material konnte nicht geladen werden' }) ??
+  const freiePosten = filterAktive(materialList.data ?? []).filter((m) => m.einheit_id == null);
+  const emptyContent =
+    nichtGefundenInhalt(materialList, { allgemein: 'Material konnte nicht geladen werden' }) ??
     'Kein freies Material';
-  const gesperrt = !rechte.canZuordnenMaterial;
-  const zuordnenGrund = zuordnenFehler.grund('zuordnen');
+  const isLocked = !rechte.canZuordnenMaterial;
+  const zuordnenReason = zuordnenErrors.grund('zuordnen');
 
   return (
     <Paneel
@@ -102,7 +102,7 @@ export default function EinheitMaterial({
       koerperPolster
     >
       {posten.map((m) => {
-        const grund = zeilen.grund(m.em_id);
+        const reason = rowErrors.grund(m.em_id);
         return (
           <div
             key={m.em_id}
@@ -132,13 +132,13 @@ export default function EinheitMaterial({
               {isMaterialAusfall(m.status) && <StatusTag darstellung={materialStatus[m.status]} />}
             </span>
             {rechte.canEditEinheit && (
-              <Button danger loading={laufend.has(m.em_id)} onClick={() => frei.mutate(m.em_id)}>
+              <Button danger loading={pending.has(m.em_id)} onClick={() => loesen.mutate(m.em_id)}>
                 Aus Einheit lösen
               </Button>
             )}
-            {grund && (
+            {reason && (
               <div style={{ flexBasis: '100%' }}>
-                <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                <ZeilenFehler fehler={reason.fehler} fallback={reason.fallback} />
               </div>
             )}
           </div>
@@ -151,27 +151,27 @@ export default function EinheitMaterial({
             placeholder="Material zuordnen …"
             aria-label="Material zuordnen"
             value={null}
-            loading={zu.isPending}
-            disabled={gesperrt}
-            aria-describedby={gesperrt ? grundId : undefined}
-            notFoundContent={leerInhalt}
+            loading={zuordnen.isPending}
+            disabled={isLocked}
+            aria-describedby={isLocked ? reasonId : undefined}
+            notFoundContent={emptyContent}
             options={freiePosten.map((m) => ({
               value: m.id,
               label: `${m.bezeichnung} ×${m.menge}`,
             }))}
-            onSelect={(emId) => zu.mutate(Number(emId))}
+            onSelect={(emId) => zuordnen.mutate(Number(emId))}
           />
-          {gesperrt && (
-            <Typography.Text type="secondary" id={grundId}>
+          {isLocked && (
+            <Typography.Text type="secondary" id={reasonId}>
               {MODUL_MATERIAL_GESPERRT}
             </Typography.Text>
           )}
         </div>
       )}
-      {zuordnenGrund && (
+      {zuordnenReason && (
         <div style={{ marginTop: token.marginSM }}>
           <SpeicherFehler
-            fehler={zuordnenGrund.fehler}
+            fehler={zuordnenReason.fehler}
             titel="Nicht zugeordnet"
             fallback="Zuordnen fehlgeschlagen"
           />

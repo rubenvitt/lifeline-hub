@@ -40,7 +40,7 @@ function zeige({
       einsatzId={1}
       einheit={einheit}
       rechte={rechte}
-      materialListe={{
+      materialList={{
         data: rechte.hasMaterialListe ? LISTE : undefined,
         isError: false,
         error: null,

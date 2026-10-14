@@ -18,11 +18,11 @@ import { DemoLabel, SUCHTEXT_SUCHE } from '../../stammdaten/demoAuswahl';
 import {
   buildFahrzeugZuordnenGroups,
   buildPersonZuordnenGroups,
-  fehlerDerKraft,
+  toKraftError,
   parseZuordnenWert,
   type EinheitRechte,
   type ZuordnenGroup,
-  type ZuordnenWahl,
+  type ZuordnenSelection,
 } from './einheitAnsichtKern';
 
 /**
@@ -42,56 +42,56 @@ import {
  */
 
 /** Was die Seite von der Einsatzliste weiß: Daten und ob ihr Abruf scheiterte. */
-interface EinsatzListe<T> {
+interface EinsatzList<T> {
   data: readonly T[] | undefined;
   isError: boolean;
   error: unknown;
 }
 
-interface Gemeinsam {
+interface CommonProps {
   einsatzId: number;
   einheitId: number;
   rechte: EinheitRechte;
 }
 
 type ZuordnenAuswahlProps =
-  | (Gemeinsam & { art: 'personal'; einsatzListe: EinsatzListe<EinsatzPersonal> })
-  | (Gemeinsam & { art: 'fahrzeug'; einsatzListe: EinsatzListe<EinsatzFahrzeug> });
+  | (CommonProps & { art: 'personal'; einsatzList: EinsatzList<EinsatzPersonal> })
+  | (CommonProps & { art: 'fahrzeug'; einsatzList: EinsatzList<EinsatzFahrzeug> });
 
 export default function ZuordnenAuswahl(props: ZuordnenAuswahlProps) {
   const { art, einsatzId, einheitId, rechte } = props;
   const qc = useQueryClient();
   const { token } = useRollen();
-  const grundId = useId();
-  const istPerson = art === 'personal';
-  const canEinsatz = istPerson
+  const reasonId = useId();
+  const isPerson = art === 'personal';
+  const canEinsatz = isPerson
     ? rechte.canZuordnenPersonalEinsatz
     : rechte.canZuordnenFahrzeugEinsatz;
-  const canStamm = istPerson ? rechte.canZuordnenPersonalStamm : rechte.canZuordnenFahrzeugStamm;
+  const canStamm = isPerson ? rechte.canZuordnenPersonalStamm : rechte.canZuordnenFahrzeugStamm;
 
   // Stamm im Dienst und die Entlassenen des Einsatzes (die der Sammelweg ablehnte, LLH-1100).
   const stammPersonal = useQuery({
     queryKey: globalKeys.personalListe('im-dienst'),
     queryFn: () => listePersonal(true),
-    enabled: istPerson && canStamm,
+    enabled: isPerson && canStamm,
   });
   const entlassenesPersonal = useQuery({
     queryKey: einsatzKeys.personalEntlassene(einsatzId),
     queryFn: () => listEntlassenesPersonal(einsatzId),
-    enabled: istPerson && canStamm,
+    enabled: isPerson && canStamm,
   });
   const stammFahrzeuge = useQuery({
     queryKey: globalKeys.fahrzeugeListe('im-dienst'),
     queryFn: () => listeFahrzeuge(true),
-    enabled: !istPerson && canStamm,
+    enabled: !isPerson && canStamm,
   });
   const entlasseneFahrzeuge = useQuery({
     queryKey: einsatzKeys.fahrzeugeEntlassene(einsatzId),
     queryFn: () => listEntlasseneFahrzeuge(einsatzId),
-    enabled: !istPerson && canStamm,
+    enabled: !isPerson && canStamm,
   });
 
-  const fehler = useZeilenFehler<'zuordnen'>();
+  const errors = useZeilenFehler<'zuordnen'>();
   function invalidate() {
     for (const key of [
       einsatzKeys.einheiten(einsatzId),
@@ -103,105 +103,105 @@ export default function ZuordnenAuswahl(props: ZuordnenAuswahlProps) {
       void qc.invalidateQueries({ queryKey: key });
   }
   const zuordnen = useMutation({
-    mutationFn: async (w: ZuordnenWahl) => {
-      if (w.quelle === 'einsatz') {
-        await (istPerson
+    mutationFn: async (w: ZuordnenSelection) => {
+      if (w.source === 'einsatz') {
+        await (isPerson
           ? ordnePersonalZu(einsatzId, einheitId, w.id)
           : ordneFahrzeugZu(einsatzId, einheitId, w.id));
-      } else if (istPerson) {
+      } else if (isPerson) {
         await disponierePersonalSammel(einsatzId, { personal_ids: [w.id], einheit_id: einheitId });
       } else {
         await disponiereFahrzeugeSammel(einsatzId, { fahrzeug_ids: [w.id], einheit_id: einheitId });
       }
     },
-    onMutate: () => fehler.beginne('zuordnen'),
+    onMutate: () => errors.beginne('zuordnen'),
     onSuccess: invalidate,
-    onError: (e, w) => fehler.melde('zuordnen', fehlerDerKraft(e, art, w.id)),
+    onError: (e, w) => errors.melde('zuordnen', toKraftError(e, art, w.id)),
   });
 
   if (!rechte.canEditEinheit) return null;
 
-  const gruppen: ZuordnenGroup[] =
+  const groups: ZuordnenGroup[] =
     props.art === 'personal'
       ? buildPersonZuordnenGroups({
-          einsatz: props.einsatzListe.data ?? [],
+          einsatz: props.einsatzList.data ?? [],
           entlassene: entlassenesPersonal.data ?? [],
           stamm: stammPersonal.data ?? [],
           canEinsatz,
           canStamm,
         })
       : buildFahrzeugZuordnenGroups({
-          einsatz: props.einsatzListe.data ?? [],
+          einsatz: props.einsatzList.data ?? [],
           entlassene: entlasseneFahrzeuge.data ?? [],
           stamm: stammFahrzeuge.data ?? [],
           canEinsatz,
           canStamm,
         });
 
-  const platzhalter = istPerson ? 'Person zuordnen …' : 'Fahrzeug zuordnen …';
-  const gesperrt = !canEinsatz && !canStamm;
-  const gesperrtGrund = istPerson ? MODUL_PERSONAL_GESPERRT : MODUL_FAHRZEUGE_GESPERRT;
+  const placeholderText = isPerson ? 'Person zuordnen …' : 'Fahrzeug zuordnen …';
+  const isLocked = !canEinsatz && !canStamm;
+  const lockedReason = isPerson ? MODUL_PERSONAL_GESPERRT : MODUL_FAHRZEUGE_GESPERRT;
 
   /*
    * Ein leeres Feld nennt den Ausfall, wenn eine Liste nicht ankam; sonst behauptete es „Keine
    * freien …“. Kein `kein403`: die Stamm-Routen sind org-lesbar ohne Admin-Schranke.
    */
-  const stamm = istPerson ? stammPersonal : stammFahrzeuge;
-  const leerInhalt =
+  const stamm = isPerson ? stammPersonal : stammFahrzeuge;
+  const emptyContent =
     (canEinsatz
-      ? nichtGefundenInhalt(props.einsatzListe, {
-          allgemein: istPerson
+      ? nichtGefundenInhalt(props.einsatzList, {
+          allgemein: isPerson
             ? 'Kräfte konnten nicht geladen werden'
             : 'Fahrzeuge konnten nicht geladen werden',
         })
       : undefined) ??
     (canStamm
       ? nichtGefundenInhalt(stamm, {
-          allgemein: istPerson
+          allgemein: isPerson
             ? 'Personalliste konnte nicht geladen werden'
             : 'Fahrzeugliste konnte nicht geladen werden',
         })
       : undefined) ??
-    (istPerson ? 'Keine freien Personen' : 'Keine freien Fahrzeuge');
+    (isPerson ? 'Keine freien Personen' : 'Keine freien Fahrzeuge');
 
-  const optionen = gruppen.map((g) => ({
-    label: g.titel,
-    title: g.titel,
-    options: g.eintraege.map((e) => ({
-      value: e.wert,
+  const options = groups.map((g) => ({
+    label: g.title,
+    title: g.title,
+    options: g.entries.map((e) => ({
+      value: e.value,
       label: g.key === 'demo' ? <DemoLabel>{e.label}</DemoLabel> : e.label,
       suchtext: e.suchtext,
     })),
   }));
-  const grund = fehler.grund('zuordnen');
+  const reason = errors.grund('zuordnen');
 
   return (
     <div style={{ marginTop: token.marginSM }}>
       <Select<string>
         style={{ width: '100%' }}
-        placeholder={platzhalter}
-        aria-label={istPerson ? 'Person zuordnen' : 'Fahrzeug zuordnen'}
+        placeholder={placeholderText}
+        aria-label={isPerson ? 'Person zuordnen' : 'Fahrzeug zuordnen'}
         value={null}
         loading={zuordnen.isPending}
-        disabled={gesperrt}
-        aria-describedby={gesperrt ? grundId : undefined}
+        disabled={isLocked}
+        aria-describedby={isLocked ? reasonId : undefined}
         showSearch={SUCHTEXT_SUCHE}
-        notFoundContent={leerInhalt}
-        options={optionen}
-        onSelect={(wert) => {
-          const wahl = parseZuordnenWert(String(wert));
-          if (wahl) zuordnen.mutate(wahl);
+        notFoundContent={emptyContent}
+        options={options}
+        onSelect={(value) => {
+          const selection = parseZuordnenWert(String(value));
+          if (selection) zuordnen.mutate(selection);
         }}
       />
-      {gesperrt && (
-        <Typography.Text type="secondary" id={grundId}>
-          {gesperrtGrund}
+      {isLocked && (
+        <Typography.Text type="secondary" id={reasonId}>
+          {lockedReason}
         </Typography.Text>
       )}
-      {grund && (
+      {reason && (
         <div style={{ marginTop: token.marginSM }}>
           <SpeicherFehler
-            fehler={grund.fehler}
+            fehler={reason.fehler}
             titel="Nicht zugeordnet"
             fallback="Zuordnen fehlgeschlagen"
           />

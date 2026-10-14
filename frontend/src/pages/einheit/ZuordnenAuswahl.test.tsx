@@ -81,7 +81,7 @@ function zeige(
         einsatzId={1}
         einheitId={10}
         rechte={rechte}
-        einsatzListe={{ data: EINSATZ_PERSONAL, isError: false, error: null }}
+        einsatzList={{ data: EINSATZ_PERSONAL, isError: false, error: null }}
       />
     ) : (
       <ZuordnenAuswahl
@@ -89,7 +89,7 @@ function zeige(
         einsatzId={1}
         einheitId={10}
         rechte={rechte}
-        einsatzListe={{ data: EINSATZ_FAHRZEUGE, isError: false, error: null }}
+        einsatzList={{ data: EINSATZ_FAHRZEUGE, isError: false, error: null }}
       />
     ),
   );
@@ -117,14 +117,14 @@ function zeigeBeideMitMitschnitt(freigaben: ModulFreigaben) {
         einsatzId={1}
         einheitId={10}
         rechte={rechte}
-        einsatzListe={{ data: EINSATZ_PERSONAL, isError: false, error: null }}
+        einsatzList={{ data: EINSATZ_PERSONAL, isError: false, error: null }}
       />
       <ZuordnenAuswahl
         art="fahrzeug"
         einsatzId={1}
         einheitId={10}
         rechte={rechte}
-        einsatzListe={{ data: EINSATZ_FAHRZEUGE, isError: false, error: null }}
+        einsatzList={{ data: EINSATZ_FAHRZEUGE, isError: false, error: null }}
       />
     </>,
   );

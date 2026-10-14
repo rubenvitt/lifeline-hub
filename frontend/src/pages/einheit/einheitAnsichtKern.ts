@@ -133,20 +133,20 @@ export function besatzungGrund(rechte: EinheitRechte): string | null {
  * Woher eine gewählte Kraft kommt. Einsatz- und Stamm-IDs kollidieren (`einsatz_personal.id`
  * gegen `personal.id`), deshalb trägt jeder Wert seine Quelle: `einsatz:<id>`, `stamm:<id>`.
  */
-export type ZuordnenQuelle = 'einsatz' | 'stamm';
+export type ZuordnenSource = 'einsatz' | 'stamm';
 
-export interface ZuordnenWahl {
-  quelle: ZuordnenQuelle;
+export interface ZuordnenSelection {
+  source: ZuordnenSource;
   id: number;
 }
 
-export function parseZuordnenWert(wert: string): ZuordnenWahl | null {
-  const treffer = /^(einsatz|stamm):(\d+)$/.exec(wert);
-  return treffer ? { quelle: treffer[1] as ZuordnenQuelle, id: Number(treffer[2]) } : null;
+export function parseZuordnenWert(value: string): ZuordnenSelection | null {
+  const match = /^(einsatz|stamm):(\d+)$/.exec(value);
+  return match ? { source: match[1] as ZuordnenSource, id: Number(match[2]) } : null;
 }
 
-export interface ZuordnenEintrag {
-  wert: string;
+export interface ZuordnenEntry {
+  value: string;
   label: string;
   /** Text, über den das Feld sucht (Suchtext aus LLH-1100). */
   suchtext: string;
@@ -155,11 +155,11 @@ export interface ZuordnenEintrag {
 /** Eine Gruppe der Auswahl; `demo` sind Demo-Stammdaten, gesammelt hinter allen echten. */
 export interface ZuordnenGroup {
   key: 'einsatz' | 'stamm' | 'demo';
-  titel: string;
-  eintraege: ZuordnenEintrag[];
+  title: string;
+  entries: ZuordnenEntry[];
 }
 
-interface ZuordnenEingabe<E, S> {
+interface ZuordnenInput<E, S> {
   /** Die disponierten Kräfte des Einsatzes (auch mit Einheit: sie sind vergeben). */
   einsatz: readonly E[];
   /** Entlassene des Einsatzes: auch sie fehlen im Stamm, der Sammelweg lehnte sie ab. */
@@ -170,7 +170,7 @@ interface ZuordnenEingabe<E, S> {
   canStamm: boolean;
 }
 
-interface ZuordnenArt<E, S> {
+interface ZuordnenAccessors<E, S> {
   stammId: (e: E) => number | null | undefined;
   einsatzLabel: (e: E) => string;
   einsatzSuchtext: (e: E) => string;
@@ -178,54 +178,54 @@ interface ZuordnenArt<E, S> {
   stammSuchtext: (s: S) => string;
 }
 
-const ohneLeere = (teile: readonly (string | null | undefined)[]) =>
-  teile.filter((t): t is string => !!t && t.trim() !== '').join(' ');
+const joinNonEmpty = (parts: readonly (string | null | undefined)[]) =>
+  parts.filter((t): t is string => !!t && t.trim() !== '').join(' ');
 
 function buildZuordnenGroups<
   E extends { id: number; einheit_id?: number | null },
   S extends { id: number; ist_demo: boolean },
->(eingabe: ZuordnenEingabe<E, S>, art: ZuordnenArt<E, S>): ZuordnenGroup[] {
-  const gruppen: ZuordnenGroup[] = [];
-  if (eingabe.canEinsatz) {
-    const frei = filterAktive(eingabe.einsatz).filter((e) => e.einheit_id == null);
-    gruppen.push({
+>(input: ZuordnenInput<E, S>, art: ZuordnenAccessors<E, S>): ZuordnenGroup[] {
+  const groups: ZuordnenGroup[] = [];
+  if (input.canEinsatz) {
+    const frei = filterAktive(input.einsatz).filter((e) => e.einheit_id == null);
+    groups.push({
       key: 'einsatz',
-      titel: 'Im Einsatz frei',
-      eintraege: frei.map((e) => ({
-        wert: `einsatz:${e.id}`,
+      title: 'Im Einsatz frei',
+      entries: frei.map((e) => ({
+        value: `einsatz:${e.id}`,
         label: art.einsatzLabel(e),
         suchtext: art.einsatzSuchtext(e),
       })),
     });
   }
-  if (eingabe.canStamm) {
+  if (input.canStamm) {
     // Aktiv disponiert oder entlassen: der Sammelweg lehnte beides ab (LLH-1100).
     const vergeben = new Set(
-      [...eingabe.einsatz, ...(eingabe.entlassene ?? [])]
+      [...input.einsatz, ...(input.entlassene ?? [])]
         .map(art.stammId)
         .filter((x): x is number => x != null),
     );
-    const { echte, demo } = splitDemo(eingabe.stamm.filter((s) => !vergeben.has(s.id)));
-    const eintrag = (s: S): ZuordnenEintrag => ({
-      wert: `stamm:${s.id}`,
+    const { echte, demo } = splitDemo(input.stamm.filter((s) => !vergeben.has(s.id)));
+    const toEntry = (s: S): ZuordnenEntry => ({
+      value: `stamm:${s.id}`,
       label: art.stammLabel(s),
       suchtext: art.stammSuchtext(s),
     });
-    gruppen.push({ key: 'stamm', titel: 'Aus dem Stamm', eintraege: echte.map(eintrag) });
-    gruppen.push({ key: 'demo', titel: DEMO_GROUP, eintraege: demo.map(eintrag) });
+    groups.push({ key: 'stamm', title: 'Aus dem Stamm', entries: echte.map(toEntry) });
+    groups.push({ key: 'demo', title: DEMO_GROUP, entries: demo.map(toEntry) });
   }
-  return gruppen.filter((g) => g.eintraege.length > 0);
+  return groups.filter((g) => g.entries.length > 0);
 }
 
 /** „Person zuordnen …“: freie Kräfte des Einsatzes, Stamm im Dienst, Demo hinten (D7). */
 export function buildPersonZuordnenGroups(
-  eingabe: ZuordnenEingabe<EinsatzPersonal, Personal>,
+  input: ZuordnenInput<EinsatzPersonal, Personal>,
 ): ZuordnenGroup[] {
-  return buildZuordnenGroups(eingabe, {
+  return buildZuordnenGroups(input, {
     stammId: (e) => e.personal_id,
     einsatzLabel: personLabel,
     einsatzSuchtext: (e) =>
-      ohneLeere([e.name, e.einsatzfunktion, e.funktion, e.traegerorganisation]),
+      joinNonEmpty([e.name, e.einsatzfunktion, e.funktion, e.traegerorganisation]),
     stammLabel: personalLabel,
     stammSuchtext: personalSuchtext,
   });
@@ -233,15 +233,15 @@ export function buildPersonZuordnenGroups(
 
 /** „Fahrzeug zuordnen …“: dieselbe Form (D8). */
 export function buildFahrzeugZuordnenGroups(
-  eingabe: ZuordnenEingabe<EinsatzFahrzeug, Fahrzeug>,
+  input: ZuordnenInput<EinsatzFahrzeug, Fahrzeug>,
 ): ZuordnenGroup[] {
   const label = (f: { funkrufname: string; fahrzeugtyp?: string | null }) =>
     `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`;
-  return buildZuordnenGroups(eingabe, {
+  return buildZuordnenGroups(input, {
     stammId: (e) => e.fahrzeug_id,
     einsatzLabel: label,
     einsatzSuchtext: (e) =>
-      ohneLeere([e.funkrufname, e.fahrzeugtyp, e.kennzeichen, e.traegerorganisation]),
+      joinNonEmpty([e.funkrufname, e.fahrzeugtyp, e.kennzeichen, e.traegerorganisation]),
     stammLabel: fahrzeugLabel,
     stammSuchtext: fahrzeugSuchtext,
   });
@@ -252,10 +252,10 @@ export function buildFahrzeugZuordnenGroups(
  * gewählten Kraft in `ApiError.zeilen` („außer Dienst“), die Meldung selbst ist allgemein. Dann
  * trägt der gezeigte Fehler diesen Grund; sonst bleibt er, wie er ist.
  */
-export function fehlerDerKraft(fehler: unknown, art: 'personal' | 'fahrzeug', id: number): unknown {
-  const grund = gruendeJeKraft(fehler, art).get(id);
-  if (grund == null || !(fehler instanceof ApiError)) return fehler;
-  return new ApiError(fehler.status, grund, { vomAnwendungsserver: fehler.vomAnwendungsserver });
+export function toKraftError(error: unknown, art: 'personal' | 'fahrzeug', id: number): unknown {
+  const reason = gruendeJeKraft(error, art).get(id);
+  if (reason == null || !(error instanceof ApiError)) return error;
+  return new ApiError(error.status, reason, { vomAnwendungsserver: error.vomAnwendungsserver });
 }
 
 // ── Menü je Person (D9) ───────────────────────────────────────────────────────
@@ -275,22 +275,22 @@ export function buildPersonMenuItems(
   fahrzeuge: readonly { id: number; funkrufname: string }[],
   rechte: Pick<EinheitRechte, 'canEditEinheit' | 'canEditBesatzung'>,
 ): MenueEintrag<PersonMenuKey>[] {
-  const eintraege: MenueEintrag<PersonMenuKey>[] = [];
+  const items: MenueEintrag<PersonMenuKey>[] = [];
   if (rechte.canEditEinheit && !person.isFuehrer) {
-    eintraege.push({ key: 'fuehrer', label: 'Als Einheitsführer' });
+    items.push({ key: 'fuehrer', label: 'Als Einheitsführer' });
   }
   if (rechte.canEditBesatzung) {
     for (const f of fahrzeuge) {
       if (f.id !== person.fahrzeugId) {
-        eintraege.push({ key: `auf:${f.id}`, label: `Auf ${f.funkrufname}` });
+        items.push({ key: `auf:${f.id}`, label: `Auf ${f.funkrufname}` });
       }
     }
     if (person.fahrzeugId != null) {
-      eintraege.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen', gefahr: true });
+      items.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen', gefahr: true });
     }
   }
   if (rechte.canEditEinheit) {
-    eintraege.push({ key: 'aus-einheit', label: 'Aus Einheit lösen', gefahr: true });
+    items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen', gefahr: true });
   }
-  return eintraege;
+  return items;
 }

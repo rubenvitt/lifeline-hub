@@ -73,8 +73,8 @@ interface FahrzeugeBesatzungProps {
    * Ladezustand statt einer flachen Liste, die gleich darauf umbaute (Zeilen und Menüs sprängen
    * unter dem Zeiger); scheitert eine, stehen Fehler und die Mitglieder flach.
    */
-  listenZustand?: 'daten' | 'laden' | 'fehler';
-  onNeuladen?: () => void;
+  listState?: 'daten' | 'laden' | 'fehler';
+  onReload?: () => void;
   /** „Als Einheitsführer“: derselbe Weg wie die Kopfzeile, genau `{ fuehrer_id }` (D1). */
   onSetFuehrer: (epId: number) => Promise<unknown>;
   /** Die Auswahlfelder „Person zuordnen …“ und „Fahrzeug zuordnen …“ am Ende (D2). */
@@ -82,7 +82,7 @@ interface FahrzeugeBesatzungProps {
 }
 
 /** Eine Person, wie das Menü und die Zeile sie brauchen — aus dem Kern oder flach aus dem DTO. */
-interface PersonZeileDaten {
+interface PersonRow {
   epId: number;
   name: string;
   position: StaerkePosition | null;
@@ -92,7 +92,7 @@ interface PersonZeileDaten {
   faehrtAuf: string | null;
 }
 
-const ausBaum = (x: PersonImBaum): PersonZeileDaten => ({
+const fromBaum = (x: PersonImBaum): PersonRow => ({
   epId: x.person.id,
   name: x.person.name,
   position: x.person.staerke_position ?? null,
@@ -102,7 +102,7 @@ const ausBaum = (x: PersonImBaum): PersonZeileDaten => ({
   faehrtAuf: x.faehrtAuf,
 });
 
-const ausMitglied = (m: Einheit['personal_mitglieder'][number]): PersonZeileDaten => ({
+const fromMitglied = (m: Einheit['personal_mitglieder'][number]): PersonRow => ({
   epId: m.ep_id,
   name: m.name,
   position: m.staerke_position ?? null,
@@ -119,15 +119,15 @@ export default function FahrzeugeBesatzung({
   personal,
   fahrzeuge,
   rechte,
-  listenZustand = 'daten',
-  onNeuladen = () => {},
+  listState = 'daten',
+  onReload = () => {},
   onSetFuehrer,
   children,
 }: FahrzeugeBesatzungProps) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
   const einheitId = einheit.id;
-  const grund = besatzungGrund(rechte);
+  const reason = besatzungGrund(rechte);
   /**
    * Die Besatzung steht erst, wenn beide Listen da sind. Solange sie laden, steht nur der
    * Ladezustand; fehlt eine (Fehler), stehen die Mitglieder flach aus dem DTO.
@@ -145,7 +145,7 @@ export default function FahrzeugeBesatzung({
     enabled: mittel != null && mittel.fahrzeuge.length > 0,
   });
   const katalog = katalogQuery.data ?? [];
-  const ankerJeStatus = new Map(katalog.map((s) => [s.id, s.fms_anker]));
+  const ankerByStatus = new Map(katalog.map((s) => [s.id, s.fms_anker]));
 
   function invalidate() {
     for (const key of [
@@ -157,96 +157,96 @@ export default function FahrzeugeBesatzung({
       void qc.invalidateQueries({ queryKey: key });
   }
 
-  const personZeilen = useZeilenFehler<number>();
-  const fahrzeugZeilen = useZeilenFehler<number>();
+  const personErrors = useZeilenFehler<number>();
+  const fahrzeugErrors = useZeilenFehler<number>();
   /*
    * Was je Zeile gerade läuft (`p<ep_id>`, `f<ef_id>`): die Rückmeldung steht am Auslöser vor der
    * Antwort, auch bei zwei Aktionen an zwei Zeilen zugleich (eine Mutation kennt nur ihre letzte).
    */
-  const [laufend, setLaufend] = useState<ReadonlySet<string>>(() => new Set());
-  const markiere = (key: string, an: boolean) =>
-    setLaufend((alt) => {
-      const neu = new Set(alt);
-      if (an) neu.add(key);
-      else neu.delete(key);
-      return neu;
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const markPending = (key: string, on: boolean) =>
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
     });
-  const personLauf = (epId: number) => ({
-    beginne: () => {
-      personZeilen.beginne(epId);
-      markiere(`p${epId}`, true);
+  const trackPerson = (epId: number) => ({
+    start: () => {
+      personErrors.beginne(epId);
+      markPending(`p${epId}`, true);
     },
-    ende: () => markiere(`p${epId}`, false),
+    end: () => markPending(`p${epId}`, false),
   });
-  const fahrzeugLauf = (efId: number) => ({
-    beginne: () => {
-      fahrzeugZeilen.beginne(efId);
-      markiere(`f${efId}`, true);
+  const trackFahrzeug = (efId: number) => ({
+    start: () => {
+      fahrzeugErrors.beginne(efId);
+      markPending(`f${efId}`, true);
     },
-    ende: () => markiere(`f${efId}`, false),
+    end: () => markPending(`f${efId}`, false),
   });
 
-  const personalFrei = useMutation({
+  const personalLoesen = useMutation({
     mutationFn: (epId: number) => gibPersonalFrei(einsatzId, einheitId, epId),
-    onMutate: (epId) => personLauf(epId).beginne(),
+    onMutate: (epId) => trackPerson(epId).start(),
     onSuccess: invalidate,
-    onError: (e, epId) => personZeilen.melde(epId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, epId) => personLauf(epId).ende(),
+    onError: (e, epId) => personErrors.melde(epId, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, epId) => trackPerson(epId).end(),
   });
-  const besatzungZu = useMutation({
+  const besatzungZuordnen = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
-    onMutate: (v) => personLauf(v.epId).beginne(),
+    onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
-    onError: (e, v) => personZeilen.melde(v.epId, e, 'Nicht auf das Fahrzeug gesetzt'),
-    onSettled: (_d, _e, v) => personLauf(v.epId).ende(),
+    onError: (e, v) => personErrors.melde(v.epId, e, 'Nicht auf das Fahrzeug gesetzt'),
+    onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
-  const besatzungFrei = useMutation({
+  const besatzungLoesen = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
-    onMutate: (v) => personLauf(v.epId).beginne(),
+    onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
-    onError: (e, v) => personZeilen.melde(v.epId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, v) => personLauf(v.epId).ende(),
+    onError: (e, v) => personErrors.melde(v.epId, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
-  const fahrzeugFrei = useMutation({
+  const fahrzeugLoesen = useMutation({
     mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, einheitId, efId),
-    onMutate: (efId) => fahrzeugLauf(efId).beginne(),
+    onMutate: (efId) => trackFahrzeug(efId).start(),
     onSuccess: invalidate,
-    onError: (e, efId) => fahrzeugZeilen.melde(efId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, efId) => fahrzeugLauf(efId).ende(),
+    onError: (e, efId) => fahrzeugErrors.melde(efId, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, efId) => trackFahrzeug(efId).end(),
   });
   const fmsStatus = useMutation({
     mutationFn: (v: { efId: number; statusId: number }) =>
       updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
-    onMutate: (v) => fahrzeugLauf(v.efId).beginne(),
+    onMutate: (v) => trackFahrzeug(v.efId).start(),
     onSuccess: invalidate,
-    onError: (e, v) => fahrzeugZeilen.melde(v.efId, e, 'Status nicht geändert'),
-    onSettled: (_d, _e, v) => fahrzeugLauf(v.efId).ende(),
+    onError: (e, v) => fahrzeugErrors.melde(v.efId, e, 'Status nicht geändert'),
+    onSettled: (_d, _e, v) => trackFahrzeug(v.efId).end(),
   });
 
-  function waehle(p: PersonZeileDaten, key: PersonMenuKey) {
+  function handleSelect(p: PersonRow, key: PersonMenuKey) {
     if (key === 'fuehrer') {
-      const zeile = personLauf(p.epId);
-      zeile.beginne();
+      const row = trackPerson(p.epId);
+      row.start();
       onSetFuehrer(p.epId)
-        .catch((e: unknown) => personZeilen.melde(p.epId, e, 'Einheitsführer nicht gesetzt'))
-        .finally(zeile.ende);
+        .catch((e: unknown) => personErrors.melde(p.epId, e, 'Einheitsführer nicht gesetzt'))
+        .finally(row.end);
     } else if (key === 'aus-einheit') {
-      personalFrei.mutate(p.epId);
+      personalLoesen.mutate(p.epId);
     } else if (key === 'vom-fahrzeug') {
-      if (p.fahrzeugId != null) besatzungFrei.mutate({ efId: p.fahrzeugId, epId: p.epId });
+      if (p.fahrzeugId != null) besatzungLoesen.mutate({ efId: p.fahrzeugId, epId: p.epId });
     } else {
-      besatzungZu.mutate({ efId: Number(key.slice('auf:'.length)), epId: p.epId });
+      besatzungZuordnen.mutate({ efId: Number(key.slice('auf:'.length)), epId: p.epId });
     }
   }
 
   // Die Fahrzeuge der Einheit als Ziele „Auf …“: dieselbe Folge wie im Paneel.
-  const menueFahrzeuge = (mittel?.fahrzeuge ?? []).map((f) => ({
+  const menuFahrzeuge = (mittel?.fahrzeuge ?? []).map((f) => ({
     id: f.fahrzeug.id,
     funkrufname: f.fahrzeug.funkrufname,
   }));
 
   /** Der Grund unter einer Zeile, über die ganze Breite. */
-  const fehlerZeile = (g: ZeilenGrund | null) =>
+  const errorRow = (g: ZeilenGrund | null) =>
     g && (
       <div style={{ flexBasis: '100%' }}>
         <ZeilenFehler fehler={g.fehler} fallback={g.fallback} />
@@ -258,7 +258,7 @@ export default function FahrzeugeBesatzung({
    * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (7/11/16 px), damit Link
    * und Aktion untereinander den Aktionsabstand halten (Leitlinie ≥ 8 / ≥ 16).
    */
-  const zeilenStil = {
+  const rowStyle = {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
@@ -267,13 +267,13 @@ export default function FahrzeugeBesatzung({
     minHeight: token.controlHeight,
     paddingBlock: token.marginSM / 2,
   } as const;
-  const nebentext = (teile: readonly (string | null | undefined)[]) => {
-    const text = teile.filter(Boolean).join(' · ');
+  const secondaryText = (parts: readonly (string | null | undefined)[]) => {
+    const text = parts.filter(Boolean).join(' · ');
     return text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
   };
 
-  const personZeile = (p: PersonZeileDaten) => (
-    <div key={p.epId} data-lfh="einheit-person" style={zeilenStil}>
+  const renderPersonRow = (p: PersonRow) => (
+    <div key={p.epId} data-lfh="einheit-person" style={rowStyle}>
       <span style={{ display: 'inline-flex', gap: token.marginXXS }}>
         <PositionsMarken
           person={{ position: p.position, isFuehrer: p.isFuehrer, faehrtAuf: p.faehrtAuf }}
@@ -286,25 +286,25 @@ export default function FahrzeugeBesatzung({
           p.name
         )}
       </span>
-      {nebentext([p.funktion, p.faehrtAuf ? `fährt auf ${p.faehrtAuf}` : null])}
+      {secondaryText([p.funktion, p.faehrtAuf ? `fährt auf ${p.faehrtAuf}` : null])}
       <span style={{ marginInlineStart: 'auto' }}>
         <MenueAusloeser<PersonMenuKey>
           eintraege={buildPersonMenuItems(
             { isFuehrer: p.isFuehrer, fahrzeugId: p.fahrzeugId },
-            menueFahrzeuge,
+            menuFahrzeuge,
             { canEditEinheit: rechte.canEditEinheit, canEditBesatzung: canBesatzung },
           )}
           zugaenglicherName={`Aktionen zu Person ${p.name}`}
-          laeuft={laufend.has(`p${p.epId}`)}
-          onWahl={(key) => waehle(p, key)}
+          laeuft={pending.has(`p${p.epId}`)}
+          onWahl={(key) => handleSelect(p, key)}
         />
       </span>
-      {fehlerZeile(personZeilen.grund(p.epId))}
+      {errorRow(personErrors.grund(p.epId))}
     </div>
   );
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
-  const funkrufname = (efId: number, name: string) => (
+  const renderFunkrufname = (efId: number, name: string) => (
     <span style={monoStil(13)}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
@@ -315,23 +315,27 @@ export default function FahrzeugeBesatzung({
   );
 
   /** Rechts: Status (bei Recht die Wahl) und rot „Aus Einheit lösen“, abgesetzt (`size="middle"`). */
-  const fahrzeugAktionen = (efId: number, status: ReactNode) => (
+  const renderFahrzeugActions = (efId: number, status: ReactNode) => (
     <Space size="middle" wrap style={{ marginInlineStart: 'auto' }}>
       {status}
       {rechte.canEditEinheit && (
-        <Button danger loading={laufend.has(`f${efId}`)} onClick={() => fahrzeugFrei.mutate(efId)}>
+        <Button
+          danger
+          loading={pending.has(`f${efId}`)}
+          onClick={() => fahrzeugLoesen.mutate(efId)}
+        >
           Aus Einheit lösen
         </Button>
       )}
     </Space>
   );
 
-  const fahrzeugZeile = (f: FahrzeugImBaum) => {
+  const renderFahrzeugRow = (f: FahrzeugImBaum) => {
     const ef = f.fahrzeug;
     // Gesperrt ist nur die eigene Zeile: eine Wahl an einem anderen Fahrzeug geht hinaus.
-    const laeuft = laufend.has(`f${ef.id}`);
+    const isPending = pending.has(`f${ef.id}`);
     return (
-      <div data-lfh="einheit-fahrzeug" style={zeilenStil}>
+      <div data-lfh="einheit-fahrzeug" style={rowStyle}>
         <FahrzeugZeichen
           tz={{
             fahrzeugtyp: ef.fahrzeugtyp ?? null,
@@ -341,8 +345,8 @@ export default function FahrzeugeBesatzung({
             organisation: ef.tz_organisation ?? null,
           }}
         />
-        {funkrufname(ef.id, ef.funkrufname)}
-        {nebentext([ef.fahrzeugtyp])}
+        {renderFunkrufname(ef.id, ef.funkrufname)}
+        {secondaryText([ef.fahrzeugtyp])}
         <span
           data-lfh="einheit-besatzung"
           style={{
@@ -356,69 +360,69 @@ export default function FahrzeugeBesatzung({
             <StatusTag darstellung={besatzungsUrteil[f.urteil]} />
           )}
           <span style={monoStil(12)}>{besatzungText(f)}</span>
-          {nebentext([fremdText(f)])}
+          {secondaryText([fremdText(f)])}
         </span>
-        {fahrzeugAktionen(
+        {renderFahrzeugActions(
           ef.id,
           <StatusWahl<number>
             darstellung={fahrzeugStatusDarstellung(
               ef,
-              ef.status_id != null ? ankerJeStatus.get(ef.status_id) : null,
+              ef.status_id != null ? ankerByStatus.get(ef.status_id) : null,
             )}
             farbe={ef.status_farbe ?? null}
             aktuell={ef.status_id ?? null}
             optionen={fmsStatusOptionen(katalog)}
             kennung={ef.funkrufname}
-            laeuft={laeuft}
+            laeuft={isPending}
             darfSchreiben={canBesatzung}
             onWaehlen={(statusId) => {
-              if (!laeuft) fmsStatus.mutate({ efId: ef.id, statusId });
+              if (!isPending) fmsStatus.mutate({ efId: ef.id, statusId });
             }}
           />,
         )}
-        {fehlerZeile(fahrzeugZeilen.grund(ef.id))}
+        {errorRow(fahrzeugErrors.grund(ef.id))}
       </div>
     );
   };
 
   /** Personen unter einem Fahrzeug bzw. unter „Ohne Fahrzeug“: eingerückt. */
-  const eingerueckt = (personen: readonly PersonZeileDaten[]) =>
+  const indented = (personen: readonly PersonRow[]) =>
     personen.length > 0 && (
-      <div style={{ paddingInlineStart: token.paddingLG }}>{personen.map(personZeile)}</div>
+      <div style={{ paddingInlineStart: token.paddingLG }}>{personen.map(renderPersonRow)}</div>
     );
 
-  let inhalt: ReactNode;
+  let content: ReactNode;
   if (mittel) {
-    const ohne = mittel.ohneFahrzeug.map(ausBaum);
-    inhalt = (
+    const ohne = mittel.ohneFahrzeug.map(fromBaum);
+    content = (
       <>
         {mittel.fahrzeuge.map((f) => (
           <div key={f.fahrzeug.id} role="group" aria-label={`Fahrzeug ${f.fahrzeug.funkrufname}`}>
-            {fahrzeugZeile(f)}
-            {eingerueckt(f.besatzung.map(ausBaum))}
+            {renderFahrzeugRow(f)}
+            {indented(f.besatzung.map(fromBaum))}
           </div>
         ))}
         {needsOhneFahrzeugKnoten(mittel) ? (
           <div role="group" aria-label="Ohne Fahrzeug">
-            <div style={zeilenStil}>
+            <div style={rowStyle}>
               <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
               <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>
-            {eingerueckt(ohne)}
+            {indented(ohne)}
           </div>
         ) : (
-          ohne.map(personZeile)
+          ohne.map(renderPersonRow)
         )}
       </>
     );
   } else {
     // Flach aus dem DTO (D5): Fahrzeuge mit Status als Wort, dann die Mitglieder.
-    inhalt = (
+    content = (
       <>
         {einheit.fahrzeug_mitglieder.map((m) => (
-          <div key={m.ef_id} data-lfh="einheit-fahrzeug" style={zeilenStil}>
+          <div key={m.ef_id} data-lfh="einheit-fahrzeug" style={rowStyle}>
             <FahrzeugZeichen
               tz={{
                 fahrzeugtyp: m.fahrzeugtyp ?? null,
@@ -428,9 +432,9 @@ export default function FahrzeugeBesatzung({
                 organisation: null,
               }}
             />
-            {funkrufname(m.ef_id, m.funkrufname)}
-            {nebentext([m.fahrzeugtyp])}
-            {fahrzeugAktionen(
+            {renderFunkrufname(m.ef_id, m.funkrufname)}
+            {secondaryText([m.fahrzeugtyp])}
+            {renderFahrzeugActions(
               m.ef_id,
               <StatusTag
                 darstellung={
@@ -444,15 +448,16 @@ export default function FahrzeugeBesatzung({
                 farbe={m.status?.farbe ?? null}
               />,
             )}
-            {fehlerZeile(fahrzeugZeilen.grund(m.ef_id))}
+            {errorRow(fahrzeugErrors.grund(m.ef_id))}
           </div>
         ))}
-        {einheit.personal_mitglieder.map((m) => personZeile(ausMitglied(m)))}
+        {einheit.personal_mitglieder.map((m) => renderPersonRow(fromMitglied(m)))}
       </>
     );
   }
 
-  const leer = einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
+  const isEmpty =
+    einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
 
   return (
     <Paneel
@@ -460,25 +465,25 @@ export default function FahrzeugeBesatzung({
       meta={`${einheit.fahrzeug_mitglieder.length} Fzg. · ${kraefteText(einheit.personal_mitglieder.length)}`}
       koerperPolster
     >
-      {grund && (
+      {reason && (
         <div style={{ marginBottom: token.marginSM }}>
-          <RechteHinweis sichtbar marke="Ohne Besatzung" text={grund} />
+          <RechteHinweis sichtbar marke="Ohne Besatzung" text={reason} />
         </div>
       )}
-      {rechte.hasBesatzung && listenZustand !== 'daten' && (
+      {rechte.hasBesatzung && listState !== 'daten' && (
         <PaneelZustand
-          zustand={listenZustand}
+          zustand={listState}
           titel="Fahrzeuge und Besatzung"
           leerText=""
-          onNeuladen={onNeuladen}
+          onNeuladen={onReload}
         >
           {null}
         </PaneelZustand>
       )}
-      {rechte.hasBesatzung && listenZustand === 'laden' ? null : leer ? (
+      {rechte.hasBesatzung && listState === 'laden' ? null : isEmpty ? (
         <span style={{ color: rollen.gedaempft }}>—</span>
       ) : (
-        inhalt
+        content
       )}
       {children}
     </Paneel>

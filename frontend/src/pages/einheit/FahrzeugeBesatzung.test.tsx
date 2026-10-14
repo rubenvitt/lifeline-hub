@@ -117,7 +117,7 @@ interface Optionen {
   fahrzeuge?: readonly EinsatzFahrzeug[] | undefined;
   darfSchreiben?: boolean;
   freigaben?: ModulFreigaben;
-  listenZustand?: 'daten' | 'laden' | 'fehler';
+  listState?: 'daten' | 'laden' | 'fehler';
 }
 
 function zeige({
@@ -126,27 +126,27 @@ function zeige({
   fahrzeuge = FAHRZEUGE,
   darfSchreiben = true,
   freigaben = freigabenFixture(),
-  listenZustand = 'daten',
+  listState = 'daten',
 }: Optionen = {}) {
   server.use(http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)));
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
   const onSetFuehrer = vi.fn<(epId: number) => Promise<unknown>>().mockResolvedValue(undefined);
-  const onNeuladen = vi.fn();
+  const onReload = vi.fn();
   const r = renderMitProviders(
     <FahrzeugeBesatzung
       einsatzId={1}
       einheit={e}
       einheiten={[e, GAST]}
       // Wie die Seite: ohne Freigabe oder solange eine Liste lädt bzw. fehlt, keine Liste.
-      personal={rechte.hasBesatzung && listenZustand === 'daten' ? personal : undefined}
-      fahrzeuge={rechte.hasBesatzung && listenZustand === 'daten' ? fahrzeuge : undefined}
+      personal={rechte.hasBesatzung && listState === 'daten' ? personal : undefined}
+      fahrzeuge={rechte.hasBesatzung && listState === 'daten' ? fahrzeuge : undefined}
       rechte={rechte}
-      listenZustand={listenZustand}
-      onNeuladen={onNeuladen}
+      listState={listState}
+      onReload={onReload}
       onSetFuehrer={onSetFuehrer}
     />,
   );
-  return { ...r, onSetFuehrer, onNeuladen };
+  return { ...r, onSetFuehrer, onReload };
 }
 
 const paneel = () => screen.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
@@ -491,7 +491,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
 
 describe('FahrzeugeBesatzung · Listen laden oder fehlen', () => {
   it('Ladezustand: benannt, ohne Zeilen und ohne Menüs', () => {
-    zeige({ listenZustand: 'laden' });
+    zeige({ listState: 'laden' });
     expect(screen.getByLabelText('Fahrzeuge und Besatzung wird geladen')).toHaveAttribute(
       'aria-busy',
       'true',
@@ -501,10 +501,10 @@ describe('FahrzeugeBesatzung · Listen laden oder fehlen', () => {
   });
 
   it('Fehlerzustand: Alarm mit „Erneut abrufen“, Mitglieder flach ohne Besatzungswege', async () => {
-    const { onNeuladen } = zeige({ listenZustand: 'fehler' });
+    const { onReload } = zeige({ listState: 'fehler' });
     const alarm = within(paneel()).getByRole('alert');
     await userEvent.click(within(alarm).getByRole('button', { name: 'Erneut abrufen' }));
-    expect(onNeuladen).toHaveBeenCalledTimes(1);
+    expect(onReload).toHaveBeenCalledTimes(1);
     expect(namenIn(paneel())).toEqual([
       'Anna Führer',
       'Bernd Mann',

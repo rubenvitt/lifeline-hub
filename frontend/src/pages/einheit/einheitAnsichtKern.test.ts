@@ -15,7 +15,7 @@ import {
   buildPersonMenuItems,
   buildPersonZuordnenGroups,
   collectNachfahren,
-  fehlerDerKraft,
+  toKraftError,
   parseZuordnenWert,
   type EinheitRechte,
 } from './einheitAnsichtKern';
@@ -165,27 +165,27 @@ const stammPerson = (id: number, teil: Partial<Personal> = {}) =>
 /** Auswahlgruppen „Person zuordnen …“ (design.md D7). */
 describe('buildPersonZuordnenGroups (D7)', () => {
   it('trennt Einsatz- und Stamm-Werte, auch bei gleicher Zahl', () => {
-    const gruppen = buildPersonZuordnenGroups({
+    const groups = buildPersonZuordnenGroups({
       einsatz: [ep(5, { name: 'Erika Frei' })],
       stamm: [stammPerson(5, { name: 'Otto Stamm' })],
       canEinsatz: true,
       canStamm: true,
     });
-    expect(gruppen.map((g) => [g.key, g.titel])).toEqual([
+    expect(groups.map((g) => [g.key, g.title])).toEqual([
       ['einsatz', 'Im Einsatz frei'],
       ['stamm', 'Aus dem Stamm'],
     ]);
-    const [einsatz, stamm] = gruppen;
-    expect(einsatz.eintraege.map((e) => e.wert)).toEqual(['einsatz:5']);
-    expect(stamm.eintraege.map((e) => e.wert)).toEqual(['stamm:5']);
-    expect(parseZuordnenWert('einsatz:5')).toEqual({ quelle: 'einsatz', id: 5 });
-    expect(parseZuordnenWert('stamm:5')).toEqual({ quelle: 'stamm', id: 5 });
+    const [einsatz, stamm] = groups;
+    expect(einsatz.entries.map((e) => e.value)).toEqual(['einsatz:5']);
+    expect(stamm.entries.map((e) => e.value)).toEqual(['stamm:5']);
+    expect(parseZuordnenWert('einsatz:5')).toEqual({ source: 'einsatz', id: 5 });
+    expect(parseZuordnenWert('stamm:5')).toEqual({ source: 'stamm', id: 5 });
     expect(parseZuordnenWert('5')).toBeNull();
     expect(parseZuordnenWert('stamm:x')).toBeNull();
   });
 
   it('im Einsatz nur Kräfte ohne Einheit; aktiv Disponierte und Entlassene fallen aus dem Stamm', () => {
-    const gruppen = buildPersonZuordnenGroups({
+    const groups = buildPersonZuordnenGroups({
       einsatz: [
         ep(1, { personal_id: 11 }),
         ep(2, { personal_id: 12, einheit_id: 9 }),
@@ -196,13 +196,13 @@ describe('buildPersonZuordnenGroups (D7)', () => {
       canEinsatz: true,
       canStamm: true,
     });
-    expect(gruppen[0].eintraege.map((e) => e.wert)).toEqual(['einsatz:1']);
+    expect(groups[0].entries.map((e) => e.value)).toEqual(['einsatz:1']);
     // 13 steht als beendete Zeile noch in der Liste; der Kern sieht sie als vergeben wie 14.
-    expect(gruppen[1].eintraege.map((e) => e.wert)).toEqual(['stamm:15']);
+    expect(groups[1].entries.map((e) => e.value)).toEqual(['stamm:15']);
   });
 
   it('Demo-Stammdaten stehen als eigene Gruppe hinten', () => {
-    const gruppen = buildPersonZuordnenGroups({
+    const groups = buildPersonZuordnenGroups({
       einsatz: [],
       stamm: [
         stammPerson(1, { ist_demo: true }),
@@ -212,7 +212,7 @@ describe('buildPersonZuordnenGroups (D7)', () => {
       canEinsatz: true,
       canStamm: true,
     });
-    expect(gruppen.map((g) => [g.key, g.titel, g.eintraege.map((e) => e.wert)])).toEqual([
+    expect(groups.map((g) => [g.key, g.title, g.entries.map((e) => e.value)])).toEqual([
       ['stamm', 'Aus dem Stamm', ['stamm:2']],
       ['demo', 'Demo-Daten', ['stamm:1', 'stamm:3']],
     ]);
@@ -232,27 +232,21 @@ describe('buildPersonZuordnenGroups (D7)', () => {
       canEinsatz: true,
       canStamm: true,
     });
-    expect(stamm.eintraege[0]).toMatchObject({
+    expect(stamm.entries[0]).toMatchObject({
       label: 'Erika Muster (P-7)',
       suchtext: 'Erika Muster P-7 DRK Sanitäter',
     });
   });
 
   it('eine Gruppe ohne Recht fällt weg, ohne jedes Recht bleibt nichts', () => {
-    const eingabe = { einsatz: [ep(1)], stamm: [stammPerson(2)] };
+    const input = { einsatz: [ep(1)], stamm: [stammPerson(2)] };
     expect(
-      buildPersonZuordnenGroups({ ...eingabe, canEinsatz: true, canStamm: false }).map(
-        (g) => g.key,
-      ),
+      buildPersonZuordnenGroups({ ...input, canEinsatz: true, canStamm: false }).map((g) => g.key),
     ).toEqual(['einsatz']);
     expect(
-      buildPersonZuordnenGroups({ ...eingabe, canEinsatz: false, canStamm: true }).map(
-        (g) => g.key,
-      ),
+      buildPersonZuordnenGroups({ ...input, canEinsatz: false, canStamm: true }).map((g) => g.key),
     ).toEqual(['stamm']);
-    expect(buildPersonZuordnenGroups({ ...eingabe, canEinsatz: false, canStamm: false })).toEqual(
-      [],
-    );
+    expect(buildPersonZuordnenGroups({ ...input, canEinsatz: false, canStamm: false })).toEqual([]);
   });
 });
 
@@ -269,7 +263,7 @@ const stammFahrzeug = (id: number, teil: Partial<Fahrzeug> = {}) =>
 
 describe('buildFahrzeugZuordnenGroups (D8)', () => {
   it('dieselbe Form wie bei Personen: frei im Einsatz, Stamm ohne aktive, Demo hinten', () => {
-    const gruppen = buildFahrzeugZuordnenGroups({
+    const groups = buildFahrzeugZuordnenGroups({
       einsatz: [
         ef(1, { fahrzeug_id: 21, fahrzeugtyp: 'HLF 20', funkrufname: 'Florian 1' }),
         ef(2, { fahrzeug_id: 22, einheit_id: 3 }),
@@ -283,7 +277,7 @@ describe('buildFahrzeugZuordnenGroups (D8)', () => {
       canEinsatz: true,
       canStamm: true,
     });
-    expect(gruppen.map((g) => [g.key, g.eintraege.map((e) => [e.wert, e.label])])).toEqual([
+    expect(groups.map((g) => [g.key, g.entries.map((e) => [e.value, e.label])])).toEqual([
       ['einsatz', [['einsatz:1', 'Florian 1 (HLF 20)']]],
       ['stamm', [['stamm:23', 'Stamm 23 (RTW)']]],
       ['demo', [['stamm:24', 'Stamm 24']]],
@@ -361,7 +355,7 @@ describe('buildPersonMenuItems (D9)', () => {
   });
 });
 
-describe('fehlerDerKraft (D7)', () => {
+describe('toKraftError (D7)', () => {
   it('nimmt den Grund der gewählten Kraft aus `zeilen`, sonst den Fehler selbst', () => {
     const fehler = new ApiError(422, 'Nicht disponiert', {
       zeilen: [
@@ -369,10 +363,10 @@ describe('fehlerDerKraft (D7)', () => {
         { art: 'fahrzeug', id: 52, grund: 'entlassen' },
       ],
     });
-    expect((fehlerDerKraft(fehler, 'personal', 52) as ApiError).message).toBe('außer Dienst');
-    expect((fehlerDerKraft(fehler, 'fahrzeug', 52) as ApiError).message).toBe('entlassen');
-    expect(fehlerDerKraft(fehler, 'personal', 53)).toBe(fehler);
+    expect((toKraftError(fehler, 'personal', 52) as ApiError).message).toBe('außer Dienst');
+    expect((toKraftError(fehler, 'fahrzeug', 52) as ApiError).message).toBe('entlassen');
+    expect(toKraftError(fehler, 'personal', 53)).toBe(fehler);
     const fremd = new Error('weg');
-    expect(fehlerDerKraft(fremd, 'personal', 52)).toBe(fremd);
+    expect(toKraftError(fremd, 'personal', 52)).toBe(fremd);
   });
 });

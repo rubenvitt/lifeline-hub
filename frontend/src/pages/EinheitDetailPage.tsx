@@ -305,14 +305,14 @@ function EinheitAnsicht({
           personal={rechte.hasBesatzung ? personalQuery.data : undefined}
           fahrzeuge={rechte.hasBesatzung ? fahrzeugeQuery.data : undefined}
           rechte={rechte}
-          listenZustand={
+          listState={
             personalQuery.isError || fahrzeugeQuery.isError
               ? 'fehler'
               : personalQuery.data && fahrzeugeQuery.data
                 ? 'daten'
                 : 'laden'
           }
-          onNeuladen={() => {
+          onReload={() => {
             void personalQuery.refetch();
             void fahrzeugeQuery.refetch();
           }}
@@ -327,14 +327,14 @@ function EinheitAnsicht({
                 einsatzId={einsatzId}
                 einheitId={einheitId}
                 rechte={rechte}
-                einsatzListe={personalQuery}
+                einsatzList={personalQuery}
               />
               <ZuordnenAuswahl
                 art="fahrzeug"
                 einsatzId={einsatzId}
                 einheitId={einheitId}
                 rechte={rechte}
-                einsatzListe={fahrzeugeQuery}
+                einsatzList={fahrzeugeQuery}
               />
             </>
           )}
@@ -356,7 +356,7 @@ function EinheitAnsicht({
           einsatzId={einsatzId}
           einheit={aktuell}
           rechte={rechte}
-          materialListe={materialQuery}
+          materialList={materialQuery}
         />
 
         <EinheitFunk
