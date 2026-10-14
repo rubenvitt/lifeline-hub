@@ -158,8 +158,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
   Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
-  klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; `fms_anker` 0–9 nur
-  Beschleuniger (Doppelbelegung setzt nichts) (`docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`).
+  klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
+  eigene der Einheit, sonst der geerbte (`abschnittDerEinheit`, dieselbe Lesart wie die
+  Abschnitt-Spalte der Liste, LLH-1073); `fms_anker` 0–9 nur Beschleuniger (Doppelbelegung setzt
+  nichts) (`docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`).
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
