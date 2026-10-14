@@ -480,10 +480,20 @@ const ZIELE: &[(&str, &str)] = &[
     ("personal", "personal_id"),
     ("einheit", "einheit_id"),
     ("fahrzeug", "fahrzeug_id"),
+    ("etb", "etb_id"),
 ];
 
-/// Ereignisse für Personal, Einheit und Fahrzeug folgen nach dem Commit (Spec
-/// `kraefte-disposition`, „Ein ETB-Eintrag je Absenden“); eine Ablehnung meldet nichts.
+/// Trennt das ETB-Ereignis ab: genau eines je Absenden, seine ID kennt der Test nicht vorab.
+fn ohne_etb(mut ereignisse: Vec<(String, i64)>) -> (Vec<(String, i64)>, usize) {
+    let etb = ereignisse.iter().filter(|(t, _)| t == "etb").count();
+    ereignisse.retain(|(t, _)| t != "etb");
+    ereignisse.sort();
+    (ereignisse, etb)
+}
+
+/// Ereignisse für Personal, Einheit, Fahrzeug und den ETB-Sammeleintrag folgen nach dem Commit
+/// (Spec `kraefte-disposition`, „Ein ETB-Eintrag je Absenden“); eine Ablehnung meldet nichts.
+/// Ohne `etb` frischte kein Client das Einsatztagebuch auf (`queryKeys.ts`, Ereignis → Keys).
 #[tokio::test]
 async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
@@ -509,8 +519,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
         json[0]["id"].as_i64().unwrap(),
         json[1]["id"].as_i64().unwrap(),
     );
-    let mut ereignisse = objekt_ereignisse(&mut rx, ZIELE);
-    ereignisse.sort();
+    let (ereignisse, etb) = ohne_etb(objekt_ereignisse(&mut rx, ZIELE));
     assert_eq!(
         ereignisse,
         vec![
@@ -520,6 +529,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
             ("personal".to_string(), ep_b),
         ]
     );
+    assert_eq!(etb, 1, "genau ein ETB-Ereignis für den Sammeleintrag");
 
     let (s, json) = sammel(
         &app,
@@ -531,8 +541,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let ef2 = json[0]["id"].as_i64().unwrap();
-    let mut ereignisse = objekt_ereignisse(&mut rx, ZIELE);
-    ereignisse.sort();
+    let (ereignisse, etb) = ohne_etb(objekt_ereignisse(&mut rx, ZIELE));
     assert_eq!(
         ereignisse,
         vec![
@@ -540,6 +549,7 @@ async fn ereignisse_nach_dem_commit_fuer_personal_einheit_und_fahrzeug() {
             ("fahrzeug".to_string(), ef2)
         ]
     );
+    assert_eq!(etb, 1, "genau ein ETB-Ereignis für den Sammeleintrag");
 
     let (s, _) = sammel(
         &app,

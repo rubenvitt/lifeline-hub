@@ -240,7 +240,7 @@ pub async fn sammel_disponieren(
         fahrzeug_id: body.fahrzeug_id,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (ergebnis, anzeigen) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, etb_id, anzeigen) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis = kraefte_disposition::disponiere_personal_tx(
             conn,
             kontext,
@@ -249,7 +249,7 @@ pub async fn sammel_disponieren(
             kraefte_disposition::Regeln::SAMMEL,
         )
         .await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -262,8 +262,10 @@ pub async fn sammel_disponieren(
             anzeigen
                 .push(disposition_repo::load_anzeige_tx(conn, einsatz_id, k.ep_id, true).await?);
         }
-        Ok((ergebnis, anzeigen))
+        Ok((ergebnis, etb_id, anzeigen))
     })?;
+    // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
+    state.live.publiziere(einsatz_id, etb_id);
     for k in &ergebnis.kraefte {
         sse_personal(&state, einsatz_id, k.ep_id);
     }
