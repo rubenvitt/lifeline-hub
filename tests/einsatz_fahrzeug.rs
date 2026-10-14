@@ -244,6 +244,39 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     );
 }
 
+/// Ein Stamm-Fahrzeug außer Dienst ist ein Zustand: 422 wie bei der Person (`src/AGENTS.md`,
+/// Statuscode-Konvention; bis LLH-1100 war es 400), ohne ETB-Eintrag.
+#[tokio::test]
+async fn stamm_fahrzeug_ausser_dienst_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/fahrzeuge/{fz}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Fahrzeug ist außer Dienst und kann nicht disponiert werden"
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 0);
+}
+
 #[tokio::test]
 async fn doppelte_stamm_disposition_ist_409() {
     let app = setup().await;
