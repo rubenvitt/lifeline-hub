@@ -62,6 +62,7 @@ import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinheitDetailPage from './pages/EinheitDetailPage';
+import EinsatzkraftPage from './pages/EinsatzkraftPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
@@ -378,6 +379,8 @@ export const appRouten = createRoutesFromElements(
           {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
           <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
+          {/* Personenansicht einer Einsatzkraft (LLH-1060); `?personal=` bleibt Zeilenmarke der Liste. */}
+          <Route path="personal/:epId" element={<EinsatzkraftPage />} />
           {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
           {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}

@@ -71,7 +71,7 @@ export function buildEinheitGruppen(
 ): EinheitGruppen | null {
   if (!einheiten) return null;
   const optionen = buildEinheitOptions(einheiten, abschnitte);
-  const pfadJe = new Map(optionen.map((o) => [`einheit:${o.id}`, o.pfad] as const));
+  const pfadJe = new Map<string, string>(optionen.map((o) => [`einheit:${o.id}`, o.pfad]));
   return {
     schluessel: (ep) => {
       if (ep.einheit_id == null) return OHNE_EINHEIT;
