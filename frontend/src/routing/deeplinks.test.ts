@@ -49,6 +49,8 @@ import {
   parseBerichtAuswahl,
   personalPfad,
   einheitenPfad,
+  einheitAusVorlagePfad,
+  einheitDetailPfad,
   fahrzeugePfad,
   parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
@@ -168,6 +170,13 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
 
   it('kraefteuebersichtPfad', () => {
     expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
+  });
+
+  it('kraefteuebersichtPfad mit ?einheit= springt auf eine Einheit (LLH-1049)', () => {
+    expect(kraefteuebersichtPfad(E, { einheit: 12 })).toBe(
+      '/einsaetze/5/kraefteuebersicht?einheit=12',
+    );
+    expect(kraefteuebersichtPfad(E, {})).toBe('/einsaetze/5/kraefteuebersicht');
   });
 
   it('ueberblickPfad — Startseite des Einsatzes (Neuentwurf)', () => {
@@ -452,6 +461,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('personalPfad mit ?personal=', () => {
     expect(personalPfad(E, { personal: 12 })).toBe('/einsaetze/5/personal?personal=12');
+  });
+  it('einheitAusVorlagePfad liegt unter den Einheiten, nicht auf einer Detail-ID (LLH-1049)', () => {
+    expect(einheitAusVorlagePfad(E, 3)).toBe('/einsaetze/5/einheiten/aus-vorlage/3');
+    expect(einheitAusVorlagePfad(E, 3)).not.toBe(einheitDetailPfad(E, 3));
   });
   it('einheitenPfad mit ?einheit=', () => {
     expect(einheitenPfad(E, { einheit: 4 })).toBe('/einsaetze/5/einheiten?einheit=4');
