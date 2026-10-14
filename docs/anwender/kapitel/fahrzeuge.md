@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
@@ -71,6 +71,25 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben 
 3. „Speichern“ wählen. Der Abschnitt daneben folgt der neuen Einheit; lehnt die App ab, steht der
    Grund am Feld.
 
+### Ein Fahrzeug als eigene Einheit führen
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist und ein Fahrzeug
+allein fährt, etwa ein RTW einer Nachbarwache:
+
+1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Als eigene Einheit führen …“ wählen.
+   Der Eintrag steht nur bei einem Fahrzeug ohne Einheit.
+2. „Name“ prüfen; vorbelegt ist der Funkrufname. Unter „Typ“ steht ein Einheitentyp nur dann
+   schon, wenn genau ein Typ dieselbe Soll-Stärke hat wie das Fahrzeug. Bei Bedarf den „Abschnitt“
+   wählen.
+3. Unter den Feldern steht „Besatzung: …“ mit den Personen, die mit dem Fahrzeug in die Einheit
+   kommen.
+
+   ![Dialog „Nachbarstadt 44/1 als eigene Einheit führen“ mit Name, Typ und Abschnitt, darunter „Besatzung: Jonas Nachbar, Mia Nachbar“ und dem Knopf „Einheit bilden“](../bilder/fahrzeuge/eigene-einheit.png)
+
+4. „Einheit bilden“ wählen. Die Liste bleibt stehen, in der Spalte „Einheit“ steht die neue
+   Einheit. Lehnt die App ab, steht der Grund im Dialog, etwa wenn das Fahrzeug inzwischen einer
+   anderen Einheit angehört.
+
 ### Angaben eines Ad-hoc-Fahrzeugs ändern
 
 Für Einsatzleitung und Führungspersonal, etwa bei einem Tippfehler im Funkrufnamen:
@@ -115,6 +134,24 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Je Person stehen Position und Funktion. Mit „Vom Fahrzeug lösen“ eine Person wieder von der
    Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz.
+
+### Personal der Einheit als Besatzung übernehmen
+
+Für Einsatzleitung und Führungspersonal, wenn das Fahrzeug einer Einheit angehört:
+
+1. In der Liste beim Fahrzeug „Besatzung“ aufklappen und „Personal der Einheit übernehmen“ wählen.
+   Ist der Knopf gesperrt, steht daneben „keine freien Kräfte der Einheit“: alle Kräfte der
+   Einheit sitzen schon auf einem Fahrzeug.
+2. Die Liste nennt die Kräfte der Einheit, die auf keinem Fahrzeug sitzen, je mit Position und
+   Funktion. Angehakt sind so viele, wie bis zur Soll-Stärke des Fahrzeugs fehlen, je Position;
+   der Führer der Einheit steht vorn.
+
+   ![Dialog „Personal der Einheit auf Musterstadt 83-2“ mit den freien Kräften der Rettungsstaffel, zwei davon angehakt, und dem Knopf „Übernehmen“](../bilder/fahrzeuge/personal-uebernehmen.png)
+
+3. Bei Bedarf Häkchen setzen oder entfernen, dann „Übernehmen“ wählen. Alle gewählten Kräfte sitzen
+   danach auf dem Fahrzeug, und die Besatzung zeigt Ist- und Soll-Stärke. Lehnt die App eine
+   Person ab, etwa weil sie inzwischen entlassen ist, steht der Grund an ihr und niemand ist
+   zugeordnet.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 
@@ -170,6 +207,29 @@ derselbe. Wechselt ein Fahrzeug von einer Einheit in eine andere, sehen beide Ei
 und das Einsatztagebuch nennt die vorige Einheit. Dieselbe Einheit noch einmal zu wählen ändert
 nichts.
 
+### Als eigene Einheit führen
+
+Die neue Einheit trägt das Fahrzeug und als Soll-Stärke die des Fahrzeugs. Mit ihr kommen alle
+Personen, die auf dem Fahrzeug sitzen und noch keiner Einheit angehören; wer auf dem Fahrzeug
+sitzt, aber zu einer anderen Einheit gehört, bleibt dort und behält die Marke „andere Einheit“.
+Einheit, Fahrzeug, Besatzung und Einsatztagebuch entstehen ganz oder gar nicht: gehört das
+Fahrzeug inzwischen einer Einheit an oder ist es entlassen, entsteht nichts. Der Name hat höchstens
+200 Zeichen. Das Feld
+„Abschnitt“ steht nur, wenn das Modul Einsatzabschnitte freigegeben ist.
+
+Die Kräfte-Zeitachse der neuen Einheit bleibt zunächst leer, auch wenn das Fahrzeug schon einen
+Status hat: ein Eintrag entsteht erst beim nächsten Statuswechsel mit Zeitachsen-Marke oder als
+Nachtrag von Hand (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Im Meldebild steht die
+Einheit sofort, mit dem Fahrzeug und der Stärke ihrer Besatzung.
+
+### Personal der Einheit übernehmen
+
+Zur Wahl stehen nur Kräfte der Einheit des Fahrzeugs, die auf keinem Fahrzeug sitzen. Die
+Vorauswahl zählt je Position (Führer, Unterführer, Mannschaft) die freien Plätze bis zum Soll,
+abzüglich der Besatzung, die schon sitzt; eine Kraft ohne Position zählt als Mannschaft. Hat das
+Fahrzeug kein Soll, etwa ein Ad-hoc-Fahrzeug, sind alle angehakt. Ein Absenden ordnet höchstens 50
+Personen zu und gilt ganz oder gar nicht.
+
 ### Abschnitt
 
 Ein Fahrzeug hat keinen eigenen Abschnitt; die Spalte „Abschnitt“ zeigt den der Einheit, und hat
@@ -215,14 +275,16 @@ Disponieren, jeder Statuswechsel, das Zuordnen und Lösen der Besatzung, das Zuo
 Einheit, das Ändern der Angaben eines Ad-hoc-Fahrzeugs (ein Eintrag, der jede Änderung mit altem
 und neuem Wert nennt), das Entlassen, das erneute Disponieren und das Stornieren stehen im
 Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
-Einheit und Funkrufnamen.
+Einheit und Funkrufnamen. Ebenso steht „Personal der Einheit übernehmen“ als ein Eintrag mit Zahl
+und Namen der Kräfte. Ein Fahrzeug als eigene Einheit zu führen schreibt drei Einträge: die
+gebildete Einheit, das zugeordnete Fahrzeug und, wenn Personen mitkommen, die mitgekommenen Kräfte.
 
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schreibrecht offen.
-Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen, entlassen und
-stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
-[Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit wählt nur, wer im Modul Einheiten schreiben
-darf.
+Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen oder aus der
+Einheit übernehmen, entlassen und stornieren dürfen Einsatzleitung und Führungspersonal, solange
+der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit wählen und ein
+Fahrzeug als eigene Einheit führen darf nur, wer im Modul Einheiten schreiben darf.
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
 [Ohne Netz](ohne-netz.md)).
