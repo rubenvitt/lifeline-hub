@@ -21,7 +21,7 @@ interface Saat {
   epId: number;
 }
 
-async function saeen(page: Page): Promise<Saat> {
+async function seed(page: Page): Promise<Saat> {
   const post = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(pfad, { data });
     expect(antwort.ok(), `${pfad}: ${await antwort.text()}`).toBe(true);
@@ -50,7 +50,7 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await anmeldenAlsAdmin(page);
-  const s = await saeen(page);
+  const s = await seed(page);
 
   await page.goto(`/einsaetze/${s.einsatzId}/personal`);
   const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });

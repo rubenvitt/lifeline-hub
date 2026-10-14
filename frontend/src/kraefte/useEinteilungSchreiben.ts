@@ -15,7 +15,7 @@ export type ZuordnungSpeichern = (neu: number | null, alt: number | null) => Pro
  * DELETE mit der bisherigen ID, unverändert = nichts. Kein zweiter Schreibweg neben dem Zielmodul:
  * das Recht hängt am Modul des Ziels (LLH-1060 D3).
  */
-async function wechsle(
+async function switchZuordnung(
   neu: number | null,
   alt: number | null,
   zu: (ziel: number) => Promise<unknown>,
@@ -39,7 +39,7 @@ async function wechsle(
 export function useEinteilungSchreiben(einsatzId: number) {
   const qc = useQueryClient();
   return useMemo(() => {
-    const abgleich = async (weitere: readonly (readonly unknown[])[]) => {
+    const syncCache = async (weitere: readonly (readonly unknown[])[]) => {
       for (const k of weitere) void qc.invalidateQueries({ queryKey: k });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       await qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
@@ -48,35 +48,35 @@ export function useEinteilungSchreiben(einsatzId: number) {
       einheit:
         (epId: number): ZuordnungSpeichern =>
         async (neu, alt) => {
-          await wechsle(
+          await switchZuordnung(
             neu,
             alt,
             (eid) => ordnePersonalZu(einsatzId, eid, epId),
             (eid) => gibPersonalFrei(einsatzId, eid, epId),
           );
-          await abgleich([einsatzKeys.einheiten(einsatzId), einsatzKeys.fahrzeuge(einsatzId)]);
+          await syncCache([einsatzKeys.einheiten(einsatzId), einsatzKeys.fahrzeuge(einsatzId)]);
         },
       fahrzeug:
         (epId: number): ZuordnungSpeichern =>
         async (neu, alt) => {
-          await wechsle(
+          await switchZuordnung(
             neu,
             alt,
             (ef) => ordneBesatzungZu(einsatzId, ef, epId),
             (ef) => gibBesatzungFrei(einsatzId, ef, epId),
           );
-          await abgleich([einsatzKeys.fahrzeuge(einsatzId), einsatzKeys.einheiten(einsatzId)]);
+          await syncCache([einsatzKeys.fahrzeuge(einsatzId), einsatzKeys.einheiten(einsatzId)]);
         },
       uhs:
         (epId: number): ZuordnungSpeichern =>
         async (neu, alt) => {
-          await wechsle(
+          await switchZuordnung(
             neu,
             alt,
             (uid) => ordneKraftZu(einsatzId, uid, epId),
             (uid) => zieheKraftAb(einsatzId, uid, epId),
           );
-          await abgleich([einsatzKeys.uhs(einsatzId)]);
+          await syncCache([einsatzKeys.uhs(einsatzId)]);
         },
       /**
        * Eine Angabe des PATCH (Position, Bemerkung, Einsatzfunktion, Ad-hoc-Angaben). Die Antwort

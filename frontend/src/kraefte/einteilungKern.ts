@@ -36,7 +36,7 @@ export function buildEinheitOptions(
   abschnitte: readonly Einsatzabschnitt[],
 ): EinheitOption[] {
   const ergebnis: EinheitOption[] = [];
-  const besuche = (knoten: EinheitKnoten, vorfahren: readonly string[]) => {
+  const visit = (knoten: EinheitKnoten, vorfahren: readonly string[]) => {
     const pfad = [...vorfahren, knoten.einheit.name];
     ergebnis.push({
       id: knoten.einheit.id,
@@ -44,9 +44,9 @@ export function buildEinheitOptions(
       pfad: pfad.join(PFAD_TRENNER),
       tiefe: vorfahren.length,
     });
-    for (const kind of knoten.kinder) besuche(kind, pfad);
+    for (const kind of knoten.kinder) visit(kind, pfad);
   };
-  for (const wurzel of einheitenBaum(filterAktive(einheiten), abschnitte)) besuche(wurzel, []);
+  for (const wurzel of einheitenBaum(filterAktive(einheiten), abschnitte)) visit(wurzel, []);
   return ergebnis;
 }
 

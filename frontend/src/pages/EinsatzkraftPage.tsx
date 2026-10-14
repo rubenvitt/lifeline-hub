@@ -78,8 +78,8 @@ dayjs.extend(utc);
 const STORNO_FRIST_MIN = 15;
 
 /** Leerer Freitext gilt als keine Angabe; verglichen wird getrimmt. */
-const istLeer = (w: string) => w.trim() === '';
-const gleichGetrimmt = (a: string, b: string) => a.trim() === b.trim();
+const isEmpty = (w: string) => w.trim() === '';
+const isEqualTrimmed = (a: string, b: string) => a.trim() === b.trim();
 
 /**
  * Personenansicht einer Einsatzkraft (LLH-1060, Spec `personal-ansicht`, design.md D1, D9–D12):
@@ -189,7 +189,7 @@ export default function EinsatzkraftPage() {
   });
 
   /** Nach Entlassen und erneutem Disponieren wechselt die Zeile die Liste ohne Lücke dazwischen. */
-  const verschiebe = (neu: EinsatzPersonal, nach: 'aktiv' | 'entlassen') => {
+  const moveZeile = (neu: EinsatzPersonal, nach: 'aktiv' | 'entlassen') => {
     const raus = nach === 'aktiv' ? einsatzKeys.personalEntlassene : einsatzKeys.personal;
     const rein = nach === 'aktiv' ? einsatzKeys.personal : einsatzKeys.personalEntlassene;
     qc.setQueryData<EinsatzPersonal[]>(raus(einsatzId), (l) => l?.filter((x) => x.id !== neu.id));
@@ -204,14 +204,14 @@ export default function EinsatzkraftPage() {
   const rueckgaengigMutation = useMutation({
     mutationFn: () => reaktiviereDisposition(einsatzId, epId),
     onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: (neu) => verschiebe(neu, 'aktiv'),
+    onSuccess: (neu) => moveZeile(neu, 'aktiv'),
     onError: (e) => setRueckgaengigFehler(e),
   });
   const entlassenMutation = useMutation({
     mutationFn: () => entlasseDisposition(einsatzId, epId),
     onMutate: () => orte.beginne('aus'),
     onSuccess: (neu) => {
-      verschiebe(neu, 'entlassen');
+      moveZeile(neu, 'entlassen');
       zeigeRueckgaengig(message, `${neu.name} entlassen`, () => rueckgaengigMutation.mutate());
     },
     onError: (e) => orte.melde('aus', e, 'Nicht entlassen'),
@@ -230,7 +230,7 @@ export default function EinsatzkraftPage() {
   const reaktivierenMutation = useMutation({
     mutationFn: () => reaktiviereDisposition(einsatzId, epId),
     onMutate: () => orte.beginne('aus'),
-    onSuccess: (neu) => verschiebe(neu, 'aktiv'),
+    onSuccess: (neu) => moveZeile(neu, 'aktiv'),
     onError: (e) => orte.melde('aus', e, 'Nicht erneut disponiert'),
   });
 
@@ -272,11 +272,11 @@ export default function EinsatzkraftPage() {
     );
   }
   const ep = (aktiv ?? entlassen)!;
-  const istEntlassen = !aktiv;
+  const isEntlassen = !aktiv;
   const imEinsatzSchreiben = darfImEinsatzSchreiben(einsatz);
   /** Eine entlassene Kraft lehnt der Server bei jedem Schreibweg ab (409, D12). */
-  const darfSchreiben = imEinsatzSchreiben && !istEntlassen;
-  const rechteText = istEntlassen ? 'entlassen' : einsatzRechteGrund(einsatz.status);
+  const darfSchreiben = imEinsatzSchreiben && !isEntlassen;
+  const rechteText = isEntlassen ? 'entlassen' : einsatzRechteGrund(einsatz.status);
 
   const einheiten = einheitenQuery.data ?? [];
   const einheitOptionen = buildEinheitOptions(einheiten, abschnitteQuery.data ?? []);
@@ -337,8 +337,8 @@ export default function EinsatzkraftPage() {
       etikett={etikett}
       wert={wert ?? ''}
       anzeige={wert}
-      leer={istLeer}
-      gleich={gleichGetrimmt}
+      leer={isEmpty}
+      gleich={isEqualTrimmed}
       pflicht={feld === 'name'}
       isValid={(w) => !istZuLang(w, PERSONAL_ADHOC_TEXT_MAX)}
       darfSchreiben={darfSchreiben}
@@ -369,7 +369,7 @@ export default function EinsatzkraftPage() {
       {ep.name}
       {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
       {ep.ist_demo && <DemoMarke />}
-      {istEntlassen && <Tag>entlassen</Tag>}
+      {isEntlassen && <Tag>entlassen</Tag>}
     </Space>
   );
 
@@ -411,7 +411,7 @@ export default function EinsatzkraftPage() {
         />
       }
       dataUpdatedAt={gemeinsamerDatenstand(
-        istEntlassen ? entlasseneQuery.dataUpdatedAt : epQuery.dataUpdatedAt,
+        isEntlassen ? entlasseneQuery.dataUpdatedAt : epQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,
         fahrzeugeQuery.dataUpdatedAt,
       )}
@@ -432,7 +432,7 @@ export default function EinsatzkraftPage() {
         <Paneel titel="Einteilung" koerperPolster>
           <Datenraster spalten={2} beschriftung="Einteilung">
             <Datenfeld label="Status">
-              {istEntlassen ? (
+              {isEntlassen ? (
                 <Typography.Text>entlassen</Typography.Text>
               ) : (
                 <StatusWahl
@@ -525,8 +525,8 @@ export default function EinsatzkraftPage() {
                 etikett="Bemerkung"
                 wert={ep.bemerkung ?? ''}
                 anzeige={<span style={{ whiteSpace: 'pre-wrap' }}>{ep.bemerkung}</span>}
-                leer={istLeer}
-                gleich={gleichGetrimmt}
+                leer={isEmpty}
+                gleich={isEqualTrimmed}
                 mehrzeilig
                 isValid={(w) => !istZuLang(w, PERSONAL_BEMERKUNG_MAX)}
                 darfSchreiben={darfSchreiben}
@@ -606,7 +606,7 @@ export default function EinsatzkraftPage() {
 
         <Paneel titel="Aus dem Einsatz" koerperPolster>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
-            {istEntlassen ? (
+            {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
                   entlassen <span style={monoStil(13)}>{formatZeitKurz(ep.beendet_at)}</span>
