@@ -91,8 +91,8 @@ mod tests {
         ),
         (
             "src/einheit/aus_vorlage.rs",
-            1,
-            "Planung der Bildung aus einer Vorlage liest auch beendete Zeilen, um „entlassen“ (erneut disponieren) von „storniert“ (neu) zu unterscheiden",
+            2,
+            "Planung der Bildung aus einer Vorlage liest auch beendete Personal- und Fahrzeugzeilen, um „entlassen“ (erneut disponieren) von „storniert“ (neu) zu unterscheiden",
         ),
         (
             "src/einheit/repo.rs",
