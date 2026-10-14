@@ -16,7 +16,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { holeRueckmeldungen } from '../api/meldungen';
@@ -688,7 +688,7 @@ export default function KraefteuebersichtPage() {
   });
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),

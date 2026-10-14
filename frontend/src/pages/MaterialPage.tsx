@@ -18,10 +18,10 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeMaterial } from '../api/material';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   disponiereAdhoc,
   disponiereMaterial,
-  listeEinsatzMaterial,
+  listEinsatzMaterial,
   listEntlassenesMaterial,
   nimmAusDemEinsatz,
   reaktiviereDisposition,
@@ -141,7 +141,7 @@ export default function MaterialPage() {
   });
   const emQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
   // Aus dem Einsatz genommenes Material (LLH-1079 Teil II): getrennt geliefert, die Liste kennt es
   // nicht. Auf dem Draht heißt der Endzustand `entlassen`.
@@ -193,7 +193,7 @@ export default function MaterialPage() {
   });
   const mengeMutation = useMutation({
     mutationFn: (v: { emId: number; menge: number }) =>
-      aktualisiereDisposition(einsatzId, v.emId, { menge: v.menge }),
+      updateDisposition(einsatzId, v.emId, { menge: v.menge }),
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.emId, e, 'Menge nicht gespeichert'),
@@ -203,7 +203,7 @@ export default function MaterialPage() {
     { emId: number; status: MaterialStatus }
   >({
     queryKey: einsatzKeys.material(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.emId, { status: v.status }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.emId, { status: v.status }),
     zeilenId: (v) => v.emId,
     anwenden: (em, v) => ({ ...em, status: v.status }),
     nochOptimistisch: (em, v) => em.status === v.status,
@@ -214,7 +214,7 @@ export default function MaterialPage() {
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { emId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.emId, e, 'Bemerkung nicht gespeichert'),

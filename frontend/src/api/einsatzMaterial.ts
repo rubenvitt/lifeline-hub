@@ -8,7 +8,7 @@ export interface MaterialAdhocEingabe {
   traegerorganisation?: string | null;
 }
 
-export function listeEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
+export function listEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
   return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material`);
 }
 
@@ -32,7 +32,7 @@ export function disponiereAdhoc(
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', { adhoc, menge });
 }
 
-export function aktualisiereDisposition(
+export function updateDisposition(
   einsatzId: number,
   emId: number,
   felder: { menge?: number; status?: MaterialStatus; bemerkung?: string; uhs_id?: number | null },

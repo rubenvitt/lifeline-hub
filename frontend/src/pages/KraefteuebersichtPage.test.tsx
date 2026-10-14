@@ -18,7 +18,7 @@ import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../api/einsatzMaterial';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
@@ -46,7 +46,7 @@ vi.mock('../api/einsatzPersonal', () => ({
   listEntlassenesPersonal: vi.fn(),
 }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
-vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
+vi.mock('../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/auftraege', () => ({ listeOffeneAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
@@ -216,7 +216,7 @@ beforeEach(() => {
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
   vi.mocked(listEntlassenesPersonal).mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
-  vi.mocked(listeEinsatzMaterial).mockResolvedValue([]);
+  vi.mocked(listEinsatzMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
   vi.mocked(listeOffeneAuftraege).mockResolvedValue([]);
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
@@ -944,7 +944,7 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
 
   it('ein Materialausfall tönt die Einheit und nennt den Grund (D6)', async () => {
     mitBaum();
-    vi.mocked(listeEinsatzMaterial).mockResolvedValue([
+    vi.mocked(listEinsatzMaterial).mockResolvedValue([
       {
         id: 40,
         einsatz_id: 1,
@@ -953,7 +953,7 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
         menge: 1,
         status: 'defekt',
       },
-    ] as Awaited<ReturnType<typeof listeEinsatzMaterial>>);
+    ] as Awaited<ReturnType<typeof listEinsatzMaterial>>);
     // Beide in der Frist: die Tönung kommt allein aus dem Material.
     vi.mocked(holeRueckmeldungen).mockResolvedValue({
       ...KEINE_RUECKMELDUNGEN,

@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Button, Space, Form, App, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
+import { listEinsatzMaterial, updateDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
@@ -42,7 +42,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
 
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
     enabled: !nurDetail,
   });
 
@@ -76,7 +76,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const loesenZeilen = useZeilenFehler<number>();
 
   const loesenMut = useMutation({
-    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),
+    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: null }),
     onMutate: (emId) => loesenZeilen.beginne(emId),
     onSuccess: () => {
       message.success('Material gelöst');
@@ -86,7 +86,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   });
 
   const zuordnenMut = useMutation({
-    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: uhs.id }),
+    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: uhs.id }),
     onSuccess: () => {
       message.success('Material zugeordnet');
       invalidate();

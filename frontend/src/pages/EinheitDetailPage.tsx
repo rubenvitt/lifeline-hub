@@ -23,7 +23,7 @@ import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { gibMaterialFrei, listeEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
+import { gibMaterialFrei, listEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
 import {
   aktualisiereEinheit,
   gibFahrzeugFrei,
@@ -163,7 +163,7 @@ export default function EinheitDetailPage() {
   });
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
 
   function invalidate() {
