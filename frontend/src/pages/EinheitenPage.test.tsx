@@ -65,7 +65,10 @@ function handlers(
     http.get('/api/einsaetze/1', () =>
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+    // `?aufgeloeste=1` (LLH-1079) liefert getrennt; ohne eigenen Fall gibt es keine aufgelöste.
+    http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('aufgeloeste') ? [] : einheiten),
+    ),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () =>
       HttpResponse.json([
@@ -77,6 +80,12 @@ function handlers(
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
   ];
+}
+
+/** Die Tabellenzeile einer Einheit, gefunden über ihren Namen (Link in der Einheitzelle). */
+async function zeileVon(name: string): Promise<HTMLElement> {
+  const link = await screen.findByRole('link', { name });
+  return link.closest('tr') as HTMLElement;
 }
 
 describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
@@ -276,7 +285,7 @@ describe('EinheitenPage', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 
-  it('zeigt den Einheiten-Baum mit Name und Soll/Ist', async () => {
+  it('zeigt die Gliederung als Tabelle mit Einheit, Einheitsführer, Ist, Soll, Abschnitt, Fahrzeuge', async () => {
     server.use(...handlers());
     renderMitProviders(
       <Routes>
@@ -284,10 +293,16 @@ describe('EinheitenPage', () => {
       </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
-    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
-    // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22) werden angezeigt (BOS-Doppelstrich vor Gesamt).
-    expect(screen.getByText(/1\/0\/2\/\/3/)).toBeInTheDocument();
-    expect(screen.getByText(/1\/3\/18\/\/22/)).toBeInTheDocument();
+    const gliederung = await screen.findByRole('region', { name: 'Gliederung' });
+    // antd teilt die stehende Kopfzeile in eine eigene Tabelle: die Köpfe zählen über die Region.
+    const koepfe = within(gliederung)
+      .getAllByRole('columnheader')
+      .map((k) => k.textContent);
+    expect(koepfe).toEqual(['Einheit', 'Einheitsführer', 'Ist', 'Soll', 'Abschnitt', 'Fahrzeuge']);
+    const zeile = await zeileVon('1. Zug');
+    // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22), BOS-Doppelstrich vor Gesamt.
+    expect(within(zeile).getByText('1/0/2//3')).toBeInTheDocument();
+    expect(within(zeile).getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
@@ -322,6 +337,12 @@ describe('EinheitenPage', () => {
     );
     const kopf = await screen.findByRole('button', { name: /Aufgelöst \(1\)/ });
     expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    // Unter der Tabelle, nicht in ihr (LLH-1029): die Gliederung bleibt die Vollmenge der aktiven.
+    const gliederung = screen.getByRole('region', { name: 'Gliederung' });
+    expect(gliederung).not.toContainElement(kopf);
+    expect(
+      gliederung.compareDocumentPosition(kopf) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByText(`${einheiten.length} Einheiten`)).toBeInTheDocument();
     await userEvent.click(kopf);
     const liste = await screen.findByRole('list', { name: 'Aufgelöst' });
@@ -329,45 +350,142 @@ describe('EinheitenPage', () => {
     expect(within(liste).queryByRole('button')).toBeNull();
   });
 
-  /**
-   * LFH-975: der Knoten ist ein Block aus zwei Zeilen, kein `Space`, dessen Kinder einzeln
-   * umbrechen. Ist und Soll stehen in EINER Zeile, und der Ist-Wert trägt sein Etikett.
-   */
-  it('baut den Knoten als zweizeiligen Block mit „Ist … · Soll …“ in einer Zeile', async () => {
-    server.use(...handlers());
-    renderMitProviders(
-      <Routes>
-        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
-      </Routes>,
-      { route: '/einsaetze/1/einheiten' },
-    );
-    const knoten = await screen.findByTestId('einheit-knoten-10');
-    expect(knoten.querySelector('.ant-space')).toBeNull();
-    const ist = within(knoten).getByText('1/0/2//3');
-    const zeile = ist.parentElement!;
-    expect(zeile).toHaveTextContent(/^Ist 1\/0\/2\/\/3 · Soll 1\/3\/18\/\/22$/);
-    expect(zeile).toContainElement(within(knoten).getByText('1/3/18//22'));
-    expect(zeile).not.toContainElement(within(knoten).getByRole('link', { name: '1. Zug' }));
-  });
+  describe('Zug mit Gruppe', () => {
+    const zug = {
+      ...einheiten[0],
+      abschnitt_id: 5,
+      abschnitt_name: 'Nord',
+      fuehrer_name: 'Anna Probe',
+      // Mit der Gruppe übererfüllt: kein Zeichen.
+      soll: { fuehrer: 1, unterfuehrer: 1, mannschaft: 4 },
+      ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 0 },
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 1, mannschaft: 5 },
+      fahrzeug_mitglieder: [
+        { ef_id: 70, funkrufname: 'RTW 10' },
+        { ef_id: 71, funkrufname: 'RTW 2' },
+      ],
+    };
+    const gruppe = {
+      ...einheiten[0],
+      id: 11,
+      name: 'Gruppe Deich',
+      typ_label: 'Gruppe',
+      ueber_einheit_id: 10,
+      soll: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 },
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 },
+    };
+    /** Abweichungen vorn: in `server.use` gewinnt der erste Treffer. */
+    function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+      server.use(
+        ...abweichungen,
+        http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([gruppe, zug])),
+        http.get('/api/einsaetze/1/abschnitte', () =>
+          HttpResponse.json([
+            { id: 5, einsatz_id: 1, name: 'Nord', ueber_abschnitt_id: null, sortier: 0 },
+          ]),
+        ),
+        ...handlers(),
+      );
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/einheiten' },
+      );
+    }
 
-  it('trägt das Etikett „Ist“ auch ohne Soll', async () => {
-    // Die erste passende Antwort gewinnt: die Abweichung steht vor dem Grundsatz.
-    server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
-        HttpResponse.json([{ ...einheiten[0], soll: null }]),
-      ),
-      ...handlers(),
-    );
-    renderMitProviders(
-      <Routes>
-        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
-      </Routes>,
-      { route: '/einsaetze/1/einheiten' },
-    );
-    const knoten = await screen.findByTestId('einheit-knoten-10');
-    expect(within(knoten).getByText('1/0/2//3').parentElement).toHaveTextContent(
-      /^Ist 1\/0\/2\/\/3$/,
-    );
+    it('Ist ist die KUMULIERTE Server-Zahl; die Gruppe steht eingerückt unter ihrem Zug', async () => {
+      zeige();
+      const oben = await zeileVon('1. Zug');
+      const unten = await zeileVon('Gruppe Deich');
+      // Zug: eigen 1/0/0, mit Gruppe 1/1/5 — gezeigt wird die kumulierte Zahl.
+      expect(within(oben).getByText('1/1/5//7')).toBeInTheDocument();
+      expect(within(oben).queryByText('1/0/0//1')).toBeNull();
+      // Die Gruppe folgt ihrem Zug, obwohl der Server sie zuerst liefert, und ist offen.
+      expect(oben.compareDocumentPosition(unten) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const einzug = (z: HTMLElement) =>
+        (z.querySelector('[data-lfh="datensicht-baum-zelle"]') as HTMLElement).style
+          .paddingInlineStart;
+      expect(einzug(oben)).toBe('0px');
+      expect(einzug(unten)).not.toBe('0px');
+    });
+
+    it('wartet auf die Abschnitte, statt die Folge nach dem Laden umzustellen', async () => {
+      // Die Folge hängt am Abschnittsrang: eine Tabelle vorab in Serverfolge spränge danach um.
+      zeige(
+        http.get('/api/einsaetze/1/abschnitte', async () => {
+          await delay(300);
+          return HttpResponse.json([]);
+        }),
+      );
+      await screen.findByRole('heading', { name: /^Einheiten/ });
+      expect(screen.queryByRole('region', { name: 'Gliederung' })).toBeNull();
+      expect(await screen.findByRole('region', { name: 'Gliederung' })).toBeInTheDocument();
+    });
+
+    it('scheitern die Abschnitte, steht die Gliederung trotzdem, mit Abschnitt aus der Einheit', async () => {
+      zeige(http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 403 })));
+      const unten = await zeileVon('Gruppe Deich');
+      expect(within(unten).getByText('Nord')).toBeInTheDocument();
+    });
+
+    it('die Gruppe ohne eigenen Abschnitt zeigt den geerbten', async () => {
+      zeige();
+      const unten = await zeileVon('Gruppe Deich');
+      expect(within(unten).getByText('Nord')).toBeInTheDocument();
+    });
+
+    it('„unterbesetzt“ steht als Wort in Achtung, „Soll erfüllt“ zeichnet nichts', async () => {
+      zeige();
+      const oben = await zeileVon('1. Zug');
+      const unten = await zeileVon('Gruppe Deich');
+      const marke = within(unten).getByText('unterbesetzt');
+      expect(marke.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'achtung');
+      expect(within(oben).queryByText('unterbesetzt')).toBeNull();
+      expect(screen.queryByText('Soll erfüllt')).toBeNull();
+    });
+
+    it('Einheitsführer und Fahrzeuge (Anzahl und Funkrufnamen) stehen in der Zeile', async () => {
+      zeige();
+      const oben = await zeileVon('1. Zug');
+      expect(within(oben).getByText('Anna Probe')).toBeInTheDocument();
+      const fahrzeuge = oben.querySelector('[data-lfh="einheit-fahrzeuge"]') as HTMLElement;
+      expect(fahrzeuge).toHaveTextContent(/^2 · RTW 2, RTW 10$/);
+      // Ein Funkrufname bricht nie in sich um („Musterstadt 11-|1“), nur zwischen den Namen.
+      const namen = within(fahrzeuge).getAllByText(/^RTW /);
+      expect(namen.map((n) => n.textContent)).toEqual(['RTW 2', 'RTW 10']);
+      for (const n of namen) expect(n.style.whiteSpace).toBe('nowrap');
+    });
+
+    it('die Einheitzelle ist die des Kräftebaums: Zeichen, Link auf die Einheit, Typ', async () => {
+      zeige();
+      const unten = await zeileVon('Gruppe Deich');
+      const zelle = unten.querySelector('[data-lfh="kraeftebaum-zelle"]');
+      expect(zelle).toHaveAttribute('data-art', 'einheit');
+      expect(zelle!.querySelector('[data-lfh="einheit-zeichen"]')).not.toBeNull();
+      expect(within(unten).getByRole('link', { name: 'Gruppe Deich' })).toHaveAttribute(
+        'href',
+        '/einsaetze/1/einheiten/11',
+      );
+      expect(within(unten).getByText('Gruppe')).toBeInTheDocument();
+    });
+
+    it('zeigt keine eigene Σ-Stärke: die Summe steht nur in der Verdichtungszeile', async () => {
+      zeige();
+      await zeileVon('Gruppe Deich');
+      // Σ der Zeilen wäre 1/2/10//13 (Zug kumuliert + Gruppe): eine solche Summe darf nirgends
+      // stehen, auch nicht als Fußzeile der Tabelle.
+      expect(screen.queryByText(/1\/2\/10\/\/13/)).toBeNull();
+      expect(document.querySelector('.ant-table-summary')).toBeNull();
+      // Die Stärke der Seite steht genau einmal, in der Verdichtungszeile über der Tabelle.
+      const verdichtung = await waitFor(() => {
+        const v = document.querySelector('[data-lfh="verdichtungszeile"]');
+        expect(v).not.toBeNull();
+        return v as HTMLElement;
+      });
+      expect(screen.getAllByText('Stärke')).toEqual([within(verdichtung).getByText('Stärke')]);
+    });
   });
 
   it('weist den Stand der Gliederung aus', async () => {
@@ -499,24 +617,20 @@ describe('EinheitenPage · Datenzustände', () => {
   });
 
   it('leere Gliederung: Leertext mit genau EINER Primäraktion und KEINEM Fehler', async () => {
-    const { container } = zeige(
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-    );
+    zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])));
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
     // Der Knopf zeigt den Weg; kein Satz, wie die Gliederung entsteht (LFH-1078).
     expect(screen.queryByText(/Gliederung entsteht/)).not.toBeInTheDocument();
     /**
      * Der Knopf heißt genau wie der im Seitenkopf — es ist dieselbe Handlung. Gezählt wird deshalb
-     * im Gliederungs-Paneel. „Genau eine Primäraktion" hält hier nur, weil `SeitenLeer` keine
-     * eigenen Knöpfe beisteuert.
+     * am Leerzustand selbst: er trägt genau EINEN Knopf, `SeitenLeer` steuert keine eigenen bei.
      */
-    const karte = [...container.querySelectorAll<HTMLElement>('[data-lfh="paneel"]')].find((k) =>
-      k.textContent?.includes('Noch keine Einheiten'),
-    );
-    expect(karte, 'das Gliederungs-Paneel muss den Leertext tragen').toBeTruthy();
-    expect(within(karte!).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
-    expect(within(karte!).getAllByRole('button')).toHaveLength(1);
+    const leer = screen.getByText('Noch keine Einheiten').parentElement!;
+    expect(within(leer).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
+    expect(within(leer).getAllByRole('button')).toHaveLength(1);
+    // Keine leere Tabelle daneben: der Leerzustand steht an ihrer Stelle.
+    expect(screen.queryByRole('region', { name: 'Gliederung' })).toBeNull();
   });
 
   /**

@@ -2210,6 +2210,35 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     expect(onAufgeklappt).toHaveBeenCalledTimes(1);
     expect(onAufgeklappt).toHaveBeenLastCalledWith([]);
   });
+
+  /**
+   * Schmaler Einzug unter md (LLH-1029, wie vormals die Einheiten-Gliederung, LFH-975): am Handy
+   * fräße der volle Einzug auf drei Ebenen ein Viertel der ersten Spalte. Ab md bleibt antds
+   * Vorgabe. Das Grenzpaar 767/768 pinnt die Schwelle am echten `useViewport`.
+   */
+  it.each([
+    [767, '8px'],
+    [768, '15px'],
+  ])('rückt bei %i px die zweite Ebene um %s ein', (breite, einzug) => {
+    setzeViewportBreite(breite);
+    const { container } = renderMitProviders(
+      <Datensicht<Knoten, 'stelle'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={knotenSpalten}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: ['a'], onAufgeklappt: vi.fn() }}
+        karte={{ art: 'plan', titel: { spalte: 'stelle' }, sekundaer: [] }}
+      />,
+    );
+    const zelle = (k: string) =>
+      container.querySelector(
+        `tr[data-row-key="${k}"] [data-lfh="datensicht-baum-zelle"]`,
+      ) as HTMLElement;
+    expect(zelle('a').style.paddingInlineStart).toBe('0px');
+    expect(zelle('e').style.paddingInlineStart).toBe(einzug);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────────────

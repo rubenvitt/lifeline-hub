@@ -110,6 +110,12 @@ import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleu
 
 /** Einzug je Baumebene in px: antds Vorgabe (`indentSize`), seit LFH-977 selbst gezeichnet. */
 const BAUM_EINZUG_PX = 15;
+/**
+ * Einzug je Baumebene unter md (LLH-1029, vormals die Einheiten-Gliederung, LFH-975): am Handy
+ * fräße der volle Einzug auf drei Ebenen ein Viertel der ersten Spalte. Das Aufklappsymbol behält
+ * seine Breite, es ist ein Bedienziel.
+ */
+const BAUM_EINZUG_SCHMAL_PX = 8;
 
 // ── Formachse ────────────────────────────────────────────────────────────────────────
 /**
@@ -941,7 +947,8 @@ export default function Datensicht<T extends object, const K extends string>(
   const { getPrefixCls, locale: antdLocale } = useContext(ConfigProvider.ConfigContext);
   const tabellenPraefix = getPrefixCls('table');
   const tabellenText = antdLocale?.Table;
-  const { abBreite } = useViewport();
+  const { abBreite, istSchmal } = useViewport();
+  const baumEinzug = istSchmal ? BAUM_EINZUG_SCHMAL_PX : BAUM_EINZUG_PX;
   const wurzel = useRef<HTMLElement>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
 
@@ -1633,7 +1640,7 @@ export default function Datensicht<T extends object, const K extends string>(
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: token.paddingXS,
-                    paddingInlineStart: (baumTiefe.get(schluessel(zeile)) ?? 0) * BAUM_EINZUG_PX,
+                    paddingInlineStart: (baumTiefe.get(schluessel(zeile)) ?? 0) * baumEinzug,
                   }}
                 >
                   <span
