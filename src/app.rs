@@ -1729,6 +1729,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/einheiten",
             post(routes::einsatz_einheit::bilden),
         )
+        // Statische Segmente vor `{eid}` (LLH-1049).
+        .route(
+            "/api/einsaetze/{id}/einheiten/aus-vorlage",
+            post(routes::einsatz_einheit::aus_vorlage_bilden),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
+            get(routes::einsatz_einheit::aus_vorlage_vorschau),
+        )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
             patch(routes::einsatz_einheit::aktualisieren),
