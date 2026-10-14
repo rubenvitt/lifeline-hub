@@ -321,6 +321,39 @@ async fn entfernen_schreibt_etb() {
     );
 }
 
+/// Stamm-Material außer Dienst ist ein Zustand: 422 wie bei Person und Fahrzeug (`src/AGENTS.md`,
+/// Statuscode-Konvention; bis LLH-1079 Teil II war es 400), ohne ETB-Eintrag.
+#[tokio::test]
+async fn stamm_material_ausser_dienst_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mid = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/material/{mid}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mid},"menge":1}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Material ist außer Dienst und kann nicht disponiert werden"
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 0);
+}
+
 #[tokio::test]
 async fn org_isolation_fremdes_material_nicht_disponierbar() {
     let app = setup().await;

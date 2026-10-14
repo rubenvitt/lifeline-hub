@@ -184,8 +184,8 @@ pub async fn laden_anzeige_tx(
 }
 
 /// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus und friert den
-/// Identitäts-Snapshot ein. `NotFound` bei fremdem/unbekanntem Material, `Validation` bei außer
-/// Dienst. Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
+/// Identitäts-Snapshot ein. `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity`
+/// bei außer Dienst. Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -218,8 +218,8 @@ pub async fn disponiere_stamm_tx(
 /// Identitäts-Snapshot eines Stamm-Materials: Bezeichnung, Kategorie, Bestandsnummer, Träger.
 type Snapshot = (String, Option<String>, Option<String>, Option<String>);
 
-/// Snapshot eines Stamm-Materials der Org; `NotFound` bei fremdem/unbekanntem, `Validation` bei
-/// außer Dienst.
+/// Snapshot eines Stamm-Materials der Org; `NotFound` bei fremdem/unbekanntem,
+/// `UnprocessableEntity` bei außer Dienst.
 async fn stamm_snapshot_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -244,7 +244,9 @@ async fn stamm_snapshot_tx(
     .await?
     .ok_or(AppError::NotFound)?;
     if dienststatus != DIENSTSTATUS_IN_DIENST {
-        return Err(AppError::Validation(
+        // Ein Zustand, also 422 wie bei Person und Fahrzeug (`src/AGENTS.md`,
+        // Statuscode-Konvention; bis LLH-1079 Teil II war es 400).
+        return Err(AppError::UnprocessableEntity(
             "Material ist außer Dienst und kann nicht disponiert werden".into(),
         ));
     }
@@ -633,13 +635,7 @@ pub async fn reaktivieren_tx(
     }
     if let Some(mid) = material_id {
         let (bezeichnung, kategorie, bestandsnummer, traeger) =
-            stamm_snapshot_tx(conn, org_id, mid)
-                .await
-                .map_err(|e| match e {
-                    // Ein Zustand der Stamm-Zeile, also 422 (`src/AGENTS.md`, Statuscode-Konvention).
-                    AppError::Validation(m) => AppError::UnprocessableEntity(m),
-                    e => e,
-                })?;
+            stamm_snapshot_tx(conn, org_id, mid).await?;
         sqlx::query(
             "UPDATE einsatz_material SET snap_bezeichnung = ?, snap_kategorie = ?, \
                  snap_bestandsnummer = ?, snap_traegerorganisation = ? WHERE id = ?",
@@ -765,8 +761,10 @@ mod tests {
         ));
     }
 
+    /// Außer Dienst ist ein Zustand der Stamm-Zeile, also 422 (`src/AGENTS.md`,
+    /// Statuscode-Konvention; bis LLH-1079 Teil II war es 400).
     #[tokio::test]
-    async fn disponiere_stamm_ausser_dienst_ist_validation() {
+    async fn disponiere_stamm_ausser_dienst_ist_422() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
@@ -779,7 +777,8 @@ mod tests {
             disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
                 .await
                 .unwrap_err(),
-            AppError::Validation(_)
+            AppError::UnprocessableEntity(m)
+                if m == "Material ist außer Dienst und kann nicht disponiert werden"
         ));
     }
 
