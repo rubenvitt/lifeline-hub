@@ -49,6 +49,32 @@ export function verorteEinheit(
   );
 }
 
+/**
+ * Genau EIN Feld des taktischen Zeichens einer Einheit (LLH-1036, design.md D4). Die Typen lassen
+ * keinen zweiten Schlüssel und keine Koordinate zu: `…/position` nähme auch `lat`/`lon`, und die
+ * Einheit-Ansicht verschöbe sonst nebenbei die Verortung.
+ */
+export type EinheitZeichenPatch =
+  | { tz_fachaufgabe: string | null; tz_organisation?: never }
+  | { tz_organisation: string | null; tz_fachaufgabe?: never };
+
+/**
+ * Speichert Fachaufgabe ODER Organisation des Zeichens über den Lageweg, wie Inspector und Karte:
+ * Tri-State am Server, kein Tagebuch-Eintrag, live über das Einheit-Ereignis. Der Body wird aus
+ * dem einen Schlüssel neu gebaut, damit auch ein breiteres Objekt nichts anderes mitschickt.
+ */
+export function patchEinheitZeichen(
+  einsatzId: number,
+  eid: number,
+  patch: EinheitZeichenPatch,
+): Promise<Einheit> {
+  const body: PositionPatch =
+    'tz_fachaufgabe' in patch && patch.tz_fachaufgabe !== undefined
+      ? { tz_fachaufgabe: patch.tz_fachaufgabe }
+      : { tz_organisation: patch.tz_organisation ?? null };
+  return verorteEinheit(einsatzId, eid, body);
+}
+
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten`, 'POST', daten);
 }
@@ -78,14 +104,6 @@ export function createEinheitAusVorlage(
     'POST',
     eingabe,
   );
-}
-
-export function aktualisiereEinheit(
-  einsatzId: number,
-  eid: number,
-  daten: EinheitEingabe,
-): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', daten);
 }
 
 /**

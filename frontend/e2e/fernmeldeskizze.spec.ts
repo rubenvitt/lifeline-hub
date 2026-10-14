@@ -309,8 +309,10 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     );
     await detail.goto(`/einsaetze/${einsatzId}/einheiten/${n.zug}`);
     await strom2;
-    const funk = detail.getByTestId('funk-erreichbarkeit');
-    await expect(funk).toContainText('TMO: BN_BOS');
+    // Seit LLH-1036 stehen die Sprechgruppen an ihrer Zeile im Paneel „Funk und Kommunikation“,
+    // je Betriebsart wie im Abschnittsdetail („TMO BN_BOS · DMO …“).
+    const funk = detail.getByRole('region', { name: 'Funk und Kommunikation' });
+    await expect(funk).toContainText('TMO BN_BOS');
     await expect(funk).not.toContainText('314_F*');
 
     const zug = element(page, `eh-${n.zug}`);
@@ -332,7 +334,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
 
     // Der zweite Kontext folgt ohne Neuladen.
     await expect(zeile).toContainText('314_F*');
-    await expect(funk).toContainText('DMO: 314_F*');
+    await expect(funk).toContainText('DMO 314_F*');
 
     // Strg+Z am Element: die Zuordnung ist wieder weg, überall.
     await page.mouse.move(0, 0);

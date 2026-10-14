@@ -11,8 +11,22 @@ import type { TzEinheit, TzFahrzeug } from './meldebildRaster';
  * der hellen Unterlage (LFH-1120): ohne eigene Organisation zeichnet die Bibliothek nur einen
  * schwarzen Umriss, im Nachtbetrieb sonst schwarz auf schwarz.
  * Reine Zierde, `aria-hidden`: die Bezeichnung daneben benennt die Einheit.
+ *
+ * Die Einheit-Ansicht (LLH-1036, design.md D4) zeigt dasselbe Zeichen groß im Kopf (`groesse`)
+ * und mit der Vorgabe der Organisation (`orgDefault`), wie die Lagekarte; das Meldebild ruft ohne
+ * beide und bleibt, wie es ist.
  */
-export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
+export default function EinheitZeichen({
+  tz,
+  groesse = 26,
+  orgDefault = null,
+}: {
+  tz: TzEinheit | null;
+  /** Kantenlänge des Rahmens in px; das Zeichen darin ist 4 px kleiner. */
+  groesse?: number;
+  /** Organisations-Vorgabe aus `/api/organisation`; eine eigene Organisation geht vor. */
+  orgDefault?: string | null;
+}) {
   const { rollen } = useRollen();
   return (
     <span
@@ -22,9 +36,9 @@ export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        flex: '0 0 26px',
-        width: 26,
-        height: 26,
+        flex: `0 0 ${groesse}px`,
+        width: groesse,
+        height: groesse,
         border: `1px solid ${rollen.linieStark}`,
       }}
     >
@@ -35,8 +49,9 @@ export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
             einheitTypLabel: tz.typLabel,
             fachaufgabe: tz.fachaufgabe,
             organisation: tz.organisation,
+            orgDefault,
           })}
-          size={22}
+          size={groesse - 4}
           unterlage
         />
       )}
