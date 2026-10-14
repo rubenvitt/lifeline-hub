@@ -136,6 +136,8 @@ Eine Person, ein Fahrzeug oder ein Materialposten gehört höchstens einer Einhe
 Auswahlfelder bieten nur an, was noch keiner Einheit zugeordnet ist; wer in eine andere Einheit
 wechseln soll, wird dort zuerst entfernt. Disponiert, also in den Einsatz geholt, werden Kräfte in
 den Modulen [Personal](personal.md), [Fahrzeuge und FMS](fahrzeuge.md) und [Material](material.md).
+Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
+Fahrzeug dabei aus seiner bisherigen Einheit um.
 
 ### Stärke
 

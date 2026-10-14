@@ -36,6 +36,14 @@ export const PERSONAL_ADHOC_TEXT_MAX = 200;
 export const PERSONAL_EINSATZFUNKTION_MAX = 200;
 /** Bemerkung zu einer Kraft im Einsatz (LLH-1067). */
 export const PERSONAL_BEMERKUNG_MAX = 2_000;
+/** Bezeichnung, Kategorie, Bestandsnummer und Träger eines Ad-hoc-Postens (LLH-1093). */
+export const MATERIAL_ADHOC_TEXT_MAX = 200;
+/** Bemerkung zu einem Material-Posten im Einsatz (LLH-1093). */
+export const MATERIAL_BEMERKUNG_MAX = 2_000;
+/** Funkrufname, Typ, Kennzeichen, Träger und OPTA eines Ad-hoc-Fahrzeugs (LLH-1073). */
+export const FAHRZEUG_ADHOC_TEXT_MAX = 200;
+/** Bemerkung zu einem Fahrzeug im Einsatz (LLH-1073). */
+export const FAHRZEUG_BEMERKUNG_MAX = 2_000;
 /** Bezeichnung einer Nachforderung. */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 /** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */

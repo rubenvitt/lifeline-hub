@@ -900,3 +900,122 @@ async fn stornieren_des_letzten_aktiven_bezirks_feuert_einsatz() {
     bezirk_stornieren(&app, &admin, einsatz, zweiter).await;
     assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
 }
+
+// ---------- Fahrzeug-Angaben (LLH-1073, design.md D1) ----------
+
+/// Geänderte Angaben eines Ad-hoc-Fahrzeugs melden nach dem Commit `fahrzeug`, die Einheit (sie
+/// liest den Funkrufnamen), den Bereitstellungsraum, in dem es steht, und den Kopf, wenn es die
+/// Führungsstelle trägt. Eine reine Bemerkung meldet nur `fahrzeug`, unverändert gesendete
+/// Angaben ebenso.
+#[tokio::test]
+async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(r#"{"adhoc":{"funkrufname":"Florian Extern 1"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let ef = json["id"].as_i64().unwrap();
+    let einheit = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Nord"}"#),
+    )
+    .await;
+    let br = json["id"].as_i64().unwrap();
+    for (methode, pfad, body) in [
+        (
+            "POST",
+            format!("bereitstellungsraeume/{br}/status"),
+            Some(r#"{"status":"aktiv"}"#.to_string()),
+        ),
+        (
+            "POST",
+            format!("bereitstellungsraeume/{br}/belegung"),
+            Some(format!(
+                r#"{{"objekt_typ":"fahrzeug","objekt_id":{ef},"art":"eintritt"}}"#
+            )),
+        ),
+        // Nach der Belegung: ein Fahrzeug einer Einheit tritt nicht einzeln ein.
+        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
+        (
+            "PATCH",
+            "fuehrungsstelle".to_string(),
+            Some(format!(r#"{{"fahrzeug_ids":[{ef}]}}"#)),
+        ),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            body.as_deref(),
+        )
+        .await;
+        assert!(s.is_success(), "{methode} {pfad}: {s} {json}");
+    }
+    let patch = |body: &'static str| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                Some(body),
+            )
+            .await
+            .0
+        }
+    };
+    let gesucht: &[(&str, &str)] = &[
+        ("fahrzeug", "fahrzeug_id"),
+        ("einheit", "einheit_id"),
+        ("bereitstellungsraum", "br_id"),
+        ("einsatz", "einsatz_id"),
+    ];
+    let mut rx = live.abonniere(einsatz);
+
+    assert_eq!(
+        patch(r#"{"funkrufname":"Florian Extern 2"}"#).await,
+        StatusCode::OK
+    );
+    let mut gemeldet = objekt_ereignisse(&mut rx, gesucht);
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("bereitstellungsraum".to_string(), br),
+        ("einheit".to_string(), einheit),
+        ("einsatz".to_string(), einsatz),
+        ("fahrzeug".to_string(), ef),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "geänderte Angaben");
+
+    assert_eq!(
+        patch(r#"{"bemerkung":"Pumpe defekt"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, gesucht),
+        vec![("fahrzeug".to_string(), ef)],
+        "nur Bemerkung"
+    );
+    assert_eq!(
+        patch(r#"{"funkrufname":"Florian Extern 2"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, gesucht),
+        vec![("fahrzeug".to_string(), ef)],
+        "unverändert"
+    );
+}

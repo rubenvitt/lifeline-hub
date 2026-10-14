@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse, type HttpHandler } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -229,6 +230,15 @@ describe('EinheitDetailPage · die Route selbst', () => {
     );
     expect(container.querySelector('form')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
+  it('der Name nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
+    server.use(...handlers());
+    rendere();
+    await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveValue('1. Zug');
+    expect(feld).toHaveAttribute('maxLength', String(EINHEIT_NAME_MAX));
   });
 
   it('die Paneele stehen in der Folge aus D2', async () => {

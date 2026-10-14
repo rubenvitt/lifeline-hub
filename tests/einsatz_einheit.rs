@@ -1647,3 +1647,280 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     // Disponiert, gebildet ×2, zugeordnet, aufgelöst, storniert.
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 6);
 }
+
+/// Spec `material-liste`, „Umhängen nennt die alte Einheit“ (LLH-1093, design.md D5): der
+/// ETB-Eintrag nennt beide Einheiten, beide werden live gemeldet; dieselbe Einheit noch einmal
+/// schreibt nichts; eine aufgelöste Zieleinheit ist 409.
+#[tokio::test]
+async fn material_umhaengen_nennt_die_alte_einheit() {
+    let (app, live) = common::setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = material_anlegen(&app, &admin, einsatz, "Wolldecke").await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let b = einheit_bilden(&app, &admin, einsatz, "Staffel B").await;
+    let zuordnen = |eid: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PUT",
+                &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+                &admin,
+                None,
+            )
+            .await
+        }
+    };
+    let (s, json) = zuordnen(a).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(texte
+        .iter()
+        .any(|t| t == "Einheit «Staffel A»: Material «Wolldecke» (×3) zugeordnet"));
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte.iter().any(|t| t
+            == "Einheit «Staffel B»: Material «Wolldecke» (×3) zugeordnet, vorher «Staffel A»"),
+        "{texte:?}"
+    );
+    let mut gemeldet = common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]);
+    gemeldet.sort();
+    let mut erwartet = vec![("einheit".to_string(), a), ("einheit".to_string(), b)];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "alte und neue Einheit");
+    let (_, einheiten) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let mitglieder = |eid: i64| {
+        einheiten
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == eid)
+            .unwrap()["material_mitglieder"]
+            .as_array()
+            .unwrap()
+            .len()
+    };
+    assert_eq!((mitglieder(a), mitglieder(b)), (0, 1));
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "dieselbe Einheit");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+    assert_eq!(
+        common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]),
+        vec![],
+        "dieselbe Einheit meldet nichts"
+    );
+
+    // Mit einem Mitglied bleibt die Einheit beim Auflösen als aufgelöst stehen (LLH-1079).
+    let trage = material_anlegen(&app, &admin, einsatz, "Trage").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{trage}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{a}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, json) = zuordnen(a).await;
+    assert_eq!(s, StatusCode::CONFLICT, "aufgelöste Zieleinheit: {json}");
+}
+
+// ── Fahrzeuge bearbeiten (LLH-1073 Teil I) ───────────────────────────────────────────────
+
+/// Spec `eingabegrenzen`, „Name einer Einheit ist begrenzt“: höchstens 200 Zeichen beim Bilden
+/// und beim Ändern, sonst 400, bevor etwas geschrieben wird.
+#[tokio::test]
+async fn name_ueber_der_grenze_ist_400_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let lang = "Z".repeat(201);
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"name":"{lang}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("darf höchstens 200 Zeichen lang sein"));
+    let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert!(liste.as_array().unwrap().is_empty());
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 0);
+
+    let e = einheit_bilden(&app, &admin, einsatz, &"Z".repeat(200)).await;
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{pfad}/{e}"),
+        &admin,
+        Some(&format!(r#"{{"name":"{lang}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(eintrag(&liste, e)["name"], "Z".repeat(200));
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Einheit eines Fahrzeugs in der Liste ändern“ (design.md D2): ein
+/// Wechsel A → B nennt im ETB die vorige Einheit und meldet beide Einheiten und das Fahrzeug;
+/// dieselbe Einheit noch einmal schreibt und meldet nichts.
+#[tokio::test]
+async fn fahrzeug_umhaengen_nennt_die_alte_einheit() {
+    let (app, live) = common::setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let b = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let zuordnen = |eid: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PUT",
+                &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/fahrzeug/{ef}"),
+                &admin,
+                None,
+            )
+            .await
+        }
+    };
+    let (s, json) = zuordnen(a).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Einheit «Zug 1»: Fahrzeug «83-1» zugeordnet"),
+        "{texte:?}"
+    );
+
+    let mut rx = live.abonniere(einsatz);
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Einheit «Zug 2»: Fahrzeug «83-1» zugeordnet, vorher «Zug 1»"),
+        "{texte:?}"
+    );
+    let mut gemeldet = common::objekt_ereignisse(
+        &mut rx,
+        &[("einheit", "einheit_id"), ("fahrzeug", "fahrzeug_id")],
+    );
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("einheit".to_string(), a),
+        ("einheit".to_string(), b),
+        ("fahrzeug".to_string(), ef),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "alte und neue Einheit, das Fahrzeug");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let mitglieder = |eid: i64| {
+        eintrag(&liste, eid)["fahrzeug_mitglieder"]
+            .as_array()
+            .unwrap()
+            .len()
+    };
+    assert_eq!((mitglieder(a), mitglieder(b)), (0, 1));
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "dieselbe Einheit");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+    assert_eq!(
+        common::objekt_ereignisse(
+            &mut rx,
+            &[("einheit", "einheit_id"), ("fahrzeug", "fahrzeug_id")]
+        ),
+        vec![],
+        "dieselbe Einheit meldet nichts"
+    );
+}
+
+/// Der ETB nennt den aufgelösten Funkrufnamen, nicht den Namen vom Disponieren (design.md D2):
+/// ein im Stamm umbenanntes Fahrzeug steht im Eintrag mit seinem jetzigen Namen.
+#[tokio::test]
+async fn fahrzeug_zuordnen_nennt_den_aufgeloesten_funkrufnamen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
+        Some(r#"{"funkrufname":"Florian 1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let fz = json["id"].as_i64().unwrap();
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let ef = json["id"].as_i64().unwrap();
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/fahrzeuge/{fz}"),
+        &admin,
+        Some(r#"{"funkrufname":"Florian 1/1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let zug = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, zug, ef).await;
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Einheit «Zug 1»: Fahrzeug «Florian 1/1» zugeordnet"),
+        "{texte:?}"
+    );
+}

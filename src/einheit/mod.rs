@@ -17,8 +17,8 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Höchstlänge des Einheitsnamens nach dem Trimmen (`src/AGENTS.md`, „Eingabegrenzen“), wie
-/// `einheit_vorlage::NAME_MAX`. Gilt beim Bilden aus einer Vorlage (LLH-1049); die Routen
-/// `POST/PATCH …/einheiten` bekommen die Grenze in einer eigenen Aufgabe. Spiegel:
+/// `einheit_vorlage::NAME_MAX`. Gilt beim Bilden aus einer Vorlage (LLH-1049) und in
+/// `POST/PATCH …/einheiten` (LLH-1073 design.md D8). Spiegel:
 /// `EINHEIT_NAME_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const NAME_MAX: usize = 200;
 
@@ -230,8 +230,32 @@ pub fn etb_text_fahrzeug_zugeordnet(einheit: &str, funkrufname: &str) -> String 
     )
 }
 
+/// System-ETB, wenn ein Fahrzeug von einer Einheit in eine andere wechselt (LLH-1073, design.md
+/// D2): nennt die vorige Einheit. Das erste Zuordnen schreibt [`etb_text_fahrzeug_zugeordnet`].
+pub fn etb_text_fahrzeug_umgehaengt(einheit: &str, funkrufname: &str, vorher: &str) -> String {
+    format!(
+        "{}, vorher «{vorher}»",
+        etb_text_fahrzeug_zugeordnet(einheit, funkrufname)
+    )
+}
+
+/// System-ETB, wenn Material einer Einheit zugeordnet wird; beim Umhängen nennt er die Einheit,
+/// der es vorher angehörte (LLH-1093, design.md D5).
+pub fn etb_text_material_zugeordnet(
+    einheit: &str,
+    bezeichnung: &str,
+    menge: i64,
+    vorher: Option<&str>,
+) -> String {
+    let text = format!("Einheit «{einheit}»: Material «{bezeichnung}» (×{menge}) zugeordnet");
+    match vorher {
+        Some(v) => format!("{text}, vorher «{v}»"),
+        None => text,
+    }
+}
+
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
-/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::ordne_personal_zu_tx`).
+/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::zuordnen_personal_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
 }
@@ -375,6 +399,26 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_storniert("1. Zug"),
             "Einheit «1. Zug» storniert (Fehlanlage)"
+        );
+    }
+
+    #[test]
+    fn fahrzeug_umgehaengt_nennt_die_vorherige_einheit() {
+        assert_eq!(
+            etb_text_fahrzeug_umgehaengt("Zug 2", "83-1", "Zug 1"),
+            "Einheit «Zug 2»: Fahrzeug «83-1» zugeordnet, vorher «Zug 1»"
+        );
+    }
+
+    #[test]
+    fn material_zugeordnet_nennt_die_vorherige_einheit() {
+        assert_eq!(
+            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, Some("Staffel A")),
+            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»"
+        );
+        assert_eq!(
+            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, None),
+            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet"
         );
     }
 }

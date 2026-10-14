@@ -147,7 +147,7 @@ pub async fn list_entlassene(
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden_anzeige(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     einsatz_id: i64,
     em_id: i64,
@@ -164,9 +164,9 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
+/// Wie [`load_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
 /// Transaktion beim atomaren Disponieren/Aktualisieren.
-pub async fn laden_anzeige_tx(
+pub async fn load_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
@@ -313,35 +313,97 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, daten, menge, disponiert_von).await
 }
 
-/// Aktualisiert Menge, Status und/oder Bemerkung. `menge`/`status` per COALESCE (`None` =
-/// unverändert); `bemerkung` und `uhs_id` sind Tri-State (`None` = unverändert, `Some(None)` =
-/// NULL, `Some(Some(x))` = setzen). Getrimmt wird in der Route, `status` ist bereits validiert.
-/// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
-pub async fn aktualisiere_tx(
+/// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
+/// `menge`, `status` und `bezeichnung`: `None` = unverändert. Die übrigen Felder sind Tri-State:
+/// `None` = unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen. Ein Struct statt
+/// Positionsparametern, damit eine neue Angabe keine Bindung still verschiebt.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MaterialPatch<'a> {
+    pub menge: Option<i64>,
+    /// Bereits validierter Wire-Wert aus [`MaterialStatus`].
+    pub status: Option<&'a str>,
+    pub bemerkung: Option<Option<&'a str>>,
+    /// Verortung an einer UHS (unabhängig von der Einheit); ein neuer Wert geht durch
+    /// [`crate::uhs::repo::require_verortbar_tx`] (LLH-1093, design.md D4).
+    pub uhs_id: Option<Option<i64>>,
+    /// Ad-hoc-Angaben (LLH-1093, design.md D6): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
+    /// Sie schreiben die `snap_*`-Spalten, die bei Ad-hoc-Material die Daten sind.
+    pub bezeichnung: Option<&'a str>,
+    pub kategorie: Option<Option<&'a str>>,
+    pub bestandsnummer: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+}
+
+impl MaterialPatch<'_> {
+    /// Ändert der Patch eine Angabe, die bei einem Stamm-Posten der Stamm trägt?
+    pub fn has_adhoc_angaben(&self) -> bool {
+        self.bezeichnung.is_some()
+            || self.kategorie.is_some()
+            || self.bestandsnummer.is_some()
+            || self.traegerorganisation.is_some()
+    }
+}
+
+/// Der 422 an einem Stamm-Posten, dessen Bezeichnung, Kategorie, Bestandsnummer oder Träger über
+/// den Einsatz geändert werden soll (LLH-1093, design.md D6).
+pub fn stamm_angaben_error() -> AppError {
+    AppError::UnprocessableEntity("Angaben eines Stamm-Postens im Stamm pflegen".into())
+}
+
+/// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
+/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
+/// Ad-hoc-Angaben an einem Stamm-Posten; die UHS-Prüfung (404/422) läuft nur bei geändertem
+/// Wert. Jede Ablehnung schreibt nichts.
+pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
-    menge: Option<i64>,
-    status: Option<&str>,
-    bemerkung: Option<Option<&str>>,
-    uhs_id: Option<Option<i64>>,
+    patch: MaterialPatch<'_>,
 ) -> Result<(), AppError> {
     // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    let (material_id, uhs_id): (Option<i64>, Option<i64>) = sqlx::query_as(
+        "SELECT material_id, uhs_id FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if patch.has_adhoc_angaben() && material_id.is_some() {
+        return Err(stamm_angaben_error());
+    }
+    // Nur ein neues Ziel wird geprüft: Lösen und ein unveränderter Wert gehen immer, auch an
+    // einer inzwischen aufgelösten UHS (design.md D4).
+    if let Some(Some(ziel)) = patch.uhs_id {
+        if Some(ziel) != uhs_id {
+            crate::uhs::repo::require_verortbar_tx(conn, einsatz_id, ziel).await?;
+        }
+    }
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
-         SET menge = COALESCE(?1, menge), \
-             status = COALESCE(?2, status), \
-             bemerkung = CASE WHEN ?3 IS NULL THEN bemerkung ELSE ?4 END, \
-             uhs_id = CASE WHEN ?5 IS NULL THEN uhs_id ELSE ?6 END \
-         WHERE id = ?7 AND einsatz_id = ?8",
+         SET menge = COALESCE(?, menge), \
+             status = COALESCE(?, status), \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
+             uhs_id = CASE WHEN ? THEN ? ELSE uhs_id END, \
+             snap_bezeichnung = COALESCE(?, snap_bezeichnung), \
+             snap_kategorie = CASE WHEN ? THEN ? ELSE snap_kategorie END, \
+             snap_bestandsnummer = CASE WHEN ? THEN ? ELSE snap_bestandsnummer END, \
+             snap_traegerorganisation = CASE WHEN ? THEN ? ELSE snap_traegerorganisation END \
+         WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(menge)
-    .bind(status)
-    .bind(bemerkung.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
-    .bind(bemerkung.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
-    .bind(uhs_id.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
-    .bind(uhs_id.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
+    .bind(patch.menge)
+    .bind(patch.status)
+    .bind(patch.bemerkung.is_some())
+    .bind(patch.bemerkung.flatten())
+    .bind(patch.uhs_id.is_some())
+    .bind(patch.uhs_id.flatten())
+    .bind(patch.bezeichnung)
+    .bind(patch.kategorie.is_some())
+    .bind(patch.kategorie.flatten())
+    .bind(patch.bestandsnummer.is_some())
+    .bind(patch.bestandsnummer.flatten())
+    .bind(patch.traegerorganisation.is_some())
+    .bind(patch.traegerorganisation.flatten())
     .bind(em_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -352,21 +414,66 @@ pub async fn aktualisiere_tx(
     Ok(())
 }
 
-/// Pool-Wrapper um [`aktualisiere_tx`].
-pub async fn aktualisiere(
+/// Pool-Hülle um [`update_tx`] ohne eigene Transaktion.
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     em_id: i64,
-    menge: Option<i64>,
-    status: Option<&str>,
-    bemerkung: Option<Option<&str>>,
-    uhs_id: Option<Option<i64>>,
+    patch: MaterialPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    aktualisiere_tx(
-        &mut conn, einsatz_id, em_id, menge, status, bemerkung, uhs_id,
+    update_tx(&mut conn, einsatz_id, em_id, patch).await
+}
+
+/// Teilt `menge` von einem Posten ab (LLH-1093, design.md D8): die Ausgangszeile wird um `menge`
+/// gemindert, und in derselben Transaktion entsteht eine neue Zeile mit `menge`, die Stammbezug,
+/// alle `snap_*`, Status, Bemerkung, Einheit, UHS und den Dispositionszeitpunkt samt
+/// Dispositionsperson übernimmt; so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
+/// und auch eine frühere Herausnahme (`zuletzt_entlassen_at`, Migration 0195) sperrt den Storno
+/// der Teilzeile wie den der Ausgangszeile. Die neue Zeile ist aktiv. `NotFound`/`Conflict` wie
+/// [`require_aktiv_tx`], `UnprocessableEntity`, wenn `menge` nicht kleiner als die Menge ist.
+/// `menge` ≥ 1 prüft die Route (400). Liefert die ID der neuen Zeile.
+pub async fn teile_auf_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    menge: i64,
+) -> Result<i64, AppError> {
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    let ausgang: i64 =
+        sqlx::query_scalar("SELECT menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
+            .bind(em_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if menge >= ausgang {
+        return Err(AppError::UnprocessableEntity(
+            "Abzuteilende Menge muss kleiner als die Menge sein".into(),
+        ));
+    }
+    let neu: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_material \
+            (einsatz_id, material_id, einheit_id, uhs_id, menge, status, snap_bezeichnung, \
+             snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
+             disponiert_at, disponiert_von, zuletzt_entlassen_at) \
+         SELECT einsatz_id, material_id, einheit_id, uhs_id, ?, status, snap_bezeichnung, \
+                snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
+                disponiert_at, disponiert_von, zuletzt_entlassen_at \
+         FROM einsatz_material WHERE id = ? AND einsatz_id = ? \
+         RETURNING id",
     )
-    .await
+    .bind(menge)
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    sqlx::query("UPDATE einsatz_material SET menge = menge - ? WHERE id = ? AND einsatz_id = ?")
+        .bind(menge)
+        .bind(em_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(neu)
 }
 
 /// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
@@ -711,7 +818,7 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.bezeichnung, "Wolldecke");
         assert_eq!(a.menge, 50);
         assert_eq!(a.status, MaterialStatus::Einsatzbereit);
@@ -800,7 +907,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.ist_adhoc && a.material_id.is_none());
         assert_eq!(a.menge, 100);
         assert_eq!(a.traegerorganisation.as_deref(), Some("THW"));
@@ -817,41 +924,43 @@ mod tests {
             .await
             .unwrap();
 
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             em,
-            Some(30),
-            Some(MaterialStatus::Defekt.as_str()),
-            Some(Some("nass")),
-            None,
+            MaterialPatch {
+                menge: Some(30),
+                status: Some(MaterialStatus::Defekt.as_str()),
+                bemerkung: Some(Some("nass")),
+                ..MaterialPatch::default()
+            },
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.menge, 30);
         assert_eq!(a.status, MaterialStatus::Defekt);
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
         // Nur Status ändern (menge/bemerkung None -> bleiben).
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             em,
-            None,
-            Some(MaterialStatus::Verbraucht.as_str()),
-            None,
-            None,
+            MaterialPatch {
+                status: Some(MaterialStatus::Verbraucht.as_str()),
+                ..MaterialPatch::default()
+            },
         )
         .await
         .unwrap();
-        let b = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(b.menge, 30, "Menge unveraendert");
         assert_eq!(b.status, MaterialStatus::Verbraucht);
 
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         // Die Zeile bleibt mit Menge und Status (LLH-1079), fehlt aber in der Liste.
-        let c = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let c = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
         assert_eq!((c.menge, c.status), (30, MaterialStatus::Verbraucht));
         assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
@@ -860,9 +969,17 @@ mod tests {
             1
         );
         assert!(matches!(
-            aktualisiere(&pool, einsatz, em, Some(1), None, None, None)
-                .await
-                .unwrap_err(),
+            update(
+                &pool,
+                einsatz,
+                em,
+                MaterialPatch {
+                    menge: Some(1),
+                    ..MaterialPatch::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
         assert!(matches!(
@@ -892,24 +1009,211 @@ mod tests {
         .await
         .unwrap();
         // Zuordnen:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
-            .await
-            .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(Some(u)),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.uhs_id, Some(u));
         // Lösen (explizit NULL):
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(None))
-            .await
-            .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(None),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.uhs_id.is_none());
         // liste_je_uhs:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                uhs_id: Some(Some(u)),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].id, em);
+    }
+
+    /// LLH-1093, design.md D6: jede Ad-hoc-Angabe landet in ihrer eigenen `snap_*`-Spalte (die
+    /// Bindungsfalle: eine verschobene Bindung schriebe ein Feld in das Nachbarfeld), und die
+    /// übrigen bleiben stehen.
+    #[tokio::test]
+    async fn adhoc_angaben_je_feld_in_der_eigenen_spalte() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let em = disponiere_adhoc(
+            &pool,
+            einsatz,
+            AdhocDaten {
+                bezeichnung: "Feldbeten",
+                kategorie: Some("K"),
+                bestandsnummer: Some("B"),
+                traegerorganisation: Some("T"),
+            },
+            4,
+            benutzer,
+        )
+        .await
+        .unwrap();
+        let load = |pool: SqlitePool| async move {
+            let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+            (
+                a.bezeichnung,
+                a.kategorie,
+                a.bestandsnummer,
+                a.traegerorganisation,
+                a.menge,
+            )
+        };
+        let s = |v: &str| Some(v.to_string());
+
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                bezeichnung: Some("Feldbetten"),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load(pool.clone()).await,
+            ("Feldbetten".into(), s("K"), s("B"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                kategorie: Some(Some("Betreuung")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                bestandsnummer: Some(Some("B-7")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                traegerorganisation: Some(Some("THW")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("THW"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                kategorie: Some(None),
+                bestandsnummer: Some(None),
+                traegerorganisation: Some(None),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load(pool.clone()).await,
+            ("Feldbetten".into(), None, None, None, 4)
+        );
+    }
+
+    /// LLH-1093, design.md D6: an einem Stamm-Posten ist jede Ad-hoc-Angabe 422, und nichts aus
+    /// dem Patch ist geschrieben, auch nicht Menge, Status oder Bemerkung.
+    #[tokio::test]
+    async fn stamm_posten_lehnt_adhoc_angaben_ab_ohne_zu_schreiben() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        let rest = MaterialPatch {
+            menge: Some(3),
+            status: Some("defekt"),
+            bemerkung: Some(Some("nass")),
+            ..MaterialPatch::default()
+        };
+        for patch in [
+            MaterialPatch {
+                bezeichnung: Some("Decke"),
+                ..rest
+            },
+            MaterialPatch {
+                kategorie: Some(None),
+                ..rest
+            },
+            MaterialPatch {
+                bestandsnummer: Some(Some("B")),
+                ..rest
+            },
+            MaterialPatch {
+                traegerorganisation: Some(Some("THW")),
+                ..rest
+            },
+        ] {
+            assert!(matches!(
+                update(&pool, einsatz, em, patch).await.unwrap_err(),
+                AppError::UnprocessableEntity(m) if m == "Angaben eines Stamm-Postens im Stamm pflegen"
+            ));
+        }
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(
+            (a.menge, a.status, a.bemerkung),
+            (50, MaterialStatus::Einsatzbereit, None)
+        );
+        assert_eq!(a.kategorie.as_deref(), Some("Betreuung"));
+        // Ohne Angaben geht derselbe Rest durch.
+        update(&pool, einsatz, em, rest).await.unwrap();
     }
 
     #[tokio::test]
@@ -929,19 +1233,19 @@ mod tests {
             .unwrap();
 
         // Aktiver Einsatz + in Dienst -> Live (neuer Name); menge/status aus der Zeile.
-        let live = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let live = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(live.bezeichnung, "Wolldecke NEU");
         assert_eq!(live.menge, 50);
 
         // Abgeschlossener Einsatz (einsatz_aktiv=false) -> Snapshot (alter Name).
-        let snap = laden_anzeige(&pool, einsatz, em, false).await.unwrap();
+        let snap = load_anzeige(&pool, einsatz, em, false).await.unwrap();
         assert_eq!(snap.bezeichnung, "Wolldecke");
 
         // Stamm außer Dienst -> auch bei aktivem Einsatz Snapshot.
         mat_repo::setze_dienststatus(&pool, 1, m.id, false)
             .await
             .unwrap();
-        let nach_ad = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let nach_ad = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(
             nach_ad.bezeichnung, "Wolldecke",
             "ausser Dienst -> Snapshot trotz aktivem Einsatz"
@@ -998,7 +1302,7 @@ mod tests {
             assert!(!marke(em_adhoc), "einsatz_aktiv={einsatz_aktiv}");
         }
         assert!(
-            laden_anzeige(&pool, einsatz, em_demo, true)
+            load_anzeige(&pool, einsatz, em_demo, true)
                 .await
                 .unwrap()
                 .ist_demo
@@ -1006,6 +1310,181 @@ mod tests {
     }
 
     // ── Lebenszustand (LLH-1079 Teil II) ──────────────────────────────────────────────
+
+    async fn teile(pool: &SqlitePool, einsatz: i64, em: i64, menge: i64) -> Result<i64, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let neu = teile_auf_tx(&mut tx, einsatz, em, menge).await?;
+        tx.commit().await.unwrap();
+        Ok(neu)
+    }
+
+    /// LLH-1093, design.md D8: Summe gleich, alle Angaben, Ort und Dispositionszeitpunkt
+    /// übernommen, die Teilzeile aktiv.
+    #[tokio::test]
+    async fn aufteilen_haelt_die_summe_und_uebernimmt_alles() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let u: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_material SET einheit_id = ?, uhs_id = ?, status = 'im_einsatz', \
+             bemerkung = 'Regal 2', disponiert_at = '2026-10-14 08:00:00' WHERE id = ?",
+        )
+        .bind(einheit)
+        .bind(u)
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let neu = teile(&pool, einsatz, em, 20).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, neu, true).await.unwrap();
+        assert_ne!(neu, em);
+        assert_eq!((a.menge, b.menge), (30, 20), "Summe gleich");
+        assert_eq!(b.material_id, Some(m.id));
+        assert_eq!(
+            (b.einheit_id, b.uhs_id, b.status, b.bemerkung.as_deref()),
+            (
+                Some(einheit),
+                Some(u),
+                MaterialStatus::ImEinsatz,
+                Some("Regal 2")
+            )
+        );
+        assert_eq!(
+            (b.bezeichnung.as_str(), b.kategorie.as_deref()),
+            ("Wolldecke", Some("Betreuung"))
+        );
+        assert_eq!(
+            b.disponiert_at, "2026-10-14 08:00:00",
+            "Dispositionszeitpunkt übernommen"
+        );
+        assert_eq!(b.disponiert_von, Some(benutzer));
+        assert_eq!(b.beendet_at, None, "die Teilzeile ist aktiv");
+        let snap: (String, Option<String>) = sqlx::query_as(
+            "SELECT snap_bezeichnung, snap_kategorie FROM einsatz_material WHERE id = ?",
+        )
+        .bind(neu)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(snap, ("Wolldecke".into(), Some("Betreuung".into())));
+        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 2);
+        assert_eq!(
+            liste_je_uhs(&pool, einsatz, u, true).await.unwrap().len(),
+            2
+        );
+    }
+
+    /// LLH-1093, design.md D8: eine Menge ab der Ausgangsmenge ist 422 (deckt Menge 1 ab),
+    /// beendetes Material 409, eine fremde Zeile 404; jeweils ohne zu schreiben.
+    #[tokio::test]
+    async fn aufteilen_grenzen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Trage"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
+            .await
+            .unwrap();
+        for menge in [3, 4] {
+            assert_eq!(
+                grund(teile(&pool, einsatz, em, menge).await.unwrap_err()),
+                "Abzuteilende Menge muss kleiner als die Menge sein"
+            );
+        }
+        let eins = disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+            .await
+            .unwrap();
+        assert!(matches!(
+            teile(&pool, einsatz, eins, 1).await.unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        assert!(matches!(
+            teile(&pool, einsatz + 1, em, 1).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        assert!(matches!(
+            teile(&pool, einsatz, em, 1).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        let gesamt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_material")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(gesamt, 2, "nichts angelegt");
+        assert_eq!(
+            load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
+            3
+        );
+    }
+
+    /// LLH-1093 Aufgabe 4.4 (LLH-1079 D3): die Teilzeile hat die Storno-Frist der Ausgangszeile.
+    /// Frisch disponiert lässt sie sich stornieren; ist die Frist der Ausgangszeile abgelaufen
+    /// oder war sie schon einmal herausgenommen, nicht.
+    #[tokio::test]
+    async fn teilzeile_erbt_die_storno_frist() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Decke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 10, benutzer)
+            .await
+            .unwrap();
+        let frisch = teile(&pool, einsatz, em, 2).await.unwrap();
+        storniere(&pool, einsatz, frisch).await.unwrap();
+
+        sqlx::query(
+            "UPDATE einsatz_material SET disponiert_at = datetime('now', '-20 minutes') WHERE id = ?",
+        )
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let spaet = teile(&pool, einsatz, em, 2).await.unwrap();
+        assert!(grund(storniere(&pool, einsatz, spaet).await.unwrap_err())
+            .contains("nur in den ersten 15 Minuten nach der Disposition"));
+
+        // Herausgenommen und erneut disponiert: die Sperre geht mit (Migration 0195).
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+            .await
+            .unwrap();
+        drop(conn);
+        let nach_herausnahme = teile(&pool, einsatz, em, 1).await.unwrap();
+        assert!(grund(
+            storniere(&pool, einsatz, nach_herausnahme)
+                .await
+                .unwrap_err()
+        )
+        .starts_with("Das Material war schon einmal aus dem Einsatz genommen"));
+    }
 
     async fn nimm_heraus(
         pool: &SqlitePool,
@@ -1075,7 +1554,7 @@ mod tests {
         let e = nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         assert_eq!(e.einheit, Some((einheit, "1. Zug".to_string())));
         assert_eq!(e.uhs_id, Some(u));
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!((a.einheit_id, a.uhs_id), (None, None));
         assert!(liste_je_uhs(&pool, einsatz, u, true)
             .await
@@ -1152,9 +1631,17 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
             .await
             .unwrap();
-        aktualisiere(&pool, einsatz, em, None, Some("defekt"), None, None)
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                status: Some("defekt"),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         let mut conn = pool.acquire().await.unwrap();
         reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
@@ -1167,7 +1654,7 @@ mod tests {
             AppError::Conflict(_)
         ));
         drop(conn);
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.beendet_at, None);
         assert_eq!((a.menge, a.status), (3, MaterialStatus::Defekt));
         assert!(grund(storniere(&pool, einsatz, em).await.unwrap_err())

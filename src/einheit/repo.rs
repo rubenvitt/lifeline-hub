@@ -1809,7 +1809,7 @@ mod tests {
             AppError::Validation(_)
         ));
         // Nach Zuordnung erlaubt.
-        mitglied_repo::ordne_personal_zu(&pool, einsatz, e.id, chef)
+        mitglied_repo::zuordnen_personal(&pool, einsatz, e.id, chef)
             .await
             .unwrap();
         setze_fuehrer(&pool, einsatz, e.id, Some(chef))
@@ -1859,7 +1859,7 @@ mod tests {
         // je Ebene ein Mannschafter.
         for (einheit, name) in [(zug.id, "Z"), (gruppe.id, "G"), (trupp.id, "T")] {
             let ep = ad_hoc_person(&pool, einsatz, name, "mannschaft").await;
-            mitglied_repo::ordne_personal_zu(&pool, einsatz, einheit, ep)
+            mitglied_repo::zuordnen_personal(&pool, einsatz, einheit, ep)
                 .await
                 .unwrap();
         }
@@ -1900,7 +1900,7 @@ mod tests {
         .await
         .unwrap();
         let ep = ad_hoc_person(&pool, einsatz, "Mann", "mannschaft").await;
-        mitglied_repo::ordne_personal_zu(&pool, einsatz, gruppe.id, ep)
+        mitglied_repo::zuordnen_personal(&pool, einsatz, gruppe.id, ep)
             .await
             .unwrap();
 
@@ -2240,7 +2240,7 @@ mod tests {
         .unwrap();
         for einheit in [a.id, c_.id, d.id] {
             let ep = ad_hoc_person(&pool, einsatz, "M", "mannschaft").await;
-            mitglied_repo::ordne_personal_zu(&pool, einsatz, einheit, ep)
+            mitglied_repo::zuordnen_personal(&pool, einsatz, einheit, ep)
                 .await
                 .unwrap();
         }
@@ -2293,24 +2293,24 @@ mod tests {
             ("M2", "mannschaft"),
         ] {
             let ep = ad_hoc_person(&pool, einsatz, name, pos).await;
-            mitglied_repo::ordne_personal_zu(&pool, einsatz, zug.id, ep)
+            mitglied_repo::zuordnen_personal(&pool, einsatz, zug.id, ep)
                 .await
                 .unwrap();
         }
         let ep_gruppe = ad_hoc_person(&pool, einsatz, "G1", "unterfuehrer").await;
-        mitglied_repo::ordne_personal_zu(&pool, einsatz, gruppe.id, ep_gruppe)
+        mitglied_repo::zuordnen_personal(&pool, einsatz, gruppe.id, ep_gruppe)
             .await
             .unwrap();
         let ef: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
-        mitglied_repo::ordne_fahrzeug_zu(&pool, einsatz, zug.id, ef)
+        mitglied_repo::zuordnen_fahrzeug(&pool, einsatz, zug.id, ef)
             .await
             .unwrap();
         let em: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
-        mitglied_repo::ordne_material_zu(&pool, einsatz, zug.id, em)
+        mitglied_repo::zuordnen_material(&pool, einsatz, zug.id, em)
             .await
             .unwrap();
         let kat = crate::sprechgruppe::repo::anlegen_katalog(

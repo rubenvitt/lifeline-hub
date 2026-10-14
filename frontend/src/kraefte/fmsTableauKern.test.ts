@@ -34,8 +34,20 @@ function fzg(id: number, funkrufname: string, einheit_id: number | null, status_
   } as unknown as EinsatzFahrzeug;
 }
 
-function einheit(id: number, name: string, abschnitt_id: number | null, abschnitt_name?: string) {
-  return { id, name, abschnitt_id, abschnitt_name: abschnitt_name ?? null } as unknown as Einheit;
+function einheit(
+  id: number,
+  name: string,
+  abschnitt_id: number | null,
+  abschnitt_name?: string,
+  ueber_einheit_id: number | null = null,
+) {
+  return {
+    id,
+    name,
+    abschnitt_id,
+    abschnitt_name: abschnitt_name ?? null,
+    ueber_einheit_id,
+  } as unknown as Einheit;
 }
 
 describe('zifferZuordnung (LFH-642)', () => {
@@ -159,5 +171,28 @@ describe('baueFmsTableau (LFH-642)', () => {
     const folge = (g: ReturnType<typeof baueFmsTableau>) =>
       g.flatMap((x) => x.kacheln.map((k) => k.ef.id));
     expect(folge(nachher)).toEqual(folge(vorher));
+  });
+
+  describe('Abschnitt der Einheit (LLH-1073, design.md D4)', () => {
+    it('Gruppe ohne eigenen Abschnitt unter einem Zug steht im Abschnitt des Zugs', () => {
+      const gruppen = baueFmsTableau(
+        [fzg(1, 'Zug-ELW', 1), fzg(2, 'Gruppen-LF', 2)],
+        [einheit(1, 'Zug 1', 10, 'EA Nord'), einheit(2, 'Gruppe 1', null, undefined, 1)],
+      );
+      expect(gruppen.map((g) => [g.titel, g.kacheln.map((k) => k.ef.funkrufname)])).toEqual([
+        ['EA Nord', ['Gruppen-LF', 'Zug-ELW']],
+      ]);
+    });
+
+    it('eigener Abschnitt der Untereinheit schlägt den des Zugs', () => {
+      const gruppen = baueFmsTableau(
+        [fzg(1, 'Zug-ELW', 1), fzg(2, 'Gruppen-LF', 2)],
+        [einheit(1, 'Zug 1', 10, 'EA Nord'), einheit(2, 'Gruppe 1', 20, 'EA Süd', 1)],
+      );
+      expect(gruppen.map((g) => [g.titel, g.kacheln.map((k) => k.ef.funkrufname)])).toEqual([
+        ['EA Nord', ['Zug-ELW']],
+        ['EA Süd', ['Gruppen-LF']],
+      ]);
+    });
   });
 });

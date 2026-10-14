@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Input } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { EINHEIT_NAME_MAX } from '../../api/eingabegrenzen';
 import type { EinheitPatch } from '../../api/einheiten';
 import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { leerZuNull } from '../../api/patchTriState';
@@ -173,7 +174,12 @@ export default function EinheitKopf({
                 pflicht
                 onSpeichern={(w) => onPatch('Name', { name: w.trim() })}
                 eingabe={({ feld, value, onChange }) => (
-                  <Input {...feld} value={value} onChange={(ev) => onChange(ev.target.value)} />
+                  <Input
+                    {...feld}
+                    maxLength={EINHEIT_NAME_MAX}
+                    value={value}
+                    onChange={(ev) => onChange(ev.target.value)}
+                  />
                 )}
               />
             </Datenfeld>
