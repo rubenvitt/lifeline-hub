@@ -5,7 +5,7 @@
  *
  * Reine SVG-Inhalte: jeder Baustein ist eine `<g>`, die in ein `<svg>` mit Benutzerkoordinaten
  * gesetzt wird; die Lage kommt über Props. Kein DOM-Messen: Die Breite des Bedingungszeichens
- * misst das Paket an den Metriken seiner Schrift (Arimo 500), sonstige Texte schätzt
+ * misst das Paket an den Metriken seiner Schrift (Einsatzzeichen Sans 500), sonstige Texte schätzt
  * `schaetzeTextbreite` (Monoschrift, feste Zeichenbreite) — Layout und Bild rechnen so dieselbe
  * Zahl.
  *
@@ -23,6 +23,7 @@
 import {
   SKETCH_BUS_BAR_MARGIN_MM,
   SKETCH_CONDITION_SIGN_HEIGHT_MM,
+  TEXT_FONT_FAMILY_ATTR,
   busBar,
   busBarMinLength,
   commsArea,
@@ -86,10 +87,13 @@ export const BESCHRIFTUNG_SCHRIFT = 10;
 export const GRUND = 'var(--lfh-skizze-grund, var(--lfh-flaeche))';
 const SCHRIFT_TEXT: CSSProperties = { fontFamily: 'var(--lfh-schrift-text)' };
 /**
- * Schrift der Paketzeichen: Arimo, an deren Metriken das Paket Breiten misst (`theme/schriften.ts`
- * bindet den Schnitt 500 aus `@einsatzzeichen/core/fonts` ein).
+ * Schrift der Paketzeichen: Einsatzzeichen Sans (`TEXT_FONT_FAMILY_ATTR`), an deren Metriken das
+ * Paket Breiten misst (`theme/schriften.ts` bindet den Schnitt 500 aus `@einsatzzeichen/core/fonts`
+ * ein).
  */
-const SCHRIFT_ZEICHEN: CSSProperties = { fontFamily: "'Arimo', var(--lfh-schrift-text)" };
+const SCHRIFT_ZEICHEN: CSSProperties = {
+  fontFamily: `'${TEXT_FONT_FAMILY_ATTR}', var(--lfh-schrift-text)`,
+};
 
 // ── Wortlaute ──────────────────────────────────────────────────────────────────────────────
 

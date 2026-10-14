@@ -22,17 +22,17 @@ importers:
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@einsatzzeichen/core':
-        specifier: 5.2.0
-        version: 5.2.0
+        specifier: 6.1.0
+        version: 6.1.0
       '@einsatzzeichen/maplibre':
-        specifier: 5.2.0
-        version: 5.2.0
+        specifier: 6.1.0
+        version: 6.1.0
       '@einsatzzeichen/react':
-        specifier: 5.2.0
-        version: 5.2.0(react@19.3.0)
+        specifier: 6.1.0
+        version: 6.1.0(react@19.3.0)
       '@einsatzzeichen/schema':
-        specifier: 5.2.0
-        version: 5.2.0
+        specifier: 6.1.0
+        version: 6.1.0
       '@simplewebauthn/browser':
         specifier: 14.0.0
         version: 14.0.0
@@ -805,19 +805,19 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
 
-  '@einsatzzeichen/core@5.2.0':
-    resolution: {integrity: sha512-6Tgx+TN5WSrayt5XfpQugVyN0ttAjeBmfH2HKPUPtv6Rnvm+CVvL+VVEgu6oGNQAsaEVIUDqDiZfmATIJwsQRw==}
+  '@einsatzzeichen/core@6.1.0':
+    resolution: {integrity: sha512-KGQK9zvpZjZyDBYCI6UDDi6Xljdhvyw6AfQr4VY+yTdl1jvSgHCoXppdJ12HOPqHgBC6auA4Gdjwh1lSAy1RyA==}
 
-  '@einsatzzeichen/maplibre@5.2.0':
-    resolution: {integrity: sha512-Vqjc+lPJgJwOraO3bxWfKVxDdKj9JwrXBinnjIuRKnb/Vsd4GzUO18HcP15mVTp0SzQun0/qhmI74OzYTgNqKQ==}
+  '@einsatzzeichen/maplibre@6.1.0':
+    resolution: {integrity: sha512-P4nT3pegCjV1asSvvdY8A2edTanyvzMeeSF0l76BRTcO/ItBDS8hA3Ilbtn0XKurgqU/hEyiK5wKots03n3K9A==}
 
-  '@einsatzzeichen/react@5.2.0':
-    resolution: {integrity: sha512-Clic6b7QHAJRxHBLjl3uUfe+Ksj1cXwiDWr4d5wyGhYIzUhJHjJSfhMYMq5kMVssEfAVoZO3nfwpBKCZaVTaCQ==}
+  '@einsatzzeichen/react@6.1.0':
+    resolution: {integrity: sha512-7FgIqFzSQkOHozVtk9vdklhHacPtP+c7tm4zEh1k7t7sHxVHXn68eFWt4djat/lUkg/9vhmIDBISKLKXtcslmQ==}
     peerDependencies:
       react: '>=18'
 
-  '@einsatzzeichen/schema@5.2.0':
-    resolution: {integrity: sha512-NIDSyrA+u2xZfm2D4sw18Rbzl3WKFlFrS4iTwA+rKs5clQvNFXB06uRCXauMeeQSQgf2w20XUjfxoJwdD0ZxHg==}
+  '@einsatzzeichen/schema@6.1.0':
+    resolution: {integrity: sha512-OcOe6O27ncbOAk9K/s9+ZLaEYGuVCHbNTkHEUHr2vse8JpFYJZmOoEXCJ96vKdsEwLhRfoFaPGbt5r2ZIQag2A==}
 
   '@emotion/hash@0.8.0':
     resolution: {integrity: sha512-kBJtf7PH6aWwZ6fka3zQ0p6SBYzx4fl1LoZXE2RrnYST9Xljm7WfKJrU4g/Xr3Beg72MLrp1AWNUmuYJTL7Cow==}
@@ -4958,22 +4958,22 @@ snapshots:
       react: 19.3.0
       tslib: 2.8.1
 
-  '@einsatzzeichen/core@5.2.0':
+  '@einsatzzeichen/core@6.1.0':
     dependencies:
-      '@einsatzzeichen/schema': 5.2.0
+      '@einsatzzeichen/schema': 6.1.0
 
-  '@einsatzzeichen/maplibre@5.2.0':
+  '@einsatzzeichen/maplibre@6.1.0':
     dependencies:
-      '@einsatzzeichen/core': 5.2.0
-      '@einsatzzeichen/schema': 5.2.0
+      '@einsatzzeichen/core': 6.1.0
+      '@einsatzzeichen/schema': 6.1.0
 
-  '@einsatzzeichen/react@5.2.0(react@19.3.0)':
+  '@einsatzzeichen/react@6.1.0(react@19.3.0)':
     dependencies:
-      '@einsatzzeichen/core': 5.2.0
-      '@einsatzzeichen/schema': 5.2.0
+      '@einsatzzeichen/core': 6.1.0
+      '@einsatzzeichen/schema': 6.1.0
       react: 19.3.0
 
-  '@einsatzzeichen/schema@5.2.0': {}
+  '@einsatzzeichen/schema@6.1.0': {}
 
   '@emotion/hash@0.8.0': {}
 

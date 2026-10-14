@@ -8,12 +8,12 @@ Alle Familien stehen unter der **SIL Open Font License 1.1**. Der Lizenztext lie
 unter `lizenzen/` und muss bei jeder Weitergabe der Schriftdateien mitgehen — das verlangt die
 OFL ausdrücklich; eine nackte `.woff2` im Repo erfüllt die Bedingung nicht.
 
-| Rolle                                        | Familie        | Dateien                                              | Herkunft                  | Lizenz                            |
-| -------------------------------------------- | -------------- | ---------------------------------------------------- | ------------------------- | --------------------------------- |
-| **Text** — Fließtext, Formulare, Listen      | Archivo        | `archivo-{400,500,600,700}.woff2`                    | Omnibus-Type              | `lizenzen/OFL-Archivo.txt`        |
-| **Display** — Köpfe, Sektionsmarken          | Archivo Narrow | `archivo-narrow-600.woff2`                           | Omnibus-Type              | `lizenzen/OFL-Archivo-Narrow.txt` |
-| **Zahl** — Stärke, DTG, Koordinaten, Nummern | JetBrains Mono | `jetbrains-mono-{400,500,600}.woff2`                 | JetBrains s.r.o.          | `lizenzen/OFL-JetBrains-Mono.txt` |
-| **Zeichen** — Text in taktischen Zeichen     | Arimo          | `@einsatzzeichen/core/fonts/text-medium.woff2` (500) | The Arimo Project Authors | `lizenzen/OFL-Arimo.txt`          |
+| Rolle                                        | Familie             | Dateien                                              | Herkunft                  | Lizenz                                 |
+| -------------------------------------------- | ------------------- | ---------------------------------------------------- | ------------------------- | -------------------------------------- |
+| **Text** — Fließtext, Formulare, Listen      | Archivo             | `archivo-{400,500,600,700}.woff2`                    | Omnibus-Type              | `lizenzen/OFL-Archivo.txt`             |
+| **Display** — Köpfe, Sektionsmarken          | Archivo Narrow      | `archivo-narrow-600.woff2`                           | Omnibus-Type              | `lizenzen/OFL-Archivo-Narrow.txt`      |
+| **Zahl** — Stärke, DTG, Koordinaten, Nummern | JetBrains Mono      | `jetbrains-mono-{400,500,600}.woff2`                 | JetBrains s.r.o.          | `lizenzen/OFL-JetBrains-Mono.txt`      |
+| **Zeichen** — Text in taktischen Zeichen     | Einsatzzeichen Sans | `@einsatzzeichen/core/fonts/text-medium.woff2` (500) | IBM Corp. (IBM Plex Sans) | `lizenzen/OFL-Einsatzzeichen-Sans.txt` |
 
 Bezogen über den Fontsource-Spiegel (`cdn.jsdelivr.net/fontsource/fonts/…`) im `latin`-Subset
 (U+0000–00FF — deutsche Diakritika und `ß` vollständig). **Archivo 600** und **JetBrains Mono 500**
@@ -24,15 +24,16 @@ die Bestandsdateien `archivo-500.woff2` und `jetbrains-mono-600.woff2` sind byte
 entsprechenden Dateien dieser Paketversionen. Lizenztexte aus dem
 Google-Fonts-Repository (`github.com/google/fonts/ofl/<familie>/OFL.txt`).
 
-**Arimo 500** (LFH-1033) liegt nicht hier, sondern kommt aus dem Paket `@einsatzzeichen/core`
+**Einsatzzeichen Sans 500** (LFH-1033, bis Paket 5.x Arimo, LLH-1159) liegt nicht hier, sondern kommt aus dem Paket `@einsatzzeichen/core`
 (Subpfad `fonts/`, `theme/schriften.ts`): Das Paket misst die Breite des Bedingungszeichens an
 den Metriken genau dieser Datei, und so wandert sie mit jedem Update des Pakets mit. Der
-Lizenztext `lizenzen/OFL-Arimo.txt` ist byte-gleich mit `fonts/OFL.txt` des Pakets.
+Lizenztext `lizenzen/OFL-Einsatzzeichen-Sans.txt` ist byte-gleich mit `fonts/OFL.txt` des Pakets.
+Die Schrift ist eine Ableitung von IBM Plex Sans; „Plex“ ist ein reservierter Name der OFL.
 
 ## Budget
 
-**155,5 KB in 9 Schnitten** (159 220 Byte Dateigröße: 134 584 Byte hier, gemessen 21.09.2026,
-und 24 636 Byte Arimo 500 aus `@einsatzzeichen/core` 4.3.0, 08.10.2026) — der Deckel aus
+**164,7 KB in 9 Schnitten** (168 644 Byte Dateigröße: 134 584 Byte hier, gemessen 21.09.2026,
+und 34 060 Byte Einsatzzeichen Sans 500 aus `@einsatzzeichen/core` 6.1.0, 14.10.2026) — der Deckel aus
 LFH-352 liegt bei 200 KB. Nachprüfbar mit
 `ls -l frontend/src/assets/fonts/*.woff2 frontend/node_modules/@einsatzzeichen/core/fonts/text-medium.woff2 | awk '{s+=$5} END {print s}'`
 — **nicht** mit `du`, das Blockgrößen zählt (gemessen 148K für die Dateien hier).

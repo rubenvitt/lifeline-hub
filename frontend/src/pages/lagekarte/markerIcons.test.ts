@@ -74,7 +74,7 @@ describe('markerIconKey', () => {
   it('gibt einem nicht darstellbaren freien Zeichen den Platzhalter, nie keinen Schlüssel', () => {
     // Spec `lagekarte-taktische-zeichen`: der Platzhalter bleibt auswählbar und löschbar.
     expect(
-      markerIconKey({ typ: 'freies_zeichen', freiesZeichen: { symbol: 'fernschreiben' } }),
+      markerIconKey({ typ: 'freies_zeichen', freiesZeichen: { symbol: 'gibt-es-nicht' } }),
     ).toBe('ez|{"v":1,"spec":{"kind":"point"}}');
   });
 });

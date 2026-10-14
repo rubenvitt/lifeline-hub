@@ -136,8 +136,8 @@ describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
     expect(gz.getByRole('radio', { name: 'Kein Grundzeichen' })).toBeInTheDocument();
     expect(gz.getByRole('radio', { name: 'Stelle' })).toBeInTheDocument();
     expect(gz.getByRole('radio', { name: 'Luftfahrzeug' })).toBeInTheDocument();
-    // 19 Arten plus „Kein Grundzeichen“.
-    expect(gz.getAllByRole('radio')).toHaveLength(20);
+    // 27 Arten plus „Kein Grundzeichen“.
+    expect(gz.getAllByRole('radio')).toHaveLength(28);
   });
 
   it('trägt auf jeder Kachel BEIDES: das gezeichnete Zeichen und seinen Namen', () => {
