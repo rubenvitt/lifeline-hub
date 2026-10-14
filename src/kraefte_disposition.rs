@@ -166,12 +166,15 @@ pub async fn check_personal_tx(
     personal_ids: &[i64],
     regeln: Regeln,
 ) -> Result<Vec<ZeilenGrund>, AppError> {
+    // Liest absichtlich auch beendete Zeilen: nur so trennt die Vorprüfung „schon disponiert“
+    // (aktive Zeile) von „entlassen“ (beendete Zeile). Ausnahme mit Grund in der ALLOWLIST des
+    // Wächters (`src/entlassung.rs`, `jede_abfrage_der_kraeftetabellen_prueft_den_zustand`).
     let zeilen: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT j.value, \
                 CASE \
                     WHEN p.id IS NULL THEN ?4 \
-                    WHEN ep.id IS NOT NULL AND ep.beendet_at IS NULL THEN ?5 \
-                    WHEN ?8 AND ep.beendet_als = 'entlassen' THEN ?6 \
+                    WHEN ep.id IS NOT NULL AND coalesce(ep.beendet_at, '') = '' THEN ?5 \
+                    WHEN ?8 AND coalesce(ep.beendet_als, '') = 'entlassen' THEN ?6 \
                     WHEN p.dienststatus <> ?7 THEN ?9 \
                 END \
          FROM json_each(?1) j \
