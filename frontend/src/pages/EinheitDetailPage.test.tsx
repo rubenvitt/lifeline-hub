@@ -614,6 +614,15 @@ describe('EinheitDetailPage · Listen nur mit Freigabe (D5)', () => {
     expect(abrufe).not.toContain('material');
   });
 
+  it('Fahrzeuge gesperrt: keine Fahrzeugliste abgefragt, Besatzung nicht gezeigt', async () => {
+    const abrufe = zaehleAbrufe(['fahrzeuge']);
+    expect(
+      await within(await screen.findByRole('region', { name: BESATZUNG })).findByRole('status'),
+    ).toHaveTextContent('Ohne Besatzung Modul Fahrzeuge gesperrt');
+    await waitFor(() => expect(abrufe).toEqual(expect.arrayContaining(['personal', 'material'])));
+    expect(abrufe).not.toContain('fahrzeuge');
+  });
+
   it('Gegenprobe: mit allen Freigaben werden alle drei Listen abgefragt, kein Hinweis', async () => {
     const abrufe = zaehleAbrufe([]);
     await waitFor(() =>

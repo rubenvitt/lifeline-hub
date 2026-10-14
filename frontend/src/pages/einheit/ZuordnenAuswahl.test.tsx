@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
@@ -93,6 +93,42 @@ function zeige(
       />
     ),
   );
+}
+
+/**
+ * Beide Auswahlfelder zugleich, mit einem Mitschnitt aller Abrufe: das freigegebene Feld ist der
+ * Inhaltsanker. Ist seine Stammliste abgerufen, wäre es die des gesperrten auch, denn beide
+ * Abfragen starten beim Einhängen.
+ */
+function zeigeBeideMitMitschnitt(freigaben: ModulFreigaben) {
+  const abgerufen: string[] = [];
+  const mitschnitt = ({ request }: { request: Request }) => {
+    const url = new URL(request.url);
+    abgerufen.push(`${url.pathname}${url.search}`);
+  };
+  server.events.on('request:start', mitschnitt);
+  onTestFinished(() => server.events.removeListener('request:start', mitschnitt));
+  server.use(...stammHandler());
+  const rechte = buildEinheitRechte(true, freigaben);
+  renderMitProviders(
+    <>
+      <ZuordnenAuswahl
+        art="personal"
+        einsatzId={1}
+        einheitId={10}
+        rechte={rechte}
+        einsatzListe={{ data: EINSATZ_PERSONAL, isError: false, error: null }}
+      />
+      <ZuordnenAuswahl
+        art="fahrzeug"
+        einsatzId={1}
+        einheitId={10}
+        rechte={rechte}
+        einsatzListe={{ data: EINSATZ_FAHRZEUGE, isError: false, error: null }}
+      />
+    </>,
+  );
+  return abgerufen;
 }
 
 async function oeffne(platzhalter: string) {
@@ -190,18 +226,22 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
   });
 
   it('ohne Freigabe Personal: gesperrt mit Kurzgrund, keine Stammliste abgefragt', async () => {
-    let stammAbgefragt = false;
-    server.use(
-      http.get('/api/personal', () => {
-        stammAbgefragt = true;
-        return HttpResponse.json([]);
-      }),
-    );
-    zeige('personal', { freigaben: freigabenFixture({ personal: { zugriff: false } }) });
+    const abgerufen = zeigeBeideMitMitschnitt(freigabenFixture({ personal: { zugriff: false } }));
     const feld = screen.getByRole('combobox', { name: 'Person zuordnen' });
     expect(feld).toBeDisabled();
     expect(feld).toHaveAccessibleDescription('Modul Personal gesperrt');
-    expect(stammAbgefragt).toBe(false);
+    // Anker: die Fahrzeug-Seite hat ihre Stammliste und ihre Entlassenen abgerufen.
+    await waitFor(() =>
+      expect(abgerufen).toEqual(
+        expect.arrayContaining([
+          '/api/fahrzeuge?nur_im_dienst=true',
+          '/api/einsaetze/1/fahrzeuge?entlassene=1',
+        ]),
+      ),
+    );
+    expect(abgerufen.filter((a) => /^\/api\/(personal|einsaetze\/1\/personal)/.test(a))).toEqual(
+      [],
+    );
   });
 
   it('Rückmeldung vor der Antwort: die Auswahl lädt, bis der Server antwortet', async () => {
@@ -258,10 +298,42 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
     await waitFor(() => expect(aufrufe).toEqual(['30']));
   });
 
-  it('ohne Freigabe Fahrzeuge: gesperrt mit Kurzgrund', () => {
-    zeige('fahrzeug', { freigaben: freigabenFixture({ fahrzeuge: { zugriff: false } }) });
+  it('ohne Freigabe Fahrzeuge: gesperrt mit Kurzgrund, keine Stammliste abgefragt', async () => {
+    const abgerufen = zeigeBeideMitMitschnitt(freigabenFixture({ fahrzeuge: { zugriff: false } }));
     expect(screen.getByRole('combobox', { name: 'Fahrzeug zuordnen' })).toHaveAccessibleDescription(
       'Modul Fahrzeuge gesperrt',
     );
+    await waitFor(() =>
+      expect(abgerufen).toEqual(
+        expect.arrayContaining([
+          '/api/personal?nur_im_dienst=true',
+          '/api/einsaetze/1/personal?entlassene=1',
+        ]),
+      ),
+    );
+    expect(abgerufen.filter((a) => /^\/api\/(fahrzeuge|einsaetze\/1\/fahrzeuge)/.test(a))).toEqual(
+      [],
+    );
+  });
+
+  it('Stamm-Fahrzeug abgelehnt: „Nicht zugeordnet“ mit dem Grund der Zeile unter dem Feld', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/sammel', () =>
+        HttpResponse.json(
+          {
+            error: 'Nicht disponiert',
+            zeilen: [{ art: 'fahrzeug', id: 71, grund: 'außer Dienst' }],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige('fahrzeug');
+    await waehle('Fahrzeug zuordnen …', 'Florian 2 (RTW)');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Nicht zugeordnet');
+    expect(alert).toHaveTextContent('außer Dienst');
+    expect(alert).not.toHaveTextContent('Nicht disponiert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 });
