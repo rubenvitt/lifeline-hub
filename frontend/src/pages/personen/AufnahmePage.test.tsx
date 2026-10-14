@@ -544,4 +544,55 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     expect(aktuellerPfad()).toBe('/einsaetze/2/personen/aufnahme');
     expect(screen.getByLabelText('Antreffort')).toHaveValue('Turnhalle B');
   });
+
+  /**
+   * LLH-1154: liegt der Kopf von B schon im Cache, bleibt die Formularhülle über den Wechsel
+   * gemountet. Ihr Absende-Riegel aus A verwürfe ein Absenden in B dann still, bis die Antwort aus
+   * A da ist, obwohl der Knopf in B nicht lädt.
+   */
+  it('ein laufendes Anlegen aus A hält das Absenden in B nicht zurück', async () => {
+    let antwortFreigeben!: () => void;
+    const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
+    let inB = 0;
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
+      ),
+      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/personen', async () => {
+        await antwortGate;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+      http.post('/api/einsaetze/2/personen', () => {
+        inB += 1;
+        return HttpResponse.json({ ...angelegt, einsatz_id: 2 }, { status: 201 });
+      }),
+    );
+    const { client } = renderMitProviders(
+      <>
+        <EinsatzWechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/personen/aufnahme' },
+    );
+    // Der Kopf von B liegt schon im Cache (der Test-Client räumt sonst sofort ab, `gcTime: 0`).
+    client.setQueryDefaults(einsatzKeys.einsatz(2), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.einsatz(2), { ...einsatzAktiv, id: 2 });
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(client.isMutating()).toBe(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    const knopf = await screen.findByRole('button', { name: /Speichern und nächste/ });
+    expect(knopf).not.toHaveClass('ant-btn-loading');
+    await userEvent.click(knopf);
+
+    // Ohne eigene Hülle je Einsatz käme in B kein POST an, solange A wartet.
+    await waitFor(() => expect(inB).toBe(1));
+    await act(async () => antwortFreigeben());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+  });
 });

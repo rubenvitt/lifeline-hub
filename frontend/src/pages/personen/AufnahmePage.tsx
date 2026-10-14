@@ -194,6 +194,9 @@ export default function AufnahmePage() {
 
       {darfSchreiben && (
         <ErfassungsFormular<AufnahmeWerte>
+          // Je Einsatz eine eigene Hülle (LLH-1154): ihr Absende-Riegel `sendetRef` hielte sonst bis
+          // zur Antwort aus A jedes Absenden in B still zurück, obwohl der Knopf dort nicht lädt.
+          key={einsatzId}
           form={form}
           serie
           uebernahme={['antreff_ort']}
