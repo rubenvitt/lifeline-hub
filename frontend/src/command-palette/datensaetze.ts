@@ -13,13 +13,13 @@ import {
   auftraegePfad,
   einheitDetailPfad,
   einsatzabschnittePfad,
+  einsatzkraftPfad,
   etbPfad,
   fahrzeugePfad,
   gefahrenPfad,
   lageberichtDetailPfad,
   meldungenPfad,
   personDetailPfad,
-  personalPfad,
   schadenDetailPfad,
   uhsDetailPfad,
 } from '../routing/deeplinks';
@@ -317,7 +317,8 @@ function quellen(k: DatensatzKontext): Quelle[] {
     baueQuelle('personal', 'text', q.personal, e, {
       id: (p) => p.id,
       label: (p) => p.name,
-      ziel: (id, p) => personalPfad(id, { personal: p.id }),
+      // Die Palette öffnet die Personenansicht (LLH-1060 D2), wie die Einheit ihre Seite.
+      ziel: (id, p) => einsatzkraftPfad(id, p.id),
       vorschau: (einsatzId, p) => ({ art: 'personal', einsatzId, id: p.id }),
     }),
     baueQuelle('einheiten', 'text', q.einheiten, e, {
