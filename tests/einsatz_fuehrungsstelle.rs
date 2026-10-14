@@ -488,6 +488,46 @@ async fn entlassen_loest_die_zuordnung() {
     );
 }
 
+/// Ein entlassenes Fahrzeug trägt keine Führungsstelle: 409 (Lebenszyklus, `src/AGENTS.md`,
+/// Statuscode-Konvention), und zwar vor dem 422 für ein nicht disponiertes Fahrzeug derselben
+/// Liste. Gespeichert wird nichts.
+#[tokio::test]
+async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: entlassen");
+
+    for ids in [json!([elw]), json!([987_654, elw])] {
+        let (status, json) = patchen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"rufname": "Florian 10", "fahrzeug_ids": ids}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{ids}: {json:?}");
+        assert_eq!(
+            json["error"], "Das Fahrzeug ist aus dem Einsatz entlassen; erst erneut disponieren",
+            "{ids}"
+        );
+    }
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1,
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        "auch der Rufname bleibt ungespeichert"
+    );
+}
+
 #[tokio::test]
 async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;

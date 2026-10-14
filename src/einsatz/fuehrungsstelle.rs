@@ -159,8 +159,9 @@ pub fn normalisiere_fahrzeug_ids(mut ids: Vec<i64>) -> Result<Vec<i64>, AppError
     Ok(ids)
 }
 
-/// Prüft, dass jede ID eine Dispositionszeile dieses Einsatzes ist; sonst 422 (Zusammenhang,
-/// `src/AGENTS.md`, Statuscode-Konvention). Eine Abfrage für die ganze Liste.
+/// Prüft zuerst, dass keine ID ein entlassenes oder storniertes Fahrzeug dieses Einsatzes ist
+/// (409, Lebenszyklus), dann, dass jede ID eine Dispositionszeile dieses Einsatzes ist; sonst 422
+/// (Zusammenhang, `src/AGENTS.md`, Statuscode-Konvention). Eine Abfrage für die ganze Liste.
 pub async fn pruefe_fahrzeuge(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -168,6 +169,12 @@ pub async fn pruefe_fahrzeuge(
 ) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
+    }
+    // Ein entlassenes oder storniertes Fahrzeug trägt keine Führungsstelle (409, LLH-1079). Der
+    // Lebenszyklus geht dem Zusammenhang vor: steht in derselben Liste auch ein nicht
+    // disponiertes Fahrzeug, bleibt es beim 409.
+    for &id in ids {
+        crate::fahrzeug::disposition_repo::require_nicht_beendet(pool, einsatz_id, id).await?;
     }
     let disponiert: Vec<i64> = sqlx::query_scalar(
         "SELECT id FROM einsatz_fahrzeug \
@@ -181,10 +188,6 @@ pub async fn pruefe_fahrzeuge(
         return Err(AppError::UnprocessableEntity(format!(
             "Fahrzeug {id} ist diesem Einsatz nicht disponiert"
         )));
-    }
-    // Ein entlassenes oder storniertes Fahrzeug trägt keine Führungsstelle (409, LLH-1079).
-    for &id in ids {
-        crate::fahrzeug::disposition_repo::require_nicht_beendet(pool, einsatz_id, id).await?;
     }
     Ok(())
 }
