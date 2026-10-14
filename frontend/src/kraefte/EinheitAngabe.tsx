@@ -32,6 +32,9 @@ export interface EinheitAngabeProps {
  *
  * Eine Einheit, die nicht in `optionen` steht (Liste noch alt), zeigt kein erfundenes Etikett.
  */
+/** Wortgrenzen statt `anywhere`; `hyphens` braucht die Sprache am Element oder darüber. */
+const NAME_STIL = { overflowWrap: 'break-word', hyphens: 'auto' } as const;
+
 export default function EinheitAngabe({
   kennung,
   wert,
@@ -41,7 +44,15 @@ export default function EinheitAngabe({
   onSpeichern,
 }: EinheitAngabeProps) {
   const aktuell = wert != null ? optionen.find((o) => o.id === wert) : undefined;
-  const name = aktuell?.name ?? 'nicht geladen';
+  // Kein Umbruch mitten im Wort (Entscheidung 14.10.2026, LLH-1073): der Wertknopf bricht überall
+  // (`overflow-wrap: anywhere` aus `wertKnopfStil`), damit lange Freitexte die Zelle nicht
+  // sprengen. Ein Einheitsname bricht nur an Wortgrenzen oder mit deutscher Silbentrennung und
+  // wird dafür lieber zweizeilig. Nur hier, nicht am geteilten Stil.
+  const name = (
+    <span style={NAME_STIL} lang="de">
+      {aktuell?.name ?? 'nicht geladen'}
+    </span>
+  );
   const option = (o: EinheitOption) => ({ value: o.id, label: o.pfad });
   const gruppen = groupEinheitOptions(optionen);
   const auswahl =

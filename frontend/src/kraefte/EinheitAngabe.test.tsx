@@ -51,6 +51,22 @@ function angabe(p: Partial<EinheitAngabeProps> = {}) {
 const FELD = 'Einheit zu Anna';
 
 describe('EinheitAngabe (LLH-1060, LLH-1073 D3)', () => {
+  it('der Name bricht nur an Wortgrenzen, nicht mitten im Wort wie der Wertknopf', () => {
+    angabe({ wert: 1 });
+    const knopf = screen.getByRole('button', { name: 'Einheit zu Anna bearbeiten' });
+    // Der geteilte Wertknopf bricht überall; der Name setzt das für sich zurück.
+    expect(knopf.style.overflowWrap).toBe('anywhere');
+    const name = screen.getByText('Rettungsstaffel');
+    expect(name.style.overflowWrap).toBe('break-word');
+    expect(name.style.hyphens).toBe('auto');
+    expect(name).toHaveAttribute('lang', 'de');
+  });
+
+  it('ohne Schreibrecht trägt der Name dieselbe Umbruchregel', () => {
+    angabe({ wert: 1, darfSchreiben: false });
+    expect(screen.getByText('Rettungsstaffel').style.overflowWrap).toBe('break-word');
+  });
+
   it('leer: Aufforderung mit Zeilenkennung; die Auswahl zeigt die Einheiten mit Pfad', async () => {
     angabe();
     await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna eintragen' }));

@@ -656,15 +656,17 @@ export default function FahrzeugePage() {
    * die Aktionsspalte auf 170 px): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ trägt
    * der Funkrufname meist schon in seiner Kennzahl.
    *
-   * Die Einheit-Spalte (LLH-1073, design.md D5, Entscheidung 14.10.2026) bleibt bei 1440 sichtbar
-   * und schreibtragend (140 px). Damit der Funkrufname einzeilig bleibt (30-Zeichen-Vorgabe vom
-   * 10.10.2026), trägt die Aktionsspalte nur noch den Menüauslöser („Entlassen“ ist sein erster
-   * Eintrag; Breite je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit
-   * LLH-1079 Teil II), `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit
-   * nennt ihn mittelbar, das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
-   * 422 px, Zeile 45 px. Ein Stamm-Name trägt damit 30 Zeichen in einer Zeile, ein Ad-hoc-Name
-   * neben „ad-hoc“ 29: 30 Zeichen brauchen 428 px und brechen um (offen, LLH-1073). Einheit,
-   * Status, Besatzung und Aktionen weichen nie. Wer eine Breite ändert, misst neu
+   * Die Einheit-Spalte (LLH-1073, design.md D5, Entscheidungen 14.10.2026) bleibt bei 1440
+   * sichtbar und schreibtragend (170 px). Damit der Funkrufname im Regelfall einzeilig bleibt,
+   * trägt die Aktionsspalte nur noch den Menüauslöser („Entlassen“ ist sein erster Eintrag; Breite
+   * je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit LLH-1079 Teil II),
+   * `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit nennt ihn mittelbar,
+   * das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
+   * 392 px, Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile. Einzeilig ist der
+   * Regelfall, keine harte Grenze: ein Ad-hoc-Name ab rund 26 Zeichen (neben „ad-hoc“) und bei
+   * 1366 schon kürzere Namen werden zweizeilig, ebenso eine Einheit mit langem Namen — beides
+   * bricht an Wortgrenzen und ist kein Überlauf. Einheit, Status, Besatzung und Aktionen weichen
+   * nie. Wer eine Breite ändert, misst neu
    * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
@@ -702,10 +704,10 @@ export default function FahrzeugePage() {
             // Schreibtragend, deshalb nie `abBreite` (D5); die Auswahl gruppiert nach Abschnitt.
             title: 'Einheit',
             key: 'einheit' as const,
-            // 140 px (Entscheidung 14.10.2026, Spanne 140–170): jeder Pixel mehr fehlt dem
-            // Funkrufnamen. Ein Einzelwort über rund 13 Zeichen bricht neben dem Stift mitten im
-            // Wort (`overflow-wrap: anywhere` der Inline-Angabe), etwa „Betreuungsgruppe“.
-            width: 140,
+            // 170 px: „Betreuungsgruppe“ steht in `kompakt` neben dem Stift in einer Zeile. Längere
+            // Namen brechen an Wortgrenzen, nie mitten im Wort (`EinheitAngabe`, Entscheidung
+            // 14.10.2026), und dürfen zweizeilig werden.
+            width: 170,
             sortWert: (ef: EinsatzFahrzeug) => einheitName(ef),
             suchText: (ef: EinsatzFahrzeug) => einheitName(ef),
             filter: filterAus(einheitName),
