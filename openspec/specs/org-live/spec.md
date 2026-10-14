@@ -75,9 +75,10 @@ nach dem Commit verteilt werden, seine Nutzlast MUST leer sein (`{}`), und es MU
 angemeldeten Abonnenten der Organisation erreichen und keinen anderer Organisationen.
 
 Stammdaten-Kataloge im Sinne dieser Anforderung sind Fahrzeuge, Fahrzeug-Status, Personal,
-Personal-Status, Material, Material-Kategorien, Qualifikationen, Einheit-Typen, Sprechgruppen der
-Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen, externe Stellen und die Organisation selbst
-(Name, Logo). Import, Neu-Import und Entfernen der Demo-Daten MUST `stammdaten` ebenfalls auslösen.
+Personal-Status, Material, Material-Kategorien, Qualifikationen, Einheit-Typen, Einheiten-Vorlagen,
+Sprechgruppen der Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen, externe
+Stellen und die Organisation selbst (Name, Logo). Import, Neu-Import und Entfernen der Demo-Daten
+MUST `stammdaten` ebenfalls auslösen.
 
 #### Scenario: Fahrzeug außer Dienst
 - **WHEN** der System-Admin auf Schirm A ein Fahrzeug außer Dienst stellt und Schirm B derselben Organisation eine Fahrzeugauswahl offen hat
@@ -94,6 +95,10 @@ Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen, externe
 #### Scenario: Externe Stelle angelegt
 - **WHEN** der Admin auf Schirm A eine externe Stelle anlegt und Schirm B derselben Organisation die Einsatzdaten offen hat
 - **THEN** schlägt Schirm B die neue Stelle bei der meldenden Stelle vor, ohne neu zu laden
+
+#### Scenario: Vorlage geändert
+- **WHEN** der Admin auf Schirm A einer Vorlage ein Fahrzeug zuordnet und Schirm B dieselbe Vorlage offen hat
+- **THEN** zeigt Schirm B das Fahrzeug ohne Neuladen
 
 ### Requirement: Eine Live-Verbindung je Tab
 Ein angemeldeter Tab SHALL zu jedem Zeitpunkt höchstens eine Live-Verbindung offen halten. Innerhalb

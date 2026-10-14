@@ -34,6 +34,16 @@ function leererEntwurf(
 }
 
 /**
+ * Protokolliert einen Plattenfehler eines Schreibauftrags, statt ihn unbehandelt zu lassen
+ * (LLH-1152). Der Auftrag steht vor dem ersten `await` schon im Vorlauf, `entwuerfeLaden` holt
+ * ihn beim nächsten Laden nach (LFH-521). Ein Hinweis an der Leiste unterbleibt: die Aufträge
+ * fallen je Tastendruck an, und der Vorlauf hält die Fassung ohnehin.
+ */
+function plattenfehler(was: string) {
+  return (fehler: unknown) => console.warn(`ETB-Entwürfe: ${was}`, fehler);
+}
+
+/**
  * Der Aufrufer montiert je Einsatz neu (key=einsatzId). `benutzerId` ist die angemeldete Person
  * (LFH-767): Sie sieht und schreibt nur ihre eigenen Entwürfe. Ohne Person lädt und speichert
  * der Hook nichts — `RequireAuth` lässt die Seite dann ohnehin nicht zu.
@@ -107,9 +117,11 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
       // die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal (LFH-216).
       if (!bestand) return;
       if (istLeer(werte) && !festhalten) {
-        void entwurfEntfernen(id);
+        void entwurfEntfernen(id).catch(plattenfehler('Entwurf ließ sich nicht entfernen'));
       } else {
-        void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
+        void entwurfSpeichern({ ...bestand, ...patch, geaendert_at }).catch(
+          plattenfehler('Entwurf ließ sich nicht speichern'),
+        );
       }
     },
     [],
@@ -122,7 +134,9 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
    */
   const entwurfFesthalten = useCallback((id: string) => {
     const bestand = entwuerfeRef.current.find((e) => e.id === id);
-    if (bestand) void entwurfSpeichern(bestand);
+    if (bestand) {
+      void entwurfSpeichern(bestand).catch(plattenfehler('Entwurf ließ sich nicht festhalten'));
+    }
   }, []);
 
   /**
@@ -145,8 +159,21 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
         sicherSchreiben(aktivSchluessel(neu.benutzer_id, einsatzId), neu.id);
         return neu.id;
       });
-      await entwurfEntfernen(id);
-      await entwurfSpeichern(neu);
+      // Erst die neue Fassung, dann die alte entfernen (LLH-1152). Andersherum ließe ein
+      // Plattenfehler beim Entfernen das Speichern ausfallen, und der Vorlauf der alten id
+      // (`null`) löschte beim nächsten Laden die einzige Fassung. Ein Fehler wirft hier nicht:
+      // der Aufrufer wirft die 409 weiter, und sie bleibt der Grund an der Erfassung.
+      try {
+        await entwurfSpeichern(neu);
+      } catch (fehler) {
+        // Die alte Fassung bleibt auf der Platte: lieber ein doppelter Reiter nach dem nächsten
+        // Laden als ein verlorener Wortlaut, falls auch der Vorlauf nicht schreiben konnte.
+        plattenfehler('neu ausgewiesener Entwurf ließ sich nicht speichern')(fehler);
+        return neu.id;
+      }
+      await entwurfEntfernen(id).catch(
+        plattenfehler('alte Fassung des neu ausgewiesenen Entwurfs ließ sich nicht entfernen'),
+      );
       return neu.id;
     },
     [einsatzId],

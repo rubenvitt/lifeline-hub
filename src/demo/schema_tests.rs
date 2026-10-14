@@ -74,13 +74,26 @@ struct StammdatenFk {
     on_delete: String,
 }
 
-/// Alle Fremdschlüssel aller Tabellen, die auf `fahrzeug`, `personal` oder `material` zeigen.
+/// Stammdatentabellen, die eine Demo-Marke tragen können (`demo::DemoStammdatenArt`).
+const MARKIERBAR: [&str; 4] = ["fahrzeug", "personal", "material", "einheit_vorlage"];
+
+/// Begründete Kaskaden auf eine markierbare Tabelle, `(tabelle, spalte, ziel)`: die Kindzeilen
+/// einer Einheiten-Vorlage (LLH-1042, Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen
+/// entfernen“) gehören ihr allein und fallen mit ihr. Jeder andere Verweis auf eine Vorlage, auch
+/// der der Untereinheit, hält fest.
+const ERLAUBTE_KASKADEN: [(&str, &str, &str); 2] = [
+    ("einheit_vorlage_fahrzeug", "vorlage_id", "einheit_vorlage"),
+    ("einheit_vorlage_personal", "vorlage_id", "einheit_vorlage"),
+];
+
+/// Alle Fremdschlüssel aller Tabellen, die auf eine markierbare Stammdatentabelle zeigen.
 async fn eingehende_stammdaten_fks(pool: &SqlitePool) -> Vec<StammdatenFk> {
     sqlx::query_as(
         "SELECT m.name AS tabelle, f.\"from\" AS spalte, lower(f.\"table\") AS ziel, \
                 f.on_delete AS on_delete \
          FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
-         WHERE m.type = 'table' AND lower(f.\"table\") IN ('fahrzeug', 'personal', 'material') \
+         WHERE m.type = 'table' \
+           AND lower(f.\"table\") IN ('fahrzeug', 'personal', 'material', 'einheit_vorlage') \
          ORDER BY ziel, m.name, f.\"from\"",
     )
     .fetch_all(pool)
@@ -105,6 +118,12 @@ async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
                 .iter()
                 .any(|aktion| fk.on_delete.eq_ignore_ascii_case(aktion))
         })
+        .filter(|fk| {
+            !(fk.on_delete.eq_ignore_ascii_case("CASCADE")
+                && ERLAUBTE_KASKADEN.iter().any(|(tabelle, spalte, ziel)| {
+                    fk.tabelle == *tabelle && fk.spalte == *spalte && fk.ziel == *ziel
+                }))
+        })
         .map(|fk| {
             format!(
                 "{}.{} → {} ON DELETE {} (erlaubt: NO ACTION, RESTRICT)",
@@ -128,8 +147,9 @@ async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     verstoesse
 }
 
-/// Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material` trägt `ON DELETE NO ACTION` oder
-/// `RESTRICT`, und keiner im Schema ist aufgeschoben. Nur dann erkennt der Savepoint je Zeile
+/// Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material`/`einheit_vorlage` trägt
+/// `ON DELETE NO ACTION` oder `RESTRICT` (Ausnahme: [`ERLAUBTE_KASKADEN`]), und keiner im Schema
+/// ist aufgeschoben. Nur dann erkennt der Savepoint je Zeile
 /// „wird noch verwiesen“ über Code 787, ohne handgepflegte Verweisliste.
 ///
 /// Die Positivkontrolle hält den Guard ehrlich: fände die Abfrage gar keine eingehenden
@@ -139,11 +159,20 @@ async fn kein_fk_kaskadiert_in_stammdaten() {
     let pool = crate::db::test_pool().await;
 
     let eingehend = eingehende_stammdaten_fks(&pool).await;
-    for ziel in ["fahrzeug", "personal", "material"] {
+    for ziel in MARKIERBAR {
         assert!(
             eingehend.iter().any(|fk| fk.ziel == ziel),
             "Positivkontrolle: kein eingehender Fremdschlüssel auf {ziel} gefunden — \
              die Abfrage sieht das Schema nicht, der Guard prüfte ins Leere: {eingehend:?}"
+        );
+    }
+
+    for (tabelle, spalte, ziel) in ERLAUBTE_KASKADEN {
+        assert!(
+            eingehend
+                .iter()
+                .any(|fk| fk.tabelle == tabelle && fk.spalte == spalte && fk.ziel == ziel),
+            "Ausnahme ohne Fremdschlüssel: {tabelle}.{spalte} → {ziel}"
         );
     }
 

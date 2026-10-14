@@ -3,7 +3,8 @@
 //! **Konfliktregel:** abgeglichen wird in der Org des Admins und nur gegen
 //! `dienststatus = 'in_dienst'` (dasselbe Prädikat wie die partiellen UNIQUE-Indizes und die
 //! Disposition). Kennung ist beim Fahrzeug der Funkrufname, beim Personal die Personalnummer
-//! (nie der Name), beim Material die Bestandsnummer.
+//! (nie der Name), beim Material die Bestandsnummer, bei der Einheiten-Vorlage der Name unter den
+//! aktiven Vorlagen (LLH-1042).
 //!
 //! - **Treffer:** mitbenutzen, unverändert, **ohne** Marke — das Entfernen lässt die Zeile in
 //!   Ruhe.
@@ -12,6 +13,11 @@
 //!
 //! `personal.benutzer_id` setzt der Import nie: `idx_personal_benutzer` ist eindeutig, und der
 //! Admin kann schon verknüpft sein. Kataloge werden nur gelesen ([`super::katalog`]).
+//!
+//! Eine Demo-Vorlage hängt nur unter einer Vorlage, die dieser Import selbst angelegt hat; unter
+//! einer mitbenutzten stünde sie in einem fremden Baum, und dessen Fahrzeuge kämen ihr in die
+//! Quere. Fahrzeuge und Stammbesetzung bekommt nur eine angelegte Vorlage, über dieselben
+//! `…_tx`-Wege wie die Verwaltung.
 //!
 //! Die Funktion committet nicht; `importieren_tx` fährt sie in `write_retry!`.
 
@@ -22,6 +28,8 @@ use sqlx::SqliteConnection;
 use super::katalog;
 use super::szenario::{self, Katalogeintrag};
 use super::{DemoBerichtZeile, DemoStammdatenArt};
+use crate::einheit_vorlage::repo::{self as vorlage_repo, NewVorlage};
+use crate::einheit_vorlage::PersonalEntry;
 use crate::error::AppError;
 use crate::fahrzeug::repo::{self as fahrzeug_repo, FahrzeugDaten};
 use crate::material::repo::{self as material_repo, MaterialDaten};
@@ -38,7 +46,10 @@ pub struct StammdatenErgebnis {
     pub personal: BTreeMap<&'static str, i64>,
     /// Material-ID je Schlüssel aus [`szenario::MATERIAL`].
     pub material: BTreeMap<&'static str, i64>,
-    /// Je Art eine Zeile, in Enum-Reihenfolge (Fahrzeug, Personal, Material). Gezählt sind
+    /// Vorlagen-ID je Schlüssel aus [`szenario::EINHEITEN_VORLAGEN`].
+    pub einheit_vorlagen: BTreeMap<&'static str, i64>,
+    /// Je Art eine Zeile, in Enum-Reihenfolge (Fahrzeug, Personal, Material, Einheiten-Vorlage).
+    /// Gezählt sind
     /// `angelegt` und `mitbenutzt`; `entfernt` und `behalten` stehen auf 0.
     pub je_art: Vec<DemoBerichtZeile>,
 }
@@ -218,6 +229,71 @@ pub async fn stammdaten_importieren_tx(
         material.insert(vorlage.schluessel, id);
     }
 
+    let mut einheit_vorlagen: BTreeMap<&'static str, i64> = BTreeMap::new();
+    let mut angelegte_vorlagen: Vec<&'static str> = Vec::new();
+    let (mut v_angelegt, mut v_mitbenutzt) = (0, 0);
+    for vorlage in &szenario::EINHEITEN_VORLAGEN {
+        let vorhanden: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM einheit_vorlage WHERE org_id = ? AND name = ? AND aktiv = 1",
+        )
+        .bind(org_id)
+        .bind(vorlage.name)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let id = match vorhanden {
+            Some(id) => {
+                v_mitbenutzt += 1;
+                id
+            }
+            None => {
+                // Nur unter einer selbst angelegten Vorlage (s. Modulkopf).
+                let ueber = vorlage
+                    .ueber
+                    .filter(|u| angelegte_vorlagen.contains(u))
+                    .map(|u| nachschlagen(&einheit_vorlagen, "Einheiten-Vorlage", u))
+                    .transpose()?;
+                let daten = NewVorlage {
+                    name: vorlage.name,
+                    typ_id: kataloge.id(Katalogeintrag::Einheitstyp(vorlage.typ))?,
+                    ueber_vorlage_id: ueber,
+                    funkrufname: None,
+                    tz_fachaufgabe: vorlage.tz_fachaufgabe,
+                    tz_organisation: vorlage.tz_organisation,
+                    soll: None,
+                    bemerkung: Some(szenario::BEMERKUNG),
+                    sortier: vorlage.sortier,
+                };
+                let id = vorlage_repo::create_tx(conn, org_id, &daten).await?;
+                markieren(conn, import_id, DemoStammdatenArt::EinheitVorlage, id).await?;
+                let fahrzeug_ids = vorlage
+                    .fahrzeuge
+                    .iter()
+                    .map(|f| nachschlagen(&fahrzeuge, "Fahrzeug", f))
+                    .collect::<Result<Vec<i64>, AppError>>()?;
+                vorlage_repo::replace_fahrzeuge_tx(conn, org_id, id, &fahrzeug_ids).await?;
+                let besetzung = vorlage
+                    .personal
+                    .iter()
+                    .map(|p| {
+                        Ok(PersonalEntry {
+                            personal_id: nachschlagen(&personal, "Personal", p.personal)?,
+                            fahrzeug_id: p
+                                .fahrzeug
+                                .map(|f| nachschlagen(&fahrzeuge, "Fahrzeug", f))
+                                .transpose()?,
+                            staerke_position: p.position,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, AppError>>()?;
+                vorlage_repo::replace_personal_tx(conn, org_id, id, &besetzung).await?;
+                angelegte_vorlagen.push(vorlage.schluessel);
+                v_angelegt += 1;
+                id
+            }
+        };
+        einheit_vorlagen.insert(vorlage.schluessel, id);
+    }
+
     let zeile = |art, angelegt, mitbenutzt| DemoBerichtZeile {
         art,
         angelegt,
@@ -229,10 +305,12 @@ pub async fn stammdaten_importieren_tx(
         fahrzeuge,
         personal,
         material,
+        einheit_vorlagen,
         je_art: vec![
             zeile(DemoStammdatenArt::Fahrzeug, f_angelegt, f_mitbenutzt),
             zeile(DemoStammdatenArt::Personal, p_angelegt, p_mitbenutzt),
             zeile(DemoStammdatenArt::Material, m_angelegt, m_mitbenutzt),
+            zeile(DemoStammdatenArt::EinheitVorlage, v_angelegt, v_mitbenutzt),
         ],
     })
 }

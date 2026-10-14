@@ -21,6 +21,7 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
+import { useStellenName } from './stellenName';
 
 dayjs.extend(utc);
 
@@ -92,12 +93,14 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
 /**
  * Kopfzeile der Gerätehülle (LFH-892, Spec `feldgeraet-bedienung`): Stelle, Gerät, Verbindung und
  * Kopplungsende stehen immer; ohne Netz zusätzlich der Stand der angezeigten Daten. Rechts das
- * Gerätemenü statt des Benutzermenüs, keine Suche und keine Sprungpalette.
+ * Gerätemenü statt des Benutzermenüs, keine Suche und keine Sprungpalette. Den Namen der Stelle
+ * liest {@link useStellenName} live, nicht aus der Sitzung (LLH-1155).
  */
 export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
   const { token } = theme.useToken();
   const ohneVerbindung = useOhneVerbindung();
   const stand = useJuengsterDatenstand();
+  const stelle = useStellenName(geraet);
   return (
     <header
       data-lfh="geraet-kopf"
@@ -116,9 +119,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
         data-lfh="kopf-stelle"
         style={{ ...kopfZelleStil(token), flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}
       >
-        <strong style={{ whiteSpace: 'nowrap' }}>
-          {geraet.stelle ?? ANSICHT_LABEL[geraet.ansicht]}
-        </strong>
+        <strong style={{ whiteSpace: 'nowrap' }}>{stelle ?? ANSICHT_LABEL[geraet.ansicht]}</strong>
         <span
           style={{
             color: rahmenFarben.gedaempft,

@@ -66,7 +66,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   (`useOfflineSync` in der Hülle).
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
-  Datenstand. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
+  Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
+  geführten Abfrage der Stelle, `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
+  einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü.
 - **Lagemonitor (Großbild):** feste Kachelung ohne Bildlauf bei 1920 × 1080, Kacheln und Karte
@@ -75,7 +77,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
-  nur für diese Ansicht); Personen-Ereignisse erreichen ihn nicht, deshalb holt
+  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
+  (Bezeichnung und Fläche) für die Karte (LLH-1153); `/zonen` und `/abschnitte` bleiben ihm
+  gesperrt, sie tragen Notizen und Leiternamen. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte

@@ -32,7 +32,7 @@ import {
   type AuswahlRoh,
   type RasterFeld,
 } from './leistenDaten';
-import type { TzProps } from './taktischesZeichen';
+import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS, type TzProps } from './taktischesZeichen';
 
 interface InspectorProps {
   einsatzId: number;
@@ -47,25 +47,6 @@ interface InspectorProps {
   /** Rohlisten für das Datenraster (Stärke, Abschnitt, Status …); ohne Angabe nur Ort. */
   roh?: AuswahlRoh;
 }
-
-const FACHAUFGABE_OPTIONEN = [
-  { value: 'rettungswesen', label: 'Rettungswesen/Sanität' },
-  { value: 'aerztliche-versorgung', label: 'Ärztliche Versorgung' },
-  { value: 'betreuung', label: 'Betreuung' },
-  { value: 'verpflegung', label: 'Verpflegung' },
-  { value: 'fuehrung', label: 'Führung' },
-  { value: 'bergung', label: 'Bergung' },
-  { value: 'wasserrettung', label: 'Wasserrettung' },
-];
-
-const ORG_OPTIONEN = [
-  { value: 'feuerwehr', label: 'Feuerwehr' },
-  { value: 'thw', label: 'THW' },
-  { value: 'hilfsorganisation', label: 'Hilfsorganisation' },
-  { value: 'polizei', label: 'Polizei' },
-  { value: 'bundeswehr', label: 'Bundeswehr' },
-  { value: 'zivil', label: 'Zivil' },
-];
 
 const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'];
 
@@ -259,7 +240,7 @@ export default function Inspector({
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.fachaufgabe ?? undefined}
-              options={FACHAUFGABE_OPTIONEN}
+              options={FACHAUFGABE_OPTIONS}
               onChange={(v) => onSymbolAendern!(marker, { tz_fachaufgabe: v ?? null })}
             />
           </FeldLabel>
@@ -269,7 +250,7 @@ export default function Inspector({
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.organisation ?? undefined}
-              options={ORG_OPTIONEN}
+              options={ORGANISATION_OPTIONS}
               onChange={(v) => onSymbolAendern!(marker, { tz_organisation: v ?? null })}
             />
           </FeldLabel>

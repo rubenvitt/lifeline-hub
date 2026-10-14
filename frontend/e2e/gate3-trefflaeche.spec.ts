@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import {
   detailBereit,
   einheitMitZuordnungen,
@@ -274,19 +274,32 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
 
 // Die Stammdaten-Detailseiten tragen ihren Pfad im Kopf der `AdminPage`, über denselben
 // `Ortspfad` wie der Seitenkopf (LFH-1047). Gemessen wird der Rückweg zur Liste („Fahrzeuge“,
-// „Personal“) neben „Einsätze“; der Datensatzname ist der ausgeblendete letzte Eintrag.
+// „Personal“, „Einheiten-Vorlagen“) neben „Einsätze“; der Datensatzname ist der ausgeblendete
+// letzte Eintrag. Eine Vorlage braucht den Einheitstyp der Organisation (LLH-1042).
 for (const { liste, api, daten, pfad } of [
   {
     liste: 'Fahrzeuge',
     api: '/api/fahrzeuge',
-    daten: { funkrufname: `E2E Gate3 Pfad Florian ${Date.now()}`, fahrzeugtyp: 'LF 20' },
+    daten: async () => ({
+      funkrufname: `E2E Gate3 Pfad Florian ${Date.now()}`,
+      fahrzeugtyp: 'LF 20',
+    }),
     pfad: (id: number) => `/admin/stammdaten/fahrzeuge/${id}`,
   },
   {
     liste: 'Personal',
     api: '/api/personal',
-    daten: { name: `E2E Gate3 Pfad Kraft ${Date.now()}` },
+    daten: async () => ({ name: `E2E Gate3 Pfad Kraft ${Date.now()}` }),
     pfad: (id: number) => `/admin/stammdaten/personal/${id}`,
+  },
+  {
+    liste: 'Einheiten-Vorlagen',
+    api: '/api/einheit-vorlagen',
+    daten: async (request: APIRequestContext) => {
+      const typen = (await (await request.get('/api/einheit-typen')).json()) as { id: number }[];
+      return { name: `E2E Gate3 Pfad Vorlage ${Date.now()}`, typ_id: typen[0].id };
+    },
+    pfad: (id: number) => `/admin/stammdaten/einheiten/${id}`,
   },
 ]) {
   test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px`, async ({
@@ -295,7 +308,7 @@ for (const { liste, api, daten, pfad } of [
     test.setTimeout(120_000);
     await page.setViewportSize(FUEKW);
     await anmelden(page);
-    const antwort = await page.request.post(api, { data: daten });
+    const antwort = await page.request.post(api, { data: await daten(page.request) });
     expect(antwort.ok(), `Seeding ${liste}: ${antwort.status()} ${await antwort.text()}`).toBe(
       true,
     );

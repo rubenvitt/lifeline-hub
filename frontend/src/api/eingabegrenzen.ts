@@ -68,3 +68,13 @@ export const EXTERNE_STELLE_KURZ_MAX = 100;
 export const MELDENDE_STELLE_MAX = 200;
 /** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
 export const EINSATZLEITER_NAME_MAX = 200;
+/** Name einer Einheiten-Vorlage (LLH-1042). */
+export const EINHEIT_VORLAGE_NAME_MAX = 200;
+/** Funkrufname einer Einheiten-Vorlage. */
+export const EINHEIT_VORLAGE_FUNKRUFNAME_MAX = 100;
+/** Bemerkung einer Einheiten-Vorlage. */
+export const EINHEIT_VORLAGE_BEMERKUNG_MAX = 2_000;
+/** Fahrzeuge je Einheiten-Vorlage. */
+export const EINHEIT_VORLAGE_FAHRZEUGE_MAX = 50;
+/** Personen der Stammbesetzung je Einheiten-Vorlage. */
+export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;

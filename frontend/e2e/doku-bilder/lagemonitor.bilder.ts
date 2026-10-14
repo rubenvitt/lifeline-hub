@@ -31,6 +31,22 @@ const KAPITEL = 'lagemonitor';
 const EINSATZORT = { einsatzort_lat: 50.953, einsatzort_lon: 10.244 };
 /** Die Turnhalle, ein Stück nordöstlich davon. */
 const UHS_ORT = { lat: 50.957, lon: 10.252 };
+/**
+ * Fläche des ersten Demo-Abschnitts um Einsatzort und Turnhalle (die Demo-Abschnitte tragen keine
+ * Fläche). Die beiden Gefahrengebiete bringt der Demo-Einsatz mit.
+ */
+const ABSCHNITT_FLAECHE = JSON.stringify({
+  type: 'Polygon',
+  coordinates: [
+    [
+      [10.236, 50.951],
+      [10.258, 50.951],
+      [10.258, 50.961],
+      [10.236, 50.961],
+      [10.236, 50.951],
+    ],
+  ],
+});
 const STIL_PFAD = '/api/karte/proxy/9/style.json';
 const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
 
@@ -57,6 +73,10 @@ async function monitor(page: Page, browser: Browser) {
   await fuelle(page, 'patch', `/api/einsaetze/${demo.id}`, EINSATZORT);
   const uhs = await ersteUhs(page, demo.id);
   await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/uhs/${uhs}`, UHS_ORT);
+  const abschnitt = await ersterAbschnitt(page, demo.id);
+  await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/abschnitte/${abschnitt}/flaeche`, {
+    flaeche_geojson: ABSCHNITT_FLAECHE,
+  });
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
@@ -77,7 +97,16 @@ async function monitor(page: Page, browser: Browser) {
     'open',
   );
   await expect(geraet.locator('[data-lfh="monitor-uhs"]').first()).toBeVisible();
-  return { kontext, geraet, einsatz: demo.id, uhs };
+  return { kontext, geraet, einsatz: demo.id, uhs, abschnitt };
+}
+
+/** Der erste Abschnitt des Demo-Einsatzes. */
+async function ersterAbschnitt(page: Page, einsatz: number): Promise<number> {
+  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/abschnitte`);
+  expect(antwort.ok(), `Abschnitte: ${antwort.status()}`).toBe(true);
+  const [erster] = (await antwort.json()) as { id: number }[];
+  expect(erster, 'der Demo-Einsatz hat einen Abschnitt').toBeDefined();
+  return erster.id;
 }
 
 /** Die UHS des Demo-Einsatzes. */
@@ -89,8 +118,11 @@ async function ersteUhs(page: Page, einsatz: number): Promise<number> {
   return erste.id;
 }
 
-/** Nimmt Einsatzort und UHS-Ort wieder heraus (Teil-PATCH mit `null`). */
-async function orteZuruecksetzen(page: Page, einsatz: number, uhs: number) {
+/** Nimmt Einsatzort, UHS-Ort und Abschnittsfläche wieder heraus (Teil-PATCH mit `null`). */
+async function orteZuruecksetzen(page: Page, einsatz: number, uhs: number, abschnitt: number) {
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/abschnitte/${abschnitt}/flaeche`, {
+    flaeche_geojson: null,
+  });
   await fuelle(page, 'patch', `/api/einsaetze/${einsatz}`, {
     einsatzort_lat: null,
     einsatzort_lon: null,
@@ -100,20 +132,20 @@ async function orteZuruecksetzen(page: Page, einsatz: number, uhs: number) {
 
 test.describe(KAPITEL, () => {
   test('Großbild mit Karte, Kacheln und Statusleiste', async ({ page, browser }) => {
-    const { kontext, geraet, einsatz, uhs } = await monitor(page, browser);
+    const { kontext, geraet, einsatz, uhs, abschnitt } = await monitor(page, browser);
     try {
-      // Gerendert heißt: Einsatzort und UHS stehen als Marken auf der Karte.
-      await expect(geraet.locator('.maplibregl-marker')).toHaveCount(2);
+      // Gerendert heißt: Einsatzort, UHS und die Abschnittsfläche stehen als Marken auf der Karte.
+      await expect(geraet.locator('.maplibregl-marker')).toHaveCount(3);
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'lagemonitor');
     } finally {
       await kontext.close();
-      await orteZuruecksetzen(page, einsatz, uhs);
+      await orteZuruecksetzen(page, einsatz, uhs, abschnitt);
     }
   });
 
   test('Gerätemenü nach langem Drücken auf die Statusleiste', async ({ page, browser }) => {
-    const { kontext, geraet, einsatz, uhs } = await monitor(page, browser);
+    const { kontext, geraet, einsatz, uhs, abschnitt } = await monitor(page, browser);
     try {
       const leiste = geraet.locator('[data-lfh="monitor-statusleiste"]');
       const box = await leiste.boundingBox();
@@ -130,7 +162,7 @@ test.describe(KAPITEL, () => {
       await expect(menue).toHaveCount(0);
     } finally {
       await kontext.close();
-      await orteZuruecksetzen(page, einsatz, uhs);
+      await orteZuruecksetzen(page, einsatz, uhs, abschnitt);
     }
   });
 });

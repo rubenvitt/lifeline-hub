@@ -24,6 +24,7 @@ const KATALOG_MODULE: &[&str] = &[
     "material",
     "qualifikation",
     "einheit_typ",
+    "einheit_vorlage",
     "sprechgruppe",
     "etb_baustein",
     "stichwort",

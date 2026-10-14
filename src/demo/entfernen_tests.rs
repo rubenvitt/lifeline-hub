@@ -310,13 +310,14 @@ async fn entfernt_demo_einsatz_samt_etb_personen_und_stammdaten() {
     );
 
     assert_eq!(bericht.vorgang, DemoVorgang::Entfernt);
-    // Alle drei Arten, in Enum-Reihenfolge — unabhängig von der Löschreihenfolge.
+    // Alle Arten, in Enum-Reihenfolge — unabhängig von der Löschreihenfolge.
     assert_eq!(
         bericht.je_art.iter().map(|z| z.art).collect::<Vec<_>>(),
         vec![
             DemoStammdatenArt::Fahrzeug,
             DemoStammdatenArt::Personal,
             DemoStammdatenArt::Material,
+            DemoStammdatenArt::EinheitVorlage,
         ]
     );
     erwarte_zeile(&bericht, DemoStammdatenArt::Fahrzeug, 1, 0);
@@ -754,11 +755,7 @@ async fn kopf_auf_fremdem_einsatz_loescht_ihn_nicht() {
         1,
         "der Kopf ist geschlossen"
     );
-    for art in [
-        DemoStammdatenArt::Fahrzeug,
-        DemoStammdatenArt::Personal,
-        DemoStammdatenArt::Material,
-    ] {
+    for art in DemoStammdatenArt::ALLE {
         erwarte_zeile(&bericht, art, 0, 0);
     }
 }

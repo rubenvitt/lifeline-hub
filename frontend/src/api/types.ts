@@ -20,6 +20,8 @@ export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
 export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
+export type LagemonitorZone = S['LagemonitorZone'];
+export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
 export type KopplungAnzeige = S['KopplungAnzeige'];
 export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
@@ -226,6 +228,51 @@ export type Qualifikation = S['Qualifikation'];
 export type PersonalStatus = S['PersonalStatus'];
 export type EinheitTyp = S['EinheitTyp'];
 export type EinsatzPersonal = S['EinsatzPersonalAnzeige'];
+
+// ============================== LLH-1042 Einheiten-Vorlagen ==============================
+export type EinheitVorlage = S['EinheitVorlage'];
+export type EinheitVorlageFahrzeug = S['EinheitVorlageFahrzeug'];
+export type EinheitVorlagePersonal = S['EinheitVorlagePersonal'];
+
+/** POST-Body einer Einheiten-Vorlage (`VorlageBody` in `src/routes/einheit_vorlage.rs`). Kein
+ *  Backend-Schema, FE-lokal. Das Soll geht als Trio oder gar nicht. */
+export interface NeueEinheitVorlage {
+  name: string;
+  typ_id: number;
+  ueber_vorlage_id?: number | null;
+  funkrufname?: string | null;
+  tz_fachaufgabe?: string | null;
+  tz_organisation?: string | null;
+  soll_fuehrer?: number | null;
+  soll_unterfuehrer?: number | null;
+  soll_mannschaft?: number | null;
+  bemerkung?: string | null;
+  sortier?: number;
+}
+
+/** PATCH-Body (Tri-State: fehlender Key = unverändert, `null` = leeren bzw. Wurzel). Kein
+ *  Backend-Schema, FE-lokal. Name und Typ lassen sich nicht leeren. */
+export interface PatchEinheitVorlage {
+  name?: string;
+  typ_id?: number;
+  ueber_vorlage_id?: number | null;
+  funkrufname?: string | null;
+  tz_fachaufgabe?: string | null;
+  tz_organisation?: string | null;
+  soll_fuehrer?: number | null;
+  soll_unterfuehrer?: number | null;
+  soll_mannschaft?: number | null;
+  bemerkung?: string | null;
+  sortier?: number;
+  aktiv?: boolean;
+}
+
+/** Eine Zeile der Stammbesetzung im PUT. Kein Backend-Schema, FE-lokal. */
+export interface EinheitVorlagePersonalEingabe {
+  personal_id: number;
+  fahrzeug_id?: number | null;
+  staerke_position?: StaerkePosition | null;
+}
 
 // ============================== LFH-109 Sprechgruppen-Katalog ==============================
 export type Betriebsart = S['Betriebsart'];
