@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { waehleIn } from './auswahl-kern';
+import { waehleStehend, zeigtWahl } from './auswahl-kern';
 import { anmelden } from './meldebild-kern';
 import { seedeVorlage } from './vorlage-kern';
 
@@ -23,7 +23,13 @@ test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)',
   await page.goto(`/einsaetze/${einsatzId}/einheiten`);
   await page.getByRole('button', { name: 'Einheit bilden' }).click();
   const dialog = page.getByRole('dialog', { name: 'Einheit bilden' });
-  await waehleIn(dialog.getByRole('combobox', { name: 'Vorlage' }), v.zug);
+  // Suchen statt Scrollen: die Liste ist virtuell, und andere Specs säen org-weit Vorlagen, deren
+  // Namen davor sortieren; ohne Suche stünde die Option unterhalb des gerenderten Ausschnitts.
+  const vorlage = dialog.getByRole('combobox', { name: 'Vorlage' });
+  await vorlage.click();
+  await vorlage.fill(v.zug);
+  await waehleStehend(page, v.zug);
+  await zeigtWahl(vorlage, v.zug);
   // Mit Vorlage fragt der Dialog weder Name noch Typ: die stehen auf der Seite.
   await expect(dialog.getByLabel('Name', { exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Weiter' }).click();
