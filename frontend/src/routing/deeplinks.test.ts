@@ -48,6 +48,7 @@ import {
   parsePersonenSicht,
   parseBerichtAuswahl,
   personalPfad,
+  einsatzkraftPfad,
   einheitenPfad,
   fahrzeugePfad,
   parseFahrzeugeAnsicht,
@@ -452,6 +453,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('personalPfad mit ?personal=', () => {
     expect(personalPfad(E, { personal: 12 })).toBe('/einsaetze/5/personal?personal=12');
+  });
+  it('einsatzkraftPfad ist die Item-Route der Personenansicht (LLH-1060)', () => {
+    expect(einsatzkraftPfad(E, 12)).toBe('/einsaetze/5/personal/12');
   });
   it('einheitenPfad mit ?einheit=', () => {
     expect(einheitenPfad(E, { einheit: 4 })).toBe('/einsaetze/5/einheiten?einheit=4');
