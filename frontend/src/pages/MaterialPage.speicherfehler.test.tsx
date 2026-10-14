@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import MaterialPage from './MaterialPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 
@@ -59,7 +58,9 @@ function render(liste = [em, zweites]) {
   server.use(
     meHandler(adminFixture()),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json(liste)),
+    http.get('/api/einsaetze/1/material', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
+    ),
     http.get('/api/material', () => HttpResponse.json(pool)),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
@@ -134,38 +135,40 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
-  it('Entfernen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
+  it('Herausnehmen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
     const ersteAntwort = tor();
     server.use(
-      http.delete('/api/einsaetze/1/material/10', async () => {
+      http.post('/api/einsaetze/1/material/10/entlassen', async () => {
         await ersteAntwort.offen;
         return HttpResponse.json(
-          { error: 'Material ist einer Einheit zugeordnet' },
+          { error: 'Das Material ist bereits aus dem Einsatz genommen' },
           { status: 409 },
         );
       }),
-      http.delete('/api/einsaetze/1/material/11', () => new HttpResponse(null, { status: 204 })),
+      http.post('/api/einsaetze/1/material/11/entlassen', () =>
+        HttpResponse.json({ ...zweites, beendet_als: 'entlassen' }),
+      ),
     );
     const { container } = render();
     await screen.findByText('Wolldecke');
 
-    await userEvent.click(within(zeile(container, 10)).getByRole('button', { name: 'Entfernen' }));
     await userEvent.click(
-      within(await offeneRueckfrage()).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+      within(zeile(container, 10)).getByRole('button', {
+        name: 'Wolldecke aus dem Einsatz nehmen',
+      }),
     );
     // Die zweite Zeile schreibt, bevor die erste Antwort da ist.
-    await userEvent.click(within(zeile(container, 11)).getByRole('button', { name: 'Entfernen' }));
-    const offen = [
-      ...document.querySelectorAll<HTMLElement>('.ant-popconfirm:not(.ant-popover-hidden)'),
-    ].pop()!;
-    await userEvent.click(within(offen).getByRole('button', { name: 'Aus Einsatz entfernen' }));
+    await userEvent.click(
+      within(zeile(container, 11)).getByRole('button', { name: 'Zeltbahn aus dem Einsatz nehmen' }),
+    );
     await act(async () => ersteAntwort.frei());
 
     expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
-      'Material ist einer Einheit zugeordnet',
+      'Das Material ist bereits aus dem Einsatz genommen',
     );
     expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
-    expect(toasts()).toBe(0);
+    // Der Erfolg der zweiten trägt den Rückgängig-Toast; ein Fehler-Toast steht nirgends.
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 
   it('Menge: der Grund steht an der Zeile, das Feld bleibt bedienbar und sendet erneut', async () => {

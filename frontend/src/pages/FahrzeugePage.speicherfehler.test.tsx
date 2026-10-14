@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import FahrzeugePage from './FahrzeugePage';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
@@ -83,7 +82,9 @@ function render({
   server.use(
     meHandler(benutzerFixture()),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(liste)),
+    http.get('/api/einsaetze/7/fahrzeuge', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
+    ),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
@@ -205,12 +206,12 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
-  it('Status und Entfernen an der Karte unter md', async () => {
+  it('Status und Entlassen an der Karte unter md', async () => {
     setzeViewportBreite(390);
     server.use(
       statusAbgelehnt(),
-      http.delete('/api/einsaetze/7/fahrzeuge/11', () =>
-        HttpResponse.json({ error: 'Fahrzeug hat Besatzung' }, { status: 409 }),
+      http.post('/api/einsaetze/7/fahrzeuge/11/entlassen', () =>
+        HttpResponse.json({ error: 'Das Fahrzeug ist storniert' }, { status: 409 }),
       ),
     );
     render();
@@ -220,12 +221,11 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
       'Status abgelehnt',
     );
 
-    await userEvent.click(within(karte('Florian 2')).getByRole('button', { name: 'Entfernen' }));
     await userEvent.click(
-      within(await offeneRueckfrage()).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+      within(karte('Florian 2')).getByRole('button', { name: 'Florian 2 entlassen' }),
     );
     expect(await within(karte('Florian 2')).findByRole('alert')).toHaveTextContent(
-      'Fahrzeug hat Besatzung',
+      'Das Fahrzeug ist storniert',
     );
     expect(toasts()).toBe(0);
   });

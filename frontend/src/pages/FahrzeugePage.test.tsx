@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import FahrzeugePage from './FahrzeugePage';
@@ -77,12 +76,18 @@ function render(
   einsatzObj: ReturnType<typeof einsatz>,
   personal: ReturnType<typeof person>[] = [],
   efObj: Record<string, unknown> | Record<string, unknown>[] = ef,
+  entlasseneDaten: unknown[] = [],
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(efListe)),
+    // Aktive und entlassene Fahrzeuge teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
+    http.get('/api/einsaetze/7/fahrzeuge', ({ request }) =>
+      HttpResponse.json(
+        new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : efListe,
+      ),
+    ),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
@@ -239,12 +244,126 @@ describe('FahrzeugePage', () => {
     );
   });
 
-  it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entfernen-Aktionen', async () => {
+  it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entlassen-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Florian 1');
     expect(screen.getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Florian 1 entlassen' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * Entlassen ist umkehrbar (LLH-1079 Teil II, design.md D8): ein Klick ohne Rückfrage, danach ein
+   * Rückgängig-Toast, der dasselbe Fahrzeug erneut disponiert.
+   */
+  it('Entlassen fragt nicht nach und bietet Rückgängig an', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => {
+        aufrufe.push('entlassen');
+        return HttpResponse.json({ ...ef, beendet_als: 'entlassen' });
+      }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/reaktivieren', () => {
+        aufrufe.push('reaktivieren');
+        return HttpResponse.json(ef);
+      }),
+    );
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    const knopf = screen.getByRole('button', { name: 'Florian 1 entlassen' });
+    expect(knopf).toHaveClass('ant-btn-dangerous');
+    await userEvent.click(knopf);
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
+    expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
+    expect(await screen.findByText('Florian 1 entlassen')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
+  });
+
+  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
+  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () =>
+        HttpResponse.json({ ...ef, beendet_als: 'entlassen' }),
+      ),
+      http.post('/api/einsaetze/7/fahrzeuge/10/reaktivieren', () =>
+        HttpResponse.json({ error: 'Fahrzeug ist außer Dienst' }, { status: 422 }),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Florian 1 entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await screen.findByText('Fahrzeug ist außer Dienst');
+    expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
+    expect(hinweis.closest('.ant-alert')).not.toBeNull();
+  });
+
+  /**
+   * Stornieren ist unumkehrbar: Zeilenmenü, `<Modal>` mit einem Satz zur Folge, der Knopf nennt
+   * die Handlung (Spec `kraefte-entlassung`). Die Ablehnung des Servers steht an der Zeile.
+   */
+  it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
+    let gesendet = 0;
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge/10/stornieren', () => {
+        gesendet += 1;
+        return HttpResponse.json(
+          {
+            error:
+              'Das Fahrzeug ist einer Einheit zugeordnet; erst lösen oder das Fahrzeug entlassen',
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    const { container } = render(einsatz());
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Florian 1 stornieren?');
+    expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
+      /^Das Fahrzeug erscheint danach in keiner Liste und keinem Nachweis\.$/,
+    );
+    expect(gesendet).toBe(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stornieren' }));
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent('erst lösen');
+    expect(gesendet).toBe(1);
+  });
+
+  /** Spec „Block Entlassen“: eingeklappt unter der Liste, mit „Erneut disponieren“. */
+  it('zeigt Entlassene eingeklappt unter der Liste und disponiert sie erneut', async () => {
+    let reaktiviert: number | null = null;
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge/:ef/reaktivieren', ({ params }) => {
+        reaktiviert = Number(params.ef);
+        return HttpResponse.json(ef);
+      }),
+    );
+    const entlassen = (id: number, funkrufname: string) => ({
+      ...ef,
+      id,
+      funkrufname,
+      beendet_at: '2026-05-26 12:00:00',
+      beendet_als: 'entlassen',
+    });
+    render(einsatz(), [], ef, [entlassen(20, 'Florian 8'), entlassen(21, 'Florian 9')]);
+    const kopf = await screen.findByRole('button', { name: /Entlassen \(2\)/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Florian 8')).toBeNull();
+    await userEvent.click(kopf);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Erneut disponieren: Florian 8' }),
+    );
+    await waitFor(() => expect(reaktiviert).toBe(20));
   });
 
   it('Beobachter sieht reine Anzeige (Status-Badge statt Select)', async () => {
@@ -252,7 +371,7 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Fahrzeuge disponieren' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Florian 1 entlassen' })).not.toBeInTheDocument();
     // Ein FMS-Format überall: „S3 · disponiert“ aus dem Katalog-Anker (LFH-973).
     expect(screen.getByText('S3 · disponiert')).toBeInTheDocument();
   });
@@ -261,7 +380,7 @@ describe('FahrzeugePage', () => {
     render(einsatz({ status: 'abgeschlossen', abgeschlossen_at: '2026-05-26 12:00:00' }));
     await screen.findByText('Florian 1');
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Florian 1 entlassen' })).not.toBeInTheDocument();
   });
 
   /** Das Besatzungs-Urteil der Tabellenzeile (die Spalte „Besatzung"), nicht das im Aufklappteil. */
@@ -613,23 +732,28 @@ describe('FahrzeugePage', () => {
       expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
     });
 
-    it('die Karte trägt genau eine Primäraktion, und die fragt nach (Kriterium 4)', async () => {
+    /**
+     * Genau eine Primäraktion (Kriterium 4): „Entlassen“ ist umkehrbar und fragt nicht nach
+     * (LLH-1079, design.md D8); Stornieren steht im Menü daneben.
+     */
+    it('die Karte trägt genau eine Primäraktion, und die entlässt ohne Rückfrage', async () => {
+      let entlassen = 0;
+      server.use(
+        http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => {
+          entlassen += 1;
+          return HttpResponse.json({ ...ef, beendet_als: 'entlassen' });
+        }),
+      );
       setzeViewportBreite(390);
       const { container } = render(einsatz());
       await screen.findByText('Florian 1');
       const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
-      const knopf = within(karte).getByRole('button', { name: 'Entfernen' });
-      // Rot bedient nichts: die kritische Aktion trägt keinen Gefahren-Anstrich, sondern eine
-      // Rückfrage.
-      expect(knopf).not.toHaveClass('ant-btn-dangerous');
-      fireEvent.click(knopf);
-      expect(await screen.findByText('Aus Einsatz entfernen?')).toBeInTheDocument();
-      // Der Bestätigungsknopf nennt die Handlung, nicht antds „OK“ (LFH-1090).
-      const rueckfrage = await offeneRueckfrage();
       expect(
-        within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+        within(karte).getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }),
       ).toBeInTheDocument();
-      expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
+      fireEvent.click(within(karte).getByRole('button', { name: 'Florian 1 entlassen' }));
+      await waitFor(() => expect(entlassen).toBe(1));
+      expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     });
   });
 
