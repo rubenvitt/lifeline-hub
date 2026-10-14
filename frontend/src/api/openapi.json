@@ -13666,7 +13666,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`, bei `gebunden`)."
+            "description": "Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`; bei `gebunden`, oder bei\n`frei`, wenn es schon ihr Fahrzeug der Vorlage ist)."
           },
           "einheit_id": {
             "type": [

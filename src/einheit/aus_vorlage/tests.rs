@@ -219,6 +219,12 @@ const ALLES: Lesen = Lesen {
     personal: true,
 };
 
+/// Für [`vorschau`]: kein Modul gesperrt.
+const NICHTS_GESPERRT: Lesen = Lesen {
+    fahrzeuge: false,
+    personal: false,
+};
+
 async fn plane(pool: &SqlitePool, z: &Zug, vorlage: i64) -> Result<Plan, AppError> {
     let mut conn = pool.acquire().await.unwrap();
     plane_tx(&mut conn, z.k.einsatz_id, z.k.org_id, vorlage, ALLES).await
@@ -889,7 +895,7 @@ async fn enkel_vor_seinem_elternteil_in_der_sortierung_haengt_unter_ihm() {
         let plan = plane(&pool, &z, z.zug).await.unwrap();
         let ids: Vec<i64> = plan.knoten.iter().map(|k| k.id).collect();
         assert_eq!(ids, [z.zug, z.staffel, enkel], "{fall}: Plan");
-        let v = vorschau(&plan, ALLES);
+        let v = vorschau(&plan, NICHTS_GESPERRT);
         let knoten: Vec<(i64, Option<i64>)> = v
             .knoten
             .iter()
@@ -1147,8 +1153,10 @@ async fn personen_nach_vorlage_mit_position_und_besatzung() {
     assert_eq!(einheit_ereignisse, 0);
 }
 
-/// Eine umgehängte Person ohne Einheit, die auf ihrem Vorlagen-Fahrzeug sitzt, gilt nicht als
-/// umgehängt; eine auf einem fremden Fahrzeug wechselt aufs Vorlagen-Fahrzeug.
+/// Eine Person ohne Einheit, die schon auf ihrem Vorlagen-Fahrzeug sitzt, ist frei (Spec
+/// `kraefte-disposition`, „Umhängen nur auf Wunsch“: nur ein *anderes* Fahrzeug bindet): sie
+/// kommt ohne „umhängen“ mit und gilt nicht als umgehängt. Eine auf einem fremden Fahrzeug
+/// braucht „umhängen“ und wechselt dann aufs Vorlagen-Fahrzeug.
 #[tokio::test]
 async fn besatzung_wechselt_aufs_vorlagenfahrzeug() {
     let pool = crate::db::test_pool().await;
@@ -1156,12 +1164,29 @@ async fn besatzung_wechselt_aufs_vorlagenfahrzeug() {
     let ef1 = im_einsatz_fahrzeug(&pool, z.k, z.rtw1, None).await;
     let fremd_fz = fahrzeug(&pool, 1, "83-4").await;
     let ef_fremd = im_einsatz_fahrzeug(&pool, z.k, fremd_fz, None).await;
-    im_einsatz_person(&pool, z.k, z.notarzt, None, None, Some(ef1)).await;
+    let ep_nora = im_einsatz_person(&pool, z.k, z.notarzt, None, None, Some(ef1)).await;
     let ep_nils = im_einsatz_person(&pool, z.k, z.notsan, None, None, Some(ef_fremd)).await;
+
+    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let nora = &plan.personal[&z.notarzt];
+    assert_eq!(
+        (nora.zustand, nora.ep_id),
+        (VorschauZustand::Frei, Some(ep_nora)),
+        "auf dem eigenen Vorlagen-Fahrzeug: frei"
+    );
+    assert_eq!(plan.personal[&z.notsan].zustand, VorschauZustand::Gebunden);
+    let v = vorschau(&plan, NICHTS_GESPERRT);
+    let zeile = v.knoten[1]
+        .personal
+        .iter()
+        .find(|p| p.personal_id == z.notarzt)
+        .unwrap();
+    assert_eq!(zeile.zustand, VorschauZustand::Frei);
+
     let personal = [
         Wahl {
             id: z.notarzt,
-            umhaengen: true,
+            umhaengen: false,
         },
         Wahl {
             id: z.notsan,
@@ -1179,13 +1204,48 @@ async fn besatzung_wechselt_aufs_vorlagenfahrzeug() {
         }]
     );
     assert_eq!(g.alte_fahrzeuge, [ef_fremd]);
-    let fz: Option<i64> =
-        sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
-            .bind(ep_nils)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(fz, Some(ef1));
+    let zeilen: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, fahrzeug_id FROM einsatz_personal WHERE id IN (?, ?) ORDER BY id",
+    )
+    .bind(ep_nora)
+    .bind(ep_nils)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(zeilen, [(ep_nora, Some(ef1)), (ep_nils, Some(ef1))]);
+}
+
+/// Gegenfall: eine Person ohne Einheit auf einem anderen als ihrem Vorlagen-Fahrzeug ist
+/// gebunden; ohne „umhängen“ 422 mit dem Grund an ihr, und nichts ist angelegt.
+#[tokio::test]
+async fn person_auf_anderem_fahrzeug_braucht_umhaengen() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    // Notarzt Nora gehört laut Vorlage auf RTW 1, sitzt aber auf RTW 2 (auch ein Fahrzeug der
+    // Vorlage, nur nicht ihres).
+    let ef2 = im_einsatz_fahrzeug(&pool, z.k, z.rtw2, None).await;
+    im_einsatz_person(&pool, z.k, z.notarzt, None, None, Some(ef2)).await;
+    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    assert_eq!(plan.personal[&z.notarzt].zustand, VorschauZustand::Gebunden);
+    let fahrzeuge = wahl(&[z.rtw1, z.rtw2]);
+    let personal = wahl(&[z.notarzt]);
+    match bilde(&pool, &z, &anfrage(&fahrzeuge, &personal)).await {
+        Err(AppError::Zeilen { zeilen, .. }) => {
+            let gruende: Vec<(ZeilenArt, i64, &str)> = zeilen
+                .iter()
+                .map(|z| (z.art, z.id, z.grund.as_str()))
+                .collect();
+            assert_eq!(gruende, [(ZeilenArt::Personal, z.notarzt, "auf «RTW 2»")]);
+        }
+        andere => panic!("erwartet Zeilen: {andere:?}"),
+    }
+    let einheiten = zaehle(
+        &pool,
+        "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+        z.k.einsatz_id,
+    )
+    .await;
+    assert_eq!(einheiten, 0);
 }
 
 /// Alles oder nichts: ein Fehler mitten im Schreiben (hier eine seit der Planung entlassene

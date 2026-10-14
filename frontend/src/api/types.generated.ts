@@ -5238,7 +5238,8 @@ export interface components {
         VorschauPersonal: {
             /**
              * Format: int64
-             * @description Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`, bei `gebunden`).
+             * @description Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`; bei `gebunden`, oder bei
+             *     `frei`, wenn es schon ihr Fahrzeug der Vorlage ist).
              */
             ef_id?: number | null;
             /**

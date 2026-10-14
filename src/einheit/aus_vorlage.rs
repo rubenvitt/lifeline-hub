@@ -42,9 +42,10 @@ wire_enum! {
     pub enum VorschauZustand {
         /// Nicht im Einsatz (oder storniert): wird disponiert.
         Neu => "neu",
-        /// Im Einsatz, ohne Einheit und (Person) ohne Fahrzeug: wird zugeordnet.
+        /// Im Einsatz, ohne Einheit und (Person) ohne Fahrzeug oder schon auf ihrem Fahrzeug der
+        /// Vorlage: wird zugeordnet.
         Frei => "frei",
-        /// In einer anderen Einheit oder (Person) auf einem Fahrzeug: nur mit „umhängen“.
+        /// In einer anderen Einheit oder (Person) auf einem anderen Fahrzeug: nur mit „umhängen“.
         Gebunden => "gebunden",
         /// Im Stamm außer Dienst und nicht im Einsatz: gesperrt.
         AusserDienst => "ausser_dienst",
@@ -128,7 +129,8 @@ pub struct VorschauPersonal {
     pub einheit_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einheit_name: Option<String>,
-    /// Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`, bei `gebunden`).
+    /// Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`; bei `gebunden`, oder bei
+    /// `frei`, wenn es schon ihr Fahrzeug der Vorlage ist).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ef_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -205,8 +207,8 @@ pub fn fahrzeug_zustand(in_dienst: bool, zeile: Option<(bool, bool)>) -> Vorscha
 }
 
 /// Zustand einer Stamm-Person (D4). `beendet_als` ist der Endzustand einer beendeten Zeile
-/// (`None` = aktiv), `gebunden` heißt Einheit oder Fahrzeug. Eine stornierte Zeile gilt als
-/// nicht im Einsatz (`neu`): sie steht in keinem Nachweis.
+/// (`None` = aktiv), `gebunden` heißt Einheit oder ein anderes Fahrzeug als das der Vorlage.
+/// Eine stornierte Zeile gilt als nicht im Einsatz (`neu`): sie steht in keinem Nachweis.
 pub fn personal_zustand(in_dienst: bool, zeile: Option<(Option<&str>, bool)>) -> VorschauZustand {
     match zeile {
         Some((None, true)) => VorschauZustand::Gebunden,
@@ -249,6 +251,8 @@ struct PersonalZeile {
     einheit_id: Option<i64>,
     einheit_name: Option<String>,
     ef_id: Option<i64>,
+    /// Stamm-ID des Fahrzeugs, auf dem die Person sitzt.
+    ef_fahrzeug_id: Option<i64>,
     fahrzeug_name: Option<String>,
 }
 
@@ -295,18 +299,22 @@ async fn load_fahrzeug_lagen_tx(
 
 /// Lage aller Stamm-Personen in **einer** Anweisung. Liest absichtlich auch beendete Zeilen
 /// (entlassen gegen storniert); Ausnahme mit Grund in der ALLOWLIST des Wächters
-/// (`src/entlassung.rs`).
+/// (`src/entlassung.rs`). `vorlagen_fahrzeug` ist je Person das Stamm-Fahrzeug der Vorlage: wer
+/// ohne Einheit schon darauf sitzt, ist frei, nicht gebunden (Spec `kraefte-disposition`,
+/// „Umhängen nur auf Wunsch“).
 async fn load_personal_lagen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     ids: &[i64],
+    vorlagen_fahrzeug: &HashMap<i64, i64>,
 ) -> Result<HashMap<i64, PersonalLage>, AppError> {
     let zeilen: Vec<PersonalZeile> = sqlx::query_as(
         "SELECT j.value AS personal_id, p.dienststatus, ep.id AS ep_id, \
                 ep.beendet_at AS ep_beendet_at, ep.beendet_als AS ep_beendet_als, \
                 e.id AS einheit_id, e.name AS einheit_name, \
-                ef.id AS ef_id, ef.snap_funkrufname AS fahrzeug_name \
+                ef.id AS ef_id, ef.fahrzeug_id AS ef_fahrzeug_id, \
+                ef.snap_funkrufname AS fahrzeug_name \
          FROM json_each(?1) j \
          JOIN personal p ON p.id = j.value AND p.org_id = ?2 \
          LEFT JOIN einsatz_personal ep ON ep.personal_id = j.value AND ep.einsatz_id = ?3 \
@@ -338,9 +346,12 @@ async fn load_personal_lagen_tx(
             } else {
                 Some(z.ep_beendet_als.as_deref().unwrap_or("entlassen"))
             };
+            let auf_eigenem = z.ef_fahrzeug_id.is_some()
+                && z.ef_fahrzeug_id == vorlagen_fahrzeug.get(&z.personal_id).copied();
+            let anderes_fahrzeug = fahrzeug.is_some() && !auf_eigenem;
             let zeile = z
                 .ep_id
-                .map(|_| (ende, einheit.is_some() || fahrzeug.is_some()));
+                .map(|_| (ende, einheit.is_some() || anderes_fahrzeug));
             let zustand = personal_zustand(z.dienststatus == DIENSTSTATUS_IN_DIENST, zeile);
             (
                 z.personal_id,
@@ -390,7 +401,12 @@ pub async fn plane_tx(
         HashMap::new()
     };
     let personal = if lesen.personal && !personal_ids.is_empty() {
-        load_personal_lagen_tx(conn, einsatz_id, org_id, &personal_ids).await?
+        let vorlagen_fahrzeug: HashMap<i64, i64> = knoten
+            .iter()
+            .flat_map(|k| k.personal.iter())
+            .filter_map(|p| p.fahrzeug_id.map(|f| (p.personal_id, f)))
+            .collect();
+        load_personal_lagen_tx(conn, einsatz_id, org_id, &personal_ids, &vorlagen_fahrzeug).await?
     } else {
         HashMap::new()
     };
