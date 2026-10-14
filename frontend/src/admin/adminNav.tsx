@@ -9,6 +9,7 @@ import QualifikationenTab from '../stammdaten/QualifikationenTab';
 import PersonalStatusTab from '../stammdaten/PersonalStatusTab';
 import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
+import EinheitVorlagenTab from '../stammdaten/EinheitVorlagenTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 import FuehrungsfunktionenTab from '../stammdaten/FuehrungsfunktionenTab';
@@ -56,6 +57,7 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'personal-status', label: 'Personal-Status', element: <PersonalStatusTab /> },
       { key: 'etb-bausteine', label: 'ETB-Schnellbausteine', element: <EtbBausteineTab /> },
       { key: 'einheit-typen', label: 'Einheitstypen', element: <EinheitTypenTab /> },
+      { key: 'einheiten', label: 'Einheiten-Vorlagen', element: <EinheitVorlagenTab /> },
       { key: 'organisation', label: 'Organisation', element: <OrganisationTab /> },
       { key: 'sprechgruppen', label: 'Sprechgruppen', element: <SprechgruppenTab /> },
       {

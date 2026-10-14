@@ -191,6 +191,76 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.schliessFehler).toBeNull();
   });
 
+  it('LLH-1152: bricht im 409-Pfad das Entfernen ab, steht der Wortlaut nach dem Laden unter der neuen id', async () => {
+    await entwurfSpeichern(entwurf({ id: 'alt', inhalt: 'Wortlaut aus Tab 2' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Echte Platte, nur die Löschtransaktion bricht ab (Plattenfehler beim Entfernen).
+    const loeschen = IDBObjectStore.prototype.delete;
+    const spion = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      const anfrage = loeschen.apply(this, args);
+      this.transaction.abort();
+      return anfrage;
+    });
+
+    let neueId: string | null = null;
+    // Wirft nicht: der Aufrufer wirft die 409 weiter, ein Plattenfehler darf sie nicht ersetzen.
+    await act(async () => {
+      neueId = await result.current.entwurfNeuAusweisen('alt');
+    });
+    spion.mockRestore();
+    expect(neueId).not.toBeNull();
+    expect(neueId).not.toBe('alt');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), expect.anything());
+
+    // Neuladen: der Vorlauf trägt das Entfernen der alten id nach, die neue Fassung steht.
+    const geladen = await entwuerfeLaden(ICH, 7);
+    expect(geladen.map((e) => [e.id, e.inhalt])).toEqual([[neueId, 'Wortlaut aus Tab 2']]);
+  });
+
+  it('LLH-1152: scheitert im 409-Pfad das Speichern, bleibt die alte Fassung auf der Platte', async () => {
+    await entwurfSpeichern(entwurf({ id: 'alt', inhalt: 'Wortlaut' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(entwurfStore, 'entwurfSpeichern').mockRejectedValueOnce(new Error('voll'));
+    const entfernen = vi.spyOn(entwurfStore, 'entwurfEntfernen');
+
+    await act(async () => {
+      await expect(result.current.entwurfNeuAusweisen('alt')).resolves.not.toBeNull();
+    });
+    expect(entfernen).not.toHaveBeenCalled();
+    expect((await entwuerfeLaden(ICH, 7)).map((e) => e.inhalt)).toEqual(['Wortlaut']);
+  });
+
+  it('LLH-1152: Plattenfehler beim Aktualisieren und Festhalten landen im Protokoll, nicht als unbehandelte Ablehnung', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    const id = result.current.entwuerfe[0].id;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const speichernGrund = new Error('Speichern gesperrt');
+    const entfernenGrund = new Error('Entfernen gesperrt');
+    const festhaltenGrund = new Error('Festhalten gesperrt');
+    vi.spyOn(entwurfStore, 'entwurfSpeichern')
+      .mockRejectedValueOnce(speichernGrund)
+      .mockRejectedValueOnce(festhaltenGrund);
+    vi.spyOn(entwurfStore, 'entwurfEntfernen').mockRejectedValueOnce(entfernenGrund);
+
+    await act(async () => {
+      result.current.entwurfAktualisieren(id, { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} });
+      result.current.entwurfAktualisieren(id, { inhalt: '', typ: 'meldung', metadaten: {} });
+      result.current.entwurfFesthalten(id);
+    });
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(3));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), speichernGrund);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), entfernenGrund);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), festhaltenGrund);
+  });
+
   it('persistiert unter StrictMode nur einmal — keine idb-Writes im setEntwuerfe-Updater (LFH-216)', async () => {
     const speichernSpy = vi.spyOn(entwurfStore, 'entwurfSpeichern');
     const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7), { wrapper: StrictMode });

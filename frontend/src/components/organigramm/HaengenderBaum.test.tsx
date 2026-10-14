@@ -125,21 +125,36 @@ describe('baumZielStil', () => {
 
 // ── Zufluss-Schleuse (LFH-867) ──────────────────────────────────────────────────────
 
-let setzeStand: (wurzeln: K[], kopf?: ReactNode) => void = () => {};
+let setzeStand: (wurzeln: K[], kopf?: ReactNode, kopfLaedt?: boolean) => void = () => {};
 
 /** Das Gerüst mit einem Stand, den der Test von außen „live“ ändert. */
-function Buehne({ start }: { start: K[] }) {
-  const [stand, setStand] = useState<{ wurzeln: K[]; kopf: ReactNode }>({
+function Buehne({
+  start,
+  kopf = <div data-testid="kopf">Stab 1</div>,
+  kopfLaedt = false,
+}: {
+  start: K[];
+  kopf?: ReactNode;
+  kopfLaedt?: boolean;
+}) {
+  const [stand, setStand] = useState<{ wurzeln: K[]; kopf: ReactNode; kopfLaedt: boolean }>({
     wurzeln: start,
-    kopf: <div data-testid="kopf">Stab 1</div>,
+    kopf,
+    kopfLaedt,
   });
-  setzeStand = (wurzeln, kopf) => setStand((alt) => ({ wurzeln, kopf: kopf ?? alt.kopf }));
+  setzeStand = (wurzeln, kopf, kopfLaedt) =>
+    setStand((alt) => ({
+      wurzeln,
+      kopf: kopf ?? alt.kopf,
+      kopfLaedt: kopfLaedt ?? alt.kopfLaedt,
+    }));
   return (
     <>
       <button type="button">draußen</button>
       <HaengenderBaum<K>
         bezeichnung="Testbaum"
         kopf={stand.kopf}
+        kopfLaedt={stand.kopfLaedt}
         wurzeln={stand.wurzeln}
         zugeklappt={new Set()}
         onUmschalten={() => {}}
@@ -155,7 +170,8 @@ function Buehne({ start }: { start: K[] }) {
 }
 
 const START = [k('a', [k('a1')]), k('b')];
-const live = (wurzeln: K[], kopf?: ReactNode) => act(() => setzeStand(wurzeln, kopf));
+const live = (wurzeln: K[], kopf?: ReactNode, kopfLaedt?: boolean) =>
+  act(() => setzeStand(wurzeln, kopf, kopfLaedt));
 const bereich = () => screen.getByRole('region', { name: 'Testbaum' });
 const stand = () => document.querySelector('[data-lfh="org-stand"]') as HTMLElement;
 const banner = () => screen.queryByRole('status');
@@ -253,6 +269,30 @@ describe('HaengenderBaum — Zufluss-Schleuse', () => {
     expect(screen.getByTestId('kopf')).toHaveTextContent('Stab 1');
     fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
     expect(screen.getByTestId('kopf')).toHaveTextContent('Stab 2');
+  });
+
+  it('lädt der Kopf beim Schließen, läuft er mit; danach hält die Schleuse ihn (LLH-1166)', () => {
+    renderMitProviders(
+      <Buehne start={START} kopf={<div data-testid="kopf">Leitung: lädt</div>} kopfLaedt />,
+    );
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    expect(stand()).toHaveTextContent('Live pausiert');
+    // Die Führungsstelle antwortet: der Einsatzleiter erscheint ohne Zeigerbewegung.
+    live(START, <div data-testid="kopf">BI Krause</div>, false);
+    expect(screen.getByTestId('kopf')).toHaveTextContent('BI Krause');
+    // Ab jetzt hält die Schleuse den Kopf wie jeden anderen, die Wurzeln hielt sie die ganze Zeit.
+    live([...START, k('c')], <div data-testid="kopf">KBM Weber</div>);
+    expect(screen.getByTestId('kopf')).toHaveTextContent('BI Krause');
+    expect(screen.queryByTestId('inhalt-c')).toBeNull();
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(screen.getByTestId('kopf')).toHaveTextContent('KBM Weber');
+  });
+
+  it('lädt der Kopf erneut, während die Schleuse ihn hält, bleibt er stehen', () => {
+    renderMitProviders(<Buehne start={START} />);
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    live(START, <div data-testid="kopf">Leitung: lädt</div>, true);
+    expect(screen.getByTestId('kopf')).toHaveTextContent('Stab 1');
   });
 
   it('im Druck stehen Baum und Kopf frisch, danach hält die Schleuse wieder', () => {

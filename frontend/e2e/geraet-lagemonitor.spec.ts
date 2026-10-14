@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  kachelnBeantworten,
+  kartenConfigBeantworten,
+  vektorStilBeantworten,
+} from './kartenFixture';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -9,10 +14,38 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Seeding als Admin über die API, die Gerätesitzung in einem eigenen Kontext. Kein `networkidle`
  * (LFH-385).
  *
+ * Die Karte zeigt Gefahrenzonen und Abschnittsflächen, aber keine Bezirke und Skizzen (LLH-1153);
+ * gelesen über den DEV-Haken `window.__lfhKarte`, die Kartengrundlage aus `kartenFixture.ts`.
+ *
  * Mutationsprobe: in `LagemonitorPage` die Zeilenhöhe `minmax(0, 1fr)` durch `auto` ersetzt und
  * alle elf UHS gezeigt (`UHS_SICHTBAR`), dazu die Zeile „+5 weitere“ gestrichen → die
  * Belegungskachel schneidet ab, und „keine Kachel schneidet ihren Inhalt ab“ wird rot.
  */
+
+const STIL_PFAD = '/api/karte/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+
+/** Rechteck um die UHS Nord als GeoJSON-String. */
+function rechteck(west: number, sued: number, ost: number, nord: number): string {
+  return JSON.stringify({
+    type: 'Polygon',
+    coordinates: [
+      [
+        [west, sued],
+        [ost, sued],
+        [ost, nord],
+        [west, nord],
+        [west, sued],
+      ],
+    ],
+  });
+}
+
+/** Ausschnitt der MapLibre-Instanz hinter `window.__lfhKarte`, ohne den maplibre-Typ. */
+interface MapHaken {
+  isStyleLoaded(): boolean;
+  queryRenderedFeatures(o: { layers: string[] }): { properties: Record<string, unknown> }[];
+}
 
 async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {
   const antwort = await page.request.post(pfad, data === undefined ? {} : { data });
@@ -54,6 +87,30 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/kraefte/${kraft.id}`);
     expect(zu.ok(), await zu.text()).toBeTruthy();
   }
+  // LLH-1153: eine Absperrung, ein Bezirk und eine Skizze, dazu ein Abschnitt mit Fläche.
+  for (const [typ, versatz] of [
+    ['absperrbereich', 0],
+    ['evakuierungsbezirk', 0.004],
+    ['freie_skizze', 0.008],
+  ] as const) {
+    await anlegen(page, `/api/einsaetze/${e}/zonen`, {
+      typ,
+      geometrie_typ: 'Polygon',
+      geometrie: rechteck(13.4 + versatz, 52.518, 13.403 + versatz, 52.52),
+      label: 'Garten Familie Erste',
+    });
+  }
+  const abschnitt = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+    name: 'EA Nord',
+    kurzbezeichnung: 'EA-N',
+  });
+  const flaeche = await page.request.patch(
+    `/api/einsaetze/${e}/abschnitte/${abschnitt.id}/flaeche`,
+    {
+      data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
+    },
+  );
+  expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -62,6 +119,15 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
 
   const kontext = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const monitor = await kontext.newPage();
+  await kartenConfigBeantworten(monitor, {
+    online_styles: [{ name: 'Kachel-Fixture', typ: 'vektor', url: STIL_PFAD }],
+  });
+  await vektorStilBeantworten(monitor, STIL_PFAD, {
+    id: 'fixture',
+    kachelVorlage: `${KACHEL_PRAEFIX}{z}/{x}/{y}.pbf`,
+    layer: 'strassen',
+  });
+  await kachelnBeantworten(monitor, KACHEL_PRAEFIX, 'strassen');
   try {
     await monitor.goto(`/koppeln#${kopplung.code.code}`);
     await monitor.getByRole('button', { name: 'Gerät koppeln' }).click();
@@ -130,6 +196,24 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     const karte = monitor.locator('[data-lfh="lagemonitor-karte"]');
     await expect(karte.locator('canvas')).toBeVisible();
     await expect(karte.getByText('UHS Nord · 3')).toBeVisible();
+    // Gefahrenzone und Abschnittsfläche sind gezeichnet, Bezirk und Skizze nicht (LLH-1153).
+    await expect(karte.getByText('EA-N')).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          monitor.evaluate(() => {
+            const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+            if (!map?.isStyleLoaded()) return null;
+            const typen = map
+              .queryRenderedFeatures({ layers: ['zonen-fill', 'zonen-line'] })
+              .map((f) => String(f.properties.typ));
+            const flaechen = map.queryRenderedFeatures({ layers: ['abschnitte-fill'] }).length;
+            return { typen: [...new Set(typen)].sort(), flaeche: flaechen > 0 };
+          }),
+        { timeout: 15_000, message: 'Flächen der Monitorkarte' },
+      )
+      .toEqual({ typen: ['absperrbereich'], flaeche: true });
+    await expect(monitor.getByText('Garten Familie Erste')).toHaveCount(0);
 
     // Tippen und Ziehen auf die Kacheln ändert nichts.
     const vorher = await belegung.textContent();

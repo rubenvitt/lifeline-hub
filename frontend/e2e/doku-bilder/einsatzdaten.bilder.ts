@@ -8,7 +8,6 @@ import {
   apiAlsAdmin,
   anmelden,
   demoEinsatz,
-  einsatzleiterFuellen,
   expect,
   fotografiere,
   fuehrungsstelleOrtFuellen,
@@ -142,7 +141,6 @@ test.describe(KAPITEL, () => {
       });
     }
     await fuehrungsstelleOrtFuellen(api, id);
-    await einsatzleiterFuellen(api, demo);
     await api.dispose();
   });
 

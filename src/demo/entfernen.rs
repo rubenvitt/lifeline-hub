@@ -10,7 +10,8 @@
 //! - Stammdaten fallen nur mit einer Marke dieses Kopfes und in der eigenen Org. Ob eine Zeile
 //!   noch verwiesen wird, entscheidet die Datenbank: je Zeile ein `SAVEPOINT`, und ein
 //!   Fremdschlüsselfehler (787) heißt „behalten“. Das trägt nur, solange kein Fremdschlüssel auf
-//!   `fahrzeug`/`personal`/`material` kaskadiert oder aufgeschoben ist (Guard
+//!   `fahrzeug`/`personal`/`material`/`einheit_vorlage` kaskadiert (außer den Kindzeilen einer
+//!   Vorlage) oder aufgeschoben ist (Guard
 //!   `kein_fk_kaskadiert_in_stammdaten` in `schema_tests.rs`) und die Verbindung Fremdschlüssel
 //!   sofort prüft ([`crate::db::fk_pruefung_sicherstellen`]).
 //!
@@ -26,17 +27,42 @@ use crate::error::AppError;
 /// interpolierten Tabellennamen.
 struct Loeschweg {
     art: DemoStammdatenArt,
+    /// Liefert eine Zeile, wenn die markierte Zeile ohne Löschversuch stehen bleibt. Bindet
+    /// `(id, org_id)`.
+    behalten_wenn: Option<&'static str>,
     /// Läuft im selben Savepoint VOR dem Löschen der Zeile. Bindet `(id, org_id)`.
     vorlauf: Option<&'static str>,
     /// Löscht die Zeile, nur in der eigenen Org. Bindet `(id, org_id)`.
     loeschen: &'static str,
+    /// Zeilen derselben Art verweisen aufeinander (Untereinheiten): eine noch verwiesene Zeile
+    /// wird erneut versucht, solange eine Runde etwas gelöscht hat.
+    mehrere_runden: bool,
 }
 
-/// Reihenfolge: Personal zuerst (samt Qualifikationen), dann Fahrzeug, dann Material. Die
-/// Reihenfolge der Berichtszeilen ist davon unabhängig (s. [`bericht_zeilen`]).
-const LOESCHWEGE: [Loeschweg; 3] = [
+/// Reihenfolge: Einheiten-Vorlagen zuerst (ihre Kindzeilen kaskadieren; sonst hielte eine
+/// Demo-Vorlage die Demo-Fahrzeuge und -Personen fest, LLH-1042), dann Personal (samt
+/// Qualifikationen), Fahrzeug, Material. Die Reihenfolge der Berichtszeilen ist davon unabhängig
+/// (s. [`bericht_zeilen`]).
+const LOESCHWEGE: [Loeschweg; 4] = [
+    Loeschweg {
+        art: DemoStammdatenArt::EinheitVorlage,
+        // Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen entfernen“: steht die Vorlage
+        // unter einer nicht markierten, bleibt sie. Eine nicht markierte Untereinheit hält sie
+        // über den Fremdschlüssel (`ueber_vorlage_id`, NO ACTION).
+        behalten_wenn: Some(
+            "SELECT 1 FROM einheit_vorlage v \
+             JOIN einheit_vorlage o ON o.id = v.ueber_vorlage_id \
+             WHERE v.id = ? AND v.org_id = ? \
+               AND NOT EXISTS (SELECT 1 FROM demo_herkunft dh \
+                               WHERE dh.tabelle = 'einheit_vorlage' AND dh.datensatz_id = o.id)",
+        ),
+        vorlauf: None,
+        loeschen: "DELETE FROM einheit_vorlage WHERE id = ? AND org_id = ?",
+        mehrere_runden: true,
+    },
     Loeschweg {
         art: DemoStammdatenArt::Personal,
+        behalten_wenn: None,
         // Die Qualifikationen fallen mit der Person, im selben Savepoint: scheitert die Person an
         // einer
         // Disposition, bringt `ROLLBACK TO` sie zurück. Die Org-Bedingung sitzt in der
@@ -46,16 +72,21 @@ const LOESCHWEGE: [Loeschweg; 3] = [
              WHERE personal_id = (SELECT id FROM personal WHERE id = ? AND org_id = ?)",
         ),
         loeschen: "DELETE FROM personal WHERE id = ? AND org_id = ?",
+        mehrere_runden: false,
     },
     Loeschweg {
         art: DemoStammdatenArt::Fahrzeug,
+        behalten_wenn: None,
         vorlauf: None,
         loeschen: "DELETE FROM fahrzeug WHERE id = ? AND org_id = ?",
+        mehrere_runden: false,
     },
     Loeschweg {
         art: DemoStammdatenArt::Material,
+        behalten_wenn: None,
         vorlauf: None,
         loeschen: "DELETE FROM material WHERE id = ? AND org_id = ?",
+        mehrere_runden: false,
     },
 ];
 
@@ -134,18 +165,41 @@ pub async fn entfernen_tx(
         .await?;
 
         let (mut entfernt, mut behalten) = (0, 0);
-        for id in ids {
-            match zeile_loeschen(conn, weg, id, org_id).await? {
-                Ausgang::Entfernt => entfernt += 1,
-                Ausgang::Behalten => behalten += 1,
-                Ausgang::NichtVorhanden => tracing::warn!(
-                    org_id,
-                    kopf_id,
-                    tabelle = weg.art.as_str(),
-                    datensatz_id = id,
-                    "Demo-Daten entfernen: Marke ohne Zeile der eigenen Org"
-                ),
+        let mut offen = ids;
+        // Entschiedene Zeilen verlieren ihre Marke erst, wenn alle Runden der Art gelaufen sind:
+        // `behalten_wenn` liest die Marken der übrigen Vorlagen.
+        let mut entschieden: Vec<i64> = Vec::new();
+        loop {
+            let mut noch_verwiesen = Vec::new();
+            let mut fortschritt = false;
+            for id in offen {
+                match zeile_loeschen(conn, weg, id, org_id).await? {
+                    Ausgang::Entfernt => {
+                        entfernt += 1;
+                        fortschritt = true;
+                        entschieden.push(id);
+                    }
+                    Ausgang::Behalten => noch_verwiesen.push(id),
+                    Ausgang::NichtVorhanden => {
+                        tracing::warn!(
+                            org_id,
+                            kopf_id,
+                            tabelle = weg.art.as_str(),
+                            datensatz_id = id,
+                            "Demo-Daten entfernen: Marke ohne Zeile der eigenen Org"
+                        );
+                        entschieden.push(id);
+                    }
+                }
             }
+            if !(weg.mehrere_runden && fortschritt && !noch_verwiesen.is_empty()) {
+                behalten += noch_verwiesen.len() as i64;
+                entschieden.extend(noch_verwiesen);
+                break;
+            }
+            offen = noch_verwiesen;
+        }
+        for id in entschieden {
             // Die Marke fällt in jedem Ausgang: eine behaltene Zeile ist ab jetzt Bestand.
             sqlx::query(
                 "DELETE FROM demo_herkunft \
@@ -198,6 +252,17 @@ async fn zeile_loeschen(
     id: i64,
     org_id: i64,
 ) -> Result<Ausgang, AppError> {
+    if let Some(sperre) = weg.behalten_wenn {
+        let gesperrt: Option<i64> = sqlx::query_scalar(sperre)
+            .bind(id)
+            .bind(org_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+        if gesperrt.is_some() {
+            return Ok(Ausgang::Behalten);
+        }
+    }
+
     sqlx::query("SAVEPOINT demo_zeile")
         .execute(&mut *conn)
         .await?;
@@ -251,28 +316,25 @@ pub(crate) fn ist_fk_verletzung(fehler: &sqlx::Error) -> bool {
     matches!(fehler, sqlx::Error::Database(db) if db.is_foreign_key_violation())
 }
 
-/// Je Art eine Zeile, immer alle drei, in Enum-Reihenfolge, auch mit Nullen. `angelegt` und
+/// Je Art eine Zeile, immer alle, in Enum-Reihenfolge, auch mit Nullen. `angelegt` und
 /// `mitbenutzt` gehören zum Import-Bericht und stehen hier auf 0.
 fn bericht_zeilen(zaehler: &[(DemoStammdatenArt, i64, i64)]) -> Vec<DemoBerichtZeile> {
-    [
-        DemoStammdatenArt::Fahrzeug,
-        DemoStammdatenArt::Personal,
-        DemoStammdatenArt::Material,
-    ]
-    .into_iter()
-    .map(|art| {
-        let (entfernt, behalten) = zaehler
-            .iter()
-            .find(|(a, _, _)| *a == art)
-            .map(|(_, e, b)| (*e, *b))
-            .unwrap_or((0, 0));
-        DemoBerichtZeile {
-            art,
-            angelegt: 0,
-            mitbenutzt: 0,
-            entfernt,
-            behalten,
-        }
-    })
-    .collect()
+    DemoStammdatenArt::ALLE
+        .iter()
+        .copied()
+        .map(|art| {
+            let (entfernt, behalten) = zaehler
+                .iter()
+                .find(|(a, _, _)| *a == art)
+                .map(|(_, e, b)| (*e, *b))
+                .unwrap_or((0, 0));
+            DemoBerichtZeile {
+                art,
+                angelegt: 0,
+                mitbenutzt: 0,
+                entfernt,
+                behalten,
+            }
+        })
+        .collect()
 }

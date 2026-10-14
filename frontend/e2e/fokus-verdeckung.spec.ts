@@ -537,6 +537,26 @@ for (const { name, feld, seite } of [
     },
   },
   {
+    // LLH-1042: unter dem Formular stehen Untereinheiten, Fahrzeuge und Stammbesetzung; die
+    // Seite scrollt also auch ohne lange Felder.
+    name: 'Einheiten-Vorlage-Detailseite',
+    feld: 'Name',
+    seite: async (page: Page) => {
+      const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+        id: number;
+      }[];
+      const antwort = await page.request.post('/api/einheit-vorlagen', {
+        data: { name: `E2E-FOKUS Vorlage ${Date.now()}`, typ_id: typen[0].id },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Einheiten-Vorlage: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      const { id } = (await antwort.json()) as { id: number };
+      return `/admin/stammdaten/einheiten/${id}`;
+    },
+  },
+  {
     name: 'Einsatz-Vorgaben',
     feld: 'Aufbewahrungs-Dauer (Tage)',
     seite: async () => '/admin/einstellungen/einsatz',

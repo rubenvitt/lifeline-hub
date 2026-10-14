@@ -106,15 +106,16 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung und Betreuung ab (LFH-612/635/639)', () => {
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung und Lagemonitor ab (LFH-612/635/639)', () => {
     // Bezirke und Stellen tragen den Abschnittsnamen per Join; fehlt die Betreuung hier, zeigt die
-    // Seite still den alten Namen.
+    // Seite still den alten Namen. Der Lagemonitor zeigt die Abschnittsflächen (LLH-1153).
     expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.abloesungen,
       EINSATZ_KEYS.betreuung,
+      EINSATZ_KEYS.lagemonitor,
     ]);
   });
 
@@ -164,6 +165,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.lage_zone).toEqual([
       EINSATZ_KEYS.zonen,
       EINSATZ_KEYS.gefahrengebiete,
+      EINSATZ_KEYS.lagemonitor,
     ]);
     expect(EINSATZ_STREAM_EVENTS.gefahr).toEqual([
       EINSATZ_KEYS.gefahrenmatrix,
@@ -738,6 +740,7 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'sprechgruppen',
         'qualifikationen',
         'einheit-typen',
+        'einheit-vorlagen',
         'etb-bausteine',
         'stichwort-vorschlaege',
         'externe-stellen',

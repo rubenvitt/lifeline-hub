@@ -543,7 +543,12 @@ export default function LagemonitorPage() {
       >
         <Kachel titel="Lagekarte">
           <div style={{ flex: '1 1 0', minHeight: 0 }}>
-            <LagemonitorKarte einsatzort={einsatzort} uhs={lage?.uhs ?? []} />
+            <LagemonitorKarte
+              einsatzort={einsatzort}
+              uhs={lage?.uhs ?? []}
+              zonen={lage?.zonen}
+              abschnitte={lage?.abschnitte}
+            />
           </div>
         </Kachel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
