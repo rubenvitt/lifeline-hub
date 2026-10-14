@@ -601,11 +601,21 @@ pub async fn bilde_tx(
             _ => k.name.as_str(),
         };
         let soll = if k.soll_eigen { k.soll } else { None };
+        // Eltern stehen vor ihren Kindern (`load_tree_tx`); ein fehlender Elternteil ist ein
+        // Programmfehler, keine eigenständige Einheit.
         let ueber = if wurzel {
             None
         } else {
-            k.ueber_vorlage_id
+            let eltern = k
+                .ueber_vorlage_id
                 .and_then(|u| einheit_von.get(&u).copied())
+                .ok_or_else(|| {
+                    AppError::Internal(format!(
+                        "Vorlage {} steht im Plan vor ihrem Elternteil",
+                        k.id
+                    ))
+                })?;
+            Some(eltern)
         };
         let id = einheit_repo::anlegen_tx(
             conn,

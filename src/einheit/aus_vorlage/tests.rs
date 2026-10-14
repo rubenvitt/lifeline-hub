@@ -853,6 +853,110 @@ async fn einheitenbaum_mit_kopfdaten_der_vorlage() {
     assert_eq!(g.einheiten[0].name, "Sanitätszug Musterstadt");
 }
 
+/// Drei Ebenen, deren Enkel in der Sortierung vor seinem Elternteil steht (erst alphabetisch bei
+/// gleichem `sortier`, dann per kleinerem `sortier`): Plan, Vorschau und Bilden halten Eltern vor
+/// Kindern, der Enkel hängt unter der Staffel, nicht als eigenständige Einheit.
+#[tokio::test]
+async fn enkel_vor_seinem_elternteil_in_der_sortierung_haengt_unter_ihm() {
+    for (fall, enkel_name, sortier) in [
+        ("alphabetisch", "Atemschutztrupp", 0),
+        ("per sortier", "Zugtrupp", 5),
+    ] {
+        let pool = crate::db::test_pool().await;
+        let z = setup(&pool).await;
+        if sortier == 0 {
+            for id in [z.zug, z.staffel] {
+                let patch = VorlagePatch {
+                    sortier: Some(0),
+                    ..Default::default()
+                };
+                vrepo::update(&pool, 1, id, patch).await.unwrap();
+            }
+        }
+        let enkel = vrepo::create(
+            &pool,
+            1,
+            NewVorlage {
+                ueber_vorlage_id: Some(z.staffel),
+                sortier,
+                ..neu_vorlage(enkel_name, z.typ_staffel)
+            },
+        )
+        .await
+        .unwrap()
+        .id;
+
+        let plan = plane(&pool, &z, z.zug).await.unwrap();
+        let ids: Vec<i64> = plan.knoten.iter().map(|k| k.id).collect();
+        assert_eq!(ids, [z.zug, z.staffel, enkel], "{fall}: Plan");
+        let v = vorschau(&plan, ALLES);
+        let knoten: Vec<(i64, Option<i64>)> = v
+            .knoten
+            .iter()
+            .map(|k| (k.vorlage_id, k.ueber_vorlage_id))
+            .collect();
+        assert_eq!(
+            knoten,
+            [
+                (z.zug, None),
+                (z.staffel, Some(z.zug)),
+                (enkel, Some(z.staffel))
+            ],
+            "{fall}: Vorschau"
+        );
+
+        let g = bilde(&pool, &z, &anfrage(&[], &[])).await.unwrap();
+        let namen: Vec<&str> = g.einheiten.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(
+            namen,
+            ["Sanitätszug Musterstadt", "Rettungsstaffel", enkel_name],
+            "{fall}: einheit_ids, Eltern vor Kindern"
+        );
+        let mut ueber = Vec::new();
+        for b in &g.einheiten {
+            let e = einheit_repo::laden(&pool, z.k.einsatz_id, b.id)
+                .await
+                .unwrap();
+            ueber.push(e.ueber_einheit_id);
+        }
+        assert_eq!(
+            ueber,
+            [None, Some(g.einheiten[0].id), Some(g.einheiten[1].id)],
+            "{fall}: ueber_einheit_id"
+        );
+    }
+}
+
+/// Ein Plan, dessen Knoten ein Kind vor seinem Elternteil tragen, ist ein Programmfehler: kein
+/// stilles Anlegen als eigenständige Einheit, sondern `Internal`.
+#[tokio::test]
+async fn fehlender_elternteil_im_plan_ist_ein_interner_fehler() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let enkel = vrepo::create(
+        &pool,
+        1,
+        NewVorlage {
+            ueber_vorlage_id: Some(z.staffel),
+            ..neu_vorlage("Atemschutztrupp", z.typ_staffel)
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let mut tx = pool.begin().await.unwrap();
+    let mut plan = plane_tx(&mut tx, z.k.einsatz_id, 1, z.zug, ALLES)
+        .await
+        .unwrap();
+    let pos = plan.knoten.iter().position(|k| k.id == enkel).unwrap();
+    let k = plan.knoten.remove(pos);
+    plan.knoten.insert(1, k);
+    let fehler = bilde_tx(&mut tx, z.k, &plan, &anfrage(&[], &[]))
+        .await
+        .unwrap_err();
+    assert!(matches!(fehler, AppError::Internal(_)), "{fehler:?}");
+}
+
 #[tokio::test]
 async fn fahrzeuge_neu_disponiert_frei_zugeordnet_gebunden_umgehaengt() {
     let pool = crate::db::test_pool().await;
