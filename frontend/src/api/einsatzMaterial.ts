@@ -16,7 +16,7 @@ export function listEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[
  * Der eine Ort eines Postens (LLH-1224, design.md D7): höchstens ein Feld mit Wert, sonst 422.
  * Im PATCH heißt ein Wert „dorthin“ (der bisherige Ort geht), `null` „von diesem Ort lösen“.
  */
-export interface MaterialOrtFelder {
+export interface MaterialOrtPatch {
   einheit_id?: number | null;
   einsatz_fahrzeug_id?: number | null;
   uhs_id?: number | null;
@@ -24,15 +24,15 @@ export interface MaterialOrtFelder {
 }
 
 /** Optionen beim Disponieren: ein Ort (alle Ortsarten) und bei Ad-hoc die Art (LLH-1224). */
-export interface DisponierOptionen {
-  ort?: MaterialOrtFelder;
+export interface DisponierEingabe {
+  ort?: MaterialOrtPatch;
 }
 
 export function disponiereMaterial(
   einsatzId: number,
   materialId: number,
   menge: number,
-  optionen: DisponierOptionen = {},
+  optionen: DisponierEingabe = {},
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
     material_id: materialId,
@@ -47,7 +47,7 @@ export function disponiereAdhoc(
   einsatzId: number,
   adhoc: MaterialAdhocEingabe,
   menge: number,
-  optionen: DisponierOptionen & { art?: MaterialArt } = {},
+  optionen: DisponierEingabe & { art?: MaterialArt } = {},
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
     adhoc,
@@ -63,7 +63,7 @@ export function disponiereAdhoc(
  * pflegen“); `bezeichnung` ist Pflicht und nie `null`. `ausgegeben` ist der neue Gesamtwert der
  * Ausgabe eines Verbrauchsguts; die Regeln der Ergebniszeile prüft der Server (422 mit Grund).
  */
-export interface MaterialPatch extends MaterialOrtFelder {
+export interface MaterialPatch extends MaterialOrtPatch {
   menge?: number;
   ausgegeben?: number;
   status?: MaterialStatus;
