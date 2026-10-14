@@ -19,7 +19,7 @@ import {
  *                             frontend/src/kraefte/MaterialVerdichtung.tsx,
  *                             frontend/src/kraefte/MaterialOrt.tsx,
  *                             frontend/src/kraefte/EinheitAngabe.tsx,
- *                             frontend/src/kraefte/einheitAngabeKern.ts
+ *                             frontend/src/kraefte/kraeftebaumKern.ts
  *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“)
  *   adhoc-material.png        frontend/src/pages/MaterialPage.tsx (Dialog „Ad-hoc-Material ohne
  *                             Stammeintrag“)

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
-import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
+import { listeVon, oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { ApiError } from '../api/client';
 import type { Einheit, Uhs } from '../api/types';
 import MaterialOrt, {
@@ -12,7 +12,7 @@ import MaterialOrt, {
   type MaterialOrtKontext,
   type MaterialOrtProps,
 } from './MaterialOrt';
-import { buildEinheitOptions } from './einheitAngabeKern';
+import { buildEinheitOptions } from './kraeftebaumKern';
 
 const einheiten = [
   { id: 1, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null },
@@ -139,6 +139,36 @@ describe('MaterialOrt (LLH-1093, design.md D1–D3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }));
     await waitFor(() => expect(onEinheit).toHaveBeenCalledWith(2, 1));
     expect(onUhs).not.toHaveBeenCalled();
+  });
+
+  it('die Einheit-Wahl gliedert nach Abschnitt, „keine Einheit“ bleibt erste Wahl', async () => {
+    const mitAbschnitt = [
+      {
+        id: 1,
+        name: 'Staffel A',
+        ueber_einheit_id: null,
+        abschnitt_id: 5,
+        abschnitt_name: 'EA Nord',
+      },
+      { id: 2, name: 'Staffel B', ueber_einheit_id: null, abschnitt_id: null },
+    ] as Einheit[];
+    const { onEinheit } = zeige({
+      ort: { einheitId: 1, uhsId: null },
+      darfSchreiben: true,
+      kontext: kontext({ einheit: { optionen: buildEinheitOptions(mitAbschnitt, []) } }),
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }));
+    await oeffne('Einheit zu Wolldecke');
+    const gruppen = listeVon('Einheit zu Wolldecke')!.querySelectorAll('.ant-select-item-group');
+    expect([...gruppen].map((g) => g.textContent)).toEqual(['EA Nord', 'ohne Abschnitt']);
+    expect(optionenVon('Einheit zu Wolldecke')).toEqual([
+      'keine Einheit',
+      'Staffel A',
+      'Staffel B',
+    ]);
+    await waehle('Einheit zu Wolldecke', 'keine Einheit');
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }));
+    await waitFor(() => expect(onEinheit).toHaveBeenCalledWith(null, 1));
   });
 
   it('die UHS-Wahl bietet geplante und aktive UHS und „keine UHS“, keine aufgelöste', async () => {

@@ -11,7 +11,7 @@ import { Select } from '../components/Select';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import { einheitDetailPfad, uhsDetailPfad } from '../routing/deeplinks';
 import EinheitAngabe from './EinheitAngabe';
-import { buildEinheitOptions, type EinheitOption } from './einheitAngabeKern';
+import { buildEinheitOptions, type EinheitOption } from './kraeftebaumKern';
 
 /**
  * Der Ort eines Material-Postens in der Materialliste (LLH-1093, design.md D1–D3, D13).

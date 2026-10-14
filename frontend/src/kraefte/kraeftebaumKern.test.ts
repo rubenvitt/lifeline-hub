@@ -238,6 +238,22 @@ describe('buildEinheitOptions / groupEinheitOptions (LLH-1073, design.md D3)', (
     ]);
   });
 
+  it('ohne Abschnittsliste gilt die Eingabefolge (Materialliste, LLH-1093)', () => {
+    const optionen = buildEinheitOptions(
+      [
+        benannt(1, 'Zug 1', null),
+        benannt(2, 'Staffel A', null, 1),
+        benannt(4, 'Rettungsstaffel', null),
+      ],
+      [],
+    );
+    expect(optionen.map((o) => [o.id, o.pfad, o.tiefe])).toEqual([
+      [1, 'Zug 1', 0],
+      [2, 'Zug 1 › Staffel A', 1],
+      [4, 'Rettungsstaffel', 0],
+    ]);
+  });
+
   it('ohne jeden Abschnitt keine Gruppen', () => {
     const optionen = buildEinheitOptions([benannt(1, 'Zug 1', null)], []);
     expect(groupEinheitOptions(optionen)).toEqual([]);

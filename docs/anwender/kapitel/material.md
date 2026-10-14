@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/einheitAngabeKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, migrations/0019_einsatz_material.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, migrations/0019_einsatz_material.sql]
 ---
 
 ## Überblick
@@ -63,7 +63,8 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Spalte „Ort“ den Einheitsnamen wählen, oder „Einheit eintragen“, wenn der Posten noch
    keiner Einheit gehört.
-2. Eine Einheit wählen, oder „keine Einheit“, um den Posten von seiner Einheit zu lösen.
+2. Eine Einheit wählen, oder „keine Einheit“ (erste Wahl), um den Posten von seiner Einheit zu
+   lösen. Die Auswahl ist nach Abschnitt gegliedert, unterstellte Einheiten stehen mit ihrem Pfad.
 3. „Speichern“ wählen. Escape oder „Abbrechen“ lässt den Ort unverändert.
 4. Für die UHS ebenso: den UHS-Namen oder „UHS eintragen“ wählen, eine UHS oder „keine UHS“
    wählen und speichern. Angeboten werden geplante und aktive UHS; eine aufgelöste UHS, an der
