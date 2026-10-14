@@ -480,13 +480,13 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
     expect(hinweis).toHaveTextContent('person · fuehrungskraft');
   });
 
-  it('zeigt den Platzhalter für ein Altzeichen ohne Nachfolger, mit Hinweis', () => {
+  it('zeigt den Platzhalter für ein unbekanntes Altsymbol, mit Hinweis', () => {
     renderInspector({
-      zeichen: { ...basis, ...OHNE_ALTFELDER, grundzeichen: 'ohne', symbol: 'fernschreiben' },
+      zeichen: { ...basis, ...OHNE_ALTFELDER, grundzeichen: 'ohne', symbol: 'gibt-es-nicht' },
       darfSchreiben: false,
     });
     expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toHaveTextContent(
-      'vereinfacht dargestellt · ohne · fernschreiben',
+      'vereinfacht dargestellt · ohne · gibt-es-nicht',
     );
     expect(screen.getByText('Punkt')).toBeInTheDocument();
   });
