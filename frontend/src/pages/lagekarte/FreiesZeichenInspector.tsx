@@ -15,7 +15,13 @@ import FreiesZeichenPicker, {
 } from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
-import { freiesZeichen, fuellfarbe, type FreiesZeichenEingabe } from '../../zeichen/freiesZeichen';
+import {
+  ALT_FELDER,
+  altform,
+  freiesZeichen,
+  fuellfarbe,
+  type FreiesZeichenEingabe,
+} from '../../zeichen/freiesZeichen';
 import { ZEICHEN_KARTEN_PX } from './markerIcons';
 import { zeichenTeile } from './zeichenWahl';
 
@@ -32,17 +38,6 @@ export interface FreiesZeichenInspectorProps {
 
 /** Ruhefrist, nach der eine Änderung im Inspector geschrieben wird. */
 const SCHREIB_FRIST_MS = 600;
-
-/** Die Altspalten eines Zeichens in der Reihenfolge, in der sie die Alt-Kennung nennen. */
-const ALT_FELDER = [
-  'grundzeichen',
-  'organisation',
-  'fachaufgabe',
-  'symbol',
-  'einheit',
-  'funktion',
-  'farbe',
-] as const;
 
 function eingabe(z: FreiesZeichen): FreiesZeichenEingabe {
   return {
@@ -87,10 +82,14 @@ function sendung(entwurf: FreiesZeichenUpdate, server: FreiesZeichenUpdate): Fre
   return entwurf.zeichen_spec === server.zeichen_spec ? { label: entwurf.label } : entwurf;
 }
 
-/** Die Alt-Kennung eines Altzeichens (`gefahr · abc · #cc0000`), sonst `null`. */
+/**
+ * Die Alt-Kennung eines Altzeichens (`gefahr · abc · #cc0000`), sonst `null` — aus der Hülle einer
+ * Altzeile (LLH-1160) wie aus den Feldern eines Lage-Snapshots von vorher.
+ */
 function altKennung(z: FreiesZeichen): string | null {
-  if (z.zeichen_spec) return null;
-  const teile = ALT_FELDER.map((f) => z[f]).filter((w): w is string => !!w);
+  const alt = altform(eingabe(z));
+  if (!alt) return null;
+  const teile = ALT_FELDER.map((f) => alt[f]).filter((w): w is string => !!w);
   return teile.length > 0 ? teile.join(' · ') : null;
 }
 

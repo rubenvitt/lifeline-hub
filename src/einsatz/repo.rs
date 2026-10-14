@@ -2469,13 +2469,16 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
+        // LLH-1160: eine Altzeile trägt ihre Altwerte als Hülle in `zeichen_spec` (Migration 0192).
+        let alt = r#"{"v":1,"alt":{"grundzeichen":"stelle"}}"#;
         sqlx::query(
-            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
-             VALUES (?, ?, ?, 'stelle', 'ELW Fam. Müller', ?)",
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von) \
+             VALUES (?, ?, ?, ?, 'ELW Fam. Müller', ?)",
         )
         .bind(einsatz.id)
         .bind(50.1)
         .bind(8.6)
+        .bind(alt)
         .bind(leit)
         .execute(&pool)
         .await
@@ -2500,7 +2503,7 @@ mod tests {
             .await
             .unwrap());
 
-        let zeilen: Vec<(Option<String>, f64, Option<String>)> = sqlx::query_as(
+        let zeilen: Vec<(Option<String>, f64, String)> = sqlx::query_as(
             "SELECT label, lat, zeichen_spec FROM freies_zeichen WHERE einsatz_id = ? ORDER BY id",
         )
         .bind(einsatz.id)
@@ -2509,7 +2512,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             zeilen,
-            vec![(None, 50.1, None), (None, 50.2, Some(spec.to_string()))],
+            vec![
+                (None, 50.1, alt.to_string()),
+                (None, 50.2, spec.to_string())
+            ],
             "Freitext-Label (PII) NULL, Position und Zeichenbeschreibung bleiben (Skelett)"
         );
     }

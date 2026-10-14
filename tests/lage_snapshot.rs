@@ -586,9 +586,10 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
 
 // ---------- LFH-836: Zeichenbeschreibung freier Zeichen im Stand ----------
 
-/// Ein neuer Stand friert `zeichen_spec` ein (und eine Altzeile in ihrer Altform); ein Stand von
-/// vor LFH-836 — freie Zeichen nur mit Altfeldern, ohne `zeichen_spec` — bleibt über die Route
-/// lesbar und kommt unverändert zurück. Den Altbestand übersetzt erst der Client (design.md D5).
+/// Ein neuer Stand friert `zeichen_spec` ein (eine Altzeile mit ihrer Hülle aus Migration 0192,
+/// LLH-1160); ein Stand von vor LFH-836 — freie Zeichen nur mit Altfeldern, ohne `zeichen_spec` —
+/// bleibt über die Route lesbar und kommt unverändert zurück. Den Altbestand übersetzt erst der
+/// Client (design.md D5).
 #[tokio::test]
 async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     const DREHLEITER: &str = r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"capability.rescue-aerial-ladder"}}"#;
@@ -601,20 +602,30 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
             .await
             .unwrap();
 
-    for body in [
-        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": DREHLEITER, "label": "DLK"}),
-        json!({"lat": 50.2, "lon": 8.7, "grundzeichen": "person"}),
-    ] {
-        let (s, v) = anfrage(
-            &app,
-            "POST",
-            &format!("/api/einsaetze/{e}/freie-zeichen"),
-            &admin,
-            Some(&body.to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v:?}");
-    }
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/freie-zeichen"),
+        &admin,
+        Some(
+            &json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": DREHLEITER, "label": "DLK"})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    // Eine Altzeile, wie Migration 0192 sie hinterlässt.
+    const HUELLE: &str = r#"{"v":1,"alt":{"grundzeichen":"person"}}"#;
+    sqlx::query(
+        "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, erstellt_von) \
+         VALUES (?, 50.2, 8.7, ?, ?)",
+    )
+    .bind(e)
+    .bind(HUELLE)
+    .bind(benutzer_id)
+    .execute(&pool)
+    .await
+    .unwrap();
     let (s, neu) = anfrage(
         &app,
         "POST",
@@ -627,9 +638,10 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     let zeichen = neu["daten"]["freie_zeichen"].as_array().unwrap();
     assert_eq!(zeichen.len(), 2, "{neu}");
     assert_eq!(zeichen[0]["zeichen_spec"], DREHLEITER);
-    assert!(zeichen[0].get("grundzeichen").is_none(), "{neu}");
-    assert_eq!(zeichen[1]["grundzeichen"], "person");
-    assert!(zeichen[1].get("zeichen_spec").is_none(), "{neu}");
+    assert_eq!(zeichen[1]["zeichen_spec"], HUELLE);
+    for z in zeichen {
+        assert!(z.get("grundzeichen").is_none(), "{neu}");
+    }
 
     // Wortlaut eines Stands vor LFH-836 (FreiesZeichenAnzeige ohne zeichen_spec).
     let alt_zeichen = json!([{

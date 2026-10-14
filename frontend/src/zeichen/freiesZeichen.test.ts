@@ -7,6 +7,7 @@ import {
 } from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
 import {
+  altform,
   freiesZeichen,
   fuellfarbe,
   naechstesFarbtoken,
@@ -892,6 +893,52 @@ describe('freiesZeichen — gespeicherte Spec (zeichen_spec)', () => {
   it('nimmt null und leeren String wie fehlend', () => {
     pruefe({ zeichen_spec: null, grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
     pruefe({ zeichen_spec: '', grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
+  });
+});
+
+// LLH-1160: Migration 0192 schreibt die Altwerte einer Altzeile als Hülle in `zeichen_spec`
+// (`json_patch` lässt NULL weg). Die Hülle muss genau so zeichnen wie dieselben Altspalten.
+describe('freiesZeichen — Hülle der Altzeilen (LLH-1160)', () => {
+  const huelle = (alt: FreiesZeichenEingabe) => JSON.stringify({ v: 1, alt });
+
+  it.each<FreiesZeichenEingabe>([
+    { grundzeichen: 'person' },
+    { grundzeichen: 'gefahr', symbol: 'abc', farbe: '#cc0000' },
+    {
+      grundzeichen: 'taktische-formation',
+      organisation: 'feuerwehr',
+      fachaufgabe: 'brandbekaempfung',
+      einheit: 'zug',
+      farbe: '#ff0000',
+    },
+    { grundzeichen: 'person', funktion: 'fuehrungskraft' },
+    { grundzeichen: 'ohne', symbol: 'fernschreiben' },
+    { grundzeichen: 'gibt-es-nicht' },
+  ])('zeichnet die Hülle wie die Altspalten: %o', (alt) => {
+    const ausHuelle = freiesZeichen({ zeichen_spec: huelle(alt) });
+    const ausSpalten = freiesZeichen(alt);
+    expect(ausHuelle.schluessel).toBe(ausSpalten.schluessel);
+    expect(ausHuelle.vereinfacht).toBe(ausSpalten.vereinfacht);
+  });
+
+  it('liest die Altwerte aus der Hülle, nur Zeichenketten', () => {
+    expect(
+      altform({
+        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"gefahr","symbol":"abc","farbe":7}}',
+      }),
+    ).toEqual({ grundzeichen: 'gefahr', symbol: 'abc' });
+  });
+
+  it('liest die Altform eines Snapshots von vor LFH-836 aus den Feldern', () => {
+    const alt = { grundzeichen: 'person', organisation: null };
+    expect(altform(alt)).toBe(alt);
+  });
+
+  it('hat für eine echte, kaputte oder fehlende Beschreibung keine Altform', () => {
+    expect(altform({ zeichen_spec: serializeAnySpec({ kind: 'hazard' }) })).toBeNull();
+    expect(altform({ zeichen_spec: '{kaputt' })).toBeNull();
+    expect(altform({ zeichen_spec: '{"v":1,"alt":["person"]}' })).toBeNull();
+    expect(altform({})).toBeNull();
   });
 });
 
