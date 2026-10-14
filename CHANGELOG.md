@@ -1,3 +1,89 @@
+## [1.0.0-alpha.125](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.124...v1.0.0-alpha.125) (2026-10-14)
+
+### Wichtige Änderungen
+
+- **Kräfte werden entlassen statt gelöscht.** Personal, Fahrzeuge und Material werden nicht mehr aus dem Einsatz gelöscht, sondern entlassen bzw. aus dem Einsatz genommen. Einheiten werden aufgelöst. Die Einträge bleiben im Nachweis erhalten. Für Schnittstellennutzer entfällt das Löschen einer Disposition. An seine Stelle treten eigene Aufrufe zum Entlassen, Stornieren und Reaktivieren.
+- **Datenbank-Migrationen:** Dieses Release spielt mehrere Migrationen ein:
+  - Zustandsspalten für Entlassen und Auflösen an allen Kräftetabellen
+  - Neuaufbau der Kräfte-Zeitachse: Personen und Einheiten mit Ereignissen lassen sich nicht mehr löschen
+  - Storno-Sperre für Personal, Fahrzeuge und Material
+  - neues Feld „Einsatzfunktion“ je Person
+  - Entfernen der Altspalten freier Zeichen auf der Lagekarte
+- **Freie Zeichen nur noch im neuen Format:** Der alte Schreibweg (Grundzeichen mit Overlays) ist abgeschaltet und wird mit einer Fehlermeldung abgelehnt. Bestehende Altzeichen bleiben sichtbar. Beim nächsten Bearbeiten werden sie ins neue Format überführt.
+- **Geänderte Statuscodes:** Wer eine Person, ein Fahrzeug oder Material „außer Dienst“ disponiert, erhält jetzt 422 statt 400. Schreibzugriffe auf eine entlassene Kraft oder eine aufgelöste Einheit beantwortet der Server mit 409.
+- **Neue Sammelaufrufe** zum Disponieren von Personal und Fahrzeugen. Bei einer Ablehnung nennt die Antwort den Grund je Kraft.
+
+### Kräfte und Mittel
+
+**Entlassen, Stornieren, Auflösen**
+- Personal und Fahrzeuge werden mit einem Klick und ohne Rückfrage entlassen, Material wird ebenso aus dem Einsatz genommen. Danach lässt sich der Schritt rückgängig machen.
+- Entlassene Kräfte stehen eingeklappt unter der Liste im Block „Entlassen (n)“ und lassen sich dort erneut disponieren. Aufgelöste Einheiten zeigt der Block „Aufgelöst (n)“.
+- Eine Fehldisposition lässt sich in den ersten 15 Minuten über das Zeilenmenü stornieren, solange keine Bindung und keine Spur entstanden ist. Wer einmal entlassen war, kann nicht mehr storniert werden.
+- Beim Entlassen eines Fahrzeugs lösen sich Besatzung, Einheit, Führungsstelle und Bereitstellungsraum.
+- Eine Einheit, auf die Aufträge, Meldungen, Dokumente oder Verteiler verweisen, wird aufgelöst statt gelöscht. Die Verweise bleiben erhalten.
+- Aufgelöste Einheiten kommen nicht mehr als Ziel in Frage für Ablösung, Bereitstellungsraum, Unterstellung, Fernmeldeskizze oder neue Dokumentbezüge.
+- Zähler, Lagemonitor, Meldebild, Kräftebaum und Auswahllisten berücksichtigen nur noch aktive Kräfte.
+- Meldebild und Lagebericht hängen einen Block „Entlassen“ an.
+- Der Einsatzbericht führt Entlassene und aufgelöste Einheiten im Nachweis, die Stärke zum Druckzeitpunkt zählt nur aktive Kräfte.
+
+**Gesammelt disponieren**
+- „Personal disponieren“ nimmt mehrere Personen auf einmal und ordnet sie optional einer Einheit und einem Fahrzeug dieser Einheit zu.
+- „Fahrzeuge disponieren“ nimmt mehrere Fahrzeuge auf einmal und ordnet sie optional einer Einheit zu.
+- Wird eine Kraft abgelehnt, steht der Grund an der jeweiligen Person bzw. am Fahrzeug. „Abgelehnte abwählen“ nimmt diese Kräfte aus der Auswahl.
+- Pro Vorgang sind höchstens 50 Kräfte möglich.
+- Ins Einsatztagebuch kommt genau ein Sammeleintrag, der in allen Ansichten sofort erscheint.
+
+**Einsatzfunktion je Person**
+- In der Personalliste lässt sich je Person eine Einsatzfunktion direkt in der Zeile setzen. Vorschläge kommen aus bereits vergebenen Funktionen, den Vorgaben nach FwDV und den Qualifikationen. Die Qualifikation steht weiterhin darunter.
+- Meldebild, Lagebericht, Druck, Auswahllisten und die UHS-Kräftetabelle zeigen die Einsatzfunktion vor der Qualifikation.
+- Bei Ad-hoc-Kräften lassen sich Name, Qualifikation und Trägerorganisation nachträglich ändern. Das Einsatztagebuch hält alten und neuen Wert fest.
+- Im Ad-hoc-Dialog heißt das Freitextfeld jetzt „Qualifikation“.
+- Die Bemerkung zählt Zeichen bis 2 000 und lässt sich darüber hinaus nicht speichern.
+
+**Einheit aus Vorlage bilden**
+- Der Dialog „Einheit bilden“ bietet das neue Feld „Vorlage“. Mit „Weiter“ öffnet sich eine Seite mit dem Baum der Vorlage, auf der jede Kraft ihren Zustand zeigt.
+- Bereits gebundene Kräfte kommen nur mit, wenn sie ausdrücklich „umgehängt“ werden. Kräfte außer Dienst sind gesperrt. Die Hinweise „ohne Fahrzeug“ und „verlässt «…»“ stehen direkt an der Person.
+- Gebildet wird alles oder nichts. Die Vorlage darf höchstens 20 Einheiten enthalten, und der Vorgang erzeugt einen Sammeleintrag im Einsatztagebuch.
+- Danach springt die Anwendung ins Meldebild und markiert die neue Einheit.
+
+**Einheiten-Gliederung**
+- Die Gliederung ist jetzt eine Tabelle im selben Kräftebaum wie das Meldebild, mit den Spalten Einheitsführer, Ist (kumuliert), Soll, Abschnitt (auch geerbt) und Fahrzeuge.
+- Unterbesetzte Einheiten sind als „unterbesetzt“ markiert.
+- Auf dem Handy bleiben Name, Ist und Soll vollständig sichtbar, die übrigen Spalten wandern in den Spaltenschalter, und der Baum rückt schmaler ein.
+
+**Material**
+- Die Angaben von Ad-hoc-Material (Bezeichnung, Kategorie, Bestandsnummer, Trägerorganisation) lassen sich im Einsatz korrigieren. Das Einsatztagebuch hält alt und neu fest.
+- Ein Posten lässt sich in zwei Zeilen aufteilen, z. B. 50 → 30 + 20.
+- Beim Umhängen auf eine andere Einheit nennt das Einsatztagebuch die vorherige Einheit.
+- Eine aufgelöste UHS nimmt kein Material mehr an.
+
+**Weitere Korrekturen**
+- In der Fahrzeugliste weicht die Spalte „Typ“ unter 1600 px Breite in den Spaltenschalter, damit Funkrufnamen nicht umbrechen.
+- Die Rückmeldungen je Einheit lassen aufgelöste Einheiten weg.
+
+### Lagekarte
+
+- Sieben Alt-Symbole werden jetzt richtig gezeichnet statt als Platzhalter: Sichten, Sammeln, Sammelplatz Betroffene, Fernschreiben, Festbildübertragung (Draht und Funk) und Drohne.
+- Kürzel in taktischen Zeichen erscheinen in der Schrift „Einsatzzeichen Sans“.
+- Die Zeichenauswahl benennt Altbestände nach SKK 2010.
+- UHS und Betreuungsstelle tragen die Organisation des Betreibers statt fest einer Hilfsorganisation. Ohne Vorgabe erscheinen sie neutral.
+- Führungskräfte zeigen ihre Fachaufgabe im Zeichen.
+- Eine Kartenansicht anzulegen oder zu löschen holt nicht mehr auf die Karte zurück, wenn die Seite inzwischen verlassen wurde.
+
+### Betroffene
+
+- Nach einem Einsatzwechsel tauchen in der Erfassungszeile und im Aufnahme-Formular keine Eingaben aus dem vorherigen Einsatz mehr auf.
+
+### Oberfläche
+
+- Gesperrte Knöpfe, Felder und Menüeinträge sind im Tag- und im Nachtmodus deutlich besser lesbar.
+- Der Einsatz-Kopf springt beim Start nicht mehr in der Höhe, während Ton- und Verbindungsprüfung laufen.
+- Suche und Spaltenfilter in Katalogtabellen folgen der eingestellten Dichte. Spaltenfilter lassen sich per Tastatur erreichen und öffnen.
+
+### Verwaltung
+
+- Die Warnleiste „Datenträger unverschlüsselt“ schiebt die Stammdaten-Listen beim Laden nicht mehr nach unten.
+
 ## [1.0.0-alpha.124](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.123...v1.0.0-alpha.124) (2026-10-14)
 
 ### Wichtige Änderungen
