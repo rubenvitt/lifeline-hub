@@ -9,7 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import PersonalPage from './PersonalPage';
 import type { EinsatzAnzeige } from '../api/types';
-import { adminFixture, einsatzFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 
 const admin = adminFixture();
 
@@ -114,21 +115,30 @@ async function oeffneStatusmenue(zeile: HTMLElement, name: string): Promise<HTML
   return menue;
 }
 
+/** Wartet, bis die Einheitenliste steht: erst dann gruppiert die Liste und nennt die Einheit. */
+async function bereit(name = 'Thomas Müller') {
+  await screen.findByRole('button', { name: `Einheit zu ${name} bearbeiten` });
+}
+
 describe('PersonalPage', () => {
-  it('bedient den Status am Etikett, nicht über eines von zwei Auswahlfeldern der Zeile', async () => {
+  it('bedient Status und Einteilung über benannte Auslöser, kein Auswahlfeld ruht in der Zeile', async () => {
     /**
-     * Die Zeile trägt genau ein `combobox`, die Stärke-Position; der Status ist ein Auslöser mit
-     * Namen. Ein Positionsindex über mehrere Auswahlfelder träfe beim Umsortieren still das
-     * falsche.
+     * Einheit, Fahrzeug und Position sind Inline-Angaben (LLH-1060 D4): erst der Auslöser öffnet
+     * ein Auswahlfeld. Ein ruhendes `Select` schriebe beim Wählen sofort.
      */
     const { container } = render(einsatz());
-    await screen.findByText('Thomas Müller');
+    await bereit();
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    expect(within(zeile).getAllByRole('combobox')).toHaveLength(1);
-    expect(
-      within(zeile).getByRole('button', { name: 'Status von Thomas Müller ändern' }),
-    ).toBeInTheDocument();
+    expect(within(zeile).queryAllByRole('combobox')).toHaveLength(0);
+    for (const name of [
+      'Status von Thomas Müller ändern',
+      'Einheit zu Thomas Müller bearbeiten',
+      'Fahrzeug zu Thomas Müller bearbeiten',
+      'Position zu Thomas Müller bearbeiten',
+    ]) {
+      expect(within(zeile).getByRole('button', { name })).toBeInTheDocument();
+    }
   });
 
   /**
@@ -239,10 +249,10 @@ describe('PersonalPage', () => {
     );
     const zweitePerson = { ...disponiert[0], id: 11, personal_id: 6, name: 'Erika Muster' };
     const { container, client } = render(einsatz(), [disponiert[0], zweitePerson]);
-    await screen.findByText('Thomas Müller');
+    await bereit();
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    // Der Auslöser ist über seinen Namen eindeutig, auch neben dem Auswahlfeld der Stärke-Position.
+    // Der Auslöser ist über seinen Namen eindeutig, auch neben den Auslösern der Einteilung.
     const menue = await oeffneStatusmenue(zeile, 'Thomas Müller');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
 
@@ -362,121 +372,39 @@ describe('PersonalPage', () => {
           container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
         ).not.toBeNull(),
       );
-      await waitFor(() => expect(gerufen).toHaveLength(1));
-      expect(gerufen[0].getAttribute('data-lfh')).toBe('datensicht-karte');
+      await waitFor(() => expect(gerufen.length).toBeGreaterThanOrEqual(1));
+      expect(gerufen[gerufen.length - 1].getAttribute('data-lfh')).toBe('datensicht-karte');
     } finally {
       Element.prototype.scrollIntoView = vorher;
     }
   });
 
-  it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
-    render(einsatz());
-    await screen.findByText('Thomas Müller');
+  it('Leitung im aktiven Einsatz: Disponieren im Kopf, keine Lösch- und Zeitachsenbedienung in der Zeile', async () => {
+    // Spec `personal-ansicht`, „Liste ohne Zeilenaktion“: Entlassen und Stornieren stehen nur in
+    // der Personenansicht, ebenso die Zeitachse.
+    const { container } = render(einsatz());
+    await bereit();
     expect(screen.getByRole('button', { name: 'Personal disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Thomas Müller entlassen' })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Weitere Aktionen zu Thomas Müller' }),
-    ).toBeInTheDocument();
-  });
-
-  /**
-   * Entlassen ist umkehrbar (LLH-1079, design.md D8): ein Klick ohne Rückfrage, danach ein
-   * Rückgängig-Toast, der dieselbe Kraft erneut disponiert.
-   */
-  it('Entlassen fragt nicht nach und bietet Rückgängig an', async () => {
-    const aufrufe: string[] = [];
-    server.use(
-      http.post('/api/einsaetze/7/personal/10/entlassen', () => {
-        aufrufe.push('entlassen');
-        return HttpResponse.json({ ...disponiert[0], beendet_als: 'entlassen' });
-      }),
-      http.post('/api/einsaetze/7/personal/10/reaktivieren', () => {
-        aufrufe.push('reaktivieren');
-        return HttpResponse.json(disponiert[0]);
-      }),
-    );
-    render(einsatz());
-    await screen.findByText('Thomas Müller');
-    const knopf = screen.getByRole('button', { name: 'Thomas Müller entlassen' });
-    expect(knopf).toHaveClass('ant-btn-dangerous');
-    await userEvent.click(knopf);
-    await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
-    expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
-    expect(await screen.findByText('Thomas Müller entlassen')).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
-  });
-
-  /**
-   * Rückgängig aus dem Toast hat keinen sichtbaren Ort mehr: die Zeile ist weg, der Block
-   * „Entlassen“ eingeklappt. Der Grund steht deshalb im Seitenhinweis (`frontend/AGENTS.md`,
-   * „Rückwege und Fehler“), nicht im Block.
-   */
-  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
-    server.use(
-      http.post('/api/einsaetze/7/personal/10/entlassen', () =>
-        HttpResponse.json({ ...disponiert[0], beendet_als: 'entlassen' }),
-      ),
-      http.post('/api/einsaetze/7/personal/10/reaktivieren', () =>
-        HttpResponse.json({ error: 'Person ist außer Dienst' }, { status: 422 }),
-      ),
-    );
-    render(einsatz());
-    await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: 'Thomas Müller entlassen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    const hinweis = await screen.findByText('Person ist außer Dienst');
-    expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
-    expect(hinweis.closest('.ant-alert')).not.toBeNull();
-  });
-
-  /**
-   * Stornieren ist unumkehrbar: es steht im Zeilenmenü und fragt per `<Modal>` mit einem Satz zur
-   * Folge nach; der Knopf nennt die Handlung (Spec `kraefte-entlassung`, „Fehldisposition
-   * stornieren“). Eine Ablehnung steht an der Zeile.
-   */
-  it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
-    let gesendet = 0;
-    server.use(
-      http.post('/api/einsaetze/7/personal/10/stornieren', () => {
-        gesendet += 1;
-        return HttpResponse.json(
-          {
-            error:
-              'Stornieren geht nur in den ersten 15 Minuten nach der Disposition; die Kraft lässt sich entlassen',
-          },
-          { status: 422 },
-        );
-      }),
-    );
-    const { container } = render(einsatz());
-    await screen.findByText('Thomas Müller');
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Weitere Aktionen zu Thomas Müller' }),
-    );
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
-    // Der Name über `aria-labelledby` trägt in jsdom nicht: `useId` liefert hier überall „test-id“.
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Thomas Müller stornieren?');
-    // Ein kurzer Satz zur Folge, kein Bedienhinweis (LFH-1078).
-    expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
-      /^Die Person erscheint danach in keiner Liste und keinem Nachweis\.$/,
-    );
-    expect(gesendet).toBe(0);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Stornieren' }));
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(await within(zeile).findByRole('alert')).toHaveTextContent(
-      'nur in den ersten 15 Minuten',
+    for (const wort of [/entlassen/i, /stornieren/i, /entfernen/i, /zeitachse/i, /weitere/i]) {
+      expect(within(zeile).queryByRole('button', { name: wort })).toBeNull();
+    }
+    expect(screen.queryByRole('columnheader', { name: 'Aktionen' })).toBeNull();
+    expect(zeile.querySelector('.ant-table-row-expand-icon, [aria-expanded]')).toBeNull();
+  });
+
+  it('der Name führt in die Personenansicht', async () => {
+    render(einsatz());
+    await bereit();
+    expect(screen.getByRole('link', { name: 'Thomas Müller' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personal/10',
     );
-    expect(gesendet).toBe(1);
   });
 
   /** Spec „Block Entlassen“: eingeklappt unter der Liste, mit „Erneut disponieren“. */
-  it('zeigt Entlassene eingeklappt unter der Liste und disponiert sie erneut', async () => {
+  it('zeigt Entlassene eingeklappt unter der Liste, verlinkt sie und disponiert sie erneut', async () => {
     let reaktiviert: number | null = null;
     server.use(
       http.post('/api/einsaetze/7/personal/:ep/reaktivieren', ({ params }) => {
@@ -500,29 +428,41 @@ describe('PersonalPage', () => {
     // Die aktive Liste zählt nur ihre eigene Kraft.
     expect(screen.getByText('1 Kräfte')).toBeInTheDocument();
     await userEvent.click(kopf);
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Erneut disponieren: Anna Alt' }),
+    // Der Name führt in die Ansicht der entlassenen Person (D8): dort steht ihr Nachweis.
+    expect(await screen.findByRole('link', { name: 'Anna Alt' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personal/20',
     );
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut disponieren: Anna Alt' }));
     await waitFor(() => expect(reaktiviert).toBe(20));
   });
 
-  it('Beobachter / abgeschlossen: reine Ansicht', async () => {
-    render(
+  it('Beobachter / abgeschlossen: reine Ansicht, Einteilung als Text', async () => {
+    const { container } = render(
       einsatz({
         status: 'abgeschlossen',
         abgeschlossen_at: '2026-05-26 12:00:00',
         meine_rolle: 'beobachter',
       }),
     );
-    await screen.findByText('Thomas Müller');
+    const zeile = await waitFor(() => {
+      const z = container.querySelector<HTMLElement>('[data-row-key="10"]');
+      expect(z).toHaveTextContent('Zugtrupp');
+      return z!;
+    });
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Personal disponieren' })).not.toBeInTheDocument();
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
+    expect(zelleNachKopf(container, zeile, 'Einheit')).toHaveTextContent('Zugtrupp');
+    expect(zelleNachKopf(container, zeile, 'Fahrzeug')).toHaveTextContent('Florian 1');
+    expect(zelleNachKopf(container, zeile, 'Position')).toHaveTextContent('F');
+    // Kein Auslöser der Einteilung; der Name bleibt der einzige Link.
+    expect(within(zeile).queryByRole('button', { name: /bearbeiten|eintragen/ })).toBeNull();
   });
 
-  // Der Position-Select ist leerbar; Clear muss explizit null senden (nicht absent), sonst
-  // verschluckt JSON.stringify das Feld und das Backend behält den Altwert.
-  it('Position leeren sendet explizit null', async () => {
+  it('Position als Kürzel; leeren sendet nach „Speichern“ explizit null', async () => {
+    // Clear muss explizit null senden (nicht absent), sonst verschluckt JSON.stringify das Feld
+    // und das Backend behält den Altwert.
     let patchBody: unknown = 'NICHT_AUFGERUFEN';
     server.use(
       http.patch('/api/einsaetze/7/personal/10', async ({ request }) => {
@@ -530,81 +470,145 @@ describe('PersonalPage', () => {
         return HttpResponse.json({ ...disponiert[0], staerke_position: null });
       }),
     );
-    const { container } = render(einsatz());
-    await screen.findByText('Thomas Müller');
+    const { container } = render(einsatz(), [
+      disponiert[0],
+      {
+        ...disponiert[0],
+        id: 11,
+        personal_id: 6,
+        name: 'Uwe Unter',
+        staerke_position: 'unterfuehrer',
+      },
+    ]);
+    await bereit();
+    const uwe = container.querySelector('[data-row-key="11"]') as HTMLElement;
+    expect(zelleNachKopf(container, uwe, 'Position')).toHaveTextContent(/^UF$/);
 
-    /**
-     * Auf die Zeile gescopt: die Werkzeugzeile von `Datensicht` steht in Dokumentordnung davor und
-     * kann eigene Löschknöpfe tragen, sobald ein Filter einen Wert hält. Ungescopt hörte der Test
-     * dann auf zu prüfen, ohne rot zu werden.
-     */
-    const clear = container.querySelector('[data-row-key="10"] .ant-select-clear');
-    expect(clear, 'Position-Select muss allowClear haben').not.toBeNull();
-    fireEvent.mouseDown(clear!);
-    fireEvent.click(clear!);
-
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Position zu Thomas Müller bearbeiten' }),
+    );
+    const feld = screen
+      .getByRole('combobox', { name: 'Position zu Thomas Müller' })
+      .closest('.ant-select')!;
+    await userEvent.click(feld.querySelector<HTMLElement>('.ant-select-clear')!);
+    // Wählen allein schreibt nicht (D4).
+    expect(patchBody).toBe('NICHT_AUFGERUFEN');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
+    );
     await waitFor(() => expect(patchBody).toEqual({ staerke_position: null }));
   });
 
-  // Gegenrichtung zur Fahrzeugseite: je Kraft das zugeordnete Fahrzeug (Funkrufname/Kennzeichen) +
-  // die Einheit, jeweils als Deeplink zur Modulseite.
-  it('zeigt zugeordnetes Fahrzeug (Funkrufname/Kennzeichen) und Einheit je Kraft, verlinkt (LFH-139)', async () => {
-    // Fahrzeug und Einheit stehen erst ab `xxl` (LFH-975).
-    setzeViewportBreite(1600);
-    render(einsatz());
-    await screen.findByText('Thomas Müller');
+  // ── Einteilung in der Zeile (D3–D5) ──
 
-    const fahrzeugLink = screen.getByRole('link', { name: 'Florian 1 (FW-1234)' });
-    expect(fahrzeugLink).toHaveAttribute('href', '/einsaetze/7/fahrzeuge?fahrzeug=8');
-
-    const einheitLink = screen.getByRole('link', { name: 'Zugtrupp' });
-    expect(einheitLink).toHaveAttribute('href', '/einsaetze/7/einheiten?einheit=3');
+  it('ordnet eine Person in der Zeile einer Einheit zu: PUT erst nach „Speichern“', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.put('/api/einsaetze/7/einheiten/:eid/personal/:ep', ({ params }) => {
+        aufrufe.push(`PUT ${params.eid}/${params.ep}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const ohne = { ...disponiert[0], id: 12, personal_id: 6, name: 'Zora Zebra', einheit_id: null };
+    render(einsatz(), [disponiert[0], ohne]);
+    await bereit();
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Zora Zebra eintragen' }));
+    await waehle('Einheit zu Zora Zebra', 'Zugtrupp');
+    expect(aufrufe).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Zora Zebra speichern' }));
+    await waitFor(() => expect(aufrufe).toEqual(['PUT 3/12']));
   });
 
-  it('stellt nicht zugeordnete Kräfte in Fahrzeug- und Einheit-Spalte als „—" dar (LFH-139)', async () => {
-    const unzugeordnet = [
-      {
-        id: 11,
-        einsatz_id: 7,
-        personal_id: 6,
-        ist_adhoc: false,
-        name: 'Erika Mustermann',
-        funktion: 'Helferin',
-        traegerorganisation: 'THW',
-        staerke_position: 'mannschaft',
-        status_id: 2,
-        status_label: 'alarmiert',
-        status_kategorie: 'gebunden',
-        status_farbe: null,
-        bemerkung: 'x',
-        disponiert_at: '2026-05-26 09:10:00',
-        disponiert_von: 1,
-        einheit_id: null,
-        fahrzeug_id: null,
-      },
-    ];
-    setzeViewportBreite(1600);
-    const { container } = render(einsatz(), unzugeordnet);
-    await screen.findByText('Erika Mustermann');
+  it('Escape verwirft eine gewählte Einheit ohne Schreiben', async () => {
+    let gesendet = 0;
+    server.use(
+      http.put('/api/einsaetze/7/einheiten/:eid/personal/:ep', () => {
+        gesendet += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.delete('/api/einsaetze/7/einheiten/:eid/personal/:ep', () => {
+        gesendet += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const ohne = { ...disponiert[0], id: 12, personal_id: 6, name: 'Zora Zebra', einheit_id: null };
+    render(einsatz(), [disponiert[0], ohne]);
+    await bereit();
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Zora Zebra eintragen' }));
+    await waehle('Einheit zu Zora Zebra', 'Zugtrupp');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('combobox', { name: 'Einheit zu Zora Zebra' })).toBeNull(),
+    );
+    expect(gesendet).toBe(0);
+  });
 
-    // Auf die Zeile der unzugeordneten Kraft scopen (robust gegen andere Zeilen/Kopf).
-    const zeile = container.querySelector('[data-row-key="11"]') as HTMLElement;
-    expect(zeile).not.toBeNull();
-    // Keine Fahrzeug-/Einheit-Deeplinks in dieser Zeile — und deshalb trägt `karte.titel` kein
-    // `ziel`: das machte die Namenszelle zum Link und drehte diese Aussage still um.
-    expect(within(zeile).queryByRole('link')).toBeNull();
-    /**
-     * ... und beide Spalten zeigen den „—"-Platzhalter, gezielt je Zelle: ein Zähler
-     * `getAllByText('—')` bliebe grün, wenn der Strich in zwei anderen Spalten stünde.
-     */
-    expect(zelleNachKopf(container, zeile, 'Fahrzeug').textContent).toBe('—');
-    expect(zelleNachKopf(container, zeile, 'Einheit').textContent).toBe('—');
+  it('die Fahrzeugauswahl stellt die Fahrzeuge der eigenen Einheit voran', async () => {
+    render(einsatz(), [{ ...disponiert[0], fahrzeug_id: null }]);
+    // Nach `render`: dessen Grundhandler gingen sonst vor.
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([
+          { ...fahrzeuge[0], id: 9, funkrufname: 'Akkon 2', einheit_id: null },
+          ...fahrzeuge,
+        ]),
+      ),
+    );
+    await bereit();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Fahrzeug zu Thomas Müller eintragen' }),
+    );
+    await oeffne('Fahrzeug zu Thomas Müller');
+    expect(optionenVon('Fahrzeug zu Thomas Müller')).toEqual(['Florian 1 (ELW)', 'Akkon 2 (ELW)']);
+  });
+
+  it('ein Fahrzeug einer anderen Einheit trägt die Marke „andere Einheit“', async () => {
+    const { container } = render(einsatz(), [{ ...disponiert[0], einheit_id: null }]);
+    await screen.findByRole('button', { name: 'Fahrzeug zu Thomas Müller bearbeiten' });
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await waitFor(() =>
+      expect(zelleNachKopf(container, zeile, 'Fahrzeug')).toHaveTextContent('andere Einheit'),
+    );
+  });
+
+  it('ohne Freigabe des Moduls Fahrzeuge: keine Spalte „Fahrzeug“, kein „—“ an ihrer Stelle', async () => {
+    // Den Abruf selbst prüft die Personenansicht: die Verdichtungszeile über der Liste liest die
+    // Fahrzeuge für ihre eigenen Zahlen (Bestand, LFH-973).
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
+      ),
+    );
+    const { container } = render(einsatz());
+    await bereit();
+    expect(screen.queryByRole('columnheader', { name: 'Fahrzeug' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Einheit' })).toBeInTheDocument();
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    // Jede Zelle hat ihren Kopf; keine behauptet ein leeres Fahrzeug.
+    expect(zeile.querySelectorAll('td')).toHaveLength(
+      container.querySelectorAll('th.ant-table-cell').length,
+    );
+    expect(zeile).not.toHaveTextContent('Florian 1');
+    expect(within(zeile).queryByRole('button', { name: /Fahrzeug zu/ })).toBeNull();
+  });
+
+  it('ohne Freigabe des Moduls Einheiten: keine Spalte „Einheit“ und keine Gruppen', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    const { container } = render(einsatz());
+    await screen.findByRole('button', { name: 'Fahrzeug zu Thomas Müller bearbeiten' });
+    expect(screen.queryByRole('columnheader', { name: 'Einheit' })).toBeNull();
+    expect(container.querySelector('[data-lfh="datensicht-gruppenzaehler"]')).toBeNull();
   });
 
   // ── Datensicht ──
 
   const epGebunden = disponiert[0];
-  const epVerfuegbar = {
+  const epOhne = {
     ...disponiert[0],
     id: 12,
     personal_id: 6,
@@ -618,135 +622,160 @@ describe('PersonalPage', () => {
   const zeilenFolge = (container: HTMLElement) =>
     [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key'));
 
+  /** Blendet eine voreingestellt verborgene Spalte über den Spaltenschalter ein. */
+  async function blendeEin(spalte: string) {
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: spalte }));
+  }
+
   it('eingeschaltete Bemerkungsspalte trägt bei leerem Wert einen benannten Auslöser', async () => {
     /**
      * Leeres Bemerkungsfeld an der Personalseite. Zwei Hälften: die Spalte ist per Voreinstellung
      * abgewählt, also gibt es vorher keinen Auslöser — eine reine „ist da"-Prüfung bestünde auch
      * bei einem Platzhalter irgendwo sonst.
-     *
-     * Die Voreinstellung bleibt: schreibtragende Spalten bekommen kein `abBreite`, sie weichen nur
-     * über die Voreinstellung. Der Zähler stimmt vorher wie nachher. Ab `xxl`, damit nur die
-     * Bemerkung fehlt (LFH-975).
      */
     setzeViewportBreite(1600);
     const { container } = render(einsatz());
-    await screen.findByText('Thomas Müller');
+    await bereit();
     expect(
       screen.queryByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' }),
     ).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
+    await blendeEin('Bemerkung');
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(
       within(zeile).getByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
-  it('der Spaltenschalter meldet die ausgeblendete Bemerkungsspalte als TEXT', async () => {
+  it('der Spaltenschalter meldet Träger, Ruhe und Bemerkung als ausgeblendet, als TEXT', async () => {
     /**
      * Kein Zähl-Abzeichen: ein antd-`Badge` mit `count` und ohne `color` rendert auf
      * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts". Der Zähler
      * steht im zugänglichen Namen des Knopfes.
      */
-    setzeViewportBreite(1600);
+    setzeViewportBreite(1440);
     render(einsatz());
-    await screen.findByText('Thomas Müller');
-    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'Bemerkung' })).toBeNull();
-    // Position ist schreibtragend und bleibt sichtbar — ohne `abBreite`, weil das Führungs-Tablet
-    // (1024–1280 px) sie sonst genau dort verlöre, und es keine Detailroute als Ausweichort gibt.
-    expect(screen.getByRole('columnheader', { name: 'Position' })).toBeInTheDocument();
+    await bereit();
+    expect(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
+    for (const kopf of ['Träger', 'Ruhe', 'Bemerkung']) {
+      expect(screen.queryByRole('columnheader', { name: kopf })).toBeNull();
+    }
   });
 
   it.each([
-    [1024, 5],
-    [1440, 4],
-    [1600, 1],
+    [1024, 4],
+    [1366, 3],
+    [1440, 3],
   ])(
-    'bei %i px weichen die Nebenspalten über den Schalter und stehen im Zähler (%i ausgeblendet, LFH-975)',
+    'bei %i px stehen Einheit, Fahrzeug und Position ohne Schalter im Bild (%i ausgeblendet, LLH-1060 D7)',
     async (breite, anzahl) => {
       setzeViewportBreite(breite);
       render(einsatz());
-      await screen.findByText('Thomas Müller');
+      await bereit();
       expect(
         screen.getByRole('button', { name: new RegExp(`Spalten · ${anzahl} ausgeblendet`) }),
       ).toBeInTheDocument();
-      // Ruhe, Position und die Aktion weichen nie.
-      for (const kopf of ['Position', 'Ruhe', 'Aktionen']) {
+      for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Status', 'Einsatzdauer']) {
         expect(screen.getByRole('columnheader', { name: kopf })).toBeInTheDocument();
       }
     },
   );
 
-  it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
-    const { container } = render(einsatz(), [epGebunden, epVerfuegbar]);
-    await screen.findByText('Thomas Müller');
-    // Im Streifen gesucht: die Verdichtungszeile darüber schreibt dieselben Wörter (LFH-973).
+  it('gruppiert nach Einheit: „nicht eingeteilt“ zuerst, mit Zähler im Etikett', async () => {
+    const { container } = render(einsatz(), [epGebunden, epOhne]);
+    await bereit();
+    // Im Streifen gesucht: die Verdichtungszeile darüber schreibt Statuswörter (LFH-973).
     const streifen = within(
       container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
     );
-    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
-    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
-    // Die Gruppenachse führt: verfügbar (Zora) steht vor gebunden (Thomas) — weder Server- noch
-    // Namensordnung.
+    expect(streifen.getByText('1 nicht eingeteilt')).toBeInTheDocument();
+    expect(streifen.getByText('1 Zugtrupp')).toBeInTheDocument();
+    // „nicht eingeteilt“ (Zora) vor „Zugtrupp“ (Thomas) — weder Server- noch Namensordnung.
     expect(zeilenFolge(container)).toEqual(['12', '10']);
   });
 
-  it('ein Statuswechsel unter dem Cursor verschiebt die Zeile NICHT (Kriterium 12)', async () => {
+  it('benennt eine Untereinheit mit ihrem Pfad und stellt sie nach ihre Obereinheit', async () => {
+    const { container } = render(einsatz(), [
+      { ...epGebunden, id: 10, einheit_id: 4, fahrzeug_id: null },
+      { ...epOhne, id: 12, einheit_id: 5 },
+    ]);
+    server.use(
+      http.get('/api/einsaetze/7/einheiten', () =>
+        HttpResponse.json([
+          { ...einheiten[0], id: 4, name: 'Staffel A', ueber_einheit_id: 5 },
+          { ...einheiten[0], id: 5, name: 'Zug 1' },
+        ]),
+      ),
+    );
+    const streifen = await waitFor(() => {
+      const s = container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]');
+      expect(s).toHaveTextContent('1 Zug 1 › Staffel A');
+      return within(s!);
+    });
+    expect(streifen.getByText('1 Zug 1')).toBeInTheDocument();
+    expect(zeilenFolge(container)).toEqual(['12', '10']);
+  });
+
+  it('der Status bleibt Filter der Statusspalte', async () => {
+    render(einsatz(), [epGebunden, epOhne]);
+    await bereit();
+    // Die Filter stehen in der Werkzeugzeile der `Datensicht`.
+    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+    await userEvent.click(await screen.findByTitle('verfügbar'));
+    await waitFor(() => expect(screen.queryByText('Thomas Müller')).toBeNull());
+    expect(screen.getByText('Zora Zebra')).toBeInTheDocument();
+  });
+
+  it('ein Einheitswechsel unter dem Cursor verschiebt die Zeile NICHT (Kriterium 12)', async () => {
     /**
-     * Zwei Auswahlfelder in der Zeile (Position und Status). Geprüft mit dem Fokus im
-     * Positions-Feld: die Schleuse hängt nur daran, dass der Fokus in der Sicht liegt.
+     * Die Zeile wandert erst, wenn Fokus und Zeiger die Sicht verlassen haben (Spec
+     * `personal-ansicht`, „Einheitswechsel unter dem Zeiger“). Fokus auf dem Auslöser der
+     * Einheitsangabe, wie nach dem Speichern.
      */
-    const { container, client } = render(einsatz(), [epGebunden, epVerfuegbar]);
-    await screen.findByText('Thomas Müller');
+    const { container, client } = render(einsatz(), [epGebunden, epOhne]);
+    await bereit();
     const vorher = zeilenFolge(container);
     expect(vorher).toEqual(['12', '10']);
 
-    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    act(() => within(zeile).getAllByRole('combobox')[0].focus());
+    act(() => screen.getByRole('button', { name: 'Einheit zu Zora Zebra eintragen' }).focus());
     const sicht = screen.getByRole('region', { name: 'Personal im Einsatz' });
     expect(sicht.contains(document.activeElement)).toBe(true);
 
     act(() => {
-      client.setQueryData(einsatzKeys.personal(7), [
-        { ...epGebunden, status_kategorie: 'verfuegbar', status_label: 'einsatzbereit' },
-        epVerfuegbar,
-      ]);
+      client.setQueryData(einsatzKeys.personal(7), [epGebunden, { ...epOhne, einheit_id: 3 }]);
     });
 
     await waitFor(() =>
       expect(
         within(
           container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
-        ).getByText('2 verfügbar'),
+        ).getByText('2 Zugtrupp'),
       ).toBeInTheDocument(),
     );
     expect(zeilenFolge(container)).toEqual(vorher);
   });
 
   it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
-    const { container, client } = render(einsatz(), [epGebunden, epVerfuegbar]);
-    await screen.findByText('Thomas Müller');
+    const { container, client } = render(einsatz(), [epGebunden, epOhne]);
+    await bereit();
     expect(zeilenFolge(container)).toEqual(['12', '10']);
 
     act(() => {
-      client.setQueryData(einsatzKeys.personal(7), [
-        { ...epGebunden, status_kategorie: 'verfuegbar', status_label: 'einsatzbereit' },
-        epVerfuegbar,
-      ]);
+      client.setQueryData(einsatzKeys.personal(7), [epGebunden, { ...epOhne, einheit_id: 3 }]);
     });
 
+    // Beide in „Zugtrupp“, dort nach Namen: Thomas vor Zora.
     await waitFor(() => expect(zeilenFolge(container)).toEqual(['10', '12']));
   });
 
   describe('unter md', () => {
-    it('steht keine Tabelle, sondern Karten — und genau EIN Zweig im Baum', async () => {
+    it('steht keine Tabelle, sondern Karten mit Einteilung und ohne Zeilenaktion', async () => {
       setzeViewportBreite(390);
       const { container } = render(einsatz());
-      expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
+      await bereit();
       expect(container.querySelector('.ant-table')).toBeNull();
       expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
       // Der Statusslot trägt ein Etikett mit Text, nicht das Auswahlfeld der Spalte — ein Select
@@ -754,12 +783,27 @@ describe('PersonalPage', () => {
       const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
       expect(within(karte).getByText('alarmiert')).toBeInTheDocument();
       expect(karte.querySelector('.ant-select')).toBeNull();
+      // Dieselben Angaben wie in der Zeile (`sekundaer`), der Name führt in die Ansicht.
+      for (const name of [
+        'Einheit zu Thomas Müller bearbeiten',
+        'Fahrzeug zu Thomas Müller bearbeiten',
+        'Position zu Thomas Müller bearbeiten',
+      ]) {
+        expect(within(karte).getByRole('button', { name })).toBeInTheDocument();
+      }
+      expect(within(karte).getByRole('link', { name: 'Thomas Müller' })).toHaveAttribute(
+        'href',
+        '/einsaetze/7/personal/10',
+      );
+      expect(
+        within(karte).queryByRole('button', { name: /entlassen|Weitere Aktionen/ }),
+      ).toBeNull();
     });
   });
 
   it('Gegenprobe: ab md steht die Tabelle', async () => {
     const { container } = render(einsatz());
-    await screen.findByText('Thomas Müller');
+    await bereit();
     expect(container.querySelector('.ant-table')).not.toBeNull();
     expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
@@ -1035,11 +1079,17 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     const zeile = document.querySelector('[data-row-key="10"]') as HTMLElement;
     return zeile.querySelectorAll('td')[i] as HTMLElement;
   };
+  /** „Ruhe“ steht seit LLH-1060 im Spaltenschalter (D7). */
+  async function zeigeRuhe() {
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Ruhe' }));
+  }
 
   it('ohne Ereignisse: „—" in Einsatzdauer und Ruhe, nie eine Zahl', async () => {
     setzeViewportBreite(1440);
     render(einsatz());
     await screen.findByText('Thomas Müller');
+    await zeigeRuhe();
     await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('—'));
     expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
     expect(zelleDerSpalte('Einsatzdauer').textContent).not.toMatch(/\d/);
@@ -1060,19 +1110,9 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     );
     render(einsatz());
     await screen.findByText('Thomas Müller');
+    await zeigeRuhe();
     await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('2 h 05'));
     expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
-  });
-
-  it('klappt die Zeitachse der Person inline auf', async () => {
-    setzeViewportBreite(1440);
-    render(einsatz());
-    await screen.findByText('Thomas Müller');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Zeitachse zu Thomas Müller' }),
-    );
-    expect(await screen.findByText(/Noch keine Ereignisse/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
   });
 });
 

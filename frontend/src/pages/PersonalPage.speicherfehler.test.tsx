@@ -8,10 +8,12 @@ import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import PersonalPage from './PersonalPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
+import { waehle } from '../test/auswahlListe';
 
 /**
  * Abgelehnte Speichervorgänge der Personalseite stehen am Ort der Handlung (LFH-1077,
- * `frontend/AGENTS.md`, „Rückwege und Fehler“): im Disponier-Dialog und an der Zeile bzw. Karte.
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“): im Disponier-Dialog, an der Zeile bzw. Karte (Status,
+ * Bemerkung) und an der Angabe selbst (Einheit, Fahrzeug, Position; LLH-1060 D4).
  * Kein Fehler-Toast; der Grund bleibt bis zum nächsten Absenden. Die Ad-hoc-Person trägt ihren
  * Fehler im eigenen Bauteil (`kraefte/AdhocPersonModal.tsx`).
  */
@@ -133,7 +135,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
-  it('Status und Position: der Grund steht an der Zeile, der nächste Wechsel räumt ihn', async () => {
+  it('Status: der Grund steht an der Zeile, der nächste Wechsel räumt ihn', async () => {
     const naechster = tor();
     let versuche = 0;
     server.use(
@@ -143,7 +145,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
           return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
         }
         await naechster.offen;
-        return HttpResponse.json({ error: 'Position abgelehnt' }, { status: 422 });
+        return HttpResponse.json({ error: 'Wieder abgelehnt' }, { status: 422 });
       }),
     );
     const { container } = render();
@@ -154,45 +156,78 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
 
-    // Die Stärke-Position derselben Zeile ist die nächste Aktion: sie räumt den alten Grund.
-    const leeren = zeile(container, 10).querySelector('.ant-select-clear')!;
-    fireEvent.mouseDown(leeren);
-    fireEvent.click(leeren);
+    await waehleStatus(zeile(container, 10), 'Thomas Müller', /einsatzbereit/);
     await waitFor(() => expect(within(zeile(container, 10)).queryByRole('alert')).toBeNull());
     await act(async () => naechster.frei());
     expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
-      'Position abgelehnt',
+      'Wieder abgelehnt',
     );
     expect(toasts()).toBe(0);
   });
 
-  it('Entlassen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
-    const ersteAntwort = tor();
+  it('Position: die Ablehnung steht an der Angabe, die Auswahl bleibt mit dem gewählten Wert offen', async () => {
     server.use(
-      http.post('/api/einsaetze/7/personal/10/entlassen', async () => {
-        await ersteAntwort.offen;
-        return HttpResponse.json({ error: 'Die Person ist bereits entlassen' }, { status: 409 });
-      }),
-      http.post('/api/einsaetze/7/personal/11/entlassen', () =>
-        HttpResponse.json({ ...zweite, beendet_als: 'entlassen' }),
+      http.patch('/api/einsaetze/7/personal/10', () =>
+        HttpResponse.json({ error: 'Position abgelehnt' }, { status: 422 }),
       ),
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
     await userEvent.click(
-      within(zeile(container, 10)).getByRole('button', { name: 'Thomas Müller entlassen' }),
+      within(zeile(container, 10)).getByRole('button', {
+        name: 'Position zu Thomas Müller bearbeiten',
+      }),
+    );
+    await waehle('Position zu Thomas Müller', 'Mannschaft');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
+    );
+    expect(await within(zeile(container, 10)).findByText(/Position abgelehnt/)).toBeVisible();
+    const feld = screen
+      .getByRole('combobox', { name: 'Position zu Thomas Müller' })
+      .closest('.ant-select')!;
+    expect(feld).toHaveTextContent('Mannschaft');
+    expect(toasts()).toBe(0);
+  });
+
+  // Spec `personal-ansicht`, „Einteilung in der Zeile ändern“, Szenario „Ablehnung an der Zelle“.
+  it('Fahrzeug: der Grund steht an der Fahrzeugzelle, die Auswahl zeigt weiter das gewählte Fahrzeug', async () => {
+    const { container } = render();
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([
+          {
+            id: 8,
+            funkrufname: 'Florian 1',
+            kennzeichen: null,
+            fahrzeugtyp: 'ELW',
+            einheit_id: null,
+            status_kategorie: null,
+            status_label: null,
+          },
+        ]),
+      ),
+      http.put('/api/einsaetze/7/fahrzeuge/8/besatzung/10', () =>
+        HttpResponse.json({ error: 'Fahrzeug ist voll besetzt' }, { status: 422 }),
+      ),
     );
     await userEvent.click(
-      within(zeile(container, 11)).getByRole('button', { name: 'Sara Weber entlassen' }),
+      await screen.findByRole('button', { name: 'Fahrzeug zu Thomas Müller eintragen' }),
     );
-    await act(async () => ersteAntwort.frei());
-
-    expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
-      'Die Person ist bereits entlassen',
+    await waehle('Fahrzeug zu Thomas Müller', 'Florian 1 (ELW)');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Fahrzeug zu Thomas Müller speichern' }),
     );
-    expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
-    // Der Erfolg der zweiten trägt den Rückgängig-Toast; ein Fehler-Toast steht nirgends.
-    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    expect(
+      await within(zeile(container, 10)).findByText(/Fahrzeug ist voll besetzt/),
+    ).toBeVisible();
+    const feld = screen
+      .getByRole('combobox', { name: 'Fahrzeug zu Thomas Müller' })
+      .closest('.ant-select')!;
+    expect(feld).toHaveTextContent('Florian 1 (ELW)');
+    // Die Zeile meldet nichts doppelt: der Grund steht nur an der Angabe.
+    expect(within(zeile(container, 10)).getAllByText(/Fahrzeug ist voll besetzt/)).toHaveLength(1);
+    expect(toasts()).toBe(0);
   });
 
   it('Bemerkung: das Feld wartet und bleibt bei Ablehnung mit dem Wortlaut offen', async () => {
@@ -204,7 +239,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {
@@ -234,7 +269,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {
