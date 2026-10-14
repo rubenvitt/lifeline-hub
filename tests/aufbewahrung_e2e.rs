@@ -215,6 +215,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "freigegebenes Besatzungsmitglied, wenn ad-hoc extern",
     },
     Ausnahme {
+        datei: "src/routes/einsatz_fahrzeug.rs",
+        funktion: "besatzung_uebernehmen",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Kräfte der Einheit, in einem Schritt als Besatzung übernommen, wenn ad-hoc extern (LLH-1073 D12)",
+    },
+    Ausnahme {
         datei: "src/einsatz/fuehrungsstelle.rs",
         funktion: "save_einsatzleiter_tx",
         spalte: "einsatz_fuehrungsstelle.einsatzleiter_name",
