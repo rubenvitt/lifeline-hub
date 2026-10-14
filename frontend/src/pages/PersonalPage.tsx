@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
+import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
@@ -479,6 +480,7 @@ export default function PersonalPage() {
           wert={ep.bemerkung}
           kennung={ep.name}
           darfSchreiben={darfSchreiben}
+          max={PERSONAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
           onSpeichern={(val) => bemerkungMutation.mutateAsync({ epId: ep.id, bemerkung: val })}
         />

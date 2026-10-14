@@ -3,6 +3,7 @@ import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 're
 import { Button, Typography } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
+import { istZuLang, Zeichenzaehler } from './zeichenGrenze';
 
 /**
  * Inline bearbeitbare Bemerkung — mit sichtbarer Affordanz im LEEREN Zustand (LFH-369 · B5i).
@@ -105,6 +106,14 @@ interface BemerkungZelleProps {
    * Zelle zeigt ihn sofort mit Ladeanzeige statt des alten Stands.
    */
   laeuft?: boolean;
+  /**
+   * Zeichengrenze des Servers (`api/eingabegrenzen.ts`, LLH-1067). Das Feld zählt wie
+   * `zeichenGrenze` („n / max“ ab 80 %, darüber „· zu lang“) und kürzt nie; ein zu langer
+   * Wortlaut geht weder mit Enter noch beim Verlassen hinaus ({@link istZuLang}), das Feld bleibt
+   * mit dem vollen Text offen. Antds `editable` kennt kein `count`, der Zähler steht deshalb unter
+   * dem Feld. Ohne Angabe keine Grenze.
+   */
+  max?: number;
 }
 
 /** Wortlaut an EINER Stelle — Seiten und Tests greifen denselben Namen.
@@ -118,6 +127,7 @@ export function BemerkungZelle({
   kennung,
   bezeichnung = 'Bemerkung',
   laeuft = false,
+  max,
 }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const { token, rollen } = useRollen();
@@ -132,6 +142,9 @@ export function BemerkungZelle({
   // Von `onChange` zurückgehaltener Wortlaut, den ein folgendes `onEnd` (Enter) doch schickt.
   const zurueckRef = useRef<string | null>(null);
   const huelleRef = useRef<HTMLDivElement>(null);
+  // Der getippte Wortlaut für Zähler und Sperre; antds `editable` meldet ihn erst beim Übernehmen.
+  const [entwurf, setEntwurf] = useState('');
+  const zuLang = max != null && istZuLang(entwurf, max);
   const gefuellt = !!wert;
 
   // Solange gesendet wird, ist das Feld nur lesbar: sonst ginge Getipptes verloren (ein zweites
@@ -141,6 +154,19 @@ export function BemerkungZelle({
     const feld = huelleRef.current?.querySelector('textarea');
     if (feld) feld.readOnly = sendet;
   }, [sendet, bearbeitet]);
+
+  // Überlänge am Feld selbst angesagt; antd reicht `aria-invalid` nicht durch.
+  useLayoutEffect(() => {
+    const feld = huelleRef.current?.querySelector('textarea');
+    if (!feld) return;
+    if (zuLang) feld.setAttribute('aria-invalid', 'true');
+    else feld.removeAttribute('aria-invalid');
+  }, [zuLang, bearbeitet]);
+
+  const oeffnen = () => {
+    setEntwurf(wert ?? '');
+    setBearbeitet(true);
+  };
 
   /**
    * Lesezweig bei „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung liefe ins Leere.
@@ -164,7 +190,7 @@ export function BemerkungZelle({
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.
         aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}
-        onClick={() => setBearbeitet(true)}
+        onClick={oeffnen}
       >
         {`${bezeichnung} hinzufügen`}
       </Button>
@@ -184,7 +210,7 @@ export function BemerkungZelle({
         }
         aria-describedby={wertId}
         style={wertKnopfStil(token)}
-        onClick={() => setBearbeitet(true)}
+        onClick={oeffnen}
       >
         <span id={wertId}>{wert}</span>
         {/* Icon ohne eigenes Vorleseziel: das Icon des Satzes ist selbst `aria-hidden`
@@ -205,6 +231,8 @@ export function BemerkungZelle({
 
   const senden = (val: string) => {
     zurueckRef.current = null;
+    // Über der Grenze geht nichts hinaus, der Server lehnte mit 400 ab; das Feld bleibt offen.
+    if (max != null && istZuLang(val, max)) return;
     // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
     // ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
     const ergebnis = val !== (wert ?? '') ? onSpeichern(val) : undefined;
@@ -231,7 +259,15 @@ export function BemerkungZelle({
 
   return (
     // `aria-busy` an der Hülle, `readOnly` am Feld (Effekt oben): antd reicht keines davon durch.
-    <div ref={huelleRef} aria-busy={sendet || undefined}>
+    <div
+      ref={huelleRef}
+      aria-busy={sendet || undefined}
+      // Eingaben im Feld laufen hier vorbei: Zähler und Sperre brauchen den Wortlaut beim Tippen.
+      onInput={(e) => {
+        const ziel = e.target;
+        if (ziel instanceof HTMLTextAreaElement) setEntwurf(ziel.value);
+      }}
+    >
       <Typography.Text
         editable={{
           // `editing` KONTROLLIERT und hier immer an: außerhalb der Bearbeitung trägt einer der
@@ -257,6 +293,7 @@ export function BemerkungZelle({
       >
         {wert ?? ''}
       </Typography.Text>
+      {max != null && <Zeichenzaehler wert={entwurf} max={max} />}
     </div>
   );
 }
