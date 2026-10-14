@@ -783,6 +783,66 @@ export interface components {
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
         };
+        /** @description Eine Benachrichtigung mit ihrem Text, wie der Empfänger sie liest. */
+        BenachrichtigungAnzeige: {
+            art: components["schemas"]["BenachrichtigungArt"];
+            /** Format: int64 */
+            bezug_id: number;
+            bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
+            /** @description Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt. */
+            detail?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            erstellt_at: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Sprungziel im Frontend (Muster aus `frontend/src/routing/deeplinks.ts`). */
+            pfad: string;
+            quittiert_at?: string | null;
+            stufe: components["schemas"]["BenachrichtigungStufe"];
+            /** @description Überschrift je Art, etwa „Neuer Auftrag“. */
+            titel: string;
+        };
+        /**
+         * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
+         *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
+         *     CHECK-Liste in `migrations/0196_benachrichtigung.sql` spiegelt `ALLE`.
+         * @enum {string}
+         */
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
+        /**
+         * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
+         *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
+         * @enum {string}
+         */
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "auftrag" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "lagebesprechung" | "nachforderung" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        /**
+         * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
+         *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
+         *     Client über `GET /api/benachrichtigungen/{id}`.
+         */
+        BenachrichtigungEreignis: {
+            art: components["schemas"]["BenachrichtigungArt"];
+            /** Format: int64 */
+            benachrichtigung_id: number;
+            /** Format: int64 */
+            bezug_id: number;
+            bezug_typ: components["schemas"]["BenachrichtigungBezugTyp"];
+            /** Format: int64 */
+            einsatz_id: number;
+            /**
+             * @description `true`: der Empfänger hat sie quittiert, ihre Toasts auf seinen anderen Verbindungen
+             *     verschwinden (Spec „Quittieren gilt für alle Verbindungen des Nutzers“).
+             */
+            quittiert: boolean;
+            stufe: components["schemas"]["BenachrichtigungStufe"];
+        };
+        /**
+         * @description Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“). Die dritte Stufe, *still*, erzeugt
+         *     keine Benachrichtigung und hat deshalb keinen Wert.
+         * @enum {string}
+         */
+        BenachrichtigungStufe: "alarm" | "hinweis";
         /** @description Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten. */
         BenutzerAnzeige: {
             aktiv: boolean;
@@ -3265,7 +3325,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -3869,7 +3929,7 @@ export interface components {
          *     `ORG_STREAM_EVENTS` (`api/queryKeys.ts`) auf die globalen Query-Keys ab.
          * @enum {string}
          */
-        OrgLiveEvent: "einsatzliste" | "stammdaten";
+        OrgLiveEvent: "einsatzliste" | "stammdaten" | "org_benachrichtigung";
         /** @description Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`. */
         OrgLogoAnzeige: {
             geaendert_at: string;

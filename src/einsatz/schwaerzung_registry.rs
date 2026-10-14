@@ -2447,6 +2447,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zeitpunkt", G_ZEIT),
         ],
     },
+    // ---------- Benachrichtigungen (LLH-1207, migrations/0196, design.md D1) ----------
+    // Keine Textspalte: der Text entsteht beim Lesen aus dem Bezug, der selbst gescrubbt wird.
+    // Die Zeilen leben kurz (Scheduler: offen 12 h, nach dem Quittieren 24 h) und fallen mit dem
+    // Einsatz (CASCADE).
+    TabellenRegel {
+        tabelle: "benachrichtigung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("benutzer_id", G_FK),
+            retain("art", G_ENUM),
+            retain("stufe", G_ENUM),
+            retain("bezug_typ", G_POLY),
+            retain("bezug_id", G_POLY),
+            retain("ausloeser_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("quittiert_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         // Nur Gerätesitzungen sind einsatz-scoped (kopplung_id gesetzt); Personensitzungen nicht.
         tabelle: "session",

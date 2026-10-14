@@ -56,6 +56,9 @@ wire_enum! {
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
+        /// Benachrichtigungen eines `melden`-Aufrufs (LLH-1207, design.md D2): EINE Nachricht im
+        /// Ring, je Verbindung nur mit der Nutzlast ihres Nutzers ([`LiveNachricht::empfaenger`]).
+        Benachrichtigung => "benachrichtigung",
         Lagged => "lagged",
     }
 }
@@ -65,9 +68,10 @@ impl LiveEvent {
     /// Live-Filters (F01/LFH-227). Ein Abonnent erhält das Event, wenn er MINDESTENS
     /// EINES dieser Module sehen darf. Eine leere Menge heißt „gehört keinem Modul — erreicht
     /// jeden, der die Tür des Stroms passiert" (`EinsatzLesezugriff` ohne Modul, `routes/live.rs`).
-    /// Sie steht nur zwei Events zu: dem Kontroll-Event `lagged` und dem Einsatzkopf `einsatz`,
-    /// dessen GET hinter genau derselben Tür liegt (LFH-555). Gepinnt von
-    /// `ungegatet_sind_nur_lagged_und_einsatz`.
+    /// Sie steht nur drei Events zu: dem Kontroll-Event `lagged`, dem Einsatzkopf `einsatz`,
+    /// dessen GET hinter genau derselben Tür liegt (LFH-555), und der Benachrichtigung, die statt
+    /// eines Moduls eine Empfängerliste trägt (LLH-1207). Gepinnt von
+    /// `ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung`.
     ///
     /// **Füll-Regel (sicherheitstragend):** hier steht das Modul, zu dessen Datenobjekt
     /// das Event gehört — NICHT das Modul der Route, die es ausgelöst hat. Ein
@@ -178,6 +182,13 @@ impl LiveEvent {
             // Auch eine Mitgliedschaftsänderung feuert es (LFH-854): kein Leck, denn die
             // Mitgliederliste mit allen Rollen liegt ebenfalls hinter dieser Tür.
             LiveEvent::Einsatz => &[],
+            // Benachrichtigung (LLH-1207, design.md D2): ungegatet, weil ihr Empfängerfilter enger
+            // ist als jedes Modul. Sie erreicht nur die Verbindungen der Nutzer in
+            // `LiveNachricht::empfaenger`, je mit seiner Nutzlast (Live und Replay,
+            // `LiveNachricht::fuer`), ohne
+            // Empfänger niemanden ([`LiveEvent::braucht_empfaenger`]). Das Modulrecht am Bezug
+            // prüft die Empfängerauflösung (`benachrichtigung::aufloesung`), nicht dieses Gate.
+            LiveEvent::Benachrichtigung => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
             LiveEvent::Lagged => &[],
@@ -189,6 +200,12 @@ impl LiveEvent {
     pub fn sichtbar_fuer(self, erlaubt: &HashSet<&'static str>) -> bool {
         let keys = self.modul_keys();
         keys.is_empty() || keys.iter().any(|k| erlaubt.contains(k))
+    }
+
+    /// Ob dieses Event nur an benannte Empfänger gehen darf (LLH-1207). Ohne Empfängerliste
+    /// erreicht es dann niemanden: fail-closed, damit ein Emitter ohne Liste nicht an jeden geht.
+    pub const fn braucht_empfaenger(self) -> bool {
+        matches!(self, LiveEvent::Benachrichtigung)
     }
 }
 
@@ -231,7 +248,42 @@ pub struct LiveNachricht {
     /// exhaustiver `match` über [`LiveEvent::modul_keys`] statt eines Rück-Parsens mit
     /// fail-closed-Laufzeitnetz (F01/LFH-227).
     pub event: LiveEvent,
+    /// Nutzlast für alle; leer bei einer Nachricht mit [`Self::empfaenger`].
     pub data: String,
+    /// Die einzigen Nutzer, deren Verbindungen die Nachricht erreichen darf, je mit IHRER
+    /// Nutzlast (LLH-1207, design.md D2): so belegt ein `melden` mit vielen Empfängern genau
+    /// einen Platz im Ring. `None` = jeder, den das Modul-Gate durchlässt, mit [`Self::data`].
+    /// Intern, nie auf dem Draht: sonst erführe jeder die Adressaten und ihre Kennungen.
+    pub empfaenger: Option<Arc<[Zustellung]>>,
+}
+
+/// Die Nutzlast einer Nachricht für genau einen Nutzer ([`LiveNachricht::empfaenger`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Zustellung {
+    pub benutzer_id: i64,
+    pub data: Arc<str>,
+}
+
+impl LiveNachricht {
+    /// Die Nachricht, wie sie an die Verbindung von `benutzer_id` mit den Modulen `erlaubt`
+    /// geht, oder `None`: das Modul-Gate des Events und, wo gesetzt, die Empfängerliste; ein
+    /// Empfänger bekommt seine eigene Nutzlast, ein Fremder nichts (auch kein leeres Ereignis).
+    /// Ein Event, das Empfänger braucht, geht ohne Liste an niemanden. Gilt für Live und Replay
+    /// (`routes::support::sse_stream_mit_replay`).
+    pub fn fuer(mut self, benutzer_id: i64, erlaubt: &HashSet<&'static str>) -> Option<Self> {
+        if !self.event.sichtbar_fuer(erlaubt) {
+            return None;
+        }
+        match self.empfaenger.take() {
+            Some(liste) => {
+                let z = liste.iter().find(|z| z.benutzer_id == benutzer_id)?;
+                self.data = z.data.to_string();
+                Some(self)
+            }
+            None if self.event.braucht_empfaenger() => None,
+            None => Some(self),
+        }
+    }
 }
 
 /// Ergebnis eines (Wieder-)Abonnements mit `Last-Event-ID` (F14/LFH-263).
@@ -426,6 +478,7 @@ impl LiveHub {
             org_id,
             event: org::OrgLiveEvent::Stammdaten,
             empfaenger: org::OrgEmpfaenger::Organisation,
+            nutzlast: None,
         });
     }
 
@@ -439,6 +492,26 @@ impl LiveHub {
             empfaenger: org::OrgEmpfaenger::Einsatzleser {
                 benutzer_ids: benutzer_ids.into(),
             },
+            nutzlast: None,
+        });
+    }
+
+    /// Eine Org-Benachrichtigung (LLH-1207, design.md D2) an genau `benutzer_ids`, mit Nutzlast
+    /// (`benachrichtigung::BenachrichtigungEreignis`). Kein System-Admin und keine org-weite
+    /// Führungskraft liest mit ([`org::OrgEmpfaenger::Benutzer`]).
+    pub fn publiziere_org_benachrichtigung(
+        &self,
+        org_id: i64,
+        data: String,
+        benutzer_ids: Vec<i64>,
+    ) {
+        self.publiziere_org(org::OrgNachricht {
+            org_id,
+            event: org::OrgLiveEvent::OrgBenachrichtigung,
+            empfaenger: org::OrgEmpfaenger::Benutzer {
+                benutzer_ids: benutzer_ids.into(),
+            },
+            nutzlast: Some(data.into()),
         });
     }
 
@@ -596,6 +669,26 @@ impl LiveHub {
     /// Client, der innerhalb der [`REPLAY_KARENZ`] zurückkommt, bekommt gerade diese Nachricht
     /// nachgeliefert. Abgebaut wird nur im Sweep ([`Self::raeume_verwaiste`]).
     pub fn publiziere_event(&self, einsatz_id: i64, event: LiveEvent, data: String) {
+        self.publiziere_nachricht(einsatz_id, event, data, None);
+    }
+
+    /// Wie [`Self::publiziere_event`], aber nur für die Verbindungen der Empfänger, je mit ihrer
+    /// eigenen Nutzlast, live und im Replay (LLH-1207, design.md D2). EINE Nachricht im Ring,
+    /// gleich wie viele Empfänger; die Liste reist intern mit, nie auf dem Draht.
+    pub fn publiziere_an(&self, einsatz_id: i64, event: LiveEvent, zustellungen: Vec<Zustellung>) {
+        if zustellungen.is_empty() {
+            return;
+        }
+        self.publiziere_nachricht(einsatz_id, event, String::new(), Some(zustellungen.into()));
+    }
+
+    fn publiziere_nachricht(
+        &self,
+        einsatz_id: i64,
+        event: LiveEvent,
+        data: String,
+        empfaenger: Option<Arc<[Zustellung]>>,
+    ) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
         let Kanaele { map, hoechste_id } = &mut *kanaele;
         let Some(kanal) = map.get_mut(&einsatz_id) else {
@@ -609,6 +702,7 @@ impl LiveHub {
             id: format!("{}-{n}", self.epoch),
             event,
             data,
+            empfaenger,
         };
         if kanal.ring.len() >= REPLAY_KAPAZITAET {
             kanal.ring.pop_front();
@@ -737,19 +831,108 @@ mod tests {
         }
     }
 
-    /// Ungegatet sind genau das Kontroll-Event `lagged` und der Einsatzkopf `einsatz`
-    /// (LFH-555): beide gehören keinem Modul und erreichen jeden, der die Tür des Stroms
-    /// passiert. Rutschte ein Fach-Event versehentlich auf `&[]`, liefe es an JEDEM
-    /// Modul-Gate vorbei — die Lücke, die F01 schließt.
+    /// Ungegatet sind genau das Kontroll-Event `lagged`, der Einsatzkopf `einsatz` (LFH-555)
+    /// und die Benachrichtigung (LLH-1207). Die ersten beiden gehören keinem Modul und erreichen
+    /// jeden, der die Tür des Stroms passiert; die Benachrichtigung ist enger als jedes Modul,
+    /// weil sie nur an ihre Empfänger geht ([`LiveEvent::braucht_empfaenger`], unten gepinnt).
+    /// Rutschte ein Fach-Event versehentlich auf `&[]`, liefe es an JEDEM Modul-Gate vorbei —
+    /// die Lücke, die F01 schließt.
     #[test]
-    fn ungegatet_sind_nur_lagged_und_einsatz() {
+    fn ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung() {
         let mut ungegatet: Vec<&str> = LiveEvent::ALLE
             .iter()
             .filter(|ev| ev.modul_keys().is_empty())
             .map(|ev| ev.as_str())
             .collect();
         ungegatet.sort_unstable();
-        assert_eq!(ungegatet, vec!["einsatz", "lagged"]);
+        assert_eq!(ungegatet, vec!["benachrichtigung", "einsatz", "lagged"]);
+        let mit_empfaengern: Vec<&str> = LiveEvent::ALLE
+            .iter()
+            .filter(|ev| ev.braucht_empfaenger())
+            .map(|ev| ev.as_str())
+            .collect();
+        assert_eq!(
+            mit_empfaengern,
+            vec!["benachrichtigung"],
+            "ein ungegatetes Fach-Event braucht eine Empfängerliste"
+        );
+    }
+
+    fn zustellung(benutzer_id: i64, data: &str) -> Zustellung {
+        Zustellung {
+            benutzer_id,
+            data: data.into(),
+        }
+    }
+
+    fn benachrichtigung_an(empfaenger: Option<Vec<Zustellung>>) -> LiveNachricht {
+        LiveNachricht {
+            id: "1-1".into(),
+            event: LiveEvent::Benachrichtigung,
+            data: String::new(),
+            empfaenger: empfaenger.map(Into::into),
+        }
+    }
+
+    /// LLH-1207, design.md D2: die Benachrichtigung erreicht nur ihre Empfänger, je mit ihrer
+    /// eigenen Nutzlast, auch ohne jedes Modulrecht; ein fremder Nutzer mit allen Modulen bekommt
+    /// nichts.
+    #[test]
+    fn benachrichtigung_erreicht_jeden_empfaenger_mit_seiner_nutzlast() {
+        let alle: HashSet<&'static str> = crate::einsatz::modul::MODUL_KEYS.into_iter().collect();
+        let n = benachrichtigung_an(Some(vec![zustellung(7, "a"), zustellung(8, "b")]));
+        let fuer_7 = n.clone().fuer(7, &HashSet::new()).expect("Empfänger 7");
+        assert_eq!(fuer_7.data, "a");
+        assert!(
+            fuer_7.empfaenger.is_none(),
+            "die Liste verlässt den Hub nicht"
+        );
+        assert_eq!(n.clone().fuer(8, &HashSet::new()).unwrap().data, "b");
+        assert!(n.fuer(9, &alle).is_none());
+    }
+
+    /// Ohne Empfängerliste geht eine Benachrichtigung an niemanden (fail-closed); ein gewöhnliches
+    /// Event ohne Liste bleibt beim Modul-Gate und behält seine Nutzlast.
+    #[test]
+    fn benachrichtigung_ohne_empfaenger_erreicht_niemanden() {
+        let alle: HashSet<&'static str> = crate::einsatz::modul::MODUL_KEYS.into_iter().collect();
+        assert!(benachrichtigung_an(None).fuer(7, &alle).is_none());
+        let etb = LiveNachricht {
+            id: "1-2".into(),
+            event: LiveEvent::Etb,
+            data: "{}".into(),
+            empfaenger: None,
+        };
+        assert_eq!(
+            etb.clone().fuer(7, &HashSet::from(["etb"])).unwrap().data,
+            "{}"
+        );
+        assert!(etb.fuer(7, &HashSet::new()).is_none());
+    }
+
+    /// Ein Aufruf mit zwei Empfängern ist EINE Nachricht: der Ring wächst um eins, und die
+    /// Empfängerliste reist mit in den Replay.
+    #[tokio::test]
+    async fn publiziere_an_belegt_einen_ringplatz_fuer_alle_empfaenger() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "vorher".into());
+        let n1 = rx.recv().await.unwrap();
+        hub.publiziere_an(
+            1,
+            LiveEvent::Benachrichtigung,
+            vec![zustellung(7, "a"), zustellung(8, "b")],
+        );
+        let live = rx.recv().await.unwrap();
+        assert_eq!(live.empfaenger.as_deref().map(<[_]>::len), Some(2));
+        assert!(rx.try_recv().is_err(), "genau eine Nachricht");
+        let Replay::Events(v) = hub.abonniere_mit_replay(1, Some(n1.id)).0 else {
+            panic!("die Benachrichtigung muss als Replay-Event kommen");
+        };
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].clone().fuer(8, &HashSet::new()).unwrap().data, "b");
+        hub.publiziere_an(1, LiveEvent::Benachrichtigung, Vec::new());
+        assert!(rx.try_recv().is_err(), "ohne Empfänger keine Nachricht");
     }
 
     /// Pinnt die Gate-Menge JEDES Events (nicht nur „nicht leer"). Eine Verbreiterung ist
@@ -796,6 +979,8 @@ mod tests {
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),
             (LiveEvent::Einsatz, &[]),
+            // Empfängerfilter statt Modul-Gate (LLH-1207, Begründung an der Variante).
+            (LiveEvent::Benachrichtigung, &[]),
             (LiveEvent::Lagged, &[]),
         ];
         for (ev, keys) in erwartet {

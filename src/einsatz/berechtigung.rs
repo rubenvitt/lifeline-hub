@@ -325,7 +325,7 @@ pub fn fordere_modul_zugriff(
 /// (PK `(einsatz_id, modul_key)` / `(org_id, modul_key)`) — ein Per-Request-Cache
 /// spart nichts (kein Handler zieht das Gate doppelt), ein App-Cache tauschte den
 /// korrektheits-neutralen Read gegen eine Invalidierungs-Angriffsfläche.
-async fn lade_modul_regeln(
+pub(crate) async fn lade_modul_regeln(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,

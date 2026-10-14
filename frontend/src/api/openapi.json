@@ -2153,6 +2153,164 @@
           }
         }
       },
+      "BenachrichtigungAnzeige": {
+        "type": "object",
+        "description": "Eine Benachrichtigung mit ihrem Text, wie der Empfänger sie liest.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "art",
+          "stufe",
+          "bezug_typ",
+          "bezug_id",
+          "erstellt_at",
+          "titel",
+          "pfad"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BenachrichtigungArt"
+          },
+          "bezug_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bezug_typ": {
+            "$ref": "#/components/schemas/BenachrichtigungBezugTyp"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennung des Bezugs ohne Inhalte Betroffener, etwa „Auftrag #12“; fehlt, wo es keine gibt."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pfad": {
+            "type": "string",
+            "description": "Sprungziel im Frontend (Muster aus `frontend/src/routing/deeplinks.ts`)."
+          },
+          "quittiert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/BenachrichtigungStufe"
+          },
+          "titel": {
+            "type": "string",
+            "description": "Überschrift je Art, etwa „Neuer Auftrag“."
+          }
+        }
+      },
+      "BenachrichtigungArt": {
+        "type": "string",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste in `migrations/0196_benachrichtigung.sql` spiegelt `ALLE`.",
+        "enum": [
+          "sofortmeldung",
+          "sofortmeldung_eskaliert",
+          "auftrag_ueberfaellig",
+          "abloesung_faellig",
+          "erinnerung_faellig",
+          "abloesung_vorwarnung",
+          "auftrag_erteilt",
+          "auftrag_quittiert",
+          "auftrag_erledigt",
+          "befehl",
+          "lagebericht",
+          "meldung",
+          "lagebesprechung_vorher",
+          "lagebesprechung_faellig",
+          "nachforderung_status",
+          "gefahr",
+          "sichtung_eins",
+          "wieder_verfuegbar",
+          "chat_erwaehnung",
+          "einsatz_aufnahme",
+          "einsatz_neu",
+          "unwetter"
+        ]
+      },
+      "BenachrichtigungBezugTyp": {
+        "type": "string",
+        "description": "Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen\nmuss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).",
+        "enum": [
+          "einsatz",
+          "meldung",
+          "auftrag",
+          "befehl",
+          "lagebericht",
+          "erinnerung",
+          "abloesung",
+          "lagebesprechung",
+          "nachforderung",
+          "gefahrengebiet",
+          "person",
+          "einheit",
+          "fahrzeug",
+          "chat_nachricht"
+        ]
+      },
+      "BenachrichtigungEreignis": {
+        "type": "object",
+        "description": "Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und\n`org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der\nClient über `GET /api/benachrichtigungen/{id}`.",
+        "required": [
+          "einsatz_id",
+          "benachrichtigung_id",
+          "art",
+          "stufe",
+          "bezug_typ",
+          "bezug_id",
+          "quittiert"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BenachrichtigungArt"
+          },
+          "benachrichtigung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bezug_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bezug_typ": {
+            "$ref": "#/components/schemas/BenachrichtigungBezugTyp"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quittiert": {
+            "type": "boolean",
+            "description": "`true`: der Empfänger hat sie quittiert, ihre Toasts auf seinen anderen Verbindungen\nverschwinden (Spec „Quittieren gilt für alle Verbindungen des Nutzers“)."
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/BenachrichtigungStufe"
+          }
+        }
+      },
+      "BenachrichtigungStufe": {
+        "type": "string",
+        "description": "Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“). Die dritte Stufe, *still*, erzeugt\nkeine Benachrichtigung und hat deshalb keinen Wert.",
+        "enum": [
+          "alarm",
+          "hinweis"
+        ]
+      },
       "BenutzerAnzeige": {
         "type": "object",
         "description": "Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten.",
@@ -8532,6 +8690,7 @@
           "lage_snapshot",
           "sofortmeldung",
           "einsatz",
+          "benachrichtigung",
           "lagged"
         ]
       },
@@ -10041,7 +10200,8 @@
         "description": "SSE-Wire-Namen der Org-Ereignisse (LFH-734). Das Frontend bildet sie in\n`ORG_STREAM_EVENTS` (`api/queryKeys.ts`) auf die globalen Query-Keys ab.",
         "enum": [
           "einsatzliste",
-          "stammdaten"
+          "stammdaten",
+          "org_benachrichtigung"
         ]
       },
       "OrgLogoAnzeige": {
