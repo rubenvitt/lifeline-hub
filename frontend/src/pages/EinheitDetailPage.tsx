@@ -187,7 +187,7 @@ function EinheitAnsicht({
    * Die Antwort eines Schreibwegs ist die ganze Einheit: sie steht sofort im Cache, damit die Zeile
    * nach dem Speichern den neuen Wert zeigt und nicht kurz den alten bis zum Neuladen.
    */
-  function setzeInCache(neu: Einheit) {
+  function setInCache(neu: Einheit) {
     qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(einsatzId), (alt) =>
       alt?.map((x) => (x.id === neu.id ? neu : x)),
     );
@@ -202,7 +202,7 @@ function EinheitAnsicht({
     mutationFn: (v: { etikett: string; patch: EinheitPatch }) =>
       patcheEinheit(einsatzId, einheitId, v.patch),
     onSuccess: (neu, v) => {
-      setzeInCache(neu);
+      setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success(`${v.etikett} gespeichert`);
@@ -213,7 +213,7 @@ function EinheitAnsicht({
     mutationFn: (v: { etikett: string; patch: EinheitZeichenPatch }) =>
       patchEinheitZeichen(einsatzId, einheitId, v.patch),
     onSuccess: (neu, v) => {
-      setzeInCache(neu);
+      setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       message.success(`${v.etikett} gespeichert`);
     },
@@ -221,7 +221,7 @@ function EinheitAnsicht({
   const handStatus = useMutation({
     mutationFn: (statusId: number | null) => setzeEinheitStatus(einsatzId, einheitId, statusId),
     onSuccess: (neu) => {
-      setzeInCache(neu);
+      setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       message.success('Status gespeichert');
     },
@@ -297,7 +297,7 @@ function EinheitAnsicht({
    * „Als Einheitsführer“ an der Personzeile schickt nur `fuehrer_id` (D1) — derselbe Weg wie die
    * Zeile „Einheitsführer“ im Kopf; die Ablehnung steht an der Personzeile.
    */
-  function setzeFuehrer(epId: number) {
+  function setFuehrer(epId: number) {
     personalZeilen.beginne(epId);
     patch
       .mutateAsync({ etikett: 'Einheitsführer', patch: { fuehrer_id: epId } })
@@ -430,7 +430,7 @@ function EinheitAnsicht({
                    als antds Vorgabeabstand. */
                 <Space size="middle" wrap>
                   {!m.ist_fuehrer && (
-                    <Button onClick={() => setzeFuehrer(m.ep_id)}>Als Einheitsführer</Button>
+                    <Button onClick={() => setFuehrer(m.ep_id)}>Als Einheitsführer</Button>
                   )}
                   <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>
                     Aus Einheit lösen

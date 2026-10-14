@@ -473,7 +473,7 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
       minimum = Math.min(minimum, hoehe, breite);
     };
     for (const { name, ziel } of ziele) await miss(name, ziel);
-    const pruefeReihen = async (reihen: Locator[][], stufe: string) => {
+    const checkReihen = async (reihen: Locator[][], stufe: string) => {
       for (const [links, rechts] of reihen) {
         const a = (await links.boundingBox())!;
         const b = (await rechts.boundingBox())!;
@@ -494,7 +494,7 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
     );
     for (const [i, feld] of staerke.entries()) await miss(`Soll-Stärke Feld ${i + 1}`, feld);
     aktionsreihen.push([staerke[0], staerke[1]], [staerke[1], staerke[2]]);
-    if (dichte !== 'kompakt') await pruefeReihen(aktionsreihen.splice(0), dichte);
+    if (dichte !== 'kompakt') await checkReihen(aktionsreihen.splice(0), dichte);
     await main.getByRole('button', { name: 'Bearbeitung von Soll-Stärke abbrechen' }).click();
 
     await zeilenAusloeser(page, 'Sprechgruppen').click();
@@ -504,7 +504,7 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
     const neueSprechgruppe = main.getByRole('button', { name: /neue Sprechgruppe anlegen$/ });
     await miss('Sprechgruppen-Auswahl', picker);
     await miss('neue Sprechgruppe anlegen', neueSprechgruppe);
-    if (dichte !== 'kompakt') await pruefeReihen([[picker, neueSprechgruppe]], dichte);
+    if (dichte !== 'kompakt') await checkReihen([[picker, neueSprechgruppe]], dichte);
     await neueSprechgruppe.click();
     const bezeichnung = main.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
     const betriebsart = main

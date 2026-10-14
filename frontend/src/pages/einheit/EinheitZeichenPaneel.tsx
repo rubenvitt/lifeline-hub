@@ -14,7 +14,7 @@ export type EinheitZeichenHandler = (
 ) => Promise<unknown>;
 
 /** Beschriftung eines gespeicherten Werts; ein Wert außerhalb der Auswahl erscheint roh. */
-function labelVon(optionen: readonly { value: string; label: string }[], wert: string | null) {
+function labelOf(optionen: readonly { value: string; label: string }[], wert: string | null) {
   if (wert == null) return null;
   return optionen.find((o) => o.value === wert)?.label ?? wert;
 }
@@ -63,7 +63,7 @@ export default function EinheitZeichenPaneel({
           <InlineAngabe<string | null>
             etikett="Fachaufgabe"
             wert={fachaufgabe}
-            anzeige={labelVon(FACHAUFGABE_OPTIONS, fachaufgabe)}
+            anzeige={labelOf(FACHAUFGABE_OPTIONS, fachaufgabe)}
             leer={(w) => w == null}
             darfSchreiben={canEdit}
             onSpeichern={(w) => onPatchZeichen('Fachaufgabe', { tz_fachaufgabe: w })}
@@ -88,7 +88,7 @@ export default function EinheitZeichenPaneel({
           <InlineAngabe<string | null>
             etikett="Organisation"
             wert={organisation}
-            anzeige={labelVon(ORGANISATION_OPTIONS, organisation)}
+            anzeige={labelOf(ORGANISATION_OPTIONS, organisation)}
             leer={(w) => w == null}
             darfSchreiben={canEdit}
             onSpeichern={(w) => onPatchZeichen('Organisation', { tz_organisation: w })}
@@ -111,7 +111,7 @@ export default function EinheitZeichenPaneel({
           {/* Leer gilt die Vorgabe der Organisation; das Zeichen im Kopf trägt sie schon. */}
           {organisation == null && orgDefault && (
             <div data-lfh="zeichen-vorgabe" style={{ color: rollen.gedaempft, fontSize: 12 }}>
-              {orgVorgabe(labelVon(ORGANISATION_OPTIONS, orgDefault)!)}
+              {orgVorgabe(labelOf(ORGANISATION_OPTIONS, orgDefault)!)}
             </div>
           )}
         </Datenfeld>

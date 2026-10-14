@@ -27,7 +27,7 @@ function recordWrites(page: Page, einsatzId: string, einheitId: number) {
   return bodies;
 }
 
-async function einheitAnlegen(page: Page, einsatzId: string, name: string): Promise<number> {
+async function createEinheit(page: Page, einsatzId: string, name: string): Promise<number> {
   const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
     data: { name },
   });
@@ -45,7 +45,7 @@ for (const dichte of DICHTEN) {
 
     test('Name an der Zeile ändern: genau `name` geht hinaus', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Name ${dichte} ${Date.now()}`);
-      const einheitId = await einheitAnlegen(page, einsatzId, '1. Zug');
+      const einheitId = await createEinheit(page, einsatzId, '1. Zug');
       await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
       await stelleDichte(page, dichte);
       const bodies = recordWrites(page, einsatzId, einheitId);
@@ -75,7 +75,7 @@ for (const dichte of DICHTEN) {
       page,
     }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Zeichen ${dichte} ${Date.now()}`);
-      const einheitId = await einheitAnlegen(page, einsatzId, '2. Zug');
+      const einheitId = await createEinheit(page, einsatzId, '2. Zug');
       await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
       await stelleDichte(page, dichte);
       const bodies = recordWrites(page, einsatzId, einheitId);
@@ -103,7 +103,7 @@ for (const dichte of DICHTEN) {
 
     test('Beobachter: keine Stifte, keine Aufforderung, kein Auflösen', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Beobachter ${dichte} ${Date.now()}`);
-      const einheitId = await einheitAnlegen(page, einsatzId, '3. Zug');
+      const einheitId = await createEinheit(page, einsatzId, '3. Zug');
       await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
       await stelleDichte(page, dichte);

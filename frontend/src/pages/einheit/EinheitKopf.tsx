@@ -137,7 +137,7 @@ export default function EinheitKopf({
     .filter((x) => !gesperrt.has(x.id))
     .map((x) => ({ value: x.id, label: x.name }));
   const ueberName = einheiten.find((x) => x.id === e.ueber_einheit_id)?.name ?? null;
-  const hatUntereinheiten = einheiten.some((x) => x.ueber_einheit_id === e.id);
+  const hasUntereinheiten = einheiten.some((x) => x.ueber_einheit_id === e.id);
   const urteil = einheitStaerkeUrteilVon(e.ist_kumuliert, e.soll ?? null);
 
   return (
@@ -308,7 +308,7 @@ export default function EinheitKopf({
             <Datenfeld label="Ist (F/UF/M//Σ)">
               <IstAnzeige
                 ist={e.ist}
-                kumuliert={hatUntereinheiten ? e.ist_kumuliert : null}
+                kumuliert={hasUntereinheiten ? e.ist_kumuliert : null}
                 urteil={urteil}
               />
             </Datenfeld>
