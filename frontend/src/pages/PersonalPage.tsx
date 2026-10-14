@@ -10,7 +10,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   entlasseDisposition,
   listeEinsatzPersonal,
   listEntlassenesPersonal,
@@ -130,7 +130,7 @@ export default function PersonalPage() {
     { epId: number; statusId: number }
   >({
     queryKey: einsatzKeys.personal(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.epId, { status_id: v.statusId }),
     zeilenId: (v) => v.epId,
     ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
     onBeginn: (v) => zeilen.beginne(v.epId),
@@ -139,14 +139,14 @@ export default function PersonalPage() {
   });
   const positionMutation = useMutation({
     mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
-      aktualisiereDisposition(einsatzId, v.epId, { staerke_position: v.position }),
+      updateDisposition(einsatzId, v.epId, { staerke_position: v.position }),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Position nicht gespeichert'),
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { epId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),

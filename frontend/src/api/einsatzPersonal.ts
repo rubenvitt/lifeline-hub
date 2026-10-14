@@ -40,7 +40,7 @@ export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise
   return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal`, 'POST', { adhoc });
 }
 
-export function aktualisiereDisposition(
+export function updateDisposition(
   einsatzId: number,
   epId: number,
   felder: { status_id?: number; staerke_position?: StaerkePosition | null; bemerkung?: string },
