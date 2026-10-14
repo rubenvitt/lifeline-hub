@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abschnittDerEinheit,
   abschnittDerObersten,
+  buildEinheitOptions,
+  groupEinheitOptions,
   besatzungsStaerke,
   besatzungsUrteilVon,
   einheitStaerkeUrteilVon,
@@ -133,6 +136,112 @@ describe('einheitenBaum', () => {
       });
     sammle(baum);
     expect(flach.sort()).toEqual([1, 2, 3]);
+  });
+});
+
+describe('abschnittDerEinheit (LLH-1073, design.md D4)', () => {
+  const benannt = (id: number, abschnitt: number | null, ueber: number | null = null) =>
+    eh(id, abschnitt, ueber, abschnitt != null ? { abschnitt_name: `A${abschnitt}` } : {});
+
+  it('Gruppe ohne eigenen Abschnitt unter einem Zug: der Abschnitt des Zugs', () => {
+    const a = abschnittDerEinheit([benannt(1, 7), benannt(2, null, 1)]);
+    expect(a.get(2)).toEqual({ id: 7, name: 'A7' });
+    expect(a.get(1)).toEqual({ id: 7, name: 'A7' });
+  });
+
+  it('eigener Abschnitt der Untereinheit schlägt den des Zugs', () => {
+    const a = abschnittDerEinheit([benannt(1, 7), benannt(2, 8, 1)]);
+    expect(a.get(2)).toEqual({ id: 8, name: 'A8' });
+  });
+
+  it('der nächste Vorfahr mit Abschnitt, nicht die oberste Einheit', () => {
+    const a = abschnittDerEinheit([benannt(1, 7), benannt(2, 8, 1), benannt(3, null, 2)]);
+    expect(a.get(3)).toEqual({ id: 8, name: 'A8' });
+  });
+
+  it('ohne Abschnitt in der Kette, Waise und Zyklus: null', () => {
+    const a = abschnittDerEinheit([
+      benannt(1, null),
+      benannt(2, null, 1),
+      benannt(3, null, 99),
+      benannt(4, null, 5),
+      benannt(5, null, 4),
+    ]);
+    expect([1, 2, 3, 4, 5].map((id) => a.get(id))).toEqual([null, null, null, null, null]);
+  });
+
+  it('einheitenBaum liest denselben Abschnitt', () => {
+    const baum = einheitenBaum([benannt(1, 7), benannt(2, 8, 1), benannt(3, null, 2)], []);
+    expect(baum[0].kinder[0].abschnittId).toBe(8);
+    expect(baum[0].kinder[0].kinder[0].abschnittId).toBe(8);
+  });
+});
+
+describe('buildEinheitOptions / groupEinheitOptions (LLH-1073, design.md D3)', () => {
+  const benannt = (
+    id: number,
+    name: string,
+    abschnitt: number | null,
+    ueber: number | null = null,
+    extra: Partial<Einheit> = {},
+  ) =>
+    eh(id, abschnitt, ueber, {
+      name,
+      ...(abschnitt != null ? { abschnitt_name: `Abschnitt ${abschnitt}` } : {}),
+      ...extra,
+    });
+
+  it('Baumfolge mit Pfad und dem Abschnitt der Einheit; aufgelöste stehen nicht zur Wahl', () => {
+    const optionen = buildEinheitOptions(
+      [
+        benannt(1, 'Zug 1', 2),
+        benannt(2, 'Staffel A', null, 1),
+        benannt(3, 'Rettungsstaffel', 1),
+        benannt(4, 'Alt', 1, null, { aufgeloest_at: '2026-10-14 10:00:00' } as Partial<Einheit>),
+      ],
+      [ab(1), ab(2)],
+    );
+    expect(optionen).toEqual([
+      {
+        id: 3,
+        name: 'Rettungsstaffel',
+        pfad: 'Rettungsstaffel',
+        tiefe: 0,
+        abschnitt: { id: 1, name: 'Abschnitt 1' },
+      },
+      { id: 1, name: 'Zug 1', pfad: 'Zug 1', tiefe: 0, abschnitt: { id: 2, name: 'Abschnitt 2' } },
+      {
+        id: 2,
+        name: 'Staffel A',
+        pfad: 'Zug 1 › Staffel A',
+        tiefe: 1,
+        abschnitt: { id: 2, name: 'Abschnitt 2' },
+      },
+    ]);
+  });
+
+  it('gruppiert nach Abschnitt in Baumfolge, „ohne Abschnitt“ zuletzt', () => {
+    const optionen = buildEinheitOptions(
+      [
+        benannt(1, 'Zug 1', 2),
+        benannt(2, 'Staffel A', null, 1),
+        benannt(3, 'Staffel B', 1, 1),
+        benannt(4, 'Fremd', null),
+        benannt(5, 'Rettungsstaffel', 1),
+      ],
+      [ab(1), ab(2)],
+    );
+    const gruppen = groupEinheitOptions(optionen);
+    expect(gruppen.map((g) => [g.titel, g.optionen.map((o) => o.pfad)])).toEqual([
+      ['Abschnitt 1', ['Rettungsstaffel', 'Zug 1 › Staffel B']],
+      ['Abschnitt 2', ['Zug 1', 'Zug 1 › Staffel A']],
+      ['ohne Abschnitt', ['Fremd']],
+    ]);
+  });
+
+  it('ohne jeden Abschnitt keine Gruppen', () => {
+    const optionen = buildEinheitOptions([benannt(1, 'Zug 1', null)], []);
+    expect(groupEinheitOptions(optionen)).toEqual([]);
   });
 });
 

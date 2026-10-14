@@ -1,4 +1,5 @@
 import { App, Breadcrumb, Button, Form, Input } from 'antd';
+import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
@@ -418,7 +419,7 @@ export default function EinheitenPage() {
         {gewaehlteVorlage == null && (
           <>
             <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-              <Input placeholder="z. B. 2. Zug" />
+              <Input placeholder="z. B. 2. Zug" maxLength={EINHEIT_NAME_MAX} />
             </Form.Item>
             <Form.Item label="Typ" name="typ_id">
               <Select

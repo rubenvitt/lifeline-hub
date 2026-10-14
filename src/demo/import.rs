@@ -456,7 +456,7 @@ impl Ablauf<'_> {
                 .await?
                 .id;
                 self.fahrzeuge.insert(fahrzeug, ef_id);
-                let anzeige = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let anzeige = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
@@ -472,13 +472,14 @@ impl Ablauf<'_> {
             Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
                 let ef_id = frueher(&self.fahrzeuge, "Fahrzeug", fahrzeug)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let funkrufname = crate::einheit::mitglied_repo::ordne_fahrzeug_zu_tx(
+                let funkrufname = crate::einheit::mitglied_repo::zuordnen_fahrzeug_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,
                     ef_id,
                 )
-                .await?;
+                .await?
+                .funkrufname;
                 self.system_etb(
                     conn,
                     &crate::einheit::etb_text_fahrzeug_zugeordnet(einheit_name, &funkrufname),
@@ -490,22 +491,24 @@ impl Ablauf<'_> {
                 let status_id = self.kataloge.id(Katalogeintrag::FahrzeugstatusFms(fms))?;
                 // Wie der Handler: Vorzustand lesen, setzen, frisch lesen, ETB nur bei einem
                 // echten Wechsel.
-                let vorher = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let vorher = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
                     true,
                 )
                 .await?;
-                crate::fahrzeug::disposition_repo::aktualisiere_tx(
+                crate::fahrzeug::disposition_repo::update_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
-                    Some(status_id),
-                    None,
+                    crate::fahrzeug::disposition_repo::FahrzeugPatch {
+                        status_id: Some(status_id),
+                        ..Default::default()
+                    },
                 )
                 .await?;
-                let nachher = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let nachher = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
@@ -561,7 +564,7 @@ impl Ablauf<'_> {
             Vorgang::PersonalZuEinheit { personal, einheit } => {
                 let ep_id = frueher(&self.personal, "Personal", personal)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let person = crate::einheit::mitglied_repo::ordne_personal_zu_tx(
+                let person = crate::einheit::mitglied_repo::zuordnen_personal_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,

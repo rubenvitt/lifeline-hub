@@ -1199,3 +1199,347 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
         assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
     }
 }
+
+// ── Fahrzeuge bearbeiten (LLH-1073 Teil I) ───────────────────────────────────────────────
+
+/// Disponiert ein Ad-hoc-Fahrzeug nur mit Funkrufnamen; liefert die `ef_id`.
+async fn adhoc_disponieren(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    funkrufname: &str,
+) -> i64 {
+    let body = serde_json::json!({ "adhoc": { "funkrufname": funkrufname } }).to_string();
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn fahrzeug_patch(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    body: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+/// Die Zeile eines Fahrzeugs aus der Liste (aktive oder mit `?entlassene=1` die entlassenen).
+async fn fahrzeug_zeile(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+) -> serde_json::Value {
+    for query in ["", "?entlassene=1"] {
+        let (s, json) = anfrage(
+            app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{json}");
+        if let Some(z) = json.as_array().unwrap().iter().find(|f| f["id"] == ef) {
+            return z.clone();
+        }
+    }
+    panic!("Fahrzeug {ef} fehlt in der Liste");
+}
+
+/// Kennung eines Katalogstatus nach seinem Label.
+async fn status_nach_label(app: &axum::Router, cookie: &str, label: &str) -> i64 {
+    let (_, stati) = anfrage(app, "GET", "/api/fahrzeug-status", cookie, None).await;
+    stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == label)
+        .unwrap_or_else(|| panic!("Status {label} fehlt"))["id"]
+        .as_i64()
+        .unwrap()
+}
+
+/// Spec `eingabegrenzen`, „Ad-hoc-Fahrzeug und Fahrzeugbemerkung sind begrenzt“: jeder der fünf
+/// Ad-hoc-Texte höchstens 200 Zeichen beim Disponieren, sonst 400 und weder Fahrzeug noch
+/// ETB-Eintrag; 200 Zeichen gehen.
+#[tokio::test]
+async fn adhoc_texte_ueber_der_grenze_sind_400_und_legen_nichts_an() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let lang = "x".repeat(201);
+    for feld in [
+        "funkrufname",
+        "fahrzeugtyp",
+        "kennzeichen",
+        "traegerorganisation",
+        "opta",
+    ] {
+        let mut adhoc = serde_json::json!({ "funkrufname": "Florian Extern 1" });
+        adhoc[feld] = serde_json::Value::String(lang.clone());
+        let body = serde_json::json!({ "adhoc": adhoc }).to_string();
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {json}");
+        assert!(
+            json["error"]
+                .as_str()
+                .unwrap()
+                .contains("darf höchstens 200 Zeichen lang sein"),
+            "{feld}: {json}"
+        );
+    }
+    assert!(funkrufnamen(&app, &admin, einsatz, "").await.is_empty());
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 0);
+    adhoc_disponieren(&app, &admin, einsatz, &"y".repeat(200)).await;
+}
+
+/// Bemerkung höchstens 2 000 Zeichen; darüber 400, und auch der mitgesendete Status bleibt.
+#[tokio::test]
+async fn bemerkung_ueber_der_grenze_ist_400_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let vorher = fahrzeug_zeile(&app, &admin, einsatz, ef).await;
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    let lang = "b".repeat(2_001);
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"bemerkung":"{lang}","status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    let zeile = fahrzeug_zeile(&app, &admin, einsatz, ef).await;
+    assert_eq!(zeile["status_id"], vorher["status_id"]);
+    assert!(zeile["bemerkung"].is_null());
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"bemerkung":"{}"}}"#, "b".repeat(2_000)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Angaben eines Ad-hoc-Fahrzeugs ändern“: genau ein ETB-Eintrag
+/// nennt jede geänderte Angabe mit alt und neu (leer als „—“), vorn der alte Funkrufname;
+/// unverändert gesendet schreibt nichts; leere Felder leeren.
+#[tokio::test]
+async fn adhoc_angaben_aendern_schreibt_einen_etb_eintrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_disponieren(&app, &admin, einsatz, "Florian Nachbarstdt 44/1").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        r#"{"funkrufname":"  Florian Nachbarstadt 44/1 ","fahrzeugtyp":"HLF 20"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["funkrufname"], "Florian Nachbarstadt 44/1");
+    assert_eq!(json["fahrzeugtyp"], "HLF 20");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 1
+    );
+    let texte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte.iter().any(|t| t
+            == "Fahrzeug «Florian Nachbarstdt 44/1»: Funkrufname «Florian Nachbarstdt 44/1» → «Florian Nachbarstadt 44/1», Typ «—» → «HLF 20»"),
+        "{texte:?}"
+    );
+    assert_eq!(
+        funkrufnamen(&app, &admin, einsatz, "").await,
+        ["Florian Nachbarstadt 44/1"]
+    );
+
+    // Kennzeichen, Träger und OPTA setzen, dann leeren (`null` und Leerzeichen).
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        r#"{"kennzeichen":"NB-FW 441","traegerorganisation":"FF Nachbarstadt","opta":"FWNB4401"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        (
+            json["kennzeichen"].as_str(),
+            json["traegerorganisation"].as_str(),
+            json["opta"].as_str()
+        ),
+        (Some("NB-FW 441"), Some("FF Nachbarstadt"), Some("FWNB4401"))
+    );
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        r#"{"kennzeichen":null,"traegerorganisation":"  ","opta":""}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(
+        json["kennzeichen"].is_null()
+            && json["traegerorganisation"].is_null()
+            && json["opta"].is_null(),
+        "{json}"
+    );
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t
+            == "Fahrzeug «Florian Nachbarstadt 44/1»: Kennzeichen «NB-FW 441» → «—», Träger «FF Nachbarstadt» → «—», OPTA «FWNB4401» → «—»"));
+
+    // Unverändert gesendet: kein Eintrag. Mit Statuswechsel: nur dessen Eintrag.
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        r#"{"funkrufname":"Florian Nachbarstadt 44/1","fahrzeugtyp":"HLF 20","kennzeichen":null}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4},"fahrzeugtyp":"LF 20"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 2);
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Angaben eines Stamm-Fahrzeugs bleiben im Stamm“: 422 „im Stamm
+/// pflegen“, und nichts aus der Anfrage ist geschrieben, auch kein Status. Eine zu lange Angabe
+/// ist auch hier 400 (Spec `eingabegrenzen`, „Grenze vor dem Zusammenhang“).
+#[tokio::test]
+async fn stamm_angaben_sind_422_und_schreiben_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let vorher = fahrzeug_zeile(&app, &admin, einsatz, ef).await;
+    let etb = system_etb_anzahl(&app, &admin, einsatz).await;
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    for body in [
+        format!(r#"{{"funkrufname":"Florian 9","status_id":{s4}}}"#),
+        r#"{"fahrzeugtyp":"HLF 20","bemerkung":"x"}"#.to_string(),
+        r#"{"kennzeichen":null}"#.to_string(),
+        r#"{"traegerorganisation":"THW"}"#.to_string(),
+        r#"{"opta":"X"}"#.to_string(),
+    ] {
+        let (s, json) = fahrzeug_patch(&app, &admin, einsatz, ef, &body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {json}");
+        assert!(
+            json["error"].as_str().unwrap().contains("im Stamm pflegen"),
+            "{json}"
+        );
+    }
+    let zeile = fahrzeug_zeile(&app, &admin, einsatz, ef).await;
+    assert_eq!(zeile["funkrufname"], "Florian 1");
+    assert_eq!(zeile["kennzeichen"], "XX-AB 1");
+    assert_eq!(zeile["status_id"], vorher["status_id"]);
+    assert!(zeile["bemerkung"].is_null());
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb);
+
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"kennzeichen":"{}"}}"#, "k".repeat(201)),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "Grenze vor dem Zusammenhang: {json}"
+    );
+}
+
+/// Leerer oder `null`-Funkrufname ist 400 (Pflicht), zu lange Angaben auch; an einem entlassenen
+/// Fahrzeug ist die Änderung 409.
+#[tokio::test]
+async fn adhoc_angaben_grenzen_und_entlassenes_fahrzeug() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_disponieren(&app, &admin, einsatz, "Florian Extern 1").await;
+    let lang = "k".repeat(201);
+    for body in [
+        r#"{"funkrufname":""}"#.to_string(),
+        r#"{"funkrufname":"   "}"#.to_string(),
+        r#"{"funkrufname":null}"#.to_string(),
+        format!(r#"{{"funkrufname":"{lang}"}}"#),
+        format!(r#"{{"fahrzeugtyp":"{lang}"}}"#),
+        format!(r#"{{"kennzeichen":"{lang}"}}"#),
+        format!(r#"{{"traegerorganisation":"{lang}"}}"#),
+        format!(r#"{{"opta":"{lang}"}}"#),
+    ] {
+        let (s, json) = fahrzeug_patch(&app, &admin, einsatz, ef, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["funkrufname"],
+        "Florian Extern 1"
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        StatusCode::OK
+    );
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        r#"{"funkrufname":"Florian Extern 2"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["funkrufname"],
+        "Florian Extern 1"
+    );
+}

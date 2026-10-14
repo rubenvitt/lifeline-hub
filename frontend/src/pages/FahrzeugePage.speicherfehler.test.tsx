@@ -87,6 +87,7 @@ function render({
     ),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(pool)),
   );
@@ -261,8 +262,8 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Florian 1');
-    // Bei 1024 px: Bemerkung (Voreinstellung), Typ, Kennzeichen und Träger (unter `xxl`).
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ }));
+    // Bei 1024 px: Bemerkung (Voreinstellung), Typ, Abschnitt, Seit, Kennzeichen und Träger (unter `xxl`).
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const schreibe = async (id: number, funkrufname: string, text: string) => {
@@ -288,7 +289,35 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
-  it('Besatzung: Zuordnen und Freigeben melden im Besatzungsblock', async () => {
+  it('Bemerkung: über 2 000 Zeichen geht kein PATCH hinaus, der Zähler sagt „zu lang“ (LLH-1073)', async () => {
+    setzeViewportBreite(1600);
+    let patches = 0;
+    server.use(
+      http.patch('/api/einsaetze/7/fahrzeuge/10', () => {
+        patches += 1;
+        return HttpResponse.json({ ...ef, bemerkung: 'x' });
+      }),
+    );
+    const { container } = render();
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', {
+        name: 'Bemerkung zu Florian 1 hinzufügen',
+      }),
+    );
+    const feld = within(zeile(container, 10)).getByRole('textbox');
+    fireEvent.input(feld, { target: { value: 'a'.repeat(2_001) } });
+    expect(within(zeile(container, 10)).getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    fireEvent.keyDown(feld, { keyCode: 13 });
+    fireEvent.keyUp(feld, { keyCode: 13 });
+    await act(async () => {});
+    expect(patches).toBe(0);
+    expect(within(zeile(container, 10)).getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('Besatzung: Zuordnen und „Vom Fahrzeug lösen“ melden im Besatzungsblock', async () => {
     server.use(
       http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/101', () =>
         HttpResponse.json({ error: 'Kraft ist schon auf einem Fahrzeug' }, { status: 409 }),
@@ -315,7 +344,9 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(zuordnen).toHaveTextContent('Nicht zugeordnet');
     expect(zuordnen).toHaveTextContent('Kraft ist schon auf einem Fahrzeug');
 
-    await userEvent.click(within(block()).getByRole('button', { name: 'Freigeben' }));
+    await userEvent.click(
+      within(block()).getByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
     await waitFor(() =>
       expect(within(block()).getByText('Kraft ist Fahrzeugführer')).toBeInTheDocument(),
     );

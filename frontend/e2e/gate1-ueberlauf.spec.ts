@@ -1692,10 +1692,12 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
       const zeile = region.locator('tr.ant-table-row').filter({ hasText: FAHRZEUG_SOLL });
       // Inhaltsanker: Ist UND Soll stehen in der Besatzungszelle.
       await expect(zeile.getByText(/Ist .* · Soll /)).toBeVisible();
-      // Der Funkrufname trägt ein Zufallssuffix; der Zeilenknopf heißt „<Funkrufname> entlassen“.
-      const entlassen = zeile.getByRole('button', { name: / entlassen$/ });
+      // Der Funkrufname trägt ein Zufallssuffix. Die Aktionsspalte trägt nur den Menüauslöser
+      // „Weitere Aktionen zu <Funkrufname>“; „Entlassen“ ist sein erster Eintrag (LLH-1073,
+      // Entscheidung 14.10.2026).
+      const menue = zeile.getByRole('button', { name: /^Weitere Aktionen zu / });
       // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-      await expect(entlassen).toHaveCount(rolle === 'admin' ? 1 : 0);
+      await expect(menue).toHaveCount(rolle === 'admin' ? 1 : 0);
 
       const ueber = await tabellenUeberlauf(region);
       test.info().annotations.push({
@@ -1711,10 +1713,11 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
         'Zeilenhöhe mit Ist und Soll',
       ).toBeLessThanOrEqual(48);
       if (rolle === 'admin') {
-        await expect(entlassen, '„Entlassen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+        await expect(menue, 'Menüauslöser ohne Querscrollen').toBeInViewport({ ratio: 1 });
         // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): Entlassen fragt nicht nach, der
         // Rückgängig-Toast steht (LLH-1079 Teil II).
-        await entlassen.click();
+        await menue.click();
+        await page.getByRole('menuitem', { name: 'Entlassen', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible();
       }
     });
@@ -1744,6 +1747,75 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
         await entfernen.click();
         await expect(page.getByText('Dokument entfernen?')).toBeVisible();
       }
+    });
+  }
+
+  /**
+   * Kein Umbruch mitten im Wort (Entscheidung 14.10.2026, LLH-1073): ein Einheitsname bricht nur
+   * an Wortgrenzen oder an einer Silbengrenze (deutsche Silbentrennung, `hyphens: auto`). Gemessen
+   * über eine Range je Wort: ein Rechteck heißt ungetrennt; bei zwei liegt die Trennstelle auf
+   * einer der Silbengrenzen. Beide Namen passen nicht neben dem Stift in die 150 px der Spalte:
+   * ein Umbruch überall (`overflow-wrap: anywhere`) zerreißt sie („Betreuungsgru|ppe“), mit der
+   * Wortgrenzen-Regel verbreitert das Wort die Spalte.
+   */
+  for (const breite of [1440, 1366] as const) {
+    test(`Fükw (${breite} px): Einheitsnamen brechen nicht mitten im Wort`, async ({ page }) => {
+      await anmelden(page);
+      const einsatzId = await neuerEinsatz(page, `E2E Fükw-Einheit ${Date.now()}`);
+      const silben: Record<string, number[]> = {
+        Betreuungsgruppe: [2, 6, 10, 14],
+        Verpflegungsgruppe: [3, 7, 12, 16],
+      };
+      for (const [i, name] of Object.keys(silben).entries()) {
+        const einheit = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/einheiten`, {
+          name,
+        });
+        const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+          adhoc: { funkrufname: `Musterstadt 83-${i + 1}` },
+        });
+        await seedeJson(
+          page,
+          'put',
+          `/api/einsaetze/${einsatzId}/einheiten/${einheit.id}/fahrzeug/${ef.id}`,
+        );
+      }
+      await page.setViewportSize({ width: breite, height: 900 });
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=liste`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+      const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+      for (const [name, grenzen] of Object.entries(silben)) {
+        const knopf = region
+          .getByRole('button', { name: /^Einheit zu Musterstadt 83-\d bearbeiten$/ })
+          .filter({ hasText: name });
+        await expect(knopf).toHaveCount(1);
+        const trennung = await knopf.evaluate((el, wort) => {
+          const text = Array.from(el.querySelectorAll('span'))
+            .flatMap((s) => Array.from(s.childNodes))
+            .find((n) => n.nodeType === Node.TEXT_NODE && n.textContent === wort)!;
+          const zeilen = (bis: number) => {
+            const r = document.createRange();
+            r.setStart(text, 0);
+            r.setEnd(text, bis);
+            return new Set(Array.from(r.getClientRects()).map((q) => Math.round(q.top))).size;
+          };
+          if (zeilen(wort.length) === 1) return null;
+          // Erste Stelle, ab der das Wort auf zwei Zeilen steht.
+          for (let k = 1; k <= wort.length; k++) if (zeilen(k) > 1) return k - 1;
+          return -1;
+        }, name);
+        test.info().annotations.push({
+          type: 'messwert',
+          description: `Einheit „${name}“ @${breite}: ${trennung == null ? 'ungetrennt' : `getrennt nach ${trennung} Zeichen`}`,
+        });
+        if (trennung != null) {
+          expect(grenzen, `„${name}“ nur an einer Silbengrenze getrennt`).toContain(trennung);
+        }
+      }
+      // Ein ungetrenntes langes Wort darf die Tabelle nicht verbreitern.
+      expect(
+        await tabellenUeberlauf(region),
+        'Fahrzeugtabelle läuft nicht über',
+      ).toBeLessThanOrEqual(1);
     });
   }
 

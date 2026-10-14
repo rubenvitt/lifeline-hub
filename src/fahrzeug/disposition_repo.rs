@@ -186,7 +186,7 @@ pub async fn list_entlassene(
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden_anzeige(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     einsatz_id: i64,
     ef_id: i64,
@@ -203,9 +203,9 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], auf einer offenen Verbindung (Reload in der Transaktion beim atomaren
+/// Wie [`load_anzeige`], auf einer offenen Verbindung (Reload in der Transaktion beim atomaren
 /// Disponieren/Aktualisieren).
-pub async fn laden_anzeige_tx(
+pub async fn load_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
@@ -398,31 +398,100 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
 }
 
-/// Aktualisiert Status und/oder Bemerkung auf einer offenen Verbindung. `status_id` per COALESCE
-/// (`None` = unverändert). `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
-/// „Seit“ den letzten Klick. `bemerkung` ist Tri-State (`None` = unverändert, `Some(None)` =
-/// NULL, `Some(Some(x))` = setzen); getrimmt wird in der Route. `NotFound`, falls die Zeile
-/// nicht zum Einsatz gehört.
-pub async fn aktualisiere_tx(
+/// Änderung einer Dispositionszeile (Muster `personal::DispositionPatch`, LLH-1067): jedes Feld
+/// `None` = unverändert. Tri-State-Felder (`Some(None)` = NULL, `Some(Some(x))` = setzen); getrimmt
+/// und begrenzt wird in der Route.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FahrzeugPatch<'a> {
+    pub status_id: Option<i64>,
+    pub bemerkung: Option<Option<&'a str>>,
+    /// Ad-hoc-Angaben (LLH-1073, design.md D1): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
+    /// Sie schreiben die `snap_*`-Spalten, die bei einem Ad-hoc-Fahrzeug die Daten sind.
+    pub funkrufname: Option<&'a str>,
+    pub fahrzeugtyp: Option<Option<&'a str>>,
+    pub kennzeichen: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+    pub opta: Option<Option<&'a str>>,
+}
+
+impl FahrzeugPatch<'_> {
+    /// Ändert der Patch eine Angabe, die bei einem Stamm-Fahrzeug der Stamm trägt?
+    pub fn has_adhoc_angaben(&self) -> bool {
+        self.funkrufname.is_some()
+            || self.fahrzeugtyp.is_some()
+            || self.kennzeichen.is_some()
+            || self.traegerorganisation.is_some()
+            || self.opta.is_some()
+    }
+}
+
+/// Der 422 an einem Stamm-Fahrzeug, dessen Angaben über den Einsatz geändert werden sollen
+/// (LLH-1073, design.md D1).
+pub fn stamm_angaben_error() -> AppError {
+    AppError::UnprocessableEntity("Angaben eines Stamm-Fahrzeugs im Stamm pflegen".into())
+}
+
+/// Aktualisiert eine Dispositionszeile nach [`FahrzeugPatch`] auf einer offenen Verbindung.
+/// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
+/// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
+/// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
+/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
+pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
-    status_id: Option<i64>,
-    bemerkung: Option<Option<&str>>,
+    patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    if patch.has_adhoc_angaben() {
+        // „Stamm“ wird in der Transaktion am Stammbezug geprüft, nicht am Client (design.md D1).
+        let fahrzeug_id: Option<i64> = sqlx::query_scalar(
+            "SELECT fahrzeug_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ef_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if fahrzeug_id.is_some() {
+            return Err(stamm_angaben_error());
+        }
+    }
+    // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
+    // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
+    // wenn eine Route die Prüfung oben vergäße.
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
-         SET status_seit = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+         SET status_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
                                 THEN datetime('now') ELSE status_seit END, \
-             status_id = COALESCE(?1, status_id), \
-             bemerkung = CASE WHEN ?2 THEN ?3 ELSE bemerkung END \
-         WHERE id = ?4 AND einsatz_id = ?5",
+             status_id = COALESCE(?, status_id), \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
+             snap_funkrufname = CASE WHEN fahrzeug_id IS NULL \
+                                     THEN COALESCE(?, snap_funkrufname) \
+                                     ELSE snap_funkrufname END, \
+             snap_fahrzeugtyp = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                     ELSE snap_fahrzeugtyp END, \
+             snap_kennzeichen = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                     ELSE snap_kennzeichen END, \
+             snap_traegerorganisation = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                             ELSE snap_traegerorganisation END, \
+             snap_opta = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? ELSE snap_opta END \
+         WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(status_id)
-    .bind(bemerkung.is_some())
-    .bind(bemerkung.flatten())
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.bemerkung.is_some())
+    .bind(patch.bemerkung.flatten())
+    .bind(patch.funkrufname)
+    .bind(patch.fahrzeugtyp.is_some())
+    .bind(patch.fahrzeugtyp.flatten())
+    .bind(patch.kennzeichen.is_some())
+    .bind(patch.kennzeichen.flatten())
+    .bind(patch.traegerorganisation.is_some())
+    .bind(patch.traegerorganisation.flatten())
+    .bind(patch.opta.is_some())
+    .bind(patch.opta.flatten())
     .bind(ef_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -433,16 +502,15 @@ pub async fn aktualisiere_tx(
     Ok(())
 }
 
-/// Pool-Wrapper: aktualisiert Status/Bemerkung in eigener Transaktion.
-pub async fn aktualisiere(
+/// Pool-Hülle um [`update_tx`] ohne eigene Transaktion.
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     ef_id: i64,
-    status_id: Option<i64>,
-    bemerkung: Option<Option<&str>>,
+    patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    aktualisiere_tx(&mut conn, einsatz_id, ef_id, status_id, bemerkung).await
+    update_tx(&mut conn, einsatz_id, ef_id, patch).await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
@@ -457,7 +525,7 @@ pub struct PositionPatch<'a> {
 /// Setzt/ändert/löscht Position und Symbol-Felder und liefert die aufgelöste Anzeige
 /// (`einsatz_aktiv` steuert Live/Snapshot). `NotFound`, falls die Zeile nicht zum Einsatz
 /// gehört.
-pub async fn aktualisiere_position(
+pub async fn update_position(
     pool: &SqlitePool,
     einsatz_id: i64,
     ef_id: i64,
@@ -917,7 +985,7 @@ mod tests {
     async fn fahrzeug_position_partial_merge() {
         let pool = crate::db::test_pool().await;
         let (einsatz_id, ef_id) = seed_fahrzeug(&pool).await;
-        aktualisiere_position(
+        update_position(
             &pool,
             einsatz_id,
             ef_id,
@@ -931,7 +999,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let a = aktualisiere_position(
+        let a = update_position(
             &pool,
             einsatz_id,
             ef_id,
@@ -961,7 +1029,7 @@ mod tests {
         let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.funkrufname, "Florian 1");
         assert_eq!(a.kennzeichen.as_deref(), Some("XX-AB 1"));
         assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
@@ -1070,18 +1138,18 @@ mod tests {
         fz_repo::aktualisiere(&pool, 1, fz.id, neu).await.unwrap();
 
         // Aktiver Einsatz → Live (zeigt neuen Namen).
-        let live = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let live = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(live.funkrufname, "Florian 1 NEU");
 
         // „Abgeschlossener" Einsatz (einsatz_aktiv=false) → Snapshot (alter Name).
-        let snap = laden_anzeige(&pool, einsatz, ef, false).await.unwrap();
+        let snap = load_anzeige(&pool, einsatz, ef, false).await.unwrap();
         assert_eq!(snap.funkrufname, "Florian 1");
 
         // Stamm außer Dienst → auch bei aktivem Einsatz Snapshot.
         fz_repo::setze_dienststatus(&pool, 1, fz.id, false)
             .await
             .unwrap();
-        let nach_ad = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let nach_ad = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(
             nach_ad.funkrufname, "Florian 1",
             "außer Dienst → Snapshot trotz aktivem Einsatz"
@@ -1113,30 +1181,41 @@ mod tests {
         .await
         .unwrap();
 
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             ef,
-            Some(neuer_status.id),
-            Some(Some("am Einsatzort")),
+            FahrzeugPatch {
+                status_id: Some(neuer_status.id),
+                bemerkung: Some(Some("am Einsatzort")),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.status_id, Some(neuer_status.id));
         assert_eq!(a.bemerkung.as_deref(), Some("am Einsatzort"));
 
         // Nur Bemerkung ändern (status_id None → bleibt).
-        aktualisiere(&pool, einsatz, ef, None, Some(Some("korrigiert")))
-            .await
-            .unwrap();
-        let b = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        update(
+            &pool,
+            einsatz,
+            ef,
+            FahrzeugPatch {
+                bemerkung: Some(Some("korrigiert")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let b = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer_status.id), "Status unverändert");
         assert_eq!(b.bemerkung.as_deref(), Some("korrigiert"));
 
         entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
         // Die Zeile bleibt (LLH-1079), fehlt aber in der Liste und nimmt keinen Status mehr an.
-        let c = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let c = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
         assert_eq!(c.beendet_von, Some(benutzer));
         assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
@@ -1150,13 +1229,21 @@ mod tests {
             [ef]
         );
         assert!(matches!(
-            aktualisiere(&pool, einsatz, ef, Some(neuer_status.id), None)
-                .await
-                .unwrap_err(),
+            update(
+                &pool,
+                einsatz,
+                ef,
+                FahrzeugPatch {
+                    status_id: Some(neuer_status.id),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
         assert!(matches!(
-            aktualisiere_position(&pool, einsatz, ef, PositionPatch::default(), true)
+            update_position(&pool, einsatz, ef, PositionPatch::default(), true)
                 .await
                 .unwrap_err(),
             AppError::Conflict(_)
@@ -1177,7 +1264,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ef, true)
+            load_anzeige(&pool, einsatz, ef, true)
                 .await
                 .unwrap()
                 .soll_besatzung,
@@ -1200,7 +1287,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, adhoc, true)
+            load_anzeige(&pool, einsatz, adhoc, true)
                 .await
                 .unwrap()
                 .soll_besatzung,
@@ -1346,7 +1433,7 @@ mod tests {
             assert!(!marke(ef_adhoc), "einsatz_aktiv={einsatz_aktiv}");
         }
         assert!(
-            laden_anzeige(&pool, einsatz, ef_demo, true)
+            load_anzeige(&pool, einsatz, ef_demo, true)
                 .await
                 .unwrap()
                 .ist_demo
@@ -1501,7 +1588,7 @@ mod tests {
                 reaktiviert: true
             }
         );
-        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.beendet_at, None);
         assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
         assert_eq!(a.status_seit.as_deref(), Some(a.disponiert_at.as_str()));
@@ -1539,7 +1626,7 @@ mod tests {
             .await
             .unwrap()
             .is_empty());
-        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.beendet_als.as_deref(), Some("storniert"));
         assert!(matches!(
             storniere(&pool, einsatz, ef).await.unwrap_err(),
@@ -1668,7 +1755,7 @@ mod tests {
             .await
             .unwrap();
         drop(conn);
-        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.beendet_als, None);
         assert_eq!(a.funkrufname, "FW Extern");
         assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 1);
