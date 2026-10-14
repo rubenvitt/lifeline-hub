@@ -90,26 +90,36 @@ function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
   return materialStatus[em.status];
 }
 /**
- * Bezeichnung mit Marken; unter `xxl` (Spalte „Kategorie“ ausgeblendet, per Breite oder von Hand)
- * steht die Kategorie gedämpft als zweite Zeile darunter, damit sie auch am Fükw zu lesen ist
- * (LLH-1093). Im Kartenzweig nicht: dort trägt nur die Suche sie (design.md D13).
+ * Bezeichnung mit Marken. Ist die Spalte „Kategorie“ ausgeblendet (unter `xxl` per Breite, oder von
+ * Hand), steht die Kategorie gedämpft als zweite Zeile unter der Bezeichnung, damit sie auch am
+ * Fükw zu lesen ist (LLH-1093); die Marken teilen diese Zeile, statt eine dritte zu öffnen. Im
+ * Kartenzweig nicht: dort trägt nur die Suche sie (design.md D13).
  */
 function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
   const kategorieAusgeblendet = useSpalteAusgeblendet('kategorie');
+  const marken = [
+    em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
+    em.ist_demo && <DemoMarke key="demo" />,
+  ];
+  if (kategorieAusgeblendet && em.kategorie) {
+    return (
+      <>
+        <div>{em.bezeichnung}</div>
+        <Space wrap>
+          <Typography.Text type="secondary" style={{ overflowWrap: 'anywhere' }}>
+            {em.kategorie}
+          </Typography.Text>
+          {marken}
+        </Space>
+      </>
+    );
+  }
+  // `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern.
   return (
-    <>
-      {/* `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern. */}
-      <Space wrap>
-        {em.bezeichnung}
-        {em.ist_adhoc && <Tag>ad-hoc</Tag>}
-        {em.ist_demo && <DemoMarke />}
-      </Space>
-      {kategorieAusgeblendet && em.kategorie && (
-        <Typography.Text type="secondary" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-          {em.kategorie}
-        </Typography.Text>
-      )}
-    </>
+    <Space wrap>
+      {em.bezeichnung}
+      {marken}
+    </Space>
   );
 }
 
