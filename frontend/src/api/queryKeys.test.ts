@@ -871,10 +871,9 @@ describe('einsatzKeys.einheitAusVorlage (LLH-1049)', () => {
       for (const prefix of EINSATZ_STREAM_EVENTS[ereignis]) {
         await qc.invalidateQueries({ queryKey: [prefix, 1] });
       }
-      expect(
-        qc.getQueryState(['einsatz-einheit-aus-vorlage', 1, 7])?.isInvalidated,
-        ereignis,
-      ).toBe(true);
+      expect(qc.getQueryState(['einsatz-einheit-aus-vorlage', 1, 7])?.isInvalidated, ereignis).toBe(
+        true,
+      );
       expect(qc.getQueryState(['einsatz-einheit-aus-vorlage', 9, 7])?.isInvalidated).toBe(false);
     }
   });
