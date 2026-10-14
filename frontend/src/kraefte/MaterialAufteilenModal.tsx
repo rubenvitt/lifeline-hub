@@ -18,7 +18,7 @@ export interface MaterialAufteilenModalProps {
 }
 
 /** Gültige abzuteilende Menge: 1 bis Menge − 1 (die Ausgangszeile behält mindestens eins). */
-function isGueltig(n: number | undefined, menge: number): n is number {
+function isValidMenge(n: number | undefined, menge: number): n is number {
   return n != null && Number.isInteger(n) && n >= 1 && n < menge;
 }
 
@@ -49,7 +49,7 @@ export default function MaterialAufteilenModal({
       speicherFehlerTitel="Nicht aufgeteilt"
       speicherFehlerFallback="Aufteilen fehlgeschlagen"
       onErfassen={async (w) => {
-        if (posten && isGueltig(w.menge, posten.menge)) await onAufteilen(w.menge);
+        if (posten && isValidMenge(w.menge, posten.menge)) await onAufteilen(w.menge);
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -61,13 +61,13 @@ export default function MaterialAufteilenModal({
           { required: true, message: 'Menge eintragen' },
           {
             validator: (_, n: number | undefined) =>
-              n == null || isGueltig(n, menge)
+              n == null || isValidMenge(n, menge)
                 ? Promise.resolve()
                 : Promise.reject(new Error(`1 bis ${menge - 1}`)),
           },
         ]}
         extra={
-          isGueltig(abteilen, menge) ? (
+          isValidMenge(abteilen, menge) ? (
             <Typography.Text data-testid="aufteilen-danach">
               Danach {menge - abteilen} + {abteilen}
             </Typography.Text>

@@ -371,7 +371,7 @@ export default function MaterialPage() {
       ? { key: 'stornieren', label: 'Stornieren · zugeordnet', gefahr: true, gesperrt: true }
       : { key: 'stornieren', label: 'Stornieren', gefahr: true },
   ];
-  const waehleAktion = (key: string, em: EinsatzMaterial) => {
+  const handleAktion = (key: string, em: EinsatzMaterial) => {
     if (key === 'angaben') {
       angabenMutation.reset();
       setAngabenFuer(em);
@@ -605,7 +605,7 @@ export default function MaterialPage() {
                     (stornierenMutation.isPending && stornierenMutation.variables === em.id) ||
                     (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === em.id)
                   }
-                  onWahl={(key) => waehleAktion(key, em)}
+                  onWahl={(key) => handleAktion(key, em)}
                 />
               </Space>
             ),
@@ -724,7 +724,7 @@ export default function MaterialPage() {
                     eintraege: menueEintraege,
                     zugaenglicherName: (em) => `Weitere Aktionen zu ${em.bezeichnung}`,
                     laeuft: (em) => isZeileBusy(em.id),
-                    onWahl: waehleAktion,
+                    onWahl: handleAktion,
                   }
                 : undefined,
             }}
