@@ -14,6 +14,7 @@
 
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
+use crate::einsatz::zaehler::{count_kraefte, KraefteZaehler, KraftMerkmale};
 use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
 use crate::lage_zone::LageZoneTyp;
@@ -142,28 +143,31 @@ pub async fn lagebild(
     .fetch_one(pool)
     .await?;
 
-    let einheiten: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_one(pool)
-            .await?;
+    let einheiten: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await?;
     // Wie die Verdichtung der Kräfte-Seiten (`kraefte/kraeftebild.ts`, `verdichte`): jedes
-    // disponierte Personal, auch ohne Einheit.
-    let positionen: Vec<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
+    // aktive Personal, auch ohne Einheit; entlassene und stornierte zählen nicht (LLH-1079,
+    // Regel `count_kraefte`, Fixture `regeln.json` Abschnitt `kraefte`).
+    let zeilen: Vec<(Option<String>, bool)> = sqlx::query_as(
+        "SELECT COALESCE(ep.staerke_position, p.staerke_position), ep.beendet_at IS NOT NULL \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE ep.einsatz_id = ?",
+         WHERE ep.einsatz_id = ? AND ep.beendet_at IS NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let personal = positionen.len() as i64;
-    let staerke = Staerke::aus_positionen(
-        positionen
-            .into_iter()
-            .flatten()
-            .filter_map(|s| StaerkePosition::parse(&s)),
-    );
+    let merkmale: Vec<KraftMerkmale> = zeilen
+        .into_iter()
+        .map(|(position, beendet)| KraftMerkmale {
+            staerke_position: position.as_deref().and_then(StaerkePosition::parse),
+            beendet,
+        })
+        .collect();
+    let KraefteZaehler { personal, staerke } = count_kraefte(&merkmale);
 
     let zeilen: Vec<(
         i64,
@@ -184,7 +188,8 @@ pub async fn lagebild(
                    AND pl.typ <> 'wartebereich'), \
                (SELECT COUNT(*) FROM einsatz_personal ep \
                  LEFT JOIN personal sp ON sp.id = ep.personal_id \
-                 WHERE ep.uhs_id = u.id AND COALESCE(ep.staerke_position, sp.staerke_position) \
+                 WHERE ep.uhs_id = u.id AND ep.beendet_at IS NULL \
+                   AND COALESCE(ep.staerke_position, sp.staerke_position) \
                    IN ('fuehrer', 'unterfuehrer', 'mannschaft')) \
              FROM uhs u \
              WHERE u.einsatz_id = ? AND u.storniert_at IS NULL AND u.status <> 'aufgeloest' \

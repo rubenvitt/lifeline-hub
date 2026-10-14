@@ -761,25 +761,84 @@ async fn check_kennt_nur_bekannte_arten_und_marken() {
     assert!(r.is_err(), "abloesung ist keine Marke");
 }
 
-/// Wird die Einheit aufgelöst, bleibt die Zeitachse ihrer Personen stehen (SET NULL).
+/// Wird die Einheit aufgelöst, bleibt ihre Zeile mit der Zeitachse stehen, und die Zeitachse
+/// ihrer Personen behält den Ursprung (LLH-1079, Spec `kraefte-entlassung` „Aufgelöste Einheit
+/// bleibt im Nachweis“). Die Entlassung der Einheit erreicht keine Person: die Mitglieder sind
+/// vor dem Schreiben gelöst.
 #[tokio::test]
-async fn einheit_loeschen_laesst_personen_zeitachse_stehen() {
+async fn einheit_aufloesen_laesst_personen_zeitachse_stehen() {
     let w = welt().await;
     schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await;
-    // Wie `einheit::repo::loese_auf_tx`: erst die Mitglieder lösen, dann löschen.
+    let ursprung = laden(&w.pool, w.e, Kraft::Einheit(w.f1))
+        .await
+        .unwrap()
+        .ereignisse[0]
+        .id;
+    let mut conn = w.pool.acquire().await.unwrap();
+    crate::einheit::repo::aufloesen_tx(
+        &mut conn,
+        w.e,
+        w.f1,
+        w.b,
+        &t("15:00"),
+        crate::einheit::repo::Aufloesung::Aufloesen,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    assert_eq!(
+        folge(&w, Kraft::Einheit(w.f1)).await,
+        vec![
+            ev("eintreffen", "06:40", "status"),
+            ev("entlassung", "15:00", "disposition")
+        ]
+    );
+    for p in w.p {
+        let z = laden(&w.pool, w.e, Kraft::Person(p)).await.unwrap();
+        assert_eq!(z.ereignisse.len(), 1, "keine Entlassung per Fan-out");
+        assert_eq!(z.ereignisse[0].ursprung_id, Some(ursprung));
+    }
+}
+
+/// D1: Eine Person oder Einheit mit Ereignissen lässt sich nicht mehr löschen (FK ohne
+/// `ON DELETE`); das Löschen des ganzen Einsatzes (Aufbewahrung, Demo-Daten) läuft durch.
+#[tokio::test]
+async fn loeschen_mit_zeitachse_scheitert_am_fremdschluessel() {
+    let w = welt().await;
+    schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await;
+    let person = sqlx::query("DELETE FROM einsatz_personal WHERE id = ?")
+        .bind(w.p[0])
+        .execute(&w.pool)
+        .await;
+    assert!(person.is_err(), "Person mit Zeitachse gelöscht");
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(w.f1)
         .execute(&w.pool)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+    let geloescht = sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
         .bind(w.f1)
+        .execute(&w.pool)
+        .await;
+    assert!(geloescht.is_err(), "Einheit mit Zeitachse gelöscht");
+    // Ohne Ereignis bleibt das Löschen möglich (Storno einer leeren Einheit, Fahrzeug, Material).
+    let leer = einheit(&w.pool, w.e, "Leer").await;
+    sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+        .bind(leer)
         .execute(&w.pool)
         .await
         .unwrap();
-    let z = laden(&w.pool, w.e, Kraft::Person(w.p[0])).await.unwrap();
-    assert_eq!(z.ereignisse.len(), 1);
-    assert_eq!(z.ereignisse[0].ursprung_id, None);
+
+    sqlx::query("DELETE FROM einsatz WHERE id = ?")
+        .bind(w.e)
+        .execute(&w.pool)
+        .await
+        .expect("der Einsatz-Purge nimmt Kräfte und Zeitachse in einer Anweisung mit");
+    let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_kraft_zeitachse")
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(rest, 0);
 }
 
 /// Spec „Bestand ohne Marke": Migration 0130 trifft auf eine Organisation mit bestehendem

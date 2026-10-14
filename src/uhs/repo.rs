@@ -10,14 +10,14 @@ const SELECT_ALLE: &str = "\
            lat, lon, \
            erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at, \
            (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-             WHERE ep.uhs_id = uhs.id \
+             WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
                AND COALESCE(ep.staerke_position, p.staerke_position) = 'fuehrer') AS fuehrer, \
            (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-             WHERE ep.uhs_id = uhs.id \
+             WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
                AND COALESCE(ep.staerke_position, p.staerke_position) = 'unterfuehrer') \
              AS unterfuehrer, \
            (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-             WHERE ep.uhs_id = uhs.id \
+             WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
                AND COALESCE(ep.staerke_position, p.staerke_position) = 'mannschaft') \
              AS mannschaft \
     FROM uhs";

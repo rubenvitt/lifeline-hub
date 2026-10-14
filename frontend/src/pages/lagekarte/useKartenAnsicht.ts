@@ -207,48 +207,94 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
   );
 
   const invalidiereAnsichten = useCallback(
-    () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenAnsicht(einsatzId) }),
-    [qc, einsatzId],
+    (einsatz: number) => qc.invalidateQueries({ queryKey: einsatzKeys.kartenAnsicht(einsatz) }),
+    [qc],
   );
 
+  /*
+   * Jede Mutation trägt ihren Einsatz in den `variables` (LLH-1154): die Seite bleibt über einen
+   * Einsatzwechsel stehen, und eine Anfrage aus A darf in B weder laden noch sperren, noch die
+   * Ansichten von B statt derer von A neu laden.
+   */
   const speichernMut = useMutation({
-    mutationFn: () => {
-      if (!aktiveAnsicht) throw new Error('keine aktive Ansicht');
-      return patcheKartenAnsicht(einsatzId, aktiveAnsicht.id, konfigPayload());
+    mutationFn: ({ einsatz, ansichtId }: { einsatz: number; ansichtId: number | undefined }) => {
+      if (ansichtId == null) throw new Error('keine aktive Ansicht');
+      return patcheKartenAnsicht(einsatz, ansichtId, konfigPayload());
     },
-    onSuccess: invalidiereAnsichten,
+    onSuccess: (_daten, { einsatz }) => invalidiereAnsichten(einsatz),
   });
 
   // „Als neue Ansicht speichern": friert den Zustand unter neuem Namen ein und liefert die neue
   // Ansicht (die Seite schaltet per `?ansicht=` um).
   const neueMut = useMutation({
-    mutationFn: (name: string) => erstelleKartenAnsicht(einsatzId, { name, ...konfigPayload() }),
-    onSuccess: invalidiereAnsichten,
+    mutationFn: ({ einsatz, name }: { einsatz: number; name: string }) =>
+      erstelleKartenAnsicht(einsatz, { name, ...konfigPayload() }),
+    onSuccess: (_daten, { einsatz }) => invalidiereAnsichten(einsatz),
   });
 
   const umbenennenMut = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) =>
-      patcheKartenAnsicht(einsatzId, id, { name }),
-    onSuccess: invalidiereAnsichten,
+    mutationFn: ({ einsatz, id, name }: { einsatz: number; id: number; name: string }) =>
+      patcheKartenAnsicht(einsatz, id, { name }),
+    onSuccess: (_daten, { einsatz }) => invalidiereAnsichten(einsatz),
   });
 
   const standardMut = useMutation({
-    mutationFn: (id: number) => patcheKartenAnsicht(einsatzId, id, { ist_standard: true }),
-    onSuccess: invalidiereAnsichten,
+    mutationFn: ({ einsatz, id }: { einsatz: number; id: number }) =>
+      patcheKartenAnsicht(einsatz, id, { ist_standard: true }),
+    onSuccess: (_daten, { einsatz }) => invalidiereAnsichten(einsatz),
   });
 
   const loeschenMut = useMutation({
-    mutationFn: ({ id, objekte }: { id: number; objekte: 'freigeben' | 'loeschen' }) =>
-      loescheKartenAnsicht(einsatzId, id, objekte),
+    mutationFn: ({
+      einsatz,
+      id,
+      objekte,
+    }: {
+      einsatz: number;
+      id: number;
+      objekte: 'freigeben' | 'loeschen';
+    }) => loescheKartenAnsicht(einsatz, id, objekte),
     // Beim Löschen ändert sich die Sichtbarkeit der ansichtsgebundenen Objekte
     // (freigegeben/mitgelöscht), daher auch deren Layer invalidieren.
-    onSuccess: () => {
-      invalidiereAnsichten();
-      qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
+    onSuccess: (_daten, { einsatz }) => {
+      invalidiereAnsichten(einsatz);
+      qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatz) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatz) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatz) });
     },
   });
+
+  const aktiveId = aktiveAnsicht?.id;
+  const { mutateAsync: speichernAsync } = speichernMut;
+  const speichern = useCallback(
+    () => speichernAsync({ einsatz: einsatzId, ansichtId: aktiveId }),
+    [speichernAsync, einsatzId, aktiveId],
+  );
+  const { mutateAsync: neueAsync } = neueMut;
+  const neueAnsicht = useCallback(
+    (name: string) => neueAsync({ einsatz: einsatzId, name }),
+    [neueAsync, einsatzId],
+  );
+  const { mutateAsync: umbenennenAsync } = umbenennenMut;
+  const umbenennen = useCallback(
+    ({ id, name }: { id: number; name: string }) =>
+      umbenennenAsync({ einsatz: einsatzId, id, name }),
+    [umbenennenAsync, einsatzId],
+  );
+  const { mutateAsync: standardAsync } = standardMut;
+  const setzeStandard = useCallback(
+    (id: number) => standardAsync({ einsatz: einsatzId, id }),
+    [standardAsync, einsatzId],
+  );
+  const { mutateAsync: loeschenAsync } = loeschenMut;
+  const loeschen = useCallback(
+    ({ id, objekte }: { id: number; objekte: 'freigeben' | 'loeschen' }) =>
+      loeschenAsync({ einsatz: einsatzId, id, objekte }),
+    [loeschenAsync, einsatzId],
+  );
+  /** Läuft die Mutation für DIESEN Einsatz? */
+  const laeuftHier = (m: { isPending: boolean; variables?: { einsatz: number } }) =>
+    m.isPending && m.variables?.einsatz === einsatzId;
 
   // Manuelle Basemap-Wahl hebt einen aktiven Anzeige-Fallback auf.
   const waehleBasemap = useCallback((m: BasemapModus) => {
@@ -280,15 +326,15 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     // Aktive Ansicht-id — für Objekt-Filterung (client-seitig) und das Stempeln neuer Objekte.
     aktiveAnsichtId: aktiveAnsicht?.id,
     // Ansichts-Verwaltung
-    neueAnsicht: neueMut.mutateAsync,
-    umbenennen: umbenennenMut.mutateAsync,
-    setzeStandard: standardMut.mutateAsync,
-    loeschen: loeschenMut.mutateAsync,
+    neueAnsicht,
+    umbenennen,
+    setzeStandard,
+    loeschen,
     ansichtBusy:
-      neueMut.isPending ||
-      umbenennenMut.isPending ||
-      standardMut.isPending ||
-      loeschenMut.isPending,
+      laeuftHier(neueMut) ||
+      laeuftHier(umbenennenMut) ||
+      laeuftHier(standardMut) ||
+      laeuftHier(loeschenMut),
     // gewählte Konfiguration (View-Config)
     basemap,
     setBasemap: waehleBasemap,
@@ -305,7 +351,7 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     onStyleFehler,
     // „Für den Einsatz speichern"
     dirty,
-    speichern: speichernMut.mutateAsync,
-    speichertGerade: speichernMut.isPending,
+    speichern,
+    speichertGerade: laeuftHier(speichernMut),
   };
 }

@@ -55,7 +55,8 @@ pub(super) fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
 async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<BrDetail, AppError> {
     let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     let einheiten = sqlx::query_as::<_, BrEinheitKurz>(
-        "SELECT id, name FROM einsatz_einheit WHERE aktueller_br_id = ? AND einsatz_id = ?",
+        "SELECT id, name FROM einsatz_einheit \
+         WHERE aktueller_br_id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
     )
     .bind(br_id)
     .bind(einsatz_id)

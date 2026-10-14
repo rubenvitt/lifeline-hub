@@ -564,10 +564,17 @@ export const einsatzKeys = {
   /** Einsatzkräfte ohne UHS (LFH-1045), Auswahl beim Zuordnen; unter `personal`, weil jede
    *  Zuordnung `personal` verteilt. */
   personalOhneUhs: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId, 'ohne-uhs'] as const,
+  /** Entlassene Kräfte (LLH-1079, Block „Entlassen“); unter `personal`, weil Entlassen und
+   *  erneutes Disponieren `personal` verteilen. */
+  personalEntlassene: (einsatzId: number) =>
+    [EINSATZ_KEYS.personal, einsatzId, 'entlassene'] as const,
   fuehrungskraefte: (einsatzId: number) => [EINSATZ_KEYS.fuehrungskraefte, einsatzId] as const,
 
   // Struktur
   einheiten: (einsatzId: number) => [EINSATZ_KEYS.einheiten, einsatzId] as const,
+  /** Aufgelöste Einheiten (LLH-1079); unter `einheiten`, weil das Auflösen `einheit` verteilt. */
+  einheitenAufgeloeste: (einsatzId: number) =>
+    [EINSATZ_KEYS.einheiten, einsatzId, 'aufgeloeste'] as const,
   abschnitte: (einsatzId: number) => [EINSATZ_KEYS.abschnitte, einsatzId] as const,
   fahrzeuge: (einsatzId: number) => [EINSATZ_KEYS.fahrzeuge, einsatzId] as const,
   material: (einsatzId: number) => [EINSATZ_KEYS.material, einsatzId] as const,

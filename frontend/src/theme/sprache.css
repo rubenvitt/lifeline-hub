@@ -322,6 +322,25 @@
   text-transform: uppercase;
   border-bottom-color: var(--lfh-linie);
 }
+/* Spaltenfilter-Auslöser im Kopf (LLH-1227, Kriterium 2). antd zeichnet ihn in Schriftgröße
+   (20 × 23 px in jeder Stufe); der Boden kommt als aufgelöster `controlHeightSM` über
+   `--lfh-filter-ziel` (`filterKopfStil` in `KatalogTabelle.tsx`), 24 / 48 / 72 px. Er ragt um
+   die Kopfzellen-Polsterung (`--lfh-filter-einzug`) nach oben und unten, so wächst der Kopf nur
+   auf die Steuerhöhe. Rechts kein negativer Rand wie bei antd: die volle Zellpolsterung
+   (11 / 18 / 26 px) trennt ihn von der nächsten, oft sortierbaren Kopfzelle. Den Fokusring
+   nach innen versetzt, wie `.lfh-segment`. */
+.ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger {
+  box-sizing: border-box;
+  justify-content: center;
+  min-width: var(--lfh-filter-ziel, 24px);
+  min-height: var(--lfh-filter-ziel, 24px);
+  margin-block: calc(-1 * var(--lfh-filter-einzug, 0px));
+  margin-inline-end: 0;
+}
+.ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
 .ant-table-wrapper.lfh-katalog td.lfh-zahl-spalte {
   font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;

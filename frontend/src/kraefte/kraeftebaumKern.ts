@@ -39,6 +39,24 @@ import type { StaerkeSumme } from './kraeftebild';
  * selbst, die Zählung bleibt bei `verdichte` (Heimat der Kräftezahl, `frontend/AGENTS.md`).
  */
 
+// ── Aktive Kräfte ─────────────────────────────────────────────────────────────
+
+/**
+ * Nur aktive Kräfte (LLH-1079, Spec `kraefte-entlassung`): eine entlassene oder stornierte Person
+ * (`beendet_at`) und eine aufgelöste Einheit (`aufgeloest_at`) stehen in keinem Baum und keiner
+ * Stärke; Entlassene führt der Block „Entlassen“ (`entlassene.ts`). Der Server liefert die Listen
+ * schon gefiltert, der Kern lässt sie trotzdem aus, damit ein ungefilterter Aufrufer auffällt
+ * (design.md D9). Eine Einheit, deren Über-Einheit aufgelöst ist, wird in {@link einheitenBaum}
+ * Wurzel wie jede Waise.
+ */
+export function filterAktive<T extends object>(liste: readonly T[]): T[] {
+  // Fahrzeug und Material tragen den Zustand erst mit Teil II; bis dahin lässt der Filter sie durch.
+  return liste.filter((x) => {
+    const z = x as { beendet_at?: string | null; aufgeloest_at?: string | null };
+    return !z.beendet_at && !z.aufgeloest_at;
+  });
+}
+
 // ── Abschnitte ────────────────────────────────────────────────────────────────
 
 /**
@@ -404,9 +422,9 @@ function vollQuelle(
   quelle: Partial<MittelQuelle> = {},
 ): MittelQuelle {
   return {
-    fahrzeuge: quelle.fahrzeuge ?? listen.fahrzeuge,
-    personal: quelle.personal ?? listen.personal,
-    einheiten: quelle.einheiten ?? listen.einheiten,
+    fahrzeuge: filterAktive(quelle.fahrzeuge ?? listen.fahrzeuge),
+    personal: filterAktive(quelle.personal ?? listen.personal),
+    einheiten: filterAktive(quelle.einheiten ?? listen.einheiten),
   };
 }
 
@@ -420,6 +438,7 @@ export function mittelDerEinheit(
   roh: MittelListen & { einheiten: readonly Einheit[] },
   quelle: Partial<MittelQuelle> = {},
 ): MittelDerEinheit {
+  roh = aktiveEingabe(roh);
   const einheit = einheitId != null ? roh.einheiten.find((e) => e.id === einheitId) : undefined;
   const hier = (x: { einheit_id?: number | null }) => (x.einheit_id ?? null) === einheitId;
   return sortMittel(
@@ -470,7 +489,19 @@ function groupByEinheit<T extends { einheit_id?: number | null }>(
   return m;
 }
 
-export function kraeftebaum(e: KraeftebaumEingabe): KraeftebaumWurzel[] {
+/** Die Eingabe ohne entlassene Kräfte und aufgelöste Einheiten ({@link filterAktive}). */
+function aktiveEingabe<T extends MittelListen & { einheiten: readonly Einheit[] }>(e: T): T {
+  return {
+    ...e,
+    einheiten: filterAktive(e.einheiten),
+    personal: filterAktive(e.personal),
+    fahrzeuge: filterAktive(e.fahrzeuge),
+    material: filterAktive(e.material),
+  };
+}
+
+export function kraeftebaum(eingabe: KraeftebaumEingabe): KraeftebaumWurzel[] {
+  const e = aktiveEingabe(eingabe);
   const quelle = vollQuelle(e, e.quelle);
   const bekannt = new Set(e.einheiten.map((x) => x.id));
   const personalJe = groupByEinheit(e.personal, bekannt);

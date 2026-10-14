@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 /// `sortier`, dann `id`; `None` ohne aktive Qualifikation. **Einzige Quelle der
 /// `snap_funktion`-Komposition**; die Live-Anzeige in `disposition_repo` nutzt die identische
 /// Subquery (Test `funktion_komposition_identisch`). Executor-generisch für
-/// `disposition_repo::disponiere_stamm_tx`.
+/// `disposition_repo::disponieren_stamm_tx`.
 pub async fn funktion_text(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     personal_id: i64,

@@ -1,4 +1,4 @@
-import { Form, Input, Modal } from 'antd';
+import { AutoComplete, Form, Input, Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
@@ -15,11 +15,15 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { teilwortSuche } from '../components/teilwortSuche';
 import { optionsLabel } from '../fuehrung/funktionsOptionenKern';
+import { externeStellenOptions, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import {
   EXTERNE_STELLENARTEN,
   STELLENART_LABEL,
   VERBINDUNGSMITTEL_OPTIONEN,
+  katalogStellenFuer,
+  verbindungAusRufnummer,
   type VerbindungsAnzeige,
 } from './kommunikationsplan';
 
@@ -43,34 +47,52 @@ interface StelleFormWerte {
   stellenart: Stellenart;
   funktion?: Fuehrungsfunktion;
   bezeichnung?: string;
+  rufnummer?: string;
 }
+
+/** Vorbelegung der Maske, etwa mit der zuständigen Leitstelle aus der Lücke (LLH-1165). */
+export type StelleVorbelegung = Pick<StelleFormWerte, 'stellenart' | 'bezeichnung' | 'rufnummer'>;
 
 /**
  * „Stelle hinzufügen“: Art, bei „Führungsfunktion“ die Funktion aus dem Katalog (schon vergebene
  * ausgegraut), die Bezeichnung nur, wo sie Pflicht ist (extern, Führungshilfspersonal,
  * Fachberater). Ausgeblendet heißt: nicht leer abgeschickt.
+ *
+ * Bei einer externen Stelle schlägt die Bezeichnung die aktiven Stellen des Katalogs „Externe
+ * Stellen“ vor, die als diese Art in den Plan kommen (LLH-1165, `STELLENART_AUS_KATALOG`); Freitext
+ * bleibt. Die Wahl übernimmt die Rufnummer ins Feld „Rufnummer“, solange dort nichts von Hand
+ * steht. Gespeichert wird nur Text; die Rufnummer wird die erste Verbindung der Stelle.
  */
 export function StelleAnlegenModal({
   stellen,
+  vorbelegung,
   laeuft,
   fehler,
   onAnlegen,
   onSchliessen,
 }: {
   stellen: readonly KommunikationsStelle[];
+  vorbelegung?: StelleVorbelegung;
   laeuft: boolean;
   fehler: unknown;
-  onAnlegen: (body: NeueKommunikationsStelle) => Promise<unknown>;
+  onAnlegen: (body: NeueKommunikationsStelle, verbindung?: NeueVerbindung) => Promise<unknown>;
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<StelleFormWerte>();
-  const art = Form.useWatch('stellenart', form) ?? 'funktion';
+  const art = Form.useWatch('stellenart', form) ?? vorbelegung?.stellenart ?? 'funktion';
   const gewaehlt = Form.useWatch('funktion', form);
   const katalog = useQuery({
     queryKey: globalKeys.fuehrungsfunktionen(),
     queryFn: ladeFuehrungsfunktionen,
     staleTime: 5 * 60_000,
   });
+  // Nur bei einer externen Art gebraucht; die Abfrage teilt den Cache mit den anderen Abnehmern.
+  const externeStellen = useExterneStellen().data;
+  const passende = useMemo(
+    () => (art === 'funktion' ? [] : katalogStellenFuer(art, externeStellen ?? [])),
+    [art, externeStellen],
+  );
+  const stellenOptionen = useMemo(() => externeStellenOptions(passende), [passende]);
   // Vergeben ist eine Funktion ohne Bezeichnungspflicht, die schon im Plan steht; FHP und
   // Fachberater dürfen mehrfach stehen (je Bezeichnung, der Server prüft die Dublette).
   const funktionsOptionen = useMemo(() => {
@@ -84,26 +106,30 @@ export function StelleAnlegenModal({
     }));
   }, [katalog.data, stellen]);
   const pflicht = katalog.data?.find((e) => e.funktion === gewaehlt)?.bezeichnung_pflicht ?? false;
-  const mitBezeichnung = art !== 'funktion' || pflicht;
+  const extern = art !== 'funktion';
+  const mitBezeichnung = extern || pflicht;
 
   return (
     <ErfassungsModal<StelleFormWerte>
       offen
       titel="Stelle hinzufügen"
       form={form}
-      initialValues={{ stellenart: 'funktion' }}
+      initialValues={vorbelegung ?? { stellenart: 'funktion' }}
       erfassenText="Anlegen"
       laeuft={laeuft}
       onErfassen={async (w) => {
         const bezeichnung = w.bezeichnung?.trim();
+        if (w.stellenart === 'funktion') {
+          await onAnlegen({
+            stellenart: 'funktion',
+            funktion: w.funktion,
+            ...(pflicht && bezeichnung ? { bezeichnung } : {}),
+          });
+          return;
+        }
         await onAnlegen(
-          w.stellenart === 'funktion'
-            ? {
-                stellenart: 'funktion',
-                funktion: w.funktion,
-                ...(pflicht && bezeichnung ? { bezeichnung } : {}),
-              }
-            : { stellenart: w.stellenart, ...(bezeichnung ? { bezeichnung } : {}) },
+          { stellenart: w.stellenart, ...(bezeichnung ? { bezeichnung } : {}) },
+          verbindungAusRufnummer(w.rufnummer),
         );
       }}
       onFertig={onSchliessen}
@@ -127,7 +153,25 @@ export function StelleAnlegenModal({
           name="bezeichnung"
           rules={[{ required: true, whitespace: true, message: 'Bezeichnung angeben' }, LAENGE]}
         >
-          <Input placeholder={art === 'funktion' ? 'z. B. THW' : 'z. B. ILS Nord'} />
+          {extern ? (
+            <AutoComplete
+              options={stellenOptionen}
+              showSearch={teilwortSuche}
+              placeholder="z. B. ILS Nord"
+              onSelect={(bezeichnung: string) => {
+                if (form.isFieldTouched('rufnummer')) return;
+                const stelle = passende.find((s) => s.bezeichnung === bezeichnung);
+                form.setFieldValue('rufnummer', stelle?.rufnummer ?? '');
+              }}
+            />
+          ) : (
+            <Input placeholder="z. B. THW" />
+          )}
+        </Form.Item>
+      )}
+      {extern && (
+        <Form.Item label="Rufnummer" name="rufnummer" rules={[LAENGE]}>
+          <Input placeholder="z. B. 0421 123456" />
         </Form.Item>
       )}
       <SpeicherFehler fehler={fehler} />

@@ -15,7 +15,7 @@ import {
   adminZugangsprotokoll,
 } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
-import DatentraegerWarnung from './DatentraegerWarnung';
+import DatentraegerWarnung, { useDatentraeger } from './DatentraegerWarnung';
 
 const { Sider, Content } = Layout;
 
@@ -25,7 +25,7 @@ const { Sider, Content } = Layout;
  * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer", „Aufbewahrung" und
  * „Zugangsprotokoll" nur für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von
  * `GET /api/demo-daten`. Über dem Inhalt steht für System-Admins die Warnleiste der
- * Datenträgerprüfung (LFH-1100).
+ * Datenträgerprüfung (LFH-1100); der Inhalt erscheint erst mit ihrem Befund (LLH-1229).
  */
 /**
  * Menü-Key einer Sektion — EINE Quelle für Eintrag und Präfix-Match, sonst verlöre eine
@@ -108,6 +108,14 @@ export default function AdminLayout() {
   const [oben, setOben] = useState(0);
   // Demo-Daten: fragt nur für den System-Admin ab, 404 heißt aus.
   const { freigeschaltet: demoFreigeschaltet } = useDemoDatenStatus();
+  // Der Inhalt wartet auf den ersten Befund der Datenträgerprüfung: käme die Warnleiste nach
+  // dem Seitentitel, schöbe sie die ganze Seite nach unten (LLH-1229, CLS bis 0,2 bei 390 px).
+  // Die Navigation steht sofort, ein Inhalt, der erscheint, verschiebt nichts. Einmal frei,
+  // bleibt er frei: ein neuer Abruf nach einem Fehler meldet sich wieder als „wartet“, und der
+  // Inhalt flackerte sonst bei jedem Versuch heraus und wieder herein.
+  const { wartet: datentraegerWartet } = useDatentraeger();
+  const [inhaltFrei, setInhaltFrei] = useState(false);
+  if (!inhaltFrei && !laedt && !datentraegerWartet) setInhaltFrei(true);
 
   // Der obere Rand der Verwaltung im Dokument (Kopfleiste, Seitenpolster). Gemessen statt aus
   // Konstanten gerechnet: die Kopfleiste wächst mit der Dichte-Staffel, ohne dass sich die
@@ -188,6 +196,22 @@ export default function AdminLayout() {
   ];
   const selektiert = markierterKey(menuKeys, aktiv);
 
+  // Befund des Server-Rechners (LFH-1100), nur für den System-Admin und nur bei Warnung. Der
+  // Inhalt hängt schon, solange er wartet, nur unsichtbar: so laden Seite und Leiste wie zuvor
+  // gleichzeitig, und eine Abfrage, die beide teilen, geht nicht ein zweites Mal hinaus.
+  // `visibility` statt `display: none`: die Seite legt sich schon aus (Tabellenköpfe messen
+  // sich), und was unsichtbar wächst, zählt nicht als Sprung. `contents` lässt den Rahmen aus
+  // dem Layout, die Seite steht wie direkt im Inhalt.
+  const inhalt = (
+    <div
+      data-lfh="verwaltung-inhalt"
+      style={{ display: 'contents', visibility: inhaltFrei ? undefined : 'hidden' }}
+    >
+      <DatentraegerWarnung />
+      <Outlet />
+    </div>
+  );
+
   const menue = (
     <ConfigProvider
       theme={{
@@ -262,8 +286,7 @@ export default function AdminLayout() {
             </div>
           )}
         </nav>
-        <DatentraegerWarnung />
-        <Outlet />
+        {inhalt}
       </div>
     );
   }
@@ -283,11 +306,7 @@ export default function AdminLayout() {
           {menue}
         </nav>
       </Sider>
-      <Content style={{ paddingInlineStart: token.paddingLG }}>
-        {/* Befund des Server-Rechners (LFH-1100), nur für den System-Admin und nur bei Warnung. */}
-        <DatentraegerWarnung />
-        <Outlet />
-      </Content>
+      <Content style={{ paddingInlineStart: token.paddingLG }}>{inhalt}</Content>
     </Layout>
   );
 }

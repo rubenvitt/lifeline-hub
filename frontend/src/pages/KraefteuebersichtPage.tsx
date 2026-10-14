@@ -14,7 +14,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
-import { listeEinsatzPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -74,6 +74,8 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { toEntlassene } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -673,6 +675,12 @@ export default function KraefteuebersichtPage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
+  // Nachweis der Entlassenen (LLH-1079): Block unter dem Raster und im Lagebericht. Scheitert
+  // der Abruf, fehlt am Schirm nur der Block; der Lagebericht sagt „nicht geladen“.
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.personalEntlassene(einsatzId),
+    queryFn: () => listEntlassenesPersonal(einsatzId),
+  });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
@@ -935,7 +943,13 @@ export default function KraefteuebersichtPage() {
           fahrzeuge: fahrzeugeQuery.data ?? [],
         },
       );
-      const md = rendereMeldebildMarkdown(bild, stand);
+      // Gefiltert gilt der Bericht einer Auswahl; die Entlassenen gehören zu keiner mehr.
+      const entlassene = gefiltert
+        ? []
+        : entlasseneQuery.data
+          ? toEntlassene(entlasseneQuery.data)
+          : null;
+      const md = rendereMeldebildMarkdown(bild, stand, entlassene);
       // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das
       // frühere POST + PATCH ließ bei gescheitertem PATCH einen leeren Entwurf stehen.
       const lb = await legeLageberichtAn(einsatzId, {
@@ -1298,6 +1312,19 @@ export default function KraefteuebersichtPage() {
             sekundaer: ['abschnitt', 'staerke', 'auftrag'],
           }}
         />
+        {!gefiltert && (
+          <EntlassenBlock
+            titel="Entlassen"
+            endeWort="entlassen"
+            aufgeklappt={druckt}
+            eintraege={(entlasseneQuery.data ?? []).map((ep) => ({
+              id: ep.id,
+              name: ep.name,
+              zusatz: ep.funktion,
+              beendetAt: ep.beendet_at,
+            }))}
+          />
+        )}
       </EinsatzSeite>
     </div>
   );

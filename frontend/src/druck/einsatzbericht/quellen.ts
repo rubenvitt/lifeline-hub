@@ -26,8 +26,10 @@ export type QuellenSchluessel =
   | 'stab'
   | 'lagebesprechungen'
   | 'einheiten'
+  | 'einheitenAufgeloest'
   | 'einheitenPerioden'
   | 'personal'
+  | 'personalEntlassen'
   | 'personalPerioden'
   | 'fahrzeuge'
   | 'lageberichte'
@@ -75,10 +77,16 @@ export const QUELLEN: readonly Quelle[] = [
     bloecke: ['kraefte', 'einheiten-zeiten', 'personal-kopf'],
     modul: 'einheiten',
   },
+  // GET …/einheiten?aufgeloeste=1 — dasselbe Gate (LLH-1079). Eine aufgelöste Einheit bleibt
+  // mit ihrer Zeitachse im Nachweis der Anlage.
+  { schluessel: 'einheitenAufgeloest', bloecke: nur('einheiten-zeiten'), modul: 'einheiten' },
   // GET …/einheiten/zeitachse — `EinsatzLesezugriff<Einheiten>` (src/routes/zeitachse.rs:176).
   { schluessel: 'einheitenPerioden', bloecke: ['kraefte', 'einheiten-zeiten'], modul: 'einheiten' },
   // GET …/personal — `EinsatzLesezugriff<Personal>` (src/routes/einsatz_personal.rs:46).
   { schluessel: 'personal', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
+  // GET …/personal?entlassene=1 — dasselbe Gate (LLH-1079). Entlassene sind geführt: sie zählen in
+  // „insgesamt“ und in der Anlage, nie in der Stärke; Stornierte liefert der Server nicht.
+  { schluessel: 'personalEntlassen', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
   // GET …/personal/zeitachse — `EinsatzLesezugriff<Personal>` (src/routes/zeitachse.rs:237).
   { schluessel: 'personalPerioden', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
   // GET …/fahrzeuge — `EinsatzLesezugriff<Fahrzeuge>` (src/routes/einsatz_fahrzeug.rs:30).

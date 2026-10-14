@@ -451,6 +451,114 @@ describe('kraeftebaum', () => {
   });
 });
 
+describe('kraeftebaum — nur aktive Kräfte (LLH-1079)', () => {
+  // Gr X (3) ist aufgelöst; ihre Untereinheit Trupp (5) zeigt noch auf sie (Waise durch die
+  // aufgelöste Über-Einheit) und muss trotzdem sichtbar bleiben. P3 ist entlassen und hängt mit
+  // einer veralteten Bindung noch am Zugfahrzeug; P5 zeigt auf die aufgelöste Einheit.
+  const einheiten = [
+    eh(1, 10, null, { name: 'Zug' }),
+    eh(2, null, 1, { name: 'Gr 1' }),
+    eh(3, null, 1, { name: 'Gr X', aufgeloest_at: '2026-10-13 15:00:00' }),
+    eh(5, null, 3, { name: 'Trupp' }),
+  ];
+  const entlassen = (x: EinsatzPersonal): EinsatzPersonal => ({
+    ...x,
+    beendet_at: '2026-10-13 14:00:00',
+    beendet_als: 'entlassen',
+  });
+  const personal = [
+    p(1, 1, 'fuehrer', 10),
+    p(2, 2, 'unterfuehrer'),
+    entlassen(p(3, 2, 'mannschaft', 10)),
+    p(4, 5),
+    p(5, 3),
+  ];
+  const fahrzeuge = [fz(10, 1)];
+  const wurzeln = kraeftebaum({
+    abschnitte: [ab(10)],
+    einheiten,
+    personal,
+    fahrzeuge,
+    material: [],
+    quelle: { einheiten, personal, fahrzeuge },
+  });
+  const knotenIds = (k: KraeftebaumKnoten): number[] => [
+    k.einheit.id,
+    ...k.kinder.flatMap(knotenIds),
+  ];
+  const personenIds = () => {
+    const ids: number[] = [];
+    const sammle = (m: KraeftebaumKnoten['mittel']) => {
+      for (const f of m.fahrzeuge) ids.push(...f.besatzung.map((x) => x.person.id));
+      ids.push(...m.ohneFahrzeug.map((x) => x.person.id));
+    };
+    const gehe = (k: KraeftebaumKnoten) => {
+      sammle(k.mittel);
+      k.kinder.forEach(gehe);
+    };
+    for (const w of wurzeln) {
+      if (w.art === 'einheit') gehe(w.knoten);
+      else sammle(w.mittel);
+    }
+    return ids.sort((a, b) => a - b);
+  };
+
+  it('eine aufgelöste Einheit steht nicht im Baum, ihre Untereinheit wird Wurzel', () => {
+    const alle = wurzeln.flatMap((w) => (w.art === 'einheit' ? knotenIds(w.knoten) : []));
+    expect(alle).not.toContain(3);
+    expect(alle.sort((a, b) => a - b)).toEqual([1, 2, 5]);
+    expect(wurzeln.map((w) => (w.art === 'einheit' ? w.knoten.einheit.id : w.art))).toEqual([
+      1,
+      5,
+      'ohne-einheit',
+    ]);
+  });
+
+  it('jede aktive Kraft genau einmal, eine entlassene nirgends', () => {
+    // P5 zeigt auf die aufgelöste Einheit: sie steht unter „Ohne Einheit“, nicht doppelt.
+    expect(personenIds()).toEqual([1, 2, 4, 5]);
+    const ohne = wurzeln[wurzeln.length - 1];
+    if (ohne.art !== 'ohne-einheit') throw new Error('„Ohne Einheit“ erwartet');
+    expect(ohne.mittel.ohneFahrzeug.map((x) => x.person.id)).toEqual([5]);
+  });
+
+  it('die Besatzung Ist zählt keine entlassene Kraft, auch nicht aus der ungefilterten Quelle', () => {
+    const zug = wurzeln[0];
+    if (zug.art !== 'einheit') throw new Error('Einheit erwartet');
+    const f10 = zug.knoten.mittel.fahrzeuge[0];
+    expect(staerkeText(f10.ist)).toBe(staerkeText({ fuehrer: 1, unterfuehrer: 0, mannschaft: 0 }));
+    expect(f10.fremd).toEqual([]);
+  });
+
+  it('die kumulierte Stärke zählt nur aktive Kräfte und stimmt mit verdichte überein', () => {
+    const k = accumulateStaerke(
+      wurzeln.flatMap((w) => (w.art === 'einheit' ? [w.knoten] : [])),
+      eigeneStaerke(personal.filter((x) => !x.beendet_at)),
+    );
+    expect(k.get(1)!.gesamt).toBe(2);
+    const ohne = wurzeln[wurzeln.length - 1];
+    const ohneSumme = ohne.art === 'ohne-einheit' ? ohne.mittel.ohneFahrzeug.length : 0;
+    expect(k.get(1)!.gesamt + k.get(5)!.gesamt + ohneSumme).toBe(
+      verdichte(personal, fahrzeuge, []).staerke.gesamt,
+    );
+  });
+
+  it('mittelDerEinheit lässt Entlassene aus den Listen und aus der Quelle', () => {
+    const m = mittelDerEinheit(
+      1,
+      { einheiten, personal, fahrzeuge, material: [] },
+      { einheiten, personal, fahrzeuge },
+    );
+    expect(m.fahrzeuge[0].besatzung.map((x) => x.person.id)).toEqual([1]);
+    expect(m.fahrzeuge[0].ist.mannschaft).toBe(0);
+    expect(
+      mittelDerEinheit(2, { einheiten, personal, fahrzeuge, material: [] }).ohneFahrzeug.map(
+        (x) => x.person.id,
+      ),
+    ).toEqual([2]);
+  });
+});
+
 // ── 1.5 Ausklappstufen ───────────────────────────────────────────────────────
 
 describe('schluesselBisStufe / stufeVon', () => {

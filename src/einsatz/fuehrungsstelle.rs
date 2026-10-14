@@ -421,11 +421,15 @@ async fn load_snap_name(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    name.ok_or_else(|| {
+    let name = name.ok_or_else(|| {
         AppError::UnprocessableEntity(format!(
             "Person {personal_id} ist in diesem Einsatz nicht disponiert"
         ))
-    })
+    })?;
+    // Eine entlassene oder stornierte Kraft leitet nicht (409, LLH-1079).
+    crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, personal_id)
+        .await?;
+    Ok(name)
 }
 
 /// Schreibt den Einsatzleiter und, bei einem fachlichen Wechsel, den Übergabe-Eintrag ins ETB —

@@ -11,6 +11,7 @@ import PersonenPage from './PersonenPage';
 import { queueLeerenFuerTests } from '../offline/queue';
 import { offlineQuittungsKanalZuruecksetzenFuerTests } from '../offline/ereignisse';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { einsatzKeys } from '../api/queryKeys';
 import { FakeEventSource } from '../test/eventSource';
 
 /**
@@ -500,5 +501,71 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
       expect(within(await offenerDialog()).queryByRole('alert')).toBeNull();
       expect(seitenGrund()).toBeNull();
     });
+  });
+});
+
+/**
+ * Die Erfassungszeile gehört ihrem Einsatz (LLH-1154, `frontend/AGENTS.md`, „Rückwege und
+ * Fehler“). Liegt der Kopf von B schon im Cache, zeigt die Seite beim Wechsel kein Skelett, und
+ * eine ungekeyte Zeile bliebe stehen: mit dem in A getippten Text und dem Grund einer Ablehnung,
+ * die erst in B eintrifft.
+ */
+describe('PersonenPage — Erfassungszeile nach dem Einsatzwechsel (LLH-1154)', () => {
+  function Wechsel() {
+    const navigate = useNavigate();
+    return (
+      <button type="button" onClick={() => void navigate('/einsaetze/2/personen')}>
+        Zu Einsatz B
+      </button>
+    );
+  }
+
+  it('die späte Ablehnung aus A steht in B nicht, der Text aus A auch nicht', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    server.use(
+      meHandler(benutzerFixture()),
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json(einsatzFixture({ id: Number(params.eid) })),
+      ),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([basis])),
+      http.get('/api/einsaetze/2/personen', () =>
+        HttpResponse.json([{ ...basis, id: 30, einsatz_id: 2, registrier_nr: 9 }]),
+      ),
+      http.post('/api/einsaetze/1/personen', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return abgelehnt('Sichtung passt nicht zum Status');
+      }),
+    );
+    const { client } = renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/personen' },
+    );
+    // Der Kopf von B liegt schon im Cache (der Test-Client räumt sonst sofort ab, `gcTime: 0`).
+    client.setQueryDefaults(einsatzKeys.einsatz(2), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.einsatz(2), einsatzFixture({ id: 2 }));
+    const feld = () => screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+      'Kowalski sk3{Enter}',
+    );
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await screen.findByText('R-009');
+    expect(feld()).toHaveValue('');
+
+    await act(async () => gibFrei());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+
+    expect(screen.queryByText(/Sichtung passt nicht zum Status/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(feld()).toHaveValue('');
   });
 });

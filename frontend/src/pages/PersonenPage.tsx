@@ -832,7 +832,11 @@ export default function PersonenPage() {
             marginBottom: token.margin,
           }}
         >
+          {/* Je Einsatz eine eigene Zeile (LLH-1154): das Layout keyt sein `Outlet` nicht, und liegt
+              der Kopf von B im Cache, bliebe die Zeile über den Wechsel stehen, samt getipptem Text
+              und dem Grund einer Ablehnung, die erst in B aus A eintrifft. */}
           <BetroffeneZeile
+            key={einsatzId}
             feldRef={feldRef}
             uhsListe={uhsListe}
             laeuft={

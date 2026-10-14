@@ -494,6 +494,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -589,16 +595,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
-            retain("grundzeichen", G_ENUM),
-            retain("organisation", G_ENUM),
-            retain("fachaufgabe", G_ENUM),
-            retain("symbol", G_ENUM),
-            retain("einheit", G_ENUM),
-            retain("funktion", G_ENUM),
-            retain("farbe", G_ENUM),
             // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
             // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
-            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`.
+            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`. Altzeilen
+            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0192 (LLH-1160): Katalog-Kennungen des
+            // Altpakets und eine Hexfarbe, ebenfalls kein Freitext.
             retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
             scrub("label", Strategie::NullSetzen, Z_EINSATZ),
@@ -957,6 +958,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ_id", G_FK),
             retain("name", G_OP_LABEL),
             retain("fuehrer_id", G_FK),
+            // Auflösung (LLH-1079): Zeitpunkt und Benutzer-FK.
+            retain("aufgeloest_at", G_ZEIT),
+            retain("aufgeloest_von", G_FK),
             retain("soll_fuehrer", G_ZAEHLER),
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
@@ -1002,6 +1006,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -1029,6 +1037,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
             retain("uhs_id", G_FK),
         ],
     },

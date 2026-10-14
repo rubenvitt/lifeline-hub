@@ -14,6 +14,7 @@ import {
   abschnittDerObersten,
   besatzungText,
   einheitenBaum,
+  filterAktive,
   needsOhneFahrzeugKnoten,
   fremdText,
   mittelDerEinheit,
@@ -22,6 +23,7 @@ import {
   type PersonImBaum,
   type EinheitKnoten,
 } from './kraeftebaumKern';
+import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -396,7 +398,14 @@ export interface FilterWerte {
   suche: string;
 }
 
-export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
+export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
+  // Zuerst nur aktive Kräfte (LLH-1079): Meldebild, Statusband und Kumulierung zählen keine
+  // Entlassenen, und eine Untereinheit einer aufgelösten Über-Einheit ist ihre eigene oberste.
+  const roh: Rohdaten = {
+    ...alles,
+    einheiten: filterAktive(alles.einheiten),
+    personal: filterAktive(alles.personal),
+  };
   const s = f.suche.trim().toLowerCase();
   const treffer = (txt: (string | null | undefined)[]) =>
     !s || txt.some((t) => t?.toLowerCase().includes(s));
@@ -497,8 +506,15 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
   return zeilen.join('\n');
 }
 
-/** Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. */
-export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): string {
+/**
+ * Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. Entlassene
+ * Kräfte stehen als eigener Block darunter (LLH-1079); `null` heißt „nicht geladen“.
+ */
+export function rendereMeldebildMarkdown(
+  bild: Kraeftebild,
+  stand: string,
+  entlassene: readonly EntlasseneKraft[] | null = [],
+): string {
   const v = bild.verdichtung;
   const zeilen: string[] = [];
 
@@ -540,6 +556,7 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
       zeilen.push('');
     }
   }
+  zeilen.push(...renderEntlasseneMarkdown(entlassene));
 
   return zeilen.join('\n');
 }
@@ -554,12 +571,14 @@ type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
  * Kräfteübersicht, UNGEFILTERT als Bezugswert daneben (die Gesamtstärke darf beim Anwählen
  * eines Abschnitts nicht verschwinden) und in der Verdichtungszeile der Kräfte-Modulseiten.
  * `soll` fehlt bewusst: es kumuliert über den Einheitenbaum und braucht `baueKraeftebild`.
+ * Gezählt wird nur aktives Personal (LLH-1079, Fixture `regeln.json` Abschnitt `kraefte`).
  */
 export function verdichte(
-  personal: EinsatzPersonal[],
+  allesPersonal: EinsatzPersonal[],
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
 ): Kurzverdichtung {
+  const personal = filterAktive(allesPersonal);
   const staerke = leereStaerke();
   const personalStatus = leereVert();
   const fahrzeugStatus = leereVert();
@@ -597,8 +616,8 @@ export function verdichte(
 
 export function baueKraeftebild(
   abschnitte: Einsatzabschnitt[],
-  einheiten: Einheit[],
-  personal: EinsatzPersonal[],
+  alleEinheiten: Einheit[],
+  allesPersonal: EinsatzPersonal[],
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
   /**
@@ -607,6 +626,9 @@ export function baueKraeftebild(
    */
   quelle: Partial<MittelQuelle> = {},
 ): Kraeftebild {
+  // Nur aktive Kräfte (LLH-1079): Entlassene führt der Block „Entlassen“ (`entlassene.ts`).
+  const einheiten = filterAktive(alleEinheiten);
+  const personal = filterAktive(allesPersonal);
   const roh = { einheiten, personal, fahrzeuge, material };
   const mittelVon: MittelVon = (einheitId) => mittelDerEinheit(einheitId, roh, quelle);
 

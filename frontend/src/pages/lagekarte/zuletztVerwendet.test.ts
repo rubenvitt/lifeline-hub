@@ -127,8 +127,8 @@ describe('zuletztVerwendet — Übernahme der alten Leiste (D10)', () => {
       ALT,
       JSON.stringify([
         { grundzeichen: 'person' },
-        // Ohne Nachfolger: nur der Platzhalter, kein Zeichen der Person.
-        { grundzeichen: 'ohne', symbol: 'fernschreiben' },
+        // Unbekanntes Symbol: nur der Platzhalter, kein Zeichen der Person.
+        { grundzeichen: 'ohne', symbol: 'gibt-es-nicht' },
         { farbe: '#000' },
         42,
         { grundzeichen: 'gibt-es-nicht' },

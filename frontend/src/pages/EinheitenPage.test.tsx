@@ -65,7 +65,10 @@ function handlers(
     http.get('/api/einsaetze/1', () =>
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+    // `?aufgeloeste=1` (LLH-1079) liefert getrennt; ohne eigenen Fall gibt es keine aufgelöste.
+    http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('aufgeloeste') ? [] : einheiten),
+    ),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () =>
       HttpResponse.json([
@@ -301,6 +304,50 @@ describe('EinheitenPage', () => {
     expect(within(zeile).getByText('1/0/2//3')).toBeInTheDocument();
     expect(within(zeile).getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  /**
+   * LLH-1079: aufgelöste Einheiten liefert der Server getrennt; sie stehen eingeklappt unter der
+   * Gliederung, ohne Aktion (eine aufgelöste Einheit wird nicht wieder aktiv), und zählen nicht.
+   */
+  it('zeigt aufgelöste Einheiten eingeklappt unter der Gliederung', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('aufgeloeste')
+            ? [
+                {
+                  ...einheiten[0],
+                  id: 99,
+                  name: 'Alter Zug',
+                  aufgeloest_at: '2026-05-26 15:00:00',
+                  aufgeloest_von: 1,
+                },
+              ]
+            : einheiten,
+        ),
+      ),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    const kopf = await screen.findByRole('button', { name: /Aufgelöst \(1\)/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    // Unter der Tabelle, nicht in ihr (LLH-1029): die Gliederung bleibt die Vollmenge der aktiven.
+    const gliederung = screen.getByRole('region', { name: 'Gliederung' });
+    expect(gliederung).not.toContainElement(kopf);
+    expect(
+      gliederung.compareDocumentPosition(kopf) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText(`${einheiten.length} Einheiten`)).toBeInTheDocument();
+    await userEvent.click(kopf);
+    const liste = await screen.findByRole('list', { name: 'Aufgelöst' });
+    expect(within(liste).getByText('Alter Zug')).toBeInTheDocument();
+    expect(within(liste).queryByRole('button')).toBeNull();
   });
 
   describe('Zug mit Gruppe', () => {

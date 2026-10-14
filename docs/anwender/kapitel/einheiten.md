@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs]
 ---
 
 ## Überblick
@@ -78,6 +78,10 @@ Für Einsatzleitung und Führungspersonal:
 2. Im Paneel „Kopfdaten“ „Auflösen“ wählen.
 3. Die Rückfrage „Einheit auflösen?“ mit „Einheit auflösen“ bestätigen. Die Mitglieder werden frei,
    unterstellte Einheiten rücken eine Ebene hoch.
+4. Auf der Seite „Einheiten“ steht die aufgelöste Einheit unter der Gliederung im Block
+   „Aufgelöst“ mit dem Zeitpunkt.
+
+   ![Aufgeklappter Block „Aufgelöst (1)“ unter der Gliederung mit einer Einheit und dem Zeitpunkt der Auflösung](../bilder/einheiten/aufgeloest.png)
 
 ## Hintergrund
 
@@ -116,6 +120,16 @@ Meldebild.
 Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er im Meldebild von Hand
 gesetzt. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Meldebild
 und Kräfte-Zeitachse](meldebild.md)).
+
+### Auflösen
+
+Eine aufgelöste Einheit verschwindet aus Gliederung, Stärke, Statusband, Lagemonitor, Karte und
+Auswahllisten. Ihre Mitglieder bleiben im Einsatz, nur ohne Einheit; eine laufende Ablösung endet,
+ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztagebuch bleibt sie im
+Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
+Einsatzzeiten“ des Einsatzberichts. Eine Einheit ohne jede Spur (keine Mitglieder, keine
+Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
+Meldung, kein Dokument, kein Verteiler) wird beim Auflösen ganz gelöscht. An einer aufgelösten Einheit lässt sich nichts mehr ändern.
 
 ### Einsatztagebuch
 

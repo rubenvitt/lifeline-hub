@@ -16,7 +16,7 @@ import { Routes, Route } from 'react-router';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
-import { listeEinsatzPersonal } from '../api/einsatzPersonal';
+import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -31,6 +31,7 @@ import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte'
 import type {
   Auftrag,
   EinsatzAnzeige,
+  EinsatzPersonal,
   FahrzeugStatus,
   LetzteRueckmeldung,
   Rueckmeldungen,
@@ -40,7 +41,10 @@ dayjs.extend(utc);
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
-vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
+vi.mock('../api/einsatzPersonal', () => ({
+  listeEinsatzPersonal: vi.fn(),
+  listEntlassenesPersonal: vi.fn(),
+}));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
@@ -210,6 +214,7 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeEinheiten).mockResolvedValue([]);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
+  vi.mocked(listEntlassenesPersonal).mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
   vi.mocked(listeEinsatzMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
@@ -1125,6 +1130,38 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(aktualisiereLagebericht)).not.toHaveBeenCalled();
     await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/99'));
+  });
+
+  it('führt Entlassene als Block unter dem Raster und im Lagebericht (LLH-1079)', async () => {
+    vi.mocked(legeLageberichtAn).mockClear();
+    vi.mocked(listEntlassenesPersonal).mockResolvedValue([
+      {
+        id: 7,
+        einsatz_id: 1,
+        einheit_id: null,
+        name: 'Bert Weg',
+        funktion: 'Sanitäter',
+        staerke_position: 'mannschaft',
+        status_kategorie: 'verfuegbar',
+        beendet_at: '2026-10-13 10:00:00',
+        beendet_als: 'entlassen',
+      } as unknown as EinsatzPersonal,
+    ]);
+    setup();
+    expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    await waitFor(() =>
+      expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          abschnitte: [
+            expect.objectContaining({
+              text: expect.stringContaining('## Entlassen\n\n- Bert Weg (Sanitäter)'),
+            }),
+          ],
+        }),
+      ),
+    );
   });
 
   it('zeigt eine gescheiterte Übernahme an der Seite, nicht als Toast', async () => {

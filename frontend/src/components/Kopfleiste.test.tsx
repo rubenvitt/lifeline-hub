@@ -14,6 +14,7 @@ import {
   railBreite,
   syncZustand,
   wortmarkeStil,
+  WortPlatz,
 } from './Kopfleiste';
 
 const LEER = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
@@ -157,6 +158,20 @@ describe('syncZeigtWort — Wort nur, wo es trägt', () => {
   });
   it('ab xl trägt auch der Ruhezustand sein Wort', () => {
     expect(syncZeigtWort('verbunden', false, false)).toBe(true);
+  });
+});
+
+/**
+ * LLH-1158: Der Platz ist erzeugter Inhalt aus `data-platz` (`Kopfleiste.css`), kein Text im DOM.
+ * Ob er die Breite hält, misst `e2e/kopfhoehe-tonpruefung.spec.ts`.
+ */
+describe('WortPlatz — das Wort hält die Breite seines Startworts', () => {
+  it('trägt den Platz als Attribut, der Text bleibt das sichtbare Wort', () => {
+    const { container } = render(<WortPlatz platz="VERBINDE">SYNC</WortPlatz>);
+    const wort = container.querySelector('.kopf-wort-platz');
+    expect(wort).toHaveAttribute('data-platz', 'VERBINDE');
+    expect(wort).toHaveAttribute('aria-hidden', 'true');
+    expect(container.textContent).toBe('SYNC');
   });
 });
 

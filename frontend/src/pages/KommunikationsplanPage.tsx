@@ -16,6 +16,7 @@ import {
   entferneVerbindung,
   ladeKommunikationsplan,
   legeKommunikationsStelleAn,
+  legeKommunikationsStelleEinzelnAn,
   legeVerbindungAn,
 } from '../api/kommunikationsplan';
 import { einsatzKeys } from '../api/queryKeys';
@@ -46,12 +47,14 @@ import {
   StelleAnlegenModal,
   StelleEntfernenRueckfrage,
   VerbindungModal,
+  type StelleVorbelegung,
 } from '../stab/KommunikationsplanDialoge';
 import {
   baueKommunikationsplan,
   brauchtRueckfrage,
   entfernText,
   entfernUmfang,
+  leitstellenVorschlag,
   type KommunikationsGruppe,
   type KommunikationsZeile,
   type VerbindungsAnzeige,
@@ -61,6 +64,7 @@ import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreig
 import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import './kommunikationsplanPrint.css';
 
 /**
@@ -84,6 +88,9 @@ import './kommunikationsplanPrint.css';
  *   Kanäle einer externen Stelle stehen als Nebentext (gepflegt in der Skizze); die Verbindungen
  *   der Skizze sind eine eigene Quelle mit Weiche. Sie belegen die Leitstelle als verbunden
  *   (`leitstelleOhneVerbindung`) und zählen in der Rückfrage beim Entfernen mit.
+ * - **Katalog „Externe Stellen“** (LLH-1165): „Stelle hinzufügen“ schlägt die aktiven Stellen vor
+ *   und übernimmt Bezeichnung und Rufnummer als Text; fehlt dem Plan jede Leitstelle, bietet die
+ *   Lücke die zuständige Leitstelle an. Ohne Katalog bleibt alles Freitext.
  */
 
 /** Eine Zeile der Tabelle: ein Gruppenknoten oder eine Stelle darunter. */
@@ -297,7 +304,7 @@ function planSpalten(
 }
 
 type Dialog =
-  | { art: 'stelle' }
+  | { art: 'stelle'; vorbelegung?: StelleVorbelegung }
   | { art: 'verbindung'; stelle: KommunikationsStelle; kennung: string; basis?: VerbindungsAnzeige }
   | { art: 'bezeichnung'; stelle: KommunikationsStelle; kennung: string }
   | { art: 'entfernen'; stelle: KommunikationsStelle; text: string };
@@ -412,6 +419,15 @@ export default function KommunikationsplanPage() {
     () => leitstelleOhneVerbindung(stellen, skizzenVerbindungen),
     [stellen, skizzenVerbindungen],
   );
+  // Katalog „Externe Stellen“ (LLH-1165): nur Komfort. Fehlt er, fehlt der Vorschlag, nicht mehr.
+  const externeStellen = useExterneStellen();
+  const vorschlag = useMemo(
+    () =>
+      luecke.fehlt && stellen.zustand === 'daten'
+        ? leitstellenVorschlag(stellen.daten, externeStellen.data ?? [])
+        : undefined,
+    [luecke.fehlt, stellen, externeStellen.data],
+  );
   const zeilen: PlanZeile[] = useMemo(
     () =>
       plan.map((g) => ({
@@ -439,9 +455,31 @@ export default function KommunikationsplanPage() {
   const mitAntwort = {
     onSuccess: (neu: KommunikationsStelle[]) => queryClient.setQueryData(planKey, neu),
   };
+  // Die Rufnummer aus dem Katalog (LLH-1165) wird die erste Verbindung der neuen Stelle. Scheitert
+  // nur sie, steht die Stelle schon: die Maske schließt (ein zweites „Anlegen“ gäbe eine Dublette),
+  // und der Grund steht über dem Plan.
+  const [rufnummerFehler, setRufnummerFehler] = useState<unknown>(null);
   const stelleAnlegen = useMutation({
-    mutationFn: (body: NeueKommunikationsStelle) => legeKommunikationsStelleAn(einsatzId, body),
-    ...mitAntwort,
+    mutationFn: async ({
+      body,
+      verbindung,
+    }: {
+      body: NeueKommunikationsStelle;
+      verbindung?: NeueVerbindung;
+    }): Promise<KommunikationsStelle[] | undefined> => {
+      if (!verbindung) return legeKommunikationsStelleAn(einsatzId, body);
+      const stelle = await legeKommunikationsStelleEinzelnAn(einsatzId, body);
+      try {
+        return await legeVerbindungAn(einsatzId, stelle.id, verbindung);
+      } catch (e) {
+        setRufnummerFehler(e);
+        await queryClient.invalidateQueries({ queryKey: planKey });
+        return undefined;
+      }
+    },
+    onSuccess: (neu) => {
+      if (neu) queryClient.setQueryData(planKey, neu);
+    },
   });
   const umbenennen = useMutation({
     mutationFn: ({ sid, bezeichnung }: { sid: number; bezeichnung: string }) =>
@@ -472,6 +510,7 @@ export default function KommunikationsplanPage() {
   });
   const oeffne = (d: Dialog) => {
     for (const m of [stelleAnlegen, umbenennen, verbindungAnlegen, verbindungAendern]) m.reset();
+    setRufnummerFehler(null);
     setDialog(d);
   };
 
@@ -600,7 +639,28 @@ export default function KommunikationsplanPage() {
             <PaneelZeile style={{ borderBlockEnd: 'none' }}>
               <Flex wrap align="baseline" gap={token.marginXS} data-lfh="kommunikationsplan-luecke">
                 {luecke.zustand === 'daten' ? (
-                  <span>Leitstelle: keine Verbindung erfasst</span>
+                  <>
+                    <span>Leitstelle: keine Verbindung erfasst</span>
+                    {vorschlag && darfSchreiben && (
+                      <Button
+                        className="kommunikationsplan-no-print"
+                        disabled={ohneVerbindung}
+                        title={sperrGrund}
+                        onClick={() =>
+                          oeffne({
+                            art: 'stelle',
+                            vorbelegung: {
+                              stellenart: 'leitstelle',
+                              bezeichnung: vorschlag.bezeichnung,
+                              rufnummer: vorschlag.rufnummer ?? '',
+                            },
+                          })
+                        }
+                      >
+                        {`${vorschlag.bezeichnung} hinzufügen`}
+                      </Button>
+                    )}
+                  </>
                 ) : (
                   <>
                     <span>Leitstelle</span>
@@ -625,6 +685,11 @@ export default function KommunikationsplanPage() {
         >
           <DruckKnopf />
         </Space>
+        {rufnummerFehler != null && (
+          <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
+            <SpeicherFehler fehler={rufnummerFehler} titel="Rufnummer nicht übernommen" />
+          </div>
+        )}
         {entfernFehler != null && (
           <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
             <SpeicherFehler fehler={entfernFehler} titel="Nicht entfernt" />
@@ -664,9 +729,10 @@ export default function KommunikationsplanPage() {
       {dialog?.art === 'stelle' && (
         <StelleAnlegenModal
           stellen={stellen.daten}
+          vorbelegung={dialog.vorbelegung}
           laeuft={stelleAnlegen.isPending}
           fehler={stelleAnlegen.error}
-          onAnlegen={(body) => stelleAnlegen.mutateAsync(body)}
+          onAnlegen={(body, verbindung) => stelleAnlegen.mutateAsync({ body, verbindung })}
           onSchliessen={schliessen}
         />
       )}

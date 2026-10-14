@@ -7,11 +7,12 @@
 use lifeline_hub::auftrag::AuftragBearbeitungsstatus;
 use lifeline_hub::einheit::repo::kumuliere;
 use lifeline_hub::einsatz::zaehler::{
-    zaehle_auftraege, zaehle_meldungen, AuftragsMerkmale, AuftragsZaehler, MeldungsMerkmale,
-    MeldungsZaehler,
+    count_kraefte, zaehle_auftraege, zaehle_meldungen, AuftragsMerkmale, AuftragsZaehler,
+    KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
 };
+use lifeline_hub::entlassung::BeendetAls;
 use lifeline_hub::meldung::MeldungStatus;
-use lifeline_hub::staerke::Staerke;
+use lifeline_hub::staerke::{Staerke, StaerkePosition};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -144,4 +145,32 @@ fn ist_kumuliert_wie_das_fixture() {
             "ist_kumuliert der Einheit {id}"
         );
     }
+}
+
+#[test]
+fn kraefte_zaehlen_nur_aktive_wie_das_fixture() {
+    let fx = fixture();
+    let k = &fx["kraefte"];
+    let merkmale: Vec<KraftMerkmale> = k["personal"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| KraftMerkmale {
+            staerke_position: p["staerke_position"]
+                .as_str()
+                .map(|s| StaerkePosition::parse(s).expect("bekannte Position")),
+            beendet: p["beendet_als"].as_str().is_some_and(|s| {
+                BeendetAls::parse(s).expect("bekannter Endzustand");
+                true
+            }),
+        })
+        .collect();
+    let e = &k["erwartet"];
+    assert_eq!(
+        count_kraefte(&merkmale),
+        KraefteZaehler {
+            personal: zahl(&e["personal"]),
+            staerke: staerke(&e["staerke"]),
+        }
+    );
 }

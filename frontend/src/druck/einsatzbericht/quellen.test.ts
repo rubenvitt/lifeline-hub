@@ -34,11 +34,17 @@ describe('QUELLEN', () => {
   it('die Anlagen schöpfen aus der Kräfte-Zeitachse (LFH-902, design.md D2)', () => {
     const quellenVon = (b: string) =>
       QUELLEN.filter((q) => q.bloecke.includes(b as never)).map((q) => q.schluessel);
-    expect(quellenVon('einheiten-zeiten')).toEqual(['einsatz', 'einheiten', 'einheitenPerioden']);
+    expect(quellenVon('einheiten-zeiten')).toEqual([
+      'einsatz',
+      'einheiten',
+      'einheitenAufgeloest',
+      'einheitenPerioden',
+    ]);
     expect(quellenVon('personal-kopf')).toEqual([
       'einsatz',
       'einheiten',
       'personal',
+      'personalEntlassen',
       'personalPerioden',
     ]);
   });
@@ -60,8 +66,18 @@ describe('QUELLEN', () => {
 
 describe('berichtFreigabe', () => {
   it('ruft bei freien Modulen jede Quelle ab', () => {
-    const f = berichtFreigabe(freigabenFixture());
+    const f = berichtFreigabe(
+      freigabenFixture(),
+      BLOECKE.map((b) => b.schluessel),
+    );
     expect(Object.values(f.je).every((z) => z === 'abrufen')).toBe(true);
+    expect(f.gesperrteModule).toEqual([]);
+  });
+
+  it('der Standardumfang ruft jede Quelle ab außer der nur für die Einheiten-Anlage', () => {
+    const f = berichtFreigabe(freigabenFixture());
+    const nicht = Object.entries(f.je).filter(([, z]) => z !== 'abrufen');
+    expect(nicht).toEqual([['einheitenAufgeloest', 'nicht-gewaehlt']]);
     expect(f.gesperrteModule).toEqual([]);
   });
 
@@ -143,7 +159,13 @@ describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
     const abgerufen = QUELLEN.filter((q) => f.je[q.schluessel] === 'abrufen').map(
       (q) => q.schluessel,
     );
-    expect(abgerufen).toEqual(['einsatz', 'einheiten', 'personal', 'personalPerioden']);
+    expect(abgerufen).toEqual([
+      'einsatz',
+      'einheiten',
+      'personal',
+      'personalEntlassen',
+      'personalPerioden',
+    ]);
   });
 
   it('der Einsatz wird bei jeder Auswahl abgerufen', () => {

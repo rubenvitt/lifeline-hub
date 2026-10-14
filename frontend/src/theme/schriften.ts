@@ -6,7 +6,7 @@
 
    Alle vier Familien stehen unter SIL OFL 1.1; Herkunft und Lizenztexte in
    `src/assets/fonts/LIESMICH.md` bzw. `src/assets/fonts/lizenzen/`.
-   Gesamtbudget 155,5 KB in 9 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
+   Gesamtbudget 164,7 KB in 9 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
    Archivo 600 und JetBrains Mono 500 kamen mit dem Neuentwurf „Instrumententafel"
    (21.09.2026) dazu: Seitentitel/Augenbraue tragen 600, Datenwerte Mono 500.
 
@@ -14,10 +14,12 @@
      LFH Archivo         Fließtext, Formulare, Listen
      LFH Archivo Narrow  Köpfe und Sektionsmarken — kartografisch, schmal
      LFH JetBrains Mono  alle fachlichen Zahlen (Stärke, DTG, Koordinaten, Nummern)
-     Arimo               Text in taktischen Zeichen (LFH-1033): Bedingungszeichen der
+     Einsatzzeichen Sans Text in taktischen Zeichen (LFH-1033): Bedingungszeichen der
                          Fernmeldeskizze und Kürzel der Katalogzeichen. Die Datei kommt aus
                          `@einsatzzeichen/core/fonts`, damit sie zu den Metriken passt, an
-                         denen das Paket Breiten misst; sie wandert mit jedem Update mit.
+                         denen das Paket Breiten misst; sie wandert mit jedem Update mit. Der
+                         Familienname ist der, den die Renderer schreiben
+                         (`TEXT_FONT_FAMILY_ATTR`; bis Paket 5.x hieß sie Arimo, LLH-1159).
 
    Angemeldet über die FontFace-API, nicht per `@font-face` (LFH-1108, `druck/AGENTS.md`,
    Schriften im Druck).
@@ -33,7 +35,8 @@ import archivoNarrow600 from '../assets/fonts/archivo-narrow-600.woff2';
 import jetbrainsMono400 from '../assets/fonts/jetbrains-mono-400.woff2';
 import jetbrainsMono500 from '../assets/fonts/jetbrains-mono-500.woff2';
 import jetbrainsMono600 from '../assets/fonts/jetbrains-mono-600.woff2';
-import arimo500 from '@einsatzzeichen/core/fonts/text-medium.woff2';
+import { TEXT_FONT_FAMILY_ATTR } from '@einsatzzeichen/core';
+import zeichenText500 from '@einsatzzeichen/core/fonts/text-medium.woff2';
 
 /** Ein Schnitt einer Schriftrolle: Familie, Gewicht und Adresse der woff2. */
 export interface Schriftschnitt {
@@ -51,7 +54,7 @@ export const SCHRIFTSCHNITTE: readonly Schriftschnitt[] = [
   { familie: 'LFH JetBrains Mono', gewicht: 400, datei: jetbrainsMono400 },
   { familie: 'LFH JetBrains Mono', gewicht: 500, datei: jetbrainsMono500 },
   { familie: 'LFH JetBrains Mono', gewicht: 600, datei: jetbrainsMono600 },
-  { familie: 'Arimo', gewicht: 500, datei: arimo500 },
+  { familie: TEXT_FONT_FAMILY_ATTR, gewicht: 500, datei: zeichenText500 },
 ];
 
 /**

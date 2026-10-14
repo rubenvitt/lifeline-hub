@@ -73,6 +73,7 @@ describe('Wörter', () => {
     expect(ankerText('alarmierung', '06:10')).toBe('seit Alarmierung 06:10');
     expect(HERKUNFT_WORT.einheit).toBe('über Einheit');
     expect(HERKUNFT_WORT.nachtrag).toBe('nachgetragen');
+    expect(HERKUNFT_WORT.disposition).toBe('aus dem Einsatz entlassen');
   });
 
   it('Ablösung lässt sich nicht nachtragen', () => {

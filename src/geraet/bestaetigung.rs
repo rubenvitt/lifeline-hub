@@ -45,16 +45,20 @@ pub async fn aufloesen(
             "Eine Bestätigung gibt es nur an einem gekoppelten Gerät".into(),
         ));
     }
-    let name: Option<String> = sqlx::query_scalar(
-        "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    let zeile: Option<(String, Option<String>)> = sqlx::query_as(
+        "SELECT snap_name, beendet_als FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
     )
     .bind(personal_id)
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?;
-    let name = name.ok_or_else(|| {
+    let (name, ende) = zeile.ok_or_else(|| {
         AppError::UnprocessableEntity("Die bestätigende Person gehört nicht zum Einsatz".into())
     })?;
+    // Eine entlassene oder stornierte Kraft bestätigt nichts mehr (409, LLH-1079).
+    if let Some(als) = ende {
+        return Err(crate::personal::disposition_repo::beendet_conflict(&als));
+    }
     Ok(Some(Bestaetigung { personal_id, name }))
 }
 
@@ -62,7 +66,7 @@ pub async fn aufloesen(
 pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Bestaetiger>, AppError> {
     Ok(sqlx::query_as::<_, Bestaetiger>(
         "SELECT id, snap_name AS name, snap_funktion AS funktion FROM einsatz_personal \
-         WHERE einsatz_id = ? ORDER BY snap_name COLLATE NOCASE, id",
+         WHERE einsatz_id = ? AND beendet_at IS NULL ORDER BY snap_name COLLATE NOCASE, id",
     )
     .bind(einsatz_id)
     .fetch_all(pool)

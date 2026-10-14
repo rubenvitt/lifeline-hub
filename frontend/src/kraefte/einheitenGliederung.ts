@@ -4,6 +4,7 @@ import {
   COLLATOR,
   einheitStaerkeUrteilVon,
   einheitenBaum,
+  filterAktive,
   type EinheitKnoten,
 } from './kraeftebaumKern';
 import type { TzEinheit } from './meldebildRaster';
@@ -79,5 +80,8 @@ export function buildEinheitenGliederung(
       ...(kinder.length > 0 ? { children: kinder } : {}),
     };
   };
-  return einheitenBaum(einheiten, abschnitte).map(zeile);
+  // Nur aktive Einheiten wie im Meldebild (LLH-1079, `filterAktive`): der Server liefert schon
+  // gefiltert; eine aufgelöste steht im Block „Aufgelöst“ unter der Tabelle, ihre Untereinheit
+  // wird Wurzel.
+  return einheitenBaum(filterAktive(einheiten), abschnitte).map(zeile);
 }

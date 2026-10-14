@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { TableColumnsType, TableProps } from 'antd';
@@ -12,14 +12,16 @@ import KatalogTabelle, {
   BLAETTER_SCHWELLE,
   KOPF_FREIRAUM,
   SPALTEN_FREIRAUM,
+  filterKopfStil,
   fliessBreite,
   setzeKopfFreiraum,
   tabellenTokens,
   type KatalogSpalte,
   suchfeldStil,
   SUCHFELD_TEXT_MAX,
+  werkzeugAbstand,
 } from './KatalogTabelle';
-import { farbenDunkel, farbenHell } from '../theme/tokens';
+import { dichten, farbenDunkel, farbenHell } from '../theme/tokens';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -1066,5 +1068,110 @@ describe('suchfeldStil', () => {
     const kompakt = suchfeldStil('x', false, token);
     const handschuh = suchfeldStil('x', false, { controlHeight: 72, paddingSM: 16, fontSize: 18 });
     expect(kompakt.width).not.toEqual(handschuh.width);
+  });
+});
+
+/**
+ * Kopfwerkzeuge im Handschuh-Betrieb (LLH-1227). Die Böden stehen als LITERALE, aus `dichten`
+ * gelesen prüfte der Test den Token gegen sich selbst. Ob Abstand und Trefffläche im Layout
+ * ankommen, misst `e2e/katalogtabelle-kopf-dichte.spec.ts` (jsdom rechnet kein CSS).
+ */
+describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
+  const stufe = (s: keyof typeof dichten) => ({
+    paddingSM: dichten[s].abstand.sm,
+    controlHeightSM: dichten[s].kleineZeilenhoehe,
+  });
+
+  it('Werkzeugzeile: ≥ 8 px in komfortabel, ≥ 16 px im Handschuh', () => {
+    expect(werkzeugAbstand(stufe('komfortabel'))).toBeGreaterThanOrEqual(8);
+    expect(werkzeugAbstand(stufe('handschuh'))).toBeGreaterThanOrEqual(16);
+  });
+
+  it('Filter-Auslöser: Boden 24 / 48 / 72 px als Variable', () => {
+    const ziel = (s: keyof typeof dichten) =>
+      (filterKopfStil(stufe(s)) as Record<string, unknown>)['--lfh-filter-ziel'];
+    expect(ziel('kompakt')).toBe('24px');
+    expect(ziel('komfortabel')).toBe('48px');
+    expect(ziel('handschuh')).toBe('72px');
+  });
+
+  it('setzt die Variablen an der Tabellenwurzel und behält ein übergebenes style', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[...SPALTEN]}
+        dataSource={ZEILEN}
+        style={{ marginTop: 3 }}
+      />,
+    );
+    const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.lfh-katalog')!;
+    expect(wurzel.style.getPropertyValue('--lfh-filter-ziel')).toMatch(/^\d+px$/);
+    expect(wurzel.style.marginTop).toBe('3px');
+  });
+
+  const ZWEI: Zeile[] = [
+    { id: 1, funkrufname: 'Rotkreuz 2/83/1', typ: 'GW-San' },
+    { id: 2, funkrufname: 'Florian 1/44/1', typ: 'LF' },
+  ];
+  const mitFilter = (): KatalogSpalte<Zeile>[] => [
+    { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
+    {
+      title: 'Typ',
+      dataIndex: 'typ',
+      key: 'typ',
+      // Sortierbar UND filterbar: Enter am Auslöser darf die Kopfzelle nicht mitsortieren.
+      // Absteigend verglichen, damit schon der erste Sortierschritt die Reihenfolge dreht.
+      sorter: (a, b) => b.typ.localeCompare(a.typ),
+      filters: [{ text: 'Löschfahrzeug', value: 'LF' }],
+      onFilter: (w, z) => z.typ === w,
+    },
+  ];
+  const offenesMenue = () =>
+    document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) .ant-table-filter-dropdown');
+
+  it('der Auslöser steht in der Tab-Folge und nennt die Spalte, gefiltert als Wort', async () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile> rowKey="id" columns={mitFilter()} dataSource={ZWEI} />,
+    );
+    const ausloeser = () =>
+      container.querySelector<HTMLElement>('thead .ant-table-filter-trigger')!;
+    expect(ausloeser().tabIndex).toBe(0);
+    expect(ausloeser()).toHaveAccessibleName('Typ filtern');
+    // Die stumme Kopie in der Messzeile bleibt draußen.
+    for (const kopie of container.querySelectorAll<HTMLElement>(
+      'tbody .ant-table-filter-trigger',
+    )) {
+      expect(kopie.tabIndex).toBe(-1);
+    }
+
+    await userEvent.click(ausloeser());
+    await userEvent.click(await screen.findByText('Löschfahrzeug'));
+    await userEvent.click(
+      document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
+    );
+    await waitFor(() => expect(ausloeser()).toHaveAccessibleName('Typ filtern, gefiltert'));
+  });
+
+  /**
+   * Per `fireEvent` mit `keyCode`: antds Kopfzelle sortiert nur auf den alten `keyCode` 13, den
+   * `userEvent.keyboard` hier nicht setzt; ohne ihn bliebe die Mutationsprobe (Hörer hält das
+   * Ereignis nicht an) grün.
+   */
+  it.each([
+    ['Enter', { key: 'Enter', keyCode: 13 }],
+    ['Leertaste', { key: ' ', keyCode: 32 }],
+  ])('%s öffnet das Filtermenü, ohne die Kopfzelle zu sortieren', async (_name, taste) => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile> rowKey="id" columns={mitFilter()} dataSource={ZWEI} />,
+    );
+    const namen = () =>
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+    const vorher = namen();
+    const ausloeser = container.querySelector<HTMLElement>('thead .ant-table-filter-trigger')!;
+    ausloeser.focus();
+    fireEvent.keyDown(ausloeser, taste);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    expect(namen()).toEqual(vorher);
+    expect(container.querySelector('th[aria-sort]')).toBeNull();
   });
 });

@@ -172,6 +172,12 @@ pub struct EinheitAnzeige {
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
     /// Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus.
     pub status: EinheitStatus,
+    /// Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur
+    /// `GET …/einheiten?aufgeloeste=1` liefert aufgelöste.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aufgeloest_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aufgeloest_von: Option<i64>,
 }
 
 #[cfg(test)]
@@ -213,6 +219,16 @@ pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
 }
 
+/// System-ETB beim Auflösen einer Einheit (LLH-1079).
+pub fn etb_text_aufgeloest(name: &str) -> String {
+    format!("Einheit «{}» aufgelöst", name)
+}
+
+/// System-ETB beim Stornieren einer fehlerhaft angelegten Einheit (LLH-1079, design.md D3).
+pub fn etb_text_storniert(name: &str) -> String {
+    format!("Einheit «{}» storniert (Fehlanlage)", name)
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -231,6 +247,15 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_personal_zugeordnet("1. Zug", "Erika Muster"),
             "Einheit «1. Zug»: «Erika Muster» zugeordnet"
+        );
+    }
+
+    #[test]
+    fn aufgeloest_und_storniert() {
+        assert_eq!(etb_text_aufgeloest("1. Zug"), "Einheit «1. Zug» aufgelöst");
+        assert_eq!(
+            etb_text_storniert("1. Zug"),
+            "Einheit «1. Zug» storniert (Fehlanlage)"
         );
     }
 }

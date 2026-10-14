@@ -101,6 +101,7 @@ export const HERKUNFT_WORT: Record<ZeitachseQuelle, string> = {
   einheit: 'über Einheit',
   abloesung: 'aus Ablösung',
   nachtrag: 'nachgetragen',
+  disposition: 'aus dem Einsatz entlassen',
 };
 
 /** Arten, die sich von Hand nachtragen lassen — die Ablösung entsteht nur aus dem Vollzug. */

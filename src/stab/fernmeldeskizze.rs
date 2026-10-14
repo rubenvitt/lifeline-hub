@@ -308,7 +308,7 @@ impl Element {
 
 /// Prüft, dass das Element im Einsatz besteht; sonst 422 (Bezug außerhalb des Einsatzes).
 /// Eine Funktion des Kommunikationsplans ist keine Stelle der Skizze (D2).
-async fn pruefe_im_einsatz(
+async fn check_im_einsatz(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     element: Element,
@@ -348,6 +348,11 @@ async fn pruefe_im_einsatz(
             "'{}' gehört nicht zu diesem Einsatz",
             element.schluessel()
         )));
+    }
+    // Eine aufgelöste Einheit steht in keiner Skizze mehr (409, LLH-1079; `vergiss` räumt ihre
+    // Bezüge beim Auflösen).
+    if let Element::Einheit(id) = element {
+        crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, id).await?;
     }
     Ok(())
 }
@@ -629,7 +634,7 @@ pub async fn lage_setzen(
     let schluessel = element.schluessel();
     write_retry!(pool, |conn| {
         fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        pruefe_im_einsatz(conn, einsatz_id, element).await?;
+        check_im_einsatz(conn, einsatz_id, element).await?;
         if !matches!(element, Element::Sprechgruppe(_)) && matches!(eingabe.breite, Some(Some(_))) {
             return Err(AppError::UnprocessableEntity(
                 "breite gibt es nur bei Schienen (sg-…)".into(),
@@ -968,8 +973,8 @@ pub async fn verbindung_anlegen(
     }
     write_retry!(pool, |conn| {
         fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        pruefe_im_einsatz(conn, einsatz_id, eingabe.von).await?;
-        pruefe_im_einsatz(conn, einsatz_id, eingabe.nach).await?;
+        check_im_einsatz(conn, einsatz_id, eingabe.von).await?;
+        check_im_einsatz(conn, einsatz_id, eingabe.nach).await?;
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO fernmeldeskizze_verbindung \
                 (einsatz_id, von_art, von_id, nach_art, nach_id, art, medium, status, verkehr, \
@@ -1290,7 +1295,7 @@ mod tests {
                 "src/einsatzabschnitt/repo.rs",
                 "aufloesen_tx",
             ),
-            ("einsatz_einheit", "src/einheit/repo.rs", "loese_auf_tx"),
+            ("einsatz_einheit", "src/einheit/repo.rs", "aufloesen_tx"),
             (
                 "einsatz_kommunikation_stelle",
                 "src/stab/kommunikation.rs",
@@ -1318,11 +1323,39 @@ mod tests {
                  stab::fernmeldeskizze::vergiss im selben Transaktionsschritt"
             );
         }
-        // 2. Es gibt keinen weiteren Löschpfad im Produktivcode.
+        // 1b. Ein Element, das weich endet (LLH-1079: die aufgelöste Einheit bleibt als Zeile
+        //     stehen), verschwindet ebenso aus der Skizze: der Pfad, der den Endzustand setzt,
+        //     vergisst im selben Rumpf.
+        const WEICHE_ENDEN: &[(&str, &str, &str)] =
+            &[("SET aufgeloest_at", "src/einheit/repo.rs", "aufloesen_tx")];
+        for (muster, datei, funktion) in WEICHE_ENDEN {
+            let quelle = std::fs::read_to_string(wurzel.join(datei)).unwrap();
+            let rumpf = funktionsrumpf(&quelle, funktion)
+                .unwrap_or_else(|| panic!("{datei}: fn {funktion} fehlt"));
+            assert!(
+                rumpf.contains(muster),
+                "{datei}::{funktion} setzt «{muster}» nicht (mehr) — Liste nachziehen"
+            );
+            assert!(
+                rumpf.contains("vergiss("),
+                "{datei}::{funktion} beendet ein Skizzen-Element weich, ruft aber nicht \
+                 stab::fernmeldeskizze::vergiss im selben Transaktionsschritt"
+            );
+        }
+        // 2. Es gibt keinen weiteren Lösch- oder Endpfad im Produktivcode.
         let mut funde = Vec::new();
         sammle(&wurzel.join("src"), &mut funde);
         for (pfad, quelle) in funde {
             let produktiv = quelle.split("#[cfg(test)]").next().unwrap_or("");
+            for (muster, datei, _) in WEICHE_ENDEN {
+                let anzahl = produktiv.matches(muster).count();
+                let gelistet = usize::from(pfad.ends_with(datei));
+                assert!(
+                    anzahl <= gelistet,
+                    "{pfad} setzt «{muster}» an {anzahl} Stelle(n), gelistet sind {gelistet}: \
+                     neuen Endpfad mit vergiss() versehen und hier eintragen"
+                );
+            }
             for (tabelle, _, _) in LOESCHPFADE {
                 let muster = format!("DELETE FROM {tabelle} ");
                 let anzahl = produktiv.matches(&muster).count();

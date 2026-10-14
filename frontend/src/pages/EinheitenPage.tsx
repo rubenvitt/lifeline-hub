@@ -17,7 +17,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheitTypen } from '../api/einheitTypen';
-import { bildeEinheit, listeEinheiten } from '../api/einheiten';
+import { bildeEinheit, listAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { staerkeText } from '../anzeige/staerke';
@@ -159,6 +160,13 @@ export default function EinheitenPage() {
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+  });
+  // Aufgelöste Einheiten (LLH-1079): getrennt geliefert, die Gliederung und ihre Zahl kennen sie
+  // nicht. Eine aufgelöste Einheit wird nicht wieder aktiv (design.md D5), der Block hat keine
+  // Aktion.
+  const aufgeloesteQuery = useQuery({
+    queryKey: einsatzKeys.einheitenAufgeloeste(einsatzId),
+    queryFn: () => listAufgeloesteEinheiten(einsatzId),
   });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
@@ -318,6 +326,19 @@ export default function EinheitenPage() {
           />
         </>
       )}
+
+      {/* Unter der Tabelle, wie bei Personal; außerhalb der Zustände, damit er auch steht, wenn
+          keine Einheit mehr aktiv ist. Ohne Einträge zeichnet er nichts. */}
+      <EntlassenBlock
+        titel="Aufgelöst"
+        endeWort="aufgelöst"
+        eintraege={(aufgeloesteQuery.data ?? []).map((e) => ({
+          id: e.id,
+          name: e.name,
+          zusatz: e.typ_label,
+          beendetAt: e.aufgeloest_at,
+        }))}
+      />
 
       {/* Zwei Felder; der Rest der Kopfdaten lebt auf der Detailansicht. Der Dialog setzt auf
           allen Auswegen selbst zurück. */}

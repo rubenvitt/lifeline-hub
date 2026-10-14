@@ -60,5 +60,22 @@
       { "name": "nur Enkel G", "einheiten": [6], "erwartet": [0, 0, 1] },
       { "name": "leer", "einheiten": [], "erwartet": null }
     ]
+  },
+  "kraefte": {
+    "_regel": "LLH-1079: Gezählt werden nur aktive Kräfte. Eine entlassene oder stornierte Personalzeile (beendet_als gesetzt) zählt weder im Personal noch in der Stärke. Eine aktive Kraft ohne Position fehlt hier bewusst: Lagemonitor und Meldebild zählen sie verschieden (gar nicht bzw. als Mannschaft). Eine aufgelöste Einheit trägt nichts zur Stärke bei. Die Listen liefert der Server schon gefiltert (beendete getrennt über ?entlassene=1 und ?aufgeloeste=1); die beendeten Zeilen hier sichern, dass ein ungefilterter Aufrufer trotzdem richtig zählt. Stärken als [F, UF, M].",
+    "personal": [
+      { "name": "Führer, aktiv", "staerke_position": "fuehrer", "beendet_als": null },
+      { "name": "Mannschaft, aktiv", "staerke_position": "mannschaft", "beendet_als": null },
+      { "name": "Unterführer, entlassen", "staerke_position": "unterfuehrer", "beendet_als": "entlassen" },
+      { "name": "Mannschaft, storniert", "staerke_position": "mannschaft", "beendet_als": "storniert" },
+      { "name": "ohne Position, entlassen", "staerke_position": null, "beendet_als": "entlassen" }
+    ],
+    "erwartet": { "personal": 2, "staerke": [1, 0, 1] },
+    "einheiten": [
+      { "id": 1, "name": "aktiv", "ueber_einheit_id": null, "aufgeloest": false, "ist_kumuliert": [1, 1, 3] },
+      { "id": 2, "name": "aufgelöst", "ueber_einheit_id": null, "aufgeloest": true, "ist_kumuliert": [0, 1, 2] },
+      { "id": 3, "name": "aktiv, der aufgelösten unterstellt", "ueber_einheit_id": 2, "aufgeloest": false, "ist_kumuliert": [0, 0, 1] }
+    ],
+    "erwartet_einheiten": [1, 1, 4]
   }
 }

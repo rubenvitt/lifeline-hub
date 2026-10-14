@@ -2561,8 +2561,8 @@ mod tests {
         // LFH-997: das Bild der Lagekarte fällt mit `anhaenge`, ein Zeichen der Lagekarte bleibt.
         bild_mit_bytes(&pool, e, &BILD_KLARTEXT.repeat(1000)).await;
         sqlx::query(
-            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
-             VALUES (?, 50.1, 8.6, 'stelle', 'ELW', ?)",
+            r#"INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von)
+               VALUES (?, 50.1, 8.6, '{"v":1,"spec":{"kind":"circle-12"}}', 'ELW', ?)"#,
         )
         .bind(e)
         .bind(b)
@@ -2638,8 +2638,8 @@ mod tests {
             .unwrap();
         bild_mit_namen(pool, e, SNAPSHOT_BILDNAME, &BILD_KLARTEXT.repeat(10)).await;
         sqlx::query(
-            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
-             VALUES (?, 50.1, 8.6, 'stelle', 'ELW', ?)",
+            r#"INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von)
+               VALUES (?, 50.1, 8.6, '{"v":1,"spec":{"kind":"circle-12"}}', 'ELW', ?)"#,
         )
         .bind(e)
         .bind(b)

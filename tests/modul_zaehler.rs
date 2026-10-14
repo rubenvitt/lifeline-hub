@@ -693,3 +693,63 @@ async fn einsatzfuehrung_zaehlt_fuer_die_einsatzleitung() {
     let v = zaehler(&app, &erika, einsatz).await;
     assert!(!v.as_object().unwrap().contains_key("personen"), "{v:?}");
 }
+
+/// LLH-1079: Eine aufgelöste Einheit zählt nicht mehr; der Zähler bleibt gleich der Liste.
+#[tokio::test]
+async fn aufgeloeste_einheit_zaehlt_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    post(
+        &app,
+        &admin,
+        &format!("{basis}/einheiten"),
+        r#"{"name":"1. Zug"}"#,
+    )
+    .await;
+    let zweiter = post(
+        &app,
+        &admin,
+        &format!("{basis}/einheiten"),
+        r#"{"name":"2. Zug"}"#,
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    // Ein Mitglied ist Spur: die Einheit bleibt als aufgelöste Zeile stehen.
+    let kraft = post(
+        &app,
+        &admin,
+        &format!("{basis}/personal"),
+        r#"{"adhoc":{"name":"Anna"}}"#,
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("{basis}/einheiten/{zweiter}/personal/{kraft}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "zuordnen: {s} {v:?}");
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{basis}/einheiten/{zweiter}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "auflösen: {s} {v:?}");
+    let aufgeloeste = get(&app, &admin, &format!("{basis}/einheiten?aufgeloeste=1")).await;
+    assert_eq!(aufgeloeste.as_array().unwrap().len(), 1, "{aufgeloeste:?}");
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["einheiten"]["gesamt"].as_i64(), Some(1), "{v:?}");
+    let liste = get(&app, &admin, &format!("{basis}/einheiten")).await;
+    assert_eq!(liste.as_array().unwrap().len(), 1, "{liste:?}");
+}

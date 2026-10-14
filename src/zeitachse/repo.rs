@@ -138,7 +138,8 @@ pub async fn schreibe_tx(
     if let (Kraft::Einheit(einheit_id), Schreibergebnis::Geschrieben(ursprung)) = (kraft, &ergebnis)
     {
         let personen: Vec<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND einheit_id = ? ORDER BY id",
+            "SELECT id FROM einsatz_personal \
+             WHERE einsatz_id = ? AND einheit_id = ? AND beendet_at IS NULL ORDER BY id",
         )
         .bind(einsatz_id)
         .bind(einheit_id)

@@ -346,6 +346,7 @@ use utoipa::OpenApi;
         crate::zeitachse::ZeitachseEreignis,
         crate::zeitachse::ZeitachseMarke,
         crate::zeitachse::ZeitachseQuelle,
+        crate::entlassung::BeendetAls,
         crate::fuehrung::aufloesung::AktuelleBesetzung,
         crate::fuehrung::aufloesung::BesetzungsZustand,
         crate::fuehrung::Fuehrungsfunktion,

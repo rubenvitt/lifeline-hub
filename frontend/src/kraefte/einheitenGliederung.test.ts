@@ -172,6 +172,17 @@ describe('buildEinheitenGliederung (LLH-1029)', () => {
     ]);
   });
 
+  it('führt nur aktive Einheiten: eine aufgelöste fehlt, ihre Untereinheit wird Wurzel (LLH-1079)', () => {
+    const zeilen = buildEinheitenGliederung(
+      [eh(1, null, null, { aufgeloest_at: '2026-05-26 15:00:00' }), eh(2, null, 1), eh(3, null)],
+      [],
+    );
+    expect(flach(zeilen)).toEqual([
+      ['eh-2', 0],
+      ['eh-3', 0],
+    ]);
+  });
+
   it('ein Zyklus verliert keine Einheit', () => {
     const zeilen = buildEinheitenGliederung([eh(1, null, 2), eh(2, null, 1)], []);
     expect(
