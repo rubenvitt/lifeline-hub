@@ -108,9 +108,14 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
       return HttpResponse.json(FAHRZEUGE);
     }),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/uhs', () =>
-      HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]),
-    ),
+    http.get('/api/einsaetze/7/uhs', ({ request }) => {
+      requests.push(`GET ${new URL(request.url).pathname}`);
+      return HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]);
+    }),
+    http.put('/api/einsaetze/7/uhs/:uid/kraefte/:ep', async (info) => {
+      await rememberRequest(info);
+      return HttpResponse.json({ id: 10 });
+    }),
     http.get('/api/personal-status', () => {
       if (a.statusFehler) {
         a.statusFehler.abgerufen = true;
@@ -292,6 +297,41 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
     expect(within(einteilung).queryByText(/Statuskatalog konnte nicht geladen werden/)).toBeNull();
   });
 
+  it('ohne Freigabe des Moduls Einheiten: keine Zeile „Einheit“ und kein Abruf', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', {
+      freigaben: freigabenFixture({ einheiten: { zugriff: false } }),
+    });
+    const einteilung = await screen.findByRole('region', { name: 'Einteilung' });
+    await within(einteilung).findByText('Musterstadt 83-1');
+    expect(within(einteilung).queryByText('Einheit', { exact: true })).toBeNull();
+    expect(within(einteilung).queryByRole('button', { name: 'Einheit bearbeiten' })).toBeNull();
+    expect(requests).not.toContain('GET /api/einsaetze/7/einheiten');
+    expect(within(einteilung).getByText('Unfallhilfsstelle')).toBeVisible();
+  });
+
+  it('ohne Freigabe des Moduls Unfallhilfsstellen: keine Zeile und kein Abruf', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', {
+      freigaben: freigabenFixture({ unfallhilfsstellen: { zugriff: false } }),
+    });
+    const einteilung = await screen.findByRole('region', { name: 'Einteilung' });
+    await within(einteilung).findByText('Rettungsstaffel');
+    expect(within(einteilung).queryByText('Unfallhilfsstelle')).toBeNull();
+    expect(requests).not.toContain('GET /api/einsaetze/7/uhs');
+    // Gegenprobe: die übrigen Zeilen stehen.
+    expect(within(einteilung).getByText('Fahrzeug')).toBeVisible();
+  });
+
+  it('ordnet die Person einer Unfallhilfsstelle zu, Toast nennt die Angabe', async () => {
+    renderAnsicht();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Unfallhilfsstelle eintragen' }),
+    );
+    await waehle('Unfallhilfsstelle', 'UHS Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Unfallhilfsstelle speichern' }));
+    await waitFor(() => expect(requests).toContain('PUT /api/einsaetze/7/uhs/21/kraefte/10'));
+    expect(await screen.findByText('Gespeichert: Unfallhilfsstelle')).toBeInTheDocument();
+  });
+
   it('springt ins Meldebild und in die Einheit', async () => {
     renderAnsicht();
     expect(await screen.findByRole('link', { name: /Meldebild/ })).toHaveAttribute(
@@ -362,6 +402,20 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     const kopf = screen.getByRole('heading', { level: 1 });
     await waitFor(() => expect(within(kopf).getByText('entlassen')).toBeVisible());
     expect(screen.getByRole('button', { name: 'Erneut disponieren' })).toBeVisible();
+  });
+
+  it('zeigt eine Ablehnung des Entlassens im Abschnitt „Aus dem Einsatz“, die Person bleibt', async () => {
+    renderAnsicht();
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen', () =>
+        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 422 }),
+      ),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    const aus = screen.getByRole('region', { name: 'Aus dem Einsatz' });
+    expect(await within(aus).findByText(/Einsatz ist abgeschlossen/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+    expect(within(screen.getByRole('heading', { level: 1 })).queryByText('entlassen')).toBeNull();
   });
 
   it('storniert nach der Rückfrage und führt zur Personalliste', async () => {
