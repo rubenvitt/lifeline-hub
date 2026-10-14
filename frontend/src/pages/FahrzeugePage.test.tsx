@@ -126,6 +126,18 @@ async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promi
   return menue;
 }
 
+/**
+ * Wählt einen Eintrag im Zeilenmenü „⋯“ (LLH-1073, Entscheidung 14.10.2026: „Entlassen“ steht dort
+ * als erster Eintrag). Das geöffnete Menü-Portal wird über die sichtbare Dropdown-Hülle gegriffen.
+ */
+async function waehleImZeilenmenue(funkrufname: string, eintrag: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${funkrufname}` }));
+  const menue = document.querySelector<HTMLElement>(
+    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+  )!;
+  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
+}
+
 describe('FahrzeugePage', () => {
   /**
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
@@ -257,7 +269,8 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Florian 1 entlassen' })).toBeInTheDocument();
+    // Die Aktionsspalte trägt nur den Menüauslöser; „Entlassen“ steht darin (LLH-1073).
+    expect(screen.queryByRole('button', { name: 'Florian 1 entlassen' })).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }),
     ).toBeInTheDocument();
@@ -265,7 +278,8 @@ describe('FahrzeugePage', () => {
 
   /**
    * Entlassen ist umkehrbar (LLH-1079 Teil II, design.md D8): ein Klick ohne Rückfrage, danach ein
-   * Rückgängig-Toast, der dasselbe Fahrzeug erneut disponiert.
+   * Rückgängig-Toast, der dasselbe Fahrzeug erneut disponiert. Seit LLH-1073 steht es als erster
+   * Eintrag im Zeilenmenü, nicht rot (umkehrbar).
    */
   it('Entlassen fragt nicht nach und bietet Rückgängig an', async () => {
     const aufrufe: string[] = [];
@@ -281,9 +295,7 @@ describe('FahrzeugePage', () => {
     );
     render(einsatz());
     await screen.findByText('Florian 1');
-    const knopf = screen.getByRole('button', { name: 'Florian 1 entlassen' });
-    expect(knopf).toHaveClass('ant-btn-dangerous');
-    await userEvent.click(knopf);
+    await waehleImZeilenmenue('Florian 1', 'Entlassen');
     await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
     expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     expect(await screen.findByText('Florian 1 entlassen')).toBeInTheDocument();
@@ -303,7 +315,7 @@ describe('FahrzeugePage', () => {
     );
     render(einsatz());
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Florian 1 entlassen' }));
+    await waehleImZeilenmenue('Florian 1', 'Entlassen');
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     const hinweis = await screen.findByText('Fahrzeug ist außer Dienst');
     expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
@@ -732,29 +744,29 @@ describe('FahrzeugePage', () => {
      * Leeres Bemerkungsfeld an der Fahrzeugseite. Die Spalte ist per Voreinstellung abgewählt; die
      * Vorprüfung auf „kein Auslöser" macht die zweite Hälfte aussagekräftig.
      *
-     * Der Zähler ist hier empfindlicher, weil die Seite `typ`, `abschnitt`, `kennzeichen` und
-     * `traeger` per `abBreite: 'xxl'` führt (LFH-1149, LLH-1079, LLH-1073): nach dem Einschalten
-     * der Bemerkung muss er bei 1024 px von fünf auf genau diese vier fallen.
+     * Der Zähler ist hier empfindlicher, weil die Seite `typ`, `abschnitt`, `seit`, `kennzeichen`
+     * und `traeger` per `abBreite: 'xxl'` führt (LFH-1149, LLH-1079, LLH-1073): nach dem
+     * Einschalten der Bemerkung muss er bei 1024 px von sechs auf genau diese fünf fallen.
      */
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(
       within(zeile).getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
     /**
      * Gate 2 verlangt den Zähler ausgeblendeter Spalten, nicht `aus.length`: ab 1600 px ist nur
-     * `bemerkung` abgewählt (1), bei 1024 px fallen `typ`, `abschnitt`, `kennzeichen` und
-     * `traeger` über `abBreite: 'xxl'` zusätzlich weg (5, LFH-1149, LLH-1079, LLH-1073). Ein Zähler, der nur die
+     * `bemerkung` abgewählt (1), bei 1024 px fallen `typ`, `abschnitt`, `seit`, `kennzeichen` und
+     * `traeger` über `abBreite: 'xxl'` zusätzlich weg (6, LFH-1149, LLH-1079, LLH-1073). Ein Zähler, der nur die
      * Handauswahl kennt, meldete beide Male „1".
      */
     setzeViewportBreite(1600);
@@ -769,8 +781,9 @@ describe('FahrzeugePage', () => {
     setzeViewportBreite(1024);
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Abschnitt' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Seit' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Typ' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Kennzeichen' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
@@ -864,10 +877,10 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     ]);
   });
 
-  it('unter xxl weicht zuerst der Abschnitt; Einheit und Seit bleiben', async () => {
+  it('unter xxl weichen Abschnitt und Seit; die Einheit bleibt (Entscheidung 14.10.2026)', async () => {
     render(einsatz(), [], { ...mitSeit, einheit_id: 1 }, [], EINHEITEN);
     await screen.findByText('Florian 1');
-    expect(kopf()).toEqual(['Funkrufname', 'Einheit', 'Status', 'Seit', 'Besatzung', 'Aktionen']);
+    expect(kopf()).toEqual(['Funkrufname', 'Einheit', 'Status', 'Besatzung', 'Aktionen']);
   });
 
   it('der Abschnitt ist der geerbte, Seit steht in Mono', async () => {
@@ -884,6 +897,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
   });
 
   it('ohne Status-Zeitpunkt steht „—“ in Seit', async () => {
+    setzeViewportBreite(1600);
     const { container } = render(einsatz(), [], { ...ef, status_seit: null }, [], EINHEITEN);
     await screen.findByText('Florian 1');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
@@ -1015,9 +1029,11 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
 });
 
 /**
- * LLH-1073 Teil I, design.md D6: „Entlassen“ bleibt sichtbar; „Angaben ändern …“ (beim
- * Stamm-Fahrzeug gesperrt mit Grund), „Im Stamm ändern ↗“ nur für die Verwaltung der Einsatz-Org,
- * hinter dem Trenner rot „Stornieren“.
+ * LLH-1073 Teil I, design.md D6 mit der Entscheidung vom 14.10.2026: in der Tabelle steht
+ * „Entlassen“ als erster Menüeintrag (die Aktionsspalte trägt nur den Auslöser), dann „Angaben
+ * ändern …“ (beim Stamm-Fahrzeug gesperrt mit Grund), „Im Stamm ändern ↗“ nur für die Verwaltung
+ * der Einsatz-Org, hinter dem Trenner rot „Stornieren“. Auf der Karte bleibt „Entlassen“ die
+ * Primäraktion.
  */
 describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
   const adhoc = {
@@ -1045,14 +1061,15 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
           }`,
     );
 
-  it('Ad-hoc-Fahrzeug: „Angaben ändern …“, Trenner, rot „Stornieren“', async () => {
+  it('Ad-hoc-Fahrzeug: „Entlassen“ zuerst, „Angaben ändern …“, Trenner, rot „Stornieren“', async () => {
     render(einsatz(), [], adhoc);
     await screen.findByText('Florian Nachbarstadt 44/1');
+    // Die Aktionsspalte trägt nur den Auslöser (Entscheidung 14.10.2026).
     expect(
-      screen.getByRole('button', { name: 'Florian Nachbarstadt 44/1 entlassen' }),
-    ).toBeVisible();
+      screen.queryByRole('button', { name: 'Florian Nachbarstadt 44/1 entlassen' }),
+    ).toBeNull();
     const menue = await oeffneMenue('Florian Nachbarstadt 44/1');
-    expect(eintraege(menue)).toEqual(['Angaben ändern …', '—', 'Stornieren (rot)']);
+    expect(eintraege(menue)).toEqual(['Entlassen', 'Angaben ändern …', '—', 'Stornieren (rot)']);
   });
 
   it('Stamm-Fahrzeug: „Angaben ändern · aus dem Stamm“ steht gesperrt, ohne Sprung', async () => {
@@ -1060,6 +1077,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     await screen.findByText('Florian 1');
     const menue = await oeffneMenue('Florian 1');
     expect(eintraege(menue)).toEqual([
+      'Entlassen',
       'Angaben ändern · aus dem Stamm (gesperrt)',
       '—',
       'Stornieren (rot)',
@@ -1079,6 +1097,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     await screen.findByText('Florian 1');
     const menue = await oeffneMenue('Florian 1');
     expect(eintraege(menue)).toEqual([
+      'Entlassen',
       'Angaben ändern · aus dem Stamm (gesperrt)',
       'Im Stamm ändern ↗',
       '—',
@@ -1097,7 +1116,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     expect(within(menue).queryByRole('menuitem', { name: 'Im Stamm ändern ↗' })).toBeNull();
   });
 
-  it('die Karte führt dasselbe Menü über „weitere“', async () => {
+  it('die Karte führt „Entlassen“ als Primäraktion, das Menü den Rest', async () => {
     setzeViewportBreite(390);
     const { container } = render(einsatz(), [], adhoc);
     await screen.findByText('Florian Nachbarstadt 44/1');

@@ -64,7 +64,8 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
+import { abstand, dichten } from '../theme/tokens';
+import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
@@ -240,7 +241,7 @@ const ANSICHT_OPTIONEN = [
 const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
 
 /** Einträge des Zeilenmenüs (design.md D6). */
-type ZeilenAktion = 'angaben' | 'stamm' | 'stornieren';
+type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'stornieren';
 
 export default function FahrzeugePage() {
   const { id } = useParams();
@@ -248,6 +249,15 @@ export default function FahrzeugePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { benutzer } = useAuth();
+  const { dichte } = useDichte();
+  /**
+   * Nur der Menüauslöser (Entscheidung 14.10.2026): die quadratische Steuerhöhe der Dichte oder der
+   * Kopf „Aktionen“ (rund 4,4 Schriftgrößen), was breiter ist, plus das Zellpolster beidseits
+   * (`abstand.md`). Gemessen 82 / 102 / 124 px (`e2e/gate1-ueberlauf.spec.ts`).
+   */
+  const stufe = dichten[dichte];
+  const aktionenBreite =
+    Math.ceil(Math.max(stufe.zeilenhoehe, 4.4 * stufe.schriftgroesse)) + 2 * stufe.abstand.md;
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
@@ -476,15 +486,23 @@ export default function FahrzeugePage() {
     (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === efId);
   /**
-   * Zeilenmenü (design.md D6): „Entlassen“ steht als Knopf daneben, hier der Rest. „Angaben ändern“
-   * steht beim Stamm-Fahrzeug gesperrt mit dem Grund im Etikett — sein Fehlen verwirrte; den Sprung
-   * in den Stamm sieht nur, wer dort schreiben darf (Verwaltung der Org des Einsatzes, `src/AGENTS.md`,
-   * Admin-Schreibwege). „Stornieren“ steht für jede aktive Zeile, das Menü ist also nie leer.
+   * Zeilenmenü (design.md D6, nachgeschärft 14.10.2026): in der Tabelle steht „Entlassen“ als
+   * erster Eintrag im Menü statt als Knopf — die Einheit-Spalte (LLH-1073) braucht den Platz, damit
+   * der Funkrufname bei 1440 px einzeilig bleibt. Entlassen ist umkehrbar und steht deshalb nicht
+   * rot (Rückgängig-Hinweis wie bisher). Auf der Karte bleibt es die Primäraktion (`aktion`), das
+   * Menü dort führt den Rest. „Angaben ändern“ steht beim Stamm-Fahrzeug gesperrt mit dem Grund im
+   * Etikett — sein Fehlen verwirrte; den Sprung in den Stamm sieht nur, wer dort schreiben darf
+   * (Verwaltung der Org des Einsatzes, `src/AGENTS.md`, Admin-Schreibwege). „Stornieren“ steht für
+   * jede aktive Zeile rot hinter dem Trenner, das Menü ist also nie leer.
    */
   const darfStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
-  const zeilenEintraege = (ef: EinsatzFahrzeug): MenueEintrag<ZeilenAktion>[] => {
+  const zeilenEintraege = (
+    ef: EinsatzFahrzeug,
+    { mitEntlassen }: { mitEntlassen: boolean },
+  ): MenueEintrag<ZeilenAktion>[] => {
     const ausStamm = ef.fahrzeug_id != null;
     return [
+      ...(mitEntlassen ? [{ key: 'entlassen' as const, label: 'Entlassen' }] : []),
       ausStamm
         ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
         : { key: 'angaben', label: 'Angaben ändern …' },
@@ -493,7 +511,8 @@ export default function FahrzeugePage() {
     ];
   };
   const waehleZeilenAktion = (aktion: ZeilenAktion, ef: EinsatzFahrzeug) => {
-    if (aktion === 'angaben') setAngabenFuer(ef);
+    if (aktion === 'entlassen') entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname });
+    else if (aktion === 'angaben') setAngabenFuer(ef);
     else if (aktion === 'stamm' && ef.fahrzeug_id != null)
       void navigate(fahrzeugDetailPfad(ef.fahrzeug_id));
     else if (aktion === 'stornieren') setStornoFuer({ id: ef.id, name: ef.funkrufname });
@@ -633,14 +652,19 @@ export default function FahrzeugePage() {
    * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
    * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
    * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
-   * die Personalseite). `typ` weicht, seit „Entlassen“ und „⋯“ die Aktionsspalte auf 170 px
-   * gebracht haben (LLH-1079 Teil II): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ
-   * trägt der Funkrufname meist schon in seiner Kennzahl.
+   * die Personalseite). `typ` weicht seit LLH-1079 Teil II (damals brachten „Entlassen“ und „⋯“
+   * die Aktionsspalte auf 170 px): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ trägt
+   * der Funkrufname meist schon in seiner Kennzahl.
    *
-   * Mit Einheit (170 px, schreibtragend, weicht nie) und Seit (90 px, „26. 14:05“) kamen 260 px
-   * dazu (LLH-1073, design.md D5). Unter `xxl` weicht deshalb zuerst der Abschnitt (130 px,
-   * lesend; die Einheit nennt ihn mittelbar, das Tableau gliedert nach ihm), dann wie bisher der
-   * Typ. Einheit, Status, Besatzung und Aktionen weichen nie. Wer eine Breite ändert, misst neu
+   * Die Einheit-Spalte (LLH-1073, design.md D5, Entscheidung 14.10.2026) bleibt bei 1440 sichtbar
+   * und schreibtragend (140 px). Damit der Funkrufname einzeilig bleibt (30-Zeichen-Vorgabe vom
+   * 10.10.2026), trägt die Aktionsspalte nur noch den Menüauslöser („Entlassen“ ist sein erster
+   * Eintrag; Breite je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit
+   * LLH-1079 Teil II), `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit
+   * nennt ihn mittelbar, das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
+   * 422 px, Zeile 45 px. Ein Stamm-Name trägt damit 30 Zeichen in einer Zeile, ein Ad-hoc-Name
+   * neben „ad-hoc“ 29: 30 Zeichen brauchen 428 px und brechen um (offen, LLH-1073). Einheit,
+   * Status, Besatzung und Aktionen weichen nie. Wer eine Breite ändert, misst neu
    * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
@@ -678,7 +702,10 @@ export default function FahrzeugePage() {
             // Schreibtragend, deshalb nie `abBreite` (D5); die Auswahl gruppiert nach Abschnitt.
             title: 'Einheit',
             key: 'einheit' as const,
-            width: 170,
+            // 140 px (Entscheidung 14.10.2026, Spanne 140–170): jeder Pixel mehr fehlt dem
+            // Funkrufnamen. Ein Einzelwort über rund 13 Zeichen bricht neben dem Stift mitten im
+            // Wort (`overflow-wrap: anywhere` der Inline-Angabe), etwa „Betreuungsgruppe“.
+            width: 140,
             sortWert: (ef: EinsatzFahrzeug) => einheitName(ef),
             suchText: (ef: EinsatzFahrzeug) => einheitName(ef),
             filter: filterAus(einheitName),
@@ -730,6 +757,7 @@ export default function FahrzeugePage() {
       title: 'Seit',
       key: 'seit',
       width: 90,
+      abBreite: 'xxl',
       zahl: true,
       sortWert: (ef) => ef.status_seit,
       render: (_, ef) => (ef.status_seit ? formatUhrzeitMitTag(ef.status_seit, konventionen) : '—'),
@@ -783,31 +811,18 @@ export default function FahrzeugePage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
-            width: 170,
+            width: aktionenBreite,
             immerSichtbar: true,
-            // Entlassen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht im
-            // Zeilenmenü und fragt nach (LLH-1079, design.md D8, wie die Personalseite).
+            // Nur der Menüauslöser (Entscheidung 14.10.2026): Entlassen, Angaben, Stamm und
+            // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
-              <Space size="middle">
-                <Button
-                  danger
-                  loading={
-                    entlassenMutation.isPending && entlassenMutation.variables?.efId === ef.id
-                  }
-                  disabled={isZeileBusy(ef.id)}
-                  aria-label={`${ef.funkrufname} entlassen`}
-                  onClick={() => entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname })}
-                >
-                  Entlassen
-                </Button>
-                <MenueAusloeser<ZeilenAktion>
-                  eintraege={zeilenEintraege(ef)}
-                  zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
-                  gesperrt={isZeileBusy(ef.id)}
-                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === ef.id}
-                  onWahl={(aktion) => waehleZeilenAktion(aktion, ef)}
-                />
-              </Space>
+              <MenueAusloeser<ZeilenAktion>
+                eintraege={zeilenEintraege(ef, { mitEntlassen: true })}
+                zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
+                gesperrt={isZeileBusy(ef.id)}
+                laeuft={isZeileBusy(ef.id)}
+                onWahl={(aktion) => waehleZeilenAktion(aktion, ef)}
+              />
             ),
           },
         ]
@@ -987,7 +1002,7 @@ export default function FahrzeugePage() {
                   : undefined,
                 weitere: darfSchreiben
                   ? {
-                      eintraege: zeilenEintraege,
+                      eintraege: (ef) => zeilenEintraege(ef, { mitEntlassen: false }),
                       zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
                       laeuft: (ef) => isZeileBusy(ef.id),
                       onWahl: (aktion, ef) => waehleZeilenAktion(aktion as ZeilenAktion, ef),

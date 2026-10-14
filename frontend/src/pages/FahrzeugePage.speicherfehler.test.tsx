@@ -262,8 +262,8 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Florian 1');
-    // Bei 1024 px: Bemerkung (Voreinstellung), Typ, Abschnitt, Kennzeichen und Träger (unter `xxl`).
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ }));
+    // Bei 1024 px: Bemerkung (Voreinstellung), Typ, Abschnitt, Seit, Kennzeichen und Träger (unter `xxl`).
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const schreibe = async (id: number, funkrufname: string, text: string) => {
