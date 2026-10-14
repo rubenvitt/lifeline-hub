@@ -103,3 +103,19 @@ verdichtet, gegliedert nach Abschnitten.
 #### Scenario: Besatzung im Text
 - **WHEN** das Meldebild mit einem besetzten Fahrzeug übernommen wird
 - **THEN** nennt der Text die Besatzung als Unterpunkt des Fahrzeugs
+
+### Requirement: Sprung auf eine Einheit
+
+Das Meldebild SHALL einen Deeplink `?einheit=<id>` annehmen. Für eine aktive Einheit des
+Einsatzes MUST es deren übergeordnete Einheiten und ihren Teilbaum bis zur Stufe „mit Fahrzeugen“
+aufklappen, die Zeile ins Bild holen und sie nach Spec `deeplink-hervorhebung` markieren. Die
+übrigen Zeilen MUST in der Vorgabestufe bleiben. Eine unbekannte oder fremde ID MUST die
+Vorgabestufe ohne Markierung lassen.
+
+#### Scenario: Nach dem Bilden aus einer Vorlage
+- **WHEN** das Meldebild mit `?einheit=` eines gerade gebildeten Zugs öffnet
+- **THEN** sind Zug, Staffel und ihre Fahrzeuge aufgeklappt, und die Zeile des Zugs ist markiert
+
+#### Scenario: Unbekannte Einheit
+- **WHEN** das Meldebild mit `?einheit=` einer nicht vorhandenen Einheit öffnet
+- **THEN** zeigt es die Vorgabestufe „Einheiten“ ohne Markierung
