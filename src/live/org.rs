@@ -8,7 +8,10 @@
 //! eines Einsatzes `GET /api/live`), ihre Wire-Namen sind deshalb disjunkt (Guard unten).
 //!
 //! Org-Ereignisse tragen keine `id:` und keinen Replay: sie bedeuten nur „neu laden", und das
-//! Frontend lädt nach jedem Wiederaufbau ohnehin nach (LFH-734, design.md D4). Die Nutzlast ist leer.
+//! Frontend lädt nach jedem Wiederaufbau ohnehin nach (LFH-734, design.md D4). Die Nutzlast ist leer,
+//! außer bei `org_benachrichtigung` (LLH-1207): sie trägt die Kennungen der Benachrichtigung und
+//! geht nur an ihren Empfänger ([`OrgEmpfaenger::Benutzer`]); verpasst er sie, holt der Client die
+//! offene Liste (`GET /api/benachrichtigungen?offen=true`).
 //! Spec `openspec/specs/org-live/`.
 
 use crate::auth::Benutzer;
@@ -27,6 +30,11 @@ wire_enum! {
         Einsatzliste => "einsatzliste",
         /// Ein Stammdaten-Katalog der Organisation hat sich geändert.
         Stammdaten => "stammdaten",
+        /// Eine Benachrichtigung einer Org-Art (Aufnahme, neuer Einsatz) an genau einen Nutzer
+        /// (LLH-1207, design.md D2). Eigener Wire-Name, weil beide Familien auf derselben
+        /// Verbindung laufen und ihre Namen disjunkt sein müssen (`benachrichtigung` ist das
+        /// Einsatz-Ereignis).
+        OrgBenachrichtigung => "org_benachrichtigung",
     }
 }
 
@@ -48,6 +56,9 @@ pub enum OrgEmpfaenger {
     /// (Mitglieder zum Zeitpunkt des Ereignisses, dazu eine gerade hinzugefügte oder entfernte
     /// Person). Wer den Einsatz nicht sehen darf, erfährt nicht, dass sich an ihm etwas ändert.
     Einsatzleser { benutzer_ids: Arc<[i64]> },
+    /// Genau die genannten Benutzer, ohne Ausnahme für System-Admins oder org-weite Leser
+    /// (LLH-1207): eine Benachrichtigung gehört ihrem Empfänger.
+    Benutzer { benutzer_ids: Arc<[i64]> },
 }
 
 /// Eine Nachricht im Org-Kanal. `org_id` ist die Organisation des Katalogs bzw. des Einsatzes.
@@ -56,6 +67,15 @@ pub struct OrgNachricht {
     pub org_id: i64,
     pub event: OrgLiveEvent,
     pub empfaenger: OrgEmpfaenger,
+    /// Nutzlast; `None` = [`ORG_NUTZLAST`]. Nur `org_benachrichtigung` trägt eine.
+    pub nutzlast: Option<Arc<str>>,
+}
+
+impl OrgNachricht {
+    /// Die Nutzlast auf dem Draht.
+    pub fn daten(&self) -> &str {
+        self.nutzlast.as_deref().unwrap_or(ORG_NUTZLAST)
+    }
 }
 
 /// Schnappschuss des Abonnenten vom Verbindungsaufbau. Ein Rollenwechsel wirkt erst beim
@@ -90,6 +110,7 @@ impl OrgAbonnent {
                     || (self.org_weiter_leser && self.org_id == n.org_id)
                     || benutzer_ids.contains(&self.benutzer_id)
             }
+            OrgEmpfaenger::Benutzer { benutzer_ids } => benutzer_ids.contains(&self.benutzer_id),
         }
     }
 }
@@ -195,6 +216,7 @@ mod tests {
             empfaenger: OrgEmpfaenger::Einsatzleser {
                 benutzer_ids: ids.into(),
             },
+            nutzlast: None,
         }
     }
 
@@ -203,13 +225,40 @@ mod tests {
             org_id,
             event: OrgLiveEvent::Stammdaten,
             empfaenger: OrgEmpfaenger::Organisation,
+            nutzlast: None,
         }
     }
 
     #[test]
-    fn zwei_ereignisse_mit_festen_wire_namen() {
+    fn drei_ereignisse_mit_festen_wire_namen() {
         let wire: Vec<&str> = OrgLiveEvent::ALLE.iter().map(|e| e.as_str()).collect();
-        assert_eq!(wire, vec!["einsatzliste", "stammdaten"]);
+        assert_eq!(
+            wire,
+            vec!["einsatzliste", "stammdaten", "org_benachrichtigung"]
+        );
+    }
+
+    /// LLH-1207: eine Org-Benachrichtigung erreicht genau ihren Empfänger, auch keinen
+    /// System-Admin und keine Führungskraft derselben Organisation.
+    #[test]
+    fn org_benachrichtigung_erreicht_nur_ihren_empfaenger() {
+        let n = OrgNachricht {
+            org_id: 1,
+            event: OrgLiveEvent::OrgBenachrichtigung,
+            empfaenger: OrgEmpfaenger::Benutzer {
+                benutzer_ids: [11].into(),
+            },
+            nutzlast: Some(r#"{"benachrichtigung_id":3}"#.into()),
+        };
+        assert!(abonnent(11, 1, false, false).sieht(&n));
+        assert!(
+            !abonnent(12, 1, true, true).sieht(&n),
+            "Admin derselben Org"
+        );
+        assert!(!abonnent(10, 1, false, true).sieht(&n), "Führungskraft");
+        assert!(!abonnent(20, 2, true, true).sieht(&n), "Admin fremder Org");
+        assert_eq!(n.daten(), r#"{"benachrichtigung_id":3}"#);
+        assert_eq!(stammdaten(1).daten(), ORG_NUTZLAST);
     }
 
     /// Beide Familien laufen auf derselben Verbindung; ein geteilter Wire-Name ließe das

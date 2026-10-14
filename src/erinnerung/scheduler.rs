@@ -22,6 +22,11 @@ const TICK_SEKUNDEN: u64 = 30;
 /// bezug_typ, bezug_id}`) und schreibt wiederkehrende per skip-forward fort.
 /// Async + injiziertes `jetzt` = deterministisch testbar.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
+    // Benachrichtigungen abräumen (LLH-1207, design.md D1): quittierte nach 24 h, unquittierte
+    // nach 12 h. Ein Fehler hier hält die Erinnerungen nicht auf.
+    if let Err(e) = crate::benachrichtigung::repo::aufraeumen(pool, jetzt).await {
+        tracing::warn!("Benachrichtigungen nicht abgeräumt: {e}");
+    }
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let faellige = match repo::faellige_zum_ausloesen(pool, &jetzt_s).await {
         Ok(v) => v,

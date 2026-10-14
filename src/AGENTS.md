@@ -300,7 +300,9 @@ Spec `passwort-anmeldung`, Herleitung
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
-`stammdaten` (`OrgLiveEvent`), Nutzlast `{}`, ohne `id:` und nie im Ring eines Einsatzes.
+`stammdaten` (`OrgLiveEvent`), Nutzlast `{}`, ohne `id:` und nie im Ring eines Einsatzes. Dazu
+`org_benachrichtigung` (LLH-1207) mit Kennungen als Nutzlast, nur an ihren Empfänger
+(`OrgEmpfaenger::Benutzer`, ohne Admin-Ausnahme), s. „Benachrichtigungen“.
 - **`einsatzliste` nur über `live::org::einsatzliste_melden`** nach dem Commit (Leser = org-weite
   Leser, System-Admins, Mitglieder, dazu eine gerade entfernte Person); ein Löschweg liest die
   Leser VOR dem `DELETE` (`einsatzleser_lesen`, `Einsatzleser::melden`). Jeder `einsatz`-Emitter
@@ -310,6 +312,30 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
 - **Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE`** (Middleware
   `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
   `tests/stammdaten_live_guard.rs`.
+
+## Backend — Benachrichtigungen (LLH-1207)
+
+Spec `benachrichtigungen`, Herleitung `openspec/changes/kcjecn9e-benachrichtigungskonzept/design.md`
+(D1–D4, D6); `src/benachrichtigung/`, `src/routes/benachrichtigung.rs`.
+- **Ein Schreibweg oder Scheduler meldet nach dem Commit nur über `benachrichtigung::melden`**
+  mit einem `Anlass` (Art, Bezug, Auslöser per `von`, Adressaten per `an`). Wer etwas bekommt,
+  entscheidet allein `aufloesung::empfaenger`: dort stehen alle Ausschlüsse (Auslöser,
+  Gerätekonten, inaktive Konten, kein Leserecht am Einsatz oder am Modul des Bezugs,
+  abgeschaltete Hinweis-Art). Kein Aufrufer filtert selbst, keiner schreibt in die Tabelle.
+- **Kein Text in der Tabelle:** eine Zeile je Empfänger mit Art, Stufe und Bezug. Titel,
+  Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
+  (Guard `detail_liest_nur_retain_spalten`). Eine neue Art braucht Variante, Titel, Migration
+  für den CHECK (`check_listen_entsprechen_dem_katalog`) und ihre Stufe in `stufe()`; ein neuer
+  Bezug sein Modul (`BenachrichtigungBezugTyp::modul`) und seinen Pfad.
+- **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung` mit
+  Empfängerliste (`LiveHub::publiziere_an`), die der Strom live und im Replay prüft
+  (`LiveNachricht::sichtbar_fuer`, fail-closed ohne Liste); Org-Arten als `org_benachrichtigung`.
+  Die Nutzlast trägt nur Kennungen, den Text holt der Client per `GET`.
+- **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
+  Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
+- Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen
+  (quittiert nach 24 h, offen nach 12 h) läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen
+  die Zeilen per `ON DELETE CASCADE`. Nachweis `tests/benachrichtigung.rs`.
 
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 

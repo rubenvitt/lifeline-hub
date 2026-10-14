@@ -1125,6 +1125,7 @@ fn live_event_wire() {
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
+        Benachrichtigung => "benachrichtigung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }
@@ -1137,7 +1138,58 @@ fn org_live_event_wire() {
     enum_wire!(lifeline_hub::live::org::OrgLiveEvent {
         Einsatzliste => "einsatzliste",
         Stammdaten => "stammdaten",
+        OrgBenachrichtigung => "org_benachrichtigung",
     } in lifeline_hub::live::org::OrgLiveEvent::ALLE);
+}
+
+/// Benachrichtigungen (LLH-1207): Katalog, Stufe und Bezug. Die CHECK-Listen der Migration
+/// pinnt `benachrichtigung::tests::check_listen_entsprechen_dem_katalog`.
+#[test]
+fn benachrichtigung_wire() {
+    enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungStufe {
+        Alarm => "alarm",
+        Hinweis => "hinweis",
+    } in lifeline_hub::benachrichtigung::BenachrichtigungStufe::ALLE);
+    enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungArt {
+        Sofortmeldung => "sofortmeldung",
+        SofortmeldungEskaliert => "sofortmeldung_eskaliert",
+        AuftragUeberfaellig => "auftrag_ueberfaellig",
+        AbloesungFaellig => "abloesung_faellig",
+        ErinnerungFaellig => "erinnerung_faellig",
+        AbloesungVorwarnung => "abloesung_vorwarnung",
+        AuftragErteilt => "auftrag_erteilt",
+        AuftragQuittiert => "auftrag_quittiert",
+        AuftragErledigt => "auftrag_erledigt",
+        Befehl => "befehl",
+        Lagebericht => "lagebericht",
+        Meldung => "meldung",
+        LagebesprechungVorher => "lagebesprechung_vorher",
+        LagebesprechungFaellig => "lagebesprechung_faellig",
+        NachforderungStatus => "nachforderung_status",
+        Gefahr => "gefahr",
+        SichtungEins => "sichtung_eins",
+        WiederVerfuegbar => "wieder_verfuegbar",
+        ChatErwaehnung => "chat_erwaehnung",
+        EinsatzAufnahme => "einsatz_aufnahme",
+        EinsatzNeu => "einsatz_neu",
+        Unwetter => "unwetter",
+    } in lifeline_hub::benachrichtigung::BenachrichtigungArt::ALLE);
+    enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp {
+        Einsatz => "einsatz",
+        Meldung => "meldung",
+        Auftrag => "auftrag",
+        Befehl => "befehl",
+        Lagebericht => "lagebericht",
+        Erinnerung => "erinnerung",
+        Abloesung => "abloesung",
+        Lagebesprechung => "lagebesprechung",
+        Nachforderung => "nachforderung",
+        Gefahrengebiet => "gefahrengebiet",
+        Person => "person",
+        Einheit => "einheit",
+        Fahrzeug => "fahrzeug",
+        ChatNachricht => "chat_nachricht",
+    } in lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp::ALLE);
 }
 
 // ───────────────────────── Inventar-Guard (LFH-312) ─────────────────────────

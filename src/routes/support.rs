@@ -10,7 +10,7 @@ use crate::anhang;
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzKontext;
 use crate::error::AppError;
-use crate::live::org::{OrgAbonnent, OrgNachricht, ORG_NUTZLAST};
+use crate::live::org::{OrgAbonnent, OrgNachricht};
 use crate::live::{LiveEvent, LiveNachricht, Replay};
 use axum::extract::Multipart;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
@@ -573,11 +573,11 @@ pub struct AnsichtFilter {
 /// Kontroll-Events (lagged/resync) passieren immer, sonst hinge der Resync.
 pub fn sse_event_stream(
     rx: Receiver<LiveNachricht>,
-    erlaubt: impl Fn(LiveEvent) -> bool,
+    erlaubt: impl Fn(&LiveNachricht) -> bool,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     BroadcastStream::new(rx).filter_map(move |res| match res {
-        // Nicht erlaubtes Modul → die Nachricht verlässt den Server nicht.
-        Ok(n) if !erlaubt(n.event) => None,
+        // Nicht erlaubtes Modul oder fremder Empfänger → die Nachricht verlässt den Server nicht.
+        Ok(n) if !erlaubt(&n) => None,
         // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
         // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
         Ok(n) => Some(Ok(Event::default()
@@ -602,9 +602,9 @@ pub fn sse_org_stream(
     abonnent: OrgAbonnent,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     BroadcastStream::new(rx).filter_map(move |res| match res {
-        Ok(n) if abonnent.sieht(&n) => Some(Ok(Event::default()
-            .event(n.event.as_str())
-            .data(ORG_NUTZLAST))),
+        Ok(n) if abonnent.sieht(&n) => {
+            Some(Ok(Event::default().event(n.event.as_str()).data(n.daten())))
+        }
         Ok(_) => None,
         Err(_) => Some(Ok(Event::default()
             .event(LiveEvent::Lagged.as_str())
@@ -630,8 +630,9 @@ pub const POSITION_EREIGNIS: &str = "position";
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
 /// GET); ohne Replay (`Keine`) nur der Live-Kanal.
-/// Der Modul-Filter `erlaubt` greift auf BEIDEN Wegen — Replay-Prefix und Live-Tail.
-/// Sonst wäre ein Reconnect mit `Last-Event-ID` ein Bypass des Gates (F01/LFH-227).
+/// Der Filter `erlaubt` (Modul-Gate und Empfängerliste, [`LiveNachricht::sichtbar_fuer`]) greift
+/// auf BEIDEN Wegen — Replay-Prefix und Live-Tail. Sonst wäre ein Reconnect mit `Last-Event-ID`
+/// ein Bypass des Gates (F01/LFH-227) bzw. ein Weg zu fremden Benachrichtigungen (LLH-1207).
 ///
 /// Nach dem Replay folgt die `position` des Abonnements als Kontroll-Ereignis
 /// [`POSITION_EREIGNIS`] mit `id:` und Daten (LFH-922, design.md D4): erst ein Frame mit Daten
@@ -642,13 +643,13 @@ pub fn sse_stream_mit_replay(
     replay: Replay,
     rx: Receiver<LiveNachricht>,
     position: String,
-    erlaubt: impl Fn(LiveEvent) -> bool,
+    erlaubt: impl Fn(&LiveNachricht) -> bool,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let mut prefix: Vec<Result<Event, Infallible>> = match replay {
         Replay::Keine => Vec::new(),
         Replay::Events(nachrichten) => nachrichten
             .into_iter()
-            .filter(|n| erlaubt(n.event))
+            .filter(|n| erlaubt(n))
             .map(|n| {
                 Ok(Event::default()
                     .id(n.id)
@@ -903,11 +904,12 @@ mod tests {
             id: id.into(),
             event,
             data: "x".into(),
+            empfaenger: None,
         }
     }
 
     /// Filter, der alles durchlässt (für die Tests der Replay-Mechanik).
-    fn alles(_: LiveEvent) -> bool {
+    fn alles(_: &LiveNachricht) -> bool {
         true
     }
 
@@ -955,8 +957,8 @@ mod tests {
             nachricht("1-3", LiveEvent::Etb),
         ];
         let nur_etb: Vec<_> =
-            sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), "1-3".into(), |ev| {
-                ev == LiveEvent::Etb
+            sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), "1-3".into(), |n| {
+                n.event == LiveEvent::Etb
             })
             .collect()
             .await;
@@ -991,7 +993,7 @@ mod tests {
         tx.send(nachricht("1-3", LiveEvent::Chat)).unwrap();
         drop(tx);
 
-        let nur_chat: Vec<_> = sse_event_stream(rx, |ev| ev == LiveEvent::Chat)
+        let nur_chat: Vec<_> = sse_event_stream(rx, |n| n.event == LiveEvent::Chat)
             .collect()
             .await;
         assert_eq!(nur_chat.len(), 2, "nur die chat-Nachrichten dürfen durch");

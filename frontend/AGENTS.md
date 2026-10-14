@@ -810,7 +810,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `EINSATZ_STREAM_EVENTS` oder `NICHT_LIVE_KEYS`. `globalKeys` (`GLOBAL_KEYS`) für alles darüber.
 - **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
   Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
-  `einsatz` und `lagged` zu, Guard `ungegatet_sind_nur_lagged_und_einsatz`), invalidiert Kopf und
+  `einsatz`, `lagged` und der empfängergebundenen `benachrichtigung` zu, Guard
+  `ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung`), invalidiert Kopf und
   Stand der Lagebesprechung. Es feuern PATCH, Abschluss, Frist und Termin oder Abschluss der
   Lagebesprechung **nur bei geändertem Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Einsatzliste und Stammdaten sind live** (LFH-734, Spec `org-live`): `globalKeys` sind wie die
