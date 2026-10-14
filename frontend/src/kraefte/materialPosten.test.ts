@@ -6,8 +6,12 @@ import {
   materialDarstellung,
   materialStatusOptionen,
   mengeText,
+  ortPatch,
   ortText,
   ortVon,
+  parseOrtValue,
+  toOrtValue,
+  type MaterialOrtRef,
   type OrtNamen,
 } from './materialPosten';
 
@@ -108,5 +112,61 @@ describe('ortText (D11/D15)', () => {
   it('ohne Leserecht oder unbekannten Namen steht „zugeordnet“, nie ein Strich', () => {
     expect(ortText({ art: 'einheit', id: 99 }, namen)).toBe('zugeordnet');
     expect(ortText({ art: 'bereitstellungsraum', id: 6 }, {})).toBe('zugeordnet');
+  });
+});
+
+describe('toOrtValue/parseOrtValue (LLH-1225 D2)', () => {
+  it('schreibt jede Ortsart mit eigenem Präfix, weil die IDs der Ortsarten kollidieren', () => {
+    expect(toOrtValue({ art: 'einheit', id: 12 })).toBe('einheit:12');
+    expect(toOrtValue({ art: 'fahrzeug', id: 3 })).toBe('fahrzeug:3');
+    expect(toOrtValue({ art: 'uhs', id: 4 })).toBe('uhs:4');
+    expect(toOrtValue({ art: 'bereitstellungsraum', id: 2 })).toBe('br:2');
+    expect(toOrtValue(null)).toBe('ohne');
+  });
+
+  it('liest jeden Wert zurück (Round-Trip)', () => {
+    const orte: (MaterialOrtRef | null)[] = [
+      { art: 'einheit', id: 12 },
+      { art: 'fahrzeug', id: 3 },
+      { art: 'uhs', id: 4 },
+      { art: 'bereitstellungsraum', id: 2 },
+      null,
+    ];
+    for (const ort of orte) expect(parseOrtValue(toOrtValue(ort))).toEqual(ort);
+  });
+
+  it('Unbekanntes ist undefined, nicht „ohne Ort“', () => {
+    for (const s of [
+      '',
+      'einheit',
+      'einheit:',
+      'einheit:x',
+      'einheit:-1',
+      'einheit:1.5',
+      'kfz:3',
+      'ohne:1',
+    ]) {
+      expect(parseOrtValue(s)).toBeUndefined();
+    }
+  });
+});
+
+describe('ortPatch (LLH-1225 D2)', () => {
+  const einheit: MaterialOrtRef = { art: 'einheit', id: 1 };
+  it('setzt einen Ort, wo keiner war', () => {
+    expect(ortPatch({ art: 'uhs', id: 7 }, null)).toEqual({ uhs_id: 7 });
+  });
+  it('wechselt den Ort mit EINEM Feld: der Server löst den bisherigen', () => {
+    expect(ortPatch({ art: 'fahrzeug', id: 3 }, einheit)).toEqual({ einsatz_fahrzeug_id: 3 });
+    expect(ortPatch({ art: 'bereitstellungsraum', id: 2 }, einheit)).toEqual({ br_id: 2 });
+    expect(ortPatch({ art: 'einheit', id: 2 }, einheit)).toEqual({ einheit_id: 2 });
+  });
+  it('löst den Ort über das Feld des bisherigen', () => {
+    expect(ortPatch(null, einheit)).toEqual({ einheit_id: null });
+    expect(ortPatch(null, { art: 'bereitstellungsraum', id: 2 })).toEqual({ br_id: null });
+  });
+  it('gleicher Ort oder ohne zu ohne sendet nichts', () => {
+    expect(ortPatch({ art: 'einheit', id: 1 }, einheit)).toBeNull();
+    expect(ortPatch(null, null)).toBeNull();
   });
 });

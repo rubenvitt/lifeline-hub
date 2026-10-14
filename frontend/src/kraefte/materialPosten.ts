@@ -61,11 +61,16 @@ export function materialStatusOptionen(art: MaterialArt): MaterialStatus[] {
   return ALLE_STATUS.filter((s) => art === 'geraet' || !NUR_GERAET.has(s));
 }
 
+/** Der Rest eines Verbrauchsguts als Text: „30 von 50 übrig“, auch „50 von 50 übrig“. */
+export function restText(em: Pick<EinsatzMaterial, 'menge' | 'ausgegeben'>): string {
+  return `${em.menge - em.ausgegeben} von ${em.menge} übrig`;
+}
+
 /** Menge als Text: Gerät „1“, Verbrauchsgut „50“, mit Ausgabe „30 von 50 übrig“. */
 export function mengeText(em: Zeile): string {
   if (em.art === 'geraet') return '1';
   if (em.ausgegeben <= 0) return String(em.menge);
-  return `${em.menge - em.ausgegeben} von ${em.menge} übrig`;
+  return restText(em);
 }
 
 export type MaterialOrtArt = 'einheit' | 'fahrzeug' | 'uhs' | 'bereitstellungsraum';
@@ -90,6 +95,56 @@ export function ortVon(em: OrtSpalten): MaterialOrtRef | null {
   if (em.uhs_id != null) return { art: 'uhs', id: em.uhs_id };
   if (em.br_id != null) return { art: 'bereitstellungsraum', id: em.br_id };
   return null;
+}
+
+/** Das Feld des PATCH/POST je Ortsart, benannt wie im DTO (LLH-1224 D7). */
+export const ORT_FELD = {
+  einheit: 'einheit_id',
+  fahrzeug: 'einsatz_fahrzeug_id',
+  uhs: 'uhs_id',
+  bereitstellungsraum: 'br_id',
+} as const satisfies Record<MaterialOrtArt, keyof OrtSpalten>;
+
+type OrtFeld = (typeof ORT_FELD)[MaterialOrtArt];
+
+/**
+ * Der Körper eines Ortswechsels (LLH-1225 D2), die eine Stelle, die ihn baut: Ziel gleich vorher →
+ * `null` (nichts senden); Ziel gesetzt → nur sein Feld, der Server löst den bisherigen Ort in
+ * derselben Anfrage; Ziel leer → das Feld des bisherigen Orts auf `null`.
+ */
+export function ortPatch(
+  ziel: MaterialOrtRef | null,
+  vorher: MaterialOrtRef | null,
+): Partial<Record<OrtFeld, number | null>> | null {
+  if (ziel == null) return vorher == null ? null : { [ORT_FELD[vorher.art]]: null };
+  if (vorher != null && vorher.art === ziel.art && vorher.id === ziel.id) return null;
+  return { [ORT_FELD[ziel.art]]: ziel.id };
+}
+
+/** Präfix je Ortsart im Auswahlwert; die IDs der Ortsarten kollidieren (`einheit:3`, `uhs:3`). */
+const WERT_PRAEFIX: Record<MaterialOrtArt, string> = {
+  einheit: 'einheit',
+  fahrzeug: 'fahrzeug',
+  uhs: 'uhs',
+  bereitstellungsraum: 'br',
+};
+/** Auswahl- und Filterwert für „ohne Ort“. */
+export const OHNE_ORT_WERT = 'ohne';
+
+/** Der Ort als Auswahlwert: `einheit:12`, `fahrzeug:3`, `uhs:4`, `br:2`, ohne Ort `ohne`. */
+export function toOrtValue(ort: MaterialOrtRef | null): string {
+  return ort == null ? OHNE_ORT_WERT : `${WERT_PRAEFIX[ort.art]}:${ort.id}`;
+}
+
+/** Umkehrung von {@link toOrtValue}; Unbekanntes ist `undefined`, nie still „ohne Ort“. */
+export function parseOrtValue(wert: string): MaterialOrtRef | null | undefined {
+  if (wert === OHNE_ORT_WERT) return null;
+  const treffer = /^([a-z]+):([1-9][0-9]*)$/.exec(wert);
+  if (!treffer) return undefined;
+  const art = (Object.keys(WERT_PRAEFIX) as MaterialOrtArt[]).find(
+    (a) => WERT_PRAEFIX[a] === treffer[1],
+  );
+  return art ? { art, id: Number(treffer[2]) } : undefined;
 }
 
 /**
