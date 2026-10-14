@@ -84,6 +84,7 @@ pub async fn anreichern_alle(
     org_id: i64,
     benutzer: &crate::auth::Benutzer,
     einsatz_rolle: Option<crate::einsatz::EinsatzRolle>,
+    geraet: Option<&crate::geraet::GeraetKontext>,
     erinnerungen: &mut [ErinnerungAnzeige],
 ) -> Result<(), crate::error::AppError> {
     let aufloeser = crate::fuehrung::aufloesung::Aufloeser::laden_fuer(
@@ -92,6 +93,7 @@ pub async fn anreichern_alle(
         org_id,
         benutzer,
         einsatz_rolle,
+        geraet,
     )
     .await?;
     let mut conn = pool.acquire().await?;

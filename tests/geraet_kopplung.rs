@@ -702,6 +702,78 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
+/// LLH-1156: Ein Abschnittsgerät liest `auftraege`, aber nicht `stab`. Auch wenn das Stab-Modul
+/// im Einsatz für alle frei ist, zeigt ein Auftrag an S3 dem Gerät keine Besetzung; die
+/// Einsatzleitung sieht sie wie bisher.
+#[tokio::test]
+async fn abschnittsgeraet_sieht_keine_stab_besetzung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{}", l.einsatz);
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("{basis}/stab/besetzung/s3"),
+        &admin,
+        Some(&json!({"besetzung_art": "extern", "bezeichnung": "Müller"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("{basis}/modul-overrides/stab"),
+        &admin,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": null})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let auftrag = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Lage erkunden",
+        json!([
+            {"empfaenger_typ": "abschnitt", "abschnitt_id": l.nord},
+            {"empfaenger_typ": "funktion", "funktion": "s3"},
+        ]),
+    )
+    .await;
+    let detail = format!("{basis}/auftraege/{}", auftrag["id"].as_i64().unwrap());
+    let s3 = |a: &Value| {
+        a["empfaenger"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["funktion"] == "s3")
+            .unwrap()
+            .clone()
+    };
+
+    // Gegenprobe: die Einsatzleitung sieht die Besetzung.
+    let (s, v) = anfrage(&app, "GET", &detail, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(s3(&v)["aktuelle_besetzung"]["name"], "Müller");
+
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let (s, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let e = s3(&v);
+    assert_eq!(e["snap_anzeige"], "S3 Einsatz");
+    assert!(
+        e.get("aktuelle_besetzung").is_none(),
+        "Gerät ohne stab: {e}"
+    );
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/auftraege"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let e = s3(&v.as_array().unwrap()[0]);
+    assert!(
+        e.get("aktuelle_besetzung").is_none(),
+        "Gerät ohne stab (Liste): {e}"
+    );
+}
+
 const BEFEHL_ROH: &str = r#"{"vorlage":"befehl_lad","titel":"TITEL","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"lage","text":"L"},{"schluessel":"auftrag","text":"A"},{"schluessel":"durchfuehrung","text":"D"}]}"#;
 
 /// Ein Befehlsentwurf mit dem Verteiler `verteiler`; freigegeben, wenn `freigeben`.

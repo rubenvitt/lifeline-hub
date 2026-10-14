@@ -79,6 +79,18 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     expect(
       liste.find((m) => m.inhalt === 'Raum voll, weitere Kräfte zum BR Schule')?.absender,
     ).toBe('BR Sportplatz · Tablet BR');
+
+    // LLH-1155: benennt die Einsatzleitung den Raum um, zieht der Gerätekopf ohne Neuanmeldung
+    // nach. Die Sitzung des Tablets nennt weiter den alten Namen.
+    const kopf = tablet.locator('[data-lfh="kopf-stelle"]');
+    await expect(kopf).toContainText('BR Sportplatz');
+    const umbenannt = await page.request.patch(
+      `/api/einsaetze/${e}/bereitstellungsraeume/${sportplatz.id}`,
+      { data: { bezeichnung: 'BR Festwiese' } },
+    );
+    expect(umbenannt.ok(), `${umbenannt.status()} ${await umbenannt.text()}`).toBeTruthy();
+    await expect(kopf).toContainText('BR Festwiese');
+    await expect(kopf).not.toContainText('BR Sportplatz');
   } finally {
     await kontext.close();
   }

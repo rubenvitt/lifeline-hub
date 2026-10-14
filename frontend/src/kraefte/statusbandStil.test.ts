@@ -1,21 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { bandSpalten } from './statusbandStil';
-import type { AbBreitePunkt } from '../components/useViewport';
+import { bandSegmente } from './statusbandStil';
+import { farbenHell } from '../theme/tokens';
 
-const ab =
-  (bis: AbBreitePunkt | null) =>
-  (punkt: AbBreitePunkt): boolean => {
-    const folge: AbBreitePunkt[] = ['sm', 'md', 'lg', 'xl', 'xxl'];
-    return bis != null && folge.indexOf(punkt) <= folge.indexOf(bis);
-  };
-
-describe('bandSpalten', () => {
-  it('6 ab xl, 3 ab md, 2 darunter', () => {
-    expect(bandSpalten(ab('xxl'))).toBe(6);
-    expect(bandSpalten(ab('xl'))).toBe(6);
-    expect(bandSpalten(ab('lg'))).toBe(3);
-    expect(bandSpalten(ab('md'))).toBe(3);
-    expect(bandSpalten(ab('sm'))).toBe(2);
-    expect(bandSpalten(ab(null))).toBe(2);
+describe('bandSegmente', () => {
+  it('Etikett ist der Code, ohne Code das Wort; die Farbe ist die Kante des Tons', () => {
+    expect(
+      bandSegmente(
+        [
+          { schluessel: 'a', code: 'S4', wert: 2, wort: 'Am Einsatzort', ton: 'achtung' },
+          { schluessel: 'b', code: null, wert: 1, wort: 'gemischt', ton: 'neutral' },
+        ],
+        farbenHell,
+      ),
+    ).toEqual([
+      { label: 'S4', wert: 2, farbe: farbenHell.achtung },
+      { label: 'gemischt', wert: 1, farbe: farbenHell.schwach },
+    ]);
   });
 });

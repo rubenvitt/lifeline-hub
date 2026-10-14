@@ -64,6 +64,10 @@ zählt beim Abschnitt ihrer obersten Einheit, nicht zusätzlich bei ihrem eigene
 - **WHEN** im Bereitstellungsraum Einheit A und die ihr unterstellte Einheit B stehen
 - **THEN** zählt die Summe B genau einmal
 
+#### Scenario: Meldebild mit kumulierter Elternzeile
+- **WHEN** das Meldebild Einheit A (1/1/2) mit der unterstellten Einheit B (0/1/3) als Kind zeigt
+- **THEN** zeigt A 1/2/5//8, B 0/1/3//4, und der Seitenkopf zählt 1/2/5//8
+
 ### Requirement: Eine Formatierung und eine Sichtungsverteilung
 Die BOS-Schreibweise einer Stärke („F/UF/M//Σ“) SHALL an jeder Stelle aus derselben Formatierung
 kommen. Die Verteilung der Betroffenen auf die Sichtungskategorien SHALL an jeder Stelle aus

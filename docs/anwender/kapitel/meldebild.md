@@ -2,15 +2,16 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
 
-Das **Meldebild** zeigt auf einer Seite, was an Kräften im Einsatz ist: je Einheit Status, letzte
-Rückmeldung, laufenden Auftrag, Stärke, Abschnitt und Einsatzdauer. Darüber zählt ein Statusband die
-Einheiten je FMS-Status und das Personal je Statuskategorie. Es ist die Seite für den Lagevortrag
-und für die Frage, wo etwas fehlt.
+Das **Meldebild** zeigt auf einer Seite, was an Kräften im Einsatz ist, gegliedert als
+Kräftebaum: jede Einheit mit ihren Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, ihr
+Personal und ihr Material. Je Einheit stehen Status, letzte Rückmeldung, laufender Auftrag, Stärke,
+Abschnitt und Einsatzdauer. Darüber zählt ein Statusband die Einheiten und das Personal. Es ist die
+Seite für den Lagevortrag und für die Frage, wo etwas fehlt.
 
 Die **Kräfte-Zeitachse** hält je Einheit und Person fest, wann sie alarmiert wurde, eingetroffen
 ist, abgelöst oder entlassen wurde. Aus ihr rechnet die App Einsatzdauer und Ruhezeit.
@@ -24,21 +25,35 @@ setzen Status, tragen nach und streichen.
 
 1. Unter „Kräfte & Mittel“ das „Meldebild“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
    Stärke (Führer/Unterführer/Mannschaft//Gesamt).
-2. Im Statusband ablesen, wie viele Einheiten in welchem FMS-Status stehen und wie viel Personal in
-   welcher Kategorie. Eine eigene Kachel „keine Rückmeldung“ zählt Einheiten, die sich noch nie
-   zurückgemeldet haben.
-
-   ![Meldebild mit Statusband für Einheiten und Personal, Werkzeugzeile und Raster der fünf Einheiten mit Status, Rückmeldung, Auftrag, Stärke, Abschnitt, Seit und Im Einsatz](../bilder/meldebild/meldebild.png)
-
+2. Im Statusband die Zahl unter „Einheiten“ ablesen; der Balken darunter gliedert sie nach
+   FMS-Status, die Legende nennt Code und Zahl, etwa „S3 2 · S4 1“. Daneben steht „Personal“ mit
+   der Gliederung nach Kategorie. „Rückmeldung“ mit dem Wort „keine Rückmeldung“ erscheint nur,
+   wenn sich eine Einheit noch nie zurückgemeldet hat, und zählt diese Einheiten.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
-   nennt ihren Grund als Wort, etwa „1 Ausfall“ oder „Rückm. überfällig“.
-4. Mit „+“ vor einer Einheit ihre Fahrzeuge, ihr Personal und ihr Material aufklappen, mit
-   „Fahrzeuge und Personal zeigen“ alle Einheiten auf einmal.
-5. Zum Eingrenzen oben rechts unter „Abschnitt“ einen Einsatzabschnitt wählen, in der Werkzeugzeile
-   nach „Trägerorganisation“ oder „Status“ (verfügbar, gebunden, nicht verfügbar) filtern oder in
-   „Suche...“ einen Namen eingeben. Die Zahl links, etwa „20 von 20 Kräften“, nennt, wie viele
-   Kräfte die Auswahl zeigt; „Filter zurücksetzen“ hebt alle Filter auf.
+   nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
+4. Die Tiefe des Baums in der Werkzeugzeile wählen. Das Meldebild öffnet auf „Einheiten“:
+   Untereinheiten stehen unter ihrer Einheit, Fahrzeuge sind zugeklappt. „mit Fahrzeugen“ öffnet
+   jede Einheit, „alles“ auch die Besatzung jedes Fahrzeugs. Mit „+“ vor einer Zeile oder einem
+   Klick auf die Zeile klappt sie einzeln auf oder zu.
+
+   ![Meldebild mit Statusband, Werkzeugzeile und Kräftebaum: Sanitätszug mit Fahrzeug und aufgeklappter Besatzung, darunter Rettungsstaffel und Sanitätsgruppe als Untereinheiten](../bilder/meldebild/meldebild.png)
+
+5. Unter einer Einheit lesen, was zu ihr gehört: zuerst ihre Fahrzeuge, in der Spalte „Stärke“
+   mit der Besatzung „Ist … · Soll …“, aufgeklappt mit den Personen darauf; dann „Ohne Fahrzeug“
+   mit ihrem Personal, das auf keinem ihrer Fahrzeuge sitzt; dann „Material“ mit der Zahl der
+   Posten und der Ausfälle; zuletzt die Untereinheiten. Hat die Einheit kein Fahrzeug, steht ihr
+   Personal direkt darunter. Vor jeder Person steht ihre Stärkeposition („F“, „UF“, „M“, ohne
+   Position „–“), vor dem Einheitsführer zusätzlich „EF“.
+6. Auf den Namen einer Einheit, den Funkrufnamen eines Fahrzeugs oder den Namen einer Person
+   klicken, um ihn in seinem Modul zu öffnen: die Einheit in den Einheiten, das Fahrzeug und die
+   Person hervorgehoben in ihrer Liste.
+7. Zum Eingrenzen oben rechts unter „Abschnitt“ einen Einsatzabschnitt wählen, in „Suche...“ einen
+   Namen eingeben oder unter „Filter“ nach „Trägerorganisation“ oder „Status“ (verfügbar,
+   gebunden, nicht verfügbar) filtern; der Knopf nennt dann die Zahl, etwa „Filter (1)“. Jeder
+   gesetzte Filter steht als Marke in der Werkzeugzeile und lässt sich dort einzeln entfernen. Die
+   Zahl links, etwa „20 von 20 Kräften“, nennt, wie viele Kräfte die Auswahl zeigt; „Filter
+   zurücksetzen“ hebt alle Filter auf.
 
 Die Zeile „Ohne Einheit“ sammelt Fahrzeuge, Personal und Material, die keiner Einheit zugeordnet
 sind. Unter „Spalten“ lassen sich Spalten aus- und einblenden; „Funkrufname“ und „Fahrzeuge und
@@ -48,8 +63,10 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
 
 1. Das Meldebild wie gewünscht eingrenzen.
 2. „In Lagebericht übernehmen“ wählen. Die App legt aus der Auswahl einen Lagebericht
-   „Kräftemeldebild“ mit Datum-Zeit-Gruppe an, gegliedert nach Abschnitten, und öffnet ihn.
-3. Für Papier „Drucken / als PDF“ wählen. Der Druck klappt alle Einheiten auf und nennt im Kopf
+   „Kräftemeldebild“ mit Datum-Zeit-Gruppe an und öffnet ihn. Er ist nach Abschnitten gegliedert,
+   darin wie das Meldebild: Einheit, Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, „Material“ mit
+   Posten und Ausfall, Untereinheiten.
+3. Für Papier „Drucken / als PDF“ wählen. Der Druck klappt den ganzen Baum auf und nennt im Kopf
    Stand, Umfang und die gewählte Auswahl.
 
 „In Lagebericht übernehmen“ steht nur Einsatzleitung und Führungspersonal zur Verfügung.
@@ -96,6 +113,21 @@ zeigt die Zelle „gemischt“ und darunter die Verteilung, etwa „1× S3 · 1�
 Fahrzeug bekommt einen Status von Hand: Einsatzleitung und Führungspersonal öffnen dafür in ihrer
 Spalte „Status“ das Statusmenü und wählen einen Wert aus dem FMS-Katalog, „kein Status“ entfernt
 ihn. Jeder Wechsel steht im Einsatztagebuch, und „Seit“ zeigt, seit wann er gilt.
+
+### Stärke und Besatzung
+
+Die Stärke einer Einheit zählt ihr eigenes Personal und das aller Untereinheiten; jede Untereinheit
+nennt ihre eigene. Die obersten Zeilen ergeben zusammen die Stärke im Kopf. Jede Kraft zählt
+einmal, bei ihrer Einheit, auch wenn sie auf dem Fahrzeug einer anderen Einheit sitzt: dann steht
+sie unter „Ohne Fahrzeug“ ihrer Einheit mit dem Zusatz „fährt auf …“. Die Besatzung „Ist“ eines
+Fahrzeugs zählt dagegen jede Kraft darauf, auch die anderer Einheiten, und nennt sie, etwa „davon 1
+aus Rettungsstaffel“. Das „Soll“ kommt aus dem Fahrzeugstamm (Kapitel [Fahrzeuge](fahrzeuge.md)).
+
+Status, Mittelverteilung und Tönung bleiben bei der eigenen Zeile: ein Ausfall in einer
+Untereinheit tönt nur sie. Material, das defekt, verbraucht oder „Desinfektion nötig“ ist, zählt
+als Ausfall und tönt die Einheit, der es gehört. Der Filter „Abschnitt“ richtet sich nach dem
+Abschnitt der obersten Einheit: eine Untereinheit bleibt unter ihrer Einheit, auch wenn sie selbst
+keinen oder einen anderen Abschnitt trägt.
 
 ### Rückmeldung und Frist
 

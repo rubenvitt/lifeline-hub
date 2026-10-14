@@ -7,12 +7,14 @@
 //! seit LFH-701 mitgeschwärzt; sein Wortlaut bleibt im ETB der Anordnung.
 //!
 //! Wer das Stab-Modul im Einsatz nicht lesen darf, bekommt keine Auflösung (das Feld fehlt) —
-//! dieselbe Filterlogik wie beim Modulzähler.
+//! dieselbe Filterlogik wie beim Modulzähler. Ein Gerät liest dafür nur die Module seiner Ansicht
+//! (LLH-1156).
 
 use super::Fuehrungsfunktion;
 use crate::auth::Benutzer;
 use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
+use crate::geraet::GeraetKontext;
 use crate::stab::{BesetzungArt, Sachgebiet};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -90,15 +92,18 @@ impl Aufloeser {
         })
     }
 
-    /// Lädt mit Rechteprüfung: das Stab-Modul muss für `benutzer` im Einsatz freigegeben sein.
+    /// Lädt mit Rechteprüfung: das Stab-Modul muss für `benutzer` im Einsatz freigegeben sein,
+    /// bei einem Gerät zudem in der Ansicht liegen.
     pub async fn laden_fuer(
         pool: &SqlitePool,
         einsatz_id: i64,
         org_id: i64,
         benutzer: &Benutzer,
         einsatz_rolle: Option<EinsatzRolle>,
+        geraet: Option<&GeraetKontext>,
     ) -> Result<Self, AppError> {
-        let darf = darf_stab_lesen(pool, einsatz_id, org_id, benutzer, einsatz_rolle).await?;
+        let darf =
+            darf_stab_lesen(pool, einsatz_id, org_id, benutzer, einsatz_rolle, geraet).await?;
         let mut conn = pool.acquire().await?;
         Self::laden(&mut conn, einsatz_id, darf).await
     }
@@ -115,15 +120,17 @@ impl Aufloeser {
 }
 
 /// Ob `benutzer` das Stab-Modul im Einsatz lesen darf (Modulfreigabe; die Mitgliedschaft
-/// prüft bereits der Extractor der aufrufenden Route).
+/// prüft bereits der Extractor der aufrufenden Route). Ein Gerät (LFH-892) darf es nur, wenn
+/// `stab` zu den Lese-Modulen seiner Ansicht gehört, wie bei Live-Feed und Modulzähler.
 pub async fn darf_stab_lesen(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
     benutzer: &Benutzer,
     einsatz_rolle: Option<EinsatzRolle>,
+    geraet: Option<&GeraetKontext>,
 ) -> Result<bool, AppError> {
-    let erlaubt = crate::einsatz::berechtigung::erlaubte_module(
+    let mut erlaubt = crate::einsatz::berechtigung::erlaubte_module(
         pool,
         einsatz_id,
         org_id,
@@ -131,6 +138,9 @@ pub async fn darf_stab_lesen(
         einsatz_rolle,
     )
     .await?;
+    if let Some(g) = geraet {
+        erlaubt = g.schneide_module(erlaubt);
+    }
     use crate::einsatz::modul::{ModulMarker, Stab};
     Ok(Stab::KEY.is_some_and(|key| erlaubt.contains(key)))
 }

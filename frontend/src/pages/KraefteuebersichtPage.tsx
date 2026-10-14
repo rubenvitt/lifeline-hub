@@ -1,7 +1,7 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
-import { Breadcrumb, Button, Input, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Input, Popover, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -40,9 +40,9 @@ import {
   type Rohdaten,
 } from '../kraefte/kraeftebild';
 import {
-  aufklappbareSchluessel,
   baueMeldebildRaster,
   einheitBand,
+  einheitZeilen,
   istProblemZeile,
   istRueckmeldungProblem,
   keineRueckmeldungZelle,
@@ -54,7 +54,13 @@ import {
 } from '../kraefte/meldebildRaster';
 import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
-import EinheitZeichen from '../kraefte/EinheitZeichen';
+import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
+import {
+  besatzungZeilen,
+  schluesselBisStufe,
+  stufeVon,
+  type Ausklappstufe,
+} from '../kraefte/kraeftebaumKern';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -77,13 +83,19 @@ import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
 
 /**
- * Meldebild: Statusraster über alle Einheiten.
+ * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
  *
- * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Einheiten je
- * FMS-Status, Personal je Kategorie, Kachel „keine Rückmeldung") → Werkzeugzeile außerhalb des
- * Primitivs (Auswahlzeile, weitere Filter, Aufklappen, Lagebericht, Druck) → Raster: eine Zeile je
- * Einheit, die Mittel als aufklappbares Detail. Die Ableitungen stehen rein in
- * `kraefte/meldebildRaster.ts`.
+ * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Kennzahl
+ * Einheiten und Personal mit Aufgliederung, „keine Rückmeldung") → Werkzeugzeile außerhalb des
+ * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Lagebericht, Druck) → Raster als
+ * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
+ * Material als Gruppe. Die Elternzeile zeigt die kumulierte Stärke, Verteilung und Tönung bleiben
+ * eigen. Die Baumlogik steht in `kraefte/kraeftebaumKern.ts`, die Zeilen in
+ * `kraefte/meldebildRaster.ts`, die erste Spalte in `kraefte/KraeftebaumZelle.tsx`.
+ *
+ * Ausklappstufe: „Einheiten“ (Vorgabe beim Öffnen: Untereinheiten sichtbar, Mittel zu) · „mit
+ * Fahrzeugen“ · „alles“; der Druck klappt alles auf. Der Wert der Segmentleiste wird aus den
+ * offenen Schlüsseln abgeleitet (`stufeVon`), einzelne Zeilen klappen weiter von Hand.
  *
  * Einheitenstatus (LFH-609): serverseitig aus den Fahrzeugen abgeleitet — gemeinsam oder „gemischt"
  * mit Verteilung —, eine Einheit ohne Fahrzeug führt ihn von Hand (Auslöser nur dort). Das
@@ -180,9 +192,6 @@ export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOp
 /** Menüwert für „Handstatus löschen" — eine Katalog-ID ist nie negativ. */
 export const KEIN_HANDSTATUS = -1;
 
-/** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist kein Icon"). */
-const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
-
 /** Breite der Auftragsspalte: gekürzt auf zwei Zeilen, der Volltext steht im `title`. */
 const AUFTRAG_BREITE = 180;
 
@@ -227,6 +236,7 @@ function rasterSpalten(
   kontext: StatusKontext,
   rueckmeldung: RueckmeldungSpalte,
   imEinsatz: ImEinsatzSpalte,
+  sprungGesperrt: SprungGesperrt,
 ) {
   // Spaltenfolge nach der Frage am Schirm (LFH-973): Status, Rückmeldung und Auftrag stehen
   // vorn, damit sie bei 1440 px ohne Querscrollen im Bild liegen; Funkrufname und Mittel weichen
@@ -242,7 +252,9 @@ function rasterSpalten(
       key: 'einheit',
       immerSichtbar: true,
       mindestBreite: 170,
-      render: (_t, z) => <EinheitZelle zeile={z} />,
+      render: (_t, z) => (
+        <KraeftebaumZelle zeile={z} einsatzId={einsatzId} gesperrt={sprungGesperrt} />
+      ),
     },
     {
       title: 'Status',
@@ -290,8 +302,14 @@ function rasterSpalten(
       title: 'Stärke',
       key: 'staerke',
       width: 100,
+      // Einheit: kumulierte Stärke (D2). Fahrzeug: die Besatzung Ist/Soll statt einer Stärke
+      // (D4), gedämpft — sie ist in der Elternzahl schon enthalten.
       render: (_t, z) =>
-        z.staerke ? <span style={monoStil(12)}>{staerkeText(z.staerke)}</span> : null,
+        z.staerke ? (
+          <span style={monoStil(12)}>{staerkeText(z.staerke)}</span>
+        ) : z.besatzung ? (
+          <StaerkeBesatzung zeilen={besatzungZeilen(z.besatzung)} />
+        ) : null,
     },
     // Kein `abBreite`: als Spalte ist der Abschnitt die Gliederung, und ein Meldeblatt auf A4
     // ginge sonst ohne die Zuordnung Einheit → Abschnitt hinaus.
@@ -386,36 +404,19 @@ function ImEinsatzZelle({
   );
 }
 
-function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
-  const { token, rollen } = useRollen();
-  // Umbrechend: die Einheitenspalte hat keine feste Breite, und ein nicht umbrechender Nebentext
-  // höbe die Mindestbreite der ganzen Tabelle — im Druck auf A4 ragte sie aus dem Blatt
-  // (`e2e/meldebild-druck.spec.ts`).
-  const nebentext = z.zusatz && (
-    <span style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}>{z.zusatz}</span>
-  );
-  if (z.art !== 'einheit') {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
-        {/* Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
-            sonst als „Pers“ über „.“ brechen (LFH-1007). */}
-        <span style={{ ...monoStil(11), color: rollen.schwach, flexShrink: 0 }}>
-          {MITTEL_KURZ[z.art]}
-        </span>
-        <span style={{ minWidth: 0 }}>
-          {z.art === 'fahrzeug' ? <span style={monoStil(12)}>{z.bezeichnung}</span> : z.bezeichnung}
-          {nebentext}
-        </span>
-      </span>
-    );
-  }
+/** Besatzung eines Fahrzeugs in der Stärkespalte — gedämpft, Ist über Soll. */
+function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
+  const { rollen } = useRollen();
+  // Untereinander und eine Stufe kleiner: hintereinander brach „Ist … · Soll …“ in der 100 px
+  // breiten Spalte auf vier Zeilen (Doku-Bild, LLH-1025).
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginSM }}>
-      <EinheitZeichen tz={z.tz} />
-      <span style={{ minWidth: 0 }}>
-        <span style={{ fontWeight: 500 }}>{z.bezeichnung}</span>
-        {nebentext}
-      </span>
+    <span
+      data-lfh="meldebild-besatzung"
+      style={{ ...monoStil(10), display: 'flex', flexDirection: 'column', color: rollen.gedaempft }}
+    >
+      {zeilen.map((z) => (
+        <span key={z}>{z}</span>
+      ))}
     </span>
   );
 }
@@ -653,7 +654,14 @@ export default function KraefteuebersichtPage() {
   const jetzt = useJetzt();
 
   const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
-  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  /**
+   * Offene Zeilen; `null` heißt „Vorgabestufe Einheiten“ (Untereinheiten sichtbar, Mittel zu).
+   * Als `null` statt einer berechneten Liste, weil das Raster beim ersten Bild noch leer ist.
+   */
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[] | null>(null);
+  /** Die zuletzt gewählte Stufe: bei gleichen Schlüsselmengen gewinnt sie (`stufeVon`). */
+  const [gewaehlteStufe, setGewaehlteStufe] = useState<Ausklappstufe | null>(null);
+  const [filterOffen, setFilterOffen] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -748,8 +756,26 @@ export default function KraefteuebersichtPage() {
         ...gefiltertRoh,
         statusKatalog: statusKatalogQuery.data ?? [],
         auftraege: auftraegeQuery.data ?? [],
+        // Ungefiltert: „fährt auf“ nennt auch ein weggefiltertes Fahrzeug, und die Besatzung Ist
+        // zählt alle Kräfte auf dem Fahrzeug (D4).
+        quelle: {
+          einheiten: einheitenQuery.data ?? [],
+          personal: personalQuery.data ?? [],
+          fahrzeuge: fahrzeugeQuery.data ?? [],
+        },
       }),
-    [gefiltertRoh, statusKatalogQuery.data, auftraegeQuery.data],
+    [
+      gefiltertRoh,
+      statusKatalogQuery.data,
+      auftraegeQuery.data,
+      einheitenQuery.data,
+      personalQuery.data,
+      fahrzeugeQuery.data,
+    ],
+  );
+  const offeneSchluessel = useMemo(
+    () => expandedKeys ?? schluesselBisStufe(raster, 'einheiten'),
+    [expandedKeys, raster],
   );
 
   const rueckmeldungZustand = abrufZustand(rueckmeldungenQuery);
@@ -763,7 +789,8 @@ export default function KraefteuebersichtPage() {
     const m = new Map<string, RueckmeldungAnzeige>();
     if (!rueckmeldungDaten) return m;
     const je = rueckmeldungJeEinheit(rueckmeldungDaten);
-    for (const z of raster) {
+    // Rekursiv: auch Untereinheiten tragen eine Rückmeldung (D12).
+    for (const z of einheitZeilen(raster)) {
       const r = rueckmeldungDerZeile(z, je, jetzt);
       if (r) m.set(z.key, r);
     }
@@ -880,6 +907,7 @@ export default function KraefteuebersichtPage() {
         },
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
         { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
+        sprungGesperrt,
       ).filter((spalte) => !druckt || !NUR_AM_SCHIRM.has(spalte.key)),
     [
       druckt,
@@ -892,6 +920,7 @@ export default function KraefteuebersichtPage() {
       rueckmeldungJeZeile,
       periodenZustand,
       imEinsatzJeEinheit,
+      sprungGesperrt,
     ],
   );
 
@@ -907,6 +936,12 @@ export default function KraefteuebersichtPage() {
         gefiltertRoh.personal,
         gefiltertRoh.fahrzeuge,
         gefiltertRoh.material,
+        // Ungefiltert wie am Schirm: „fährt auf“ und Besatzung Ist (D4, D10).
+        {
+          einheiten: einheitenQuery.data ?? [],
+          personal: personalQuery.data ?? [],
+          fahrzeuge: fahrzeugeQuery.data ?? [],
+        },
       );
       // Gefiltert gilt der Bericht einer Auswahl; die Entlassenen gehören zu keiner mehr.
       const entlassene = gefiltert
@@ -932,10 +967,11 @@ export default function KraefteuebersichtPage() {
   // Ein Einsatzwechsel setzt Filter und Aufklappzustand zurück — sonst trüge die Filtermarke den
   // Abschnittsnamen des vorigen Einsatzes.
   //
-  // Zugeklappt starten ist richtig: die Einheitenzeile selbst trägt Stärke, Verteilung und Auftrag;
-  // die Mittel darunter sind Detail.
+  // Vorgabe „Einheiten“ (Ruben, 13.10.2026): die Gliederung steht offen, die Mittel sind Detail —
+  // die Einheitenzeile trägt Stärke, Verteilung und Auftrag schon selbst.
   useEffect(() => {
-    setExpandedKeys([]);
+    setExpandedKeys(null);
+    setGewaehlteStufe(null);
     setFilter(LEERER_FILTER);
   }, [einsatzId]);
 
@@ -961,12 +997,11 @@ export default function KraefteuebersichtPage() {
   );
 
   /**
-   * Stehen alle Mittel offen? Trägt den Zustand des Umschalters. Als benannte Zwischenvariable,
-   * nicht inline im `value` — `datensicht.guard.test.ts` liest aus dem Schalter-Attribut eine
-   * „Reiterachse"; hier liest der Schalter die Daten, nicht umgekehrt.
+   * Die Stufe, die die offenen Zeilen gerade zeigen — trägt den Zustand des Umschalters. Als
+   * benannte Zwischenvariable, nicht inline im `value` — `datensicht.guard.test.ts` liest aus dem
+   * Schalter-Attribut eine „Reiterachse"; hier liest der Schalter die Daten, nicht umgekehrt.
    */
-  const alleAufgeklappt =
-    expandedKeys.length > 0 && expandedKeys.length === aufklappbareSchluessel(raster).length;
+  const stufe = stufeVon(raster, offeneSchluessel, gewaehlteStufe);
 
   const abschnittName = (aid: number) =>
     (abschnitteQuery.data ?? []).find((a) => a.id === aid)?.name ?? `Abschnitt ${aid}`;
@@ -975,7 +1010,10 @@ export default function KraefteuebersichtPage() {
   /** „Kräfte" = Personal + Fahrzeuge, kein Material (eigene Statusachse). */
   const sichtbareKraefte = v.anzahlPersonal + v.anzahlFahrzeuge;
   const alleKraefte = gesamt.anzahlPersonal + gesamt.anzahlFahrzeuge;
-  const einheitenZeilen = raster.filter((z) => z.einheitId != null).length;
+  // Rekursiv (D12): eine Untereinheit ist eine Einheit der Auswahl.
+  const einheitenZeilen = einheitZeilen(raster).filter((z) => z.einheitId != null).length;
+  /** Die zwei Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
+  const filterZahl = (filter.traeger ? 1 : 0) + (filter.kategorie ? 1 : 0);
 
   const listenFehler = personalQuery.isError || fahrzeugeQuery.isError || einheitenQuery.isError;
   const listenLaden = personalQuery.isLoading || fahrzeugeQuery.isLoading;
@@ -1118,51 +1156,80 @@ export default function KraefteuebersichtPage() {
               Filter zurücksetzen
             </Button>
           )}
-          <Select
-            placeholder="Trägerorganisation"
-            aria-label="Nach Trägerorganisation filtern"
-            allowClear
-            style={{ minWidth: 180 }}
-            value={filter.traeger ?? undefined}
-            options={traeger.map((t) => ({ value: t, label: t }))}
-            onChange={(wert) => setFilter((f) => ({ ...f, traeger: wert ?? null }))}
-          />
-          {/* Der vierte Eimer („ohne Status") bleibt draußen: `filtereKraefte` vergleicht `kat
-              === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
-          <Select
-            placeholder="Status"
-            aria-label="Nach Status filtern"
-            allowClear
-            style={{ minWidth: 160 }}
-            value={filter.kategorie ?? undefined}
-            options={KATEGORIE_WERTE.filter((w) => w.value !== 'ohne').map((w) => ({
-              value: w.value as StatusKategorie,
-              label: w.text,
-            }))}
-            onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
-          />
           {/* Ein schlichtes Feld: `Input.Search` brächte einen Lupenknopf mit dem englischen
               Namen „search“ mit, und die Suche wirkt ohnehin bei jeder Eingabe. */}
           <Input
             placeholder="Suche..."
             aria-label="Einheiten und Kräfte durchsuchen"
             allowClear
-            style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}
+            style={{ flex: '1 1 180px', minWidth: 0, maxWidth: 280 }}
             value={filter.suche}
             onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
           />
-          {/* Zwei Zustände desselben Rasters. Der Wert wird aus `expandedKeys` gegen die
-              Vollzähligkeit abgeleitet — mit `length > 0` stünde der Umschalter nach dem
-              Zuklappen einer einzelnen Zeile weiter auf „alles". */}
-          <Segmentleiste<'einheiten' | 'mittel'>
-            beschriftung="Zeilen auf- oder zuklappen"
-            wert={alleAufgeklappt ? 'mittel' : 'einheiten'}
-            onWechsel={(wert) =>
-              setExpandedKeys(wert === 'mittel' ? aufklappbareSchluessel(raster) : [])
+          {/* Träger und Status hinter einem Knopf (D9): die Zeile bleibt bei 1366 px einzeilig.
+              Gesetzte Filter stehen trotzdem sichtbar als Marken davor, der Knopf nennt ihre
+              Zahl. */}
+          <Popover
+            trigger="click"
+            placement="bottomRight"
+            open={filterOffen}
+            onOpenChange={setFilterOffen}
+            content={
+              <div
+                data-lfh="meldebild-filter"
+                style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
+              >
+                <Select
+                  placeholder="Trägerorganisation"
+                  aria-label="Nach Trägerorganisation filtern"
+                  allowClear
+                  style={{ minWidth: 220 }}
+                  value={filter.traeger ?? undefined}
+                  options={traeger.map((t) => ({ value: t, label: t }))}
+                  onChange={(wert) => setFilter((f) => ({ ...f, traeger: wert ?? null }))}
+                />
+                {/* Der vierte Eimer („ohne Status") bleibt draußen: `filtereKraefte` vergleicht
+                    `kat === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
+                <Select
+                  placeholder="Status"
+                  aria-label="Nach Status filtern"
+                  allowClear
+                  style={{ minWidth: 220 }}
+                  value={filter.kategorie ?? undefined}
+                  options={KATEGORIE_WERTE.filter((w) => w.value !== 'ohne').map((w) => ({
+                    value: w.value as StatusKategorie,
+                    label: w.text,
+                  }))}
+                  onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
+                />
+              </div>
             }
+          >
+            <Button
+              aria-expanded={filterOffen}
+              icon={
+                <span aria-hidden style={{ display: 'inline-flex' }}>
+                  <IconTrichter />
+                </span>
+              }
+            >
+              {filterZahl > 0 ? `Filter (${filterZahl})` : 'Filter'}
+            </Button>
+          </Popover>
+          {/* Drei Stufen desselben Baums. Der Wert wird aus den offenen Schlüsseln abgeleitet
+              (`stufeVon`) — klappt jemand eine Zeile von Hand, zeigt die Leiste die größte Stufe,
+              die noch ganz offen steht, sonst „Einheiten“; ein Klick darauf stellt sie wieder her. */}
+          <Segmentleiste<Ausklappstufe>
+            beschriftung="Ausklappstufe des Kräftebaums"
+            wert={stufe}
+            onWechsel={(wert) => {
+              setGewaehlteStufe(wert);
+              setExpandedKeys(schluesselBisStufe(raster, wert));
+            }}
             optionen={[
-              { wert: 'einheiten', label: 'Einheiten zugeklappt' },
-              { wert: 'mittel', label: 'Fahrzeuge und Personal zeigen' },
+              { wert: 'einheiten', label: 'Einheiten' },
+              { wert: 'fahrzeuge', label: 'mit Fahrzeugen' },
+              { wert: 'alles', label: 'alles' },
             ]}
           />
           {darfSchreiben && (
@@ -1177,7 +1244,12 @@ export default function KraefteuebersichtPage() {
           )}
           {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
               löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf vorbereiten={() => setExpandedKeys(aufklappbareSchluessel(raster))} />
+          <DruckKnopf
+            vorbereiten={() => {
+              setGewaehlteStufe('alles');
+              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+            }}
+          />
         </div>
         {uebernehmen.error != null && (
           <div className="kraefte-no-print" style={{ marginBlockEnd: token.margin }}>
@@ -1224,7 +1296,11 @@ export default function KraefteuebersichtPage() {
               )}
             </span>
           }
-          baum={{ kinder: 'children', aufgeklappt: expandedKeys, onAufgeklappt: setExpandedKeys }}
+          baum={{
+            kinder: 'children',
+            aufgeklappt: offeneSchluessel,
+            onAufgeklappt: setExpandedKeys,
+          }}
           zeilenKlasse={(z) =>
             istProblemZeile(z) || istRueckmeldungProblem(rueckmeldungJeZeile.get(z.key))
               ? 'meldebild-problemzeile'

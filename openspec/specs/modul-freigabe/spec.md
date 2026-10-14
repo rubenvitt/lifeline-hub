@@ -241,9 +241,12 @@ unbekannt sind, MUST der Eintrag wie bisher erscheinen.
 
 ### Requirement: Die Rollensperre „Führung im Einsatz“ bezieht die Einsatzrolle ein
 Steht die effektive benötigte Rolle eines Moduls auf `einsatzfuehrung`, MUST `zugriff` genau dann
-`true` sein, wenn der Benutzer System-Admin ist, org-weite Führungskraft ist oder im Einsatz die
-Rolle Einsatzleitung oder Führungspersonal trägt. Beobachter und Benutzer ohne Rolle im Einsatz
-MUST keinen Zugriff erhalten. Die Stufe `fuehrungskraft` MUST unverändert nur die Org-Rolle prüfen.
+`true` sein, wenn der Benutzer System-Admin ist, Führungskraft der Organisation des Einsatzes ist
+oder im Einsatz die Rolle Einsatzleitung oder Führungspersonal trägt. Beobachter und Benutzer ohne
+Rolle im Einsatz MUST keinen Zugriff erhalten. Die Stufe `fuehrungskraft` MUST unverändert nur die
+Org-Rolle prüfen, nicht die Rolle im Einsatz. Für beide Stufen MUST die Org-Rolle „Führungskraft“
+nur in der Organisation des Einsatzes zählen; eine Führungskraft einer fremden Organisation gilt
+dort als Benutzer ohne diese Org-Rolle.
 
 #### Scenario: Einsatzleitung ohne Org-Rolle
 - **WHEN** der Einsatz das Modul `schaeden` auf `einsatzfuehrung` beschränkt und eine Einsatzleitung ohne Org-Rolle „Führungskraft“ die Freigaben abruft
@@ -260,6 +263,10 @@ MUST keinen Zugriff erhalten. Die Stufe `fuehrungskraft` MUST unverändert nur d
 #### Scenario: Org-Führungskraft ohne Mitgliedschaft
 - **WHEN** der Einsatz das Modul `schaeden` auf `einsatzfuehrung` beschränkt und eine org-weite Führungskraft der Einsatz-Org ohne Mitgliedschaft anfragt
 - **THEN** lautet der Eintrag `schaeden` `zugriff: true`
+
+#### Scenario: Führungskraft einer fremden Organisation
+- **WHEN** der Einsatz das Modul `schaeden` auf `fuehrungskraft` oder `einsatzfuehrung` beschränkt und eine Führungskraft einer anderen Organisation anfragt, die im Einsatz Beobachter ist
+- **THEN** lautet der Eintrag `schaeden` `zugriff: false`, und der Listen-Endpunkt der Schäden antwortet ihr mit HTTP 403
 
 #### Scenario: Org-Vorgabe mit der neuen Stufe
 - **WHEN** die Org-Vorgabe `schaeden` auf `einsatzfuehrung` beschränkt, der Einsatz keinen Override dafür hat und eine Einsatzleitung ohne Org-Rolle anfragt

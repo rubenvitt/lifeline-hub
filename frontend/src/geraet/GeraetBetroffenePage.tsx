@@ -10,6 +10,7 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { personenKarte, personenSpalten, verbleibText } from '../personen/personenSpalten';
 import { geraetBetroffenAufnahmePfad, geraetBetroffenerPfad } from '../routing/deeplinks';
+import { useStellenName } from './stellenName';
 
 /** Spalten des Registers, die das Gerät zeigt; Zustand, Fundort und Vermerk stehen im Detail. */
 const GERAET_SPALTEN = new Set(['reg', 'person', 'seit']);
@@ -39,6 +40,7 @@ export default function GeraetBetroffenePage() {
   const navigate = useNavigate();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const stelleId = geraet?.stelle_id ?? null;
+  const stelle = useStellenName(geraet);
 
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
@@ -63,7 +65,7 @@ export default function GeraetBetroffenePage() {
   return (
     <EinsatzSeite
       titel="Betroffene"
-      meta={geraet?.stelle ?? undefined}
+      meta={stelle ?? undefined}
       dataUpdatedAt={personenQuery.dataUpdatedAt}
       aktionen={
         <Button
