@@ -275,6 +275,23 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
   expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
 });
 
+it('Abschnitts-Filter behält eine Untereinheit ohne eigenen Abschnitt unter ihrem Zug (D11)', () => {
+  const abschnitte = [ab(1), ab(2)];
+  // Gr 11 ohne eigenen Abschnitt unter Zug 10 (Abschnitt 1); Gr 12 steht selbst in 2, zählt aber
+  // beim Abschnitt ihrer obersten Einheit (Spec `lage-verdichtung`).
+  const einheiten = [eh(10, 1), eh(11, null, 10), eh(12, 2, 10), eh(20, 2)];
+  const personal = [p(1, 11, 'mannschaft'), p(2, 12, 'mannschaft'), p(3, 20, 'mannschaft')];
+  const nach = (abschnittId: number) =>
+    filtereKraefte(
+      { abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
+      { traeger: null, abschnittId, kategorie: null, suche: '' },
+    );
+  expect(nach(1).einheiten.map((e) => e.id)).toEqual([10, 11, 12]);
+  expect(nach(1).personal.map((x) => x.id)).toEqual([1, 2]);
+  expect(nach(2).einheiten.map((e) => e.id)).toEqual([20]);
+  expect(nach(2).personal.map((x) => x.id)).toEqual([3]);
+});
+
 it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   // Die Fixture trägt ALLE DREI Mittelarten, sonst wäre „keine Bildzeichen" für zwei Zweige
   // nicht belegt.
@@ -296,6 +313,41 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   expect(md).toContain('- Fzg. F1');
   expect(md).toContain('- Mtl. M1');
   expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
+});
+
+it('der Lagebericht-Text folgt dem Kräftebaum: Fahrzeug mit Besatzung, „Ohne Fahrzeug“, Material verdichtet (D10)', () => {
+  // Zug 10 mit Fahrzeug F1 (Soll 1/1/7), Führer P1 darauf, P2 ohne Fahrzeug, defektes Material;
+  // Gruppe 20 darunter mit P3 auf F1 — sie „fährt auf“ und zählt in der Besatzung Ist mit.
+  const zug = { ...eh(10, 1), typ_label: 'Zug', fuehrer_id: 1 };
+  const fahrzeug = { ...fz(1, 10), soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 7 } };
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [zug, eh(20, null, 10)],
+    [
+      { ...p(1, 10, 'fuehrer'), fahrzeug_id: 1 },
+      p(2, 10, 'mannschaft'),
+      { ...p(3, 20, 'mannschaft'), fahrzeug_id: 1 },
+    ],
+    [fahrzeug],
+    [mat(1, 10, 'defekt'), mat(2, 10, 'einsatzbereit')],
+  );
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  const teil = md.slice(
+    md.indexOf('- **E10**'),
+    md.lastIndexOf('fährt auf F1') + 'fährt auf F1'.length,
+  );
+  expect(teil.split('\n')).toEqual([
+    '- **E10** (Zug) — Stärke: 1/0/2//3',
+    '  - Fzg. F1 (LF) [2] — Besatzung Ist 1/0/1//2 · Soll 1/1/7//9, davon 1 aus E20',
+    '    - Pers. P1 (EF) [gebunden]',
+    '  - Ohne Fahrzeug: 1 Kraft',
+    '    - Pers. P2 [gebunden]',
+    '  - Material: 2 Posten, 1 Ausfall',
+    '    - Mtl. M1 ×1 [defekt]',
+    '    - Mtl. M2 ×1 [einsatzbereit]',
+    '  - **E20** (Gruppe) — Stärke: 0/0/1//1',
+    '    - Pers. P3 [gebunden] — fährt auf F1',
+  ]);
 });
 
 it('Kennzahlen des Lagebilds stehen in der Anzeige je in eigenem Block (LFH-1153)', () => {
@@ -450,4 +502,22 @@ it('verdichte stimmt mit der Verdichtung aus baueKraeftebild überein', () => {
   expect(v.fahrzeugStatus).toEqual(bild.verdichtung.fahrzeugStatus);
   expect(v.materialStatus).toEqual(bild.verdichtung.materialStatus);
   expect(v.anzahlMaterialPositionen).toBe(bild.verdichtung.anzahlMaterialPositionen);
+});
+
+it('eine Waise und ein Zyklus stehen in der Kräftegliederung und zählen wie die Gesamtstärke', () => {
+  // E30 nennt eine Obereinheit, die nicht in der Liste steht (Waise); E40 und E41 unterstellen
+  // sich gegenseitig (Zyklus). Beide Fälle verlor der frühere eigene Baum, die Gesamtstärke
+  // zählte die Kräfte trotzdem — der Kern (`einheitenBaum`) verliert keine Einheit.
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1), eh(30, null, 99), eh(40, null, 41), eh(41, null, 40)],
+    [p(1, 10, 'fuehrer'), p(5, 30, 'mannschaft'), p(6, 40, 'mannschaft'), p(7, 41, 'mannschaft')],
+    [],
+    [],
+  );
+  const gliederung = bild.baum.reduce((s, z) => s + (z.staerke?.gesamt ?? 0), 0);
+  expect(bild.verdichtung.staerke.gesamt).toBe(4);
+  expect(gliederung).toBe(bild.verdichtung.staerke.gesamt);
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  for (const name of ['E30', 'E40', 'E41', 'P5', 'P6', 'P7']) expect(md).toContain(name);
 });

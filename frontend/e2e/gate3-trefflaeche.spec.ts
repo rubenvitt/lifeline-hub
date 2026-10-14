@@ -920,13 +920,20 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (1) Umschalter: jedes Segment der Leiste (`role="radio"`) hält den Boden selbst.
     const leiste = page.locator('[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"]');
+    // Drei Stufen des Kräftebaums (LLH-1025): Einheiten · mit Fahrzeugen · alles.
     const segmente = leiste.locator('button');
-    await expect(segmente).toHaveCount(2);
-    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 2);
+    await expect(segmente).toHaveCount(3);
+    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 3);
 
     // (2) Suchfeld der Filterleiste, an der sichtbaren Feldhülle gemessen.
     const suchfeld = page.locator('.ant-input-affix-wrapper');
     const feld = await haeltStufe(suchfeld, soll, `Filter-Suchfeld (${dichte})`);
+    // Der Knopf „Filter“ vor Träger und Status (LLH-1025, D9).
+    const filterKnopf = await haeltStufe(
+      page.getByRole('button', { name: 'Filter', exact: true }),
+      soll,
+      `„Filter“ (${dichte})`,
+    );
 
     // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
@@ -943,7 +950,8 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
-        `Suchfeld ${feld}, Zurücksetzen ${knopf} | dichteblind: Marke ${markenKasten.height}, ` +
+        `Suchfeld ${feld}, Filter ${filterKnopf}, Zurücksetzen ${knopf} | ` +
+        `dichteblind: Marke ${markenKasten.height}, ` +
         `Schließkreuz ${kreuz.height}×${kreuz.width}`,
     );
   }
@@ -999,8 +1007,8 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     const segmente = page.locator(
       '[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"] button',
     );
-    await expect(segmente).toHaveCount(2);
-    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 2);
+    await expect(segmente).toHaveCount(3);
+    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 3);
     const feld = await haeltStufe(
       page.locator('.ant-input-affix-wrapper'),
       soll,
