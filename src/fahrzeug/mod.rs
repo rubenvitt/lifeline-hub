@@ -265,6 +265,20 @@ pub fn etb_text_disponiert(funkrufname: &str) -> String {
     format!("Fahrzeug «{}» disponiert", funkrufname)
 }
 
+/// System-ETB, wenn Personen einem Fahrzeug als Besatzung zugeordnet werden (LFH-9; Sammelweg
+/// LLH-1073 D12, Wortlaut nach LLH-1100 D1): eine Person „Fahrzeug «X»: «A» als Besatzung
+/// zugeordnet“, mehrere „Fahrzeug «X»: 3 Kräfte als Besatzung zugeordnet: A, B, C“.
+pub fn etb_text_besatzung_zugeordnet(funkrufname: &str, personen: &[String]) -> String {
+    match personen {
+        [p] => format!("Fahrzeug «{funkrufname}»: «{p}» als Besatzung zugeordnet"),
+        alle => format!(
+            "Fahrzeug «{funkrufname}»: {} Kräfte als Besatzung zugeordnet: {}",
+            alle.len(),
+            alle.join(", ")
+        ),
+    }
+}
+
 /// System-ETB beim Statuswechsel (FMS) eines disponierten Fahrzeugs. Ein fehlendes
 /// Status-Label steht als «—».
 pub fn etb_text_status_wechsel(funkrufname: &str, alt: Option<&str>, neu: Option<&str>) -> String {

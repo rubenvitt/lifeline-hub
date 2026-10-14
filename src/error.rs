@@ -56,13 +56,14 @@ pub enum AppError {
 }
 
 crate::wire_enum::wire_enum! {
-    /// Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen
-    /// können kollidieren (LLH-1100, D2). Wire == `as_str()`.
+    /// Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
+    /// kollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im
+    /// Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
     pub enum ZeilenArt {
-        /// Stamm-Person (`personal.id`).
+        /// Person (`personal.id`, im Einsatz `einsatz_personal.id`).
         Personal => "personal",
-        /// Stamm-Fahrzeug (`fahrzeug.id`).
+        /// Fahrzeug (`fahrzeug.id`, im Einsatz `einsatz_fahrzeug.id`).
         Fahrzeug => "fahrzeug",
     }
     try_from = |s| format!("Ungültige Zeilenart: {s}");
@@ -72,7 +73,7 @@ crate::wire_enum::wire_enum! {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct ZeilenGrund {
     pub art: ZeilenArt,
-    /// Die ID, wie die Anfrage sie nannte (Stamm-ID).
+    /// Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition).
     pub id: i64,
     /// Kurzgrund zum Anzeigen an der Zeile, etwa „außer Dienst“.
     pub grund: String,

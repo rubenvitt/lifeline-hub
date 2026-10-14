@@ -99,20 +99,45 @@ pub struct EinheitBody {
     #[serde(default)]
     pub sortier: i64,
     pub sprechgruppe_ids: Option<Vec<i64>>,
+    /// Disponierte Fahrzeuge (`einsatz_fahrzeug.id`), die der neuen Einheit angehören sollen
+    /// („Als eigene Einheit führen“, LLH-1073 D9); höchstens `SAMMEL_MAX`, entdoppelt.
+    pub fahrzeug_ids: Option<Vec<i64>>,
 }
 
-/// POST /api/einsaetze/{id}/einheiten — Einheit bilden. ETB-Eintrag.
+/// Die Fahrzeugliste beim Bilden (LLH-1073 D9): höchstens [`SAMMEL_MAX`] Einträge, gezählt vor
+/// dem Entdoppeln (`src/AGENTS.md`, „Eingabegrenzen“), sonst 400; leer heißt ohne Fahrzeug.
+///
+/// [`SAMMEL_MAX`]: crate::kraefte_disposition::SAMMEL_MAX
+fn check_fahrzeug_ids(ids: Option<&[i64]>) -> Result<Vec<i64>, AppError> {
+    let ids = ids.unwrap_or_default();
+    let max = crate::kraefte_disposition::SAMMEL_MAX;
+    if ids.len() > max {
+        return Err(AppError::Validation(format!(
+            "Höchstens {max} Fahrzeuge je Einheit"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
+}
+
+/// POST /api/einsaetze/{id}/einheiten — Einheit bilden, optional mit Fahrzeugen („Als eigene
+/// Einheit führen“, LLH-1073, Spec `fahrzeug-bearbeitung`). Alles oder nichts in einem
+/// `write_retry!` (design.md D9): Einheit, Sprechgruppen, Vorprüfung der Fahrzeuge (unbekannt,
+/// beendet, schon in einer Einheit → 422 mit Grund je Fahrzeug), Zuordnung, die mitkommende
+/// Besatzung ohne Einheit (D10) und die ETB-Einträge. Recht nur am Modul Einheiten, wie
+/// `PUT …/fahrzeug/{ef_id}`. Kein Zeitachsen-Ereignis aus dem Status der Fahrzeuge (D11).
 pub async fn bilden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    // Liste vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let org_id = ctx.einsatz.org_id;
+    // Listen vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
     let sprechgruppe_ids = body
         .sprechgruppe_ids
         .map(crate::sprechgruppe::normalisiere_ids)
         .transpose()?;
+    let fahrzeug_ids = check_fahrzeug_ids(body.fahrzeug_ids.as_deref())?;
     // Der Name geht ins ETB (LLH-1073 design.md D8): Grenze vor jedem Schreiben.
     let name = pflicht_max(&body.name, "Name", crate::einheit::NAME_MAX)?;
     Staerke::aus_optionen(
@@ -126,48 +151,79 @@ pub async fn bilden(
     let kommunikationsmittel = trimme(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(kommunikationsmittel.as_deref())?;
     let erreichbarkeit = trimme(body.erreichbarkeit);
-    let anzeige = einheit_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        ctx.einsatz.org_id,
-        EinheitDaten {
-            name: &name,
-            abschnitt_id: body.abschnitt_id,
-            ueber_einheit_id: body.ueber_einheit_id,
-            typ_id: body.typ_id,
-            soll_fuehrer: body.soll_fuehrer,
-            soll_unterfuehrer: body.soll_unterfuehrer,
-            soll_mannschaft: body.soll_mannschaft,
-            bemerkung: bemerkung.as_deref(),
-            funkrufname: funkrufname.as_deref(),
-            kommunikationsmittel: kommunikationsmittel.as_deref(),
-            erreichbarkeit: erreichbarkeit.as_deref(),
-            sortier: body.sortier,
-            tz_fachaufgabe: None,
-            tz_organisation: None,
-        },
-        ctx.benutzer.id,
-    )
-    .await?;
     if let Some(ids) = &sprechgruppe_ids {
-        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
-            &state.pool,
-            ctx.einsatz.org_id,
-            einsatz_id,
-            anzeige.id,
-            ids,
-        )
-        .await?;
+        crate::sprechgruppe::repo::pruefe_zuordenbar(&state.pool, org_id, einsatz_id, ids).await?;
     }
-    let anzeige = einheit_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        ctx.benutzer.id,
-        &crate::einheit::etb_text_gebildet(&anzeige.name),
-    )
-    .await;
-    sse_einheit(&state, einsatz_id, anzeige.id);
+    let daten = EinheitDaten {
+        name: &name,
+        abschnitt_id: body.abschnitt_id,
+        ueber_einheit_id: body.ueber_einheit_id,
+        typ_id: body.typ_id,
+        soll_fuehrer: body.soll_fuehrer,
+        soll_unterfuehrer: body.soll_unterfuehrer,
+        soll_mannschaft: body.soll_mannschaft,
+        bemerkung: bemerkung.as_deref(),
+        funkrufname: funkrufname.as_deref(),
+        kommunikationsmittel: kommunikationsmittel.as_deref(),
+        erreichbarkeit: erreichbarkeit.as_deref(),
+        sortier: body.sortier,
+        tz_fachaufgabe: None,
+        tz_organisation: None,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (id, fahrzeuge, besatzung, etb_ids) = crate::write_retry!(&state.pool, |conn| {
+        let fahrzeuge = if fahrzeug_ids.is_empty() {
+            Vec::new()
+        } else {
+            mitglied_repo::check_fahrzeug_menge_tx(conn, einsatz_id, &fahrzeug_ids).await?
+        };
+        let id =
+            einheit_repo::anlegen_tx(conn, einsatz_id, org_id, &daten, ctx.benutzer.id).await?;
+        if let Some(ids) = &sprechgruppe_ids {
+            crate::sprechgruppe::repo::ersetzen_tx(
+                conn,
+                crate::sprechgruppe::repo::Zuordnungsziel::Einheit(id),
+                ids,
+            )
+            .await?;
+        }
+        let mut besatzung = Vec::new();
+        if !fahrzeuge.is_empty() {
+            mitglied_repo::zuordnen_fahrzeug_menge_tx(conn, einsatz_id, id, &fahrzeug_ids).await?;
+            besatzung =
+                mitglied_repo::mitnehmen_besatzung_tx(conn, einsatz_id, id, &fahrzeug_ids).await?;
+        }
+        let mut texte = vec![crate::einheit::etb_text_gebildet(&name)];
+        texte.extend(
+            fahrzeuge
+                .iter()
+                .map(|f| crate::einheit::etb_text_fahrzeug_zugeordnet(&name, &f.funkrufname)),
+        );
+        if !besatzung.is_empty() {
+            let namen: Vec<String> = besatzung.iter().map(|(_, n)| n.clone()).collect();
+            texte.push(crate::einheit::etb_text_kraefte_zugeordnet(&name, &namen));
+        }
+        let mut etb_ids = Vec::with_capacity(texte.len());
+        for text in &texte {
+            etb_ids.push(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text)
+                    .await?,
+            );
+        }
+        Ok((id, fahrzeuge, besatzung, etb_ids))
+    })?;
+    // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+    sse_einheit(&state, einsatz_id, id);
+    for f in &fahrzeuge {
+        sse_fahrzeug(&state, einsatz_id, f.ef_id);
+    }
+    for (ep_id, _) in &besatzung {
+        sse_personal(&state, einsatz_id, *ep_id);
+    }
+    let anzeige = einheit_repo::laden(&state.pool, einsatz_id, id).await?;
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 

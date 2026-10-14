@@ -207,6 +207,132 @@ pub async fn freigeben_fahrzeug_tx(
     Ok(name)
 }
 
+/// Meldung des 422, wenn beim Bilden einer Einheit nicht jedes Fahrzeug frei ist (LLH-1073 D9).
+pub const MELDUNG_FAHRZEUGE_NICHT_FREI: &str = "Nicht alle Fahrzeuge lassen sich zuordnen";
+
+/// Ein freies Fahrzeug der Menge beim Bilden einer Einheit: `ef_id` und der aufgelöste
+/// Funkrufname für den ETB-Text (bei einem Stamm-Fahrzeug der des Stamms, wie
+/// [`zuordnen_fahrzeug_tx`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreiesFahrzeug {
+    pub ef_id: i64,
+    pub funkrufname: String,
+}
+
+/// Grund, warum ein Fahrzeug nicht in die neue Einheit kann: unbekannt im Einsatz, beendet
+/// (`entlassen`/`storniert`) oder schon in einer Einheit („gehört zu «Zug 2»“). `None` = frei.
+fn grund_fahrzeug(
+    gefunden: bool,
+    beendet_als: Option<&str>,
+    einheit: Option<&str>,
+) -> Option<String> {
+    if !gefunden {
+        return Some(crate::kraefte_disposition::GRUND_UNBEKANNT.into());
+    }
+    if let Some(als) = beendet_als {
+        return Some(als.into());
+    }
+    einheit.map(|e| format!("gehört zu «{e}»"))
+}
+
+/// Vorprüfung der Fahrzeuge beim Bilden einer Einheit (LLH-1073, design.md D9) in **einer**
+/// Abfrage über `json_each`, unabhängig von der Listenlänge. Ein schon zugeordnetes Fahrzeug ist
+/// ein Grund, kein Umhängen: ein veralteter Dialog nähme sonst einer anderen Einheit still ihr
+/// Fahrzeug. Lehnt mit [`AppError::Zeilen`] (422, `art = fahrzeug`, `einsatz_fahrzeug.id`) ab,
+/// sonst die Fahrzeuge in der Reihenfolge der Eingabe. `ef_ids` ist entdoppelt.
+pub async fn check_fahrzeug_menge_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_ids: &[i64],
+) -> Result<Vec<FreiesFahrzeug>, AppError> {
+    let zeilen: Vec<(
+        i64,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    )> = sqlx::query_as(
+        "SELECT j.value, ef.id, coalesce(f.funkrufname, ef.snap_funkrufname), \
+                    ef.beendet_als, e.name \
+             FROM json_each(?1) j \
+             LEFT JOIN einsatz_fahrzeug ef ON ef.id = j.value AND ef.einsatz_id = ?2 \
+             LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+             LEFT JOIN einsatz_einheit e ON e.id = ef.einheit_id \
+             ORDER BY j.key",
+    )
+    .bind(crate::kraefte_disposition::ids_json(ef_ids))
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut frei = Vec::with_capacity(zeilen.len());
+    let mut abgelehnt = Vec::new();
+    for (id, ef, funkrufname, beendet_als, einheit) in zeilen {
+        match grund_fahrzeug(ef.is_some(), beendet_als.as_deref(), einheit.as_deref()) {
+            Some(grund) => abgelehnt.push(crate::error::ZeilenGrund {
+                art: crate::error::ZeilenArt::Fahrzeug,
+                id,
+                grund,
+            }),
+            None => frei.push(FreiesFahrzeug {
+                ef_id: id,
+                funkrufname: funkrufname.unwrap_or_default(),
+            }),
+        }
+    }
+    if abgelehnt.is_empty() {
+        Ok(frei)
+    } else {
+        Err(AppError::Zeilen {
+            meldung: MELDUNG_FAHRZEUGE_NICHT_FREI.into(),
+            zeilen: abgelehnt,
+        })
+    }
+}
+
+/// Ordnet die (vorgeprüften) Fahrzeuge einer Einheit zu, in **einer** Anweisung (LLH-1073 D9).
+pub async fn zuordnen_fahrzeug_menge_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_ids: &[i64],
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET einheit_id = ?1 \
+         WHERE einsatz_id = ?2 AND beendet_at IS NULL \
+           AND id IN (SELECT value FROM json_each(?3))",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .bind(crate::kraefte_disposition::ids_json(ef_ids))
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Die Besatzung kommt mit (LLH-1073, design.md D10): aktive Personen auf einem der Fahrzeuge,
+/// die noch keiner Einheit angehören, bekommen die Einheit, in **einer** Anweisung. Wer einer
+/// anderen Einheit angehört, bleibt dort. Liefert `(ep_id, Name)` nach Disposition geordnet.
+pub async fn mitnehmen_besatzung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_ids: &[i64],
+) -> Result<Vec<(i64, String)>, AppError> {
+    let mut personen: Vec<(i64, String)> = sqlx::query_as(
+        "UPDATE einsatz_personal SET einheit_id = ?1 \
+         WHERE einsatz_id = ?2 AND beendet_at IS NULL AND einheit_id IS NULL \
+           AND fahrzeug_id IN (SELECT value FROM json_each(?3)) \
+         RETURNING id, snap_name",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .bind(crate::kraefte_disposition::ids_json(ef_ids))
+    .fetch_all(&mut *conn)
+    .await?;
+    personen.sort_by_key(|(id, _)| *id);
+    Ok(personen)
+}
+
 /// Ergebnis von [`zuordnen_material_tx`]: Bezeichnung und Menge für den ETB-Text, die Einheit,
 /// der das Material vorher angehörte (ID für das Ereignis, Name für den Text), und ob sich die
 /// Zuordnung geändert hat (LLH-1093, design.md D5).

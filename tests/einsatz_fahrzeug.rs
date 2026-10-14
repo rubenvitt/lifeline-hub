@@ -1543,3 +1543,231 @@ async fn adhoc_angaben_grenzen_und_entlassenes_fahrzeug() {
         "Florian Extern 1"
     );
 }
+
+// ── Personal der Einheit als Besatzung übernehmen (LLH-1073 Teil II) ─────────────────────
+
+/// Disponiert eine Ad-hoc-Kraft; liefert die `ep_id`.
+async fn adhoc_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let body = serde_json::json!({ "adhoc": { "name": name } }).to_string();
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn besatzung_uebernehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    ep_ids: &[i64],
+) -> (StatusCode, serde_json::Value) {
+    let body = serde_json::json!({ "ep_ids": ep_ids }).to_string();
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung"),
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+async fn fahrzeug_der_person(pool: &sqlx::SqlitePool, ep: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
+        .bind(ep)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Besatzung in einem Schritt übernehmen“, und `eingabegrenzen`,
+/// „Dubletten“ (design.md D12): drei Personen in einer Anfrage, eine davon zweimal genannt und
+/// vorher auf einem anderen Fahrzeug. Alle sitzen danach auf dem Ziel, genau ein ETB-Eintrag nennt
+/// jede einmal, gemeldet werden das Ziel, das verlassene Fahrzeug und jede Person.
+#[tokio::test]
+async fn besatzung_uebernehmen_ordnet_alle_in_einem_schritt_zu() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let rtw = adhoc_disponieren(&app, &admin, einsatz, "RTW 1").await;
+    let ktw = adhoc_disponieren(&app, &admin, einsatz, "KTW 1").await;
+    let anna = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let berta = adhoc_kraft(&app, &admin, einsatz, "Berta").await;
+    let carl = adhoc_kraft(&app, &admin, einsatz, "Carl").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ktw}/besatzung/{carl}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (s, json) =
+        besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna, berta, carl, anna]).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    for ep in [anna, berta, carl] {
+        assert_eq!(fahrzeug_der_person(&pool, ep).await, Some(rtw));
+    }
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Fahrzeug «RTW 1»: 3 Kräfte als Besatzung zugeordnet: Anna, Berta, Carl"),
+        "{texte:?}"
+    );
+    let mut gemeldet = objekt_ereignisse(
+        &mut rx,
+        &[("fahrzeug", "fahrzeug_id"), ("personal", "personal_id")],
+    );
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ereignis("fahrzeug", rtw),
+        ereignis("fahrzeug", ktw),
+        ereignis("personal", anna),
+        ereignis("personal", berta),
+        ereignis("personal", carl),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet);
+
+    // Wer schon auf dem Ziel sitzt, ändert nichts: kein Eintrag, kein Ereignis.
+    let (s, _) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna]).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    assert_eq!(
+        objekt_ereignisse(
+            &mut rx,
+            &[("fahrzeug", "fahrzeug_id"), ("personal", "personal_id")]
+        ),
+        vec![]
+    );
+}
+
+/// Bei einer Person steht der Wortlaut des Einzelwegs im ETB (LLH-1100 D1).
+#[tokio::test]
+async fn besatzung_uebernehmen_mit_einer_person_im_einzelwortlaut() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let rtw = adhoc_disponieren(&app, &admin, einsatz, "RTW 1").await;
+    let anna = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna]).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Fahrzeug «RTW 1»: «Anna» als Besatzung zugeordnet"),
+        "{texte:?}"
+    );
+}
+
+/// Spec `fahrzeug-bearbeitung`, „Eine Person entlassen“: eine entlassene, eine unbekannte und
+/// eine Person eines anderen Einsatzes stehen je mit Grund im 422; niemand sitzt danach auf dem
+/// Fahrzeug, kein ETB-Eintrag.
+#[tokio::test]
+async fn besatzung_uebernehmen_mit_entlassener_person_ist_422_und_ordnet_niemanden_zu() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Nachbarlage").await;
+    let rtw = adhoc_disponieren(&app, &admin, einsatz, "RTW 1").await;
+    let anna = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let berta = adhoc_kraft(&app, &admin, einsatz, "Berta").await;
+    let carl = adhoc_kraft(&app, &admin, einsatz, "Carl").await;
+    let fremd = adhoc_kraft(&app, &admin, anderer, "Fremd").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{carl}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{json}");
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = besatzung_uebernehmen(
+        &app,
+        &admin,
+        einsatz,
+        rtw,
+        &[anna, berta, carl, fremd, 999999],
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["zeilen"],
+        serde_json::json!([
+            {"art": "personal", "id": carl, "grund": "entlassen"},
+            {"art": "personal", "id": fremd, "grund": "unbekannt"},
+            {"art": "personal", "id": 999999, "grund": "unbekannt"},
+        ])
+    );
+    for ep in [anna, berta, carl] {
+        assert_eq!(fahrzeug_der_person(&pool, ep).await, None);
+    }
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+}
+
+/// Spec `eingabegrenzen`, „51 Personen“: 51 (gezählt vor dem Entdoppeln) und eine leere Liste
+/// sind 400, bevor eine Abfrage läuft; ein entlassenes Fahrzeug ist 409, ein unbekanntes 404.
+#[tokio::test]
+async fn besatzung_uebernehmen_grenzen_und_beendetes_fahrzeug() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let rtw = adhoc_disponieren(&app, &admin, einsatz, "RTW 1").await;
+    let anna = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna; 51]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert!(json["error"].as_str().unwrap().contains("50"), "{json}");
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, 999999, &[anna]).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{json}");
+    assert_eq!(fahrzeug_der_person(&pool, anna).await, None);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna; 50]).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "genau 50 mit Dubletten: {json}");
+    assert_eq!(fahrzeug_der_person(&pool, anna).await, Some(rtw));
+
+    let ktw = adhoc_disponieren(&app, &admin, einsatz, "KTW 1").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ktw, "entlassen").await.0,
+        StatusCode::OK
+    );
+    let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, ktw, &[anna]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(fahrzeug_der_person(&pool, anna).await, Some(rtw));
+}
+
+/// Ein Beobachter darf die Besatzung nicht übernehmen (Modul Fahrzeuge, wie der Einzelweg).
+#[tokio::test]
+async fn besatzung_uebernehmen_ist_dem_beobachter_verwehrt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let rtw = adhoc_disponieren(&app, &admin, einsatz, "RTW 1").await;
+    let anna = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+    let (s, json) = besatzung_uebernehmen(&app, &erika_c, einsatz, rtw, &[anna]).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{json}");
+}
