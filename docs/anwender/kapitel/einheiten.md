@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs]
 ---
 
 ## Überblick
@@ -21,10 +21,13 @@ dürfen Einsatzleitung und Führungspersonal.
 ### Die Gliederung lesen
 
 1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen.
-2. Im Paneel „Gliederung“ jede Einheit mit Typ lesen, darunter „Ist“, „Soll“ und den Einheitsführer.
-   Unterstellte Einheiten stehen eingerückt unter ihrer Über-Einheit.
+2. In der Tabelle „Gliederung“ je Einheit „Einheitsführer“, „Ist“, „Soll“, „Abschnitt“ und
+   „Fahrzeuge“ lesen. Unterstellte Einheiten stehen eingerückt unter ihrer Über-Einheit; das Plus-
+   bzw. Minuszeichen vor einer Einheit klappt ihre Untereinheiten auf und zu. Am Handy stehen
+   nur Einheit, „Ist“ und „Soll“; die übrigen Spalten holt der Knopf „Spalten · 3 ausgeblendet“
+   zurück.
 
-   ![Paneel „Gliederung“ mit dem Sanitätszug, der unterstellten Rettungsstaffel mit Einheitsführerin und drei weiteren Einheiten, je mit Ist- und Soll-Stärke](../bilder/einheiten/gliederung.png)
+   ![Tabelle „Gliederung“ mit dem Sanitätszug, der eingerückten Rettungsstaffel samt Einheitsführerin und weiteren Einheiten, je mit Ist- und Soll-Stärke, Abschnitt und Fahrzeugen](../bilder/einheiten/gliederung.png)
 
 3. Den Namen einer Einheit wählen, um ihre Seite zu öffnen.
 
@@ -96,6 +99,21 @@ Mannschaft), die im Modul Personal gesetzt wird. Einheitsführer ist ein eigenes
 mit der Position „Führer“ ist dadurch noch nicht Einheitsführer, die Seite weist darauf hin. Je
 Einheit gibt es einen Einheitsführer. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten
 mit ein.
+
+In der Gliederung steht unter „Ist“ die kumulierte Ist-Stärke: ein Zug zählt seine Gruppen mit,
+jede Gruppe zeigt ihre eigene. Fehlt in einer Position (Führer, Unterführer oder Mannschaft) jemand
+gegenüber dem Soll, steht darunter „unterbesetzt“, als Hinweis, nicht als Warnung; mehr Kräfte in
+einer Position gleichen eine fehlende nicht aus. Eine erfüllte Stärke trägt kein Zeichen.
+
+### Gliederung und Meldebild
+
+Die Gliederung zeigt dieselben Einheiten in derselben Ordnung wie das
+[Meldebild](meldebild.md): nach der Reihenfolge der Einsatzabschnitte, darin in der Reihenfolge, in
+der die Einheiten gebildet wurden; unterstellte Einheiten unter ihrer Über-Einheit. Eine
+unterstellte Einheit ohne eigenen Abschnitt zeigt den Abschnitt ihrer Über-Einheit. Fahrzeuge,
+Personal und Material einer Einheit stehen im Meldebild und auf der Seite der Einheit, nicht in der
+Gliederung. Die Gesamtstärke aller Kräfte steht über der Tabelle, zusammen mit dem Weg ins
+Meldebild.
 
 ### Status und Zeitachse
 
