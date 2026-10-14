@@ -115,8 +115,8 @@ zugeordnet oder von ihr abgezogen werden, stehen ebenfalls dort.
 
 Der Kopf der Stelle nennt ihre Stärke. Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
-Unter „Material“ ordnet „Material zuordnen“ Material des Einsatzes der Stelle zu; erfasst wird es
-im Modul „Material“. Zugeordnet wird an eine geplante oder aktive Stelle; eine aufgelöste nimmt
+Unter „Material“ ordnet „Material zuordnen“ Material des Einsatzes der Stelle zu, angeboten werden
+nur Posten ohne Ort; erfasst wird es im Modul „Material“. Zugeordnet wird an eine geplante oder aktive Stelle; eine aufgelöste nimmt
 kein Material mehr an. Material, das schon dort liegt, bleibt änderbar und lässt sich lösen.
 
 ### Rechte

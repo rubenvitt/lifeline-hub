@@ -252,7 +252,8 @@ Einheit (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 ### Entlassen und Stornieren
 
 Entlassen ist der Normalweg: Das Fahrzeug verlässt seine Einheit, die Führungsstelle und einen
-Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fahrzeug. Aufträge
+Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fahrzeug. Seine
+Beladung bleibt im Einsatz zurück, ohne Ort; das Einsatztagebuch nennt, wie viele Posten. Aufträge
 nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
 zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter. Erneut disponiert,
 steht es wieder in der Liste, mit dem Anfangsstatus wie beim Disponieren; Besatzung, Einheit und
@@ -260,8 +261,8 @@ Bereitstellungsraum kommen nicht zurück.
 
 Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
 Minuten nach der Disposition und nur, solange das Fahrzeug noch nichts im Einsatz hat: keinen
-Statuswechsel, keine Besatzung, keine Einheit, keinen Bereitstellungsraum, keine Führungsstelle,
-keinen Auftrag. Wer einmal entlassen war, lässt sich auch nach dem erneuten Disponieren nicht mehr
+Statuswechsel, keine Besatzung, keine Beladung, keine Einheit, keinen Bereitstellungsraum, keine
+Führungsstelle, keinen Auftrag. Wer einmal entlassen war, lässt sich auch nach dem erneuten Disponieren nicht mehr
 stornieren. Ein storniertes Fahrzeug erscheint in keiner Liste und steht beim nächsten Disponieren
 wieder zur Wahl.
 
