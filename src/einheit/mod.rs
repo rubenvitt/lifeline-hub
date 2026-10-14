@@ -230,6 +230,21 @@ pub fn etb_text_fahrzeug_zugeordnet(einheit: &str, funkrufname: &str) -> String 
     )
 }
 
+/// System-ETB, wenn Material einer Einheit zugeordnet wird; beim Umhängen nennt er die Einheit,
+/// der es vorher angehörte (LLH-1093, design.md D5).
+pub fn etb_text_material_zugeordnet(
+    einheit: &str,
+    bezeichnung: &str,
+    menge: i64,
+    vorher: Option<&str>,
+) -> String {
+    let text = format!("Einheit «{einheit}»: Material «{bezeichnung}» (×{menge}) zugeordnet");
+    match vorher {
+        Some(v) => format!("{text}, vorher «{v}»"),
+        None => text,
+    }
+}
+
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
 /// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::ordne_personal_zu_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
@@ -375,6 +390,18 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_storniert("1. Zug"),
             "Einheit «1. Zug» storniert (Fehlanlage)"
+        );
+    }
+
+    #[test]
+    fn material_zugeordnet_nennt_die_vorherige_einheit() {
+        assert_eq!(
+            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, Some("Staffel A")),
+            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»"
+        );
+        assert_eq!(
+            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, None),
+            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet"
         );
     }
 }

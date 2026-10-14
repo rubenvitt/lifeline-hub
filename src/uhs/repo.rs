@@ -310,6 +310,30 @@ pub async fn storniere_tx(
     .await
 }
 
+/// Darf Material an dieser UHS verortet werden (LLH-1093, design.md D4)? Unbekannt, aus einem
+/// anderen Einsatz oder storniert → `NotFound` (die UHS gibt es für Zuordnungen nicht);
+/// aufgelöst → `UnprocessableEntity` (ein Zustand des Ziels, kein Lebenszyklus der geschriebenen
+/// Zeile); `geplant` und `aktiv` gehen. Anders als die Belegung (`pruefe_uhs_aktiv`) reicht eine
+/// geplante UHS: Material wird dort vorbereitet.
+pub async fn require_verortbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    uhs_id: i64,
+) -> Result<(), AppError> {
+    let status: Option<String> = sqlx::query_scalar(
+        "SELECT status FROM uhs WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
+    )
+    .bind(uhs_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match status.as_deref() {
+        None => Err(AppError::NotFound),
+        Some("aufgeloest") => Err(AppError::UnprocessableEntity("UHS ist aufgelöst".into())),
+        Some(_) => Ok(()),
+    }
+}
+
 /// Anzahl aktuell belegter Personen (Inbox + echte Plätze) auf einer offenen
 /// Connection/Transaktion. Über den Cache `einsatz_person.aktuelle_uhs_id`, daher ein
 /// einzelner indizierter Scan.
@@ -362,6 +386,48 @@ mod tests {
             standort: None,
             notiz: None,
         }
+    }
+
+    /// LLH-1093, design.md D4: geplant und aktiv sind Ziele für Material, aufgelöst ist 422,
+    /// storniert, fremd und unbekannt sind 404.
+    #[tokio::test]
+    async fn verortbar_nur_geplant_und_aktiv() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let check = |uhs: i64| {
+            let pool = pool.clone();
+            async move {
+                let mut conn = pool.acquire().await.unwrap();
+                require_verortbar_tx(&mut conn, e, uhs).await
+            }
+        };
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP"))
+            .await
+            .unwrap();
+        check(u.id).await.unwrap();
+        setze_status(&pool, e, u.id, "aktiv", b).await.unwrap();
+        check(u.id).await.unwrap();
+        setze_status(&pool, e, u.id, "aufgeloest", b).await.unwrap();
+        assert!(matches!(
+            check(u.id).await.unwrap_err(),
+            AppError::UnprocessableEntity(m) if m == "UHS ist aufgelöst"
+        ));
+        let s = anlegen(&pool, e, b, daten("behandlungsplatz", "Storno"))
+            .await
+            .unwrap();
+        storniere(&pool, e, s.id, b).await.unwrap();
+        assert!(matches!(check(s.id).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            check(999_999).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(matches!(
+            require_verortbar_tx(&mut conn, e + 1, u.id)
+                .await
+                .unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]

@@ -182,33 +182,65 @@ pub async fn gib_fahrzeug_frei_tx(
     Ok(name)
 }
 
+/// Ergebnis von [`ordne_material_zu_tx`]: Bezeichnung und Menge für den ETB-Text, die Einheit,
+/// der das Material vorher angehörte (ID für das Ereignis, Name für den Text), und ob sich die
+/// Zuordnung geändert hat (LLH-1093, design.md D5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterialZuordnung {
+    pub bezeichnung: String,
+    pub menge: i64,
+    pub vorher: Option<(i64, String)>,
+    pub is_changed: bool,
+}
+
 /// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
-/// sein), auf offener Connection/Tx. `NotFound` analog. Liefert (Bezeichnung, Menge) für
-/// den ETB-Text.
+/// sein), auf offener Connection/Tx. Eine Zeile, die schon einer anderen Einheit angehört,
+/// wechselt; dieselbe Einheit noch einmal schreibt nichts. `NotFound`, falls Dispozeile oder
+/// Einheit nicht zum Einsatz gehören, `Conflict` bei aufgelöster Einheit oder beendetem Material.
 pub async fn ordne_material_zu_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     em_id: i64,
-) -> Result<(String, i64), AppError> {
-    pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
-    let row: Option<(String, i64)> = sqlx::query_as(
-        "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+) -> Result<MaterialZuordnung, AppError> {
+    // In der Transaktion: auch eine gerade aufgelöste Einheit nimmt kein Material mehr (409).
+    super::repo::require_aktiv_tx(conn, einsatz_id, einheit_id).await?;
+    let row: Option<(String, i64, Option<i64>)> = sqlx::query_as(
+        "SELECT snap_bezeichnung, menge, einheit_id FROM einsatz_material \
+         WHERE id = ? AND einsatz_id = ?",
     )
     .bind(em_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let row = row.ok_or(AppError::NotFound)?;
+    let (bezeichnung, menge, vorher_id) = row.ok_or(AppError::NotFound)?;
     // Material, das aus dem Einsatz genommen ist, tritt keiner Einheit bei (409, LLH-1079).
     crate::material::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, em_id).await?;
-    sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id)
-        .bind(em_id)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    Ok(row)
+    let vorher = match vorher_id {
+        Some(id) => {
+            let name: String = sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
+                .bind(id)
+                .fetch_one(&mut *conn)
+                .await?;
+            Some((id, name))
+        }
+        None => None,
+    };
+    let is_changed = vorher_id != Some(einheit_id);
+    if is_changed {
+        sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
+            .bind(einheit_id)
+            .bind(em_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(MaterialZuordnung {
+        bezeichnung,
+        menge,
+        vorher,
+        is_changed,
+    })
 }
 
 /// Pool-Wrapper.
@@ -217,7 +249,7 @@ pub async fn ordne_material_zu(
     einsatz_id: i64,
     einheit_id: i64,
     em_id: i64,
-) -> Result<(String, i64), AppError> {
+) -> Result<MaterialZuordnung, AppError> {
     let mut conn = pool.acquire().await?;
     ordne_material_zu_tx(&mut conn, einsatz_id, einheit_id, em_id).await
 }
@@ -891,13 +923,40 @@ mod tests {
             "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
 
-        let (bez, menge) = ordne_material_zu(&pool, einsatz, a, em).await.unwrap();
-        assert_eq!((bez.as_str(), menge), ("Wolldecke", 50));
+        let z = ordne_material_zu(&pool, einsatz, a, em).await.unwrap();
+        assert_eq!(
+            z,
+            MaterialZuordnung {
+                bezeichnung: "Wolldecke".into(),
+                menge: 50,
+                vorher: None,
+                is_changed: true,
+            }
+        );
         assert_eq!(material_mitglieder(&pool, a).await.unwrap().len(), 1);
 
-        // Exklusiv: erneutes Zuordnen zu B wechselt.
-        ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
+        // Exklusiv: erneutes Zuordnen zu B wechselt und nennt A (LLH-1093, design.md D5).
+        let z = ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
+        assert_eq!(z.vorher, Some((a, "A".to_string())));
+        assert!(z.is_changed);
         assert!(material_mitglieder(&pool, a).await.unwrap().is_empty());
+        assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
+        // Dieselbe Einheit noch einmal: nichts geändert.
+        let z = ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
+        assert_eq!(z.vorher, Some((b, "B".to_string())));
+        assert!(!z.is_changed);
+        // Eine aufgelöste Zieleinheit ist 409, in der Transaktion geprüft.
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-14 10:00:00' WHERE id = ?",
+        )
+        .bind(a)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(matches!(
+            ordne_material_zu(&pool, einsatz, a, em).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
         assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
 
         // Freigeben aus falscher Einheit (a) → NotFound.
