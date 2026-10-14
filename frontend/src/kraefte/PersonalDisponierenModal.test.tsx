@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
+import { gewaehlteOptionen, oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, Personal } from '../api/types';
 import PersonalDisponierenModal from './PersonalDisponierenModal';
 
@@ -86,48 +87,6 @@ function Harness({ serie = false }: { serie?: boolean }) {
       />
     </>
   );
-}
-
-/**
- * Die Liste GENAU dieses Feldes: antd lässt die Portale zuvor geöffneter Listen stehen, und in
- * jsdom endet ihre Schließanimation nie. Zugeordnet über `aria-controls` des Eingabefelds.
- */
-function listeVon(feld: string): HTMLElement | null {
-  const eingabe = screen.getByRole('combobox', { name: feld });
-  const id = eingabe.getAttribute('aria-controls');
-  return id
-    ? (document.getElementById(id)?.closest<HTMLElement>('.ant-select-dropdown') ?? null)
-    : null;
-}
-async function oeffne(feld: string) {
-  await userEvent.click(await screen.findByRole('combobox', { name: feld }));
-  await waitFor(() => expect(listeVon(feld)).not.toBeNull());
-}
-function optionenVon(feld: string, auswahl = ''): string[] {
-  return [
-    ...(listeVon(feld)?.querySelectorAll<HTMLElement>(`.ant-select-item-option${auswahl}`) ?? []),
-  ].map((k) => k.getAttribute('title') ?? k.textContent ?? '');
-}
-async function waehle(feld: string, ...optionen: string[]) {
-  await oeffne(feld);
-  for (const o of optionen) {
-    const knoten = await waitFor(() => {
-      const k = listeVon(feld)?.querySelector<HTMLElement>(`.ant-select-item-option[title="${o}"]`);
-      expect(k).toBeTruthy();
-      return k!;
-    });
-    await userEvent.click(knoten);
-  }
-}
-/**
- * Gewählte Einträge einer Mehrfachauswahl, aus ihrer Liste gelesen: die Tags selbst stehen in
- * jsdom nicht als Text da (`maxTagCount="responsive"` misst 0 px). Den Tag mit Grund prüft
- * `SammelGruende.test.tsx`.
- */
-async function gewaehlteOptionen(feld: string): Promise<string[]> {
-  await oeffne(feld);
-  await waitFor(() => expect(optionenVon(feld).length).toBeGreaterThan(0));
-  return optionenVon(feld, '-selected');
 }
 
 describe('PersonalDisponierenModal', () => {
