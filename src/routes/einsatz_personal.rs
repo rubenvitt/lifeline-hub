@@ -336,6 +336,7 @@ pub async fn update(
                 status_id: body.status_id,
                 staerke_position,
                 bemerkung,
+                ..Default::default()
             },
         )
         .await?;

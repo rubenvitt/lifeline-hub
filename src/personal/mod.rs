@@ -161,7 +161,8 @@ pub struct EinsatzPersonalAnzeige {
     pub uhs_id: Option<i64>,
     pub ist_adhoc: bool,
     pub name: String,
-    /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).
+    /// Qualifikationen als flacher Text (Live recomposed oder Snapshot); bei Ad-hoc-Personen die
+    /// erfasste Qualifikation. Die Einsatzfunktion steht getrennt in `einsatzfunktion`.
     pub funktion: Option<String>,
     pub traegerorganisation: Option<String>,
     #[schema(value_type = Option<crate::staerke::StaerkePosition>)]
@@ -171,6 +172,10 @@ pub struct EinsatzPersonalAnzeige {
     pub status_kategorie: Option<StatusKategorie>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,
+    /// Einsatzfunktion (LLH-1067, Spec `personal-einsatzangaben`): was die Kraft im Einsatz gerade
+    /// tut, getrennt von `funktion` (Qualifikation). Angezeigt wird sie vor der Qualifikation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
     /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus

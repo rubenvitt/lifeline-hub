@@ -13,7 +13,7 @@ const SELECT_AUFGELOEST: &str = "\
            ep.status_id, \
            ep.staerke_position AS ep_staerke_position, \
            ep.snap_name, ep.snap_funktion, ep.snap_traegerorganisation, \
-           ep.bemerkung, ep.disponiert_at, ep.disponiert_von, \
+           ep.bemerkung, ep.einsatzfunktion, ep.disponiert_at, ep.disponiert_von, \
            ep.beendet_at, ep.beendet_von, ep.beendet_als, \
            p.name AS live_name, p.traegerorganisation AS live_traegerorganisation, \
            p.dienststatus AS live_dienststatus, p.staerke_position AS live_staerke_position, \
@@ -44,6 +44,7 @@ struct Row {
     snap_funktion: Option<String>,
     snap_traegerorganisation: Option<String>,
     bemerkung: Option<String>,
+    einsatzfunktion: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
     beendet_at: Option<String>,
@@ -102,6 +103,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
         status_kategorie: row.status_kategorie,
         status_farbe: row.status_farbe,
         bemerkung: row.bemerkung,
+        einsatzfunktion: row.einsatzfunktion,
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
         ist_demo: row.ist_demo,
@@ -406,17 +408,40 @@ pub async fn disponieren_adhoc_tx(
 }
 
 /// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
-/// `status_id`: `None` = unverändert. Die übrigen Felder sind Tri-State: `None` = unverändert,
-/// `Some(None)` = NULL, `Some(Some(x))` = setzen.
+/// `status_id` und `name`: `None` = unverändert. Die übrigen Felder sind Tri-State: `None` =
+/// unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DispositionPatch<'a> {
     pub status_id: Option<i64>,
     pub staerke_position: Option<Option<&'a str>>,
     pub bemerkung: Option<Option<&'a str>>,
+    /// Einsatzfunktion (LLH-1067): was die Kraft gerade tut, für Stamm und Ad-hoc gleich.
+    pub einsatzfunktion: Option<Option<&'a str>>,
+    /// Ad-hoc-Angaben (LLH-1067, design.md D3): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
+    pub name: Option<&'a str>,
+    /// Qualifikation einer Ad-hoc-Person (`snap_funktion`).
+    pub funktion: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+}
+
+impl DispositionPatch<'_> {
+    /// Ändert der Patch eine Angabe, die bei einer Stamm-Person der Stamm trägt?
+    pub fn has_adhoc_angaben(&self) -> bool {
+        self.name.is_some() || self.funktion.is_some() || self.traegerorganisation.is_some()
+    }
+}
+
+/// Der 422 an einer Stamm-Person, deren Name, Qualifikation oder Träger über den Einsatz geändert
+/// werden soll (LLH-1067, design.md D3).
+pub fn stamm_angaben_fehler() -> AppError {
+    AppError::UnprocessableEntity(
+        "Name, Qualifikation und Trägerorganisation einer Stamm-Person im Stamm pflegen".into(),
+    )
 }
 
 /// Aktualisiert eine Dispositionszeile nach [`DispositionPatch`]. `NotFound`, falls die Zeile
-/// nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079).
+/// nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079),
+/// `UnprocessableEntity` bei Ad-hoc-Angaben an einer Stamm-Person; dann schreibt sie nichts.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -424,11 +449,27 @@ pub async fn update_tx(
     patch: DispositionPatch<'_>,
 ) -> Result<(), AppError> {
     require_aktiv_tx(conn, einsatz_id, ep_id).await?;
+    if patch.has_adhoc_angaben() {
+        let stamm: Option<i64> = sqlx::query_scalar(
+            "SELECT personal_id FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if stamm.is_some() {
+            return Err(stamm_angaben_fehler());
+        }
+    }
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
              staerke_position = CASE WHEN ? THEN ? ELSE staerke_position END, \
-             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
+             einsatzfunktion = CASE WHEN ? THEN ? ELSE einsatzfunktion END, \
+             snap_name = COALESCE(?, snap_name), \
+             snap_funktion = CASE WHEN ? THEN ? ELSE snap_funktion END, \
+             snap_traegerorganisation = CASE WHEN ? THEN ? ELSE snap_traegerorganisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(patch.status_id)
@@ -436,6 +477,13 @@ pub async fn update_tx(
     .bind(patch.staerke_position.flatten())
     .bind(patch.bemerkung.is_some())
     .bind(patch.bemerkung.flatten())
+    .bind(patch.einsatzfunktion.is_some())
+    .bind(patch.einsatzfunktion.flatten())
+    .bind(patch.name)
+    .bind(patch.funktion.is_some())
+    .bind(patch.funktion.flatten())
+    .bind(patch.traegerorganisation.is_some())
+    .bind(patch.traegerorganisation.flatten())
     .bind(ep_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -1458,6 +1506,7 @@ mod tests {
                 status_id: Some(neuer.id),
                 staerke_position: Some(Some("mannschaft")),
                 bemerkung: Some(Some("vor Ort")),
+                ..Default::default()
             },
         )
         .await
@@ -2209,5 +2258,141 @@ mod tests {
                 .unwrap()
                 .ist_demo
         );
+    }
+
+    // ── Einsatzfunktion und Ad-hoc-Angaben (LLH-1067, Spec `personal-einsatzangaben`) ──────
+
+    #[tokio::test]
+    async fn einsatzfunktion_setzen_leeren_und_qualifikation_bleibt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let q = qualifikation_repo::anlegen(&pool, 1, "Notfallsanitäter", 5)
+            .await
+            .unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Max Mustermann"), &[q.id])
+            .await
+            .unwrap();
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap()
+            .id;
+        let vorher = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(vorher.einsatzfunktion, None);
+
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                einsatzfunktion: Some(Some("Sprechfunker")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(a.einsatzfunktion.as_deref(), Some("Sprechfunker"));
+        assert_eq!(
+            a.funktion.as_deref(),
+            Some("Notfallsanitäter"),
+            "Qualifikation bleibt"
+        );
+
+        // Fehlend = unverändert.
+        update(&pool, einsatz, ep, DispositionPatch::default())
+            .await
+            .unwrap();
+        let b = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(b.einsatzfunktion.as_deref(), Some("Sprechfunker"));
+
+        // `Some(None)` = leeren.
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                einsatzfunktion: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let c = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(c.einsatzfunktion, None);
+    }
+
+    #[tokio::test]
+    async fn adhoc_angaben_aenderbar() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let ep = disponieren_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                name: "Maier",
+                funktion: Some("Sanitäter"),
+                traegerorganisation: Some("ASB"),
+                staerke_position: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        update(
+            &pool,
+            einsatz,
+            ep,
+            DispositionPatch {
+                name: Some("Meier"),
+                funktion: Some(Some("Rettungssanitäter")),
+                traegerorganisation: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(a.name, "Meier");
+        assert_eq!(a.funktion.as_deref(), Some("Rettungssanitäter"));
+        assert_eq!(a.traegerorganisation, None);
+    }
+
+    #[tokio::test]
+    async fn stamm_person_lehnt_adhoc_angaben_ab_ohne_zu_schreiben() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let person = p_repo::anlegen(&pool, 1, p_daten("Max Mustermann"), &[])
+            .await
+            .unwrap();
+        let ep = disponieren_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap()
+            .id;
+        for patch in [
+            DispositionPatch {
+                name: Some("Moritz"),
+                einsatzfunktion: Some(Some("Melder")),
+                ..Default::default()
+            },
+            DispositionPatch {
+                funktion: Some(None),
+                ..Default::default()
+            },
+            DispositionPatch {
+                traegerorganisation: Some(Some("THW")),
+                ..Default::default()
+            },
+        ] {
+            let fehler = update(&pool, einsatz, ep, patch).await.unwrap_err();
+            assert!(
+                matches!(&fehler, AppError::UnprocessableEntity(m) if m.contains("im Stamm pflegen")),
+                "{fehler:?}"
+            );
+        }
+        let a = load_anzeige(&pool, einsatz, ep, true).await.unwrap();
+        assert_eq!(a.name, "Max Mustermann");
+        assert_eq!(a.einsatzfunktion, None, "nichts geschrieben");
+        assert_eq!(a.traegerorganisation.as_deref(), Some("DRK"));
     }
 }
