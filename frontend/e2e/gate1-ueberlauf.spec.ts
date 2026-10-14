@@ -1798,3 +1798,136 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     expect(ueber, 'Aufbewahrungstabelle läuft nicht über').toBeLessThanOrEqual(1);
   });
 });
+
+/*
+ * FAHRZEUG ALS EIGENE EINHEIT, PERSONAL DER EINHEIT ÜBERNEHMEN (LLH-1073 Teil II): beide Dialoge
+ * öffnen nur Schreibende, deshalb misst die Achse Admin und Führungspersonal (`e2e/AGENTS.md`,
+ * LFH-435), je Prüfbreite. Lange Funkrufnamen, Personennamen und Funktionen; weder Seite noch
+ * Dialogkörper laufen quer, der Absendeknopf wird geklickt (LFH-355).
+ */
+const EIGENE_EINHEIT_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-1';
+const UEBERNAHME_FAHRZEUG = 'Florian Musterstadt-Nordwest Wasserschaden 46/11-2';
+
+async function seedeEigeneEinheit(page: Page): Promise<string> {
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Eigene Einheit ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const put = async (pfad: string) => {
+    const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/${pfad}`);
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  };
+  await post('abschnitte', {
+    name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2',
+  });
+  const ohneEinheit = await post('fahrzeuge', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });
+  const mitEinheit = await post('fahrzeuge', { adhoc: { funkrufname: UEBERNAHME_FAHRZEUG } });
+  const einheit = await post('einheiten', {
+    name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+  });
+  await put(`einheiten/${einheit}/fahrzeug/${mitEinheit}`);
+  for (const name of [
+    'Kirchgassner-Wohlfahrt, Maximiliane',
+    'Oberhauser-Brandstätter, Friedemann',
+  ]) {
+    const kraft = await post('personal', { adhoc: { name } });
+    await put(`fahrzeuge/${ohneEinheit}/besatzung/${kraft}`);
+  }
+  for (const name of ['Wohlgemuth-Kirchhoff, Annemarie', 'Brandstätter-Oberhauser, Konstantin']) {
+    const kraft = await post('personal', {
+      adhoc: {
+        name,
+        funktion: 'Abschnittsleitung Technische Hilfeleistung',
+        staerke_position: 'unterfuehrer',
+      },
+    });
+    await put(`einheiten/${einheit}/personal/${kraft}`);
+  }
+  return String(einsatzId);
+}
+
+/** Querlauf im Körper des offenen Dialogs in px (0 = passt). */
+async function dialogUeberlauf(dialog: Locator): Promise<number> {
+  return dialog.evaluate((el) => {
+    const koerper = el.querySelector<HTMLElement>('.ant-modal-body') ?? (el as HTMLElement);
+    return koerper.scrollWidth - koerper.clientWidth;
+  });
+}
+
+test.describe('Gate 1 · Fahrzeug als eigene Einheit (LLH-1073)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  for (const pruefbreite of PRUEFBREITEN) {
+    for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
+      test(`${pruefbreite.name} (${pruefbreite.breite} px) · ${rolle}: beide Dialoge ohne Querlauf`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await anmelden(page);
+        const einsatzId = await seedeEigeneEinheit(page);
+        if (rolle === 'fuehrungspersonal') await wechsleZuRolle(page, rolle, einsatzId);
+        await page.setViewportSize({ width: pruefbreite.breite, height: pruefbreite.hoehe });
+        const messwerte: string[] = [];
+        const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+
+        // Dialog 1: Als eigene Einheit führen.
+        await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+        await expect(region.getByText(EIGENE_EINHEIT_FAHRZEUG, { exact: true })).toBeVisible();
+        await region
+          .getByRole('button', { name: `Weitere Aktionen zu ${EIGENE_EINHEIT_FAHRZEUG}` })
+          .click();
+        await page.getByRole('menuitem', { name: 'Als eigene Einheit führen …' }).click();
+        const eigene = page.getByRole('dialog');
+        // Vorbedingung: der Dialog steht mit allen drei Feldern und der mitkommenden Besatzung.
+        await expect(eigene.getByRole('combobox', { name: 'Abschnitt' })).toBeVisible();
+        await expect(eigene.getByText(/^Besatzung: Kirchgassner-Wohlfahrt/)).toBeVisible();
+        {
+          const seite = await ueberlauf(page);
+          const koerper = await dialogUeberlauf(eigene);
+          messwerte.push(`eigene Einheit: Seite ${seite.ueber}px, Dialog ${koerper}px`);
+          expect(
+            seite.ueber,
+            `Seite läuft quer:\n${seite.schuldige.join('\n')}`,
+          ).toBeLessThanOrEqual(1);
+          expect(koerper, 'Dialogkörper läuft quer').toBeLessThanOrEqual(1);
+        }
+        await eigene.getByRole('button', { name: 'Einheit bilden' }).click();
+        await expect(page.getByText(`Einheit «${EIGENE_EINHEIT_FAHRZEUG}» gebildet`)).toBeVisible();
+        await expect(eigene).toBeHidden();
+
+        // Dialog 2: Personal der Einheit übernehmen.
+        await region.getByRole('button', { name: `Besatzung zu ${UEBERNAHME_FAHRZEUG}` }).click();
+        await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
+        const uebernahme = page.getByRole('dialog');
+        await expect(uebernahme.getByRole('checkbox')).toHaveCount(2);
+        {
+          const seite = await ueberlauf(page);
+          const koerper = await dialogUeberlauf(uebernahme);
+          messwerte.push(`übernehmen: Seite ${seite.ueber}px, Dialog ${koerper}px`);
+          expect(
+            seite.ueber,
+            `Seite läuft quer:\n${seite.schuldige.join('\n')}`,
+          ).toBeLessThanOrEqual(1);
+          expect(koerper, 'Dialogkörper läuft quer').toBeLessThanOrEqual(1);
+        }
+        await uebernahme.getByRole('button', { name: 'Übernehmen' }).click();
+        await expect(
+          page.getByText('2 Kräfte als Besatzung zugeordnet', { exact: true }),
+        ).toBeVisible();
+        test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
+      });
+    }
+  }
+});

@@ -1746,6 +1746,15 @@ async fn besatzung_uebernehmen_grenzen_und_beendetes_fahrzeug() {
     let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, rtw, &[anna; 50]).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "genau 50 mit Dubletten: {json}");
     assert_eq!(fahrzeug_der_person(&pool, anna).await, Some(rtw));
+    // Spec `eingabegrenzen`, „Dubletten“: der ETB-Eintrag nennt sie einmal.
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Fahrzeug «RTW 1»: «Anna» als Besatzung zugeordnet"),
+        "{texte:?}"
+    );
 
     let ktw = adhoc_disponieren(&app, &admin, einsatz, "KTW 1").await;
     assert_eq!(
