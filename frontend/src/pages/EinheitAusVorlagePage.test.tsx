@@ -396,6 +396,27 @@ describe('EinheitAusVorlagePage · Absenden', () => {
     expect(await screen.findByTestId('ort')).toHaveTextContent('/einsaetze/1/einheiten/50');
   });
 
+  it('wer die Seite während des Bildens verlässt, wird danach nicht zurückgerissen', async () => {
+    let freigeben: () => void = () => {};
+    zeige(
+      http.post('/api/einsaetze/1/einheiten/aus-vorlage', async () => {
+        await new Promise<void>((r) => (freigeben = r));
+        return HttpResponse.json(
+          { einheit_id: 50, einheit_ids: [50], fahrzeuge: [], personal: [] },
+          { status: 201 },
+        );
+      }),
+    );
+    await warteAufBaum();
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled());
+    await userEvent.click(screen.getByRole('link', { name: 'Einheiten' }));
+    expect(await screen.findByTestId('ort')).toHaveTextContent('/einsaetze/1/einheiten');
+    freigeben();
+    expect(await screen.findByText('Einheit gebildet')).toBeInTheDocument();
+    expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/einheiten$/);
+  });
+
   it('eine Ablehnung steht an der Zeile, ohne Toast; die Vorschau wird abgeglichen (D14)', async () => {
     let abrufe = 0;
     zeige(

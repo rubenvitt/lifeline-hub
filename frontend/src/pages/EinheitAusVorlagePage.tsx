@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Checkbox, Form, Input, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -104,6 +104,15 @@ function EinheitAusVorlage({
   const [namen, setNamen] = useState<ReadonlyMap<string, string>>(new Map());
   const [rohWahl, setRohWahl] = useState<Wahl>(LEERE_WAHL);
   const nameWert = Form.useWatch('name', form);
+  // Steht die Seite noch? Der Erfolg kommt auch, wenn sie inzwischen verlassen wurde; dann bleibt
+  // der Bediener, wo er hingegangen ist (nur die Rückmeldung erscheint).
+  const stehtRef = useRef(true);
+  useEffect(() => {
+    stehtRef.current = true;
+    return () => {
+      stehtRef.current = false;
+    };
+  }, []);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -160,6 +169,7 @@ function EinheitAusVorlage({
       ])
         void qc.invalidateQueries({ queryKey: key });
       message.success('Einheit gebildet');
+      if (!stehtRef.current) return;
       // Ins Meldebild mit der neuen Einheit (D12), ohne dessen Freigabe in ihre Ansicht.
       void navigate(
         sprungGesperrt('kraefteuebersicht')
