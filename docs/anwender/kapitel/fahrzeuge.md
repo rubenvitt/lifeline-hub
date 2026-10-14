@@ -8,9 +8,9 @@ quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FahrzeugeDi
 ## Überblick
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
-der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Typ, FMS-Status und
-Besatzung; Kennzeichen und Träger stehen erst ab 1600 px Fensterbreite in der Liste, darunter lassen
-sie sich wie die Bemerkung unter „Spalten“ einblenden.
+der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, FMS-Status und Besatzung;
+Typ, Kennzeichen und Träger stehen erst ab 1600 px Fensterbreite in der Liste, darunter lassen sie
+sich wie die Bemerkung unter „Spalten“ einblenden.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
 **FMS-Tableau** als Überblick über die ganze Flotte, in dem sich der Status mit einem Klick oder
@@ -25,7 +25,7 @@ Einsatzleitung und Führungspersonal.
 2. Je Fahrzeug „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa „Besatzung nicht
    erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
 
-   ![Fahrzeugliste mit Funkrufname, Typ, FMS-Status, Besatzung und dem Knopf „Entlassen“ je Fahrzeug, darüber „Spalten · 3 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
+   ![Fahrzeugliste mit Funkrufname, FMS-Status, Besatzung und dem Knopf „Entlassen“ je Fahrzeug, darüber „Spalten · 4 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
 
 3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Status“ eine Kategorie wählen.
 

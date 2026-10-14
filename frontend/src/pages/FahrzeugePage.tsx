@@ -526,8 +526,10 @@ export default function FahrzeugePage() {
    * Besatzung hält dabei eine Zeile (320 px für „unterbesetzt“ samt Ist und Soll). Den Rest
    * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
    * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
-   * weichen `kennzeichen` und `traeger`, beide über den Spaltenschalter und im Zähler (wie die
-   * Personalseite). Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
+   * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
+   * die Personalseite). `typ` weicht, seit „Entlassen“ und „⋯“ die Aktionsspalte auf 170 px
+   * gebracht haben (LLH-1079 Teil II): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ
+   * trägt der Funkrufname meist schon in seiner Kennzahl. Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
    * am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
@@ -554,6 +556,7 @@ export default function FahrzeugePage() {
       dataIndex: 'fahrzeugtyp',
       key: 'typ',
       width: 100,
+      abBreite: 'xxl',
       sortWert: (ef) => ef.fahrzeugtyp,
       suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
