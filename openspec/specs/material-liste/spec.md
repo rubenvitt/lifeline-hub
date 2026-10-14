@@ -2,7 +2,7 @@
 
 ## Purpose
 Die Materialliste zeigt, was an Material im Einsatz ist, wo es liegt und was davon ausgefallen ist,
-und lässt es dort ändern: Ort aus Einheit und Unfallhilfsstelle, Menge mit ausdrücklichem
+und lässt es dort ändern: der eine Ort je Posten (LLH-1224), Menge mit ausdrücklichem
 Speichern, Korrektur der Angaben eines Ad-hoc-Postens, Aufteilen einer Menge auf zwei Zeilen und
 die Zeilenaktionen mit dem Wortlaut „Aus dem Einsatz nehmen“. Eingeführt mit LLH-1093.
 
@@ -10,15 +10,20 @@ die Zeilenaktionen mit dem Wortlaut „Aus dem Einsatz nehmen“. Eingeführt mi
 
 ### Requirement: Ort eines Postens in der Materialliste
 
-Die Materialliste SHALL je Posten eine Spalte „Ort“ zeigen, die die zugeordnete Einheit und die
-zugeordnete Unfallhilfsstelle nennt, beide zugleich, wenn beide gesetzt sind. Kann die Person das
-Modul der Einheit oder der UHS nicht lesen, MUST der Teil „zugeordnet“ zeigen statt eines Namens
-und nie „—“. Die Liste MUST nach Ort filterbar sein („ohne Ort“, je Einheit, je UHS); ein Posten an
-Einheit und UHS MUST beiden Filterwerten entsprechen.
+Die Materialliste SHALL je Posten eine Spalte „Ort“ zeigen, die den einen Ort des Postens nennt:
+eine Einheit, ein Fahrzeug, eine Unfallhilfsstelle, einen Bereitstellungsraum oder „ohne Ort“. Kann
+die Person das Modul des Orts nicht lesen, MUST die Spalte „zugeordnet“ zeigen statt eines Namens
+und nie „—“. Die Liste MUST nach Ort filterbar sein („ohne Ort“, je Einheit, je Fahrzeug, je UHS, je
+Bereitstellungsraum); ein Posten
+MUST höchstens einem Filterwert entsprechen.
 
-#### Scenario: Einheit und UHS zugleich
-- **WHEN** ein Posten der Einheit „Rettungsstaffel“ und der UHS „Turnhalle“ zugeordnet ist
-- **THEN** zeigt seine Zeile den Ort „Rettungsstaffel · UHS Turnhalle“
+#### Scenario: Posten an einer UHS
+- **WHEN** ein Posten der UHS „Turnhalle“ zugeordnet ist
+- **THEN** zeigt seine Zeile den Ort „UHS Turnhalle“
+
+#### Scenario: Posten auf einem Fahrzeug
+- **WHEN** ein Posten dem Fahrzeug „Florian 1/83-1“ zugeordnet ist
+- **THEN** zeigt seine Zeile den Ort „Florian 1/83-1“ und keinen Strich
 
 #### Scenario: Ohne Leserecht auf Einheiten
 - **WHEN** eine Person ohne Zugriff auf das Modul Einheiten die Materialliste öffnet
@@ -26,14 +31,17 @@ Einheit und UHS MUST beiden Filterwerten entsprechen.
 
 ### Requirement: Ort in der Liste ändern
 
-Die Materialliste SHALL Einheit und UHS eines Postens in der Zeile ändern lassen, jeden Teil mit
-ausdrücklichem Speichern. Die Einheit MUST über den Zuordnungsweg der Einheiten geändert werden und
-dessen Recht verlangen, die UHS über die Material-Disposition. Ein Teil, dessen Modul die Person
-nicht nutzen darf, MUST nur lesbar sein.
+Die Materialliste SHALL den Ort eines Postens in der Zeile ändern lassen, mit ausdrücklichem
+Speichern. Setzt die Person einen neuen Ort, MUST der bisherige gelöst werden. Ein Teil, dessen
+Modul die Person nicht nutzen darf, MUST nur lesbar sein.
 
 #### Scenario: Umhängen aus der Liste
 - **WHEN** die Einsatzleitung beim Posten „Wolldecke“ die Einheit von „Staffel A“ auf „Staffel B“ ändert
-- **THEN** gehört der Posten zu „Staffel B“, und seine UHS bleibt unverändert
+- **THEN** gehört der Posten zu „Staffel B“ und zu keinem anderen Ort
+
+#### Scenario: Von der Einheit an die UHS
+- **WHEN** die Einsatzleitung beim Posten „Wolldecke“ an der Einheit „Staffel A“ die UHS „Turnhalle“ setzt
+- **THEN** liegt der Posten an der UHS „Turnhalle“, und der Einheit-Teil ist leer
 
 #### Scenario: Einheiten-Modul gesperrt
 - **WHEN** eine Person Material schreiben darf, das Modul Einheiten aber nicht nutzen darf
@@ -60,13 +68,13 @@ geschrieben werden. Das Lösen der UHS und ein unveränderter Wert MUST ohne die
 
 ### Requirement: Umhängen nennt die alte Einheit
 
-Wird ein Posten von einer Einheit an eine andere gehängt, SHALL der ETB-Eintrag beide Einheiten
-nennen, und beide Einheiten MUST live aktualisiert werden. Die Zuordnung an dieselbe Einheit MUST
+Wechselt ein Posten seinen Ort, SHALL der ETB-Eintrag den alten und den neuen Ort nennen, und beide
+Orte MUST live aktualisiert werden. Die Zuordnung an den Ort, an dem der Posten schon ist, MUST
 nichts schreiben.
 
 #### Scenario: Von A nach B
 - **WHEN** „Wolldecke“ (×20) von „Staffel A“ an „Staffel B“ gehängt wird
-- **THEN** steht im ETB „Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»“, und die Ansicht von „Staffel A“ zeigt den Posten nicht mehr
+- **THEN** steht im ETB „Material «Wolldecke» (×20): Einheit «Staffel A» → Einheit «Staffel B»“, und die Ansicht von „Staffel A“ zeigt den Posten nicht mehr
 
 #### Scenario: Dieselbe Einheit
 - **WHEN** ein Posten erneut seiner eigenen Einheit zugeordnet wird
@@ -113,24 +121,34 @@ mit altem und neuem Wert nennt. Ändert sich keine Angabe, MUST kein Eintrag ent
 
 ### Requirement: Posten aufteilen
 
-Das System SHALL die Menge eines Postens auf zwei Zeilen aufteilen. Das Aufteilen MUST in einer
-Transaktion die Ausgangszeile mindern und eine neue Zeile mit der abgeteilten Menge anlegen, die
-Bezeichnung, Stammbezug, Status, Bemerkung, Einheit, UHS und Dispositionszeitpunkt übernimmt, und
-genau einen ETB-Eintrag schreiben. Die Summe beider Mengen MUST der Ausgangsmenge gleichen.
+Das System SHALL die Menge eines Verbrauchsguts auf zwei Zeilen aufteilen. Das Aufteilen MUST in
+einer Transaktion die Ausgangszeile mindern und eine neue Zeile mit der abgeteilten Menge anlegen,
+die Bezeichnung, Stammbezug, Art, Status, Bemerkung, Ort und Dispositionszeitpunkt übernimmt, ohne
+Ausgabe beginnt und genau einen ETB-Eintrag schreibt. Die Ausgabe MUST an der Ausgangszeile bleiben.
+Die Summe beider Mengen MUST der Ausgangsmenge gleichen.
 
 #### Scenario: 50 Decken
 - **WHEN** von 50 Wolldecken 20 abgeteilt werden
 - **THEN** gibt es zwei Zeilen mit 30 und 20, beide mit demselben Ort, und das ETB nennt „aufgeteilt: 50 → 30 + 20“
 
+#### Scenario: Teilweise ausgegeben
+- **WHEN** von 50 Wolldecken mit Ausgabe 20 genau 20 abgeteilt werden
+- **THEN** trägt die Ausgangszeile Menge 30 mit Ausgabe 20 und die neue Zeile Menge 20 ohne Ausgabe
+
 ### Requirement: Grenzen des Aufteilens
 
-Die abgeteilte Menge SHALL mindestens 1 und kleiner als die Menge des Postens sein. Unter 1 MUST
-der Server mit 400 antworten, bei einer Menge ab der Ausgangsmenge mit 422, an einem aus dem Einsatz
-genommenen oder stornierten Posten mit 409; in keinem Fall MUST etwas geschrieben werden.
+Die abgeteilte Menge SHALL mindestens 1, kleiner als die Menge und höchstens der Rest des Postens
+sein. Unter 1 MUST der Server mit 400 antworten; bei einer Menge ab der Ausgangsmenge, über dem Rest
+oder an einem Gerät mit 422; an einem aus dem Einsatz genommenen oder stornierten Posten mit 409; in
+keinem Fall MUST etwas geschrieben werden.
 
 #### Scenario: Menge 1
 - **WHEN** ein Posten mit Menge 1 aufgeteilt werden soll
 - **THEN** antwortet der Server mit 422, und die Liste bietet „Aufteilen“ für ihn nur gesperrt mit dem Grund an
+
+#### Scenario: Mehr als der Rest
+- **WHEN** von 50 Wolldecken mit Ausgabe 40 genau 20 abgeteilt werden sollen
+- **THEN** antwortet der Server mit 422
 
 #### Scenario: Beendeter Posten
 - **WHEN** ein aus dem Einsatz genommener Posten aufgeteilt werden soll
@@ -151,13 +169,17 @@ Verlassen des Felds.
 Über der Materialliste SHALL eine Verdichtung die aktiven Posten nach einsatzbereit, im Einsatz und
 Ausfall zählen; die Gesamtzahl der Posten MUST im Seitenkopf stehen. Ausfall MUST jeden Status
 umfassen, dessen Rolle im Statusvertrag Alarm oder Achtung ist (defekt, verbraucht, Desinfektion
-nötig). Gezählt MUST in Posten werden, nicht in Mengen, mit derselben Funktion, die die
-Material-Gruppenzeile im Meldebild zählt. Personal- oder Fahrzeugzahlen MUST NOT auf der
-Materialseite stehen.
+nötig), und jedes aufgebrauchte Verbrauchsgut. Gezählt MUST in Posten werden, nicht in Mengen, mit
+derselben Funktion, die die Material-Gruppenzeile im Meldebild zählt. Personal- oder Fahrzeugzahlen
+MUST NOT auf der Materialseite stehen.
 
 #### Scenario: Zählung
-- **WHEN** von zwölf Posten sieben einsatzbereit, drei im Einsatz, einer defekt und einer verbraucht sind
+- **WHEN** von zwölf Posten sieben einsatzbereit, drei im Einsatz, einer defekt und ein Verbrauchsgut aufgebraucht sind
 - **THEN** steht über der Liste „7 einsatzbereit · 3 im Einsatz · 2 Ausfall“ und im Kopf „12 Posten“
+
+#### Scenario: Teilweise ausgegeben
+- **WHEN** ein einsatzbereites Verbrauchsgut 30 von 50 übrig hat
+- **THEN** zählt es als einsatzbereit, nicht als Ausfall
 
 #### Scenario: Jeder Status in genau einem Topf
 - **WHEN** der Statusvertrag des Materials geprüft wird
