@@ -6,6 +6,7 @@ import {
   zuordnungsKarte,
 } from './einheit-fixture';
 import { tippe } from './fernmeldeskizze-kern';
+import { seedeVorlage } from './vorlage-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
@@ -1910,6 +1911,78 @@ for (const schreibend of [true, false]) {
       await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`);
       await stelleDichte(page, dichte);
       gemessen.push(await messeKommunikationsplan(page, soll, dichte, schreibend));
+    }
+    test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  });
+}
+
+// ── Einheit aus Vorlage bilden (LLH-1049) ──────────────────────────────────────────────
+//
+// Kopf (Name, Abschnitt), je Fahrzeug und Person ein beschriftetes Kästchen und die Aktion mit
+// der Zusammenfassung. Das Kästchen trägt den Boden des Kontexts (`antdKaestchen`, LFH-907):
+// 24 / 48 / 72, in `kompakt` also nicht die Steuerhöhe 30. Gesät: Zug mit ELW und Führer, Staffel
+// mit zwei RTW, drei Personen darauf und eine ohne Fahrzeug — acht Kästchen.
+
+const VORLAGE_KAESTCHEN = 8;
+const BODEN_KAESTCHEN = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
+
+for (const schreibend of [true, false]) {
+  test(`Einheit aus Vorlage (${schreibend ? 'Admin' : 'Beobachter'}): Kopffelder, Kästchen und Aktion folgen der Dichte-Staffel`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Vorlage`);
+    const v = await seedeVorlage(page, 'Gate3 ');
+    if (!schreibend) await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+    const gemessen: string[] = [];
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/einheiten/aus-vorlage/${v.vorlageId}`);
+      await stelleDichte(page, dichte);
+      const main = page.getByRole('main');
+      // Datenanker: das Kästchen eines Fahrzeugs der Staffel steht.
+      await expect(main.getByRole('checkbox', { name: v.fahrzeuge.rtw2 })).toHaveCount(1);
+      const bilden = main.getByRole('button', { name: 'Einheit bilden', exact: true });
+      if (!schreibend) {
+        await rechteHinweisSteht(page);
+        await expect(
+          main.getByRole('checkbox', { name: v.fahrzeuge.rtw2 }),
+          'Vorbedingung: ohne Schreibrecht ist kein Kästchen wählbar',
+        ).toBeDisabled();
+      }
+      const name = await haeltStufe(
+        main.getByLabel('Name', { exact: true }),
+        soll,
+        `Name (${dichte})`,
+      );
+      const abschnitt = await haeltStufe(
+        main.locator('.ant-select').filter({
+          has: page.getByRole('combobox', { name: 'Abschnitt', exact: true }),
+        }),
+        soll,
+        `Abschnitt (${dichte})`,
+      );
+      const kaestchen = await alleHaltenStufe(
+        main.locator('label.ant-checkbox-wrapper'),
+        BODEN_KAESTCHEN[dichte],
+        `Kästchen (${dichte})`,
+        VORLAGE_KAESTCHEN,
+      );
+      const knopf = schreibend
+        ? await haeltStufe(bilden, soll, `Einheit bilden (${dichte})`)
+        : await gesperrtHaeltStufe(bilden, soll, `Einheit bilden (${dichte})`);
+      const abbrechen = await haeltStufe(
+        main.getByRole('button', { name: 'Abbrechen', exact: true }),
+        soll,
+        `Abbrechen (${dichte})`,
+      );
+      gemessen.push(
+        `${dichte} (Soll ≥ ${soll}): Name ${name}, Abschnitt ${abschnitt}, ` +
+          `Kästchen ${kaestchen} (Boden ${BODEN_KAESTCHEN[dichte]}), Einheit bilden ${knopf}, ` +
+          `Abbrechen ${abbrechen}`,
+      );
     }
     test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
   });

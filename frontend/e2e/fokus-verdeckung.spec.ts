@@ -8,6 +8,7 @@ import {
 } from './einheit-fixture';
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 import { einsatzAnlegen } from './einsatz-kern';
+import { seedeVorlage } from './vorlage-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -1701,4 +1702,86 @@ for (const viewport of [
       });
     }
   });
+}
+
+/**
+ * Einheit aus Vorlage bilden (LLH-1049): Kopf, je Fahrzeug und Person ein Kästchen, die Aktion
+ * mit Zusammenfassung — eine lange Seite ohne eigene Leiste. Vorwärts darf kein Ziel unter einer
+ * stehenden Fläche am unteren Rand verschwinden, rückwärts keins hinter dem klebenden Kopf (ab
+ * `md`). Jedes Ziel muss besucht werden; Vorbedingung ist eine Bildlaufreserve, sonst käme kein
+ * Ziel in die Nähe eines Rands.
+ */
+for (const viewport of [
+  { width: 1366, height: 520 },
+  { width: 390, height: 420 },
+]) {
+  for (const dichte of ['kompakt', 'handschuh']) {
+    test(`Einheit aus Vorlage (LLH-1049): kein Ziel verdeckt bei ${viewport.width}px, ${dichte}`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await ohneDevtoolsKnopf(page);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegenPerApi(page, `Fokus Vorlage ${Date.now()}`);
+      const v = await seedeVorlage(page, 'Fokus ');
+      await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+      await page.goto(`/einsaetze/${einsatzId}/einheiten/aus-vorlage/${v.vorlageId}`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      const main = page.getByRole('main');
+      await expect(main.getByRole('checkbox', { name: v.fahrzeuge.rtw2 })).toHaveCount(1);
+
+      const ziele = [
+        { name: 'Name', fokus: main.getByLabel('Name', { exact: true }) },
+        {
+          name: 'Abschnitt',
+          fokus: main.getByRole('combobox', { name: 'Abschnitt', exact: true }),
+        },
+        ...[...Object.values(v.fahrzeuge), ...Object.values(v.personen)].map((name) => ({
+          name,
+          fokus: main.getByRole('checkbox', { name }),
+        })),
+        ...['Einheit bilden', 'Abbrechen'].map((name) => ({
+          name,
+          fokus: main.getByRole('button', { name, exact: true }),
+        })),
+      ];
+      for (const { name, fokus } of ziele) {
+        await expect(fokus, name).toHaveCount(1);
+        await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
+      }
+      const reserve = await page.evaluate(
+        () => document.documentElement.scrollHeight - innerHeight,
+      );
+      expect(reserve, 'Vorbedingung: die Seite rollt').toBeGreaterThan(0);
+
+      await ziele[0].fokus.focus();
+      await page.keyboard.press('Shift+Tab');
+      const vor = await pruefeFokusVerdeckung(page, ziele.length + 2);
+      expect(vor.besuchteZiele.sort(), 'jedes Ziel der Seite muss per Tab besucht werden').toEqual(
+        ziele.map(({ name }) => name).sort(),
+      );
+      expect(vor.verdeckt, vor.verdeckt.join('\n')).toEqual([]);
+
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await ziele[ziele.length - 1].fokus.focus();
+      const zurueck = await pruefeFokusVerdeckung(page, ziele.length + 2, 'Shift+Tab');
+      if (viewport.width >= 768) {
+        expect(zurueck.fixierteKandidaten, 'Vorbedingung: der Kopf klebt').toBeGreaterThan(0);
+      }
+      expect(zurueck.verdeckt, zurueck.verdeckt.join('\n')).toEqual([]);
+      test.info().annotations.push({
+        type: 'messwert',
+        description:
+          `${viewport.width}px ${dichte}: ${vor.besuchteZiele.length} Ziele, Reserve ${reserve}px, ` +
+          `${vor.stoppsBeruehrt + zurueck.stoppsBeruehrt} Stopps an einer stehenden Fläche`,
+      });
+    });
+  }
+}
+
+async function einsatzAnlegenPerApi(page: Page, bezeichnung: string): Promise<number> {
+  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  return ((await antwort.json()) as { id: number }).id;
 }
