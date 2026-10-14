@@ -83,8 +83,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 12. Neue Person der Sichtungskategorie I (benötigt 1, 2) · LLH-1218
 
-- [ ] 12.1 Neuerfassung mit SK I und Hochstufung auf SK I melden `sichtung_eins` an Leser des Moduls Personen; Rust-Test „Hochstufung“
-- [ ] 12.2 Anwenderkapitel zu Personen und Sichtung nachziehen
+- [x] 12.1 Neuerfassung mit SK I und Hochstufung auf SK I melden `sichtung_eins` an Leser des Moduls Personen; Rust-Test „Hochstufung“
+- [x] 12.2 Anwenderkapitel zu Personen und Sichtung nachziehen
 
 ## 13. Einheit oder Fahrzeug wieder verfügbar (D11, benötigt 1, 2) · LLH-1219
 
