@@ -9,6 +9,16 @@ export const POSITION_LABELS: Record<StaerkePosition, string> = {
   mannschaft: 'Mannschaft',
 };
 
+/**
+ * Kürzel der Stärke-Position (F/UF/M) — die Marke im Kräftebaum und die Spalte „Position“ der
+ * Personalliste (LLH-1060). Eine Stelle neben den Wörtern, kein zweites Kürzelwerk.
+ */
+export const POSITION_KUERZEL: Record<StaerkePosition, string> = {
+  fuehrer: 'F',
+  unterfuehrer: 'UF',
+  mannschaft: 'M',
+};
+
 /** Aus POSITION_LABELS abgeleitete Optionen für Position-Selects. */
 export const POSITION_OPTIONEN = (Object.keys(POSITION_LABELS) as StaerkePosition[]).map((p) => ({
   value: p,
