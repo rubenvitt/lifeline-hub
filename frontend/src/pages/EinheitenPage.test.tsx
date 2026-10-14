@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -155,6 +156,22 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
     const wieder = await screen.findByRole('dialog');
     await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
+  });
+
+  it('der Name nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Name')).toHaveAttribute(
+      'maxLength',
+      String(EINHEIT_NAME_MAX),
+    );
   });
 
   it('erst das Absenden mit Namen legt an — und nie als „Neue Einheit"', async () => {
