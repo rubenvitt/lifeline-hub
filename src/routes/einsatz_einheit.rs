@@ -768,7 +768,7 @@ pub async fn material_zuordnen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let zuordnung = crate::write_retry!(&state.pool, |conn| {
         let z = mitglied_repo::zuordnen_material_tx(conn, einsatz_id, eid, em_id).await?;
-        if z.is_geaendert {
+        if z.is_changed {
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
@@ -785,7 +785,7 @@ pub async fn material_zuordnen(
         }
         Ok(z)
     })?;
-    if zuordnung.is_geaendert {
+    if zuordnung.is_changed {
         sse_einheit(&state, einsatz_id, eid);
         if let Some((alt, _)) = zuordnung.vorher {
             sse_einheit(&state, einsatz_id, alt);

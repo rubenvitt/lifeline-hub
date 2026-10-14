@@ -394,7 +394,7 @@ mod tests {
     async fn verortbar_nur_geplant_und_aktiv() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let pruefe = |uhs: i64| {
+        let check = |uhs: i64| {
             let pool = pool.clone();
             async move {
                 let mut conn = pool.acquire().await.unwrap();
@@ -404,24 +404,21 @@ mod tests {
         let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP"))
             .await
             .unwrap();
-        pruefe(u.id).await.unwrap();
+        check(u.id).await.unwrap();
         setze_status(&pool, e, u.id, "aktiv", b).await.unwrap();
-        pruefe(u.id).await.unwrap();
+        check(u.id).await.unwrap();
         setze_status(&pool, e, u.id, "aufgeloest", b).await.unwrap();
         assert!(matches!(
-            pruefe(u.id).await.unwrap_err(),
+            check(u.id).await.unwrap_err(),
             AppError::UnprocessableEntity(m) if m == "UHS ist aufgelöst"
         ));
         let s = anlegen(&pool, e, b, daten("behandlungsplatz", "Storno"))
             .await
             .unwrap();
         storniere(&pool, e, s.id, b).await.unwrap();
+        assert!(matches!(check(s.id).await.unwrap_err(), AppError::NotFound));
         assert!(matches!(
-            pruefe(s.id).await.unwrap_err(),
-            AppError::NotFound
-        ));
-        assert!(matches!(
-            pruefe(999_999).await.unwrap_err(),
+            check(999_999).await.unwrap_err(),
             AppError::NotFound
         ));
         let mut conn = pool.acquire().await.unwrap();

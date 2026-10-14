@@ -1074,7 +1074,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let lies = |pool: SqlitePool| async move {
+        let load = |pool: SqlitePool| async move {
             let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
             (
                 a.bezeichnung,
@@ -1098,7 +1098,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            lies(pool.clone()).await,
+            load(pool.clone()).await,
             ("Feldbetten".into(), s("K"), s("B"), s("T"), 4)
         );
         update(
@@ -1113,7 +1113,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            lies(pool.clone()).await,
+            load(pool.clone()).await,
             ("Feldbetten".into(), s("Betreuung"), s("B"), s("T"), 4)
         );
         update(
@@ -1128,7 +1128,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            lies(pool.clone()).await,
+            load(pool.clone()).await,
             ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("T"), 4)
         );
         update(
@@ -1143,7 +1143,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            lies(pool.clone()).await,
+            load(pool.clone()).await,
             ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("THW"), 4)
         );
         update(
@@ -1160,7 +1160,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            lies(pool.clone()).await,
+            load(pool.clone()).await,
             ("Feldbetten".into(), None, None, None, 4)
         );
     }
