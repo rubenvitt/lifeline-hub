@@ -3,6 +3,8 @@ import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import {
   baueFmsTableau,
   fmsStatusOptionen,
+  handStatusOptionen,
+  KEIN_HANDSTATUS,
   OHNE_ABSCHNITT_TITEL,
   OHNE_EINHEIT_TITEL,
   UNGEGLIEDERT_TITEL,
@@ -64,6 +66,18 @@ describe('fmsStatusOptionen (LFH-642)', () => {
       [2, 'Reserve'],
     ]);
     expect(o[0].darstellung?.rolle).toBeDefined();
+  });
+});
+
+describe('handStatusOptionen (LFH-609, gehoben für LLH-1036)', () => {
+  it('bietet den Katalog wie das Tableau und zuletzt „kein Status“ zum Leeren', () => {
+    const o = handStatusOptionen([status(1, '2 – Frei auf Wache', 2)]);
+    expect(o.map((x) => [x.wert, x.label])).toEqual([
+      [1, 'S2 · Frei auf Wache'],
+      [KEIN_HANDSTATUS, 'kein Status'],
+    ]);
+    // Eine Katalog-ID ist nie negativ: der Menüwert zum Leeren kollidiert mit keiner.
+    expect(KEIN_HANDSTATUS).toBeLessThan(0);
   });
 });
 
