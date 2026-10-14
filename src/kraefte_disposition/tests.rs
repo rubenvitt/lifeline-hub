@@ -294,11 +294,27 @@ async fn fahrzeug_einer_anderen_einheit_ist_422_und_legt_nichts_an() {
     let zug = einheit(&pool, k.einsatz_id, "Sanitätszug").await;
     let fz = fahrzeug(&pool, 1, "83-1").await;
     let ef = einsatz_fahrzeug(&pool, k, fz, Some(zug)).await;
+    let lose = fahrzeug(&pool, 1, "83-9").await;
+    let ef_lose = einsatz_fahrzeug(&pool, k, lose, None).await;
     let a = person(&pool, 1, "Anna", None).await;
     let mut conn = pool.acquire().await.unwrap();
     let ziel = Ziel {
         einheit_id: Some(staffel),
         fahrzeug_id: Some(ef),
+    };
+    let fehler = disponiere_personal_tx(&mut conn, k, &wahl(&[a]), ziel, Regeln::SAMMEL)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(fehler, AppError::UnprocessableEntity(_)),
+        "{fehler:?}"
+    );
+    assert_eq!(anzahl_disponiert(&mut conn, k.einsatz_id).await, 0);
+
+    // Ein Fahrzeug ohne Einheit gehört auch nicht zur gewählten Einheit (D5).
+    let ziel = Ziel {
+        einheit_id: Some(staffel),
+        fahrzeug_id: Some(ef_lose),
     };
     let fehler = disponiere_personal_tx(&mut conn, k, &wahl(&[a]), ziel, Regeln::SAMMEL)
         .await
