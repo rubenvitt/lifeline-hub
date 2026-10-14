@@ -124,7 +124,7 @@ describe('PersonalDisponierenModal', () => {
     standardHandler(
       freigabenFixture({ einheiten: { zugriff: false }, fahrzeuge: { zugriff: false } }),
     );
-    renderMitProviders(<Harness />);
+    renderMitProviders(<Harness serie />);
     const gesperrt = await screen.findByRole('dialog');
     await within(gesperrt).findByRole('combobox', { name: 'Personen' });
     // Die Freigaben sind da, wenn das Feld steht: der Dialog wartet nicht auf sie, also ein
@@ -133,6 +133,8 @@ describe('PersonalDisponierenModal', () => {
     expect(gesperrt.querySelectorAll('.ant-form-item')).toHaveLength(1);
     expect(within(gesperrt).queryByRole('combobox', { name: 'In Einheit' })).toBeNull();
     expect(within(gesperrt).queryByRole('combobox', { name: 'Auf Fahrzeug' })).toBeNull();
+    // Ohne Einheit gibt es nichts zu behalten.
+    expect(within(gesperrt).queryByRole('checkbox', { name: 'Werte behalten' })).toBeNull();
   });
 
   it('bietet weder aktiv disponierte noch entlassene Personen an', async () => {

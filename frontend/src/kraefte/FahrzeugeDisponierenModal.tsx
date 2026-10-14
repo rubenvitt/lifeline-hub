@@ -112,7 +112,8 @@ export default function FahrzeugeDisponierenModal({
       form={form}
       erfassenText="Disponieren"
       serie={serie}
-      uebernahme={['einheit_id']}
+      // „Werte behalten“ nur, wenn es etwas zu behalten gibt: das Feld Einheit steht.
+      uebernahme={einheitenFrei ? ['einheit_id'] : undefined}
       laeuft={mutation.isPending}
       speicherung={mutation}
       speicherFehlerTitel="Nicht disponiert"
