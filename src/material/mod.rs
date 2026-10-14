@@ -199,6 +199,60 @@ pub fn etb_text_erneut_disponiert(bezeichnung: &str, menge: i64) -> String {
     format!("Material «{bezeichnung}» (×{menge}) erneut disponiert")
 }
 
+/// System-ETB beim Korrigieren der Angaben eines Ad-hoc-Postens (LLH-1093, design.md D6): EIN
+/// Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt (`(Angabe, alt, neu)`, leer
+/// als „—“), benannt nach der neuen Bezeichnung. Ändert sich nichts, gibt es keinen Text.
+pub fn etb_text_angaben_geaendert(
+    bezeichnung: &str,
+    angaben: &[(&str, Option<&str>, Option<&str>)],
+) -> Option<String> {
+    let teile: Vec<String> = angaben
+        .iter()
+        .filter(|(_, alt, neu)| alt != neu)
+        .map(|(angabe, alt, neu)| {
+            format!(
+                "{angabe} «{}» → «{}»",
+                alt.unwrap_or("—"),
+                neu.unwrap_or("—")
+            )
+        })
+        .collect();
+    (!teile.is_empty()).then(|| format!("Material «{bezeichnung}»: {}", teile.join(", ")))
+}
+
+/// [`etb_text_angaben_geaendert`] für Vor- und Nachzustand eines Postens: Bezeichnung, Kategorie,
+/// Bestandsnummer, Träger in dieser Folge.
+pub fn etb_text_angaben(
+    vorher: &EinsatzMaterialAnzeige,
+    nachher: &EinsatzMaterialAnzeige,
+) -> Option<String> {
+    etb_text_angaben_geaendert(
+        &nachher.bezeichnung,
+        &[
+            (
+                "Bezeichnung",
+                Some(&vorher.bezeichnung),
+                Some(&nachher.bezeichnung),
+            ),
+            (
+                "Kategorie",
+                vorher.kategorie.as_deref(),
+                nachher.kategorie.as_deref(),
+            ),
+            (
+                "Bestandsnummer",
+                vorher.bestandsnummer.as_deref(),
+                nachher.bestandsnummer.as_deref(),
+            ),
+            (
+                "Träger",
+                vorher.traegerorganisation.as_deref(),
+                nachher.traegerorganisation.as_deref(),
+            ),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -220,6 +274,31 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_erneut_disponiert("Sandsäcke", 3),
             "Material «Sandsäcke» (×3) erneut disponiert"
+        );
+    }
+
+    #[test]
+    fn angaben_geaendert_nennt_jede_angabe_mit_alt_und_neu() {
+        assert_eq!(
+            etb_text_angaben_geaendert(
+                "Feldbetten",
+                &[
+                    ("Bezeichnung", Some("Feldbeten"), Some("Feldbetten")),
+                    ("Kategorie", None, Some("Betreuung")),
+                    ("Bestandsnummer", Some("B-1"), Some("B-1")),
+                    ("Träger", Some("THW"), None),
+                ],
+            )
+            .as_deref(),
+            Some(
+                "Material «Feldbetten»: Bezeichnung «Feldbeten» → «Feldbetten», \
+                 Kategorie «—» → «Betreuung», Träger «THW» → «—»"
+            )
+        );
+        assert_eq!(
+            etb_text_angaben_geaendert("Decke", &[("Kategorie", Some("A"), Some("A"))]),
+            None,
+            "unverändert: kein Text"
         );
     }
 

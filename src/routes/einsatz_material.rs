@@ -169,13 +169,27 @@ pub struct DispoPatchBody {
     /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
+    /// Verortung an einer UHS, Tri-State; ein neuer Wert muss eine UHS des Einsatzes in `geplant`
+    /// oder `aktiv` sein (LLH-1093, design.md D4).
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub uhs_id: Option<Option<i64>>,
+    /// Ad-hoc-Angaben (LLH-1093, design.md D6), symmetrisch zum Ad-hoc-Body; an einem
+    /// Stamm-Posten 422. `bezeichnung` ist Pflicht: `null` oder leer → 400.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezeichnung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kategorie: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bestandsnummer: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/material/{em_id} — Menge und/oder Status und/oder Bemerkung.
-/// Mengen-Änderung und Status-Wechsel schreiben je einen ETB-Eintrag; eine reine
-/// Bemerkungsänderung schreibt keinen.
+/// PATCH /api/einsaetze/{id}/material/{em_id} — Menge, Status, Bemerkung, UHS und bei
+/// Ad-hoc-Posten Bezeichnung, Kategorie, Bestandsnummer und Träger (LLH-1093).
+/// Mengen-Änderung und Status-Wechsel schreiben je einen ETB-Eintrag, geänderte Angaben zusammen
+/// einen weiteren; eine reine Bemerkungs- oder UHS-Änderung schreibt keinen. Reihenfolge: 400
+/// (Feld) → 404 (Zeile) → 409 (beendet) → 422 (Stamm-Posten, UHS aufgelöst).
 pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -202,14 +216,32 @@ pub async fn update(
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
     let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let bezeichnung = body
+        .bezeichnung
+        .map(|b| pflicht_max(b.as_deref().unwrap_or(""), "Bezeichnung", ADHOC_TEXT_MAX))
+        .transpose()?;
+    let kategorie = optional_max_tri(body.kategorie, "Kategorie", ADHOC_TEXT_MAX)?;
+    let bestandsnummer = optional_max_tri(body.bestandsnummer, "Bestandsnummer", ADHOC_TEXT_MAX)?;
+    let traeger = optional_max_tri(
+        body.traegerorganisation,
+        "Trägerorganisation",
+        ADHOC_TEXT_MAX,
+    )?;
+    fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
+        w.as_ref().map(|o| o.as_deref())
+    }
     let patch = MaterialPatch {
         menge: body.menge,
         status,
-        bemerkung: bemerkung.as_ref().map(|o| o.as_deref()),
+        bemerkung: tri(&bemerkung),
         uhs_id: body.uhs_id,
+        bezeichnung: bezeichnung.as_deref(),
+        kategorie: tri(&kategorie),
+        bestandsnummer: tri(&bestandsnummer),
+        traegerorganisation: tri(&traeger),
     };
 
-    // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu zwei) System-ETB-Einträge atomar in
+    // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu drei) System-ETB-Einträge atomar in
     // EINER Tx (BEGIN IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload
     // (`nachher`) liefert die frischen Werte für ETB-Texte UND Response; ein Menge-Wechsel und
     // ein Status-Wechsel schreiben je einen Eintrag (eine reine Bemerkungsänderung keinen). SSE
@@ -247,21 +279,33 @@ pub async fn update(
             )
             .await?;
         }
+        // LLH-1093, design.md D6: ein Eintrag für alle geänderten Ad-hoc-Angaben.
+        if let Some(text) = crate::material::etb_text_angaben(&vorher, &nachher) {
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        }
         Ok((vorher, nachher))
     })?;
     sse_material(&state, einsatz_id, em_id);
     // `material` erreicht Einheiten- und UHS-Leser ohne Materialrecht nicht (LLH-1182). Die
-    // Einheit zeigt Menge und Status ihres Materials, das UHS-Detail die ganze Zeile des dort
-    // verorteten Materials (LFH-892); beim Umverorten ändern sich alte und neue UHS.
+    // Einheit zeigt Bezeichnung, Menge und Status ihres Materials, das UHS-Detail die ganze Zeile
+    // des dort verorteten Materials (LFH-892); beim Umverorten ändern sich alte und neue UHS.
     if let Some(einheit_id) = nachher.einheit_id {
-        if vorher.menge != nachher.menge || vorher.status != nachher.status {
+        if vorher.menge != nachher.menge
+            || vorher.status != nachher.status
+            || vorher.bezeichnung != nachher.bezeichnung
+        {
             super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
         }
     }
     let has_row_changed = vorher.menge != nachher.menge
         || vorher.status != nachher.status
         || vorher.bemerkung != nachher.bemerkung
-        || vorher.uhs_id != nachher.uhs_id;
+        || vorher.uhs_id != nachher.uhs_id
+        || vorher.bezeichnung != nachher.bezeichnung
+        || vorher.kategorie != nachher.kategorie
+        || vorher.bestandsnummer != nachher.bestandsnummer
+        || vorher.traegerorganisation != nachher.traegerorganisation;
     if has_row_changed {
         if let Some(uhs_id) = vorher.uhs_id {
             sse_uhs(&state, einsatz_id, uhs_id);

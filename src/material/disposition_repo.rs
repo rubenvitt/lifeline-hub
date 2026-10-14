@@ -314,8 +314,8 @@ pub async fn disponiere_adhoc(
 }
 
 /// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
-/// `menge`/`status`: `None` = unverändert. Die übrigen Felder sind Tri-State: `None` =
-/// unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen. Ein Struct statt
+/// `menge`, `status` und `bezeichnung`: `None` = unverändert. Die übrigen Felder sind Tri-State:
+/// `None` = unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen. Ein Struct statt
 /// Positionsparametern, damit eine neue Angabe keine Bindung still verschiebt.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MaterialPatch<'a> {
@@ -323,11 +323,37 @@ pub struct MaterialPatch<'a> {
     /// Bereits validierter Wire-Wert aus [`MaterialStatus`].
     pub status: Option<&'a str>,
     pub bemerkung: Option<Option<&'a str>>,
+    /// Verortung an einer UHS (unabhängig von der Einheit); ein neuer Wert geht durch
+    /// [`crate::uhs::repo::require_verortbar_tx`] (LLH-1093, design.md D4).
     pub uhs_id: Option<Option<i64>>,
+    /// Ad-hoc-Angaben (LLH-1093, design.md D6): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
+    /// Sie schreiben die `snap_*`-Spalten, die bei Ad-hoc-Material die Daten sind.
+    pub bezeichnung: Option<&'a str>,
+    pub kategorie: Option<Option<&'a str>>,
+    pub bestandsnummer: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+}
+
+impl MaterialPatch<'_> {
+    /// Ändert der Patch eine Angabe, die bei einem Stamm-Posten der Stamm trägt?
+    pub fn has_adhoc_angaben(&self) -> bool {
+        self.bezeichnung.is_some()
+            || self.kategorie.is_some()
+            || self.bestandsnummer.is_some()
+            || self.traegerorganisation.is_some()
+    }
+}
+
+/// Der 422 an einem Stamm-Posten, dessen Bezeichnung, Kategorie, Bestandsnummer oder Träger über
+/// den Einsatz geändert werden soll (LLH-1093, design.md D6).
+pub fn stamm_angaben_error() -> AppError {
+    AppError::UnprocessableEntity("Angaben eines Stamm-Postens im Stamm pflegen".into())
 }
 
 /// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
-/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079).
+/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
+/// Ad-hoc-Angaben an einem Stamm-Posten; die UHS-Prüfung (404/422) läuft nur bei geändertem
+/// Wert. Jede Ablehnung schreibt nichts.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -336,12 +362,33 @@ pub async fn update_tx(
 ) -> Result<(), AppError> {
     // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    let (material_id, uhs_id): (Option<i64>, Option<i64>) = sqlx::query_as(
+        "SELECT material_id, uhs_id FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if patch.has_adhoc_angaben() && material_id.is_some() {
+        return Err(stamm_angaben_error());
+    }
+    // Nur ein neues Ziel wird geprüft: Lösen und ein unveränderter Wert gehen immer, auch an
+    // einer inzwischen aufgelösten UHS (design.md D4).
+    if let Some(Some(ziel)) = patch.uhs_id {
+        if Some(ziel) != uhs_id {
+            crate::uhs::repo::require_verortbar_tx(conn, einsatz_id, ziel).await?;
+        }
+    }
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
          SET menge = COALESCE(?, menge), \
              status = COALESCE(?, status), \
              bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
-             uhs_id = CASE WHEN ? THEN ? ELSE uhs_id END \
+             uhs_id = CASE WHEN ? THEN ? ELSE uhs_id END, \
+             snap_bezeichnung = COALESCE(?, snap_bezeichnung), \
+             snap_kategorie = CASE WHEN ? THEN ? ELSE snap_kategorie END, \
+             snap_bestandsnummer = CASE WHEN ? THEN ? ELSE snap_bestandsnummer END, \
+             snap_traegerorganisation = CASE WHEN ? THEN ? ELSE snap_traegerorganisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(patch.menge)
@@ -350,6 +397,13 @@ pub async fn update_tx(
     .bind(patch.bemerkung.flatten())
     .bind(patch.uhs_id.is_some())
     .bind(patch.uhs_id.flatten())
+    .bind(patch.bezeichnung)
+    .bind(patch.kategorie.is_some())
+    .bind(patch.kategorie.flatten())
+    .bind(patch.bestandsnummer.is_some())
+    .bind(patch.bestandsnummer.flatten())
+    .bind(patch.traegerorganisation.is_some())
+    .bind(patch.traegerorganisation.flatten())
     .bind(em_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -946,6 +1000,169 @@ mod tests {
         let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].id, em);
+    }
+
+    /// LLH-1093, design.md D6: jede Ad-hoc-Angabe landet in ihrer eigenen `snap_*`-Spalte (die
+    /// Bindungsfalle: eine verschobene Bindung schriebe ein Feld in das Nachbarfeld), und die
+    /// übrigen bleiben stehen.
+    #[tokio::test]
+    async fn adhoc_angaben_je_feld_in_der_eigenen_spalte() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let em = disponiere_adhoc(
+            &pool,
+            einsatz,
+            AdhocDaten {
+                bezeichnung: "Feldbeten",
+                kategorie: Some("K"),
+                bestandsnummer: Some("B"),
+                traegerorganisation: Some("T"),
+            },
+            4,
+            benutzer,
+        )
+        .await
+        .unwrap();
+        let lies = |pool: SqlitePool| async move {
+            let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+            (
+                a.bezeichnung,
+                a.kategorie,
+                a.bestandsnummer,
+                a.traegerorganisation,
+                a.menge,
+            )
+        };
+        let s = |v: &str| Some(v.to_string());
+
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                bezeichnung: Some("Feldbetten"),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            lies(pool.clone()).await,
+            ("Feldbetten".into(), s("K"), s("B"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                kategorie: Some(Some("Betreuung")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            lies(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                bestandsnummer: Some(Some("B-7")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            lies(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("T"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                traegerorganisation: Some(Some("THW")),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            lies(pool.clone()).await,
+            ("Feldbetten".into(), s("Betreuung"), s("B-7"), s("THW"), 4)
+        );
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                kategorie: Some(None),
+                bestandsnummer: Some(None),
+                traegerorganisation: Some(None),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            lies(pool.clone()).await,
+            ("Feldbetten".into(), None, None, None, 4)
+        );
+    }
+
+    /// LLH-1093, design.md D6: an einem Stamm-Posten ist jede Ad-hoc-Angabe 422, und nichts aus
+    /// dem Patch ist geschrieben, auch nicht Menge, Status oder Bemerkung.
+    #[tokio::test]
+    async fn stamm_posten_lehnt_adhoc_angaben_ab_ohne_zu_schreiben() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        let rest = MaterialPatch {
+            menge: Some(3),
+            status: Some("defekt"),
+            bemerkung: Some(Some("nass")),
+            ..MaterialPatch::default()
+        };
+        for patch in [
+            MaterialPatch {
+                bezeichnung: Some("Decke"),
+                ..rest
+            },
+            MaterialPatch {
+                kategorie: Some(None),
+                ..rest
+            },
+            MaterialPatch {
+                bestandsnummer: Some(Some("B")),
+                ..rest
+            },
+            MaterialPatch {
+                traegerorganisation: Some(Some("THW")),
+                ..rest
+            },
+        ] {
+            assert!(matches!(
+                update(&pool, einsatz, em, patch).await.unwrap_err(),
+                AppError::UnprocessableEntity(m) if m == "Angaben eines Stamm-Postens im Stamm pflegen"
+            ));
+        }
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(
+            (a.menge, a.status, a.bemerkung),
+            (50, MaterialStatus::Einsatzbereit, None)
+        );
+        assert_eq!(a.kategorie.as_deref(), Some("Betreuung"));
+        // Ohne Angaben geht derselbe Rest durch.
+        update(&pool, einsatz, em, rest).await.unwrap();
     }
 
     #[tokio::test]
