@@ -256,7 +256,9 @@ struct PersonalZeile {
     fahrzeug_name: Option<String>,
 }
 
-/// Lage aller Stamm-Fahrzeuge in **einer** Anweisung. Eine aufgelöste Einheit zählt nicht.
+/// Lage aller Stamm-Fahrzeuge in **einer** Anweisung. Eine aufgelöste Einheit zählt nicht. Liest
+/// absichtlich auch beendete Zeilen (entlassen gegen neu); Ausnahme mit Grund in der ALLOWLIST
+/// des Wächters (`src/entlassung.rs`).
 async fn load_fahrzeug_lagen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
