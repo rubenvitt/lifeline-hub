@@ -418,6 +418,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn verortbar_nur_geplant_und_aktiv_im_eigenen_einsatz() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let check = |einsatz: i64, br: i64| {
+            let pool = pool.clone();
+            async move {
+                let mut conn = pool.acquire().await.unwrap();
+                require_verortbar_tx(&mut conn, einsatz, br).await
+            }
+        };
+        let br = anlegen(&pool, e, b, neu("BR Nord")).await.unwrap();
+        check(e, br.id).await.unwrap();
+        // Ein geplanter BR eines anderen Einsatzes ist für diesen Einsatz unbekannt.
+        assert!(matches!(
+            check(e + 1, br.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        setze_status(&pool, e, br.id, "aktiv", b).await.unwrap();
+        check(e, br.id).await.unwrap();
+        setze_status(&pool, e, br.id, "aufgeloest", b)
+            .await
+            .unwrap();
+        assert!(matches!(
+            check(e, br.id).await.unwrap_err(),
+            AppError::UnprocessableEntity(m) if m == "Bereitstellungsraum ist aufgelöst"
+        ));
+        let s = anlegen(&pool, e, b, neu("Storno")).await.unwrap();
+        storniere(&pool, e, s.id, b).await.unwrap();
+        assert!(matches!(
+            check(e, s.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(matches!(
+            check(e, 999_999).await.unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    #[tokio::test]
     async fn anlegen_doppelte_bezeichnung_ist_konflikt() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
