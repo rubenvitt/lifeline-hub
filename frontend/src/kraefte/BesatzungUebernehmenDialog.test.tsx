@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -49,7 +49,7 @@ beforeEach(() => {
   );
 });
 
-function Harness() {
+function Harness({ personal = PERSONAL }: { personal?: EinsatzPersonal[] }) {
   const [auftrag, setAuftrag] = useState<{
     fahrzeug: EinsatzFahrzeug;
     vorgewaehlt: number[];
@@ -68,7 +68,7 @@ function Harness() {
       <BesatzungUebernehmenDialog
         einsatzId={1}
         auftrag={auftrag}
-        personal={PERSONAL}
+        personal={personal}
         fuehrerId={null}
         onSchliessen={() => setAuftrag(null)}
       />
@@ -138,5 +138,64 @@ describe('BesatzungUebernehmenDialog — Personal der Einheit übernehmen (LLH-1
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     expect(await screen.findByText('Mindestens eine Person wählen')).toBeInTheDocument();
     expect(bodies).toEqual([]);
+  });
+
+  /**
+   * Review-Fund: die Vorwahl gilt beim Öffnen. Fällt eine vorgewählte Kraft danach live aus den
+   * Kandidaten, verschwindet ihr Kästchen — ihre ID darf nicht mehr mitgehen, sonst holte der
+   * Server sie still vom anderen Fahrzeug bzw. lehnte mit einem nicht abwählbaren Grund ab.
+   */
+  it('schickt eine inzwischen auf ein anderes Fahrzeug gesetzte Kraft nicht mit', async () => {
+    const { rerender } = renderMitProviders(<Harness />);
+    await screen.findByRole('dialog');
+    expect(haekchen('Ali')).toBeChecked();
+    rerender(
+      <Harness personal={PERSONAL.map((x) => (x.id === 4 ? { ...x, fahrzeug_id: 9 } : x))} />,
+    );
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /^Ali/ })).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(await screen.findByText('zu')).toBeInTheDocument();
+    expect(bodies).toEqual([{ ep_ids: [2] }]);
+  });
+
+  it('schickt eine inzwischen entlassene Kraft nicht mit', async () => {
+    const { rerender } = renderMitProviders(<Harness />);
+    await screen.findByRole('dialog');
+    rerender(<Harness personal={PERSONAL.filter((x) => x.id !== 4)} />);
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /^Ali/ })).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(await screen.findByText('zu')).toBeInTheDocument();
+    expect(bodies).toEqual([{ ep_ids: [2] }]);
+  });
+
+  it('verlangt eine Person, wenn alle vorgewählten inzwischen weg sind', async () => {
+    const { rerender } = renderMitProviders(<Harness />);
+    await screen.findByRole('dialog');
+    rerender(<Harness personal={PERSONAL.filter((x) => x.id !== 2 && x.id !== 4)} />);
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /^Ulla/ })).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(await screen.findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it('nennt eine abgelehnte Kraft, die danach aus der Liste fällt, mit Namen', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/3/besatzung', () =>
+        HttpResponse.json(
+          {
+            error: 'Nicht alle Personen lassen sich zuordnen',
+            zeilen: [{ art: 'personal', id: 4, grund: 'gehört zu einem anderen Einsatz' }],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const { rerender } = renderMitProviders(<Harness />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Übernehmen' }));
+    await screen.findByText('gehört zu einem anderen Einsatz');
+    rerender(
+      <Harness personal={PERSONAL.map((x) => (x.id === 4 ? { ...x, fahrzeug_id: 9 } : x))} />,
+    );
+    expect(await screen.findByText('Ali – gehört zu einem anderen Einsatz')).toBeInTheDocument();
   });
 });

@@ -72,6 +72,18 @@ export default function BesatzungUebernehmenDialog({
     if (auftrag) form.setFieldsValue({ ep_ids: [...auftrag.vorgewaehlt] });
   }, [auftrag, form]);
 
+  // Fällt eine gewählte Kraft live aus den Kandidaten (auf ein anderes Fahrzeug gesetzt,
+  // entlassen), verschwindet ihr Kästchen; dann fällt sie auch aus der Wahl. Sonst ginge ihre ID
+  // unsichtbar mit: der Server holte sie still vom anderen Fahrzeug oder lehnte mit einem Grund
+  // ab, den niemand abwählen kann. Der Schlüssel hält die Abhängigkeit stabil.
+  const kandidatSchluessel = vorschlag.kandidaten.map((p) => p.id).join(',');
+  useEffect(() => {
+    const sichtbar = new Set(kandidatSchluessel.split(',').filter(Boolean).map(Number));
+    const gewaehlt = (form.getFieldValue('ep_ids') as number[] | undefined) ?? [];
+    const bleibt = gewaehlt.filter((id) => sichtbar.has(id));
+    if (bleibt.length !== gewaehlt.length) form.setFieldsValue({ ep_ids: bleibt });
+  }, [kandidatSchluessel, form]);
+
   const mutation = useMutation({
     mutationFn: (v: { efId: number; epIds: number[] }) =>
       zuordnenBesatzungMenge(einsatzId, v.efId, v.epIds),
@@ -107,7 +119,9 @@ export default function BesatzungUebernehmenDialog({
       speicherFehlerFallback="Übernehmen fehlgeschlagen"
       onErfassen={async (werte) => {
         if (!fahrzeug) return;
-        setNamen(new Map(vorschlag.kandidaten.map((p) => [p.id, p.name] as const)));
+        // Namen aus dem ganzen Personal: ein Grund nennt die Person auch, wenn sie danach aus der
+        // Liste fällt. Die Wahl enthält nur, was als Kästchen steht (Effekt oben).
+        setNamen(new Map(personal.map((p) => [p.id, p.name] as const)));
         await mutation.mutateAsync({ efId: fahrzeug.id, epIds: werte.ep_ids });
       }}
       onFertig={onSchliessen}
