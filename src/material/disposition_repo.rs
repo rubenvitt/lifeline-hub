@@ -147,7 +147,7 @@ pub async fn list_entlassene(
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden_anzeige(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     einsatz_id: i64,
     em_id: i64,
@@ -164,9 +164,9 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
+/// Wie [`load_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
 /// Transaktion beim atomaren Disponieren/Aktualisieren.
-pub async fn laden_anzeige_tx(
+pub async fn load_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
@@ -317,7 +317,7 @@ pub async fn disponiere_adhoc(
 /// unverändert); `bemerkung` und `uhs_id` sind Tri-State (`None` = unverändert, `Some(None)` =
 /// NULL, `Some(Some(x))` = setzen). Getrimmt wird in der Route, `status` ist bereits validiert.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
-pub async fn aktualisiere_tx(
+pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
@@ -352,8 +352,8 @@ pub async fn aktualisiere_tx(
     Ok(())
 }
 
-/// Pool-Wrapper um [`aktualisiere_tx`].
-pub async fn aktualisiere(
+/// Pool-Wrapper um [`update_tx`].
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     em_id: i64,
@@ -363,7 +363,7 @@ pub async fn aktualisiere(
     uhs_id: Option<Option<i64>>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    aktualisiere_tx(
+    update_tx(
         &mut conn, einsatz_id, em_id, menge, status, bemerkung, uhs_id,
     )
     .await
@@ -711,7 +711,7 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.bezeichnung, "Wolldecke");
         assert_eq!(a.menge, 50);
         assert_eq!(a.status, MaterialStatus::Einsatzbereit);
@@ -800,7 +800,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.ist_adhoc && a.material_id.is_none());
         assert_eq!(a.menge, 100);
         assert_eq!(a.traegerorganisation.as_deref(), Some("THW"));
@@ -817,7 +817,7 @@ mod tests {
             .await
             .unwrap();
 
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             em,
@@ -828,13 +828,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.menge, 30);
         assert_eq!(a.status, MaterialStatus::Defekt);
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
         // Nur Status ändern (menge/bemerkung None -> bleiben).
-        aktualisiere(
+        update(
             &pool,
             einsatz,
             em,
@@ -845,13 +845,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let b = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(b.menge, 30, "Menge unveraendert");
         assert_eq!(b.status, MaterialStatus::Verbraucht);
 
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         // Die Zeile bleibt mit Menge und Status (LLH-1079), fehlt aber in der Liste.
-        let c = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let c = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
         assert_eq!((c.menge, c.status), (30, MaterialStatus::Verbraucht));
         assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
@@ -860,7 +860,7 @@ mod tests {
             1
         );
         assert!(matches!(
-            aktualisiere(&pool, einsatz, em, Some(1), None, None, None)
+            update(&pool, einsatz, em, Some(1), None, None, None)
                 .await
                 .unwrap_err(),
             AppError::Conflict(_)
@@ -892,19 +892,19 @@ mod tests {
         .await
         .unwrap();
         // Zuordnen:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
+        update(&pool, einsatz, em, None, None, None, Some(Some(u)))
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.uhs_id, Some(u));
         // Lösen (explizit NULL):
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(None))
+        update(&pool, einsatz, em, None, None, None, Some(None))
             .await
             .unwrap();
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.uhs_id.is_none());
         // liste_je_uhs:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
+        update(&pool, einsatz, em, None, None, None, Some(Some(u)))
             .await
             .unwrap();
         let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
@@ -929,19 +929,19 @@ mod tests {
             .unwrap();
 
         // Aktiver Einsatz + in Dienst -> Live (neuer Name); menge/status aus der Zeile.
-        let live = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let live = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(live.bezeichnung, "Wolldecke NEU");
         assert_eq!(live.menge, 50);
 
         // Abgeschlossener Einsatz (einsatz_aktiv=false) -> Snapshot (alter Name).
-        let snap = laden_anzeige(&pool, einsatz, em, false).await.unwrap();
+        let snap = load_anzeige(&pool, einsatz, em, false).await.unwrap();
         assert_eq!(snap.bezeichnung, "Wolldecke");
 
         // Stamm außer Dienst -> auch bei aktivem Einsatz Snapshot.
         mat_repo::setze_dienststatus(&pool, 1, m.id, false)
             .await
             .unwrap();
-        let nach_ad = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let nach_ad = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(
             nach_ad.bezeichnung, "Wolldecke",
             "ausser Dienst -> Snapshot trotz aktivem Einsatz"
@@ -998,7 +998,7 @@ mod tests {
             assert!(!marke(em_adhoc), "einsatz_aktiv={einsatz_aktiv}");
         }
         assert!(
-            laden_anzeige(&pool, einsatz, em_demo, true)
+            load_anzeige(&pool, einsatz, em_demo, true)
                 .await
                 .unwrap()
                 .ist_demo
@@ -1075,7 +1075,7 @@ mod tests {
         let e = nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         assert_eq!(e.einheit, Some((einheit, "1. Zug".to_string())));
         assert_eq!(e.uhs_id, Some(u));
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!((a.einheit_id, a.uhs_id), (None, None));
         assert!(liste_je_uhs(&pool, einsatz, u, true)
             .await
@@ -1152,7 +1152,7 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
             .await
             .unwrap();
-        aktualisiere(&pool, einsatz, em, None, Some("defekt"), None, None)
+        update(&pool, einsatz, em, None, Some("defekt"), None, None)
             .await
             .unwrap();
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
@@ -1167,7 +1167,7 @@ mod tests {
             AppError::Conflict(_)
         ));
         drop(conn);
-        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.beendet_at, None);
         assert_eq!((a.menge, a.status), (3, MaterialStatus::Defekt));
         assert!(grund(storniere(&pool, einsatz, em).await.unwrap_err())

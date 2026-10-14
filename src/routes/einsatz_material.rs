@@ -139,7 +139,7 @@ pub async fn disponieren(
                 .await?
             }
         };
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -168,7 +168,7 @@ pub struct DispoPatchBody {
 /// PATCH /api/einsaetze/{id}/material/{em_id} — Menge und/oder Status und/oder Bemerkung.
 /// Mengen-Änderung und Status-Wechsel schreiben je einen ETB-Eintrag; eine reine
 /// Bemerkungsänderung schreibt keinen.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
     PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
@@ -203,8 +203,8 @@ pub async fn aktualisieren(
     // erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        disposition_repo::aktualisiere_tx(
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        disposition_repo::update_tx(
             conn,
             einsatz_id,
             em_id,
@@ -214,7 +214,7 @@ pub async fn aktualisieren(
             body.uhs_id,
         )
         .await?;
-        let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         if vorher.menge != nachher.menge {
             crate::etb::system_audit_tx(
                 conn,
@@ -284,7 +284,7 @@ pub async fn entlassen(
     // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand und System-ETB atomar in EINER Tx; SSE erst
     // nach dem Commit.
     let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt)
                 .await?;
@@ -300,7 +300,7 @@ pub async fn entlassen(
             ),
         )
         .await?;
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         Ok((ergebnis, anzeige))
     })?;
     sse_material(&state, einsatz_id, em_id);
@@ -328,7 +328,7 @@ pub async fn stornieren(
     let jetzt = crate::zeit::jetzt();
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
         crate::etb::system_audit_tx(
             conn,
@@ -363,7 +363,7 @@ pub async fn reaktivieren(
             ctx.benutzer.id,
         )
         .await?;
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,

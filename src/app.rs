@@ -955,7 +955,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/material/{em_id}",
-            patch(routes::einsatz_material::aktualisieren),
+            patch(routes::einsatz_material::update),
         )
         // LLH-1079 Teil II: aus dem Einsatz nehmen statt löschen; Storno und erneutes Disponieren.
         .route(
