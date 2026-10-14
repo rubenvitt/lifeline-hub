@@ -74,6 +74,8 @@ interface BildProps {
   einsatzleiter: EinsatzleiterDarstellung;
   stab: StabsstelleZustand;
   fuehrungsstelle?: WurzelFuehrungsstelle | null;
+  /** Führungsstelle oder Stabsstelle laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
+  kopfLaedt?: boolean;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
 }
@@ -171,6 +173,7 @@ export function OrganigrammBild({
   einsatzleiter,
   stab,
   fuehrungsstelle = null,
+  kopfLaedt = false,
   zugeklappt,
   onUmschalten,
 }: BildProps) {
@@ -187,6 +190,7 @@ export function OrganigrammBild({
           fuehrungsstelle={fuehrungsstelle}
         />
       }
+      kopfLaedt={kopfLaedt}
       wurzeln={org.wurzeln}
       zugeklappt={zugeklappt}
       onUmschalten={onUmschalten}
@@ -357,6 +361,11 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
       : stabQuery.isError
         ? { zustand: 'fehler' }
         : { zustand: 'aus' };
+  // Die Quellen des Kopfs: Führungsstelle und Stabsstelle samt ihrer Freigabe (LLH-1166).
+  const kopfLaedt =
+    fuehrungsstelleQuery.isPending ||
+    stabFreigabe.zustand === 'laden' ||
+    (stabFrei && stabQuery.isPending);
 
   // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
   // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.
@@ -477,6 +486,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         einsatzleiter={einsatzleiter}
         stab={stab}
         fuehrungsstelle={fuehrungsstelle}
+        kopfLaedt={kopfLaedt}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
       />

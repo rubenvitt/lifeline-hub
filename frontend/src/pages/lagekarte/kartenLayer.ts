@@ -118,6 +118,9 @@ export function baueZonenFc(zonen: ZoneFeature[] | undefined): ZonenFeatureColle
   };
 }
 
+/** Farbe der Abschnittsflächen; auch die Beschriftung der Flächen auf dem Lagemonitor. */
+export const ABSCHNITT_FARBE = '#722ed1';
+
 /** Idempotent: legt Source + fill/line-Layer für Abschnittsflächen an (Style-Wechsel entfernt sie). */
 export function sorgeFuerAbschnittLayer(map: MapLibreMap, daten: FlaechenFeatureCollection) {
   if (!map.getSource('abschnitte')) {
@@ -128,7 +131,7 @@ export function sorgeFuerAbschnittLayer(map: MapLibreMap, daten: FlaechenFeature
       id: 'abschnitte-fill',
       type: 'fill',
       source: 'abschnitte',
-      paint: { 'fill-color': '#722ed1', 'fill-opacity': 0.15 },
+      paint: { 'fill-color': ABSCHNITT_FARBE, 'fill-opacity': 0.15 },
     });
   }
   if (!map.getLayer('abschnitte-line')) {
@@ -136,7 +139,7 @@ export function sorgeFuerAbschnittLayer(map: MapLibreMap, daten: FlaechenFeature
       id: 'abschnitte-line',
       type: 'line',
       source: 'abschnitte',
-      paint: { 'line-color': '#722ed1', 'line-width': 2 },
+      paint: { 'line-color': ABSCHNITT_FARBE, 'line-width': 2 },
     });
   }
 }
