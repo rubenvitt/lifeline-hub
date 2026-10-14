@@ -3,6 +3,7 @@ import type { FormInstance, FormProps } from 'antd';
 import {
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
@@ -194,6 +195,12 @@ interface ErfassungsFormularProps<T> {
   speicherFehlerTitel?: string;
   /** Text für einen Fehler ohne Servermeldung; Vorgabe „Speichern fehlgeschlagen“. */
   speicherFehlerFallback?: string;
+  /**
+   * Was das Absenden umfasst, in einer Zeile am Primärknopf („1 Zug, 1 Staffel, 3 Fahrzeuge“,
+   * LLH-1049): ab `md` links in der Aktionszeile, darunter über den gestapelten Knöpfen; der
+   * Knopf trägt sie als Beschreibung (`aria-describedby`).
+   */
+  zusammenfassung?: ReactNode;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -227,9 +234,11 @@ export function ErfassungsFormular<T extends object>({
   speicherung,
   speicherFehlerTitel,
   speicherFehlerFallback,
+  zusammenfassung,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
+  const zusammenfassungId = useId();
   const { istSchmal } = useViewport();
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
@@ -441,48 +450,72 @@ export function ErfassungsFormular<T extends object>({
             </div>
           )}
           {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
-              `AKTION_OHNE_BEWEGUNG`. */}
-          <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
-            <Space
-              size="middle"
-              orientation={istSchmal ? 'vertical' : 'horizontal'}
-              wrap={!istSchmal}
-              style={
-                istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
-              }
-            >
-              {onAbbrechen && (
-                <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
-                  Abbrechen
-                </Button>
-              )}
-              {serie && (
-                // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
-                // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
-                // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
-                <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
-                  Speichern und nächste
-                  <span
-                    aria-hidden
-                    className={SERIEN_KUERZEL_KLASSE}
-                    style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
-                  >
-                    {SERIEN_KUERZEL}
-                  </span>
-                </Button>
-              )}
-              <Button
-                type="primary"
-                htmlType="submit"
-                block={istSchmal}
-                loading={laeuft}
-                danger={unumkehrbar}
-                disabled={gesperrt}
+              `AKTION_OHNE_BEWEGUNG`. Eine Zusammenfassung steht links daneben bzw. darüber. */}
+          <div
+            data-lfh="erfassung-aktion"
+            style={
+              zusammenfassung == null
+                ? undefined
+                : {
+                    display: 'flex',
+                    flexDirection: istSchmal ? 'column' : 'row',
+                    alignItems: istSchmal ? 'stretch' : 'center',
+                    gap: token.marginSM,
+                  }
+            }
+          >
+            {zusammenfassung != null && (
+              <Typography.Text
+                id={zusammenfassungId}
+                data-lfh="erfassung-zusammenfassung"
+                style={{ flex: '1 1 auto', minWidth: 0 }}
               >
-                {erfassenText}
-              </Button>
-            </Space>
-          </ConfigProvider>
+                {zusammenfassung}
+              </Typography.Text>
+            )}
+            <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
+              <Space
+                size="middle"
+                orientation={istSchmal ? 'vertical' : 'horizontal'}
+                wrap={!istSchmal}
+                style={
+                  istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
+                }
+              >
+                {onAbbrechen && (
+                  <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
+                    Abbrechen
+                  </Button>
+                )}
+                {serie && (
+                  // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
+                  // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
+                  // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
+                  <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
+                    Speichern und nächste
+                    <span
+                      aria-hidden
+                      className={SERIEN_KUERZEL_KLASSE}
+                      style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
+                    >
+                      {SERIEN_KUERZEL}
+                    </span>
+                  </Button>
+                )}
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  block={istSchmal}
+                  loading={laeuft}
+                  danger={unumkehrbar}
+                  disabled={gesperrt}
+                  aria-describedby={zusammenfassung != null ? zusammenfassungId : undefined}
+                >
+                  {erfassenText}
+                </Button>
+              </Space>
+            </ConfigProvider>
+          </div>
         </div>
       </Form>
     </div>
