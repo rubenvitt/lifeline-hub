@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -124,8 +124,8 @@ Fahrzeugs zählt dagegen jede Kraft darauf, auch die anderer Einheiten, und nenn
 aus Rettungsstaffel“. Das „Soll“ kommt aus dem Fahrzeugstamm (Kapitel [Fahrzeuge](fahrzeuge.md)).
 
 Status, Mittelverteilung und Tönung bleiben bei der eigenen Zeile: ein Ausfall in einer
-Untereinheit tönt nur sie. Material, das defekt, verbraucht oder „Desinfektion nötig“ ist, zählt
-als Ausfall und tönt die Einheit, der es gehört. Der Filter „Abschnitt“ richtet sich nach dem
+Untereinheit tönt nur sie. Material, das defekt, verbraucht, „Desinfektion nötig“ oder aufgebraucht
+ist, zählt als Ausfall und tönt die Einheit, der es gehört. Der Filter „Abschnitt“ richtet sich nach dem
 Abschnitt der obersten Einheit: eine Untereinheit bleibt unter ihrer Einheit, auch wenn sie selbst
 keinen oder einen anderen Abschnitt trägt.
 
