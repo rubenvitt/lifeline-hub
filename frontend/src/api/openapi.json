@@ -14018,6 +14018,56 @@
           }
         }
       },
+      "ZeilenArt": {
+        "type": "string",
+        "description": "Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen\nkönnen kollidieren (LLH-1100, D2). Wire == `as_str()`.",
+        "enum": [
+          "personal",
+          "fahrzeug"
+        ]
+      },
+      "ZeilenFehler": {
+        "type": "object",
+        "description": "Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag\n`{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].",
+        "required": [
+          "error",
+          "zeilen"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeilenGrund"
+            }
+          }
+        }
+      },
+      "ZeilenGrund": {
+        "type": "object",
+        "description": "Grund, warum eine Zeile einer Mengen-Anfrage abgelehnt ist (LLH-1100, D2).",
+        "required": [
+          "art",
+          "id",
+          "grund"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/ZeilenArt"
+          },
+          "grund": {
+            "type": "string",
+            "description": "Kurzgrund zum Anzeigen an der Zeile, etwa „außer Dienst“."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die ID, wie die Anfrage sie nannte (Stamm-ID)."
+          }
+        }
+      },
       "ZeitachseAnzeige": {
         "type": "object",
         "description": "Zeitachse einer Kraft: alle Ereignisse nach Zeit (gestrichene eingeschlossen) und die\nPerioden aus den nicht gestrichenen.",

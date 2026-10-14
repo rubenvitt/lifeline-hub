@@ -5411,6 +5411,31 @@ export interface components {
             zustand: components["schemas"]["WetterTeilZustand"];
         };
         /**
+         * @description Wovon die ID einer abgelehnten Zeile spricht: Stamm-IDs von Personal und Fahrzeugen
+         *     können kollidieren (LLH-1100, D2). Wire == `as_str()`.
+         * @enum {string}
+         */
+        ZeilenArt: "personal" | "fahrzeug";
+        /**
+         * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
+         *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].
+         */
+        ZeilenFehler: {
+            error: string;
+            zeilen: components["schemas"]["ZeilenGrund"][];
+        };
+        /** @description Grund, warum eine Zeile einer Mengen-Anfrage abgelehnt ist (LLH-1100, D2). */
+        ZeilenGrund: {
+            art: components["schemas"]["ZeilenArt"];
+            /** @description Kurzgrund zum Anzeigen an der Zeile, etwa „außer Dienst“. */
+            grund: string;
+            /**
+             * Format: int64
+             * @description Die ID, wie die Anfrage sie nannte (Stamm-ID).
+             */
+            id: number;
+        };
+        /**
          * @description Zeitachse einer Kraft: alle Ereignisse nach Zeit (gestrichene eingeschlossen) und die
          *     Perioden aus den nicht gestrichenen.
          */
