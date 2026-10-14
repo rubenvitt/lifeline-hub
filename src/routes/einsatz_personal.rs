@@ -124,46 +124,63 @@ pub async fn disponieren(
         }
     };
 
-    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx. Eine
-    // entlassene Stamm-Person wird wieder aufgenommen (LLH-1079, design.md D7).
+    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx. Eine Stamm-
+    // Person läuft über den Baustein der Sammel-Disposition (LLH-1100) mit einer ID; eine
+    // entlassene wird dabei wieder aufgenommen (LLH-1079, design.md D7), die Fehler bleiben die
+    // des Einzelwegs (`als_einzelfehler`).
+    let kontext = kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
     let disponiert = crate::write_retry!(&state.pool, |conn| {
         let disponiert = match &vorbereitet {
             Vorbereitet::Stamm(personal_id) => {
-                disposition_repo::disponieren_stamm_tx(
+                let wahl = [kraefte_disposition::PersonalWahl {
+                    personal_id: *personal_id,
+                    staerke_position: body.staerke_position.clone(),
+                }];
+                let ergebnis = kraefte_disposition::disponiere_personal_tx(
                     conn,
-                    einsatz_id,
-                    ctx.einsatz.org_id,
-                    *personal_id,
-                    body.staerke_position.as_deref(),
-                    ctx.benutzer.id,
+                    kontext,
+                    &wahl,
+                    kraefte_disposition::Ziel::default(),
+                    kraefte_disposition::Regeln::EINZEL,
                 )
-                .await?
+                .await
+                .map_err(kraefte_disposition::als_einzelfehler)?;
+                let kraft = &ergebnis.kraefte[0];
+                disposition_repo::Disponiert {
+                    id: kraft.ep_id,
+                    reaktiviert: kraft.reaktiviert,
+                }
             }
             Vorbereitet::Adhoc {
                 name,
                 funktion,
                 traeger,
                 position,
-            } => disposition_repo::disponieren_adhoc_tx(
-                conn,
-                einsatz_id,
-                ctx.einsatz.org_id,
-                AdhocDaten {
-                    name,
-                    funktion: funktion.as_deref(),
-                    traegerorganisation: traeger.as_deref(),
-                    staerke_position: position.as_deref(),
-                },
-                ctx.benutzer.id,
-            )
-            .await
-            .map(|id| disposition_repo::Disponiert {
-                id,
-                reaktiviert: false,
-            })?,
+            } => {
+                let id = disposition_repo::disponieren_adhoc_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.einsatz.org_id,
+                    AdhocDaten {
+                        name,
+                        funktion: funktion.as_deref(),
+                        traegerorganisation: traeger.as_deref(),
+                        staerke_position: position.as_deref(),
+                    },
+                    ctx.benutzer.id,
+                )
+                .await?;
+                disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, id).await?;
+                disposition_repo::Disponiert {
+                    id,
+                    reaktiviert: false,
+                }
+            }
         };
-        disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, disponiert.id)
-            .await?;
         Ok(disponiert)
     })?;
     let ep_id = disponiert.id;

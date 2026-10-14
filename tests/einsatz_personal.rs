@@ -63,6 +63,48 @@ async fn doppelte_stamm_disposition_ist_409() {
     );
 }
 
+/// Statuscode-Konvention (`src/AGENTS.md`): außer Dienst ist ein Zustand, also 422 (LLH-1100:
+/// der Einzelweg läuft über den Baustein der Sammel-Disposition). Unbekannt bleibt 404.
+#[tokio::test]
+async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/personal/{person}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(r#"{{"personal_id":{person}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Person ist außer Dienst und kann nicht disponiert werden"
+    );
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(r#"{"personal_id":424242}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 0);
+}
+
 #[tokio::test]
 async fn adhoc_ohne_stamm() {
     let app = setup().await;

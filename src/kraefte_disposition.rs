@@ -245,6 +245,24 @@ pub async fn check_fahrzeuge_tx(
         .collect())
 }
 
+/// Der Einzelweg einer Stamm-Person (`POST …/personal`) behält seine Fehler: die eine
+/// abgelehnte Zeile wird zum Fehler der Anfrage — unbekannt 404, schon disponiert 409 (wie der
+/// UNIQUE-Konflikt), außer Dienst 422 (Zustand, `src/AGENTS.md`, Statuscode-Konvention).
+pub fn als_einzelfehler(fehler: AppError) -> AppError {
+    let AppError::Zeilen { zeilen, meldung } = fehler else {
+        return fehler;
+    };
+    match zeilen.first().map(|z| z.grund.as_str()) {
+        Some(GRUND_UNBEKANNT) => AppError::NotFound,
+        Some(GRUND_SCHON_DISPONIERT) => {
+            AppError::Conflict("Person ist bereits in diesem Einsatz disponiert".into())
+        }
+        Some(GRUND_AUSSER_DIENST) => disposition_repo::ausser_dienst_fehler(),
+        Some(GRUND_ENTLASSEN) => disposition_repo::beendet_conflict("entlassen"),
+        _ => AppError::Zeilen { meldung, zeilen },
+    }
+}
+
 fn ablehnen_wenn(zeilen: Vec<ZeilenGrund>) -> Result<(), AppError> {
     if zeilen.is_empty() {
         Ok(())
