@@ -657,7 +657,7 @@ pub async fn personal_zuordnen(
     // atomar in EINER Tx. Der Personalname kommt aus dem Write und speist den ETB-Text.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::ordne_personal_zu_tx(conn, einsatz_id, eid, ep_id).await?;
+        let person = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -684,7 +684,7 @@ pub async fn personal_freigeben(
     // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::gib_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
+        let person = mitglied_repo::freigeben_personal_tx(conn, einsatz_id, eid, ep_id).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -711,7 +711,7 @@ pub async fn fahrzeug_zuordnen(
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let fz = mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, eid, ef_id).await?;
+        let fz = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -738,7 +738,7 @@ pub async fn fahrzeug_freigeben(
     // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let fz = mitglied_repo::gib_fahrzeug_frei_tx(conn, einsatz_id, eid, ef_id).await?;
+        let fz = mitglied_repo::freigeben_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -767,7 +767,7 @@ pub async fn material_zuordnen(
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let zuordnung = crate::write_retry!(&state.pool, |conn| {
-        let z = mitglied_repo::ordne_material_zu_tx(conn, einsatz_id, eid, em_id).await?;
+        let z = mitglied_repo::zuordnen_material_tx(conn, einsatz_id, eid, em_id).await?;
         if z.is_geaendert {
             crate::etb::system_audit_tx(
                 conn,
@@ -807,7 +807,7 @@ pub async fn material_freigeben(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         let (bez, menge) =
-            mitglied_repo::gib_material_frei_tx(conn, einsatz_id, eid, em_id).await?;
+            mitglied_repo::freigeben_material_tx(conn, einsatz_id, eid, em_id).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,

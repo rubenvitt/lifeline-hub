@@ -472,7 +472,7 @@ impl Ablauf<'_> {
             Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
                 let ef_id = frueher(&self.fahrzeuge, "Fahrzeug", fahrzeug)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let funkrufname = crate::einheit::mitglied_repo::ordne_fahrzeug_zu_tx(
+                let funkrufname = crate::einheit::mitglied_repo::zuordnen_fahrzeug_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,
@@ -561,7 +561,7 @@ impl Ablauf<'_> {
             Vorgang::PersonalZuEinheit { personal, einheit } => {
                 let ep_id = frueher(&self.personal, "Personal", personal)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let person = crate::einheit::mitglied_repo::ordne_personal_zu_tx(
+                let person = crate::einheit::mitglied_repo::zuordnen_personal_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,

@@ -383,7 +383,7 @@ pub async fn disponiere_personal_tx(
         .await?;
         disposition_repo::start_zeitachse_tx(conn, einsatz_id, kontext.benutzer_id, d.id).await?;
         if let Some(e) = &einheit {
-            mitglied_repo::ordne_personal_zu_tx(conn, einsatz_id, e.id, d.id).await?;
+            mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, e.id, d.id).await?;
         }
         if let Some(f) = &fahrzeug {
             besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, f.id, d.id).await?;
@@ -434,7 +434,7 @@ pub async fn disponiere_fahrzeuge_tx(
         .await?;
         let ef_id = d.id;
         let funkrufname = match &einheit {
-            Some(e) => mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, e.id, ef_id).await?,
+            Some(e) => mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, e.id, ef_id).await?,
             None => {
                 crate::fahrzeug::disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true)
                     .await?

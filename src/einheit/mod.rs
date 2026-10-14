@@ -246,7 +246,7 @@ pub fn etb_text_material_zugeordnet(
 }
 
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
-/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::ordne_personal_zu_tx`).
+/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::zuordnen_personal_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
 }
