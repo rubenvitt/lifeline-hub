@@ -271,6 +271,24 @@ describe('mittelDerEinheit', () => {
     expect(isMaterialAusfall('im_einsatz')).toBe(false);
     expect(materialAusfall([mt(4, 1, 'verbraucht'), mt(5, 1, 'einsatzbereit')])).toBe(1);
   });
+
+  it('Material-Ausfall der Einheit zählt defekt, verbraucht und Desinfektion nötig (Spec kraeftebaum)', () => {
+    // Durch `mittelDerEinheit`, nicht nur über `materialAusfall`: zählte der Baum eine eigene
+    // Regel (etwa nur „defekt“), wiche die Gruppenzeile von der Materialliste ab.
+    const m = mittelDerEinheit(1, {
+      einheiten: [eh(1, null)],
+      personal: [],
+      fahrzeuge: [],
+      material: [
+        mt(1, 1, 'defekt'),
+        mt(2, 1, 'verbraucht'),
+        mt(3, 1, 'desinfektion_noetig'),
+        mt(4, 1, 'einsatzbereit'),
+      ],
+    });
+    expect(m.material).toHaveLength(4);
+    expect(m.materialAusfall).toBe(3);
+  });
 });
 
 // ── 1.3 Besatzungsrechnung ───────────────────────────────────────────────────
