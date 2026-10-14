@@ -237,6 +237,26 @@ export type EinheitVorlage = S['EinheitVorlage'];
 export type EinheitVorlageFahrzeug = S['EinheitVorlageFahrzeug'];
 export type EinheitVorlagePersonal = S['EinheitVorlagePersonal'];
 
+// ============================== LLH-1049 Einheit aus Vorlage ==============================
+/** Vorschau einer Vorlage im Einsatz: Baum und Zustand jeder Kraft (Spec `einheit-vorlagen`). */
+export type VorlageVorschau = S['VorlageVorschau'];
+export type VorschauKnoten = S['VorschauKnoten'];
+export type VorschauFahrzeug = S['VorschauFahrzeug'];
+export type VorschauPersonal = S['VorschauPersonal'];
+export type VorschauZustand = S['VorschauZustand'];
+export type AusVorlageErgebnis = S['AusVorlageErgebnis'];
+
+/** POST-Body des Bildens (`AusVorlageBody` in `src/routes/einsatz_einheit.rs`). Kein
+ *  Backend-Schema, FE-lokal. Jede Zeile trägt ihr „umhängen“ (design.md D3). */
+export interface AusVorlageEingabe {
+  vorlage_id: number;
+  /** Name der obersten Einheit; fehlt er, gilt der Name der Vorlage. */
+  name?: string | null;
+  abschnitt_id?: number | null;
+  fahrzeuge: { fahrzeug_id: number; umhaengen: boolean }[];
+  personal: { personal_id: number; umhaengen: boolean }[];
+}
+
 /** POST-Body einer Einheiten-Vorlage (`VorlageBody` in `src/routes/einheit_vorlage.rs`). Kein
  *  Backend-Schema, FE-lokal. Das Soll geht als Trio oder gar nicht. */
 export interface NeueEinheitVorlage {

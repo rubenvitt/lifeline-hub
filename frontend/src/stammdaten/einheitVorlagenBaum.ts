@@ -49,6 +49,24 @@ export function orderAsTree(vorlagen: readonly EinheitVorlage[]): VorlageRow[] {
   return rows;
 }
 
+/**
+ * Name mit allen Elternvorlagen der Menge: „Sanitätszug Musterstadt › Rettungsstaffel“ (LLH-1049,
+ * design.md D1: eine Untervorlage ist allein bildbar und braucht ihren Ort im Namen). Eine nicht
+ * gelistete (etwa deaktivierte) Elternvorlage beendet den Pfad; ein Zyklus ebenso.
+ */
+export function vorlagePfad(vorlagen: readonly EinheitVorlage[], v: EinheitVorlage): string {
+  const byId = new Map(vorlagen.map((x) => [x.id, x]));
+  const namen = [v.name];
+  const gesehen = new Set([v.id]);
+  let eltern = v.ueber_vorlage_id != null ? byId.get(v.ueber_vorlage_id) : undefined;
+  while (eltern && !gesehen.has(eltern.id)) {
+    namen.unshift(eltern.name);
+    gesehen.add(eltern.id);
+    eltern = eltern.ueber_vorlage_id != null ? byId.get(eltern.ueber_vorlage_id) : undefined;
+  }
+  return namen.join(' › ');
+}
+
 /** Die Vorlage selbst und alle ihre Nachfahren: als Unterstellung ausgeschlossen (Zyklus). */
 export function subtreeIds(vorlagen: readonly EinheitVorlage[], rootId: number): Set<number> {
   const result = new Set<number>([rootId]);

@@ -117,3 +117,40 @@ Rolle freigegeben ist; sonst MUST die Vorschau den Teil als gesperrt melden.
 #### Scenario: Personal gesperrt
 - **WHEN** die Rolle das Modul Personal nicht freigegeben hat
 - **THEN** enthält die Vorschau keine Personen und meldet das Personal als gesperrt
+
+### Requirement: Vorlage im Dialog „Einheit bilden“
+Der Dialog „Einheit bilden“ SHALL als erstes Feld „Vorlage“ zeigen, wenn es aktive Vorlagen gibt.
+Ohne Vorlage MUST er unverändert Name und Typ erfragen, mit Vorlage MUST er auf eine eigene Seite
+führen.
+
+#### Scenario: Ohne Vorlage
+- **WHEN** die Führung im Dialog keine Vorlage wählt
+- **THEN** bildet sie die Einheit wie bisher mit Name und Typ
+
+### Requirement: Seite zum Bilden aus der Vorlage
+Die Seite SHALL den Namen der obersten Einheit (vorbelegt, änderbar), den Abschnitt und den Baum
+der Vorlage mit einem Häkchen je Fahrzeug (Vorgabe an) und je Person (Vorgabe aus) zeigen. Jede
+Zeile MUST ihren Zustand als Wort tragen; eine gebundene Kraft MUST nur über ein Häkchen
+„umhängen“ wählbar sein, eine außer Dienst stehende MUST gesperrt sein. Eine Person, deren
+Fahrzeug nicht mitkommt, MUST „ohne Fahrzeug“ zeigen.
+
+#### Scenario: Vorgaben der Häkchen
+- **WHEN** die Führung „Sanitätszug Musterstadt“ wählt und keine Kraft im Einsatz ist
+- **THEN** sind alle Fahrzeuge angehakt, keine Person, und die Zusammenfassung nennt „1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte“
+
+#### Scenario: Fahrzeug abgewählt
+- **WHEN** die Führung RTW 1 abwählt und eine Person der Vorlage auf RTW 1 anhakt
+- **THEN** zeigt die Person „ohne Fahrzeug“
+
+### Requirement: Rückmeldung der Seite
+Ein gleichnamiger aktiver Name MUST als Warnung am Feld stehen, ohne zu sperren. Gründe einer
+Ablehnung MUST an der Zeile stehen, nicht als Toast. Nach dem Bilden MUST das Meldebild mit der
+neuen Einheit öffnen, ohne Freigabe des Meldebilds die Ansicht der Einheit.
+
+#### Scenario: Gleicher Name
+- **WHEN** im Einsatz schon eine aktive Einheit „Sanitätszug Musterstadt“ besteht
+- **THEN** zeigt das Namensfeld „Name schon vergeben“, und „Einheit bilden“ bleibt wählbar
+
+#### Scenario: Grund an der Zeile
+- **WHEN** das Bilden mit 422 abgelehnt wird, weil RTW 2 inzwischen dem „2. Zug“ angehört
+- **THEN** steht der Grund an der Zeile von RTW 2, und es erscheint kein Toast

@@ -22,7 +22,15 @@ import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { staerkeText } from '../anzeige/staerke';
-import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
+import {
+  einheitAusVorlagePfad,
+  einheitDetailPfad,
+  kraefteuebersichtPfad,
+  parseRouteId,
+} from '../routing/deeplinks';
+import { loadEinheitVorlagen } from '../api/einheitVorlagen';
+import { orderAsTree, vorlagePfad } from '../stammdaten/einheitVorlagenBaum';
+import { demoGroupedOptions, SUCHTEXT_SUCHE } from '../stammdaten/demoAuswahl';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import { buildEinheitenGliederung, type GliederungZeile } from '../kraefte/einheitenGliederung';
@@ -33,6 +41,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
+import type { EinheitVorlage } from '../api/types';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
@@ -129,10 +138,30 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
   ]);
 }
 
-/** Feldsatz des „Einheit bilden"-Dialogs — bewusst zwei Felder (siehe `bilden`). */
+/**
+ * Feldsatz des „Einheit bilden"-Dialogs — bewusst wenige Felder (siehe `bilden`). Mit Vorlage
+ * (LLH-1049) steht nur sie; Name, Typ und alles Weitere stehen auf der Seite „Aus Vorlage“.
+ */
 interface BildenWerte {
+  vorlage_id?: number | null;
   name: string;
   typ_id?: number | null;
+}
+
+/**
+ * Optionen des Feldes „Vorlage“ (LLH-1049, design.md D1): Baumfolge, Untervorlagen mit Pfad (sie
+ * sind allein bildbar), Demo-Vorlagen hinten über `demoGroupedOptions`. Der Pfad steht auch als
+ * `title`, weil das Demo-Label ein Element ist und Auswahl wie Tooltip sonst keinen Text hätten.
+ */
+function vorlagenOptionen(vorlagen: readonly EinheitVorlage[]) {
+  const geordnet = orderAsTree(vorlagen).map((r) => r.vorlage);
+  const pfad = new Map(geordnet.map((v) => [v.id, vorlagePfad(vorlagen, v)] as const));
+  const text = (v: EinheitVorlage) => pfad.get(v.id) ?? v.name;
+  return demoGroupedOptions(geordnet, text, text).map((o) =>
+    'options' in o
+      ? { ...o, options: o.options.map((x) => ({ ...x, title: pfad.get(x.value) })) }
+      : { ...o, title: pfad.get(o.value) },
+  );
 }
 
 export default function EinheitenPage() {
@@ -169,6 +198,15 @@ export default function EinheitenPage() {
     queryFn: () => listAufgeloesteEinheiten(einsatzId),
   });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
+  // Aktive Einheiten-Vorlagen der Organisation (LLH-1049): ohne sie fehlt das Feld „Vorlage“.
+  // Beim Seitenaufbau geladen, nicht erst mit dem Dialog: ein später erscheinendes erstes Feld
+  // schöbe den Dialog unter dem Fokus.
+  const vorlagenQuery = useQuery({
+    queryKey: globalKeys.einheitVorlagenListe('aktiv'),
+    queryFn: () => loadEinheitVorlagen('aktiv'),
+  });
+  const vorlagen = vorlagenQuery.data ?? [];
+  const gewaehlteVorlage = Form.useWatch('vorlage_id', bildenForm);
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const zeilen = useMemo(
@@ -205,7 +243,7 @@ export default function EinheitenPage() {
    * Kein `serie`: eine Einheit zu bilden ist keine Minutentakt-Erfassung.
    */
   const bilden = useMutation({
-    mutationFn: (werte: BildenWerte) =>
+    mutationFn: (werte: Omit<BildenWerte, 'vorlage_id'>) =>
       bildeEinheit(einsatzId, { name: werte.name.trim(), typ_id: werte.typ_id ?? null }),
     onSuccess: (e) => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
@@ -346,7 +384,6 @@ export default function EinheitenPage() {
         offen={bildenOffen}
         titel="Einheit bilden"
         form={bildenForm}
-        erfassenText="Bilden"
         laeuft={bilden.isPending}
         // Grund einer Ablehnung im Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen
         // ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
@@ -355,23 +392,46 @@ export default function EinheitenPage() {
         speicherFehlerFallback="Bilden fehlgeschlagen"
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
         // ankam. Ein 422 kostete sonst den eingegebenen Namen.
-        onErfassen={(w) => bilden.mutateAsync(w)}
+        // Mit Vorlage schreibt der Dialog nichts: „Weiter“ öffnet die Seite, auf der gebildet wird
+        // (design.md D1). Die Hülle leert danach und schließt wie nach jedem Erfolg.
+        onErfassen={(w) => {
+          if (w.vorlage_id != null) {
+            void navigate(einheitAusVorlagePfad(einsatzId, w.vorlage_id));
+            return Promise.resolve();
+          }
+          return bilden.mutateAsync(w);
+        }}
+        erfassenText={gewaehlteVorlage != null ? 'Weiter' : 'Bilden'}
         onFertig={() => setBildenOffen(false)}
         onAbbrechen={() => setBildenOffen(false)}
       >
-        <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-          <Input placeholder="z. B. 2. Zug" />
-        </Form.Item>
-        <Form.Item label="Typ" name="typ_id">
-          <Select
-            allowClear
-            placeholder="Typ wählen"
-            notFoundContent={nichtGefundenInhalt(typenQuery, {
-              allgemein: 'Einheitentypen konnten nicht geladen werden',
-            })}
-            options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
-          />
-        </Form.Item>
+        {vorlagen.length > 0 && (
+          <Form.Item label="Vorlage" name="vorlage_id">
+            <Select<number>
+              allowClear
+              showSearch={SUCHTEXT_SUCHE}
+              placeholder="ohne Vorlage"
+              options={vorlagenOptionen(vorlagen)}
+            />
+          </Form.Item>
+        )}
+        {gewaehlteVorlage == null && (
+          <>
+            <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+              <Input placeholder="z. B. 2. Zug" />
+            </Form.Item>
+            <Form.Item label="Typ" name="typ_id">
+              <Select
+                allowClear
+                placeholder="Typ wählen"
+                notFoundContent={nichtGefundenInhalt(typenQuery, {
+                  allgemein: 'Einheitentypen konnten nicht geladen werden',
+                })}
+                options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
+              />
+            </Form.Item>
+          </>
+        )}
       </ErfassungsModal>
     </EinsatzSeite>
   );
