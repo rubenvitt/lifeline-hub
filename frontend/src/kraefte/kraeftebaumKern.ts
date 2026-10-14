@@ -105,6 +105,42 @@ export function abschnittDerObersten(einheiten: readonly Einheit[]): Map<number,
   return ergebnis;
 }
 
+/** Der Abschnitt, den eine Einheit anzeigt: ID und Name aus `abschnitt_name` der tragenden Einheit. */
+export interface EinheitAbschnitt {
+  id: number;
+  name: string | null;
+}
+
+/**
+ * Abschnitt je Einheit für die ANZEIGE (LLH-1073, design.md D4): der eigene Abschnitt der
+ * Einheit, sonst der des nächsten Vorfahren mit Abschnitt; ohne Abschnitt in der Kette `null`.
+ * Der Name kommt aus `abschnitt_name` der Einheit, die ihn trägt. Zyklen und fehlende
+ * Obereinheiten brechen den Aufstieg ab. Gelesen von {@link einheitenBaum}, der Abschnitt-Spalte
+ * der Fahrzeugliste und dem FMS-Tableau; Filter und Stärke bleiben bei
+ * {@link abschnittDerObersten} (Spec `lage-verdichtung`).
+ */
+export function abschnittDerEinheit(
+  einheiten: readonly Einheit[],
+): Map<number, EinheitAbschnitt | null> {
+  const nachId = new Map(einheiten.map((e) => [e.id, e]));
+  const ergebnis = new Map<number, EinheitAbschnitt | null>();
+  for (const e of einheiten) {
+    let cur: Einheit | undefined = e;
+    let treffer: EinheitAbschnitt | null = null;
+    const gesehen = new Set<number>();
+    while (cur && !gesehen.has(cur.id)) {
+      if (cur.abschnitt_id != null) {
+        treffer = { id: cur.abschnitt_id, name: cur.abschnitt_name ?? null };
+        break;
+      }
+      gesehen.add(cur.id);
+      cur = cur.ueber_einheit_id != null ? nachId.get(cur.ueber_einheit_id) : undefined;
+    }
+    ergebnis.set(e.id, treffer);
+  }
+  return ergebnis;
+}
+
 // ── Einheit-Hierarchie ────────────────────────────────────────────────────────
 
 /** Ein Knoten der Einheit-Hierarchie (ohne Mittel). */
@@ -138,17 +174,9 @@ export function einheitenBaum(
     }
   }
 
-  // Abschnitt einer Einheit: der eigene, sonst der geerbte.
-  const abschnittVon = (x: Einheit): number | null => {
-    let cur: Einheit | undefined = x;
-    const gesehen = new Set<number>();
-    while (cur && !gesehen.has(cur.id)) {
-      if (cur.abschnitt_id != null) return cur.abschnitt_id;
-      gesehen.add(cur.id);
-      cur = cur.ueber_einheit_id != null ? nachId.get(cur.ueber_einheit_id) : undefined;
-    }
-    return null;
-  };
+  // Abschnitt einer Einheit: der eigene, sonst der geerbte (eine Lesart mit Spalte und Tableau).
+  const abschnittJe = abschnittDerEinheit(einheiten);
+  const abschnittVon = (x: Einheit): number | null => abschnittJe.get(x.id)?.id ?? null;
   const rangVon = (x: Einheit) => {
     const a = abschnittVon(x);
     return a != null && rang.has(a) ? rang.get(a)! : Number.MAX_SAFE_INTEGER;
@@ -172,6 +200,80 @@ export function einheitenBaum(
   // Zyklen (a ↔ b) hätten keine Wurzel — sie dürfen trotzdem nicht verschwinden.
   for (const x of einheiten) if (!besucht.has(x.id)) baum.push(build(x));
   return baum;
+}
+
+// ── Einheit-Auswahl ───────────────────────────────────────────────────────────
+
+/** Eine wählbare Einheit (LLH-1073, design.md D3): Pfad über die Obereinheiten, Tiefe im Baum. */
+export interface EinheitOption {
+  id: number;
+  name: string;
+  /** „Zug 1 › Staffel A“ — die Obereinheiten in Baumfolge, dann die Einheit selbst. */
+  pfad: string;
+  tiefe: number;
+  abschnitt: EinheitAbschnitt | null;
+}
+
+/** Eine Gruppe der Einheit-Auswahl: ein Abschnitt oder „ohne Abschnitt“. */
+export interface EinheitOptionGruppe {
+  /** Abschnitt-ID als Text, `ohne` für Einheiten ohne Abschnitt. */
+  schluessel: string;
+  titel: string;
+  optionen: EinheitOption[];
+}
+
+/**
+ * Die wählbaren Einheiten in der Folge von {@link einheitenBaum} (Regel „Eine Baumlogik der
+ * Kräfte“, kein eigener Baum): nur aktive, Untereinheiten mit Pfad, je Einheit der Abschnitt nach
+ * {@link abschnittDerEinheit}.
+ */
+export function buildEinheitOptions(
+  einheiten: readonly Einheit[],
+  abschnitte: readonly Einsatzabschnitt[],
+): EinheitOption[] {
+  const aktive = filterAktive(einheiten);
+  const abschnittJe = abschnittDerEinheit(aktive);
+  const optionen: EinheitOption[] = [];
+  const walk = (k: EinheitKnoten, vorfahren: readonly string[]) => {
+    const pfad = [...vorfahren, k.einheit.name];
+    optionen.push({
+      id: k.einheit.id,
+      name: k.einheit.name,
+      pfad: pfad.join(' › '),
+      tiefe: vorfahren.length,
+      abschnitt: abschnittJe.get(k.einheit.id) ?? null,
+    });
+    for (const kind of k.kinder) walk(kind, pfad);
+  };
+  for (const w of einheitenBaum(aktive, abschnitte)) walk(w, []);
+  return optionen;
+}
+
+/**
+ * Gruppiert die Auswahl nach Abschnitt: Gruppen in der Folge ihres ersten Auftretens im Baum,
+ * „ohne Abschnitt“ zuletzt, Optionen in Baumfolge. Trägt keine Einheit einen Abschnitt, gibt es
+ * keine Gruppen (`[]`) — die Auswahl bleibt dann eine flache Liste.
+ */
+export function groupEinheitOptions(optionen: readonly EinheitOption[]): EinheitOptionGruppe[] {
+  if (!optionen.some((o) => o.abschnitt)) return [];
+  const gruppen = new Map<string, EinheitOptionGruppe>();
+  const ohne: EinheitOptionGruppe = { schluessel: 'ohne', titel: 'ohne Abschnitt', optionen: [] };
+  for (const o of optionen) {
+    if (!o.abschnitt) {
+      ohne.optionen.push(o);
+      continue;
+    }
+    const schluessel = String(o.abschnitt.id);
+    let g = gruppen.get(schluessel);
+    if (!g) {
+      g = { schluessel, titel: o.abschnitt.name ?? `Abschnitt ${o.abschnitt.id}`, optionen: [] };
+      gruppen.set(schluessel, g);
+    }
+    g.optionen.push(o);
+  }
+  const liste = [...gruppen.values()];
+  if (ohne.optionen.length > 0) liste.push(ohne);
+  return liste;
 }
 
 // ── Besatzung ─────────────────────────────────────────────────────────────────
