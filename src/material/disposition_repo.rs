@@ -108,7 +108,7 @@ pub struct AdhocDaten<'a> {
 
 /// Aktives Material eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit. Herausgenommenes
 /// und storniertes fehlt (LLH-1079, Spec `kraefte-entlassung`).
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     einsatz_id: i64,
     einsatz_aktiv: bool,
@@ -478,7 +478,7 @@ pub async fn teile_auf_tx(
 
 /// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
 /// UND `uhs_id`.
-pub async fn liste_je_uhs(
+pub async fn list_je_uhs(
     pool: &SqlitePool,
     einsatz_id: i64,
     uhs_id: i64,
@@ -840,7 +840,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            liste(&pool, einsatz, true).await.unwrap().len(),
+            list(&pool, einsatz, true).await.unwrap().len(),
             2,
             "kein UNIQUE - Mengen-Splitting"
         );
@@ -963,7 +963,7 @@ mod tests {
         let c = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
         assert_eq!((c.menge, c.status), (30, MaterialStatus::Verbraucht));
-        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert!(list(&pool, einsatz, true).await.unwrap().is_empty());
         assert_eq!(
             list_entlassene(&pool, einsatz, true).await.unwrap().len(),
             1
@@ -1036,7 +1036,7 @@ mod tests {
         .unwrap();
         let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.uhs_id.is_none());
-        // liste_je_uhs:
+        // list_je_uhs:
         update(
             &pool,
             einsatz,
@@ -1048,7 +1048,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
+        let liste = list_je_uhs(&pool, einsatz, u, true).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].id, em);
     }
@@ -1295,7 +1295,7 @@ mod tests {
         assert_ne!(em_demo, demo.id, "Vorbedingung: IDs entkoppelt");
 
         for einsatz_aktiv in [true, false] {
-            let alle = liste(&pool, einsatz, einsatz_aktiv).await.unwrap();
+            let alle = list(&pool, einsatz, einsatz_aktiv).await.unwrap();
             let marke = |id| alle.iter().find(|a| a.id == id).unwrap().ist_demo;
             assert!(marke(em_demo), "einsatz_aktiv={einsatz_aktiv}");
             assert!(!marke(em_echt), "einsatz_aktiv={einsatz_aktiv}");
@@ -1391,11 +1391,8 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(snap, ("Wolldecke".into(), Some("Betreuung".into())));
-        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 2);
-        assert_eq!(
-            liste_je_uhs(&pool, einsatz, u, true).await.unwrap().len(),
-            2
-        );
+        assert_eq!(list(&pool, einsatz, true).await.unwrap().len(), 2);
+        assert_eq!(list_je_uhs(&pool, einsatz, u, true).await.unwrap().len(), 2);
     }
 
     /// LLH-1093, design.md D8: eine Menge ab der Ausgangsmenge ist 422 (deckt Menge 1 ab),
@@ -1556,7 +1553,7 @@ mod tests {
         assert_eq!(e.uhs_id, Some(u));
         let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!((a.einheit_id, a.uhs_id), (None, None));
-        assert!(liste_je_uhs(&pool, einsatz, u, true)
+        assert!(list_je_uhs(&pool, einsatz, u, true)
             .await
             .unwrap()
             .is_empty());
@@ -1608,7 +1605,7 @@ mod tests {
             .await
             .unwrap();
         storniere(&pool, einsatz, em).await.unwrap();
-        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert!(list(&pool, einsatz, true).await.unwrap().is_empty());
         assert!(list_entlassene(&pool, einsatz, true)
             .await
             .unwrap()

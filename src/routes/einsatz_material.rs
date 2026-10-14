@@ -47,7 +47,7 @@ pub async fn liste(
         if parse_flag(params.entlassene.as_deref(), "entlassene")? {
             disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
         } else {
-            disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
+            disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
         },
     ))
 }
