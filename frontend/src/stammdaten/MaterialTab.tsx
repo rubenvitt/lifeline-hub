@@ -17,10 +17,8 @@ import type { Material, MaterialArt } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { ART_LABEL } from '../kraefte/materialPosten';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
-
-/** Wortlaut der Art am Stamm (LLH-1224 D1/D16); Filterwerte fest aus dem Wire-Enum. */
-const ART_LABEL: Record<MaterialArt, string> = { geraet: 'Gerät', verbrauchsgut: 'Verbrauchsgut' };
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();

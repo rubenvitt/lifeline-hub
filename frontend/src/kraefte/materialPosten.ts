@@ -11,6 +11,20 @@ import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 
 type Zeile = Pick<EinsatzMaterial, 'art' | 'menge' | 'ausgegeben'>;
 
+/**
+ * Die Wörter der Art (D1), die eine Quelle für Stammtabelle, Stammformular und „Art ändern …“:
+ * ein Gerät steht je Stück im Einsatz, ein Verbrauchsgut mit Menge.
+ */
+export const ART_LABEL: Readonly<Record<MaterialArt, string>> = {
+  geraet: 'Gerät',
+  verbrauchsgut: 'Verbrauchsgut',
+};
+
+/** Die Arten als Segmente, in der Folge des Wire-Enums. */
+export const ART_OPTIONEN: readonly { wert: MaterialArt; label: string }[] = (
+  ['geraet', 'verbrauchsgut'] as const
+).map((wert) => ({ wert, label: ART_LABEL[wert] }));
+
 /** Ein Verbrauchsgut, dessen ganze Menge ausgegeben ist (D4). Ein Gerät ist es nie. */
 export function isAufgebraucht(em: Zeile): boolean {
   return em.art === 'verbrauchsgut' && em.ausgegeben >= em.menge;
