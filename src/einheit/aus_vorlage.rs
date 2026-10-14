@@ -714,8 +714,9 @@ pub async fn bilde_tx(
                     let ef_id = lage.ef_id.ok_or_else(|| {
                         AppError::Internal("Fahrzeug im Einsatz ohne Zeile".into())
                     })?;
-                    let name =
-                        mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
+                    let name = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id)
+                        .await?
+                        .funkrufname;
                     if let Some(alt) = &lage.einheit {
                         push_unique(&mut gebildet.alte_einheiten, alt.id);
                         gebildet.umgehaengt.push(Umgehaengt {

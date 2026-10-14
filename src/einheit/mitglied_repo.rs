@@ -124,32 +124,57 @@ pub async fn load_betroffene_einheiten_tx(
     Ok(ids)
 }
 
-/// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. `NotFound`
-/// analog. Liefert den Funkrufnamen.
+/// Ergebnis von [`zuordnen_fahrzeug_tx`]: der aufgelöste Funkrufname für den ETB-Text, die
+/// Einheit, der das Fahrzeug vorher angehörte (ID für das Ereignis, Name für den Text), und ob
+/// sich die Zuordnung geändert hat (LLH-1073, design.md D2; Muster [`MaterialZuordnung`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FahrzeugZuordnung {
+    pub funkrufname: String,
+    pub vorher: Option<(i64, String)>,
+    pub is_changed: bool,
+}
+
+/// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. Ein Fahrzeug, das
+/// schon einer anderen Einheit angehört, wechselt; dieselbe Einheit noch einmal schreibt nichts.
+/// Der Funkrufname ist der aufgelöste (bei einem Stamm-Fahrzeug im aktiven Einsatz der des
+/// Stamms), nicht der vom Disponieren. `NotFound`, falls Fahrzeug oder Einheit nicht zum Einsatz
+/// gehören, `Conflict` bei aufgelöster Einheit oder beendetem Fahrzeug.
 pub async fn zuordnen_fahrzeug_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ef_id: i64,
-) -> Result<String, AppError> {
-    pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
-    let name: Option<String> = sqlx::query_scalar(
-        "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let name = name.ok_or(AppError::NotFound)?;
+) -> Result<FahrzeugZuordnung, AppError> {
+    // In der Transaktion: auch eine gerade aufgelöste Einheit nimmt kein Fahrzeug mehr (409).
+    super::repo::require_aktiv_tx(conn, einsatz_id, einheit_id).await?;
+    let anzeige =
+        crate::fahrzeug::disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
     // Ein entlassenes oder storniertes Fahrzeug tritt keiner Einheit bei (409, LLH-1079).
     crate::fahrzeug::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, ef_id).await?;
-    sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id)
-        .bind(ef_id)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    Ok(name)
+    let vorher = match anzeige.einheit_id {
+        Some(id) => {
+            let name: String = sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
+                .bind(id)
+                .fetch_one(&mut *conn)
+                .await?;
+            Some((id, name))
+        }
+        None => None,
+    };
+    let is_changed = anzeige.einheit_id != Some(einheit_id);
+    if is_changed {
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
+            .bind(einheit_id)
+            .bind(ef_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(FahrzeugZuordnung {
+        funkrufname: anzeige.funkrufname,
+        vorher,
+        is_changed,
+    })
 }
 
 /// Pool-Wrapper.
@@ -158,7 +183,7 @@ pub async fn zuordnen_fahrzeug(
     einsatz_id: i64,
     einheit_id: i64,
     ef_id: i64,
-) -> Result<String, AppError> {
+) -> Result<FahrzeugZuordnung, AppError> {
     let mut conn = pool.acquire().await?;
     zuordnen_fahrzeug_tx(&mut conn, einsatz_id, einheit_id, ef_id).await
 }
@@ -795,14 +820,29 @@ mod tests {
     #[tokio::test]
     async fn fahrzeug_zuordnen_und_freigeben() {
         let pool = crate::db::test_pool().await;
-        let (einsatz, a, _b) = setup(&pool).await;
+        let (einsatz, a, b) = setup(&pool).await;
         let ef: i64 = sqlx::query_scalar("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id")
             .bind(einsatz).fetch_one(&pool).await.unwrap();
         assert_eq!(
             zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap(),
-            "Florian 1"
+            FahrzeugZuordnung {
+                funkrufname: "Florian 1".into(),
+                vorher: None,
+                is_changed: true,
+            }
         );
         assert_eq!(fahrzeug_mitglieder(&pool, a).await.unwrap().len(), 1);
+        // Exklusiv: erneutes Zuordnen zu B wechselt und nennt A (LLH-1073, design.md D2).
+        let z = zuordnen_fahrzeug(&pool, einsatz, b, ef).await.unwrap();
+        assert_eq!(z.vorher, Some((a, "A".to_string())));
+        assert!(z.is_changed);
+        assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
+        // Dieselbe Einheit noch einmal: nichts geändert.
+        let z = zuordnen_fahrzeug(&pool, einsatz, b, ef).await.unwrap();
+        assert_eq!(z.vorher, Some((b, "B".to_string())));
+        assert!(!z.is_changed);
+        // Zurück zu A für das Freigeben unten.
+        zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap();
         assert_eq!(
             freigeben_fahrzeug_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ef)
                 .await

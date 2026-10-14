@@ -478,7 +478,8 @@ impl Ablauf<'_> {
                     einheit_id,
                     ef_id,
                 )
-                .await?;
+                .await?
+                .funkrufname;
                 self.system_etb(
                     conn,
                     &crate::einheit::etb_text_fahrzeug_zugeordnet(einheit_name, &funkrufname),
