@@ -1,6 +1,7 @@
 import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import type { StatusOption } from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
+import { abschnittDerEinheit } from './kraeftebaumKern';
 import { fmsEtikett } from './meldebildRaster';
 
 /**
@@ -14,7 +15,8 @@ import { fmsEtikett } from './meldebildRaster';
  *
  * REIHENFOLGE IST STABIL: Abschnitt → Einheit → Funkrufname, NIE nach Status — sonst spränge
  * die Kachel beim eigenen Klick unter dem Finger weg. Der Abschnitt kommt über die Einheit (ein
- * Fahrzeug hat keinen eigenen).
+ * Fahrzeug hat keinen eigenen): ihr eigener, sonst der des nächsten Vorfahren mit Abschnitt
+ * (`abschnittDerEinheit`, LLH-1073 D4) — dieselbe Lesart wie die Abschnitt-Spalte der Liste.
  */
 
 export const OHNE_ABSCHNITT_TITEL = 'ohne Abschnitt';
@@ -60,6 +62,7 @@ export function baueFmsTableau(
   }
 
   const einheitNach = new Map(einheiten.map((e) => [e.id, e]));
+  const abschnittJe = abschnittDerEinheit(einheiten);
   const abschnitte = new Map<number, FmsGruppe>();
   const ohneAbschnitt: FmsGruppe = {
     schluessel: 'ab-ohne',
@@ -75,18 +78,19 @@ export function baueFmsTableau(
       continue;
     }
     const kachel = { ef, einheit: e.name };
-    if (e.abschnitt_id == null) {
+    const abschnitt = abschnittJe.get(e.id) ?? null;
+    if (!abschnitt) {
       ohneAbschnitt.kacheln.push(kachel);
       continue;
     }
-    let gruppe = abschnitte.get(e.abschnitt_id);
+    let gruppe = abschnitte.get(abschnitt.id);
     if (!gruppe) {
       gruppe = {
-        schluessel: `ab-${e.abschnitt_id}`,
-        titel: e.abschnitt_name ?? `Abschnitt ${e.abschnitt_id}`,
+        schluessel: `ab-${abschnitt.id}`,
+        titel: abschnitt.name ?? `Abschnitt ${abschnitt.id}`,
         kacheln: [],
       };
-      abschnitte.set(e.abschnitt_id, gruppe);
+      abschnitte.set(abschnitt.id, gruppe);
     }
     gruppe.kacheln.push(kachel);
   }

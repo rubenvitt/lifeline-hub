@@ -1,28 +1,18 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { darfImEinsatzSchreiben, darfVerwaltung } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
+import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   disponiereAdhoc,
   entlasseDisposition,
   gibBesatzungFrei,
@@ -45,7 +35,17 @@ import {
   parseFahrzeugeAnsicht,
   type FahrzeugeAnsicht,
 } from '../routing/deeplinks';
-import { listeEinheiten } from '../api/einheiten';
+import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheiten';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatUhrzeitMitTag } from '../anzeige/format';
+import EinheitAngabe from '../kraefte/EinheitAngabe';
+import { funktionText } from '../kraefte/einsatzfunktionKern';
+import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
+import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
+import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
+import { hasFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
 import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -64,7 +64,8 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
+import { abstand, dichten } from '../theme/tokens';
+import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
@@ -77,8 +78,13 @@ import {
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
-import { besatzungsStaerke, besatzungsUrteilVon } from '../kraefte/kraeftebaumKern';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import {
+  abschnittDerEinheit,
+  besatzungsStaerke,
+  besatzungsUrteilVon,
+  buildEinheitOptions,
+} from '../kraefte/kraeftebaumKern';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
@@ -116,7 +122,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
  * `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`). Eine Kraft in einer anderen Einheit als
  * das Fahrzeug wird markiert.
  *
- * Abgelehntes Zuordnen steht unter dem Auswahlfeld, abgelehntes Freigeben an der Kraft (LFH-1077,
+ * Abgelehntes Zuordnen steht unter dem Auswahlfeld, abgelehntes Lösen an der Kraft (LFH-1077,
  * `frontend/AGENTS.md`, „Rückwege und Fehler“).
  */
 function BesatzungsBlock({
@@ -160,21 +166,36 @@ function BesatzungsBlock({
       ) : (
         crew.map((m) => {
           const grund = freigebenFehler(m.id);
+          // Position und Funktion je Person (LLH-1073, design.md D13): die Position als Wort
+          // (LFH-946), die Funktion wie überall über `funktionText` (LLH-1067).
+          const angabe = [
+            m.staerke_position ? POSITION_LABELS[m.staerke_position] : null,
+            funktionText(m),
+          ]
+            .filter(Boolean)
+            .join(' · ');
           return (
             <div key={m.id}>
-              <Space style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
-                <Space size={abstand.sm}>
-                  <span>
-                    {m.name}
-                    {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
-                  </span>
+              <Space
+                size="middle"
+                style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+              >
+                <Space size={abstand.sm} wrap>
+                  <span>{m.name}</span>
+                  {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
                   {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
                     <Tag style={{ margin: 0 }}>andere Einheit</Tag>
                   )}
                 </Space>
+                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage (D13, Regel „Destruktiv ist
+                    nicht gleich destruktiv“). Der Name nennt Handlung und Person. */}
                 {darfSchreiben && (
-                  <Button danger onClick={() => onFreigeben(m.id)}>
-                    Freigeben
+                  <Button
+                    danger
+                    aria-label={`${m.name} vom Fahrzeug lösen`}
+                    onClick={() => onFreigeben(m.id)}
+                  >
+                    Vom Fahrzeug lösen
                   </Button>
                 )}
               </Space>
@@ -216,17 +237,37 @@ const ANSICHT_OPTIONEN = [
   { wert: 'tableau', label: 'FMS-Tableau' },
 ] as const satisfies readonly { wert: FahrzeugeAnsicht; label: string }[];
 
+/** Im Disponieren stehen vier Felder sichtbar (Schnellerfassung), nur OPTA im Klappteil. */
+const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
+
+/** Einträge des Zeilenmenüs (design.md D6). */
+type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'stornieren';
+
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { benutzer } = useAuth();
+  const { dichte } = useDichte();
+  /**
+   * Nur der Menüauslöser (Entscheidung 14.10.2026): die quadratische Steuerhöhe der Dichte oder der
+   * Kopf „Aktionen“ (rund 4,4 Schriftgrößen), was breiter ist, plus das Zellpolster beidseits
+   * (`abstand.md`). Gemessen 82 / 102 / 124 px (`e2e/gate1-ueberlauf.spec.ts`).
+   */
+  const stufe = dichten[dichte];
+  const aktionenBreite =
+    Math.ceil(Math.max(stufe.zeilenhoehe, 4.4 * stufe.schriftgroesse)) + 2 * stufe.abstand.md;
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
+  /** Offener Dialog „Angaben ändern“ (design.md D7), ebenfalls außerhalb der Zeilen-`map`. */
+  const [angabenFuer, setAngabenFuer] = useState<EinsatzFahrzeug | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
   // mitnimmt (Muster `PersonenPage`).
@@ -272,13 +313,29 @@ export default function FahrzeugePage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  // Nur das Tableau gliedert nach Einheit/Abschnitt. Die Route hängt am Modul `einheiten`, nicht an
-  // `fahrzeuge` — ist es gesperrt, läuft das Tableau ungegliedert weiter.
+  // Einheit und Abschnitt hängen am Modul `einheiten`, nicht an `fahrzeuge` (LLH-1073, design.md
+  // D5): ohne Freigabe weder Spalten noch Abruf, das Tableau läuft ungegliedert. Die Freigaben
+  // teilen den Schlüssel mit `useModulFreigaben`; der Abruf hier liefert zusätzlich den Ladezustand,
+  // damit das Tableau bis zur Antwort keine ungegliederte Fläche zeigt.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data);
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: ansicht === 'tableau',
+    enabled: einheitenFrei,
   });
+  // Der Rang der Abschnitte ordnet die Einheit-Auswahl wie den Kräftebaum; ohne Freigabe die
+  // Eingabefolge (wie die Personalliste, LLH-1060).
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: einheitenFrei && abschnitteFrei,
+  });
+  const { konventionen } = useAnzeigeKonventionen();
 
   // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
   // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
@@ -317,7 +374,7 @@ export default function FahrzeugePage() {
     { efId: number; statusId: number }
   >({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
     zeilenId: (v) => v.efId,
     ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
     // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
@@ -329,7 +386,7 @@ export default function FahrzeugePage() {
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { efId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),
@@ -387,11 +444,25 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: (e, v) => zuordnenFehler.melde(v.efId, e, 'Zuordnen fehlgeschlagen'),
   });
+  /**
+   * Einheit eines Fahrzeugs über die Zuordnungswege des Moduls Einheiten (design.md D2): Wechsel =
+   * PUT auf die neue Einheit (der Server hängt um und meldet beide), Leeren = DELETE über die
+   * bisherige, unverändert = nichts (das hält schon `InlineAngabe`). Erfüllt erst, wenn die neue
+   * Fahrzeugliste im Cache steht; eine Ablehnung bleibt an der Angabe.
+   */
+  async function saveEinheit(efId: number, neu: number | null, alt: number | null) {
+    if (neu === alt) return;
+    if (neu != null) await ordneFahrzeugZu(einsatzId, neu, efId);
+    else if (alt != null) await gibFahrzeugFrei(einsatzId, alt, efId);
+    void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+  }
   const besatzungFreiMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
     onMutate: (v) => freigebenFehler.beginne(v.epId),
     onSuccess: invalidate,
-    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Freigeben fehlgeschlagen'),
+    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Nicht vom Fahrzeug gelöst'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -414,7 +485,38 @@ export default function FahrzeugePage() {
   const isZeileBusy = (efId: number) =>
     (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === efId);
-  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
+  /**
+   * Zeilenmenü (design.md D6, nachgeschärft 14.10.2026): in der Tabelle steht „Entlassen“ als
+   * erster Eintrag im Menü statt als Knopf — die Einheit-Spalte (LLH-1073) braucht den Platz, damit
+   * der Funkrufname bei 1440 px einzeilig bleibt. Entlassen ist umkehrbar und steht deshalb nicht
+   * rot (Rückgängig-Hinweis wie bisher). Auf der Karte bleibt es die Primäraktion (`aktion`), das
+   * Menü dort führt den Rest. „Angaben ändern“ steht beim Stamm-Fahrzeug gesperrt mit dem Grund im
+   * Etikett — sein Fehlen verwirrte; den Sprung in den Stamm sieht nur, wer dort schreiben darf
+   * (Verwaltung der Org des Einsatzes, `src/AGENTS.md`, Admin-Schreibwege). „Stornieren“ steht für
+   * jede aktive Zeile rot hinter dem Trenner, das Menü ist also nie leer.
+   */
+  const canStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
+  const zeilenEintraege = (
+    ef: EinsatzFahrzeug,
+    { mitEntlassen }: { mitEntlassen: boolean },
+  ): MenueEintrag<ZeilenAktion>[] => {
+    const ausStamm = ef.fahrzeug_id != null;
+    return [
+      ...(mitEntlassen ? [{ key: 'entlassen' as const, label: 'Entlassen' }] : []),
+      ausStamm
+        ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
+        : { key: 'angaben', label: 'Angaben ändern …' },
+      ...(ausStamm && canStamm ? [{ key: 'stamm' as const, label: 'Im Stamm ändern ↗' }] : []),
+      { key: 'stornieren', label: 'Stornieren', gefahr: true },
+    ];
+  };
+  const handleZeilenAktion = (aktion: ZeilenAktion, ef: EinsatzFahrzeug) => {
+    if (aktion === 'entlassen') entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname });
+    else if (aktion === 'angaben') setAngabenFuer(ef);
+    else if (aktion === 'stamm' && ef.fahrzeug_id != null)
+      void navigate(fahrzeugDetailPfad(ef.fahrzeug_id));
+    else if (aktion === 'stornieren') setStornoFuer({ id: ef.id, name: ef.funkrufname });
+  };
 
   /**
    * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
@@ -434,6 +536,29 @@ export default function FahrzeugePage() {
 
   const stati = statusQuery.data ?? [];
   const personal = personalQuery.data ?? [];
+
+  // Einheit und Abschnitt je Fahrzeug (D4): der Abschnitt ist der eigene der Einheit, sonst der
+  // geerbte — dieselbe Lesart wie Meldebild und FMS-Tableau.
+  const einheiten = einheitenFrei ? (einheitenQuery.data ?? []) : [];
+  const abschnitte = einheitenFrei && abschnitteFrei ? (abschnitteQuery.data ?? []) : [];
+  const einheitOptionen = buildEinheitOptions(einheiten, abschnitte);
+  const einheitNameJe = new Map(einheiten.map((e) => [e.id, e.name]));
+  const abschnittJe = abschnittDerEinheit(einheiten);
+  const einheitName = (ef: EinsatzFahrzeug) =>
+    ef.einheit_id != null ? (einheitNameJe.get(ef.einheit_id) ?? null) : null;
+  const abschnittName = (ef: EinsatzFahrzeug) => {
+    const a = ef.einheit_id != null ? abschnittJe.get(ef.einheit_id) : null;
+    return a ? (a.name ?? `Abschnitt ${a.id}`) : null;
+  };
+  /** Filterwerte aus den eigenen Zeilen; ohne jeden Wert kein Filterfeld (Muster Träger). */
+  const filterAus = (wert: (ef: EinsatzFahrzeug) => string | null) => {
+    const werte = [...new Set(efs.map(wert).filter((w): w is string => !!w))]
+      .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+      .map((w) => ({ text: w, value: w }));
+    return werte.length > 0
+      ? { werte, trifft: (ef: EinsatzFahrzeug, w: string) => wert(ef) === w }
+      : undefined;
+  };
 
   /**
    * Der Katalog als Menüwerte — einmal gebaut, von beiden Zweigen gelesen. Der Fahrzeugkatalog ist
@@ -527,10 +652,22 @@ export default function FahrzeugePage() {
    * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
    * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
    * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
-   * die Personalseite). `typ` weicht, seit „Entlassen“ und „⋯“ die Aktionsspalte auf 170 px
-   * gebracht haben (LLH-1079 Teil II): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ
-   * trägt der Funkrufname meist schon in seiner Kennzahl. Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
-   * am Führungsarbeitsplatz“ und „Kräfte-Listen“).
+   * die Personalseite). `typ` weicht seit LLH-1079 Teil II (damals brachten „Entlassen“ und „⋯“
+   * die Aktionsspalte auf 170 px): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ trägt
+   * der Funkrufname meist schon in seiner Kennzahl.
+   *
+   * Die Einheit-Spalte (LLH-1073, design.md D5, Entscheidungen 14.10.2026) bleibt bei 1440
+   * sichtbar und schreibtragend (150 px, ein langes Einzelwort verbreitert sie). Damit der Funkrufname im Regelfall einzeilig bleibt,
+   * trägt die Aktionsspalte nur noch den Menüauslöser („Entlassen“ ist sein erster Eintrag; Breite
+   * je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit LLH-1079 Teil II),
+   * `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit nennt ihn mittelbar,
+   * das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
+   * 412 px, Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile, ein Ad-hoc-Name neben
+   * „ad-hoc“ 27. Einzeilig ist der Regelfall, keine harte Grenze: ein längerer Ad-hoc-Name und bei
+   * 1366 schon kürzere Namen werden zweizeilig, ebenso eine Einheit mit langem Namen — beides
+   * bricht an Wortgrenzen und ist kein Überlauf. Einheit, Status, Besatzung und Aktionen weichen
+   * nie. Wer eine Breite ändert, misst neu
+   * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
@@ -561,24 +698,42 @@ export default function FahrzeugePage() {
       suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
     },
-    {
-      title: 'Kennzeichen',
-      dataIndex: 'kennzeichen',
-      key: 'kennzeichen',
-      width: 120,
-      abBreite: 'xxl',
-      suchText: (ef) => ef.kennzeichen,
-      render: (t) => t ?? '—',
-    },
-    {
-      title: 'Träger',
-      dataIndex: 'traegerorganisation',
-      key: 'traeger',
-      width: 160,
-      abBreite: 'xxl',
-      filter: traegerFilter,
-      render: (t) => t ?? '—',
-    },
+    ...(einheitenFrei
+      ? [
+          {
+            // Schreibtragend, deshalb nie `abBreite` (D5); die Auswahl gruppiert nach Abschnitt.
+            title: 'Einheit',
+            key: 'einheit' as const,
+            // 150 px als Vorgabe. Ein Name bricht an Wortgrenzen, nie mitten im Wort
+            // (`EinheitAngabe`, Entscheidung 14.10.2026), und darf zweizeilig werden; ein langes
+            // Einzelwort verbreitert die Spalte selbst („Betreuungsgruppe“ neben dem Stift 152 px,
+            // „Verpflegungsgruppe“ 162 px). Über 157 px fehlen dem Funkrufnamen die 27 Zeichen
+            // aus Gate 1 („Kräfte-Listen“).
+            width: 150,
+            sortWert: (ef: EinsatzFahrzeug) => einheitName(ef),
+            suchText: (ef: EinsatzFahrzeug) => einheitName(ef),
+            filter: filterAus(einheitName),
+            render: (_: unknown, ef: EinsatzFahrzeug) => (
+              <EinheitAngabe
+                kennung={ef.funkrufname}
+                wert={ef.einheit_id ?? null}
+                optionen={einheitOptionen}
+                darfSchreiben={darfSchreiben}
+                onSpeichern={(neu, alt) => saveEinheit(ef.id, neu, alt)}
+              />
+            ),
+          },
+          {
+            title: 'Abschnitt',
+            key: 'abschnitt' as const,
+            width: 130,
+            abBreite: 'xxl' as const,
+            sortWert: (ef: EinsatzFahrzeug) => abschnittName(ef),
+            filter: filterAus(abschnittName),
+            render: (_: unknown, ef: EinsatzFahrzeug) => abschnittName(ef) ?? '—',
+          },
+        ]
+      : []),
     {
       title: 'Status',
       key: 'status',
@@ -602,6 +757,16 @@ export default function FahrzeugePage() {
       ),
     },
     {
+      // Zeitpunkt des Status, wie in der Kräfteübersicht; ohne Wert „—“.
+      title: 'Seit',
+      key: 'seit',
+      width: 90,
+      abBreite: 'xxl',
+      zahl: true,
+      sortWert: (ef) => ef.status_seit,
+      render: (_, ef) => (ef.status_seit ? formatUhrzeitMitTag(ef.status_seit, konventionen) : '—'),
+    },
+    {
       title: 'Besatzung',
       key: 'besatzung',
       width: 320,
@@ -613,12 +778,31 @@ export default function FahrzeugePage() {
       ),
     },
     {
+      title: 'Kennzeichen',
+      dataIndex: 'kennzeichen',
+      key: 'kennzeichen',
+      width: 120,
+      abBreite: 'xxl',
+      suchText: (ef) => ef.kennzeichen,
+      render: (t) => t ?? '—',
+    },
+    {
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      width: 160,
+      abBreite: 'xxl',
+      filter: traegerFilter,
+      render: (t) => t ?? '—',
+    },
+    {
       title: 'Bemerkung',
       key: 'bemerkung',
       width: 200,
       render: (_, ef) => (
         <BemerkungZelle
           wert={ef.bemerkung}
+          max={FAHRZEUG_BEMERKUNG_MAX}
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
@@ -631,31 +815,18 @@ export default function FahrzeugePage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
-            width: 170,
+            width: aktionenBreite,
             immerSichtbar: true,
-            // Entlassen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht im
-            // Zeilenmenü und fragt nach (LLH-1079, design.md D8, wie die Personalseite).
+            // Nur der Menüauslöser (Entscheidung 14.10.2026): Entlassen, Angaben, Stamm und
+            // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
-              <Space size="middle">
-                <Button
-                  danger
-                  loading={
-                    entlassenMutation.isPending && entlassenMutation.variables?.efId === ef.id
-                  }
-                  disabled={isZeileBusy(ef.id)}
-                  aria-label={`${ef.funkrufname} entlassen`}
-                  onClick={() => entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname })}
-                >
-                  Entlassen
-                </Button>
-                <MenueAusloeser
-                  eintraege={stornoEintraege}
-                  zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
-                  gesperrt={isZeileBusy(ef.id)}
-                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === ef.id}
-                  onWahl={() => setStornoFuer({ id: ef.id, name: ef.funkrufname })}
-                />
-              </Space>
+              <MenueAusloeser<ZeilenAktion>
+                eintraege={zeilenEintraege(ef, { mitEntlassen: true })}
+                zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
+                gesperrt={isZeileBusy(ef.id)}
+                laeuft={isZeileBusy(ef.id)}
+                onWahl={(aktion) => handleZeilenAktion(aktion, ef)}
+              />
             ),
           },
         ]
@@ -752,18 +923,19 @@ export default function FahrzeugePage() {
             <FmsTableau
               fahrzeuge={efs}
               katalog={stati}
-              einheiten={einheitenQuery.data ?? null}
+              einheiten={einheitenFrei ? (einheitenQuery.data ?? null) : null}
               // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung weiter
-              // da.
+              // da. Ohne Freigabe sagt der Hinweis ebenfalls, warum ungegliedert.
               einheitenHinweis={
-                einheitenQuery.isError && !einheitenQuery.data
+                (freigabenQuery.isSuccess && !einheitenFrei) ||
+                (einheitenQuery.isError && !einheitenQuery.data)
                   ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
                   : undefined
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
               zeilenFehler={(f) => zeilen.grund(f.id)}
-              ladend={efQuery.isLoading || einheitenQuery.isLoading}
+              ladend={efQuery.isLoading || freigabenQuery.isLoading || einheitenQuery.isLoading}
             />
           ) : (
             <Datensicht
@@ -820,7 +992,10 @@ export default function FahrzeugePage() {
                 // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entlassen"
                 // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-                sekundaer: ['typ', 'traeger', 'besatzung'],
+                // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
+                sekundaer: einheitenFrei
+                  ? ['einheit', 'seit', 'besatzung']
+                  : ['typ', 'seit', 'besatzung'],
                 aktion: darfSchreiben
                   ? {
                       etikett: 'Entlassen',
@@ -831,10 +1006,10 @@ export default function FahrzeugePage() {
                   : undefined,
                 weitere: darfSchreiben
                   ? {
-                      eintraege: () => stornoEintraege,
+                      eintraege: (ef) => zeilenEintraege(ef, { mitEntlassen: false }),
                       zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
                       laeuft: (ef) => isZeileBusy(ef.id),
-                      onWahl: (_, ef) => setStornoFuer({ id: ef.id, name: ef.funkrufname }),
+                      onWahl: (aktion, ef) => handleZeilenAktion(aktion as ZeilenAktion, ef),
                     }
                   : undefined,
               }}
@@ -918,11 +1093,8 @@ export default function FahrzeugePage() {
 
           Feldbudget: vier sichtbare Felder, `OPTA` liegt unter „Weitere Angaben" — bei einem
           ad-hoc erfassten Fremdfahrzeug meist unbekannt, während Funkrufname, Typ, Träger und
-          Kennzeichen ablesbar sind.
-
-          `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
-          eingetragener und wieder zugeklappter Wert beim Absenden mitgeht und das Feld für
-          Tastatur und Prüfung existiert. */}
+          Kennzeichen ablesbar sind. Den Feldsatz teilt der Dialog „Angaben ändern“
+          (`AdhocFahrzeugFelder`, dort mit `forceRender`, Grenzen und Klappteil). */}
       <ErfassungsModal<AdhocEingabe>
         offen={adhocOffen}
         titel="Ad-hoc-Fahrzeug disponieren"
@@ -937,41 +1109,25 @@ export default function FahrzeugePage() {
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
         // ankam. Den Grund zeigt die Hülle über `speicherung`.
         onErfassen={(w) => adhocMutation.mutateAsync(w)}
+        onPruefungGescheitert={(felder) => {
+          if (hasFehlerIn(ADHOC_WEITERE, felder)) setAdhocWeitereOffen(true);
+        }}
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form.Item
-          label="Funkrufname"
-          name="funkrufname"
-          rules={[{ required: true, whitespace: true }]}
-        >
-          <Input placeholder="z. B. Florian Nachbarstadt 44/1" />
-        </Form.Item>
-        <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Trägerorganisation" name="traegerorganisation">
-          <Input placeholder="z. B. Feuerwehr Nachbarstadt" />
-        </Form.Item>
-        <Form.Item label="Kennzeichen" name="kennzeichen">
-          <Input />
-        </Form.Item>
-        <Collapse
-          ghost
-          items={[
-            {
-              key: 'weitere',
-              label: 'Weitere Angaben',
-              forceRender: true,
-              children: (
-                <Form.Item label="OPTA" name="opta">
-                  <Input />
-                </Form.Item>
-              ),
-            },
-          ]}
+        <AdhocFahrzeugFelder
+          weitere={ADHOC_WEITERE}
+          weitereOffen={adhocWeitereOffen}
+          onWeitereOffen={setAdhocWeitereOffen}
         />
       </ErfassungsModal>
+
+      {/* Angaben eines Ad-hoc-Fahrzeugs ändern (design.md D7), geöffnet aus dem Zeilenmenü. */}
+      <FahrzeugAngabenDialog
+        einsatzId={einsatzId}
+        fahrzeug={angabenFuer}
+        onSchliessen={() => setAngabenFuer(null)}
+      />
     </EinsatzSeite>
   );
 }

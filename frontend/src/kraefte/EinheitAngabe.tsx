@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Space } from 'antd';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
-import type { EinheitOption } from './einheitAngabeKern';
+import { groupEinheitOptions, type EinheitOption } from './kraeftebaumKern';
 
 /** Auswahlwert für „keine Einheit“; keine Einheit hat eine negative ID. */
 const OHNE = -1;
@@ -12,7 +12,7 @@ export interface EinheitAngabeProps {
   kennung?: string;
   /** Gespeicherte Einheit (Serverstand); `null` = keine. */
   wert: number | null;
-  /** Wählbare Einheiten in Baumfolge mit Pfad (`buildEinheitOptions`). */
+  /** Wählbare Einheiten in Baumfolge mit Pfad und Abschnitt (`buildEinheitOptions`). */
   optionen: readonly EinheitOption[];
   darfSchreiben: boolean;
   /** Zusatz hinter dem Namen, etwa die Marke „Einheitsführer“. */
@@ -32,13 +32,17 @@ export interface EinheitAngabeProps {
 }
 
 /**
- * Einheit als Inline-Angabe (LLH-1060 D4/D14, geteilt mit LLH-1073/1093): wählen, dann
- * „Speichern“; kein Speichern beim Verlassen, denn ein Fehlgriff schriebe sofort einen ETB-Eintrag
- * und nähme still eine Führung. Unverändert sendet nichts (`InlineAngabe`). Die Auswahl zeigt den
- * Pfad („Zug 1 › Staffel A“), der Wert den Namen. Ohne Schreibrecht steht der Name als Text.
+ * Einheit als Inline-Angabe (LLH-1073 D3, geteilt mit LLH-1060/1093): wählen, dann „Speichern“;
+ * kein Speichern beim Verlassen, denn ein Fehlgriff schriebe sofort einen ETB-Eintrag. Unverändert
+ * sendet nichts (`InlineAngabe`). Die Auswahl zeigt den Pfad („Zug 1 › Staffel A“), gruppiert nach
+ * dem Abschnitt der Einheit (`groupEinheitOptions`, „ohne Abschnitt“ zuletzt; ohne jeden
+ * Abschnitt flach); der Wert zeigt den Namen. Ohne Schreibrecht steht der Name als Text.
  *
  * Eine Einheit, die nicht in `optionen` steht (Liste noch alt), zeigt kein erfundenes Etikett.
  */
+/** Wortgrenzen statt `anywhere`; `hyphens` braucht die Sprache am Element oder darüber. */
+const NAME_STIL = { overflowWrap: 'break-word', hyphens: 'auto' } as const;
+
 export default function EinheitAngabe({
   kennung,
   wert,
@@ -49,7 +53,27 @@ export default function EinheitAngabe({
   onSpeichern,
 }: EinheitAngabeProps) {
   const aktuell = wert != null ? optionen.find((o) => o.id === wert) : undefined;
-  const name = aktuell?.name ?? 'nicht geladen';
+  // Kein Umbruch mitten im Wort (Entscheidung 14.10.2026, LLH-1073): der Wertknopf bricht überall
+  // (`overflow-wrap: anywhere` aus `wertKnopfStil`), damit lange Freitexte die Zelle nicht
+  // sprengen. Ein Einheitsname bricht nur an Wortgrenzen oder mit deutscher Silbentrennung und
+  // wird dafür lieber zweizeilig. Nur hier, nicht am geteilten Stil.
+  const name = (
+    <span style={NAME_STIL} lang="de">
+      {aktuell?.name ?? 'nicht geladen'}
+    </span>
+  );
+  const option = (o: EinheitOption) => ({ value: o.id, label: o.pfad });
+  const gruppen = groupEinheitOptions(optionen);
+  const auswahl =
+    gruppen.length > 0
+      ? gruppen.map((g) => ({
+          key: g.schluessel,
+          label: g.titel,
+          title: g.titel,
+          options: g.optionen.map(option),
+        }))
+      : optionen.map(option);
+  const ohne = ohneOption ? [{ value: OHNE, label: ohneOption }] : [];
   return (
     <InlineAngabe<number | null>
       etikett="Einheit"
@@ -76,10 +100,7 @@ export default function EinheitAngabe({
           allowClear
           placeholder="ohne Einheit"
           onChange={(v) => onChange(v == null || v === OHNE ? null : v)}
-          options={[
-            ...(ohneOption ? [{ value: OHNE, label: ohneOption }] : []),
-            ...optionen.map((o) => ({ value: o.id, label: o.pfad })),
-          ]}
+          options={[...ohne, ...auswahl]}
           popupMatchSelectWidth={false}
           style={{ width: '100%', minWidth: 0 }}
         />

@@ -10,6 +10,7 @@ import {
   TreeSelect,
   theme,
 } from 'antd';
+import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -492,7 +493,7 @@ export default function EinheitDetailPage() {
             }}
           >
             <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-              <Input />
+              <Input maxLength={EINHEIT_NAME_MAX} />
             </Form.Item>
             <Form.Item label="Typ" name="typ_id">
               {/* Der Typkatalog ist die einzige Fremdquelle des Formulars. Fällt er aus, wäre

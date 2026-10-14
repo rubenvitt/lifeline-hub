@@ -4,14 +4,33 @@ import { Tag } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { renderMitProviders } from '../test/utils';
-import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
+import { listeVon, optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import EinheitAngabe, { type EinheitAngabeProps } from './EinheitAngabe';
-import type { EinheitOption } from './einheitAngabeKern';
+import type { EinheitOption } from './kraeftebaumKern';
 
 const OPTIONEN: EinheitOption[] = [
-  { id: 1, name: 'Rettungsstaffel', pfad: 'Rettungsstaffel', tiefe: 0 },
-  { id: 2, name: 'Zug 1', pfad: 'Zug 1', tiefe: 0 },
-  { id: 3, name: 'Staffel A', pfad: 'Zug 1 › Staffel A', tiefe: 1 },
+  { id: 1, name: 'Rettungsstaffel', pfad: 'Rettungsstaffel', tiefe: 0, abschnitt: null },
+  { id: 2, name: 'Zug 1', pfad: 'Zug 1', tiefe: 0, abschnitt: null },
+  { id: 3, name: 'Staffel A', pfad: 'Zug 1 › Staffel A', tiefe: 1, abschnitt: null },
+];
+
+const MIT_ABSCHNITT: EinheitOption[] = [
+  {
+    id: 1,
+    name: 'Rettungsstaffel',
+    pfad: 'Rettungsstaffel',
+    tiefe: 0,
+    abschnitt: { id: 1, name: 'EA Nord' },
+  },
+  { id: 2, name: 'Zug 1', pfad: 'Zug 1', tiefe: 0, abschnitt: { id: 2, name: 'EA Süd' } },
+  {
+    id: 3,
+    name: 'Staffel A',
+    pfad: 'Zug 1 › Staffel A',
+    tiefe: 1,
+    abschnitt: { id: 2, name: 'EA Süd' },
+  },
+  { id: 4, name: 'Fremd', pfad: 'Fremd', tiefe: 0, abschnitt: null },
 ];
 
 function angabe(p: Partial<EinheitAngabeProps> = {}) {
@@ -31,7 +50,23 @@ function angabe(p: Partial<EinheitAngabeProps> = {}) {
 
 const FELD = 'Einheit zu Anna';
 
-describe('EinheitAngabe (LLH-1060, LLH-1093)', () => {
+describe('EinheitAngabe (LLH-1060, LLH-1073 D3, LLH-1093)', () => {
+  it('der Name bricht nur an Wortgrenzen, nicht mitten im Wort wie der Wertknopf', () => {
+    angabe({ wert: 1 });
+    const knopf = screen.getByRole('button', { name: 'Einheit zu Anna bearbeiten' });
+    // Der geteilte Wertknopf bricht überall; der Name setzt das für sich zurück.
+    expect(knopf.style.overflowWrap).toBe('anywhere');
+    const name = screen.getByText('Rettungsstaffel');
+    expect(name.style.overflowWrap).toBe('break-word');
+    expect(name.style.hyphens).toBe('auto');
+    expect(name).toHaveAttribute('lang', 'de');
+  });
+
+  it('ohne Schreibrecht trägt der Name dieselbe Umbruchregel', () => {
+    angabe({ wert: 1, darfSchreiben: false });
+    expect(screen.getByText('Rettungsstaffel').style.overflowWrap).toBe('break-word');
+  });
+
   it('leer: Aufforderung mit Zeilenkennung; die Auswahl zeigt die Einheiten mit Pfad', async () => {
     angabe();
     await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna eintragen' }));
@@ -104,6 +139,27 @@ describe('EinheitAngabe (LLH-1060, LLH-1093)', () => {
   it('ohne Schreibrecht und ohne Einheit: „—“', () => {
     angabe({ darfSchreiben: false });
     expect(screen.getByText('—')).toBeVisible();
+  });
+
+  it('gruppiert die Auswahl nach dem Abschnitt der Einheit, „ohne Abschnitt“ zuletzt', async () => {
+    const onSpeichern = angabe({ optionen: MIT_ABSCHNITT });
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna eintragen' }));
+    await oeffne(FELD);
+    const liste = listeVon(FELD)!;
+    expect([...liste.querySelectorAll('.ant-select-item-group')].map((g) => g.textContent)).toEqual(
+      ['EA Nord', 'EA Süd', 'ohne Abschnitt'],
+    );
+    expect(optionenVon(FELD)).toEqual(['Rettungsstaffel', 'Zug 1', 'Zug 1 › Staffel A', 'Fremd']);
+    await waehle(FELD, 'Fremd');
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna speichern' }));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(4, null));
+  });
+
+  it('ohne jeden Abschnitt bleibt die Auswahl flach', async () => {
+    angabe();
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna eintragen' }));
+    await oeffne(FELD);
+    expect(listeVon(FELD)!.querySelectorAll('.ant-select-item-group')).toHaveLength(0);
   });
 
   // LLH-1093, design.md D3: „keine Einheit“ als eigene Wahl, weil das Leeren-Kreuz am Touchschirm
