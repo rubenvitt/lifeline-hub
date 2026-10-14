@@ -398,31 +398,41 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
 }
 
-/// Aktualisiert Status und/oder Bemerkung auf einer offenen Verbindung. `status_id` per COALESCE
-/// (`None` = unverändert). `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
-/// „Seit“ den letzten Klick. `bemerkung` ist Tri-State (`None` = unverändert, `Some(None)` =
-/// NULL, `Some(Some(x))` = setzen); getrimmt wird in der Route. `NotFound`, falls die Zeile
-/// nicht zum Einsatz gehört.
+/// Änderung einer Dispositionszeile (Muster `personal::DispositionPatch`, LLH-1067): jedes Feld
+/// `None` = unverändert. `bemerkung` ist Tri-State (`Some(None)` = NULL, `Some(Some(x))` =
+/// setzen); getrimmt wird in der Route.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FahrzeugPatch<'a> {
+    pub status_id: Option<i64>,
+    pub bemerkung: Option<Option<&'a str>>,
+}
+
+/// Aktualisiert eine Dispositionszeile nach [`FahrzeugPatch`] auf einer offenen Verbindung.
+/// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
+/// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
-    status_id: Option<i64>,
-    bemerkung: Option<Option<&str>>,
+    patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
+    // still (Muster LLH-1067).
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
-         SET status_seit = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+         SET status_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
                                 THEN datetime('now') ELSE status_seit END, \
-             status_id = COALESCE(?1, status_id), \
-             bemerkung = CASE WHEN ?2 THEN ?3 ELSE bemerkung END \
-         WHERE id = ?4 AND einsatz_id = ?5",
+             status_id = COALESCE(?, status_id), \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
+         WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(status_id)
-    .bind(bemerkung.is_some())
-    .bind(bemerkung.flatten())
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.bemerkung.is_some())
+    .bind(patch.bemerkung.flatten())
     .bind(ef_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -433,16 +443,15 @@ pub async fn update_tx(
     Ok(())
 }
 
-/// Pool-Wrapper: aktualisiert Status/Bemerkung in eigener Transaktion.
+/// Pool-Hülle um [`update_tx`] ohne eigene Transaktion.
 pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     ef_id: i64,
-    status_id: Option<i64>,
-    bemerkung: Option<Option<&str>>,
+    patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ef_id, status_id, bemerkung).await
+    update_tx(&mut conn, einsatz_id, ef_id, patch).await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
@@ -1117,8 +1126,10 @@ mod tests {
             &pool,
             einsatz,
             ef,
-            Some(neuer_status.id),
-            Some(Some("am Einsatzort")),
+            FahrzeugPatch {
+                status_id: Some(neuer_status.id),
+                bemerkung: Some(Some("am Einsatzort")),
+            },
         )
         .await
         .unwrap();
@@ -1127,9 +1138,17 @@ mod tests {
         assert_eq!(a.bemerkung.as_deref(), Some("am Einsatzort"));
 
         // Nur Bemerkung ändern (status_id None → bleibt).
-        update(&pool, einsatz, ef, None, Some(Some("korrigiert")))
-            .await
-            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            ef,
+            FahrzeugPatch {
+                bemerkung: Some(Some("korrigiert")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         let b = load_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer_status.id), "Status unverändert");
         assert_eq!(b.bemerkung.as_deref(), Some("korrigiert"));
@@ -1150,9 +1169,17 @@ mod tests {
             [ef]
         );
         assert!(matches!(
-            update(&pool, einsatz, ef, Some(neuer_status.id), None)
-                .await
-                .unwrap_err(),
+            update(
+                &pool,
+                einsatz,
+                ef,
+                FahrzeugPatch {
+                    status_id: Some(neuer_status.id),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
         assert!(matches!(

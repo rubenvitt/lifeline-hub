@@ -501,8 +501,10 @@ impl Ablauf<'_> {
                     conn,
                     self.einsatz_id,
                     ef_id,
-                    Some(status_id),
-                    None,
+                    crate::fahrzeug::disposition_repo::FahrzeugPatch {
+                        status_id: Some(status_id),
+                        ..Default::default()
+                    },
                 )
                 .await?;
                 let nachher = crate::fahrzeug::disposition_repo::load_anzeige_tx(

@@ -7,7 +7,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::fahrzeug::besatzung_repo;
-use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
+use crate::fahrzeug::disposition_repo::{self, AdhocDaten, FahrzeugPatch};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use crate::kraefte_disposition;
@@ -267,8 +267,16 @@ pub async fn update(
     let jetzt = crate::zeit::jetzt();
     let (nachher, has_status_changed, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        disposition_repo::update_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
-            .await?;
+        disposition_repo::update_tx(
+            conn,
+            einsatz_id,
+            ef_id,
+            FahrzeugPatch {
+                status_id: body.status_id,
+                bemerkung,
+            },
+        )
+        .await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let has_status_changed = vorher.status_id != nachher.status_id;
         let mut beruehrt = Vec::new();
