@@ -112,9 +112,23 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     Ausnahme {
         datei: "src/personal/mod.rs",
         funktion: "etb_text_angaben",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name einer Kraft beim Ändern ihrer Angaben (Kopf „Person «…»“), bei ad-hoc externen Kräften alt und neu (LLH-1067)",
+    },
+    Ausnahme {
+        datei: "src/personal/mod.rs",
+        funktion: "etb_text_angaben",
+        spalte: "einsatz_personal.snap_funktion",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Qualifikation ad-hoc externer Kräfte beim Ändern, alt und neu (LLH-1067)",
+    },
+    Ausnahme {
+        datei: "src/personal/mod.rs",
+        funktion: "etb_text_angaben",
         spalte: "einsatz_personal.snap_traegerorganisation",
         gruppe: Gruppe::Einsatzkraft,
-        begruendung: "Name, Qualifikation und Träger ad-hoc externer Kräfte beim Ändern, alt und neu (LLH-1067)",
+        begruendung: "Träger ad-hoc externer Kräfte beim Ändern, alt und neu (LLH-1067)",
     },
     Ausnahme {
         datei: "src/personal/mod.rs",
