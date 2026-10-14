@@ -22,7 +22,7 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   disponiereAdhoc,
   entlasseDisposition,
   gibBesatzungFrei,
@@ -343,7 +343,7 @@ export default function FahrzeugePage() {
     { efId: number; statusId: number }
   >({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
     zeilenId: (v) => v.efId,
     ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
     // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
@@ -355,7 +355,7 @@ export default function FahrzeugePage() {
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { efId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),

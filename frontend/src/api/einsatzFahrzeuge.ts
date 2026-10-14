@@ -38,7 +38,7 @@ export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge`, 'POST', { adhoc });
 }
 
-export function aktualisiereDisposition(
+export function updateDisposition(
   einsatzId: number,
   efId: number,
   felder: { status_id?: number; bemerkung?: string },
