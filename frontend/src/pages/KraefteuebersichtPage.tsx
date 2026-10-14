@@ -81,6 +81,7 @@ import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/inst
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
+import { funktionText } from '../kraefte/einsatzfunktionKern';
 
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
@@ -1320,7 +1321,7 @@ export default function KraefteuebersichtPage() {
             eintraege={(entlasseneQuery.data ?? []).map((ep) => ({
               id: ep.id,
               name: ep.name,
-              zusatz: ep.funktion,
+              zusatz: funktionText(ep),
               beendetAt: ep.beendet_at,
             }))}
           />

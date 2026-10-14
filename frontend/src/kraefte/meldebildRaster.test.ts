@@ -410,6 +410,20 @@ describe('Raster als Kräftebaum', () => {
     expect(zug.children![0].staerke).toBeNull();
   });
 
+  // LLH-1067, Spec `personal-einsatzangaben`, „Meldebild“: die Einsatzfunktion vor der Qualifikation.
+  it('nennt an der Personenzeile die Einsatzfunktion, sonst die Qualifikation', () => {
+    const [zug] = baueMeldebildRaster(
+      eingabe({
+        einheiten: [eh(1, null)],
+        personal: [
+          { ...p(1, 1), funktion: 'Notfallsanitäterin', einsatzfunktion: 'Gruppenführerin' },
+          { ...p(2, 1), funktion: 'Notfallsanitäterin' },
+        ],
+      }),
+    );
+    expect(zug.children!.map((z) => z.zusatz)).toEqual(['Gruppenführerin', 'Notfallsanitäterin']);
+  });
+
   it('Person auf fremdem Fahrzeug: einmal bei ihrer Einheit mit „fährt auf“', () => {
     const e = eingabe({
       einheiten: [eh(1, null, null, { name: 'Gr 1' }), eh(2, null, null, { name: 'Gr 2' })],

@@ -85,6 +85,21 @@ describe('BesetzungModal', () => {
     expect(deletes).toBe(0);
   });
 
+  it('nennt in der Personenauswahl die Einsatzfunktion vor der Qualifikation (LLH-1067)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json([{ ...personal[1], einsatzfunktion: 'Sprechfunker' }]),
+      ),
+    );
+    const onSchliessen = rendere(undefined);
+    await screen.findByRole('button', { name: 'Übernehmen' });
+    await waehle('Besetzung', 'disponierte Person');
+    await waehle('Person', 'Müller · Sprechfunker');
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(puts).toEqual([{ besetzung_art: 'personal', personal_id: 7 }]);
+  });
+
   it('belegte Zeile, „nicht vergeben" → genau ein DELETE', async () => {
     const zeile: Stabsfunktion = {
       sachgebiet: 's2',
