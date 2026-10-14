@@ -430,6 +430,18 @@ export default function EinsatzkraftPage() {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
         <Paneel titel="Einteilung" koerperPolster>
+          {/* Der Statuskatalog trägt die Auswahl des Status. Fällt er aus, wäre der Wechsel
+              lautlos unmöglich (leeres Menü); Meldung wie in der Personalliste. Wer nur liest,
+              sieht den Status aus den Zeilendaten und verliert nichts. */}
+          {darfSchreiben && !isEntlassen && statusQuery.isError && (
+            <div style={{ marginBottom: token.margin }}>
+              <SeitenFehler
+                text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
+                ursache={statusQuery.error}
+                onWiederholen={() => void statusQuery.refetch()}
+              />
+            </div>
+          )}
           <Datenraster spalten={2} beschriftung="Einteilung">
             <Datenfeld label="Status">
               {isEntlassen ? (

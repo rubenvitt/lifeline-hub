@@ -65,6 +65,8 @@ interface Aufbau {
   freigaben?: ReturnType<typeof freigabenFixture>;
   benutzer?: ReturnType<typeof adminFixture>;
   perioden?: unknown[];
+  /** Der Statuskatalog scheitert (500); `abgerufen` hält fest, dass er gefragt wurde. */
+  statusFehler?: { abgerufen: boolean };
 }
 
 let requests: string[];
@@ -109,12 +111,16 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
     http.get('/api/einsaetze/7/uhs', () =>
       HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]),
     ),
-    http.get('/api/personal-status', () =>
-      HttpResponse.json([
+    http.get('/api/personal-status', () => {
+      if (a.statusFehler) {
+        a.statusFehler.abgerufen = true;
+        return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+      }
+      return HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
         { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
-      ]),
-    ),
+      ]);
+    }),
     http.get('/api/qualifikationen', () => HttpResponse.json([])),
     http.put('/api/einsaetze/7/einheiten/:eid/personal/:ep', async (info) => {
       await rememberRequest(info);
@@ -260,6 +266,30 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
     expect(within(einteilung).queryByText('Fahrzeug')).toBeNull();
     expect(requests).not.toContain('GET /api/einsaetze/7/fahrzeuge');
     expect(within(einteilung).getByText('Unfallhilfsstelle')).toBeVisible();
+  });
+
+  it('meldet einen gescheiterten Statuskatalog im Paneel „Einteilung“ mit Wiederholen', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', { statusFehler: { abgerufen: false } });
+    const einteilung = await screen.findByRole('region', { name: 'Einteilung' });
+    expect(
+      await within(einteilung).findByText(
+        'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
+      ),
+    ).toBeVisible();
+    expect(within(einteilung).getByRole('button', { name: 'Erneut abrufen' })).toBeVisible();
+  });
+
+  it('ohne Schreibrecht meldet ein gescheiterter Statuskatalog nichts (der Status steht als Text)', async () => {
+    const statusFehler = { abgerufen: false };
+    renderAnsicht('/einsaetze/7/personal/10', {
+      einsatz: { status: 'abgeschlossen' },
+      statusFehler,
+    });
+    const einteilung = await screen.findByRole('region', { name: 'Einteilung' });
+    await within(einteilung).findByText('Rettungsstaffel');
+    // Vorbedingung: der Abruf ist wirklich gescheitert, sonst prüfte der Test nichts.
+    await waitFor(() => expect(statusFehler.abgerufen).toBe(true));
+    expect(within(einteilung).queryByText(/Statuskatalog konnte nicht geladen werden/)).toBeNull();
   });
 
   it('springt ins Meldebild und in die Einheit', async () => {
