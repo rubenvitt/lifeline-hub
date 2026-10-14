@@ -8,6 +8,7 @@ import { Segmentleiste } from '../components/instrument';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { ART_OPTIONEN } from '../kraefte/materialPosten';
 
 interface FormWerte {
   bezeichnung: string;
@@ -18,12 +19,6 @@ interface FormWerte {
   standort?: string;
   bemerkung?: string;
 }
-
-/** Wortlaut der Art (LLH-1224 D1): ein Gerät steht je Stück im Einsatz, ein Verbrauchsgut mit Menge. */
-const ART_OPTIONEN: { wert: MaterialArt; label: string }[] = [
-  { wert: 'geraet', label: 'Gerät' },
-  { wert: 'verbrauchsgut', label: 'Verbrauchsgut' },
-];
 
 /** Vorgabe der Art: ein einzeln verfolgtes Gerät (D1). */
 const ART_VORGABE: MaterialArt = 'geraet';
@@ -135,11 +130,7 @@ export default function MaterialFormModal({
       </Form.Item>
       {/* Die Art entscheidet, wie der Posten im Einsatz steht (LLH-1224 D1/D16): sie gilt für neue
           Dispositionen, nie rückwirkend. Ohne das Feld ließe sich kein Verbrauchsgut anlegen. */}
-      <Form.Item
-        label="Art"
-        name="art"
-        extra="Gerät: je Stück im Einsatz · Verbrauchsgut: mit Menge und Ausgabe"
-      >
+      <Form.Item label="Art" name="art">
         <ArtFeld />
       </Form.Item>
       <Form.Item label="Kategorie" name="kategorie">

@@ -67,8 +67,7 @@ export default function MaterialAufteilenModal({
       {posten != null && posten.ausgegeben > 0 && (
         <Typography.Paragraph type="secondary">
           {/* Aufteilen gibt es nur für Verbrauchsgut; ein Gerät sperrt das Zeilenmenü. */}
-          {mengeText({ art: 'verbrauchsgut', menge, ausgegeben: posten.ausgegeben })}; abgeteilt
-          wird aus dem Rest.
+          {mengeText({ art: 'verbrauchsgut', menge, ausgegeben: posten.ausgegeben })}
         </Typography.Paragraph>
       )}
       <Form.Item
