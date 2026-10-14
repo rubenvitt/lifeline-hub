@@ -14,9 +14,8 @@
    sollte mitentscheiden, ob überhaupt gescrollt wird. Was zählt: die Wirkung ist gemessen,
    und `scroll-padding` verkleinert den Scrollport nachweislich so, dass der Browser scrollt
    und den Abzug einrechnet.
-   `pages/EinheitDetailPage.css` löst dieselbe Frage seit LFH-446 mit `scroll-margin` und
-   bleibt bewusst unberührt: dort ist sie NICHT nachgemessen worden, weder von LFH-446 noch
-   von hier. Das ist keine Aussage über ihre Wirksamkeit — wer sie anfasst, misst zuerst.
+   Die Einheit-Ansicht löste dieselbe Frage seit LFH-446 mit `scroll-margin`; seit LLH-1036
+   ändert sie jede Angabe an ihrer Zeile und hat keine sticky Leiste mehr.
 
    Die Variable folgt per ResizeObserver der tatsächlichen Leistenhöhe
    (`components/fokusabstandUnten.ts`, seit LFH-373 gemeinsam mit dem ETB) — die Dichte-Staffel (30/48/72 px)

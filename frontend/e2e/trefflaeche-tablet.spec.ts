@@ -67,8 +67,8 @@ async function anmelden(page: Page) {
 
 /**
  * Eine Einheit trägt die Bestätigungsblase: Personal, Fahrzeug und Material entlassen seit
- * LLH-1079 ohne Rückfrage (Rückgängig-Toast); „Auflösen" auf der Einheit-Detailseite fragt per
- * `Popconfirm` nach. Seeding per `page.request`: die Session ist Cookie-basiert und der Jar wird
+ * LLH-1079 ohne Rückfrage (Rückgängig-Toast); „Einheit auflösen" im letzten Paneel der
+ * Einheit-Ansicht (LLH-1036) fragt per `Popconfirm` nach. Seeding per `page.request`: die Session ist Cookie-basiert und der Jar wird
  * geteilt. Liefert den Pfad der Detailseite.
  */
 async function seedeEinheit(page: Page, einsatzId: string): Promise<string> {
@@ -197,9 +197,13 @@ for (const { dichte, soll } of STAFFEL) {
     // Inhaltsanker: die geseedete Einheit steht im Seitentitel.
     await expect(page.getByRole('heading', { name: EINHEIT, exact: true })).toBeVisible();
 
-    const ausloeser = page.getByRole('button', { name: 'Auflösen', exact: true });
+    // Der Auslöser steht im Paneel „Einheit auflösen“; gescopt, weil die Blase einen gleichnamigen
+    // Bestätigungsknopf trägt.
+    const ausloeser = page
+      .getByRole('region', { name: 'Einheit auflösen' })
+      .getByRole('button', { name: 'Einheit auflösen', exact: true });
     // Der Auslöser hängt an `controlHeight`, die Blasenknöpfe an `controlHeightSM` — zwei Token.
-    await haeltTreffflaeche(ausloeser, soll, 'Auslöser „Auflösen"');
+    await haeltTreffflaeche(ausloeser, soll, 'Auslöser „Einheit auflösen"');
     await ausloeser.click();
 
     /**
@@ -236,6 +240,75 @@ for (const { dichte, soll } of STAFFEL) {
     // nebenbei die Bedienbarkeit.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
+  });
+}
+
+/**
+ * Die Einteilung in der Personalliste (LLH-1060): Einheit, Fahrzeug und Position sind
+ * Inline-Angaben in der Tabellenzeile. Gemessen am Führungs-Tablet quer (1024, Tabellenzweig) der
+ * Auslöser der Einheitsangabe und, geöffnet, Auswahlfeld, „Speichern“ und „Abbrechen“: alle
+ * halten die Stufe. Der Auslöser der leeren Angabe ist ein Linkknopf mit Text — wüchse er nicht
+ * mit, träfe man ihn im Handschuh nicht.
+ */
+const KRAFT = 'Tablet, Tanja';
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet, Stufe ${dichte}: die Einheitsangabe der Personalliste hält ${soll} px`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Personal ${dichte} ${Date.now()}`);
+    await seedeEinheit(page, einsatzId);
+    const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+      data: { adhoc: { name: KRAFT } },
+    });
+    expect(kraft.ok(), `Seeding Personal: ${await kraft.text()}`).toBeTruthy();
+
+    await page.setViewportSize(TABLET);
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    if (dichte === 'handschuh') {
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+    // Wache: der Tabellenzweig steht, nicht die Karte.
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT });
+    await expect(zeile).toHaveCount(1);
+
+    const messwerte: string[] = [];
+    for (const angabe of ['Einheit', 'Fahrzeug', 'Position']) {
+      const breite = await haeltTreffflaeche(
+        zeile.getByRole('button', { name: `${angabe} zu ${KRAFT} eintragen` }),
+        soll,
+        `Auslöser „${angabe} eintragen“`,
+      );
+      messwerte.push(`${angabe} ${breite.toFixed(0)}px breit`);
+    }
+
+    await zeile.getByRole('button', { name: `Einheit zu ${KRAFT} eintragen` }).click();
+    const feld = zeile.getByRole('combobox', { name: `Einheit zu ${KRAFT}` });
+    await expect(feld).toBeFocused();
+    // Gemessen wird der sichtbare Rahmen des Auswahlfelds, nicht das innere `input`. Der
+    // `has`-Locator gilt relativ zum Rahmen, deshalb ohne den Zeilen-Präfix.
+    await haeltTreffflaeche(
+      zeile
+        .locator('.ant-select')
+        .filter({ has: page.getByRole('combobox', { name: `Einheit zu ${KRAFT}` }) }),
+      soll,
+      'Auswahlfeld „Einheit“',
+    );
+    for (const knopf of [
+      `Einheit zu ${KRAFT} speichern`,
+      `Bearbeitung von Einheit zu ${KRAFT} abbrechen`,
+    ]) {
+      await haeltTreffflaeche(zeile.getByRole('button', { name: knopf }), soll, `Knopf „${knopf}“`);
+    }
+    test
+      .info()
+      .annotations.push({ type: 'messwert', description: `${dichte}: ${messwerte.join(', ')}` });
   });
 }
 
@@ -359,9 +432,9 @@ for (const { dichte, soll } of STAFFEL) {
  * LFH-435 · Zweig „Beobachter" (weder Verwaltungs- noch Schreibrecht) auf derselben
  * Einheit-Detailseite wie (c).
  *
- * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfällt die Aktionsleiste mit
- * „Speichern" und „Auflösen" samt Bestätigungsblase (`EinheitDetailPage.tsx`,
- * `darfSchreiben`). Diese Ziele sind VERSTECKT, also als abwesend zugesichert statt still aus
+ * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfallen die Zeilenauslöser der Angaben
+ * und das Paneel „Einheit auflösen“ samt Bestätigungsblase (LLH-1036, `EinheitDetailPage.tsx`,
+ * `buildEinheitRechte`). Diese Ziele sind VERSTECKT, also als abwesend zugesichert statt still aus
  * der Messmenge gefallen. Was dem Beobachter bleibt, sind Modulzeilen und Kategorie-Ziele —
  * sie werden in der Stufe gemessen, damit die Messmenge nie leer ist.
  *
@@ -396,12 +469,16 @@ for (const { dichte, soll } of STAFFEL) {
     //    auch im Ladezustand wahr.
     await expect(page.getByRole('heading', { name: EINHEIT, exact: true })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Auflösen', exact: true }),
-      'Vorbedingung: ohne Schreibrecht kein Auslöser „Auflösen" — sonst misst der Test den Admin-Zweig',
+      page.getByRole('button', { name: 'Einheit auflösen', exact: true }),
+      'Vorbedingung: ohne Schreibrecht kein Auslöser „Einheit auflösen" — sonst misst der Test den Admin-Zweig',
     ).toHaveCount(0);
     await expect(
-      page.getByRole('button', { name: 'Speichern', exact: true }),
-      'Vorbedingung: ohne Schreibrecht keine Aktionsleiste',
+      page.getByRole('region', { name: 'Einheit auflösen' }),
+      'Vorbedingung: ohne Schreibrecht kein Paneel „Einheit auflösen"',
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('main').getByRole('button', { name: /(bearbeiten|eintragen)$/ }),
+      'Vorbedingung: ohne Schreibrecht kein Zeilenauslöser',
     ).toHaveCount(0);
     await expect(page.locator('.ant-popconfirm'), 'keine Bestätigungsblase im Baum').toHaveCount(0);
 

@@ -59,8 +59,8 @@ Abschnitt sowie für den Organisations-Vorgabewert. Werte aus Lage-Snapshots und
 Offline-Speicher des Geräts MUST auf demselben Weg dargestellt werden. Die alten
 Organisationskennungen `fuehrung`, `gefahrenabwehr` und `zivil` MUST als „Führung und Leitung“,
 „Sonstige Gefahrenabwehr“ und „Zivile Einheiten“ erscheinen. Die Auswahl der Organisation und
-der Fachaufgabe im Inspector und in der Verwaltung MUST weiter dieselben Werte speichern wie
-bisher.
+der Fachaufgabe im Inspector, in der Verwaltung und in der Ansicht einer Einheit MUST dieselben
+Werte speichern wie bisher; alle drei Orte MUST ihre Auswahl aus einer gemeinsamen Liste nehmen.
 
 #### Scenario: Bestandseinheit mit altem Wert
 - **WHEN** eine Einheit mit `tz_organisation = 'zivil'` aus einem bestehenden Einsatz geladen wird
@@ -69,6 +69,11 @@ bisher.
 #### Scenario: Rückblick auf einen Lage-Snapshot
 - **WHEN** eine Person einen Lage-Snapshot öffnet, der vor der Umstellung eingefroren wurde
 - **THEN** tragen die Fachobjekte darin ihr Zeichen nach der neuen Darstellung
+
+#### Scenario: Zeichen in der Einheit-Ansicht gesetzt
+- **WHEN** in der Ansicht einer Einheit die Fachaufgabe „Betreuung“ gespeichert wird
+- **THEN** ist `tz_fachaufgabe = 'betreuung'` gespeichert, und der Inspector der Lagekarte zeigt
+  für diese Einheit dieselbe Fachaufgabe gewählt
 
 ### Requirement: Definierter Rückfall statt Ausfall
 Lässt sich ein Zeichen mit allen Merkmalen nicht darstellen, SHALL das System es mit weniger

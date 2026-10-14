@@ -1,10 +1,22 @@
-import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Modal, Space, Tag } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Modal,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, { spaltenFuer, useSpalteAusgeblendet } from '../components/Datensicht';
 import {
   nichtGefundenInhalt,
   SeitenFehler,
@@ -13,25 +25,40 @@ import {
 } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeMaterial } from '../api/material';
 import {
-  aktualisiereDisposition,
+  updateDisposition,
   disponiereAdhoc,
   disponiereMaterial,
-  listeEinsatzMaterial,
+  gibMaterialFrei,
+  listEinsatzMaterial,
   listEntlassenesMaterial,
   nimmAusDemEinsatz,
+  ordneMaterialZu,
   reaktiviereDisposition,
   storniereDisposition,
+  teileAuf,
   type MaterialAdhocEingabe,
+  type MaterialPatch,
 } from '../api/einsatzMaterial';
+import { MATERIAL_ADHOC_TEXT_MAX, MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
-import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
+import MaterialOrt, {
+  ortFilter,
+  ortText,
+  ortVon,
+  useMaterialOrtKontext,
+} from '../kraefte/MaterialOrt';
+import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
+import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
+import { InlineAngabe } from '../components/InlineAngabe';
+import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
@@ -62,59 +89,45 @@ const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((
 function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
   return materialStatus[em.status];
 }
+/**
+ * Bezeichnung mit Marken. Ist die Spalte „Kategorie“ ausgeblendet (unter `xxl` per Breite, oder von
+ * Hand), steht die Kategorie gedämpft als zweite Zeile unter der Bezeichnung, damit sie auch am
+ * Fükw zu lesen ist (LLH-1093); die Marken teilen diese Zeile, statt eine dritte zu öffnen. Im
+ * Kartenzweig nicht: dort trägt nur die Suche sie (design.md D13).
+ */
+function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
+  const kategorieAusgeblendet = useSpalteAusgeblendet('kategorie');
+  const marken = [
+    em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
+    em.ist_demo && <DemoMarke key="demo" />,
+  ];
+  if (kategorieAusgeblendet && em.kategorie) {
+    return (
+      <>
+        <div>{em.bezeichnung}</div>
+        <Space wrap>
+          <Typography.Text type="secondary" style={{ overflowWrap: 'anywhere' }}>
+            {em.kategorie}
+          </Typography.Text>
+          {marken}
+        </Space>
+      </>
+    );
+  }
+  // `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern.
+  return (
+    <Space wrap>
+      {em.bezeichnung}
+      {marken}
+    </Space>
+  );
+}
+
 /** Filterwerte auf der eigenen Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
 const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
   value: s,
   text: materialStatus[s].label,
 }));
-
-/**
- * Inline-Mengen-Editor: lokaler Zustand, committet erst bei Blur/Enter (min 1). Der Riegel hält
- * bis zum neuen Serverstand; eine Ablehnung löst ihn (LFH-1077): sonst bliebe das Feld nach dem
- * ersten Fehler stumm, weil `em.menge` sich nie ändert. Der getippte Wert bleibt stehen, den
- * Grund zeigt die Zeile.
- */
-function MengeZelle({
-  em,
-  onChange,
-}: {
-  em: EinsatzMaterial;
-  onChange: (menge: number) => Promise<unknown>;
-}) {
-  const [wert, setWert] = useState<number>(em.menge);
-  const pendingRef = useRef(false);
-  // Abgelehnte Menge: das Verlassen schickt sie nicht noch einmal (sonst ginge sie bei jedem Klick
-  // in eine andere Zelle erneut hinaus), Enter als ausdrücklicher Wiederholungsweg schon.
-  const abgelehntRef = useRef<number | null>(null);
-  useEffect(() => {
-    setWert(em.menge);
-    pendingRef.current = false;
-    abgelehntRef.current = null;
-  }, [em.menge]);
-  const commit = (perEnter: boolean) => {
-    if (pendingRef.current || wert < 1 || wert === em.menge) return;
-    if (!perEnter && wert === abgelehntRef.current) return;
-    const gesendet = wert;
-    pendingRef.current = true;
-    onChange(gesendet).catch(() => {
-      pendingRef.current = false;
-      abgelehntRef.current = gesendet;
-    });
-  };
-  return (
-    // Die Höhe kommt aus `controlHeight` und zieht mit der Dichtestufe mit. Die Breite bleibt fest:
-    // sie trägt eine zweistellige Menge, keine Trefffläche. Der Name nennt die Position, sonst
-    // hörte man in jeder Zeile nur „Menge“.
-    <MengenFeld
-      beschriftung={`Menge ${em.bezeichnung}`}
-      style={{ width: 80 }}
-      value={wert}
-      onChange={(v) => setWert(v ?? 1)}
-      onBlur={() => commit(false)}
-      onPressEnter={() => commit(true)}
-    />
-  );
-}
 
 /** Werte des Disponier-Dialogs für Stamm-Material. */
 interface StammDisposition {
@@ -134,6 +147,12 @@ export default function MaterialPage() {
   /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
+  /** Offene Dialoge „Angaben ändern“ und „Aufteilen“ (LLH-1093), je mit der Disposition. */
+  // Der Posten beim Öffnen, nicht nur seine ID: entfällt die Zeile live (anderer Platz storniert,
+  // nimmt heraus), bleibt der Dialog offen und die Ablehnung steht an ihm (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“). Solange die Zeile da ist, gilt ihr aktueller Stand.
+  const [angabenFuer, setAngabenFuer] = useState<EinsatzMaterial | null>(null);
+  const [aufteilenFuer, setAufteilenFuer] = useState<EinsatzMaterial | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -141,7 +160,7 @@ export default function MaterialPage() {
   });
   const emQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
   });
   // Aus dem Einsatz genommenes Material (LLH-1079 Teil II): getrennt geliefert, die Liste kennt es
   // nicht. Auf dem Draht heißt der Endzustand `entlassen`.
@@ -154,14 +173,24 @@ export default function MaterialPage() {
     queryFn: () => listeMaterial(true),
   });
 
+  /**
+   * Liefert die Zusage des Listenabgleichs: eine `InlineAngabe` schließt erst, wenn der neue Wert im
+   * Cache steht (`onSuccess` gibt sie an `mutateAsync` weiter).
+   */
   function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    return qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
   }
   // Ablehnungen an der Zeile, je Disposition gemerkt; alle Zeilenaktionen teilen den Speicher, die
   // zuletzt begonnene zählt (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Die Dialoge
   // zeigen ihren Fehler über `speicherung` selbst.
   const zeilen = useZeilenFehler<number>();
+  // Einheiten und UHS für die Spalte „Ort“; ohne Schreibrecht nur zum Lesen der Namen. Das
+  // Schreibrecht hängt am Einsatz, der hier noch laden kann: bis dahin bedient kein Teil.
+  const { kontext: ortKontext } = useMaterialOrtKontext(
+    einsatzId,
+    einsatzQuery.data != null && darfImEinsatzSchreiben(einsatzQuery.data),
+  );
 
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number }) =>
@@ -191,19 +220,63 @@ export default function MaterialPage() {
       message.success('Ad-hoc-Material disponiert');
     },
   });
+  // Menge und Ort stehen in einer `InlineAngabe`: deren Eingabe bleibt bei einer Ablehnung offen und
+  // zeigt den Grund selbst (an der Zeile). Ein zweiter Eintrag in `zeilen` stünde doppelt.
   const mengeMutation = useMutation({
     mutationFn: (v: { emId: number; menge: number }) =>
-      aktualisiereDisposition(einsatzId, v.emId, { menge: v.menge }),
-    onMutate: (v) => zeilen.beginne(v.emId),
+      updateDisposition(einsatzId, v.emId, { menge: v.menge }),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.emId, e, 'Menge nicht gespeichert'),
+  });
+  /*
+   * Ort auf der Doppelregel (LLH-1093, design.md D1): die Einheit über den Zuordnungsweg der
+   * Einheiten (Umhängen in einer Anfrage, „keine Einheit“ gibt die alte frei), die UHS über den
+   * Material-PATCH. Die Einheitenliste zählt ihr Material mit.
+   */
+  const einheitMutation = useMutation({
+    mutationFn: (v: { emId: number; neu: number | null; alt: number | null }) =>
+      v.neu != null
+        ? ordneMaterialZu(einsatzId, v.neu, v.emId)
+        : v.alt != null
+          ? gibMaterialFrei(einsatzId, v.alt, v.emId)
+          : Promise.resolve(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      return invalidate();
+    },
+  });
+  const uhsMutation = useMutation({
+    mutationFn: (v: { emId: number; uhsId: number | null }) =>
+      updateDisposition(einsatzId, v.emId, { uhs_id: v.uhsId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+      return invalidate();
+    },
+  });
+  // Die Dialoge zeigen ihre Ablehnung über `speicherung` selbst.
+  const angabenMutation = useMutation({
+    mutationFn: (v: { emId: number; patch: MaterialPatch }) =>
+      updateDisposition(einsatzId, v.emId, v.patch),
+    onSuccess: (_, v) => {
+      message.success('Angaben gespeichert');
+      if (v.patch.bezeichnung !== undefined) {
+        void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      }
+      return invalidate();
+    },
+  });
+  const aufteilenMutation = useMutation({
+    mutationFn: (v: { emId: number; menge: number }) => teileAuf(einsatzId, v.emId, v.menge),
+    onSuccess: () => {
+      message.success('Aufgeteilt');
+      return invalidate();
+    },
   });
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzMaterial,
     { emId: number; status: MaterialStatus }
   >({
     queryKey: einsatzKeys.material(einsatzId),
-    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.emId, { status: v.status }),
+    mutationFn: (v) => updateDisposition(einsatzId, v.emId, { status: v.status }),
     zeilenId: (v) => v.emId,
     anwenden: (em, v) => ({ ...em, status: v.status }),
     nochOptimistisch: (em, v) => em.status === v.status,
@@ -214,7 +287,7 @@ export default function MaterialPage() {
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { emId: number; bemerkung: string }) =>
-      aktualisiereDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
+      updateDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.emId, e, 'Bemerkung nicht gespeichert'),
@@ -227,7 +300,7 @@ export default function MaterialPage() {
   const reaktivierenMutation = useMutation({
     mutationFn: (emId: number) => reaktiviereDisposition(einsatzId, emId),
     onMutate: (emId) => zeilen.beginne(emId),
-    onSuccess: invalidate,
+    onSuccess: () => void invalidate(),
     onError: (e, emId) => zeilen.melde(emId, e, 'Nicht erneut disponiert'),
   });
   const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
@@ -285,11 +358,44 @@ export default function MaterialPage() {
 
   const ems = emQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
-  /** Läuft für diese Zeile Herausnehmen oder Stornieren? Dann keine zweite Handlung. */
+  /** Läuft für diese Zeile Herausnehmen, Aufteilen oder Stornieren? Dann keine zweite Handlung. */
   const isZeileBusy = (emId: number) =>
     (herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === emId) ||
+    (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === emId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === emId);
-  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
+  /**
+   * Zeilenmenü (LLH-1093, design.md D11): „Angaben ändern“ und „Aufteilen“, hinter dem Trenner rot
+   * „Stornieren“. Gesperrte Einträge tragen ihren Grund im Etikett — ein Etikett ist nur Text, und
+   * ein Tooltip erscheint am Touchschirm nicht.
+   */
+  const menueEintraege = (em: EinsatzMaterial): MenueEintrag[] => [
+    em.ist_adhoc
+      ? { key: 'angaben', label: 'Angaben ändern' }
+      : { key: 'angaben', label: 'Angaben ändern · im Stamm pflegen', gesperrt: true },
+    em.menge > 1
+      ? { key: 'aufteilen', label: 'Aufteilen' }
+      : { key: 'aufteilen', label: 'Aufteilen · Menge 1', gesperrt: true },
+    // Der Server lehnt das Stornieren eines zugeordneten Postens sicher ab (Spec `material-liste`,
+    // „Zeilenaktionen“); Frist und frühere Herausnahme prüft weiter er.
+    em.einheit_id != null || em.uhs_id != null
+      ? { key: 'stornieren', label: 'Stornieren · zugeordnet', gefahr: true, gesperrt: true }
+      : { key: 'stornieren', label: 'Stornieren', gefahr: true },
+  ];
+  const handleAktion = (key: string, em: EinsatzMaterial) => {
+    if (key === 'angaben') {
+      angabenMutation.reset();
+      setAngabenFuer(em);
+    } else if (key === 'aufteilen') {
+      aufteilenMutation.reset();
+      setAufteilenFuer(em);
+    } else if (key === 'stornieren') setStornoFuer({ id: em.id, name: em.bezeichnung });
+  };
+  const angabenPosten = angabenFuer
+    ? (ems.find((em) => em.id === angabenFuer.id) ?? angabenFuer)
+    : null;
+  const aufteilenPosten = aufteilenFuer
+    ? (ems.find((em) => em.id === aufteilenFuer.id) ?? aufteilenFuer)
+    : null;
 
   /**
    * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig (Herleitung in `FahrzeugePage.tsx`). Ohne
@@ -360,47 +466,98 @@ export default function MaterialPage() {
    * Spaltenregister der Materialseite. `EinsatzMaterialAnzeige` hat kein `status_kategorie`;
    * gruppiert und gefiltert wird auf der eigenen Fünf-Werte-Achse (`MaterialStatus`), dieselbe
    * Grenze wie in `filtereKraefte`.
+   *
+   * ── Gemessen gegen den Fükw (LLH-1093, Prüfliste) ──
+   *
+   * Mit der Spalte „Ort“ wuchs die Tabelle inhaltsgetrieben auf 1326 px; am Fükw (1050 px Inhalt
+   * bei 1366) lag „Aus dem Einsatz nehmen“ außerhalb des Bilds. Jetzt FLIESST der Ort
+   * (`mindestBreite`, LFH-523): seine Teile Einheit und UHS brechen untereinander um. Alle übrigen
+   * tragen eine Zahlbreite; die Aktionsspalte trägt Knopf, Abstand und Menü (226 px Inhalt in
+   * `kompakt`). Die Kategorie weicht unter `xxl` (wie Typ, Kennzeichen und Träger der
+   * Fahrzeugseite), sonst blieben dem Ort bei 1366 nur 125 px und die Namen brächen Silbe für
+   * Silbe. Wer eine Breite ändert, misst neu.
    */
   const spalten = spaltenFuer<EinsatzMaterial>()([
     {
       title: 'Bezeichnung',
       key: 'bezeichnung',
       immerSichtbar: true,
+      width: 170,
       sortWert: (m) => m.bezeichnung,
       suchText: (m) => m.bezeichnung,
-      render: (_, em) => (
-        <Space>
-          {em.bezeichnung}
-          {em.ist_adhoc && <Tag>ad-hoc</Tag>}
-          {em.ist_demo && <DemoMarke />}
-        </Space>
-      ),
+      render: (_, em) => <BezeichnungZelle em={em} />,
     },
     {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
+      width: 100,
+      // Lesend, darf weichen: unter `xxl` als zweite Zeile der Bezeichnung (`BezeichnungZelle`),
+      // über den Spaltenschalter, im Zähler und in der Suche.
+      abBreite: 'xxl',
       filter: kategorieFilter,
       suchText: (m) => m.kategorie,
       render: (t) => t ?? '—',
     },
     {
+      // Ort auf der Doppelregel (LLH-1093, design.md D1–D3, D13): Einheit und UHS, je Teil mit
+      // ausdrücklichem Speichern; Filter „ohne Ort“, je Einheit, je UHS.
+      title: 'Ort',
+      key: 'ort',
+      mindestBreite: 170,
+      filter: ortFilter(ems, ortKontext),
+      sortWert: (m) => ortText(ortVon(m), ortKontext),
+      suchText: (m) => ortText(ortVon(m), ortKontext),
+      render: (_, em) => (
+        <MaterialOrt
+          kennung={em.bezeichnung}
+          ort={ortVon(em)}
+          kontext={ortKontext}
+          darfSchreiben={darfSchreiben}
+          onEinheit={(neu, alt) => einheitMutation.mutateAsync({ emId: em.id, neu, alt })}
+          onUhs={(uhsId) => uhsMutation.mutateAsync({ emId: em.id, uhsId })}
+        />
+      ),
+    },
+    {
+      // Die Menge ist ein Wert, der erst auf „bearbeiten“ zum Feld wird, und speichert nur mit Enter
+      // oder „Speichern“ (LLH-1093, design.md D9): auf dem Tablet änderte ein Wisch sonst die Menge
+      // und schrieb einen ETB-Eintrag.
       title: 'Menge',
       key: 'menge',
+      width: 80,
       sortWert: (m) => m.menge,
-      render: (_, em) =>
-        darfSchreiben ? (
-          <MengeZelle
-            em={em}
-            onChange={(menge) => mengeMutation.mutateAsync({ emId: em.id, menge })}
-          />
-        ) : (
-          em.menge
-        ),
+      render: (_, em) => (
+        <InlineAngabe<number | null>
+          etikett="Menge"
+          kennung={em.bezeichnung}
+          wert={em.menge}
+          // Eine Zahl bricht nicht um: im Kartenfeld (Breite nach Inhalt) stand „50“ sonst als „5“
+          // über „0“, weil der Wertknopf seine Polsterung über den Rand hinausträgt.
+          anzeige={<span style={{ whiteSpace: 'nowrap' }}>{em.menge}</span>}
+          leer={(w) => w == null}
+          pflicht
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(menge) => mengeMutation.mutateAsync({ emId: em.id, menge: menge ?? 1 })}
+          eingabe={({ feld, value, onChange }) => (
+            // Die Breite trägt eine zweistellige Menge, keine Trefffläche; die Höhe zieht mit der
+            // Dichtestufe mit.
+            <MengenFeld
+              id={feld.id}
+              autoFocus={feld.autoFocus}
+              beschriftung={feld['aria-label']}
+              style={{ width: 120 }}
+              value={value}
+              onChange={(v) => onChange(v ?? null)}
+            />
+          )}
+        />
+      ),
     },
     {
       title: 'Status',
       key: 'status',
+      width: 120,
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
       // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
       // gespreizt — Herleitung in `FahrzeugePage.tsx`.
@@ -415,11 +572,13 @@ export default function MaterialPage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
+      width: 160,
       render: (_, em) => (
         <BemerkungZelle
           wert={em.bemerkung}
           kennung={em.bezeichnung}
           darfSchreiben={darfSchreiben}
+          max={MATERIAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
           onSpeichern={(val) => bemerkungMutation.mutateAsync({ emId: em.id, bemerkung: val })}
         />
@@ -430,9 +589,11 @@ export default function MaterialPage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
+            width: 250,
             immerSichtbar: true,
-            // Herausnehmen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht
-            // im Zeilenmenü und fragt nach (LLH-1079, design.md D8, wie die Fahrzeugseite).
+            // Herausnehmen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Angaben ändern,
+            // Aufteilen und Stornieren stehen im Zeilenmenü, Stornieren fragt nach (LLH-1079 D8,
+            // LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (
               <Space size="middle">
                 <Button
@@ -447,11 +608,14 @@ export default function MaterialPage() {
                   Aus dem Einsatz nehmen
                 </Button>
                 <MenueAusloeser
-                  eintraege={stornoEintraege}
+                  eintraege={menueEintraege(em)}
                   zugaenglicherName={`Weitere Aktionen zu ${em.bezeichnung}`}
                   gesperrt={isZeileBusy(em.id)}
-                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === em.id}
-                  onWahl={() => setStornoFuer({ id: em.id, name: em.bezeichnung })}
+                  laeuft={
+                    (stornierenMutation.isPending && stornierenMutation.variables === em.id) ||
+                    (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === em.id)
+                  }
+                  onWahl={(key) => handleAktion(key, em)}
                 />
               </Space>
             ),
@@ -472,7 +636,8 @@ export default function MaterialPage() {
         />
       }
       titel={modulName('material')}
-      meta={emQuery.isSuccess ? `${ems.length} Positionen` : undefined}
+      // Die Gesamtzahl steht einmal, hier; die Verdichtung über der Liste teilt sie auf (D10).
+      meta={emQuery.isSuccess ? `${ems.length} Posten` : undefined}
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={
         (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
@@ -524,7 +689,11 @@ export default function MaterialPage() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void emQuery.refetch()} />}
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+          <MaterialVerdichtung
+            einsatzId={einsatzId}
+            material={emQuery.data}
+            pfad={kraefteuebersichtPfad(einsatzId)}
+          />
           <Datensicht
             bezeichnung="Material im Einsatz"
             spalten={spalten}
@@ -532,7 +701,7 @@ export default function MaterialPage() {
             zeilenSchluessel="id"
             ladend={emQuery.isLoading}
             leerText="Noch kein Material disponiert"
-            suche={{ platzhalter: 'Bezeichnung, Kategorie' }}
+            suche={{ platzhalter: 'Bezeichnung, Kategorie, Ort' }}
             standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
             zeilenFehler={(em) => zeilen.grund(em.id)}
             gruppen={{
@@ -547,8 +716,11 @@ export default function MaterialPage() {
               titel: { spalte: 'bezeichnung' },
               status: (em) => statusDarstellung(em),
               statusBedienung: (em) => (darfSchreiben ? statusBedienungVon(em) : null),
-              // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt.
-              sekundaer: ['kategorie', 'menge'],
+              // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt. Die
+              // Kategorie bleibt in der Suche (LLH-1093, design.md D13).
+              sekundaer: ['ort', 'menge'],
+              // „Aus dem Einsatz nehmen“ ließe dem Inhalt rechts daneben auf 390 px keinen Platz.
+              gestapelt: true,
               aktion: darfSchreiben
                 ? {
                     etikett: 'Aus dem Einsatz nehmen',
@@ -559,10 +731,10 @@ export default function MaterialPage() {
                 : undefined,
               weitere: darfSchreiben
                 ? {
-                    eintraege: () => stornoEintraege,
+                    eintraege: menueEintraege,
                     zugaenglicherName: (em) => `Weitere Aktionen zu ${em.bezeichnung}`,
                     laeuft: (em) => isZeileBusy(em.id),
-                    onWahl: (_, em) => setStornoFuer({ id: em.id, name: em.bezeichnung }),
+                    onWahl: handleAktion,
                   }
                 : undefined,
             }}
@@ -625,6 +797,30 @@ export default function MaterialPage() {
       >
         Das Material erscheint danach in keiner Liste und keinem Nachweis.
       </Modal>
+
+      {/* „Angaben ändern“ und „Aufteilen“ (LLH-1093, design.md D12) auf der Erfassungs-Hülle,
+          außerhalb der Zeilen-`map`; entfällt die Zeile, bleiben sie offen und tragen die
+          Ablehnung. */}
+      <MaterialAngabenModal
+        posten={angabenPosten}
+        laeuft={angabenMutation.isPending}
+        speicherung={angabenMutation}
+        onSpeichern={(patch) => {
+          if (!angabenPosten) return Promise.resolve();
+          return angabenMutation.mutateAsync({ emId: angabenPosten.id, patch });
+        }}
+        onSchliessen={() => setAngabenFuer(null)}
+      />
+      <MaterialAufteilenModal
+        posten={aufteilenPosten}
+        laeuft={aufteilenMutation.isPending}
+        speicherung={aufteilenMutation}
+        onAufteilen={(menge) => {
+          if (!aufteilenPosten) return Promise.resolve();
+          return aufteilenMutation.mutateAsync({ emId: aufteilenPosten.id, menge });
+        }}
+        onSchliessen={() => setAufteilenFuer(null)}
+      />
 
       {/* Stamm-Material disponieren. Serienmodus, weil eine Anlieferung mehrere Positionen bringt.
           Die Pflichtprüfung meldet ein fehlendes Material; der Knopf ist nie grau ohne Grund. */}
@@ -694,16 +890,16 @@ export default function MaterialPage() {
           name="bezeichnung"
           rules={[{ required: true, whitespace: true }]}
         >
-          <Input placeholder="z. B. Spende-Decken" />
+          <Input placeholder="z. B. Spende-Decken" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
         </Form.Item>
         <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
           <MengenFeld beschriftung="Menge" style={{ width: 120 }} />
         </Form.Item>
         <Form.Item label="Kategorie" name="kategorie">
-          <Input />
+          <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
         </Form.Item>
         <Form.Item label="Trägerorganisation" name="traegerorganisation">
-          <Input placeholder="z. B. THW" />
+          <Input placeholder="z. B. THW" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
         </Form.Item>
         <Collapse
           ghost
@@ -714,7 +910,7 @@ export default function MaterialPage() {
               forceRender: true,
               children: (
                 <Form.Item label="Bestandsnummer" name="bestandsnummer" style={{ marginBottom: 0 }}>
-                  <Input />
+                  <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
                 </Form.Item>
               ),
             },

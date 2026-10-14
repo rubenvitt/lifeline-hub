@@ -115,7 +115,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig)
   nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
-  Warnstufe über `verdichteGefahrengebiete`. Stärke einer Menge nur über `summiereStaerke`
+  Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
+  Achtung) über `kraefte/materialVerdichtungKern.ts`. Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
   nur `anzeige/staerke.ts:staerkeText`. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
@@ -491,13 +492,17 @@ anwendbar), „nicht geprüft" ist keins.
   gewähltem Treffer Adresse und Koordinate zusammen; beide stehen im Paneel „Einsatzort“, die
   Kopfleiste zeigt den Einsatzort nur an. Eine Eingabe, die einen ungültigen Entwurf selbst
   anzeigt (Koordinate), sperrt das Senden über `isValid`.
+  Die Einheit-Ansicht hat ebenso nur den Zeilenweg (LLH-1036, Spec `einheit-ansicht`): eine Zeile
+  schickt genau ihr Feld (`patcheEinheit`; die Soll-Stärke ihre drei, das taktische Zeichen ein
+  `tz_*`-Feld über `patchEinheitZeichen`), kein Formular, keine Speichern-Leiste. Der Inhalt
+  hängt an `key={einheitId}`, damit kein Grund und keine offene Zeile zur nächsten Einheit wandert.
 - **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
   auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
   Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz
   `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide ohne Lagekarten-Recht; den Punkt zeigt
   `anzeige/Kartenausschnitt.tsx`. Personenadressen bekommen keine Suche (folgt mit LFH-1248).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
-  Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
+  Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
   kommt erst nach dem Sweep.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
@@ -790,9 +795,15 @@ Quelle der Wahrheit: `frontend/src/routing/deeplinks.ts` — keine Template-Lite
 Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`).
 
 - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` bei Vollseiten-Detail (uhs, br, lagebericht,
-  befehl, person, tier, schaden), sonst **Query-Param** `?<modul>=<id>` (`?einheit=`,
-  `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB
-  `?eintrag=`); `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+  befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
+  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
+  `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+- **Zwei Bestands-Params neben einer Item-Route** (LLH-1060 D2): `?einheit=` an der
+  Einheitenliste leitet auf `einheitDetailPfad` weiter (am Meldebild ist `?einheit=` ein Auftrag,
+  `kraefteuebersichtPfad`, LLH-1049). `?personal=` bleibt **Zeilenmarke** der Personalliste
+  (`personalPfad`): Lagekarte, Schaden und Meldebild springen auf die hervorgehobene Zeile, um
+  die Person im Vergleich zu zeigen; Sprungpalette, Namenslink und Block „Entlassen“ öffnen die
+  Personenansicht (`einsatzkraftPfad`), ihre Brotkrume führt auf die Zeilenmarke zurück.
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
 - **Filter gehören in die URL** (`etbPfad`/`parseEtbFilter`, `mitQuery` kodiert). Unbekannter

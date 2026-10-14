@@ -1,5 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Modal, Space, Tag } from 'antd';
-import { Select } from '../components/Select';
+import { Alert, Breadcrumb, Button, Space, Tag } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,22 +7,19 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
 import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
 import { listeQualifikationen } from '../api/qualifikationen';
 import {
   updateDisposition,
-  entlasseDisposition,
   listeEinsatzPersonal,
   listEntlassenesPersonal,
   reaktiviereDisposition,
-  storniereDisposition,
 } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { kraefteuebersichtPfad, einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { einsatzkraftPfad, kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
-import KraftZeitachse from '../kraefte/KraftZeitachse';
 import { dauerText, kraftDauern, type KraftDauern } from '../kraefte/zeitachse';
 import { listePersonalPerioden } from '../api/kraefteZeitachse';
 import { abrufZustand } from '../api/abrufZustand';
@@ -32,18 +28,13 @@ import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
 import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { EinsatzPersonal, StaerkePosition } from '../api/types';
+import type { EinsatzPersonal } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
-import {
-  KATEGORIE_REIHENFOLGE,
-  KATEGORIE_WERTE,
-  kategorieEtikett,
-  kategorieVon,
-} from '../kraefte/statusAchse';
+import { KATEGORIE_WERTE, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import DemoMarke from '../components/DemoMarke';
@@ -53,27 +44,37 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
-import { KennungsLink } from '../components/kennungsLink';
-import { modulName } from '../einsatz/modulRegistry';
-import { MenueAusloeser } from '../components/MenueAusloeser';
-import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EinsatzfunktionZelle from '../kraefte/EinsatzfunktionZelle';
 import { einsatzfunktionVorschlaege, funktionText } from '../kraefte/einsatzfunktionKern';
-import { useNewGesture } from './einsatzabschnitte/useNewGesture';
+import EinheitAngabe from '../kraefte/EinheitAngabe';
+import FahrzeugAngabe from '../kraefte/FahrzeugAngabe';
+import PositionAngabe from '../kraefte/PositionAngabe';
+import { buildEinheitGruppen } from '../kraefte/einteilungKern';
+import { buildEinheitOptions } from '../kraefte/kraeftebaumKern';
+import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
 
+/**
+ * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
+ * Einheit, Fahrzeug und Position in der Zeile änderbar, der Name führt in die Personenansicht
+ * (`EinsatzkraftPage`). Entlassen, Stornieren und die Zeitachse stehen nur dort (D8).
+ */
 export default function PersonalPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
-  /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
-  const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
-  const isNewGestureStorno = useNewGesture(stornoFuer !== null);
+  const schreiben = useEinteilungSchreiben(einsatzId);
+
+  // Einheit und Fahrzeug hängen am Recht ihres Moduls (D3): ohne Freigabe weder Spalte noch Abruf.
+  const freigaben = useModulFreigaben(einsatzId);
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
+  const fahrzeugeFrei = istKeyFreigegeben('fahrzeuge', freigaben);
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigaben);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -97,15 +98,21 @@ export default function PersonalPage() {
     queryKey: globalKeys.qualifikationen(),
     queryFn: listeQualifikationen,
   });
-  // Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label (Gegenrichtung zur
-  // Fahrzeugseite).
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei,
+  });
+  // Rang der Abschnitte ordnet Geschwister im Kräftebaum (LLH-1025); ohne Freigabe die Eingabefolge.
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: einheitenFrei && abschnitteFrei,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei,
   });
   // Kräfte-Zeitachse (LFH-552): Perioden je Person für „Einsatzdauer" und „Ruhe". Scheitert der
   // Abruf, bleiben die Zellen leer — ein „—" behauptete sonst „keine Ereignisse".
@@ -115,8 +122,8 @@ export default function PersonalPage() {
   });
   const uhr = useUhr(60_000);
 
-  // Cross-Modul-Deeplink ?personal=<id> hebt die Zeile hervor und scrollt sie ins Bild
-  // (best-effort).
+  // `?personal=<id>` bleibt Zeilenmarke (D2): Lagekarte und Schaden springen hierher, um die Person
+  // im Vergleich zu sehen; die Zeile wird hervorgehoben und ins Bild gerollt (best-effort).
   useQueryParamSelektion('personal', epQuery.isSuccess, (pid) => {
     if ((epQuery.data ?? []).some((p) => p.id === pid)) setHighlightId(pid);
   });
@@ -129,9 +136,9 @@ export default function PersonalPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  // Ablehnungen an der Zeile, je Disposition gemerkt; alle Zeilenaktionen teilen den Speicher, die
-  // zuletzt begonnene zählt (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Der Dialog
-  // zeigt seinen Fehler über `speicherung` selbst.
+  // Ablehnungen von Status, Bemerkung und „Erneut disponieren“ an der Zeile, je Disposition
+  // gemerkt (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Einheit, Fahrzeug, Position
+  // und Einsatzfunktion zeigen ihren Grund selbst an der Angabe (`InlineAngabe`, D4).
   const zeilen = useZeilenFehler<number>();
 
   const statusMutation = useOptimistischesZeilenUpdate<
@@ -146,25 +153,6 @@ export default function PersonalPage() {
     onFehler: (e, v) => zeilen.melde(v.epId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
-  const positionMutation = useMutation({
-    mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
-      updateDisposition(einsatzId, v.epId, { staerke_position: v.position }),
-    onMutate: (v) => zeilen.beginne(v.epId),
-    onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.epId, e, 'Position nicht gespeichert'),
-  });
-  // Die Zelle schließt erst, wenn der neue Wert im Cache steht (`InlineAngabe`); ihre Ablehnung
-  // zeigt sie selbst an der Eingabe.
-  const einsatzfunktionMutation = useMutation({
-    mutationFn: (v: { epId: number; einsatzfunktion: string | null }) =>
-      updateDisposition(einsatzId, v.epId, { einsatzfunktion: v.einsatzfunktion }),
-    onSuccess: (neu) => {
-      qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (alt) =>
-        alt?.map((ep) => (ep.id === neu.id ? neu : ep)),
-      );
-      invalidate();
-    },
-  });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { epId: number; bemerkung: string }) =>
       updateDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
@@ -172,46 +160,13 @@ export default function PersonalPage() {
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
   });
-  /*
-   * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
-   * „Rückwege und Fehler“): die Aktion im Block „Entlassen“ meldet an ihrem Eintrag, Rückgängig
-   * aus dem Toast im Seitenhinweis — die Zeile ist dann weg, der Block meist eingeklappt.
-   */
+  // Erneut disponieren (LLH-1079) bleibt im Block „Entlassen“ unter der Liste; die Ablehnung steht
+  // an ihrem Eintrag.
   const reaktivierenMutation = useMutation({
     mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
     onMutate: (epId) => zeilen.beginne(epId),
     onSuccess: invalidate,
     onError: (e, epId) => zeilen.melde(epId, e, 'Nicht erneut disponiert'),
-  });
-  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
-  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
-  const rueckgaengigMutation = useMutation({
-    mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
-    onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: invalidate,
-    onError: (e) => {
-      setRueckgaengigFehler(e);
-      invalidate();
-    },
-  });
-  // Entlassen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast (`frontend/AGENTS.md`,
-  // „Destruktiv ist nicht gleich destruktiv“, design.md D8).
-  const entlassenMutation = useMutation({
-    mutationFn: (v: { epId: number; name: string }) => entlasseDisposition(einsatzId, v.epId),
-    onMutate: (v) => zeilen.beginne(v.epId),
-    onSuccess: (_, v) => {
-      invalidate();
-      zeigeRueckgaengig(message, `${v.name} entlassen`, () => rueckgaengigMutation.mutate(v.epId));
-    },
-    onError: (e, v) => zeilen.melde(v.epId, e, 'Nicht entlassen'),
-  });
-  // Stornieren ist unumkehrbar und nur kurz nach einer Fehldisposition möglich; der Server nennt
-  // den Grund einer Ablehnung, er steht an der Zeile.
-  const stornierenMutation = useMutation({
-    mutationFn: (epId: number) => storniereDisposition(einsatzId, epId),
-    onMutate: (epId) => zeilen.beginne(epId),
-    onSuccess: invalidate,
-    onError: (e, epId) => zeilen.melde(epId, e, 'Nicht storniert'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -230,11 +185,6 @@ export default function PersonalPage() {
 
   const eps = epQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
-  /** Läuft für diese Zeile Entlassen oder Stornieren? Dann keine zweite Handlung. */
-  const isZeileBusy = (epId: number) =>
-    (entlassenMutation.isPending && entlassenMutation.variables?.epId === epId) ||
-    (stornierenMutation.isPending && stornierenMutation.variables === epId);
-  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
 
   /**
    * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
@@ -252,8 +202,15 @@ export default function PersonalPage() {
   const listeGescheitert = epQuery.isError && eps.length === 0;
   const standVeraltet = epQuery.isError && eps.length > 0;
 
-  const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
-  const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
+  const einheiten = einheitenQuery.data ?? [];
+  const abschnitte = abschnitteFrei ? (abschnitteQuery.data ?? []) : [];
+  const einheitOptionen = buildEinheitOptions(einheiten, abschnitte);
+  // Ohne geladene Einheitenliste ungruppiert: „Einheit #12“ als Etikett gibt es nicht (D6).
+  const einheitGruppen = buildEinheitGruppen(
+    einheitenFrei ? einheitenQuery.data : undefined,
+    abschnitte,
+  );
+  const fahrzeuge = fahrzeugeQuery.data ?? [];
   const stati = statusQuery.data ?? [];
   const vorschlaege = einsatzfunktionVorschlaege({
     vergeben: eps.map((ep) => ep.einsatzfunktion),
@@ -306,26 +263,6 @@ export default function PersonalPage() {
         }
       : undefined;
 
-  /**
-   * Spaltenregister der Personalseite — die breiteste Fläche (9 Spalten) und damit der erste
-   * Adressat des Spaltenschalters. Durch `spaltenFuer<EinsatzPersonal>()` geführt, nicht annotiert.
-   *
-   * ── Kein `abBreite` auf `position` ──
-   *
-   * antds `xl` liegt bei 1200 px; auf dem Führungs-Tablet (1024–1280 px) verschwände die Spalte
-   * genau dort, wo sie gebraucht wird. `position` ist eine von zwei Schreib-Bedienungen, und es
-   * gibt keine Detailroute als Ausweichort. Wer sie weghaben will, nimmt
-   * `spaltenAusVoreinstellung`; dann steht sie im Schalter und im Zähler.
-   *
-   * ── Gemessen gegen 1180 und 1440 (LFH-975) ──
-   *
-   * `name` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so bricht
-   * Langtext um, statt die Tabelle zu verbreitern, und „Ruhe“ und die Aktionen bleiben im Bild.
-   * Unter `xl` weicht `funktion`, unter `xxl` weichen `traeger`, `fahrzeug` und `einheit` — alle
-   * über den Spaltenschalter und im Zähler. Wer eine Breite ändert, misst neu
-   * (`e2e/gate1-ueberlauf.spec.ts`, „Kräfte-Listen“): neben dem Aufklapp-Auslöser braucht die
-   * Kennung bei 1440 rund 250 px, sonst rutscht „Zeitachse“ in eine zweite Zeile.
-   */
   const periodenBereit = abrufZustand(periodenQuery) === 'daten';
   const dauernJePerson = new Map<number, KraftDauern>(
     (periodenQuery.data ?? []).map((p) => [p.personal_id, kraftDauern(p.perioden, uhr.valueOf())]),
@@ -338,6 +275,25 @@ export default function PersonalPage() {
       </span>
     ) : null;
 
+  /**
+   * Spaltenregister der Personalliste (D7): Name | Funktion | Einheit | Fahrzeug | Position |
+   * Status | Einsatzdauer, dazu Träger, Ruhe und Bemerkung im Spaltenschalter
+   * (`spaltenAusVoreinstellung`). Durch `spaltenFuer<EinsatzPersonal>()` geführt, nicht annotiert.
+   *
+   * ── Einheit und Fahrzeug ohne `abBreite` ──
+   *
+   * Die Einteilung ist der Zweck der Liste am Fükw und am Führungs-Tablet; unter `xxl` verschwände
+   * sie genau dort. Ohne Freigabe ihres Moduls entfällt die Spalte ganz, statt mit „—“ eine freie
+   * Kraft zu behaupten (D3, D7).
+   *
+   * ── Gemessen gegen 1180 und 1440 (LFH-975) ──
+   *
+   * `name` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so bricht
+   * Langtext um, statt die Tabelle zu verbreitern. Einheit, Fahrzeug und Position sind so breit,
+   * dass ihre Aufforderung („Fahrzeug eintragen“) in `kompakt` eine Zeile hält; ein langer
+   * Einheitsname bricht um. Unter `xl` weicht `funktion`, über den Spaltenschalter und im Zähler.
+   * Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Kräfte-Listen“).
+   */
   const spalten = spaltenFuer<EinsatzPersonal>()([
     {
       title: 'Name',
@@ -346,12 +302,11 @@ export default function PersonalPage() {
       mindestBreite: 180,
       sortWert: (ep) => ep.name,
       suchText: (ep) => ep.name,
-      // Der Deeplink der Fahrzeug-/Einheitsspalte wandert nicht hierher: nur die Titelspalte dürfte
-      // `titel.ziel` tragen, und `personalPfad` zeigte auf diese Seite.
-      // `wrap`: neben dem Aufklapp-Auslöser darf die Marke unter den Namen rutschen, statt die
+      // Der Name ist `karte.titel.ziel` und führt in die Personenansicht (D8); das `render` trägt
+      // deshalb keinen Anker. `wrap`: eine Marke darf unter einen langen Namen rutschen, statt die
       // Fließspalte über ihr Maß zu drücken (LFH-975).
       render: (_, ep) => (
-        <Space wrap>
+        <Space wrap size={4}>
           {ep.name}
           {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ep.ist_demo && <DemoMarke />}
@@ -374,9 +329,7 @@ export default function PersonalPage() {
           funktion={ep.funktion}
           vorschlaege={vorschlaege}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(einsatzfunktion) =>
-            einsatzfunktionMutation.mutateAsync({ epId: ep.id, einsatzfunktion })
-          }
+          onSpeichern={(einsatzfunktion) => schreiben.angabe(ep.id, { einsatzfunktion })}
         />
       ),
     },
@@ -385,58 +338,71 @@ export default function PersonalPage() {
       dataIndex: 'traegerorganisation',
       key: 'traeger',
       width: 160,
-      abBreite: 'xxl',
       filter: traegerFilter,
       render: (t) => t ?? '—',
     },
-    {
-      title: 'Fahrzeug',
-      key: 'fahrzeug',
-      width: 160,
-      abBreite: 'xxl',
-      render: (_, ep) => {
-        const f = ep.fahrzeug_id != null ? fahrzeugById.get(ep.fahrzeug_id) : undefined;
-        if (!f) return '—';
-        const label = f.kennzeichen ? `${f.funkrufname} (${f.kennzeichen})` : f.funkrufname;
-        return (
-          <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.id })}>{label}</KennungsLink>
-        );
-      },
-    },
-    {
-      title: 'Einheit',
-      key: 'einheit',
-      width: 140,
-      abBreite: 'xxl',
-      render: (_, ep) => {
-        const e = ep.einheit_id != null ? einheitById.get(ep.einheit_id) : undefined;
-        if (!e) return '—';
-        return (
-          <KennungsLink to={einheitenPfad(einsatzId, { einheit: e.id })}>{e.name}</KennungsLink>
-        );
-      },
-    },
+    ...(einheitenFrei
+      ? [
+          {
+            title: 'Einheit',
+            key: 'einheit' as const,
+            width: 150,
+            sortWert: (ep: EinsatzPersonal) =>
+              einheitOptionen.find((o) => o.id === ep.einheit_id)?.pfad ?? '',
+            render: (_: unknown, ep: EinsatzPersonal) => (
+              <EinheitAngabe
+                kennung={ep.name}
+                wert={ep.einheit_id ?? null}
+                optionen={einheitOptionen}
+                darfSchreiben={darfSchreiben}
+                // Wechselt der Einheitsführer die Einheit, leert der Server die Führung still
+                // (D3): die Marke steht deshalb schon vor dem Wechsel am Wert.
+                marke={
+                  ep.einheit_id != null &&
+                  einheiten.find((e) => e.id === ep.einheit_id)?.fuehrer_id === ep.id ? (
+                    <Tag>Einheitsführer</Tag>
+                  ) : undefined
+                }
+                onSpeichern={schreiben.einheit(ep.id)}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(fahrzeugeFrei
+      ? [
+          {
+            title: 'Fahrzeug',
+            key: 'fahrzeug' as const,
+            width: 150,
+            sortWert: (ep: EinsatzPersonal) =>
+              fahrzeuge.find((f) => f.id === ep.fahrzeug_id)?.funkrufname ?? '',
+            render: (_: unknown, ep: EinsatzPersonal) => (
+              <FahrzeugAngabe
+                kennung={ep.name}
+                wert={ep.fahrzeug_id ?? null}
+                einheitId={ep.einheit_id ?? null}
+                fahrzeuge={fahrzeuge}
+                einheiten={einheiten}
+                darfSchreiben={darfSchreiben}
+                onSpeichern={schreiben.fahrzeug(ep.id)}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       title: 'Position',
       key: 'position',
-      width: 150,
-      render: (_, ep) =>
-        darfSchreiben ? (
-          <Select
-            style={{ minWidth: 130 }}
-            value={ep.staerke_position ?? undefined}
-            placeholder="—"
-            allowClear
-            options={POSITION_OPTIONEN}
-            onChange={(position) =>
-              positionMutation.mutate({ epId: ep.id, position: position ?? null })
-            }
-          />
-        ) : ep.staerke_position ? (
-          POSITION_LABELS[ep.staerke_position]
-        ) : (
-          '—'
-        ),
+      width: 140,
+      render: (_, ep) => (
+        <PositionAngabe
+          kennung={ep.name}
+          wert={ep.staerke_position ?? null}
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(staerke_position) => schreiben.angabe(ep.id, { staerke_position })}
+        />
+      ),
     },
     {
       title: 'Status',
@@ -486,41 +452,22 @@ export default function PersonalPage() {
         />
       ),
     },
-    ...(darfSchreiben
-      ? [
-          {
-            title: 'Aktionen',
-            key: 'aktionen' as const,
-            width: 170,
-            immerSichtbar: true,
-            // Entlassen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht im
-            // Zeilenmenü und fragt nach (LLH-1079, design.md D8).
-            render: (_: unknown, ep: EinsatzPersonal) => (
-              <Space size="middle">
-                <Button
-                  danger
-                  loading={
-                    entlassenMutation.isPending && entlassenMutation.variables?.epId === ep.id
-                  }
-                  disabled={isZeileBusy(ep.id)}
-                  aria-label={`${ep.name} entlassen`}
-                  onClick={() => entlassenMutation.mutate({ epId: ep.id, name: ep.name })}
-                >
-                  Entlassen
-                </Button>
-                <MenueAusloeser
-                  eintraege={stornoEintraege}
-                  zugaenglicherName={`Weitere Aktionen zu ${ep.name}`}
-                  gesperrt={isZeileBusy(ep.id)}
-                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === ep.id}
-                  onWahl={() => setStornoFuer({ id: ep.id, name: ep.name })}
-                />
-              </Space>
-            ),
-          },
-        ]
-      : []),
   ]);
+
+  /**
+   * Höchstens drei Kartenfelder (`Datensicht`): die Einteilung zuerst; fehlt eine Spalte mangels
+   * Freigabe, rückt die Funktion nach.
+   */
+  const kartenFelder = (
+    [
+      einheitenFrei ? 'einheit' : null,
+      fahrzeugeFrei ? 'fahrzeug' : null,
+      'position',
+      'funktion',
+    ] as const
+  )
+    .filter((k) => k != null)
+    .slice(0, 3) as ['einheit' | 'fahrzeug' | 'position' | 'funktion'];
 
   return (
     <EinsatzSeite
@@ -552,32 +499,16 @@ export default function PersonalPage() {
         )
       }
       hinweis={
-        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            {!darfSchreiben && einsatz.status !== 'aktiv' && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SeitenHinweise
-              fehler={rueckgaengigFehler}
-              fehlerTitel="Nicht erneut disponiert"
-              fehlerFallback="Rückgängig fehlgeschlagen"
-            />
-          </Space>
+        !darfSchreiben && einsatz.status !== 'aktiv' ? (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         ) : null
       }
     >
-      {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf diese Seite,
-          der Link zeigte auf sich selbst und machte die Namenszelle zum Link. Die echten
-          Fremd-Links (Fahrzeug, Einheit) bleiben in ihren Zellen.
-
-          `zufluss` bleibt `sammelbanner`: zwei Auswahlfelder in der Zeile (Position, Status),
-          eigener wie fremder Wechsel läuft über eine Invalidierung. */}
-
       {/* Der Statuskatalog trägt die Auswahlliste jeder Statuszelle. Fällt er aus, wäre der
           Statuswechsel lautlos unmöglich; die Meldung steht deshalb über der Tabelle.
 
           An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
-          und verliert nichts. (Die Positionsspalte bleibt bedienbar — `POSITION_OPTIONEN` ist
+          und verliert nichts. (Die Positionsangabe bleibt bedienbar — `POSITION_OPTIONEN` ist
           ein lokales Enum.) */}
       {darfSchreiben && statusQuery.isError && (
         <div style={{ marginBottom: abstand.md }}>
@@ -603,6 +534,9 @@ export default function PersonalPage() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+          {/* `zufluss` bleibt `sammelbanner`: Einheitswechsel, Status und Position sind Bedienziele
+              der Zeile. Wechselt eine Person unter Fokus oder Zeiger die Einheit, hält die
+              Schleuse Platz und Folge, bis beide die Sicht verlassen (D6). */}
           <Datensicht
             bezeichnung="Personal im Einsatz"
             spalten={spalten}
@@ -612,53 +546,24 @@ export default function PersonalPage() {
             leerText="Noch kein Personal disponiert"
             suche={{ platzhalter: 'Name, Funktion' }}
             standardSortierung={{ spalte: 'name', richtung: 'auf' }}
-            spaltenAusVoreinstellung={['bemerkung']}
+            spaltenAusVoreinstellung={['traeger', 'ruhe', 'bemerkung']}
             zeilenFehler={(p) => zeilen.grund(p.id)}
-            gruppen={{
-              schluessel: (ep) => kategorieVon(ep.status_kategorie),
-              etikett: kategorieEtikett,
-              reihenfolge: KATEGORIE_REIHENFOLGE,
-              // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
-              unterEbene: 1,
-            }}
+            gruppen={
+              einheitGruppen
+                ? {
+                    ...einheitGruppen,
+                    // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+                    unterEbene: 1,
+                  }
+                : undefined
+            }
             zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-            // Zeitachse der Person (LFH-552) ohne Seitenwechsel — Inline-Expander statt Drawer.
-            aufklappen={{
-              etikett: 'Zeitachse',
-              zugaenglicherName: (ep) => `Zeitachse zu ${ep.name}`,
-              inhalt: (ep) => (
-                <KraftZeitachse
-                  einsatzId={einsatzId}
-                  art="person"
-                  id={ep.id}
-                  kennung={ep.name}
-                  darfSchreiben={darfSchreiben}
-                />
-              ),
-            }}
             karte={{
               art: 'plan',
-              titel: { spalte: 'name' },
+              titel: { spalte: 'name', ziel: (ep) => einsatzkraftPfad(einsatzId, ep.id) },
               status: (ep) => personalStatusDarstellung(ep),
-              // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entlassen"
-              // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
               statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
-              sekundaer: ['funktion', 'einheit', 'fahrzeug'],
-              aktion: darfSchreiben
-                ? {
-                    etikett: 'Entlassen',
-                    zugaenglicherName: (ep) => `${ep.name} entlassen`,
-                    onKlick: (ep) => entlassenMutation.mutate({ epId: ep.id, name: ep.name }),
-                  }
-                : undefined,
-              weitere: darfSchreiben
-                ? {
-                    eintraege: () => stornoEintraege,
-                    zugaenglicherName: (ep) => `Weitere Aktionen zu ${ep.name}`,
-                    laeuft: (ep) => isZeileBusy(ep.id),
-                    onWahl: (_, ep) => setStornoFuer({ id: ep.id, name: ep.name }),
-                  }
-                : undefined,
+              sekundaer: kartenFelder,
             }}
           />
           <EntlassenBlock
@@ -670,6 +575,7 @@ export default function PersonalPage() {
               zusatz: funktionText(ep),
               beendetAt: ep.beendet_at,
             }))}
+            ziel={(epId) => einsatzkraftPfad(einsatzId, epId)}
             aktion={
               darfSchreiben
                 ? {
@@ -684,40 +590,6 @@ export default function PersonalPage() {
           />
         </>
       )}
-
-      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
-          nennt ihre Person und schließt, wenn die Zeile entfällt. */}
-      <Modal
-        open={stornoFuer !== null && eps.some((ep) => ep.id === stornoFuer.id)}
-        title={stornoFuer ? `${stornoFuer.name} stornieren?` : undefined}
-        onCancel={() => {
-          if (isNewGestureStorno()) setStornoFuer(null);
-        }}
-        destroyOnHidden
-        footer={
-          <Space size="middle">
-            <Button
-              onClick={() => {
-                if (isNewGestureStorno()) setStornoFuer(null);
-              }}
-            >
-              Abbrechen
-            </Button>
-            <Button
-              danger
-              onClick={() => {
-                if (!stornoFuer || !isNewGestureStorno()) return;
-                setStornoFuer(null);
-                stornierenMutation.mutate(stornoFuer.id);
-              }}
-            >
-              Stornieren
-            </Button>
-          </Space>
-        }
-      >
-        Die Person erscheint danach in keiner Liste und keinem Nachweis.
-      </Modal>
 
       {/* Personal aus dem Stamm disponieren: eine Gruppe in einem Absenden, optional in Einheit
           und Fahrzeug (LLH-1100), im Serienmodus wie die Ad-hoc-Kette. */}

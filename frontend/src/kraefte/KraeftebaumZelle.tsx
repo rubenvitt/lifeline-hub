@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { StaerkePosition } from '../api/types';
+import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
 import { Augenbraue, monoStil, useRollen } from '../components/instrument';
@@ -30,19 +30,6 @@ import type { PersonAnzeige, RasterZeile } from './meldebildRaster';
  * Ein Sprung ist keine Handlung (LFH-616); der Anker bedient den Klick allein (Riegel der
  * `Datensicht`). Abnehmer neben dem Meldebild: die Einheiten-Gliederung (LLH-1029).
  */
-
-/** Kurzwort der Stärkeposition — die Marke der Personenzeile. */
-const POSITION_KURZ: Record<StaerkePosition, string> = {
-  fuehrer: 'F',
-  unterfuehrer: 'UF',
-  mannschaft: 'M',
-};
-
-const POSITION_WORT: Record<StaerkePosition, string> = {
-  fuehrer: 'Führer',
-  unterfuehrer: 'Unterführer',
-  mannschaft: 'Mannschaft',
-};
 
 /** Ein umrandetes Kurzwort (Positionsmarke, „EF“): Zeichen der Personenzeile, nie nur Farbe. */
 export function Marke({ text, titel }: { text: string; titel: string }) {
@@ -77,8 +64,8 @@ export function PositionsMarken({ person }: { person: PersonAnzeige }) {
   return (
     <>
       <Marke
-        text={pos ? POSITION_KURZ[pos] : '–'}
-        titel={pos ? POSITION_WORT[pos] : 'ohne Stärkeposition'}
+        text={pos ? POSITION_KUERZEL[pos] : '–'}
+        titel={pos ? POSITION_LABELS[pos] : 'ohne Stärkeposition'}
       />
       {person.isFuehrer && <Marke text="EF" titel="Einheitsführer" />}
     </>

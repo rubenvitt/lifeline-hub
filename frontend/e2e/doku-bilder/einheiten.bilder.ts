@@ -23,6 +23,10 @@ import {
  *   vorlage-bilden.png  frontend/src/pages/EinheitAusVorlagePage.tsx (Seite „Einheit aus Vorlage
  *                       bilden“: Kopf, Baum der Vorlage, Aktion mit Zusammenfassung;
  *                       frontend/src/components/Erfassung.tsx)
+ *   kopf.png            frontend/src/pages/einheit/EinheitKopf.tsx (Paneel „Kopfdaten“,
+ *                       frontend/src/kraefte/EinheitZeichen.tsx, components/InlineAngabe.tsx)
+ *   zeichen.png         frontend/src/pages/einheit/EinheitZeichenPaneel.tsx (Paneel „Taktisches
+ *                       Zeichen“ mit offener Zeile „Organisation“)
  *   personal.png        frontend/src/pages/EinheitDetailPage.tsx (Paneel „Personal“)
  *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)
  *
@@ -145,6 +149,37 @@ test.describe(KAPITEL, () => {
     const paneel = page.getByRole('region', { name: 'Personal' });
     await expect(paneel.getByText('Einheitsführer', { exact: true })).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'personal');
+  });
+
+  test('Kopf einer Einheit', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const rettung = await einheitNamens(page.request, demo.id, 'Rettungsstaffel');
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einheiten/${rettung.id}`);
+    const paneel = page.getByRole('region', { name: 'Kopfdaten' });
+    await expect(
+      paneel.getByRole('button', { name: 'Einheitsführer bearbeiten' }),
+    ).toHaveAccessibleDescription('Anna Probe');
+    await page.mouse.move(0, 0);
+    await fotografiere(paneel, KAPITEL, 'kopf');
+  });
+
+  // Die Zeile bleibt offen und wird nicht gespeichert: ein gespeichertes Zeichen änderte das Bild
+  // der Gliederung.
+  test('Taktisches Zeichen setzen', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const rettung = await einheitNamens(page.request, demo.id, 'Rettungsstaffel');
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einheiten/${rettung.id}`);
+    const paneel = page.getByRole('region', { name: 'Taktisches Zeichen' });
+    await paneel.getByRole('button', { name: /^Organisation (bearbeiten|eintragen)$/ }).click();
+    const auswahl = paneel.getByRole('combobox', { name: 'Organisation' });
+    await waehleIn(auswahl, 'Feuerwehr');
+    await auswahl.blur();
+    await page.mouse.move(0, 0);
+    await fotografiere(paneel, KAPITEL, 'zeichen');
   });
 
   test('Block „Aufgelöst“', async ({ page }) => {

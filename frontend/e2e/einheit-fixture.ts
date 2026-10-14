@@ -44,44 +44,47 @@ export function zuordnungsKarte(page: Page, titel: string): Locator {
     });
 }
 
+/**
+ * Die Angaben der Einheit-Ansicht (LLH-1036): Kopf, Funk und Zeichen, je an ihrer Zeile. Ohne
+ * Klick steht kein Eingabefeld da; das Bedienziel ist der Zeilenauslöser „… bearbeiten“ (gefüllt)
+ * bzw. „… eintragen“ (leer).
+ */
+export const ANGABEN = [
+  'Name',
+  'Typ',
+  'Funkrufname',
+  'Abschnitt',
+  'Über-Einheit',
+  'Einheitsführer',
+  'Soll-Stärke',
+  'Bemerkung',
+  'Sprechgruppen',
+  'Kommunikationsmittel',
+  'Erreichbarkeit / Nummer',
+  'Fachaufgabe',
+  'Organisation',
+] as const;
+
+/** Zeilenauslöser einer Angabe, gleich ob sie gefüllt oder leer ist. */
+export function zeilenAusloeser(page: Page, angabe: string): Locator {
+  return page
+    .getByRole('main')
+    .getByRole('button', { name: new RegExp(`^${angabe} (bearbeiten|eintragen)$`) });
+}
+
 export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: Locator }[] {
-  const form = page.getByRole('main').locator('form');
-  const ergebnis: { name: string; huelle: Locator; fokus: Locator }[] = [];
-  for (const name of [
-    'Name',
-    'Typ',
-    'Abschnitt',
-    'Über-Einheit',
-    'Sprechgruppen',
-    'Kommunikationsmittel',
-    'Erreichbarkeit / Nummer',
-    'Bemerkung',
-  ]) {
-    const gruppe = form.locator('.ant-form-item').filter({
-      has: page.locator('label').filter({ hasText: new RegExp(`^${name}$`) }),
-    });
-    const fokus = gruppe.locator('input, textarea').first();
-    const huelle = gruppe.locator(
-      '.ant-select, .ant-input-affix-wrapper, textarea, input.ant-input:not(.ant-input-affix-wrapper input)',
-    );
-    ergebnis.push({ name, huelle, fokus });
-  }
-  for (const name of ['Führer', 'Unterführer', 'Mannschaft']) {
-    const fokus = form.getByRole('spinbutton', { name, exact: true });
-    const huelle = form
-      .locator('.ant-input-number')
-      .filter({ has: page.getByRole('spinbutton', { name, exact: true }) });
-    ergebnis.push({ name, huelle, fokus });
-  }
-  return ergebnis;
+  return ANGABEN.map((name) => {
+    const ausloeser = zeilenAusloeser(page, name);
+    return { name, huelle: ausloeser, fokus: ausloeser };
+  });
 }
 
 export async function detailBereit(page: Page) {
   await expect(page.getByRole('heading', { name: 'Messzug 446', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Messzug 446');
+  await expect(zeilenAusloeser(page, 'Name')).toHaveAccessibleDescription('Messzug 446');
   for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
     await expect(
-      zuordnungsKarte(page, titel).getByRole('button', { name: 'Entfernen', exact: true }),
+      zuordnungsKarte(page, titel).getByRole('button', { name: 'Aus Einheit lösen', exact: true }),
     ).toHaveCount(1);
   }
 }

@@ -9,10 +9,8 @@ import {
   einheitStaerkeUrteilVon,
   needsOhneFahrzeugKnoten,
   einheitenBaum,
-  isMaterialAusfall,
   kraeftebaum,
   accumulateStaerke,
-  materialAusfall,
   mittelDerEinheit,
   schluesselBisStufe,
   schluesselZumSprung,
@@ -22,6 +20,7 @@ import {
   type StufenZeile,
 } from './kraeftebaumKern';
 import { verdichte, type StaerkeSumme } from './kraeftebild';
+import { isMaterialAusfall, materialAusfall } from './materialVerdichtungKern';
 import { staerkeText } from '../anzeige/staerke';
 import type {
   Einheit,
@@ -239,6 +238,22 @@ describe('buildEinheitOptions / groupEinheitOptions (LLH-1073, design.md D3)', (
     ]);
   });
 
+  it('ohne Abschnittsliste gilt die Eingabefolge (Materialliste, LLH-1093)', () => {
+    const optionen = buildEinheitOptions(
+      [
+        benannt(1, 'Zug 1', null),
+        benannt(2, 'Staffel A', null, 1),
+        benannt(4, 'Rettungsstaffel', null),
+      ],
+      [],
+    );
+    expect(optionen.map((o) => [o.id, o.pfad, o.tiefe])).toEqual([
+      [1, 'Zug 1', 0],
+      [2, 'Zug 1 › Staffel A', 1],
+      [4, 'Rettungsstaffel', 0],
+    ]);
+  });
+
   it('ohne jeden Abschnitt keine Gruppen', () => {
     const optionen = buildEinheitOptions([benannt(1, 'Zug 1', null)], []);
     expect(groupEinheitOptions(optionen)).toEqual([]);
@@ -380,6 +395,24 @@ describe('mittelDerEinheit', () => {
     expect(isMaterialAusfall('desinfektion_noetig')).toBe(true);
     expect(isMaterialAusfall('im_einsatz')).toBe(false);
     expect(materialAusfall([mt(4, 1, 'verbraucht'), mt(5, 1, 'einsatzbereit')])).toBe(1);
+  });
+
+  it('Material-Ausfall der Einheit zählt defekt, verbraucht und Desinfektion nötig (Spec kraeftebaum)', () => {
+    // Durch `mittelDerEinheit`, nicht nur über `materialAusfall`: zählte der Baum eine eigene
+    // Regel (etwa nur „defekt“), wiche die Gruppenzeile von der Materialliste ab.
+    const m = mittelDerEinheit(1, {
+      einheiten: [eh(1, null)],
+      personal: [],
+      fahrzeuge: [],
+      material: [
+        mt(1, 1, 'defekt'),
+        mt(2, 1, 'verbraucht'),
+        mt(3, 1, 'desinfektion_noetig'),
+        mt(4, 1, 'einsatzbereit'),
+      ],
+    });
+    expect(m.material).toHaveLength(4);
+    expect(m.materialAusfall).toBe(3);
   });
 });
 
