@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    auftrag, einheit_vorlage, einsatz, etb, externe_stelle, fuehrung, infotelefon,
+    auftrag, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fuehrung, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, nachforderung, personal, presse, schaden,
     sprechgruppe, vorlagendokument,
 };
@@ -90,6 +90,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             einheit_vorlage::PERSONAL_JE_VORLAGE_MAX,
         ),
         ("SAMMEL_MAX", kraefte_disposition::SAMMEL_MAX),
+        ("EINHEIT_NAME_MAX", einheit::NAME_MAX),
     ])
 }
 

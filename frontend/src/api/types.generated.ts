@@ -521,6 +521,20 @@ export interface components {
              */
             ueberfaellig: number;
         };
+        /** @description Antwort des Bildens (D3). */
+        AusVorlageErgebnis: {
+            /**
+             * Format: int64
+             * @description Die oberste neue Einheit (Sprungziel ins Meldebild).
+             */
+            einheit_id: number;
+            /** @description Alle neuen Einheiten, die oberste vorn, Eltern vor ihren Kindern. */
+            einheit_ids: number[];
+            /** @description Die übernommenen Fahrzeuge (`einsatz_fahrzeug.id`). */
+            fahrzeuge: number[];
+            /** @description Die übernommenen Personen (`einsatz_personal.id`). */
+            personal: number[];
+        };
         /** @description Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung. */
         AusgabeAnzeige: {
             bemerkung?: string | null;
@@ -5182,6 +5196,93 @@ export interface components {
             /** Format: int64 */
             groesse: number;
         };
+        /** @description Vorschau einer Vorlage im Einsatz (D2): der Baum mit dem Zustand jeder Kraft. Schreibt nichts. */
+        VorlageVorschau: {
+            /** @description Das Modul Fahrzeuge ist für die Rolle nicht freigegeben: keine Fahrzeugzeilen. */
+            fahrzeuge_gesperrt: boolean;
+            /** @description Die Einheiten des Baums, die Wurzel vorn, Eltern vor ihren Kindern. */
+            knoten: components["schemas"]["VorschauKnoten"][];
+            /** @description Das Modul Personal ist für die Rolle nicht freigegeben: keine Personenzeilen. */
+            personal_gesperrt: boolean;
+            /** Format: int64 */
+            vorlage_id: number;
+        };
+        /** @description Ein Stamm-Fahrzeug der Vorlage und sein Zustand im Einsatz. */
+        VorschauFahrzeug: {
+            /**
+             * Format: int64
+             * @description Die Dispositionszeile (`einsatz_fahrzeug.id`), wenn das Fahrzeug im Einsatz ist.
+             */
+            ef_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die Einheit, der das Fahrzeug angehört (bei `gebunden`).
+             */
+            einheit_id?: number | null;
+            einheit_name?: string | null;
+            /** Format: int64 */
+            fahrzeug_id: number;
+            fahrzeugtyp?: string | null;
+            funkrufname: string;
+            zustand: components["schemas"]["VorschauZustand"];
+        };
+        /** @description Eine Einheit des Vorlagen-Baums mit ihren Kopfdaten. */
+        VorschauKnoten: {
+            fahrzeuge: components["schemas"]["VorschauFahrzeug"][];
+            funkrufname?: string | null;
+            name: string;
+            personal: components["schemas"]["VorschauPersonal"][];
+            soll?: components["schemas"]["Staerke"] | null;
+            soll_eigen: boolean;
+            /** Format: int64 */
+            typ_id: number;
+            typ_label: string;
+            tz_fachaufgabe?: string | null;
+            tz_organisation?: string | null;
+            /**
+             * Format: int64
+             * @description Übergeordnete Vorlage im gebildeten Baum; fehlt an der Wurzel.
+             */
+            ueber_vorlage_id?: number | null;
+            /** Format: int64 */
+            vorlage_id: number;
+        };
+        /** @description Eine Person der Stammbesetzung und ihr Zustand im Einsatz. */
+        VorschauPersonal: {
+            /**
+             * Format: int64
+             * @description Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`; bei `gebunden`, oder bei
+             *     `frei`, wenn es schon ihr Fahrzeug der Vorlage ist).
+             */
+            ef_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die Einheit, der die Person angehört (bei `gebunden`).
+             */
+            einheit_id?: number | null;
+            einheit_name?: string | null;
+            /**
+             * Format: int64
+             * @description Die Dispositionszeile (`einsatz_personal.id`), wenn die Person aktiv im Einsatz ist.
+             */
+            ep_id?: number | null;
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage (Stamm-ID), auf dem die Person sitzt, wenn es mitkommt.
+             */
+            fahrzeug_id?: number | null;
+            fahrzeug_name?: string | null;
+            name: string;
+            /** Format: int64 */
+            personal_id: number;
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
+            zustand: components["schemas"]["VorschauZustand"];
+        };
+        /**
+         * @description Zustand einer Kraft der Vorlage im Einsatz (D4). Wire == `as_str()`.
+         * @enum {string}
+         */
+        VorschauZustand: "neu" | "frei" | "gebunden" | "ausser_dienst" | "entlassen";
         /**
          * @description VS-Vermerk im Schriftfeld (J.5).
          * @enum {string}

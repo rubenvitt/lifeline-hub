@@ -64,6 +64,8 @@ async fn seed_einheit(
             kommunikationsmittel: None,
             erreichbarkeit: None,
             sortier: 0,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
         },
         benutzer_id,
     )

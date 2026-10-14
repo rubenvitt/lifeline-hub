@@ -3,16 +3,16 @@ use super::einsatz_material::sse_material;
 use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
-use crate::einheit::{mitglied_repo, EinheitAnzeige};
+use crate::einheit::{aus_vorlage, mitglied_repo, EinheitAnzeige};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Einheiten;
+use crate::einsatz::modul::{Einheiten, Fahrzeuge, Personal};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, parse_flag, pflicht, pruefe_kommunikationsmittel,
+    deserialize_optional_field, parse_flag, pflicht, pflicht_max, pruefe_kommunikationsmittel,
     pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::Staerke;
@@ -142,6 +142,8 @@ pub async fn bilden(
             kommunikationsmittel: kommunikationsmittel.as_deref(),
             erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
         },
         ctx.benutzer.id,
     )
@@ -166,6 +168,198 @@ pub async fn bilden(
     .await;
     sse_einheit(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// Ein gesperrtes Zielmodul ist für die Vorschau kein Fehler, sondern ein leerer Teil (D8).
+fn is_gesperrt(pruefung: Result<(), AppError>) -> Result<bool, AppError> {
+    match pruefung {
+        Ok(()) => Ok(false),
+        Err(AppError::Forbidden) => Ok(true),
+        Err(e) => Err(e),
+    }
+}
+
+/// GET /api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id} — Vorschau einer Einheiten-Vorlage
+/// im Einsatz (LLH-1049, Spec `einheit-vorlagen`, „Vorschau im Einsatz“): Baum und Zustand jeder
+/// Kraft. Fahrzeuge und Personen nur mit Freigabe ihres Moduls, sonst leer und als gesperrt
+/// gemeldet. Fremde oder unbekannte Vorlage 404, deaktivierte oder zu große 422. Schreibt nichts.
+pub async fn aus_vorlage_vorschau(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Einheiten>,
+    PfadParam((_id, vorlage_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<aus_vorlage::VorlageVorschau>, AppError> {
+    let gesperrt = aus_vorlage::Lesen {
+        fahrzeuge: is_gesperrt(ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await)?,
+        personal: is_gesperrt(ctx.fordere_zielmodul::<Personal>(&state.pool).await)?,
+    };
+    let lesen = aus_vorlage::Lesen {
+        fahrzeuge: !gesperrt.fahrzeuge,
+        personal: !gesperrt.personal,
+    };
+    let mut conn = state.pool.acquire().await?;
+    let plan = aus_vorlage::plan_tx(
+        &mut conn,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        vorlage_id,
+        lesen,
+    )
+    .await?;
+    Ok(Json(aus_vorlage::vorschau(&plan, gesperrt)))
+}
+
+/// Ein Fahrzeug der Vorlage im Body des Bildens.
+#[derive(Debug, Deserialize)]
+pub struct AusVorlageFahrzeug {
+    /// Stamm-ID (`fahrzeug.id`).
+    pub fahrzeug_id: i64,
+    /// Ausdrücklich aus einer anderen Einheit umhängen (D3); ohne wird ein gebundenes abgelehnt.
+    #[serde(default)]
+    pub umhaengen: bool,
+}
+
+/// Eine Person der Vorlage im Body des Bildens.
+#[derive(Debug, Deserialize)]
+pub struct AusVorlagePerson {
+    /// Stamm-ID (`personal.id`).
+    pub personal_id: i64,
+    /// Ausdrücklich aus einer anderen Einheit oder von einem anderen Fahrzeug umhängen (D3).
+    #[serde(default)]
+    pub umhaengen: bool,
+}
+
+/// Body von `POST …/einheiten/aus-vorlage` (D3). Der Einheitenbaum kommt aus der Vorlage.
+#[derive(Debug, Deserialize)]
+pub struct AusVorlageBody {
+    pub vorlage_id: i64,
+    /// Name der obersten Einheit; fehlt er, gilt der Name der Vorlage.
+    pub name: Option<String>,
+    /// Abschnitt der obersten Einheit; Untereinheiten erben ihn.
+    pub abschnitt_id: Option<i64>,
+    /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
+    #[serde(default)]
+    pub fahrzeuge: Vec<AusVorlageFahrzeug>,
+    /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
+    #[serde(default)]
+    pub personal: Vec<AusVorlagePerson>,
+}
+
+/// Prüft eine Liste von außen gegen `SAMMEL_MAX` (vor dem Entdoppeln, 400) und entdoppelt je
+/// Stamm-ID; die erste Zeile gewinnt (D7).
+fn check_wahl(
+    liste: Vec<aus_vorlage::Wahl>,
+    art: &str,
+) -> Result<Vec<aus_vorlage::Wahl>, AppError> {
+    let max = crate::kraefte_disposition::SAMMEL_MAX;
+    if liste.len() > max {
+        return Err(AppError::Validation(format!(
+            "Höchstens {max} {art} je Bildung"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(&liste, |w| w.id))
+}
+
+/// POST /api/einsaetze/{id}/einheiten/aus-vorlage — Einheit samt Untereinheiten, Fahrzeugen und
+/// gewählter Stammbesetzung aus einer Vorlage bilden (LLH-1049, Spec `kraefte-disposition`,
+/// „Einheit aus Vorlage bilden“). Alles oder nichts in einer Transaktion: Gründe je Zeile 422,
+/// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal (403 vor jedem
+/// Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion, Ereignisse nach dem Commit, auch an
+/// Einheiten, aus denen umgehängt wurde.
+pub async fn aus_vorlage_bilden(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    JsonBody(body): JsonBody<AusVorlageBody>,
+) -> Result<(StatusCode, Json<aus_vorlage::AusVorlageErgebnis>), AppError> {
+    // Listen und Name vor jeder Abfrage (`src/AGENTS.md`, „Eingabegrenzen“).
+    let fahrzeuge = check_wahl(
+        body.fahrzeuge
+            .iter()
+            .map(|f| aus_vorlage::Wahl {
+                id: f.fahrzeug_id,
+                umhaengen: f.umhaengen,
+            })
+            .collect(),
+        "Fahrzeuge",
+    )?;
+    let personal = check_wahl(
+        body.personal
+            .iter()
+            .map(|p| aus_vorlage::Wahl {
+                id: p.personal_id,
+                umhaengen: p.umhaengen,
+            })
+            .collect(),
+        "Personen",
+    )?;
+    let name = body
+        .name
+        .as_deref()
+        .map(|n| pflicht_max(n, "Name", crate::einheit::NAME_MAX))
+        .transpose()?;
+    if !fahrzeuge.is_empty() {
+        ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
+    }
+    if !personal.is_empty() {
+        ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    }
+    let einsatz_id = ctx.einsatz.id;
+    let kontext = crate::kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
+    let lesen = aus_vorlage::Lesen {
+        fahrzeuge: !fahrzeuge.is_empty(),
+        personal: !personal.is_empty(),
+    };
+    let anfrage = aus_vorlage::Anfrage {
+        name: name.as_deref(),
+        abschnitt_id: body.abschnitt_id,
+        fahrzeuge: &fahrzeuge,
+        personal: &personal,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (gebildet, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let plan =
+            aus_vorlage::plan_tx(conn, einsatz_id, kontext.org_id, body.vorlage_id, lesen).await?;
+        let gebildet = aus_vorlage::bilde_tx(conn, kontext, &plan, &anfrage).await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &aus_vorlage::etb_text(&plan.knoten[0].name, &gebildet),
+        )
+        .await?;
+        Ok((gebildet, etb_id))
+    })?;
+    // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
+    state.live.publiziere(einsatz_id, etb_id);
+    for e in &gebildet.einheiten {
+        sse_einheit(&state, einsatz_id, e.id);
+    }
+    for alt in &gebildet.alte_einheiten {
+        sse_einheit(&state, einsatz_id, *alt);
+    }
+    for f in &gebildet.fahrzeuge {
+        sse_fahrzeug(&state, einsatz_id, f.id);
+    }
+    for alt in &gebildet.alte_fahrzeuge {
+        sse_fahrzeug(&state, einsatz_id, *alt);
+    }
+    for p in &gebildet.personal {
+        sse_personal(&state, einsatz_id, p.id);
+    }
+    let einheit_ids: Vec<i64> = gebildet.einheiten.iter().map(|e| e.id).collect();
+    Ok((
+        StatusCode::CREATED,
+        Json(aus_vorlage::AusVorlageErgebnis {
+            einheit_id: einheit_ids[0],
+            einheit_ids,
+            fahrzeuge: gebildet.fahrzeuge.iter().map(|f| f.id).collect(),
+            personal: gebildet.personal.iter().map(|p| p.id).collect(),
+        }),
+    ))
 }
 
 /// PATCH-Body (LFH-306, Tri-State): jedes Feld optional, absent = unverändert,

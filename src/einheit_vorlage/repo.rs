@@ -432,6 +432,8 @@ pub async fn load_tree_tx(
             stack.extend(children.iter().rev().copied());
         }
     }
+    // `Selection::Ids` liefert in der Reihenfolge von `ids`, also der Tiefensuche, nicht nach
+    // `sortier`/Name: das Bilden legt die Einheiten in dieser Folge an (LLH-1049).
     let mut vorlagen = load_where(conn, org_id, Selection::Ids(&ids[1..])).await?;
     vorlagen.insert(0, wurzel);
     Ok(vorlagen)
