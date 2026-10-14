@@ -1390,11 +1390,14 @@ export interface components {
         };
         /** @description Personal-Mitglied einer Einheit (leichtgewichtig für die Einheiten-Anzeige). */
         EinheitMitgliedPerson: {
+            /** @description Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation. */
+            einsatzfunktion?: string | null;
             /**
              * Format: int64
              * @description `einsatz_personal.id` der Dispozeile.
              */
             ep_id: number;
+            /** @description Qualifikation (Snapshot), wie `EinsatzPersonalAnzeige::funktion`. */
             funktion?: string | null;
             /** @description `true`, wenn diese Person als Führer der Einheit eingetragen ist. */
             ist_fuehrer: boolean;
@@ -1738,12 +1741,20 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             /**
+             * @description Einsatzfunktion (LLH-1067, Spec `personal-einsatzangaben`): was die Kraft im Einsatz gerade
+             *     tut, getrennt von `funktion` (Qualifikation). Angezeigt wird sie vor der Qualifikation.
+             */
+            einsatzfunktion?: string | null;
+            /**
              * Format: int64
              * @description Fahrzeug, dessen Besatzung die Kraft ist (LFH-9); `None` = keinem Fahrzeug zugeteilt.
              *     Unabhängig von `einheit_id` (orthogonale Zuordnung).
              */
             fahrzeug_id?: number | null;
-            /** @description Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot). */
+            /**
+             * @description Qualifikationen als flacher Text (Live recomposed oder Snapshot); bei Ad-hoc-Personen die
+             *     erfasste Qualifikation. Die Einsatzfunktion steht getrennt in `einsatzfunktion`.
+             */
             funktion?: string | null;
             /** Format: int64 */
             id: number;
@@ -4989,6 +5000,8 @@ export interface components {
              * @description Einheit der Kraft (Kennung und Name); fehlen ohne Einheit.
              */
             einheit_id?: number | null;
+            /** @description Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation. */
+            einsatzfunktion?: string | null;
             /** @description Qualifikationen als flacher Text, wie in der Personalliste. */
             funktion?: string | null;
             /**

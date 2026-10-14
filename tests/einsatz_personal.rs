@@ -1683,3 +1683,52 @@ async fn angaben_aendern_meldet_nur_betroffene_ansichten() {
         "Name einer geschädigten Kraft"
     );
 }
+
+/// Einheit-Mitglieder und UHS-Kräfte tragen die Einsatzfunktion mit (design.md D6).
+#[tokio::test]
+async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mitglied = adhoc_kraft(&app, &admin, einsatz, "Mitglied").await;
+    let an_uhs = adhoc_kraft(&app, &admin, einsatz, "An der UHS").await;
+    let einheit = einheit_mit(&app, &admin, einsatz, mitglied).await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, an_uhs).await;
+    for ep in [mitglied, an_uhs] {
+        let (s, _) =
+            patch_kraft(&app, &admin, einsatz, ep, r#"{"einsatzfunktion":"Melder"}"#).await;
+        assert_eq!(s, StatusCode::OK);
+    }
+
+    let (_, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let e = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .unwrap();
+    assert_eq!(
+        e["personal_mitglieder"][0]["einsatzfunktion"], "Melder",
+        "{e}"
+    );
+    assert_eq!(e["personal_mitglieder"][0]["funktion"], "Sanitäter", "{e}");
+
+    let (s, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["kraefte"][0]["einsatzfunktion"], "Melder", "{json}");
+    assert_eq!(json["kraefte"][0]["funktion"], "Sanitäter", "{json}");
+}
