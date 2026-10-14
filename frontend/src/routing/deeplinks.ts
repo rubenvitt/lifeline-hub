@@ -143,12 +143,9 @@ export function ueberblickPfad(einsatzId: number): string {
 
 /**
  * Aggregierende Kräfteübersicht, in der Navigation „Meldebild". Der Routenschlüssel
- * `kraefteuebersicht` bleibt, damit bestehende Deeplinks tragen.
- */
-/**
- * Meldebild (Kräfteübersicht). `einheit` ist ein AUFTRAG (apply-then-clean, LLH-1049, Spec
- * `kraeftebaum`, „Sprung auf eine Einheit“): Ahnen und Teilbaum der Einheit klappen auf, die Zeile
- * wird hervorgehoben.
+ * `kraefteuebersicht` bleibt, damit bestehende Deeplinks tragen. `einheit` ist ein AUFTRAG
+ * (apply-then-clean, LLH-1049, Spec `kraeftebaum`, „Sprung auf eine Einheit“): Ahnen und
+ * Teilbaum der Einheit klappen auf, die Zeile wird hervorgehoben.
  */
 export function kraefteuebersichtPfad(einsatzId: number, opts: { einheit?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'kraefteuebersicht'), { einheit: opts.einheit });
