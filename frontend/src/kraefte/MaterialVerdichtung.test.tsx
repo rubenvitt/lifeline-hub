@@ -47,9 +47,16 @@ describe('MaterialVerdichtung', () => {
     expect(mit.style.color).not.toBe('');
   });
 
-  it('bleibt ohne Daten stumm, statt eine Null zu behaupten', () => {
-    const { container } = setup(undefined);
-    expect(container.textContent).toBe('');
+  it('behauptet ohne Daten keine Null, hält aber den Platz (kein Sprung beim Laden)', () => {
+    setup(undefined);
+    expect(screen.queryByTestId('material-verdichtung')).toBeNull();
+    const platz = screen.getByTestId('material-verdichtung-platz');
+    // Unsichtbar und für Hilfsmittel verborgen: keine Zahl, kein erreichbarer Link.
+    expect(platz).toHaveAttribute('aria-hidden', 'true');
+    expect(platz).toHaveStyle({ visibility: 'hidden' });
+    expect(platz).not.toBeVisible();
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByText(/einsatzbereit/)).not.toBeVisible();
   });
 
   it('verlinkt auf das Meldebild', () => {

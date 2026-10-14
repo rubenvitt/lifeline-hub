@@ -17,7 +17,9 @@ import { verdichtungsLinkStil, verdichtungsTextfarbe } from './Verdichtungszeile
  * Einsatzbereit und im Einsatz sind der Normalfall und bleiben ohne Farbe.
  *
  * Gezählt wird, was der Aufrufer hereinreicht: die ganze aktive Liste, nicht die gefilterte. Ohne
- * Daten (Laden, erster Fehler) ist die Zeile stumm, wie die `Verdichtungszeile`.
+ * Daten (Laden, erster Fehler) behauptet die Zeile keine Null: sie hält nur ihren Platz, unsichtbar
+ * und für Hilfsmittel verborgen. Erschiene sie erst mit den Daten, schöbe sie die Liste darunter
+ * nach unten (CLS 0,10–0,13 bei 1024 und 390 px, Prüfliste LLH-1093, Kriterium 12).
  */
 export default function MaterialVerdichtung({
   einsatzId,
@@ -30,15 +32,19 @@ export default function MaterialVerdichtung({
 }) {
   const { token, rollen } = useRollen();
   const meldebildGesperrt = useSprungSperre(einsatzId)('kraefteuebersicht');
-  if (!material) return null;
-  const v = verdichteMaterial(material);
+  const platzhalter = material == null;
+  const v = verdichteMaterial(material ?? []);
   return (
     <Space
       wrap
       align="center"
-      data-testid="material-verdichtung"
-      data-lfh="verdichtungszeile"
-      style={{ marginBlockEnd: token.margin }}
+      data-testid={platzhalter ? 'material-verdichtung-platz' : 'material-verdichtung'}
+      data-lfh={platzhalter ? undefined : 'verdichtungszeile'}
+      aria-hidden={platzhalter || undefined}
+      style={{
+        marginBlockEnd: token.margin,
+        ...(platzhalter ? { visibility: 'hidden' as const } : {}),
+      }}
     >
       <span>{v.einsatzbereit} einsatzbereit</span>
       <span aria-hidden>·</span>

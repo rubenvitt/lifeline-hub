@@ -293,6 +293,12 @@ export type Kartenplan<T, K extends string> =
       aktion?: PrimaerAktion<T>;
       /** Gebündelte weitere Aktionen neben der Primäraktion — siehe {@link WeitereAktionen}. */
       weitere?: WeitereAktionen<T>;
+      /**
+       * Aktionen UNTER dem Karteninhalt statt rechts daneben (`ListenEintrag` `gestapelt`). Für
+       * eine Primäraktion mit langem Etikett: „Aus dem Einsatz nehmen“ ließ dem Inhalt auf 390 px
+       * keine 60 px, der Titel brach Buchstabe für Buchstabe um (LLH-1093, Prüfliste).
+       */
+      gestapelt?: true;
     }
   | {
       art: 'eigen';
@@ -1981,7 +1987,13 @@ export default function Datensicht<T extends object, const K extends string>(
         className={zeilenKlasse?.(zeile)}
         style={{ paddingInlineStart: token.padding * Math.min(tiefe, TIEFE_DECKEL) }}
       >
-        <ListenEintrag actions={aktionen.length > 0 ? aktionen : undefined}>
+        <ListenEintrag
+          actions={aktionen.length > 0 ? aktionen : undefined}
+          gestapelt={karte.gestapelt}
+          // Gestapelt stünde die Aktionszeile mit `paddingXS` (5 / 7 px) unter dem letzten Ziel des
+          // Inhalts; die Leitlinie verlangt ≥ 8 / ≥ 16 px (Prüfliste LLH-1093, Kriterium 2).
+          style={karte.gestapelt ? { rowGap: token.padding } : undefined}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
             <div
               style={{

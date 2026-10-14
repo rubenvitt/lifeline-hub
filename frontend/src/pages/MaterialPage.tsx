@@ -468,7 +468,9 @@ export default function MaterialPage() {
           etikett="Menge"
           kennung={em.bezeichnung}
           wert={em.menge}
-          anzeige={em.menge}
+          // Eine Zahl bricht nicht um: im Kartenfeld (Breite nach Inhalt) stand „50“ sonst als „5“
+          // über „0“, weil der Wertknopf seine Polsterung über den Rand hinausträgt.
+          anzeige={<span style={{ whiteSpace: 'nowrap' }}>{em.menge}</span>}
           leer={(w) => w == null}
           pflicht
           darfSchreiben={darfSchreiben}
@@ -650,6 +652,8 @@ export default function MaterialPage() {
               // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt. Die
               // Kategorie bleibt in der Suche (LLH-1093, design.md D13).
               sekundaer: ['ort', 'menge'],
+              // „Aus dem Einsatz nehmen“ ließe dem Inhalt rechts daneben auf 390 px keinen Platz.
+              gestapelt: true,
               aktion: darfSchreiben
                 ? {
                     etikett: 'Aus dem Einsatz nehmen',

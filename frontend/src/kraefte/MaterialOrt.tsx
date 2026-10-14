@@ -278,7 +278,12 @@ export default function MaterialOrt({
         display: 'inline-flex',
         flexWrap: 'wrap',
         alignItems: 'center',
-        columnGap: token.marginXS,
+        // Der Wertknopf von `InlineAngabe` ragt je Seite um `paddingSM` über seinen Text hinaus
+        // (Text bündig mit der Spalte). Ohne Ausgleich überlappten die Knöpfe von Einheit und UHS
+        // (gemessen −3,5 px kompakt, −13 px handschuh); so bleiben 10 / 15 / 19 px frei
+        // (Prüfliste LLH-1093, Kriterien 1 und 2).
+        columnGap: token.paddingSM + token.marginXS,
+        rowGap: token.paddingSM,
         minWidth: 0,
       }}
     >
