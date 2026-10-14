@@ -895,6 +895,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_fahrzeug::reaktivieren),
         )
         .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung",
+            post(routes::einsatz_fahrzeug::besatzung_uebernehmen),
+        )
+        .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
             put(routes::einsatz_fahrzeug::besatzung_zuordnen),
         )

@@ -4,7 +4,7 @@ import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
-import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
+import { fussFokusabstandScrollportStil, useFussFokusabstand } from './fussFokusabstand';
 
 interface Props {
   kategorien: Kategorie[];
@@ -93,7 +93,7 @@ const ETIKETT_STIL: CSSProperties = {
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
-  const { wurzelRef, fussRef } = useFussFokusabstand();
+  const { wurzelRef, fussRef } = useFussFokusabstand('spalte');
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
@@ -109,8 +109,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         aria-expanded={aktiv && panel ? panel.offen : undefined}
         aria-controls={aktiv && panel?.offen ? MODUL_PANEL_ID : undefined}
         onClick={() => onKategorieKlick(k.key)}
-        // Fokusabstand zum klebenden Fuß (WCAG 2.4.11) — neben, nicht in `railZielStil`.
-        style={{ ...railZielStil(token, { aktiv }), ...fussFokusabstandStil }}
+        style={railZielStil(token, { aktiv })}
       >
         {/* `flexShrink: 0`, sonst gibt das Icon statt des Etiketts nach. `aria-hidden`: der Name steht
            am Knopf. */}
@@ -147,7 +146,8 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
          Fuß unten, zusammen höchstens so hoch wie das Fenster unter dem Rahmen. Zwei getrennt
          klebende Teile (Kategorien oben, Fuß unten) überlappten bei geringer Höhe in `handschuh`,
          und keiner rollte die verdeckte Kategorie frei. Reicht die Höhe nicht, rollt die Spalte in
-         sich; der Fuß klebt an ihrem Ende, `fussFokusabstand` hält Fokusziele über ihm frei.
+         sich; der Fuß klebt an ihrem Ende, und `scroll-padding-block-end` der Spalte in seiner Höhe
+         rollt ein fokussiertes Ziel über ihn (WCAG 2.4.11, `fussFokusabstand`, LLH-1241).
          Steht über dem Kopf eine Zeile im Fluss (Betriebszeile ab `md`), liegt der Fuß um ihre
          Höhe unter dem Fensterrand, bis die Seite so weit gerollt ist. */}
       <div
@@ -159,6 +159,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
+          ...fussFokusabstandScrollportStil,
         }}
       >
         <div data-lfh="rail-haupt" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -189,7 +190,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
                 aria-controls={panel.offen ? MODUL_PANEL_ID : undefined}
                 data-lfh="rail-griff"
                 onClick={panel.onUmschalten}
-                style={{ ...railZielStil(token, { aktiv: false }), ...fussFokusabstandStil }}
+                style={railZielStil(token, { aktiv: false })}
               >
                 <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
                   {panel.offen ? (

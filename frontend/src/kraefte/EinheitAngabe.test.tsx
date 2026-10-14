@@ -50,7 +50,7 @@ function angabe(p: Partial<EinheitAngabeProps> = {}) {
 
 const FELD = 'Einheit zu Anna';
 
-describe('EinheitAngabe (LLH-1060, LLH-1073 D3)', () => {
+describe('EinheitAngabe (LLH-1060, LLH-1073 D3, LLH-1093)', () => {
   it('der Name bricht nur an Wortgrenzen, nicht mitten im Wort wie der Wertknopf', () => {
     angabe({ wert: 1 });
     const knopf = screen.getByRole('button', { name: 'Einheit zu Anna bearbeiten' });
@@ -160,5 +160,22 @@ describe('EinheitAngabe (LLH-1060, LLH-1073 D3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna eintragen' }));
     await oeffne(FELD);
     expect(listeVon(FELD)!.querySelectorAll('.ant-select-item-group')).toHaveLength(0);
+  });
+
+  // LLH-1093, design.md D3: „keine Einheit“ als eigene Wahl, weil das Leeren-Kreuz am Touchschirm
+  // nur beim Zeigen erscheint.
+  it('mit `ohneOption` steht „keine Einheit“ als erste Wahl und übergibt null', async () => {
+    const onSpeichern = angabe({ wert: 2, ohneOption: 'keine Einheit' });
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna bearbeiten' }));
+    await oeffne(FELD);
+    expect(optionenVon(FELD)).toEqual([
+      'keine Einheit',
+      'Rettungsstaffel',
+      'Zug 1',
+      'Zug 1 › Staffel A',
+    ]);
+    await waehle(FELD, 'keine Einheit');
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zu Anna speichern' }));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(null, 2));
   });
 });

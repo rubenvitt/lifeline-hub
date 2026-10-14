@@ -87,6 +87,9 @@ import {
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
+import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
+import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
+import { besatzungKandidaten, besatzungVorschlag } from '../kraefte/besatzungVorschlag';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 /**
@@ -134,6 +137,7 @@ function BesatzungsBlock({
   onFreigeben,
   zuordnenFehler,
   freigebenFehler,
+  uebernehmen,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
@@ -150,6 +154,11 @@ function BesatzungsBlock({
   zuordnenFehler: ZeilenGrund | null;
   /** Grund des letzten abgelehnten Freigebens je Kraft. */
   freigebenFehler: (epId: number) => ZeilenGrund | null;
+  /**
+   * „Personal der Einheit übernehmen“ (LLH-1073, design.md D12): `null` ohne Einheit des Fahrzeugs
+   * (der Knopf fehlt), sonst die Zahl freier Kräfte der Einheit und der Öffner des Dialogs.
+   */
+  uebernehmen: { kandidaten: number; onOeffnen: () => void } | null;
 }) {
   const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
   const frei = personal.filter((p) => p.fahrzeug_id == null);
@@ -159,6 +168,17 @@ function BesatzungsBlock({
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
       </Space>
+      {darfSchreiben && uebernehmen && (
+        // Gesperrt steht der Grund sichtbar daneben, nicht nur im Tooltip (D12).
+        <Space size={abstand.sm} wrap style={{ display: 'flex', marginBottom: abstand.sm }}>
+          <Button disabled={uebernehmen.kandidaten === 0} onClick={uebernehmen.onOeffnen}>
+            Personal der Einheit übernehmen
+          </Button>
+          {uebernehmen.kandidaten === 0 && (
+            <Typography.Text type="secondary">keine freien Kräfte der Einheit</Typography.Text>
+          )}
+        </Space>
+      )}
       {crew.length === 0 ? (
         <div>
           <Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text>
@@ -240,8 +260,8 @@ const ANSICHT_OPTIONEN = [
 /** Im Disponieren stehen vier Felder sichtbar (Schnellerfassung), nur OPTA im Klappteil. */
 const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
 
-/** Einträge des Zeilenmenüs (design.md D6). */
-type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'stornieren';
+/** Einträge des Zeilenmenüs (design.md D6; „Als eigene Einheit führen“ D9). */
+type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'einheit' | 'stornieren';
 
 export default function FahrzeugePage() {
   const { id } = useParams();
@@ -268,6 +288,13 @@ export default function FahrzeugePage() {
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
   /** Offener Dialog „Angaben ändern“ (design.md D7), ebenfalls außerhalb der Zeilen-`map`. */
   const [angabenFuer, setAngabenFuer] = useState<EinsatzFahrzeug | null>(null);
+  /** Offener Dialog „Als eigene Einheit führen“ (design.md D9). */
+  const [einheitFuer, setEinheitFuer] = useState<EinsatzFahrzeug | null>(null);
+  /** Offener Dialog „Personal der Einheit übernehmen“ samt Vorwahl beim Öffnen (D12). */
+  const [uebernehmenFuer, setUebernehmenFuer] = useState<{
+    fahrzeug: EinsatzFahrzeug;
+    vorgewaehlt: number[];
+  } | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
   // mitnimmt (Muster `PersonenPage`).
@@ -507,6 +534,11 @@ export default function FahrzeugePage() {
         ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
         : { key: 'angaben', label: 'Angaben ändern …' },
       ...(ausStamm && canStamm ? [{ key: 'stamm' as const, label: 'Im Stamm ändern ↗' }] : []),
+      // Nur ohne Einheit und mit Freigabe des Moduls Einheiten (D9): ein schon zugeordnetes
+      // Fahrzeug wechselt über die Einheit-Spalte.
+      ...(einheitenFrei && ef.einheit_id == null
+        ? [{ key: 'einheit' as const, label: 'Als eigene Einheit führen …' }]
+        : []),
       { key: 'stornieren', label: 'Stornieren', gefahr: true },
     ];
   };
@@ -515,6 +547,7 @@ export default function FahrzeugePage() {
     else if (aktion === 'angaben') setAngabenFuer(ef);
     else if (aktion === 'stamm' && ef.fahrzeug_id != null)
       void navigate(fahrzeugDetailPfad(ef.fahrzeug_id));
+    else if (aktion === 'einheit') setEinheitFuer(ef);
     else if (aktion === 'stornieren') setStornoFuer({ id: ef.id, name: ef.funkrufname });
   };
 
@@ -543,6 +576,18 @@ export default function FahrzeugePage() {
   const abschnitte = einheitenFrei && abschnitteFrei ? (abschnitteQuery.data ?? []) : [];
   const einheitOptionen = buildEinheitOptions(einheiten, abschnitte);
   const einheitNameJe = new Map(einheiten.map((e) => [e.id, e.name]));
+  /**
+   * Besatzungsvorschlag aus der Einheit (D12): freie Kräfte der Einheit bis zum Soll, der Führer
+   * der Einheit zuerst (nur mit Freigabe `einheiten` bekannt).
+   */
+  const fuehrerJe = new Map(einheiten.map((e) => [e.id, e.fuehrer_id ?? null]));
+  const vorschlagFuer = (ef: EinsatzFahrzeug) =>
+    besatzungVorschlag({
+      kandidaten: besatzungKandidaten(personal, ef),
+      crew: personal.filter((p) => p.fahrzeug_id === ef.id),
+      soll: ef.soll_besatzung ?? null,
+      fuehrerId: ef.einheit_id != null ? (fuehrerJe.get(ef.einheit_id) ?? null) : null,
+    });
   const abschnittJe = abschnittDerEinheit(einheiten);
   const einheitName = (ef: EinsatzFahrzeug) =>
     ef.einheit_id != null ? (einheitNameJe.get(ef.einheit_id) ?? null) : null;
@@ -978,6 +1023,18 @@ export default function FahrzeugePage() {
                     onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
                     zuordnenFehler={zuordnenFehler.grund(ef.id)}
                     freigebenFehler={freigebenFehler.grund}
+                    uebernehmen={
+                      ef.einheit_id != null
+                        ? {
+                            kandidaten: besatzungKandidaten(personal, ef).length,
+                            onOeffnen: () =>
+                              setUebernehmenFuer({
+                                fahrzeug: ef,
+                                vorgewaehlt: vorschlagFuer(ef).vorgewaehlt,
+                              }),
+                          }
+                        : null
+                    }
                   />
                 ),
               }}
@@ -1127,6 +1184,29 @@ export default function FahrzeugePage() {
         einsatzId={einsatzId}
         fahrzeug={angabenFuer}
         onSchliessen={() => setAngabenFuer(null)}
+      />
+
+      {/* Ein Fahrzeug als eigene Einheit führen (D9), geöffnet aus dem Zeilenmenü; der Abschnitt
+          nur mit Freigabe der Einsatzabschnitte. */}
+      <EigeneEinheitDialog
+        einsatzId={einsatzId}
+        fahrzeug={einheitFuer}
+        personal={personal}
+        abschnitte={einheitenFrei && abschnitteFrei ? abschnitte : null}
+        onSchliessen={() => setEinheitFuer(null)}
+      />
+
+      {/* Personal der Einheit als Besatzung übernehmen (D12), geöffnet im Besatzungsblock. */}
+      <BesatzungUebernehmenDialog
+        einsatzId={einsatzId}
+        auftrag={uebernehmenFuer}
+        personal={personal}
+        fuehrerId={
+          uebernehmenFuer?.fahrzeug.einheit_id != null
+            ? (fuehrerJe.get(uebernehmenFuer.fahrzeug.einheit_id) ?? null)
+            : null
+        }
+        onSchliessen={() => setUebernehmenFuer(null)}
       />
     </EinsatzSeite>
   );

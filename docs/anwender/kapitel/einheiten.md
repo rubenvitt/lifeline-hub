@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs]
 ---
 
 ## Überblick
@@ -12,10 +12,13 @@ eine Staffel oder einen Trupp. Einheiten lassen sich einander unterstellen und e
 Einsatzabschnitt zuordnen. Ihre Ist-Stärke ergibt sich aus dem zugeordneten Personal, die
 Soll-Stärke trägt die Führung ein.
 
-Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit Kopfdaten,
-Zeitachse und den Paneelen „Personal“, „Fahrzeuge“ und „Material“. Eine stehende Einheit wie ein
-Sanitätszug lässt sich in einem Zug aus ihrer Einheiten-Vorlage bilden, samt Untereinheiten,
-Fahrzeugen und Besatzung. Bilden, ändern und zuordnen dürfen Einsatzleitung und Führungspersonal.
+Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit den
+Paneelen „Kopfdaten“, „Fahrzeuge und Besatzung“, „Zeitachse“, „Material“, „Funk und
+Kommunikation“ und „Taktisches Zeichen“, zuletzt „Einheit auflösen“. „Fahrzeuge und Besatzung“
+zeigt je Fahrzeug, wer darauf sitzt, und darunter, wer ohne Fahrzeug zur Einheit gehört. Jede
+Angabe wird an ihrem Wert geändert. Eine stehende Einheit wie ein Sanitätszug lässt sich in einem Zug aus ihrer
+Einheiten-Vorlage bilden, samt Untereinheiten, Fahrzeugen und Besatzung. Bilden, ändern und
+zuordnen dürfen Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -62,40 +65,82 @@ Für Einsatzleitung und Führungspersonal:
    3 Fahrzeuge, 2 Kräfte“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
    Untereinheiten und Fahrzeuge aufgeklappt.
 
-### Die Kopfdaten einer Einheit pflegen
+### Angaben einer Einheit ändern
 
 Für Einsatzleitung und Führungspersonal:
 
 1. Die Einheit öffnen.
-2. Im Paneel „Kopfdaten“ „Name“, „Typ“, „Abschnitt“ und „Über-Einheit“ setzen.
-3. Unter „Soll-Stärke (F/UF/M)“ Führer, Unterführer und Mannschaft eintragen. Daneben stehen die
-   Ist-Stärke und die kumulierte Ist-Stärke samt unterstellter Einheiten.
-4. Unter „Funk / Kommunikation“ bei Bedarf „Funkrufname“, „Sprechgruppen“, „Kommunikationsmittel“,
-   „Erreichbarkeit / Nummer“ und „Bemerkung“ eintragen.
-5. „Speichern“ wählen.
+2. Im Paneel „Kopfdaten“ den Wert der Angabe wählen, etwa „Name“. Eine leere Angabe steht als
+   Aufforderung da, etwa „Funkrufname eintragen“.
 
-### Personal, Fahrzeuge und Material zuordnen
+   ![Paneel „Kopfdaten“ der Rettungsstaffel mit großem taktischem Zeichen, Name, Typ, Über-Einheit „Sanitätszug Musterstadt“, Einheitsführerin Anna Probe, Soll- und Ist-Stärke und Status](../bilder/einheiten/kopf.png)
+
+3. Den neuen Wert eingeben oder wählen und mit „Speichern“ oder Enter übernehmen. „Abbrechen“
+   oder Escape lässt den alten Wert stehen. In „Bemerkung“ bricht Enter die Zeile um; übernommen
+   wird mit Strg+Enter oder „Speichern“.
+4. Unter „Soll-Stärke (F/UF/M)“ Führer, Unterführer und Mannschaft zusammen eintragen. Unter „Ist
+   (F/UF/M//Σ)“ steht die Ist-Stärke, mit unterstellten Einheiten auch die kumulierte, und
+   daneben „unterbesetzt“ oder „Soll erfüllt“.
+5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
+   zurück.
+6. Im Paneel „Funk und Kommunikation“ ebenso „Sprechgruppen“, „Kommunikationsmittel“ und
+   „Erreichbarkeit / Nummer“ ändern.
+
+### Das taktische Zeichen setzen
 
 Für Einsatzleitung und Führungspersonal:
 
 1. Die Einheit öffnen.
-2. Im Paneel „Personal“ unter „Person zuordnen …“ eine Person wählen. Sie steht sofort in der Liste;
-   zu speichern ist nichts.
+2. Im Paneel „Taktisches Zeichen“ „Fachaufgabe eintragen“ oder „Organisation eintragen“ wählen
+   (bei gesetztem Wert den Wert).
+3. Einen Eintrag wählen. Das kleine Zeichen neben der Auswahl zeigt das Zeichen mit der Wahl.
 
-   ![Paneel „Personal“ der Rettungsstaffel mit vier Personen, Anna Probe als Einheitsführer, und dem Auswahlfeld „Person zuordnen …“](../bilder/einheiten/personal.png)
+   ![Paneel „Taktisches Zeichen“ mit geöffneter Zeile „Organisation“, gewähltem Eintrag und dem Zeichen daneben](../bilder/einheiten/zeichen.png)
 
-3. Mit „Als Einheitsführer“ eine Person der Einheit als Einheitsführer setzen.
-4. Ebenso in „Fahrzeuge“ unter „Fahrzeug zuordnen …“ und in „Material“ unter „Material zuordnen …“
-   wählen.
-5. Mit „Entfernen“ eine Person, ein Fahrzeug oder Material wieder aus der Einheit lösen. Es bleibt
-   im Einsatz, nur ohne Einheit.
+4. „Speichern“ wählen. Das große Zeichen im Kopf, das Meldebild und die Lagekarte zeigen das
+   neue Zeichen.
+
+### Personal und Fahrzeuge zuordnen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Die Einheit öffnen.
+2. Im Paneel „Fahrzeuge und Besatzung“ unter „Fahrzeug zuordnen …“ ein Fahrzeug wählen. Unter
+   „Im Einsatz frei“ stehen Fahrzeuge im Einsatz ohne Einheit, unter „Aus dem Stamm“ Fahrzeuge
+   der Organisation, die noch nicht im Einsatz sind; Demo-Fahrzeuge stehen zuletzt unter
+   „Demo-Daten“. Ein Stamm-Fahrzeug wird mit der Wahl in den Einsatz geholt. Zu speichern ist
+   nichts.
+3. Ebenso unter „Person zuordnen …“ eine Person wählen. Hat die Einheit Fahrzeuge, steht die
+   Person zunächst unter „Ohne Fahrzeug“.
+4. Im Menü „Aktionen zu Person …“ (drei Punkte) einer Person „Auf …“ mit dem Funkrufnamen wählen.
+   Die Person steht dann unter dem Fahrzeug. Neben dem Fahrzeug steht die Besatzung als Ist und
+   Soll, mit „unterbesetzt“ oder „Soll erfüllt“, und wer davon aus einer anderen Einheit oder
+   ohne Einheit mitfährt.
+
+   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
+
+5. Im selben Menü setzt „Als Einheitsführer“ die Person als Einheitsführer, „Vom Fahrzeug
+   lösen“ nimmt sie vom Fahrzeug und lässt sie in der Einheit, „Aus Einheit lösen“ löst sie aus
+   der Einheit.
+6. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
+   löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
+
+### Material zuordnen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Die Einheit öffnen.
+2. Im Paneel „Material“ unter „Material zuordnen …“ einen freien Posten wählen. Die Kopfzeile des
+   Paneels zählt die Posten und, falls vorhanden, den Ausfall; ein ausgefallener Posten trägt
+   seinen Status als Wort.
+3. Mit „Aus Einheit lösen“ einen Posten wieder lösen.
 
 ### Eine Einheit auflösen
 
 Für Einsatzleitung und Führungspersonal:
 
 1. Die Einheit öffnen.
-2. Im Paneel „Kopfdaten“ „Auflösen“ wählen.
+2. Im letzten Paneel „Einheit auflösen“ „Einheit auflösen“ wählen.
 3. Die Rückfrage „Einheit auflösen?“ mit „Einheit auflösen“ bestätigen. Die Mitglieder werden frei,
    unterstellte Einheiten rücken eine Ebene hoch.
 4. Auf der Seite „Einheiten“ steht die aufgelöste Einheit unter der Gliederung im Block
@@ -108,19 +153,25 @@ Für Einsatzleitung und Führungspersonal:
 ### Wer zu einer Einheit gehört
 
 Eine Person, ein Fahrzeug oder ein Materialposten gehört höchstens einer Einheit an. Die
-Auswahlfelder bieten nur an, was noch keiner Einheit zugeordnet ist; wer in eine andere Einheit
-wechseln soll, wird dort zuerst entfernt. Disponiert, also in den Einsatz geholt, werden Kräfte in
-den Modulen [Personal](personal.md), [Fahrzeuge und FMS](fahrzeuge.md) und [Material](material.md).
+Auswahlfelder bieten aus dem Einsatz nur an, was noch keiner Einheit zugeordnet ist; wer in eine
+andere Einheit wechseln soll, wird dort zuerst gelöst. Aus dem Stamm stehen nur Kräfte im Dienst,
+die weder im Einsatz stehen noch aus ihm entlassen wurden; eine entlassene Kraft kommt über
+die Module [Personal](personal.md) und [Fahrzeuge und FMS](fahrzeuge.md) zurück. Eine Stamm-Kraft
+wird mit der Wahl disponiert und zugeordnet, ganz oder gar nicht: ist sie inzwischen außer Dienst
+oder schon im Einsatz, geschieht nichts, und der Grund steht unter dem Auswahlfeld. Material kommt
+nur über das Modul [Material](material.md) in den Einsatz.
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
-Fahrzeug dabei aus seiner bisherigen Einheit um.
+Fahrzeug dabei aus seiner bisherigen Einheit um. Ein Fahrzeug ohne Einheit lässt sich dort auch als
+eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
+[Fahrzeuge und FMS](fahrzeuge.md)).
 
 ### Stärke
 
 Die Ist-Stärke zählt das zugeordnete Personal nach seiner Stärke-Position (Führer, Unterführer,
 Mannschaft), die im Modul Personal gesetzt wird. Einheitsführer ist ein eigenes Merkmal: eine Person
-mit der Position „Führer“ ist dadurch noch nicht Einheitsführer, die Seite weist darauf hin. Je
-Einheit gibt es einen Einheitsführer. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten
-mit ein.
+mit der Position „Führer“ ist dadurch noch nicht Einheitsführer. Je Einheit gibt es einen
+Einheitsführer, eine Person der Einheit; solange keiner gesetzt ist, steht im Kopf „Einheitsführer
+eintragen“. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten mit ein.
 
 In der Gliederung steht unter „Ist“ die kumulierte Ist-Stärke: ein Zug zählt seine Gruppen mit,
 jede Gruppe zeigt ihre eigene. Fehlt in einer Position (Führer, Unterführer oder Mannschaft) jemand
@@ -137,11 +188,39 @@ Personal und Material einer Einheit stehen im Meldebild und auf der Seite der Ei
 Gliederung. Die Gesamtstärke aller Kräfte steht über der Tabelle, zusammen mit dem Weg ins
 Meldebild.
 
+### Besatzung und Freigaben
+
+Die Besatzung (wer auf welchem Fahrzeug sitzt) ist dieselbe wie im [Meldebild](meldebild.md); sie
+wird auch in den Modulen Personal und Fahrzeuge gesetzt. Das Soll der Besatzung trägt das
+Fahrzeug. Eine Person auf einem Fahrzeug einer anderen Einheit steht in ihrer Einheit unter „Ohne
+Fahrzeug“ mit „fährt auf …“.
+
+Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide freigegeben
+sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
+„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
+dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
+„Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund; ohne Freigabe Material
+ebenso „Material zuordnen …“.
+
 ### Status und Zeitachse
 
-Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er im Meldebild von Hand
-gesetzt. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Meldebild
+Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er von Hand gesetzt, im
+Meldebild oder auf der Seite der Einheit. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Meldebild
 und Kräfte-Zeitachse](meldebild.md)).
+
+### Jede Angabe für sich
+
+Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz oder die Fernmeldeskizze
+inzwischen an einer anderen Angabe derselben Einheit geändert hat, bleibt erhalten; nur die
+geänderte Angabe wird überschrieben. Ein abgelehnter Wert bleibt in der offenen Zeile stehen,
+der Grund steht darunter.
+
+### Taktisches Zeichen
+
+Das taktische Zeichen gehört zur Lage: es wird wie auf der Lagekarte gespeichert, ohne Eintrag im
+Einsatztagebuch, und verschiebt die Einheit auf der Karte nicht. Ohne eigene Organisation zeichnet
+die App die Vorgabe der Organisation; die Zeile „Organisation“ nennt sie dann („Vorgabe der
+Organisation: …“).
 
 ### Auflösen
 
@@ -156,9 +235,11 @@ Meldung, kein Dokument, kein Verteiler) wird beim Auflösen ganz gelöscht. An e
 ### Einsatztagebuch
 
 Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit, eine neue
-Abschnittszuordnung, einen Wechsel des Einheitsführers und jedes Zuordnen und Lösen von Personal,
-Fahrzeugen und Material. Änderungen an Name, Typ, Unterstellung, Soll-Stärke und Funkangaben stehen
-nicht im Einsatztagebuch.
+Abschnittszuordnung, einen Wechsel des Einheitsführers, einen Statuswechsel von Hand und jedes
+Zuordnen und Lösen von Personal, Fahrzeugen und Material. Eine Kraft aus dem Stamm bekommt einen
+Eintrag für Disposition und Einheit zusammen, wie im Modul Personal bzw. Fahrzeuge. Das Setzen
+auf ein Fahrzeug und das Lösen davon stehen als Eintrag des Fahrzeugs im Einsatztagebuch. Änderungen an Name, Typ, Unterstellung, Soll-Stärke, Funkangaben und
+taktischem Zeichen stehen nicht im Einsatztagebuch.
 
 ### Aus einer Vorlage bilden
 
@@ -201,6 +282,8 @@ Fahrzeugen, Kräften und wer woher umgehängt wurde.
 
 Lesen darf, wer das Modul Einheiten sieht. Bilden, ändern, zuordnen und auflösen dürfen
 Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im
-Einsatz](rechte-im-einsatz.md)). Ohne Netz bleiben Gliederung und Einheiten mit dem zuletzt
-geladenen Stand lesbar; ändern lässt sich nichts, und eine Vorlage lässt sich weder ansehen noch
-bilden (Kapitel [Ohne Netz](ohne-netz.md)).
+Einsatz](rechte-im-einsatz.md)). Ohne dieses Recht zeigt die Seite einer Einheit nur die Werte,
+leere als „—“, ohne Statuswahl, ohne Menü an den Personen, ohne Auswahlfelder, ohne Lösen und
+ohne das Paneel „Einheit auflösen“. Ohne Netz
+bleiben Gliederung und Einheiten mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts,
+und eine Vorlage lässt sich weder ansehen noch bilden (Kapitel [Ohne Netz](ohne-netz.md)).

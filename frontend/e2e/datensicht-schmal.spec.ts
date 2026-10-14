@@ -18,10 +18,10 @@ import { einsatzAnlegen } from './einsatz-kern';
  * hier durch. Auf der Vorgabestufe gilt zusätzlich der 24-px-Boden aus Kriterium 1.
  *
  * WO WELCHES ZIEL GEMESSEN WIRD:
- *  - Aktionsknopf auf `/personal` bei 390 px.
+ *  - Auslöser der Einheitsangabe auf `/personal` bei 390 px: seit LLH-1060 trägt die
+ *    Personalkarte keinen Aktionsknopf mehr, ihre Bedienziele sind die Inline-Angaben.
  *  - Spaltenschalter auf `/personal` bei 1366 px — im Kartenzweig gibt es ihn nicht.
- *  - Titel-Link auf `/tiere` bei 390 px: die Personalseite setzt `titel` ohne `ziel` (der
- *    Link zeigte auf sie selbst) und rendert Text statt eines Ankers.
+ *  - Titel-Link auf `/tiere` und `/personal` bei 390 px: beide führen in ihre Detailroute.
  *
  * `toHaveCount(1)` VOR JEDER ZUSICHERUNG: `boundingBox()` auf einem mehrdeutigen Locator misst
  * still den ersten Treffer.
@@ -186,14 +186,12 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
 
 /**
  * LFH-435 · Zweig: Beobachter (kein Schreibrecht) auf der Personalseite. Ohne Schreibrecht
- * verliert die Karte Statusauslöser und „Entlassen", die Tabelle die Aktionsspalte, und die
- * Position steht als Text statt als `Select` mit `minWidth: 130` (`PersonalPage.tsx`, Spalte
- * `position`). Gemessen wird dieselbe Weiche wie oben, dazu der waagerechte Überlauf beider
- * Zweige — der Nur-Lese-Zweig ist anders gebaut und wurde nie gemessen.
+ * verliert die Karte Statusauslöser und die Auslöser der Einteilung, und Einheit, Fahrzeug und
+ * Position stehen als Text (`PersonalPage.tsx`, LLH-1060). Gemessen wird dieselbe Weiche wie
+ * oben, dazu der waagerechte Überlauf beider Zweige — der Nur-Lese-Zweig ist anders gebaut.
  *
- * Die Kraft trägt eine Position, damit die Zelle Text statt „—" zeigt: die Admin-Zeile zeigt
- * denselben Wortlaut als gewählten Wert im `Select`, deshalb sichert der Test zusätzlich die
- * ABWESENHEIT jeder Auswahl in der Zeile zu.
+ * Die Kraft trägt eine Position, damit die Zelle das Kürzel statt „—" zeigt; zusätzlich sichert
+ * der Test die ABWESENHEIT jeder Auswahl und jedes Knopfs in der Zeile zu.
  */
 test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter)', async ({
   page,
@@ -236,16 +234,17 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
   await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
     0,
   );
-  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entlassen". Einzige
-  // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552), eigens gezählt.
+  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser und Inline-Angaben. Seit
+  // LLH-1060 gibt es weder „Entlassen“ noch den Aufklapper der Zeitachse; der Name ist der Link
+  // in die Personenansicht.
   await expect(
-    karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
-    'Vorbedingung: die Karte trägt ohne Schreibrecht kein schreibendes Bedienziel',
+    karte.getByRole('button'),
+    'Vorbedingung: die Karte trägt ohne Schreibrecht keinen Knopf',
   ).toHaveCount(0);
   await expect(
-    karte.getByRole('button', { name: /^Zeitachse zu / }),
-    'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
-  ).toHaveCount(1);
+    karte.getByRole('link', { name: KRAFT }),
+    'Vorbedingung: der Name führt in die Personenansicht',
+  ).toHaveAttribute('href', new RegExp(`/einsaetze/${einsatzId}/personal/\\d+$`));
   await expect
     .poll(querlauf, { message: 'Personal (390 px, Beobachter) läuft waagerecht über' })
     .toBeLessThanOrEqual(SUBPIXEL);
@@ -257,15 +256,18 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
   await expect(zeile, 'bei 1366 px steht genau eine Tabellenzeile').toHaveCount(1);
   await expect(zeile.getByText(KRAFT)).toBeVisible();
   await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
-  // ── VORBEDINGUNGEN: Position als Text, keine Auswahl, keine Aktionsspalte.
+  // ── VORBEDINGUNGEN: Position als Kürzel, keine Auswahl, kein Knopf, keine Aktionsspalte.
   await expect(
-    zeile.getByText('Unterführer', { exact: true }),
-    'Vorbedingung: die Position steht als Text in der Zeile',
+    zeile.getByText('UF', { exact: true }),
+    'Vorbedingung: die Position steht als Kürzel in der Zeile',
   ).toBeVisible();
   await expect(
     zeile.getByRole('combobox'),
-    'Vorbedingung: ohne Schreibrecht keine Positions-Auswahl in der Zeile',
+    'Vorbedingung: ohne Schreibrecht keine Auswahl in der Zeile',
   ).toHaveCount(0);
+  await expect(zeile.getByRole('button'), 'Vorbedingung: ohne Schreibrecht kein Knopf').toHaveCount(
+    0,
+  );
   await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
     0,
   );
@@ -278,7 +280,7 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
     .toBeLessThanOrEqual(SUBPIXEL);
 });
 
-test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — Aktionsknopf, Spaltenschalter, Titel-Link', async ({
+test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — Inline-Angabe der Karte, Spaltenschalter, Titel-Link', async ({
   page,
 }) => {
   // Drei Dichtestufen mit je vier Seitenaufrufen samt Neuladen: unter Volllast reicht das
@@ -300,18 +302,42 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    // ── Aktionsknopf im Kartenzweig (390 px)
+    // ── Inline-Angabe und Titel-Link im Kartenzweig (390 px, Personalliste)
     await page.setViewportSize(HANDSCHIRM);
     await page.goto(`/einsaetze/${einsatzId}/personal`);
     await stelleDichte(page, dichte);
     const karte = page.locator('[data-lfh="datensicht-karte"]');
     await expect(karte).toHaveCount(1);
+    // Seit LLH-1060 kein Aktionsknopf und kein Aufklapper; die Einteilung ist das Bedienziel.
+    await expect(karte.getByRole('button', { name: / entlassen$|^Zeitachse zu / })).toHaveCount(0);
     const knopf = await haeltStufe(
-      // Seit LLH-1079 trägt die Personalkarte „Entlassen" (Name mit der Person) statt „Entfernen".
-      karte.getByRole('button', { name: `${KRAFT} entlassen`, exact: true }),
+      karte.getByRole('button', { name: `Einheit zu ${KRAFT} eintragen`, exact: true }),
       soll,
-      `Aktionsknopf „Entlassen" (390 px, ${dichte})`,
+      `Auslöser „Einheit eintragen" (390 px, ${dichte})`,
     );
+    const personLink = karte.getByRole('link', { name: KRAFT });
+    await haeltStufe(personLink, soll, `Titel-Link der Personalkarte (390 px, ${dichte})`);
+    await expect(personLink).toHaveAttribute(
+      'href',
+      new RegExp(`/einsaetze/${einsatzId}/personal/\\d+$`),
+    );
+    // Titel-Link und Statusauslöser stehen im Kartenkopf nebeneinander: zwei Ziele, also der
+    // Zielabstand aus Kriterium 2 (komfortabel ≥ 8, handschuh ≥ 16; kompakt Spacing-Ausnahme).
+    const statusKnopf = karte.getByRole('button', { name: new RegExp(`^Status von ${KRAFT}`) });
+    await expect(statusKnopf).toHaveCount(1);
+    const [l, k] = [(await personLink.boundingBox())!, (await statusKnopf.boundingBox())!];
+    const luecke = Math.max(
+      k.x - (l.x + l.width),
+      l.x - (k.x + k.width),
+      k.y - (l.y + l.height),
+      l.y - (k.y + k.height),
+    );
+    gemessen.push(`${dichte}: Titel-Link ↔ Status ${luecke.toFixed(1)}px`);
+    const sollAbstand = { kompakt: 0, komfortabel: 8, handschuh: 16 }[dichte];
+    expect(
+      luecke,
+      `Abstand Titel-Link ↔ Statusauslöser (390 px, ${dichte}, gemessen ${luecke}px)`,
+    ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
 
     // ── Titel-Link im Kartenzweig (390 px, Tierliste)
     await page.goto(`/einsaetze/${einsatzId}/tiere`);
@@ -339,14 +365,14 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
     );
 
     gemessen.push(
-      `${dichte} (Soll ${soll}): Aktionsknopf ${knopf}, Titel-Link ${titel}, Spaltenschalter ${schalter}`,
+      `${dichte} (Soll ${soll}): Einheitsangabe ${knopf}, Titel-Link ${titel}, Spaltenschalter ${schalter}`,
     );
 
     // Auf der Vorgabestufe zusätzlich der harte Boden aus Kriterium 1 — eine andere Aussage
     // als die Staffel, deshalb getrennt belegt.
     if (dichte === 'kompakt') {
       for (const [name, wert] of [
-        ['Aktionsknopf', knopf],
+        ['Einheitsangabe', knopf],
         ['Titel-Link', titel],
         ['Spaltenschalter', schalter],
       ] as const) {

@@ -154,7 +154,8 @@ pub fn check_ids(ids: &[i64]) -> Result<Vec<i64>, AppError> {
     Ok(dedupe(ids, |id| *id))
 }
 
-fn ids_json(ids: &[i64]) -> String {
+/// IDs als JSON-Array für `json_each(?)`.
+pub(crate) fn ids_json(ids: &[i64]) -> String {
     serde_json::to_string(ids).expect("Zahlenliste ist serialisierbar")
 }
 
