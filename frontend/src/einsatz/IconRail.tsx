@@ -93,7 +93,7 @@ const ETIKETT_STIL: CSSProperties = {
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
-  const { wurzelRef, fussRef } = useFussFokusabstand();
+  const { wurzelRef, fussRef } = useFussFokusabstand('spalte');
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;

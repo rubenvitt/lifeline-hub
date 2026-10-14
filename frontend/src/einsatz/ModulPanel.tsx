@@ -14,7 +14,7 @@ import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
-import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
+import { useFussFokusabstand } from './fussFokusabstand';
 import { MODUL_PANEL_ID } from './IconRail';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
@@ -197,10 +197,7 @@ export function ModulListe({
               // wissen, dass er im ETB landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
               onClick={() => !gesperrt && onSprungKlick?.(marke)}
-              style={{
-                ...modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche }),
-                ...fussFokusabstandStil,
-              }}
+              style={modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche })}
             >
               <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
               <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
@@ -238,12 +235,7 @@ export function ModulListe({
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             aria-describedby={beschreibungId}
             onClick={() => !gesperrt && onModulKlick(m)}
-            // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11) neben, nicht in
-            // `modulZeilenStil`: der ist die Dichte-Zusicherung.
-            style={{
-              ...modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche }),
-              ...fussFokusabstandStil,
-            }}
+            style={modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche })}
           >
             {/* Keine Modulicon: die Zeile trägt Marke · Etikett · Zähler. Die Icons bleiben in der
                Kommandopalette, wo sie Module, Aktionen und Datensätze unterscheiden. */}
@@ -320,10 +312,9 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
-  const { wurzelRef, fussRef } = useFussFokusabstand();
+  const { fussRef } = useFussFokusabstand('dokument');
   return (
     <div
-      ref={wurzelRef}
       // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
       // Navigationsträger keine Landmark — eine zweite machte `getByRole('navigation')` ohne Namen
       // mehrdeutig —, deshalb ein Datenmerkmal.
@@ -354,7 +345,8 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       <ModulListe {...liste} />
       {dauer && (
         // `sticky; bottom: 0` wie der Rail-Fuß: die Seite scrollt im Dokument, der Fuß hängt so am
-        // Fensterrand statt am Seitenende.
+        // Fensterrand statt am Seitenende. Den Fokusabstand über ihm hält `index.css` per
+        // `scroll-padding` am Dokument, solange der Fokus im Panel steht (`fussFokusabstand`).
         <div
           ref={fussRef}
           data-lfh="modul-panel-fuss"

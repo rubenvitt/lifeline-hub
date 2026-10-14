@@ -651,29 +651,26 @@ async function einheitFokusBereit(page: Page, dichte: string) {
 }
 
 /**
- * Tabulatorstopps im Inhalt NACH dem Brotkrumen „Einheiten“, dem Startpunkt des Laufs. Ohne
- * Formular ist die Route kürzer als früher; ein fester Zähler liefe über ihr Ende hinaus in den
- * Navigationsrahmen, der nicht zu dieser Route gehört (dort liegt bei 1366 × 520 handschuh der
- * Schienenknopf „Kommunikation“ unter einem klebenden Element, LLH-1241). Zu knapp gezählt fehlt
- * ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
+ * Tabulatorstopps eines ganzen Umlaufs durch das Dokument: vom Brotkrumen „Einheiten“ über das
+ * Inhaltsende hinaus durch Kopf, Rail und Modulpanel zurück in den Seitenkopf. Der Rahmen gehört
+ * mit in den Lauf, seit die Rail ihre letzte Kategorie über den klebenden Fuß rollt (LLH-1241).
+ * Zu knapp gezählt fehlt ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
  */
-async function stoppsBisInhaltsende(page: Page): Promise<number> {
-  return page.getByRole('main').evaluate((main) => {
-    const start = [...main.querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Einheiten',
-    );
-    if (!start) throw new Error('Brotkrumen „Einheiten“ fehlt');
-    return [
-      ...main.querySelectorAll<HTMLElement>('a[href], button, input, textarea, select, [tabindex]'),
-    ].filter(
-      (el) =>
-        el.tabIndex >= 0 &&
-        !(el as HTMLButtonElement).disabled &&
-        el.getClientRects().length > 0 &&
-        getComputedStyle(el).visibility !== 'hidden' &&
-        (start.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-    ).length;
-  });
+async function stoppsEinUmlauf(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          'a[href], button, input, textarea, select, [tabindex]',
+        ),
+      ].filter(
+        (el) =>
+          el.tabIndex >= 0 &&
+          !(el as HTMLButtonElement).disabled &&
+          el.getClientRects().length > 0 &&
+          getComputedStyle(el).visibility !== 'hidden',
+      ).length,
+  );
 }
 
 for (const viewport of [
@@ -691,18 +688,24 @@ for (const viewport of [
       await expect(
         page.getByRole('main').getByRole('button', { name: 'Speichern', exact: true }),
       ).toHaveCount(0);
-      const stopps = await stoppsBisInhaltsende(page);
+      const stopps = await stoppsEinUmlauf(page);
       await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
-      const befund = await pruefeFokusVerdeckung(page, stopps);
+      const befund = await pruefeFokusVerdeckung(page, stopps, 'Tab', {
+        region: 'nav[aria-label="Kategorien"]',
+      });
       expect(
         befund.besuchteZiele.sort(),
         'Jeder Zeilenauslöser und jede Zuordnungsaktion muss per Tab besucht werden',
       ).toEqual(ziele.sort());
+      // Ab `lg` steht die Rail im Rahmen; der Umlauf muss sie erreicht haben (LLH-1241).
+      if (viewport.width >= 992) {
+        expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+      }
       expect(befund.fixierteKandidaten).toBeGreaterThan(0);
       expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
       test.info().annotations.push({
         type: 'messwert',
-        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, davon ${befund.stoppsInRegion} in der Rail, ${befund.verdeckt.length} Verdeckungen`,
       });
     });
   }
