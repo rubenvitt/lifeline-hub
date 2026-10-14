@@ -10,10 +10,12 @@ use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten, FahrzeugPatch};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
+use crate::fahrzeug::{ADHOC_TEXT_MAX, BEMERKUNG_MAX};
 use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, parse_flag, pflicht, pruefe_koordinate, trimme, trimme_tri,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
+    pruefe_koordinate,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -89,16 +91,19 @@ pub async fn disponieren(
     }
     let vorbereitet = match (body.fahrzeug_id, body.adhoc) {
         (Some(fahrzeug_id), None) => Vorbereitet::Stamm(fahrzeug_id),
-        (None, Some(adhoc)) => {
-            let funkrufname = pflicht(&adhoc.funkrufname, "Funkrufname")?;
-            Vorbereitet::Adhoc {
-                funkrufname,
-                fahrzeugtyp: trimme(adhoc.fahrzeugtyp),
-                kennzeichen: trimme(adhoc.kennzeichen),
-                opta: trimme(adhoc.opta),
-                traegerorganisation: trimme(adhoc.traegerorganisation),
-            }
-        }
+        // Grenzen (LLH-1073 design.md D8, `src/AGENTS.md`, „Eingabegrenzen“): 400 vor der
+        // Transaktion; der Funkrufname geht unverändert ins ETB.
+        (None, Some(adhoc)) => Vorbereitet::Adhoc {
+            funkrufname: pflicht_max(&adhoc.funkrufname, "Funkrufname", ADHOC_TEXT_MAX)?,
+            fahrzeugtyp: optional_max(adhoc.fahrzeugtyp, "Fahrzeugtyp", ADHOC_TEXT_MAX)?,
+            kennzeichen: optional_max(adhoc.kennzeichen, "Kennzeichen", ADHOC_TEXT_MAX)?,
+            opta: optional_max(adhoc.opta, "OPTA", ADHOC_TEXT_MAX)?,
+            traegerorganisation: optional_max(
+                adhoc.traegerorganisation,
+                "Trägerorganisation",
+                ADHOC_TEXT_MAX,
+            )?,
+        },
         (None, None) => {
             return Err(AppError::Validation(
                 "Entweder fahrzeug_id (Stamm) oder adhoc angeben".into(),
@@ -235,10 +240,24 @@ pub struct DispoPatchBody {
     /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
+    /// Ad-hoc-Angaben (LLH-1073, design.md D1), symmetrisch zum Ad-hoc-Body; an einem
+    /// Stamm-Fahrzeug 422. `funkrufname` ist Pflicht: `null` oder leer → 400.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funkrufname: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fahrzeugtyp: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kennzeichen: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub opta: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id} — Status und/oder Bemerkung.
-/// Status-Wechsel schreibt ETB-Eintrag.
+/// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id} — Status, Bemerkung und bei Ad-hoc-Fahrzeugen
+/// Funkrufname, Typ, Kennzeichen, Träger und OPTA (LLH-1073). Ein Statuswechsel schreibt einen
+/// ETB-Eintrag, geänderte Angaben zusammen einen weiteren; die Bemerkung keinen. Reihenfolge:
+/// 400 (Feld) → 404 (Zeile) → 409 (beendet) → 422 (Angaben an einem Stamm-Fahrzeug).
 pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
@@ -254,10 +273,33 @@ pub async fn update(
     }
 
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
-    // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
-    // der Route, das Repo bleibt dumm.
-    let bemerkung = trimme_tri(body.bemerkung);
-    let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
+    // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren und die Grenzen
+    // (LLH-1073 design.md D8) prüft die Route vor jedem Zusammenhang, das Repo bleibt dumm.
+    let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let funkrufname = body
+        .funkrufname
+        .map(|f| pflicht_max(f.as_deref().unwrap_or(""), "Funkrufname", ADHOC_TEXT_MAX))
+        .transpose()?;
+    let fahrzeugtyp = optional_max_tri(body.fahrzeugtyp, "Fahrzeugtyp", ADHOC_TEXT_MAX)?;
+    let kennzeichen = optional_max_tri(body.kennzeichen, "Kennzeichen", ADHOC_TEXT_MAX)?;
+    let traeger = optional_max_tri(
+        body.traegerorganisation,
+        "Trägerorganisation",
+        ADHOC_TEXT_MAX,
+    )?;
+    let opta = optional_max_tri(body.opta, "OPTA", ADHOC_TEXT_MAX)?;
+    fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
+        w.as_ref().map(|o| o.as_deref())
+    }
+    let patch = FahrzeugPatch {
+        status_id: body.status_id,
+        bemerkung: tri(&bemerkung),
+        funkrufname: funkrufname.as_deref(),
+        fahrzeugtyp: tri(&fahrzeugtyp),
+        kennzeichen: tri(&kennzeichen),
+        traegerorganisation: tri(&traeger),
+        opta: tri(&opta),
+    };
 
     // F06/LFH-244 Tier-A: Update + (bedingter) System-ETB atomar in EINER Tx. Der ETB-Text
     // braucht die frische Anzeige (neues Status-Label) → In-Tx-Reload. Auch den Vorzustand
@@ -265,60 +307,76 @@ pub async fn update(
     // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (nachher, has_status_changed, beruehrt) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        disposition_repo::update_tx(
-            conn,
-            einsatz_id,
-            ef_id,
-            FahrzeugPatch {
-                status_id: body.status_id,
-                bemerkung,
-            },
-        )
-        .await?;
-        let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        let has_status_changed = vorher.status_id != nachher.status_id;
-        let mut beruehrt = Vec::new();
-        if has_status_changed {
-            // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
-            // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
-            // ihrer Personen; deren Leser erreicht nach dem Commit `personal`.
-            if let Some(sid) = nachher.status_id {
-                if let Some((_, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
+    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle) =
+        crate::write_retry!(&state.pool, |conn| {
+            let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+            disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
+            let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+            let mut beruehrt = Vec::new();
+            if vorher.status_id != nachher.status_id {
+                // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
+                // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
+                // ihrer Personen; deren Leser erreicht nach dem Commit `personal`.
+                if let Some(sid) = nachher.status_id {
+                    if let Some((_, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
+                        conn,
+                        einsatz_id,
+                        ctx.benutzer.id,
+                        ef_id,
+                        sid,
+                        &jetzt,
+                    )
+                    .await?
+                    {
+                        beruehrt = b.personen;
+                    }
+                }
+                crate::etb::system_audit_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,
-                    ef_id,
-                    sid,
-                    &jetzt,
+                    startwert,
+                    &crate::fahrzeug::etb_text_status_wechsel(
+                        &nachher.funkrufname,
+                        vorher.status_label.as_deref(),
+                        nachher.status_label.as_deref(),
+                    ),
                 )
-                .await?
-                {
-                    beruehrt = b.personen;
-                }
+                .await?;
             }
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &crate::fahrzeug::etb_text_status_wechsel(
-                    &nachher.funkrufname,
-                    vorher.status_label.as_deref(),
-                    nachher.status_label.as_deref(),
-                ),
-            )
-            .await?;
-        }
-        Ok((nachher, has_status_changed, beruehrt))
-    })?;
+            // LLH-1073, design.md D1: ein Eintrag für alle geänderten Ad-hoc-Angaben.
+            let angaben_text = crate::fahrzeug::etb_text_angaben(&vorher, &nachher);
+            let mut traegt_fuehrungsstelle = false;
+            if let Some(text) = angaben_text {
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?;
+                traegt_fuehrungsstelle =
+                    crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
+            }
+            Ok((vorher, nachher, beruehrt, traegt_fuehrungsstelle))
+        })?;
+    let has_status_changed = vorher.status_id != nachher.status_id;
+    let has_angaben_changed = vorher.funkrufname != nachher.funkrufname
+        || vorher.fahrzeugtyp != nachher.fahrzeugtyp
+        || vorher.kennzeichen != nachher.kennzeichen
+        || vorher.traegerorganisation != nachher.traegerorganisation
+        || vorher.opta != nachher.opta;
     sse_fahrzeug(&state, einsatz_id, ef_id);
-    // Die Einheit zeigt den Status ihrer Fahrzeuge und leitet ihren eigenen daraus ab (LFH-609);
-    // `fahrzeug` erreicht ihre Leser ohne Fahrzeugrecht nicht (LLH-1182).
-    if has_status_changed {
+    // Die Einheit zeigt den Status ihrer Fahrzeuge und leitet ihren eigenen daraus ab (LFH-609),
+    // dazu Funkrufname und Typ (LLH-1073); `fahrzeug` erreicht ihre Leser ohne Fahrzeugrecht
+    // nicht (LLH-1182). Ebenso das Detail des Bereitstellungsraums und die Führungsstelle im
+    // Kopf, die den Funkrufnamen zeigen.
+    if has_status_changed || has_angaben_changed {
         if let Some(einheit_id) = nachher.einheit_id {
             super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+        }
+    }
+    if has_angaben_changed {
+        if let Some(br_id) = nachher.aktueller_br_id {
+            super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+        }
+        if traegt_fuehrungsstelle {
+            crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
         }
     }
     // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur

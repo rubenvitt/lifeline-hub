@@ -13,6 +13,16 @@ pub use crate::katalog::{
     KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
 };
 
+/// Höchstlänge der Ad-hoc-Texte eines Fahrzeugs (Funkrufname, Typ, Kennzeichen, Träger, OPTA)
+/// beim Disponieren und Ändern, nach dem Trimmen (`src/AGENTS.md`, „Eingabegrenzen“, LLH-1073
+/// design.md D8). Unter `etb::PARTEI_MAX`, damit der Funkrufname unverändert ins ETB passt.
+/// Spiegel: `FAHRZEUG_ADHOC_TEXT_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const ADHOC_TEXT_MAX: usize = 200;
+
+/// Höchstlänge der Bemerkung einer Fahrzeug-Disposition (LLH-1073 design.md D8, wie
+/// `personal::BEMERKUNG_MAX`). Spiegel: `FAHRZEUG_BEMERKUNG_MAX`.
+pub const BEMERKUNG_MAX: usize = 2_000;
+
 /// Default-Status-Katalog je neuer Organisation (label, kategorie, fms_anker, sortier), den
 /// `bootstrap_admin` anlegt. **Muss mit dem Seed in `migrations/0008_fahrzeug_status.sql`
 /// übereinstimmen.**
@@ -286,9 +296,96 @@ pub fn etb_text_storniert(funkrufname: &str) -> String {
     format!("Fahrzeug «{funkrufname}» storniert (Fehldisposition)")
 }
 
+/// System-ETB beim Ändern der Angaben eines Ad-hoc-Fahrzeugs (LLH-1073, design.md D1): EIN
+/// Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt (`(Angabe, alt, neu)`, leer
+/// als „—“). Vorn steht der bisherige Funkrufname, damit die Volltextsuche den alten Namen
+/// findet. Ändert sich nichts, gibt es keinen Text.
+pub fn etb_text_angaben_geaendert(
+    funkrufname_vorher: &str,
+    angaben: &[(&str, Option<&str>, Option<&str>)],
+) -> Option<String> {
+    let teile: Vec<String> = angaben
+        .iter()
+        .filter(|(_, alt, neu)| alt != neu)
+        .map(|(angabe, alt, neu)| {
+            format!(
+                "{angabe} «{}» → «{}»",
+                alt.unwrap_or("—"),
+                neu.unwrap_or("—")
+            )
+        })
+        .collect();
+    (!teile.is_empty()).then(|| format!("Fahrzeug «{funkrufname_vorher}»: {}", teile.join(", ")))
+}
+
+/// [`etb_text_angaben_geaendert`] für Vor- und Nachzustand einer Disposition: Funkrufname, Typ,
+/// Kennzeichen, Träger, OPTA in dieser Folge.
+pub fn etb_text_angaben(
+    vorher: &EinsatzFahrzeugAnzeige,
+    nachher: &EinsatzFahrzeugAnzeige,
+) -> Option<String> {
+    etb_text_angaben_geaendert(
+        &vorher.funkrufname,
+        &[
+            (
+                "Funkrufname",
+                Some(&vorher.funkrufname),
+                Some(&nachher.funkrufname),
+            ),
+            (
+                "Typ",
+                vorher.fahrzeugtyp.as_deref(),
+                nachher.fahrzeugtyp.as_deref(),
+            ),
+            (
+                "Kennzeichen",
+                vorher.kennzeichen.as_deref(),
+                nachher.kennzeichen.as_deref(),
+            ),
+            (
+                "Träger",
+                vorher.traegerorganisation.as_deref(),
+                nachher.traegerorganisation.as_deref(),
+            ),
+            ("OPTA", vorher.opta.as_deref(), nachher.opta.as_deref()),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn angaben_geaendert_nennt_jede_angabe_mit_alt_und_neu() {
+        assert_eq!(
+            etb_text_angaben_geaendert(
+                "Florian Nachbarstdt 44/1",
+                &[
+                    (
+                        "Funkrufname",
+                        Some("Florian Nachbarstdt 44/1"),
+                        Some("Florian Nachbarstadt 44/1")
+                    ),
+                    ("Typ", None, Some("HLF 20")),
+                    ("Kennzeichen", Some("NB 1"), Some("NB 1")),
+                    ("Träger", Some("THW"), None),
+                ],
+            )
+            .as_deref(),
+            Some(
+                "Fahrzeug «Florian Nachbarstdt 44/1»: Funkrufname «Florian Nachbarstdt 44/1» → \
+                 «Florian Nachbarstadt 44/1», Typ «—» → «HLF 20», Träger «THW» → «—»"
+            )
+        );
+        assert_eq!(
+            etb_text_angaben_geaendert(
+                "F",
+                &[("Typ", Some("LF"), Some("LF")), ("OPTA", None, None)]
+            ),
+            None
+        );
+    }
 
     #[test]
     fn entlassen_storniert_erneut() {

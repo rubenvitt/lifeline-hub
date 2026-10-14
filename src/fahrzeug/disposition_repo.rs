@@ -399,17 +399,43 @@ pub async fn disponiere_adhoc(
 }
 
 /// Änderung einer Dispositionszeile (Muster `personal::DispositionPatch`, LLH-1067): jedes Feld
-/// `None` = unverändert. `bemerkung` ist Tri-State (`Some(None)` = NULL, `Some(Some(x))` =
-/// setzen); getrimmt wird in der Route.
+/// `None` = unverändert. Tri-State-Felder (`Some(None)` = NULL, `Some(Some(x))` = setzen); getrimmt
+/// und begrenzt wird in der Route.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FahrzeugPatch<'a> {
     pub status_id: Option<i64>,
     pub bemerkung: Option<Option<&'a str>>,
+    /// Ad-hoc-Angaben (LLH-1073, design.md D1): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
+    /// Sie schreiben die `snap_*`-Spalten, die bei einem Ad-hoc-Fahrzeug die Daten sind.
+    pub funkrufname: Option<&'a str>,
+    pub fahrzeugtyp: Option<Option<&'a str>>,
+    pub kennzeichen: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+    pub opta: Option<Option<&'a str>>,
+}
+
+impl FahrzeugPatch<'_> {
+    /// Ändert der Patch eine Angabe, die bei einem Stamm-Fahrzeug der Stamm trägt?
+    pub fn has_adhoc_angaben(&self) -> bool {
+        self.funkrufname.is_some()
+            || self.fahrzeugtyp.is_some()
+            || self.kennzeichen.is_some()
+            || self.traegerorganisation.is_some()
+            || self.opta.is_some()
+    }
+}
+
+/// Der 422 an einem Stamm-Fahrzeug, dessen Angaben über den Einsatz geändert werden sollen
+/// (LLH-1073, design.md D1).
+pub fn stamm_angaben_error() -> AppError {
+    AppError::UnprocessableEntity("Angaben eines Stamm-Fahrzeugs im Stamm pflegen".into())
 }
 
 /// Aktualisiert eine Dispositionszeile nach [`FahrzeugPatch`] auf einer offenen Verbindung.
 /// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
-/// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört.
+/// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
+/// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
+/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -418,14 +444,38 @@ pub async fn update_tx(
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    if patch.has_adhoc_angaben() {
+        // „Stamm“ wird in der Transaktion am Stammbezug geprüft, nicht am Client (design.md D1).
+        let fahrzeug_id: Option<i64> = sqlx::query_scalar(
+            "SELECT fahrzeug_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ef_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if fahrzeug_id.is_some() {
+            return Err(stamm_angaben_error());
+        }
+    }
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
-    // still (Muster LLH-1067).
+    // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
+    // wenn eine Route die Prüfung oben vergäße.
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
          SET status_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
                                 THEN datetime('now') ELSE status_seit END, \
              status_id = COALESCE(?, status_id), \
-             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
+             snap_funkrufname = CASE WHEN fahrzeug_id IS NULL \
+                                     THEN COALESCE(?, snap_funkrufname) \
+                                     ELSE snap_funkrufname END, \
+             snap_fahrzeugtyp = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                     ELSE snap_fahrzeugtyp END, \
+             snap_kennzeichen = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                     ELSE snap_kennzeichen END, \
+             snap_traegerorganisation = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? \
+                                             ELSE snap_traegerorganisation END, \
+             snap_opta = CASE WHEN ? AND fahrzeug_id IS NULL THEN ? ELSE snap_opta END \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(patch.status_id)
@@ -433,6 +483,15 @@ pub async fn update_tx(
     .bind(patch.status_id)
     .bind(patch.bemerkung.is_some())
     .bind(patch.bemerkung.flatten())
+    .bind(patch.funkrufname)
+    .bind(patch.fahrzeugtyp.is_some())
+    .bind(patch.fahrzeugtyp.flatten())
+    .bind(patch.kennzeichen.is_some())
+    .bind(patch.kennzeichen.flatten())
+    .bind(patch.traegerorganisation.is_some())
+    .bind(patch.traegerorganisation.flatten())
+    .bind(patch.opta.is_some())
+    .bind(patch.opta.flatten())
     .bind(ef_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -1129,6 +1188,7 @@ mod tests {
             FahrzeugPatch {
                 status_id: Some(neuer_status.id),
                 bemerkung: Some(Some("am Einsatzort")),
+                ..Default::default()
             },
         )
         .await
