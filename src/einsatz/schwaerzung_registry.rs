@@ -1048,6 +1048,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
             retain("zuletzt_entlassen_at", G_ZEIT),
             retain("uhs_id", G_FK),
+            // Material-Modell (LLH-1224): Art der Zeile, ausgegebene Menge, zwei weitere Orte.
+            retain("art", G_ENUM),
+            retain("ausgegeben", G_ZAEHLER),
+            retain("einsatz_fahrzeug_id", G_FK),
+            retain("br_id", G_FK),
         ],
     },
     TabellenRegel {

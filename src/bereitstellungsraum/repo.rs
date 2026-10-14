@@ -272,6 +272,32 @@ pub async fn storniere(
     .await
 }
 
+/// Darf Material in diesem Bereitstellungsraum liegen (LLH-1224, design.md D8, gleiche Regel wie
+/// `uhs::repo::require_verortbar_tx`)? Fremd, unbekannt oder storniert → `NotFound`, aufgelöst →
+/// `UnprocessableEntity` (ein Ort mit Status, 422 wie `belegung_repo`); `geplant` und `aktiv`
+/// gehen.
+pub async fn require_verortbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+) -> Result<(), AppError> {
+    let status: Option<String> = sqlx::query_scalar(
+        "SELECT status FROM bereitstellungsraum \
+         WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
+    )
+    .bind(br_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match status.as_deref() {
+        None => Err(AppError::NotFound),
+        Some("aufgeloest") => Err(AppError::UnprocessableEntity(
+            "Bereitstellungsraum ist aufgelöst".into(),
+        )),
+        Some(_) => Ok(()),
+    }
+}
+
 /// Anzahl aktiv belegter Einheiten + Fahrzeuge über den denormalisierten Cache,
 /// auf einer offenen Connection/Transaktion (damit die `aufgeloest`-Vorbedingung
 /// atomar mit dem Status-UPDATE gelesen wird). Prüft sowohl

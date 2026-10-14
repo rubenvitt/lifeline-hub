@@ -1,4 +1,8 @@
-use super::{EinsatzMaterialAnzeige, MaterialStatus, DIENSTSTATUS_IN_DIENST};
+use super::ort::{self, MaterialOrt, OrtPatch};
+use super::{
+    pruefe_zeile, EinsatzMaterialAnzeige, MaterialArt, MaterialStatus, DIENSTSTATUS_IN_DIENST,
+    GERAET_JE_STUECK,
+};
 use crate::entlassung::BeendetAls;
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -11,6 +15,7 @@ const SELECT_AUFGELOEST: &str = "\
            em.snap_bezeichnung, em.snap_kategorie, em.snap_bestandsnummer, \
            em.snap_traegerorganisation, em.bemerkung, em.disponiert_at, em.disponiert_von, \
            em.beendet_at, em.beendet_von, em.beendet_als, \
+           em.art, em.ausgegeben, em.einsatz_fahrzeug_id, em.br_id, \
            m.bezeichnung AS live_bezeichnung, m.kategorie AS live_kategorie, \
            m.bestandsnummer AS live_bestandsnummer, m.traegerorganisation AS live_traegerorganisation, \
            m.dienststatus AS live_dienststatus, \
@@ -39,6 +44,11 @@ struct Row {
     beendet_at: Option<String>,
     beendet_von: Option<i64>,
     beendet_als: Option<String>,
+    #[sqlx(try_from = "String")]
+    art: MaterialArt,
+    ausgegeben: i64,
+    einsatz_fahrzeug_id: Option<i64>,
+    br_id: Option<i64>,
     live_bezeichnung: Option<String>,
     live_kategorie: Option<String>,
     live_bestandsnummer: Option<String>,
@@ -79,12 +89,16 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
         material_id: row.material_id,
         einheit_id: row.einheit_id,
         uhs_id: row.uhs_id,
+        einsatz_fahrzeug_id: row.einsatz_fahrzeug_id,
+        br_id: row.br_id,
+        art: row.art,
         ist_adhoc: row.material_id.is_none(),
         bezeichnung,
         kategorie,
         bestandsnummer,
         traegerorganisation: traeger,
         menge: row.menge,
+        ausgegeben: row.ausgegeben,
         status: row.status,
         bemerkung: row.bemerkung,
         disponiert_at: row.disponiert_at,
@@ -183,9 +197,10 @@ pub async fn load_anzeige_tx(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus und friert den
-/// Identitäts-Snapshot ein. `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity`
-/// bei außer Dienst. Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
+/// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus, friert den
+/// Identitäts-Snapshot ein und kopiert die Art des Stamms an die Zeile (LLH-1224, design.md D1).
+/// `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity` bei außer Dienst und bei
+/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -194,17 +209,19 @@ pub async fn disponiere_stamm_tx(
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let (bezeichnung, kategorie, bestandsnummer, traeger) =
+    let ((bezeichnung, kategorie, bestandsnummer, traeger), art) =
         stamm_snapshot_tx(conn, org_id, material_id).await?;
+    pruefe_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
-            (einsatz_id, material_id, menge, snap_bezeichnung, snap_kategorie, \
+            (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
              snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(material_id)
     .bind(menge)
+    .bind(art.as_str())
     .bind(&bezeichnung)
     .bind(&kategorie)
     .bind(&bestandsnummer)
@@ -218,14 +235,14 @@ pub async fn disponiere_stamm_tx(
 /// Identitäts-Snapshot eines Stamm-Materials: Bezeichnung, Kategorie, Bestandsnummer, Träger.
 type Snapshot = (String, Option<String>, Option<String>, Option<String>);
 
-/// Snapshot eines Stamm-Materials der Org; `NotFound` bei fremdem/unbekanntem,
+/// Snapshot und Art eines Stamm-Materials der Org; `NotFound` bei fremdem/unbekanntem,
 /// `UnprocessableEntity` bei außer Dienst.
 async fn stamm_snapshot_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     material_id: i64,
-) -> Result<Snapshot, AppError> {
-    let (bezeichnung, kategorie, bestandsnummer, traeger, dienststatus) = sqlx::query_as::<
+) -> Result<(Snapshot, MaterialArt), AppError> {
+    let (bezeichnung, kategorie, bestandsnummer, traeger, dienststatus, art) = sqlx::query_as::<
         _,
         (
             String,
@@ -233,9 +250,10 @@ async fn stamm_snapshot_tx(
             Option<String>,
             Option<String>,
             String,
+            String,
         ),
     >(
-        "SELECT bezeichnung, kategorie, bestandsnummer, traegerorganisation, dienststatus \
+        "SELECT bezeichnung, kategorie, bestandsnummer, traegerorganisation, dienststatus, art \
          FROM material WHERE id = ? AND org_id = ?",
     )
     .bind(material_id)
@@ -250,7 +268,8 @@ async fn stamm_snapshot_tx(
             "Material ist außer Dienst und kann nicht disponiert werden".into(),
         ));
     }
-    Ok((bezeichnung, kategorie, bestandsnummer, traeger))
+    let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
+    Ok(((bezeichnung, kategorie, bestandsnummer, traeger), art))
 }
 
 /// Pool-Wrapper um [`disponiere_stamm_tx`].
@@ -275,22 +294,27 @@ pub async fn disponiere_stamm(
 }
 
 /// Disponiert Ad-hoc-externes Material (`material_id = NULL`); `snap_*` sind die
-/// eigentlichen Daten. Liefert die neue `em_id`.
+/// eigentlichen Daten. Ohne Art gilt die Vorgabe aus der Menge (LLH-1224, design.md D1); ein
+/// Gerät mit Menge über 1 ist `UnprocessableEntity` (D2). Liefert die neue `em_id`.
 pub async fn disponiere_adhoc_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     daten: AdhocDaten<'_>,
+    art: Option<MaterialArt>,
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
+    let art = art.unwrap_or(MaterialArt::aus_menge(menge));
+    pruefe_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
-            (einsatz_id, material_id, menge, snap_bezeichnung, snap_kategorie, \
+            (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
              snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(menge)
+    .bind(art.as_str())
     .bind(daten.bezeichnung)
     .bind(daten.kategorie)
     .bind(daten.bestandsnummer)
@@ -306,26 +330,30 @@ pub async fn disponiere_adhoc(
     pool: &SqlitePool,
     einsatz_id: i64,
     daten: AdhocDaten<'_>,
+    art: Option<MaterialArt>,
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_adhoc_tx(&mut conn, einsatz_id, daten, menge, disponiert_von).await
+    disponiere_adhoc_tx(&mut conn, einsatz_id, daten, art, menge, disponiert_von).await
 }
 
 /// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
-/// `menge`, `status` und `bezeichnung`: `None` = unverändert. Die übrigen Felder sind Tri-State:
-/// `None` = unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen. Ein Struct statt
-/// Positionsparametern, damit eine neue Angabe keine Bindung still verschiebt.
+/// `menge`, `ausgegeben`, `status`, `art` und `bezeichnung`: `None` = unverändert. Die übrigen
+/// Felder sind Tri-State: `None` = unverändert, `Some(None)` = NULL, `Some(Some(x))` = setzen.
+/// Ein Struct statt Positionsparametern, damit eine neue Angabe keine Bindung still verschiebt.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MaterialPatch<'a> {
     pub menge: Option<i64>,
-    /// Bereits validierter Wire-Wert aus [`MaterialStatus`].
-    pub status: Option<&'a str>,
+    /// Ausgegebene Menge als neuer Gesamtwert (LLH-1224, design.md D4), ≥ 0 prüft die Route.
+    pub ausgegeben: Option<i64>,
+    pub status: Option<MaterialStatus>,
+    /// Art der Zeile (LLH-1224, design.md D10); die Stamm-Art bleibt.
+    pub art: Option<MaterialArt>,
     pub bemerkung: Option<Option<&'a str>>,
-    /// Verortung an einer UHS (unabhängig von der Einheit); ein neuer Wert geht durch
-    /// [`crate::uhs::repo::require_verortbar_tx`] (LLH-1093, design.md D4).
-    pub uhs_id: Option<Option<i64>>,
+    /// Der eine Ort (LLH-1224, design.md D7): ein neues Ziel geht durch
+    /// [`ort::require_ziel_tx`], geschrieben über [`ort::set_ort_tx`].
+    pub ort: OrtPatch,
     /// Ad-hoc-Angaben (LLH-1093, design.md D6): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
     /// Sie schreiben die `snap_*`-Spalten, die bei Ad-hoc-Material die Daten sind.
     pub bezeichnung: Option<&'a str>,
@@ -352,8 +380,9 @@ pub fn stamm_angaben_error() -> AppError {
 
 /// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
 /// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
-/// Ad-hoc-Angaben an einem Stamm-Posten; die UHS-Prüfung (404/422) läuft nur bei geändertem
-/// Wert. Jede Ablehnung schreibt nichts.
+/// Ad-hoc-Angaben an einem Stamm-Posten und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
+/// Status verstößt ([`pruefe_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
+/// geändertem Ziel. Erst wird alles geprüft, dann geschrieben: jede Ablehnung schreibt nichts.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -362,41 +391,56 @@ pub async fn update_tx(
 ) -> Result<(), AppError> {
     // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
-    let (material_id, uhs_id): (Option<i64>, Option<i64>) = sqlx::query_as(
-        "SELECT material_id, uhs_id FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(em_id)
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
+    let (material_id, art, menge, ausgegeben, status): (Option<i64>, String, i64, i64, String) =
+        sqlx::query_as(
+            "SELECT material_id, art, menge, ausgegeben, status FROM einsatz_material \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(em_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
     if patch.has_adhoc_angaben() && material_id.is_some() {
         return Err(stamm_angaben_error());
     }
-    // Nur ein neues Ziel wird geprüft: Lösen und ein unveränderter Wert gehen immer, auch an
-    // einer inzwischen aufgelösten UHS (design.md D4).
-    if let Some(Some(ziel)) = patch.uhs_id {
-        if Some(ziel) != uhs_id {
-            crate::uhs::repo::require_verortbar_tx(conn, einsatz_id, ziel).await?;
+    patch.ort.validate()?;
+    let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
+    let status = MaterialStatus::try_from(status).map_err(AppError::Internal)?;
+    pruefe_zeile(
+        patch.art.unwrap_or(art),
+        patch.menge.unwrap_or(menge),
+        patch.ausgegeben.unwrap_or(ausgegeben),
+        patch.status.unwrap_or(status),
+        patch.ausgegeben.is_some(),
+    )?;
+    // Der Ort zuletzt geprüft und vor der Zeile geschrieben: `set_ort_tx` prüft nur ein neues Ziel
+    // (Lösen und ein unveränderter Wert gehen immer, auch an einer aufgelösten UHS) und schreibt
+    // erst danach.
+    if !patch.ort.is_leer() {
+        let aktuell = ort::load_ort_tx(conn, einsatz_id, em_id).await?;
+        if let Some(ziel) = patch.ort.ziel(aktuell) {
+            ort::set_ort_tx(conn, einsatz_id, em_id, ziel).await?;
         }
     }
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
-         SET menge = COALESCE(?, menge), \
-             status = COALESCE(?, status), \
-             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
-             uhs_id = CASE WHEN ? THEN ? ELSE uhs_id END, \
-             snap_bezeichnung = COALESCE(?, snap_bezeichnung), \
-             snap_kategorie = CASE WHEN ? THEN ? ELSE snap_kategorie END, \
-             snap_bestandsnummer = CASE WHEN ? THEN ? ELSE snap_bestandsnummer END, \
-             snap_traegerorganisation = CASE WHEN ? THEN ? ELSE snap_traegerorganisation END \
-         WHERE id = ? AND einsatz_id = ?",
+         SET menge = COALESCE(?1, menge), \
+             ausgegeben = COALESCE(?2, ausgegeben), \
+             status = COALESCE(?3, status), \
+             art = COALESCE(?4, art), \
+             bemerkung = CASE WHEN ?5 THEN ?6 ELSE bemerkung END, \
+             snap_bezeichnung = COALESCE(?7, snap_bezeichnung), \
+             snap_kategorie = CASE WHEN ?8 THEN ?9 ELSE snap_kategorie END, \
+             snap_bestandsnummer = CASE WHEN ?10 THEN ?11 ELSE snap_bestandsnummer END, \
+             snap_traegerorganisation = CASE WHEN ?12 THEN ?13 ELSE snap_traegerorganisation END \
+         WHERE id = ?14 AND einsatz_id = ?15",
     )
     .bind(patch.menge)
-    .bind(patch.status)
+    .bind(patch.ausgegeben)
+    .bind(patch.status.map(|s| s.as_str()))
+    .bind(patch.art.map(|a| a.as_str()))
     .bind(patch.bemerkung.is_some())
     .bind(patch.bemerkung.flatten())
-    .bind(patch.uhs_id.is_some())
-    .bind(patch.uhs_id.flatten())
     .bind(patch.bezeichnung)
     .bind(patch.kategorie.is_some())
     .bind(patch.kategorie.flatten())
@@ -427,12 +471,14 @@ pub async fn update(
 
 /// Teilt `menge` von einem Posten ab (LLH-1093, design.md D8): die Ausgangszeile wird um `menge`
 /// gemindert, und in derselben Transaktion entsteht eine neue Zeile mit `menge`, die Stammbezug,
-/// alle `snap_*`, Status, Bemerkung, Einheit, UHS und den Dispositionszeitpunkt samt
-/// Dispositionsperson übernimmt; so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
+/// alle `snap_*`, Art, Status, Bemerkung, den einen Ort und den Dispositionszeitpunkt samt
+/// Dispositionsperson übernimmt und ohne Ausgabe beginnt (LLH-1224, design.md D14: die Teilzeile
+/// kommt aus dem Rest, die Ausgabe bleibt an der Ausgangszeile); so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
 /// und auch eine frühere Herausnahme (`zuletzt_entlassen_at`, Migration 0195) sperrt den Storno
 /// der Teilzeile wie den der Ausgangszeile. Die neue Zeile ist aktiv. `NotFound`/`Conflict` wie
-/// [`require_aktiv_tx`], `UnprocessableEntity`, wenn `menge` nicht kleiner als die Menge ist.
-/// `menge` ≥ 1 prüft die Route (400). Liefert die ID der neuen Zeile.
+/// [`require_aktiv_tx`], `UnprocessableEntity` an einem Gerät, wenn `menge` nicht kleiner als die
+/// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400). Liefert die ID
+/// der neuen Zeile.
 pub async fn teile_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -440,25 +486,36 @@ pub async fn teile_auf_tx(
     menge: i64,
 ) -> Result<i64, AppError> {
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
-    let ausgang: i64 =
-        sqlx::query_scalar("SELECT menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
-            .bind(em_id)
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
+    let (ausgang, ausgegeben, art): (i64, i64, String) = sqlx::query_as(
+        "SELECT menge, ausgegeben, art FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if art == MaterialArt::Geraet.as_str() {
+        return Err(AppError::UnprocessableEntity(GERAET_JE_STUECK.into()));
+    }
     if menge >= ausgang {
         return Err(AppError::UnprocessableEntity(
             "Abzuteilende Menge muss kleiner als die Menge sein".into(),
         ));
     }
+    if menge > ausgang - ausgegeben {
+        return Err(AppError::UnprocessableEntity(
+            "Abzuteilende Menge größer als der Rest".into(),
+        ));
+    }
     let neu: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_material \
-            (einsatz_id, material_id, einheit_id, uhs_id, menge, status, snap_bezeichnung, \
-             snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
-             disponiert_at, disponiert_von, zuletzt_entlassen_at) \
-         SELECT einsatz_id, material_id, einheit_id, uhs_id, ?, status, snap_bezeichnung, \
-                snap_kategorie, snap_bestandsnummer, snap_traegerorganisation, bemerkung, \
-                disponiert_at, disponiert_von, zuletzt_entlassen_at \
+            (einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, menge, \
+             ausgegeben, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
+             snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
+             zuletzt_entlassen_at) \
+         SELECT einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, ?, \
+                0, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
+                snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
+                zuletzt_entlassen_at \
          FROM einsatz_material WHERE id = ? AND einsatz_id = ? \
          RETURNING id",
     )
@@ -557,14 +614,14 @@ pub async fn require_nicht_beendet(
 /// Commit und nennt die Einheit im ETB-Text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Entlassen {
-    /// Einheit, der das Material angehörte (ID für das Ereignis, Name für den ETB-Text).
+    /// Einheit, der das Material angehörte (Name für den ETB-Text).
     pub einheit: Option<(i64, String)>,
-    /// UHS, an der das Material lag.
-    pub uhs_id: Option<i64>,
+    /// Der Ort, an dem das Material lag (LLH-1224); sein Leser bekommt ein Ereignis.
+    pub ort: Option<MaterialOrt>,
 }
 
 /// Nimmt Material aus dem Einsatz (design.md D4, Wortlaut LLH-1093): die Zeile bleibt mit
-/// Zeitpunkt und handelnder Person stehen, Einheit und UHS werden gelöst. Keine Zeitachse (D5).
+/// Zeitpunkt und handelnder Person stehen, der Ort wird gelöst (alle vier Spalten, LLH-1224 D13). Keine Zeitachse (D5).
 /// `NotFound`/`Conflict` wie [`require_aktiv_tx`].
 pub async fn entlassen_tx(
     conn: &mut SqliteConnection,
@@ -583,20 +640,7 @@ pub async fn entlassen_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let uhs_id: Option<i64> =
-        sqlx::query_scalar("SELECT uhs_id FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
-            .bind(em_id)
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    sqlx::query(
-        "UPDATE einsatz_material SET einheit_id = NULL, uhs_id = NULL \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(em_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?;
+    let wechsel = ort::set_ort_tx(conn, einsatz_id, em_id, None).await?;
     set_beendet_tx(
         conn,
         einsatz_id,
@@ -606,7 +650,10 @@ pub async fn entlassen_tx(
         BeendetAls::Entlassen,
     )
     .await?;
-    Ok(Entlassen { einheit, uhs_id })
+    Ok(Entlassen {
+        einheit,
+        ort: wechsel.vorher,
+    })
 }
 
 /// Setzt den Endzustand genau einmal; die Bedingung `beendet_at IS NULL` steht im UPDATE, so
@@ -643,7 +690,7 @@ async fn set_beendet_tx(
 
 /// Storniert eine Fehldisposition (design.md D3): die Zeile endet als `storniert` und erscheint
 /// in keinem Nachweis. Nur solange das Material aktiv ist (sonst `Conflict`), nie aus dem
-/// Einsatz genommen war, an keiner Einheit und keiner UHS liegt und höchstens
+/// Einsatz genommen war, ohne Ort ist (LLH-1224, design.md D13) und höchstens
 /// [`crate::entlassung::STORNO_FRIST_MINUTEN`] nach der Disposition; sonst 422 mit dem ersten
 /// verletzten Grund als Satz.
 pub async fn stornieren_tx(
@@ -675,13 +722,8 @@ async fn find_storno_hindernis_tx(
     em_id: i64,
     jetzt: &str,
 ) -> Result<Option<String>, AppError> {
-    let (disponiert_at, einheit, uhs, entlassen_at): (
-        String,
-        Option<i64>,
-        Option<i64>,
-        Option<String>,
-    ) = sqlx::query_as(
-        "SELECT disponiert_at, einheit_id, uhs_id, zuletzt_entlassen_at \
+    let (disponiert_at, entlassen_at): (String, Option<String>) = sqlx::query_as(
+        "SELECT disponiert_at, zuletzt_entlassen_at \
          FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
     )
     .bind(em_id)
@@ -694,12 +736,14 @@ async fn find_storno_hindernis_tx(
             "Das Material war schon einmal aus dem Einsatz genommen; {AUSWEG}"
         )));
     }
-    let bindung = if einheit.is_some() {
-        Some("Das Material gehört einer Einheit an")
-    } else if uhs.is_some() {
-        Some("Das Material liegt an einer UHS")
-    } else {
-        None
+    let bindung = match ort::load_ort_tx(conn, einsatz_id, em_id).await? {
+        Some(MaterialOrt::Einheit(_)) => Some("Das Material gehört einer Einheit an"),
+        Some(MaterialOrt::Fahrzeug(_)) => Some("Das Material ist auf ein Fahrzeug geladen"),
+        Some(MaterialOrt::Uhs(_)) => Some("Das Material liegt an einer UHS"),
+        Some(MaterialOrt::Bereitstellungsraum(_)) => {
+            Some("Das Material liegt in einem Bereitstellungsraum")
+        }
+        None => None,
     };
     if let Some(b) = bindung {
         return Ok(Some(format!(
@@ -741,7 +785,8 @@ pub async fn reaktivieren_tx(
         ));
     }
     if let Some(mid) = material_id {
-        let (bezeichnung, kategorie, bestandsnummer, traeger) =
+        // Die Art bleibt die der Zeile (design.md D1): sie gilt für die Zeile, nicht für den Stamm.
+        let ((bezeichnung, kategorie, bestandsnummer, traeger), _) =
             stamm_snapshot_tx(conn, org_id, mid).await?;
         sqlx::query(
             "UPDATE einsatz_material SET snap_bezeichnung = ?, snap_kategorie = ?, \
@@ -796,6 +841,7 @@ mod tests {
         (benutzer, einsatz)
     }
 
+    /// Stamm-Verbrauchsgut (Mengen über 1, Ausgabe); Geräte über [`geraet_daten`].
     fn mat_daten(bezeichnung: &str) -> MaterialDaten<'_> {
         MaterialDaten {
             bezeichnung,
@@ -804,6 +850,14 @@ mod tests {
             traegerorganisation: None,
             standort: None,
             bemerkung: None,
+            art: MaterialArt::Verbrauchsgut,
+        }
+    }
+
+    fn geraet_daten(bezeichnung: &str) -> MaterialDaten<'_> {
+        MaterialDaten {
+            art: MaterialArt::Geraet,
+            ..mat_daten(bezeichnung)
         }
     }
 
@@ -902,6 +956,7 @@ mod tests {
                 bestandsnummer: None,
                 traegerorganisation: Some("THW"),
             },
+            None,
             100,
             benutzer,
         )
@@ -930,7 +985,7 @@ mod tests {
             em,
             MaterialPatch {
                 menge: Some(30),
-                status: Some(MaterialStatus::Defekt.as_str()),
+                status: Some(MaterialStatus::Defekt),
                 bemerkung: Some(Some("nass")),
                 ..MaterialPatch::default()
             },
@@ -942,27 +997,31 @@ mod tests {
         assert_eq!(a.status, MaterialStatus::Defekt);
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
-        // Nur Status ändern (menge/bemerkung None -> bleiben).
+        // Nur die Ausgabe ändern (menge/status/bemerkung None -> bleiben); ganz ausgegeben
+        // heißt aufgebraucht, der Status bleibt (LLH-1224 D3).
         update(
             &pool,
             einsatz,
             em,
             MaterialPatch {
-                status: Some(MaterialStatus::Verbraucht.as_str()),
+                ausgegeben: Some(30),
                 ..MaterialPatch::default()
             },
         )
         .await
         .unwrap();
         let b = load_anzeige(&pool, einsatz, em, true).await.unwrap();
-        assert_eq!(b.menge, 30, "Menge unveraendert");
-        assert_eq!(b.status, MaterialStatus::Verbraucht);
+        assert_eq!((b.menge, b.ausgegeben), (30, 30), "Menge unveraendert");
+        assert_eq!(b.status, MaterialStatus::Defekt);
 
         nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
         // Die Zeile bleibt mit Menge und Status (LLH-1079), fehlt aber in der Liste.
         let c = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
-        assert_eq!((c.menge, c.status), (30, MaterialStatus::Verbraucht));
+        assert_eq!(
+            (c.menge, c.ausgegeben, c.status),
+            (30, 30, MaterialStatus::Defekt)
+        );
         assert!(list(&pool, einsatz, true).await.unwrap().is_empty());
         assert_eq!(
             list_entlassene(&pool, einsatz, true).await.unwrap().len(),
@@ -1014,7 +1073,10 @@ mod tests {
             einsatz,
             em,
             MaterialPatch {
-                uhs_id: Some(Some(u)),
+                ort: OrtPatch {
+                    uhs_id: Some(Some(u)),
+                    ..OrtPatch::default()
+                },
                 ..MaterialPatch::default()
             },
         )
@@ -1028,7 +1090,10 @@ mod tests {
             einsatz,
             em,
             MaterialPatch {
-                uhs_id: Some(None),
+                ort: OrtPatch {
+                    uhs_id: Some(None),
+                    ..OrtPatch::default()
+                },
                 ..MaterialPatch::default()
             },
         )
@@ -1042,7 +1107,10 @@ mod tests {
             einsatz,
             em,
             MaterialPatch {
-                uhs_id: Some(Some(u)),
+                ort: OrtPatch {
+                    uhs_id: Some(Some(u)),
+                    ..OrtPatch::default()
+                },
                 ..MaterialPatch::default()
             },
         )
@@ -1069,6 +1137,7 @@ mod tests {
                 bestandsnummer: Some("B"),
                 traegerorganisation: Some("T"),
             },
+            None,
             4,
             benutzer,
         )
@@ -1179,7 +1248,7 @@ mod tests {
             .unwrap();
         let rest = MaterialPatch {
             menge: Some(3),
-            status: Some("defekt"),
+            status: Some(MaterialStatus::Defekt),
             bemerkung: Some(Some("nass")),
             ..MaterialPatch::default()
         };
@@ -1284,6 +1353,7 @@ mod tests {
                 bestandsnummer: None,
                 traegerorganisation: None,
             },
+            None,
             1,
             benutzer,
         )
@@ -1318,8 +1388,223 @@ mod tests {
         Ok(neu)
     }
 
-    /// LLH-1093, design.md D8: Summe gleich, alle Angaben, Ort und Dispositionszeitpunkt
-    /// übernommen, die Teilzeile aktiv.
+    /// LLH-1224 D2/D3/D4: Art, Menge, Ausgabe und Status passen zueinander, beim Disponieren
+    /// wie beim Ändern; ein abgelehnter Patch schreibt nichts, auch keinen Ort.
+    #[tokio::test]
+    async fn zeilenregeln_beim_disponieren_und_aendern() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let g = mat_repo::anlegen(&pool, 1, geraet_daten("Stromerzeuger"))
+            .await
+            .unwrap();
+        assert_eq!(
+            grund(
+                disponiere_stamm(&pool, einsatz, 1, g.id, 2, benutzer)
+                    .await
+                    .unwrap_err()
+            ),
+            GERAET_JE_STUECK
+        );
+        let geraet = disponiere_stamm(&pool, einsatz, 1, g.id, 1, benutzer)
+            .await
+            .unwrap();
+        assert_eq!(
+            load_anzeige(&pool, einsatz, geraet, true)
+                .await
+                .unwrap()
+                .art,
+            MaterialArt::Geraet,
+            "Art aus dem Stamm"
+        );
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let vg = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mit_ort = |patch: MaterialPatch<'static>| MaterialPatch {
+            ort: OrtPatch {
+                einheit_id: Some(Some(einheit)),
+                ..OrtPatch::default()
+            },
+            ..patch
+        };
+        let faelle: [(i64, MaterialPatch<'static>, &str); 7] = [
+            (
+                geraet,
+                MaterialPatch {
+                    menge: Some(3),
+                    ..MaterialPatch::default()
+                },
+                GERAET_JE_STUECK,
+            ),
+            (
+                geraet,
+                MaterialPatch {
+                    ausgegeben: Some(1),
+                    ..MaterialPatch::default()
+                },
+                "Ausgabe gibt es nur für Verbrauchsgut",
+            ),
+            (
+                vg,
+                MaterialPatch {
+                    ausgegeben: Some(60),
+                    ..MaterialPatch::default()
+                },
+                "Ausgabe größer als die Menge",
+            ),
+            (
+                vg,
+                MaterialPatch {
+                    status: Some(MaterialStatus::Verbraucht),
+                    ..MaterialPatch::default()
+                },
+                "Status «verbraucht» gibt es nur für Geräte",
+            ),
+            (
+                vg,
+                MaterialPatch {
+                    status: Some(MaterialStatus::DesinfektionNoetig),
+                    ..MaterialPatch::default()
+                },
+                "Status «Desinfektion nötig» gibt es nur für Geräte",
+            ),
+            (
+                vg,
+                MaterialPatch {
+                    art: Some(MaterialArt::Geraet),
+                    ..MaterialPatch::default()
+                },
+                GERAET_JE_STUECK,
+            ),
+            (
+                geraet,
+                MaterialPatch {
+                    status: Some(MaterialStatus::Verbraucht),
+                    art: Some(MaterialArt::Verbrauchsgut),
+                    ..MaterialPatch::default()
+                },
+                "Status «verbraucht» gibt es nur für Geräte",
+            ),
+        ];
+        for (em, patch, erwartet) in faelle {
+            assert_eq!(
+                grund(
+                    update(&pool, einsatz, em, mit_ort(patch))
+                        .await
+                        .unwrap_err()
+                ),
+                erwartet
+            );
+            let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+            assert_eq!(a.ort(), None, "{erwartet}: kein Ort geschrieben");
+        }
+        // Die Ausgabe steht, dann ist eine kleinere Menge die Verletzung.
+        update(
+            &pool,
+            einsatz,
+            vg,
+            MaterialPatch {
+                ausgegeben: Some(30),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            grund(
+                update(
+                    &pool,
+                    einsatz,
+                    vg,
+                    MaterialPatch {
+                        menge: Some(20),
+                        ..MaterialPatch::default()
+                    },
+                )
+                .await
+                .unwrap_err()
+            ),
+            "Menge kleiner als die Ausgabe"
+        );
+        // Ein Gerät darf „verbraucht“ werden; ein Verbrauchsgut mit Menge 1 darf ein Gerät werden.
+        update(
+            &pool,
+            einsatz,
+            geraet,
+            MaterialPatch {
+                status: Some(MaterialStatus::Verbraucht),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        let eins = disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+            .await
+            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            eins,
+            MaterialPatch {
+                art: Some(MaterialArt::Geraet),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            load_anzeige(&pool, einsatz, eins, true).await.unwrap().art,
+            MaterialArt::Geraet
+        );
+        // Zwei Orte in einem Patch: 422 ohne zu schreiben.
+        let u: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            grund(
+                update(
+                    &pool,
+                    einsatz,
+                    vg,
+                    MaterialPatch {
+                        ort: OrtPatch {
+                            einheit_id: Some(Some(einheit)),
+                            uhs_id: Some(Some(u)),
+                            ..OrtPatch::default()
+                        },
+                        ..MaterialPatch::default()
+                    },
+                )
+                .await
+                .unwrap_err()
+            ),
+            "Ein Posten hat höchstens einen Ort"
+        );
+        assert_eq!(
+            load_anzeige(&pool, einsatz, vg, true).await.unwrap().ort(),
+            None
+        );
+    }
+
+    /// LLH-1093, design.md D8, LLH-1224 D14: Summe gleich, Art, alle Angaben, der eine Ort und
+    /// der Dispositionszeitpunkt übernommen, die Teilzeile aktiv; sie kommt aus dem Rest und
+    /// startet ohne Ausgabe, die Ausgabe bleibt an der Ausgangszeile.
     #[tokio::test]
     async fn aufteilen_haelt_die_summe_und_uebernimmt_alles() {
         let pool = crate::db::test_pool().await;
@@ -1330,13 +1615,6 @@ mod tests {
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
             .await
             .unwrap();
-        let einheit: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
-        )
-        .bind(einsatz)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
         let u: i64 = sqlx::query_scalar(
             "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
              VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
@@ -1348,10 +1626,9 @@ mod tests {
         .await
         .unwrap();
         sqlx::query(
-            "UPDATE einsatz_material SET einheit_id = ?, uhs_id = ?, status = 'im_einsatz', \
+            "UPDATE einsatz_material SET uhs_id = ?, status = 'im_einsatz', ausgegeben = 10, \
              bemerkung = 'Regal 2', disponiert_at = '2026-10-14 08:00:00' WHERE id = ?",
         )
-        .bind(einheit)
         .bind(u)
         .bind(em)
         .execute(&pool)
@@ -1363,12 +1640,13 @@ mod tests {
         let b = load_anzeige(&pool, einsatz, neu, true).await.unwrap();
         assert_ne!(neu, em);
         assert_eq!((a.menge, b.menge), (30, 20), "Summe gleich");
+        assert_eq!((a.ausgegeben, b.ausgegeben), (10, 0), "Ausgabe bleibt");
+        assert_eq!(b.art, MaterialArt::Verbrauchsgut);
         assert_eq!(b.material_id, Some(m.id));
         assert_eq!(
-            (b.einheit_id, b.uhs_id, b.status, b.bemerkung.as_deref()),
+            (b.ort(), b.status, b.bemerkung.as_deref()),
             (
-                Some(einheit),
-                Some(u),
+                Some(MaterialOrt::Uhs(u)),
                 MaterialStatus::ImEinsatz,
                 Some("Regal 2")
             )
@@ -1393,6 +1671,55 @@ mod tests {
         assert_eq!(snap, ("Wolldecke".into(), Some("Betreuung".into())));
         assert_eq!(list(&pool, einsatz, true).await.unwrap().len(), 2);
         assert_eq!(list_je_uhs(&pool, einsatz, u, true).await.unwrap().len(), 2);
+    }
+
+    /// LLH-1224 D14: ein Gerät lässt sich nicht aufteilen, ein Verbrauchsgut höchstens um seinen
+    /// Rest; jeweils ohne zu schreiben. Der ganze Rest geht.
+    #[tokio::test]
+    async fn aufteilen_nur_aus_dem_rest_und_nie_ein_geraet() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let g = mat_repo::anlegen(&pool, 1, geraet_daten("Stromerzeuger"))
+            .await
+            .unwrap();
+        let geraet = disponiere_stamm(&pool, einsatz, 1, g.id, 1, benutzer)
+            .await
+            .unwrap();
+        assert_eq!(
+            grund(teile(&pool, einsatz, geraet, 1).await.unwrap_err()),
+            GERAET_JE_STUECK
+        );
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                ausgegeben: Some(40),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            grund(teile(&pool, einsatz, em, 11).await.unwrap_err()),
+            "Abzuteilende Menge größer als der Rest"
+        );
+        assert_eq!(
+            load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
+            50
+        );
+        assert_eq!(list(&pool, einsatz, true).await.unwrap().len(), 2);
+        let neu = teile(&pool, einsatz, em, 10).await.unwrap();
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!((a.menge, a.ausgegeben), (40, 40), "ganz ausgegeben");
+        let b = load_anzeige(&pool, einsatz, neu, true).await.unwrap();
+        assert_eq!((b.menge, b.ausgegeben), (10, 0));
     }
 
     /// LLH-1093, design.md D8: eine Menge ab der Ausgangsmenge ist 422 (deckt Menge 1 ab),
@@ -1513,15 +1840,13 @@ mod tests {
         }
     }
 
-    /// design.md D4: Herausnehmen löst Einheit und UHS und meldet beide.
+    /// design.md D4, LLH-1224 D13: Herausnehmen löst den einen Ort (alle vier Spalten) und
+    /// meldet ihn; an einer Einheit nennt es zusätzlich deren Namen für den ETB-Text.
     #[tokio::test]
-    async fn herausnehmen_loest_einheit_und_uhs() {
+    async fn herausnehmen_loest_den_ort() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let m = mat_repo::anlegen(&pool, 1, mat_daten("Trage"))
-            .await
-            .unwrap();
-        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 2, benutzer)
             .await
             .unwrap();
         let einheit: i64 = sqlx::query_scalar(
@@ -1541,18 +1866,25 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        sqlx::query("UPDATE einsatz_material SET einheit_id = ?, uhs_id = ? WHERE id = ?")
-            .bind(einheit)
-            .bind(u)
-            .bind(em)
-            .execute(&pool)
-            .await
-            .unwrap();
-        let e = nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
-        assert_eq!(e.einheit, Some((einheit, "1. Zug".to_string())));
-        assert_eq!(e.uhs_id, Some(u));
-        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
-        assert_eq!((a.einheit_id, a.uhs_id), (None, None));
+        for ort in [MaterialOrt::Einheit(einheit), MaterialOrt::Uhs(u)] {
+            let em = disponiere_stamm(&pool, einsatz, 1, m.id, 2, benutzer)
+                .await
+                .unwrap();
+            let mut conn = pool.acquire().await.unwrap();
+            ort::set_ort_tx(&mut conn, einsatz, em, Some(ort))
+                .await
+                .unwrap();
+            drop(conn);
+            let e = nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+            assert_eq!(e.ort, Some(ort));
+            let einheit_erwartet = match ort {
+                MaterialOrt::Einheit(_) => Some((einheit, "1. Zug".to_string())),
+                _ => None,
+            };
+            assert_eq!(e.einheit, einheit_erwartet);
+            let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+            assert_eq!(a.ort(), None, "{ort:?}");
+        }
         assert!(list_je_uhs(&pool, einsatz, u, true)
             .await
             .unwrap()
@@ -1633,7 +1965,7 @@ mod tests {
             einsatz,
             em,
             MaterialPatch {
-                status: Some("defekt"),
+                status: Some(MaterialStatus::Defekt),
                 ..MaterialPatch::default()
             },
         )

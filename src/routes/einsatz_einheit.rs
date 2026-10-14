@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::routes::support::{
     deserialize_optional_field, parse_flag, pflicht_max, pruefe_kommunikationsmittel,
     pruefe_koordinate, trimme, trimme_tri,
@@ -763,75 +764,67 @@ pub async fn fahrzeug_freigeben(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT .../einheiten/{eid}/material/{em_id} — Material zuordnen oder umhängen. ETB-Eintrag, der
-/// beim Umhängen die vorherige Einheit nennt; beide Einheiten werden gemeldet. Dieselbe Einheit
-/// noch einmal schreibt nichts (LLH-1093, design.md D5).
+/// PUT .../einheiten/{eid}/material/{em_id} — Material an die Einheit (Recht Einheiten). Der
+/// eine Ort geht über `material::ort::set_ort_tx` (LLH-1224, design.md D9): ein Posten an einer
+/// anderen Einheit, einem Fahrzeug, einer UHS oder einem Bereitstellungsraum wechselt hierher. Ein
+/// ETB-Eintrag mit altem und neuem Ort, beide Orte werden gemeldet; derselbe Ort schreibt nichts.
 pub async fn material_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let zuordnung = crate::write_retry!(&state.pool, |conn| {
-        let z = mitglied_repo::zuordnen_material_tx(conn, einsatz_id, eid, em_id).await?;
-        if z.is_changed {
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &crate::einheit::etb_text_material_zugeordnet(
-                    &einheit,
-                    &z.bezeichnung,
-                    z.menge,
-                    z.vorher.as_ref().map(|(_, name)| name.as_str()),
-                ),
-            )
-            .await?;
-        }
-        Ok(z)
-    })?;
-    if zuordnung.is_changed {
-        sse_einheit(&state, einsatz_id, eid);
-        if let Some((alt, _)) = zuordnung.vorher {
-            sse_einheit(&state, einsatz_id, alt);
-        }
-        sse_material(&state, einsatz_id, em_id);
-    }
-    Ok(StatusCode::NO_CONTENT)
+    material_ort_setzen(&state, &ctx, eid, em_id, Some(MaterialOrt::Einheit(eid))).await
 }
 
-/// DELETE .../einheiten/{eid}/material/{em_id} — Material freigeben. ETB-Eintrag.
+/// DELETE .../einheiten/{eid}/material/{em_id} — Material von der Einheit lösen: danach ohne Ort
+/// (LLH-1224). 404, wenn der Posten nicht an dieser Einheit liegt. ETB-Eintrag.
 pub async fn material_freigeben(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    material_ort_setzen(&state, &ctx, eid, em_id, None).await
+}
+
+/// Gemeinsamer Weg von PUT und DELETE: `ziel` `None` heißt „von `eid` lösen“.
+async fn material_ort_setzen(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Einheiten>,
+    eid: i64,
+    em_id: i64,
+    ziel: Option<MaterialOrt>,
+) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
+    einheit_name(state, einsatz_id, eid).await?;
+    // F06/LFH-244 Tier-A: Ort + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
-        let (bez, menge) =
-            mitglied_repo::freigeben_material_tx(conn, einsatz_id, eid, em_id).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &format!(
-                "Einheit «{}»: Material «{}» (×{}) freigegeben",
-                einheit, bez, menge
-            ),
-        )
-        .await?;
-        Ok(())
+    let wechsel = crate::write_retry!(&state.pool, |conn| {
+        if ziel.is_none()
+            && material_ort::load_ort_tx(conn, einsatz_id, em_id).await?
+                != Some(MaterialOrt::Einheit(eid))
+        {
+            return Err(AppError::NotFound);
+        }
+        let wechsel = material_ort::set_ort_tx(conn, einsatz_id, em_id, ziel).await?;
+        if wechsel.is_changed() {
+            let em =
+                crate::material::disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true)
+                    .await?;
+            let text = crate::material::etb_text_ort_gewechselt(
+                &em.bezeichnung,
+                em.menge,
+                &material_ort::ort_text_tx(conn, einsatz_id, wechsel.vorher).await?,
+                &material_ort::ort_text_tx(conn, einsatz_id, wechsel.nachher).await?,
+            );
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        }
+        Ok(wechsel)
     })?;
-    sse_einheit(&state, einsatz_id, eid);
-    sse_material(&state, einsatz_id, em_id);
+    if wechsel.is_changed() {
+        super::einsatz_material::sse_ortswechsel(state, einsatz_id, wechsel);
+        sse_material(state, einsatz_id, em_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

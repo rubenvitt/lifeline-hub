@@ -2408,7 +2408,9 @@ async fn laptop_liest_material_und_anhaenge_der_eigenen_uhs() {
         "POST",
         "/api/material",
         &admin,
-        Some(&json!({"bezeichnung": "Wolldecke", "kategorie": "Betreuung"})),
+        Some(
+            &json!({"bezeichnung": "Wolldecke", "kategorie": "Betreuung", "art": "verbrauchsgut"}),
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");

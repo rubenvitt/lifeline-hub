@@ -1543,3 +1543,79 @@ async fn adhoc_angaben_grenzen_und_entlassenes_fahrzeug() {
         "Florian Extern 1"
     );
 }
+
+// ── Beladung (LLH-1224, design.md D13) ───────────────────────────────────────────────────
+
+/// Spec `material-modell`, „Ende eines Orts“: ein Fahrzeug mit Beladung lässt sich nicht
+/// stornieren (422); beim Entlassen bleibt die Beladung ohne Ort im Einsatz, der ETB-Eintrag des
+/// Entlassens nennt die Zahl der Posten, und jeder Posten wird live gemeldet.
+#[tokio::test]
+async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1/83-1").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(
+            r#"{{"adhoc":{{"bezeichnung":"Stromerzeuger"}},"einsatz_fahrzeug_id":{ef}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["einsatz_fahrzeug_id"], ef);
+    assert_eq!(json["art"], "geraet", "Ad-hoc ×1 ist ein Gerät");
+    let em = json["id"].as_i64().unwrap();
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Material «Stromerzeuger» (×1) disponiert, Ort Fahrzeug «Florian 1/83-1»"));
+
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Fahrzeug hat Material geladen"),
+        "{json}"
+    );
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t
+            == "Fahrzeug «Florian 1/83-1» aus dem Einsatz entlassen; Beladung ohne Ort: 1 Posten"),);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, &[("material", "material_id")]),
+        vec![ereignis("material", em)],
+        "der Posten wird gemeldet"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
+    let zeile = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == em)
+        .expect("der Posten steht weiter im Einsatz")
+        .clone();
+    for feld in ["einheit_id", "einsatz_fahrzeug_id", "uhs_id", "br_id"] {
+        assert!(
+            zeile.get(feld).is_none_or(|v| v.is_null()),
+            "{feld}: {zeile}"
+        );
+    }
+}

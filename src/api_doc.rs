@@ -216,6 +216,7 @@ use utoipa::OpenApi;
         crate::live::org::OrgLiveEvent,
         crate::material::EinsatzMaterialAnzeige,
         crate::material::MaterialAnzeige,
+        crate::material::MaterialArt,
         crate::material::MaterialStatus,
         crate::meldung::LageMeldungAnzeige,
         crate::meldung::MeldungAnzeige,

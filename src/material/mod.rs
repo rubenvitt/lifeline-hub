@@ -1,4 +1,5 @@
 pub mod disposition_repo;
+pub mod ort;
 pub mod repo;
 
 use crate::wire_enum::wire_enum;
@@ -29,6 +30,9 @@ pub struct Material {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Gerät oder Verbrauchsgut (LLH-1224, design.md D1): Vorgabe jeder neuen Disposition.
+    #[sqlx(try_from = "String")]
+    pub art: MaterialArt,
     /// Demo-Herkunft (LFH-733): wahr, solange `demo_herkunft` die Zeile markiert. Live gelesen
     /// über `SPALTEN`, kein gespeichertes Flag.
     pub ist_demo: bool,
@@ -47,6 +51,7 @@ impl Material {
             bemerkung: self.bemerkung.clone(),
             dienststatus: self.dienststatus.clone(),
             angelegt_at: self.angelegt_at.clone(),
+            art: self.art,
             ist_demo: self.ist_demo,
         }
     }
@@ -65,6 +70,8 @@ pub struct MaterialAnzeige {
     #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Gerät oder Verbrauchsgut (LLH-1224); gilt für neue Dispositionen, nie rückwirkend.
+    pub art: MaterialArt,
     /// Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`.
     pub ist_demo: bool,
 }
@@ -83,6 +90,39 @@ wire_enum! {
     try_from = |s| format!("Ungültiger MaterialStatus: {s}");
 }
 
+wire_enum! {
+    /// Art eines Materials (LLH-1224, Spec `material-modell`): ein einzeln verfolgtes Gerät steht
+    /// je Stück im Einsatz (Menge 1, alle fünf Status); ein Verbrauchsgut hat eine Menge, eine
+    /// Ausgabe und keine Status „verbraucht“ und „Desinfektion nötig“. Am Stamm die Vorgabe jeder
+    /// Disposition, an der Dispositionszeile eine eigene Spalte (design.md D1).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum MaterialArt {
+        Geraet => "geraet",
+        Verbrauchsgut => "verbrauchsgut",
+    }
+    try_from = |s| format!("Ungültige MaterialArt: {s}");
+}
+
+impl MaterialArt {
+    /// Anzeigewort im ETB („Art Gerät → Verbrauchsgut“).
+    pub fn label(self) -> &'static str {
+        match self {
+            MaterialArt::Geraet => "Gerät",
+            MaterialArt::Verbrauchsgut => "Verbrauchsgut",
+        }
+    }
+
+    /// Vorgabe eines Ad-hoc-Postens ohne Angabe und der Übernahme des Bestands (design.md D1,
+    /// D12): über 1 Stück Verbrauchsgut, sonst Gerät.
+    pub fn aus_menge(menge: i64) -> Self {
+        if menge > 1 {
+            MaterialArt::Verbrauchsgut
+        } else {
+            MaterialArt::Geraet
+        }
+    }
+}
+
 // Non-null, manuell gemappt (`disposition_repo::zu_anzeige` aus dem internen `Row`) —
 // TryFrom<String> für `#[sqlx(try_from = "String")]` auf dem internen FromRow-Struct
 // (analog `LageZoneTyp` in `src/lage_zone/repo.rs`).
@@ -96,16 +136,28 @@ pub struct EinsatzMaterialAnzeige {
     pub einsatz_id: i64,
     /// `None` = Ad-hoc-externes Material (kein Stamm-Bezug).
     pub material_id: Option<i64>,
-    /// Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position.
+    /// Ort Einheit; höchstens eines von `einheit_id`, `einsatz_fahrzeug_id`, `uhs_id`, `br_id`
+    /// ist gesetzt, keines heißt „ohne Ort“ (LLH-1224, Spec `material-modell`).
     pub einheit_id: Option<i64>,
-    /// Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet.
+    /// Ort Unfallhilfsstelle.
     pub uhs_id: Option<i64>,
+    /// Ort Fahrzeug (Beladung, `einsatz_fahrzeug.id`); fehlt, wenn nicht gesetzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatz_fahrzeug_id: Option<i64>,
+    /// Ort Bereitstellungsraum; fehlt, wenn nicht gesetzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub br_id: Option<i64>,
+    /// Gerät oder Verbrauchsgut der Zeile, beim Disponieren aus dem Stamm kopiert (LLH-1224).
+    pub art: MaterialArt,
     pub ist_adhoc: bool,
     pub bezeichnung: String,
     pub kategorie: Option<String>,
     pub bestandsnummer: Option<String>,
     pub traegerorganisation: Option<String>,
     pub menge: i64,
+    /// Ausgegebene Menge eines Verbrauchsguts (0 bei Geräten); Rest = `menge − ausgegeben`. Ganz
+    /// ausgegeben heißt „aufgebraucht“ (LLH-1224, design.md D4).
+    pub ausgegeben: i64,
     pub status: MaterialStatus,
     pub bemerkung: Option<String>,
     pub disponiert_at: String,
@@ -125,9 +177,104 @@ pub struct EinsatzMaterialAnzeige {
     pub beendet_als: Option<String>,
 }
 
+impl EinsatzMaterialAnzeige {
+    /// Der eine Ort der Zeile (LLH-1224); `None` = ohne Ort.
+    pub fn ort(&self) -> Option<ort::MaterialOrt> {
+        ort::MaterialOrt::aus_spalten(
+            self.einheit_id,
+            self.einsatz_fahrzeug_id,
+            self.uhs_id,
+            self.br_id,
+        )
+    }
+}
+
+/// Prüft eine Zeile, wie sie nach einer Änderung aussähe, gegen die Regeln von Art, Menge,
+/// Ausgabe und Status (LLH-1224, design.md D2–D4, D10); die CHECKs der Tabelle sind nur das Netz.
+/// `ausgabe_geaendert` wählt den Grund, wenn die Ausgabe über der Menge läge: die Anfrage setzt die
+/// Ausgabe („Ausgabe größer als die Menge“) oder die Menge („Menge kleiner als die Ausgabe“).
+pub fn pruefe_zeile(
+    art: MaterialArt,
+    menge: i64,
+    ausgegeben: i64,
+    status: MaterialStatus,
+    ausgabe_geaendert: bool,
+) -> Result<(), crate::error::AppError> {
+    use crate::error::AppError::UnprocessableEntity as U;
+    if art == MaterialArt::Geraet && menge != 1 {
+        return Err(U(GERAET_JE_STUECK.into()));
+    }
+    if art == MaterialArt::Geraet && ausgegeben > 0 {
+        return Err(U("Ausgabe gibt es nur für Verbrauchsgut".into()));
+    }
+    if ausgegeben > menge {
+        return Err(U(if ausgabe_geaendert {
+            "Ausgabe größer als die Menge".into()
+        } else {
+            "Menge kleiner als die Ausgabe".into()
+        }));
+    }
+    if art == MaterialArt::Verbrauchsgut
+        && matches!(
+            status,
+            MaterialStatus::Verbraucht | MaterialStatus::DesinfektionNoetig
+        )
+    {
+        let wort = match status {
+            MaterialStatus::Verbraucht => "verbraucht",
+            _ => "Desinfektion nötig",
+        };
+        return Err(U(format!("Status «{wort}» gibt es nur für Geräte")));
+    }
+    Ok(())
+}
+
+/// Der Grund, wenn ein Gerät mit einer Menge über 1 im Einsatz stehen soll (D2).
+pub const GERAET_JE_STUECK: &str = "Ein Gerät steht je Stück im Einsatz";
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn grund(r: Result<(), crate::error::AppError>) -> String {
+        match r {
+            Err(crate::error::AppError::UnprocessableEntity(m)) => m,
+            other => panic!("kein 422: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pruefe_zeile_je_regel() {
+        use MaterialArt::{Geraet as G, Verbrauchsgut as V};
+        use MaterialStatus::*;
+        assert!(pruefe_zeile(G, 1, 0, DesinfektionNoetig, false).is_ok());
+        assert!(pruefe_zeile(V, 50, 50, Einsatzbereit, true).is_ok());
+        assert!(pruefe_zeile(V, 50, 0, Defekt, false).is_ok());
+        assert_eq!(
+            grund(pruefe_zeile(G, 2, 0, Einsatzbereit, false)),
+            "Ein Gerät steht je Stück im Einsatz"
+        );
+        assert_eq!(
+            grund(pruefe_zeile(G, 1, 1, Einsatzbereit, true)),
+            "Ausgabe gibt es nur für Verbrauchsgut"
+        );
+        assert_eq!(
+            grund(pruefe_zeile(V, 50, 60, Einsatzbereit, true)),
+            "Ausgabe größer als die Menge"
+        );
+        assert_eq!(
+            grund(pruefe_zeile(V, 10, 20, Einsatzbereit, false)),
+            "Menge kleiner als die Ausgabe"
+        );
+        assert_eq!(
+            grund(pruefe_zeile(V, 5, 0, Verbraucht, false)),
+            "Status «verbraucht» gibt es nur für Geräte"
+        );
+        assert_eq!(
+            grund(pruefe_zeile(V, 5, 0, DesinfektionNoetig, false)),
+            "Status «Desinfektion nötig» gibt es nur für Geräte"
+        );
+    }
 
     #[test]
     fn status_roundtrip() {
@@ -144,6 +291,18 @@ mod tests {
     }
 
     #[test]
+    fn art_roundtrip_und_vorgabe_aus_der_menge() {
+        for s in ["geraet", "verbrauchsgut"] {
+            assert_eq!(MaterialArt::parse(s).unwrap().as_str(), s);
+        }
+        assert!(MaterialArt::parse("Gerät").is_none());
+        assert_eq!(MaterialArt::aus_menge(1), MaterialArt::Geraet);
+        assert_eq!(MaterialArt::aus_menge(2), MaterialArt::Verbrauchsgut);
+        assert_eq!(MaterialArt::Geraet.label(), "Gerät");
+        assert_eq!(MaterialArt::Verbrauchsgut.label(), "Verbrauchsgut");
+    }
+
+    #[test]
     fn anzeige_ohne_org_id() {
         let m = Material {
             id: 7,
@@ -156,6 +315,7 @@ mod tests {
             bemerkung: None,
             dienststatus: DIENSTSTATUS_IN_DIENST.into(),
             angelegt_at: "2026-05-27 10:00:00".into(),
+            art: MaterialArt::Verbrauchsgut,
             ist_demo: false,
         };
         let a = m.anzeige();
@@ -169,9 +329,45 @@ mod tests {
 // Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
 // importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
 
-/// System-ETB beim Disponieren von Material (Stamm oder Ad-hoc), mit Menge.
-pub fn etb_text_disponiert(bezeichnung: &str, menge: i64) -> String {
-    format!("Material «{}» (×{}) disponiert", bezeichnung, menge)
+/// System-ETB beim Disponieren von Material (Stamm oder Ad-hoc), mit Menge und, wenn gesetzt,
+/// dem Ort im Wortlaut von [`ort::ort_text_tx`] (LLH-1224, design.md D11).
+pub fn etb_text_disponiert(bezeichnung: &str, menge: i64, ort: Option<&str>) -> String {
+    match ort {
+        Some(o) => format!("Material «{bezeichnung}» (×{menge}) disponiert, Ort {o}"),
+        None => format!("Material «{bezeichnung}» (×{menge}) disponiert"),
+    }
+}
+
+/// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
+/// und neuer Ort im Wortlaut von [`ort::ort_text_tx`], leer „ohne Ort“.
+pub fn etb_text_ort_gewechselt(
+    bezeichnung: &str,
+    menge: i64,
+    vorher: &str,
+    nachher: &str,
+) -> String {
+    format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
+}
+
+/// System-ETB bei geänderter Ausgabe eines Verbrauchsguts (LLH-1224, design.md D11), mit Rest.
+pub fn etb_text_ausgabe(bezeichnung: &str, vorher: i64, nachher: i64, menge: i64) -> String {
+    format!(
+        "Material «{bezeichnung}»: Ausgabe {vorher} → {nachher} (Rest {} von {menge})",
+        menge - nachher
+    )
+}
+
+/// System-ETB beim Wechsel der Art einer Zeile (LLH-1224, design.md D10/D11).
+pub fn etb_text_art_geaendert(
+    bezeichnung: &str,
+    vorher: MaterialArt,
+    nachher: MaterialArt,
+) -> String {
+    format!(
+        "Material «{bezeichnung}»: Art {} → {}",
+        vorher.label(),
+        nachher.label()
+    )
 }
 
 /// System-ETB beim Herausnehmen aus dem Einsatz (LLH-1079, Wortlaut LLH-1093 Nr. 3: Material
@@ -320,10 +516,38 @@ mod etb_text_tests {
     }
 
     #[test]
-    fn disponiert_mit_menge() {
+    fn disponiert_mit_menge_und_ort() {
         assert_eq!(
-            etb_text_disponiert("Sandsäcke", 250),
+            etb_text_disponiert("Sandsäcke", 250, None),
             "Material «Sandsäcke» (×250) disponiert"
+        );
+        assert_eq!(
+            etb_text_disponiert("Wolldecke", 50, Some("UHS «Turnhalle»")),
+            "Material «Wolldecke» (×50) disponiert, Ort UHS «Turnhalle»"
+        );
+    }
+
+    #[test]
+    fn ort_gewechselt_ausgabe_und_art() {
+        assert_eq!(
+            etb_text_ort_gewechselt("Wolldecke", 20, "Einheit «Staffel A»", "UHS «Turnhalle»"),
+            "Material «Wolldecke» (×20): Einheit «Staffel A» → UHS «Turnhalle»"
+        );
+        assert_eq!(
+            etb_text_ort_gewechselt("Wolldecke", 20, "ohne Ort", "Fahrzeug «Florian 1/83-1»"),
+            "Material «Wolldecke» (×20): ohne Ort → Fahrzeug «Florian 1/83-1»"
+        );
+        assert_eq!(
+            etb_text_ort_gewechselt("Wolldecke", 20, "Einheit «Staffel A»", "ohne Ort"),
+            "Material «Wolldecke» (×20): Einheit «Staffel A» → ohne Ort"
+        );
+        assert_eq!(
+            etb_text_ausgabe("Wolldecke", 20, 30, 50),
+            "Material «Wolldecke»: Ausgabe 20 → 30 (Rest 20 von 50)"
+        );
+        assert_eq!(
+            etb_text_art_geaendert("Wolldecke", MaterialArt::Geraet, MaterialArt::Verbrauchsgut),
+            "Material «Wolldecke»: Art Gerät → Verbrauchsgut"
         );
     }
 }

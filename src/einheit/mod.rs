@@ -146,6 +146,10 @@ pub struct EinheitMitgliedMaterial {
     pub menge: i64,
     /// Festes Status-Enum als String (z. B. "einsatzbereit").
     pub status: crate::material::MaterialStatus,
+    /// Gerät oder Verbrauchsgut (LLH-1224): mit `ausgegeben` erkennen Einheit-Ansicht und
+    /// Kräftebaum ohne Materialrecht ein aufgebrauchtes Verbrauchsgut.
+    pub art: crate::material::MaterialArt,
+    pub ausgegeben: i64,
 }
 
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
@@ -237,21 +241,6 @@ pub fn etb_text_fahrzeug_umgehaengt(einheit: &str, funkrufname: &str, vorher: &s
         "{}, vorher «{vorher}»",
         etb_text_fahrzeug_zugeordnet(einheit, funkrufname)
     )
-}
-
-/// System-ETB, wenn Material einer Einheit zugeordnet wird; beim Umhängen nennt er die Einheit,
-/// der es vorher angehörte (LLH-1093, design.md D5).
-pub fn etb_text_material_zugeordnet(
-    einheit: &str,
-    bezeichnung: &str,
-    menge: i64,
-    vorher: Option<&str>,
-) -> String {
-    let text = format!("Einheit «{einheit}»: Material «{bezeichnung}» (×{menge}) zugeordnet");
-    match vorher {
-        Some(v) => format!("{text}, vorher «{v}»"),
-        None => text,
-    }
 }
 
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
@@ -407,18 +396,6 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_fahrzeug_umgehaengt("Zug 2", "83-1", "Zug 1"),
             "Einheit «Zug 2»: Fahrzeug «83-1» zugeordnet, vorher «Zug 1»"
-        );
-    }
-
-    #[test]
-    fn material_zugeordnet_nennt_die_vorherige_einheit() {
-        assert_eq!(
-            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, Some("Staffel A")),
-            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»"
-        );
-        assert_eq!(
-            etb_text_material_zugeordnet("Staffel B", "Wolldecke", 20, None),
-            "Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet"
         );
     }
 }

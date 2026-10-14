@@ -3719,9 +3719,19 @@
           "em_id",
           "bezeichnung",
           "menge",
-          "status"
+          "status",
+          "art",
+          "ausgegeben"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut (LLH-1224): mit `ausgegeben` erkennen Einheit-Ansicht und\nKräftebaum ohne Materialrecht ein aufgebrauchtes Verbrauchsgut."
+          },
+          "ausgegeben": {
+            "type": "integer",
+            "format": "int64"
+          },
           "bezeichnung": {
             "type": "string"
           },
@@ -4501,14 +4511,25 @@
         "required": [
           "id",
           "einsatz_id",
+          "art",
           "ist_adhoc",
           "bezeichnung",
           "menge",
+          "ausgegeben",
           "status",
           "disponiert_at",
           "ist_demo"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut der Zeile, beim Disponieren aus dem Stamm kopiert (LLH-1224)."
+          },
+          "ausgegeben": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Ausgegebene Menge eines Verbrauchsguts (0 bei Geräten); Rest = `menge − ausgegeben`. Ganz\nausgegeben heißt „aufgebraucht“ (LLH-1224, design.md D4)."
+          },
           "beendet_als": {
             "oneOf": [
               {
@@ -4548,6 +4569,14 @@
           "bezeichnung": {
             "type": "string"
           },
+          "br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ort Bereitstellungsraum; fehlt, wenn nicht gesetzt."
+          },
           "disponiert_at": {
             "type": "string"
           },
@@ -4564,7 +4593,15 @@
               "null"
             ],
             "format": "int64",
-            "description": "Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position."
+            "description": "Ort Einheit; höchstens eines von `einheit_id`, `einsatz_fahrzeug_id`, `uhs_id`, `br_id`\nist gesetzt, keines heißt „ohne Ort“ (LLH-1224, Spec `material-modell`)."
+          },
+          "einsatz_fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ort Fahrzeug (Beladung, `einsatz_fahrzeug.id`); fehlt, wenn nicht gesetzt."
           },
           "einsatz_id": {
             "type": "integer",
@@ -4614,7 +4651,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet."
+            "description": "Ort Unfallhilfsstelle."
           }
         }
       },
@@ -8543,11 +8580,16 @@
           "bezeichnung",
           "dienststatus",
           "angelegt_at",
+          "art",
           "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
             "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut (LLH-1224); gilt für neue Dispositionen, nie rückwirkend."
           },
           "bemerkung": {
             "type": [
@@ -8594,6 +8636,14 @@
             ]
           }
         }
+      },
+      "MaterialArt": {
+        "type": "string",
+        "description": "Art eines Materials (LLH-1224, Spec `material-modell`): ein einzeln verfolgtes Gerät steht\nje Stück im Einsatz (Menge 1, alle fünf Status); ein Verbrauchsgut hat eine Menge, eine\nAusgabe und keine Status „verbraucht“ und „Desinfektion nötig“. Am Stamm die Vorgabe jeder\nDisposition, an der Dispositionszeile eine eigene Spalte (design.md D1).",
+        "enum": [
+          "geraet",
+          "verbrauchsgut"
+        ]
       },
       "MaterialStatus": {
         "type": "string",
