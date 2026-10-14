@@ -38,10 +38,26 @@ export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge`, 'POST', { adhoc });
 }
 
+/**
+ * Angaben eines Ad-hoc-Fahrzeugs im Teil-Patch (LLH-1073, design.md D1): fehlender Key =
+ * unverändert, `null` = leeren; der Funkrufname ist Pflicht und nie `null`. Bei einem
+ * Stamm-Fahrzeug antwortet der Server mit 422 („im Stamm pflegen“).
+ */
+export interface AngabenPatch {
+  funkrufname?: string;
+  fahrzeugtyp?: string | null;
+  kennzeichen?: string | null;
+  traegerorganisation?: string | null;
+  opta?: string | null;
+}
+
+/** Der Zeilen-PATCH einer Disposition: Status, Bemerkung und die Ad-hoc-Angaben. */
+export type DispositionPatch = AngabenPatch & { status_id?: number; bemerkung?: string | null };
+
 export function updateDisposition(
   einsatzId: number,
   efId: number,
-  felder: { status_id?: number; bemerkung?: string },
+  felder: DispositionPatch,
 ): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'PATCH', felder);
 }

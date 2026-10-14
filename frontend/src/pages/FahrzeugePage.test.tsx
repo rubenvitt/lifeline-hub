@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
+import type { ReactNode } from 'react';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -79,13 +80,14 @@ function render(
   efObj: Record<string, unknown> | Record<string, unknown>[] = ef,
   entlasseneDaten: unknown[] = [],
   einheitenDaten: unknown[] = [],
+  optionen: { benutzer?: ReturnType<typeof benutzerFixture>; weitereRouten?: ReactNode } = {},
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
     // Mit Freigabe des Moduls Einheiten lädt die Liste die Einheiten stets (LLH-1073, design.md D5).
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheitenDaten)),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
-    meHandler(nutzer),
+    meHandler(optionen.benutzer ?? nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     // Aktive und entlassene Fahrzeuge teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
     http.get('/api/einsaetze/7/fahrzeuge', ({ request }) =>
@@ -100,6 +102,7 @@ function render(
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+      {optionen.weitereRouten}
     </Routes>,
     { route: '/einsaetze/7/fahrzeuge' },
   );
@@ -965,6 +968,234 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     expect(within(karte).getByText('Einheit')).toBeInTheDocument();
     expect(within(karte).getByText('Seit')).toBeInTheDocument();
     expect(within(karte).getByText(/11:10/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * LLH-1073 Teil I, design.md D6: „Entlassen“ bleibt sichtbar; „Angaben ändern …“ (beim
+ * Stamm-Fahrzeug gesperrt mit Grund), „Im Stamm ändern ↗“ nur für die Verwaltung der Einsatz-Org,
+ * hinter dem Trenner rot „Stornieren“.
+ */
+describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
+  const adhoc = {
+    ...ef,
+    fahrzeug_id: null,
+    ist_adhoc: true,
+    funkrufname: 'Florian Nachbarstadt 44/1',
+  };
+  async function oeffneMenue(name: string, bereich: HTMLElement = document.body) {
+    await userEvent.click(
+      within(bereich).getByRole('button', { name: `Weitere Aktionen zu ${name}` }),
+    );
+    return document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+  }
+  const eintraege = (menue: HTMLElement) =>
+    [
+      ...menue.querySelectorAll<HTMLElement>('[role="menuitem"], .ant-dropdown-menu-item-divider'),
+    ].map((e) =>
+      e.classList.contains('ant-dropdown-menu-item-divider')
+        ? '—'
+        : `${e.textContent}${e.getAttribute('aria-disabled') === 'true' ? ' (gesperrt)' : ''}${
+            e.classList.contains('ant-dropdown-menu-item-danger') ? ' (rot)' : ''
+          }`,
+    );
+
+  it('Ad-hoc-Fahrzeug: „Angaben ändern …“, Trenner, rot „Stornieren“', async () => {
+    render(einsatz(), [], adhoc);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    expect(
+      screen.getByRole('button', { name: 'Florian Nachbarstadt 44/1 entlassen' }),
+    ).toBeVisible();
+    const menue = await oeffneMenue('Florian Nachbarstadt 44/1');
+    expect(eintraege(menue)).toEqual(['Angaben ändern …', '—', 'Stornieren (rot)']);
+  });
+
+  it('Stamm-Fahrzeug: „Angaben ändern · aus dem Stamm“ steht gesperrt, ohne Sprung', async () => {
+    render(einsatz(), [], ef);
+    await screen.findByText('Florian 1');
+    const menue = await oeffneMenue('Florian 1');
+    expect(eintraege(menue)).toEqual([
+      'Angaben ändern · aus dem Stamm (gesperrt)',
+      '—',
+      'Stornieren (rot)',
+    ]);
+  });
+
+  it('Verwaltung der Einsatz-Org springt über „Im Stamm ändern ↗“ zum Stammfahrzeug', async () => {
+    render(einsatz(), [], ef, [], [], {
+      benutzer: benutzerFixture({ org_rolle: 'fuehrungskraft', org_id: 1 }),
+      weitereRouten: (
+        <Route
+          path="/admin/stammdaten/fahrzeuge/:fahrzeugId"
+          element={<output data-testid="stamm">Stammfahrzeug</output>}
+        />
+      ),
+    });
+    await screen.findByText('Florian 1');
+    const menue = await oeffneMenue('Florian 1');
+    expect(eintraege(menue)).toEqual([
+      'Angaben ändern · aus dem Stamm (gesperrt)',
+      'Im Stamm ändern ↗',
+      '—',
+      'Stornieren (rot)',
+    ]);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Im Stamm ändern ↗' }));
+    expect(await screen.findByTestId('stamm')).toBeInTheDocument();
+  });
+
+  it('ein Admin einer fremden Org sieht den Sprung nicht', async () => {
+    render(einsatz(), [], ef, [], [], {
+      benutzer: benutzerFixture({ system_rolle: 'admin', org_id: 2 }),
+    });
+    await screen.findByText('Florian 1');
+    const menue = await oeffneMenue('Florian 1');
+    expect(within(menue).queryByRole('menuitem', { name: 'Im Stamm ändern ↗' })).toBeNull();
+  });
+
+  it('die Karte führt dasselbe Menü über „weitere“', async () => {
+    setzeViewportBreite(390);
+    const { container } = render(einsatz(), [], adhoc);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
+    const menue = await oeffneMenue('Florian Nachbarstadt 44/1', karte);
+    expect(eintraege(menue)).toEqual(['Angaben ändern …', '—', 'Stornieren (rot)']);
+  });
+
+  it('ohne Schreibrecht kein Auslöser', async () => {
+    render(einsatz({ meine_rolle: 'beobachter' }), [], adhoc);
+    await screen.findByText('Florian Nachbarstadt 44/1');
+    expect(
+      screen.queryByRole('button', { name: 'Weitere Aktionen zu Florian Nachbarstadt 44/1' }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * LLH-1073 Teil I, design.md D7: Dialog „Angaben ändern“ eines Ad-hoc-Fahrzeugs — drei Felder
+ * sichtbar, Kennzeichen und OPTA im Klappteil (im Baum, Kopf nennt die Werte), gesendet nur das
+ * Geänderte, ohne Änderung keine Anfrage, die Ablehnung im Dialog.
+ */
+describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
+  const adhoc = {
+    ...ef,
+    fahrzeug_id: null,
+    ist_adhoc: true,
+    funkrufname: 'Florian Nachbarstdt 44/1',
+    fahrzeugtyp: null,
+    kennzeichen: 'NB-FW 441',
+    traegerorganisation: 'FF Nachbarstadt',
+    opta: null,
+  };
+  function sichtbareFelder(dialog: HTMLElement) {
+    return [...dialog.querySelectorAll<HTMLElement>('.ant-form-item-label label')]
+      .filter((l) => {
+        const klappinhalt = l.closest('.ant-collapse-panel');
+        return klappinhalt == null || klappinhalt.classList.contains('ant-collapse-panel-active');
+      })
+      .map((l) => l.textContent);
+  }
+  async function oeffneAngaben(zeilenDaten: Record<string, unknown> = adhoc) {
+    const patches: unknown[] = [];
+    let stand = { ...zeilenDaten };
+    render(einsatz(), [], stand);
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [stand]),
+      ),
+      http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patches.push(body);
+        stand = { ...stand, ...body };
+        return HttpResponse.json(stand);
+      }),
+    );
+    const name = String(zeilenDaten.funkrufname);
+    await screen.findByText(name);
+    await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${name}` }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(`Angaben zu ${name} ändern`);
+    return { dialog, patches };
+  }
+
+  it('vorbelegt, drei Felder sichtbar; Kennzeichen und OPTA eingeklappt im Baum, der Kopf nennt sie', async () => {
+    const { dialog } = await oeffneAngaben();
+    expect(sichtbareFelder(dialog)).toEqual(['Funkrufname', 'Fahrzeugtyp', 'Trägerorganisation']);
+    expect(within(dialog).getByLabelText('Funkrufname')).toHaveValue('Florian Nachbarstdt 44/1');
+    expect(within(dialog).getByLabelText('Trägerorganisation')).toHaveValue('FF Nachbarstadt');
+    // `forceRender`: eingeklappt und trotzdem da.
+    expect(within(dialog).getByLabelText('Kennzeichen')).toHaveValue('NB-FW 441');
+    expect(within(dialog).getByLabelText('OPTA')).toBeInTheDocument();
+    expect(dialog.querySelector('[data-lfh="weitere-angaben-werte"]')).toHaveTextContent(
+      'Kennzeichen NB-FW 441',
+    );
+  });
+
+  it('sendet nur das Geänderte, geleert als null, und die Zeile zeigt den neuen Namen', async () => {
+    const { dialog, patches } = await oeffneAngaben();
+    const name = within(dialog).getByLabelText('Funkrufname');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Florian Nachbarstadt 44/1');
+    await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'HLF 20');
+    await userEvent.clear(within(dialog).getByLabelText('Trägerorganisation'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          funkrufname: 'Florian Nachbarstadt 44/1',
+          fahrzeugtyp: 'HLF 20',
+          traegerorganisation: null,
+        },
+      ]),
+    );
+    expect(await screen.findByText('Florian Nachbarstadt 44/1')).toBeInTheDocument();
+  });
+
+  it('ohne Änderung schließt der Dialog ohne Anfrage', async () => {
+    const { dialog, patches } = await oeffneAngaben();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(patches).toEqual([]);
+  });
+
+  it('ein leerer Funkrufname sendet nicht', async () => {
+    const { dialog, patches } = await oeffneAngaben();
+    await userEvent.clear(within(dialog).getByLabelText('Funkrufname'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Funkrufname').closest('.ant-form-item')).toHaveClass(
+        'ant-form-item-has-error',
+      ),
+    );
+    expect(patches).toEqual([]);
+  });
+
+  it('ein Altwert über der Grenze im Klappteil öffnet ihn und sperrt das Senden', async () => {
+    const { dialog, patches } = await oeffneAngaben({ ...adhoc, opta: 'O'.repeat(201) });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(sichtbareFelder(dialog)).toContain('OPTA'));
+    expect(
+      await within(dialog).findByText('OPTA darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(patches).toEqual([]);
+  });
+
+  it('eine Ablehnung steht im Dialog', async () => {
+    const { dialog } = await oeffneAngaben();
+    server.use(
+      http.patch('/api/einsaetze/7/fahrzeuge/10', () =>
+        HttpResponse.json({ error: 'Fahrzeug ist entlassen' }, { status: 409 }),
+      ),
+    );
+    await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'HLF 20');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    expect(await within(dialog).findByText(/Fahrzeug ist entlassen/)).toBeInTheDocument();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
   });
 });
 

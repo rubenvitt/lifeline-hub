@@ -1,23 +1,13 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, darfVerwaltung } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
+import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
@@ -51,6 +41,9 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
 import EinheitAngabe from '../kraefte/EinheitAngabe';
+import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
+import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
+import { hatFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
 import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -88,7 +81,7 @@ import {
   besatzungsUrteilVon,
   buildEinheitOptions,
 } from '../kraefte/kraeftebaumKern';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
@@ -226,17 +219,28 @@ const ANSICHT_OPTIONEN = [
   { wert: 'tableau', label: 'FMS-Tableau' },
 ] as const satisfies readonly { wert: FahrzeugeAnsicht; label: string }[];
 
+/** Im Disponieren stehen vier Felder sichtbar (Schnellerfassung), nur OPTA im Klappteil. */
+const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
+
+/** Einträge des Zeilenmenüs (design.md D6). */
+type ZeilenAktion = 'angaben' | 'stamm' | 'stornieren';
+
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
+  /** Offener Dialog „Angaben ändern“ (design.md D7), ebenfalls außerhalb der Zeilen-`map`. */
+  const [angabenFuer, setAngabenFuer] = useState<EinsatzFahrzeug | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
   // mitnimmt (Muster `PersonenPage`).
@@ -454,7 +458,29 @@ export default function FahrzeugePage() {
   const isZeileBusy = (efId: number) =>
     (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === efId);
-  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
+  /**
+   * Zeilenmenü (design.md D6): „Entlassen“ steht als Knopf daneben, hier der Rest. „Angaben ändern“
+   * steht beim Stamm-Fahrzeug gesperrt mit dem Grund im Etikett — sein Fehlen verwirrte; den Sprung
+   * in den Stamm sieht nur, wer dort schreiben darf (Verwaltung der Org des Einsatzes, `src/AGENTS.md`,
+   * Admin-Schreibwege). „Stornieren“ steht für jede aktive Zeile, das Menü ist also nie leer.
+   */
+  const darfStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
+  const zeilenEintraege = (ef: EinsatzFahrzeug): MenueEintrag<ZeilenAktion>[] => {
+    const ausStamm = ef.fahrzeug_id != null;
+    return [
+      ausStamm
+        ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
+        : { key: 'angaben', label: 'Angaben ändern …' },
+      ...(ausStamm && darfStamm ? [{ key: 'stamm' as const, label: 'Im Stamm ändern ↗' }] : []),
+      { key: 'stornieren', label: 'Stornieren', gefahr: true },
+    ];
+  };
+  const waehleZeilenAktion = (aktion: ZeilenAktion, ef: EinsatzFahrzeug) => {
+    if (aktion === 'angaben') setAngabenFuer(ef);
+    else if (aktion === 'stamm' && ef.fahrzeug_id != null)
+      void navigate(fahrzeugDetailPfad(ef.fahrzeug_id));
+    else if (aktion === 'stornieren') setStornoFuer({ id: ef.id, name: ef.funkrufname });
+  };
 
   /**
    * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
@@ -756,12 +782,12 @@ export default function FahrzeugePage() {
                 >
                   Entlassen
                 </Button>
-                <MenueAusloeser
-                  eintraege={stornoEintraege}
+                <MenueAusloeser<ZeilenAktion>
+                  eintraege={zeilenEintraege(ef)}
                   zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
                   gesperrt={isZeileBusy(ef.id)}
                   laeuft={stornierenMutation.isPending && stornierenMutation.variables === ef.id}
-                  onWahl={() => setStornoFuer({ id: ef.id, name: ef.funkrufname })}
+                  onWahl={(aktion) => waehleZeilenAktion(aktion, ef)}
                 />
               </Space>
             ),
@@ -943,10 +969,10 @@ export default function FahrzeugePage() {
                   : undefined,
                 weitere: darfSchreiben
                   ? {
-                      eintraege: () => stornoEintraege,
+                      eintraege: zeilenEintraege,
                       zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
                       laeuft: (ef) => isZeileBusy(ef.id),
-                      onWahl: (_, ef) => setStornoFuer({ id: ef.id, name: ef.funkrufname }),
+                      onWahl: (aktion, ef) => waehleZeilenAktion(aktion as ZeilenAktion, ef),
                     }
                   : undefined,
               }}
@@ -1030,11 +1056,8 @@ export default function FahrzeugePage() {
 
           Feldbudget: vier sichtbare Felder, `OPTA` liegt unter „Weitere Angaben" — bei einem
           ad-hoc erfassten Fremdfahrzeug meist unbekannt, während Funkrufname, Typ, Träger und
-          Kennzeichen ablesbar sind.
-
-          `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
-          eingetragener und wieder zugeklappter Wert beim Absenden mitgeht und das Feld für
-          Tastatur und Prüfung existiert. */}
+          Kennzeichen ablesbar sind. Den Feldsatz teilt der Dialog „Angaben ändern“
+          (`AdhocFahrzeugFelder`, dort mit `forceRender`, Grenzen und Klappteil). */}
       <ErfassungsModal<AdhocEingabe>
         offen={adhocOffen}
         titel="Ad-hoc-Fahrzeug disponieren"
@@ -1049,41 +1072,25 @@ export default function FahrzeugePage() {
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
         // ankam. Den Grund zeigt die Hülle über `speicherung`.
         onErfassen={(w) => adhocMutation.mutateAsync(w)}
+        onPruefungGescheitert={(felder) => {
+          if (hatFehlerIn(ADHOC_WEITERE, felder)) setAdhocWeitereOffen(true);
+        }}
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form.Item
-          label="Funkrufname"
-          name="funkrufname"
-          rules={[{ required: true, whitespace: true }]}
-        >
-          <Input placeholder="z. B. Florian Nachbarstadt 44/1" />
-        </Form.Item>
-        <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Trägerorganisation" name="traegerorganisation">
-          <Input placeholder="z. B. Feuerwehr Nachbarstadt" />
-        </Form.Item>
-        <Form.Item label="Kennzeichen" name="kennzeichen">
-          <Input />
-        </Form.Item>
-        <Collapse
-          ghost
-          items={[
-            {
-              key: 'weitere',
-              label: 'Weitere Angaben',
-              forceRender: true,
-              children: (
-                <Form.Item label="OPTA" name="opta">
-                  <Input />
-                </Form.Item>
-              ),
-            },
-          ]}
+        <AdhocFahrzeugFelder
+          weitere={ADHOC_WEITERE}
+          weitereOffen={adhocWeitereOffen}
+          onWeitereOffen={setAdhocWeitereOffen}
         />
       </ErfassungsModal>
+
+      {/* Angaben eines Ad-hoc-Fahrzeugs ändern (design.md D7), geöffnet aus dem Zeilenmenü. */}
+      <FahrzeugAngabenDialog
+        einsatzId={einsatzId}
+        fahrzeug={angabenFuer}
+        onSchliessen={() => setAngabenFuer(null)}
+      />
     </EinsatzSeite>
   );
 }
