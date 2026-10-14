@@ -653,8 +653,9 @@ async function einheitFokusBereit(page: Page, dichte: string) {
 /**
  * Tabulatorstopps im Inhalt NACH dem Brotkrumen „Einheiten“, dem Startpunkt des Laufs. Ohne
  * Formular ist die Route kürzer als früher; ein fester Zähler liefe über ihr Ende hinaus in den
- * Navigationsrahmen, der nicht zu dieser Route gehört. Zu knapp gezählt fehlt ein Ziel in
- * `besuchteZiele`, der Test wird also nicht still grün.
+ * Navigationsrahmen, der nicht zu dieser Route gehört (dort liegt bei 1366 × 520 handschuh der
+ * Schienenknopf „Kommunikation“ unter einem klebenden Element, LLH-1241). Zu knapp gezählt fehlt
+ * ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
  */
 async function stoppsBisInhaltsende(page: Page): Promise<number> {
   return page.getByRole('main').evaluate((main) => {
