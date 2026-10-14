@@ -54,7 +54,10 @@ Spec `eingabegrenzen`, Herleitung
   (`kraefte_disposition`, LLH-1100) prüft ihre Menge in einer `json_each`-Abfrage je Art, schreibt
   aber je Kraft (Disposition, Zeitachse, Einheit, Besatzung), gedeckelt durch
   `kraefte_disposition::SAMMEL_MAX` (gezählt vor dem Entdoppeln); eine Ablehnung nennt den Grund
-  je Zeile (`AppError::Zeilen`, 422 `{error, zeilen}`) und schreibt nichts.
+  je Zeile (`AppError::Zeilen`, 422 `{error, zeilen}`) und schreibt nichts. Ebenso das **Bilden
+  aus einer Vorlage** (`einheit::aus_vorlage`, LLH-1049): eine `json_each`-Abfrage je Art für
+  den Zustand, Schreiben je Kraft über den Baustein, gedeckelt durch `SAMMEL_MAX` je Liste und
+  `aus_vorlage::KNOTEN_MAX` Einheiten.
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,
