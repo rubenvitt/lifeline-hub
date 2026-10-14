@@ -1269,6 +1269,46 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(gesendet).toEqual([{ bezeichnung: 'Feldbetten' }]));
   });
 
+  /**
+   * LLH-1224 D10: ein Ad-hoc-Posten mit Menge 1 entsteht als Gerät; „Art ändern …“ macht ihn zum
+   * Verbrauchsgut mit mehr Menge — Art und Menge in EINEM PATCH. Ein Stamm-Posten hat den Eintrag
+   * nicht (Liste oben, „Zeilenmenü eines Stamm-Postens“).
+   */
+  it('„Art ändern …“ eines Ad-hoc-Geräts schickt Art und Menge zusammen', async () => {
+    const gesendet: unknown[] = [];
+    const adhoc = {
+      ...em,
+      ist_adhoc: true,
+      material_id: null,
+      bezeichnung: 'Sandsack',
+      art: 'geraet',
+      menge: 1,
+    };
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...adhoc, art: 'verbrauchsgut', menge: 40 });
+      }),
+    );
+    render(einsatzAktiv, [adhoc as never]);
+    await screen.findByText('Sandsack');
+    const menue = await oeffneZeilenmenue('Sandsack');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Angaben ändern', 'Art ändern …', 'Aufteilen · Gerät', 'Stornieren']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Art ändern …' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Verbrauchsgut' }));
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await waitFor(() => expect(menge).toBeEnabled());
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '40');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(gesendet).toEqual([{ art: 'verbrauchsgut', menge: 40 }]));
+  });
+
   it('„Aufteilen“ schickt die abgeteilte Menge an den eigenen Weg', async () => {
     const gesendet: unknown[] = [];
     server.use(

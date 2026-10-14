@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialArtModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
 ---
 
 ## Überblick
@@ -107,6 +107,18 @@ Für Einsatzleitung und Führungspersonal, etwa bei einem Tippfehler in der Beze
 Bei einem Posten aus dem Materialstamm heißt der Eintrag „Angaben ändern · im Stamm pflegen“ und
 ist gesperrt: seine Angaben stehen im Materialstamm.
 
+### Die Art eines Ad-hoc-Postens ändern
+
+Für Einsatzleitung und Führungspersonal, etwa wenn ein Ad-hoc-Posten mit Menge 1 als Gerät
+angelegt wurde und mehr davon kommt:
+
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Art ändern …“ wählen.
+2. Unter „Art“ „Gerät“ oder „Verbrauchsgut“ wählen und beim Verbrauchsgut die „Menge“ eintragen.
+   Ein Gerät hat immer Menge 1; ein Verbrauchsgut mit Ausgabe wird kein Gerät mehr.
+3. „Speichern“ wählen. Das Einsatztagebuch nennt beide Arten.
+
+Ein Posten aus dem Materialstamm hat den Eintrag nicht: seine Art steht im Materialstamm.
+
 ### Einen Posten aufteilen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebraucht wird:
@@ -116,7 +128,7 @@ Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebr
    Menge und höchstens den Rest, der noch nicht ausgegeben ist. Darunter steht das Ergebnis, etwa
    „Danach 30 + 20“.
 
-   ![Dialog „Spende-Decken aufteilen“ mit dem Hinweis „30 von 50 übrig; abgeteilt wird aus dem Rest.“, „Menge abteilen“ 20 und dem Ergebnis „Danach 30 + 20“](../bilder/material/aufteilen.png)
+   ![Dialog „Spende-Decken aufteilen“ mit dem Hinweis „30 von 50 übrig“, „Menge abteilen“ 20 und dem Ergebnis „Danach 30 + 20“](../bilder/material/aufteilen.png)
 
 3. „Aufteilen“ wählen. Die neue Zeile steht in der Liste; ihren Ort in der Spalte „Ort“ ändern.
 

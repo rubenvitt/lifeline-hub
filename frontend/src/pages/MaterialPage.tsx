@@ -59,6 +59,7 @@ import {
   ortVon,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
+import MaterialArtModal from '../kraefte/MaterialArtModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import { InlineAngabe } from '../components/InlineAngabe';
 import type { MenueEintrag } from '../components/MenueAusloeser';
@@ -171,6 +172,8 @@ export default function MaterialPage() {
   // „Rückwege und Fehler“). Solange die Zeile da ist, gilt ihr aktueller Stand.
   const [angabenFuer, setAngabenFuer] = useState<EinsatzMaterial | null>(null);
   const [aufteilenFuer, setAufteilenFuer] = useState<EinsatzMaterial | null>(null);
+  /** Offener Dialog „Art ändern …“ eines Ad-hoc-Postens (LLH-1224 D10), Muster wie oben. */
+  const [artFuer, setArtFuer] = useState<EinsatzMaterial | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -294,6 +297,16 @@ export default function MaterialPage() {
       return invalidate();
     },
   });
+  const artMutation = useMutation({
+    mutationFn: (v: { emId: number; patch: MaterialPatch }) =>
+      updateDisposition(einsatzId, v.emId, v.patch),
+    onSuccess: () => {
+      message.success('Art gespeichert');
+      // Die Einheit zeigt Art und Menge ihres Materials mit.
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      return invalidate();
+    },
+  });
   const aufteilenMutation = useMutation({
     mutationFn: (v: { emId: number; menge: number }) => teileAuf(einsatzId, v.emId, v.menge),
     onSuccess: () => {
@@ -394,7 +407,8 @@ export default function MaterialPage() {
     (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === emId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === emId);
   /**
-   * Zeilenmenü (LLH-1093, design.md D11): „Angaben ändern“ und „Aufteilen“, hinter dem Trenner rot
+   * Zeilenmenü (LLH-1093, design.md D11): „Angaben ändern“, beim Ad-hoc-Posten „Art ändern …“
+   * (LLH-1224 D10) und „Aufteilen“, hinter dem Trenner rot
    * „Stornieren“. Gesperrte Einträge tragen ihren Grund im Etikett — ein Etikett ist nur Text, und
    * ein Tooltip erscheint am Touchschirm nicht.
    */
@@ -402,6 +416,10 @@ export default function MaterialPage() {
     em.ist_adhoc
       ? { key: 'angaben', label: 'Angaben ändern' }
       : { key: 'angaben', label: 'Angaben ändern · im Stamm pflegen', gesperrt: true },
+    // Die Art eines Ad-hoc-Postens folgt beim Anlegen der Menge (Menge 1 → Gerät, D12); hier wird
+    // sie korrigiert. Ein Stamm-Posten trägt die Art seines Stamms (D16) und bekommt den Eintrag
+    // nicht.
+    ...(em.ist_adhoc ? [{ key: 'art', label: 'Art ändern …' }] : []),
     // Aufteilen nur aus dem Rest eines Verbrauchsguts (LLH-1224 D14); ein Gerät steht je Stück.
     em.art === 'geraet'
       ? { key: 'aufteilen', label: 'Aufteilen · Gerät', gesperrt: true }
@@ -420,6 +438,9 @@ export default function MaterialPage() {
     if (key === 'angaben') {
       angabenMutation.reset();
       setAngabenFuer(em);
+    } else if (key === 'art') {
+      artMutation.reset();
+      setArtFuer(em);
     } else if (key === 'aufteilen') {
       aufteilenMutation.reset();
       setAufteilenFuer(em);
@@ -431,6 +452,7 @@ export default function MaterialPage() {
   const aufteilenPosten = aufteilenFuer
     ? (ems.find((em) => em.id === aufteilenFuer.id) ?? aufteilenFuer)
     : null;
+  const artPosten = artFuer ? (ems.find((em) => em.id === artFuer.id) ?? artFuer) : null;
 
   /**
    * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig (Herleitung in `FahrzeugePage.tsx`). Ohne
@@ -849,6 +871,16 @@ export default function MaterialPage() {
           return angabenMutation.mutateAsync({ emId: angabenPosten.id, patch });
         }}
         onSchliessen={() => setAngabenFuer(null)}
+      />
+      <MaterialArtModal
+        posten={artPosten}
+        laeuft={artMutation.isPending}
+        speicherung={artMutation}
+        onSpeichern={(patch) => {
+          if (!artPosten) return Promise.resolve();
+          return artMutation.mutateAsync({ emId: artPosten.id, patch });
+        }}
+        onSchliessen={() => setArtFuer(null)}
       />
       <MaterialAufteilenModal
         posten={aufteilenPosten}

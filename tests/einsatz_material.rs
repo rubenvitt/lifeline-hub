@@ -1980,6 +1980,26 @@ async fn art_wechsel_schreibt_etb() {
     let neu = neue_etb(&app, &admin, einsatz, vorher).await;
     assert_eq!(neu.len(), 2, "{neu:?}");
     assert_eq!(neu[1], "Material «Sandsack»: Art Gerät → Verbrauchsgut");
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(
+        (zeile["art"].as_str(), zeile["menge"].as_i64()),
+        (Some("verbrauchsgut"), Some(40))
+    );
+
+    // Zurück zum Gerät geht nur mit Menge 1 im selben PATCH („Art ändern …“ schickt beides).
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"art":"geraet"}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) =
+        material_patch(&app, &admin, einsatz, em, r#"{"art":"geraet","menge":1}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        (json["art"].as_str(), json["menge"].as_i64()),
+        (Some("geraet"), Some(1))
+    );
+    let neu = neue_etb(&app, &admin, einsatz, vorher).await;
+    assert_eq!(neu.len(), 2, "{neu:?}");
+    assert_eq!(neu[1], "Material «Sandsack»: Art Verbrauchsgut → Gerät");
 }
 
 /// Die Einheit zeigt Art und Ausgabe ihres Materials (Ausfall „aufgebraucht“): beide melden sie.
