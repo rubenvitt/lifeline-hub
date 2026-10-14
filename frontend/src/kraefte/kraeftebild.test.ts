@@ -9,6 +9,7 @@ import {
   verdichte,
   OHNE_ABSCHNITT_KEY,
 } from './kraeftebild';
+import { personalBand } from './meldebildRaster';
 import type {
   Einheit,
   EinsatzPersonal,
@@ -520,4 +521,61 @@ it('eine Waise und ein Zyklus stehen in der Kräftegliederung und zählen wie di
   expect(gliederung).toBe(bild.verdichtung.staerke.gesamt);
   const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
   for (const name of ['E30', 'E40', 'E41', 'P5', 'P6', 'P7']) expect(md).toContain(name);
+});
+
+// ── Nur aktive Kräfte (LLH-1079) ─────────────────────────────────────────────
+
+const entlassen = (x: EinsatzPersonal): EinsatzPersonal => ({
+  ...x,
+  beendet_at: '2026-10-13 14:00:00',
+  beendet_als: 'entlassen',
+});
+const aufgeloest = (x: Einheit): Einheit => ({ ...x, aufgeloest_at: '2026-10-13 15:00:00' });
+const ohneFilter = { traeger: null, abschnittId: null, kategorie: null, suche: '' };
+
+it('filtereKraefte lässt Entlassene und aufgelöste Einheiten aus: Meldebild und Statusband zählen zehn', () => {
+  // Spec `kraefte-entlassung`, „Stärke ohne Entlassene“: zwölf Personen, zwei entlassen.
+  const personal = Array.from({ length: 12 }, (_, i) =>
+    i < 2 ? entlassen(p(i + 1, 10, 'mannschaft')) : p(i + 1, 10, 'mannschaft'),
+  );
+  const ge = filtereKraefte(
+    {
+      abschnitte: [ab(1)],
+      einheiten: [eh(10, 1), aufgeloest(eh(20, 1))],
+      personal,
+      fahrzeuge: [],
+      material: [],
+    },
+    ohneFilter,
+  );
+  expect(ge.einheiten.map((e) => e.id)).toEqual([10]);
+  expect(ge.personal).toHaveLength(10);
+  expect(personalBand(ge.personal).reduce((s, z) => s + z.wert, 0)).toBe(10);
+  const bild = baueKraeftebild(ge.abschnitte, ge.einheiten, ge.personal, [], []);
+  expect(bild.verdichtung.staerke.gesamt).toBe(10);
+  expect(bild.baum[0].staerke.gesamt).toBe(10);
+});
+
+it('eine Untereinheit einer aufgelösten Über-Einheit bleibt sichtbar und zählt bei ihrem eigenen Abschnitt', () => {
+  // Gr X (11) unter Zug 10 (Abschnitt 1) ist aufgelöst; Trupp 12 zeigt noch auf sie und steht
+  // selbst in Abschnitt 2. Ohne die aufgelöste Über-Einheit ist der Trupp eine Waise und damit
+  // seine eigene oberste Einheit (D11).
+  const abschnitte = [ab(1), ab(2)];
+  const einheiten = [eh(10, 1), aufgeloest(eh(11, null, 10)), eh(12, 2, 11)];
+  const personal = [p(1, 10, 'fuehrer'), p(2, 12, 'mannschaft')];
+  const roh = { abschnitte, einheiten, personal, fahrzeuge: [], material: [] };
+
+  const alle = filtereKraefte(roh, ohneFilter);
+  const bild = baueKraeftebild(alle.abschnitte, alle.einheiten, alle.personal, [], []);
+  const md = rendereMeldebildMarkdown(bild, 'Stand');
+  expect(md).toContain('E12');
+  expect(md).not.toContain('E11');
+  expect(bild.baum.map((z) => z.key)).toEqual(['ab-1', 'ab-2']);
+  expect(bild.baum.reduce((s, z) => s + z.staerke.gesamt, 0)).toBe(2);
+
+  const nach = (abschnittId: number) => filtereKraefte(roh, { ...ohneFilter, abschnittId });
+  expect(nach(2).einheiten.map((e) => e.id)).toEqual([12]);
+  expect(nach(2).personal.map((x) => x.id)).toEqual([2]);
+  expect(nach(1).einheiten.map((e) => e.id)).toEqual([10]);
+  expect(nach(1).personal.map((x) => x.id)).toEqual([1]);
 });

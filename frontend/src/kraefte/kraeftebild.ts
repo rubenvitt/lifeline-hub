@@ -14,6 +14,7 @@ import {
   abschnittDerObersten,
   besatzungText,
   einheitenBaum,
+  filterAktive,
   needsOhneFahrzeugKnoten,
   fremdText,
   mittelDerEinheit,
@@ -397,7 +398,14 @@ export interface FilterWerte {
   suche: string;
 }
 
-export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
+export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
+  // Zuerst nur aktive Kräfte (LLH-1079): Meldebild, Statusband und Kumulierung zählen keine
+  // Entlassenen, und eine Untereinheit einer aufgelösten Über-Einheit ist ihre eigene oberste.
+  const roh: Rohdaten = {
+    ...alles,
+    einheiten: filterAktive(alles.einheiten),
+    personal: filterAktive(alles.personal),
+  };
   const s = f.suche.trim().toLowerCase();
   const treffer = (txt: (string | null | undefined)[]) =>
     !s || txt.some((t) => t?.toLowerCase().includes(s));
@@ -570,7 +578,7 @@ export function verdichte(
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
 ): Kurzverdichtung {
-  const personal = allesPersonal.filter((ep) => !ep.beendet_at);
+  const personal = filterAktive(allesPersonal);
   const staerke = leereStaerke();
   const personalStatus = leereVert();
   const fahrzeugStatus = leereVert();
@@ -619,8 +627,8 @@ export function baueKraeftebild(
   quelle: Partial<MittelQuelle> = {},
 ): Kraeftebild {
   // Nur aktive Kräfte (LLH-1079): Entlassene führt der Block „Entlassen“ (`entlassene.ts`).
-  const einheiten = alleEinheiten.filter((e) => !e.aufgeloest_at);
-  const personal = allesPersonal.filter((ep) => !ep.beendet_at);
+  const einheiten = filterAktive(alleEinheiten);
+  const personal = filterAktive(allesPersonal);
   const roh = { einheiten, personal, fahrzeuge, material };
   const mittelVon: MittelVon = (einheitId) => mittelDerEinheit(einheitId, roh, quelle);
 
