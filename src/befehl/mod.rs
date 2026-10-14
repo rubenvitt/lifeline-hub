@@ -4,7 +4,9 @@ use crate::vorlagendokument::{self as kern, Abschnittsart, Dokumentart};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::benachrichtigung::{BenachrichtigungArt, BenachrichtigungBezugTyp};
 use crate::vorlagendokument::anlage::AnlagenTabelle;
+use crate::vorlagendokument::benachrichtigung::FreigabeHinweis;
 use crate::vorlagendokument::verteiler::VerteilerTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
@@ -150,6 +152,11 @@ impl Dokumentart for Befehl {
         dokument_spalte: "befehl_id",
     });
     const QUITTUNG: Option<&'static str> = Some("Einsatzbefehl");
+    /// „Neuer Befehl“ an die Funktionen im Verteiler (LLH-1213); Modul Aufträge.
+    const BENACHRICHTIGUNG: Option<FreigabeHinweis> = Some(FreigabeHinweis {
+        art: BenachrichtigungArt::Befehl,
+        bezug_typ: BenachrichtigungBezugTyp::Befehl,
+    });
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

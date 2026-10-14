@@ -56,10 +56,11 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         BenachrichtigungBezugTyp::Person => Some(("einsatz_person", "registrier_nr")),
         BenachrichtigungBezugTyp::Einheit => Some(("einsatz_einheit", "name")),
         BenachrichtigungBezugTyp::Fahrzeug => Some(("einsatz_fahrzeug", "snap_funkrufname")),
+        // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
+        BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
+        BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
         // Titel und Freitexte dieser Objekte sind Scrub-Werte; ihr Titel genügt.
-        BenachrichtigungBezugTyp::Befehl
-        | BenachrichtigungBezugTyp::Lagebericht
-        | BenachrichtigungBezugTyp::Erinnerung
+        BenachrichtigungBezugTyp::Erinnerung
         | BenachrichtigungBezugTyp::Abloesung
         | BenachrichtigungBezugTyp::Lagebesprechung
         | BenachrichtigungBezugTyp::Gefahrengebiet
@@ -72,6 +73,9 @@ fn detail_formen(typ: BenachrichtigungBezugTyp, wert: String) -> String {
     match typ {
         BenachrichtigungBezugTyp::Meldung => format!("Meldung #{wert}"),
         BenachrichtigungBezugTyp::Auftrag => format!("Auftrag #{wert}"),
+        BenachrichtigungBezugTyp::Befehl | BenachrichtigungBezugTyp::Lagebericht => {
+            format!("Version {wert}")
+        }
         BenachrichtigungBezugTyp::Nachforderung => format!("Status: {}", wert.replace('_', " ")),
         BenachrichtigungBezugTyp::Person => match wert.parse::<i64>() {
             Ok(nr) => format!("Person {}", crate::person::registrier_anzeige(nr)),
