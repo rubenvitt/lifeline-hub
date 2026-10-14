@@ -103,6 +103,27 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Name ad-hoc externer Kräfte beim Statuswechsel",
     },
     Ausnahme {
+        datei: "src/personal/mod.rs",
+        funktion: "etb_text_angaben",
+        spalte: "einsatz_personal.einsatzfunktion",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Einsatzfunktion einer Kraft beim Ändern ihrer Angaben, alt und neu (LLH-1067)",
+    },
+    Ausnahme {
+        datei: "src/personal/mod.rs",
+        funktion: "etb_text_angaben",
+        spalte: "einsatz_personal.snap_traegerorganisation",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name, Qualifikation und Träger ad-hoc externer Kräfte beim Ändern, alt und neu (LLH-1067)",
+    },
+    Ausnahme {
+        datei: "src/personal/mod.rs",
+        funktion: "etb_bezeichnung",
+        spalte: "einsatz_personal.einsatzfunktion",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Bezeichnung einer Kraft in Disponieren, Entlassen, Stornieren und UHS-Zuordnung nennt die Einsatzfunktion vor der Qualifikation (LLH-1067)",
+    },
+    Ausnahme {
         datei: "src/routes/zeitachse.rs",
         funktion: "nachtragen",
         spalte: "einsatz_personal.snap_name",

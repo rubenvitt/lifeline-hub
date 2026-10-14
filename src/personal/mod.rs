@@ -14,9 +14,15 @@ use utoipa::ToSchema;
 /// Höchstzahl verschiedener Qualifikationen je Person (LFH-937, design.md D5). Darüber → 400.
 pub const QUALIFIKATIONEN_MAX: usize = 64;
 
-/// Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045, Spec
-/// `eingabegrenzen`); der Text gelangt ins ETB.
+/// Name, Qualifikation und Trägerorganisation einer Ad-hoc-Kraft, an einer UHS (LFH-1045) oder im
+/// Personal erfasst und geändert (LLH-1067, Spec `eingabegrenzen`); der Text gelangt ins ETB.
 pub const ADHOC_TEXT_MAX: usize = 200;
+
+/// Einsatzfunktion einer Kraft (LLH-1067, Spec `personal-einsatzangaben`); gelangt ins ETB.
+pub const EINSATZFUNKTION_MAX: usize = 200;
+
+/// Bemerkung zu einer Kraft im Einsatz (LLH-1067).
+pub const BEMERKUNG_MAX: usize = 2_000;
 
 /// Qualifikations-Liste von außen: sortiert, entdoppelt, höchstens [`QUALIFIKATIONEN_MAX`]
 /// (sonst 400), vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
@@ -192,6 +198,18 @@ pub struct EinsatzPersonalAnzeige {
     pub beendet_als: Option<String>,
 }
 
+impl EinsatzPersonalAnzeige {
+    /// Die eine Funktionsangabe einer Stelle, die nur Platz für eine hat (LLH-1067, design.md D2):
+    /// die Einsatzfunktion, sonst die Qualifikation. Spiegel `funktionText` in
+    /// `frontend/src/kraefte/einsatzfunktionKern.ts`.
+    pub fn funktion_text(&self) -> Option<&str> {
+        self.einsatzfunktion
+            .as_deref()
+            .filter(|f| !f.is_empty())
+            .or(self.funktion.as_deref())
+    }
+}
+
 /// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct FuehrungskraftKarte {
@@ -249,6 +267,56 @@ pub fn etb_bezeichnung(name: &str, funktion: Option<&str>) -> String {
     }
 }
 
+/// System-ETB beim Ändern der Angaben einer Kraft (LLH-1067, design.md D4): EIN Eintrag, der jede
+/// geänderte Angabe mit altem und neuem Wert nennt (`(Angabe, alt, neu)`, leer als „—“). Ändert
+/// sich nichts, gibt es keinen Text.
+pub fn etb_text_angaben_geaendert(
+    name: &str,
+    angaben: &[(&str, Option<&str>, Option<&str>)],
+) -> Option<String> {
+    let teile: Vec<String> = angaben
+        .iter()
+        .filter(|(_, alt, neu)| alt != neu)
+        .map(|(angabe, alt, neu)| {
+            format!(
+                "{angabe} «{}» → «{}»",
+                alt.unwrap_or("—"),
+                neu.unwrap_or("—")
+            )
+        })
+        .collect();
+    (!teile.is_empty()).then(|| format!("Person «{name}»: {}", teile.join("; ")))
+}
+
+/// [`etb_text_angaben_geaendert`] für Vor- und Nachzustand einer Disposition: Einsatzfunktion,
+/// Name, Qualifikation, Träger in dieser Folge, benannt nach dem neuen Namen.
+pub fn etb_text_angaben(
+    vorher: &EinsatzPersonalAnzeige,
+    nachher: &EinsatzPersonalAnzeige,
+) -> Option<String> {
+    etb_text_angaben_geaendert(
+        &nachher.name,
+        &[
+            (
+                "Funktion",
+                vorher.einsatzfunktion.as_deref(),
+                nachher.einsatzfunktion.as_deref(),
+            ),
+            ("Name", Some(&vorher.name), Some(&nachher.name)),
+            (
+                "Qualifikation",
+                vorher.funktion.as_deref(),
+                nachher.funktion.as_deref(),
+            ),
+            (
+                "Träger",
+                vorher.traegerorganisation.as_deref(),
+                nachher.traegerorganisation.as_deref(),
+            ),
+        ],
+    )
+}
+
 /// System-ETB beim Disponieren einer Person (Stamm oder Ad-hoc).
 pub fn etb_text_disponiert(name: &str, funktion: Option<&str>) -> String {
     format!("Person «{}» disponiert", etb_bezeichnung(name, funktion))
@@ -299,6 +367,37 @@ mod etb_text_tests {
             "Person «Anna Muster» disponiert"
         );
         assert_eq!(etb_bezeichnung("B", Some("SAN")), "B (SAN)");
+    }
+
+    #[test]
+    fn angaben_geaendert_nennt_jede_angabe_mit_alt_und_neu() {
+        assert_eq!(
+            etb_text_angaben_geaendert(
+                "Max Mustermann",
+                &[
+                    ("Funktion", None, Some("Sprechfunker")),
+                    ("Name", Some("Max Mustermann"), Some("Max Mustermann"))
+                ]
+            )
+            .as_deref(),
+            Some("Person «Max Mustermann»: Funktion «—» → «Sprechfunker»")
+        );
+        assert_eq!(
+            etb_text_angaben_geaendert(
+                "Meier",
+                &[
+                    ("Name", Some("Maier"), Some("Meier")),
+                    ("Träger", Some("ASB"), None)
+                ]
+            )
+            .as_deref(),
+            Some("Person «Meier»: Name «Maier» → «Meier»; Träger «ASB» → «—»")
+        );
+        assert_eq!(
+            etb_text_angaben_geaendert("Meier", &[("Funktion", Some("Melder"), Some("Melder"))]),
+            None,
+            "nichts geändert, kein Eintrag"
+        );
     }
 
     #[test]

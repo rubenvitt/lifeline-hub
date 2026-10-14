@@ -476,6 +476,20 @@ pub fn optional_max(
     Ok(w)
 }
 
+/// [`optional_max`] für ein Tri-State-PATCH-Feld ([`trimme_tri`]): absent bleibt `None`, `null`
+/// oder leer wird `Some(None)` (leeren), ein Wert hat höchstens `max` Zeichen ([`hoechstens`]).
+pub fn optional_max_tri(
+    wert: Option<Option<String>>,
+    feld: &str,
+    max: usize,
+) -> Result<Option<Option<String>>, AppError> {
+    let w = trimme_tri(wert);
+    if let Some(Some(w)) = &w {
+        hoechstens(w, feld, max)?;
+    }
+    Ok(w)
+}
+
 /// Liest einen Enum-Wert über dessen `parse`; unbekannt → 400 mit `meldung` (LFH-267).
 pub fn parse_enum<T>(
     parse: impl FnOnce(&str) -> Option<T>,
@@ -702,6 +716,27 @@ mod tests {
         );
         assert_eq!(
             meldung(optional_max(Some("abcd".into()), "Notiz", 3).unwrap_err()),
+            "Notiz darf höchstens 3 Zeichen lang sein"
+        );
+    }
+
+    #[test]
+    fn optional_max_tri_unterscheidet_absent_leeren_und_setzen() {
+        assert_eq!(optional_max_tri(None, "Notiz", 3).unwrap(), None);
+        assert_eq!(
+            optional_max_tri(Some(None), "Notiz", 3).unwrap(),
+            Some(None)
+        );
+        assert_eq!(
+            optional_max_tri(Some(Some("  ".into())), "Notiz", 3).unwrap(),
+            Some(None)
+        );
+        assert_eq!(
+            optional_max_tri(Some(Some(" äöü ".into())), "Notiz", 3).unwrap(),
+            Some(Some("äöü".into()))
+        );
+        assert_eq!(
+            meldung(optional_max_tri(Some(Some("abcd".into())), "Notiz", 3).unwrap_err()),
             "Notiz darf höchstens 3 Zeichen lang sein"
         );
     }

@@ -89,7 +89,7 @@ pub async fn zuordnen(
         kraefte::setze_uhs_tx(conn, einsatz_id, ep_id, Some(uhs_id)).await?;
         let kraft = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let text = kraefte::etb_text_zugeordnet(
-            &etb_bezeichnung(&kraft.name, kraft.funktion.as_deref()),
+            &etb_bezeichnung(&kraft.name, kraft.funktion_text()),
             &uhs.bezeichnung,
         );
         let etb_id =
@@ -208,7 +208,7 @@ pub async fn loesen(
         let kraft = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         kraefte::setze_uhs_tx(conn, einsatz_id, ep_id, None).await?;
         let text = kraefte::etb_text_geloest(
-            &etb_bezeichnung(&kraft.name, kraft.funktion.as_deref()),
+            &etb_bezeichnung(&kraft.name, kraft.funktion_text()),
             &uhs.bezeichnung,
         );
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await
