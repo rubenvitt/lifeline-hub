@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
-import { useId, useState, type ReactNode } from 'react';
+import { Fragment, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -70,6 +70,7 @@ import {
 } from '../routing/deeplinks';
 import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
+import './EinsatzkraftPage.css';
 
 dayjs.extend(utc);
 
@@ -234,7 +235,11 @@ export default function EinsatzkraftPage() {
   });
 
   if (!idGueltig) return <Navigate to={personalPfad(einsatzId)} replace />;
-  if (einsatzQuery.isLoading || epQuery.isLoading) return <SeitenSkeleton />;
+  // Die Perioden tragen die Einsatzdauer im Kopf: kämen sie nach dem ersten Bild, wüchse die
+  // Meta in der Titelzeile, und alles darunter rückte (CLS 0,22 bei 1280 px, LLH-1060).
+  if (einsatzQuery.isLoading || epQuery.isLoading || periodenQuery.isLoading) {
+    return <SeitenSkeleton />;
+  }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
@@ -295,7 +300,9 @@ export default function EinsatzkraftPage() {
         ? `Ruhe ${dauerText(dauern.ruheMinuten)}`
         : null;
   const funktion = funktionText(ep);
-  const meta = [funktion, ep.traegerorganisation, dauerMeta].filter(Boolean).join(' · ');
+  const metaTeile = [funktion, ep.traegerorganisation, dauerMeta].filter((t): t is string =>
+    Boolean(t),
+  );
 
   const vorschlaege = einsatzfunktionVorschlaege({
     vergeben: (epQuery.data ?? []).map((x) => x.einsatzfunktion),
@@ -369,7 +376,24 @@ export default function EinsatzkraftPage() {
   return (
     <EinsatzSeite
       titel={titel}
-      meta={meta ? <span style={monoStil(12)}>{meta}</span> : undefined}
+      // Unter `md` bricht die Kopf-Meta um (`EinsatzkraftPage.css`): `seitenMetaStil` hält sie in
+      // einer Zeile, und Funktion, Träger und Dauer liefen bei 390 px quer über die Seite. Ab `md`
+      // bleibt sie einzeilig, sonst bräche sie beim Eintreffen der Dauer in der Titelzeile um.
+      // Nur die Dauer bleibt immer beisammen.
+      meta={
+        metaTeile.length > 0 ? (
+          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
+            {metaTeile.map((teil, i) => (
+              <Fragment key={i}>
+                {i > 0 && ' · '}
+                <span style={teil === dauerMeta ? { whiteSpace: 'nowrap' } : undefined}>
+                  {teil}
+                </span>
+              </Fragment>
+            ))}
+          </span>
+        ) : undefined
+      }
       breadcrumb={
         <Breadcrumb
           items={[

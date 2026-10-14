@@ -157,7 +157,13 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
         },
       ],
     });
-    expect(await screen.findByText(/Sprechfunker · DRK · im Einsatz 4 h 47/)).toBeVisible();
+    // Die Meta steht in Teilen (sie bricht zwischen ihnen um); geprüft wird die ganze Folge an
+    // der innersten Hülle, die sie trägt.
+    const huellen = await screen.findAllByText(
+      (_, el) =>
+        el?.tagName === 'SPAN' && el.textContent === 'Sprechfunker · DRK · im Einsatz 4 h 47',
+    );
+    expect(huellen[huellen.length - 1]).toBeVisible();
   });
 
   it('zeigt ohne Ereignis keine Dauer und die Ruhe nach der letzten Periode', async () => {
