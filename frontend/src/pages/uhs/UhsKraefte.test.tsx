@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { UhsDetail, UhsKraft } from '../../api/types';
+import { PERSONAL_ADHOC_TEXT_MAX } from '../../api/eingabegrenzen';
 import UhsKraefte from './UhsKraefte';
 
 /**
@@ -80,6 +81,50 @@ describe('UhsKraefte', () => {
     // Freigegeben, sobald die Kräfte ohne UHS eine Einheit tragen.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Einheit zuordnen' })).toBeEnabled(),
+    );
+  });
+
+  it('Spalte „Funktion“: Einsatzfunktion vor Qualifikation, die Qualifikation darunter (LLH-1067)', () => {
+    mitFreien();
+    const funker: UhsKraft = { ...anna, einsatzfunktion: 'Sprechfunker' };
+    renderMitProviders(
+      <UhsKraefte
+        einsatzId={1}
+        uhs={uhs({ kraefte: [funker, bernd] })}
+        schreibgeschuetzt={false}
+        einheitZuordnen
+      />,
+    );
+    const annaZeile = screen.getByRole('row', { name: /Anna Arzt/ });
+    expect(within(annaZeile).getByText('Sprechfunker')).toBeInTheDocument();
+    expect(within(annaZeile).getByText('Notarzt')).toBeInTheDocument();
+    // Ohne Einsatzfunktion steht die Qualifikation genau einmal.
+    const berndZeile = screen.getByRole('row', { name: /Bernd Berg/ });
+    expect(within(berndZeile).getAllByText('Sanitäter')).toHaveLength(1);
+  });
+
+  it('Kraft erfassen: das Freitextfeld heißt „Qualifikation“, begrenzt wie der Server (LLH-1067)', async () => {
+    mitFreien();
+    let gesendet: unknown = null;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/2/kraefte', async ({ request }) => {
+        gesendet = await request.json();
+        return HttpResponse.json(bernd, { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Kraft erfassen' }));
+    const d = await screen.findByRole('dialog');
+    expect(within(d).queryByRole('textbox', { name: 'Funktion' })).toBeNull();
+    const feld = within(d).getByRole('textbox', { name: 'Qualifikation' });
+    expect(feld).toHaveAttribute('maxlength', String(PERSONAL_ADHOC_TEXT_MAX));
+    await userEvent.type(within(d).getByRole('textbox', { name: 'Name' }), 'Dora Dienst');
+    await userEvent.type(feld, 'Sanitäter');
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() =>
+      expect(gesendet).toMatchObject({ name: 'Dora Dienst', funktion: 'Sanitäter' }),
     );
   });
 

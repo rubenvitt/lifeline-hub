@@ -24,6 +24,13 @@ describe('Block „Entlassen“ im Meldebild (LLH-1079)', () => {
       beendet_als: 'entlassen',
     }),
     person(3, 'Cora Weg', { beendet_at: '2026-10-13 10:05:00', beendet_als: 'entlassen' }),
+    // LLH-1067: die Einsatzfunktion steht vor der Qualifikation.
+    person(5, 'Emil Weg', {
+      funktion: 'Sanitäter',
+      einsatzfunktion: 'Melder',
+      beendet_at: '2026-10-13 10:07:00',
+      beendet_als: 'entlassen',
+    }),
     // Eine stornierte Kraft erscheint in keinem Nachweis, auch wenn sie hineingerät.
     person(4, 'Dora Fehl', { beendet_at: '2026-10-13 10:06:00', beendet_als: 'storniert' }),
   ];
@@ -31,7 +38,9 @@ describe('Block „Entlassen“ im Meldebild (LLH-1079)', () => {
   it('nennt die Entlassenen als eigenen Block, die Stärke zählt sie nicht', () => {
     const bild = baueKraeftebild([], [], [...aktiv, ...entlassen], [], []);
     const md = rendereMeldebildMarkdown(bild, 'Stand', toEntlassene(entlassen));
-    expect(md).toContain('## Entlassen\n\n- Bert Weg (Sanitäter)\n- Cora Weg\n');
+    expect(md).toContain(
+      '## Entlassen\n\n- Bert Weg (Sanitäter)\n- Cora Weg\n- Emil Weg (Melder)\n',
+    );
     expect(md).not.toContain('Dora Fehl');
     expect(md).toContain('1/0/0//1');
   });

@@ -75,6 +75,7 @@ function render(liste = [ep, zweite]) {
       ]),
     ),
     http.get('/api/personal', () => HttpResponse.json([stamm])),
+    http.get('/api/qualifikationen', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -220,6 +221,34 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     expect(within(zeile(container, 10)).getByRole('textbox')).toHaveValue('Knie verletzt');
     expect(toasts()).toBe(0);
+  });
+
+  it('Bemerkung: über 2 000 Zeichen geht kein PATCH hinaus, der Zähler sagt „zu lang“ (LLH-1067)', async () => {
+    setzeViewportBreite(1600);
+    let patches = 0;
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', () => {
+        patches += 1;
+        return HttpResponse.json({ ...ep, bemerkung: 'x' });
+      }),
+    );
+    const { container } = render();
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', {
+        name: 'Bemerkung zu Thomas Müller hinzufügen',
+      }),
+    );
+    const feld = within(zeile(container, 10)).getByRole('textbox');
+    fireEvent.input(feld, { target: { value: 'a'.repeat(2_001) } });
+    expect(within(zeile(container, 10)).getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    fireEvent.keyDown(feld, { keyCode: 13 });
+    fireEvent.keyUp(feld, { keyCode: 13 });
+    await act(async () => {});
+    expect(patches).toBe(0);
+    expect(within(zeile(container, 10)).getByRole('textbox')).toBeInTheDocument();
   });
 
   it('unter md steht der Grund an der Karte', async () => {

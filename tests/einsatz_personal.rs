@@ -1241,3 +1241,494 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
     }
 }
+
+// ---------- Einsatzfunktion und Ad-hoc-Angaben (LLH-1067, Spec `personal-einsatzangaben`) ----------
+
+async fn patch_kraft(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ep: i64,
+    body: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+/// Ad-hoc-Kraft mit Qualifikation und Träger; liefert die `ep_id`.
+async fn adhoc_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&format!(
+            r#"{{"adhoc":{{"name":"{name}","funktion":"Sanitäter","traegerorganisation":"ASB"}}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn einsatzfunktion_setzen_und_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Max Mustermann").await;
+
+    let (s, json) = patch_kraft(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        r#"{"einsatzfunktion":"  Sprechfunker "}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["einsatzfunktion"], "Sprechfunker");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["einsatzfunktion"], "Sprechfunker");
+
+    for leer in [r#"{"einsatzfunktion":""}"#, r#"{"einsatzfunktion":null}"#] {
+        let (s, _) =
+            patch_kraft(&app, &admin, einsatz, ep, r#"{"einsatzfunktion":"Melder"}"#).await;
+        assert_eq!(s, StatusCode::OK);
+        let (s, json) = patch_kraft(&app, &admin, einsatz, ep, leer).await;
+        assert_eq!(s, StatusCode::OK, "{json}");
+        assert!(
+            !json.as_object().unwrap().contains_key("einsatzfunktion"),
+            "{leer} leert: {json}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn einsatzfunktion_ueber_200_zeichen_ist_400_und_aendert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Max Mustermann").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let zu_lang = format!(r#"{{"einsatzfunktion":"{}"}}"#, "x".repeat(201));
+    let (s, json) = patch_kraft(&app, &admin, einsatz, ep, &zu_lang).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(
+        json["error"],
+        "Einsatzfunktion darf höchstens 200 Zeichen lang sein"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(!liste[0]
+        .as_object()
+        .unwrap()
+        .contains_key("einsatzfunktion"));
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    let genau = format!(r#"{{"einsatzfunktion":"{}"}}"#, "ä".repeat(200));
+    assert_eq!(
+        patch_kraft(&app, &admin, einsatz, ep, &genau).await.0,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn bemerkung_ueber_2000_zeichen_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Max Mustermann").await;
+    let zu_lang = format!(r#"{{"bemerkung":"{}"}}"#, "x".repeat(2_001));
+    let (s, json) = patch_kraft(&app, &admin, einsatz, ep, &zu_lang).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(
+        json["error"],
+        "Bemerkung darf höchstens 2000 Zeichen lang sein"
+    );
+    let genau = format!(r#"{{"bemerkung":"{}"}}"#, "x".repeat(2_000));
+    assert_eq!(
+        patch_kraft(&app, &admin, einsatz, ep, &genau).await.0,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn adhoc_disponieren_prueft_die_grenzen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let lang = "x".repeat(201);
+    for (body, meldung) in [
+        (
+            format!(r#"{{"adhoc":{{"name":"{lang}"}}}}"#),
+            "Name darf höchstens 200 Zeichen lang sein",
+        ),
+        (
+            format!(r#"{{"adhoc":{{"name":"A","funktion":"{lang}"}}}}"#),
+            "Qualifikation darf höchstens 200 Zeichen lang sein",
+        ),
+        (
+            format!(r#"{{"adhoc":{{"name":"A","traegerorganisation":"{lang}"}}}}"#),
+            "Trägerorganisation darf höchstens 200 Zeichen lang sein",
+        ),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personal"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+        assert_eq!(json["error"], meldung);
+    }
+    let genau = "x".repeat(200);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(
+            r#"{{"adhoc":{{"name":"{genau}","funktion":"{genau}","traegerorganisation":"{genau}"}}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1);
+}
+
+#[tokio::test]
+async fn adhoc_angaben_im_patch_aenderbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Maier").await;
+    let einheit = einheit_mit(&app, &admin, einsatz, ep).await;
+
+    let (s, json) = patch_kraft(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        r#"{"name":" Meier ","funktion":"Rettungssanitäter","traegerorganisation":""}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["name"], "Meier");
+    assert_eq!(json["funktion"], "Rettungssanitäter");
+    assert!(json["traegerorganisation"].is_null(), "{json}");
+
+    let (_, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let e = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .unwrap();
+    assert_eq!(e["personal_mitglieder"][0]["name"], "Meier", "{e}");
+}
+
+#[tokio::test]
+async fn adhoc_name_leer_oder_null_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Maier").await;
+    for body in [r#"{"name":"  "}"#, r#"{"name":null}"#] {
+        let (s, json) = patch_kraft(&app, &admin, einsatz, ep, body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+        assert_eq!(json["error"], "Name darf nicht leer sein");
+    }
+    let lang = format!(r#"{{"funktion":"{}"}}"#, "x".repeat(201));
+    let (s, json) = patch_kraft(&app, &admin, einsatz, ep, &lang).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(
+        json["error"],
+        "Qualifikation darf höchstens 200 Zeichen lang sein"
+    );
+}
+
+#[tokio::test]
+async fn stamm_person_umbenennen_ist_422_im_stamm_pflegen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Max Mustermann").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    for body in [
+        r#"{"name":"Moritz","einsatzfunktion":"Melder"}"#,
+        r#"{"funktion":null}"#,
+        r#"{"traegerorganisation":"THW"}"#,
+    ] {
+        let (s, json) = patch_kraft(&app, &admin, einsatz, ep, body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {json}");
+        assert!(
+            json["error"].as_str().unwrap().contains("im Stamm pflegen"),
+            "{json}"
+        );
+    }
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["name"], "Max Mustermann");
+    assert!(
+        !liste[0]
+            .as_object()
+            .unwrap()
+            .contains_key("einsatzfunktion"),
+        "nichts geschrieben"
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    // Grenze vor Zusammenhang: ein zu langer Name an einer Stamm-Person ist 400, nicht 422.
+    let lang = format!(r#"{{"name":"{}"}}"#, "x".repeat(201));
+    assert_eq!(
+        patch_kraft(&app, &admin, einsatz, ep, &lang).await.0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
+async fn aenderungen_stehen_in_genau_einem_etb_eintrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Max Mustermann").await;
+    let n = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, _) = patch_kraft(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        r#"{"einsatzfunktion":"Sprechfunker"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert_eq!(inhalte.len(), n + 1);
+    assert!(
+        inhalte.contains(&"Person «Max Mustermann»: Funktion «—» → «Sprechfunker»".to_string()),
+        "{inhalte:?}"
+    );
+
+    // Gleicher Wert und reine Bemerkung schreiben nichts.
+    for body in [
+        r#"{"einsatzfunktion":"Sprechfunker"}"#,
+        r#"{"bemerkung":"vor Ort"}"#,
+    ] {
+        assert_eq!(
+            patch_kraft(&app, &admin, einsatz, ep, body).await.0,
+            StatusCode::OK
+        );
+    }
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, n + 1);
+
+    // Ad-hoc: mehrere Angaben in einem Eintrag, jede mit altem und neuem Wert.
+    let adhoc = adhoc_kraft(&app, &admin, einsatz, "Maier").await;
+    let n = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = patch_kraft(
+        &app,
+        &admin,
+        einsatz,
+        adhoc,
+        r#"{"einsatzfunktion":"Melder","name":"Meier","funktion":"Rettungssanitäter","traegerorganisation":null}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert_eq!(inhalte.len(), n + 1);
+    assert!(
+        inhalte.contains(
+            &"Person «Meier»: Funktion «—» → «Melder»; Name «Maier» → «Meier»; \
+              Qualifikation «Sanitäter» → «Rettungssanitäter»; Träger «ASB» → «—»"
+                .to_string()
+        ),
+        "{inhalte:?}"
+    );
+
+    // Die Bezeichnung in späteren Einträgen nennt die Einsatzfunktion vor der Qualifikation.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{adhoc}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        inhalte.contains(&"Person «Meier (Melder)» aus dem Einsatz entlassen".to_string()),
+        "{inhalte:?}"
+    );
+}
+
+/// Name und Funktionstext lesen Einheit, Abschnitt, UHS und Schaden live (design.md D5): eine
+/// Änderung meldet genau die Ansichten, die die Kraft tragen; der Schaden zeigt nur den Namen.
+/// Träger, Bemerkung und gleiche Werte melden nichts außerhalb von `personal`.
+#[tokio::test]
+async fn angaben_aendern_meldet_nur_betroffene_ansichten() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frei = adhoc_kraft(&app, &admin, einsatz, "Frei").await;
+    let mitglied = adhoc_kraft(&app, &admin, einsatz, "Mitglied").await;
+    let an_uhs = adhoc_kraft(&app, &admin, einsatz, "An der UHS").await;
+    let geschaedigt = adhoc_kraft(&app, &admin, einsatz, "Geschädigt").await;
+    let einheit = einheit_mit(&app, &admin, einsatz, mitglied).await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, an_uhs).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &admin,
+        Some(&format!(
+            r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let schaden = json["id"].as_i64().unwrap();
+
+    let mut rx = live.abonniere(einsatz);
+    let patch = |ep: i64, body: &'static str| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move { patch_kraft(&app, &admin, einsatz, ep, body).await.0 }
+    };
+
+    assert_eq!(patch(frei, r#"{"name":"Frei 2"}"#).await, StatusCode::OK);
+    assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
+    assert_eq!(
+        patch(mitglied, r#"{"einsatzfunktion":"Melder"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "Einsatzfunktion eines Mitglieds"
+    );
+    assert_eq!(
+        patch(
+            mitglied,
+            r#"{"einsatzfunktion":"Melder","traegerorganisation":"DRK"}"#
+        )
+        .await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "gleicher Wert, Träger"
+    );
+    assert_eq!(
+        patch(an_uhs, r#"{"funktion":"Notfallsanitäter"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Qualifikation einer UHS-Kraft"
+    );
+    assert_eq!(
+        patch(geschaedigt, r#"{"einsatzfunktion":"Fahrer"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "der Schaden zeigt keine Funktion"
+    );
+    assert_eq!(
+        patch(geschaedigt, r#"{"name":"Geschädigt 2"}"#).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("schaden", schaden)],
+        "Name einer geschädigten Kraft"
+    );
+}
+
+/// Einheit-Mitglieder und UHS-Kräfte tragen die Einsatzfunktion mit (design.md D6).
+#[tokio::test]
+async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mitglied = adhoc_kraft(&app, &admin, einsatz, "Mitglied").await;
+    let an_uhs = adhoc_kraft(&app, &admin, einsatz, "An der UHS").await;
+    let einheit = einheit_mit(&app, &admin, einsatz, mitglied).await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, an_uhs).await;
+    for ep in [mitglied, an_uhs] {
+        let (s, _) =
+            patch_kraft(&app, &admin, einsatz, ep, r#"{"einsatzfunktion":"Melder"}"#).await;
+        assert_eq!(s, StatusCode::OK);
+    }
+
+    let (_, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let e = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .unwrap();
+    assert_eq!(
+        e["personal_mitglieder"][0]["einsatzfunktion"], "Melder",
+        "{e}"
+    );
+    assert_eq!(e["personal_mitglieder"][0]["funktion"], "Sanitäter", "{e}");
+
+    let (s, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["kraefte"][0]["einsatzfunktion"], "Melder", "{json}");
+    assert_eq!(json["kraefte"][0]["funktion"], "Sanitäter", "{json}");
+}

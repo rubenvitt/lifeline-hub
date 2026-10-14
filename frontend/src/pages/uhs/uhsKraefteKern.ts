@@ -1,4 +1,5 @@
 import type { UhsKraft } from '../../api/types';
+import { funktionText } from '../../kraefte/einsatzfunktionKern';
 
 /** Anzahl einer Qualifikation unter den Kräften einer UHS. */
 export interface QualifikationsZahl {
@@ -52,7 +53,7 @@ export function freieEinheiten(ohneUhs: readonly UhsKraft[]): FreieEinheit[] {
   return [...einheiten.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
-/** Auswahltext einer Kraft: „Name · Funktion · Einheit“. */
+/** Auswahltext einer Kraft: „Name · Funktion · Einheit“; Einsatzfunktion vor Qualifikation. */
 export function kraftAuswahlText(k: UhsKraft): string {
-  return [k.name, k.funktion, k.einheit].filter((t) => t != null && t !== '').join(' · ');
+  return [k.name, funktionText(k), k.einheit].filter((t) => t != null && t !== '').join(' · ');
 }

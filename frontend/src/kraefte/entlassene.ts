@@ -1,9 +1,11 @@
 import type { EinsatzPersonal } from '../api/types';
+import { funktionText } from './einsatzfunktionKern';
 
 /**
  * Eine entlassene Kraft im Nachweis des Meldebilds (LLH-1079, Spec `kraefte-entlassung`,
  * „Entlassene im Nachweis“): Name und Funktion. Die Einheit, aus der sie ging, steht nur im
- * ETB-Text (design.md, offene Frage 3); die Zeile kennt sie nach dem Entlassen nicht mehr.
+ * ETB-Text (design.md, offene Frage 3); die Zeile kennt sie nach dem Entlassen nicht mehr. Als
+ * Funktion steht die Einsatzfunktion, sonst die Qualifikation (LLH-1067).
  */
 export interface EntlasseneKraft {
   name: string;
@@ -14,7 +16,7 @@ export interface EntlasseneKraft {
 export function toEntlassene(personal: readonly EinsatzPersonal[]): EntlasseneKraft[] {
   return personal
     .filter((ep) => ep.beendet_als === 'entlassen')
-    .map((ep) => ({ name: ep.name, funktion: ep.funktion }));
+    .map((ep) => ({ name: ep.name, funktion: funktionText(ep) }));
 }
 
 /**

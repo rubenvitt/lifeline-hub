@@ -55,4 +55,12 @@ describe('kraftAuswahlText', () => {
     ).toBe('Anna · Notärztin · SEG 1');
     expect(kraftAuswahlText(kraft({ id: 2, name: 'Bernd' }))).toBe('Bernd');
   });
+
+  it('nennt die Einsatzfunktion vor der Qualifikation (LLH-1067)', () => {
+    expect(
+      kraftAuswahlText(
+        kraft({ id: 1, name: 'Anna', funktion: 'Notärztin', einsatzfunktion: 'Melder' }),
+      ),
+    ).toBe('Anna · Melder');
+  });
 });

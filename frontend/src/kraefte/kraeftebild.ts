@@ -24,6 +24,7 @@ import {
   type EinheitKnoten,
 } from './kraeftebaumKern';
 import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
+import { funktionText } from './einsatzfunktionKern';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -174,7 +175,7 @@ function personMittelZeile(x: PersonImBaum): MeldebildZeile {
     key: `ep-${ep.id}`,
     mittelArt: 'person',
     bezeichnung: ep.name,
-    detail: [x.isFuehrer ? 'EF' : null, ep.funktion].filter(Boolean).join(' · ') || null,
+    detail: [x.isFuehrer ? 'EF' : null, funktionText(ep)].filter(Boolean).join(' · ') || null,
     staerke: ps,
     statusKategorie: ep.status_kategorie ?? null,
     statusLabel: ep.status_label ?? null,
@@ -434,7 +435,11 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
       f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
     einheiten: roh.einheiten.filter(einheitErlaubt),
     personal: roh.personal.filter((x) =>
-      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.name, x.funktion]),
+      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [
+        x.name,
+        x.funktion,
+        x.einsatzfunktion,
+      ]),
     ),
     fahrzeuge: roh.fahrzeuge.filter((x) =>
       passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [

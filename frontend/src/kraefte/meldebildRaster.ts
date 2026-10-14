@@ -35,6 +35,7 @@ import {
   type PersonImBaum,
 } from './kraeftebaumKern';
 import { KATEGORIE_REIHENFOLGE, OHNE_STATUS, type KategorieOderOhne } from './statusAchse';
+import { funktionText } from './einsatzfunktionKern';
 
 /**
  * Das Meldebild als STATUSRASTER über dem KRÄFTEBAUM — reine Ableitungen.
@@ -370,7 +371,7 @@ function personZeile(x: PersonImBaum): RasterZeile {
     art: 'person',
     mittelId: ep.id,
     bezeichnung: ep.name,
-    zusatz: ep.funktion ?? null,
+    zusatz: funktionText(ep),
     status: personStatus(ep),
     person: {
       position: ep.staerke_position ?? null,

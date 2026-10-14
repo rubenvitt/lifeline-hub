@@ -492,6 +492,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("snap_funktion", Strategie::NullSetzen, Z_EINSATZ),
             scrub("snap_traegerorganisation", Strategie::NullSetzen, Z_EINSATZ),
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
+            // Einsatzfunktion (LLH-1067, design.md D8): Freitext wie die Bemerkung.
+            scrub("einsatzfunktion", Strategie::NullSetzen, Z_EINSATZ),
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
             // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.

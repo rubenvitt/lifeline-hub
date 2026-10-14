@@ -236,6 +236,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("snap_funktion", Mit),
             ("snap_traegerorganisation", Mit),
             ("bemerkung", Mit),
+            ("einsatzfunktion", Mit),
         ],
     },
     PersonenBezug {

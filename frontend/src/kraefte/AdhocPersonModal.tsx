@@ -2,6 +2,7 @@ import { Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { disponiereAdhoc, type AdhocEingabe } from '../api/einsatzPersonal';
+import { PERSONAL_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import { POSITION_OPTIONEN } from '../api/personal';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal } from '../api/types';
@@ -20,7 +21,9 @@ interface AdhocPersonModalProps {
 
 /**
  * Ad-hoc-Person disponieren — ein Bauteil für Personal-Liste und Stab-Besetzung.
- * Vier Felder (Name, Funktion, Trägerorganisation, Stärke-Position); Name ist Pflicht.
+ * Vier Felder (Name, Qualifikation, Trägerorganisation, Stärke-Position); Name ist Pflicht. Die
+ * Qualifikation geht als `funktion` auf den Draht; die Einsatzfunktion setzt die Personalliste
+ * nach dem Disponieren (LLH-1067, design.md D2/D7). Die Texte begrenzt der Spiegel des Servers.
  * `onFertig` der Hülle gibt kein Ergebnis weiter: die Disposition wandert über `onSuccess` in
  * einen Ref und wird in `onErfasst` gemeldet, nach bestandener Abbruchprüfung der Hülle.
  */
@@ -66,13 +69,13 @@ export default function AdhocPersonModal({
       onAbbrechen={onSchliessen}
     >
       <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-        <Input placeholder="z. B. Dr. Schmidt" />
+        <Input placeholder="z. B. Dr. Schmidt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
       </Form.Item>
-      <Form.Item label="Funktion" name="funktion">
-        <Input placeholder="z. B. Notarzt" />
+      <Form.Item label="Qualifikation" name="funktion">
+        <Input placeholder="z. B. Notarzt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
       </Form.Item>
       <Form.Item label="Trägerorganisation" name="traegerorganisation">
-        <Input placeholder="z. B. KV Musterstadt" />
+        <Input placeholder="z. B. KV Musterstadt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
       </Form.Item>
       <Form.Item label="Stärke-Position" name="staerke_position">
         <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
