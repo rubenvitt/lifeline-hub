@@ -496,13 +496,56 @@ describe('FahrzeugePage', () => {
     await userEvent.click(ausloeser);
     expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
 
-    // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
-    expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
+    // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit „Vom Fahrzeug lösen“
+    // (LLH-1073, design.md D13: der Knopf nennt die Handlung).
+    expect(await screen.findByText('Anna Crew')).toBeInTheDocument();
     // Die Stärke-Position steht als Wort, nicht als Wire-Wert (LFH-946).
-    expect(screen.getByText('Anna Crew (Mannschaft)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Freigeben' })).toBeInTheDocument();
+    expect(screen.getByText('Mannschaft')).toBeInTheDocument();
+    const loesen = screen.getByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' });
+    expect(loesen).toHaveTextContent('Vom Fahrzeug lösen');
+    expect(loesen).toHaveClass('ant-btn-dangerous');
     // Frei-Pool-Picker vorhanden (nur freie Kräfte).
     expect(screen.getByText('Kraft zur Besatzung …')).toBeInTheDocument();
+  });
+
+  it('nennt je Person Position und Funktion; „Vom Fahrzeug lösen“ fragt nicht nach (LLH-1073)', async () => {
+    const geloest: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
+        geloest.push(String(params.epId));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const crew = [
+      person({
+        id: 100,
+        name: 'Anna Crew',
+        fahrzeug_id: 10,
+        staerke_position: 'unterfuehrer',
+        einsatzfunktion: 'Gruppenführerin',
+        funktion: 'Notfallsanitäterin',
+      }),
+      person({
+        id: 102,
+        name: 'Carl Ohne',
+        fahrzeug_id: 10,
+        staerke_position: null,
+        funktion: 'Maschinist',
+      }),
+    ];
+    const { container } = render(einsatz(), crew);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    // Einsatzfunktion vor Qualifikation (`funktionText`, LLH-1067).
+    expect(await within(block).findByText('Unterführer · Gruppenführerin')).toBeInTheDocument();
+    expect(within(block).getByText('Maschinist')).toBeInTheDocument();
+    await userEvent.click(
+      within(block).getByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    await waitFor(() => expect(geloest).toEqual(['100']));
+    expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {

@@ -41,6 +41,8 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
 import EinheitAngabe from '../kraefte/EinheitAngabe';
+import { funktionText } from '../kraefte/einsatzfunktionKern';
+import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
 import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
 import { hatFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
@@ -119,7 +121,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
  * `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`). Eine Kraft in einer anderen Einheit als
  * das Fahrzeug wird markiert.
  *
- * Abgelehntes Zuordnen steht unter dem Auswahlfeld, abgelehntes Freigeben an der Kraft (LFH-1077,
+ * Abgelehntes Zuordnen steht unter dem Auswahlfeld, abgelehntes Lösen an der Kraft (LFH-1077,
  * `frontend/AGENTS.md`, „Rückwege und Fehler“).
  */
 function BesatzungsBlock({
@@ -163,21 +165,36 @@ function BesatzungsBlock({
       ) : (
         crew.map((m) => {
           const grund = freigebenFehler(m.id);
+          // Position und Funktion je Person (LLH-1073, design.md D13): die Position als Wort
+          // (LFH-946), die Funktion wie überall über `funktionText` (LLH-1067).
+          const angabe = [
+            m.staerke_position ? POSITION_LABELS[m.staerke_position] : null,
+            funktionText(m),
+          ]
+            .filter(Boolean)
+            .join(' · ');
           return (
             <div key={m.id}>
-              <Space style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
-                <Space size={abstand.sm}>
-                  <span>
-                    {m.name}
-                    {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
-                  </span>
+              <Space
+                size="middle"
+                style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+              >
+                <Space size={abstand.sm} wrap>
+                  <span>{m.name}</span>
+                  {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
                   {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
                     <Tag style={{ margin: 0 }}>andere Einheit</Tag>
                   )}
                 </Space>
+                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage (D13, Regel „Destruktiv ist
+                    nicht gleich destruktiv“). Der Name nennt Handlung und Person. */}
                 {darfSchreiben && (
-                  <Button danger onClick={() => onFreigeben(m.id)}>
-                    Freigeben
+                  <Button
+                    danger
+                    aria-label={`${m.name} vom Fahrzeug lösen`}
+                    onClick={() => onFreigeben(m.id)}
+                  >
+                    Vom Fahrzeug lösen
                   </Button>
                 )}
               </Space>
@@ -435,7 +452,7 @@ export default function FahrzeugePage() {
     mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
     onMutate: (v) => freigebenFehler.beginne(v.epId),
     onSuccess: invalidate,
-    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Freigeben fehlgeschlagen'),
+    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Nicht vom Fahrzeug gelöst'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -753,6 +770,7 @@ export default function FahrzeugePage() {
       render: (_, ef) => (
         <BemerkungZelle
           wert={ef.bemerkung}
+          max={FAHRZEUG_BEMERKUNG_MAX}
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
