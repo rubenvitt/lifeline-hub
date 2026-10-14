@@ -62,7 +62,7 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { besatzungsUrteil, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
+import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
@@ -76,45 +76,7 @@ import {
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
-
-/**
- * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte, clientseitig gezählt und
- * bewusst orthogonal zur Einheiten-Stärke. Eine Kraft ohne F/UF-Position ist trotzdem auf dem
- * Fahrzeug und zählt als Mannschaft (Sammeltopf), sodass Σ die tatsächliche Kopfzahl bleibt.
- */
-function istBesatzungsStaerke(crew: EinsatzPersonal[]): Staerke {
-  const s: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
-  for (const m of crew) {
-    if (m.staerke_position === 'fuehrer') s.fuehrer += 1;
-    else if (m.staerke_position === 'unterfuehrer') s.unterfuehrer += 1;
-    else s.mannschaft += 1;
-  }
-  return s;
-}
-
-/** Soll gilt als erfüllt, wenn Ist in JEDER Position (F/UF/M) ≥ Soll ist (Überbesetzung zählt mit). */
-function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
-  return (
-    ist.fuehrer >= soll.fuehrer &&
-    ist.unterfuehrer >= soll.unterfuehrer &&
-    ist.mannschaft >= soll.mannschaft
-  );
-}
-
-/**
- * Das Urteil über die Besatzung, rein, damit die Regel ohne Render prüfbar ist. „nicht erfasst"
- * geht vor allem anderen: ohne zugeordnete Kraft gibt es kein Ist, das man am Soll messen könnte
- * (LFH-962, das Personal läuft oft über die Einheit).
- */
-function besatzungsUrteilVon(
-  anzahlKraefte: number,
-  ist: Staerke,
-  soll: Staerke | null,
-): BesatzungsUrteil {
-  if (anzahlKraefte === 0) return 'nicht_erfasst';
-  if (!soll) return 'kein_soll';
-  return istSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
-}
+import { besatzungsStaerke, besatzungsUrteilVon } from '../kraefte/kraeftebaumKern';
 
 /**
  * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
@@ -122,7 +84,7 @@ function besatzungsUrteilVon(
  * zweite Kanal, nicht die Farbe.
  */
 function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll: Staerke | null }) {
-  const ist = istBesatzungsStaerke(crew);
+  const ist = besatzungsStaerke(crew);
   const urteil = besatzungsUrteilVon(crew.length, ist, soll);
   return (
     <Space size={abstand.sm} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
