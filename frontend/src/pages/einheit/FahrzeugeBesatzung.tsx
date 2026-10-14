@@ -128,7 +128,10 @@ export default function FahrzeugeBesatzung({
   const { token, rollen } = useRollen();
   const einheitId = einheit.id;
   const grund = besatzungGrund(rechte);
-  /** Die Besatzung steht erst, wenn beide Listen da sind; bis dahin flach, ohne Hinweis. */
+  /**
+   * Die Besatzung steht erst, wenn beide Listen da sind. Solange sie laden, steht nur der
+   * Ladezustand; fehlt eine (Fehler), stehen die Mitglieder flach aus dem DTO.
+   */
   const mittel =
     rechte.hasBesatzung && personal && fahrzeuge
       ? mittelDerEinheit(einheitId, { personal, fahrzeuge, material: [], einheiten })
@@ -214,9 +217,10 @@ export default function FahrzeugeBesatzung({
   const fmsStatus = useMutation({
     mutationFn: (v: { efId: number; statusId: number }) =>
       updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
-    onMutate: (v) => fahrzeugZeilen.beginne(v.efId),
+    onMutate: (v) => fahrzeugLauf(v.efId).beginne(),
     onSuccess: invalidate,
     onError: (e, v) => fahrzeugZeilen.melde(v.efId, e, 'Status nicht geändert'),
+    onSettled: (_d, _e, v) => fahrzeugLauf(v.efId).ende(),
   });
 
   function waehle(p: PersonZeileDaten, key: PersonMenuKey) {
@@ -324,7 +328,8 @@ export default function FahrzeugeBesatzung({
 
   const fahrzeugZeile = (f: FahrzeugImBaum) => {
     const ef = f.fahrzeug;
-    const laeuft = fmsStatus.isPending && fmsStatus.variables?.efId === ef.id;
+    // Gesperrt ist nur die eigene Zeile: eine Wahl an einem anderen Fahrzeug geht hinaus.
+    const laeuft = laufend.has(`f${ef.id}`);
     return (
       <div data-lfh="einheit-fahrzeug" style={zeilenStil}>
         <FahrzeugZeichen
@@ -367,8 +372,7 @@ export default function FahrzeugeBesatzung({
             laeuft={laeuft}
             darfSchreiben={canBesatzung}
             onWaehlen={(statusId) => {
-              if (fmsStatus.isPending) return;
-              fmsStatus.mutate({ efId: ef.id, statusId });
+              if (!laeuft) fmsStatus.mutate({ efId: ef.id, statusId });
             }}
           />,
         )}

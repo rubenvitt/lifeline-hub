@@ -197,7 +197,7 @@ Fahrzeug“ mit „fährt auf …“.
 
 Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide freigegeben
 sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
-„Ohne Besatzung“ mit dem gesperrten Modul; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
+„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
 dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
 „Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund; ohne Freigabe Material
 ebenso „Material zuordnen …“.

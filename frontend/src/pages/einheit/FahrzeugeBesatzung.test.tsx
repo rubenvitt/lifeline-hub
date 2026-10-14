@@ -117,6 +117,7 @@ interface Optionen {
   fahrzeuge?: readonly EinsatzFahrzeug[] | undefined;
   darfSchreiben?: boolean;
   freigaben?: ModulFreigaben;
+  listenZustand?: 'daten' | 'laden' | 'fehler';
 }
 
 function zeige({
@@ -125,22 +126,27 @@ function zeige({
   fahrzeuge = FAHRZEUGE,
   darfSchreiben = true,
   freigaben = freigabenFixture(),
+  listenZustand = 'daten',
 }: Optionen = {}) {
   server.use(http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)));
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
   const onSetFuehrer = vi.fn<(epId: number) => Promise<unknown>>().mockResolvedValue(undefined);
+  const onNeuladen = vi.fn();
   const r = renderMitProviders(
     <FahrzeugeBesatzung
       einsatzId={1}
       einheit={e}
       einheiten={[e, GAST]}
-      personal={rechte.hasBesatzung ? personal : undefined}
-      fahrzeuge={rechte.hasBesatzung ? fahrzeuge : undefined}
+      // Wie die Seite: ohne Freigabe oder solange eine Liste lädt bzw. fehlt, keine Liste.
+      personal={rechte.hasBesatzung && listenZustand === 'daten' ? personal : undefined}
+      fahrzeuge={rechte.hasBesatzung && listenZustand === 'daten' ? fahrzeuge : undefined}
       rechte={rechte}
+      listenZustand={listenZustand}
+      onNeuladen={onNeuladen}
       onSetFuehrer={onSetFuehrer}
     />,
   );
-  return { ...r, onSetFuehrer };
+  return { ...r, onSetFuehrer, onNeuladen };
 }
 
 const paneel = () => screen.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
@@ -174,6 +180,22 @@ async function oeffneMenue(name: string) {
     expect(offen.length).toBeGreaterThan(0);
     return offen[offen.length - 1];
   });
+}
+/** Wählt am Status eines Fahrzeugs einen Eintrag, im zuletzt geöffneten Menü. */
+async function waehleStatus(funkrufname: string, eintrag: string) {
+  await userEvent.click(
+    within(fahrzeugZeile(funkrufname)).getByRole('button', {
+      name: `Status von ${funkrufname} ändern`,
+    }),
+  );
+  const menue = await waitFor(() => {
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(offen.length).toBeGreaterThan(0);
+    return offen[offen.length - 1];
+  });
+  await userEvent.click(within(menue).getByText(eintrag));
 }
 const eintraege = (menue: HTMLElement) =>
   within(menue)
@@ -409,6 +431,41 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
     expect(fahrzeugZeile('83-2').querySelector('[data-fehler]')).toBeNull();
   });
 
+  it('abgelehnte FMS-Wahl: der Grund steht an der Fahrzeugzeile, kein Toast', async () => {
+    server.use(
+      http.patch('/api/einsaetze/1/fahrzeuge/30', () =>
+        HttpResponse.json({ error: 'Status ist gesperrt' }, { status: 409 }),
+      ),
+    );
+    zeige();
+    await waehleStatus('83-1', 'S3 · Einsatz übernommen');
+    expect(await within(fahrzeugZeile('83-1')).findByText('Status ist gesperrt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(fahrzeugZeile('83-2').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('FMS-Wahl an einem zweiten Fahrzeug, während die erste noch läuft, geht hinaus', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/fahrzeuge/:efId', async ({ params, request }) => {
+        aufrufe.push(`${params.efId}:${JSON.stringify(await request.json())}`);
+        if (params.efId === '30') await delay('infinite');
+        return HttpResponse.json(FAHRZEUGE[0]);
+      }),
+    );
+    zeige();
+    await waehleStatus('83-1', 'S3 · Einsatz übernommen');
+    await waitFor(() =>
+      expect(
+        within(fahrzeugZeile('83-1')).getByRole('button', { name: /^Status von 83-1 ändern/ }),
+      ).toBeDisabled(),
+    );
+    await waehleStatus('83-2', 'S3 · Einsatz übernommen');
+    await waitFor(() => expect(aufrufe).toEqual(['30:{"status_id":103}', '31:{"status_id":103}']));
+  });
+
   it('„Aus Einheit lösen“ lädt bis zur Antwort, nur an seiner Zeile', async () => {
     server.use(
       http.delete('/api/einsaetze/1/einheiten/10/fahrzeug/30', async () => {
@@ -429,6 +486,37 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
     expect(
       within(fahrzeugZeile('83-2')).getByRole('button', { name: 'Aus Einheit lösen' }),
     ).not.toHaveClass('ant-btn-loading');
+  });
+});
+
+describe('FahrzeugeBesatzung · Listen laden oder fehlen', () => {
+  it('Ladezustand: benannt, ohne Zeilen und ohne Menüs', () => {
+    zeige({ listenZustand: 'laden' });
+    expect(screen.getByLabelText('Fahrzeuge und Besatzung wird geladen')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(paneel().querySelectorAll('[data-lfh="einheit-person"]')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Person / })).toBeNull();
+  });
+
+  it('Fehlerzustand: Alarm mit „Erneut abrufen“, Mitglieder flach ohne Besatzungswege', async () => {
+    const { onNeuladen } = zeige({ listenZustand: 'fehler' });
+    const alarm = within(paneel()).getByRole('alert');
+    await userEvent.click(within(alarm).getByRole('button', { name: 'Erneut abrufen' }));
+    expect(onNeuladen).toHaveBeenCalledTimes(1);
+    expect(namenIn(paneel())).toEqual([
+      'Anna Führer',
+      'Bernd Mann',
+      'Clara Unter',
+      'Dora Ohne',
+      'Emil Fremdfahrer',
+    ]);
+    expect(screen.queryByRole('group', { name: 'Ohne Fahrzeug' })).toBeNull();
+    expect(eintraege(await oeffneMenue('Dora Ohne'))).toEqual([
+      'Als Einheitsführer',
+      'Aus Einheit lösen',
+    ]);
   });
 });
 

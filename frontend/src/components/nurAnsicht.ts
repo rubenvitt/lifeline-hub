@@ -26,6 +26,7 @@ export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';
 export const MODUL_PERSONAL_GESPERRT = 'Modul Personal gesperrt';
 export const MODUL_FAHRZEUGE_GESPERRT = 'Modul Fahrzeuge gesperrt';
 export const MODUL_MATERIAL_GESPERRT = 'Modul Material gesperrt';
+export const MODULE_PERSONAL_FAHRZEUGE_GESPERRT = 'Module Personal und Fahrzeuge gesperrt';
 
 /** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
 export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {

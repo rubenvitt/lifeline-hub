@@ -8,7 +8,11 @@ import type {
   Personal,
 } from '../../api/types';
 import type { MenueEintrag } from '../../components/MenueAusloeser';
-import { MODUL_FAHRZEUGE_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
+import {
+  MODUL_FAHRZEUGE_GESPERRT,
+  MODUL_PERSONAL_GESPERRT,
+  MODULE_PERSONAL_FAHRZEUGE_GESPERRT,
+} from '../../components/nurAnsicht';
 import { istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { personLabel } from '../../kraefte/einsatzfunktionKern';
 import { filterAktive } from '../../kraefte/kraeftebaumKern';
@@ -116,9 +120,10 @@ export function buildEinheitRechte(
   };
 }
 
-/** Das gesperrte Modul, ohne das die Besatzung fehlt (D5); `null`, wenn sie erscheint. */
+/** Die gesperrten Module, ohne die die Besatzung fehlt (D5); `null`, wenn sie erscheint. */
 export function besatzungGrund(rechte: EinheitRechte): string | null {
   if (rechte.hasBesatzung) return null;
+  if (!rechte.hasPersonalLink && !rechte.hasFahrzeugLink) return MODULE_PERSONAL_FAHRZEUGE_GESPERRT;
   return rechte.hasPersonalLink ? MODUL_FAHRZEUGE_GESPERRT : MODUL_PERSONAL_GESPERRT;
 }
 

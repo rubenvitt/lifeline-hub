@@ -133,13 +133,16 @@ describe('buildEinheitRechte (design.md D6)', () => {
 });
 
 describe('besatzungGrund (design.md D5)', () => {
-  it('nennt das erste gesperrte Modul der Besatzung, sonst nichts', () => {
+  it('nennt jedes gesperrte Modul der Besatzung, sonst nichts', () => {
     expect(besatzungGrund(buildEinheitRechte(true, freigaben()))).toBeNull();
     expect(besatzungGrund(buildEinheitRechte(true, freigaben(['personal'])))).toBe(
       'Modul Personal gesperrt',
     );
     expect(besatzungGrund(buildEinheitRechte(true, freigaben(['fahrzeuge'])))).toBe(
       'Modul Fahrzeuge gesperrt',
+    );
+    expect(besatzungGrund(buildEinheitRechte(true, freigaben(['personal', 'fahrzeuge'])))).toBe(
+      'Module Personal und Fahrzeuge gesperrt',
     );
     // Der Beobachter sieht die Besatzung, er bedient sie nur nicht.
     expect(besatzungGrund(buildEinheitRechte(false, freigaben()))).toBeNull();

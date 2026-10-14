@@ -126,9 +126,9 @@ interface EinheitAnsichtProps {
 }
 
 /**
- * Der Inhalt einer geladenen Einheit in der Reihenfolge von design.md D2: Kopf, Personal,
- * Fahrzeuge, Zeitachse, Material, Funk und Kommunikation, Taktisches Zeichen, zuletzt abgesetzt
- * „Einheit auflösen“. Was bedienbar ist, sagt allein `buildEinheitRechte` (D6).
+ * Der Inhalt einer geladenen Einheit in der Reihenfolge von design.md D2: Kopf, Fahrzeuge und
+ * Besatzung (mit „Person zuordnen …“ und „Fahrzeug zuordnen …“), Zeitachse, Material, Funk und
+ * Kommunikation, Taktisches Zeichen, zuletzt abgesetzt „Einheit auflösen“. Was bedienbar ist, sagt allein `buildEinheitRechte` (D6).
  */
 function EinheitAnsicht({
   einsatzId,
