@@ -172,7 +172,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
   test.slow();
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Kraefte schmal lesend ${Date.now()}`);
-  await seedeAlles(page, einsatzId);
+  const kraftId = await seedeAlles(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   await page.setViewportSize(HANDSCHIRM);
@@ -227,6 +227,29 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);
+      },
+    ],
+    [
+      // Die Personenansicht (LLH-1060) im Nur-Lese-Zweig: Hinweis statt Bedienung.
+      `personal/${kraftId}`,
+      'Freiwillige Feuerwehr Musterstadt-Nordwest',
+      async () => {
+        await expect(
+          hauptteil.getByText(/^Nur Ansicht/).first(),
+          'Vorbedingung: der Hinweis „Nur Ansicht“ steht',
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: `${KRAFT} entlassen` }),
+          'Vorbedingung: ohne Schreibrecht kein „Entlassen“',
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Stornieren' }),
+          'Vorbedingung: ohne Schreibrecht kein „Stornieren“',
+        ).toHaveCount(0);
+        await expect(
+          hauptteil.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
+          'Vorbedingung: keine Angabe ist bearbeitbar',
+        ).toHaveCount(0);
       },
     ],
     [

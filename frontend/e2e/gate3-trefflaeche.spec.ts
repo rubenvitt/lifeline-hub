@@ -4462,3 +4462,57 @@ test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entla
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziele fehlen', async ({
+  page,
+}) => {
+  // LLH-1060: ohne Schreibrecht steht „Nur Ansicht“; Angaben, Entlassen und Stornieren fehlen,
+  // „Nachtragen“ ist gesperrt. Ziele bleiben die Sprünge „Meldebild“ und „Einheit“.
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht Lesend`);
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const einheitId = await post('einheiten', { name: 'Messeinheit Lesend' });
+  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const zu = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+  );
+  expect(zu.ok(), await zu.text()).toBeTruthy();
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const main = page.getByRole('main');
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
+    await stelleDichte(page, dichte);
+    // Datenanker vor der Abwesenheit: die Einheit steht aufgelöst, der Hinweis steht.
+    await expect(main.getByText('Messeinheit Lesend', { exact: true })).toBeVisible();
+    await expect(main.getByText(/^Nur Ansicht/).first()).toBeVisible();
+    // „Nachtragen“ bleibt sichtbar und gesperrt, die Zeitachse nennt „Nur Ansicht“ (Bestand
+    // von `KraftZeitachse`).
+    await expect(main.getByRole('button', { name: 'Nachtragen', exact: true })).toBeDisabled();
+    for (const name of [
+      `${KRAFT_ANSICHT} entlassen`,
+      'Stornieren',
+      `Status von ${KRAFT_ANSICHT} ändern`,
+    ]) {
+      await expect(
+        main.getByRole('button', { name, exact: true }),
+        `Vorbedingung: ohne Schreibrecht kein „${name}“`,
+      ).toHaveCount(0);
+    }
+    await expect(
+      main.getByRole('button', { name: /bearbeiten$|eintragen$/ }),
+      'Vorbedingung: keine Angabe ist bearbeitbar',
+    ).toHaveCount(0);
+    const spruenge = main.locator('[data-lfh="inspector-sprung"]');
+    const kleinste = await alleHaltenStufe(spruenge, soll, `Sprung lesend (${dichte})`, 2);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Sprünge, kleinste ${kleinste}px`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
