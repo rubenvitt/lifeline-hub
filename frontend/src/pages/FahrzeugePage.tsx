@@ -16,7 +16,7 @@ import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
@@ -45,7 +45,12 @@ import {
   parseFahrzeugeAnsicht,
   type FahrzeugeAnsicht,
 } from '../routing/deeplinks';
-import { listeEinheiten } from '../api/einheiten';
+import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheiten';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatUhrzeitMitTag } from '../anzeige/format';
+import EinheitAngabe from '../kraefte/EinheitAngabe';
 import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -77,7 +82,12 @@ import {
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
-import { besatzungsStaerke, besatzungsUrteilVon } from '../kraefte/kraeftebaumKern';
+import {
+  abschnittDerEinheit,
+  besatzungsStaerke,
+  besatzungsUrteilVon,
+  buildEinheitOptions,
+} from '../kraefte/kraeftebaumKern';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
@@ -272,13 +282,29 @@ export default function FahrzeugePage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  // Nur das Tableau gliedert nach Einheit/Abschnitt. Die Route hängt am Modul `einheiten`, nicht an
-  // `fahrzeuge` — ist es gesperrt, läuft das Tableau ungegliedert weiter.
+  // Einheit und Abschnitt hängen am Modul `einheiten`, nicht an `fahrzeuge` (LLH-1073, design.md
+  // D5): ohne Freigabe weder Spalten noch Abruf, das Tableau läuft ungegliedert. Die Freigaben
+  // teilen den Schlüssel mit `useModulFreigaben`; der Abruf hier liefert zusätzlich den Ladezustand,
+  // damit das Tableau bis zur Antwort keine ungegliederte Fläche zeigt.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data);
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: ansicht === 'tableau',
+    enabled: einheitenFrei,
   });
+  // Der Rang der Abschnitte ordnet die Einheit-Auswahl wie den Kräftebaum; ohne Freigabe die
+  // Eingabefolge (wie die Personalliste, LLH-1060).
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: einheitenFrei && abschnitteFrei,
+  });
+  const { konventionen } = useAnzeigeKonventionen();
 
   // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
   // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
@@ -387,6 +413,20 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: (e, v) => zuordnenFehler.melde(v.efId, e, 'Zuordnen fehlgeschlagen'),
   });
+  /**
+   * Einheit eines Fahrzeugs über die Zuordnungswege des Moduls Einheiten (design.md D2): Wechsel =
+   * PUT auf die neue Einheit (der Server hängt um und meldet beide), Leeren = DELETE über die
+   * bisherige, unverändert = nichts (das hält schon `InlineAngabe`). Erfüllt erst, wenn die neue
+   * Fahrzeugliste im Cache steht; eine Ablehnung bleibt an der Angabe.
+   */
+  async function speichereEinheit(efId: number, neu: number | null, alt: number | null) {
+    if (neu === alt) return;
+    if (neu != null) await ordneFahrzeugZu(einsatzId, neu, efId);
+    else if (alt != null) await gibFahrzeugFrei(einsatzId, alt, efId);
+    void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+  }
   const besatzungFreiMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
     onMutate: (v) => freigebenFehler.beginne(v.epId),
@@ -434,6 +474,29 @@ export default function FahrzeugePage() {
 
   const stati = statusQuery.data ?? [];
   const personal = personalQuery.data ?? [];
+
+  // Einheit und Abschnitt je Fahrzeug (D4): der Abschnitt ist der eigene der Einheit, sonst der
+  // geerbte — dieselbe Lesart wie Meldebild und FMS-Tableau.
+  const einheiten = einheitenFrei ? (einheitenQuery.data ?? []) : [];
+  const abschnitte = einheitenFrei && abschnitteFrei ? (abschnitteQuery.data ?? []) : [];
+  const einheitOptionen = buildEinheitOptions(einheiten, abschnitte);
+  const einheitNameJe = new Map(einheiten.map((e) => [e.id, e.name]));
+  const abschnittJe = abschnittDerEinheit(einheiten);
+  const einheitName = (ef: EinsatzFahrzeug) =>
+    ef.einheit_id != null ? (einheitNameJe.get(ef.einheit_id) ?? null) : null;
+  const abschnittName = (ef: EinsatzFahrzeug) => {
+    const a = ef.einheit_id != null ? abschnittJe.get(ef.einheit_id) : null;
+    return a ? (a.name ?? `Abschnitt ${a.id}`) : null;
+  };
+  /** Filterwerte aus den eigenen Zeilen; ohne jeden Wert kein Filterfeld (Muster Träger). */
+  const filterAus = (wert: (ef: EinsatzFahrzeug) => string | null) => {
+    const werte = [...new Set(efs.map(wert).filter((w): w is string => !!w))]
+      .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+      .map((w) => ({ text: w, value: w }));
+    return werte.length > 0
+      ? { werte, trifft: (ef: EinsatzFahrzeug, w: string) => wert(ef) === w }
+      : undefined;
+  };
 
   /**
    * Der Katalog als Menüwerte — einmal gebaut, von beiden Zweigen gelesen. Der Fahrzeugkatalog ist
@@ -529,8 +592,13 @@ export default function FahrzeugePage() {
    * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
    * die Personalseite). `typ` weicht, seit „Entlassen“ und „⋯“ die Aktionsspalte auf 170 px
    * gebracht haben (LLH-1079 Teil II): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ
-   * trägt der Funkrufname meist schon in seiner Kennzahl. Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
-   * am Führungsarbeitsplatz“ und „Kräfte-Listen“).
+   * trägt der Funkrufname meist schon in seiner Kennzahl.
+   *
+   * Mit Einheit (170 px, schreibtragend, weicht nie) und Seit (90 px, „26. 14:05“) kamen 260 px
+   * dazu (LLH-1073, design.md D5). Unter `xxl` weicht deshalb zuerst der Abschnitt (130 px,
+   * lesend; die Einheit nennt ihn mittelbar, das Tableau gliedert nach ihm), dann wie bisher der
+   * Typ. Einheit, Status, Besatzung und Aktionen weichen nie. Wer eine Breite ändert, misst neu
+   * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
@@ -561,24 +629,37 @@ export default function FahrzeugePage() {
       suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
     },
-    {
-      title: 'Kennzeichen',
-      dataIndex: 'kennzeichen',
-      key: 'kennzeichen',
-      width: 120,
-      abBreite: 'xxl',
-      suchText: (ef) => ef.kennzeichen,
-      render: (t) => t ?? '—',
-    },
-    {
-      title: 'Träger',
-      dataIndex: 'traegerorganisation',
-      key: 'traeger',
-      width: 160,
-      abBreite: 'xxl',
-      filter: traegerFilter,
-      render: (t) => t ?? '—',
-    },
+    ...(einheitenFrei
+      ? [
+          {
+            // Schreibtragend, deshalb nie `abBreite` (D5); die Auswahl gruppiert nach Abschnitt.
+            title: 'Einheit',
+            key: 'einheit' as const,
+            width: 170,
+            sortWert: (ef: EinsatzFahrzeug) => einheitName(ef),
+            suchText: (ef: EinsatzFahrzeug) => einheitName(ef),
+            filter: filterAus(einheitName),
+            render: (_: unknown, ef: EinsatzFahrzeug) => (
+              <EinheitAngabe
+                kennung={ef.funkrufname}
+                wert={ef.einheit_id ?? null}
+                optionen={einheitOptionen}
+                darfSchreiben={darfSchreiben}
+                onSpeichern={(neu, alt) => speichereEinheit(ef.id, neu, alt)}
+              />
+            ),
+          },
+          {
+            title: 'Abschnitt',
+            key: 'abschnitt' as const,
+            width: 130,
+            abBreite: 'xxl' as const,
+            sortWert: (ef: EinsatzFahrzeug) => abschnittName(ef),
+            filter: filterAus(abschnittName),
+            render: (_: unknown, ef: EinsatzFahrzeug) => abschnittName(ef) ?? '—',
+          },
+        ]
+      : []),
     {
       title: 'Status',
       key: 'status',
@@ -602,6 +683,15 @@ export default function FahrzeugePage() {
       ),
     },
     {
+      // Zeitpunkt des Status, wie in der Kräfteübersicht; ohne Wert „—“.
+      title: 'Seit',
+      key: 'seit',
+      width: 90,
+      zahl: true,
+      sortWert: (ef) => ef.status_seit,
+      render: (_, ef) => (ef.status_seit ? formatUhrzeitMitTag(ef.status_seit, konventionen) : '—'),
+    },
+    {
       title: 'Besatzung',
       key: 'besatzung',
       width: 320,
@@ -611,6 +701,24 @@ export default function FahrzeugePage() {
           soll={ef.soll_besatzung ?? null}
         />
       ),
+    },
+    {
+      title: 'Kennzeichen',
+      dataIndex: 'kennzeichen',
+      key: 'kennzeichen',
+      width: 120,
+      abBreite: 'xxl',
+      suchText: (ef) => ef.kennzeichen,
+      render: (t) => t ?? '—',
+    },
+    {
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      width: 160,
+      abBreite: 'xxl',
+      filter: traegerFilter,
+      render: (t) => t ?? '—',
     },
     {
       title: 'Bemerkung',
@@ -752,18 +860,19 @@ export default function FahrzeugePage() {
             <FmsTableau
               fahrzeuge={efs}
               katalog={stati}
-              einheiten={einheitenQuery.data ?? null}
+              einheiten={einheitenFrei ? (einheitenQuery.data ?? null) : null}
               // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung weiter
-              // da.
+              // da. Ohne Freigabe sagt der Hinweis ebenfalls, warum ungegliedert.
               einheitenHinweis={
-                einheitenQuery.isError && !einheitenQuery.data
+                (freigabenQuery.isSuccess && !einheitenFrei) ||
+                (einheitenQuery.isError && !einheitenQuery.data)
                   ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
                   : undefined
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
               zeilenFehler={(f) => zeilen.grund(f.id)}
-              ladend={efQuery.isLoading || einheitenQuery.isLoading}
+              ladend={efQuery.isLoading || freigabenQuery.isLoading || einheitenQuery.isLoading}
             />
           ) : (
             <Datensicht
@@ -820,7 +929,10 @@ export default function FahrzeugePage() {
                 // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entlassen"
                 // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-                sekundaer: ['typ', 'traeger', 'besatzung'],
+                // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
+                sekundaer: einheitenFrei
+                  ? ['einheit', 'seit', 'besatzung']
+                  : ['typ', 'seit', 'besatzung'],
                 aktion: darfSchreiben
                   ? {
                       etikett: 'Entlassen',

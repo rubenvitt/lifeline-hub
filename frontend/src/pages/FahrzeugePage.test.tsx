@@ -9,7 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import FahrzeugePage from './FahrzeugePage';
 import type { EinsatzAnzeige } from '../api/types';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { listeVon, oeffne, waehle } from '../test/auswahlListe';
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
 // fürs Schreiben nicht zählt, deckt schreibrecht.test.ts ab.
@@ -77,9 +78,13 @@ function render(
   personal: ReturnType<typeof person>[] = [],
   efObj: Record<string, unknown> | Record<string, unknown>[] = ef,
   entlasseneDaten: unknown[] = [],
+  einheitenDaten: unknown[] = [],
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
+    // Mit Freigabe des Moduls Einheiten lädt die Liste die Einheiten stets (LLH-1073, design.md D5).
+    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheitenDaten)),
+    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     // Aktive und entlassene Fahrzeuge teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
@@ -681,29 +686,29 @@ describe('FahrzeugePage', () => {
      * Leeres Bemerkungsfeld an der Fahrzeugseite. Die Spalte ist per Voreinstellung abgewählt; die
      * Vorprüfung auf „kein Auslöser" macht die zweite Hälfte aussagekräftig.
      *
-     * Der Zähler ist hier empfindlicher, weil die Seite `typ`, `kennzeichen` und `traeger` per
-     * `abBreite: 'xxl'` führt (LFH-1149, LLH-1079): nach dem Einschalten der Bemerkung muss er bei
-     * 1024 px von vier auf genau diese drei fallen.
+     * Der Zähler ist hier empfindlicher, weil die Seite `typ`, `abschnitt`, `kennzeichen` und
+     * `traeger` per `abBreite: 'xxl'` führt (LFH-1149, LLH-1079, LLH-1073): nach dem Einschalten
+     * der Bemerkung muss er bei 1024 px von fünf auf genau diese vier fallen.
      */
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(
       within(zeile).getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
     /**
      * Gate 2 verlangt den Zähler ausgeblendeter Spalten, nicht `aus.length`: ab 1600 px ist nur
-     * `bemerkung` abgewählt (1), bei 1024 px fallen `typ`, `kennzeichen` und `traeger` über
-     * `abBreite: 'xxl'` zusätzlich weg (4, LFH-1149, LLH-1079). Ein Zähler, der nur die
+     * `bemerkung` abgewählt (1), bei 1024 px fallen `typ`, `abschnitt`, `kennzeichen` und
+     * `traeger` über `abBreite: 'xxl'` zusätzlich weg (5, LFH-1149, LLH-1079, LLH-1073). Ein Zähler, der nur die
      * Handauswahl kennt, meldete beide Male „1".
      */
     setzeViewportBreite(1600);
@@ -712,12 +717,14 @@ describe('FahrzeugePage', () => {
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Kennzeichen' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Typ' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Abschnitt' })).toBeInTheDocument();
     unmount();
 
     setzeViewportBreite(1024);
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 5 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Abschnitt' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Typ' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Kennzeichen' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
@@ -766,6 +773,198 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(container.querySelector('.ant-table')).not.toBeNull();
     expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
+  });
+});
+
+/**
+ * LLH-1073 Teil I (design.md D4/D5): Einheit (inline änderbar über das Modul Einheiten),
+ * Abschnitt (der eigene der Einheit, sonst der geerbte) und Seit (Zeitpunkt des Status, Mono).
+ */
+describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
+  const EINHEITEN = [
+    { id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord', ueber_einheit_id: null },
+    { id: 2, name: 'Gruppe 1', abschnitt_id: null, abschnitt_name: null, ueber_einheit_id: 1 },
+    {
+      id: 3,
+      name: 'Rettungsstaffel',
+      abschnitt_id: 20,
+      abschnitt_name: 'EA Süd',
+      ueber_einheit_id: null,
+    },
+  ];
+  const mitSeit = { ...ef, status_seit: '2026-05-26 09:10:00' };
+  const kopf = () =>
+    screen
+      .getAllByRole('columnheader')
+      .map((k) => k.textContent?.trim() ?? '')
+      .filter((t) => t.length > 0);
+  const FELD = 'Einheit zu Florian 1';
+
+  it('Spalten in der Folge Funkrufname · Typ · Einheit · Abschnitt · Status · Seit · Besatzung', async () => {
+    setzeViewportBreite(1600);
+    render(einsatz(), [], { ...mitSeit, einheit_id: 1 }, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    expect(kopf()).toEqual([
+      'Funkrufname',
+      'Typ',
+      'Einheit',
+      'Abschnitt',
+      'Status',
+      'Seit',
+      'Besatzung',
+      'Kennzeichen',
+      'Träger',
+      'Aktionen',
+    ]);
+  });
+
+  it('unter xxl weicht zuerst der Abschnitt; Einheit und Seit bleiben', async () => {
+    render(einsatz(), [], { ...mitSeit, einheit_id: 1 }, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    expect(kopf()).toEqual(['Funkrufname', 'Einheit', 'Status', 'Seit', 'Besatzung', 'Aktionen']);
+  });
+
+  it('der Abschnitt ist der geerbte, Seit steht in Mono', async () => {
+    setzeViewportBreite(1600);
+    const { container } = render(einsatz(), [], { ...mitSeit, einheit_id: 2 }, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(
+      await within(zeile).findByRole('button', { name: `${FELD} bearbeiten` }),
+    ).toHaveTextContent('Gruppe 1');
+    expect(within(zeile).getByText('EA Nord')).toBeInTheDocument();
+    const seit = within(zeile).getByText(/11:10/).closest('td')!;
+    expect(seit).toHaveClass('lfh-zahl-spalte');
+  });
+
+  it('ohne Status-Zeitpunkt steht „—“ in Seit', async () => {
+    const { container } = render(einsatz(), [], { ...ef, status_seit: null }, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect([...zeile.querySelectorAll('td.lfh-zahl-spalte')].map((z) => z.textContent)).toEqual([
+      '—',
+    ]);
+  });
+
+  it('Einheit wählen ordnet über das Modul Einheiten zu, der Abschnitt folgt', async () => {
+    setzeViewportBreite(1600);
+    const anfragen: string[] = [];
+    let stand: Record<string, unknown> = { ...mitSeit, einheit_id: null };
+    const { container } = render(einsatz(), [], stand, [], EINHEITEN);
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [stand]),
+      ),
+      http.put('/api/einsaetze/7/einheiten/:eid/fahrzeug/:efId', ({ params }) => {
+        anfragen.push(`PUT ${params.eid}/${params.efId}`);
+        stand = { ...stand, einheit_id: Number(params.eid) };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(within(zeile).getByRole('button', { name: `${FELD} eintragen` }));
+    await waehle(FELD, 'Zug 1 › Gruppe 1');
+    await userEvent.click(screen.getByRole('button', { name: `${FELD} speichern` }));
+    await waitFor(() => expect(anfragen).toEqual(['PUT 2/10']));
+    expect(
+      await within(zeile).findByRole('button', { name: `${FELD} bearbeiten` }),
+    ).toHaveTextContent('Gruppe 1');
+    expect(within(zeile).getByText('EA Nord')).toBeInTheDocument();
+  });
+
+  it('die Auswahl gruppiert nach Abschnitt', async () => {
+    const { container } = render(einsatz(), [], mitSeit, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(within(zeile).getByRole('button', { name: `${FELD} eintragen` }));
+    await oeffne(FELD);
+    expect(
+      [...listeVon(FELD)!.querySelectorAll('.ant-select-item-group')].map((g) => g.textContent),
+    ).toEqual(['EA Nord', 'EA Süd']);
+  });
+
+  it('Leeren gibt das Fahrzeug über die bisherige Einheit frei', async () => {
+    const anfragen: string[] = [];
+    const { container } = render(einsatz(), [], { ...mitSeit, einheit_id: 3 }, [], EINHEITEN);
+    server.use(
+      http.delete('/api/einsaetze/7/einheiten/:eid/fahrzeug/:efId', ({ params }) => {
+        anfragen.push(`DELETE ${params.eid}/${params.efId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(await within(zeile).findByRole('button', { name: `${FELD} bearbeiten` }));
+    const feld = screen.getByRole('combobox', { name: FELD }).closest('.ant-select')!;
+    await userEvent.click(feld.querySelector<HTMLElement>('.ant-select-clear')!);
+    await userEvent.click(screen.getByRole('button', { name: `${FELD} speichern` }));
+    await waitFor(() => expect(anfragen).toEqual(['DELETE 3/10']));
+  });
+
+  it('eine Ablehnung steht an der Einheit', async () => {
+    const { container } = render(einsatz(), [], mitSeit, [], EINHEITEN);
+    server.use(
+      http.put('/api/einsaetze/7/einheiten/:eid/fahrzeug/:efId', () =>
+        HttpResponse.json({ error: 'Einheit ist aufgelöst' }, { status: 409 }),
+      ),
+    );
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(within(zeile).getByRole('button', { name: `${FELD} eintragen` }));
+    await waehle(FELD, 'Zug 1');
+    await userEvent.click(screen.getByRole('button', { name: `${FELD} speichern` }));
+    expect(await within(zeile).findByText(/Einheit ist aufgelöst/)).toBeInTheDocument();
+  });
+
+  it('Beobachter sieht die Einheit als Text', async () => {
+    const { container } = render(
+      einsatz({ meine_rolle: 'beobachter' }),
+      [],
+      { ...mitSeit, einheit_id: 1 },
+      [],
+      EINHEITEN,
+    );
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(await within(zeile).findByText('Zug 1')).toBeInTheDocument();
+    expect(within(zeile).queryByRole('button', { name: new RegExp(FELD) })).toBeNull();
+  });
+
+  it('ohne Freigabe des Moduls Einheiten fehlen Einheit und Abschnitt, ohne Abruf', async () => {
+    setzeViewportBreite(1600);
+    const abrufe: string[] = [];
+    const zaehle = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname === '/api/einsaetze/7/einheiten') abrufe.push(request.url);
+    };
+    server.events.on('request:start', zaehle);
+    // Vor `render`: dessen Handler kennen die Freigaben nicht und überdecken sie deshalb nicht.
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    try {
+      render(einsatz(), [], { ...mitSeit, einheit_id: 1 }, [], EINHEITEN);
+      await screen.findByText('Florian 1');
+      await waitFor(() => expect(kopf()).toContain('Seit'));
+      expect(kopf()).not.toContain('Einheit');
+      expect(kopf()).not.toContain('Abschnitt');
+      expect(abrufe).toEqual([]);
+    } finally {
+      server.events.removeListener('request:start', zaehle);
+    }
+  });
+
+  it('die Karte zeigt Einheit und Seit', async () => {
+    setzeViewportBreite(390);
+    const { container } = render(einsatz(), [], { ...mitSeit, einheit_id: 1 }, [], EINHEITEN);
+    await screen.findByText('Florian 1');
+    const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
+    expect(await within(karte).findByText('Zug 1')).toBeInTheDocument();
+    expect(within(karte).getByText('Einheit')).toBeInTheDocument();
+    expect(within(karte).getByText('Seit')).toBeInTheDocument();
+    expect(within(karte).getByText(/11:10/)).toBeInTheDocument();
   });
 });
 
@@ -1148,6 +1347,19 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     expect(
       within(tableau).getByRole('button', { name: 'Status von Florian 1 ändern' }),
     ).toBeEnabled();
+  });
+
+  it('ohne Freigabe des Moduls Einheiten ungegliedert, mit Grund (LLH-1073, design.md D5)', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    expect(await within(tableau).findByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
+    expect(within(tableau).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
+    expect(within(tableau).queryByRole('heading', { name: 'EA Nord' })).toBeNull();
   });
 
   it('ein gescheiterter Refetch der Einheiten behauptet nicht „ohne Gliederung"', async () => {
