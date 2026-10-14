@@ -45,7 +45,7 @@ import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
 import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
-import { hatFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
+import { hasFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
 import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -450,7 +450,7 @@ export default function FahrzeugePage() {
    * bisherige, unverändert = nichts (das hält schon `InlineAngabe`). Erfüllt erst, wenn die neue
    * Fahrzeugliste im Cache steht; eine Ablehnung bleibt an der Angabe.
    */
-  async function speichereEinheit(efId: number, neu: number | null, alt: number | null) {
+  async function saveEinheit(efId: number, neu: number | null, alt: number | null) {
     if (neu === alt) return;
     if (neu != null) await ordneFahrzeugZu(einsatzId, neu, efId);
     else if (alt != null) await gibFahrzeugFrei(einsatzId, alt, efId);
@@ -495,7 +495,7 @@ export default function FahrzeugePage() {
    * (Verwaltung der Org des Einsatzes, `src/AGENTS.md`, Admin-Schreibwege). „Stornieren“ steht für
    * jede aktive Zeile rot hinter dem Trenner, das Menü ist also nie leer.
    */
-  const darfStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
+  const canStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
   const zeilenEintraege = (
     ef: EinsatzFahrzeug,
     { mitEntlassen }: { mitEntlassen: boolean },
@@ -506,11 +506,11 @@ export default function FahrzeugePage() {
       ausStamm
         ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
         : { key: 'angaben', label: 'Angaben ändern …' },
-      ...(ausStamm && darfStamm ? [{ key: 'stamm' as const, label: 'Im Stamm ändern ↗' }] : []),
+      ...(ausStamm && canStamm ? [{ key: 'stamm' as const, label: 'Im Stamm ändern ↗' }] : []),
       { key: 'stornieren', label: 'Stornieren', gefahr: true },
     ];
   };
-  const waehleZeilenAktion = (aktion: ZeilenAktion, ef: EinsatzFahrzeug) => {
+  const handleZeilenAktion = (aktion: ZeilenAktion, ef: EinsatzFahrzeug) => {
     if (aktion === 'entlassen') entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname });
     else if (aktion === 'angaben') setAngabenFuer(ef);
     else if (aktion === 'stamm' && ef.fahrzeug_id != null)
@@ -717,7 +717,7 @@ export default function FahrzeugePage() {
                 wert={ef.einheit_id ?? null}
                 optionen={einheitOptionen}
                 darfSchreiben={darfSchreiben}
-                onSpeichern={(neu, alt) => speichereEinheit(ef.id, neu, alt)}
+                onSpeichern={(neu, alt) => saveEinheit(ef.id, neu, alt)}
               />
             ),
           },
@@ -823,7 +823,7 @@ export default function FahrzeugePage() {
                 zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
                 gesperrt={isZeileBusy(ef.id)}
                 laeuft={isZeileBusy(ef.id)}
-                onWahl={(aktion) => waehleZeilenAktion(aktion, ef)}
+                onWahl={(aktion) => handleZeilenAktion(aktion, ef)}
               />
             ),
           },
@@ -1007,7 +1007,7 @@ export default function FahrzeugePage() {
                       eintraege: (ef) => zeilenEintraege(ef, { mitEntlassen: false }),
                       zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
                       laeuft: (ef) => isZeileBusy(ef.id),
-                      onWahl: (aktion, ef) => waehleZeilenAktion(aktion as ZeilenAktion, ef),
+                      onWahl: (aktion, ef) => handleZeilenAktion(aktion as ZeilenAktion, ef),
                     }
                   : undefined,
               }}
@@ -1108,7 +1108,7 @@ export default function FahrzeugePage() {
         // ankam. Den Grund zeigt die Hülle über `speicherung`.
         onErfassen={(w) => adhocMutation.mutateAsync(w)}
         onPruefungGescheitert={(felder) => {
-          if (hatFehlerIn(ADHOC_WEITERE, felder)) setAdhocWeitereOffen(true);
+          if (hasFehlerIn(ADHOC_WEITERE, felder)) setAdhocWeitereOffen(true);
         }}
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}

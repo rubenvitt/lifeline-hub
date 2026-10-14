@@ -1763,7 +1763,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
-            patch(routes::einsatz_einheit::aktualisieren),
+            patch(routes::einsatz_einheit::update),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/position",

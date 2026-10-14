@@ -403,7 +403,7 @@ pub struct EinheitPatchBody {
 /// PATCH /api/einsaetze/{id}/einheiten/{eid} — echter Teil-Patch (LFH-306) inkl.
 /// authoritativem `fuehrer_id`. Führer-Wechsel und Abschnitts-Zuordnungs-Änderung
 /// schreiben je einen ETB-Eintrag.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid)): PfadParam<(i64, i64)>,

@@ -6,7 +6,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import AdhocFahrzeugFelder from './AdhocFahrzeugFelder';
-import { angabenVon, buildAngabenPatch, hatFehlerIn, type AdhocFeld } from './fahrzeugAngaben';
+import { angabenVon, buildAngabenPatch, hasFehlerIn, type AdhocFeld } from './fahrzeugAngaben';
 
 /** Im Modal stehen drei Felder sichtbar (Feldbudget LFH-19), der Rest im Klappteil. */
 const WEITERE: readonly AdhocFeld[] = ['kennzeichen', 'opta'];
@@ -65,7 +65,7 @@ export default function FahrzeugAngabenDialog({
       speicherFehlerTitel="Nicht geändert"
       speicherFehlerFallback="Ändern fehlgeschlagen"
       onPruefungGescheitert={(felder) => {
-        if (hatFehlerIn(WEITERE, felder)) setWeitereOffen(true);
+        if (hasFehlerIn(WEITERE, felder)) setWeitereOffen(true);
       }}
       onErfassen={async (werte) => {
         if (!fahrzeug) return;

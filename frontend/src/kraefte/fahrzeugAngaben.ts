@@ -41,7 +41,7 @@ export function buildAngabenPatch(ef: EinsatzFahrzeug, werte: AdhocEingabe): Ang
 }
 
 /** Liegt ein Feld mit Prüffehler im Klappteil? Dann geht er auf (`onPruefungGescheitert`). */
-export function hatFehlerIn(
+export function hasFehlerIn(
   felder: readonly AdhocFeld[],
   fehlerFelder: readonly string[],
 ): boolean {

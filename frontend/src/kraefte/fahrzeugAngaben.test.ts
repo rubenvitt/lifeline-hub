@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EinsatzFahrzeug } from '../api/types';
-import { angabenVon, buildAngabenPatch, hatFehlerIn } from './fahrzeugAngaben';
+import { angabenVon, buildAngabenPatch, hasFehlerIn } from './fahrzeugAngaben';
 
 const zeile = {
   id: 10,
@@ -39,7 +39,7 @@ describe('Angaben eines Ad-hoc-Fahrzeugs (LLH-1073, design.md D7)', () => {
   });
 
   it('erkennt einen Prüffehler im Klappteil', () => {
-    expect(hatFehlerIn(['kennzeichen', 'opta'], ['opta'])).toBe(true);
-    expect(hatFehlerIn(['kennzeichen', 'opta'], ['funkrufname'])).toBe(false);
+    expect(hasFehlerIn(['kennzeichen', 'opta'], ['opta'])).toBe(true);
+    expect(hasFehlerIn(['kennzeichen', 'opta'], ['funkrufname'])).toBe(false);
   });
 });
