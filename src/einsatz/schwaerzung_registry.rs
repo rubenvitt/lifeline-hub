@@ -1015,6 +1015,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beendet_at", G_ZEIT),
             retain("beendet_von", G_FK),
             retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -1046,6 +1048,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beendet_at", G_ZEIT),
             retain("beendet_von", G_FK),
             retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("uhs_id", G_FK),
         ],
     },
