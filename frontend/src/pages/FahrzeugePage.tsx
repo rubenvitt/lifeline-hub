@@ -657,13 +657,13 @@ export default function FahrzeugePage() {
    * der Funkrufname meist schon in seiner Kennzahl.
    *
    * Die Einheit-Spalte (LLH-1073, design.md D5, Entscheidungen 14.10.2026) bleibt bei 1440
-   * sichtbar und schreibtragend (170 px). Damit der Funkrufname im Regelfall einzeilig bleibt,
+   * sichtbar und schreibtragend (150 px, ein langes Einzelwort verbreitert sie). Damit der Funkrufname im Regelfall einzeilig bleibt,
    * trägt die Aktionsspalte nur noch den Menüauslöser („Entlassen“ ist sein erster Eintrag; Breite
    * je Dichte 82 / 102 / 124 px), und unter `xxl` weichen neben `typ` (seit LLH-1079 Teil II),
    * `kennzeichen` und `traeger` auch `abschnitt` (130 px, lesend; die Einheit nennt ihn mittelbar,
    * das Tableau gliedert nach ihm) und `seit` (90 px). Gemessen bei 1440 kompakt: Funkrufname
-   * 392 px, Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile. Einzeilig ist der
-   * Regelfall, keine harte Grenze: ein Ad-hoc-Name ab rund 26 Zeichen (neben „ad-hoc“) und bei
+   * 412 px, Zeile 45 px; ein Stamm-Name trägt 30 Zeichen in einer Zeile, ein Ad-hoc-Name neben
+   * „ad-hoc“ 27. Einzeilig ist der Regelfall, keine harte Grenze: ein längerer Ad-hoc-Name und bei
    * 1366 schon kürzere Namen werden zweizeilig, ebenso eine Einheit mit langem Namen — beides
    * bricht an Wortgrenzen und ist kein Überlauf. Einheit, Status, Besatzung und Aktionen weichen
    * nie. Wer eine Breite ändert, misst neu
@@ -704,10 +704,12 @@ export default function FahrzeugePage() {
             // Schreibtragend, deshalb nie `abBreite` (D5); die Auswahl gruppiert nach Abschnitt.
             title: 'Einheit',
             key: 'einheit' as const,
-            // 170 px: „Betreuungsgruppe“ steht in `kompakt` neben dem Stift in einer Zeile. Längere
-            // Namen brechen an Wortgrenzen, nie mitten im Wort (`EinheitAngabe`, Entscheidung
-            // 14.10.2026), und dürfen zweizeilig werden.
-            width: 170,
+            // 150 px als Vorgabe. Ein Name bricht an Wortgrenzen, nie mitten im Wort
+            // (`EinheitAngabe`, Entscheidung 14.10.2026), und darf zweizeilig werden; ein langes
+            // Einzelwort verbreitert die Spalte selbst („Betreuungsgruppe“ neben dem Stift 152 px,
+            // „Verpflegungsgruppe“ 162 px). Über 157 px fehlen dem Funkrufnamen die 27 Zeichen
+            // aus Gate 1 („Kräfte-Listen“).
+            width: 150,
             sortWert: (ef: EinsatzFahrzeug) => einheitName(ef),
             suchText: (ef: EinsatzFahrzeug) => einheitName(ef),
             filter: filterAus(einheitName),

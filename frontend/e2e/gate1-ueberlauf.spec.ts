@@ -1702,8 +1702,9 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
    * Kein Umbruch mitten im Wort (Entscheidung 14.10.2026, LLH-1073): ein Einheitsname bricht nur
    * an Wortgrenzen oder an einer Silbengrenze (deutsche Silbentrennung, `hyphens: auto`). Gemessen
    * über eine Range je Wort: ein Rechteck heißt ungetrennt; bei zwei liegt die Trennstelle auf
-   * einer der Silbengrenzen. „Verpflegungsgruppe“ ist gerade so lang, dass ein Umbruch überall
-   * (`overflow-wrap: anywhere`) sie in 170 px neben dem Stift zerreißt.
+   * einer der Silbengrenzen. Beide Namen passen nicht neben dem Stift in die 150 px der Spalte:
+   * ein Umbruch überall (`overflow-wrap: anywhere`) zerreißt sie („Betreuungsgru|ppe“), mit der
+   * Wortgrenzen-Regel verbreitert das Wort die Spalte.
    */
   for (const breite of [1440, 1366] as const) {
     test(`Fükw (${breite} px): Einheitsnamen brechen nicht mitten im Wort`, async ({ page }) => {
