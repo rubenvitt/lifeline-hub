@@ -479,8 +479,10 @@ function PersonZeile({
   onWahl: BaumProps['onWahl'];
 }) {
   const verlaesst = verlaesstFahrzeug(person, vorschau, wahl);
+  const gewaehlt = wahl.personal.get(person.personal_id)?.an === true;
   const hinweise = [
-    ohneFahrzeug(person, vorschau, wahl) ? 'ohne Fahrzeug' : null,
+    // Nur an einer gewählten Person: wer nicht mitkommt, braucht den Hinweis nicht.
+    gewaehlt && ohneFahrzeug(person, vorschau, wahl) ? 'ohne Fahrzeug' : null,
     verlaesst != null ? `verlässt «${verlaesst}»` : null,
   ].filter((h): h is string => h != null);
   return (

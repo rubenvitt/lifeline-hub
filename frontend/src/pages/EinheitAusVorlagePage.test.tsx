@@ -272,8 +272,11 @@ describe('EinheitAusVorlagePage · Baum', () => {
     await warteAufBaum();
     expect(zeile('personal-200')).not.toHaveTextContent('ohne Fahrzeug');
     await userEvent.click(kaestchen('fahrzeug-20'));
+    // Erst an einer gewählten Person: eine, die nicht mitkommt, braucht den Hinweis nicht.
+    expect(zeile('personal-200')).not.toHaveTextContent('ohne Fahrzeug');
     await userEvent.click(kaestchen('personal-200'));
     expect(zeile('personal-200')).toHaveTextContent('ohne Fahrzeug');
+    expect(zeile('personal-201')).not.toHaveTextContent('ohne Fahrzeug');
     expect(screen.getByText('1 Zug, 1 Staffel, 2 Fahrzeuge, 1 Kraft')).toBeInTheDocument();
   });
 
