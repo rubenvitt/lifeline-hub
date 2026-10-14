@@ -240,6 +240,75 @@ for (const { dichte, soll } of STAFFEL) {
 }
 
 /**
+ * Die Einteilung in der Personalliste (LLH-1060): Einheit, Fahrzeug und Position sind
+ * Inline-Angaben in der Tabellenzeile. Gemessen am Führungs-Tablet quer (1024, Tabellenzweig) der
+ * Auslöser der Einheitsangabe und, geöffnet, Auswahlfeld, „Speichern“ und „Abbrechen“: alle
+ * halten die Stufe. Der Auslöser der leeren Angabe ist ein Linkknopf mit Text — wüchse er nicht
+ * mit, träfe man ihn im Handschuh nicht.
+ */
+const KRAFT = 'Tablet, Tanja';
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet, Stufe ${dichte}: die Einheitsangabe der Personalliste hält ${soll} px`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Personal ${dichte} ${Date.now()}`);
+    await seedeEinheit(page, einsatzId);
+    const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+      data: { adhoc: { name: KRAFT } },
+    });
+    expect(kraft.ok(), `Seeding Personal: ${await kraft.text()}`).toBeTruthy();
+
+    await page.setViewportSize(TABLET);
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    if (dichte === 'handschuh') {
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+    // Wache: der Tabellenzweig steht, nicht die Karte.
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT });
+    await expect(zeile).toHaveCount(1);
+
+    const messwerte: string[] = [];
+    for (const angabe of ['Einheit', 'Fahrzeug', 'Position']) {
+      const breite = await haeltTreffflaeche(
+        zeile.getByRole('button', { name: `${angabe} zu ${KRAFT} eintragen` }),
+        soll,
+        `Auslöser „${angabe} eintragen“`,
+      );
+      messwerte.push(`${angabe} ${breite.toFixed(0)}px breit`);
+    }
+
+    await zeile.getByRole('button', { name: `Einheit zu ${KRAFT} eintragen` }).click();
+    const feld = zeile.getByRole('combobox', { name: `Einheit zu ${KRAFT}` });
+    await expect(feld).toBeFocused();
+    // Gemessen wird der sichtbare Rahmen des Auswahlfelds, nicht das innere `input`. Der
+    // `has`-Locator gilt relativ zum Rahmen, deshalb ohne den Zeilen-Präfix.
+    await haeltTreffflaeche(
+      zeile
+        .locator('.ant-select')
+        .filter({ has: page.getByRole('combobox', { name: `Einheit zu ${KRAFT}` }) }),
+      soll,
+      'Auswahlfeld „Einheit“',
+    );
+    for (const knopf of [
+      `Einheit zu ${KRAFT} speichern`,
+      `Bearbeitung von Einheit zu ${KRAFT} abbrechen`,
+    ]) {
+      await haeltTreffflaeche(zeile.getByRole('button', { name: knopf }), soll, `Knopf „${knopf}“`);
+    }
+    test
+      .info()
+      .annotations.push({ type: 'messwert', description: `${dichte}: ${messwerte.join(', ')}` });
+  });
+}
+
+/**
  * Der Drawer-Zweig am Tablet HOCHKANT: Hamburger, Akkordeon-Köpfe, Modulzeilen im Drawer und
  * der Drawer-Schließer. Bis LFH-384 nahm diese Datei die Stellen im Handschuh-Durchgang aus —
  * Schließer und Kopf standen fest auf 48 und wären per Konstruktion rot gewesen.

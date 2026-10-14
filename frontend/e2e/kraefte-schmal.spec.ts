@@ -136,8 +136,9 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
 });
 
 /**
- * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser und
- * „Entlassen" (Material: „Aus dem Einsatz nehmen"), der Kopf seine Dispositionsfelder,
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser, die
+ * Personalkarte die Inline-Angaben der Einteilung, die Materialkarte „Aus dem Einsatz nehmen",
+ * der Kopf seine Dispositionsfelder,
  * Einheiten und Meldebild ihre Primäraktion.
  * Gemessen wird wie oben, dazu das Meldebild (`kraefteuebersicht`), das im Nur-Lese-Zweig
  * ebenfalls Knöpfe verliert.
@@ -193,16 +194,16 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
           'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
         ).toHaveCount(0);
-        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entlassen". Einzige
-        // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552) — er steht in jeder
-        // Rolle und wird hier eigens gezählt.
+        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser und die Inline-Angaben
+        // der Einteilung. Seit LLH-1060 gibt es keinen Aufklapper der Zeitachse mehr; der Name
+        // führt in die Personenansicht, in jeder Rolle.
         await expect(
-          karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
-          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht kein schreibendes Bedienziel',
+          karte.getByRole('button'),
+          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht keinen Knopf',
         ).toHaveCount(0);
         await expect(
-          karte.getByRole('button', { name: `Zeitachse zu ${KRAFT}` }),
-          'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
+          karte.getByRole('link', { name: KRAFT }),
+          'Vorbedingung: der Name führt in die Personenansicht',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Personal disponieren' })).toHaveCount(0);

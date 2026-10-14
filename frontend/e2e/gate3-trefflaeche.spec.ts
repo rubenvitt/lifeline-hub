@@ -4294,3 +4294,80 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+// ── Personenansicht (LLH-1060) ──────────────────────────────────────────────────────
+//
+// Eine frisch disponierte Ad-hoc-Kraft mit Einheit: so steht jede Angabe der Ansicht als Ziel da
+// (Ad-hoc-Angaben im Paneel „Person“, „Stornieren“ in der Frist). Gemessen werden alle Ziele der
+// vier Paneele in den drei Stufen, dazu der Abstand zwischen „Entlassen“ und „Stornieren“.
+
+const KRAFT_ANSICHT = 'Messkraft Ansicht';
+
+test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entlassen und Stornieren den Abstand', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht`);
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const einheitId = await post('einheiten', { name: 'Messeinheit Ansicht' });
+  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const zu = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+  );
+  expect(zu.ok(), await zu.text()).toBeTruthy();
+
+  const main = page.getByRole('main');
+  const knopf = (name: string) => main.getByRole('button', { name, exact: true });
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
+    await stelleDichte(page, dichte);
+    // Datenanker: die Einheit steht aufgelöst, die Zeitachse geladen.
+    await expect(knopf('Einheit bearbeiten')).toHaveText(/Messeinheit Ansicht/);
+    await expect(knopf('Nachtragen')).toBeVisible();
+
+    const entlassen = knopf(`${KRAFT_ANSICHT} entlassen`);
+    const stornieren = knopf('Stornieren');
+    const ziele: [string, Locator][] = [
+      ['Status', knopf(`Status von ${KRAFT_ANSICHT} ändern`)],
+      ['Einsatzfunktion', knopf(`Funktion zu ${KRAFT_ANSICHT} eintragen`)],
+      ['Einheit', knopf('Einheit bearbeiten')],
+      ['Fahrzeug', knopf('Fahrzeug eintragen')],
+      ['Unfallhilfsstelle', knopf('Unfallhilfsstelle eintragen')],
+      ['Position', knopf('Position eintragen')],
+      ['Bemerkung', knopf('Bemerkung eintragen')],
+      ['Name', knopf('Name bearbeiten')],
+      ['Qualifikation', knopf('Qualifikation eintragen')],
+      ['Träger', knopf('Träger eintragen')],
+      ['Nachtragen', knopf('Nachtragen')],
+      ['Entlassen', entlassen],
+      ['Stornieren', stornieren],
+    ];
+    let kleinste = Number.POSITIVE_INFINITY;
+    for (const [name, ziel] of ziele) {
+      kleinste = Math.min(kleinste, await haeltStufe(ziel, soll, `${name} (${dichte})`));
+    }
+    // Die Sprünge „Meldebild“ und „Einheit“ unter der Einteilung.
+    const spruenge = main.locator('[data-lfh="inspector-sprung"]');
+    kleinste = Math.min(kleinste, await alleHaltenStufe(spruenge, soll, `Sprung (${dichte})`, 2));
+    let abstand = Number.NaN;
+    if (dichte !== 'kompakt') {
+      const a = (await entlassen.boundingBox())!;
+      const b = (await stornieren.boundingBox())!;
+      abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
+      expect(abstand, `Entlassen → Stornieren (${dichte})`).toBeGreaterThanOrEqual(
+        (dichte === 'handschuh' ? 16 : 8) - SUBPIXEL,
+      );
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ${ziele.length + 2} Ziele, kleinste ${kleinste}px${Number.isNaN(abstand) ? '' : `, Abstand ${abstand}px`}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
