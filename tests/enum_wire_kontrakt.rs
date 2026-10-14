@@ -1432,3 +1432,14 @@ fn zeilen_art_wire() {
         Fahrzeug => "fahrzeug",
     } in lifeline_hub::error::ZeilenArt::ALLE);
 }
+
+#[test]
+fn vorschau_zustand_wire() {
+    enum_wire!(lifeline_hub::einheit::aus_vorlage::VorschauZustand {
+        Neu => "neu",
+        Frei => "frei",
+        Gebunden => "gebunden",
+        AusserDienst => "ausser_dienst",
+        Entlassen => "entlassen",
+    } in lifeline_hub::einheit::aus_vorlage::VorschauZustand::ALLE);
+}

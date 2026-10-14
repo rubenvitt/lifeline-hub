@@ -1487,6 +1487,47 @@
           }
         }
       },
+      "AusVorlageErgebnis": {
+        "type": "object",
+        "description": "Antwort des Bildens (D3).",
+        "required": [
+          "einheit_id",
+          "einheit_ids",
+          "fahrzeuge",
+          "personal"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die oberste neue Einheit (Sprungziel ins Meldebild)."
+          },
+          "einheit_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Alle neuen Einheiten, die oberste vorn, Eltern vor ihren Kindern."
+          },
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die übernommenen Fahrzeuge (`einsatz_fahrzeug.id`)."
+          },
+          "personal": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die übernommenen Personen (`einsatz_personal.id`)."
+          }
+        }
+      },
       "AusgabeAnzeige": {
         "type": "object",
         "description": "Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung.",
@@ -13448,6 +13489,254 @@
             "format": "int64"
           }
         }
+      },
+      "VorlageVorschau": {
+        "type": "object",
+        "description": "Vorschau einer Vorlage im Einsatz (D2): der Baum mit dem Zustand jeder Kraft. Schreibt nichts.",
+        "required": [
+          "vorlage_id",
+          "knoten",
+          "fahrzeuge_gesperrt",
+          "personal_gesperrt"
+        ],
+        "properties": {
+          "fahrzeuge_gesperrt": {
+            "type": "boolean",
+            "description": "Das Modul Fahrzeuge ist für die Rolle nicht freigegeben: keine Fahrzeugzeilen."
+          },
+          "knoten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauKnoten"
+            },
+            "description": "Die Einheiten des Baums, die Wurzel vorn, Eltern vor ihren Kindern."
+          },
+          "personal_gesperrt": {
+            "type": "boolean",
+            "description": "Das Modul Personal ist für die Rolle nicht freigegeben: keine Personenzeilen."
+          },
+          "vorlage_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "VorschauFahrzeug": {
+        "type": "object",
+        "description": "Ein Stamm-Fahrzeug der Vorlage und sein Zustand im Einsatz.",
+        "required": [
+          "fahrzeug_id",
+          "funkrufname",
+          "zustand"
+        ],
+        "properties": {
+          "ef_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Dispositionszeile (`einsatz_fahrzeug.id`), wenn das Fahrzeug im Einsatz ist."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Einheit, der das Fahrzeug angehört (bei `gebunden`)."
+          },
+          "einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fahrzeug_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/VorschauZustand"
+          }
+        }
+      },
+      "VorschauKnoten": {
+        "type": "object",
+        "description": "Eine Einheit des Vorlagen-Baums mit ihren Kopfdaten.",
+        "required": [
+          "vorlage_id",
+          "name",
+          "typ_id",
+          "typ_label",
+          "soll_eigen",
+          "fahrzeuge",
+          "personal"
+        ],
+        "properties": {
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauFahrzeug"
+            }
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauPersonal"
+            }
+          },
+          "soll": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Staerke",
+                "description": "Wirksames Soll (eigenes, sonst das des Typs); fehlt, wenn keins gilt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "soll_eigen": {
+            "type": "boolean"
+          },
+          "typ_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typ_label": {
+            "type": "string"
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ueber_vorlage_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Übergeordnete Vorlage im gebildeten Baum; fehlt an der Wurzel."
+          },
+          "vorlage_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "VorschauPersonal": {
+        "type": "object",
+        "description": "Eine Person der Stammbesetzung und ihr Zustand im Einsatz.",
+        "required": [
+          "personal_id",
+          "name",
+          "zustand"
+        ],
+        "properties": {
+          "ef_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`, bei `gebunden`)."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Einheit, der die Person angehört (bei `gebunden`)."
+          },
+          "einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ep_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Dispositionszeile (`einsatz_personal.id`), wenn die Person aktiv im Einsatz ist."
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug der Vorlage (Stamm-ID), auf dem die Person sitzt, wenn es mitkommt."
+          },
+          "fahrzeug_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "staerke_position": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StaerkePosition",
+                "description": "Position aus der Vorlage; fehlt, wenn die Stamm-Vorgabe der Person gilt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/VorschauZustand"
+          }
+        }
+      },
+      "VorschauZustand": {
+        "type": "string",
+        "description": "Zustand einer Kraft der Vorlage im Einsatz (D4). Wire == `as_str()`.",
+        "enum": [
+          "neu",
+          "frei",
+          "gebunden",
+          "ausser_dienst",
+          "entlassen"
+        ]
       },
       "VsVermerk": {
         "type": "string",

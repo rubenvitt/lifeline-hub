@@ -1,3 +1,9 @@
+//! Einheiten im Einsatz: bilden, zuordnen, Status und Stärke; Auflösen nach Spec
+//! `openspec/specs/kraefte-entlassung`. Bilden aus einer Einheiten-Vorlage samt Untereinheiten,
+//! Fahrzeugen und Stammbesetzung in einem Schritt: [`aus_vorlage`] (LLH-1049, Spec
+//! `openspec/specs/kraefte-disposition`, „Einheit aus Vorlage bilden“, und
+//! `openspec/specs/einheit-vorlagen`, „Vorschau im Einsatz“).
+
 pub mod aus_vorlage;
 pub mod mitglied_repo;
 pub mod repo;
