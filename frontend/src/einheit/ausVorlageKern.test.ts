@@ -9,18 +9,18 @@ import type {
 } from '../api/types';
 import {
   LEERE_WAHL,
-  abgleichen,
-  baueAnfrage,
+  reconcileWahl,
+  buildAnfrage,
   deckelGrund,
   gruendeJeZeile,
   isGesperrt,
-  istNameVergeben,
+  isNameVergeben,
   kommtMit,
   ohneFahrzeug,
-  setzeWahl,
+  setWahl,
   umhaengenText,
   verlaesstFahrzeug,
-  zeigtUmhaengen,
+  showsUmhaengen,
   zeilenSchluessel,
   zusammenfassung,
   zustandWort,
@@ -89,7 +89,7 @@ function sanitaetszug(
 describe('Vorgaben der Häkchen (D4)', () => {
   it('hakt jedes freie Fahrzeug an, keine Person; die Zusammenfassung zählt den Baum', () => {
     const v = sanitaetszug();
-    const wahl = abgleichen(LEERE_WAHL, v);
+    const wahl = reconcileWahl(LEERE_WAHL, v);
     expect([...wahl.fahrzeuge].filter(([, e]) => e.an).map(([id]) => id)).toEqual([10, 20, 21]);
     expect([...wahl.personal].some(([, e]) => e.an)).toBe(false);
     expect(zusammenfassung(v, wahl)).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte');
@@ -101,7 +101,7 @@ describe('Vorgaben der Häkchen (D4)', () => {
       20: { zustand: 'gebunden', einheit_id: 9, einheit_name: '2. Zug' },
       21: { zustand: 'ausser_dienst' },
     });
-    const wahl = abgleichen(LEERE_WAHL, v);
+    const wahl = reconcileWahl(LEERE_WAHL, v);
     expect(wahl.fahrzeuge.get(10)?.an).toBe(true);
     expect(wahl.fahrzeuge.get(20)?.an).toBe(false);
     expect(wahl.fahrzeuge.get(21)?.an).toBe(false);
@@ -116,28 +116,28 @@ describe('Vorgaben der Häkchen (D4)', () => {
   it('zählt mehrere Einheiten desselben Typs mit Mal-Zeichen, eine Kraft im Singular', () => {
     const v = sanitaetszug();
     v.knoten.push(knoten(3, 'Zweite Staffel', 'Staffel', [], [], 1));
-    let wahl = abgleichen(LEERE_WAHL, v);
-    wahl = setzeWahl(wahl, 'fahrzeug', fz(20, 'RTW 1'), false);
-    wahl = setzeWahl(wahl, 'fahrzeug', fz(21, 'RTW 2'), false);
-    wahl = setzeWahl(wahl, 'personal', ps(203, 'Dirk'), true);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    wahl = setWahl(wahl, 'fahrzeug', fz(20, 'RTW 1'), false);
+    wahl = setWahl(wahl, 'fahrzeug', fz(21, 'RTW 2'), false);
+    wahl = setWahl(wahl, 'personal', ps(203, 'Dirk'), true);
     expect(zusammenfassung(v, wahl)).toBe('1 Zug, 2 × Staffel, 1 Fahrzeug, 1 Kraft');
   });
 
   it('lässt einen gesperrten Teil aus der Zusammenfassung', () => {
     const v = { ...sanitaetszug(), personal_gesperrt: true };
-    expect(zusammenfassung(v, abgleichen(LEERE_WAHL, v))).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge');
+    expect(zusammenfassung(v, reconcileWahl(LEERE_WAHL, v))).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge');
   });
 });
 
 describe('Wahl je Stamm-ID über Abgleiche hinweg (D14)', () => {
   it('behält eine getroffene Wahl, eine neue Zeile bekommt ihre Vorgabe', () => {
     const v = sanitaetszug();
-    let wahl = abgleichen(LEERE_WAHL, v);
-    wahl = setzeWahl(wahl, 'fahrzeug', fz(20, 'RTW 1'), false);
-    wahl = setzeWahl(wahl, 'personal', ps(200, 'Anna'), true);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    wahl = setWahl(wahl, 'fahrzeug', fz(20, 'RTW 1'), false);
+    wahl = setWahl(wahl, 'personal', ps(200, 'Anna'), true);
     const neu = sanitaetszug();
     neu.knoten[1].fahrzeuge.push(fz(22, 'RTW 3'));
-    const danach = abgleichen(wahl, neu);
+    const danach = reconcileWahl(wahl, neu);
     expect(danach.fahrzeuge.get(20)?.an).toBe(false);
     expect(danach.personal.get(200)?.an).toBe(true);
     expect(danach.fahrzeuge.get(22)?.an).toBe(true);
@@ -145,12 +145,12 @@ describe('Wahl je Stamm-ID über Abgleiche hinweg (D14)', () => {
 
   it('eine gebunden gewordene Kraft verliert ihr Häkchen nicht und wird nicht still umgehängt', () => {
     const v = sanitaetszug();
-    const wahl = abgleichen(LEERE_WAHL, v);
+    const wahl = reconcileWahl(LEERE_WAHL, v);
     const gebunden = sanitaetszug({ 21: { zustand: 'gebunden', einheit_name: '2. Zug' } });
-    const danach = abgleichen(wahl, gebunden);
+    const danach = reconcileWahl(wahl, gebunden);
     expect(danach.fahrzeuge.get(21)).toEqual({ an: true, umhaengen: false });
-    expect(zeigtUmhaengen(gebunden.knoten[1].fahrzeuge[1], danach.fahrzeuge.get(21))).toBe(false);
-    const body = baueAnfrage({
+    expect(showsUmhaengen(gebunden.knoten[1].fahrzeuge[1], danach.fahrzeuge.get(21))).toBe(false);
+    const body = buildAnfrage({
       vorlageId: 1,
       name: 'Zug',
       abschnittId: null,
@@ -163,12 +163,12 @@ describe('Wahl je Stamm-ID über Abgleiche hinweg (D14)', () => {
   it('ein Häkchen an einer gebundenen Kraft heißt umhängen', () => {
     const f = fz(21, 'RTW 2', { zustand: 'gebunden', einheit_name: '2. Zug' });
     const p = ps(202, 'Cleo', { zustand: 'gebunden', fahrzeug_name: '83-4' });
-    let wahl = setzeWahl(LEERE_WAHL, 'fahrzeug', f, true);
-    wahl = setzeWahl(wahl, 'personal', p, true);
+    let wahl = setWahl(LEERE_WAHL, 'fahrzeug', f, true);
+    wahl = setWahl(wahl, 'personal', p, true);
     expect(wahl.fahrzeuge.get(21)).toEqual({ an: true, umhaengen: true });
     expect(wahl.personal.get(202)).toEqual({ an: true, umhaengen: true });
-    expect(zeigtUmhaengen(f, wahl.fahrzeuge.get(21))).toBe(true);
-    expect(zeigtUmhaengen(f, undefined)).toBe(true);
+    expect(showsUmhaengen(f, wahl.fahrzeuge.get(21))).toBe(true);
+    expect(showsUmhaengen(f, undefined)).toBe(true);
     expect(umhaengenText('fahrzeug', f)).toBe('umhängen aus «2. Zug»');
     expect(umhaengenText('personal', p)).toBe('umhängen von «83-4»');
     expect(umhaengenText('personal', { ...p, einheit_name: '1. Zug' })).toBe(
@@ -196,11 +196,11 @@ describe('Zustand als Wort (D4)', () => {
 describe('Fahrzeugbindung (D4, Entscheidung 14.10.2026)', () => {
   it('eine Person, deren Fahrzeug abgewählt ist, zeigt „ohne Fahrzeug“', () => {
     const v = sanitaetszug();
-    let wahl = abgleichen(LEERE_WAHL, v);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
     const anna = v.knoten[1].personal[0];
     expect(ohneFahrzeug(anna, v, wahl)).toBe(false);
-    wahl = setzeWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], false);
-    wahl = setzeWahl(wahl, 'personal', anna, true);
+    wahl = setWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], false);
+    wahl = setWahl(wahl, 'personal', anna, true);
     expect(ohneFahrzeug(anna, v, wahl)).toBe(true);
     // Ohne Fahrzeug in der Vorlage gibt es nichts zu verlieren.
     expect(ohneFahrzeug(v.knoten[1].personal[3], v, wahl)).toBe(false);
@@ -211,16 +211,16 @@ describe('Fahrzeugbindung (D4, Entscheidung 14.10.2026)', () => {
       10: { zustand: 'ausser_dienst' },
       20: { zustand: 'gebunden', einheit_name: '2. Zug' },
     });
-    const wahl = abgleichen(LEERE_WAHL, v);
+    const wahl = reconcileWahl(LEERE_WAHL, v);
     expect(kommtMit(v.knoten[0].fahrzeuge[0], wahl)).toBe(false);
     expect(kommtMit(v.knoten[1].fahrzeuge[0], wahl)).toBe(false);
     expect(ohneFahrzeug(v.knoten[0].personal[0], v, wahl)).toBe(true);
-    const umgehaengt = setzeWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], true);
+    const umgehaengt = setWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], true);
     expect(kommtMit(v.knoten[1].fahrzeuge[0], umgehaengt)).toBe(true);
     const gesperrt = { ...sanitaetszug(), fahrzeuge_gesperrt: true };
     gesperrt.knoten = gesperrt.knoten.map((k) => ({ ...k, fahrzeuge: [] }));
     expect(
-      ohneFahrzeug(gesperrt.knoten[1].personal[0], gesperrt, abgleichen(LEERE_WAHL, gesperrt)),
+      ohneFahrzeug(gesperrt.knoten[1].personal[0], gesperrt, reconcileWahl(LEERE_WAHL, gesperrt)),
     ).toBe(true);
   });
 
@@ -232,13 +232,13 @@ describe('Fahrzeugbindung (D4, Entscheidung 14.10.2026)', () => {
       },
     );
     const anna = v.knoten[1].personal[0];
-    let wahl = abgleichen(LEERE_WAHL, v);
-    wahl = setzeWahl(wahl, 'personal', anna, true);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    wahl = setWahl(wahl, 'personal', anna, true);
     expect(verlaesstFahrzeug(anna, v, wahl)).toBeNull();
-    wahl = setzeWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], false);
+    wahl = setWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], false);
     expect(verlaesstFahrzeug(anna, v, wahl)).toBe('RTW 1');
     // Nicht gewählt: sie bleibt, wo sie ist.
-    expect(verlaesstFahrzeug(anna, v, setzeWahl(wahl, 'personal', anna, false))).toBeNull();
+    expect(verlaesstFahrzeug(anna, v, setWahl(wahl, 'personal', anna, false))).toBeNull();
   });
 });
 
@@ -251,10 +251,10 @@ describe('Deckel (D7)', () => {
       personal_gesperrt: false,
       knoten: [knoten(1, 'Bereitschaft', 'Bereitschaft', [], viele)],
     };
-    let wahl = abgleichen(LEERE_WAHL, v);
-    for (const p of viele.slice(0, 50)) wahl = setzeWahl(wahl, 'personal', p, true);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    for (const p of viele.slice(0, 50)) wahl = setWahl(wahl, 'personal', p, true);
     expect(deckelGrund(v, wahl)).toBeNull();
-    wahl = setzeWahl(wahl, 'personal', viele[50], true);
+    wahl = setWahl(wahl, 'personal', viele[50], true);
     expect(deckelGrund(v, wahl)).toBe('Höchstens 50 Personen je Bildung');
   });
 });
@@ -265,22 +265,22 @@ describe('Namenswarnung (D15)', () => {
     { id: 2, name: '2. Zug', aufgeloest_at: '2026-10-14T08:00:00Z' },
   ] as Einheit[];
   it('warnt bei gleichem Namen einer aktiven Einheit, ohne Rücksicht auf Groß- und Leerzeichen', () => {
-    expect(istNameVergeben(' sanitätszug musterstadt ', einheiten)).toBe(true);
-    expect(istNameVergeben('2. Zug', einheiten)).toBe(false);
-    expect(istNameVergeben('', einheiten)).toBe(false);
+    expect(isNameVergeben(' sanitätszug musterstadt ', einheiten)).toBe(true);
+    expect(isNameVergeben('2. Zug', einheiten)).toBe(false);
+    expect(isNameVergeben('', einheiten)).toBe(false);
   });
 });
 
 describe('Anfrage und Gründe (D3, D6)', () => {
   it('schickt nur gewählte Zeilen der Vorschau, den getrimmten Namen und nichts aus gesperrten Modulen', () => {
     const v = sanitaetszug({ 21: { zustand: 'gebunden', einheit_name: '2. Zug' } });
-    let wahl = abgleichen(LEERE_WAHL, v);
-    wahl = setzeWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[1], true);
-    wahl = setzeWahl(wahl, 'personal', v.knoten[1].personal[3], true);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    wahl = setWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[1], true);
+    wahl = setWahl(wahl, 'personal', v.knoten[1].personal[3], true);
     // Eine Wahl ohne Zeile in der Vorschau (aus der Vorlage gefallen) geht nicht mit.
-    wahl = setzeWahl(wahl, 'personal', ps(999, 'Weg'), true);
+    wahl = setWahl(wahl, 'personal', ps(999, 'Weg'), true);
     expect(
-      baueAnfrage({ vorlageId: 1, name: ' 1. Zug ', abschnittId: 4, vorschau: v, wahl }),
+      buildAnfrage({ vorlageId: 1, name: ' 1. Zug ', abschnittId: 4, vorschau: v, wahl }),
     ).toEqual({
       vorlage_id: 1,
       name: '1. Zug',
@@ -294,7 +294,7 @@ describe('Anfrage und Gründe (D3, D6)', () => {
     });
     const ohnePersonal = { ...v, personal_gesperrt: true };
     expect(
-      baueAnfrage({ vorlageId: 1, name: 'Zug', abschnittId: null, vorschau: ohnePersonal, wahl })
+      buildAnfrage({ vorlageId: 1, name: 'Zug', abschnittId: null, vorschau: ohnePersonal, wahl })
         .personal,
     ).toEqual([]);
   });

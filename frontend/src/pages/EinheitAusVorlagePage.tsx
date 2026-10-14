@@ -28,18 +28,18 @@ import { RechteHinweis, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   LEERE_WAHL,
-  abgleichen,
+  reconcileWahl,
   allePersonen,
-  baueAnfrage,
+  buildAnfrage,
   deckelGrund,
   gruendeJeZeile,
   isGesperrt,
-  istNameVergeben,
+  isNameVergeben,
   ohneFahrzeug,
-  setzeWahl,
+  setWahl,
   umhaengenText,
   verlaesstFahrzeug,
-  zeigtUmhaengen,
+  showsUmhaengen,
   zeilenSchluessel,
   zusammenfassung,
   zustandWort,
@@ -128,10 +128,10 @@ function EinheitAusVorlage({
   // Vorgabe, eine getroffene Wahl bleibt. Der Effekt hält sie fest; gerendert wird schon vorher
   // mit dem Abgleich, damit eine neue Zeile nicht einen Takt lang ohne Vorgabe steht.
   useEffect(() => {
-    if (vorschau) setRohWahl((w) => abgleichen(w, vorschau));
+    if (vorschau) setRohWahl((w) => reconcileWahl(w, vorschau));
   }, [vorschau]);
   const wahl = useMemo(
-    () => (vorschau ? abgleichen(rohWahl, vorschau) : rohWahl),
+    () => (vorschau ? reconcileWahl(rohWahl, vorschau) : rohWahl),
     [rohWahl, vorschau],
   );
 
@@ -217,7 +217,7 @@ function EinheitAusVorlage({
   const verwaisteGruende = zeilen.gemeldet().filter((k) => !zeilenSchluesselJetzt.has(k));
 
   const absenden = (werte: KopfWerte) => {
-    const eingabe = baueAnfrage({
+    const eingabe = buildAnfrage({
       vorlageId,
       name: werte.name,
       abschnittId: werte.abschnitt_id,
@@ -280,7 +280,7 @@ function EinheitAusVorlage({
           gesperrt={!darfSchreiben}
           grund={(k) => zeilen.grund(k)?.fehler ?? null}
           onWahl={(art, zeile, an) =>
-            setRohWahl((w) => setzeWahl(abgleichen(w, vorschau), art, zeile, an))
+            setRohWahl((w) => setWahl(reconcileWahl(w, vorschau), art, zeile, an))
           }
         />
         {verwaisteGruende.map((k) => (
@@ -309,13 +309,13 @@ function KopfFelder({
   abschnitte,
   abschnitteInhalt,
 }: {
-  einheiten: Parameters<typeof istNameVergeben>[1];
+  einheiten: Parameters<typeof isNameVergeben>[1];
   abschnitte: { value: number; label: string }[];
   abschnitteInhalt: string | undefined;
 }) {
   const name =
     (Form.useWatch('name', Form.useFormInstance<KopfWerte>()) as string | undefined) ?? '';
-  const vergeben = istNameVergeben(name, einheiten);
+  const vergeben = isNameVergeben(name, einheiten);
   return (
     <>
       <Form.Item
@@ -344,7 +344,7 @@ interface BaumProps {
   vorschau: VorlageVorschau;
   wahl: Wahl;
   wurzelName: string;
-  einheiten: Parameters<typeof istNameVergeben>[1];
+  einheiten: Parameters<typeof isNameVergeben>[1];
   gesperrt: boolean;
   grund: (schluessel: string) => unknown;
   onWahl: (art: ZeilenArt, zeile: VorschauFahrzeug | VorschauPersonal, an: boolean) => void;
@@ -398,7 +398,7 @@ function Baum({ vorschau, wahl, wurzelName, einheiten, gesperrt, grund, onWahl }
             koerperPolster
             style={{ marginInlineStart: t * token.margin }}
           >
-            {i > 0 && istNameVergeben(k.name, einheiten) && (
+            {i > 0 && isNameVergeben(k.name, einheiten) && (
               <Typography.Text type="warning" style={{ display: 'block' }}>
                 Name schon vergeben
               </Typography.Text>
@@ -540,7 +540,7 @@ function KraftZeile({
       : (zeile as VorschauPersonal).personal_id;
   const eintrag = (art === 'fahrzeug' ? wahl.fahrzeuge : wahl.personal).get(id);
   const an = eintrag?.an === true;
-  const umhaengen = zeigtUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
+  const umhaengen = showsUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
   const zustandGesperrt = isGesperrt(art, zeile.zustand);
   return (
     <div

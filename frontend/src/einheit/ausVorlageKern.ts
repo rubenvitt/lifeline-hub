@@ -66,7 +66,7 @@ export function allePersonen(v: VorlageVorschau): VorschauPersonal[] {
  * Gleicht die Wahl mit einer (neuen) Vorschau ab: getroffene Wahl bleibt, eine neu erscheinende
  * Zeile bekommt ihre Vorgabe (D14).
  */
-export function abgleichen(wahl: Wahl, v: VorlageVorschau): Wahl {
+export function reconcileWahl(wahl: Wahl, v: VorlageVorschau): Wahl {
   const ergaenze = <T extends Zeile>(
     alt: ReadonlyMap<number, WahlEintrag>,
     zeilen: T[],
@@ -92,7 +92,7 @@ function idVon(art: ZeilenArt, z: Zeile): number {
 }
 
 /** Setzt das Häkchen einer Zeile; an einer gebundenen Kraft heißt es „umhängen“. */
-export function setzeWahl(wahl: Wahl, art: ZeilenArt, zeile: Zeile, an: boolean): Wahl {
+export function setWahl(wahl: Wahl, art: ZeilenArt, zeile: Zeile, an: boolean): Wahl {
   const eintrag: WahlEintrag = { an, umhaengen: an && zeile.zustand === 'gebunden' };
   const id = idVon(art, zeile);
   if (art === 'fahrzeug') return { ...wahl, fahrzeuge: new Map(wahl.fahrzeuge).set(id, eintrag) };
@@ -103,7 +103,7 @@ export function setzeWahl(wahl: Wahl, art: ZeilenArt, zeile: Zeile, an: boolean)
  * Trägt die Zeile das Häkchen „umhängen“? Ja bei einer gebundenen Kraft, außer sie wurde erst
  * nach dem Anhaken gebunden: dann steht das alte Häkchen, und der Server nennt den Grund (D14).
  */
-export function zeigtUmhaengen(zeile: Zeile, eintrag: WahlEintrag | undefined): boolean {
+export function showsUmhaengen(zeile: Zeile, eintrag: WahlEintrag | undefined): boolean {
   return zeile.zustand === 'gebunden' && (!eintrag?.an || eintrag.umhaengen);
 }
 
@@ -205,7 +205,7 @@ export function deckelGrund(v: VorlageVorschau, wahl: Wahl): string | null {
 const vergleichsName = (s: string) => s.trim().toLocaleLowerCase('de');
 
 /** Trägt eine aktive Einheit des Einsatzes schon diesen Namen (D15)? Warnt, sperrt nicht. */
-export function istNameVergeben(name: string, einheiten: readonly Einheit[]): boolean {
+export function isNameVergeben(name: string, einheiten: readonly Einheit[]): boolean {
   const n = vergleichsName(name);
   if (n === '') return false;
   return einheiten.some((e) => e.aufgeloest_at == null && vergleichsName(e.name) === n);
@@ -220,7 +220,7 @@ export interface AnfrageEingabe {
 }
 
 /** Body des Bildens (D3): gewählte Zeilen der Vorschau in Baumfolge, je mit „umhängen“. */
-export function baueAnfrage({
+export function buildAnfrage({
   vorlageId,
   name,
   abschnittId,
