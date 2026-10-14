@@ -151,6 +151,35 @@ describe('MaterialOrt (LLH-1093, design.md D1–D3)', () => {
     await waitFor(() => expect(onUhs).toHaveBeenCalledWith(null));
   });
 
+  it('eine aufgelöste UHS am Posten steht als gesperrte Option vorn, mit Namen statt ID', async () => {
+    zeige({ ort: { einheitId: null, uhsId: 9 }, darfSchreiben: true });
+    expect(screen.getByRole('button', { name: 'UHS zu Wolldecke bearbeiten' })).toHaveTextContent(
+      'UHS Zelt Nord',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'UHS zu Wolldecke bearbeiten' }));
+    await oeffne('UHS zu Wolldecke');
+    expect(optionenVon('UHS zu Wolldecke')).toEqual([
+      'UHS Zelt Nord',
+      'keine UHS',
+      'UHS Turnhalle',
+      'UHS Schule',
+    ]);
+    expect(optionenVon('UHS zu Wolldecke', '-disabled')).toEqual(['UHS Zelt Nord']);
+    const auswahl = screen
+      .getByRole('combobox', { name: 'UHS zu Wolldecke' })
+      .closest('.ant-select')
+      ?.querySelector('.ant-select-content');
+    expect(auswahl).toHaveTextContent('UHS Zelt Nord');
+    expect(auswahl?.textContent).not.toBe('9');
+  });
+
+  it('eine nicht gelistete UHS heißt in der Auswahl „zugeordnet“, gesperrt', async () => {
+    zeige({ ort: { einheitId: null, uhsId: 42 }, darfSchreiben: true });
+    await userEvent.click(screen.getByRole('button', { name: 'UHS zu Wolldecke bearbeiten' }));
+    await oeffne('UHS zu Wolldecke');
+    expect(optionenVon('UHS zu Wolldecke', '-disabled')).toEqual(['zugeordnet']);
+  });
+
   it('eine Ablehnung steht am Teil', async () => {
     const onUhs = vi.fn().mockRejectedValue(new ApiError(422, 'UHS ist aufgelöst'));
     zeige({ ort: { einheitId: null, uhsId: null }, darfSchreiben: true, onUhs });

@@ -172,7 +172,7 @@ export function useMaterialOrtKontext(einsatzId: number, darfSchreiben: boolean)
       liste: uhsQuery.data ?? [],
     },
   };
-  return { kontext, dataUpdatedAt: Math.max(einheitenQuery.dataUpdatedAt, uhsQuery.dataUpdatedAt) };
+  return { kontext };
 }
 
 export interface MaterialOrtProps {
@@ -233,6 +233,12 @@ export default function MaterialOrt({
     const waehlbar = k.uhs.liste.filter(
       (u) => !u.storniert_at && (u.status === 'geplant' || u.status === 'aktiv'),
     );
+    // Eine aufgelöste, stornierte oder nicht gelistete UHS ist nicht wählbar, steht aber noch am
+    // Posten: als gesperrte Option vorn, damit die Auswahl ihren Namen zeigt statt der rohen ID.
+    const aktuellGesperrt =
+      ort.uhsId != null && !waehlbar.some((u) => u.id === ort.uhsId)
+        ? [{ value: ort.uhsId, label: aktuell ? uhsName(aktuell) : ZUGEORDNET, disabled: true }]
+        : [];
     teile.push({
       key: 'uhs',
       inhalt: (
@@ -251,6 +257,7 @@ export default function MaterialOrt({
               value={value ?? KEINE_UHS}
               onChange={(v) => onChange(v == null || v === KEINE_UHS ? null : v)}
               options={[
+                ...aktuellGesperrt,
                 { value: KEINE_UHS, label: 'keine UHS' },
                 ...waehlbar.map((u) => ({ value: u.id, label: uhsName(u) })),
               ]}
