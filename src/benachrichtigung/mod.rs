@@ -137,6 +137,9 @@ wire_enum! {
         Einsatz => "einsatz",
         Meldung => "meldung",
         Auftrag => "auftrag",
+        /// Eine Empfänger-Zeile eines Auftrags (`auftrag_empfaenger.id`), für die Quittung: die
+        /// Detailzeile nennt den quittierenden Empfänger, der Sprung führt zum Auftrag.
+        AuftragEmpfaenger => "auftrag_empfaenger",
         Befehl => "befehl",
         Lagebericht => "lagebericht",
         Erinnerung => "erinnerung",
@@ -169,9 +172,9 @@ impl BenachrichtigungBezugTyp {
             BenachrichtigungBezugTyp::Einsatz => None,
             BenachrichtigungBezugTyp::Meldung => Some("meldungen"),
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
-            BenachrichtigungBezugTyp::Auftrag | BenachrichtigungBezugTyp::Befehl => {
-                Some("auftraege")
-            }
+            BenachrichtigungBezugTyp::Auftrag
+            | BenachrichtigungBezugTyp::AuftragEmpfaenger
+            | BenachrichtigungBezugTyp::Befehl => Some("auftraege"),
             BenachrichtigungBezugTyp::Lagebericht => Some("lageberichte"),
             BenachrichtigungBezugTyp::Erinnerung => Some("erinnerungen"),
             BenachrichtigungBezugTyp::Abloesung => Some("abloesung"),

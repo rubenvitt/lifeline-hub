@@ -287,6 +287,14 @@ pub async fn auftrag_erteilen(
     )
     .await?;
 
+    crate::auftrag::benachrichtigung::erteilt(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        auftrag_id,
+        ctx.benutzer.id,
+    )
+    .await;
     let mut detail = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await?;
     crate::auftrag::anreichern_alle(
         &state.pool,
