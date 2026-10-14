@@ -150,10 +150,7 @@ export function ueberblickPfad(einsatzId: number): string {
  * `kraeftebaum`, „Sprung auf eine Einheit“): Ahnen und Teilbaum der Einheit klappen auf, die Zeile
  * wird hervorgehoben.
  */
-export function kraefteuebersichtPfad(
-  einsatzId: number,
-  opts: { einheit?: number } = {},
-): string {
+export function kraefteuebersichtPfad(einsatzId: number, opts: { einheit?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'kraefteuebersicht'), { einheit: opts.einheit });
 }
 
