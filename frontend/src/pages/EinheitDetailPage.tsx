@@ -56,6 +56,7 @@ import {
 import './EinheitDetailPage.css';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
+import { collectNachfahren } from './einheit/einheitAnsichtKern';
 
 /**
  * Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste. Der
@@ -104,26 +105,6 @@ interface KopfWerte {
   funkrufname?: string;
   kommunikationsmittel?: string;
   erreichbarkeit?: string;
-}
-
-/** Menge der Nachfahren-IDs (inkl. self) — für die zyklenfreie Parent-Auswahl. */
-function nachfahrenInkl(einheiten: Einheit[], id: number): Set<number> {
-  const kinder = new Map<number, number[]>();
-  for (const e of einheiten) {
-    if (e.ueber_einheit_id != null) {
-      if (!kinder.has(e.ueber_einheit_id)) kinder.set(e.ueber_einheit_id, []);
-      kinder.get(e.ueber_einheit_id)!.push(e.id);
-    }
-  }
-  const ergebnis = new Set<number>();
-  const stack = [id];
-  while (stack.length) {
-    const n = stack.pop()!;
-    if (ergebnis.has(n)) continue;
-    ergebnis.add(n);
-    for (const c of kinder.get(n) ?? []) stack.push(c);
-  }
-  return ergebnis;
 }
 
 export default function EinheitDetailPage() {
@@ -375,7 +356,7 @@ export default function EinheitDetailPage() {
     );
   }
 
-  const verbotenAlsParent = nachfahrenInkl(einheiten, aktuell.id);
+  const verbotenAlsParent = collectNachfahren(einheiten, aktuell.id);
   const parentOptionen = einheiten
     .filter((e) => !verbotenAlsParent.has(e.id))
     .map((e) => ({ value: e.id, title: e.name }));
