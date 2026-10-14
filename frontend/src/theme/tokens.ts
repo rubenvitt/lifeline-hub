@@ -95,6 +95,11 @@ export interface Farbrollen {
    *  Zeigerspur und nachts von der Ruhe zu wenig ab (Messwerte über `farbenHell`/`farbenDunkel`,
    *  Vergleich in `openspec/changes/archive/2026-10-05-lfh-984-auswahlflaeche-rolle/design.md`, E1). */
   auswahlFlaeche: string;
+  /** Schrift eines GESPERRTEN Steuerelements (antds `colorTextDisabled`, LLH-1228): Knopf,
+   *  Eingabefeld, Menüeintrag. Keine Textstufe, sie hält nicht den Textboden, sondern den
+   *  Gesperrt-Boden ≥ 4,5 : 1 (Spec `textstufen-kontrast`) auf antds Sperrfläche
+   *  (`colorBgContainerDisabled`) über jeder deckenden Fläche. Nur für Gesperrtes. */
+  gesperrt: string;
   /** Sammelbanner („12 neue Meldungen"): Grund und Kante. */
   bannerGrund: string;
   bannerLinie: string;
@@ -164,6 +169,11 @@ export interface Farbrollen {
  * Auswahlfläche (LFH-984, `antdToken`: `colorPrimaryBg`): knappste Textstufe `schwach` 7,17,
  * `bedienText` 7,59, `steuerRahmen` 3,15; ΔE gegen `flaeche2` 9,2, gegen die Zeigerspur darauf
  * 7,5 (antds `#b9c1c4`: `schwach` 4,92, Rand 2,16). Gerechnet in `auswahlKontrast.test.ts`.
+ *
+ * Gesperrte Steuerelemente (LLH-1228, `antdToken`: `colorTextDisabled`): `gesperrt` auf antds
+ * Sperrfläche (4 % Schwarz) ≥ 4,74 über jeder deckenden Fläche (knappstes Paar flaeche3), ohne
+ * Sperrfläche ≥ 5,16. antds Ableitung (25 % Schwarz) lag bei 1,80. Gerechnet in
+ * `gesperrtKontrast.test.ts`, gemessen in `e2e/gesperrt-kontrast.spec.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -203,6 +213,7 @@ export const farbenHell: Farbrollen = {
   alarmFlaeche: '#f9e3e3',
   bedienFlaeche: '#e4edf7',
   auswahlFlaeche: '#dbe7f5',
+  gesperrt: '#565e67',
   bannerGrund: '#e6eef8',
   bannerLinie: '#9dbbe0',
   berichtigungZeile: '#fbeaea',
@@ -233,6 +244,9 @@ export const farbenHell: Farbrollen = {
  * Auswahlfläche (LFH-984): knappste Textstufe `schwach` 5,21, `bedienText` 9,53,
  * `steuerRahmen` 3,28; ΔE gegen `flaeche2` 12,3, gegen die Zeigerspur 16,2 (antds `#253a4e`:
  * `schwach` 3,39, Rand 2,13).
+ * Gesperrte Steuerelemente (LLH-1228): `gesperrt` auf antds Sperrfläche (8 % Weiß) ≥ 4,80 über
+ * jeder deckenden Fläche (flaeche3), ohne sie ≥ 5,96; antds Ableitung (25 % Weiß) lag bei 2,25.
+ * Heller als `schwach`, weil die Sperrfläche den Grund aufhellt: `schwach` läge darauf bei 4,11.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -284,6 +298,7 @@ export const farbenDunkel: Farbrollen = {
   alarmFlaeche: '#1c0a0d',
   bedienFlaeche: '#0d1620',
   auswahlFlaeche: '#08172b',
+  gesperrt: '#8f97a0',
   bannerGrund: '#0d1520',
   bannerLinie: '#1d3a5c',
   berichtigungZeile: '#160d0f',
@@ -985,6 +1000,11 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus
     // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält den Textboden (Tag ≥ 7, Nacht ≥ 5).
     colorTextPlaceholder: farben.schwach,
+    // Schrift gesperrter Steuerelemente (LLH-1228). antd leitete sie aus `colorTextQuaternary` ab
+    // (25 % Deckkraft) und lag auf der eigenen Sperrfläche Tag bei 1,80, Nacht bei 2,25. Die
+    // Sperrfläche (`colorBgContainerDisabled`) bleibt antds Ableitung; der Wächter rechnet mit dem
+    // aufgelösten Wert. Gerechnet in `gesperrtKontrast.test.ts`.
+    colorTextDisabled: farben.gesperrt,
 
     // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).
     colorBorder: farben.steuerRahmen,
