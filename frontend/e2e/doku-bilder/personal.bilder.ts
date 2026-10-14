@@ -16,7 +16,8 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep personal`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   personal.png         frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx
+ *   personal.png         frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx,
+ *                        frontend/src/kraefte/EinsatzfunktionZelle.tsx
  *   personal-disponieren.png frontend/src/kraefte/PersonalDisponierenModal.tsx,
  *                        frontend/src/kraefte/SammelGruende.tsx
  *   adhoc-person.png     frontend/src/kraefte/AdhocPersonModal.tsx
@@ -29,7 +30,8 @@ import {
  * Lena Beispiel Eintreffen und Entlassung, damit „Einsatzdauer“ und „Ruhe“ etwas zeigen. Für
  * den Block „Entlassen“ disponiert sie eine Ad-hoc-Kraft und entlässt sie (LLH-1079). Für den
  * Dialog „Personal disponieren“ legt sie drei Stamm-Personen an, die noch nicht im Einsatz sind
- * (LLH-1100): die Demo-Personen sind alle disponiert.
+ * (LLH-1100): die Demo-Personen sind alle disponiert. Anna Probe bekommt die Einsatzfunktion
+ * „Sprechfunker“, damit die Spalte „Funktion“ beide Angaben zeigt (LLH-1067).
  */
 
 const KAPITEL = 'personal';
@@ -99,6 +101,11 @@ test.describe(KAPITEL, () => {
         art: 'entlassung',
         zeitpunkt_at: draht(vor(jetzt, 40)),
         notiz: 'Dienstende',
+      });
+
+      const anna = await personNamens(api, demo.id, 'Anna Probe');
+      await fuelle(api, 'patch', `/api/einsaetze/${demo.id}/personal/${anna.id}`, {
+        einsatzfunktion: 'Sprechfunker',
       });
 
       const weg = await fuelle<Person>(api, 'post', `/api/einsaetze/${demo.id}/personal`, {
