@@ -126,6 +126,45 @@ mark.lfh-fundstelle {
   margin-inline-start: var(--ant-padding);
 }
 
+/* Gesperrtes trägt die Sperre auch ohne Farbe (LLH-1233, Spec `textstufen-kontrast`): die Schrift
+   gesperrter Steuerelemente unterschreitet den Textboden (`gesperrt` ≥ 4,5, LLH-1228), dann
+   braucht die Sperre ein Zeichen ohne Farbe. Das Zeichen ist der GESTRICHELTE Rand: gleiche Box,
+   gleiche Breite (kein Springen beim Entsperren), auch an Symbolknöpfen. Gestrichelt heißt deshalb
+   nur noch gesperrt; antds freie Variante `dashed` ist gesperrt (`theme/gesperrtZeichen.guard.test.ts`).
+   Der Rand liest `steuer-rahmen`, dieselbe Linie wie am freien Feld; Text- und Linkknöpfe (sonst
+   randlos) bekommen ihn mit. Einträge in Menü, Auswahlliste und antds `Segmented` haben keinen Rand
+   und tragen die Strichlinie als `outline` nach innen, damit nichts wächst.
+   `:root` und die doppelte Klasse heben die Regeln über antds `:where(…)`-gekapselte Varianten
+   (Text-/Linkknopf (0,3,0)), unabhängig von der Reihenfolge im Dokument. Nachweis:
+   `e2e/gesperrt-kontrast.spec.ts` (gerechneter Stil im Browser). */
+:root .ant-btn.ant-btn:disabled,
+:root .ant-btn.ant-btn.ant-btn-disabled,
+:root .ant-input.ant-input-disabled,
+:root .ant-input.ant-input[disabled],
+:root .ant-input-affix-wrapper.ant-input-affix-wrapper-disabled,
+:root .ant-input-number.ant-input-number-disabled,
+:root .ant-picker.ant-picker-disabled,
+:root .ant-select.ant-select-disabled,
+:root .ant-radio-button-wrapper.ant-radio-button-wrapper-disabled,
+:root .ant-checkbox-disabled .ant-checkbox-inner.ant-checkbox-inner {
+  border-style: dashed;
+  border-color: var(--lfh-steuer-rahmen);
+}
+/* Im Feld mit Rahmen (Affix-Hülle, Zahlenfeld) trägt die Hülle die Strichlinie, das innere Feld
+   bleibt randlos. */
+:root .ant-input-affix-wrapper-disabled .ant-input.ant-input,
+:root .ant-input-number-disabled .ant-input-number-input.ant-input-number-input {
+  border-style: none;
+}
+:root .ant-menu-item.ant-menu-item-disabled,
+:root .ant-menu-submenu.ant-menu-submenu-disabled > .ant-menu-submenu-title,
+:root .ant-dropdown-menu-item.ant-dropdown-menu-item-disabled,
+:root .ant-select-item-option.ant-select-item-option-disabled,
+:root .ant-segmented-item.ant-segmented-item-disabled {
+  outline: 1px dashed var(--lfh-steuer-rahmen);
+  outline-offset: -1px;
+}
+
 /* ETB: Fokusabstand zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).
    `scroll-margin` an den ZIELEN von Seitenkopf und Inhalt, NICHT `scroll-padding` am Dokument:
    die Scrollport-Variante zählt auch die Ziele IN der Leiste zum verdeckten Streifen und rollt
