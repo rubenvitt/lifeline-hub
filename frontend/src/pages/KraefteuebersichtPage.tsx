@@ -982,12 +982,13 @@ export default function KraefteuebersichtPage() {
 
   // Sprung auf eine Einheit (LLH-1049, Spec `kraeftebaum`, „Sprung auf eine Einheit“): Vorfahren
   // und Teilbaum bis „mit Fahrzeugen“ auf, die übrigen Zeilen in der Vorgabestufe. Erst mit
-  // frischen Listen: nach dem Bilden steht noch der alte Cache, in dem die Einheit fehlt. Steht
-  // NACH dem Rücksetzen oben, sonst räumte es beim ersten Bild den Sprung wieder ab. Eine
-  // unbekannte oder fremde ID lässt die Vorgabe ohne Markierung.
-  const listenFrisch = [einheitenQuery, personalQuery, fahrzeugeQuery].every(
-    (q) => q.isSuccess && !q.isFetching,
-  );
+  // frischen Listen: nach dem Bilden steht noch der alte Cache, in dem die Einheit fehlt. Eine
+  // gescheiterte Mittel-Liste (Modul ohne Freigabe) hält den Sprung nicht auf. Steht NACH dem
+  // Rücksetzen oben, sonst räumte es beim ersten Bild den Sprung wieder ab. Eine unbekannte oder
+  // fremde ID lässt die Vorgabe ohne Markierung.
+  const listenFrisch =
+    einheitenQuery.isSuccess &&
+    [einheitenQuery, personalQuery, fahrzeugeQuery].every((q) => !q.isPending && !q.isFetching);
   useQueryParamSelektion('einheit', listenFrisch, (eid) => {
     const ziel = `eh-${eid}`;
     const sprung = schluesselZumSprung(raster, ziel);

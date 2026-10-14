@@ -1640,6 +1640,13 @@ describe('KraefteuebersichtPage — Sprung auf eine Einheit (LLH-1049)', () => {
     expect(screen.getByRole('radio', { name: 'Einheiten' })).toBeChecked();
   });
 
+  it('eine gescheiterte Personalliste hält den Sprung nicht auf', async () => {
+    mitZweitemZug();
+    vi.mocked(listeEinsatzPersonal).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    const { container } = setupMitSprung('?einheit=21');
+    await waitFor(() => expect(markiert(zeile(container, 'eh-21'))).toBe(true));
+  });
+
   it('wartet auf frische Listen: im alten Cache fehlt die gerade gebildete Einheit', async () => {
     mitZweitemZug();
     const client = neuerQueryClient();
