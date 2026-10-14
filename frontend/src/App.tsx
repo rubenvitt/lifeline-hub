@@ -116,6 +116,7 @@ import { modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
+  BENACHRICHTIGUNGEN_PFAD,
   HILFE_PFAD,
   KOPPELN_PFAD,
   KOPPLUNG_BEENDET_PFAD,
@@ -133,6 +134,7 @@ const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'))
 // Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
 const HilfePage = lazy(() => import('./hilfe/HilfePage'));
 const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
+const BenachrichtigungenPage = lazy(() => import('./pages/BenachrichtigungenPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -323,6 +325,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="/profil" element={<ProfilPage />} />
+          <Route path={BENACHRICHTIGUNGEN_PFAD} element={<BenachrichtigungenPage />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
             {adminGruppen.map((g) => (

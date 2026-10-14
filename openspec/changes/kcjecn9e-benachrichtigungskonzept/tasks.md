@@ -23,7 +23,7 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 - [x] 2.3 Nachreichen nach `lagged`, nach eigenem Neuaufbau und beim Öffnen eines Einsatzes, mit Uhrzeit und höchstens einem dezenten Ton; Vitest „Server-Neustart“
 - [x] 2.4 Sammeltoast nennt alle neuen Arten mit Sprung; Vitest „Fünf Hinweise“
 - [x] 2.5 Org-Layout bekommt eine schlanke Zentrale für Org-Arten; Vitest
-- [ ] 2.6 Benutzermenü → „Benachrichtigungen“: Schalter je Hinweis-Art, Alarm-Arten „immer an“; Vitest und Anwenderkapitel `einsatz-oberflaeche` (Abschnitt Benachrichtigungen) nach `docs/anwender/AGENTS.md`
+- [x] 2.6 Benutzermenü → „Benachrichtigungen“: Schalter je Hinweis-Art, Alarm-Arten „immer an“; Vitest und Anwenderkapitel `einsatz-oberflaeche` (Abschnitt Benachrichtigungen) nach `docs/anwender/AGENTS.md`
 
 ## 3. Bestehende Alarme auf den neuen Weg (benötigt 1, 2) · LLH-1209
 
