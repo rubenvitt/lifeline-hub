@@ -9,7 +9,7 @@ use lifeline_hub::benachrichtigung::{
     melden, Adressat, Anlass, BenachrichtigungArt as Art, BenachrichtigungBezugTyp as Typ, Bezug,
 };
 use lifeline_hub::fuehrung::Fuehrungsfunktion;
-use lifeline_hub::live::{LiveEvent, LiveHub};
+use lifeline_hub::live::{LiveEvent, LiveHub, Replay};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -617,6 +617,75 @@ async fn einsatz_strom_stellt_nur_dem_empfaenger_zu_live_und_im_replay() {
     let replay_bert = ereignisse(&lesen(oeffnen(&w.app, &feed, &bert, Some(&pos)).await).await);
     assert_eq!(namen(&replay_anna), ["benachrichtigung", "einsatz"]);
     assert_eq!(namen(&replay_bert), ["einsatz"]);
+}
+
+/// Ein `melden`-Aufruf belegt genau EINEN Platz im Ring des Einsatzes, gleich wie viele
+/// Empfänger er hat; jeder Empfänger bekommt live und im Replay seine eigene
+/// `benachrichtigung_id`, ein Nicht-Empfänger nichts.
+#[tokio::test]
+async fn ein_melden_belegt_einen_ringplatz_und_jeder_bekommt_seine_eigene_id() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    let bert = w.cookie("bertram").await;
+    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let anna_live = oeffnen(&w.app, &feed, &anna, None).await;
+    let bert_live = oeffnen(&w.app, &feed, &bert, None).await;
+    let admin_live = oeffnen(&w.app, &feed, &w.admin, None).await;
+    let (_, _halter, pos) = w.live.abonniere_mit_position(w.einsatz, None);
+
+    let an = w
+        .melden(
+            w.anlass(Art::Sofortmeldung, Typ::Meldung, 3)
+                .von(w.admin_id)
+                .an(Adressat::ModulLeser("meldungen")),
+        )
+        .await;
+    assert_eq!(an, vec![w.anna, w.bert]);
+
+    let Replay::Events(ring) = w.live.abonniere_mit_replay(w.einsatz, Some(pos.clone())).0 else {
+        panic!("Replay erwartet");
+    };
+    assert_eq!(ring.len(), 1, "ein melden-Aufruf, ein Ringplatz");
+
+    let eigene = |benutzer_id: i64| {
+        let pool = w.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT id FROM benachrichtigung WHERE benutzer_id = ?")
+                .bind(benutzer_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    let ids_aus = |roh: &str| -> Vec<i64> {
+        ereignisse(roh)
+            .into_iter()
+            .filter(|(n, _)| n == "benachrichtigung")
+            .map(|(_, d)| {
+                serde_json::from_str::<Value>(&d).unwrap()["benachrichtigung_id"]
+                    .as_i64()
+                    .unwrap()
+            })
+            .collect()
+    };
+    let id_anna = eigene(w.anna).await;
+    let id_bert = eigene(w.bert).await;
+    assert_ne!(id_anna, id_bert);
+
+    assert_eq!(ids_aus(&lesen(anna_live).await), vec![id_anna], "live");
+    assert_eq!(ids_aus(&lesen(bert_live).await), vec![id_bert], "live");
+    assert!(
+        ids_aus(&lesen(admin_live).await).is_empty(),
+        "Auslöser live"
+    );
+    for (cookie, erwartet) in [
+        (&anna, vec![id_anna]),
+        (&bert, vec![id_bert]),
+        (&w.admin, vec![]),
+    ] {
+        let roh = lesen(oeffnen(&w.app, &feed, cookie, Some(&pos)).await).await;
+        assert_eq!(ids_aus(&roh), erwartet, "Replay: {roh:?}");
+    }
 }
 
 /// Org-Arten gehen über den Org-Kanal (`/api/live`) an genau ihren Empfänger.

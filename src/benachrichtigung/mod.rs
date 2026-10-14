@@ -5,7 +5,8 @@
 //! Scheduler meldet nach dem Commit nur, *was* geschah: Art, Bezug, Auslöser und Adressaten als
 //! Vorgabe ([`Anlass`]). [`melden`] löst daraus die Empfänger auf ([`aufloesung`]), schreibt je
 //! Empfänger eine Zeile ([`repo`]) und stellt jedem genau sein Ereignis zu: im Einsatz-Strom
-//! `benachrichtigung` mit Empfängerfilter, für die Org-Arten im Org-Kanal
+//! `benachrichtigung` als EINE Nachricht mit der Nutzlast je Empfänger, für die Org-Arten im
+//! Org-Kanal
 //! `org_benachrichtigung`. Den Text bildet der Server erst beim Lesen aus dem Bezug ([`text`]).
 //!
 //! ```ignore
@@ -28,7 +29,7 @@ pub mod text;
 mod tests;
 
 use crate::fuehrung::Fuehrungsfunktion;
-use crate::live::{LiveEvent, LiveHub};
+use crate::live::{LiveEvent, LiveHub, Zustellung};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -330,37 +331,64 @@ async fn melden_mit_fehler(
         return Ok(Vec::new());
     }
     let zeilen = repo::anlegen(pool, anlass, &aufgeloest.benutzer_ids).await?;
-    for (benutzer_id, id) in &zeilen {
-        zustellen(
-            live,
-            aufgeloest.org_id,
-            *benutzer_id,
-            &BenachrichtigungEreignis {
-                einsatz_id: anlass.einsatz_id,
-                benachrichtigung_id: *id,
-                art: anlass.art,
-                stufe: anlass.art.stufe(),
-                bezug_typ: anlass.bezug.typ,
-                bezug_id: anlass.bezug.id,
-                quittiert: false,
-            },
-        );
-    }
+    let ereignisse: Vec<(i64, BenachrichtigungEreignis)> = zeilen
+        .into_iter()
+        .map(|(benutzer_id, id)| {
+            (
+                benutzer_id,
+                BenachrichtigungEreignis {
+                    einsatz_id: anlass.einsatz_id,
+                    benachrichtigung_id: id,
+                    art: anlass.art,
+                    stufe: anlass.art.stufe(),
+                    bezug_typ: anlass.bezug.typ,
+                    bezug_id: anlass.bezug.id,
+                    quittiert: false,
+                },
+            )
+        })
+        .collect();
+    zustellen(
+        live,
+        aufgeloest.org_id,
+        anlass.einsatz_id,
+        anlass.art,
+        &ereignisse,
+    );
     Ok(aufgeloest.benutzer_ids)
 }
 
-/// Stellt ein Ereignis genau einem Nutzer zu: Einsatz-Arten über den Einsatz-Strom mit
-/// Empfängerfilter, Org-Arten über den Org-Kanal. Auch das Quittier-Ereignis geht diesen Weg.
-pub fn zustellen(live: &LiveHub, org_id: i64, benutzer_id: i64, e: &BenachrichtigungEreignis) {
-    let data = serde_json::to_string(e).expect("Nutzlast serialisierbar");
-    if e.art.ist_org() {
-        live.publiziere_org_benachrichtigung(org_id, data, vec![benutzer_id]);
+/// Stellt die Ereignisse einer Art und eines Einsatzes zu, je `(benutzer_id, Ereignis)` genau
+/// an diesen Nutzer. Einsatz-Arten gehen als EINE Nachricht in den Einsatz-Strom (ein Platz im
+/// Ring, gleich wie viele Empfänger), jede Verbindung bekommt nur die Nutzlast ihres Nutzers;
+/// Org-Arten gehen einzeln über den Org-Kanal (ohne Ring). Auch das Quittier-Ereignis geht
+/// diesen Weg, dann mit einem einzigen Eintrag.
+pub fn zustellen(
+    live: &LiveHub,
+    org_id: i64,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    ereignisse: &[(i64, BenachrichtigungEreignis)],
+) {
+    let nutzlast = |e: &BenachrichtigungEreignis| {
+        debug_assert!(e.einsatz_id == einsatz_id && e.art == art);
+        serde_json::to_string(e).expect("Nutzlast serialisierbar")
+    };
+    if art.ist_org() {
+        for (benutzer_id, e) in ereignisse {
+            live.publiziere_org_benachrichtigung(org_id, nutzlast(e), vec![*benutzer_id]);
+        }
     } else {
         live.publiziere_an(
-            e.einsatz_id,
+            einsatz_id,
             LiveEvent::Benachrichtigung,
-            data,
-            vec![benutzer_id],
+            ereignisse
+                .iter()
+                .map(|(benutzer_id, e)| Zustellung {
+                    benutzer_id: *benutzer_id,
+                    data: nutzlast(e).into(),
+                })
+                .collect(),
         );
     }
 }

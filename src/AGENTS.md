@@ -327,10 +327,13 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/kcjecn9e-benachrichtigun
   (Guard `detail_liest_nur_retain_spalten`). Eine neue Art braucht Variante, Titel, Migration
   für den CHECK (`check_listen_entsprechen_dem_katalog`) und ihre Stufe in `stufe()`; ein neuer
   Bezug sein Modul (`BenachrichtigungBezugTyp::modul`) und seinen Pfad.
-- **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung` mit
-  Empfängerliste (`LiveHub::publiziere_an`), die der Strom live und im Replay prüft
-  (`LiveNachricht::sichtbar_fuer`, fail-closed ohne Liste); Org-Arten als `org_benachrichtigung`.
-  Die Nutzlast trägt nur Kennungen, den Text holt der Client per `GET`.
+- **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung`,
+  EINE Nachricht je `melden` mit der Nutzlast je Empfänger (`LiveHub::publiziere_an`): ein Platz
+  im Ring, gleich wie viele Empfänger. Der Strom gibt live und im Replay jeder Verbindung nur die
+  Nutzlast ihres Nutzers, Fremden nichts (`LiveNachricht::fuer`, fail-closed ohne Liste); nie je
+  Empfänger eine eigene Ring-Nachricht, das drängt bei Alarmen die anderen Clients in `lagged`.
+  Org-Arten als `org_benachrichtigung`. Die Nutzlast trägt nur Kennungen, den Text holt der
+  Client per `GET`.
 - **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
   Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
 - Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen

@@ -149,16 +149,20 @@ pub async fn quittieren(
                 crate::benachrichtigung::zustellen(
                     &state.live,
                     org_id,
-                    benutzer.id,
-                    &BenachrichtigungEreignis {
-                        einsatz_id: z.einsatz_id,
-                        benachrichtigung_id: z.id,
-                        art: z.art,
-                        stufe: z.stufe,
-                        bezug_typ: z.bezug_typ,
-                        bezug_id: z.bezug_id,
-                        quittiert: true,
-                    },
+                    z.einsatz_id,
+                    z.art,
+                    &[(
+                        benutzer.id,
+                        BenachrichtigungEreignis {
+                            einsatz_id: z.einsatz_id,
+                            benachrichtigung_id: z.id,
+                            art: z.art,
+                            stufe: z.stufe,
+                            bezug_typ: z.bezug_typ,
+                            bezug_id: z.bezug_id,
+                            quittiert: true,
+                        },
+                    )],
                 );
             }
         }
