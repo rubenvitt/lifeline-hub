@@ -8,8 +8,10 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
-use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::{deserialize_optional_field, parse_flag, pflicht, trimme, trimme_tri};
+use crate::material::{EinsatzMaterialAnzeige, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX};
+use crate::routes::support::{
+    deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -92,10 +94,16 @@ pub async fn disponieren(
     let ziel = match (body.material_id, body.adhoc) {
         (Some(material_id), None) => Ziel::Stamm(material_id),
         (None, Some(adhoc)) => {
-            bezeichnung_owned = pflicht(&adhoc.bezeichnung, "Bezeichnung")?;
-            kategorie_owned = trimme(adhoc.kategorie);
-            bestandsnummer_owned = trimme(adhoc.bestandsnummer);
-            traeger_owned = trimme(adhoc.traegerorganisation);
+            // Grenzen (LLH-1093, `src/AGENTS.md`, „Eingabegrenzen“): 400 vor der Transaktion.
+            bezeichnung_owned = pflicht_max(&adhoc.bezeichnung, "Bezeichnung", ADHOC_TEXT_MAX)?;
+            kategorie_owned = optional_max(adhoc.kategorie, "Kategorie", ADHOC_TEXT_MAX)?;
+            bestandsnummer_owned =
+                optional_max(adhoc.bestandsnummer, "Bestandsnummer", ADHOC_TEXT_MAX)?;
+            traeger_owned = optional_max(
+                adhoc.traegerorganisation,
+                "Trägerorganisation",
+                ADHOC_TEXT_MAX,
+            )?;
             Ziel::Adhoc(AdhocDaten {
                 bezeichnung: &bezeichnung_owned,
                 kategorie: kategorie_owned.as_deref(),
@@ -193,7 +201,7 @@ pub async fn update(
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
     // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
-    let bemerkung = trimme_tri(body.bemerkung);
+    let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
     let patch = MaterialPatch {
         menge: body.menge,
         status,

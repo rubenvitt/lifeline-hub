@@ -8,6 +8,14 @@ use utoipa::ToSchema;
 // Geteilte Dienststatus-Konstanten (wie Fahrzeug/Personal) aus crate::katalog.
 pub use crate::katalog::{DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 
+/// Bezeichnung, Kategorie, Bestandsnummer und Trägerorganisation eines Ad-hoc-Postens, beim
+/// Disponieren und beim Korrigieren (LLH-1093, Spec `material-liste`); die Bezeichnung gelangt
+/// ins ETB. Wie `personal::ADHOC_TEXT_MAX`.
+pub const ADHOC_TEXT_MAX: usize = 200;
+
+/// Bemerkung zu einem Material-Posten im Einsatz (LLH-1093); wie `personal::BEMERKUNG_MAX`.
+pub const BEMERKUNG_MAX: usize = 2_000;
+
 /// Interner Material-Stamm-Datensatz (alle Spalten von `material`).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Material {
