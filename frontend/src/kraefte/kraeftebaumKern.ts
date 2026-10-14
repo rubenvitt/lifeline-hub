@@ -42,15 +42,14 @@ import type { StaerkeSumme } from './kraeftebild';
 // ── Aktive Kräfte ─────────────────────────────────────────────────────────────
 
 /**
- * Nur aktive Kräfte (LLH-1079, Spec `kraefte-entlassung`): eine entlassene oder stornierte Person
- * (`beendet_at`) und eine aufgelöste Einheit (`aufgeloest_at`) stehen in keinem Baum und keiner
- * Stärke; Entlassene führt der Block „Entlassen“ (`entlassene.ts`). Der Server liefert die Listen
- * schon gefiltert, der Kern lässt sie trotzdem aus, damit ein ungefilterter Aufrufer auffällt
- * (design.md D9). Eine Einheit, deren Über-Einheit aufgelöst ist, wird in {@link einheitenBaum}
- * Wurzel wie jede Waise.
+ * Nur aktive Kräfte (LLH-1079, Spec `kraefte-entlassung`): eine entlassene oder stornierte Person,
+ * ein entlassenes oder storniertes Fahrzeug, herausgenommenes Material (alle `beendet_at`) und eine
+ * aufgelöste Einheit (`aufgeloest_at`) stehen in keinem Baum und keiner Stärke; Entlassene führt
+ * der Block „Entlassen“ (`entlassene.ts`). Der Server liefert die Listen schon gefiltert, der Kern
+ * lässt sie trotzdem aus, damit ein ungefilterter Aufrufer auffällt (design.md D9). Eine Einheit,
+ * deren Über-Einheit aufgelöst ist, wird in {@link einheitenBaum} Wurzel wie jede Waise.
  */
 export function filterAktive<T extends object>(liste: readonly T[]): T[] {
-  // Fahrzeug und Material tragen den Zustand erst mit Teil II; bis dahin lässt der Filter sie durch.
   return liste.filter((x) => {
     const z = x as { beendet_at?: string | null; aufgeloest_at?: string | null };
     return !z.beendet_at && !z.aufgeloest_at;

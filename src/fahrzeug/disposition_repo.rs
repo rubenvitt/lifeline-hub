@@ -2,6 +2,8 @@ use super::{
     status_repo, EinsatzFahrzeugAnzeige, StatusKategorie, DIENSTSTATUS_IN_DIENST,
     KATEGORIE_GEBUNDEN,
 };
+use crate::bereitstellungsraum::belegung_repo;
+use crate::entlassung::{BeendetAls, Disponiert};
 use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -16,6 +18,7 @@ const SELECT_AUFGELOEST: &str = "\
            ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
            ef.aktueller_br_id, ef.status_seit, \
            ef.disponiert_at, ef.disponiert_von, \
+           ef.beendet_at, ef.beendet_von, ef.beendet_als, \
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
            f.fahrzeugtyp AS live_fahrzeugtyp, f.opta AS live_opta, \
            f.traegerorganisation AS live_traegerorganisation, f.dienststatus AS live_dienststatus, \
@@ -49,6 +52,9 @@ struct Row {
     status_seit: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
+    beendet_at: Option<String>,
+    beendet_von: Option<i64>,
+    beendet_als: Option<String>,
     live_funkrufname: Option<String>,
     live_kennzeichen: Option<String>,
     live_fahrzeugtyp: Option<String>,
@@ -123,6 +129,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
         ist_demo: row.ist_demo,
+        beendet_at: row.beendet_at,
+        beendet_von: row.beendet_von,
+        beendet_als: row.beendet_als,
     }
 }
 
@@ -136,14 +145,36 @@ pub struct AdhocDaten<'a> {
     pub traegerorganisation: Option<&'a str>,
 }
 
-/// Disponierte Fahrzeuge eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit.
+/// Aktive Fahrzeuge eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit. Entlassene und
+/// stornierte fehlen (LLH-1079, Spec `kraefte-entlassung`).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzFahrzeugAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE ef.einsatz_id = ? ORDER BY ef.disponiert_at, ef.id"
+        "{SELECT_AUFGELOEST} WHERE ef.einsatz_id = ? AND ef.beendet_at IS NULL \
+         ORDER BY ef.disponiert_at, ef.id"
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
+}
+
+/// Entlassene Fahrzeuge eines Einsatzes (aufgelöst), zuletzt entlassene zuerst — der Nachweis
+/// hinter `GET …/fahrzeuge?entlassene=1` (LLH-1079). Stornierte erscheinen nie.
+pub async fn list_entlassene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<Vec<EinsatzFahrzeugAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE ef.einsatz_id = ? AND ef.beendet_als = 'entlassen' \
+         ORDER BY ef.beendet_at DESC, ef.id DESC"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -194,43 +225,36 @@ pub async fn laden_anzeige_tx(
 /// Disponiert ein Stamm-Fahrzeug auf einer offenen Verbindung: prüft Org und Dienststatus,
 /// friert den Identitäts-Snapshot ein und setzt den ersten `gebunden`-Status. `NotFound` bei
 /// fremdem/unbekanntem Fahrzeug, `UnprocessableEntity` bei außer Dienst, `Conflict` bei
-/// Doppel-Disposition. Liefert die `ef_id`.
+/// Doppel-Disposition. Ein entlassenes oder storniertes Fahrzeug wird wieder aufgenommen statt
+/// abgelehnt (LLH-1079, design.md D7): `UNIQUE(einsatz_id, fahrzeug_id)` lässt keine zweite
+/// Zeile zu.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     fahrzeug_id: i64,
     disponiert_von: i64,
-) -> Result<i64, AppError> {
-    let snap = sqlx::query_as::<
-        _,
-        (
-            String,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            String,
-        ),
-    >(
-        "SELECT funkrufname, kennzeichen, fahrzeugtyp, opta, traegerorganisation, dienststatus \
-         FROM fahrzeug WHERE id = ? AND org_id = ?",
+) -> Result<Disponiert, AppError> {
+    let bestehend: Option<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, beendet_at FROM einsatz_fahrzeug WHERE einsatz_id = ? AND fahrzeug_id = ?",
     )
+    .bind(einsatz_id)
     .bind(fahrzeug_id)
-    .bind(org_id)
     .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-
-    let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger, dienststatus) = snap;
-    if dienststatus != DIENSTSTATUS_IN_DIENST {
-        // Ein Zustand, also 422 wie bei der Person (`src/AGENTS.md`, Statuscode-Konvention; bis
-        // LLH-1100 war es 400).
-        return Err(AppError::UnprocessableEntity(
-            "Fahrzeug ist außer Dienst und kann nicht disponiert werden".into(),
-        ));
+    .await?;
+    match bestehend {
+        Some((_, None)) => return Err(doppelt_conflict()),
+        Some((id, Some(_))) => {
+            reaktivieren_tx(conn, einsatz_id, org_id, id, disponiert_von).await?;
+            return Ok(Disponiert {
+                id,
+                reaktiviert: true,
+            });
+        }
+        None => {}
     }
-
+    let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger) =
+        stamm_snapshot_tx(conn, org_id, fahrzeug_id).await?;
     let status_id =
         status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
 
@@ -255,15 +279,66 @@ pub async fn disponiere_stamm_tx(
     .await;
 
     match ergebnis {
-        Ok(id) => Ok(id),
-        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
-            "Fahrzeug ist bereits in diesem Einsatz disponiert".into(),
-        )),
+        Ok(id) => Ok(Disponiert {
+            id,
+            reaktiviert: false,
+        }),
+        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(doppelt_conflict()),
         Err(e) => Err(e.into()),
     }
 }
 
-/// Pool-Wrapper: disponiert ein Stamm-Fahrzeug in eigener Transaktion.
+fn doppelt_conflict() -> AppError {
+    AppError::Conflict("Fahrzeug ist bereits in diesem Einsatz disponiert".into())
+}
+
+/// Identitäts-Snapshot eines Stamm-Fahrzeugs: Funkrufname, Kennzeichen, Typ, OPTA, Träger.
+type Snapshot = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
+/// Snapshot eines Stamm-Fahrzeugs der Org; `NotFound` bei fremdem/unbekanntem,
+/// `UnprocessableEntity` bei außer Dienst.
+async fn stamm_snapshot_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    fahrzeug_id: i64,
+) -> Result<Snapshot, AppError> {
+    let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger, dienststatus) = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
+        "SELECT funkrufname, kennzeichen, fahrzeugtyp, opta, traegerorganisation, \
+                    dienststatus \
+             FROM fahrzeug WHERE id = ? AND org_id = ?",
+    )
+    .bind(fahrzeug_id)
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if dienststatus != DIENSTSTATUS_IN_DIENST {
+        // Ein Zustand, also 422 wie bei der Person (`src/AGENTS.md`, Statuscode-Konvention; bis
+        // LLH-1100 war es 400).
+        return Err(AppError::UnprocessableEntity(
+            "Fahrzeug ist außer Dienst und kann nicht disponiert werden".into(),
+        ));
+    }
+    Ok((funkrufname, kennzeichen, fahrzeugtyp, opta, traeger))
+}
+
+/// Pool-Wrapper ohne eigene Transaktion; liefert die `ef_id`.
 pub async fn disponiere_stamm(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -272,7 +347,11 @@ pub async fn disponiere_stamm(
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_stamm_tx(&mut conn, einsatz_id, org_id, fahrzeug_id, disponiert_von).await
+    Ok(
+        disponiere_stamm_tx(&mut conn, einsatz_id, org_id, fahrzeug_id, disponiert_von)
+            .await?
+            .id,
+    )
 }
 
 /// Disponiert ein Ad-hoc-externes Fahrzeug (`fahrzeug_id = NULL`) auf einer offenen
@@ -331,6 +410,8 @@ pub async fn aktualisiere_tx(
     status_id: Option<i64>,
     bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
+    // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
+    require_aktiv_tx(conn, einsatz_id, ef_id).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
          SET status_seit = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
@@ -383,6 +464,8 @@ pub async fn aktualisiere_position(
     daten: PositionPatch<'_>,
     einsatz_aktiv: bool,
 ) -> Result<EinsatzFahrzeugAnzeige, AppError> {
+    // Ein beendetes Fahrzeug steht auf keiner Karte mehr (409, LLH-1079).
+    require_aktiv_tx(&mut *pool.acquire().await?, einsatz_id, ef_id).await?;
     let betroffen = sqlx::query(
         "UPDATE einsatz_fahrzeug SET \
             lat = CASE WHEN ? THEN ? ELSE lat END, \
@@ -417,36 +500,345 @@ pub async fn aktualisiere_position(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Entfernt eine Dispositionszeile (der Stamm bleibt); `NotFound`, falls nicht zum Einsatz.
-///
-/// Vor dem DELETE wird die Besatzung freigegeben (`einsatz_personal.fahrzeug_id = NULL`); die
-/// Kräfte werden frei, nicht gelöscht, sonst scheiterte das DELETE am FK. Ein `NotFound` rollt
-/// die Freigabe zurück.
-pub async fn entferne_tx(
+// ── Lebenszustand (LLH-1079 Teil II, Spec `kraefte-entlassung`) ──────────────────────────
+
+/// Jeder Schreibweg an einem Fahrzeug fragt zuerst hier (design.md D6): `NotFound`, wenn die
+/// Zeile nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn es entlassen
+/// oder storniert ist. Nur das erneute Disponieren schreibt an einem beendeten Fahrzeug.
+pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
 ) -> Result<(), AppError> {
-    sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE fahrzeug_id = ?")
-        .bind(ef_id)
-        .execute(&mut *conn)
-        .await?;
-    let resultat = sqlx::query("DELETE FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
-        .bind(ef_id)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    if resultat.rows_affected() == 0 {
-        return Err(AppError::NotFound);
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match ende.ok_or(AppError::NotFound)? {
+        None => Ok(()),
+        Some(als) => Err(beendet_conflict(&als)),
+    }
+}
+
+/// Der 409 an einem beendeten Fahrzeug (Lebenszyklus), je Endzustand.
+pub fn beendet_conflict(beendet_als: &str) -> AppError {
+    AppError::Conflict(match beendet_als {
+        "storniert" => "Das Fahrzeug ist storniert; erst erneut disponieren".into(),
+        _ => "Das Fahrzeug ist aus dem Einsatz entlassen; erst erneut disponieren".into(),
+    })
+}
+
+/// Wie [`require_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
+/// selbst prüfen (mit eigenem Statuscode): ein unbekanntes Fahrzeug ist hier kein Fehler, ein
+/// beendetes der 409 aus [`beendet_conflict`] (design.md D6).
+pub async fn require_nicht_beendet(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<(), AppError> {
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_fahrzeug \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NOT NULL",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?;
+    match ende.flatten() {
+        None => Ok(()),
+        Some(als) => Err(beendet_conflict(&als)),
+    }
+}
+
+/// Was das Entlassen eines Fahrzeugs über die Zeile hinaus berührt hat; der Aufrufer meldet es
+/// nach dem Commit und nennt die Einheit im ETB-Text.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Entlassen {
+    /// Einheit, der das Fahrzeug angehörte (ID für das Ereignis, Name nur für den ETB-Text,
+    /// design.md D4).
+    pub einheit: Option<(i64, String)>,
+    /// Bereitstellungsraum, aus dem das Entlassen den Austritt geschrieben hat.
+    pub br_id: Option<i64>,
+    /// Besatzung, die frei geworden ist (`einsatz_personal.id`).
+    pub besatzung: Vec<i64>,
+    /// Trug das Fahrzeug die Führungsstelle?
+    pub trug_fuehrungsstelle: bool,
+}
+
+/// Entlässt ein Fahrzeug aus dem Einsatz (design.md D4): die Zeile bleibt mit Zeitpunkt und
+/// entlassender Person stehen. Gelöst werden Besatzung, Einheit, Bereitstellungsraum (mit
+/// Austritt) und die Zuordnung zur Führungsstelle; Auftragsempfänger bleiben. Keine Zeitachse
+/// (D5: Fahrzeuge wirken nur über ihre Einheit). `NotFound`/`Conflict` wie [`require_aktiv_tx`].
+pub async fn entlassen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Entlassen, AppError> {
+    require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    let einheit: Option<(i64, String)> = sqlx::query_as(
+        "SELECT e.id, e.name FROM einsatz_fahrzeug ef \
+         JOIN einsatz_einheit e ON e.id = ef.einheit_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let besatzung = super::besatzung_repo::load_besatzung_tx(conn, einsatz_id, ef_id).await?;
+    let trug_fuehrungsstelle =
+        crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
+    let br_id =
+        belegung_repo::austritt_fahrzeug_bei_entlassung_tx(conn, einsatz_id, ef_id, benutzer_id)
+            .await?;
+    for sql in [
+        "UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE fahrzeug_id = ? AND einsatz_id = ?",
+        "DELETE FROM einsatz_fuehrungsstelle_fahrzeug \
+         WHERE einsatz_fahrzeug_id = ? AND einsatz_id = ?",
+        "UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE id = ? AND einsatz_id = ?",
+    ] {
+        sqlx::query(sql)
+            .bind(ef_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        ef_id,
+        benutzer_id,
+        jetzt,
+        BeendetAls::Entlassen,
+    )
+    .await?;
+    Ok(Entlassen {
+        einheit,
+        br_id,
+        besatzung,
+        trug_fuehrungsstelle,
+    })
+}
+
+/// Setzt den Endzustand genau einmal; die Bedingung `beendet_at IS NULL` steht im UPDATE, so
+/// trifft ein gleichzeitiger zweiter Versuch keine Zeile mehr (`Conflict`).
+async fn set_beendet_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    als: BeendetAls,
+) -> Result<(), AppError> {
+    // `zuletzt_entlassen_at` überdauert das erneute Disponieren (Storno-Sperre, design.md D3).
+    let r = sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = ?1, beendet_von = ?2, beendet_als = ?3, \
+             zuletzt_entlassen_at = CASE WHEN ?3 = 'entlassen' THEN ?1 \
+                                         ELSE zuletzt_entlassen_at END \
+         WHERE id = ?4 AND einsatz_id = ?5 AND beendet_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(als.as_str())
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "Das Fahrzeug ist bereits entlassen".into(),
+        ));
     }
     Ok(())
 }
 
-/// Pool-Wrapper mit eigener Transaktion (Freigabe und DELETE atomar).
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
-    entferne_tx(&mut tx, einsatz_id, ef_id).await?;
-    tx.commit().await?;
+/// Storniert eine Fehldisposition (design.md D3): die Zeile endet als `storniert` und erscheint
+/// in keinem Nachweis. Nur solange das Fahrzeug aktiv ist (sonst `Conflict`), nie entlassen war,
+/// seinen Status seit der Disposition behalten hat, ohne Besatzung, Einheit,
+/// Bereitstellungsraum, Führungsstelle und Auftrag und höchstens
+/// [`crate::entlassung::STORNO_FRIST_MINUTEN`] nach der Disposition; sonst 422 mit dem ersten
+/// verletzten Grund als Satz. Ein Fahrzeug trägt keine eigene Zeitachse, es gibt nichts zu
+/// streichen.
+pub async fn stornieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    if let Some(grund) = find_storno_hindernis_tx(conn, einsatz_id, ef_id, jetzt).await? {
+        return Err(AppError::UnprocessableEntity(grund));
+    }
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        ef_id,
+        benutzer_id,
+        jetzt,
+        BeendetAls::Storniert,
+    )
+    .await
+}
+
+/// Der erste Grund, der den Storno eines Fahrzeugs verbietet (design.md D3), oder `None`.
+async fn find_storno_hindernis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    jetzt: &str,
+) -> Result<Option<String>, AppError> {
+    let (disponiert_at, status_id, status_seit, einheit, br, entlassen_at, org_id): (
+        String,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        i64,
+    ) = sqlx::query_as(
+        "SELECT ef.disponiert_at, ef.status_id, ef.status_seit, ef.einheit_id, \
+                ef.aktueller_br_id, ef.zuletzt_entlassen_at, e.org_id \
+         FROM einsatz_fahrzeug ef JOIN einsatz e ON e.id = ef.einsatz_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    // Wer einmal entlassen war, war im Einsatz: das erneute Disponieren setzt die Frist nicht
+    // zurück.
+    if entlassen_at.is_some() {
+        return Ok(Some(
+            "Das Fahrzeug war schon einmal aus dem Einsatz entlassen; \
+             das Fahrzeug lässt sich entlassen"
+                .into(),
+        ));
+    }
+    // Disponieren setzt den ersten `gebunden`-Status und `status_seit` = `disponiert_at` in
+    // derselben Anweisung; jeder echte Statuswechsel danach ändert den Status oder rückt
+    // `status_seit` weiter (sekundengenau, deshalb beides).
+    let initial =
+        status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
+    if status_id != initial || status_seit.is_some_and(|s| s != disponiert_at) {
+        return Ok(Some(
+            "Der Status des Fahrzeugs hat sich seit der Disposition geändert; \
+             das Fahrzeug lässt sich entlassen"
+                .into(),
+        ));
+    }
+    let hat_besatzung: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM einsatz_personal \
+                       WHERE fahrzeug_id = ?1 AND einsatz_id = ?2 AND beendet_at IS NULL)",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let bindung = if hat_besatzung {
+        Some("Das Fahrzeug hat eine Besatzung")
+    } else if einheit.is_some() {
+        Some("Das Fahrzeug gehört einer Einheit an")
+    } else if br.is_some() {
+        Some("Das Fahrzeug steht in einem Bereitstellungsraum")
+    } else {
+        None
+    };
+    if let Some(b) = bindung {
+        return Ok(Some(format!("{b}; erst lösen oder das Fahrzeug entlassen")));
+    }
+    // Spuren außerhalb der eigenen Zeile, in fester Reihenfolge.
+    const SPUREN: [(&str, &str); 3] = [
+        (
+            "SELECT EXISTS(SELECT 1 FROM br_belegung \
+                           WHERE objekt_typ = 'fahrzeug' AND objekt_id = ?1 AND einsatz_id = ?2)",
+            "Das Fahrzeug war in einem Bereitstellungsraum",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM einsatz_fuehrungsstelle_fahrzeug \
+                           WHERE einsatz_fahrzeug_id = ?1 AND einsatz_id = ?2)",
+            "Das Fahrzeug trägt die Führungsstelle",
+        ),
+        (
+            "SELECT EXISTS(SELECT 1 FROM auftrag_empfaenger ae JOIN auftrag a ON a.id = ae.auftrag_id \
+                           WHERE ae.fahrzeug_id = ?1 AND a.einsatz_id = ?2)",
+            "Das Fahrzeug ist Empfänger eines Auftrags",
+        ),
+    ];
+    for (sql, grund) in SPUREN {
+        let hat: bool = sqlx::query_scalar(sql)
+            .bind(ef_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        if hat {
+            return Ok(Some(format!("{grund}; das Fahrzeug lässt sich entlassen")));
+        }
+    }
+    if !crate::entlassung::is_in_storno_frist(&disponiert_at, jetzt) {
+        return Ok(Some(crate::entlassung::storno_frist_text()));
+    }
+    Ok(None)
+}
+
+/// Nimmt ein entlassenes oder storniertes Fahrzeug wieder auf (design.md D7): Endzustand weg,
+/// Initialstatus und Dispositionszeit neu. Ein Stamm-Fahrzeug muss in Dienst sein, sein Snapshot
+/// wird erneuert. `NotFound` bei fremder Zeile, `Conflict` bei einer aktiven.
+pub async fn reaktivieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    let zeile: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT fahrzeug_id, beendet_at FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (fahrzeug_id, beendet_at) = zeile.ok_or(AppError::NotFound)?;
+    if beendet_at.is_none() {
+        return Err(doppelt_conflict());
+    }
+    if let Some(fid) = fahrzeug_id {
+        let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger) =
+            stamm_snapshot_tx(conn, org_id, fid).await?;
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET snap_funkrufname = ?, snap_kennzeichen = ?, \
+                 snap_fahrzeugtyp = ?, snap_opta = ?, snap_traegerorganisation = ? WHERE id = ?",
+        )
+        .bind(&funkrufname)
+        .bind(&kennzeichen)
+        .bind(&fahrzeugtyp)
+        .bind(&opta)
+        .bind(&traeger)
+        .bind(ef_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    let status_id =
+        status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
+    // `status_seit` und `disponiert_at` in derselben Anweisung: daran erkennt der Storno einen
+    // unveränderten Status (design.md D3).
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL, \
+             status_id = ?1, \
+             status_seit = CASE WHEN ?1 IS NULL THEN NULL ELSE datetime('now') END, \
+             disponiert_at = datetime('now'), disponiert_von = ?2 \
+         WHERE id = ?3 AND einsatz_id = ?4",
+    )
+    .bind(status_id)
+    .bind(benutzer_id)
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
@@ -697,7 +1089,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aktualisiere_status_und_bemerkung_dann_entferne() {
+    async fn aktualisiere_status_und_bemerkung_dann_entlassen() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
@@ -742,10 +1134,32 @@ mod tests {
         assert_eq!(b.status_id, Some(neuer_status.id), "Status unverändert");
         assert_eq!(b.bemerkung.as_deref(), Some("korrigiert"));
 
-        entferne(&pool, einsatz, ef).await.unwrap();
+        entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
+        // Die Zeile bleibt (LLH-1079), fehlt aber in der Liste und nimmt keinen Status mehr an.
+        let c = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
+        assert_eq!(c.beendet_von, Some(benutzer));
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert_eq!(
+            list_entlassene(&pool, einsatz, true)
+                .await
+                .unwrap()
+                .iter()
+                .map(|a| a.id)
+                .collect::<Vec<_>>(),
+            [ef]
+        );
         assert!(matches!(
-            laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(),
-            AppError::NotFound
+            aktualisiere(&pool, einsatz, ef, Some(neuer_status.id), None)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        assert!(matches!(
+            aktualisiere_position(&pool, einsatz, ef, PositionPatch::default(), true)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
         ));
     }
 
@@ -795,23 +1209,18 @@ mod tests {
         );
     }
 
-    /// Fahrzeug entfernen gibt die Besatzung transaktional frei; ohne Freigabe scheiterte das
-    /// DELETE am FK, die Kraft bleibt als freie Kraft erhalten.
+    /// Fahrzeug entlassen gibt die Besatzung frei (design.md D4); die Kraft bleibt als freie
+    /// Kraft erhalten.
     #[tokio::test]
-    async fn entferne_gibt_besatzung_frei_statt_orphan() {
+    async fn entlassen_gibt_besatzung_frei() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ef) = seed_fahrzeug(&pool).await;
         let ep: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_personal (einsatz_id, snap_name, fahrzeug_id) VALUES (?, 'Crew', ?) RETURNING id",
         ).bind(einsatz).bind(ef).fetch_one(&pool).await.unwrap();
 
-        entferne(&pool, einsatz, ef).await.unwrap();
-
-        // Fahrzeug weg, Person bleibt als freie Kraft (fahrzeug_id NULL).
-        assert!(matches!(
-            laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(),
-            AppError::NotFound
-        ));
+        let e = entlasse(&pool, einsatz, ef, 1).await.unwrap();
+        assert_eq!(e.besatzung, [ep]);
         let fahrzeug_id: Option<i64> =
             sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
                 .bind(ep)
@@ -821,10 +1230,10 @@ mod tests {
         assert_eq!(fahrzeug_id, None, "Besatzung wird frei, nicht gelöscht");
     }
 
-    /// Ein als Auftrag-Empfänger referenziertes Fahrzeug entfernen: der Bezug wird per ON DELETE
-    /// SET NULL freigegeben.
+    /// Ein als Auftrag-Empfänger referenziertes Fahrzeug entlassen: der Auftrag nennt es weiter
+    /// (design.md D4, „Historie bleibt“).
     #[tokio::test]
-    async fn entferne_setzt_empfaenger_fahrzeug_null() {
+    async fn entlassen_behaelt_auftrag_empfaenger() {
         let pool = crate::db::test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -869,16 +1278,21 @@ mod tests {
         .await
         .unwrap();
 
-        entferne(&pool, einsatz, ef)
+        entlasse(&pool, einsatz, ef, bn)
             .await
-            .expect("Fahrzeug entfernen darf nicht am FK scheitern");
+            .expect("Fahrzeug entlassen darf nicht am FK scheitern");
         let emp: Option<i64> =
             sqlx::query_scalar("SELECT fahrzeug_id FROM auftrag_empfaenger WHERE auftrag_id = ?")
                 .bind(auftrag)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(emp, None, "Empfänger.fahrzeug_id muss NULL sein (SET NULL)");
+        assert_eq!(
+            emp,
+            Some(ef),
+            "der Auftrag nennt das entlassene Fahrzeug weiter"
+        );
+        // Ein Auftrag ist eine Spur: das Fahrzeug ließe sich nicht stornieren.
     }
 
     /// LFH-733 (design.md D2): `ist_demo` folgt der Marke des Stamm-Fahrzeugs, unabhängig von
@@ -936,6 +1350,366 @@ mod tests {
                 .await
                 .unwrap()
                 .ist_demo
+        );
+    }
+
+    // ── Lebenszustand (LLH-1079 Teil II) ──────────────────────────────────────────────
+
+    const JETZT: &str = "2099-01-01 00:00:00";
+
+    async fn entlasse(
+        pool: &SqlitePool,
+        einsatz: i64,
+        ef: i64,
+        benutzer: i64,
+    ) -> Result<Entlassen, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let e = entlassen_tx(&mut tx, einsatz, ef, benutzer, JETZT).await?;
+        tx.commit().await.unwrap();
+        Ok(e)
+    }
+
+    /// Storniert „jetzt“ (Uhrzeit der Datenbank), damit die Frist ab der Disposition läuft.
+    async fn storniere(pool: &SqlitePool, einsatz: i64, ef: i64) -> Result<(), AppError> {
+        let jetzt: String = sqlx::query_scalar("SELECT datetime('now')")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        let mut tx = pool.begin().await.unwrap();
+        stornieren_tx(&mut tx, einsatz, ef, 1, &jetzt).await?;
+        tx.commit().await.unwrap();
+        Ok(())
+    }
+
+    fn grund(e: AppError) -> String {
+        match e {
+            AppError::UnprocessableEntity(g) => g,
+            e => panic!("422 erwartet, bekam {e:?}"),
+        }
+    }
+
+    /// design.md D4: Entlassen löst Einheit, Bereitstellungsraum (mit Austritt) und die
+    /// Führungsstelle; ein zweites Entlassen ist 409.
+    #[tokio::test]
+    async fn entlassen_loest_einheit_raum_und_fuehrungsstelle() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'BR Nord', 1, 1) RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ?, aktueller_br_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(br)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle_fahrzeug (einsatz_id, einsatz_fahrzeug_id) \
+             VALUES (?, ?)",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let e = entlasse(&pool, einsatz, ef, 1).await.unwrap();
+        assert_eq!(e.einheit, Some((einheit, "1. Zug".to_string())));
+        assert_eq!(e.br_id, Some(br));
+        assert!(e.trug_fuehrungsstelle);
+
+        let (einheit_nach, br_nach): (Option<i64>, Option<i64>) =
+            sqlx::query_as("SELECT einheit_id, aktueller_br_id FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((einheit_nach, br_nach), (None, None));
+        let austritt: (String, Option<String>) = sqlx::query_as(
+            "SELECT art, notiz FROM br_belegung WHERE objekt_typ = 'fahrzeug' AND objekt_id = ?",
+        )
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            austritt,
+            ("austritt".into(), Some("Fahrzeug entlassen".into()))
+        );
+        let fs: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_fahrzeug_id = ?",
+        )
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(fs, 0);
+        // Keine Zeitachse für Fahrzeuge (D5).
+        let zeitachse: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_kraft_zeitachse")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zeitachse, 0);
+
+        assert!(matches!(
+            entlasse(&pool, einsatz, ef, 1).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    /// design.md D7: Disponieren eines entlassenen Stamm-Fahrzeugs nimmt dieselbe Zeile wieder
+    /// auf, mit neuem Initialstatus; erst das zweite Disponieren ist 409.
+    #[tokio::test]
+    async fn disponieren_nimmt_entlassenes_fahrzeug_wieder_auf() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET status_id = NULL WHERE id = ?")
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        let d = disponiere_stamm_tx(&mut conn, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        drop(conn);
+        assert_eq!(
+            d,
+            Disponiert {
+                id: ef,
+                reaktiviert: true
+            }
+        );
+        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        assert_eq!(a.beendet_at, None);
+        assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
+        assert_eq!(a.status_seit.as_deref(), Some(a.disponiert_at.as_str()));
+        assert!(matches!(
+            disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        // `reaktivieren_tx` an einer aktiven Zeile ist 409, an einer fremden 404.
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(matches!(
+            reaktivieren_tx(&mut conn, einsatz, 1, ef, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        assert!(matches!(
+            reaktivieren_tx(&mut conn, einsatz + 1, 1, ef, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    /// design.md D3: direkt nach dem Disponieren lässt sich ein Fahrzeug stornieren; es erscheint
+    /// danach in keiner Liste und keinem Nachweis, und ein zweiter Storno ist 409.
+    #[tokio::test]
+    async fn storno_direkt_nach_der_disposition() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        storniere(&pool, einsatz, ef).await.unwrap();
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert!(list_entlassene(&pool, einsatz, true)
+            .await
+            .unwrap()
+            .is_empty());
+        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        assert_eq!(a.beendet_als.as_deref(), Some("storniert"));
+        assert!(matches!(
+            storniere(&pool, einsatz, ef).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    /// design.md D3: jede Spur verhindert den Storno mit 422 und einem Satz, der den Ausweg nennt.
+    #[tokio::test]
+    async fn storno_mit_spur_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let setze = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(sql).bind(ef).execute(&pool).await.unwrap();
+            }
+        };
+
+        // Status gewechselt.
+        setze("UPDATE einsatz_fahrzeug SET status_seit = '2000-01-01 00:00:00' WHERE id = ?").await;
+        assert!(grund(storniere(&pool, einsatz, ef).await.unwrap_err())
+            .starts_with("Der Status des Fahrzeugs hat sich seit der Disposition geändert"));
+        setze("UPDATE einsatz_fahrzeug SET status_seit = disponiert_at WHERE id = ?").await;
+        // Status in derselben Sekunde gewechselt: `status_seit` gleicht der Disposition, der
+        // Status nicht mehr dem ersten `gebunden`.
+        let initial: Option<i64> =
+            sqlx::query_scalar("SELECT status_id FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        setze("UPDATE einsatz_fahrzeug SET status_id = NULL WHERE id = ?").await;
+        assert!(grund(storniere(&pool, einsatz, ef).await.unwrap_err())
+            .starts_with("Der Status des Fahrzeugs hat sich seit der Disposition geändert"));
+        sqlx::query("UPDATE einsatz_fahrzeug SET status_id = ? WHERE id = ?")
+            .bind(initial)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Besatzung.
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, fahrzeug_id) \
+             VALUES (?, 'Crew', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            grund(storniere(&pool, einsatz, ef).await.unwrap_err()),
+            "Das Fahrzeug hat eine Besatzung; erst lösen oder das Fahrzeug entlassen"
+        );
+        sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE id = ?")
+            .bind(ep)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Führungsstelle.
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle_fahrzeug (einsatz_id, einsatz_fahrzeug_id) \
+             VALUES (?, ?)",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            grund(storniere(&pool, einsatz, ef).await.unwrap_err()),
+            "Das Fahrzeug trägt die Führungsstelle; das Fahrzeug lässt sich entlassen"
+        );
+        setze("DELETE FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_fahrzeug_id = ?").await;
+
+        // Frist abgelaufen.
+        setze(
+            "UPDATE einsatz_fahrzeug SET disponiert_at = datetime('now', '-20 minutes'), \
+             status_seit = datetime('now', '-20 minutes') WHERE id = ?",
+        )
+        .await;
+        assert!(grund(storniere(&pool, einsatz, ef).await.unwrap_err())
+            .contains("nur in den ersten 15 Minuten nach der Disposition"));
+    }
+
+    /// Wer einmal entlassen war, lässt sich nach dem erneuten Disponieren nicht stornieren
+    /// (Storno-Sperre, Migration 0195): sonst verschwände er aus dem Nachweis.
+    #[tokio::test]
+    async fn einmal_entlassen_sperrt_den_storno() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        entlasse(&pool, einsatz, ef, 1).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, ef, 1).await.unwrap();
+        drop(conn);
+        assert!(grund(storniere(&pool, einsatz, ef).await.unwrap_err())
+            .starts_with("Das Fahrzeug war schon einmal aus dem Einsatz entlassen"));
+    }
+
+    /// Ein Ad-hoc-Fahrzeug kehrt über `reaktivieren_tx` zurück (Block „Entlassen“, D7).
+    #[tokio::test]
+    async fn adhoc_fahrzeug_wird_reaktiviert() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let ef = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "FW Extern",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, ef, benutzer)
+            .await
+            .unwrap();
+        drop(conn);
+        let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
+        assert_eq!(a.beendet_als, None);
+        assert_eq!(a.funkrufname, "FW Extern");
+        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 1);
+    }
+
+    /// Der zweite Versuch, der hinter `require_aktiv_tx` durchrutscht (gleichzeitig), trifft im
+    /// UPDATE keine Zeile mehr: 409 mit dem Wortlaut „bereits entlassen“.
+    #[tokio::test]
+    async fn set_beendet_zweimal_ist_409_bereits_entlassen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let ef = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "FW Extern",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        entlasse(&pool, einsatz, ef, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let e = set_beendet_tx(
+            &mut conn,
+            einsatz,
+            ef,
+            benutzer,
+            JETZT,
+            BeendetAls::Entlassen,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&e, AppError::Conflict(m) if m == "Das Fahrzeug ist bereits entlassen"),
+            "{e:?}"
         );
     }
 }

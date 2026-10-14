@@ -24,6 +24,7 @@ import { Select } from '../components/Select';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { personLabel } from '../kraefte/einsatzfunktionKern';
 
 /**
  * Zeile „Einsatzleiter“ der eigenen Führungsstelle (LFH-1199): eine disponierte Person oder ein
@@ -64,7 +65,7 @@ function toEingabe(w: Wahl): EinsatzleiterEingabe | null {
 
 function personText(p: EinsatzPersonal): string {
   // Gleichnamige Personen bleiben über die Funktion unterscheidbar (wie die Stab-Besetzung).
-  return p.funktion ? `${p.name} · ${p.funktion}` : p.name;
+  return personLabel(p);
 }
 
 /**

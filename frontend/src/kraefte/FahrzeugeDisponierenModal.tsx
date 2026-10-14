@@ -6,6 +6,7 @@ import { listeEinheiten } from '../api/einheiten';
 import {
   disponiereFahrzeugeSammel,
   listeEinsatzFahrzeuge,
+  listEntlasseneFahrzeuge,
   type SammelFahrzeugEingabe,
 } from '../api/einsatzFahrzeuge';
 import { listeFahrzeuge } from '../api/fahrzeuge';
@@ -40,6 +41,9 @@ type Werte = { fahrzeug_ids: number[]; einheit_id?: number };
  * `iw7x9980-sammel-disposition`): mehrere Stamm-Fahrzeuge in einem Absenden, optional in eine
  * Einheit — das Feld nur bei Freigabe des Moduls Einheiten (D4). Keine Zeitachse für Fahrzeuge
  * (D6). „Werte behalten“ hält die Einheit (D8). Gründe je Fahrzeug wie im Personal-Dialog.
+ * Aktiv disponierte und entlassene Fahrzeuge fehlen in der Auswahl (LLH-1079 Teil II) — ein
+ * entlassenes kommt über „Erneut disponieren“ im Block „Entlassen“ zurück; die Ablehnung
+ * „entlassen“ des Servers bleibt die Wache. Ein storniertes steht wieder zur Wahl.
  */
 export default function FahrzeugeDisponierenModal({
   offen,
@@ -65,6 +69,11 @@ export default function FahrzeugeDisponierenModal({
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
     enabled: offen,
   });
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeugeEntlassene(einsatzId),
+    queryFn: () => listEntlasseneFahrzeuge(einsatzId),
+    enabled: offen,
+  });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
@@ -85,7 +94,9 @@ export default function FahrzeugeDisponierenModal({
   });
 
   const vergeben = new Set(
-    (aktivQuery.data ?? []).map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
+    [...(aktivQuery.data ?? []), ...(entlasseneQuery.data ?? [])]
+      .map((e) => e.fahrzeug_id)
+      .filter((x): x is number => x != null),
   );
   const pool = (poolQuery.data ?? []).filter((f) => !vergeben.has(f.id));
   const optionen = demoGroupedOptions(pool, fahrzeugLabel, fahrzeugSuchtext);

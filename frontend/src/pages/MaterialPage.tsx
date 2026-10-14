@@ -1,15 +1,4 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Form,
-  Input,
-  Popconfirm,
-  Space,
-  Tag,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Modal, Space, Tag } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -32,8 +21,11 @@ import {
   aktualisiereDisposition,
   disponiereAdhoc,
   disponiereMaterial,
-  entferneDisposition,
   listeEinsatzMaterial,
+  listEntlassenesMaterial,
+  nimmAusDemEinsatz,
+  reaktiviereDisposition,
+  storniereDisposition,
   type MaterialAdhocEingabe,
 } from '../api/einsatzMaterial';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -47,6 +39,11 @@ import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -134,6 +131,9 @@ export default function MaterialPage() {
   const [form] = Form.useForm<MaterialAdhocEingabe & { menge: number }>();
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [stammForm] = Form.useForm<StammDisposition>();
+  /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
+  const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
+  const isNewGestureStorno = useNewGesture(stornoFuer !== null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -142,6 +142,12 @@ export default function MaterialPage() {
   const emQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
+  });
+  // Aus dem Einsatz genommenes Material (LLH-1079 Teil II): getrennt geliefert, die Liste kennt es
+  // nicht. Auf dem Draht heißt der Endzustand `entlassen`.
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.materialEntlassene(einsatzId),
+    queryFn: () => listEntlassenesMaterial(einsatzId),
   });
   const poolQuery = useQuery({
     queryKey: globalKeys.materialListe('im-dienst'),
@@ -213,11 +219,50 @@ export default function MaterialPage() {
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.emId, e, 'Bemerkung nicht gespeichert'),
   });
-  const entfernenMutation = useMutation({
-    mutationFn: (emId: number) => entferneDisposition(einsatzId, emId),
+  /*
+   * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): die Aktion im Block meldet an ihrem Eintrag, Rückgängig aus dem Toast
+   * im Seitenhinweis — die Zeile ist dann weg, der Block meist eingeklappt.
+   */
+  const reaktivierenMutation = useMutation({
+    mutationFn: (emId: number) => reaktiviereDisposition(einsatzId, emId),
     onMutate: (emId) => zeilen.beginne(emId),
     onSuccess: invalidate,
-    onError: (e, emId) => zeilen.melde(emId, e, 'Entfernen fehlgeschlagen'),
+    onError: (e, emId) => zeilen.melde(emId, e, 'Nicht erneut disponiert'),
+  });
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  const rueckgaengigMutation = useMutation({
+    mutationFn: (emId: number) => reaktiviereDisposition(einsatzId, emId),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: invalidate,
+    onError: (e) => {
+      setRueckgaengigFehler(e);
+      invalidate();
+    },
+  });
+  // Aus dem Einsatz nehmen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast
+  // (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“, design.md D8). Rückgängig
+  // setzt Einheit und UHS nicht wieder. Die Einheit verliert ein Mitglied: ihre Liste mit.
+  const herausnehmenMutation = useMutation({
+    mutationFn: (v: { emId: number; name: string }) => nimmAusDemEinsatz(einsatzId, v.emId),
+    onMutate: (v) => zeilen.beginne(v.emId),
+    onSuccess: (_, v) => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      zeigeRueckgaengig(message, `${v.name} aus dem Einsatz genommen`, () =>
+        rueckgaengigMutation.mutate(v.emId),
+      );
+    },
+    onError: (e, v) => zeilen.melde(v.emId, e, 'Nicht aus dem Einsatz genommen'),
+  });
+  // Stornieren ist unumkehrbar und nur kurz nach einer Fehldisposition möglich; der Server nennt
+  // den Grund einer Ablehnung, er steht an der Zeile.
+  const stornierenMutation = useMutation({
+    mutationFn: (emId: number) => storniereDisposition(einsatzId, emId),
+    onMutate: (emId) => zeilen.beginne(emId),
+    onSuccess: invalidate,
+    onError: (e, emId) => zeilen.melde(emId, e, 'Nicht storniert'),
   });
 
   // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
@@ -239,6 +284,12 @@ export default function MaterialPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const ems = emQuery.data ?? [];
+  const entlassene = entlasseneQuery.data ?? [];
+  /** Läuft für diese Zeile Herausnehmen oder Stornieren? Dann keine zweite Handlung. */
+  const isZeileBusy = (emId: number) =>
+    (herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === emId) ||
+    (stornierenMutation.isPending && stornierenMutation.variables === emId);
+  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
 
   /**
    * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig (Herleitung in `FahrzeugePage.tsx`). Ohne
@@ -380,15 +431,29 @@ export default function MaterialPage() {
             title: 'Aktionen',
             key: 'aktionen' as const,
             immerSichtbar: true,
+            // Herausnehmen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht
+            // im Zeilenmenü und fragt nach (LLH-1079, design.md D8, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (
-              <Popconfirm
-                title="Aus Einsatz entfernen?"
-                okText="Aus Einsatz entfernen"
-                onConfirm={() => entfernenMutation.mutate(em.id)}
-              >
-                {/* Ohne `danger`: Rot ist Gefahr, nicht Bedienung. */}
-                <Button>Entfernen</Button>
-              </Popconfirm>
+              <Space size="middle">
+                <Button
+                  danger
+                  loading={
+                    herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === em.id
+                  }
+                  disabled={isZeileBusy(em.id)}
+                  aria-label={`${em.bezeichnung} aus dem Einsatz nehmen`}
+                  onClick={() => herausnehmenMutation.mutate({ emId: em.id, name: em.bezeichnung })}
+                >
+                  Aus dem Einsatz nehmen
+                </Button>
+                <MenueAusloeser
+                  eintraege={stornoEintraege}
+                  zugaenglicherName={`Weitere Aktionen zu ${em.bezeichnung}`}
+                  gesperrt={isZeileBusy(em.id)}
+                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === em.id}
+                  onWahl={() => setStornoFuer({ id: em.id, name: em.bezeichnung })}
+                />
+              </Space>
             ),
           },
         ]
@@ -410,10 +475,18 @@ export default function MaterialPage() {
       meta={emQuery.isSuccess ? `${ems.length} Positionen` : undefined}
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-        )
+        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {!darfSchreiben && einsatz.status !== 'aktiv' && (
+              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+            )}
+            <SeitenHinweise
+              fehler={rueckgaengigFehler}
+              fehlerTitel="Nicht erneut disponiert"
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+          </Space>
+        ) : null
       }
       /**
        * Der Kopf ÖFFNET nur (LFH-983, `frontend/AGENTS.md`, Bedien-Leitlinie): disponiert wird im
@@ -478,16 +551,80 @@ export default function MaterialPage() {
               sekundaer: ['kategorie', 'menge'],
               aktion: darfSchreiben
                 ? {
-                    etikett: 'Entfernen',
-                    bestaetigung: 'Aus Einsatz entfernen?',
-                    bestaetigungKnopf: 'Aus Einsatz entfernen',
-                    onKlick: (em) => entfernenMutation.mutate(em.id),
+                    etikett: 'Aus dem Einsatz nehmen',
+                    zugaenglicherName: (em) => `${em.bezeichnung} aus dem Einsatz nehmen`,
+                    onKlick: (em) =>
+                      herausnehmenMutation.mutate({ emId: em.id, name: em.bezeichnung }),
+                  }
+                : undefined,
+              weitere: darfSchreiben
+                ? {
+                    eintraege: () => stornoEintraege,
+                    zugaenglicherName: (em) => `Weitere Aktionen zu ${em.bezeichnung}`,
+                    laeuft: (em) => isZeileBusy(em.id),
+                    onWahl: (_, em) => setStornoFuer({ id: em.id, name: em.bezeichnung }),
                   }
                 : undefined,
             }}
           />
+          {/* Der Nachweis bleibt erreichbar (Spec `kraefte-entlassung`); Wortlaut LLH-1093. */}
+          <EntlassenBlock
+            titel="Aus dem Einsatz genommen"
+            endeWort="aus dem Einsatz genommen"
+            eintraege={entlassene.map((em) => ({
+              id: em.id,
+              name: em.bezeichnung,
+              zusatz: `×${em.menge}`,
+              beendetAt: em.beendet_at,
+            }))}
+            aktion={
+              darfSchreiben
+                ? {
+                    etikett: 'Erneut disponieren',
+                    onKlick: (emId) => reaktivierenMutation.mutate(emId),
+                    laeuft: (emId) =>
+                      reaktivierenMutation.isPending && reaktivierenMutation.variables === emId,
+                  }
+                : undefined
+            }
+            fehler={(emId) => zeilen.grund(emId)}
+          />
         </>
       )}
+
+      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
+          nennt ihre Position und schließt, wenn die Zeile entfällt. */}
+      <Modal
+        open={stornoFuer !== null && ems.some((em) => em.id === stornoFuer.id)}
+        title={stornoFuer ? `${stornoFuer.name} stornieren?` : undefined}
+        onCancel={() => {
+          if (isNewGestureStorno()) setStornoFuer(null);
+        }}
+        destroyOnHidden
+        footer={
+          <Space size="middle">
+            <Button
+              onClick={() => {
+                if (isNewGestureStorno()) setStornoFuer(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              danger
+              onClick={() => {
+                if (!stornoFuer || !isNewGestureStorno()) return;
+                setStornoFuer(null);
+                stornierenMutation.mutate(stornoFuer.id);
+              }}
+            >
+              Stornieren
+            </Button>
+          </Space>
+        }
+      >
+        Das Material erscheint danach in keiner Liste und keinem Nachweis.
+      </Modal>
 
       {/* Stamm-Material disponieren. Serienmodus, weil eine Anlieferung mehrere Positionen bringt.
           Die Pflichtprüfung meldet ein fehlendes Material; der Knopf ist nie grau ohne Grund. */}

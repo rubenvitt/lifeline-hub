@@ -453,7 +453,8 @@ impl Ablauf<'_> {
                     fahrzeug_id,
                     self.admin_id,
                 )
-                .await?;
+                .await?
+                .id;
                 self.fahrzeuge.insert(fahrzeug, ef_id);
                 let anzeige = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
                     conn,

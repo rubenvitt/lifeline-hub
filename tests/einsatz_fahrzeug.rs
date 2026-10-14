@@ -182,18 +182,18 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
         StatusCode::NO_CONTENT
     );
 
-    // Fahrzeug entfernen → 204 (kein FK-Fehler trotz Besatzung); Kraft bleibt frei.
+    // Fahrzeug entlassen → 200 (LLH-1079); die Kraft bleibt frei.
     assert_eq!(
         anfrage(
             &app,
-            "DELETE",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
             &admin,
             None
         )
         .await
         .0,
-        StatusCode::NO_CONTENT
+        StatusCode::OK
     );
     let (_, personal) = anfrage(
         &app,
@@ -474,15 +474,15 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
 
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
         &admin,
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(status, StatusCode::OK);
 
-    // Disponieren + Status-Wechsel + Entfernen = 3 System-Einträge.
+    // Disponieren + Status-Wechsel + Entlassen = 3 System-Einträge.
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 3);
 }
 
@@ -854,8 +854,8 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
                 &admin,
                 None,
             )
@@ -864,21 +864,21 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
         }
     };
 
-    assert_eq!(entfernen(frei).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(frei).await, StatusCode::OK);
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
-    assert_eq!(entfernen(im_zug).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(im_zug).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("einheit", einheit)],
         "Mitglied der Einheit"
     );
-    assert_eq!(entfernen(besetzt).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(besetzt).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("personal", ep)],
         "Besatzung gelöst"
     );
-    assert_eq!(entfernen(im_br).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(im_br).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("bereitstellungsraum", br)],
@@ -939,4 +939,263 @@ async fn statuswechsel_feuert_einheit_nur_fuer_fahrzeug_einer_einheit() {
         StatusCode::OK
     );
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "nur Bemerkung");
+}
+
+// ── Entlassen statt löschen (LLH-1079 Teil II, Spec `kraefte-entlassung`) ────────────────
+
+async fn aktion(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    was: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/{was}"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+async fn funkrufnamen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> Vec<String> {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    json.as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["funkrufname"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Das entlassene Fahrzeug bleibt mit Zeitpunkt und entlassender Person, fehlt in der Liste und
+/// steht unter `?entlassene=1`; jeder Schreibweg an ihm ist 409, das Disponieren des Stamm-
+/// Fahrzeugs holt dieselbe Zeile zurück. Das alte Löschen gibt es nicht mehr.
+#[tokio::test]
+async fn fahrzeug_entlassen_und_erneut_disponieren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    let ef = json["id"].as_i64().unwrap();
+    fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
+
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["beendet_als"], "entlassen");
+    assert!(json["beendet_at"].is_string() && json["beendet_von"].is_i64());
+    assert_eq!(funkrufnamen(&app, &admin, einsatz, "").await, ["Florian 2"]);
+    assert_eq!(
+        funkrufnamen(&app, &admin, einsatz, "?entlassene=1").await,
+        ["Florian 1"]
+    );
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Fahrzeug «Florian 1» aus dem Einsatz entlassen"));
+
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "stornieren").await.0,
+        StatusCode::CONFLICT
+    );
+    for (methode, pfad, body) in [
+        ("PATCH", format!("fahrzeuge/{ef}"), r#"{"bemerkung":"x"}"#),
+        (
+            "PATCH",
+            format!("fahrzeuge/{ef}/position"),
+            r#"{"lat":52.0,"lon":10.0}"#,
+        ),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::METHOD_NOT_ALLOWED, "kein Löschweg mehr");
+
+    // D7: das Stamm-Fahrzeug erneut disponieren trifft dieselbe Zeile.
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["id"], ef);
+    assert!(json.get("beendet_als").is_none_or(|v| v.is_null()));
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Fahrzeug «Florian 1» erneut disponiert"));
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        StatusCode::CONFLICT,
+        "ein aktives Fahrzeug wird nicht reaktiviert"
+    );
+}
+
+/// design.md D3: Storno direkt nach der Disposition (204, in keiner Liste); nach einem
+/// Statuswechsel 422 mit dem Grund. Ein Ad-hoc-Fahrzeug kehrt über `…/reaktivieren` zurück.
+#[tokio::test]
+async fn fahrzeug_stornieren_und_reaktivieren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1"}}"#),
+    )
+    .await;
+    let fehl = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(funkrufnamen(&app, &admin, einsatz, "").await.is_empty());
+    assert!(funkrufnamen(&app, &admin, einsatz, "?entlassene=1")
+        .await
+        .is_empty());
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Fahrzeug «FW Extern 1» storniert (Fehldisposition)"));
+    let (s, json) = aktion(&app, &admin, einsatz, fehl, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        funkrufnamen(&app, &admin, einsatz, "").await,
+        ["FW Extern 1"]
+    );
+
+    // Ein Statuswechsel ist eine Spur.
+    let gewechselt = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 3").await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let anderer = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"].as_str().unwrap().starts_with("4"))
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{gewechselt}"),
+        &admin,
+        Some(&format!(r#"{{"status_id":{anderer}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = aktion(&app, &admin, einsatz, gewechselt, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert!(json["error"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("Status des Fahrzeugs"));
+}
+
+/// Jeder Schreibweg anderer Module an einem entlassenen Fahrzeug antwortet 409: Besatzung,
+/// Einheit, Bereitstellungsraum, Führungsstelle, neuer Auftragsempfänger.
+#[tokio::test]
+async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Maschinist").await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Nord"}"#),
+    )
+    .await;
+    let br = json["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        &admin,
+        Some(r#"{"status":"aktiv"}"#),
+    )
+    .await;
+    assert!(s.is_success());
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        StatusCode::OK
+    );
+
+    let belegung = format!(r#"{{"objekt_typ":"fahrzeug","objekt_id":{ef},"art":"eintritt"}}"#);
+    let fuehrungsstelle = format!(r#"{{"fahrzeug_ids":[{ef}]}}"#);
+    let auftrag = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "empfaenger": [{ "empfaenger_typ": "fahrzeug", "fahrzeug_id": ef }]
+    })
+    .to_string();
+    for (methode, pfad, body) in [
+        ("PUT", format!("fahrzeuge/{ef}/besatzung/{ep}"), None),
+        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
+        (
+            "POST",
+            format!("bereitstellungsraeume/{br}/belegung"),
+            Some(belegung),
+        ),
+        (
+            "PATCH",
+            "fuehrungsstelle".to_string(),
+            Some(fuehrungsstelle),
+        ),
+        ("POST", "auftraege".to_string(), Some(auftrag)),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            body.as_deref(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+    }
 }

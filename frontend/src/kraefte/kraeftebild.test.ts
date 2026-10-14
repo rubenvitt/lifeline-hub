@@ -351,6 +351,36 @@ it('der Lagebericht-Text folgt dem Kräftebaum: Fahrzeug mit Besatzung, „Ohne 
   ]);
 });
 
+// LLH-1067: Lagebericht-Übernahme und Meldebild nennen die Einsatzfunktion vor der Qualifikation.
+it('die Personenzeile nennt die Einsatzfunktion vor der Qualifikation', () => {
+  const zug = { ...eh(10, 1), fuehrer_id: 1 };
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [zug],
+    [
+      { ...p(1, 10, 'fuehrer'), funktion: 'Notfallsanitäter', einsatzfunktion: 'Zugführer' },
+      { ...p(2, 10, 'mannschaft'), funktion: 'Sanitäter' },
+    ],
+    [],
+    [],
+  );
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  expect(md).toContain('  - Pers. P1 (EF · Zugführer) [gebunden]');
+  expect(md).toContain('  - Pers. P2 (Sanitäter) [gebunden]');
+});
+
+it('Suche trifft auch die Einsatzfunktion', () => {
+  const personal = [
+    { ...p(1, null, 'mannschaft'), einsatzfunktion: 'Sprechfunker' },
+    { ...p(2, null, 'mannschaft'), funktion: 'Sanitäter' },
+  ];
+  const treffer = filtereKraefte(
+    { abschnitte: [], einheiten: [], personal, fahrzeuge: [], material: [] },
+    { traeger: null, abschnittId: null, kategorie: null, suche: 'sprech' },
+  );
+  expect(treffer.personal.map((x) => x.id)).toEqual([1]);
+});
+
 it('Kennzahlen des Lagebilds stehen in der Anzeige je in eigenem Block (LFH-1153)', () => {
   // Markdown ohne harte Umbrüche: Zeilen ohne Leerzeile dazwischen liefen zu EINEM Absatz zusammen
   // — im Lagebericht stand „Gesamtstärke … Fahrzeuge … Material …“ in einer Zeile.

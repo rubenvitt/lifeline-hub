@@ -285,7 +285,8 @@ pub async fn aktive_belegungen_tx(
         "SELECT \
             (SELECT COUNT(*) FROM einsatz_einheit \
                WHERE aktueller_br_id = ? AND aufgeloest_at IS NULL) + \
-            (SELECT COUNT(*) FROM einsatz_fahrzeug WHERE aktueller_br_id = ?)",
+            (SELECT COUNT(*) FROM einsatz_fahrzeug \
+               WHERE aktueller_br_id = ? AND beendet_at IS NULL)",
     )
     .bind(br_id)
     .bind(br_id)

@@ -492,6 +492,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("snap_funktion", Strategie::NullSetzen, Z_EINSATZ),
             scrub("snap_traegerorganisation", Strategie::NullSetzen, Z_EINSATZ),
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
+            // Einsatzfunktion (LLH-1067, design.md D8): Freitext wie die Bemerkung.
+            scrub("einsatzfunktion", Strategie::NullSetzen, Z_EINSATZ),
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
             // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
@@ -1010,6 +1012,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beendet_at", G_ZEIT),
             retain("beendet_von", G_FK),
             retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -1041,6 +1045,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beendet_at", G_ZEIT),
             retain("beendet_von", G_FK),
             retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("uhs_id", G_FK),
         ],
     },

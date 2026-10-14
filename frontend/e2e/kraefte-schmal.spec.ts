@@ -137,7 +137,8 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
 
 /**
  * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser und
- * „Entfernen", der Kopf seine Dispositionsfelder, Einheiten und Meldebild ihre Primäraktion.
+ * „Entlassen" (Material: „Aus dem Einsatz nehmen"), der Kopf seine Dispositionsfelder,
+ * Einheiten und Meldebild ihre Primäraktion.
  * Gemessen wird wie oben, dazu das Meldebild (`kraefteuebersicht`), das im Nur-Lese-Zweig
  * ebenfalls Knöpfe verliert.
  *
@@ -192,7 +193,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
           'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
         ).toHaveCount(0);
-        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen". Einzige
+        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entlassen". Einzige
         // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552) — er steht in jeder
         // Rolle und wird hier eigens gezählt.
         await expect(

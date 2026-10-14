@@ -105,6 +105,16 @@ pub struct EinsatzMaterialAnzeige {
     /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
+    /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.
+    /// Nur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene
+    /// (`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_von: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::entlassung::BeendetAls>)]
+    pub beendet_als: Option<String>,
 }
 
 #[cfg(test)]
@@ -156,9 +166,54 @@ pub fn etb_text_disponiert(bezeichnung: &str, menge: i64) -> String {
     format!("Material «{}» (×{}) disponiert", bezeichnung, menge)
 }
 
+/// System-ETB beim Herausnehmen aus dem Einsatz (LLH-1079, Wortlaut LLH-1093 Nr. 3: Material
+/// wird nicht „entlassen“). Der Name der Einheit steht nur hier.
+pub fn etb_text_aus_einsatz_genommen(
+    bezeichnung: &str,
+    menge: i64,
+    einheit: Option<&str>,
+) -> String {
+    match einheit {
+        Some(e) => {
+            format!("Material «{bezeichnung}» (×{menge}, Einheit «{e}») aus dem Einsatz genommen")
+        }
+        None => format!("Material «{bezeichnung}» (×{menge}) aus dem Einsatz genommen"),
+    }
+}
+
+/// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
+pub fn etb_text_storniert(bezeichnung: &str, menge: i64) -> String {
+    format!("Material «{bezeichnung}» (×{menge}) storniert (Fehldisposition)")
+}
+
+/// System-ETB beim erneuten Disponieren (LLH-1079, design.md D7).
+pub fn etb_text_erneut_disponiert(bezeichnung: &str, menge: i64) -> String {
+    format!("Material «{bezeichnung}» (×{menge}) erneut disponiert")
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn aus_einsatz_genommen_storniert_erneut() {
+        assert_eq!(
+            etb_text_aus_einsatz_genommen("Sandsäcke", 250, Some("1. Zug")),
+            "Material «Sandsäcke» (×250, Einheit «1. Zug») aus dem Einsatz genommen"
+        );
+        assert_eq!(
+            etb_text_aus_einsatz_genommen("Sandsäcke", 250, None),
+            "Material «Sandsäcke» (×250) aus dem Einsatz genommen"
+        );
+        assert_eq!(
+            etb_text_storniert("Sandsäcke", 3),
+            "Material «Sandsäcke» (×3) storniert (Fehldisposition)"
+        );
+        assert_eq!(
+            etb_text_erneut_disponiert("Sandsäcke", 3),
+            "Material «Sandsäcke» (×3) erneut disponiert"
+        );
+    }
 
     #[test]
     fn disponiert_mit_menge() {

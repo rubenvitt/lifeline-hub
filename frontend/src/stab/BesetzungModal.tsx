@@ -9,6 +9,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
+import { personLabel } from '../kraefte/einsatzfunktionKern';
 import {
   BESETZUNG_OPTIONEN,
   besetzungAktion,
@@ -64,7 +65,7 @@ export default function BesetzungModal({
       // Gleichnamige Personen bleiben über die Funktion unterscheidbar.
       ...mitAngelegt.map((p) => ({
         value: p.id,
-        label: p.funktion ? `${p.name} · ${p.funktion}` : p.name,
+        label: personLabel(p),
       })),
       { value: ADHOC, label: 'Ad-hoc-Person anlegen …' },
     ];

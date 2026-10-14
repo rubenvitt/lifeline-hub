@@ -25,7 +25,7 @@ pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marke
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND aufgeloest_at IS NULL \
          UNION ALL \
          SELECT 'fahrzeug', id, snap_funkrufname, lat, lon FROM einsatz_fahrzeug \
-          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL \
+          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \
          UNION ALL \
          SELECT 'personal', id, snap_name, lat, lon FROM einsatz_personal \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \

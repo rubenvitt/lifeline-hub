@@ -141,6 +141,8 @@ pub async fn ordne_fahrzeug_zu_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
+    // Ein entlassenes oder storniertes Fahrzeug tritt keiner Einheit bei (409, LLH-1079).
+    crate::fahrzeug::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, ef_id).await?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(ef_id)
@@ -198,6 +200,8 @@ pub async fn ordne_material_zu_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let row = row.ok_or(AppError::NotFound)?;
+    // Material, das aus dem Einsatz genommen ist, tritt keiner Einheit bei (409, LLH-1079).
+    crate::material::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, em_id).await?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(em_id)
@@ -253,7 +257,7 @@ pub async fn material_mitglieder(
 ) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {
     let rows = sqlx::query_as::<_, MaterialRow>(
         "SELECT id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
-         FROM einsatz_material WHERE einheit_id = ? ORDER BY id",
+         FROM einsatz_material WHERE einheit_id = ? AND beendet_at IS NULL ORDER BY id",
     )
     .bind(einheit_id)
     .fetch_all(pool)
@@ -292,6 +296,7 @@ pub async fn material_mitglieder_map(
          FROM einsatz_material \
          WHERE einheit_id IN (SELECT id FROM einsatz_einheit \
                               WHERE einsatz_id = ? AND aufgeloest_at IS NULL) \
+           AND beendet_at IS NULL \
          ORDER BY id",
     )
     .bind(einsatz_id)
@@ -316,6 +321,7 @@ struct PersonRow {
     ep_id: i64,
     name: String,
     funktion: Option<String>,
+    einsatzfunktion: Option<String>,
     staerke_position: Option<String>,
     ist_fuehrer: i64,
 }
@@ -328,6 +334,7 @@ pub async fn personal_mitglieder(
 ) -> Result<Vec<EinheitMitgliedPerson>, AppError> {
     let rows = sqlx::query_as::<_, PersonRow>(
         "SELECT ep.id AS ep_id, ep.snap_name AS name, ep.snap_funktion AS funktion, \
+                ep.einsatzfunktion, \
                 COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
                 COALESCE(ep.id = e.fuehrer_id, 0) AS ist_fuehrer \
          FROM einsatz_personal ep \
@@ -344,6 +351,7 @@ pub async fn personal_mitglieder(
             ep_id: r.ep_id,
             name: r.name,
             funktion: r.funktion,
+            einsatzfunktion: r.einsatzfunktion,
             staerke_position: r.staerke_position,
             ist_fuehrer: r.ist_fuehrer != 0,
         })
@@ -356,6 +364,7 @@ struct PersonZeileMitEinheit {
     ep_id: i64,
     name: String,
     funktion: Option<String>,
+    einsatzfunktion: Option<String>,
     staerke_position: Option<String>,
     ist_fuehrer: i64,
 }
@@ -371,7 +380,7 @@ pub async fn personal_mitglieder_map(
 ) -> Result<HashMap<i64, Vec<EinheitMitgliedPerson>>, AppError> {
     let zeilen = sqlx::query_as::<_, PersonZeileMitEinheit>(
         "SELECT ep.einheit_id AS einheit_id, ep.id AS ep_id, ep.snap_name AS name, \
-                ep.snap_funktion AS funktion, \
+                ep.snap_funktion AS funktion, ep.einsatzfunktion, \
                 COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
                 COALESCE(ep.id = e.fuehrer_id, 0) AS ist_fuehrer \
          FROM einsatz_personal ep \
@@ -390,6 +399,7 @@ pub async fn personal_mitglieder_map(
                 ep_id: z.ep_id,
                 name: z.name,
                 funktion: z.funktion,
+                einsatzfunktion: z.einsatzfunktion,
                 staerke_position: z.staerke_position,
                 ist_fuehrer: z.ist_fuehrer != 0,
             });
@@ -450,7 +460,8 @@ pub async fn fahrzeug_mitglieder(
     einheit_id: i64,
 ) -> Result<Vec<EinheitMitgliedFahrzeug>, AppError> {
     let rows = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(sqlx::AssertSqlSafe(format!(
-        "SELECT {FAHRZEUG_MITGLIED_SPALTEN} WHERE ef.einheit_id = ? ORDER BY ef.id"
+        "SELECT {FAHRZEUG_MITGLIED_SPALTEN} WHERE ef.einheit_id = ? AND ef.beendet_at IS NULL \
+         ORDER BY ef.id"
     )))
     .bind(einheit_id)
     .fetch_all(pool)
@@ -471,6 +482,7 @@ pub async fn fahrzeug_mitglieder_map(
         "SELECT {FAHRZEUG_MITGLIED_SPALTEN} \
          WHERE ef.einheit_id IN (SELECT id FROM einsatz_einheit \
                                  WHERE einsatz_id = ? AND aufgeloest_at IS NULL) \
+           AND ef.beendet_at IS NULL \
          ORDER BY ef.id"
     )))
     .bind(einsatz_id)

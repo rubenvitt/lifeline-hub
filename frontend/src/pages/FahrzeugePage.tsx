@@ -1,11 +1,12 @@
 import {
   Alert,
+  App,
   Breadcrumb,
   Button,
   Collapse,
   Form,
   Input,
-  Popconfirm,
+  Modal,
   Space,
   Tag,
   Typography,
@@ -23,10 +24,13 @@ import { POSITION_LABELS } from '../api/personal';
 import {
   aktualisiereDisposition,
   disponiereAdhoc,
-  entferneDisposition,
+  entlasseDisposition,
   gibBesatzungFrei,
   listeEinsatzFahrzeuge,
+  listEntlasseneFahrzeuge,
   ordneBesatzungZu,
+  reaktiviereDisposition,
+  storniereDisposition,
   type AdhocEingabe,
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -66,7 +70,7 @@ import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { fmsEtikett } from '../kraefte/meldebildRaster';
-import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
   katalogStatusWechsel,
@@ -74,6 +78,10 @@ import {
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
 import { besatzungsStaerke, besatzungsUrteilVon } from '../kraefte/kraeftebaumKern';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 /**
  * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
@@ -212,9 +220,13 @@ export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
+  const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
+  const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
+  const isNewGestureStorno = useNewGesture(stornoFuer !== null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
   // mitnimmt (Muster `PersonenPage`).
@@ -246,6 +258,11 @@ export default function FahrzeugePage() {
   const efQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+  });
+  // Entlassene Fahrzeuge (LLH-1079 Teil II): getrennt geliefert, Liste und Tableau kennen sie nicht.
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeugeEntlassene(einsatzId),
+    queryFn: () => listEntlasseneFahrzeuge(einsatzId),
   });
   const statusQuery = useQuery({
     queryKey: globalKeys.fahrzeugStatus(),
@@ -317,11 +334,52 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),
   });
-  const entfernenMutation = useMutation({
-    mutationFn: (efId: number) => entferneDisposition(einsatzId, efId),
+  /** Entlassen löst die Einheit; deren Mitglieder und Status nicht erst mit dem Live-Ereignis. */
+  function invalidateNachEntlassen() {
+    invalidate();
+    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+  }
+  /*
+   * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): die Aktion im Block „Entlassen“ meldet an ihrem Eintrag, Rückgängig
+   * aus dem Toast im Seitenhinweis — die Zeile ist dann weg, der Block meist eingeklappt.
+   */
+  const reaktivierenMutation = useMutation({
+    mutationFn: (efId: number) => reaktiviereDisposition(einsatzId, efId),
     onMutate: (efId) => zeilen.beginne(efId),
     onSuccess: invalidate,
-    onError: (e, efId) => zeilen.melde(efId, e, 'Entfernen fehlgeschlagen'),
+    onError: (e, efId) => zeilen.melde(efId, e, 'Nicht erneut disponiert'),
+  });
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  const rueckgaengigMutation = useMutation({
+    mutationFn: (efId: number) => reaktiviereDisposition(einsatzId, efId),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: invalidate,
+    onError: (e) => {
+      setRueckgaengigFehler(e);
+      invalidate();
+    },
+  });
+  // Entlassen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast (`frontend/AGENTS.md`,
+  // „Destruktiv ist nicht gleich destruktiv“, design.md D8). Rückgängig setzt Besatzung, Einheit
+  // und Bereitstellungsraum nicht wieder (design.md, Risiken).
+  const entlassenMutation = useMutation({
+    mutationFn: (v: { efId: number; name: string }) => entlasseDisposition(einsatzId, v.efId),
+    onMutate: (v) => zeilen.beginne(v.efId),
+    onSuccess: (_, v) => {
+      invalidateNachEntlassen();
+      zeigeRueckgaengig(message, `${v.name} entlassen`, () => rueckgaengigMutation.mutate(v.efId));
+    },
+    onError: (e, v) => zeilen.melde(v.efId, e, 'Nicht entlassen'),
+  });
+  // Stornieren ist unumkehrbar und nur kurz nach einer Fehldisposition möglich; der Server nennt
+  // den Grund einer Ablehnung, er steht an der Zeile.
+  const stornierenMutation = useMutation({
+    mutationFn: (efId: number) => storniereDisposition(einsatzId, efId),
+    onMutate: (efId) => zeilen.beginne(efId),
+    onSuccess: invalidate,
+    onError: (e, efId) => zeilen.melde(efId, e, 'Nicht storniert'),
   });
   const besatzungZuMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
@@ -351,6 +409,12 @@ export default function FahrzeugePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const efs = efQuery.data ?? [];
+  const entlassene = entlasseneQuery.data ?? [];
+  /** Läuft für diese Zeile Entlassen oder Stornieren? Dann keine zweite Handlung. */
+  const isZeileBusy = (efId: number) =>
+    (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
+    (stornierenMutation.isPending && stornierenMutation.variables === efId);
+  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
 
   /**
    * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
@@ -462,8 +526,10 @@ export default function FahrzeugePage() {
    * Besatzung hält dabei eine Zeile (320 px für „unterbesetzt“ samt Ist und Soll). Den Rest
    * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
    * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
-   * weichen `kennzeichen` und `traeger`, beide über den Spaltenschalter und im Zähler (wie die
-   * Personalseite). Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
+   * weichen `typ`, `kennzeichen` und `traeger`, alle über den Spaltenschalter und im Zähler (wie
+   * die Personalseite). `typ` weicht, seit „Entlassen“ und „⋯“ die Aktionsspalte auf 170 px
+   * gebracht haben (LLH-1079 Teil II): sonst blieben dem Funkrufnamen keine 30 Zeichen; den Typ
+   * trägt der Funkrufname meist schon in seiner Kennzahl. Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
    * am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
@@ -490,6 +556,7 @@ export default function FahrzeugePage() {
       dataIndex: 'fahrzeugtyp',
       key: 'typ',
       width: 100,
+      abBreite: 'xxl',
       sortWert: (ef) => ef.fahrzeugtyp,
       suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
@@ -564,18 +631,31 @@ export default function FahrzeugePage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
-            width: 110,
+            width: 170,
             immerSichtbar: true,
+            // Entlassen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht im
+            // Zeilenmenü und fragt nach (LLH-1079, design.md D8, wie die Personalseite).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
-              <Popconfirm
-                title="Aus Einsatz entfernen?"
-                okText="Aus Einsatz entfernen"
-                onConfirm={() => entfernenMutation.mutate(ef.id)}
-              >
-                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
-                    Rückfrage, nicht die Farbe. */}
-                <Button>Entfernen</Button>
-              </Popconfirm>
+              <Space size="middle">
+                <Button
+                  danger
+                  loading={
+                    entlassenMutation.isPending && entlassenMutation.variables?.efId === ef.id
+                  }
+                  disabled={isZeileBusy(ef.id)}
+                  aria-label={`${ef.funkrufname} entlassen`}
+                  onClick={() => entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname })}
+                >
+                  Entlassen
+                </Button>
+                <MenueAusloeser
+                  eintraege={stornoEintraege}
+                  zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
+                  gesperrt={isZeileBusy(ef.id)}
+                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === ef.id}
+                  onWahl={() => setStornoFuer({ id: ef.id, name: ef.funkrufname })}
+                />
+              </Space>
             ),
           },
         ]
@@ -617,10 +697,18 @@ export default function FahrzeugePage() {
         </Space>
       }
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-        )
+        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {!darfSchreiben && einsatz.status !== 'aktiv' && (
+              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+            )}
+            <SeitenHinweise
+              fehler={rueckgaengigFehler}
+              fehlerTitel="Nicht erneut disponiert"
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+          </Space>
+        ) : null
       }
     >
       {/* `karte.titel` trägt bewusst kein `ziel`: `fahrzeugePfad` ist eine
@@ -729,23 +817,88 @@ export default function FahrzeugePage() {
                 // Mandantenfarbe geht über `statusBedienung.farbe` mit und steht auf Rand und Text,
                 // nie auf der Fläche.
                 status: (ef) => statusDarstellung(ef),
-                // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entfernen"
+                // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entlassen"
                 // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
                 sekundaer: ['typ', 'traeger', 'besatzung'],
                 aktion: darfSchreiben
                   ? {
-                      etikett: 'Entfernen',
-                      bestaetigung: 'Aus Einsatz entfernen?',
-                      bestaetigungKnopf: 'Aus Einsatz entfernen',
-                      onKlick: (ef) => entfernenMutation.mutate(ef.id),
+                      etikett: 'Entlassen',
+                      zugaenglicherName: (ef) => `${ef.funkrufname} entlassen`,
+                      onKlick: (ef) =>
+                        entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname }),
+                    }
+                  : undefined,
+                weitere: darfSchreiben
+                  ? {
+                      eintraege: () => stornoEintraege,
+                      zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
+                      laeuft: (ef) => isZeileBusy(ef.id),
+                      onWahl: (_, ef) => setStornoFuer({ id: ef.id, name: ef.funkrufname }),
                     }
                   : undefined,
               }}
             />
           )}
+          {/* Unter beiden Ansichten: das Tableau zeigt nur aktive Fahrzeuge, der Nachweis bleibt
+              erreichbar (Spec `kraefte-entlassung`). */}
+          <EntlassenBlock
+            titel="Entlassen"
+            endeWort="entlassen"
+            eintraege={entlassene.map((ef) => ({
+              id: ef.id,
+              name: ef.funkrufname,
+              zusatz: ef.fahrzeugtyp,
+              beendetAt: ef.beendet_at,
+            }))}
+            aktion={
+              darfSchreiben
+                ? {
+                    etikett: 'Erneut disponieren',
+                    onKlick: (efId) => reaktivierenMutation.mutate(efId),
+                    laeuft: (efId) =>
+                      reaktivierenMutation.isPending && reaktivierenMutation.variables === efId,
+                  }
+                : undefined
+            }
+            fehler={(efId) => zeilen.grund(efId)}
+          />
         </>
       )}
+
+      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
+          nennt ihr Fahrzeug und schließt, wenn die Zeile entfällt. */}
+      <Modal
+        open={stornoFuer !== null && efs.some((ef) => ef.id === stornoFuer.id)}
+        title={stornoFuer ? `${stornoFuer.name} stornieren?` : undefined}
+        onCancel={() => {
+          if (isNewGestureStorno()) setStornoFuer(null);
+        }}
+        destroyOnHidden
+        footer={
+          <Space size="middle">
+            <Button
+              onClick={() => {
+                if (isNewGestureStorno()) setStornoFuer(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              danger
+              onClick={() => {
+                if (!stornoFuer || !isNewGestureStorno()) return;
+                setStornoFuer(null);
+                stornierenMutation.mutate(stornoFuer.id);
+              }}
+            >
+              Stornieren
+            </Button>
+          </Space>
+        }
+      >
+        Das Fahrzeug erscheint danach in keiner Liste und keinem Nachweis.
+      </Modal>
 
       {/* Fahrzeuge aus dem Stamm disponieren: mehrere in einem Absenden, optional in eine Einheit
           (LLH-1100), im Serienmodus: eine Einheit nach der anderen. */}

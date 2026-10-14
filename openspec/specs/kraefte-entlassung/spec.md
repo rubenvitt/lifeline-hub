@@ -1,19 +1,21 @@
 # kraefte-entlassung Specification
 
 ## Purpose
-Eine Kraft verlässt den Einsatz, ohne aus ihm zu verschwinden: Personal wird entlassen, eine
-Einheit aufgelöst. Beide bleiben mit Zeitachse, Tagebuch und Bezügen im Nachweis, zählen aber in
-keiner Liste, Stärke und Auswahl mehr. Eine Fehldisposition lässt sich kurz nach dem Disponieren
+Eine Kraft verlässt den Einsatz, ohne aus ihm zu verschwinden: Personal und Fahrzeuge werden
+entlassen, Material aus dem Einsatz genommen, eine Einheit aufgelöst. Sie bleiben mit Zeitachse,
+Tagebuch und Bezügen im Nachweis, zählen aber in keiner Liste, Stärke und Auswahl mehr. Eine Fehldisposition lässt sich kurz nach dem Disponieren
 spurlos stornieren, eine entlassene Kraft erneut disponieren.
 
 ## Requirements
 
 ### Requirement: Kraft aus dem Einsatz entlassen
 
-Das System SHALL Personal eines Einsatzes entlassen können, ohne die Disposition zu löschen.
-Die entlassene Kraft MUST mit Zeitpunkt und entlassender Person erhalten bleiben. Entlassen MUST
-ihre Bindungen lösen (Einheit, Besatzung, UHS, Führung einer Einheit, Leitung eines Abschnitts,
-Stab, Einsatzleitung) und MUST ihre Historie behalten (Auftragsempfänger, Schadensbezug,
+Das System SHALL Personal, Fahrzeuge und Material eines Einsatzes entlassen können, ohne die
+Disposition zu löschen; Material heißt in Oberfläche, Tagebuch und Doku „aus dem Einsatz
+genommen“, auf dem Draht `entlassen`. Die entlassene Kraft MUST mit Zeitpunkt und entlassender
+Person erhalten bleiben. Entlassen MUST ihre Bindungen lösen (Einheit, Fahrzeug, Besatzung, UHS,
+Führung einer Einheit, Leitung eines Abschnitts, Stab, Einsatzleitung, Führungsstelle,
+Bereitstellungsraum) und MUST ihre Historie behalten (Auftragsempfänger, Schadensbezug,
 Bestätigungen). Entlassen einer Person MUST das Zeitachsen-Ereignis `entlassung` mit Quelle
 `disposition` schreiben, sofern sie eine offene Periode hat. Entlassen MUST einen ETB-Eintrag erzeugen und erfordert keine Rückfrage.
 
@@ -28,6 +30,14 @@ Bestätigungen). Entlassen einer Person MUST das Zeitachsen-Ereignis `entlassung
 #### Scenario: Auftrag bleibt
 - **WHEN** eine Person entlassen wird, die Empfänger eines Auftrags ist
 - **THEN** nennt der Auftrag sie weiter als Empfänger
+
+#### Scenario: Fahrzeug entlassen
+- **WHEN** ein Fahrzeug mit zwei Personen Besatzung, in einer Einheit und in einem Bereitstellungsraum entlassen wird
+- **THEN** sind beide Personen weiter im Einsatz, nur ohne Fahrzeug, das Fahrzeug gehört keiner Einheit mehr an, und der Bereitstellungsraum verzeichnet seinen Austritt
+
+#### Scenario: Material aus dem Einsatz genommen
+- **WHEN** ein Materialposten einer Einheit und einer UHS aus dem Einsatz genommen wird
+- **THEN** gehört er weder der Einheit noch der UHS an, und das Tagebuch nennt ihn „aus dem Einsatz genommen“
 
 #### Scenario: Bereits entlassen
 - **WHEN** eine entlassene Kraft erneut entlassen werden soll
@@ -56,7 +66,9 @@ Das System SHALL eine Kraft stornieren können, die versehentlich disponiert wur
 MUST die Kraft als storniert beenden und jedes nicht gestrichene Zeitachsen-Ereignis der Kraft
 mit dem Grund „Fehldisposition storniert“ streichen. Ein Storno MUST nur gelingen, solange die
 Kraft aktiv ist, nie entlassen war, keine Bindung hat, keine andere Spur als die Ereignisse aus
-der Disposition trägt und die Disposition höchstens 15 Minuten zurückliegt. Sonst MUST das System mit 422 und
+der Disposition trägt und die Disposition höchstens 15 Minuten zurückliegt. Bei einem Fahrzeug
+MUST auch ein Statuswechsel, eine Belegung eines Bereitstellungsraums, die Führungsstelle und ein
+Auftrag als Spur gelten. Sonst MUST das System mit 422 und
 dem Grund als Satz antworten, bei einer schon beendeten Kraft mit 409. Die Oberfläche MUST vor dem
 Storno mit einem Satz zur Folge rückfragen.
 
@@ -68,6 +80,10 @@ Storno mit einem Satz zur Folge rückfragen.
 - **WHEN** eine Person storniert werden soll, die schon eingetroffen ist
 - **THEN** antwortet das System mit 422, und der Grund steht am Ort der Handlung
 
+#### Scenario: Fahrzeug mit Statuswechsel
+- **WHEN** ein Fahrzeug fünf Minuten nach dem Disponieren auf „Auf Anfahrt“ steht und storniert werden soll
+- **THEN** antwortet das System mit 422, und das Fahrzeug lässt sich entlassen
+
 #### Scenario: Frist abgelaufen
 - **WHEN** eine Person 20 Minuten nach dem Disponieren storniert werden soll
 - **THEN** antwortet das System mit 422 „nur in den ersten 15 Minuten nach der Disposition“
@@ -77,7 +93,10 @@ Storno mit einem Satz zur Folge rückfragen.
 Das System SHALL eine entlassene oder stornierte Kraft erneut disponieren, indem es ihre
 bestehende Zeile reaktiviert. Das Disponieren einer beendeten Stamm-Kraft MUST gelingen statt
 mit 409 abgelehnt zu werden und MUST den Initialstatus neu setzen, sodass eine neue Periode
-beginnt. Gestrichene Ereignisse MUST gestrichen bleiben.
+beginnt; ein schon entlassenes Fahrzeug MUST beim Sammel-Disponieren mit dem Grund „entlassen“
+abgelehnt werden, ein storniertes reaktiviert werden. Material MUST beim Reaktivieren Menge und
+Status behalten; das Disponieren aus dem Stamm legt bei Material immer eine neue Zeile an.
+Gestrichene Ereignisse MUST gestrichen bleiben.
 
 #### Scenario: Stamm-Person kommt zurück
 - **WHEN** eine um 14:00 entlassene Stamm-Person um 18:00 erneut disponiert wird
@@ -87,15 +106,20 @@ beginnt. Gestrichene Ereignisse MUST gestrichen bleiben.
 - **WHEN** die Person direkt nach dem Entlassen „Rückgängig“ wählt
 - **THEN** ist die Kraft wieder aktiv
 
+#### Scenario: Material kommt zurück
+- **WHEN** ein defekter Posten mit Menge 4 aus dem Einsatz genommen und erneut disponiert wird
+- **THEN** steht er wieder in der Liste, mit Menge 4 und Status „defekt“, ohne Einheit und UHS
+
 ### Requirement: Beendete Kräfte in Listen und Zahlen
 
 Das System SHALL entlassene und stornierte Kräfte sowie aufgelöste Einheiten aus jeder Liste,
 Auswahl, Karte, Stärke, Statusverteilung und jedem Zähler herauslassen. Entlassene Kräfte und
-aufgelöste Einheiten MUST auf Anfrage getrennt abrufbar sein. Die Personalliste MUST sie als
-eingeklappten Block „Entlassen“ mit der Aktion „Erneut disponieren“ zeigen, die Einheitenliste
-aufgelöste Einheiten als eingeklappten Block „Aufgelöst“. Jeder Schreibweg an einer
-beendeten Kraft außer dem erneuten Disponieren MUST mit 409 antworten. Ein Test MUST fehlschlagen,
-wenn eine Abfrage der Tabellen für Personal und Einheiten außerhalb einer Ausnahmeliste den
+aufgelöste Einheiten MUST auf Anfrage getrennt abrufbar sein. Personal- und Fahrzeugliste MUST
+sie als eingeklappten Block „Entlassen“ mit der Aktion „Erneut disponieren“ zeigen, die
+Materialliste als Block „Aus dem Einsatz genommen“, die Einheitenliste aufgelöste Einheiten als
+eingeklappten Block „Aufgelöst“. Jeder Schreibweg an einer beendeten Kraft außer dem erneuten
+Disponieren MUST mit 409 antworten. Ein Test MUST fehlschlagen, wenn eine Abfrage der vier
+Kräftetabellen (Personal, Einheiten, Fahrzeuge, Material) außerhalb einer Ausnahmeliste den
 Zustand nicht prüft.
 
 #### Scenario: Stärke ohne Entlassene
@@ -110,10 +134,14 @@ Zustand nicht prüft.
 - **WHEN** der Status einer entlassenen Person gesetzt werden soll
 - **THEN** antwortet das System mit 409
 
+#### Scenario: Besatzung an entlassenem Fahrzeug
+- **WHEN** einem entlassenen Fahrzeug eine Person als Besatzung zugeordnet werden soll
+- **THEN** antwortet das System mit 409
+
 ### Requirement: Entlassene im Nachweis
 
 Meldebild-Druck, die Übernahme des Meldebilds in einen Lagebericht und der Einsatzbericht SHALL
-entlassene Kräfte als eigenen Block „Entlassen“ führen. Stornierte Kräfte MUST in keinem
+entlassene Personen als eigenen Block „Entlassen“ führen. Stornierte Kräfte MUST in keinem
 Nachweis erscheinen.
 
 #### Scenario: Meldebild nennt Entlassene

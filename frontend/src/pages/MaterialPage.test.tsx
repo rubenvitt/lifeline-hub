@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -32,11 +31,20 @@ const em = {
   disponiert_von: 1,
 };
 
-function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
+function render(
+  einsatzObj: typeof einsatzAktiv,
+  materialListe: (typeof em)[],
+  entlasseneDaten: unknown[] = [],
+) {
   server.use(
     meHandler(admin),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json(materialListe)),
+    // Aktives und herausgenommenes Material teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
+    http.get('/api/einsaetze/1/material', ({ request }) =>
+      HttpResponse.json(
+        new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : materialListe,
+      ),
+    ),
     http.get('/api/material', () => HttpResponse.json([])),
     // Die Verdichtungszeile über der Tabelle lädt selbst. Ohne diese Handler fiele ihre Query in
     // jedem Test auf `isError` (`onUnhandledRequest: 'error'`), und die Zeile verschwände lautlos.
@@ -290,7 +298,7 @@ describe('MaterialPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {
+  it('keine Klein-Variante mehr am Status-Auswahlfeld und am Herausnehmen-Knopf', async () => {
     /**
      * Keine punktuellen Klein-Angaben an den Zeilen-Bedienelementen (Dichte-Regel); den Bestand
      * hält die Schuldmenge in `components/dichte.guard.test.ts`.
@@ -299,22 +307,124 @@ describe('MaterialPage', () => {
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(zeile.querySelector('.ant-select-sm')).toBeNull();
-    const entfernen = within(zeile).getByRole('button', { name: 'Entfernen' });
-    expect(entfernen).not.toHaveClass('ant-btn-sm');
-    // Rot bedient nichts: der Entfernen-Knopf trägt keinen Gefahren-Anstrich.
-    expect(entfernen).not.toHaveClass('ant-btn-dangerous');
+    const knopf = within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' });
+    expect(knopf).not.toHaveClass('ant-btn-sm');
+    // Umkehrbar und doch folgenreich: `danger` mit Abstand statt Rückfrage (LLH-1079, D8).
+    expect(knopf).toHaveClass('ant-btn-dangerous');
   });
 
-  it('die Rückfrage vor dem Entfernen nennt die Handlung, nicht „OK“ (LFH-1090)', async () => {
+  /**
+   * Aus dem Einsatz nehmen ist umkehrbar (LLH-1079 Teil II, Wortlaut LLH-1093): ein Klick ohne
+   * Rückfrage, danach ein Rückgängig-Toast, der dieselbe Position erneut disponiert.
+   */
+  it('Aus dem Einsatz nehmen fragt nicht nach und bietet Rückgängig an', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material/10/entlassen', () => {
+        aufrufe.push('entlassen');
+        return HttpResponse.json({ ...em, beendet_als: 'entlassen' });
+      }),
+      http.post('/api/einsaetze/1/material/10/reaktivieren', () => {
+        aufrufe.push('reaktivieren');
+        return HttpResponse.json(em);
+      }),
+    );
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    await userEvent.click(within(zeile).getByRole('button', { name: 'Entfernen' }));
-    const rueckfrage = await offeneRueckfrage();
-    expect(
-      within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
-    ).toBeInTheDocument();
-    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
+    await userEvent.click(
+      within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' }),
+    );
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
+    expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
+    expect(await screen.findByText('Wolldecke aus dem Einsatz genommen')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
+  });
+
+  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
+  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/material/10/entlassen', () =>
+        HttpResponse.json({ ...em, beendet_als: 'entlassen' }),
+      ),
+      http.post('/api/einsaetze/1/material/10/reaktivieren', () =>
+        HttpResponse.json({ error: 'Material ist außer Dienst' }, { status: 422 }),
+      ),
+    );
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(
+      within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await screen.findByText('Material ist außer Dienst');
+    expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
+    expect(hinweis.closest('.ant-alert')).not.toBeNull();
+  });
+
+  /** Stornieren: Zeilenmenü, `<Modal>` mit einem Satz zur Folge; die Ablehnung an der Zeile. */
+  it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
+    let gesendet = 0;
+    server.use(
+      http.post('/api/einsaetze/1/material/10/stornieren', () => {
+        gesendet += 1;
+        return HttpResponse.json(
+          {
+            error:
+              'Stornieren geht nur in den ersten 15 Minuten nach der Disposition; das Material lässt sich aus dem Einsatz nehmen',
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Wolldecke stornieren?');
+    expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
+      /^Das Material erscheint danach in keiner Liste und keinem Nachweis\.$/,
+    );
+    expect(gesendet).toBe(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stornieren' }));
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent(
+      'nur in den ersten 15 Minuten',
+    );
+    expect(gesendet).toBe(1);
+  });
+
+  /** Block „Aus dem Einsatz genommen“: eingeklappt unter der Liste, mit „Erneut disponieren“. */
+  it('zeigt herausgenommenes Material eingeklappt und disponiert es erneut', async () => {
+    let reaktiviert: number | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/material/:em/reaktivieren', ({ params }) => {
+        reaktiviert = Number(params.em);
+        return HttpResponse.json(em);
+      }),
+    );
+    const heraus = { ...em, id: 20, bezeichnung: 'Feldbett', menge: 4 };
+    render(
+      einsatzAktiv,
+      [em],
+      [{ ...heraus, beendet_at: '2026-05-27 12:00:00', beendet_als: 'entlassen' }],
+    );
+    const kopf = await screen.findByRole('button', { name: /Aus dem Einsatz genommen \(1\)/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Feldbett')).toBeNull();
+    expect(screen.getByText('1 Positionen')).toBeInTheDocument();
+    await userEvent.click(kopf);
+    expect(await screen.findByText(/· ×4/)).toBeInTheDocument();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Erneut disponieren: Feldbett' }),
+    );
+    await waitFor(() => expect(reaktiviert).toBe(20));
   });
 });
 

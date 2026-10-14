@@ -558,6 +558,43 @@ describe('kraeftebaum — nur aktive Kräfte (LLH-1079)', () => {
       ),
     ).toEqual([2]);
   });
+
+  /**
+   * LLH-1079 Teil II: Fahrzeug und Material tragen den Zustand ebenfalls. Die veraltete Bindung an
+   * den Zug steht hier mit Absicht: der Kern lässt die Zeile trotzdem aus (design.md D9).
+   */
+  it('ein entlassenes Fahrzeug und herausgenommenes Material stehen nirgends', () => {
+    const beendet = <T extends object>(x: T, als: 'entlassen' | 'storniert' = 'entlassen'): T => ({
+      ...x,
+      beendet_at: '2026-10-13 14:00:00',
+      beendet_als: als,
+    });
+    const fzListe = [fz(10, 1), beendet(fz(11, 1)), beendet(fz(12, null), 'storniert')];
+    const mtListe = [mt(20, 1, 'einsatzbereit'), beendet(mt(21, 1, 'einsatzbereit'))];
+    const baum = kraeftebaum({
+      abschnitte: [ab(10)],
+      einheiten,
+      personal: [],
+      fahrzeuge: fzListe,
+      material: mtListe,
+      quelle: { einheiten, personal: [], fahrzeuge: fzListe },
+    });
+    const zug = baum[0];
+    if (zug.art !== 'einheit') throw new Error('Einheit erwartet');
+    expect(zug.knoten.mittel.fahrzeuge.map((f) => f.fahrzeug.id)).toEqual([10]);
+    expect(zug.knoten.mittel.material.map((m) => m.id)).toEqual([20]);
+    // Ohne aktive Kraft ohne Einheit gibt es keine Wurzel „Ohne Einheit“.
+    expect(baum.some((w) => w.art === 'ohne-einheit')).toBe(false);
+
+    const m = mittelDerEinheit(1, {
+      einheiten,
+      personal: [],
+      fahrzeuge: fzListe,
+      material: mtListe,
+    });
+    expect(m.fahrzeuge.map((f) => f.fahrzeug.id)).toEqual([10]);
+    expect(m.material.map((x) => x.id)).toEqual([20]);
+  });
 });
 
 // ── 1.5 Ausklappstufen ───────────────────────────────────────────────────────

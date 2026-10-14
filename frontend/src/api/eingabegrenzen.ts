@@ -30,8 +30,12 @@ export const VERTEILER_MAX = 50;
 export const VERTEILER_BEZEICHNUNG_MAX = 200;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
-/** Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045). */
+/** Name, Qualifikation und Träger einer Ad-hoc-Kraft (UHS LFH-1045, Personal LLH-1067). */
 export const PERSONAL_ADHOC_TEXT_MAX = 200;
+/** Einsatzfunktion einer Kraft (LLH-1067). */
+export const PERSONAL_EINSATZFUNKTION_MAX = 200;
+/** Bemerkung zu einer Kraft im Einsatz (LLH-1067). */
+export const PERSONAL_BEMERKUNG_MAX = 2_000;
 /** Bezeichnung einer Nachforderung. */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 /** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */

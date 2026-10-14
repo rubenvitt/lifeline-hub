@@ -1404,11 +1404,14 @@ export interface components {
         };
         /** @description Personal-Mitglied einer Einheit (leichtgewichtig für die Einheiten-Anzeige). */
         EinheitMitgliedPerson: {
+            /** @description Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation. */
+            einsatzfunktion?: string | null;
             /**
              * Format: int64
              * @description `einsatz_personal.id` der Dispozeile.
              */
             ep_id: number;
+            /** @description Qualifikation (Snapshot), wie `EinsatzPersonalAnzeige::funktion`. */
             funktion?: string | null;
             /** @description `true`, wenn diese Person als Führer der Einheit eingetragen ist. */
             ist_fuehrer: boolean;
@@ -1621,6 +1624,14 @@ export interface components {
              * @description BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
              */
             aktueller_br_id?: number | null;
+            beendet_als?: components["schemas"]["BeendetAls"] | null;
+            /**
+             * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
+             *     Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+             */
+            beendet_at?: string | null;
+            /** Format: int64 */
+            beendet_von?: number | null;
             bemerkung?: string | null;
             disponiert_at: string;
             /** Format: int64 */
@@ -1674,6 +1685,15 @@ export interface components {
          *     `menge` und `status` kommen **immer** aus der Dispositionszeile.
          */
         EinsatzMaterialAnzeige: {
+            beendet_als?: components["schemas"]["BeendetAls"] | null;
+            /**
+             * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.
+             *     Nur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene
+             *     (`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“).
+             */
+            beendet_at?: string | null;
+            /** Format: int64 */
+            beendet_von?: number | null;
             bemerkung?: string | null;
             bestandsnummer?: string | null;
             bezeichnung: string;
@@ -1752,12 +1772,20 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             /**
+             * @description Einsatzfunktion (LLH-1067, Spec `personal-einsatzangaben`): was die Kraft im Einsatz gerade
+             *     tut, getrennt von `funktion` (Qualifikation). Angezeigt wird sie vor der Qualifikation.
+             */
+            einsatzfunktion?: string | null;
+            /**
              * Format: int64
              * @description Fahrzeug, dessen Besatzung die Kraft ist (LFH-9); `None` = keinem Fahrzeug zugeteilt.
              *     Unabhängig von `einheit_id` (orthogonale Zuordnung).
              */
             fahrzeug_id?: number | null;
-            /** @description Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot). */
+            /**
+             * @description Qualifikationen als flacher Text (Live recomposed oder Snapshot); bei Ad-hoc-Personen die
+             *     erfasste Qualifikation. Die Einsatzfunktion steht getrennt in `einsatzfunktion`.
+             */
             funktion?: string | null;
             /** Format: int64 */
             id: number;
@@ -4996,6 +5024,8 @@ export interface components {
              * @description Einheit der Kraft (Kennung und Name); fehlen ohne Einheit.
              */
             einheit_id?: number | null;
+            /** @description Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation. */
+            einsatzfunktion?: string | null;
             /** @description Qualifikationen als flacher Text, wie in der Personalliste. */
             funktion?: string | null;
             /**

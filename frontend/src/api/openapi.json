@@ -3749,6 +3749,13 @@
           "ist_fuehrer"
         ],
         "properties": {
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation."
+          },
           "ep_id": {
             "type": "integer",
             "format": "int64",
@@ -3758,7 +3765,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Qualifikation (Snapshot), wie `EinsatzPersonalAnzeige::funktion`."
           },
           "ist_fuehrer": {
             "type": "boolean",
@@ -4314,6 +4322,30 @@
             "format": "int64",
             "description": "BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR)."
           },
+          "beendet_als": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetAls"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.\nNur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
+          },
+          "beendet_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -4477,6 +4509,30 @@
           "ist_demo"
         ],
         "properties": {
+          "beendet_als": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetAls"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.\nNur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene\n(`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“)."
+          },
+          "beendet_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -4668,6 +4724,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067, Spec `personal-einsatzangaben`): was die Kraft im Einsatz gerade\ntut, getrennt von `funktion` (Qualifikation). Angezeigt wird sie vor der Qualifikation."
+          },
           "fahrzeug_id": {
             "type": [
               "integer",
@@ -4681,7 +4744,7 @@
               "string",
               "null"
             ],
-            "description": "Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot)."
+            "description": "Qualifikationen als flacher Text (Live recomposed oder Snapshot); bei Ad-hoc-Personen die\nerfasste Qualifikation. Die Einsatzfunktion steht getrennt in `einsatzfunktion`."
           },
           "id": {
             "type": "integer",
@@ -13060,6 +13123,13 @@
             ],
             "format": "int64",
             "description": "Einheit der Kraft (Kennung und Name); fehlen ohne Einheit."
+          },
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1067); angezeigt vor der Qualifikation."
           },
           "funktion": {
             "type": [

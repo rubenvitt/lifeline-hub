@@ -86,6 +86,9 @@ function render(
       ]),
     ),
     http.get('/api/personal', () => HttpResponse.json([])), // Pool (nur_im_dienst)
+    http.get('/api/qualifikationen', () =>
+      HttpResponse.json([{ id: 1, label: 'Notfallsanitäter', sortier: 30 }]),
+    ),
   );
   return renderMitProviders(
     <Routes>
@@ -144,6 +147,83 @@ describe('PersonalPage', () => {
     render(einsatz());
     expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
     expect(screen.getByText('Sanitäter, Gruppenführer')).toBeInTheDocument();
+  });
+
+  // LLH-1067: die Einsatzfunktion steht vor der Qualifikation, beide sichtbar in der Zelle.
+  it('zeigt Einsatzfunktion und Qualifikation und sucht in beiden', async () => {
+    setzeViewportBreite(1440);
+    render(einsatz(), [
+      { ...disponiert[0], einsatzfunktion: 'Sprechfunker' },
+      {
+        ...disponiert[0],
+        id: 11,
+        personal_id: 6,
+        name: 'Anna Berg',
+        funktion: 'Notfallsanitäter',
+        einheit_id: null,
+        fahrzeug_id: null,
+      },
+    ]);
+    const knopf = await screen.findByRole('button', {
+      name: 'Funktion zu Thomas Müller bearbeiten',
+    });
+    expect(knopf).toHaveAccessibleDescription('Sprechfunker');
+    expect(screen.getByText('Sanitäter, Gruppenführer')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Funktion zu Anna Berg eintragen' })).toBeVisible();
+
+    const suche = screen.getByRole('searchbox', { name: 'Suche in Personal im Einsatz' });
+    fireEvent.change(suche, { target: { value: 'sprechfunk' } });
+    await waitFor(() => expect(screen.queryByText('Anna Berg')).toBeNull());
+    expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
+    fireEvent.change(suche, { target: { value: 'notfallsan' } });
+    await waitFor(() => expect(screen.queryByText('Thomas Müller')).toBeNull());
+    expect(screen.getByText('Anna Berg')).toBeInTheDocument();
+  });
+
+  it('setzt die Einsatzfunktion inline und schlägt Vorgaben und Qualifikationen vor', async () => {
+    setzeViewportBreite(1440);
+    let patchBody: unknown = 'NICHT_AUFGERUFEN';
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({ ...disponiert[0], einsatzfunktion: 'Notfallsanitäter' });
+      }),
+    );
+    render(einsatz());
+    // Nach dem Speichern liefert die Liste den neuen Stand.
+    server.use(
+      http.get('/api/einsaetze/7/personal', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('entlassene')
+            ? []
+            : [
+                {
+                  ...disponiert[0],
+                  einsatzfunktion: patchBody === 'NICHT_AUFGERUFEN' ? null : 'Notfallsanitäter',
+                },
+              ],
+        ),
+      ),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Funktion zu Thomas Müller eintragen' }),
+    );
+    const feld = screen.getByRole('combobox', { name: 'Funktion zu Thomas Müller' });
+    await userEvent.type(feld, 'notf');
+    await userEvent.click(
+      await screen.findByText(
+        (_, el) =>
+          el?.className === 'ant-select-item-option-content' &&
+          el?.textContent === 'Notfallsanitäter',
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Funktion zu Thomas Müller speichern' }),
+    );
+    await waitFor(() => expect(patchBody).toEqual({ einsatzfunktion: 'Notfallsanitäter' }));
+    expect(
+      await screen.findByRole('button', { name: 'Funktion zu Thomas Müller bearbeiten' }),
+    ).toHaveAccessibleDescription('Notfallsanitäter');
   });
 
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {

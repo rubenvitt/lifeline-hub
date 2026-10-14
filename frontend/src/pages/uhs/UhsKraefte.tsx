@@ -21,6 +21,7 @@ import { teilwortSuche } from '../../components/teilwortSuche';
 import { Datenfeld, Datenraster } from '../../components/instrument';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
+import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
 
 interface Props {
@@ -112,11 +113,28 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
 
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
+    // Die eine Funktionsangabe (Einsatzfunktion vor Qualifikation), die Qualifikation darunter wie
+    // in der Personalliste (LLH-1067, `kraefte/einsatzfunktionKern.ts`).
     {
       title: 'Funktion',
-      dataIndex: 'funktion',
       key: 'funktion',
-      render: (v: string | undefined) => v ?? '—',
+      render: (_: unknown, k: UhsKraft) => {
+        const text = funktionText(k);
+        const qualifikation = k.funktion?.trim();
+        return (
+          <>
+            {text ?? '—'}
+            {qualifikation && qualifikation !== text && (
+              <Typography.Text
+                type="secondary"
+                style={{ display: 'block', overflowWrap: 'anywhere' }}
+              >
+                {qualifikation}
+              </Typography.Text>
+            )}
+          </>
+        );
+      },
     },
     {
       title: 'Position',
@@ -292,7 +310,8 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         >
           <Input maxLength={PERSONAL_ADHOC_TEXT_MAX} />
         </Form.Item>
-        <Form.Item<AdhocWerte> name="funktion" label="Funktion">
+        {/* Freitext ist die Qualifikation (`funktion`); die Einsatzfunktion setzt die Personalliste. */}
+        <Form.Item<AdhocWerte> name="funktion" label="Qualifikation">
           <Input maxLength={PERSONAL_ADHOC_TEXT_MAX} />
         </Form.Item>
         <Form.Item<AdhocWerte> name="staerke_position" label="Position">

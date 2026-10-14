@@ -27,6 +27,7 @@ const POOL: Fahrzeug[] = [
   fahrzeug(1, '83-1', { kennzeichen: 'MS-RK 831' }),
   fahrzeug(2, '83-2', { fahrzeugtyp: 'KTW' }),
   fahrzeug(3, '83-3'),
+  fahrzeug(4, '83-4'),
 ];
 
 const EINHEITEN = [
@@ -36,6 +37,10 @@ const EINHEITEN = [
 
 /** 83-3 ist schon disponiert. */
 const AKTIV = [{ id: 90, fahrzeug_id: 3, funkrufname: '83-3' }] as EinsatzFahrzeug[];
+/** 83-4 ist entlassen (LLH-1079 Teil II): es kommt über „Erneut disponieren“ zurück. */
+const ENTLASSEN = [
+  { id: 91, fahrzeug_id: 4, funkrufname: '83-4', beendet_als: 'entlassen' },
+] as EinsatzFahrzeug[];
 
 let bodies: unknown[];
 
@@ -43,7 +48,9 @@ function standardHandler(freigaben = freigabenFixture()) {
   server.use(
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(POOL)),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(AKTIV)),
+    http.get('/api/einsaetze/1/fahrzeuge', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? ENTLASSEN : AKTIV),
+    ),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
     http.post('/api/einsaetze/1/fahrzeuge/sammel', async ({ request }) => {
       const body = (await request.json()) as { fahrzeug_ids: number[] };
@@ -102,7 +109,7 @@ describe('FahrzeugeDisponierenModal', () => {
     expect(gesperrt.querySelectorAll('.ant-form-item')).toHaveLength(1);
   });
 
-  it('bietet keine schon disponierten Fahrzeuge an und sucht über das Kennzeichen', async () => {
+  it('bietet weder disponierte noch entlassene Fahrzeuge an und sucht über das Kennzeichen', async () => {
     standardHandler();
     renderMitProviders(<Harness />);
     await screen.findByRole('dialog');

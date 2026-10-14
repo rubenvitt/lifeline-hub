@@ -31,6 +31,8 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  * - **Der Auslöser nennt die Angabe** („Leitstellen-Nr. bearbeiten"); der Wert ist die
  *   Beschreibung (`aria-describedby`), kein `aria-label`, das den Inhalt verdeckte.
  * - **Ohne Schreibrecht keine Aufforderung**: nur der Wert, leer als „—".
+ * - **In einer Liste trägt `kennung` die Zeile in jeden Namen** („Funktion zu Anna bearbeiten“,
+ *   LLH-1067), wie bei `BemerkungZelle`; der sichtbare Text bleibt „Funktion eintragen“.
  * - **Fokus fällt nicht auf `<body>`**, auch wenn der neue Wert erst eine Runde später kommt.
  * - Die `keyCode`-Falle von antds `Editable` gilt NICHT: hier sendet das native `<form>` (Enter),
  *   Escape läuft über `key`.
@@ -57,6 +59,8 @@ export interface InlineEingabe<T> {
 export interface InlineAngabeProps<T> {
   /** Name der Angabe — Etikett der Eingabe und Kern jedes zugänglichen Namens. */
   etikett: string;
+  /** Menschenlesbare Zeilenkennung für die zugänglichen Namen in einer Liste („… zu Anna“). */
+  kennung?: string;
   /** Gespeicherter Wert (Serverstand), Ausgangspunkt jeder Bearbeitung. */
   wert: T;
   /** Darstellung des gefüllten Werts. Ein leerer Wert zeigt stattdessen die Aufforderung bzw. „—". */
@@ -117,6 +121,7 @@ export function leerKnopfStil(
 
 export function InlineAngabe<T>({
   etikett,
+  kennung,
   wert,
   anzeige,
   leer,
@@ -146,6 +151,8 @@ export function InlineAngabe<T>({
   const { token, rollen } = useRollen();
   const wertId = useId();
   const feldId = useId();
+  /** Zugänglicher Name der Angabe, in einer Liste mit der Zeile. */
+  const name = kennung ? `${etikett} zu ${kennung}` : etikett;
 
   if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
@@ -226,7 +233,7 @@ export function InlineAngabe<T>({
         style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
       >
         {eingabe({
-          feld: { id: feldId, 'aria-label': etikett, autoFocus: true },
+          feld: { id: feldId, 'aria-label': name, autoFocus: true },
           value: entwurf,
           onChange: setEntwurf,
           popup: {
@@ -241,13 +248,13 @@ export function InlineAngabe<T>({
             type="primary"
             htmlType="submit"
             loading={sendet}
-            aria-label={`${etikett} speichern`}
+            aria-label={`${name} speichern`}
           >
             Speichern
           </Button>
           <Button
             disabled={sendet}
-            aria-label={`Bearbeitung von ${etikett} abbrechen`}
+            aria-label={`Bearbeitung von ${name} abbrechen`}
             onClick={schliessen}
           >
             Abbrechen
@@ -278,6 +285,7 @@ export function InlineAngabe<T>({
         <Button
           ref={knopfRef}
           type="link"
+          aria-label={kennung ? `${name} eintragen` : undefined}
           style={leerKnopfStil(token, rollen.bedienText)}
           onClick={oeffnen}
         >
@@ -293,7 +301,7 @@ export function InlineAngabe<T>({
       <Button
         ref={knopfRef}
         type="text"
-        aria-label={`${etikett} bearbeiten`}
+        aria-label={`${name} bearbeiten`}
         aria-describedby={wertId}
         style={{
           ...wertKnopfStil(token),

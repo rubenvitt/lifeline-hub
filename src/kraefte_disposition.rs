@@ -118,6 +118,8 @@ pub struct PersonalErgebnis {
 pub struct DisponiertesFahrzeug {
     pub ef_id: i64,
     pub funkrufname: String,
+    /// Eine stornierte Zeile desselben Fahrzeugs wieder aufgenommen (LLH-1079, D7)?
+    pub reaktiviert: bool,
 }
 
 /// Ergebnis von [`disponiere_fahrzeuge_tx`].
@@ -206,19 +208,24 @@ pub async fn check_personal_tx(
 }
 
 /// Mengen-Vorprüfung der Fahrzeug-IDs (D2) in **einer** Anweisung: unbekannt oder fremd, schon
-/// disponiert (auch beendet: ein Fahrzeug kennt noch kein erneutes Disponieren), außer Dienst.
+/// disponiert, entlassen, außer Dienst. Wie beim Personal nimmt der Sammelweg ein entlassenes
+/// Fahrzeug nicht still wieder auf (Rückweg „Erneut disponieren“, LLH-1079 Teil II), ein
+/// storniertes dagegen schon: es war nie im Einsatz.
 pub async fn check_fahrzeuge_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     fahrzeug_ids: &[i64],
 ) -> Result<Vec<ZeilenGrund>, AppError> {
+    // Liest absichtlich auch beendete Zeilen: nur so trennt die Vorprüfung „schon disponiert“
+    // (aktive Zeile) von „entlassen“ (beendete Zeile). Ausnahme mit Grund in der ALLOWLIST des
+    // Wächters (`src/entlassung.rs`, `jede_abfrage_der_kraeftetabellen_prueft_den_zustand`).
     let zeilen: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT j.value, \
                 CASE \
                     WHEN f.id IS NULL THEN ?4 \
-                    WHEN ef.id IS NOT NULL AND ef.beendet_at IS NULL THEN ?5 \
-                    WHEN ef.id IS NOT NULL THEN ?6 \
+                    WHEN ef.id IS NOT NULL AND coalesce(ef.beendet_at, '') = '' THEN ?5 \
+                    WHEN coalesce(ef.beendet_als, '') = 'entlassen' THEN ?6 \
                     WHEN f.dienststatus <> ?7 THEN ?8 \
                 END \
          FROM json_each(?1) j \
@@ -382,10 +389,12 @@ pub async fn disponiere_personal_tx(
             besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, f.id, d.id).await?;
         }
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, d.id, true).await?;
+        // Die Bezeichnung im ETB nennt die Einsatzfunktion vor der Qualifikation (LLH-1067).
+        let funktion = anzeige.funktion_text().map(str::to_owned);
         kraefte.push(DisponiertePerson {
             ep_id: d.id,
             name: anzeige.name,
-            funktion: anzeige.funktion,
+            funktion,
             traegerorganisation: anzeige.traegerorganisation,
             reaktiviert: d.reaktiviert,
         });
@@ -415,7 +424,7 @@ pub async fn disponiere_fahrzeuge_tx(
 
     let mut fahrzeuge = Vec::with_capacity(fahrzeug_ids.len());
     for &fid in fahrzeug_ids {
-        let ef_id = crate::fahrzeug::disposition_repo::disponiere_stamm_tx(
+        let d = crate::fahrzeug::disposition_repo::disponiere_stamm_tx(
             conn,
             einsatz_id,
             kontext.org_id,
@@ -423,6 +432,7 @@ pub async fn disponiere_fahrzeuge_tx(
             kontext.benutzer_id,
         )
         .await?;
+        let ef_id = d.id;
         let funkrufname = match &einheit {
             Some(e) => mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, e.id, ef_id).await?,
             None => {
@@ -431,7 +441,11 @@ pub async fn disponiere_fahrzeuge_tx(
                     .funkrufname
             }
         };
-        fahrzeuge.push(DisponiertesFahrzeug { ef_id, funkrufname });
+        fahrzeuge.push(DisponiertesFahrzeug {
+            ef_id,
+            funkrufname,
+            reaktiviert: d.reaktiviert,
+        });
     }
     Ok(FahrzeugErgebnis { fahrzeuge, einheit })
 }
@@ -483,6 +497,10 @@ pub fn etb_text_personal(e: &PersonalErgebnis) -> String {
 pub fn etb_text_fahrzeuge(e: &FahrzeugErgebnis) -> String {
     let ziel = ziel_text(e.einheit.as_ref(), None);
     match e.fahrzeuge.as_slice() {
+        [f] if f.reaktiviert => format!(
+            "{}{ziel}",
+            crate::fahrzeug::etb_text_erneut_disponiert(&f.funkrufname)
+        ),
         [f] => format!(
             "{}{ziel}",
             crate::fahrzeug::etb_text_disponiert(&f.funkrufname)

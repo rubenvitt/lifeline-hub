@@ -589,7 +589,13 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.einheitAusVorlage, einsatzId, vorlageId] as const,
   abschnitte: (einsatzId: number) => [EINSATZ_KEYS.abschnitte, einsatzId] as const,
   fahrzeuge: (einsatzId: number) => [EINSATZ_KEYS.fahrzeuge, einsatzId] as const,
+  /** Entlassene Fahrzeuge (LLH-1079 Teil II): unter dem Präfix der Liste, gleiche Invalidierung. */
+  fahrzeugeEntlassene: (einsatzId: number) =>
+    [EINSATZ_KEYS.fahrzeuge, einsatzId, 'entlassene'] as const,
   material: (einsatzId: number) => [EINSATZ_KEYS.material, einsatzId] as const,
+  /** Aus dem Einsatz genommenes Material (LLH-1079 Teil II): unter dem Präfix der Liste. */
+  materialEntlassene: (einsatzId: number) =>
+    [EINSATZ_KEYS.material, einsatzId, 'entlassene'] as const,
 
   // UHS
   uhs: (einsatzId: number) => [EINSATZ_KEYS.uhs, einsatzId] as const,

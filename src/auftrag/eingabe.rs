@@ -179,6 +179,10 @@ async fn validate_empfaenger(
                     "Fahrzeug gehört nicht zum Einsatz".into(),
                 ));
             }
+            // Ein entlassenes oder storniertes Fahrzeug ist kein neues Ziel mehr (409, LLH-1079);
+            // als bisheriger Empfänger bleibt es (siehe `validate_empfaenger_liste`).
+            let mut conn = pool.acquire().await?;
+            crate::fahrzeug::disposition_repo::require_aktiv_tx(&mut conn, einsatz_id, id).await?;
             EMPF_FAHRZEUG
         }
         EMPF_FUNKTION => {

@@ -2,14 +2,15 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
 
 Das Modul **Personal** führt alle Einsatzkräfte, die im Einsatz disponiert sind: Personen aus dem
 Personalstamm der Organisation und Ad-hoc-Kräfte, die nur in diesem Einsatz vorkommen. Je Person
-stehen Funktion, Träger, Fahrzeug, Einheit, Stärke-Position, Status, Einsatzdauer und Ruhezeit.
+stehen Einsatzfunktion und Qualifikation, Träger, Fahrzeug, Einheit, Stärke-Position, Status,
+Einsatzdauer und Ruhezeit.
 
 Die Führung liest hier, wer verfügbar oder gebunden ist und wer wie lange im Einsatz steht.
 Disponieren, Status setzen und entlassen dürfen Einsatzleitung und Führungspersonal.
@@ -23,7 +24,7 @@ Disponieren, Status setzen und entlassen dürfen Einsatzleitung und Führungsper
 2. Die Liste ist nach Statuskategorie gruppiert: verfügbar, gebunden, nicht verfügbar, ohne Status.
    In „Name, Funktion“ suchen oder unter „Status“ eine Kategorie wählen.
 
-   ![Personalliste mit Name, Funktion, Position, Status, Einsatzdauer, Ruhe und dem Knopf „Entlassen“ je Person](../bilder/personal/personal.png)
+   ![Personalliste mit Name, Funktion, Position, Status, Einsatzdauer, Ruhe und dem Knopf „Entlassen“ je Person; Anna Probe trägt die Einsatzfunktion „Sprechfunker“ über der Qualifikation „Notarzt“, die anderen „Funktion eintragen“](../bilder/personal/personal.png)
 
 3. Unter „Spalten“ ausgeblendete Spalten wie „Träger“, „Fahrzeug“, „Einheit“ oder „Bemerkung“
    einblenden.
@@ -51,14 +52,24 @@ Für Einsatzleitung und Führungspersonal, für eine Person oder eine ganze Grup
 Für Einsatzleitung und Führungspersonal, wenn eine Kraft nicht im Personalstamm steht:
 
 1. „Ad-hoc-Person“ wählen.
-2. „Name“ eingeben, bei Bedarf „Funktion“, „Trägerorganisation“ und „Stärke-Position“.
+2. „Name“ eingeben, bei Bedarf „Qualifikation“, „Trägerorganisation“ und „Stärke-Position“.
 
-   ![Dialog „Ad-hoc-Person disponieren“ mit Name, Funktion, Trägerorganisation, Stärke-Position und den Knöpfen „Speichern und nächste“ und „Disponieren“](../bilder/personal/adhoc-person.png)
+   ![Dialog „Ad-hoc-Person disponieren“ mit Name, Qualifikation, Trägerorganisation, Stärke-Position und den Knöpfen „Speichern und nächste“ und „Disponieren“](../bilder/personal/adhoc-person.png)
 
 3. „Disponieren“ wählen. Für eine ganze Gruppe „Speichern und nächste“ (Strg + Enter) wählen; mit
    „Werte behalten“ bleiben Trägerorganisation und Stärke-Position für die nächste Person stehen.
 
 Ad-hoc-Kräfte tragen in der Liste die Marke „ad-hoc“.
+
+### Eine Einsatzfunktion vergeben
+
+Für Einsatzleitung und Führungspersonal, wenn eine Person im Einsatz eine Aufgabe übernimmt:
+
+1. In der Spalte „Funktion“ der Person „Funktion eintragen“ wählen, bei einer schon vergebenen
+   Einsatzfunktion auf ihren Text klicken.
+2. Eine Funktion aus den Vorschlägen wählen oder einen eigenen Text eingeben, etwa „Sprechfunker“.
+3. „Speichern“ wählen oder Enter drücken. Die Einsatzfunktion steht über der Qualifikation.
+4. Zum Entfernen das Feld leeren und speichern.
 
 ### Status, Position und Bemerkung ändern
 
@@ -113,6 +124,24 @@ Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steh
 inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
 nennt den Grund je Person.
 
+### Einsatzfunktion und Qualifikation
+
+Die Einsatzfunktion sagt, was eine Person in diesem Einsatz tut (Sprechfunker, Melder, Fahrer);
+die Qualifikation, was sie kann. Die Qualifikation einer Stamm-Person kommt aus dem Personalstamm
+und wird dort gepflegt; die einer Ad-hoc-Kraft ist der Text aus dem Dialog. Die Einsatzfunktion
+gilt nur im Einsatz und wechselt, so oft es die Lage verlangt.
+
+Vorgeschlagen werden zuerst die im Einsatz schon vergebenen Einsatzfunktionen, dann Funktionen
+nach FwDV 3 und FwDV 100 (Einheitsführer, Gruppenführer, Truppführer, Maschinist, Melder,
+Sprechfunker, Fahrer), dann die Qualifikationen der Organisation. Ein eigener Text darf bis zu 200
+Zeichen lang sein, eine Bemerkung bis zu 2 000.
+
+Wo eine Person mit nur einer Angabe steht, nennt die App die Einsatzfunktion, ohne sie die
+Qualifikation: im Meldebild und seiner Übernahme in einen Lagebericht, im Block „Entlassen“, in
+der Anlage „Personal je Kopf“ des Einsatzberichts, in den Personenauswahlen von Stab-Besetzung,
+Einsatzleitung, Schäden und UHS und im Einsatztagebuch. Die Vorschau in der Sprungpalette zeigt
+beide. Entlassen und erneut disponiert, behält die Person ihre Einsatzfunktion.
+
 ### Status
 
 Die Statuswerte pflegt die Organisation selbst; jeder gehört zu einer Kategorie (verfügbar,
@@ -153,7 +182,9 @@ und Nachtragen lehnt die App ab.
 
 Disponieren, jeder Statuswechsel, das Entlassen, das erneute Disponieren und das Stornieren stehen
 im Einsatztagebuch. Eine Gruppe aus einem Absenden steht dort als ein Eintrag mit Zahl, Einheit,
-Fahrzeug und den Namen. Position und Bemerkung ändern es nicht.
+Fahrzeug und den Namen. Eine vergebene, geänderte oder entfernte Einsatzfunktion steht dort mit
+altem und neuem Wert, etwa „Person «Anna Probe»: Funktion «—» → «Sprechfunker»“. Position und
+Bemerkung ändern es nicht.
 
 ### Rechte und ohne Netz
 
