@@ -5,7 +5,8 @@
  *
  * - D1: Übersetzt wird beim Lesen. DB-Spalten `tz_*`, Snapshots und Offline-Stände behalten die
  *   alten Kennungen; eine Migration erreichte Snapshots und Geräte nicht.
- * - D2: Abbildungstabellen unten; die fachlichen Entscheidungen vom 29.09.2026 stehen dort.
+ * - D2: Abbildungstabellen unten; die fachlichen Entscheidungen vom 29.09.2026 stehen dort, die
+ *   Stelle und die Person seit LLH-1161 ohne die Notlösungen für LFH-829/LFH-830.
  * - D3: Welche Kombination sich zeichnen lässt, entscheidet allein die Komposition — nicht
  *   `validateSpec` und keine gepflegte Accepts-Liste. Deshalb eine Rückfallkaskade: jede Fassung
  *   der Fachaufgabe, dann ohne Fachaufgabe, ohne Stärke, ohne Organisation, Körper allein.
@@ -51,10 +52,10 @@ export type Teil = Partial<SymbolSpec>;
 type Koerpermarke = CapabilityId | TechnicalBodyMarkId;
 
 // Grundzeichen des Hubs → Körper. `befehlsstelle` (Abschnitt) ist neutral in „Führung und
-// Leitung“, ohne functionRole mit eingebackenem Kürzel. `stelle` ist circle-12 der
-// Hilfsorganisation mit Fachaufgabe (F.3; Lücke LFH-829); seit core 4.0 füllt jede Organisation
-// den Kreis, die Stellen des Hubs bleiben bewusst Hilfsorganisation. `zweirad` hat keinen Körper
-// (LFH-831) und wird Landfahrzeug. `organisation` hier überstimmt die gespeicherte.
+// Leitung“, ohne functionRole mit eingebackenem Kürzel. `stelle` ist circle-12 mit Fachaufgabe
+// (F.3) in der Organisation des Betreibers, ohne bekannte Organisation neutral (LLH-1161; bis
+// dahin fest Hilfsorganisation wegen Lücke LFH-829). `zweirad` hat keinen Körper (LFH-831) und
+// wird Landfahrzeug. `organisation` hier überstimmt die gespeicherte.
 export const KOERPER: Record<string, Teil> = {
   'taktische-formation': { kind: 'formation' },
   'kraftfahrzeug-landgebunden': { kind: 'vehicle-land', vehicleCategory: 'kfz-kategorie-1' },
@@ -66,7 +67,7 @@ export const KOERPER: Record<string, Teil> = {
   befehlsstelle: { kind: 'formation', organization: 'fuehrung-leitung' },
   anlass: { kind: 'event' },
   gefahr: { kind: 'hazard' },
-  stelle: { kind: 'circle-12', organization: 'hilfsorganisation' },
+  stelle: { kind: 'circle-12' },
 };
 
 // Alte Organisationskennungen, die @einsatzzeichen umbenannt hat; die übrigen sind gleich.
@@ -247,9 +248,9 @@ function kandidaten(tz: TzProps): SymbolSpec[][] | null {
   if (!koerper) return null;
   const org: Teil = { organization: koerper.organization ?? organisation(tz.organisation) };
   const staerke = eigen(STAERKE, tz.einheit);
-  // An der Person entfallen Fachaufgabe und Funktion (Entscheidung 29.09.2026, Lücke LFH-830).
-  const fachaufgabe =
-    koerper.kind === 'person' ? undefined : (tz.fachaufgabe ?? eigen(SYMBOL_ERSATZ, tz.symbol));
+  // Die Person (Führungskraft) trägt ihre Fachaufgabe; der Motor zeichnet sie dort nur abgeleitet,
+  // die Kaskade nimmt die abgeleitete Fassung (LLH-1161, bis dahin entfiel sie wegen LFH-830).
+  const fachaufgabe = tz.fachaufgabe ?? eigen(SYMBOL_ERSATZ, tz.symbol);
   const farbe: Teil = tz.farbe ? { technicalFill: eigen(FARBE_TOKEN, tz.farbe) ?? 'grau' } : {};
 
   const liste: SymbolSpec[][] = fassungen(fachaufgabe, koerper).map((stufe) =>

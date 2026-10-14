@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use serde_json::Value;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
+use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
 const ANMELDUNGEN: &str = "/api/zugangsprotokoll/anmeldungen";
 const AENDERUNGEN: &str = "/api/zugangsprotokoll/zugangsaenderungen";
@@ -390,4 +390,73 @@ async fn blaettern_ueber_vor_id() {
 
     let eine = lesen(&app, &admin, &format!("{AENDERUNGEN}?limit=0")).await;
     assert_eq!(eine.len(), 1, "limit wird auf mindestens 1 geklemmt");
+}
+
+async fn fehlversuch(app: &axum::Router, name: &str) {
+    let (status, _) = anfrage(
+        app,
+        "POST",
+        "/api/auth/login",
+        "",
+        Some(&format!(
+            r#"{{"benutzername":"{name}","passwort":"geraten123"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// Jede Org liest ihre eigene Spur (LLH-1151): ein System-Admin sieht keinen Eintrag, der ein Konto
+/// einer anderen Org betrifft oder von ihm ausgelöst wurde, auch keinen Fehlversuch auf dessen
+/// Namen. Ein versuchter Name ohne Konto gehört keiner Org und steht bei beiden. Die Zeilen
+/// entstehen über die echten Schreibwege.
+#[tokio::test]
+async fn jede_org_liest_nur_ihre_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, fremd_id) =
+        fremde_org_anlegen(&pool, "Nachbar", "fremdadmin", "fremdpw12", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(fremd_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fremdadmin = login_cookie(&app, "fremdadmin", "fremdpw12").await;
+    leeren(&pool).await;
+
+    benutzer_anlegen(&app, &admin, "agnes", "keine").await;
+    benutzer_anlegen(&app, &fremdadmin, "bernd", "keine").await;
+    login_cookie(&app, "agnes", "agnespw1").await;
+    let bernd = login_cookie(&app, "bernd", "berndpw1").await;
+    // Die Abmeldung schreibt nur `benutzer_id`, keinen Namen.
+    let (status, _) = anfrage(&app, "POST", "/api/auth/logout", &bernd, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    fehlversuch(&app, "agnes").await;
+    // Anders geschrieben als das Konto, wie der Login es annimmt.
+    fehlversuch(&app, "BERND").await;
+    fehlversuch(&app, "niemand").await;
+
+    let eigene = lesen(&app, &admin, ANMELDUNGEN).await;
+    assert_eq!(feld(&eigene, "benutzername"), ["niemand", "agnes", "agnes"]);
+    let fremde = lesen(&app, &fremdadmin, ANMELDUNGEN).await;
+    assert_eq!(
+        feld(&fremde, "benutzername"),
+        ["niemand", "BERND", "bernd", "bernd"]
+    );
+
+    let eigene = lesen(&app, &admin, AENDERUNGEN).await;
+    assert_eq!(feld(&eigene, "ziel"), ["agnes"]);
+    assert_eq!(feld(&eigene, "akteur_name"), ["admin"]);
+    let fremde = lesen(&app, &fremdadmin, AENDERUNGEN).await;
+    assert_eq!(feld(&fremde, "ziel"), ["bernd"]);
+    assert_eq!(feld(&fremde, "akteur_name"), ["fremdadmin"]);
+
+    // Auch der Kontofilter öffnet keine fremde Org.
+    for (uri, cookie) in [
+        (format!("{ANMELDUNGEN}?konto=bernd"), &admin),
+        (format!("{AENDERUNGEN}?konto=fremdadmin"), &admin),
+        (format!("{ANMELDUNGEN}?konto=agnes"), &fremdadmin),
+    ] {
+        assert!(lesen(&app, cookie, &uri).await.is_empty(), "{uri}");
+    }
 }

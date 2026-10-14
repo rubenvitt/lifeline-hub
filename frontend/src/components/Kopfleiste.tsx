@@ -14,6 +14,7 @@ import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import './Kopfleiste.css';
 
 /**
  * Bausteine der Kommandoleiste (`shell.dc.html`) — geteilt von der Ebene-1-Shell (`AppLayout`)
@@ -198,6 +199,26 @@ export function Uhr() {
 }
 
 /**
+ * Ein Zustandswort des Kopfs, das die Breite von `platz` hält (LLH-1158, `Kopfleiste.css`): für
+ * Wörter, die beim Start ohne Zutun wechseln. Ist das Wort breiter als `platz`, gilt das Wort.
+ */
+export function WortPlatz({
+  platz,
+  style,
+  children,
+}: {
+  platz: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <span aria-hidden="true" className="kopf-wort-platz" data-platz={platz} style={style}>
+      {children}
+    </span>
+  );
+}
+
+/**
  * Die Zustände der SYNC-Anzeige. `ruhe` heißt „nichts zu melden UND keine Live-Verbindung
  * erwartet" — auf der Einsatzliste läuft kein SSE-Strom.
  */
@@ -299,6 +320,12 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Icon. Jede
  * Störung (VERBINDE, WARTET, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
  * Kanal (WCAG 1.4.1).
+ *
+ * `haeltStartPlatz` (im Einsatz-Kopf ab `xl`): das Wort hält die Breite von „VERBINDE“
+ * (LLH-1158, {@link WortPlatz}). Der Verbindungsaufbau beim Start wechselt es ohne Zutun auf
+ * „SYNC“, und dort hängt der Umbruch an der Breite der rechten Gruppe. Nicht zusammen mit
+ * `ruheOhneWort`: dort steht „SYNC“ nur als Icon, und der Platz machte nur Störungswörter
+ * breiter.
  */
 export function syncZeigtWort(
   zustand: Exclude<SyncZustand, 'ruhe'>,
@@ -313,10 +340,12 @@ export function SyncAnzeige({
   liveErwartet,
   kompakt = false,
   ruheOhneWort = false,
+  haeltStartPlatz = false,
 }: {
   liveErwartet: boolean;
   kompakt?: boolean;
   ruheOhneWort?: boolean;
+  haeltStartPlatz?: boolean;
 }) {
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
@@ -344,8 +373,8 @@ export function SyncAnzeige({
         <Icon size={16} />
       </span>
       {syncZeigtWort(zustand, kompakt, ruheOhneWort) && (
-        <span
-          aria-hidden="true"
+        <WortPlatz
+          platz={haeltStartPlatz ? SYNC_DARSTELLUNG.verbinde.wort : ''}
           style={{
             fontFamily: schrift.zahl,
             fontSize: 11,
@@ -355,7 +384,7 @@ export function SyncAnzeige({
           }}
         >
           {wort}
-        </span>
+        </WortPlatz>
       )}
     </div>
   );

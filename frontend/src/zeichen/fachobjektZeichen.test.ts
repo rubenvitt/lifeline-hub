@@ -144,16 +144,24 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
     baueTzProps({ objekttyp: 'fuehrung', organisation: 'feuerwehr' }),
     { kind: 'person', organization: 'feuerwehr' },
   ],
-  [
-    'Führungskraft Notarzt: ohne Fachaufgabe und ohne Funktionsindikator',
+  // Die Fachaufgabe der Führungskraft kommt aus ihrer Funktion und ist an der Person nur
+  // abgeleitet gezeichnet (LLH-1161); der Funktionsindikator bleibt weg.
+  ...(
+    [
+      ['Notarzt', 'physician'],
+      ['Rettungssanitäter', 'medical-service'],
+      ['Funk', 'information-communications'],
+    ] as const
+  ).map(([funktion, marke]): [string, TzProps, SymbolSpec] => [
+    `Führungskraft ${funktion}: Person mit Fachaufgabe, ohne Funktionsindikator`,
     baueTzProps({
       objekttyp: 'fuehrung',
       organisation: 'hilfsorganisation',
-      funktion: 'Notarzt',
+      funktion,
       istFuehrungskraft: true,
     }),
-    { kind: 'person', organization: 'hilfsorganisation' },
-  ],
+    { kind: 'person', organization: 'hilfsorganisation', bodyMarks: [marke] },
+  ]),
   [
     'Einsatzabschnitt neutral: Führung und Leitung ohne Kürzel',
     baueTzProps({ objekttyp: 'abschnitt', organisation: 'feuerwehr' }),
@@ -173,22 +181,34 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
     schadenTz(ausmass as Ausmass),
     { kind: 'hazard', technicalFill: token },
   ]),
+  // Stellen ohne bekannte Organisation des Betreibers stehen neutral (LLH-1161).
   [
     'UHS Behandlungsplatz',
     uhsTz('behandlungsplatz'),
-    { kind: 'circle-12', organization: 'hilfsorganisation', bodyMarks: ['physician'] },
+    { kind: 'circle-12', bodyMarks: ['physician'] },
   ],
   ...(['patientenablage', 'verletztensammelstelle', 'sonstige'] as UhsTyp[]).map(
     (typ): [string, TzProps, SymbolSpec] => [
       `UHS ${typ}`,
       uhsTz(typ),
-      { kind: 'circle-12', organization: 'hilfsorganisation', bodyMarks: ['medical-service'] },
+      { kind: 'circle-12', bodyMarks: ['medical-service'] },
     ],
   ),
+  ['Betreuungsstelle', betreuungsstelleTz(), { kind: 'circle-12', bodyMarks: ['care'] }],
   [
-    'Betreuungsstelle',
-    betreuungsstelleTz(),
+    'UHS in der Organisation des Betreibers (Feuerwehr)',
+    uhsTz('sonstige', 'feuerwehr'),
+    { kind: 'circle-12', organization: 'feuerwehr', bodyMarks: ['medical-service'] },
+  ],
+  [
+    'Betreuungsstelle in der Organisation des Betreibers (Hilfsorganisation)',
+    betreuungsstelleTz('hilfsorganisation'),
     { kind: 'circle-12', organization: 'hilfsorganisation', bodyMarks: ['care'] },
+  ],
+  [
+    'Stelle mit alter Organisationskennung des Betreibers',
+    betreuungsstelleTz('zivil'),
+    { kind: 'circle-12', organization: 'zivile-einheiten', bodyMarks: ['care'] },
   ],
   ...(
     [
@@ -408,6 +428,8 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
     einheit: 'gruppe',
   };
   const KFZ: TzProps = { grundzeichen: 'kraftfahrzeug-landgebunden', organisation: 'feuerwehr' };
+  const PERSON: TzProps = { grundzeichen: 'person', organisation: 'hilfsorganisation' };
+  const STELLE: TzProps = { grundzeichen: 'stelle' };
 
   // `fuehrung` fehlt in FAEHIGKEIT mit Absicht (s. dort); sonst zeichnet core 4.x jede Fachaufgabe.
   it('an der Formation (Feuerwehr, Gruppe)', () => {
@@ -416,6 +438,26 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
 
   it('am Kraftfahrzeug (Feuerwehr)', () => {
     expect(ohneFachaufgabe(KFZ)).toEqual(['fuehrung']);
+  });
+
+  it('an der Person (Führungskraft, Hilfsorganisation)', () => {
+    expect(ohneFachaufgabe(PERSON)).toEqual(['fuehrung']);
+  });
+
+  it('an der Stelle ohne Organisation', () => {
+    expect(ohneFachaufgabe(STELLE)).toEqual(['fuehrung']);
+  });
+
+  // An der Person ist keine Fachaufgabe vermessen (LLH-1161): jede erscheint abgeleitet.
+  it('abgeleitet an der Person (Führungskraft, Hilfsorganisation)', () => {
+    expect(abgeleitet(PERSON)).toEqual(ALLE_FACHAUFGABEN.filter((f) => f !== 'fuehrung'));
+  });
+
+  // Was UHS und Betreuungsstelle tragen, ist an der Stelle ohne Organisation vermessen.
+  it('Fachaufgaben der UHS und Betreuungsstelle an der neutralen Stelle vermessen', () => {
+    for (const f of ['aerztliche-versorgung', 'rettungswesen', 'betreuung']) {
+      expect(abgeleitet(STELLE)).not.toContain(f);
+    }
   });
 
   // Genau die Paare, die bis core 3.0 fehlten (und am Kfz die Versorgungsmarken am Fußband): das

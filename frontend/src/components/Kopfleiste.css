@@ -1,0 +1,20 @@
+/* Platz eines Zustandsworts im Kopf (LLH-1158). Das Wort hält die Breite seines längsten
+   Wortlauts beim Start (`data-platz`): Tonprüfung („Ton wird geprüft“ → „Ton bereit“ bzw. „Ton
+   blockiert“) und Verbindungsaufbau („VERBINDE“ → „SYNC“) wechseln den Wortlaut ohne Zutun, und
+   in `handschuh` hängt der Umbruch des Kopfs an der Breite der rechten Gruppe. An der
+   Umbruchgrenze sprang der Kopf mit dem kürzeren Wort von zwei Zeilen auf eine.
+   Der Platzhalter ist erzeugter Inhalt, kein Text im DOM: `textContent` bleibt das sichtbare Wort,
+   und `visibility: hidden` nimmt ihn aus dem Barrierebaum. Spalte statt Zeile: der Platzhalter
+   hat keine Höhe, die Breite ist das Maximum beider. Schrift erbt er vom Wort. Keine Farbwerte
+   hier. */
+.kopf-wort-platz {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.kopf-wort-platz::after {
+  content: attr(data-platz);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}

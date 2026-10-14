@@ -471,7 +471,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               <AlarmZentrale einsatzId={einsatzId} />
             </EinsatzAnzeigeProvider>
           </div>
-          <SyncAnzeige liveErwartet kompakt={!mittel} ruheOhneWort={!weit} />
+          <SyncAnzeige liveErwartet kompakt={!mittel} ruheOhneWort={!weit} haeltStartPlatz={weit} />
           {mittel && <Uhr />}
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>

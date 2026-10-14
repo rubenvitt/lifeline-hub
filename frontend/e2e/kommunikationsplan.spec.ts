@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waehleIn } from './auswahl-kern';
+import { waehleIn, waehleStehend } from './auswahl-kern';
 
 /**
  * Kommunikationsplan S6 (LFH-848): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein
@@ -14,6 +14,8 @@ import { waehleIn } from './auswahl-kern';
  * - DRUCKPFAD bei A4-Breite (680 px): keine Aktionsspalte, keine Knöpfe, nichts ragt heraus.
  * - ZEILENSCHLEUSE IM BAUM (LFH-1020): Fokus oder Zeiger in der Tabelle, eine Stelle kommt live
  *   dazu: keine Zeile rückt, der Sammelbanner nennt sie.
+ * - KATALOG „Externe Stellen“ (LLH-1165): die Wahl im echten AutoComplete übernimmt Bezeichnung
+ *   und Rufnummer; die Rufnummer steht danach als wählbare Verbindung im Plan.
  *
  * Mutationsprobe (Prüfliste): `mindestBreite` der Verbindungen auf 700 → Überhang am Fükw rot.
  */
@@ -291,3 +293,47 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     expect((await zeile.boundingBox())!.y).toBeGreaterThan(vorher!.y);
   });
 }
+
+// Der Katalog gilt für die ganze Organisation und damit für jede Spec dieses Laufs: eigener Name,
+// nie „zuständig“ (die Nachforderung belegt sonst vor), am Ende deaktiviert.
+test('Katalog: Bezeichnung und Rufnummer einer Polizeidienststelle übernehmen', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const marke = Date.now();
+  const name = `PI Katalogprobe ${marke}`;
+  const rufnummer = `0421 110 ${marke % 1000}`;
+  const angelegt = await page.request.post('/api/externe-stellen', {
+    data: { bezeichnung: name, art: 'polizei', rufnummer },
+  });
+  expect(angelegt.status(), `Katalog: ${await angelegt.text()}`).toBe(201);
+  const katalogId = ((await angelegt.json()) as { id: number }).id;
+  try {
+    const einsatzId = await einsatzAnlegen(page, `E2E Kommunikationsplan Katalog ${marke}`);
+    await seede(page, einsatzId);
+    await oeffne(page, einsatzId);
+
+    await page.getByRole('button', { name: 'Stelle hinzufügen' }).click();
+    const maske = page.getByRole('dialog', { name: 'Stelle hinzufügen' });
+    await waehleIn(maske.getByLabel('Art'), 'Behörde');
+    await maske.getByLabel('Bezeichnung').fill('Katalogprobe');
+    await waehleStehend(page, name);
+    await expect(maske.getByLabel('Bezeichnung')).toHaveValue(name);
+    await expect(maske.getByLabel('Rufnummer')).toHaveValue(rufnummer);
+    await maske.getByRole('button', { name: 'Anlegen', exact: true }).click();
+    await expect(maske).toBeHidden();
+
+    const zeile = tabelle(page).locator('tr.ant-table-row', { hasText: name });
+    await expect(zeile.getByText('Behörde')).toBeVisible();
+    await expect(zeile.getByRole('link', { name: rufnummer })).toHaveAttribute(
+      'href',
+      `tel:${rufnummer.replace(/\D/g, '')}`,
+    );
+  } finally {
+    const weg = await page.request.patch(`/api/externe-stellen/${katalogId}`, {
+      data: { aktiv: false },
+    });
+    expect(weg.ok(), `Katalog deaktivieren: ${await weg.text()}`).toBeTruthy();
+  }
+});

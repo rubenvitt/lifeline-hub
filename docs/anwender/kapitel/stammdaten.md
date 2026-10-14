@@ -62,8 +62,9 @@ gleich:
 ### Externe Stellen pflegen
 
 Externe Stellen sind Leitstellen, Behörden, Polizei und Hilfsorganisationen, mit denen Einsätze
-zu tun haben. Sie erscheinen als Vorschlag bei der meldenden Stelle eines Einsatzes und beim
-Adressaten einer Nachforderung.
+zu tun haben. Sie erscheinen als Vorschlag bei der meldenden Stelle eines Einsatzes, beim
+Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
+[Kommunikationsplan](funkplan.md).
 
 1. Unter „Stammdaten“ „Externe Stellen“ öffnen.
 2. „Externe Stelle anlegen“ wählen.
@@ -139,8 +140,8 @@ Verwaltung nicht.
 
 - Eine Stelle lässt sich nicht löschen, nur deaktivieren. Eine deaktivierte Stelle erscheint
   nicht mehr als Vorschlag. Einsätze, die sie als meldende Stelle tragen, behalten den Text.
-- Einsätze und Nachforderungen speichern nur den Text der Stelle. Eine spätere Umbenennung im
-  Katalog ändert ältere Einsätze nicht.
+- Einsätze, Nachforderungen und der Kommunikationsplan speichern nur den Text der Stelle. Eine
+  spätere Umbenennung im Katalog ändert ältere Einsätze nicht.
 - Je Organisation ist höchstens eine Stelle die „Zuständige Leitstelle“, und nur eine aktive
   Stelle der Art Leitstelle. Wer eine andere Leitstelle als zuständig markiert, nimmt der
   bisherigen die Markierung ab; Deaktivieren nimmt sie ebenfalls. Die zuständige Leitstelle steht

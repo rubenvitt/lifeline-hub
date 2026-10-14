@@ -326,9 +326,23 @@ export default function LagekartePage() {
   // Eine Antwort, die erst nach dem Einsatzwechsel eintrifft, quittiert dort nicht und wählt oder
   // räumt keine Ansicht (LFH-1138, `frontend/AGENTS.md`, „Rückwege und Fehler“): ihr
   // `setSearchParams` stammt aus dem alten Render und führte zurück in den alten Einsatz. Die
-  // Gründe hält `useKartenFehler` selbst fern.
+  // Gründe hält `useKartenFehler` selbst fern. Dasselbe gilt, wenn die Seite inzwischen verlassen
+  // ist, etwa ins ETB desselben Einsatzes (LLH-1154): dort griffe der Einsatz-Vergleich nicht, und
+  // das alte `setSearchParams` führte zurück auf die Lagekarte.
   const einsatzRef = useRef(einsatzId);
   einsatzRef.current = einsatzId;
+  const montiertRef = useRef(false);
+  useEffect(() => {
+    montiertRef.current = true;
+    return () => {
+      montiertRef.current = false;
+    };
+  }, []);
+  /** Steht die Seite noch auf dem Einsatz, in dem die Handlung begann? */
+  const nochHier = useCallback(
+    (einsatz: number) => montiertRef.current && einsatzRef.current === einsatz,
+    [],
+  );
 
   // „In dieser Ansicht speichern": den Karten-Zustand in die aktive Ansicht schreiben (nicht
   // einsatzweit); Erfolg als Toast, eine Ablehnung im Paneel (die Mutation wirft, hier gefangen).
@@ -344,11 +358,11 @@ export default function LagekartePage() {
     const einsatz = einsatzRef.current;
     try {
       await speichern();
-      if (einsatzRef.current === einsatz) message.success('In der Ansicht gespeichert');
+      if (nochHier(einsatz)) message.success('In der Ansicht gespeichert');
     } catch (e) {
       melde(e);
     }
-  }, [speichern, message, beginneAnsicht, aktiveAnsichtId, aktiveAnsicht]);
+  }, [speichern, message, beginneAnsicht, aktiveAnsichtId, aktiveAnsicht, nochHier]);
   // Ein Ansichtswechsel räumt die Gründe der verlassenen Ansicht: im Paneel der neuen wären sie
   // falsch, und das Paneel ließe sich ihretwegen nicht zuklappen.
   useEffect(() => {
@@ -392,11 +406,11 @@ export default function LagekartePage() {
     async (name: string) => {
       const einsatz = einsatzRef.current;
       const neu = await neueAnsicht(name);
-      if (einsatzRef.current !== einsatz) return;
+      if (!nochHier(einsatz)) return;
       waehleAnsicht(neu.id);
       message.success(`Ansicht „${name}" angelegt`);
     },
-    [neueAnsicht, waehleAnsicht, message],
+    [neueAnsicht, waehleAnsicht, message, nochHier],
   );
 
   const onAnsichtUmbenennen = useCallback(
@@ -414,19 +428,19 @@ export default function LagekartePage() {
       const einsatz = einsatzRef.current;
       try {
         await setzeStandard(id);
-        if (einsatzRef.current === einsatz) message.success('Als Standardansicht gesetzt');
+        if (nochHier(einsatz)) message.success('Als Standardansicht gesetzt');
       } catch (e) {
         melde(e);
       }
     },
-    [setzeStandard, message, beginneAnsicht, ansichten],
+    [setzeStandard, message, beginneAnsicht, ansichten, nochHier],
   );
 
   const onAnsichtLoeschen = useCallback(
     async (id: number, objekte: 'freigeben' | 'loeschen') => {
       const einsatz = einsatzRef.current;
       await loeschen({ id, objekte });
-      if (einsatzRef.current !== einsatz) return;
+      if (!nochHier(einsatz)) return;
       message.success('Ansicht gelöscht');
       // War die gelöschte Ansicht aktiv, ?ansicht= räumen → Fallback auf die Standardansicht.
       if (id === aktiveAnsichtId) {
@@ -435,7 +449,7 @@ export default function LagekartePage() {
         setSearchParams(naechste);
       }
     },
-    [loeschen, aktiveAnsichtId, searchParams, setSearchParams, message],
+    [loeschen, aktiveAnsichtId, searchParams, setSearchParams, message, nochHier],
   );
 
   const {

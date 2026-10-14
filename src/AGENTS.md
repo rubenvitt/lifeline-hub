@@ -14,11 +14,10 @@ fehlendes oder **leeres** Pflichtfeld) · **422** `UnprocessableEntity` — der 
 (Feld-Kombination, **Status-Übergang**, Zustand) · **409** `Conflict` — Nebenläufigkeit (CAS) oder
 Lebenszyklus (storniert) · **413** `PayloadTooLarge` — Body über dem Limit der Route, vor dem
 Handler (`JsonBody`, LFH-1074).
-- Referenzpaare, nicht „harmonisieren": `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
-  `leere_zeichenform_ist_400` gegen `altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422`; zwei
-  Zeichenformen in einem Body sind per Spec `lagekarte-freie-zeichen` 400, LFH-836),
-  `tests/einsatz_schaden.rs` (`abschliessen_ohne_grund_ist_400` gegen
-  `abschluss_ohne_grund_ist_422_und_mit_grund_ok`).
+- Referenzpaar, nicht „harmonisieren": `tests/einsatz_schaden.rs`
+  (`abschliessen_ohne_grund_ist_400` gegen `abschluss_ohne_grund_ist_422_und_mit_grund_ok`).
+  Reine 400er-Referenz: `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
+  `leere_zeichenform_ist_400`, `altes_format_ist_400`; seit LLH-1160 gibt es dort keinen 422 mehr).
 - **409 hat zwei Quellen:** CAS (`basis_geaendert_at` in `schaden/repo.rs`, `tier/repo.rs`;
   Überschreiben-Dialog) und Lebenszyklus (kein Dialog). Das Frontend trennt nur heuristisch
   (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
@@ -271,6 +270,11 @@ Spec `passwort-anmeldung`, Herleitung
   `/mnt/project-files/lfh-1097/design.md`): nur System-Admin, das Lesen schreibt keine Spur, der
   Kontofilter wird wie beim Schreiben gekürzt (`benutzername::fuer_protokoll`) und mit
   `COLLATE NOCASE` verglichen; Nachweis `tests/zugangsprotokoll.rs`.
+- **Jede Zeile trägt die Org als Schnappschuss** (`org_id`, LLH-1151, Migration 0191): gelesen
+  wird `org_id = <Org des Admins> OR org_id IS NULL`. `audit::schreibe` setzt sie selbst (Konto,
+  sonst versuchter Name), `admin_audit::schreibe` aus der handelnden Person; NULL heißt
+  serverweit (versuchter Name ohne Konto). Ein Rebuild einer der Tabellen nimmt die Spalte mit.
+  Nachweis `tests/zugangsprotokoll.rs` (`jede_org_liest_nur_ihre_spur`).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
 

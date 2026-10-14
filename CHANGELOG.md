@@ -1,3 +1,60 @@
+## [1.0.0-alpha.124](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.123...v1.0.0-alpha.124) (2026-10-14)
+
+### Wichtige Änderungen
+
+- **Zwei neue Datenbank-Migrationen:** Beim ersten Start werden sie automatisch eingespielt. Eine Migration legt die Tabellen für die neuen Einheiten-Vorlagen an. Die andere ergänzt jede Zeile des Zugangsprotokolls um die Organisation, zu der sie gehört; vorhandene Einträge werden dabei nachgetragen.
+- **Zugangsprotokoll nur noch je Organisation:** Bisher sah ein System-Admin in der Anmelde- und der Admin-Spur Namen, Ereignisse und Adressen aller Organisationen. Jetzt sieht er nur noch die Einträge der eigenen Organisation und Anmeldeversuche mit einem Namen, zu dem es kein Konto gibt.
+- **Modulfreigabe strenger:** Die Freigabestufen „Führungskraft der Organisation“ und „Führung im Einsatz“ greifen nur noch für Führungskräfte aus der Organisation, die den Einsatz führt. Führungskräfte anderer Organisationen bekommen über diese Stufen keinen Zugriff mehr.
+- **Neue Schnittstelle für Einheiten-Vorlagen:** Alle Mitglieder einer Organisation können die Vorlagen lesen. Anlegen und Ändern dürfen nur Admins.
+
+### Kräfte und Mittel
+
+- **Meldebild als Kräftebaum:** Untereinheiten stehen eingerückt unter ihrer Einheit. Darunter folgen die Fahrzeuge mit ihrer Besatzung, „Ohne Fahrzeug“ und das Material. Einheiten, Fahrzeuge, Personen und Gruppen sind an Zeichen, Einzug und Schrift zu erkennen: taktisches Zeichen, Fahrzeugzeichen, Positionsmarken F/UF/M und die Kennzeichnung „EF“.
+- **Drei Ausklappstufen:** „Einheiten“ (beim Öffnen eingestellt), „mit Fahrzeugen“ und „alles“. Beim Drucken wird immer alles aufgeklappt. Die gewählte Stufe bleibt auch dann stehen, wenn mehrere Stufen dieselben Zeilen öffnen.
+- **Werkzeugzeile:** Die Filter für Träger und Status liegen jetzt hinter „Filter (n)“, damit die Werkzeugzeile einzeilig bleibt.
+- **Sprung in die Module:** Ein Klick auf einen Namen öffnet das passende Modul. Ohne Leserecht steht der Name als reiner Text da.
+- **Stärke und Rückmeldung:** Die Zeile einer Einheit zeigt die Stärke zusammen mit ihren Untereinheiten. Rückmeldung und die Kennzahl „keine Rückmeldung“ zählen die Untereinheiten mit. Fällt Material aus, wird die Einheit farblich hervorgehoben.
+- **Besatzung:** Am Fahrzeug steht die Besatzung als Ist und Soll untereinander, statt in der schmalen Spalte umzubrechen.
+- **Statusband:** Je Gruppe gibt es eine Kennzahl mit Aufgliederung nach Status. Das Band nutzt die volle Breite und hat keine leeren Kacheln mehr.
+- **Abschnittsfilter:** Eine Gruppe ohne eigenen Abschnitt bleibt beim Filtern unter ihrem Zug sichtbar.
+- **Lagebericht-Text:** Die Kräftegliederung folgt jetzt demselben Baum wie das Meldebild, mit Fahrzeugen, Besatzung, Material und Untereinheiten. Bisher fehlten verwaiste Einheiten in der Gliederung, wurden aber in der Gesamtstärke gezählt; bei verschachtelten Zuordnungen fehlten sogar ganze Einheiten. Beides ist behoben.
+
+### Verwaltung
+
+- **Einheiten-Vorlagen in den Stammdaten:** In der neuen Sektion steht eine Liste mit Untereinheiten als Baum, Typ, Unterstellung, Fahrzeugen, Soll und Aktiv-Zustand. Neue Vorlagen werden in einem Dialog angelegt.
+- **Detailseite einer Vorlage:** Hier lassen sich Name, Typ, Unterstellung, Funkrufname, taktisches Zeichen mit Vorschau, Soll und Bemerkung bearbeiten. Dazu kommen Untereinheiten, Stamm-Fahrzeuge und Stammbesetzung.
+  - Ein Fahrzeug oder eine Person darf innerhalb eines Vorlagenbaums nur einmal vorkommen. Hinweise wie „außer Dienst“ und „auch in …“ stehen direkt am Eintrag.
+  - Ohne eigenes Soll gilt das Soll des Einheitstyps.
+  - Ohne Admin-Recht ist die Seite nur lesbar, und der Grund wird angezeigt.
+  - Die Bedienelemente haben auch im Handschuh-Modus ausreichend Abstand zueinander.
+
+### Kommunikation
+
+- **Kommunikationsplan:** Beim Hinzufügen einer externen Stelle werden die aktiven Einträge aus dem Katalog „Externe Stellen“ vorgeschlagen. Bezeichnung und Rufnummer werden übernommen; die Rufnummer wird als Festnetz-Verbindung eingetragen. Fehlt im Plan eine Leitstelle, wird die zuständige Leitstelle angeboten.
+
+### Gekoppelte Geräte und Lagemonitor
+
+- **Karte des Lagemonitors:** Die Kachel „Lagekarte“ zeigt jetzt die Gefahrenzonen und die gezeichneten Flächen der Einsatzabschnitte und aktualisiert sie live. Notizen und Namen der Abschnittsleitungen bleiben für den Monitor gesperrt.
+- **Umbenannte Stelle:** Wird eine Stelle umbenannt, zeigt der Kopf des gekoppelten Geräts den neuen Namen sofort, ohne neue Anmeldung. Das gilt auch für den Seitenkopf der Betroffenen und den Absender von Meldungen.
+- **Stab-Besetzung:** Geräte sehen die Stab-Besetzung in Aufträgen und Erinnerungen nur noch, wenn ihre Ansicht den Stab einschließt. Bisher sah zum Beispiel ein Gerät eines Einsatzabschnitts die Namen der Besetzung.
+
+### Führung
+
+- **Organigramm:** Der Kopf bleibt beim Laden nicht mehr auf „Leitung: lädt“ stehen, wenn der Mauszeiger über dem Organigramm liegt. Die Stabsstelle erscheint jetzt ebenfalls zuverlässig.
+
+### Einsatztagebuch
+
+- **Entwürfe bei Konflikt:** Bekommt ein Entwurf wegen eines Konflikts beim Speichern eine neue Kennung, wird zuerst die neue Fassung gespeichert und erst danach die alte entfernt. So geht bei einem Speicherfehler im Browser keine Fassung mehr verloren, und an der Erfassung steht weiterhin der Konflikt als Grund.
+
+### Demo-Daten
+
+- Der Zugführer „Max Mustermann“ ist jetzt Einsatzleiter der Führungsstelle; dazu gehört ein passender Eintrag im Einsatztagebuch.
+- Die Demo-Daten enthalten die Einheiten-Vorlagen „Sanitätszug Musterstadt“ und „Rettungsstaffel“ als Untereinheit, mit Fahrzeugen und Stammbesetzung. Gibt es schon eine aktive Vorlage mit demselben Namen, wird sie mitbenutzt. Beim Entfernen der Demo-Daten werden die Vorlagen vor Personal und Fahrzeugen gelöscht.
+
+### Anwenderdokumentation
+
+- Neue oder überarbeitete Kapitel zu Meldebild und Kräftebaum, Einheiten-Vorlagen, Kommunikationsplan mit externen Stellen und Lagemonitor-Karte, jeweils mit aktualisierten Bildern.
+
 ## [1.0.0-alpha.123](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.122...v1.0.0-alpha.123) (2026-10-13)
 
 ### Wichtige Änderungen
