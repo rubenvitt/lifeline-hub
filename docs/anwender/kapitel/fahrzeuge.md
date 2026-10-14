@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
@@ -14,8 +14,8 @@ sie sich wie die Bemerkung unter „Spalten“ einblenden.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
 **FMS-Tableau** als Überblick über die ganze Flotte, in dem sich der Status mit einem Klick oder
-einer Ziffer setzen lässt. Disponieren, Status setzen und Besatzung zuordnen dürfen Einsatzleitung
-und Führungspersonal.
+einer Ziffer setzen lässt. Disponieren, Status setzen, Besatzung zuordnen und entlassen dürfen
+Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -25,7 +25,7 @@ und Führungspersonal.
 2. Je Fahrzeug „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa „Besatzung nicht
    erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
 
-   ![Fahrzeugliste mit Funkrufname, Typ, FMS-Status, Besatzung und „Entfernen“ je Fahrzeug, darüber „Spalten · 3 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
+   ![Fahrzeugliste mit Funkrufname, Typ, FMS-Status, Besatzung und dem Knopf „Entlassen“ je Fahrzeug, darüber „Spalten · 3 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
 
 3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Status“ eine Kategorie wählen.
 
@@ -83,19 +83,35 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Mit „Freigeben“ eine Person wieder von der Besatzung lösen.
 
-### Ein Fahrzeug aus dem Einsatz entfernen
+### Ein Fahrzeug aus dem Einsatz entlassen
 
-Für Einsatzleitung und Führungspersonal:
+Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug den Einsatz verlässt:
 
-1. In der Zeile des Fahrzeugs „Entfernen“ wählen.
-2. Die Rückfrage „Aus Einsatz entfernen?“ mit „Aus Einsatz entfernen“ bestätigen.
+1. In der Zeile des Fahrzeugs „Entlassen“ wählen. Eine Rückfrage gibt es nicht.
+2. Das Fahrzeug verlässt die Liste und das FMS-Tableau. Der Hinweis unten bietet einige Sekunden
+   lang „Rückgängig“.
+3. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Fahrzeuge mit Typ und
+   Zeitpunkt.
+
+   ![Aufgeklappter Block „Entlassen (1)“ unter der Fahrzeugliste mit einem Fahrzeug, seinem Typ, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/fahrzeuge/entlassen.png)
+
+4. Kommt das Fahrzeug zurück, „Erneut disponieren“ wählen.
+
+### Eine Fehldisposition stornieren
+
+Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug versehentlich disponiert wurde:
+
+1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Stornieren“ wählen.
+2. Die Rückfrage „… stornieren?“ mit „Stornieren“ bestätigen.
+3. Lehnt die App ab, steht der Grund an der Zeile; das Fahrzeug lässt sich dann nur entlassen.
 
 ## Hintergrund
 
 ### Wer zur Auswahl steht
 
 „Fahrzeuge disponieren“ bietet die Fahrzeuge des Fahrzeugstamms an, die in Dienst stehen und noch
-nicht im Einsatz sind. Ad-hoc-Fahrzeuge gibt es nur im Einsatz. Ein Absenden nimmt höchstens 50
+nicht im Einsatz sind. Ein entlassenes Fahrzeug fehlt dort; es kommt über „Erneut disponieren“ im
+Block „Entlassen“ zurück. Ad-hoc-Fahrzeuge gibt es nur im Einsatz. Ein Absenden nimmt höchstens 50
 Fahrzeuge auf und gilt ganz oder gar nicht. Das Feld „In Einheit“ steht nur, wenn das Modul
 Einheiten im Einsatz freigegeben ist; Personal und Besatzung bringt das Disponieren eines
 Fahrzeugs nicht mit.
@@ -123,21 +139,36 @@ Aus dem Status ihrer Fahrzeuge leitet sich der Status der Einheit im Meldebild a
 Statuswert im Katalog eine Zeitachsen-Marke, schreibt der Wechsel auch die Kräfte-Zeitachse der
 Einheit (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
-### Entfernen
+### Entlassen und Stornieren
 
-Ein entferntes Fahrzeug verlässt den Einsatz; seine Besatzung bleibt als Personal im Einsatz, nur
-ohne Fahrzeug.
+Entlassen ist der Normalweg: Das Fahrzeug verlässt seine Einheit, die Führungsstelle und einen
+Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fahrzeug. Aufträge
+nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
+zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter. Erneut disponiert,
+steht es wieder in der Liste, mit dem Anfangsstatus wie beim Disponieren; Besatzung, Einheit und
+Bereitstellungsraum kommen nicht zurück.
+
+Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
+Minuten nach der Disposition und nur, solange das Fahrzeug noch nichts im Einsatz hat: keinen
+Statuswechsel, keine Besatzung, keine Einheit, keinen Bereitstellungsraum, keine Führungsstelle,
+keinen Auftrag. Wer einmal entlassen war, lässt sich auch nach dem erneuten Disponieren nicht mehr
+stornieren. Ein storniertes Fahrzeug erscheint in keiner Liste und steht beim nächsten Disponieren
+wieder zur Wahl.
+
+An einem entlassenen oder stornierten Fahrzeug lässt sich nichts mehr ändern: Status setzen,
+Besatzung zuordnen, einer Einheit, der Führungsstelle oder einem Auftrag zuordnen und einen
+Bereitstellungsraum belegen lehnt die App ab.
 
 ### Einsatztagebuch
 
-Disponieren, jeder Statuswechsel, das Zuordnen und Freigeben der Besatzung und das Entfernen stehen
-im Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
+Disponieren, jeder Statuswechsel, das Zuordnen und Freigeben der Besatzung, das Entlassen, das
+erneute Disponieren und das Stornieren stehen im Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
 Einheit und Funkrufnamen.
 
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schreibrecht offen.
-Disponieren, Status setzen, Besatzung zuordnen und entfernen dürfen Einsatzleitung und
+Disponieren, Status setzen, Besatzung zuordnen, entlassen und stornieren dürfen Einsatzleitung und
 Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
 [Ohne Netz](ohne-netz.md)).

@@ -12,11 +12,13 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   besatzung.png    frontend/src/pages/FahrzeugePage.tsx (`BesatzungsBlock`)
  *   fahrzeuge-disponieren.png frontend/src/kraefte/FahrzeugeDisponierenModal.tsx
  *   fms-tableau.png  frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts
+ *   entlassen.png    frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
  *
  * Demo-Lücke (D3): die Demo-Fahrzeuge haben keine Besatzung. Die Spec setzt Anna und Paul Probe
  * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“. Für den Dialog
  * „Fahrzeuge disponieren“ legt sie zwei Stamm-Fahrzeuge an, die noch nicht im Einsatz sind
- * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert.
+ * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert. Für den Block „Entlassen“ disponiert sie
+ * zuletzt ein Ad-hoc-Fahrzeug und entlässt es (LLH-1079 Teil II); die Bilder davor zeigen es nicht.
  */
 
 const KAPITEL = 'fahrzeuge';
@@ -115,5 +117,27 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'fahrzeuge-disponieren');
+  });
+
+  test('Block „Entlassen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const weg = await fuelle<Fahrzeug>(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge`, {
+      adhoc: {
+        funkrufname: 'Musterstadt 19-1',
+        fahrzeugtyp: 'MTW',
+        traegerorganisation: 'DRK Musterstadt',
+      },
+    });
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/fahrzeuge/${weg.id}/entlassen`);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    const block = page.locator('[data-lfh="entlassen-block"]');
+    await block.getByText('Entlassen (1)').click();
+    await expect(
+      block.getByRole('button', { name: 'Erneut disponieren: Musterstadt 19-1' }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(block, KAPITEL, 'entlassen');
   });
 });
