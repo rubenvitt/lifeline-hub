@@ -267,6 +267,11 @@ Spec `passwort-anmeldung`, Herleitung
   `/mnt/project-files/lfh-1097/design.md`): nur System-Admin, das Lesen schreibt keine Spur, der
   Kontofilter wird wie beim Schreiben gekürzt (`benutzername::fuer_protokoll`) und mit
   `COLLATE NOCASE` verglichen; Nachweis `tests/zugangsprotokoll.rs`.
+- **Jede Zeile trägt die Org als Schnappschuss** (`org_id`, LLH-1151, Migration 0191): gelesen
+  wird `org_id = <Org des Admins> OR org_id IS NULL`. `audit::schreibe` setzt sie selbst (Konto,
+  sonst versuchter Name), `admin_audit::schreibe` aus der handelnden Person; NULL heißt
+  serverweit (versuchter Name ohne Konto). Ein Rebuild einer der Tabellen nimmt die Spalte mit.
+  Nachweis `tests/zugangsprotokoll.rs` (`jede_org_liest_nur_ihre_spur`).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
 
