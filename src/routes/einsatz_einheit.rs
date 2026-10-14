@@ -171,7 +171,7 @@ pub async fn bilden(
 }
 
 /// Ein gesperrtes Zielmodul ist für die Vorschau kein Fehler, sondern ein leerer Teil (D8).
-fn ist_gesperrt(pruefung: Result<(), AppError>) -> Result<bool, AppError> {
+fn is_gesperrt(pruefung: Result<(), AppError>) -> Result<bool, AppError> {
     match pruefung {
         Ok(()) => Ok(false),
         Err(AppError::Forbidden) => Ok(true),
@@ -189,15 +189,15 @@ pub async fn aus_vorlage_vorschau(
     PfadParam((_id, vorlage_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<aus_vorlage::VorlageVorschau>, AppError> {
     let gesperrt = aus_vorlage::Lesen {
-        fahrzeuge: ist_gesperrt(ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await)?,
-        personal: ist_gesperrt(ctx.fordere_zielmodul::<Personal>(&state.pool).await)?,
+        fahrzeuge: is_gesperrt(ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await)?,
+        personal: is_gesperrt(ctx.fordere_zielmodul::<Personal>(&state.pool).await)?,
     };
     let lesen = aus_vorlage::Lesen {
         fahrzeuge: !gesperrt.fahrzeuge,
         personal: !gesperrt.personal,
     };
     let mut conn = state.pool.acquire().await?;
-    let plan = aus_vorlage::plane_tx(
+    let plan = aus_vorlage::plan_tx(
         &mut conn,
         ctx.einsatz.id,
         ctx.einsatz.org_id,
@@ -321,7 +321,7 @@ pub async fn aus_vorlage_bilden(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (gebildet, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let plan =
-            aus_vorlage::plane_tx(conn, einsatz_id, kontext.org_id, body.vorlage_id, lesen).await?;
+            aus_vorlage::plan_tx(conn, einsatz_id, kontext.org_id, body.vorlage_id, lesen).await?;
         let gebildet = aus_vorlage::bilde_tx(conn, kontext, &plan, &anfrage).await?;
         let etb_id = crate::etb::system_audit_tx(
             conn,

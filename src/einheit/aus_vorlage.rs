@@ -8,7 +8,7 @@
 //! kommt nur mit ausdrücklichem „umhängen“ mit; sonst lehnt der Abgleich mit Gründen je Zeile ab
 //! (`AppError::Zeilen`, 422), bevor etwas geschrieben ist.
 //!
-//! Vorschau und Bilden rechnen dieselbe Planung ([`plane_tx`]): Baum der Vorlage, dann je Art
+//! Vorschau und Bilden rechnen dieselbe Planung ([`plan_tx`]): Baum der Vorlage, dann je Art
 //! eine `json_each`-Abfrage für den Zustand aller Kräfte (`src/AGENTS.md`, „Eingabegrenzen“).
 //! Maßgeblich ist nur die Planung in der Transaktion des Bildens.
 
@@ -175,7 +175,7 @@ pub struct PersonalLage {
     pub fahrzeug: Option<Bezug>,
 }
 
-/// Welche Arten [`plane_tx`] liest: ein gesperrtes Modul (Vorschau) oder eine leere Wahl
+/// Welche Arten [`plan_tx`] liest: ein gesperrtes Modul (Vorschau) oder eine leere Wahl
 /// (Bilden) braucht keine Abfrage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Lesen {
@@ -369,7 +369,7 @@ async fn load_personal_lagen_tx(
 /// Plant die Bildung aus der Vorlage `vorlage_id` (D2): fremd oder unbekannt → 404, deaktivierte
 /// Wurzel → 422, mehr als [`KNOTEN_MAX`] Einheiten → 422. Danach je gelesener Art eine Abfrage für
 /// die Lage aller Kräfte des Baums. Schreibt nichts.
-pub async fn plane_tx(
+pub async fn plan_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
@@ -505,7 +505,7 @@ pub fn grund_gebunden(einheit: Option<&Bezug>, fahrzeug: Option<&Bezug>) -> Stri
 /// Grund für „nicht in der Vorlage“, „außer Dienst“, ein entlassenes Fahrzeug (noch ohne
 /// erneutes Disponieren, LLH-1079 II) und „gebunden ohne umhängen“; Fahrzeuge vor Personen, in
 /// der Reihenfolge der Anfrage. Leer = alles übernehmbar.
-pub fn gleiche_ab(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) -> Vec<ZeilenGrund> {
+pub fn check_against_plan(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) -> Vec<ZeilenGrund> {
     let mut zeilen = Vec::new();
     let zeile = |art, id, grund: String| ZeilenGrund { art, id, grund };
     for w in fahrzeuge {
@@ -581,9 +581,9 @@ pub struct Anfrage<'a> {
     pub personal: &'a [Wahl],
 }
 
-fn merke(liste: &mut Vec<i64>, id: i64) {
-    if !liste.contains(&id) {
-        liste.push(id);
+fn push_unique(list: &mut Vec<i64>, id: i64) {
+    if !list.contains(&id) {
+        list.push(id);
     }
 }
 
@@ -598,7 +598,7 @@ pub async fn bilde_tx(
     plan: &Plan,
     anfrage: &Anfrage<'_>,
 ) -> Result<Gebildet, AppError> {
-    let zeilen = gleiche_ab(plan, anfrage.fahrzeuge, anfrage.personal);
+    let zeilen = check_against_plan(plan, anfrage.fahrzeuge, anfrage.personal);
     if !zeilen.is_empty() {
         return Err(AppError::Zeilen {
             meldung: MELDUNG_ZEILEN.into(),
@@ -715,7 +715,7 @@ pub async fn bilde_tx(
                     let name =
                         mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, eid, ef_id).await?;
                     if let Some(alt) = &lage.einheit {
-                        merke(&mut gebildet.alte_einheiten, alt.id);
+                        push_unique(&mut gebildet.alte_einheiten, alt.id);
                         gebildet.umgehaengt.push(Umgehaengt {
                             name: name.clone(),
                             woher: format!("aus «{}»", alt.name),
@@ -804,12 +804,12 @@ pub async fn bilde_tx(
                     }
                     if let Some(alt) = &lage.fahrzeug {
                         if ziel_ef != Some(alt.id) {
-                            merke(&mut gebildet.alte_fahrzeuge, alt.id);
+                            push_unique(&mut gebildet.alte_fahrzeuge, alt.id);
                         }
                     }
                     match (&lage.einheit, &lage.fahrzeug) {
                         (Some(alt), _) => {
-                            merke(&mut gebildet.alte_einheiten, alt.id);
+                            push_unique(&mut gebildet.alte_einheiten, alt.id);
                             gebildet.umgehaengt.push(Umgehaengt {
                                 name: name.clone(),
                                 woher: format!("aus «{}»", alt.name),

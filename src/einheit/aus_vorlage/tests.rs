@@ -225,9 +225,9 @@ const NICHTS_GESPERRT: Lesen = Lesen {
     personal: false,
 };
 
-async fn plane(pool: &SqlitePool, z: &Zug, vorlage: i64) -> Result<Plan, AppError> {
+async fn load_plan(pool: &SqlitePool, z: &Zug, vorlage: i64) -> Result<Plan, AppError> {
     let mut conn = pool.acquire().await.unwrap();
-    plane_tx(&mut conn, z.k.einsatz_id, z.k.org_id, vorlage, ALLES).await
+    plan_tx(&mut conn, z.k.einsatz_id, z.k.org_id, vorlage, ALLES).await
 }
 
 async fn einheit(pool: &SqlitePool, einsatz: i64, name: &str) -> i64 {
@@ -303,7 +303,7 @@ fn wahl(ids: &[i64]) -> Vec<Wahl> {
 
 async fn bilde(pool: &SqlitePool, z: &Zug, anfrage: &Anfrage<'_>) -> Result<Gebildet, AppError> {
     let mut tx = pool.begin().await.unwrap();
-    let plan = plane_tx(&mut tx, z.k.einsatz_id, z.k.org_id, z.zug, ALLES).await?;
+    let plan = plan_tx(&mut tx, z.k.einsatz_id, z.k.org_id, z.zug, ALLES).await?;
     let g = bilde_tx(&mut tx, z.k, &plan, anfrage).await?;
     tx.commit().await.unwrap();
     Ok(g)
@@ -332,7 +332,7 @@ async fn zaehle(pool: &SqlitePool, sql: &str, einsatz: i64) -> i64 {
 async fn plan_traegt_den_aktiven_baum_wurzel_vorn() {
     let pool = crate::db::test_pool().await;
     let z = setup(&pool).await;
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     let ids: Vec<i64> = plan.knoten.iter().map(|k| k.id).collect();
     assert_eq!(ids, [z.zug, z.staffel]);
     let v = vorschau(
@@ -347,7 +347,7 @@ async fn plan_traegt_den_aktiven_baum_wurzel_vorn() {
     assert_eq!(v.knoten[1].ueber_vorlage_id, Some(z.zug));
 
     // Eine Untervorlage ist allein bildbar: sie ist dann selbst die Wurzel.
-    let plan = plane(&pool, &z, z.staffel).await.unwrap();
+    let plan = load_plan(&pool, &z, z.staffel).await.unwrap();
     let v = vorschau(
         &plan,
         Lesen {
@@ -369,11 +369,11 @@ async fn fremde_unbekannte_und_deaktivierte_vorlagen() {
         .unwrap()
         .id;
     assert!(matches!(
-        plane(&pool, &z, fremd).await,
+        load_plan(&pool, &z, fremd).await,
         Err(AppError::NotFound)
     ));
     assert!(matches!(
-        plane(&pool, &z, 987654).await,
+        load_plan(&pool, &z, 987654).await,
         Err(AppError::NotFound)
     ));
 
@@ -383,10 +383,10 @@ async fn fremde_unbekannte_und_deaktivierte_vorlagen() {
         ..Default::default()
     };
     vrepo::update(&pool, 1, z.staffel, patch).await.unwrap();
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     assert_eq!(plan.knoten.len(), 1);
     vrepo::update(&pool, 1, z.zug, patch).await.unwrap();
-    match plane(&pool, &z, z.zug).await {
+    match load_plan(&pool, &z, z.zug).await {
         Err(AppError::UnprocessableEntity(m)) => assert!(m.contains("deaktiviert"), "{m}"),
         andere => panic!("erwartet 422: {andere:?}"),
     }
@@ -411,7 +411,7 @@ async fn mehr_als_zwanzig_einheiten_sind_422() {
         .unwrap();
     }
     assert_eq!(
-        plane(&pool, &z, z.zug).await.unwrap().knoten.len(),
+        load_plan(&pool, &z, z.zug).await.unwrap().knoten.len(),
         KNOTEN_MAX
     );
     vrepo::create(
@@ -424,7 +424,7 @@ async fn mehr_als_zwanzig_einheiten_sind_422() {
     )
     .await
     .unwrap();
-    match plane(&pool, &z, z.zug).await {
+    match load_plan(&pool, &z, z.zug).await {
         Err(AppError::UnprocessableEntity(m)) => {
             assert_eq!(m, "Vorlage hat mehr als 20 Einheiten")
         }
@@ -456,7 +456,7 @@ async fn fahrzeugzeilen_nennen_zustand_und_einheit() {
     let ef2 = im_einsatz_fahrzeug(&pool, z.k, z.rtw2, Some(zweiter)).await;
     ausser_dienst(&pool, "fahrzeug", z.elw).await;
 
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     let elw = &plan.fahrzeuge[&z.elw];
     assert_eq!(elw.zustand, VorschauZustand::AusserDienst);
     assert_eq!(elw.ef_id, None);
@@ -489,7 +489,7 @@ async fn fahrzeugzeilen_nennen_zustand_und_einheit() {
         .execute(&pool)
         .await
         .unwrap();
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     assert_eq!(plan.fahrzeuge[&z.rtw2].zustand, VorschauZustand::Frei);
     assert_eq!(plan.fahrzeuge[&z.rtw2].einheit, None);
 }
@@ -503,7 +503,7 @@ async fn gesperrte_module_bleiben_in_der_vorschau_leer() {
         fahrzeuge: true,
         personal: false,
     };
-    let plan = plane_tx(
+    let plan = plan_tx(
         &mut conn,
         z.k.einsatz_id,
         1,
@@ -586,7 +586,7 @@ async fn personenzeilen_nennen_zustand_einheit_und_fahrzeug() {
         .unwrap();
     }
 
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     let lage = |id: i64| plan.personal[&id].clone();
     assert_eq!(lage(z.zugfuehrer).zustand, VorschauZustand::AusserDienst);
     let frei = lage(z.funker);
@@ -730,7 +730,7 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
             umhaengen: false,
         },
     ];
-    let gruende: Vec<(ZeilenArt, i64, String)> = gleiche_ab(&plan, &fahrzeuge, &personal)
+    let gruende: Vec<(ZeilenArt, i64, String)> = check_against_plan(&plan, &fahrzeuge, &personal)
         .into_iter()
         .map(|z| (z.art, z.id, z.grund))
         .collect();
@@ -753,7 +753,7 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
         id: 2,
         umhaengen: true,
     }];
-    assert!(gleiche_ab(&plan, &umhaengen, &umhaengen).is_empty());
+    assert!(check_against_plan(&plan, &umhaengen, &umhaengen).is_empty());
 }
 
 /// Der Abgleich läuft vor dem ersten Schreiben: eine Ablehnung legt keine Einheit an.
@@ -892,7 +892,7 @@ async fn enkel_vor_seinem_elternteil_in_der_sortierung_haengt_unter_ihm() {
         .unwrap()
         .id;
 
-        let plan = plane(&pool, &z, z.zug).await.unwrap();
+        let plan = load_plan(&pool, &z, z.zug).await.unwrap();
         let ids: Vec<i64> = plan.knoten.iter().map(|k| k.id).collect();
         assert_eq!(ids, [z.zug, z.staffel, enkel], "{fall}: Plan");
         let v = vorschau(&plan, NICHTS_GESPERRT);
@@ -951,7 +951,7 @@ async fn fehlender_elternteil_im_plan_ist_ein_interner_fehler() {
     .unwrap()
     .id;
     let mut tx = pool.begin().await.unwrap();
-    let mut plan = plane_tx(&mut tx, z.k.einsatz_id, 1, z.zug, ALLES)
+    let mut plan = plan_tx(&mut tx, z.k.einsatz_id, 1, z.zug, ALLES)
         .await
         .unwrap();
     let pos = plan.knoten.iter().position(|k| k.id == enkel).unwrap();
@@ -1167,7 +1167,7 @@ async fn besatzung_wechselt_aufs_vorlagenfahrzeug() {
     let ep_nora = im_einsatz_person(&pool, z.k, z.notarzt, None, None, Some(ef1)).await;
     let ep_nils = im_einsatz_person(&pool, z.k, z.notsan, None, None, Some(ef_fremd)).await;
 
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     let nora = &plan.personal[&z.notarzt];
     assert_eq!(
         (nora.zustand, nora.ep_id),
@@ -1225,7 +1225,7 @@ async fn person_auf_anderem_fahrzeug_braucht_umhaengen() {
     // Vorlage, nur nicht ihres).
     let ef2 = im_einsatz_fahrzeug(&pool, z.k, z.rtw2, None).await;
     im_einsatz_person(&pool, z.k, z.notarzt, None, None, Some(ef2)).await;
-    let plan = plane(&pool, &z, z.zug).await.unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
     assert_eq!(plan.personal[&z.notarzt].zustand, VorschauZustand::Gebunden);
     let fahrzeuge = wahl(&[z.rtw1, z.rtw2]);
     let personal = wahl(&[z.notarzt]);
@@ -1256,7 +1256,7 @@ async fn fehler_mitten_im_schreiben_legt_nichts_an() {
     let z = setup(&pool).await;
     let ep = im_einsatz_person(&pool, z.k, z.rettsan2, None, None, None).await;
     let mut tx = pool.begin().await.unwrap();
-    let plan = plane_tx(&mut tx, z.k.einsatz_id, 1, z.zug, ALLES)
+    let plan = plan_tx(&mut tx, z.k.einsatz_id, 1, z.zug, ALLES)
         .await
         .unwrap();
     crate::personal::disposition_repo::entlassen_tx(
