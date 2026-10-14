@@ -8,6 +8,8 @@ interface Props {
   value?: Staerke | null;
   onChange?: (wert: Staerke | null) => void;
   disabled?: boolean;
+  /** Fokus ins erste Feld beim Einhängen — für die Zeile der Einheit-Ansicht (LLH-1036). */
+  autoFocus?: boolean;
 }
 
 /**
@@ -36,7 +38,7 @@ const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'co
  * onChange durch. Der Echo-Guard im useEffect spiegelt nur eine wirklich externe
  * value-Änderung in die Felder, nicht das eigene onChange-Echo.
  */
-export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
+export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }: Props) {
   const { token } = theme.useToken();
   const [f, setF] = useState<Feld>(value?.fuehrer ?? null);
   const [uf, setUf] = useState<Feld>(value?.unterfuehrer ?? null);
@@ -71,6 +73,7 @@ export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
           value={f}
           disabled={disabled}
           aria-label="Führer"
+          autoFocus={autoFocus}
           placeholder="F"
           onChange={(v) => melde(v, uf, m)}
           style={{ width: 88 }}

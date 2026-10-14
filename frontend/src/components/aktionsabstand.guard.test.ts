@@ -51,7 +51,7 @@ const MIT_NACHBARSCHAFT = [
   // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
   // steht nur noch hier, in der gemeinsamen Hülle.
   'stammdaten/KatalogVerwaltung.tsx',
-  // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
+  // Personzeile der Einheit-Ansicht: „Als Einheitsführer“ neben dem roten „Aus Einheit lösen“.
   'pages/EinheitDetailPage.tsx',
   // Fuß der Rückfrage „Abschnitt … auflösen?“: Abbrechen neben dem roten „Abschnitt auflösen“
   // (LFH-1212); „Auflösen“ selbst steht im Menü „Weitere Aktionen“.
