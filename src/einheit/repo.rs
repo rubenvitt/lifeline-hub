@@ -24,6 +24,10 @@ pub struct EinheitDaten<'a> {
     pub kommunikationsmittel: Option<&'a str>,
     pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
+    /// Taktisches Zeichen (Fachaufgabe, Organisation) schon beim Anlegen, etwa aus einer
+    /// Einheiten-Vorlage (LLH-1049); später pflegt es `aktualisiere_position`.
+    pub tz_fachaufgabe: Option<&'a str>,
+    pub tz_organisation: Option<&'a str>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -543,8 +547,9 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
              soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, funkrufname, \
-             kommunikationsmittel, erreichbarkeit, sortier, angelegt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             kommunikationsmittel, erreichbarkeit, sortier, angelegt_von, \
+             tz_fachaufgabe, tz_organisation) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -560,6 +565,8 @@ pub async fn anlegen_tx(
     .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
     .bind(angelegt_von)
+    .bind(daten.tz_fachaufgabe)
+    .bind(daten.tz_organisation)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -1302,6 +1309,8 @@ mod tests {
             kommunikationsmittel: None,
             erreichbarkeit: None,
             sortier: 0,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
         }
     }
 
@@ -1354,6 +1363,24 @@ mod tests {
         assert_eq!(e.abschnitt_id, Some(abschnitt));
         let t = laden(&pool, einsatz, trupp).await.unwrap();
         assert_eq!(t.ueber_einheit_id, Some(einheit));
+    }
+
+    /// Das taktische Zeichen kommt schon beim Anlegen mit (LLH-1049, Kopfdaten aus der Vorlage).
+    #[tokio::test]
+    async fn zeichen_beim_anlegen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let mut d = daten("Rettungsstaffel", None, None, None, None);
+        d.tz_fachaufgabe = Some("rettungswesen");
+        d.tz_organisation = Some("hilfsorganisation");
+        let e = anlegen(&pool, einsatz, 1, d, b).await.unwrap();
+        assert_eq!(e.tz_fachaufgabe.as_deref(), Some("rettungswesen"));
+        assert_eq!(e.tz_organisation.as_deref(), Some("hilfsorganisation"));
+        let ohne = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+            .await
+            .unwrap();
+        assert_eq!(ohne.tz_fachaufgabe, None);
+        assert_eq!(ohne.tz_organisation, None);
     }
 
     #[tokio::test]
@@ -1645,6 +1672,8 @@ mod tests {
                 kommunikationsmittel: Some("digitalfunk"),
                 erreichbarkeit: Some("0170/1"),
                 sortier: 42,
+                tz_fachaufgabe: None,
+                tz_organisation: None,
             },
             b,
         )

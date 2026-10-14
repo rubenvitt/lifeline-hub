@@ -142,6 +142,8 @@ pub async fn bilden(
             kommunikationsmittel: kommunikationsmittel.as_deref(),
             erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
         },
         ctx.benutzer.id,
     )

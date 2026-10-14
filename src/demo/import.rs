@@ -427,6 +427,8 @@ impl Ablauf<'_> {
                         kommunikationsmittel: None,
                         erreichbarkeit: None,
                         sortier: v.sortier,
+                        tz_fachaufgabe: None,
+                        tz_organisation: None,
                     },
                     self.admin_id,
                 )
