@@ -6169,7 +6169,7 @@
           },
           "zeichen_spec": {
             "type": "string",
-            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0191, LLH-1160), bis es das nächste Mal geändert wird."
+            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird."
           }
         }
       },
@@ -8068,15 +8068,53 @@
           }
         }
       },
+      "LagemonitorAbschnitt": {
+        "type": "object",
+        "description": "Die Fläche eines Einsatzabschnitts für die Monitorkarte, ohne Leiter und Freitexte.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "flaeche_geojson"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "flaeche_geojson": {
+            "type": "string",
+            "description": "GeoJSON-Polygon als String."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kurzbezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kurzbezeichnung im Einsatz (z. B. „EA-N“), falls gesetzt."
+          }
+        }
+      },
       "LagemonitorAnzeige": {
         "type": "object",
         "required": [
           "stand_at",
           "betroffene",
           "kraefte",
-          "uhs"
+          "uhs",
+          "zonen",
+          "abschnitte"
         ],
         "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorAbschnitt"
+            },
+            "description": "Einsatzabschnitte mit gezeichneter Fläche."
+          },
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
           },
@@ -8092,6 +8130,13 @@
             "items": {
               "$ref": "#/components/schemas/LagemonitorUhs"
             }
+          },
+          "zonen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorZone"
+            },
+            "description": "Gefahrenzonen; Evakuierungsbezirke und freie Skizzen fehlen."
           }
         }
       },
@@ -8231,6 +8276,28 @@
           },
           "typ": {
             "$ref": "#/components/schemas/UhsTyp"
+          }
+        }
+      },
+      "LagemonitorZone": {
+        "type": "object",
+        "description": "Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit\nund gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.",
+        "required": [
+          "id",
+          "typ",
+          "geometrie"
+        ],
+        "properties": {
+          "geometrie": {
+            "type": "string",
+            "description": "GeoJSON-Geometrie als String, wie in der Zonenliste."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/LageZoneTyp"
           }
         }
       },

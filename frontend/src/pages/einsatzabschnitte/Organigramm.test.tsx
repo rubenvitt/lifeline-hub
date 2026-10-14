@@ -364,6 +364,37 @@ describe('Organigramm — Klappzustand im Container', () => {
     expect(screen.queryByRole('link', { name: '1. Zug' })).toBeNull();
   });
 
+  it('zeigt den Einsatzleiter, sobald die Führungsstelle antwortet, auch unter ruhendem Zeiger (LLH-1166)', async () => {
+    let antworte: (f: Awaited<ReturnType<typeof ladeFuehrungsstelle>>) => void = () => {};
+    vi.mocked(ladeFuehrungsstelle).mockReturnValueOnce(new Promise((r) => (antworte = r)));
+    container();
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(wurzel).toHaveTextContent('Leitung: lädt');
+    await act(async () =>
+      antworte({
+        art: 'mobil',
+        sprechgruppen: [],
+        fahrzeug_ids: [],
+        einsatzleiter: {
+          art: 'extern',
+          name: 'BI Krause',
+          personal_noch_disponiert: true,
+          seit: '2026-10-11 12:30:00',
+        },
+      }),
+    );
+    expect(
+      await within(screen.getByRole('group', { name: 'Einsatzleitung' })).findByText(
+        'BI Krause (extern)',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+  });
+
   it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', () => {
     renderMitProviders(
       <Organigramm
@@ -434,6 +465,22 @@ describe('Organigramm — Stabsstelle', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
     expect(ladeStab).not.toHaveBeenCalled();
+  });
+
+  it('zeigt die Stabsstelle, sobald sie geladen ist, auch unter ruhendem Zeiger (LLH-1166)', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    let antworte: (s: Stab) => void = () => {};
+    vi.mocked(ladeStab).mockReturnValueOnce(new Promise((r) => (antworte = r)));
+    container();
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    await waitFor(() => expect(ladeStab).toHaveBeenCalled());
+    expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
+    await act(async () => antworte({ besetzung: [besetzung({ name: 'Clara Lage' })] } as Stab));
+    const stab = await screen.findByRole('group', { name: 'Stab' });
+    expect(within(stab).getByText('Clara Lage')).toBeInTheDocument();
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
   });
 
   it('sagt „Besetzung nicht geladen“, wenn der Abruf bei freigegebenem Stab scheitert', async () => {

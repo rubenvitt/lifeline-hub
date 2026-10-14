@@ -5902,15 +5902,58 @@ mod tests {
         assert_eq!(kinder, 0, "Kindzeilen kaskadieren an der Vorlage");
     }
 
-    // --- Migration 0191: Altspalten der freien Zeichen entfernt (LLH-1160) ---
+    // --- Migration 0191: Zugangsprotokoll je Organisation (LLH-1151) ---
+
+    /// Der Bestand bekommt die Org wie beim Schreiben: Anmeldespur über das Konto, sonst über den
+    /// versuchten Namen (ohne Groß-/Kleinschreibung), sonst keine; Admin-Spur über die handelnde
+    /// Person, sonst über das Zielkonto.
+    #[tokio::test]
+    async fn migration_0191_ordnet_den_bestand_seiner_org_zu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 190).await;
+        sqlx::raw_sql(
+            "INSERT INTO organisation (id, name) VALUES (1, 'A'), (2, 'B'); \
+             INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (10, 1, 'a', 'anna', 'h'), (20, 2, 'b', 'bert', 'h'); \
+             INSERT INTO auth_audit (id, ereignis, benutzername, benutzer_id, provider) VALUES \
+               (1, 'login_ok', 'anna', 10, 'passwort'), \
+               (2, 'logout', NULL, 20, 'passwort'), \
+               (3, 'login_fehlgeschlagen', 'BERT', NULL, 'passwort'), \
+               (4, 'login_fehlgeschlagen', 'niemand', NULL, 'passwort'); \
+             INSERT INTO admin_audit (id, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel) VALUES \
+               (1, 'benutzer_angelegt', 10, 'anna', 10, 'anna'), \
+               (2, 'anmeldeweg_aktiviert', 20, 'bert', NULL, 'oidc'), \
+               (3, 'benutzer_deaktiviert', NULL, 'weg', 20, 'bert'), \
+               (4, 'anmeldeweg_deaktiviert', NULL, 'weg', NULL, 'oidc');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, 191).await;
+
+        let auth: Vec<Option<i64>> =
+            sqlx::query_scalar("SELECT org_id FROM auth_audit ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        let admin: Vec<Option<i64>> =
+            sqlx::query_scalar("SELECT org_id FROM admin_audit ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(auth, [Some(1), Some(2), Some(2), None]);
+        assert_eq!(admin, [Some(1), Some(2), Some(2), None]);
+    }
+
+    // --- Migration 0192: Altspalten der freien Zeichen entfernt (LLH-1160) ---
     //
     // Geprüft an Zeilen, die VOR dem Rebuild existieren: eine Altzeile bekommt ihre Altwerte als
     // Hülle `{"v":1,"alt":{…}}` (nur gesetzte Felder), eine Zeile mit Beschreibung behält sie
     // unverändert; ids, Bezeichnung, Ansicht und Zeitstempel bleiben, Fremdschlüssel und Index
     // sind dieselben, und `zeichen_spec` ist danach Pflicht.
     #[tokio::test]
-    async fn migration_0191_freies_zeichen_huellt_altzeilen_und_entfernt_altspalten() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 190).await;
+    async fn migration_0192_freies_zeichen_huellt_altzeilen_und_entfernt_altspalten() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 191).await;
         let (e, b) = bild_grundlage(&pool).await;
         let a: i64 = sqlx::query_scalar(
             "INSERT INTO karten_ansicht (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
@@ -5975,7 +6018,7 @@ mod tests {
         .await
         .unwrap();
 
-        migriere_bis(&pool, 191).await;
+        migriere_bis(&pool, 192).await;
 
         let zeile = |id: i64| {
             let pool = pool.clone();

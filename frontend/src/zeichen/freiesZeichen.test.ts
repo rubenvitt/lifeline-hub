@@ -859,7 +859,7 @@ describe('freiesZeichen — gespeicherte Spec (zeichen_spec)', () => {
   });
 });
 
-// LLH-1160: Migration 0191 schreibt die Altwerte einer Altzeile als Hülle in `zeichen_spec`
+// LLH-1160: Migration 0192 schreibt die Altwerte einer Altzeile als Hülle in `zeichen_spec`
 // (`json_patch` lässt NULL weg). Die Hülle muss genau so zeichnen wie dieselben Altspalten.
 describe('freiesZeichen — Hülle der Altzeilen (LLH-1160)', () => {
   const huelle = (alt: FreiesZeichenEingabe) => JSON.stringify({ v: 1, alt });

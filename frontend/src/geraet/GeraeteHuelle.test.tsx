@@ -151,6 +151,30 @@ function renderApp(route: string) {
   return router;
 }
 
+/** Live-Strom, der Ereignisse zustellen kann; die stumme Attrappe empfängt nie etwas. */
+class SendendeEventSource {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+  readyState = 1;
+  constructor(public url: string) {}
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  private hoerer: Record<string, ((e: MessageEvent) => void)[]> = {};
+  addEventListener(typ: string, cb: (e: MessageEvent) => void) {
+    (this.hoerer[typ] ??= []).push(cb);
+  }
+  removeEventListener(typ: string, cb: (e: MessageEvent) => void) {
+    this.hoerer[typ] = (this.hoerer[typ] ?? []).filter((h) => h !== cb);
+  }
+  close() {
+    this.readyState = SendendeEventSource.CLOSED;
+  }
+  sende(typ: string, data: string) {
+    (this.hoerer[typ] ?? []).forEach((cb) => cb(new MessageEvent(typ, { data })));
+  }
+}
+
 const pfad = (router: ReturnType<typeof renderApp>) =>
   router.state.location.pathname + router.state.location.search;
 
@@ -631,6 +655,48 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
       empfaenger: 'Einsatzleitung',
       inhalt: 'Raum voll',
     });
+  });
+
+  it('umbenannter Raum: Kopf und Absender zeigen ohne Neuanmeldung den neuen Namen (LLH-1155)', async () => {
+    vi.useRealTimers();
+    const quellen: SendendeEventSource[] = [];
+    vi.stubGlobal(
+      'EventSource',
+      class extends SendendeEventSource {
+        constructor(url: string) {
+          super(url);
+          quellen.push(this);
+        }
+      },
+    );
+    brBereit();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
+      }),
+    );
+    renderApp('/geraet/7/meldungen');
+    const kopf = await screen.findByRole('banner');
+    expect(await within(kopf).findByText('BR Sportplatz')).toBeVisible();
+
+    // Die Einsatzleitung benennt den Raum um; die Sitzung (`/me`) nennt weiter den alten Namen.
+    server.use(
+      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () =>
+        HttpResponse.json({ ...raum, bezeichnung: 'BR Festwiese' }),
+      ),
+    );
+    await waitFor(() => expect(quellen.length).toBeGreaterThan(0));
+    act(() => quellen[quellen.length - 1].sende('bereitstellungsraum', JSON.stringify({ id: 4 })));
+    expect(await within(kopf).findByText('BR Festwiese')).toBeVisible();
+    expect(within(kopf).queryByText('BR Sportplatz')).toBeNull();
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Inhalt'), 'Raum voll');
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ absender: 'BR Festwiese · Tablet BR' });
   });
 
   it('das UHS-Tablet hat keine Meldungsseite', async () => {

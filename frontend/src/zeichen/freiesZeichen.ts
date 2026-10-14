@@ -8,7 +8,7 @@
  *   einem Upgrade mit neuer Sperrregel), läuft die Kaskade über die Felder der Spec.
  * - **Altform** (Kennungen des Altpakets taktische-zeichen, als `string`, denn sie sind Eingabe):
  *   bei einer DB-Zeile seit LLH-1160 als Hülle `{"v":1,"alt":{…}}` in `zeichen_spec` (Migration
- *   0191), in Lage-Snapshots von vorher und alten Offline-Ständen als eigene Felder. Übersetzt:
+ *   0192), in Lage-Snapshots von vorher und alten Offline-Ständen als eigene Felder. Übersetzt:
  *   Körper, Organisations-Alias, Stärke und Fachaufgaben aus `fachobjektZeichen` (LFH-835), dazu
  *   die Symboltabelle unten. Was das Altpaket an einem Grundzeichen nicht zeichnete
  *   (`accepts` des Altkatalogs), bleibt auch hier weg; so zeigte es der Hub bisher.
@@ -301,7 +301,7 @@ export const ALT_FELDER = [
 
 /**
  * Die Altform eines freien Zeichens, sonst `null`: die Altwerte aus der Hülle
- * `{"v":1,"alt":{…}}`, die Migration 0191 an Altzeilen in `zeichen_spec` geschrieben hat
+ * `{"v":1,"alt":{…}}`, die Migration 0192 an Altzeilen in `zeichen_spec` geschrieben hat
  * (LLH-1160), oder — ohne `zeichen_spec`, bei Lage-Snapshots von vorher — die eigenen Felder.
  * Nur Zeichenketten zählen; die Hülle stammt aus der DB, sie ist trotzdem Eingabe.
  */

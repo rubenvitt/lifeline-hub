@@ -714,7 +714,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
     // LLH-1160: Grundzeichen plus Hexfarbe, wie es ein Client vor LFH-836 sendet. Altzeilen aus der
-    // DB zeichnet der Leseadapter weiter (Hülle aus Migration 0191, Vitest `freiesZeichen.test.ts`).
+    // DB zeichnet der Leseadapter weiter (Hülle aus Migration 0192, Vitest `freiesZeichen.test.ts`).
     const r = await page.request.post(`/api/einsaetze/${eid}/freie-zeichen`, {
       data: { lat: ORT.lat, lon: ORT.lon, grundzeichen: 'gefahr', farbe: '#cc0000' },
     });

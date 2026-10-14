@@ -113,6 +113,9 @@ pub struct AdminEintrag<'a> {
 /// Schreibt einen Eintrag der Admin-Spur, dazu eine `tracing`-Zeile im Request-Span. Aufrufer
 /// rufen das NACH dem Commit ihrer Aktion: eine abgewiesene Aktion hinterlässt nichts.
 ///
+/// Der Eintrag gehört zur Org der handelnden Person (LLH-1151); ein Zielkonto liegt seit
+/// LFH-1123 immer in derselben Org, und das Schalten eines Anmeldewegs zählt zur Org des Admins.
+///
 /// **Schlägt bewusst nie nach außen durch** (wie `audit::schreibe`): eine Kontosperre im Vorfall
 /// darf nicht an einer klemmenden Audit-Tabelle scheitern. Die Lücke bleibt durch den `error!`
 /// sichtbar.
@@ -143,8 +146,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
     );
 
     let ergebnis = sqlx::query(
-        "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(eintrag.aktion.as_str())
     .bind(eintrag.akteur.id)
@@ -153,6 +156,7 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
     .bind(&ziel)
     .bind(detail.as_deref())
     .bind(peer_ip.as_deref())
+    .bind(eintrag.akteur.org_id)
     .execute(pool)
     .await;
 
@@ -192,18 +196,23 @@ pub struct ZugangsaenderungAnzeige {
     pub peer_ip: Option<String>,
 }
 
-/// Liest die Admin-Spur, neueste zuerst. `konto` trifft die handelnde Person UND das Zielkonto
-/// („was hat dieses Konto getan oder erlitten“), nie einen Anmeldeweg gleichen Namens.
+/// Liest die Admin-Spur der Org `org_id`, neueste zuerst (LLH-1151): ihre Einträge und
+/// serverweite ohne Org (nur Altbestand ohne Konto), nie die einer anderen Org. `konto` trifft die
+/// handelnde Person UND das Zielkonto („was hat dieses Konto getan oder erlitten“), nie einen
+/// Anmeldeweg gleichen Namens.
 pub async fn liste(
     pool: &SqlitePool,
+    org_id: i64,
     filter: &SpurFilter,
     aktion: Option<AdminAktion>,
 ) -> Result<Vec<ZugangsaenderungAnzeige>, sqlx::Error> {
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT id, zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, \
                 peer_ip \
-         FROM admin_audit WHERE 1 = 1",
+         FROM admin_audit WHERE (org_id IS NULL OR org_id = ",
     );
+    qb.push_bind(org_id);
+    qb.push(")");
     if let Some(aktion) = aktion {
         qb.push(" AND aktion = ");
         qb.push_bind(aktion.as_str());
@@ -392,7 +401,7 @@ mod tests {
             limit: 10,
             ..SpurFilter::default()
         };
-        let zeilen = liste(&pool, &filter, None).await.unwrap();
+        let zeilen = liste(&pool, akteur.org_id, &filter, None).await.unwrap();
         let gelesen: Vec<(Option<&str>, Option<&ZugangsAngaben>)> = zeilen
             .iter()
             .map(|z| (z.detail.as_deref(), z.angaben.as_ref()))
@@ -448,7 +457,7 @@ mod tests {
             limit: 10,
             ..SpurFilter::default()
         };
-        let zeilen = liste(&pool, &filter, None).await.unwrap();
+        let zeilen = liste(&pool, akteur.org_id, &filter, None).await.unwrap();
         let gelesen: Vec<(&str, Option<&str>, Option<&ZugangsAngaben>)> = zeilen
             .iter()
             .map(|z| (z.aktion.as_str(), z.detail.as_deref(), z.angaben.as_ref()))

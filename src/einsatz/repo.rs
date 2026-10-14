@@ -2469,7 +2469,7 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        // LLH-1160: eine Altzeile trägt ihre Altwerte als Hülle in `zeichen_spec` (Migration 0191).
+        // LLH-1160: eine Altzeile trägt ihre Altwerte als Hülle in `zeichen_spec` (Migration 0192).
         let alt = r#"{"v":1,"alt":{"grundzeichen":"stelle"}}"#;
         sqlx::query(
             "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von) \

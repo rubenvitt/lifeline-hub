@@ -20,6 +20,8 @@ export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
 export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
+export type LagemonitorZone = S['LagemonitorZone'];
+export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
 export type KopplungAnzeige = S['KopplungAnzeige'];
 export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
@@ -443,7 +445,7 @@ export interface NeuesFreiesZeichen {
 }
 
 /** PATCH-Body (ohne lat/lon, nicht verschiebbar). `zeichen_spec` schreibt das Zeichen; eine
- *  Altzeile (Hülle aus Migration 0191) wird so beim nächsten Ändern zur Spec. */
+ *  Altzeile (Hülle aus Migration 0192) wird so beim nächsten Ändern zur Spec. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
 /** Teil-PATCH: Nur eine Umbenennung schickt bloß `label`, dann bleibt die gespeicherte Form —

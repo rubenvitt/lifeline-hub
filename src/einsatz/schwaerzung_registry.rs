@@ -592,7 +592,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
             // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
             // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`. Altzeilen
-            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0191 (LLH-1160): Katalog-Kennungen des
+            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0192 (LLH-1160): Katalog-Kennungen des
             // Altpakets und eine Hexfarbe, ebenfalls kein Freitext.
             retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).

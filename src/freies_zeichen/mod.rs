@@ -17,7 +17,7 @@ pub struct FreiesZeichenAnzeige {
     pub lon: f64,
     /// Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie
     /// gesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{"v":1,"alt":{…}}` mit den
-    /// Altwerten (Migration 0191, LLH-1160), bis es das nächste Mal geändert wird.
+    /// Altwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird.
     pub zeichen_spec: String,
     pub label: Option<String>,
     /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.

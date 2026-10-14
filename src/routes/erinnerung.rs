@@ -72,6 +72,7 @@ pub async fn liste(
         ctx.einsatz.org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         &mut liste,
     )
     .await?;
@@ -207,6 +208,7 @@ pub async fn anlegen(
         ctx.einsatz.org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         &mut r,
     )
     .await?;
@@ -257,6 +259,7 @@ pub async fn erledigen(
         org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         &mut r,
     )
     .await?;
@@ -293,6 +296,7 @@ pub async fn quittieren(
         org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         &mut r,
     )
     .await?;
@@ -349,6 +353,7 @@ pub async fn oeffnen(
         org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         &mut r,
     )
     .await?;

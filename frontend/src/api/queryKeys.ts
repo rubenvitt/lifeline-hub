@@ -190,7 +190,8 @@ export const EINSATZ_STREAM_EVENTS = {
   material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
   // Ablegen und Entfernen einer Tier-Datei verteilen `tier` (LFH-758).
   tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge],
-  lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
+  // Der Lagemonitor zeigt die Gefahrenzonen aus seinem Lagebild (LLH-1153).
+  lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete, EINSATZ_KEYS.lagemonitor],
   freies_zeichen: [EINSATZ_KEYS.freieZeichen],
   gefahr: [EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete],
   einheit: [
@@ -217,6 +218,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.abloesungen,
     EINSATZ_KEYS.betreuung,
+    // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
+    EINSATZ_KEYS.lagemonitor,
   ],
   // Betroffene Personen (Modul `personen`); `personal` ist ein eigenes Ereignis. Die
   // Betreuungsübersicht trägt „davon namentlich n“ je Stelle, das sich mit jedem Verbleib ändert.

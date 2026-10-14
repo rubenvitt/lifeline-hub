@@ -491,7 +491,7 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
     expect(screen.getByText('Punkt')).toBeInTheDocument();
   });
 
-  // LLH-1160: Seit Migration 0191 kommt eine Altzeile als Hülle in `zeichen_spec`.
+  // LLH-1160: Seit Migration 0192 kommt eine Altzeile als Hülle in `zeichen_spec`.
   it('nennt die Alt-Kennung auch aus der Hülle einer Altzeile', () => {
     renderInspector({
       zeichen: {

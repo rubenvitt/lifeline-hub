@@ -72,14 +72,20 @@ pub struct AuditEintrag<'a> {
 /// ([`crate::auth::benutzername::fuer_protokoll`], LFH-921): ein versuchter Name bleibt 90 Tage
 /// liegen, und kein Aufrufer soll die Grenze selbst einhalten müssen.
 ///
+/// `org_id` hält der Server selbst fest (LLH-1151): die Org des Kontos aus `benutzer_id`, sonst
+/// die des Kontos, dessen Name dem versuchten entspricht (ungekürzt, wie der Login vergleicht),
+/// sonst keine. Ohne Org ist der Eintrag serverweit ([`liste`]).
+///
 /// **Schlägt bewusst nie nach außen durch.** Ein Schreibfehler wird laut geloggt, aber
 /// nicht propagiert: einen Einsatzkräfte-Login zu verweigern, weil die Audit-Tabelle
 /// klemmt, wäre im Feld der schlechtere Ausgang als eine Lücke in der Spur. Die Lücke
 /// bleibt durch den `error!` sichtbar.
 pub async fn schreibe(pool: &SqlitePool, eintrag: AuditEintrag<'_>) {
     let ergebnis = sqlx::query(
-        "INSERT INTO auth_audit (ereignis, benutzername, benutzer_id, peer_ip, provider)
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO auth_audit (ereignis, benutzername, benutzer_id, peer_ip, provider, org_id)
+         VALUES (?, ?, ?, ?, ?, COALESCE(
+             (SELECT org_id FROM benutzer WHERE id = ?),
+             (SELECT org_id FROM benutzer WHERE benutzername = ? COLLATE NOCASE)))",
     )
     .bind(eintrag.ereignis.as_str())
     .bind(
@@ -90,6 +96,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AuditEintrag<'_>) {
     .bind(eintrag.benutzer_id)
     .bind(eintrag.peer_ip.as_deref())
     .bind(eintrag.provider)
+    .bind(eintrag.benutzer_id)
+    .bind(eintrag.benutzername.map(str::trim))
     .execute(pool)
     .await;
 
@@ -121,14 +129,16 @@ pub struct AnmeldeEintragAnzeige {
     pub provider: String,
 }
 
-/// Liest die Anmeldespur, neueste zuerst. `konto` trifft jeden protokollierten Namen, der ihn
-/// enthält, auch einen versuchten, zu dem es kein Konto gibt.
+/// Liest die Anmeldespur der Org `org_id`, neueste zuerst (LLH-1151): ihre Einträge und die
+/// serverweiten (versuchte Namen ohne Konto), nie die einer anderen Org. `konto` trifft jeden
+/// protokollierten Namen, der ihn enthält, auch einen versuchten, zu dem es kein Konto gibt.
 ///
 /// Manche Ereignisse schreiben nur `benutzer_id` (Abmeldung, Code-Tausch, Gerätekopplung): ihr
 /// Name kommt aus dem Konto, gekürzt wie [`benutzername::fuer_protokoll`], damit Anzeige und
 /// Kontofilter sie wie jede andere Zeile behandeln.
 pub async fn liste(
     pool: &SqlitePool,
+    org_id: i64,
     filter: &SpurFilter,
     ereignis: Option<Ereignis>,
 ) -> Result<Vec<AnmeldeEintragAnzeige>, sqlx::Error> {
@@ -136,10 +146,13 @@ pub async fn liste(
         "SELECT * FROM (SELECT a.id, a.zeitpunkt, a.ereignis, \
          COALESCE(a.benutzername, CASE WHEN length(b.benutzername) > {n} \
            THEN substr(b.benutzername, 1, {n}) || '…' ELSE b.benutzername END) AS benutzername, \
-         a.benutzer_id, a.peer_ip, a.provider \
-         FROM auth_audit a LEFT JOIN benutzer b ON b.id = a.benutzer_id) WHERE 1 = 1",
+         a.benutzer_id, a.peer_ip, a.provider, a.org_id \
+         FROM auth_audit a LEFT JOIN benutzer b ON b.id = a.benutzer_id) \
+         WHERE (org_id IS NULL OR org_id = ",
         n = benutzername::PROTOKOLL_LAENGE
     ));
+    qb.push_bind(org_id);
+    qb.push(")");
     if let Some(ereignis) = ereignis {
         qb.push(" AND ereignis = ");
         qb.push_bind(ereignis.as_str());

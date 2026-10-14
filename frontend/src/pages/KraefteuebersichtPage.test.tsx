@@ -345,7 +345,7 @@ describe('meldebildMeta', () => {
 });
 
 describe('KraefteuebersichtPage — Statusband', () => {
-  it('zählt Einheiten je FMS-Status mit Code, Zahl und Wort (LFH-609)', async () => {
+  it('zählt Einheiten als Zahl, aufgegliedert je FMS-Status mit Code (LFH-609, LLH-1025)', async () => {
     mitEinheit();
     const { container } = setup();
     const zelle = await waitFor(() => {
@@ -355,11 +355,15 @@ describe('KraefteuebersichtPage — Statusband', () => {
       expect(z).not.toBeNull();
       return z;
     });
-    expect(zelle).toHaveTextContent('S4');
-    expect(zelle).toHaveTextContent('1');
-    expect(zelle).toHaveTextContent('Am Einsatzort');
-    // Ton aus der Kategorie (gebunden → achtung), nicht aus dem Anker.
-    expect(zelle).toHaveAttribute('data-ton', 'achtung');
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^1$/);
+    // Die Aufgliederung als Bild mit Wortlaut, die Legende fürs Auge (Farbe aus dem Ton:
+    // `statusbandStil.test.ts`).
+    expect(
+      within(zelle).getByRole('img', { name: 'Einheiten nach Status: S4 1' }),
+    ).toBeInTheDocument();
+    expect(zelle).toHaveTextContent('S4 1');
+    // Keine Füllkachel mehr (Spec `kraeftebaum`, „Statusband ohne Füllkacheln“).
+    expect(container.querySelector('[data-lfh="meldebild-bandluecke"]')).toBeNull();
   });
 
   it('sagt am Einheitenband, dass Suche/Träger/Status nur die Mittel filtern — und schweigt ohne', async () => {
@@ -381,7 +385,9 @@ describe('KraefteuebersichtPage — Statusband', () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
     const gruppe = await screen.findByRole('region', { name: 'Personal je Status' });
-    expect(within(gruppe).getByText('gebunden')).toBeInTheDocument();
+    expect(
+      within(gruppe).getByRole('img', { name: 'Personal nach Status: gebunden 1' }),
+    ).toBeInTheDocument();
   });
 
   // Die positiven Aussagen zur Rückmeldung — und ihre Gegenproben.
@@ -391,8 +397,7 @@ describe('KraefteuebersichtPage — Statusband', () => {
     const gruppe = await screen.findByRole('region', { name: 'Einheiten ohne Rückmeldung' });
     const k = gruppe.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(k).toHaveAttribute('data-ton', 'alarm');
-    expect(k).toHaveTextContent('—');
-    expect(k).toHaveTextContent('1');
+    expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^1$/);
     expect(k).toHaveTextContent('keine Rückmeldung');
   });
 
@@ -443,7 +448,9 @@ describe('KraefteuebersichtPage — Raster', () => {
   it('klappt die Mittel per Zeilenklick auf und zeigt den FMS-Chip', async () => {
     mitEinheit();
     const { container } = setup();
-    fireEvent.click(await screen.findByText('1. Zug'));
+    // Auf eine Zelle ohne Sprung: der Name ist ein Link in die Einheit-Ansicht.
+    await screen.findByText('1. Zug');
+    fireEvent.click(within(zeile(container, 'eh-20')!).getByText('Abschnitt Nord'));
     const mittel = await waitFor(() => {
       const m = zeile(container, 'ef-30');
       expect(m).not.toBeNull();
@@ -839,50 +846,258 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 });
 
-describe('KraefteuebersichtPage — Aufklappen', () => {
-  it('„Fahrzeuge und Personal zeigen" klappt alle auf, „Einheiten zugeklappt" wieder zu', async () => {
-    mitEinheit();
-    setup();
+/**
+ * Zug (20) mit Untergruppe (21, ohne eigenen Abschnitt); am Zug das HLF (30, Soll 1/1/7) mit dem
+ * Zugführer darauf, in der Gruppe eine Person ohne Fahrzeug.
+ */
+function mitBaum() {
+  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
+  vi.mocked(listeEinheiten).mockResolvedValue([
+    {
+      ...EINHEIT_E10,
+      typ_label: 'Zug',
+      fuehrer_id: 2,
+      fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+    },
+    {
+      ...EINHEIT_E10,
+      id: 21,
+      name: '1. Gruppe',
+      typ_label: 'Gruppe',
+      abschnitt_id: null,
+      abschnitt_name: null,
+      ueber_einheit_id: 20,
+    },
+  ]);
+  vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+    { ...FAHRZEUG_F1, soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 7 } },
+  ]);
+  vi.mocked(listeEinsatzPersonal).mockResolvedValue([
+    {
+      ...PERSON_P1,
+      id: 2,
+      name: 'Meier',
+      einheit_id: 20,
+      fahrzeug_id: 30,
+      staerke_position: 'fuehrer',
+      status_kategorie: 'gebunden',
+    },
+    { ...PERSON_P1, id: 3, name: 'Schulz', einheit_id: 21 },
+  ]);
+}
+
+describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
+  it('öffnet auf der Stufe „Einheiten“: Untereinheiten sichtbar, Fahrzeuge zugeklappt', async () => {
+    mitBaum();
+    const { container } = setup();
     await screen.findByText('1. Zug');
-    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
-    expect(await screen.findByText('HLF 20')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: 'Einheiten zugeklappt' }));
-    await waitFor(() => expect(screen.queryByText('HLF 20')).toBeNull());
-    expect(screen.getByText('1. Zug')).toBeInTheDocument();
+    await waitFor(() => expect(zeile(container, 'eh-21')).not.toBeNull());
+    expect(zeile(container, 'ef-30')).not.toBeNull();
+    expect(zeile(container, 'ep-2')).toBeNull();
+    expect(zeile(container, 'ep-3')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Einheiten' })).toBeChecked();
   });
 
-  it('klappt nach dem Zuklappen EINER Zeile über „Fahrzeuge und Personal zeigen" wieder vollständig auf', async () => {
-    mitEinheit();
-    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+  it('„mit Fahrzeugen“ öffnet jede Einheit, „alles“ auch die Besatzung', async () => {
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    fireEvent.click(screen.getByRole('radio', { name: 'mit Fahrzeugen' }));
+    // Ohne eigenes Fahrzeug steht die Person direkt unter der Gruppe (D5).
+    await waitFor(() => expect(zeile(container, 'ep-3')).not.toBeNull());
+    expect(zeile(container, 'ep-2')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'mit Fahrzeugen' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'alles' }));
+    await waitFor(() => expect(zeile(container, 'ep-2')).not.toBeNull());
+    expect(screen.getByRole('radio', { name: 'alles' })).toBeChecked();
+  });
+
+  it('bei gleichen Schlüsselmengen bleibt die gewählte Stufe stehen (kein toter Klick)', async () => {
+    // Zug mit einer Gruppe ohne Mittel: alle drei Stufen öffnen nur den Zug.
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      { ...EINHEIT_E10, typ_label: 'Zug' },
+      { ...EINHEIT_E10, id: 21, name: '1. Gruppe', typ_label: 'Gruppe', ueber_einheit_id: 20 },
+    ]);
+    const { container } = setup();
+    await waitFor(() => expect(zeile(container, 'eh-21')).not.toBeNull());
+    for (const name of ['alles', 'mit Fahrzeugen', 'Einheiten']) {
+      fireEvent.click(screen.getByRole('radio', { name }));
+      await waitFor(() => expect(screen.getByRole('radio', { name })).toBeChecked());
+    }
+  });
+
+  it('die Elternzeile zeigt die kumulierte Stärke, das Fahrzeug seine Besatzung Ist/Soll', async () => {
+    mitBaum();
+    const { container } = setup();
+    await waitFor(() => expect(zeile(container, 'ef-30')).not.toBeNull());
+    expect(within(zeile(container, 'eh-20')!).getByText('1/0/1//2')).toBeInTheDocument();
+    expect(within(zeile(container, 'eh-21')!).getByText('0/0/1//1')).toBeInTheDocument();
+    expect(
+      zeile(container, 'ef-30')!.querySelector('[data-lfh="meldebild-besatzung"]'),
+    ).toHaveTextContent('Ist 1/0/0//1Soll 1/1/7//9');
+  });
+
+  it('ein Materialausfall tönt die Einheit und nennt den Grund (D6)', async () => {
+    mitBaum();
+    vi.mocked(listeEinsatzMaterial).mockResolvedValue([
+      {
+        id: 40,
+        einsatz_id: 1,
+        einheit_id: 21,
+        bezeichnung: 'Tauchpumpe',
+        menge: 1,
+        status: 'defekt',
+      },
+    ] as Awaited<ReturnType<typeof listeEinsatzMaterial>>);
+    // Beide in der Frist: die Tönung kommt allein aus dem Material.
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30), rueckmeldungVon(21, 30)],
+    });
+    const { container } = setup();
+    const gruppe = await waitFor(() => {
+      const z = zeile(container, 'eh-21');
+      expect(z).not.toBeNull();
+      return z!;
+    });
+    await waitFor(() => expect(gruppe).toHaveClass('meldebild-problemzeile'));
+    expect(gruppe.querySelector('[data-lfh="meldebild-toenungsgrund"]')).toHaveTextContent(
+      '1 Ausfall Material',
+    );
+    // Eigen (D3): der Zug darüber bleibt ungetönt.
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('eine Untereinheit trägt ihre eigene Rückmeldung und Tönung (D12)', async () => {
+    mitBaum();
+    // Zug in der Frist, Gruppe überfällig: nur die Gruppenzeile zeigt das Urteil.
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30), rueckmeldungVon(21, -1)],
+    });
+    const { container } = setup();
+    const zelle = await waitFor(() => {
+      const z = zeile(container, 'eh-21')?.querySelector(
+        '[data-lfh="meldebild-rueckmeldung"]',
+      ) as HTMLElement | null;
+      expect(z).toHaveAttribute('data-zustand', 'ueberfaellig');
+      return z!;
+    });
+    expect(zelle.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
+    expect(zeile(container, 'eh-21')).toHaveClass('meldebild-problemzeile');
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('der Einheitenname springt in die Einheit-Ansicht', async () => {
+    mitBaum();
+    setup();
+    expect(await screen.findByRole('link', { name: '1. Gruppe' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/21',
+    );
+  });
+
+  it('zählt Untereinheiten mit: Meta, Kachel „keine Rückmeldung“ (D12)', async () => {
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    // Die Suche trifft nur die Mittel: beide Einheiten bleiben in der Auswahl.
+    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'xyz' } });
+    const kopf = await seitenkopf();
+    expect(await kopf.findByText(/^2 von 2 Einheiten/)).toBeInTheDocument();
+    const gruppe = await screen.findByRole('region', { name: 'Einheiten ohne Rückmeldung' });
+    expect(gruppe.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^2$/);
+    expect(zeile(container, 'eh-21')).not.toBeNull();
+  });
+
+  it('„Filter (n)“ zählt Träger und Status; der gesetzte Filter bleibt als Marke sichtbar', async () => {
+    mitBaum();
     setup();
     await screen.findByText('1. Zug');
-    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
-    await screen.findByText('HLF 20');
-
-    fireEvent.click(screen.getByText('1. Zug'));
-    await waitFor(() => expect(screen.queryByText('HLF 20')).toBeNull());
-    // „Ohne Einheit" steht noch offen — die Liste ist also nicht leer, aber unvollständig.
-    expect(screen.getByText('P1')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
-    expect(await screen.findByText('HLF 20')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filter$/ })).toBeInTheDocument();
+    await oeffneFilter();
+    const feld = await waitFor(() => {
+      const f = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement | null;
+      expect(f).not.toBeNull();
+      return f!;
+    });
+    const statusFilter = [...feld.querySelectorAll('.ant-select')].find((x) =>
+      x.textContent?.includes('Status'),
+    )!;
+    fireEvent.mouseDown(statusFilter.querySelector('.ant-select-content')!);
+    fireEvent.click(
+      await waitFor(() => {
+        const o = [...document.querySelectorAll('.ant-select-item-option')].find(
+          (x) => x.textContent === 'gebunden',
+        );
+        expect(o).toBeDefined();
+        return o!;
+      }),
+    );
+    expect(await screen.findByRole('button', { name: /^Filter \(1\)$/ })).toBeInTheDocument();
+    const leiste = document.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+    expect(within(leiste).getByText('Status: gebunden')).toBeInTheDocument();
   });
 });
 
+describe('KraefteuebersichtPage — Aufklappen', () => {
+  it('„alles“ klappt alle auf, „Einheiten“ die Mittel wieder zu', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    fireEvent.click(screen.getByRole('radio', { name: 'alles' }));
+    await waitFor(() => expect(zeile(container, 'ef-30')).not.toBeNull());
+    fireEvent.click(screen.getByRole('radio', { name: 'Einheiten' }));
+    await waitFor(() => expect(zeile(container, 'ef-30')).toBeNull());
+    expect(screen.getByText('1. Zug')).toBeInTheDocument();
+  });
+
+  it('klappt nach dem Zuklappen EINER Zeile über „alles“ wieder vollständig auf', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    fireEvent.click(screen.getByRole('radio', { name: 'alles' }));
+    await waitFor(() => expect(zeile(container, 'ef-30')).not.toBeNull());
+
+    fireEvent.click(within(zeile(container, 'eh-20')!).getByText('Abschnitt Nord'));
+    await waitFor(() => expect(zeile(container, 'ef-30')).toBeNull());
+    // „Ohne Einheit" steht noch offen — die Liste ist also nicht leer, aber unvollständig.
+    expect(screen.getByText('P1')).toBeInTheDocument();
+    // Die Leiste leitet die Stufe ab: nicht mehr „alles“.
+    expect(screen.getByRole('radio', { name: 'alles' })).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'alles' }));
+    await waitFor(() => expect(zeile(container, 'ef-30')).not.toBeNull());
+  });
+});
+
+/** Öffnet das Filterfeld hinter „Filter (n)“ (D9). */
+async function oeffneFilter() {
+  fireEvent.click(await screen.findByRole('button', { name: /^Filter/ }));
+}
+
 describe('KraefteuebersichtPage — Werkzeugzeile', () => {
-  it('trägt Trägerorganisation-Filter und Druck', async () => {
+  it('trägt Trägerorganisation-Filter hinter „Filter“ und Druck', async () => {
     setup();
+    await oeffneFilter();
     expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
   });
 
   it('Filter, Suche und Umschalter tragen deutsche zugängliche Namen, keinen englischen Rest', async () => {
     setup();
+    await oeffneFilter();
     await screen.findByText('Trägerorganisation');
-    expect(screen.getByRole('combobox', { name: 'Nach Trägerorganisation filtern' })).toBeVisible();
+    // Das Filterfeld blendet ein — sichtbar erst nach der Öffnungsbewegung.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('combobox', { name: 'Nach Trägerorganisation filtern' }),
+      ).toBeVisible(),
+    );
     expect(screen.getByRole('combobox', { name: 'Nach Status filtern' })).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Einheiten und Kräfte durchsuchen' })).toBeVisible();
-    expect(screen.getByRole('radiogroup', { name: 'Zeilen auf- oder zuklappen' })).toBeVisible();
+    expect(screen.getByRole('radiogroup', { name: 'Ausklappstufe des Kräftebaums' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /search/i })).toBeNull();
     expect(document.querySelector('[aria-label="segmented control"]')).toBeNull();
   });
@@ -924,11 +1139,12 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
   });
 
   it('die Statusfilter-Optionen kommen aus der einen Statusachse — ohne den vierten Eimer', async () => {
-    const { container } = setup();
+    setup();
+    await oeffneFilter();
     await screen.findByText('Trägerorganisation');
-    // Auf die Werkzeugzeile scopen: „Status" ist auch ein Spaltenkopf.
-    const leiste = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
-    expect(leiste, 'Werkzeugzeile nicht gefunden').not.toBeNull();
+    // Auf das Filterfeld scopen: „Status" ist auch ein Spaltenkopf.
+    const leiste = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement;
+    expect(leiste, 'Filterfeld nicht gefunden').not.toBeNull();
     const statusFilter = [...leiste.querySelectorAll('.ant-select')].find((s) =>
       s.textContent?.includes('Status'),
     );
