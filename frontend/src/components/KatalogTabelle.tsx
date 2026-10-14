@@ -64,6 +64,13 @@ import '../theme/sprache.css';
  *   Spalten, eine ausgeblendete gefilterte Spalte siebt nicht (gepinnt in
  *   `OnlineQuellenVerwaltung.test.tsx`).
  *
+ * **Kopfwerkzeuge folgen der Dichte** (LLH-1227, Kriterium 2). Die Werkzeugzeile hält zwischen
+ * Suche und Spaltenschalter `paddingSM` (7 / 11 / 16 px, {@link werkzeugAbstand}). antds
+ * Spaltenfilter-Auslöser ist ein `span` mit `tabIndex=-1` in Schriftgröße (20 × 23 px in jeder
+ * Stufe): er bekommt den Boden `controlHeightSM` über {@link filterKopfStil} und `sprache.css`,
+ * und {@link useFilterTastatur} nimmt ihn in die Tab-Folge (Enter/Leertaste öffnen, Escape
+ * schließt und gibt den Fokus zurück, das trägt antds Dropdown).
+ *
  * ── DREI ZUSTÄNDE, DIE LADEUNTERDRÜCKUNG LEBT HIER ──
  *
  * **ladend**, **leer** und **gefüllt**; **Fehler** tauscht die Seite gegen `SeitenFehler`, bevor
@@ -213,6 +220,87 @@ export function suchfeldStil(
     width: `calc(min(${platzhalter.length}ch, ${SUCHFELD_TEXT_MAX}px) + ${rahmen}px)`,
     maxWidth: '100%',
   };
+}
+
+/**
+ * Abstand zwischen den Werkzeugen über der Tabelle, rein und exportiert (LLH-1227). Die Leitlinie
+ * verlangt zwischen zwei Zielen ≥ 8 px in `komfortabel` und ≥ 16 px in `handschuh`; `paddingXS`
+ * lag bei 3 / 5 / 7 px, `paddingSM` hält 7 / 11 / 16 (`kompakt` hat die Spacing-Ausnahme).
+ */
+export function werkzeugAbstand(token: { paddingSM: number }): number {
+  return token.paddingSM;
+}
+
+/**
+ * Boden und Einzug des Spaltenfilter-Auslösers als Variablen an der Tabellenwurzel, rein und
+ * exportiert (LLH-1227; gelesen in `theme/sprache.css`, Muster `ortspfadStil`). Der Boden ist
+ * `controlHeightSM` (24 / 48 / 72); der Einzug ist die Kopfzellen-Polsterung (`paddingSM`, wie
+ * `cellPaddingBlock` in {@link tabellenTokens}), um die der Auslöser in die Polsterung ragt,
+ * damit der Kopf nicht um das Doppelte wächst.
+ */
+export function filterKopfStil(token: { controlHeightSM: number; paddingSM: number }) {
+  return {
+    '--lfh-filter-ziel': `${token.controlHeightSM}px`,
+    '--lfh-filter-einzug': `${token.paddingSM}px`,
+  } as CSSProperties;
+}
+
+/** antds Filter-Auslöser im Kopf; die Messzeile im Körper trägt eine stumme Kopie. */
+const FILTER_AUSLOESER = 'thead .ant-table-filter-trigger';
+
+/** Zugänglicher Name des Auslösers aus dem Spaltentitel, mit Zustand als Wort. */
+function filterName(ausloeser: HTMLElement): string {
+  const titel = ausloeser.closest('th')?.querySelector('.ant-table-column-title')?.textContent;
+  const spalte = titel?.trim() ? `${titel.trim()} filtern` : 'Spalte filtern';
+  return ausloeser.classList.contains('active') ? `${spalte}, gefiltert` : spalte;
+}
+
+/**
+ * Nimmt antds Spaltenfilter-Auslöser in die Tab-Folge (LLH-1227). antd rendert ihn als
+ * `span role="button" tabIndex={-1}` ohne Namen und ohne Tastenweg; ein eigener `filterIcon`
+ * läge nur IN diesem `span` (verschachteltes Bedienziel). Deshalb am DOM: `tabIndex` 0, Name aus
+ * dem Spaltentitel, Enter/Leertaste lösen den Klick aus, auf den antds Dropdown hört. Escape und
+ * die Fokusrückgabe trägt das Dropdown selbst (`useAccessibility` in `@rc-component/dropdown`).
+ *
+ * Der Tastenhörer liegt an der Wurzel und hält das Ereignis an: sonst sortierte eine sortierbare
+ * Kopfzelle beim selben Enter mit (ihr `onKeyDown` hört über Reacts Wurzel). Ein Beobachter hält
+ * Neuaufbauten des Kopfs (Spaltenschalter, Filterzustand) nach; er hört nur auf `class`, die
+ * eigenen Attribute lösen ihn nicht aus.
+ */
+export function useFilterTastatur(tabelle: RefObject<TableRef | null>): void {
+  useEffect(() => {
+    const wurzel = tabelle.current?.nativeElement;
+    if (!wurzel) return;
+    const erschliesse = () => {
+      for (const ausloeser of wurzel.querySelectorAll<HTMLElement>(FILTER_AUSLOESER)) {
+        if (ausloeser.tabIndex !== 0) ausloeser.tabIndex = 0;
+        const name = filterName(ausloeser);
+        if (ausloeser.getAttribute('aria-label') !== name)
+          ausloeser.setAttribute('aria-label', name);
+      }
+    };
+    const taste = (ereignis: KeyboardEvent) => {
+      if (ereignis.key !== 'Enter' && ereignis.key !== ' ') return;
+      const ziel = ereignis.target as HTMLElement | null;
+      if (!ziel?.matches(FILTER_AUSLOESER)) return;
+      ereignis.preventDefault();
+      ereignis.stopPropagation();
+      ziel.click();
+    };
+    erschliesse();
+    const beobachter = new MutationObserver(erschliesse);
+    beobachter.observe(wurzel, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    wurzel.addEventListener('keydown', taste);
+    return () => {
+      beobachter.disconnect();
+      wurzel.removeEventListener('keydown', taste);
+    };
+  }, [tabelle]);
 }
 
 /** Ab dieser Zeilenzahl blättert das Primitiv von selbst. */
@@ -470,6 +558,7 @@ export default function KatalogTabelle<T extends object>({
   // Der Kopf steht unter dem klebenden Rahmen, in Drawer und Modal an deren Oberkante (LFH-952).
   const rahmenOben = useRahmenObenFuer(useCallback(() => tabelleRef.current?.nativeElement, []));
   useKopfFreiraum(tabelleRef);
+  useFilterTastatur(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 
   // ── Spaltenschalter ───────────────────────────────────────────────────────────────
@@ -637,7 +726,7 @@ export default function KatalogTabelle<T extends object>({
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            gap: token.paddingXS,
+            gap: werkzeugAbstand(token),
           }}
         >
           {suche != null && (
@@ -672,6 +761,7 @@ export default function KatalogTabelle<T extends object>({
           {...rest}
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
+          style={{ ...filterKopfStil(token), ...rest.style }}
           columns={fixierteSpalten}
           dataSource={sichtbareZeilen}
           loading={loading}
