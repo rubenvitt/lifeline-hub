@@ -489,6 +489,10 @@ anwendbar), „nicht geprüft" ist keins.
   gewähltem Treffer Adresse und Koordinate zusammen; beide stehen im Paneel „Einsatzort“, die
   Kopfleiste zeigt den Einsatzort nur an. Eine Eingabe, die einen ungültigen Entwurf selbst
   anzeigt (Koordinate), sperrt das Senden über `isValid`.
+  Die Einheit-Ansicht hat ebenso nur den Zeilenweg (LLH-1036, Spec `einheit-ansicht`): eine Zeile
+  schickt genau ihr Feld (`patcheEinheit`; die Soll-Stärke ihre drei, das taktische Zeichen ein
+  `tz_*`-Feld über `patchEinheitZeichen`), kein Formular, keine Speichern-Leiste. Der Inhalt
+  hängt an `key={einheitId}`, damit kein Grund und keine offene Zeile zur nächsten Einheit wandert.
 - **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
   auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
   Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz
