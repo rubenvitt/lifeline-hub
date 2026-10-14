@@ -1647,3 +1647,103 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     // Disponiert, gebildet ×2, zugeordnet, aufgelöst, storniert.
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 6);
 }
+
+/// Spec `material-liste`, „Umhängen nennt die alte Einheit“ (LLH-1093, design.md D5): der
+/// ETB-Eintrag nennt beide Einheiten, beide werden live gemeldet; dieselbe Einheit noch einmal
+/// schreibt nichts; eine aufgelöste Zieleinheit ist 409.
+#[tokio::test]
+async fn material_umhaengen_nennt_die_alte_einheit() {
+    let (app, live) = common::setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = material_anlegen(&app, &admin, einsatz, "Wolldecke").await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let b = einheit_bilden(&app, &admin, einsatz, "Staffel B").await;
+    let zuordnen = |eid: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "PUT",
+                &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+                &admin,
+                None,
+            )
+            .await
+        }
+    };
+    let (s, json) = zuordnen(a).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(texte
+        .iter()
+        .any(|t| t == "Einheit «Staffel A»: Material «Wolldecke» (×3) zugeordnet"));
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte.iter().any(|t| t
+            == "Einheit «Staffel B»: Material «Wolldecke» (×3) zugeordnet, vorher «Staffel A»"),
+        "{texte:?}"
+    );
+    let mut gemeldet = common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]);
+    gemeldet.sort();
+    let mut erwartet = vec![("einheit".to_string(), a), ("einheit".to_string(), b)];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "alte und neue Einheit");
+    let (_, einheiten) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let mitglieder = |eid: i64| {
+        einheiten
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == eid)
+            .unwrap()["material_mitglieder"]
+            .as_array()
+            .unwrap()
+            .len()
+    };
+    assert_eq!((mitglieder(a), mitglieder(b)), (0, 1));
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = zuordnen(b).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "dieselbe Einheit");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+    assert_eq!(
+        common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]),
+        vec![],
+        "dieselbe Einheit meldet nichts"
+    );
+
+    // Mit einem Mitglied bleibt die Einheit beim Auflösen als aufgelöst stehen (LLH-1079).
+    let trage = material_anlegen(&app, &admin, einsatz, "Trage").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{trage}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{a}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, json) = zuordnen(a).await;
+    assert_eq!(s, StatusCode::CONFLICT, "aufgelöste Zieleinheit: {json}");
+}

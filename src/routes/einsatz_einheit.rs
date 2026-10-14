@@ -754,7 +754,9 @@ pub async fn fahrzeug_freigeben(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT .../einheiten/{eid}/material/{em_id} — Material zuordnen. ETB-Eintrag.
+/// PUT .../einheiten/{eid}/material/{em_id} — Material zuordnen oder umhängen. ETB-Eintrag, der
+/// beim Umhängen die vorherige Einheit nennt; beide Einheiten werden gemeldet. Dieselbe Einheit
+/// noch einmal schreibt nichts (LLH-1093, design.md D5).
 pub async fn material_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -764,24 +766,32 @@ pub async fn material_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
-        let (bez, menge) =
-            mitglied_repo::ordne_material_zu_tx(conn, einsatz_id, eid, em_id).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &format!(
-                "Einheit «{}»: Material «{}» (×{}) zugeordnet",
-                einheit, bez, menge
-            ),
-        )
-        .await?;
-        Ok(())
+    let zuordnung = crate::write_retry!(&state.pool, |conn| {
+        let z = mitglied_repo::ordne_material_zu_tx(conn, einsatz_id, eid, em_id).await?;
+        if z.is_geaendert {
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                startwert,
+                &crate::einheit::etb_text_material_zugeordnet(
+                    &einheit,
+                    &z.bezeichnung,
+                    z.menge,
+                    z.vorher.as_ref().map(|(_, name)| name.as_str()),
+                ),
+            )
+            .await?;
+        }
+        Ok(z)
     })?;
-    sse_einheit(&state, einsatz_id, eid);
-    sse_material(&state, einsatz_id, em_id);
+    if zuordnung.is_geaendert {
+        sse_einheit(&state, einsatz_id, eid);
+        if let Some((alt, _)) = zuordnung.vorher {
+            sse_einheit(&state, einsatz_id, alt);
+        }
+        sse_material(&state, einsatz_id, em_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
