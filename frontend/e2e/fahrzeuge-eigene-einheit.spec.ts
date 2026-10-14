@@ -177,6 +177,9 @@ for (const { dichte, hoehe, abstand } of [
     await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
     const kaestchen = page.getByRole('dialog').locator('label.ant-checkbox-wrapper');
     await expect(kaestchen).toHaveCount(3);
+    // Erst nach dem Einblenden messen: im Zoom ist der Dialog noch skaliert (ab 0,2), und
+    // `getBoundingClientRect` misst die verkleinerten Kästchen.
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
     const boxen = await kaestchen.evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect();
