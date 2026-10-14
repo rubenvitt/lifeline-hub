@@ -1410,12 +1410,16 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
   }
 
   /*
-   * EINHEITEN-GLIEDERUNG AM HANDY: jeder Knoten ist ein Block aus zwei Zeilen, „Ist … · Soll …“
-   * steht in EINER Zeile, und der Einzug je Ebene ist schmal. Zwei Ebenen (Zug → Gruppe), damit
-   * der Einzug messbar ist.
+   * EINHEITEN-GLIEDERUNG (LLH-1029): eine Tabelle mit Baum aus dem Kräftebaum-Kern. Am Handy
+   * bleiben Einheit, Ist und Soll als Spalten, der Einzug je Ebene ist schmal, Name, Ist und Soll
+   * stehen ganz im Bild, und weder Tabelle noch Seite laufen quer — angepasst, nicht in Karten
+   * aufgelöst. Ein langes Wort im Namen („Behandlungsgruppe“) wird getrennt, statt die
+   * Einheitenspalte breit zu halten. Am Fükw (1366) läuft die volle Spaltenreihe nicht über.
+   * Zwei Ebenen (Zug → Gruppe), damit der Einzug messbar ist; die Gruppe ist gegen ihr Soll aus
+   * dem Typ unterbesetzt, damit das Urteil mitgemessen wird.
    */
   for (const rolle of ['admin', 'beobachter'] as const) {
-    test(`mobil (390 px) · ${rolle}: Einheiten-Knoten zweizeilig, Ist und Soll in einer Zeile`, async ({
+    test(`mobil (390 px) · ${rolle}: Einheiten-Gliederung als Tabelle ohne Querlauf, schmaler Einzug`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
@@ -1435,57 +1439,69 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         expect(antwort.ok(), `Seeding Einheit: ${await antwort.text()}`).toBeTruthy();
         return ((await antwort.json()) as { id: number }).id;
       };
-      const zug = await post({ name: 'Sanitätszug Musterstadt', typ_id: typ('Zug') });
-      const gruppe = await post({
+      const zugId = await post({ name: 'Sanitätszug Musterstadt', typ_id: typ('Zug') });
+      await post({
         name: 'Behandlungsgruppe Musterstadt-Nordwest',
         typ_id: typ('Gruppe'),
-        ueber_einheit_id: zug,
+        ueber_einheit_id: zugId,
       });
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
-      await page.setViewportSize({ width: 390, height: 844 });
+
       await page.goto(`/einsaetze/${einsatzId}/einheiten`);
-      const oben = page.getByTestId(`einheit-knoten-${zug}`);
-      const unten = page.getByTestId(`einheit-knoten-${gruppe}`);
-      await expect(oben).toBeVisible();
-      await expect(unten).toBeVisible();
+      const gliederung = page.getByRole('region', { name: 'Gliederung' });
+      // Der Link ohne äußeren Bezug: als `has` einer Zeile wird er relativ zur Zeile gesucht.
+      const zug = page.getByRole('link', { name: 'Sanitätszug Musterstadt' });
+      const gruppe = page.getByRole('link', { name: 'Behandlungsgruppe Musterstadt-Nordwest' });
+      await expect(gruppe).toBeVisible();
       // Vorbedingung: der Rollenzweig steht.
       await expect(page.getByRole('button', { name: 'Einheit bilden' })).toHaveCount(
         rolle === 'admin' ? 1 : 0,
       );
+      // Vorbedingung: das Urteil steht als Wort (die Gruppe hat ihr Soll aus dem Typ).
+      await expect(gliederung.getByText('unterbesetzt').first()).toBeVisible();
+      const breit = await tabellenUeberlauf(gliederung);
 
-      const mass = async (knoten: Locator) =>
-        knoten.evaluate((el) => {
-          const [kopf, staerke] = Array.from(el.children) as HTMLElement[];
-          const r = el.getBoundingClientRect();
-          const zeilenhoehe = parseFloat(getComputedStyle(staerke).lineHeight);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(gliederung.getByRole('columnheader', { name: 'Abschnitt' })).toHaveCount(0);
+      const zeile = (link: Locator) => gliederung.locator('tbody tr').filter({ has: link });
+      const mass = async (link: Locator) => {
+        const r = await zeile(link).evaluate((tr) => {
+          const zellen = Array.from(tr.querySelectorAll('td')).map((td) =>
+            td.getBoundingClientRect(),
+          );
           return {
-            links: r.left,
-            rechts: r.right,
-            zeilen: el.children.length,
-            kopfText: kopf.textContent ?? '',
-            staerkeText: staerke.textContent ?? '',
-            staerkeZeilen: Math.round(staerke.getBoundingClientRect().height / zeilenhoehe),
+            istRechts: zellen[1]?.right ?? Infinity,
+            sollRechts: zellen[2]?.right ?? Infinity,
+            spalten: zellen.length,
           };
         });
-      const [m1, m2] = [await mass(oben), await mass(unten)];
+        const box = (await link.boundingBox())!;
+        return { ...r, links: box.x, linkRechts: box.x + box.width };
+      };
+      const [m1, m2] = [await mass(zug), await mass(gruppe)];
+      const schmal = await tabellenUeberlauf(gliederung);
+      const seite = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
       test.info().annotations.push({
         type: 'messwert',
-        description: `Einzug ${Math.round(m2.links - m1.links)}px · ${m1.staerkeText} · ${m2.staerkeText}`,
+        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px, 390 ${schmal}px · Seite ${seite}px · Spalten ${m1.spalten} · Soll-Kante ${Math.round(Math.max(m1.sollRechts, m2.sollRechts))}px`,
       });
       for (const [m, name] of [
         [m1, 'Zug'],
         [m2, 'Gruppe'],
       ] as const) {
-        expect(m.zeilen, `${name}: zwei Blöcke`).toBe(2);
-        expect(m.kopfText, `${name}: oben Name und Typ`).toContain(name);
-        expect(m.staerkeText, `${name}: Ist und Soll in EINER Zeile`).toMatch(
-          /^Ist \S+ · Soll \S+$/,
-        );
-        expect(m.staerkeZeilen, `${name}: die Stärkezeile bricht nicht um`).toBe(1);
-        expect(m.rechts, `${name}: im Bild`).toBeLessThanOrEqual(390);
+        expect(m.spalten, `${name}: Einheit, Ist und Soll`).toBe(3);
+        expect(m.linkRechts, `${name}: der Name steht im Bild`).toBeLessThanOrEqual(390);
+        expect(m.istRechts, `${name}: Ist steht im Bild`).toBeLessThanOrEqual(390);
+        expect(m.sollRechts, `${name}: Soll steht ganz im Bild`).toBeLessThanOrEqual(390);
       }
-      // Der Einzug je Ebene ist schmal: antds Vorgabe folgt der Titelhöhe (24–72 px).
+      await expect(zeile(gruppe).getByText('unterbesetzt')).toBeInViewport();
       expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
+      expect(m2.links - m1.links, 'die Gruppe steht eingerückt').toBeGreaterThan(0);
+      expect(seite, 'Seite läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
+      expect(schmal, 'Tabelle läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
+      expect(breit, 'Tabelle läuft bei 1366 px nicht quer').toBeLessThanOrEqual(1);
     });
   }
 });

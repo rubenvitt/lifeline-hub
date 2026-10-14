@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle sechsunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle siebenunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -59,6 +59,7 @@ describe('Statusfarb-Vertrag', () => {
       'dienststatus',
       'dringlichkeit',
       'dwdWarnstufe',
+      'einheitStaerkeUrteil',
       'einsatzStatus',
       'etbTyp',
       'hochwasserKlasse',
@@ -116,6 +117,17 @@ describe('Statusfarb-Vertrag', () => {
       kein_soll: { rolle: 'neutral', label: 'kein Soll' },
       erfuellt: { rolle: 'normal', label: 'Soll erfüllt' },
       unterbesetzt: { rolle: 'alarm', label: 'unterbesetzt' },
+    });
+  });
+
+  it('eine unterbesetzte EINHEIT ist ein Führungshinweis (achtung), kein Alarm; sonst kein Zeichen (LLH-1029)', () => {
+    // Dasselbe Wort wie am Fahrzeug, anderer Ton: dort rückt ein Fahrzeug unterbesetzt aus, hier
+    // fehlt einem Zug eine Gruppe (Alarmbudget EEMUA 191). „Soll erfüllt“ bleibt neutral, damit
+    // die Gliederung keinen Grün-Teppich trägt.
+    expect(sf.einheitStaerkeUrteil).toEqual({
+      kein_soll: { rolle: 'neutral', label: 'kein Soll' },
+      erfuellt: { rolle: 'neutral', label: 'Soll erfüllt' },
+      unterbesetzt: { rolle: 'achtung', label: 'unterbesetzt' },
     });
   });
 
@@ -210,7 +222,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(36);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(37);
   });
 });
 

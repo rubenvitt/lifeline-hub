@@ -123,6 +123,9 @@ const NUR_TABELLE: string[] = [
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
   // Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?“), Tabelle in jeder Breite.
   '/src/betreuung/StellenBlock.tsx',
+  // Die Einheiten-Gliederung (LLH-1029): „welche Einheit?“ ist ein Vergleich über Ist und Soll,
+  // Tabelle in jeder Breite, am Handy über `abBreite` angepasst.
+  '/src/pages/EinheitenPage.tsx',
   // Der Funkplan (LFH-548) wird verglichen („welche Stelle funkt auf welcher Gruppe?“) und
   // gedruckt; Tabelle in jeder Breite, auf schmalem Schirm angepasst.
   '/src/pages/FunkplanPage.tsx',
@@ -142,7 +145,12 @@ const NUR_TABELLE: string[] = [
  * und nur in DEV warnt. `Input.Search` ist ERLAUBT: die Filter-Card liegt außerhalb der
  * Datensicht und filtert die Rohlisten. Die Liste ist dateibezogen.
  */
-const VOLLMENGE_PFLICHT: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
+const VOLLMENGE_PFLICHT: string[] = [
+  // Die Einheiten-Gliederung (LLH-1029) trägt dieselbe Herleitung: die Elternzeile zeigt die
+  // kumulierte Ist-Stärke über ihre Untereinheiten, die Folge ist die des Kräftebaum-Kerns.
+  '/src/pages/EinheitenPage.tsx',
+  '/src/pages/KraefteuebersichtPage.tsx',
+];
 
 /**
  * Dateien mit einer Reiterachse, deren Sicht den Reiter NICHT im Schlüssel trägt: eine
@@ -172,6 +180,8 @@ const KONSUMENTEN = [
   // Die Dokumentenablage: Titel als nativer Download-Anker aus dem Spalten-`render` (kein
   // `titel.ziel`, das wäre eine Client-Navigation).
   '/src/pages/DokumentePage.tsx',
+  // Die Einheiten-Gliederung (LLH-1029): Baum aus dem Kräftebaum-Kern, nur Einheiten.
+  '/src/pages/EinheitenPage.tsx',
   '/src/pages/FahrzeugePage.tsx',
   // Der Funkplan S6 (LFH-548): abgeleiteter Baum Abschnitt → Einheit → Fahrzeug, schreibgeschützt.
   '/src/pages/FunkplanPage.tsx',
@@ -703,13 +713,14 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Zwei Kartenmodule (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`), fünf
+    // Zwei Kartenmodule (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`), sechs
     // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
     // umbaut, ohne einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(2);
-    expect(NUR_TABELLE).toHaveLength(5);
-    // Eine PFLICHT, dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild.
-    expect(VOLLMENGE_PFLICHT).toHaveLength(1);
+    expect(NUR_TABELLE).toHaveLength(6);
+    // Zwei PFLICHTEN, dateibezogen: Meldebild und Einheiten-Gliederung (beide kumulieren über den
+    // Kräftebaum). Ein weiterer Eintrag braucht dieselbe Herleitung.
+    expect(VOLLMENGE_PFLICHT).toHaveLength(2);
     // Eine SCHULD, auf 0 geschrumpft. Ein Eintrag wäre eine zweite Seite mit demselben Fehler.
     expect(REITERSCHLUESSEL_OFFEN).toHaveLength(0);
   });

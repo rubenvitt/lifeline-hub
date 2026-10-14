@@ -1,17 +1,8 @@
-import { IconPerson } from '../icons';
-import {
-  App,
-  Breadcrumb,
-  Button,
-  ConfigProvider,
-  Form,
-  Input,
-  Tag,
-  Tree,
-  type TreeDataNode,
-} from 'antd';
+import { App, Breadcrumb, Button, Form, Input } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import StatusTag from '../components/StatusTag';
+import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
   SeitenFehler,
@@ -21,7 +12,7 @@ import {
   nichtGefundenInhalt,
 } from '../components/SeitenZustand';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type Key } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -29,92 +20,114 @@ import { listeEinheitTypen } from '../api/einheitTypen';
 import { bildeEinheit, listAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { Einheit } from '../api/types';
-import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { staerkeText } from '../anzeige/staerke';
 import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
+import { buildEinheitenGliederung, type GliederungZeile } from '../kraefte/einheitenGliederung';
+import { schluesselBisStufe } from '../kraefte/kraeftebaumKern';
+import { einheitStaerkeUrteil } from '../theme/statusFarben';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { KennungsLink } from '../components/kennungsLink';
-import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
 
 /**
- * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
- * (`EinheitDetailPage.tsx`, `/einsaetze/:id/einheiten/:einheitId`); hier bleibt die Auswahl, und
- * die darf umbrechen.
+ * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
+ * EINEN Kräftebaum-Kern (`kraefte/einheitenGliederung.ts` über `einheitenBaum`) — dieselben
+ * Einheit-Knoten in derselben Folge wie das Meldebild, nur ohne Mittel. Die Frage ist „welche
+ * Einheit?“, also Tabelle (`frontend/AGENTS.md`, „Die Liste ist die zweite Frage“), auch am Handy
+ * angepasst statt in Karten aufgelöst. Die Detailansicht liegt auf eigener Route
+ * (`EinheitDetailPage.tsx`, `/einsaetze/:id/einheiten/:einheitId`).
  */
 
 /**
- * Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id).
+ * Die Spalten. Keine Sortierung, kein Filter, keine Suche (`VOLLMENGE_PFLICHT` im
+ * `datensicht.guard`): die Folge ist die des Kerns, und die Elternzeile trägt die kumulierte Zahl
+ * über ihre Kinder — fiele im Primitiv eine Zeile weg, stimmte sie still nicht mehr.
  *
- * Jeder Knoten trägt einen echten `<Link>` auf die Detailroute: das ist das Tastaturziel der Zeile
- * und macht die Gliederung deeplink-fähig. Ein `onSelect` am Baum allein wäre für die Tastatur ein
- * Umweg und für „im neuen Tab öffnen" gar kein Weg.
- *
- * ZWEI ZEILEN STATT `Space` (LFH-975): oben Name und Typ, darunter EINE umbrechende Zeile
- * „Ist … · Soll … · Führer“. Ein `Space` bricht jedes Kind für sich um; am Handy standen Ist und
- * Soll dann versetzt über drei bis vier Zeilen und ließen sich keiner Einheit sicher zuordnen.
- *
- * Der Führer ist ein Icon, kein Emoji. Das Icon des Satzes ist selbst `aria-hidden` (LFH-595);
- * die Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
+ * AM HANDY (390 px) bleiben Einheit, Ist und Soll: das ist der Vergleich. Einheitsführer weicht
+ * unter sm, Abschnitt und Fahrzeuge unter md; der Spaltenschalter zählt sie und holt sie zurück.
+ * Die Einheit ist die Fließspalte (LFH-523), alle übrigen tragen eine Zahlbreite.
  */
-function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: string): TreeDataNode[] {
-  const kinder = new Map<number | null, Einheit[]>();
-  for (const e of einheiten) {
-    const key = e.ueber_einheit_id ?? null;
-    if (!kinder.has(key)) kinder.set(key, []);
-    kinder.get(key)!.push(e);
-  }
-  const baue = (parent: number | null): TreeDataNode[] =>
-    (kinder.get(parent) ?? []).map((e) => ({
-      key: e.id,
-      title: (
-        <div
-          data-testid={`einheit-knoten-${e.id}`}
-          style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
-        >
-          <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
-            <KennungsLink to={einheitDetailPfad(einsatzId, e.id)} klein>
-              {e.name}
-            </KennungsLink>
-            {e.typ_label && <Tag>{e.typ_label}</Tag>}
-          </span>
-          {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien`, eine Stärke ist
-              eine Angabe. „Ist“ steht immer dran, auch ohne Soll (LFH-975). */}
-          <span style={{ color: sekundaerFarbe, fontSize: 12 }}>
-            Ist{' '}
-            <span style={monoStil(12)}>
-              <StaerkeAnzeige wert={e.ist} />
-            </span>
-            {e.soll ? (
-              <>
-                {' · '}Soll{' '}
-                <span style={monoStil(12)}>
-                  <StaerkeAnzeige wert={e.soll} />
-                </span>
-              </>
-            ) : null}
-            {e.fuehrer_name && (
-              <>
-                {' · '}
-                <span aria-hidden="true">
-                  <IconPerson />
-                </span>{' '}
-                {e.fuehrer_name}
-              </>
-            )}
-          </span>
+function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
+  return spaltenFuer<GliederungZeile>()([
+    {
+      title: 'Einheit',
+      key: 'einheit',
+      immerSichtbar: true,
+      mindestBreite: 140,
+      // Ein langes Wort im Namen („Behandlungsgruppe“) darf die Spalte nicht so breit halten,
+      // dass Soll am Handy aus dem Bild läuft: es wird getrennt (`lang="de"`), und wo der Browser
+      // kein Trennwörterbuch hat, bricht es notfalls im Wort. Beides erbt die Zelle.
+      render: (_t, z) => (
+        <div style={{ hyphens: 'auto', overflowWrap: 'anywhere' }}>
+          <KraeftebaumZelle zeile={z} einsatzId={einsatzId} gesperrt={sprungGesperrt} />
         </div>
       ),
-      children: baue(e.id),
-    }));
-  return baue(null);
+    },
+    {
+      title: 'Einheitsführer',
+      key: 'fuehrer',
+      width: 150,
+      abBreite: 'sm',
+      render: (_t, z) => z.fuehrer ?? '—',
+    },
+    {
+      title: 'Ist',
+      key: 'ist',
+      width: 88,
+      // Kumuliert (Server), dazu das Urteil gegen das Soll: nur „unterbesetzt“ steht da, als Wort
+      // neben der Farbe (WCAG 1.4.1). „Soll erfüllt“ bliebe ein Grün-Teppich.
+      render: (_t, z) => (
+        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
+          {z.urteil === 'unterbesetzt' && (
+            // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
+            <StatusTag darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
+          )}
+        </span>
+      ),
+    },
+    {
+      title: 'Soll',
+      key: 'soll',
+      width: 88,
+      render: (_t, z) => <span style={monoStil(12)}>{staerkeText(z.soll)}</span>,
+    },
+    {
+      title: 'Abschnitt',
+      key: 'abschnitt',
+      width: 140,
+      abBreite: 'md',
+      render: (_t, z) => z.abschnitt ?? '—',
+    },
+    {
+      title: 'Fahrzeuge',
+      key: 'fahrzeuge',
+      width: 180,
+      abBreite: 'md',
+      // Anzahl, dann die Funkrufnamen in Mono. Ein Name bricht nie in sich um („Musterstadt
+      // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
+      render: (_t, z) =>
+        z.fahrzeuge.length > 0 ? (
+          <span data-lfh="einheit-fahrzeuge" style={monoStil(12)}>
+            {z.fahrzeuge.length} ·{' '}
+            {z.fahrzeuge.map((f, i) => (
+              <Fragment key={`${i}-${f}`}>
+                {i > 0 && ', '}
+                <span style={{ whiteSpace: 'nowrap' }}>{f}</span>
+              </Fragment>
+            ))}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+  ]);
 }
-
-/** Einzug je Baumebene unter md (LFH-975), siehe den Baum unten. */
-const BAUM_EINZUG_SCHMAL = 8;
 
 /** Feldsatz des „Einheit bilden"-Dialogs — bewusst zwei Felder (siehe `bilden`). */
 interface BildenWerte {
@@ -130,8 +143,9 @@ export default function EinheitenPage() {
   const { message } = App.useApp();
   const [bildenOffen, setBildenOffen] = useState(false);
   const [bildenForm] = Form.useForm<BildenWerte>();
-  const { rollen } = useRollen();
-  const { istSchmal } = useViewport();
+  const sprungGesperrt = useSprungSperre(einsatzId);
+  /** Offene Zeilen; `null` heißt Vorgabe: jede Einheit mit Untereinheiten offen. */
+  const [offen, setOffen] = useState<Key[] | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -140,6 +154,12 @@ export default function EinheitenPage() {
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+  });
+  // Nur für Rang und Namen der Abschnitte: ohne Leserecht oder bei Fehler bleibt die Folge die
+  // Eingabefolge, und der Name kommt aus der Einheit (`buildEinheitenGliederung`).
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
   });
   // Aufgelöste Einheiten (LLH-1079): getrennt geliefert, die Gliederung und ihre Zahl kennen sie
   // nicht. Eine aufgelöste Einheit wird nicht wieder aktiv (design.md D5), der Block hat keine
@@ -151,6 +171,15 @@ export default function EinheitenPage() {
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
+  const zeilen = useMemo(
+    () => buildEinheitenGliederung(einheiten, abschnitteQuery.data ?? []),
+    [einheiten, abschnitteQuery.data],
+  );
+  const vorgabeOffen = useMemo(() => schluesselBisStufe(zeilen, 'einheiten'), [zeilen]);
+  const spalten = useMemo(
+    () => gliederungSpalten(einsatzId, sprungGesperrt),
+    [einsatzId, sprungGesperrt],
+  );
 
   /**
    * Bestands-Deeplink `?einheit=<id>` leitet auf die Item-Route weiter: andere Module verlinken
@@ -188,11 +217,6 @@ export default function EinheitenPage() {
     },
   });
 
-  const baumDaten = useMemo(
-    () => baueBaum(einheiten, einsatzId, rollen.gedaempft),
-    [einheiten, einsatzId, rollen.gedaempft],
-  );
-
   // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
   // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden.
   if (einsatzQuery.isLoading) {
@@ -216,9 +240,9 @@ export default function EinheitenPage() {
   }
 
   /**
-   * Listenzustand der Gliederungs-Karte — der Fehler allein reicht als Bedingung nicht. Ohne
-   * Einheiten im Zwischenspeicher tritt der Fehler an die Stelle des Baums; mit Einheiten bleibt
-   * der Baum stehen und bekommt ein Banner, er ist echt, nur womöglich alt.
+   * Listenzustand der Gliederung — der Fehler allein reicht als Bedingung nicht. Ohne Einheiten im
+   * Zwischenspeicher tritt der Fehler an die Stelle der Tabelle; mit Einheiten bleibt sie stehen
+   * und bekommt ein Banner, sie ist echt, nur womöglich alt.
    */
   const listeGescheitert = einheitenQuery.isError && einheiten.length === 0;
   const standVeraltet = einheitenQuery.isError && einheiten.length > 0;
@@ -253,71 +277,68 @@ export default function EinheitenPage() {
     >
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
 
-      {/* Die Gliederung ist die ganze Seite. Sie wächst mit und deckelt bei 360 px auf breitem
-          Schirm; `flexWrap`, damit sie auf 390 px ausweichen kann. */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Paneel
-          titel="Gliederung"
-          meta={einheitenQuery.isSuccess ? einheiten.length : undefined}
-          koerperPolster
-          style={{ flex: '1 1 clamp(260px, 30%, 360px)' }}
-        >
-          {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens
-              und im Fehlerfall wahr. Gefragt wird deshalb die Query; die Länge entscheidet
-              erst, wenn sie etwas bedeutet. Reihenfolge: laden vor Fehler vor leer.
-
-              Der Fehlerzweig trägt zusätzlich die Mengenbedingung (`listeGescheitert`): er
-              verdrängt den Baum nur, wenn es keinen gibt. */}
-          {einheitenQuery.isLoading ? (
-            <SeitenSkeleton zeilen={3} />
-          ) : listeGescheitert ? (
-            <SeitenFehler
-              text="Gliederung konnte nicht geladen werden"
-              ursache={einheitenQuery.error}
-              onWiederholen={() => void einheitenQuery.refetch()}
-            />
-          ) : einheiten.length === 0 ? (
-            <SeitenLeer
-              titel="Noch keine Einheiten"
-              aktion={
-                darfSchreiben
-                  ? // Wortlaut gleich dem Kopfknopf: es ist dieselbe Handlung.
-                    { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
-                  : undefined
-              }
-            />
-          ) : (
-            <>
-              {standVeraltet && (
-                <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
-              )}
-              {/* `selectable={false}`: das Bedienziel ist der Link im Knoten, nicht die
-                  Zeilenauswahl. Unter md schrumpft nur der Einzug je Ebene (LFH-975): er folgt
-                  sonst der Titelhöhe und frisst am Handy auf zwei Ebenen rund 60 px. Der
-                  Aufklappschalter behält seine Breite, er ist ein Bedienziel. */}
-              <ConfigProvider
-                theme={
-                  istSchmal
-                    ? { components: { Tree: { indentSize: BAUM_EINZUG_SCHMAL } } }
-                    : undefined
-                }
-              >
-                <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
-              </ConfigProvider>
-            </>
+      {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens und im
+          Fehlerfall wahr. Gefragt wird deshalb die Query; die Länge entscheidet erst, wenn sie
+          etwas bedeutet. Reihenfolge: laden vor Fehler vor leer. Der Fehlerzweig trägt zusätzlich
+          die Mengenbedingung (`listeGescheitert`): er verdrängt die Tabelle nur, wenn es keine
+          gibt. */}
+      {/* Auch auf die Abschnitte wird gewartet: die Folge hängt an ihrem Rang, eine Tabelle in
+          vorläufiger Serverfolge spränge nach deren Ankunft um. Scheitern sie, gilt die
+          Eingabefolge. */}
+      {einheitenQuery.isLoading || abschnitteQuery.isLoading ? (
+        <SeitenSkeleton zeilen={3} />
+      ) : listeGescheitert ? (
+        <SeitenFehler
+          text="Gliederung konnte nicht geladen werden"
+          ursache={einheitenQuery.error}
+          onWiederholen={() => void einheitenQuery.refetch()}
+        />
+      ) : einheiten.length === 0 ? (
+        <SeitenLeer
+          titel="Noch keine Einheiten"
+          aktion={
+            darfSchreiben
+              ? // Wortlaut gleich dem Kopfknopf: es ist dieselbe Handlung.
+                { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
+              : undefined
+          }
+        />
+      ) : (
+        <>
+          {standVeraltet && (
+            <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
           )}
-          <EntlassenBlock
-            titel="Aufgelöst"
-            endeWort="aufgelöst"
-            eintraege={(aufgeloesteQuery.data ?? []).map((e) => ({
-              id: e.id,
-              name: e.name,
-              zusatz: e.typ_label,
-              beendetAt: e.aufgeloest_at,
-            }))}
+          {/* Volle Breite, Baum aus dem Kern; das Bedienziel der Zeile ist der Name (Link in der
+              Einheitzelle). Zufluss `sammelbanner`: eine neu gebildete Einheit erscheint als
+              Banner, solange Fokus oder Zeiger in der Tabelle liegen. */}
+          <Datensicht
+            bezeichnung="Gliederung"
+            form="tabelle"
+            spalten={spalten}
+            daten={zeilen}
+            zeilenSchluessel="key"
+            baum={{
+              kinder: 'children',
+              aufgeklappt: offen ?? vorgabeOffen,
+              onAufgeklappt: setOffen,
+            }}
+            karte={{ art: 'plan', titel: { spalte: 'einheit' }, sekundaer: ['ist', 'soll'] }}
           />
-        </Paneel>
-      </div>
+        </>
+      )}
+
+      {/* Unter der Tabelle, wie bei Personal; außerhalb der Zustände, damit er auch steht, wenn
+          keine Einheit mehr aktiv ist. Ohne Einträge zeichnet er nichts. */}
+      <EntlassenBlock
+        titel="Aufgelöst"
+        endeWort="aufgelöst"
+        eintraege={(aufgeloesteQuery.data ?? []).map((e) => ({
+          id: e.id,
+          name: e.name,
+          zusatz: e.typ_label,
+          beendetAt: e.aufgeloest_at,
+        }))}
+      />
 
       {/* Zwei Felder; der Rest der Kopfdaten lebt auf der Detailansicht. Der Dialog setzt auf
           allen Auswegen selbst zurück. */}
