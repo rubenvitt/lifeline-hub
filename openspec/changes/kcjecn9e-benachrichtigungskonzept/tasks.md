@@ -78,8 +78,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 11. Neue Gefahr (benötigt 1, 2) · LLH-1217
 
-- [ ] 11.1 Neu eingetragene Gefahr meldet `gefahr` an Leser der Lagekarte, Änderung bleibt still; Rust-Test „Gefahr eingetragen“ und Test für die Änderung
-- [ ] 11.2 Anwenderkapitel zur Lagekarte (Gefahren) nachziehen
+- [x] 11.1 Neu eingetragene Gefahr meldet `gefahr` an Leser der Lagekarte, Änderung bleibt still; Rust-Test „Gefahr eingetragen“ und Test für die Änderung
+- [x] 11.2 Anwenderkapitel zur Lagekarte (Gefahren) nachziehen
 
 ## 12. Neue Person der Sichtungskategorie I (benötigt 1, 2) · LLH-1218
 
