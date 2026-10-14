@@ -10,8 +10,10 @@ const api = vi.hoisted(() => ({
   ladeStab: vi.fn(),
   fetchLagebesprechungen: vi.fn(),
   listeEinheiten: vi.fn(),
+  listAufgeloesteEinheiten: vi.fn(),
   listeEinheitenPerioden: vi.fn(),
   listeEinsatzPersonal: vi.fn(),
+  listEntlassenesPersonal: vi.fn(),
   listePersonalPerioden: vi.fn(),
   listeEinsatzFahrzeuge: vi.fn(),
   listeLageberichte: vi.fn(),
@@ -32,12 +34,18 @@ vi.mock('../../api/stab', () => ({ ladeStab: api.ladeStab }));
 vi.mock('../../api/lagebesprechung', () => ({
   fetchLagebesprechungen: api.fetchLagebesprechungen,
 }));
-vi.mock('../../api/einheiten', () => ({ listeEinheiten: api.listeEinheiten }));
+vi.mock('../../api/einheiten', () => ({
+  listeEinheiten: api.listeEinheiten,
+  listAufgeloesteEinheiten: api.listAufgeloesteEinheiten,
+}));
 vi.mock('../../api/kraefteZeitachse', () => ({
   listeEinheitenPerioden: api.listeEinheitenPerioden,
   listePersonalPerioden: api.listePersonalPerioden,
 }));
-vi.mock('../../api/einsatzPersonal', () => ({ listeEinsatzPersonal: api.listeEinsatzPersonal }));
+vi.mock('../../api/einsatzPersonal', () => ({
+  listeEinsatzPersonal: api.listeEinsatzPersonal,
+  listEntlassenesPersonal: api.listEntlassenesPersonal,
+}));
 vi.mock('../../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: api.listeEinsatzFahrzeuge }));
 vi.mock('../../api/lageberichte', () => ({
   listeLageberichte: api.listeLageberichte,

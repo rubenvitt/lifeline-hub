@@ -184,6 +184,30 @@ describe('baueMeldebildRaster', () => {
     expect(raster[0].children?.[2].children?.map((k) => k.key)).toEqual(['em-1']);
   });
 
+  it('nur aktive Kräfte: keine aufgelöste Einheit, keine Entlassene, die Waise bleibt (LLH-1079)', () => {
+    // Gr 2 ist aufgelöst, ihre Untereinheit 3 zeigt noch auf sie; P2 ist entlassen.
+    const raster = baueMeldebildRaster(
+      eingabe({
+        abschnitte: [ab(10)],
+        einheiten: [
+          eh(1, 10),
+          eh(2, null, 1, { aufgeloest_at: '2026-10-13 15:00:00' }),
+          eh(3, null, 2),
+        ],
+        personal: [
+          p(1, 1),
+          { ...p(2, 1), beendet_at: '2026-10-13 14:00:00', beendet_als: 'entlassen' },
+          p(3, 3),
+        ],
+      }),
+    );
+    const keys = alleZeilen(raster).map((z) => z.key);
+    expect(keys).not.toContain('eh-2');
+    expect(keys).not.toContain('ep-2');
+    expect(raster.map((z) => z.key)).toEqual(['eh-1', 'eh-3']);
+    expect(raster.map((z) => z.staerke?.gesamt)).toEqual([1, 1]);
+  });
+
   it('jede Kraft genau einmal — auch Untereinheiten und Kräfte ohne Einheit', () => {
     const e = eingabe({
       abschnitte: [ab(10)],

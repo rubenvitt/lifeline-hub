@@ -1367,3 +1367,40 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
     .unwrap();
     assert_eq!(status, "geplant", "Status bleibt");
 }
+
+/// LLH-1079 (Spec `kraefte-entlassung`, Schreibwege an beendeten Kräften): eine aufgelöste
+/// Einheit bekommt in der Skizze keine Lage mehr (409, Lebenszyklus).
+#[tokio::test]
+async fn aufgeloeste_einheit_bekommt_keine_lage() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let einheit = format!("/api/einsaetze/{einsatz}/einheiten/{eh}");
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{einheit}/personal/{ep}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = anfrage(&app, "DELETE", &einheit, &admin, None).await;
+    assert_eq!(
+        status,
+        StatusCode::NO_CONTENT,
+        "aufgelöst, nicht gelöscht: sie hat ein Mitglied"
+    );
+
+    let (status, json) = senden(
+        &app,
+        &admin,
+        "PUT",
+        &format!("{}/lage/eh-{eh}", basis(einsatz)),
+        Some(json!({"x": 0, "y": 0, "version": null})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+}

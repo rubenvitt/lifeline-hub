@@ -19,10 +19,12 @@ import {
  *   adhoc-person.png     frontend/src/kraefte/AdhocPersonModal.tsx
  *   zeitachse-person.png frontend/src/pages/PersonalPage.tsx (aufgeklappte Zeile),
  *                        frontend/src/kraefte/KraftZeitachse.tsx
+ *   entlassen.png        frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Ereignisse der Kräfte-Zeitachse. Die Spec trägt
  * Alarmierung und Eintreffen der Rettungsstaffel nach (gilt für ihre vier Personen) und für
- * Lena Beispiel Eintreffen und Entlassung, damit „Einsatzdauer“ und „Ruhe“ etwas zeigen.
+ * Lena Beispiel Eintreffen und Entlassung, damit „Einsatzdauer“ und „Ruhe“ etwas zeigen. Für
+ * den Block „Entlassen“ disponiert sie eine Ad-hoc-Kraft und entlässt sie (LLH-1079).
  */
 
 const KAPITEL = 'personal';
@@ -86,6 +88,11 @@ test.describe(KAPITEL, () => {
         zeitpunkt_at: draht(vor(jetzt, 40)),
         notiz: 'Dienstende',
       });
+
+      const weg = await fuelle<Person>(api, 'post', `/api/einsaetze/${demo.id}/personal`, {
+        adhoc: { name: 'Paul Muster', funktion: 'Sanitäter' },
+      });
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personal/${weg.id}/entlassen`);
     } finally {
       await api.dispose();
     }
@@ -129,5 +136,19 @@ test.describe(KAPITEL, () => {
     const zeile = page.locator('tr', { has: ereignisse.first() });
     await page.mouse.move(0, 0);
     await fotografiere(zeile, KAPITEL, 'zeitachse-person');
+  });
+
+  test('Block „Entlassen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/personal`);
+    const block = page.locator('[data-lfh="entlassen-block"]');
+    await block.getByText('Entlassen (1)').click();
+    await expect(
+      block.getByRole('button', { name: 'Erneut disponieren: Paul Muster' }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(block, KAPITEL, 'entlassen');
   });
 });

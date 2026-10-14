@@ -289,8 +289,8 @@ async fn snap_name_ueberlebt_das_entfernen_der_disposition() {
 
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
         &admin,
         None,
     )
@@ -350,8 +350,8 @@ async fn entlassen_einer_besetzten_person_feuert_stab() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
                 &admin,
                 None,
             )
@@ -359,9 +359,9 @@ async fn entlassen_einer_besetzten_person_feuert_stab() {
             .0
         }
     };
-    assert_eq!(entlassen(kurz).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(kurz).await, StatusCode::OK);
     assert_eq!(stab_events(), 0, "keine Besetzung, kein Stab-Ereignis");
-    assert_eq!(entlassen(weber).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(weber).await, StatusCode::OK);
     assert_eq!(stab_events(), 1, "S1 ist nicht mehr disponiert");
 }
 

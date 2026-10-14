@@ -36,8 +36,30 @@ export function aktualisiereDisposition(
   return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'PATCH', felder);
 }
 
-export function entferneDisposition(einsatzId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'DELETE');
+/** Entlassene Kräfte des Einsatzes (LLH-1079, Block „Entlassen“); Stornierte liefert keine Liste. */
+export function listEntlassenesPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
+  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personal?entlassene=1`);
+}
+
+/**
+ * Aus dem Einsatz entlassen (LLH-1079): die Zeile bleibt mit ihrer Zeitachse, Bindungen gehen.
+ * Umkehrbar über {@link reaktiviereDisposition}, deshalb ohne Rückfrage.
+ */
+export function entlasseDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
+  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}/entlassen`, 'POST');
+}
+
+/** Fehldisposition stornieren (LLH-1079): nur ohne Bindung und Spur in den ersten 15 Minuten. */
+export function storniereDisposition(einsatzId: number, epId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/personal/${epId}/stornieren`, 'POST');
+}
+
+/** Eine entlassene oder stornierte Kraft erneut disponieren (Rückgängig, Block „Entlassen“). */
+export function reaktiviereDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
+  return apiSend<EinsatzPersonal>(
+    `/api/einsaetze/${einsatzId}/personal/${epId}/reaktivieren`,
+    'POST',
+  );
 }
 
 /** L‑2: Lädt die Führungskräfte-Marker für die Lagekarte. */

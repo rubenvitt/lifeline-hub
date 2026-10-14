@@ -3072,6 +3072,36 @@ async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
     assert!(!v["geraet"].is_null(), "weiter eine Gerätesitzung: {v}");
 }
 
+/// LLH-1079: Eine entlassene Kraft steht nicht mehr zur Auswahl.
+#[tokio::test]
+async fn entlassene_kraft_fehlt_in_der_auswahl_der_bestaetigenden() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    kraft(&app, &admin, einsatz, "Zander").await;
+    let weg = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{weg}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
+    let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let namen: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, ["Zander"]);
+}
+
 #[tokio::test]
 async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

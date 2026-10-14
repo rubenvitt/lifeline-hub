@@ -37,11 +37,12 @@ async fn einheit_namen(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<HashMap<i64, String>, AppError> {
-    let zeilen: Vec<(i64, String)> =
-        sqlx::query_as("SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_all(pool)
-            .await?;
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
     Ok(zeilen.into_iter().collect())
 }
 
@@ -79,7 +80,7 @@ pub async fn laden(
     ep_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<UhsKraft, AppError> {
-    let a = disposition_repo::laden_anzeige(pool, einsatz_id, ep_id, einsatz_aktiv).await?;
+    let a = disposition_repo::load_anzeige(pool, einsatz_id, ep_id, einsatz_aktiv).await?;
     let einheiten = einheit_namen(pool, einsatz_id).await?;
     Ok(zu_kraft(a, &einheiten))
 }
@@ -107,6 +108,8 @@ pub async fn setze_uhs_tx(
     ep_id: i64,
     uhs_id: Option<i64>,
 ) -> Result<(), AppError> {
+    // Fremd → 404, entlassen oder storniert → 409 (LLH-1079).
+    disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     let r = sqlx::query("UPDATE einsatz_personal SET uhs_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(uhs_id)
         .bind(ep_id)

@@ -19,10 +19,12 @@ import {
  *   gliederung.png      frontend/src/pages/EinheitenPage.tsx (Paneel „Gliederung“)
  *   einheit-bilden.png  frontend/src/pages/EinheitenPage.tsx (Dialog „Einheit bilden“)
  *   personal.png        frontend/src/pages/EinheitDetailPage.tsx (Paneel „Personal“)
+ *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)
  *
  * Demo-Lücke (D3): die Demo-Einheiten stehen alle auf einer Ebene und haben keinen
  * Einheitsführer. Die Spec unterstellt die Rettungsstaffel dem Sanitätszug und setzt Anna Probe
- * als ihre Einheitsführerin.
+ * als ihre Einheitsführerin. Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
+ * Alarmierung (eine Spur, sonst löschte das Auflösen sie ganz) und löst sie auf (LLH-1079).
  */
 
 const KAPITEL = 'einheiten';
@@ -59,6 +61,18 @@ test.describe(KAPITEL, () => {
         ueber_einheit_id: zug.id,
         fuehrer_id: anna!.id,
       });
+
+      const alt = await fuelle<Einheit>(api, 'post', `/api/einsaetze/${demo.id}/einheiten`, {
+        name: 'Erkundungstrupp',
+      });
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/einheiten/${alt.id}/zeitachse`, {
+        art: 'alarmierung',
+        zeitpunkt_at: new Date(Date.now() - 90 * 60_000)
+          .toISOString()
+          .slice(0, 19)
+          .replace('T', ' '),
+      });
+      await fuelle(api, 'delete', `/api/einsaetze/${demo.id}/einheiten/${alt.id}`);
     } finally {
       await api.dispose();
     }
@@ -97,5 +111,19 @@ test.describe(KAPITEL, () => {
     const paneel = page.getByRole('region', { name: 'Personal' });
     await expect(paneel.getByText('Einheitsführer', { exact: true })).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'personal');
+  });
+
+  test('Block „Aufgelöst“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einheiten`);
+    const block = page.locator('[data-lfh="entlassen-block"]');
+    await block.getByText('Aufgelöst (1)').click();
+    await expect(
+      block.getByRole('list', { name: 'Aufgelöst' }).getByText('Erkundungstrupp'),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(block, KAPITEL, 'aufgeloest');
   });
 });

@@ -1128,3 +1128,42 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND, "generischer Download");
 }
+
+/// LLH-1079 (Spec `kraefte-entlassung`, Schreibwege an beendeten Kräften): ein neues Dokument
+/// bezieht sich nicht auf eine aufgelöste Einheit (409, Lebenszyklus).
+#[tokio::test]
+async fn bezug_auf_aufgeloeste_einheit_ist_409() {
+    let (app, admin, einsatz) = start().await;
+    let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let einheit = format!("/api/einsaetze/{einsatz}/einheiten/{eh}");
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{einheit}/personal/{ep}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = anfrage(&app, "DELETE", &einheit, &admin, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let eh_s = eh.to_string();
+    let (status, json) = ablegen(
+        &app,
+        einsatz,
+        &admin,
+        Some(PDF),
+        &[
+            ("titel", "Plan"),
+            ("kategorie", "befehl"),
+            ("bezug_typ", "einheit"),
+            ("bezug_id", &eh_s),
+        ],
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+    let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+}

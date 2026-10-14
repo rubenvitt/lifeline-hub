@@ -342,7 +342,8 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
         .find(|x| x["id"] == m["id"])
         .expect("Meldung überlebt das Auflösen");
     assert_eq!(meldung["absender"], "Florian Nord 1");
-    assert!(!meldung.as_object().unwrap().contains_key("einheit_id"));
+    // Die Meldung ist Spur (LLH-1079): die Einheit wird aufgelöst statt gelöscht, der Bezug bleibt.
+    assert_eq!(meldung["einheit_id"], a);
 
     let r = rueckmeldungen(&app, &admin, e).await;
     assert!(r["einheiten"].as_array().unwrap().is_empty());

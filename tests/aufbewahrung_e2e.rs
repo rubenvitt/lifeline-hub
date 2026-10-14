@@ -118,10 +118,24 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
-        funktion: "entfernen",
+        funktion: "entlassen",
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,
-        begruendung: "Name und Funktion ad-hoc externer Kräfte beim Entfernen",
+        begruendung: "Name und Funktion ad-hoc externer Kräfte beim Entlassen (LLH-1079)",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "stornieren",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name und Funktion ad-hoc externer Kräfte beim Stornieren (LLH-1079)",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "reaktivieren",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name und Funktion ad-hoc externer Kräfte beim erneuten Disponieren (LLH-1079)",
     },
     Ausnahme {
         datei: "src/routes/einsatz_einheit.rs",
@@ -202,10 +216,24 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
-        funktion: "entfernen",
+        funktion: "entlassen",
         spalte: "einsatz_personal.snap_funktion",
         gruppe: Gruppe::Einsatzkraft,
-        begruendung: "Funktion ad-hoc externer Kräfte über person_bezeichnung",
+        begruendung: "Funktion ad-hoc externer Kräfte über etb_text_entlassen, „Name (Funktion)“",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "stornieren",
+        spalte: "einsatz_personal.snap_funktion",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Funktion ad-hoc externer Kräfte über etb_text_storniert, „Name (Funktion)“",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "reaktivieren",
+        spalte: "einsatz_personal.snap_funktion",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Funktion ad-hoc externer Kräfte über etb_text_erneut_disponiert, „Name (Funktion)“",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",

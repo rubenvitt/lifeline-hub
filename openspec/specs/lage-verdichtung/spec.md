@@ -85,7 +85,8 @@ einem Rust-Test und von einem Vitest-Test. Es MUST mindestens diese Regeln abdec
 - Auftrag offen und davon überfällig;
 - Meldung offen, neu und Bestätigung überfällig;
 - kumulierte Ist-Stärke einer Einheit über ihre Unterstellung;
-- Stärke eines Abschnitts.
+- Stärke eines Abschnitts;
+- entlassene und stornierte Kräfte zählen in keiner Stärke und keiner Statusverteilung.
 
 Eine Änderung an einer Regel, die nur eine Seite nachzieht, MUST einen der beiden Tests rot machen.
 
@@ -96,3 +97,7 @@ Eine Änderung an einer Regel, die nur eine Seite nachzieht, MUST einen der beid
 #### Scenario: Client weicht ab
 - **WHEN** die Client-Regel für „Bestätigung überfällig“ geändert wird und das Fixture nicht
 - **THEN** schlägt der Vitest-Test fehl
+
+#### Scenario: Entlassene mitgezählt
+- **WHEN** eine Seite entlassene Personen in die Stärke zählt
+- **THEN** schlägt der Test ihrer Sprache fehl

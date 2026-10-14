@@ -387,6 +387,10 @@ pub async fn anlegen(
         if !schaden_repo::personal_im_einsatz(&state.pool, einsatz_id, ep_id).await? {
             return Err(AppError::NotFound);
         }
+        // Eine entlassene oder stornierte Kraft wird nicht neu als geschädigt eingetragen (409,
+        // LLH-1079); ein bestehender Eintrag bleibt Historie.
+        crate::personal::disposition_repo::require_nicht_beendet(&state.pool, einsatz_id, ep_id)
+            .await?;
     }
 
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
@@ -586,6 +590,24 @@ pub async fn aktualisieren(
     if let Some(Some(ep_id)) = body.geschaedigt_personal_id {
         if !schaden_repo::personal_im_einsatz(&state.pool, einsatz_id, ep_id).await? {
             return Err(AppError::NotFound); // Org-Isolation der Einsatzkraft → 404
+        }
+        // Nur ein NEU eingetragener Geschädigter muss aktiv sein (409, LLH-1079): der bestehende
+        // Bezug auf eine inzwischen entlassene Kraft ist Historie und hält das Bearbeiten nicht auf.
+        let bisher: Option<i64> = sqlx::query_scalar(
+            "SELECT geschaedigt_personal_id FROM einsatz_schaden WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(schaden_id)
+        .bind(einsatz_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .flatten();
+        if bisher != Some(ep_id) {
+            crate::personal::disposition_repo::require_nicht_beendet(
+                &state.pool,
+                einsatz_id,
+                ep_id,
+            )
+            .await?;
         }
     }
 

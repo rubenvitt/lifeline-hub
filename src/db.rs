@@ -5702,6 +5702,177 @@ mod tests {
         assert_eq!(rest, 0, "ON DELETE CASCADE über etb_eintrag");
     }
 
+    // --- Migration 0193: Kräfte entlassen statt löschen (LLH-1079) ---
+
+    /// Der Neubau der Zeitachse übernimmt den Bestand Zeile für Zeile (samt Fan-out-Bezug und
+    /// Streichung), verweist auf Person und Einheit ohne `ON DELETE` und kennt die Quelle
+    /// `disposition`. Die Dispositionstabellen tragen den Lebenszustand, der Bestand bleibt aktiv.
+    #[tokio::test]
+    async fn migration_0193_baut_die_zeitachse_ohne_kaskade_und_uebernimmt_den_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 192).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) \
+             VALUES (?, 'Anna', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ursprung: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_kraft_zeitachse \
+                (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von, erfasst_at) \
+             VALUES (?, ?, 'eintreffen', '2026-10-13 06:40:00', 'status', ?, \
+                     '2026-10-13 06:40:01') RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_kraft_zeitachse \
+                (einsatz_id, personal_id, art, zeitpunkt_at, quelle, ursprung_id, notiz, \
+                 erfasst_von, erfasst_at, gestrichen_at, gestrichen_von, streichgrund) \
+             VALUES (?, ?, 'eintreffen', '2026-10-13 06:40:00', 'einheit', ?, 'Notiz', ?, \
+                     '2026-10-13 06:40:01', '2026-10-13 07:00:00', ?, 'verwechselt')",
+        )
+        .bind(e)
+        .bind(person)
+        .bind(ursprung)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        #[derive(Debug, PartialEq, sqlx::FromRow)]
+        struct Zeile {
+            id: i64,
+            einsatz_id: i64,
+            einheit_id: Option<i64>,
+            personal_id: Option<i64>,
+            art: String,
+            zeitpunkt_at: String,
+            quelle: String,
+            ursprung_id: Option<i64>,
+            notiz: Option<String>,
+            erfasst_von: i64,
+            erfasst_at: String,
+            gestrichen_at: Option<String>,
+            gestrichen_von: Option<i64>,
+            streichgrund: Option<String>,
+        }
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, einsatz_id, einheit_id, personal_id, art, zeitpunkt_at, quelle, \
+                        ursprung_id, notiz, erfasst_von, erfasst_at, gestrichen_at, \
+                        gestrichen_von, streichgrund \
+                 FROM einsatz_kraft_zeitachse ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 193).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand Zeile für Zeile");
+        let fks: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"from\", \"table\", on_delete \
+             FROM pragma_foreign_key_list('einsatz_kraft_zeitachse') ORDER BY \"from\"",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let fk = |spalte: &str| {
+            fks.iter()
+                .find(|(f, _, _)| f == spalte)
+                .map(|(_, t, d)| (t.as_str(), d.as_str()))
+                .unwrap_or_else(|| panic!("FK {spalte} fehlt: {fks:?}"))
+        };
+        assert_eq!(fk("einheit_id"), ("einsatz_einheit", "NO ACTION"));
+        assert_eq!(fk("personal_id"), ("einsatz_personal", "NO ACTION"));
+        assert_eq!(fk("einsatz_id"), ("einsatz", "CASCADE"));
+        assert_eq!(
+            fk("ursprung_id"),
+            ("einsatz_kraft_zeitachse", "SET NULL"),
+            "Selbstbezug auf die neue Tabelle, nicht auf die alte"
+        );
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_index_list('einsatz_kraft_zeitachse') \
+             WHERE origin = 'c' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            [
+                "idx_zeitachse_einheit",
+                "idx_zeitachse_einsatz",
+                "idx_zeitachse_personal",
+                "idx_zeitachse_ursprung"
+            ]
+        );
+        sqlx::query(
+            "INSERT INTO einsatz_kraft_zeitachse \
+                (einsatz_id, personal_id, art, zeitpunkt_at, quelle, erfasst_von) \
+             VALUES (?, ?, 'entlassung', '2026-10-13 14:00:00', 'disposition', ?)",
+        )
+        .bind(e)
+        .bind(person)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .expect("Quelle disposition");
+
+        for tabelle in ["einsatz_personal", "einsatz_fahrzeug", "einsatz_material"] {
+            let spalten: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT name FROM pragma_table_info('{tabelle}') WHERE name LIKE 'beendet_%' \
+                 ORDER BY name"
+            )))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                spalten,
+                ["beendet_als", "beendet_at", "beendet_von"],
+                "{tabelle}"
+            );
+        }
+        let aktiv: (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT beendet_at, beendet_als FROM einsatz_personal WHERE id = ?")
+                .bind(person)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(aktiv, (None, None), "Bestand bleibt aktiv");
+        let falsch = sqlx::query("UPDATE einsatz_personal SET beendet_als = 'geloescht'")
+            .execute(&pool)
+            .await;
+        assert!(
+            falsch.is_err(),
+            "beendet_als kennt nur entlassen und storniert"
+        );
+        let aufgeloest: Option<String> =
+            sqlx::query_scalar("SELECT aufgeloest_at FROM einsatz_einheit WHERE id = ?")
+                .bind(einheit)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(aufgeloest, None);
+    }
+
     // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
     /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem

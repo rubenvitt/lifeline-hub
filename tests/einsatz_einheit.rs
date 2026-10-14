@@ -1560,3 +1560,90 @@ async fn kommunikationsmittel_unbekannt_ist_400_bei_post_und_patch() {
     assert_eq!(s, StatusCode::OK);
     assert!(json["kommunikationsmittel"].is_null());
 }
+
+// ── Auflösen und Stornieren (LLH-1079) ──────────────────────────────────────────────────────
+
+async fn einheiten_namen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    query: &str,
+) -> Vec<String> {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten{query}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    json.as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Spec „Aufgelöste Einheit bleibt im Nachweis“: eine Einheit mit Mitglied bleibt als aufgelöst
+/// stehen, steht unter `?aufgeloeste=1`, und jeder Schreibweg an ihr ist 409. Eine leere Einheit
+/// lässt sich stornieren (gelöscht), eine mit Spur nicht (422).
+#[tokio::test]
+async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zug = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let leer = einheit_bilden(&app, &admin, einsatz, "Fehlanlage").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let pfad = |e: i64, rest: &str| format!("/api/einsaetze/{einsatz}/einheiten/{e}{rest}");
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &pfad(zug, &format!("/personal/{ep}")),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let (s, json) = anfrage(&app, "POST", &pfad(zug, "/stornieren"), &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Der Einheit gehört Personal an; die Einheit lässt sich nur auflösen"
+    );
+
+    let (s, _) = anfrage(&app, "DELETE", &pfad(zug, ""), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        einheiten_namen(&app, &admin, einsatz, "").await,
+        ["Fehlanlage"]
+    );
+    assert_eq!(
+        einheiten_namen(&app, &admin, einsatz, "?aufgeloeste=1").await,
+        ["1. Zug"]
+    );
+    for (methode, rest, body) in [
+        ("DELETE", "", None),
+        ("POST", "/stornieren", None),
+        ("PATCH", "", Some(r#"{"bemerkung":"x"}"#)),
+        ("PATCH", "/position", Some(r#"{"lat":52.0,"lon":10.0}"#)),
+        ("PUT", "/status", Some(r#"{"status_id":null}"#)),
+        ("PUT", &format!("/personal/{ep}"), None),
+    ] {
+        let (s, json) = anfrage(&app, methode, &pfad(zug, rest), &admin, body).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {rest}: {json}");
+    }
+
+    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/stornieren"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert!(einheiten_namen(&app, &admin, einsatz, "").await.is_empty());
+    assert_eq!(
+        einheiten_namen(&app, &admin, einsatz, "?aufgeloeste=1").await,
+        ["1. Zug"],
+        "die stornierte Einheit ist gelöscht, nicht aufgelöst"
+    );
+    // Disponiert, gebildet ×2, zugeordnet, aufgelöst, storniert.
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 6);
+}

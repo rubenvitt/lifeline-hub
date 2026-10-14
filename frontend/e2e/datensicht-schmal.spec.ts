@@ -186,7 +186,7 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
 
 /**
  * LFH-435 · Zweig: Beobachter (kein Schreibrecht) auf der Personalseite. Ohne Schreibrecht
- * verliert die Karte Statusauslöser und „Entfernen", die Tabelle die Aktionsspalte, und die
+ * verliert die Karte Statusauslöser und „Entlassen", die Tabelle die Aktionsspalte, und die
  * Position steht als Text statt als `Select` mit `minWidth: 130` (`PersonalPage.tsx`, Spalte
  * `position`). Gemessen wird dieselbe Weiche wie oben, dazu der waagerechte Überlauf beider
  * Zweige — der Nur-Lese-Zweig ist anders gebaut und wurde nie gemessen.
@@ -236,7 +236,7 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
   await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
     0,
   );
-  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen". Einzige
+  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entlassen". Einzige
   // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552), eigens gezählt.
   await expect(
     karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
@@ -307,9 +307,10 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
     const karte = page.locator('[data-lfh="datensicht-karte"]');
     await expect(karte).toHaveCount(1);
     const knopf = await haeltStufe(
-      karte.getByRole('button', { name: 'Entfernen' }),
+      // Seit LLH-1079 trägt die Personalkarte „Entlassen" (Name mit der Person) statt „Entfernen".
+      karte.getByRole('button', { name: `${KRAFT} entlassen`, exact: true }),
       soll,
-      `Aktionsknopf „Entfernen" (390 px, ${dichte})`,
+      `Aktionsknopf „Entlassen" (390 px, ${dichte})`,
     );
 
     // ── Titel-Link im Kartenzweig (390 px, Tierliste)

@@ -28,6 +28,7 @@ use crate::auftrag::AuftragBearbeitungsstatus;
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use crate::meldung::MeldungStatus;
+use crate::staerke::{Staerke, StaerkePosition};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
@@ -143,6 +144,33 @@ pub fn zaehle_meldungen_gewichtet(
     z
 }
 
+/// Was an einer Dispositionszeile Personal gezählt wird (LLH-1079, design.md D9): die
+/// aufgelöste Stärkeposition (Dispo-Override vor Stamm-Default) und ob die Kraft beendet ist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KraftMerkmale {
+    pub staerke_position: Option<StaerkePosition>,
+    /// Entlassen oder storniert (`beendet_at` gesetzt).
+    pub beendet: bool,
+}
+
+/// Personal in Zahlen: aktive Kräfte und ihre Stärke.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KraefteZaehler {
+    pub personal: i64,
+    pub staerke: Staerke,
+}
+
+/// Zählregel der Kräfte (Fixture `regeln.json`, Abschnitt `kraefte`): nur aktive Kräfte zählen;
+/// im Personal jede, in der Stärke nur die mit Position. Die Leser filtern beendete schon in SQL;
+/// die Regel lässt sie trotzdem aus, damit ein ungefilterter Aufrufer richtig zählt.
+pub fn count_kraefte(kraefte: &[KraftMerkmale]) -> KraefteZaehler {
+    let aktiv = || kraefte.iter().filter(|k| !k.beendet);
+    KraefteZaehler {
+        personal: aktiv().count() as i64,
+        staerke: Staerke::aus_positionen(aktiv().filter_map(|k| k.staerke_position)),
+    }
+}
+
 /// Erinnerungen: fällig und noch offen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ErinnerungsZaehler {
@@ -236,7 +264,8 @@ pub async fn berechne(
         z.einheiten = Some(
             menge(
                 pool,
-                "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?",
+                "SELECT COUNT(*) FROM einsatz_einheit \
+                 WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
                 einsatz_id,
             )
             .await?,

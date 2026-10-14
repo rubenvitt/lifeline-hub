@@ -6,6 +6,8 @@ export interface StaerkeTraeger {
   id: number;
   ueber_einheit_id?: number | null;
   ist_kumuliert: Staerke;
+  /** Gesetzt, wenn die Einheit aufgelöst ist (LLH-1079); sie trägt nichts zur Summe bei. */
+  aufgeloest_at?: string | null;
 }
 
 /**
@@ -18,12 +20,15 @@ export interface StaerkeTraeger {
  * läuft über `alle` (die Einheiten des Einsatzes), damit ein fehlendes Zwischenglied sie nicht
  * abreißt; ohne `alle` gilt die Menge selbst. Ein korrupter Zyklus (der Server kumuliert
  * zyklussicher) zählt über sein Mitglied mit der kleinsten Kennung genau einmal. Die Regel steht
- * im gemeinsamen Fixture `tests/fixtures/verdichtung/regeln.json`.
+ * im gemeinsamen Fixture `tests/fixtures/verdichtung/regeln.json`. Eine aufgelöste Einheit zählt
+ * nicht (LLH-1079, Abschnitt `kraefte`); der Server liefert sie getrennt, die Regel lässt sie
+ * trotzdem aus.
  */
 export function summiereStaerke(
-  einheiten: ReadonlyArray<StaerkeTraeger>,
-  alle: ReadonlyArray<Pick<StaerkeTraeger, 'id' | 'ueber_einheit_id'>> = einheiten,
+  menge: ReadonlyArray<StaerkeTraeger>,
+  alle: ReadonlyArray<Pick<StaerkeTraeger, 'id' | 'ueber_einheit_id'>> = menge,
 ): Staerke | null {
+  const einheiten = menge.filter((e) => !e.aufgeloest_at);
   if (einheiten.length === 0) return null;
   const inMenge = new Set(einheiten.map((e) => e.id));
   const eltern = new Map<number, number | null>();

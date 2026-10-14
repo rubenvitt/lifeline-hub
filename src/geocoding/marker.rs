@@ -22,13 +22,13 @@ pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marke
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND storniert_at IS NULL \
          UNION ALL \
          SELECT 'einheit', id, name, lat, lon FROM einsatz_einheit \
-          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL \
+          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND aufgeloest_at IS NULL \
          UNION ALL \
          SELECT 'fahrzeug', id, snap_funkrufname, lat, lon FROM einsatz_fahrzeug \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL \
          UNION ALL \
          SELECT 'personal', id, snap_name, lat, lon FROM einsatz_personal \
-          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL \
+          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \
          UNION ALL \
          SELECT 'lagemeldung', id, 'Lagemeldung', lat, lon FROM lage_meldung \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL",
@@ -92,6 +92,52 @@ mod tests {
         let uhs = marker.iter().find(|m| m.typ == "uhs").unwrap();
         assert_eq!(uhs.label, "PA 1");
         assert_eq!((uhs.lat, uhs.lon), (51.2, 10.2));
+    }
+
+    #[tokio::test]
+    async fn entlassene_kraft_und_aufgeloeste_einheit_sind_kein_bezugspunkt() {
+        let pool = crate::db::test_pool().await;
+        let (bid, eid) = fixture(&pool).await;
+        for (name, ende) in [("Aktiv", None), ("Weg", Some("2026-10-13 10:00:00"))] {
+            sqlx::query(
+                "INSERT INTO einsatz_einheit (einsatz_id, name, lat, lon, aufgeloest_at) \
+                 VALUES (?, ?, 51.1, 10.1, ?)",
+            )
+            .bind(eid)
+            .bind(name)
+            .bind(ende)
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO einsatz_personal (einsatz_id, snap_name, disponiert_von, \
+                                               lat, lon, beendet_at, beendet_als) \
+                 VALUES (?, ?, ?, 51.3, 10.3, ?, ?)",
+            )
+            .bind(eid)
+            .bind(name)
+            .bind(bid)
+            .bind(ende)
+            .bind(ende.map(|_| "entlassen"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let mut namen: Vec<_> = lade_marker(&pool, eid)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|m| m.typ == "einheit" || m.typ == "personal")
+            .map(|m| (m.typ, m.label))
+            .collect();
+        namen.sort();
+        assert_eq!(
+            namen,
+            [
+                ("einheit".to_string(), "Aktiv".to_string()),
+                ("personal".to_string(), "Aktiv".to_string())
+            ]
+        );
     }
 
     #[tokio::test]

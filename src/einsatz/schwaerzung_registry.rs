@@ -494,6 +494,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
+            // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
+            retain("zuletzt_entlassen_at", G_ZEIT),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -957,6 +963,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ_id", G_FK),
             retain("name", G_OP_LABEL),
             retain("fuehrer_id", G_FK),
+            // Auflösung (LLH-1079): Zeitpunkt und Benutzer-FK.
+            retain("aufgeloest_at", G_ZEIT),
+            retain("aufgeloest_von", G_FK),
             retain("soll_fuehrer", G_ZAEHLER),
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
@@ -1002,6 +1011,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -1029,6 +1042,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
+            // Lebenszustand der Disposition (LLH-1079): Zeitpunkt, Benutzer-FK, Endzustand.
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von", G_FK),
+            retain("beendet_als", G_ENUM),
             retain("uhs_id", G_FK),
         ],
     },

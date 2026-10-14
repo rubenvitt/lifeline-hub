@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -12,7 +12,7 @@ Personalstamm der Organisation und Ad-hoc-Kräfte, die nur in diesem Einsatz vor
 stehen Funktion, Träger, Fahrzeug, Einheit, Stärke-Position, Status, Einsatzdauer und Ruhezeit.
 
 Die Führung liest hier, wer verfügbar oder gebunden ist und wer wie lange im Einsatz steht.
-Disponieren, Status setzen und entfernen dürfen Einsatzleitung und Führungspersonal.
+Disponieren, Status setzen und entlassen dürfen Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -23,7 +23,7 @@ Disponieren, Status setzen und entfernen dürfen Einsatzleitung und Führungsper
 2. Die Liste ist nach Statuskategorie gruppiert: verfügbar, gebunden, nicht verfügbar, ohne Status.
    In „Name, Funktion“ suchen oder unter „Status“ eine Kategorie wählen.
 
-   ![Personalliste mit Name, Funktion, Position, Status, Einsatzdauer, Ruhe und dem Knopf „Entfernen“ je Person](../bilder/personal/personal.png)
+   ![Personalliste mit Name, Funktion, Position, Status, Einsatzdauer, Ruhe und dem Knopf „Entlassen“ je Person](../bilder/personal/personal.png)
 
 3. Unter „Spalten“ ausgeblendete Spalten wie „Träger“, „Fahrzeug“, „Einheit“ oder „Bemerkung“
    einblenden.
@@ -66,12 +66,28 @@ Für Einsatzleitung und Führungspersonal:
 3. Fehlt ein Ereignis, mit „Nachtragen“ ergänzen (Kapitel [Meldebild und
    Kräfte-Zeitachse](meldebild.md)).
 
-### Eine Person aus dem Einsatz entfernen
+### Eine Person aus dem Einsatz entlassen
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Zeile der Person „Entfernen“ wählen.
-2. Die Rückfrage „Aus Einsatz entfernen?“ mit „Aus Einsatz entfernen“ bestätigen.
+1. Ist die Person schon früher gegangen, zuerst in ihrer „Zeitachse“ mit „Nachtragen“ die
+   Entlassung mit der richtigen Zeit erfassen. Die App trägt dann keine zweite ein.
+2. In der Zeile der Person „Entlassen“ wählen. Eine Rückfrage gibt es nicht.
+3. Die Person verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
+4. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Personen mit dem Zeitpunkt.
+
+   ![Aufgeklappter Block „Entlassen (1)“ unter der Personalliste mit einer Person, ihrer Funktion, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/personal/entlassen.png)
+
+5. Kommt die Person zurück, „Erneut disponieren“ wählen. Eine Person aus dem Personalstamm lässt
+   sich auch wieder über „Person disponieren“ aufnehmen.
+
+### Eine Fehldisposition stornieren
+
+Für Einsatzleitung und Führungspersonal, kurz nachdem eine Person versehentlich disponiert wurde:
+
+1. In der Zeile der Person „Weitere Aktionen“ öffnen und „Stornieren“ wählen.
+2. Die Rückfrage „… stornieren?“ mit „Stornieren“ bestätigen.
+3. Lehnt die App ab, steht der Grund an der Zeile; die Person lässt sich dann nur entlassen.
 
 ## Hintergrund
 
@@ -93,19 +109,34 @@ Einer Einheit wird eine Person im Modul [Einheiten](einheiten.md) zugeordnet, ei
 Besatzung im Modul [Fahrzeuge und FMS](fahrzeuge.md). Die Stärke-Position bestimmt, ob die Person
 als Führer, Unterführer oder Mannschaft zählt; Einheitsführer ist ein eigenes Merkmal der Einheit.
 
-### Entfernen
+### Entlassen und Stornieren
 
-Eine entfernte Person verlässt den Einsatz ganz, mit Einheit und Fahrzeug. War sie Einheitsführer
-oder Leiter eines Einsatzabschnitts, ist diese Stelle danach leer.
+Entlassen ist der Normalweg: Die Person verlässt Einheit, Fahrzeug, UHS, Stab und Führungsstelle.
+War sie Einheitsführer oder Leiter eines Einsatzabschnitts, ist diese Stelle danach leer. Ihre
+Zeitachse bleibt, mit offener Periode endet sie mit einer „Entlassung“ (Herkunft „aus dem Einsatz
+entlassen“). In Stärke, Statusband, Lagemonitor und Auswahllisten zählt sie nicht mehr. Im Nachweis
+bleibt sie: im Block „Entlassen“ unter der Personalliste und im Meldebild, in der Übernahme des
+Meldebilds in einen Lagebericht, in „insgesamt eingesetzt“ und in der Anlage „Personal je Kopf“ des
+Einsatzberichts. Erneut disponiert, steht sie wieder in der Liste; ihre Zeitachse läuft weiter,
+ihre Bindungen kommen nicht zurück.
+
+Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
+Minuten nach der Disposition und nur, solange die Person noch nichts im Einsatz hat: keine Einheit,
+kein Fahrzeug, keine Rolle, keine Ereignisse außer denen aus der Disposition. Wer einmal entlassen
+war, lässt sich auch nach dem erneuten Disponieren nicht mehr stornieren. Eine stornierte Person
+erscheint in keinem Nachweis; ihre Ereignisse sind gestrichen.
+
+An einer entlassenen oder stornierten Person lässt sich nichts mehr ändern: Zuordnen, Status setzen
+und Nachtragen lehnt die App ab.
 
 ### Einsatztagebuch
 
-Disponieren, jeder Statuswechsel und das Entfernen stehen im Einsatztagebuch. Position und Bemerkung
-ändern es nicht.
+Disponieren, jeder Statuswechsel, das Entlassen, das erneute Disponieren und das Stornieren stehen
+im Einsatztagebuch. Position und Bemerkung ändern es nicht.
 
 ### Rechte und ohne Netz
 
-Lesen darf, wer das Modul Personal sieht. Disponieren, ändern und entfernen dürfen Einsatzleitung
-und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
-Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
-[Ohne Netz](ohne-netz.md)).
+Lesen darf, wer das Modul Personal sieht. Disponieren, ändern, entlassen und stornieren dürfen
+Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im
+Einsatz](rechte-im-einsatz.md)). Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar;
+ändern lässt sich nichts (Kapitel [Ohne Netz](ohne-netz.md)).

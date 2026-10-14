@@ -176,6 +176,15 @@ pub struct EinsatzPersonalAnzeige {
     /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
+    /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.
+    /// Nur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_von: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::entlassung::BeendetAls>)]
+    pub beendet_als: Option<String>,
 }
 
 /// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).
@@ -240,6 +249,32 @@ pub fn etb_text_disponiert(name: &str, funktion: Option<&str>) -> String {
     format!("Person «{}» disponiert", etb_bezeichnung(name, funktion))
 }
 
+/// System-ETB beim erneuten Disponieren einer entlassenen oder stornierten Person (LLH-1079).
+pub fn etb_text_erneut_disponiert(name: &str, funktion: Option<&str>) -> String {
+    format!(
+        "Person «{}» erneut disponiert",
+        etb_bezeichnung(name, funktion)
+    )
+}
+
+/// System-ETB beim Entlassen (LLH-1079, design.md D4): der Name der Einheit steht nur hier, die
+/// Zeile behält keinen eingefrorenen Einheitsbezug.
+pub fn etb_text_entlassen(name: &str, funktion: Option<&str>, einheit: Option<&str>) -> String {
+    let wer = etb_bezeichnung(name, funktion);
+    match einheit {
+        Some(e) => format!("Person «{wer}» (Einheit «{e}») aus dem Einsatz entlassen"),
+        None => format!("Person «{wer}» aus dem Einsatz entlassen"),
+    }
+}
+
+/// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
+pub fn etb_text_storniert(name: &str, funktion: Option<&str>) -> String {
+    format!(
+        "Person «{}» storniert (Fehldisposition)",
+        etb_bezeichnung(name, funktion)
+    )
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -259,5 +294,25 @@ mod etb_text_tests {
             "Person «Anna Muster» disponiert"
         );
         assert_eq!(etb_bezeichnung("B", Some("SAN")), "B (SAN)");
+    }
+
+    #[test]
+    fn entlassen_nennt_die_einheit_nur_im_text() {
+        assert_eq!(
+            etb_text_entlassen("Anna", Some("SAN"), Some("Florian 1")),
+            "Person «Anna (SAN)» (Einheit «Florian 1») aus dem Einsatz entlassen"
+        );
+        assert_eq!(
+            etb_text_entlassen("Anna", None, None),
+            "Person «Anna» aus dem Einsatz entlassen"
+        );
+        assert_eq!(
+            etb_text_storniert("Anna", None),
+            "Person «Anna» storniert (Fehldisposition)"
+        );
+        assert_eq!(
+            etb_text_erneut_disponiert("Anna", Some("SAN")),
+            "Person «Anna (SAN)» erneut disponiert"
+        );
     }
 }

@@ -181,16 +181,16 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     assert_eq!(
         anfrage(
             &app,
-            "DELETE",
-            &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
             &admin,
             None
         )
         .await
         .0,
-        StatusCode::NO_CONTENT
+        StatusCode::OK
     );
-    // Disponieren + Status-Wechsel + Entfernen = 3 System-Einträge.
+    // Disponieren + Status-Wechsel + Entlassen = 3 System-Einträge.
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 3);
 }
 
@@ -261,8 +261,8 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
                 &admin,
                 None,
             )
@@ -271,17 +271,17 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
         }
     };
 
-    assert_eq!(entlassen(ohne).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(ohne).await, StatusCode::OK);
     assert_eq!(ereignisse(), (vec![], vec![]), "ohne Rolle: nur `personal`");
-    assert_eq!(entlassen(mitglied).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(mitglied).await, StatusCode::OK);
     assert_eq!(
         ereignisse(),
         (vec![einheit], vec![]),
         "Mitgliederliste geändert"
     );
-    assert_eq!(entlassen(chef).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(chef).await, StatusCode::OK);
     assert_eq!(ereignisse(), (vec![einheit], vec![]), "Führer gelöst");
-    assert_eq!(entlassen(leiter).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(leiter).await, StatusCode::OK);
     assert_eq!(ereignisse(), (vec![], vec![abschnitt]), "Leiter gelöst");
 }
 
@@ -665,12 +665,12 @@ fn ereignis(tag: &str, id: i64) -> (String, i64) {
     (tag.to_string(), id)
 }
 
-/// Das Entlassen ändert die Stärke einer UHS, an der die Kraft arbeitet (LFH-1045), und nimmt
-/// einem Schaden die geschädigte Einsatzkraft samt Namen (ON DELETE SET NULL). `personal`
-/// erreicht UHS- und Schadenleser ohne Personalrecht nicht; `uhs` bzw. `schaden` tragen die
-/// Änderung, aber nur, wenn die Kraft dort steht.
+/// Das Entlassen ändert die Stärke einer UHS, an der die Kraft arbeitet (LFH-1045). `personal`
+/// erreicht UHS-Leser ohne Personalrecht nicht; `uhs` trägt die Änderung, aber nur, wenn die
+/// Kraft dort steht. Den Schaden lässt das Entlassen unverändert: die geschädigte Einsatzkraft
+/// bleibt Historie (LLH-1079, design.md D4), also meldet es dort nichts.
 #[tokio::test]
-async fn entlassen_feuert_uhs_und_schaden_nur_bei_betroffener_kraft() {
+async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -697,8 +697,8 @@ async fn entlassen_feuert_uhs_und_schaden_nur_bei_betroffener_kraft() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
                 &admin,
                 None,
             )
@@ -707,19 +707,19 @@ async fn entlassen_feuert_uhs_und_schaden_nur_bei_betroffener_kraft() {
         }
     };
 
-    assert_eq!(entlassen(ohne).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(ohne).await, StatusCode::OK);
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
-    assert_eq!(entlassen(an_uhs).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(an_uhs).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("uhs", uhs)],
         "Stärke der UHS geändert"
     );
-    assert_eq!(entlassen(geschaedigt).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(geschaedigt).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
-        vec![ereignis("schaden", schaden)],
-        "Geschädigte Einsatzkraft gelöst"
+        vec![],
+        "der Schaden ändert sich nicht"
     );
     let (_, json) = anfrage(
         &app,
@@ -729,10 +729,9 @@ async fn entlassen_feuert_uhs_und_schaden_nur_bei_betroffener_kraft() {
         None,
     )
     .await;
-    assert!(
-        json.get("geschaedigt_personal_id")
-            .is_none_or(|v| v.is_null()),
-        "die Ansicht des Schadens hat sich wirklich geändert: {json}"
+    assert_eq!(
+        json["geschaedigt_personal_id"], geschaedigt,
+        "die geschädigte Einsatzkraft bleibt im Nachweis: {json}"
     );
 }
 
@@ -897,4 +896,306 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
         StatusCode::OK
     );
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "schon gelöscht");
+}
+
+// ── Entlassen, Stornieren, erneut Disponieren (LLH-1079) ──────────────────────────────────
+
+/// `(id, name)` der Liste, aktiv oder mit `?entlassene=1`.
+async fn namen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> Vec<String> {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal{query}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    json.as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["name"].as_str().unwrap().to_string())
+        .collect()
+}
+
+async fn aktion(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ep: i64,
+    was: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}/{was}"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+/// Spec `kraefte-entlassung`: die entlassene Person bleibt mit Zeitpunkt und entlassender Person,
+/// fehlt in der Liste und steht unter `?entlassene=1`; jeder Schreibweg an ihr ist 409, das
+/// erneute Disponieren holt sie zurück.
+#[tokio::test]
+async fn entlassen_und_erneut_disponieren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
+
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["beendet_als"], "entlassen");
+    assert!(
+        json["beendet_at"].is_string() && json["beendet_von"].is_i64(),
+        "{json}"
+    );
+    assert_eq!(namen(&app, &admin, einsatz, "").await, ["Bert"]);
+    assert_eq!(
+        namen(&app, &admin, einsatz, "?entlassene=1").await,
+        ["Anna"]
+    );
+    assert_eq!(
+        namen(&app, &admin, einsatz, "?entlassene=0").await,
+        ["Bert"]
+    );
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal?entlassene=ja"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Schreibwege an der Entlassenen: Lebenszyklus.
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "stornieren").await.0,
+        StatusCode::CONFLICT
+    );
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{anna}"),
+        &admin,
+        Some(r#"{"bemerkung":"x"}"#),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "Status oder Bemerkung an einer Entlassenen"
+    );
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{anna}/position"),
+        &admin,
+        Some(r#"{"lat":52.0,"lon":10.0}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+
+    // Rückgängig bzw. „Erneut disponieren“.
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(
+        json.get("beendet_als").is_none_or(|v| v.is_null()),
+        "{json}"
+    );
+    // Die Liste ordnet nach Disposition; die Reaktivierung disponiert neu.
+    let mut aktiv = namen(&app, &admin, einsatz, "").await;
+    aktiv.sort();
+    assert_eq!(aktiv, ["Anna", "Bert"]);
+    assert!(namen(&app, &admin, einsatz, "?entlassene=1")
+        .await
+        .is_empty());
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        StatusCode::CONFLICT,
+        "eine aktive Kraft wird nicht reaktiviert"
+    );
+}
+
+/// Spec „Stamm-Person kommt zurück“: das Disponieren einer entlassenen Stamm-Person gelingt statt
+/// 409 und trifft dieselbe Zeile.
+#[tokio::test]
+async fn entlassene_stamm_person_erneut_disponieren_ist_201() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas Müller").await;
+    let dispo = || {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal"),
+                &admin,
+                Some(&format!(r#"{{"personal_id":{person}}}"#)),
+            )
+            .await
+        }
+    };
+    let (s, json) = dispo().await;
+    assert_eq!(s, StatusCode::CREATED);
+    let ep = json["id"].as_i64().unwrap();
+    assert_eq!(dispo().await.0, StatusCode::CONFLICT, "aktiv: weiter 409");
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ep, "entlassen").await.0,
+        StatusCode::OK
+    );
+    let (s, json) = dispo().await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["id"].as_i64().unwrap(), ep, "dieselbe Zeile");
+    assert_eq!(namen(&app, &admin, einsatz, "").await, ["Thomas Müller"]);
+}
+
+/// Spec „Fehldisposition stornieren“: direkt nach dem Disponieren gelingt der Storno (204), die
+/// Kraft steht in keiner Liste; mit Bindung ist es ein Zustand (422 mit Satz).
+#[tokio::test]
+async fn stornieren_nur_ohne_spur() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fehl = kraft(&app, &admin, einsatz, "Fehl", "mannschaft").await;
+    let gebunden = kraft(&app, &admin, einsatz, "Gebunden", "mannschaft").await;
+    einheit_mit(&app, &admin, einsatz, gebunden).await;
+
+    assert_eq!(
+        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(namen(&app, &admin, einsatz, "").await, ["Gebunden"]);
+    assert!(namen(&app, &admin, einsatz, "?entlassene=1")
+        .await
+        .is_empty());
+
+    let (s, json) = aktion(&app, &admin, einsatz, gebunden, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"], "Die Person gehört einer Einheit an; erst lösen oder die Person entlassen",
+        "{json}"
+    );
+    // Eine stornierte Kraft kommt über „Erneut disponieren“ zurück.
+    assert_eq!(
+        aktion(&app, &admin, einsatz, fehl, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+}
+
+/// Storno nach erneutem Disponieren (Review LLH-1079, S3): wer einmal entlassen war, war im
+/// Einsatz. Auch wenn die Zeitachse leer blieb (Status ohne Marke) und das erneute Disponieren
+/// die Frist neu beginnen ließe, ist ein Storno 422; die Person lässt sich nur entlassen.
+#[tokio::test]
+async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
+    let (app, pool) = setup_mit_pool().await;
+    // Ohne Marke am Status bleibt die Zeitachse leer; nur dann fiele der Storno durch.
+    sqlx::query("UPDATE personal_status SET zeitachse_marke = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Die Person war schon einmal aus dem Einsatz entlassen; die Person lässt sich entlassen",
+        "{json}"
+    );
+    // Ein Storno ist dagegen keine Entlassung: danach bleibt ein neuer Storno möglich.
+    let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+}
+
+/// Spec „Status an Entlassener“ und design.md D6: jeder Schreibweg an einer entlassenen Kraft
+/// außer dem erneuten Disponieren antwortet 409 — auch die Wege anderer Module, die eine Person
+/// binden (Einheit, Besatzung, UHS, Stab, Einsatzleitung, Abschnittsleitung, Schaden) und ihre
+/// Zeitachse.
+#[tokio::test]
+async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, bert).await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(r#"{"adhoc":{"funkrufname":"Florian 1","fahrzeugtyp":"ELW 2"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let fahrzeug = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        StatusCode::OK
+    );
+
+    let leiter = format!(r#"{{"name":"Nord","leiter_id":{anna}}}"#);
+    let besetzung = format!(r#"{{"besetzung_art":"personal","personal_id":{anna}}}"#);
+    let einsatzleiter = format!(r#"{{"einsatzleiter":{{"art":"personal","personal_id":{anna}}}}}"#);
+    let schaden = format!(
+        r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{anna}}}"#
+    );
+    let nachtrag = r#"{"art":"eintreffen","zeitpunkt_at":"2026-10-13T08:00:00Z"}"#.to_string();
+    for (methode, pfad, body) in [
+        ("PUT", format!("einheiten/{einheit}/personal/{anna}"), None),
+        (
+            "PUT",
+            format!("fahrzeuge/{fahrzeug}/besatzung/{anna}"),
+            None,
+        ),
+        ("PUT", format!("uhs/{uhs}/kraefte/{anna}"), None),
+        ("PUT", "stab/besetzung/s1".to_string(), Some(besetzung)),
+        ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
+        ("POST", "abschnitte".to_string(), Some(leiter)),
+        ("POST", "schaeden".to_string(), Some(schaden)),
+        ("POST", format!("personal/{anna}/zeitachse"), Some(nachtrag)),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            body.as_deref(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+    }
 }

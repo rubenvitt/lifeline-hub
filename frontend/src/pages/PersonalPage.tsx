@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Popconfirm, Space, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -13,8 +13,11 @@ import { listePersonalStatus } from '../api/personalStatus';
 import {
   aktualisiereDisposition,
   disponierePerson,
-  entferneDisposition,
+  entlasseDisposition,
   listeEinsatzPersonal,
+  listEntlassenesPersonal,
+  reaktiviereDisposition,
+  storniereDisposition,
 } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -57,6 +60,11 @@ import {
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -67,6 +75,9 @@ export default function PersonalPage() {
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [stammForm] = Form.useForm<{ personal_id: number }>();
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
+  const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
+  const isNewGestureStorno = useNewGesture(stornoFuer !== null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -75,6 +86,11 @@ export default function PersonalPage() {
   const epQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+  });
+  // Entlassene Kräfte (LLH-1079): getrennt geliefert, die Liste und ihre Zahlen kennen sie nicht.
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.personalEntlassene(einsatzId),
+    queryFn: () => listEntlassenesPersonal(einsatzId),
   });
   const statusQuery = useQuery({
     queryKey: globalKeys.personalStatus(),
@@ -154,11 +170,46 @@ export default function PersonalPage() {
     onSuccess: invalidate,
     onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
   });
-  const entfernenMutation = useMutation({
-    mutationFn: (epId: number) => entferneDisposition(einsatzId, epId),
+  /*
+   * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): die Aktion im Block „Entlassen“ meldet an ihrem Eintrag, Rückgängig
+   * aus dem Toast im Seitenhinweis — die Zeile ist dann weg, der Block meist eingeklappt.
+   */
+  const reaktivierenMutation = useMutation({
+    mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
     onMutate: (epId) => zeilen.beginne(epId),
     onSuccess: invalidate,
-    onError: (e, epId) => zeilen.melde(epId, e, 'Entfernen fehlgeschlagen'),
+    onError: (e, epId) => zeilen.melde(epId, e, 'Nicht erneut disponiert'),
+  });
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  const rueckgaengigMutation = useMutation({
+    mutationFn: (epId: number) => reaktiviereDisposition(einsatzId, epId),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: invalidate,
+    onError: (e) => {
+      setRueckgaengigFehler(e);
+      invalidate();
+    },
+  });
+  // Entlassen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast (`frontend/AGENTS.md`,
+  // „Destruktiv ist nicht gleich destruktiv“, design.md D8).
+  const entlassenMutation = useMutation({
+    mutationFn: (v: { epId: number; name: string }) => entlasseDisposition(einsatzId, v.epId),
+    onMutate: (v) => zeilen.beginne(v.epId),
+    onSuccess: (_, v) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${v.name} entlassen`, () => rueckgaengigMutation.mutate(v.epId));
+    },
+    onError: (e, v) => zeilen.melde(v.epId, e, 'Nicht entlassen'),
+  });
+  // Stornieren ist unumkehrbar und nur kurz nach einer Fehldisposition möglich; der Server nennt
+  // den Grund einer Ablehnung, er steht an der Zeile.
+  const stornierenMutation = useMutation({
+    mutationFn: (epId: number) => storniereDisposition(einsatzId, epId),
+    onMutate: (epId) => zeilen.beginne(epId),
+    onSuccess: invalidate,
+    onError: (e, epId) => zeilen.melde(epId, e, 'Nicht storniert'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -176,6 +227,12 @@ export default function PersonalPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const eps = epQuery.data ?? [];
+  const entlassene = entlasseneQuery.data ?? [];
+  /** Läuft für diese Zeile Entlassen oder Stornieren? Dann keine zweite Handlung. */
+  const isZeileBusy = (epId: number) =>
+    (entlassenMutation.isPending && entlassenMutation.variables?.epId === epId) ||
+    (stornierenMutation.isPending && stornierenMutation.variables === epId);
+  const stornoEintraege = [{ key: 'stornieren', label: 'Stornieren', gefahr: true as const }];
 
   /**
    * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
@@ -278,7 +335,7 @@ export default function PersonalPage() {
    * ── Gemessen gegen 1180 und 1440 (LFH-975) ──
    *
    * `name` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so bricht
-   * Langtext um, statt die Tabelle zu verbreitern, und „Ruhe“ und „Entfernen“ bleiben im Bild.
+   * Langtext um, statt die Tabelle zu verbreitern, und „Ruhe“ und die Aktionen bleiben im Bild.
    * Unter `xl` weicht `funktion`, unter `xxl` weichen `traeger`, `fahrzeug` und `einheit` — alle
    * über den Spaltenschalter und im Zähler. Wer eine Breite ändert, misst neu
    * (`e2e/gate1-ueberlauf.spec.ts`, „Kräfte-Listen“): neben dem Aufklapp-Auslöser braucht die
@@ -436,18 +493,31 @@ export default function PersonalPage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
-            width: 120,
+            width: 170,
             immerSichtbar: true,
+            // Entlassen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Stornieren steht im
+            // Zeilenmenü und fragt nach (LLH-1079, design.md D8).
             render: (_: unknown, ep: EinsatzPersonal) => (
-              <Popconfirm
-                title="Aus Einsatz entfernen?"
-                okText="Aus Einsatz entfernen"
-                onConfirm={() => entfernenMutation.mutate(ep.id)}
-              >
-                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
-                    Rückfrage. */}
-                <Button>Entfernen</Button>
-              </Popconfirm>
+              <Space size="middle">
+                <Button
+                  danger
+                  loading={
+                    entlassenMutation.isPending && entlassenMutation.variables?.epId === ep.id
+                  }
+                  disabled={isZeileBusy(ep.id)}
+                  aria-label={`${ep.name} entlassen`}
+                  onClick={() => entlassenMutation.mutate({ epId: ep.id, name: ep.name })}
+                >
+                  Entlassen
+                </Button>
+                <MenueAusloeser
+                  eintraege={stornoEintraege}
+                  zugaenglicherName={`Weitere Aktionen zu ${ep.name}`}
+                  gesperrt={isZeileBusy(ep.id)}
+                  laeuft={stornierenMutation.isPending && stornierenMutation.variables === ep.id}
+                  onWahl={() => setStornoFuer({ id: ep.id, name: ep.name })}
+                />
+              </Space>
             ),
           },
         ]
@@ -484,10 +554,18 @@ export default function PersonalPage() {
         )
       }
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-        )
+        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {!darfSchreiben && einsatz.status !== 'aktiv' && (
+              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+            )}
+            <SeitenHinweise
+              fehler={rueckgaengigFehler}
+              fehlerTitel="Nicht erneut disponiert"
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+          </Space>
+        ) : null
       }
     >
       {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf diese Seite,
@@ -564,22 +642,84 @@ export default function PersonalPage() {
               art: 'plan',
               titel: { spalte: 'name' },
               status: (ep) => personalStatusDarstellung(ep),
-              // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
+              // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entlassen"
               // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
               statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
               sekundaer: ['funktion', 'einheit', 'fahrzeug'],
               aktion: darfSchreiben
                 ? {
-                    etikett: 'Entfernen',
-                    bestaetigung: 'Aus Einsatz entfernen?',
-                    bestaetigungKnopf: 'Aus Einsatz entfernen',
-                    onKlick: (ep) => entfernenMutation.mutate(ep.id),
+                    etikett: 'Entlassen',
+                    zugaenglicherName: (ep) => `${ep.name} entlassen`,
+                    onKlick: (ep) => entlassenMutation.mutate({ epId: ep.id, name: ep.name }),
+                  }
+                : undefined,
+              weitere: darfSchreiben
+                ? {
+                    eintraege: () => stornoEintraege,
+                    zugaenglicherName: (ep) => `Weitere Aktionen zu ${ep.name}`,
+                    laeuft: (ep) => isZeileBusy(ep.id),
+                    onWahl: (_, ep) => setStornoFuer({ id: ep.id, name: ep.name }),
                   }
                 : undefined,
             }}
           />
+          <EntlassenBlock
+            titel="Entlassen"
+            endeWort="entlassen"
+            eintraege={entlassene.map((ep) => ({
+              id: ep.id,
+              name: ep.name,
+              zusatz: ep.funktion,
+              beendetAt: ep.beendet_at,
+            }))}
+            aktion={
+              darfSchreiben
+                ? {
+                    etikett: 'Erneut disponieren',
+                    onKlick: (epId) => reaktivierenMutation.mutate(epId),
+                    laeuft: (epId) =>
+                      reaktivierenMutation.isPending && reaktivierenMutation.variables === epId,
+                  }
+                : undefined
+            }
+            fehler={(epId) => zeilen.grund(epId)}
+          />
         </>
       )}
+
+      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
+          nennt ihre Person und schließt, wenn die Zeile entfällt. */}
+      <Modal
+        open={stornoFuer !== null && eps.some((ep) => ep.id === stornoFuer.id)}
+        title={stornoFuer ? `${stornoFuer.name} stornieren?` : undefined}
+        onCancel={() => {
+          if (isNewGestureStorno()) setStornoFuer(null);
+        }}
+        destroyOnHidden
+        footer={
+          <Space size="middle">
+            <Button
+              onClick={() => {
+                if (isNewGestureStorno()) setStornoFuer(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              danger
+              onClick={() => {
+                if (!stornoFuer || !isNewGestureStorno()) return;
+                setStornoFuer(null);
+                stornierenMutation.mutate(stornoFuer.id);
+              }}
+            >
+              Stornieren
+            </Button>
+          </Space>
+        }
+      >
+        Die Person erscheint danach in keiner Liste und keinem Nachweis.
+      </Modal>
 
       {/* Person aus dem Stamm disponieren, im Serienmodus wie die Ad-hoc-Kette. */}
       <ErfassungsModal<{ personal_id: number }>

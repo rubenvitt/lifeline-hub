@@ -39,6 +39,8 @@ pub async fn ordne_personal_zu_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
+    // Eine entlassene oder stornierte Kraft wird keinem Verband mehr zugeordnet (409, LLH-1079).
+    crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, ep_id).await?;
 
     // Stale Führer-Verweis bereinigen (Person war evtl. anderswo Führer).
     sqlx::query(
@@ -110,8 +112,9 @@ pub async fn load_betroffene_einheiten_tx(
     ep_id: i64,
 ) -> Result<Vec<i64>, AppError> {
     let ids = sqlx::query_scalar(
-        "SELECT id FROM einsatz_einheit WHERE einsatz_id = ? AND (fuehrer_id = ? \
-         OR id = (SELECT einheit_id FROM einsatz_personal WHERE id = ?)) ORDER BY id",
+        "SELECT id FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL \
+         AND (fuehrer_id = ? OR id = (SELECT einheit_id FROM einsatz_personal WHERE id = ?)) \
+         ORDER BY id",
     )
     .bind(einsatz_id)
     .bind(ep_id)
@@ -287,7 +290,8 @@ pub async fn material_mitglieder_map(
     let zeilen = sqlx::query_as::<_, MaterialZeileMitEinheit>(
         "SELECT einheit_id, id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
          FROM einsatz_material \
-         WHERE einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
+         WHERE einheit_id IN (SELECT id FROM einsatz_einheit \
+                              WHERE einsatz_id = ? AND aufgeloest_at IS NULL) \
          ORDER BY id",
     )
     .bind(einsatz_id)
@@ -465,7 +469,8 @@ pub async fn fahrzeug_mitglieder_map(
 ) -> Result<HashMap<i64, Vec<EinheitMitgliedFahrzeug>>, AppError> {
     let zeilen = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(sqlx::AssertSqlSafe(format!(
         "SELECT {FAHRZEUG_MITGLIED_SPALTEN} \
-         WHERE ef.einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
+         WHERE ef.einheit_id IN (SELECT id FROM einsatz_einheit \
+                                 WHERE einsatz_id = ? AND aufgeloest_at IS NULL) \
          ORDER BY ef.id"
     )))
     .bind(einsatz_id)
@@ -484,7 +489,7 @@ pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, 
     let positionen: Vec<Option<String>> = sqlx::query_scalar(
         "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE ep.einheit_id = ?",
+         WHERE ep.einheit_id = ? AND ep.beendet_at IS NULL",
     )
     .bind(einheit_id)
     .fetch_all(pool)
@@ -507,7 +512,9 @@ pub async fn ist_staerke_map(
     let zeilen: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT ep.einheit_id, COALESCE(ep.staerke_position, p.staerke_position) \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE ep.einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?)",
+         WHERE ep.beendet_at IS NULL \
+           AND ep.einheit_id IN (SELECT id FROM einsatz_einheit \
+                                 WHERE einsatz_id = ? AND aufgeloest_at IS NULL)",
     )
     .bind(einsatz_id)
     .fetch_all(pool)

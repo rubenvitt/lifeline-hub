@@ -102,11 +102,12 @@ Einträge je Typ und alle Entscheidungen zeigen.
 ### Requirement: Kräfte zum Druckzeitpunkt und insgesamt
 
 Der Block Kräfte SHALL die Stärke zum Druckzeitpunkt im Format F/UF/M//Σ samt Zahl der
-Einheiten und Fahrzeuge nennen. Er SHALL außerdem „insgesamt eingesetzt“ aus der
-Kräfte-Zeitachse nennen: Einheiten und Personen mit mindestens einer Periode sowie die Summe
-der Einsatzzeit der Personen als Helferstunden. Er MUST nennen, für wie viele der geführten
-Personen die Zeitachse Daten hat. Eine Kraft ohne Ereignis MUST NOT mit 0 in die
-Helferstunden eingehen.
+Einheiten und Fahrzeuge nennen; entlassene Kräfte und aufgelöste Einheiten zählen darin nicht.
+Er SHALL außerdem „insgesamt eingesetzt“ aus der Kräfte-Zeitachse nennen: Einheiten und
+Personen mit mindestens einer Periode sowie die Summe der Einsatzzeit der Personen als
+Helferstunden, entlassene Kräfte eingeschlossen. Er MUST nennen, für wie viele der geführten
+Personen die Zeitachse Daten hat; geführt sind aktive und entlassene Personen, nie stornierte.
+Eine Kraft ohne Ereignis MUST NOT mit 0 in die Helferstunden eingehen.
 
 #### Scenario: Zeitachse lückenhaft
 
@@ -124,6 +125,11 @@ Helferstunden eingehen.
 
 - **WHEN** keine Kraft ein Zeitachsen-Ereignis hat
 - **THEN** steht bei „insgesamt eingesetzt“ „keine Zeitachse erfasst“ statt einer Zahl
+
+#### Scenario: Entlassene bleiben in den Helferstunden
+
+- **WHEN** zwei von zehn Personen entlassen sind und eine weitere storniert ist
+- **THEN** zählt die Stärke acht, „insgesamt eingesetzt“ nennt zehn Personen, und die stornierte fehlt überall
 
 ### Requirement: Keine personenbezogenen Daten Betroffener
 

@@ -164,17 +164,21 @@ async fn check_leiter(
     einsatz_id: i64,
     leiter_id: i64,
 ) -> Result<(), AppError> {
-    let treffer: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
-            .bind(leiter_id)
-            .bind(einsatz_id)
-            .fetch_optional(executor)
-            .await?;
-    treffer.map(|_| ()).ok_or_else(|| {
-        AppError::Validation(
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(leiter_id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?;
+    match ende {
+        None => Err(AppError::Validation(
             "Abschnittsleiter muss eine disponierte Person des Einsatzes sein".into(),
-        )
-    })
+        )),
+        // Eine entlassene oder stornierte Kraft leitet nicht (409, LLH-1079).
+        Some(Some(als)) => Err(crate::personal::disposition_repo::beendet_conflict(&als)),
+        Some(None) => Ok(()),
+    }
 }
 
 /// Ob `kandidat` ein Nachfahre von `start` ist (oder `kandidat == start`): verhindert

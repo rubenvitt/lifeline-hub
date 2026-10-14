@@ -596,6 +596,11 @@ export interface components {
             /** Format: int64 */
             weitere: number;
         };
+        /**
+         * @description Wie eine Kraft den Einsatz verließ. Wire == `as_str()`.
+         * @enum {string}
+         */
+        BeendetAls: "entlassen" | "storniert";
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         BefehlAbschnitt: {
             schluessel: string;
@@ -1308,6 +1313,13 @@ export interface components {
              * @description BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
              */
             aktueller_br_id?: number | null;
+            /**
+             * @description Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur
+             *     `GET …/einheiten?aufgeloeste=1` liefert aufgelöste.
+             */
+            aufgeloest_at?: string | null;
+            /** Format: int64 */
+            aufgeloest_von?: number | null;
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -1706,6 +1718,14 @@ export interface components {
          *     Stärke-Position (Dispo-Override vor Stamm-Default) und aufgelöster Status.
          */
         EinsatzPersonalAnzeige: {
+            beendet_als?: components["schemas"]["BeendetAls"] | null;
+            /**
+             * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.
+             *     Nur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+             */
+            beendet_at?: string | null;
+            /** Format: int64 */
+            beendet_von?: number | null;
             bemerkung?: string | null;
             disponiert_at: string;
             /** Format: int64 */
@@ -5436,7 +5456,7 @@ export interface components {
          * @description Herkunft eines Ereignisses. Wire == `as_str()`.
          * @enum {string}
          */
-        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag";
+        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition";
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;

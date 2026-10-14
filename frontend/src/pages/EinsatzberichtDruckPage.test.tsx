@@ -37,6 +37,19 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
       zaehle(pfad);
       return HttpResponse.json(wert(roh, k));
     });
+  // Beendete Kräfte liegen unter demselben Pfad mit Abfrageparameter (LLH-1079); msw trifft nur
+  // den Pfad, der Handler unterscheidet selbst.
+  const mitBeendeten = (
+    pfad: string,
+    k: keyof EinsatzberichtRoh['quellen'],
+    param: string,
+    kBeendet: keyof EinsatzberichtRoh['quellen'],
+  ) =>
+    http.get(`/api/einsaetze/${E}${pfad}`, ({ request }) => {
+      const beendet = new URL(request.url).searchParams.has(param);
+      zaehle(beendet ? `${pfad}?${param}=1` : pfad);
+      return HttpResponse.json(wert(roh, beendet ? kBeendet : k));
+    });
   const etb = wert<{ eintraege: unknown[] }>(roh, 'etbEntscheidungen');
   server.use(
     meHandler(kraft),
@@ -44,9 +57,9 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/fuehrungsstelle', 'fuehrungsstelle'),
     json('/stab', 'stab'),
     json('/lagebesprechungen', 'lagebesprechungen'),
-    json('/einheiten', 'einheiten'),
+    mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/einheiten/zeitachse', 'einheitenPerioden'),
-    json('/personal', 'personal'),
+    mitBeendeten('/personal', 'personal', 'entlassene', 'personalEntlassen'),
     json('/personal/zeitachse', 'personalPerioden'),
     json('/fahrzeuge', 'fahrzeuge'),
     // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.

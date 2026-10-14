@@ -151,6 +151,10 @@ async fn validate_empfaenger(
                     "Einheit gehört nicht zum Einsatz".into(),
                 ));
             }
+            // Eine aufgelöste Einheit ist kein neues Ziel mehr (409, LLH-1079); als bisheriger
+            // Empfänger bleibt sie (siehe `validate_empfaenger_liste`).
+            let mut conn = pool.acquire().await?;
+            crate::einheit::repo::require_aktiv_tx(&mut conn, einsatz_id, id).await?;
             EMPF_EINHEIT
         }
         EMPF_PERSON => {
@@ -162,6 +166,8 @@ async fn validate_empfaenger(
                     "Person gehört nicht zum Einsatz".into(),
                 ));
             }
+            let mut conn = pool.acquire().await?;
+            crate::personal::disposition_repo::require_aktiv_tx(&mut conn, einsatz_id, id).await?;
             EMPF_PERSON
         }
         EMPF_FAHRZEUG => {

@@ -148,7 +148,7 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
 }
 
 /// `id` des ersten aktiven Status einer Kategorie (nach `sortier`, dann `id`); `None`, wenn es
-/// keinen gibt. Executor-generisch für `disposition_repo::disponiere_stamm_tx`.
+/// keinen gibt. Executor-generisch für `disposition_repo::disponieren_stamm_tx`.
 pub async fn erster_der_kategorie(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,

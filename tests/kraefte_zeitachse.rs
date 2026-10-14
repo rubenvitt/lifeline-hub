@@ -881,3 +881,47 @@ async fn ruecknahme_meldet_einheit_und_personal() {
         "ohne Ablösungsereignis bleibt die Zeitachse unberührt"
     );
 }
+
+/// Rückwirkend entlassen (LLH-1079, Kapitel Personal): wer die Entlassung vorher mit ihrer Zeit
+/// nachträgt, behält genau diese eine; „Entlassen“ schreibt ohne offene Periode keine zweite.
+#[tokio::test]
+async fn nachgetragene_entlassung_bleibt_die_einzige() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    // Die Disposition liegt drei Stunden zurück.
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(3, 0))
+        .bind(w.ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = w.person_pfad();
+    let (s, json) = w
+        .nachtrag(
+            &pfad,
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(2, 0)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    let ende = vor(1, 0);
+    let (s, json) = w
+        .nachtrag(
+            &pfad,
+            &format!(r#"{{"art":"entlassung","zeitpunkt_at":"{ende}"}}"#),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+
+    let (s, json) = anfrage(&w.app, "POST", &format!("{pfad}/entlassen"), &w.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let entlassungen: Vec<_> = z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["art"] == "entlassung" && e.get("gestrichen_at").is_none())
+        .collect();
+    assert_eq!(entlassungen.len(), 1, "{z:?}");
+    assert_eq!(entlassungen[0]["quelle"], "nachtrag");
+    assert_eq!(entlassungen[0]["zeitpunkt_at"], ende.as_str());
+}

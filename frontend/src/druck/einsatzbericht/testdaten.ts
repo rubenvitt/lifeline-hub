@@ -169,11 +169,13 @@ export function rohBericht(
         ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
       },
     ] as Einheit[]),
+    einheitenAufgeloest: daten([] as Einheit[]),
     einheitenPerioden: daten([
       { einheit_id: 1, perioden: [periode('2026-03-29T00:35:00', null)] },
       { einheit_id: 2, perioden: [] },
     ] as EinheitPerioden[]),
     personal: daten([{ id: 11 }, { id: 12 }, { id: 13 }] as EinsatzPersonal[]),
+    personalEntlassen: daten([] as EinsatzPersonal[]),
     personalPerioden: daten([
       { personal_id: 11, perioden: [periode('2026-03-29T00:30:00', '2026-03-29T01:30:00')] },
       { personal_id: 12, perioden: [periode('2026-03-29T01:00:00', null)] },
