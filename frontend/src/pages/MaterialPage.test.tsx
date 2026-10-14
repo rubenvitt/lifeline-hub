@@ -260,13 +260,27 @@ describe('MaterialPage', () => {
   it('der Spaltenschalter lügt nicht: ohne ausgeblendete Spalte trägt er keinen Zähler', async () => {
     /**
      * Das Primitiv zeigt den Spaltenschalter, sobald eine Spalte abwählbar ist. Geprüft wird, dass
-     * der Zähler nichts erfindet: keine Spalte ist abgewählt oder per Breite verborgen → nur
-     * „Spalten".
+     * der Zähler nichts erfindet: ab `xxl` ist keine Spalte abgewählt oder per Breite verborgen →
+     * nur „Spalten".
      */
+    setzeViewportBreite(1600);
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     expect(screen.getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Kategorie' })).toBeInTheDocument();
+  });
+
+  it('am Fükw weicht die Kategorie, im Zähler und in der Suche (LLH-1093, Prüfliste)', async () => {
+    // Mit der Spalte „Ort“ passte die Tabelle bei 1366 px nicht mehr; die lesende Kategorie weicht
+    // unter `xxl`, über den Spaltenschalter zurückzuholen.
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Kategorie' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Ort' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Aktionen' })).toBeInTheDocument();
   });
 
   it('unter md steht der Status als BEDIENBARES Etikett, nicht als Sekundärfeld', async () => {

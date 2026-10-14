@@ -85,6 +85,9 @@ export function ortText(ort: MaterialOrtWert, k: MaterialOrtKontext): string {
 
 const OHNE_ORT = 'ohne';
 
+/** Boden der Ortsangabe in px: ein Wort wie „Musterstadt“ steht in jeder Dichte in einer Zeile. */
+const ORT_MINDESTBREITE = 150;
+
 /**
  * Filter der Spalte „Ort“ (D13): „ohne Ort“, je Einheit, je UHS der aktuellen Liste. Ein Posten an
  * Einheit und UHS trifft beide Werte. Ohne Leserecht fasst ein Wert „Einheit zugeordnet“ bzw. „UHS
@@ -284,7 +287,9 @@ export default function MaterialOrt({
         // (Prüfliste LLH-1093, Kriterien 1 und 2).
         columnGap: token.paddingSM + token.marginXS,
         rowGap: token.paddingSM,
-        minWidth: 0,
+        // Die Wertknöpfe brechen überall um (`overflowWrap: anywhere`); ohne Boden drückte die
+        // Tabelle die Ortsspalte so schmal, dass „Musterstadt“ Silbe für Silbe stand.
+        minWidth: ORT_MINDESTBREITE,
       }}
     >
       {teile.length === 0

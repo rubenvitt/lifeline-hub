@@ -413,16 +413,28 @@ export default function MaterialPage() {
    * Spaltenregister der Materialseite. `EinsatzMaterialAnzeige` hat kein `status_kategorie`;
    * gruppiert und gefiltert wird auf der eigenen Fünf-Werte-Achse (`MaterialStatus`), dieselbe
    * Grenze wie in `filtereKraefte`.
+   *
+   * ── Gemessen gegen den Fükw (LLH-1093, Prüfliste) ──
+   *
+   * Mit der Spalte „Ort“ wuchs die Tabelle inhaltsgetrieben auf 1326 px; am Fükw (1050 px Inhalt
+   * bei 1366) lag „Aus dem Einsatz nehmen“ außerhalb des Bilds. Jetzt FLIESST der Ort
+   * (`mindestBreite`, LFH-523): seine Teile Einheit und UHS brechen untereinander um. Alle übrigen
+   * tragen eine Zahlbreite; die Aktionsspalte trägt Knopf, Abstand und Menü (226 px Inhalt in
+   * `kompakt`). Die Kategorie weicht unter `xxl` (wie Typ, Kennzeichen und Träger der
+   * Fahrzeugseite), sonst blieben dem Ort bei 1366 nur 125 px und die Namen brächen Silbe für
+   * Silbe. Wer eine Breite ändert, misst neu.
    */
   const spalten = spaltenFuer<EinsatzMaterial>()([
     {
       title: 'Bezeichnung',
       key: 'bezeichnung',
       immerSichtbar: true,
+      width: 170,
       sortWert: (m) => m.bezeichnung,
       suchText: (m) => m.bezeichnung,
+      // `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern.
       render: (_, em) => (
-        <Space>
+        <Space wrap>
           {em.bezeichnung}
           {em.ist_adhoc && <Tag>ad-hoc</Tag>}
           {em.ist_demo && <DemoMarke />}
@@ -433,6 +445,9 @@ export default function MaterialPage() {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
+      width: 100,
+      // Lesend, darf weichen: unter `xxl` über den Spaltenschalter, im Zähler und in der Suche.
+      abBreite: 'xxl',
       filter: kategorieFilter,
       suchText: (m) => m.kategorie,
       render: (t) => t ?? '—',
@@ -442,6 +457,7 @@ export default function MaterialPage() {
       // ausdrücklichem Speichern; Filter „ohne Ort“, je Einheit, je UHS.
       title: 'Ort',
       key: 'ort',
+      mindestBreite: 170,
       filter: ortFilter(ems, ortKontext),
       sortWert: (m) => ortText(ortVon(m), ortKontext),
       suchText: (m) => ortText(ortVon(m), ortKontext),
@@ -462,6 +478,7 @@ export default function MaterialPage() {
       // und schrieb einen ETB-Eintrag.
       title: 'Menge',
       key: 'menge',
+      width: 80,
       sortWert: (m) => m.menge,
       render: (_, em) => (
         <InlineAngabe<number | null>
@@ -493,6 +510,7 @@ export default function MaterialPage() {
     {
       title: 'Status',
       key: 'status',
+      width: 120,
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
       // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
       // gespreizt — Herleitung in `FahrzeugePage.tsx`.
@@ -507,6 +525,7 @@ export default function MaterialPage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
+      width: 160,
       render: (_, em) => (
         <BemerkungZelle
           wert={em.bemerkung}
@@ -523,6 +542,7 @@ export default function MaterialPage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
+            width: 250,
             immerSichtbar: true,
             // Herausnehmen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Angaben ändern,
             // Aufteilen und Stornieren stehen im Zeilenmenü, Stornieren fragt nach (LLH-1079 D8,
