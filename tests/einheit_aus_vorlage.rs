@@ -705,6 +705,45 @@ async fn fremde_unbekannte_und_deaktivierte_vorlage() {
     assert_eq!(bestand(&app, &admin, einsatz).await, (0, 0, 0));
 }
 
+/// Eine Vorlage mit mehr als 20 Einheiten (D7) ist kein Eingabefehler, sondern ihr Zustand: 422
+/// in Vorschau und Bilden, nichts angelegt. Mit genau 20 geht beides.
+#[tokio::test]
+async fn vorlage_mit_mehr_als_zwanzig_einheiten_ist_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+    let v = vorlage(&pool, org).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let trupp = typ_id(&pool, org, "Staffel").await;
+    // Zug und Staffel plus 18 Trupps ergeben 20 Einheiten.
+    for i in 0..18 {
+        let name = format!("Trupp {i}");
+        let funk = format!("Trupp-Funk {i}");
+        vrepo::create(&pool, org, neu(&name, trupp, Some(v.staffel), &funk))
+            .await
+            .unwrap();
+    }
+    let (s, json) = vorschau(&app, &admin, einsatz, v.zug).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["knoten"].as_array().unwrap().len(), 20);
+
+    vrepo::create(
+        &pool,
+        org,
+        neu("Trupp 21", trupp, Some(v.zug), "Trupp-Funk 21"),
+    )
+    .await
+    .unwrap();
+    let (s, json) = vorschau(&app, &admin, einsatz, v.zug).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(json["error"], "Vorlage hat mehr als 20 Einheiten");
+    let body = json!({"vorlage_id": v.zug, "fahrzeuge": fz(&[v.elw])});
+    let (s, json) = bilden(&app, &admin, einsatz, &body).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(json["error"], "Vorlage hat mehr als 20 Einheiten");
+    assert_eq!(bestand(&app, &admin, einsatz).await, (0, 0, 0));
+}
+
 #[tokio::test]
 async fn gesperrte_module_403_und_leere_vorschau() {
     let (app, pool) = setup_mit_pool().await;
