@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
 ---
 
 ## Überblick
@@ -116,7 +116,8 @@ zugeordnet oder von ihr abgezogen werden, stehen ebenfalls dort.
 Der Kopf der Stelle nennt ihre Stärke. Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
 Unter „Material“ ordnet „Material zuordnen“ Material des Einsatzes der Stelle zu; erfasst wird es
-im Modul „Material“.
+im Modul „Material“. Zugeordnet wird an eine geplante oder aktive Stelle; eine aufgelöste nimmt
+kein Material mehr an. Material, das schon dort liegt, bleibt änderbar und lässt sich lösen.
 
 ### Rechte
 
