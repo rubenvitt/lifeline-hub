@@ -149,8 +149,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Fahrzeug einer Einheit angeh
    ![Dialog „Personal der Einheit auf Musterstadt 83-2“ mit den freien Kräften der Rettungsstaffel, zwei davon angehakt, und dem Knopf „Übernehmen“](../bilder/fahrzeuge/personal-uebernehmen.png)
 
 3. Bei Bedarf Häkchen setzen oder entfernen, dann „Übernehmen“ wählen. Alle gewählten Kräfte sitzen
-   danach auf dem Fahrzeug, und die Besatzung zeigt Ist- und Soll-Stärke. Lehnt die App eine
-   Person ab, etwa weil sie inzwischen entlassen ist, steht der Grund an ihr und niemand ist
+   danach auf dem Fahrzeug, und die Besatzung zeigt Ist- und Soll-Stärke. Wer inzwischen auf ein
+   anderes Fahrzeug gesetzt oder entlassen wurde, verschwindet aus der Liste und wird nicht
+   übernommen. Lehnt die App eine Person dennoch ab, steht der Grund an ihr und niemand ist
    zugeordnet.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
@@ -214,8 +215,7 @@ Personen, die auf dem Fahrzeug sitzen und noch keiner Einheit angehören; wer au
 sitzt, aber zu einer anderen Einheit gehört, bleibt dort und behält die Marke „andere Einheit“.
 Einheit, Fahrzeug, Besatzung und Einsatztagebuch entstehen ganz oder gar nicht: gehört das
 Fahrzeug inzwischen einer Einheit an oder ist es entlassen, entsteht nichts. Der Name hat höchstens
-200 Zeichen. Das Feld
-„Abschnitt“ steht nur, wenn das Modul Einsatzabschnitte freigegeben ist.
+200 Zeichen. Das Feld „Abschnitt“ steht nur, wenn das Modul Einsatzabschnitte freigegeben ist.
 
 Die Kräfte-Zeitachse der neuen Einheit bleibt zunächst leer, auch wenn das Fahrzeug schon einen
 Status hat: ein Eintrag entsteht erst beim nächsten Statuswechsel mit Zeitachsen-Marke oder als
