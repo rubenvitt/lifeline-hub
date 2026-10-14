@@ -213,7 +213,9 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
     );
     zeige('personal');
     await waehle('Person zuordnen …', 'Erika Muster (P-7)');
-    await waitFor(() => expect(document.querySelector('.ant-select .anticon-loading')).not.toBeNull());
+    await waitFor(() =>
+      expect(document.querySelector('.ant-select .anticon-loading')).not.toBeNull(),
+    );
   });
 
   it('ohne Schreibrecht: keine Auswahl', () => {

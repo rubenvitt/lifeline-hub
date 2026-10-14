@@ -102,7 +102,9 @@ describe('EinheitMaterial (D11)', () => {
     ).not.toHaveClass('ant-btn-loading');
     await userEvent.click(within(paneel()).getByRole('combobox', { name: 'Material zuordnen' }));
     await userEvent.click(await screen.findByText('Stromerzeuger ×1'));
-    await waitFor(() => expect(paneel().querySelector('.ant-select .anticon-loading')).not.toBeNull());
+    await waitFor(() =>
+      expect(paneel().querySelector('.ant-select .anticon-loading')).not.toBeNull(),
+    );
   });
 
   it('„Material zuordnen …“ bietet freie Posten an und ordnet zu', async () => {

@@ -11,6 +11,7 @@ export async function einheitMitZuordnungen(page: Page) {
   const basis = `/api/einsaetze/${einsatzId}`;
   const einheitId = await post(`${basis}/einheiten`, { name: 'Messzug 446' });
   const namen = { personal: 'Messperson 446', fahrzeug: 'Florian 446', material: 'Messkiste 446' };
+  const zugeordnet: Record<string, number> = {};
   for (const [modul, zuordnung, adhoc] of [
     ['personal', 'personal', { name: namen.personal }],
     ['fahrzeuge', 'fahrzeug', { funkrufname: namen.fahrzeug }],
@@ -29,9 +30,15 @@ export async function einheitMitZuordnungen(page: Page) {
           `${basis}/einheiten/${einheitId}/${zuordnung}/${id}`,
         );
         expect(antwort.ok(), `Zuordnung ${modul}: ${await antwort.text()}`).toBeTruthy();
+        zugeordnet[modul] = id;
       }
     }
   }
+  // Die Person sitzt auf dem Fahrzeug: Fahrzeug- und Personenzeile stehen direkt untereinander.
+  const besatzung = await page.request.put(
+    `${basis}/fahrzeuge/${zugeordnet.fahrzeuge}/besatzung/${zugeordnet.personal}`,
+  );
+  expect(besatzung.ok(), `Besatzung: ${await besatzung.text()}`).toBeTruthy();
   return { pfad: `/einsaetze/${einsatzId}/einheiten/${einheitId}`, namen };
 }
 
@@ -82,8 +89,9 @@ export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: 
 /**
  * Die Bedienziele der Zuordnungen (LLH-1036 Teil II): im Paneel „Fahrzeuge und Besatzung“ das
  * Menü der Person, die FMS-Wahl und „Aus Einheit lösen“ des Fahrzeugs und die beiden
- * Auswahlfelder, im Paneel „Material“ Lösen und Auswahl. `reihen` sind die Nachbarn auf einer
- * Zeile, `stapel` je Paneel die letzte Zeilenaktion über dem ersten Auswahlfeld.
+ * Auswahlfelder, im Paneel „Material“ Lösen und Auswahl. `reihen` sind benachbarte Ziele (auf
+ * einer Zeile oder Zeile über Zeile), `stapel` je Paneel die letzte Zeilenaktion über dem ersten
+ * Auswahlfeld.
  */
 export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug: string }) {
   const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
@@ -126,6 +134,12 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
     reihen: [
       [fmsStatus, fahrzeugLoesen],
       [huelle(personZuordnen), huelle(fahrzeugZuordnen)],
+      // Zeile über Zeile: Funkrufname über dem Namen der Person, Lösen über ihrem Menü.
+      [
+        fahrzeugZeile.getByRole('link', { name: namen.fahrzeug }),
+        besatzung.getByRole('link', { name: namen.personal }),
+      ],
+      [fahrzeugLoesen, personMenue],
     ],
     stapel: [
       { name: 'Fahrzeuge und Besatzung', aktion: personMenue, auswahl: huelle(personZuordnen) },

@@ -111,11 +111,13 @@ export default function EinheitMaterial({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: token.margin,
+              columnGap: token.margin,
+              rowGap: token.marginSM,
               flexWrap: 'wrap',
-              // Bedienziel-Boden einer handgebauten Zeile (LFH-365).
+              // Bedienziel-Boden einer handgebauten Zeile (LFH-365); zwei Zeilen stehen `marginSM`
+              // auseinander, Lösen über Lösen hält so den Aktionsabstand (≥ 8 / ≥ 16).
               minHeight: token.controlHeight,
-              paddingBlock: token.paddingXXS,
+              paddingBlock: token.marginSM / 2,
             }}
           >
             <span

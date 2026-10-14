@@ -249,14 +249,19 @@ export default function FahrzeugeBesatzung({
       </div>
     );
 
-  /** Bedienziel-Boden einer handgebauten Zeile (LFH-365): Steuerhöhe plus Polsterung. */
+  /**
+   * Bedienziel-Boden einer handgebauten Zeile (LFH-365): Steuerhöhe plus Polsterung. Zwei Zeilen
+   * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (7/11/16 px), damit Link
+   * und Aktion untereinander den Aktionsabstand halten (Leitlinie ≥ 8 / ≥ 16).
+   */
   const zeilenStil = {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: token.marginXS,
+    columnGap: token.marginXS,
+    rowGap: token.marginSM,
     minHeight: token.controlHeight,
-    paddingBlock: token.paddingXXS,
+    paddingBlock: token.marginSM / 2,
   } as const;
   const nebentext = (teile: readonly (string | null | undefined)[]) => {
     const text = teile.filter(Boolean).join(' · ');
