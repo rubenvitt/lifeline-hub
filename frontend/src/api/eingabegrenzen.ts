@@ -80,3 +80,5 @@ export const EINHEIT_VORLAGE_FAHRZEUGE_MAX = 50;
 export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;
 /** Kräfte je Sammel-Disposition im Request (LLH-1100, vor dem Entdoppeln). */
 export const SAMMEL_MAX = 50;
+/** Name der obersten Einheit beim Bilden aus einer Vorlage (LLH-1049). */
+export const EINHEIT_NAME_MAX = 200;

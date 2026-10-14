@@ -9,6 +9,12 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// Höchstlänge des Einheitsnamens nach dem Trimmen (`src/AGENTS.md`, „Eingabegrenzen“), wie
+/// `einheit_vorlage::NAME_MAX`. Gilt beim Bilden aus einer Vorlage (LLH-1049); die Routen
+/// `POST/PATCH …/einheiten` bekommen die Grenze in einer eigenen Aufgabe. Spiegel:
+/// `EINHEIT_NAME_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const NAME_MAX: usize = 200;
+
 /// Default-Einheitstyp-Katalog je neu angelegter Organisation
 /// (label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier).
 /// **Muss mit dem Seed in `migrations/0015_einheit_typ.sql` übereinstimmen.**
