@@ -106,14 +106,6 @@ export function createEinheitAusVorlage(
   );
 }
 
-export function aktualisiereEinheit(
-  einsatzId: number,
-  eid: number,
-  daten: EinheitEingabe,
-): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', daten);
-}
-
 /**
  * Teiländerung einer Einheit (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
  * `null` leert. Für Einzelfelder ohne Formular, etwa Funkrufname und Kommunikationsmittel aus der

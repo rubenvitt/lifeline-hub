@@ -6,11 +6,13 @@ import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinheitDetailPage from './EinheitDetailPage';
-import { einsatzFixture } from '../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 /**
- * Detailansicht einer Einheit: Sprechgruppen-Picker, Funkdaten im PATCH, Typkatalog-Ausfall im
- * Feld, der Zuordnungs-Pool mit seiner Fehlerunterscheidung und die Route selbst.
+ * Einheit-Ansicht (LLH-1036, Spec `einheit-ansicht`) über die ganze Kette bis zur Anfrage: jede
+ * Zeile schickt genau ihr Feld, Zeichen über den Lageweg, Auflösen als letztes Paneel, Fehler am
+ * Ort, der Wechsel der Einheit räumt. Was eine Zeile dem Handler gibt, belegen die Tests unter
+ * `pages/einheit/`.
  */
 
 const tmoSprechgruppe = {
@@ -48,15 +50,21 @@ const einheiten = [
     name: '1. Zug',
     fuehrer_id: null,
     fuehrer_name: null,
+    funkrufname: null,
     bemerkung: null,
     sortier: 0,
     soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
     ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
     ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    status: { quelle: 'ohne', status: null, seit: null, verteilung: [] },
     personal_mitglieder: [],
     fahrzeug_mitglieder: [],
     material_mitglieder: [],
     sprechgruppen: [tmoSprechgruppe],
+    kommunikationsmittel: null,
+    erreichbarkeit: null,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
   },
 ];
 
@@ -66,7 +74,12 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/abschnitte', () =>
+      HttpResponse.json([
+        { id: 3, name: 'EA Nord' },
+        { id: 4, name: 'EA Süd' },
+      ]),
+    ),
     http.get('/api/einheit-typen', () =>
       HttpResponse.json([
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
@@ -78,6 +91,18 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
     http.get('/api/einsaetze/1/sprechgruppen', () =>
       HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
     ),
+    http.get('/api/fahrzeug-status', () =>
+      HttpResponse.json([
+        {
+          id: 102,
+          label: '2 – Frei auf Wache',
+          kategorie: 'verfuegbar',
+          farbe: null,
+          fms_anker: 2,
+          sortier: 2,
+        },
+      ]),
+    ),
   ];
 }
 
@@ -85,6 +110,7 @@ function rendere(route = '/einsaetze/1/einheiten/10') {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+      <Route path="/einsaetze/:id/einheiten" element={<div>Gliederung</div>} />
     </Routes>,
     { route },
   );
@@ -97,12 +123,32 @@ function rendere(route = '/einsaetze/1/einheiten/10') {
  */
 function zeige(...abweichungen: HttpHandler[]) {
   server.use(...abweichungen, ...handlers());
-  return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
-    </Routes>,
-    { route: '/einsaetze/1/einheiten/10' },
-  );
+  return rendere();
+}
+
+/**
+ * Zeichnet die Bodies einer Schreibroute auf und spielt den Server: `liste` liefert die Einheiten
+ * erst im geladenen Stand, nach jedem Schreiben im fortgeschriebenen Serverstand — wie nach der
+ * Invalidierung. `serverStand` darf vom geladenen abweichen (fremde Änderung).
+ */
+function zeichneAuf(
+  methode: 'patch' | 'put',
+  pfad: string,
+  serverStand: Record<string, unknown>,
+  geladenerStand: Record<string, unknown> = serverStand,
+) {
+  const bodies: Record<string, unknown>[] = [];
+  let aktuell = { ...serverStand };
+  let geladen = geladenerStand;
+  const handler = http[methode](pfad, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    bodies.push(body);
+    aktuell = { ...aktuell, ...body };
+    geladen = aktuell;
+    return HttpResponse.json(aktuell);
+  });
+  const liste = http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([geladen]));
+  return { bodies, handler, liste };
 }
 
 /**
@@ -118,16 +164,47 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
 
+async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: string) {
+  await oeffneAuswahl(container, platzhalter);
+  await userEvent.click(
+    await screen.findByText(
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === eintrag,
+    ),
+  );
+}
+
+const paneel = (titel: string) => screen.getByRole('region', { name: titel });
+const zeileVon = (text: string) =>
+  screen.getByText(text, { exact: false }).closest('[data-lfh="einheit-zuordnung"]') as HTMLElement;
+
+const PANEELE = [
+  'Kopfdaten',
+  'Personal',
+  'Fahrzeuge',
+  'Zeitachse',
+  'Material',
+  'Funk und Kommunikation',
+  'Taktisches Zeichen',
+  'Einheit auflösen',
+];
+
 describe('EinheitDetailPage · die Route selbst', () => {
-  it('nennt die Stärke-Position in Klartext', async () => {
+  it('nennt die Stärke-Position in Klartext, ohne den Satz „als Führer gezählt“ (D9)', async () => {
     const mitPersonal = [
       {
         ...einheiten[0],
         personal_mitglieder: [
           { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
           { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
-          { ep_id: 3, name: 'Nora Platzhalter', staerke_position: 'mannschaft', ist_fuehrer: true },
-          { ep_id: 4, name: 'Frida Führer', staerke_position: 'fuehrer', ist_fuehrer: true },
+          {
+            ep_id: 3,
+            name: 'Nora Platzhalter',
+            staerke_position: 'mannschaft',
+            ist_fuehrer: false,
+          },
         ],
       },
     ];
@@ -138,33 +215,31 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(screen.getByText(/Uwe Unter \(Unterführer\)/)).toBeInTheDocument();
     expect(screen.getByText(/Nora Platzhalter \(Mannschaft\)/)).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/\((fuehrer|unterfuehrer|mannschaft)\)/);
-    // Die Einheit hat schon Einheitsführer: der Hinweis entfällt, sonst läse er sich als Auftrag.
-    expect(screen.queryByText(/noch nicht als Einheitsführer gesetzt/)).not.toBeInTheDocument();
+    // Die Lücke zeigt die leere Zeile „Einheitsführer eintragen“ im Kopf, nicht ein Satz je Person.
+    expect(screen.queryByText(/als Führer gezählt/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Einheitsführer eintragen' })).toBeInTheDocument();
   });
 
-  it('erklärt den Führer ohne Merkmal, solange die Einheit keinen Einheitsführer hat', async () => {
-    const ohneEinheitsfuehrer = [
-      {
-        ...einheiten[0],
-        personal_mitglieder: [
-          { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
-          { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
-        ],
-      },
-    ];
-    zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(ohneEinheitsfuehrer)));
-    await screen.findByText(/Max Mustermann \(Führer\)/);
-    // Genau einmal, beim Führer — nicht beim Unterführer.
-    expect(
-      screen.getAllByText(/als Führer gezählt, noch nicht als Einheitsführer gesetzt/),
-    ).toHaveLength(1);
+  it('zeigt die Kopfdaten der adressierten Einheit, ohne Formular und ohne Speichern-Leiste', async () => {
+    server.use(...handlers());
+    const { container } = rendere();
+    expect(await screen.findByRole('heading', { name: '1. Zug', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toHaveAccessibleDescription(
+      '1. Zug',
+    );
+    expect(container.querySelector('form')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
-  it('zeigt die Kopfdaten der adressierten Einheit', async () => {
+  it('die Paneele stehen in der Folge aus D2', async () => {
     server.use(...handlers());
     rendere();
-    expect(await screen.findByRole('heading', { name: '1. Zug', level: 1 })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('1. Zug'));
+    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    const titel = screen
+      .getAllByRole('region')
+      .map((r) => r.querySelector('h2')?.textContent ?? '')
+      .filter((t) => PANEELE.includes(t));
+    expect(titel).toEqual(PANEELE);
   });
 
   it('eine unbekannte Einheiten-Kennung meldet das und führt zurück, statt einen Ausfall zu behaupten', async () => {
@@ -179,36 +254,14 @@ describe('EinheitDetailPage · die Route selbst', () => {
   });
 
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {
-    // Das Etikett trägt keinen Programmierbegriff für „überschreiben".
     server.use(...handlers());
     rendere();
     expect(await screen.findByText('Soll-Stärke (F/UF/M)')).toBeInTheDocument();
     // Keine Eingaberegel als Satz: die Summe zeigt `StaerkeEingabe` live (LFH-1078).
     expect(screen.queryByText(/alle drei Werte/)).not.toBeInTheDocument();
   });
-});
-
-describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
-  it('die Zuordnungen liegen AUSSERHALB des Formulars, der Speichern-Knopf darin', async () => {
-    /**
-     * Die drei Zuordnungen wirken sofort — jeder Klick schreibt — und stehen deshalb nicht unter
-     * dem Speichern-Knopf des Formulars.
-     *
-     * Beide Hälften: die Zuordnung ist draußen und der Speichern-Knopf drin. Die erste allein wäre
-     * auch ohne Formular grün.
-     */
-    server.use(...handlers());
-    rendere();
-    const speichern = await screen.findByRole('button', { name: 'Speichern' });
-    expect(speichern.closest('form')).not.toBeNull();
-
-    const personZuordnen = screen.getByText('Person zuordnen …');
-    expect(personZuordnen.closest('form')).toBeNull();
-  });
 
   it('jede Zuordnung steht in einem eigenen Paneel, ohne Erklärsatz (LFH-1078)', async () => {
-    // Die Trennung zeigt die Position; die Zeile im Paneel quittiert die Zuordnung. Kein Satz
-    // „wirken sofort — hier gibt es nichts zu speichern“ mehr.
     server.use(...handlers());
     rendere();
     await screen.findByRole('heading', { name: 'Personal', level: 2 });
@@ -219,98 +272,154 @@ describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
   });
 });
 
-describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)', () => {
-  it('zeigt den SprechgruppenPicker samt zugeordneter Gruppe', async () => {
-    server.use(...handlers());
-    rendere();
-    expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Erscheint als Picker-Tag und in der Funk-Zusammenfassung.
-    expect((await screen.findAllByText('412_F_DRK')).length).toBeGreaterThanOrEqual(1);
-  });
-
-  // Funk-/Kommunikationsdaten auch an der Einheit pflegbar und sichtbar.
-  it('zeigt und sendet Kommunikationsmittel + Erreichbarkeit', async () => {
-    let patchBody: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers(),
-      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...einheiten[0], ...patchBody });
-      }),
+describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
+  it('Name: der PATCH trägt genau `name`, die Zeile zeigt den neuen Wert, Toast nennt die Angabe', async () => {
+    const { bodies, handler, liste } = zeichneAuf(
+      'patch',
+      '/api/einsaetze/1/einheiten/10',
+      einheiten[0],
     );
-    rendere();
-    await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '0151 23456');
-    await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
-    await userEvent.click(await screen.findByText('Digitalfunk'));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
-    expect(patchBody).toMatchObject({
-      kommunikationsmittel: 'digitalfunk',
-      erreichbarkeit: '0151 23456',
-    });
-  });
-
-  // Eigener Funkrufname der Einheit: vorbelegt aus dem Serverstand, geändert gesendet, geleert als
-  // `null` (nicht Leerstring, nicht weggelassen).
-  it('belegt den Funkrufnamen vor, sendet Änderung und Leeren', async () => {
-    const bodies: Record<string, unknown>[] = [];
-    // Der Serverstand folgt dem PATCH: die Invalidierung lädt neu und setzt das Formular darauf —
-    // ein fester Stand schriebe den alten Wert zurück.
-    let stand: Record<string, unknown> = { ...einheiten[0], funkrufname: 'Heros 3/1' };
-    server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
-        HttpResponse.json([stand, ...einheiten.slice(1)]),
-      ),
-      ...handlers(),
-      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        bodies.push(body);
-        stand = { ...stand, ...body };
-        return HttpResponse.json(stand);
-      }),
-    );
-    rendere();
-    const feld = await screen.findByLabelText('Funkrufname');
-    await waitFor(() => expect(feld).toHaveValue('Heros 3/1'));
-
+    zeige(liste, handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Name' });
     await userEvent.clear(feld);
-    await userEvent.type(feld, 'Florian HM 12/44');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.type(feld, '2. Zug{Enter}');
+
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toMatchObject({ funkrufname: 'Florian HM 12/44' });
-    await waitFor(() => expect(feld).toHaveValue('Florian HM 12/44'));
-
-    await userEvent.clear(feld);
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(bodies).toHaveLength(2));
-    expect(bodies[1]).toHaveProperty('funkrufname', null);
+    expect(bodies[0]).toEqual({ name: '2. Zug' });
+    expect(
+      await screen.findByRole('button', { name: 'Name bearbeiten' }),
+    ).toHaveAccessibleDescription('2. Zug');
+    expect(await screen.findByText('Name gespeichert')).toBeInTheDocument();
   });
 
-  it('sendet sprechgruppe_ids beim Speichern', async () => {
-    let patchBody: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers(),
-      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...einheiten[0], ...patchBody });
-      }),
+  it('Funkrufname geleert: der PATCH trägt genau `funkrufname: null`', async () => {
+    const mitRufname = { ...einheiten[0], funkrufname: 'Heros 3/1' };
+    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', mitRufname);
+    zeige(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitRufname])),
+      handler,
     );
-    rendere();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
+    await userEvent.click(await screen.findByRole('button', { name: 'Funkrufname bearbeiten' }));
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Funkrufname' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Funkrufname speichern' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ funkrufname: null });
+  });
 
-    // Vorbelegt mit tmoSprechgruppe.id=7.
-    expect(patchBody).toHaveProperty('sprechgruppe_ids');
-    expect(patchBody!['sprechgruppe_ids'] as number[]).toContain(7);
+  /**
+   * Gegenprobe zum Vollersatz: ein anderer Arbeitsplatz setzt den Abschnitt, diese Seite hat noch
+   * den alten Stand. Zwei Zeilen nacheinander schicken je nur ihr Feld; der fremde Abschnitt
+   * bleibt am Server und steht nach der Antwort auch hier.
+   */
+  it('zwei Zeilen nacheinander aus altem Stand: der fremd geänderte Abschnitt bleibt', async () => {
+    const { bodies, handler, liste } = zeichneAuf(
+      'patch',
+      '/api/einsaetze/1/einheiten/10',
+      { ...einheiten[0], abschnitt_id: 4, abschnitt_name: 'EA Süd' },
+      einheiten[0],
+    );
+    zeige(liste, handler);
+    expect(await screen.findByRole('button', { name: 'Abschnitt eintragen' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    await userEvent.clear(name);
+    await userEvent.type(name, '2. Zug{Enter}');
+    await waitFor(() => expect(bodies).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Funkrufname eintragen' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funkrufname' }), 'Heros 3/1{Enter}');
+    await waitFor(() => expect(bodies).toHaveLength(2));
+
+    expect(bodies).toEqual([{ name: '2. Zug' }, { funkrufname: 'Heros 3/1' }]);
+    expect(
+      await screen.findByRole('button', { name: 'Abschnitt bearbeiten' }),
+    ).toHaveAccessibleDescription('EA Süd');
+  });
+
+  it('„Als Einheitsführer“ an der Personzeile schickt genau `{ fuehrer_id }`', async () => {
+    const mitPersonal = {
+      ...einheiten[0],
+      personal_mitglieder: [
+        { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
+      ],
+    };
+    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', mitPersonal);
+    zeige(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitPersonal])),
+      handler,
+    );
+    await screen.findByText('Max Mustermann', { exact: false });
+    await userEvent.click(
+      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Als Einheitsführer' }),
+    );
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ fuehrer_id: 1 });
+  });
+
+  it('Sprechgruppen: der PATCH trägt genau `sprechgruppe_ids`', async () => {
+    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', einheiten[0]);
+    zeige(handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await userEvent.click(await screen.findByTitle('DMO 31'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ sprechgruppe_ids: [7, 8] });
+  });
+
+  it('Zeichen: genau `tz_organisation` an den Lageweg, keine Koordinate', async () => {
+    const zeichen = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10/position', einheiten[0]);
+    const angaben = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', einheiten[0]);
+    zeige(zeichen.liste, zeichen.handler, angaben.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Organisation eintragen' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Organisation' }));
+    await userEvent.click(await screen.findByTitle('THW'));
+    await userEvent.click(screen.getByRole('button', { name: 'Organisation speichern' }));
+    await waitFor(() => expect(zeichen.bodies).toHaveLength(1));
+    expect(zeichen.bodies[0]).toEqual({ tz_organisation: 'thw' });
+    expect(angaben.bodies).toHaveLength(0);
+    // Das große Zeichen im Kopf trägt den gespeicherten Stand.
+    await waitFor(() =>
+      expect(
+        paneel('Kopfdaten').querySelector('[data-lfh="einheit-zeichen"] svg desc'),
+      ).toHaveTextContent('Organisation: Technisches Hilfswerk'),
+    );
+  });
+
+  it('Handstatus „kein Status“ schickt `status_id: null`', async () => {
+    const mitHand = {
+      ...einheiten[0],
+      status: {
+        quelle: 'hand',
+        status: {
+          status_id: 102,
+          label: '2 – Frei auf Wache',
+          fms_anker: 2,
+          kategorie: 'verfuegbar',
+          sortier: 2,
+        },
+        seit: '2026-09-30T04:40:00Z',
+        verteilung: [],
+      },
+    };
+    const { bodies, handler } = zeichneAuf('put', '/api/einsaetze/1/einheiten/10/status', mitHand);
+    zeige(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitHand])),
+      handler,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Status von 1. Zug ändern' }));
+    await userEvent.click(await screen.findByText('kein Status'));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ status_id: null });
   });
 });
 
-describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', () => {
+describe('EinheitDetailPage · Datenzustände', () => {
   it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
     zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
-    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
-    await userEvent.click(await screen.findByLabelText('Typ'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Typ bearbeiten' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Typ' }));
     expect(
       await screen.findByText('Einheitentypen konnten nicht geladen werden'),
     ).toBeInTheDocument();
@@ -320,8 +429,8 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
     // Ohne die Gegenprobe belegt der Test darüber nichts — ein Feld, das immer meldet, wäre dort
     // ebenfalls grün.
     zeige();
-    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
-    await userEvent.click(await screen.findByLabelText('Typ'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Typ bearbeiten' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Typ' }));
     expect((await screen.findAllByTitle('Zug')).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Einheitentypen konnten nicht geladen werden')).toBeNull();
   });
@@ -347,60 +456,97 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
     expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
     expect(screen.queryByText('Kräfte konnten nicht geladen werden')).toBeNull();
   });
+});
 
-  it('Beobachter sieht die Daten, aber keine Schreibaktionen', async () => {
-    server.use(...handlers('beobachter'));
+describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
+  const mitMitgliedern = {
+    ...einheiten[0],
+    personal_mitglieder: [
+      { ep_id: 1, name: 'Max Mustermann', staerke_position: null, ist_fuehrer: false },
+    ],
+  };
+
+  it('Beobachter: kein Stift, keine Aufforderung, keine Statuswahl, kein Lösen, kein Auflösen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitMitgliedern])),
+      ...handlers('beobachter'),
+    );
     rendere();
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
-    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
+    expect(screen.queryAllByRole('button', { name: /bearbeiten$/ })).toHaveLength(0);
+    expect(screen.queryByText(/eintragen$/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Status von / })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Als Einheitsführer' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull();
     expect(screen.queryByText('Person zuordnen …')).toBeNull();
+  });
+
+  it('Gegenprobe: mit Schreibrecht stehen Stift, Statuswahl, Lösen und Auflösen da', async () => {
+    zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([mitMitgliedern])));
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Status von 1. Zug ändern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aus Einheit lösen' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Einheit auflösen' })).toBeInTheDocument();
+  });
+
+  it('Modul Einheiten gesperrt: auch mit Schreibrecht keine Stifte und kein Auflösen (D6)', async () => {
+    zeige(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull(),
+    );
+    expect(screen.queryAllByRole('button', { name: /bearbeiten$/ })).toHaveLength(0);
   });
 });
 
-describe('EinheitDetailPage · Auflösen', () => {
+describe('EinheitDetailPage · Auflösen (D12)', () => {
   it('führt nach dem Auflösen zurück zur Gliederung', async () => {
     // Die Route zeigt danach auf eine Einheit, die es nicht mehr gibt — dort zu bleiben hieße, den
     // Leerzustand als Ergebnis einer erfolgreichen Handlung zu zeigen.
     let geloest = false;
-    server.use(
-      ...handlers(),
+    zeige(
       http.delete('/api/einsaetze/1/einheiten/10', () => {
         geloest = true;
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    renderMitProviders(
-      <Routes>
-        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
-        <Route path="/einsaetze/:id/einheiten" element={<div>Gliederung</div>} />
-      </Routes>,
-      { route: '/einsaetze/1/einheiten/10' },
-    );
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    const aufloesen = await screen.findByRole('region', { name: 'Einheit auflösen' });
+    await userEvent.click(within(aufloesen).getByRole('button', { name: 'Einheit auflösen' }));
     const blase = await screen.findByRole('tooltip');
-    // Ein kurzer Satz zur Folge, kein Bedienhinweis (LFH-1078).
-    expect(blase.querySelector('.ant-popconfirm-description')).toHaveTextContent(
-      /^Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch\.$/,
-    );
     await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
 
     await waitFor(() => expect(geloest).toBe(true));
     expect(await screen.findByText('Gliederung')).toBeInTheDocument();
   });
+
+  it('abgelehnt: der Grund steht im Paneel „Einheit auflösen“, kein Toast', async () => {
+    zeige(
+      http.delete('/api/einsaetze/1/einheiten/10', () =>
+        HttpResponse.json({ error: 'Einheit ist disponiert' }, { status: 409 }),
+      ),
+    );
+    const aufloesen = await screen.findByRole('region', { name: 'Einheit auflösen' });
+    await userEvent.click(within(aufloesen).getByRole('button', { name: 'Einheit auflösen' }));
+    const blase = await screen.findByRole('tooltip');
+    await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
+
+    expect(await within(aufloesen).findByRole('alert')).toHaveTextContent('Einheit ist disponiert');
+    expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
 });
 
 /**
- * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Speichern und
- * Auflösen melden am Paneel „Kopfdaten“, Zuordnen am Paneel der Zuordnung, Entfernen und
- * „Als Einheitsführer“ an der Zeile. Kein Fehler-Toast.
+ * Fehler am Ort (LFH-1077, design.md D13): Kopfzeilen an der Zeile, Zuordnen am Paneel der
+ * Zuordnung, „Aus Einheit lösen“ und „Als Einheitsführer“ an der Personzeile. Kein Fehler-Toast.
  */
-describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
-  const paneel = (titel: string) => screen.getByRole('region', { name: titel });
-  const zeileVon = (text: string) =>
-    screen
-      .getByText(text, { exact: false })
-      .closest('[data-lfh="einheit-zuordnung"]') as HTMLElement;
+describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
   const mitMitgliedern = [
     {
       ...einheiten[0],
@@ -432,58 +578,17 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     };
   }
 
-  async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: string) {
-    await oeffneAuswahl(container, platzhalter);
-    await userEvent.click(
-      await screen.findByText(
-        (_, el) =>
-          typeof el?.className === 'string' &&
-          el.className.includes('ant-select-item-option-content') &&
-          el.textContent === eintrag,
-      ),
-    );
-  }
-
-  it('Speichern: der Grund steht am Paneel „Kopfdaten“, kein Toast', async () => {
-    server.use(
-      http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Name bereits vergeben', 422)),
-      ...handlers(),
-    );
-    rendere();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+  it('Kopfzeile abgelehnt: der Grund steht an der Zeile, die Eingabe bleibt, kein Toast', async () => {
+    zeige(http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Name bereits vergeben', 422)));
+    await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Name' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '2. Zug{Enter}');
 
     expect(await within(paneel('Kopfdaten')).findByRole('alert')).toHaveTextContent(
       'Name bereits vergeben',
     );
-    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
-  });
-
-  it('Speichern: das nächste Speichern räumt den Grund', async () => {
-    server.use(
-      http.patch('/api/einsaetze/1/einheiten/10', erstAblehnenDannWarten('Name bereits vergeben')),
-      ...handlers(),
-    );
-    rendere();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await within(paneel('Kopfdaten')).findByRole('alert');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull());
-  });
-
-  it('Auflösen: der Grund steht am Paneel „Kopfdaten“, kein Toast', async () => {
-    server.use(
-      http.delete('/api/einsaetze/1/einheiten/10', abgelehnt('Einheit ist disponiert')),
-      ...handlers(),
-    );
-    rendere();
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
-    const blase = await screen.findByRole('tooltip');
-    await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
-
-    expect(await within(paneel('Kopfdaten')).findByRole('alert')).toHaveTextContent(
-      'Einheit ist disponiert',
-    );
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('2. Zug');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
@@ -514,8 +619,8 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
   });
 
   /**
-   * Wie beim Entfernen: `personalZu.error` kennte nur die zweite, noch laufende Zuordnung; die
-   * Ablehnung der ersten ginge verloren.
+   * `personalZu.error` kennte nur die zweite, noch laufende Zuordnung; die Ablehnung der ersten
+   * ginge verloren.
    */
   it('Zuordnen: zwei Zuordnungen nebenläufig, die späte Ablehnung der ersten steht am Paneel', async () => {
     let lehneAb: () => void = () => {};
@@ -550,8 +655,11 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
+  /**
+   * Der Inhalt hängt an `key={einheitId}` (D13): der Wechsel baut ihn neu. Ohne den Schlüssel
+   * stünden die offene Zeile samt Grund und der Grund am Paneel noch an der nächsten Einheit.
+   */
   it('Wechsel zu einer anderen Einheit: die Gründe der vorigen bleiben nicht stehen', async () => {
-    /** Die Route hat keinen `key`: dieselbe Seite zeigt nach dem Wechsel die nächste Einheit. */
     function Wechsel() {
       const navigate = useNavigate();
       return (
@@ -567,7 +675,7 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
       http.get('/api/einsaetze/1/personal', () =>
         HttpResponse.json([{ id: 5, name: 'Erika Frei', einheit_id: null }]),
       ),
-      http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Name bereits vergeben', 422)),
+      http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Rufname bereits vergeben', 422)),
       http.put('/api/einsaetze/1/einheiten/10/personal/:epId', abgelehnt('Person ist gebunden')),
       ...handlers(),
     );
@@ -581,7 +689,8 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
       { route: '/einsaetze/1/einheiten/10' },
     );
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Funkrufname eintragen' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funkrufname' }), 'Heros{Enter}');
     await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
     await within(paneel('Kopfdaten')).findByRole('alert');
     await within(paneel('Personal')).findByRole('alert');
@@ -589,14 +698,15 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Einheit' }));
     await screen.findByRole('heading', { name: '2. Zug', level: 1 });
     expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+    expect(within(paneel('Kopfdaten')).queryByRole('textbox')).toBeNull();
     expect(within(paneel('Personal')).queryByRole('alert')).toBeNull();
   });
 
   /**
-   * `useMutation` verfolgt nur den LETZTEN Aufruf: entfernt man Zeile 2, bevor Zeile 1 geantwortet
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: löst man Zeile 2, bevor Zeile 1 geantwortet
    * hat, ginge die Ablehnung von Zeile 1 über `mutation.error` verloren.
    */
-  it('Entfernen: zwei Zeilen nebenläufig, die Ablehnung steht an ihrer Zeile', async () => {
+  it('Aus Einheit lösen: zwei Zeilen nebenläufig, die Ablehnung steht an ihrer Zeile', async () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     zeige(
@@ -611,9 +721,11 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     await screen.findByText('Max Mustermann', { exact: false });
     await userEvent.click(
-      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Entfernen' }),
+      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Aus Einheit lösen' }),
     );
-    await userEvent.click(within(zeileVon('Uwe Unter')).getByRole('button', { name: 'Entfernen' }));
+    await userEvent.click(
+      within(zeileVon('Uwe Unter')).getByRole('button', { name: 'Aus Einheit lösen' }),
+    );
     lehneAb();
 
     expect(
@@ -641,6 +753,7 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     ).toHaveAttribute('data-fehler');
     expect(zeileVon('Uwe Unter').querySelector('[data-fehler]')).toBeNull();
     expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
     await userEvent.click(knopf());
     await waitFor(() =>
@@ -648,7 +761,7 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
   });
 
-  it('Fahrzeug und Material entfernen: der Grund steht an ihrer Zeile', async () => {
+  it('Fahrzeug und Material aus der Einheit lösen: der Grund steht an ihrer Zeile', async () => {
     zeige(
       mitglieder(),
       http.delete(
@@ -658,9 +771,11 @@ describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
       http.delete('/api/einsaetze/1/einheiten/10/material/40', abgelehnt('Material ist verliehen')),
     );
     await screen.findByText('FW 1/44-1');
-    await userEvent.click(within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Entfernen' }));
     await userEvent.click(
-      within(zeileVon('Tragkraftspritze')).getByRole('button', { name: 'Entfernen' }),
+      within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
+    );
+    await userEvent.click(
+      within(zeileVon('Tragkraftspritze')).getByRole('button', { name: 'Aus Einheit lösen' }),
     );
 
     expect(
@@ -698,19 +813,19 @@ describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {
         }),
       ),
     );
-    const paneel = await screen.findByRole('region', { name: 'Zeitachse' });
+    const zeitachse = await screen.findByRole('region', { name: 'Zeitachse' });
     await waitFor(() =>
-      expect(paneel.querySelectorAll('[data-lfh="zeitachse-ereignis"]')).toHaveLength(1),
+      expect(zeitachse.querySelectorAll('[data-lfh="zeitachse-ereignis"]')).toHaveLength(1),
     );
-    expect(paneel).toHaveTextContent(/seit Eintreffen/);
-    expect(within(paneel).getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
+    expect(zeitachse).toHaveTextContent(/seit Eintreffen/);
+    expect(within(zeitachse).getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
   });
 
   it('Leserolle: Grund genannt, Nachtragen gesperrt sichtbar', async () => {
     server.use(...handlers('beobachter'));
     rendere();
-    const paneel = await screen.findByRole('region', { name: 'Zeitachse' });
-    expect(within(paneel).getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
-    expect(paneel).toHaveTextContent(/Schreibrecht/);
+    const zeitachse = await screen.findByRole('region', { name: 'Zeitachse' });
+    expect(within(zeitachse).getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
+    expect(zeitachse).toHaveTextContent(/Schreibrecht/);
   });
 });
