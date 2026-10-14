@@ -120,6 +120,10 @@ describe('IconRail', () => {
     expect(spalte.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
     expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-rahmen-oben, 0px))');
     expect(spalte.style.overflowY).toBe('auto');
+    // Der Fokusabstand zum Fuß hängt am Scrollport der Spalte, nicht an den Zielen (LLH-1241).
+    expect(spalte.style.getPropertyValue('scroll-padding-block-end')).toBe(
+      'var(--lfh-fuss-fokusabstand, 0px)',
+    );
     const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
     expect(haupt.style.position).toBe('');
     expect(spalte.querySelector('[data-lfh="rail-fuss"]')).not.toBeNull();

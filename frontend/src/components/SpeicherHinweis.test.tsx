@@ -62,6 +62,12 @@ describe('RechteHinweis', () => {
     expect(document.querySelector('.ant-alert')).toBeNull();
   });
 
+  it('trägt eine eigene Marke statt „Nur Ansicht“, wenn ein Teil fehlt (LLH-1036 D5)', () => {
+    render(<RechteHinweis sichtbar marke="Ohne Besatzung" text="Modul Personal gesperrt" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Ohne Besatzung Modul Personal gesperrt');
+    expect(screen.queryByText('Nur Ansicht')).toBeNull();
+  });
+
   it('schweigt bei vorhandener Berechtigung', () => {
     const { container } = render(<RechteHinweis sichtbar={false} text="egal" />);
     expect(container).toBeEmptyDOMElement();

@@ -4,7 +4,9 @@
 Die Ansicht einer Einheit im Einsatz (`/einsaetze/:id/einheiten/:einheitId`) zeigt ihre Angaben
 als Werte und lässt jede an ihrer Zeile bearbeiten, ohne Formular und Speichern-Leiste; ein
 Speichern schickt genau die geänderte Angabe. Dazu gehören Kopf mit Stärke, Urteil und Status,
-das taktische Zeichen und das abgesetzte Auflösen (LLH-1036).
+das taktische Zeichen und das abgesetzte Auflösen (LLH-1036 Teil I), die Fahrzeuge mit ihrer
+Besatzung, die Aktionen je Person über ein Menü und das Zuordnen aus Einsatz oder Stamm
+(LLH-1036 Teil II).
 
 ## Requirements
 
@@ -109,6 +111,110 @@ tragen.
 - **WHEN** die Organisation der Einheit leer ist und die Vorgabe der Organisation „Feuerwehr“ lautet
 - **THEN** zeigt die Zeile „Vorgabe der Organisation: Feuerwehr“, und das Zeichen im Kopf trägt
   die Organisation Feuerwehr
+
+### Requirement: Fahrzeuge mit ihrer Besatzung
+Die Ansicht SHALL die Fahrzeuge der Einheit mit taktischem Zeichen, Funkrufname, Typ, FMS-Status
+und Besatzung Ist/Soll mit Wort zeigen und unter jedem Fahrzeug die Personen der Einheit, die
+darauf sitzen, mit den Marken EF, F, UF und M in dieser Reihenfolge. Die Rechnung MUST dieselbe
+sein wie im Meldebild.
+
+#### Scenario: Besatzung je Fahrzeug
+- **WHEN** eine Einheit die Fahrzeuge „83-1“ mit drei Personen und „83-2“ ohne Besatzung hat und
+  eine weitere Person ohne Fahrzeug
+- **THEN** stehen die drei Personen unter 83-1, 83-2 ohne Personen und die weitere Person unter
+  „Ohne Fahrzeug“
+
+### Requirement: Personal ohne Fahrzeug
+Hat die Einheit Fahrzeuge, MUST ihr Personal ohne Fahrzeug unter „Ohne Fahrzeug“ stehen; sitzt
+eine Person auf dem Fahrzeug einer anderen Einheit, MUST sie dort mit „fährt auf <Funkrufname>“
+stehen. Hat die Einheit kein Fahrzeug, MUST ihr Personal ohne Zwischenebene stehen.
+
+#### Scenario: Einheit ohne Fahrzeug
+- **WHEN** eine Einheit ohne Fahrzeug drei Personen hat
+- **THEN** stehen die drei Personen direkt in der Einheit, ohne Gruppe „Ohne Fahrzeug“
+
+#### Scenario: Person auf fremdem Fahrzeug
+- **WHEN** eine Person der Einheit auf einem Fahrzeug einer anderen Einheit sitzt
+- **THEN** steht sie unter „Ohne Fahrzeug“ mit „fährt auf“ und dem Funkrufnamen dieses Fahrzeugs
+
+### Requirement: Besatzung nur mit Freigabe Personal und Fahrzeuge
+Fehlt der Person die Freigabe des Moduls Personal oder des Moduls Fahrzeuge, MUST die Ansicht die
+Besatzung nicht zeigen. Sie MUST dann die Fahrzeuge der Einheit und ihre Mitglieder ohne
+Zuordnung zu Fahrzeugen zeigen und das gesperrte Modul in wenigen Wörtern nennen. Die Ansicht
+MUST für ein gesperrtes Modul keine Liste abfragen und keinen Link in dieses Modul zeigen.
+
+#### Scenario: Personal gesperrt
+- **WHEN** eine Person ohne Freigabe Personal eine Einheit mit zwei Fahrzeugen und fünf
+  Mitgliedern öffnet
+- **THEN** stehen die zwei Fahrzeuge und die fünf Mitglieder ohne Besatzungszuordnung da, mit dem
+  Hinweis „Ohne Besatzung · Modul Personal gesperrt“, und kein Name verlinkt ins Modul Personal
+
+### Requirement: Aktionen je Person über ein Menü
+Jede Person der Einheit SHALL ihre Aktionen über genau einen Menü-Auslöser anbieten, der ihren
+Namen trägt: „Als Einheitsführer“ (nicht beim Einheitsführer selbst), je anderem Fahrzeug der
+Einheit „Auf <Funkrufname>“, dann
+nach einem Trenner rot „Vom Fahrzeug lösen“ (nur wer auf einem Fahrzeug sitzt) und rot „Aus
+Einheit lösen“. Lösen MUST ohne Rückfrage wirken, und „Aus Einheit lösen“ MUST die Person im
+Einsatz lassen.
+
+#### Scenario: Person auf ein Fahrzeug setzen
+- **WHEN** eine Person mit Schreibrecht im Menü einer Person ohne Fahrzeug „Auf 83-1“ wählt
+- **THEN** steht die Person danach unter 83-1, und das ETB erhält wie bisher einen
+  Besatzungs-Eintrag
+
+### Requirement: Menüeinträge nach Modulrecht
+Die Einträge „Auf <Funkrufname>“ und „Vom Fahrzeug lösen“ MUST nur mit Schreibrecht im Modul
+Fahrzeuge und sichtbarer Besatzung erscheinen, „Als Einheitsführer“ und „Aus Einheit lösen“ nur mit Schreibrecht im Modul
+Einheiten. Bleibt kein Eintrag, MUST der Auslöser fehlen.
+
+#### Scenario: Ohne Recht auf Fahrzeuge
+- **WHEN** eine Rolle ohne Zugriff auf das Modul Fahrzeuge das Menü einer Person öffnet
+- **THEN** fehlen „Auf …“ und „Vom Fahrzeug lösen“, und „Als Einheitsführer“ und „Aus Einheit
+  lösen“ stehen da
+
+### Requirement: Person und Fahrzeug aus Einsatz oder Stamm zuordnen
+Die Auswahl „Person zuordnen …“ SHALL disponierte Personen ohne Einheit unter „Im Einsatz frei“
+und Stamm-Personen im Dienst, die weder aktiv disponiert noch aus dem Einsatz entlassen sind,
+unter „Aus dem Stamm“ anbieten,
+Demo-Stammdaten als eigene Gruppe dahinter. „Fahrzeug zuordnen …“ SHALL dasselbe für Fahrzeuge
+tun. Die Gruppe „Aus dem Stamm“ MUST nur mit Schreibrecht im Modul der Kraft erscheinen.
+
+#### Scenario: Stamm ohne Recht auf Personal
+- **WHEN** eine Rolle mit Schreibrecht im Modul Einheiten, aber ohne Zugriff auf das Modul
+  Personal „Person zuordnen …“ öffnen will
+- **THEN** bietet die Ansicht keine Gruppe „Aus dem Stamm“ an
+
+### Requirement: Stamm-Eintrag in einem Schritt
+Ein Stamm-Eintrag MUST die Kraft in einer Anfrage über die Sammel-Disposition disponieren und
+der Einheit zuordnen, alles oder nichts. Lehnt der Server ab, MUST der Grund der Kraft unter der
+Auswahl stehen, und nichts ist angelegt.
+
+#### Scenario: Person aus dem Stamm
+- **WHEN** eine Person mit Schreibrecht in „Person zuordnen …“ unter „Aus dem Stamm“ „Erika
+  Muster“ wählt
+- **THEN** ist Erika Muster disponiert, mit Initialstatus in der Zeitachse, und steht in der
+  Einheit
+
+#### Scenario: Stamm-Person außer Dienst
+- **WHEN** die gewählte Stamm-Person inzwischen außer Dienst steht
+- **THEN** steht unter der Auswahl „Nicht zugeordnet“ mit dem Grund „außer Dienst“, kein Toast
+  erscheint, und die Person ist nicht disponiert
+
+#### Scenario: Fahrzeug aus dem Stamm
+- **WHEN** eine Person mit Schreibrecht in „Fahrzeug zuordnen …“ unter „Aus dem Stamm“ ein
+  Fahrzeug wählt
+- **THEN** ist das Fahrzeug disponiert und steht in der Einheit
+
+### Requirement: Ohne Schreibrecht nur die Ansicht
+Ohne Schreibrecht im Einsatz (Beobachter, abgeschlossener Einsatz) MUST keine Angabe eine
+Bearbeiten- oder Eintragen-Aufforderung tragen, und es MUST weder Menüs noch Lösen-Knöpfe noch
+Zuordnen-Auswahl noch den Abschnitt „Einheit auflösen“ geben. Status und FMS-Status MUST als Wort
+stehen, leere Angaben als „—“.
+
+#### Scenario: Beobachter
+- **WHEN** eine beobachtende Person eine Einheit öffnet
+- **THEN** zeigt die Ansicht Angaben, Besatzung und Zeitachse ohne jedes Bedienelement außer
+  Links
 
 ### Requirement: Auflösen abgesetzt und rückgefragt
 Mit Schreibrecht SHALL die Ansicht „Einheit auflösen“ als letzten Abschnitt der Seite anbieten,
