@@ -79,12 +79,74 @@ export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: 
   });
 }
 
+/**
+ * Die Bedienziele der Zuordnungen (LLH-1036 Teil II): im Paneel „Fahrzeuge und Besatzung“ das
+ * Menü der Person, die FMS-Wahl und „Aus Einheit lösen“ des Fahrzeugs und die beiden
+ * Auswahlfelder, im Paneel „Material“ Lösen und Auswahl. `reihen` sind die Nachbarn auf einer
+ * Zeile, `stapel` je Paneel die letzte Zeilenaktion über dem ersten Auswahlfeld.
+ */
+export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug: string }) {
+  const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
+  const material = zuordnungsKarte(page, 'Material');
+  const fahrzeugZeile = besatzung.getByRole('group', { name: `Fahrzeug ${namen.fahrzeug}` });
+  const fmsStatus = fahrzeugZeile.getByRole('button', {
+    name: `Status von ${namen.fahrzeug} ändern`,
+  });
+  const fahrzeugLoesen = fahrzeugZeile.getByRole('button', {
+    name: 'Aus Einheit lösen',
+    exact: true,
+  });
+  const personMenue = besatzung.getByRole('button', {
+    name: `Aktionen zu Person ${namen.personal}`,
+  });
+  const personZuordnen = besatzung.getByRole('combobox', { name: 'Person zuordnen' });
+  const fahrzeugZuordnen = besatzung.getByRole('combobox', { name: 'Fahrzeug zuordnen' });
+  const materialLoesen = material.getByRole('button', { name: 'Aus Einheit lösen', exact: true });
+  const materialZuordnen = material.getByRole('combobox', { name: 'Material zuordnen' });
+  /** Die Hülle des antd-Felds: sie ist das Bedienziel, nicht das innere Eingabefeld. */
+  const huelle = (feld: Locator) =>
+    feld.locator(
+      'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]',
+    );
+  return {
+    ziele: [
+      { name: 'Person: Aktionen', ziel: personMenue, fokus: personMenue },
+      { name: 'Fahrzeug: Status', ziel: fmsStatus, fokus: fmsStatus },
+      { name: 'Fahrzeug aus Einheit lösen', ziel: fahrzeugLoesen, fokus: fahrzeugLoesen },
+      { name: 'Person zuordnen', ziel: huelle(personZuordnen), fokus: personZuordnen },
+      { name: 'Fahrzeug zuordnen', ziel: huelle(fahrzeugZuordnen), fokus: fahrzeugZuordnen },
+      { name: 'Material aus Einheit lösen', ziel: materialLoesen, fokus: materialLoesen },
+      { name: 'Material zuordnen', ziel: huelle(materialZuordnen), fokus: materialZuordnen },
+    ],
+    zeilen: [
+      { name: 'Fahrzeugzeile', zeile: besatzung.locator('[data-lfh="einheit-fahrzeug"]') },
+      { name: 'Personenzeile', zeile: besatzung.locator('[data-lfh="einheit-person"]') },
+      { name: 'Materialzeile', zeile: material.locator('[data-lfh="einheit-zuordnung"]') },
+    ],
+    reihen: [
+      [fmsStatus, fahrzeugLoesen],
+      [huelle(personZuordnen), huelle(fahrzeugZuordnen)],
+    ],
+    stapel: [
+      { name: 'Fahrzeuge und Besatzung', aktion: personMenue, auswahl: huelle(personZuordnen) },
+      { name: 'Material', aktion: materialLoesen, auswahl: huelle(materialZuordnen) },
+    ],
+  };
+}
+
 export async function detailBereit(page: Page) {
   await expect(page.getByRole('heading', { name: 'Messzug 446', exact: true })).toBeVisible();
   await expect(zeilenAusloeser(page, 'Name')).toHaveAccessibleDescription('Messzug 446');
-  for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
-    await expect(
-      zuordnungsKarte(page, titel).getByRole('button', { name: 'Aus Einheit lösen', exact: true }),
-    ).toHaveCount(1);
-  }
+  // Datenanker: die Besatzung steht erst, wenn Personal- und Fahrzeugliste geladen sind.
+  const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
+  await expect(besatzung.getByRole('group', { name: 'Fahrzeug Florian 446' })).toBeVisible();
+  await expect(
+    besatzung.getByRole('button', { name: 'Aktionen zu Person Messperson 446' }),
+  ).toHaveCount(1);
+  await expect(
+    zuordnungsKarte(page, 'Material').getByRole('button', {
+      name: 'Aus Einheit lösen',
+      exact: true,
+    }),
+  ).toHaveCount(1);
 }
