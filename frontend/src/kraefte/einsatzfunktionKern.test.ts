@@ -48,7 +48,7 @@ describe('einsatzfunktionVorschlaege (D1)', () => {
     });
     expect(v[0]).toBe('Lotse');
     expect(v.slice(1, 1 + EINSATZFUNKTION_VORGABEN.length)).toEqual([...EINSATZFUNKTION_VORGABEN]);
-    expect(v.at(-1)).toBe('Notfallsanitäter');
+    expect(v[v.length - 1]).toBe('Notfallsanitäter');
   });
 
   it('enthält die Vorgaben nach FwDV 3/100', () => {

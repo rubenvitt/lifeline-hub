@@ -75,6 +75,7 @@ function render(liste = [ep, zweite]) {
       ]),
     ),
     http.get('/api/personal', () => HttpResponse.json([stamm])),
+    http.get('/api/qualifikationen', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
