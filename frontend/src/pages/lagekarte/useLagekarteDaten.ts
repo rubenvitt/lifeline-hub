@@ -329,10 +329,13 @@ export function useLagekarteDaten({
   );
 
   const { verortet: basisVerortet, nichtVerortet: basisNichtVerortet } = useMemo(
-    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token),
-    [einsatz, uhsRoh, schaedenRoh, token],
+    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token, orgDefault),
+    [einsatz, uhsRoh, schaedenRoh, token, orgDefault],
   );
-  const stellen = useMemo(() => baueBetreuungMarker(stellenRoh ?? [], token), [stellenRoh, token]);
+  const stellen = useMemo(
+    () => baueBetreuungMarker(stellenRoh ?? [], token, orgDefault),
+    [stellenRoh, token, orgDefault],
+  );
   const fuehrungsstelleMarker = useMemo(
     () => baueFuehrungsstelleMarker(fuehrungsstelleRoh, token),
     [fuehrungsstelleRoh, token],

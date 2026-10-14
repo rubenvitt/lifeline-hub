@@ -127,14 +127,12 @@ const ANNAHME: Record<string, readonly Merkmal[]> = {
 };
 
 // Grundzeichen → Körper; `null` heißt „Kein Grundzeichen“ (nur ein freistehendes Symbol). Die
-// Fachobjekt-Tabelle gilt mit, nur die Stelle steht hier in der gespeicherten Organisation statt
-// fest in der Hilfsorganisation. Näherungen (D5): Befehlsstelle als Formation in Führung und
+// Fachobjekt-Tabelle gilt mit. Näherungen (D5): Befehlsstelle als Formation in Führung und
 // Leitung (LFH-1293), Behälter-Familie ohne Aufbau (LFH-831), Zweiräder als Landfahrzeug
 // (LFH-1298).
 const GRUNDZEICHEN: Record<string, Teil | null> = {
   ...KOERPER,
   ohne: null,
-  stelle: { kind: 'circle-12' },
   'ortsfeste-stelle': { kind: 'circle-12', bodyVariant: 'raised-gable' },
   gebaeude: { kind: 'building' },
   fahrzeug: { kind: 'vehicle-land' },

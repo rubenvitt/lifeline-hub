@@ -291,16 +291,24 @@ const UHS_TZ: Record<UhsTyp, TzProps> = {
   sonstige: { grundzeichen: 'stelle', fachaufgabe: 'rettungswesen' },
 };
 
-/** Unfallhilfsstelle: Grundzeichen „stelle" + Overlay nach UhsTyp. */
-export function uhsTz(typ: UhsTyp): TzProps {
-  return UHS_TZ[typ];
+/**
+ * Organisation des Betreibers einer Stelle (LLH-1161): die Organisations-Vorgabe des Hubs, denn UHS
+ * und Betreuungsstelle tragen keine eigene. Ohne Vorgabe steht die Stelle neutral.
+ */
+function betreiber(organisation: string | null | undefined): Pick<TzProps, 'organisation'> {
+  return organisation ? { organisation: organisation as OrganisationId } : {};
+}
+
+/** Unfallhilfsstelle: Grundzeichen „stelle" + Overlay nach UhsTyp, Organisation des Betreibers. */
+export function uhsTz(typ: UhsTyp, organisation?: string | null): TzProps {
+  return { ...UHS_TZ[typ], ...betreiber(organisation) };
 }
 
 /**
  * Betreuungsstelle: Grundzeichen „stelle" + Fachaufgabe „betreuung" nach DV 102, für alle vier
  * Einrichtungsstufen dasselbe (der Katalog kennt keine Variante je Stufe) — die Art steht in der
- * Unterzeile des Inspectors.
+ * Unterzeile des Inspectors. Organisation wie bei der UHS.
  */
-export function betreuungsstelleTz(): TzProps {
-  return { grundzeichen: 'stelle', fachaufgabe: 'betreuung' };
+export function betreuungsstelleTz(organisation?: string | null): TzProps {
+  return { grundzeichen: 'stelle', fachaufgabe: 'betreuung', ...betreiber(organisation) };
 }

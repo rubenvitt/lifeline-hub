@@ -159,6 +159,7 @@ export function baueMarker(
   uhsListe: Uhs[],
   schaeden: readonly SchadenMarker[],
   token: GlobalToken,
+  orgDefault: string | null = null,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];
   const nichtVerortet: NichtVerortet[] = [];
@@ -187,7 +188,7 @@ export function baueMarker(
         lon: u.lon,
         label: u.bezeichnung,
         farbe: rollenFarbe(UHS_ROLLE, token),
-        tz: uhsTz(u.typ),
+        tz: uhsTz(u.typ, orgDefault),
         trefferDurchmesser: token.controlHeight,
       });
     } else {
@@ -230,6 +231,7 @@ export function baueMarker(
 export function baueBetreuungMarker(
   stellen: readonly Betreuungsstelle[],
   token: GlobalToken,
+  orgDefault: string | null = null,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];
   const nichtVerortet: NichtVerortet[] = [];
@@ -244,7 +246,7 @@ export function baueBetreuungMarker(
         lon: s.lon,
         label: s.bezeichnung,
         farbe: rollenFarbe(UHS_ROLLE, token),
-        tz: betreuungsstelleTz(),
+        tz: betreuungsstelleTz(orgDefault),
         trefferDurchmesser: token.controlHeight,
       });
     } else {
