@@ -13,9 +13,9 @@ use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, pflicht, pruefe_koordinate, trimme, trimme_tri,
+    deserialize_optional_field, parse_flag, pflicht, pruefe_koordinate, trimme, trimme_tri,
 };
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -27,14 +27,29 @@ pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
 }
 
-/// GET /api/einsaetze/{id}/fahrzeuge — disponierte Fahrzeuge (aufgelöst). Nur Mitglieder/höhere Berechtigung.
+#[derive(Debug, Deserialize)]
+pub struct ListeParams {
+    /// `1` = statt der aktiven die entlassenen Fahrzeuge (LLH-1079, Nachweis).
+    #[serde(default)]
+    entlassene: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/fahrzeuge — aktive Fahrzeuge (aufgelöst), mit `?entlassene=1` die
+/// entlassenen (Spec `kraefte-entlassung`). Stornierte liefert keine der beiden. Nur
+/// Mitglieder/höhere Berechtigung.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Fahrzeuge>,
+    Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<EinsatzFahrzeugAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let aktiv = ctx.einsatz.ist_aktiv();
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
+        if parse_flag(params.entlassene.as_deref(), "entlassene")? {
+            disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
+        } else {
+            disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
+        },
     ))
 }
 
@@ -101,7 +116,8 @@ pub async fn disponieren(
     // für ETB-Text UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
-        let ef_id = match &vorbereitet {
+        let disponiert = match &vorbereitet {
+            // Ein entlassenes oder storniertes Fahrzeug wird wieder aufgenommen (LLH-1079, D7).
             Vorbereitet::Stamm(fahrzeug_id) => {
                 disposition_repo::disponiere_stamm_tx(
                     conn,
@@ -118,32 +134,33 @@ pub async fn disponieren(
                 kennzeichen,
                 opta,
                 traegerorganisation,
-            } => {
-                disposition_repo::disponiere_adhoc_tx(
-                    conn,
-                    einsatz_id,
-                    ctx.einsatz.org_id,
-                    AdhocDaten {
-                        funkrufname: funkrufname.as_str(),
-                        fahrzeugtyp: fahrzeugtyp.as_deref(),
-                        kennzeichen: kennzeichen.as_deref(),
-                        opta: opta.as_deref(),
-                        traegerorganisation: traegerorganisation.as_deref(),
-                    },
-                    ctx.benutzer.id,
-                )
-                .await?
-            }
+            } => disposition_repo::disponiere_adhoc_tx(
+                conn,
+                einsatz_id,
+                ctx.einsatz.org_id,
+                AdhocDaten {
+                    funkrufname: funkrufname.as_str(),
+                    fahrzeugtyp: fahrzeugtyp.as_deref(),
+                    kennzeichen: kennzeichen.as_deref(),
+                    opta: opta.as_deref(),
+                    traegerorganisation: traegerorganisation.as_deref(),
+                },
+                ctx.benutzer.id,
+            )
+            .await
+            .map(|id| crate::entlassung::Disponiert {
+                id,
+                reaktiviert: false,
+            })?,
         };
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::fahrzeug::etb_text_disponiert(&anzeige.funkrufname),
-        )
-        .await?;
+        let anzeige =
+            disposition_repo::laden_anzeige_tx(conn, einsatz_id, disponiert.id, true).await?;
+        let text = if disponiert.reaktiviert {
+            crate::fahrzeug::etb_text_erneut_disponiert(&anzeige.funkrufname)
+        } else {
+            crate::fahrzeug::etb_text_disponiert(&anzeige.funkrufname)
+        };
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(anzeige)
     })?;
     sse_fahrzeug(&state, einsatz_id, anzeige.id);
@@ -304,48 +321,123 @@ pub async fn aktualisieren(
     Ok(Json(nachher))
 }
 
-/// DELETE /api/einsaetze/{id}/fahrzeuge/{ef_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
-pub async fn entfernen(
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,
+/// Spec `kraefte-entlassung`): die Zeile bleibt, Besatzung, Einheit, Bereitstellungsraum und
+/// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage, der Rückweg ist
+/// `…/reaktivieren`. Schreibt ETB-Eintrag; ein beendetes Fahrzeug → 409. Liefert das entlassene
+/// Fahrzeug.
+pub async fn entlassen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    // F06/LFH-244 Tier-A: Bindungen lösen, Austritt, Endzustand und System-ETB atomar in EINER
+    // Tx. Was das Fahrzeug außerhalb des Fahrzeugmoduls trug, liefert `entlassen_tx`; SSE erst
+    // nach dem Commit.
+    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let ergebnis =
+            disposition_repo::entlassen_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt)
+                .await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_entlassen(
+                &vorher.funkrufname,
+                ergebnis.einheit.as_ref().map(|(_, name)| name.as_str()),
+            ),
+        )
+        .await?;
+        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        Ok((ergebnis, anzeige))
+    })?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    // Die Zuordnung an der Führungsstelle ist gelöscht (LFH-1106): deren Leser hängen am
+    // Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
+    // nicht: die Einheit verliert ein Mitglied, die Besatzung ihr Fahrzeug. Das Detail des
+    // Bereitstellungsraums listet seine Fahrzeuge und hängt nur an `bereitstellungsraum`
+    // (LLH-1182).
+    if ergebnis.trug_fuehrungsstelle {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    if let Some(br_id) = ergebnis.br_id {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+    }
+    if let Some((einheit_id, _)) = ergebnis.einheit {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    for ep_id in ergebnis.besatzung {
+        sse_personal(&state, einsatz_id, ep_id);
+    }
+    Ok(Json(anzeige))
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren — Fehldisposition stornieren (LLH-1079,
+/// design.md D3): nur mit unverändertem Status, ohne Bindung und Spur und in den ersten
+/// 15 Minuten, sonst 422 mit dem Grund; ein beendetes Fahrzeug → 409. ETB-Eintrag.
+pub async fn stornieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
-    // F06/LFH-244 Tier-A: Besatzungs-Freigabe + DELETE + System-ETB atomar in EINER Tx.
-    // Der ETB-Text ist aus dem Vorlade-`anzeige` (funkrufname) VOR der Tx berechenbar.
-    let text = format!(
-        "Fahrzeug «{}» aus dem Einsatz entfernt",
-        anzeige.funkrufname
-    );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (trug_fuehrungsstelle, entfernt, besatzung) = crate::write_retry!(&state.pool, |conn| {
-        let trug = crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
-        let entfernt = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        let besatzung = besatzung_repo::load_besatzung_tx(conn, einsatz_id, ef_id).await?;
-        disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok((trug, entfernt, besatzung))
+    let jetzt = crate::zeit::jetzt();
+    crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        disposition_repo::stornieren_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_storniert(&vorher.funkrufname),
+        )
+        .await?;
+        Ok(())
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
-    // Die Kaskade hat die Zuordnung an der Führungsstelle gelöst (LFH-1106): deren Leser hängen
-    // am Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
-    // nicht: die Einheit verliert ein Mitglied, die Besatzung ihr Fahrzeug. Das Detail des
-    // Bereitstellungsraums listet seine Fahrzeuge und hängt nur an `bereitstellungsraum`
-    // (LLH-1182).
-    if trug_fuehrungsstelle {
-        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
-    }
-    if let Some(br_id) = entfernt.aktueller_br_id {
-        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
-    }
-    if let Some(einheit_id) = entfernt.einheit_id {
-        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
-    }
-    for ep_id in besatzung {
-        sse_personal(&state, einsatz_id, ep_id);
-    }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/reaktivieren — ein entlassenes oder storniertes
+/// Fahrzeug erneut disponieren (LLH-1079, design.md D7): Block „Entlassen“ (auch für Ad-hoc) und
+/// Rückgängig nach dem Entlassen. Initialstatus neu. Aktiv → 409. ETB-Eintrag.
+pub async fn reaktivieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::reaktivieren_tx(
+            conn,
+            einsatz_id,
+            ctx.einsatz.org_id,
+            ef_id,
+            ctx.benutzer.id,
+        )
+        .await?;
+        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_erneut_disponiert(&anzeige.funkrufname),
+        )
+        .await?;
+        Ok(anzeige)
+    })?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    Ok(Json(anzeige))
 }
 
 /// PUT /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id} — Kraft als Besatzung

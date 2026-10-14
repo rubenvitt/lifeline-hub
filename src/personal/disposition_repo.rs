@@ -4,6 +4,9 @@ use crate::error::AppError;
 use crate::katalog::{StatusKategorie, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
 use sqlx::{SqliteConnection, SqlitePool};
 
+/// Ergebnis einer Disposition (LLH-1079, design.md D7); geteilt mit dem Fahrzeug.
+pub use crate::entlassung::Disponiert;
+
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN personal), Live-Funktion (geordnete
 /// Subquery über aktive Qualifikationen, identisch zu `qualifikation_repo::funktion_text`) und
 /// Status. Live oder Snapshot wählt `zu_anzeige`. `ist_demo` liest die Demo-Marke der
@@ -219,14 +222,6 @@ pub async fn load_anzeige_tx(
     .await?
     .ok_or(AppError::NotFound)?;
     Ok(zu_anzeige(row, einsatz_aktiv))
-}
-
-/// Ergebnis einer Disposition: die Zeile und ob sie eine beendete Zeile derselben Stamm-Person
-/// wieder aufgenommen hat (LLH-1079, design.md D7). Der Aufrufer wählt danach den ETB-Text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Disponiert {
-    pub id: i64,
-    pub reaktiviert: bool,
 }
 
 /// Disponiert eine Stamm-Person: prüft Org und Dienststatus, friert den Identitäts-Snapshot ein

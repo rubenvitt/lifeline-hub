@@ -868,9 +868,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
             patch(routes::einsatz_fahrzeug::aktualisieren),
         )
+        // LLH-1079 Teil II: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
-            delete(routes::einsatz_fahrzeug::entfernen),
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen",
+            post(routes::einsatz_fahrzeug::entlassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren",
+            post(routes::einsatz_fahrzeug::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/reaktivieren",
+            post(routes::einsatz_fahrzeug::reaktivieren),
         )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
@@ -948,9 +957,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/material/{em_id}",
             patch(routes::einsatz_material::aktualisieren),
         )
+        // LLH-1079 Teil II: aus dem Einsatz nehmen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}",
-            delete(routes::einsatz_material::entfernen),
+            "/api/einsaetze/{id}/material/{em_id}/entlassen",
+            post(routes::einsatz_material::entlassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/stornieren",
+            post(routes::einsatz_material::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/reaktivieren",
+            post(routes::einsatz_material::reaktivieren),
         )
         .route(
             "/api/einsaetze/{id}/personen",

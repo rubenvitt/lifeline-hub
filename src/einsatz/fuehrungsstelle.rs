@@ -182,6 +182,10 @@ pub async fn pruefe_fahrzeuge(
             "Fahrzeug {id} ist diesem Einsatz nicht disponiert"
         )));
     }
+    // Ein entlassenes oder storniertes Fahrzeug trägt keine Führungsstelle (409, LLH-1079).
+    for &id in ids {
+        crate::fahrzeug::disposition_repo::require_nicht_beendet(pool, einsatz_id, id).await?;
+    }
     Ok(())
 }
 

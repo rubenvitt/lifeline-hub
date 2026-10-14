@@ -64,7 +64,8 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
     .await?;
     let fahrzeuge = sqlx::query_as::<_, BrFahrzeugKurz>(
         "SELECT id, snap_funkrufname AS funkrufname \
-         FROM einsatz_fahrzeug WHERE aktueller_br_id = ? AND einsatz_id = ?",
+         FROM einsatz_fahrzeug \
+         WHERE aktueller_br_id = ? AND einsatz_id = ? AND beendet_at IS NULL",
     )
     .bind(br_id)
     .bind(einsatz_id)

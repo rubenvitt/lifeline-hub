@@ -177,6 +177,15 @@ pub struct EinsatzFahrzeugAnzeige {
     /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
+    /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
+    /// Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_von: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::entlassung::BeendetAls>)]
+    pub beendet_als: Option<String>,
 }
 
 #[cfg(test)]
@@ -257,9 +266,49 @@ pub fn etb_text_status_wechsel(funkrufname: &str, alt: Option<&str>, neu: Option
     )
 }
 
+/// System-ETB beim erneuten Disponieren eines entlassenen oder stornierten Fahrzeugs (LLH-1079,
+/// design.md D7).
+pub fn etb_text_erneut_disponiert(funkrufname: &str) -> String {
+    format!("Fahrzeug «{funkrufname}» erneut disponiert")
+}
+
+/// System-ETB beim Entlassen (LLH-1079, design.md D4): der Name der Einheit steht nur hier, die
+/// Zeile behält keinen eingefrorenen Einheitsbezug.
+pub fn etb_text_entlassen(funkrufname: &str, einheit: Option<&str>) -> String {
+    match einheit {
+        Some(e) => format!("Fahrzeug «{funkrufname}» (Einheit «{e}») aus dem Einsatz entlassen"),
+        None => format!("Fahrzeug «{funkrufname}» aus dem Einsatz entlassen"),
+    }
+}
+
+/// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
+pub fn etb_text_storniert(funkrufname: &str) -> String {
+    format!("Fahrzeug «{funkrufname}» storniert (Fehldisposition)")
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn entlassen_storniert_erneut() {
+        assert_eq!(
+            etb_text_entlassen("Florian 1", Some("1. Zug")),
+            "Fahrzeug «Florian 1» (Einheit «1. Zug») aus dem Einsatz entlassen"
+        );
+        assert_eq!(
+            etb_text_entlassen("Florian 1", None),
+            "Fahrzeug «Florian 1» aus dem Einsatz entlassen"
+        );
+        assert_eq!(
+            etb_text_storniert("Florian 1"),
+            "Fahrzeug «Florian 1» storniert (Fehldisposition)"
+        );
+        assert_eq!(
+            etb_text_erneut_disponiert("Florian 1"),
+            "Fahrzeug «Florian 1» erneut disponiert"
+        );
+    }
 
     #[test]
     fn disponiert_und_status_wechsel() {

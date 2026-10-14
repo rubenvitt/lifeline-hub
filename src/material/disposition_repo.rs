@@ -1,4 +1,5 @@
 use super::{EinsatzMaterialAnzeige, MaterialStatus, DIENSTSTATUS_IN_DIENST};
+use crate::entlassung::BeendetAls;
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -9,6 +10,7 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT em.id, em.einsatz_id, em.material_id, em.einheit_id, em.uhs_id, em.menge, em.status, \
            em.snap_bezeichnung, em.snap_kategorie, em.snap_bestandsnummer, \
            em.snap_traegerorganisation, em.bemerkung, em.disponiert_at, em.disponiert_von, \
+           em.beendet_at, em.beendet_von, em.beendet_als, \
            m.bezeichnung AS live_bezeichnung, m.kategorie AS live_kategorie, \
            m.bestandsnummer AS live_bestandsnummer, m.traegerorganisation AS live_traegerorganisation, \
            m.dienststatus AS live_dienststatus, \
@@ -34,6 +36,9 @@ struct Row {
     bemerkung: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
+    beendet_at: Option<String>,
+    beendet_von: Option<i64>,
+    beendet_als: Option<String>,
     live_bezeichnung: Option<String>,
     live_kategorie: Option<String>,
     live_bestandsnummer: Option<String>,
@@ -85,6 +90,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
         ist_demo: row.ist_demo,
+        beendet_at: row.beendet_at,
+        beendet_von: row.beendet_von,
+        beendet_als: row.beendet_als,
     }
 }
 
@@ -98,14 +106,36 @@ pub struct AdhocDaten<'a> {
     pub traegerorganisation: Option<&'a str>,
 }
 
-/// Disponiertes Material eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit.
+/// Aktives Material eines Einsatzes (aufgelöst), sortiert nach Dispo-Zeit. Herausgenommenes
+/// und storniertes fehlt (LLH-1079, Spec `kraefte-entlassung`).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? ORDER BY em.disponiert_at, em.id"
+        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.beendet_at IS NULL \
+         ORDER BY em.disponiert_at, em.id"
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
+}
+
+/// Aus dem Einsatz genommenes Material (aufgelöst), zuletzt herausgenommenes zuerst — der
+/// Nachweis hinter `GET …/material?entlassene=1` (LLH-1079). Storniertes erscheint nie.
+pub async fn list_entlassene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.beendet_als = 'entlassen' \
+         ORDER BY em.beendet_at DESC, em.id DESC"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -164,32 +194,8 @@ pub async fn disponiere_stamm_tx(
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let snap = sqlx::query_as::<
-        _,
-        (
-            String,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            String,
-        ),
-    >(
-        "SELECT bezeichnung, kategorie, bestandsnummer, traegerorganisation, dienststatus \
-         FROM material WHERE id = ? AND org_id = ?",
-    )
-    .bind(material_id)
-    .bind(org_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-
-    let (bezeichnung, kategorie, bestandsnummer, traeger, dienststatus) = snap;
-    if dienststatus != DIENSTSTATUS_IN_DIENST {
-        return Err(AppError::Validation(
-            "Material ist außer Dienst und kann nicht disponiert werden".into(),
-        ));
-    }
-
+    let (bezeichnung, kategorie, bestandsnummer, traeger) =
+        stamm_snapshot_tx(conn, org_id, material_id).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, snap_bezeichnung, snap_kategorie, \
@@ -207,6 +213,42 @@ pub async fn disponiere_stamm_tx(
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
+}
+
+/// Identitäts-Snapshot eines Stamm-Materials: Bezeichnung, Kategorie, Bestandsnummer, Träger.
+type Snapshot = (String, Option<String>, Option<String>, Option<String>);
+
+/// Snapshot eines Stamm-Materials der Org; `NotFound` bei fremdem/unbekanntem, `Validation` bei
+/// außer Dienst.
+async fn stamm_snapshot_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    material_id: i64,
+) -> Result<Snapshot, AppError> {
+    let (bezeichnung, kategorie, bestandsnummer, traeger, dienststatus) = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
+        "SELECT bezeichnung, kategorie, bestandsnummer, traegerorganisation, dienststatus \
+         FROM material WHERE id = ? AND org_id = ?",
+    )
+    .bind(material_id)
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if dienststatus != DIENSTSTATUS_IN_DIENST {
+        return Err(AppError::Validation(
+            "Material ist außer Dienst und kann nicht disponiert werden".into(),
+        ));
+    }
+    Ok((bezeichnung, kategorie, bestandsnummer, traeger))
 }
 
 /// Pool-Wrapper um [`disponiere_stamm_tx`].
@@ -282,6 +324,8 @@ pub async fn aktualisiere_tx(
     bemerkung: Option<Option<&str>>,
     uhs_id: Option<Option<i64>>,
 ) -> Result<(), AppError> {
+    // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
          SET menge = COALESCE(?1, menge), \
@@ -323,7 +367,7 @@ pub async fn aktualisiere(
     .await
 }
 
-/// Disponiertes Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
+/// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
 /// UND `uhs_id`.
 pub async fn liste_je_uhs(
     pool: &SqlitePool,
@@ -332,7 +376,8 @@ pub async fn liste_je_uhs(
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.uhs_id = ? ORDER BY em.disponiert_at, em.id"
+        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.uhs_id = ? AND em.beendet_at IS NULL \
+         ORDER BY em.disponiert_at, em.id"
     )))
     .bind(einsatz_id)
     .bind(uhs_id)
@@ -344,28 +389,280 @@ pub async fn liste_je_uhs(
         .collect())
 }
 
-/// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
-/// falls nicht zum Einsatz gehörend.
-pub async fn entferne_tx(
+// ── Lebenszustand (LLH-1079 Teil II, Spec `kraefte-entlassung`) ──────────────────────────
+// Material wird nicht „entlassen“, sondern „aus dem Einsatz genommen“ (Entscheidung Welle 2,
+// LLH-1093 Nr. 3); der Endzustand auf dem Draht bleibt `entlassen` wie bei jeder Kraft.
+
+/// Jeder Schreibweg an einer Materialposition fragt zuerst hier (design.md D6): `NotFound`, wenn
+/// die Zeile nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie aus
+/// dem Einsatz genommen oder storniert ist. Nur das erneute Disponieren schreibt daran.
+pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
 ) -> Result<(), AppError> {
-    let resultat = sqlx::query("DELETE FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
-        .bind(em_id)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    if resultat.rows_affected() == 0 {
-        return Err(AppError::NotFound);
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match ende.ok_or(AppError::NotFound)? {
+        None => Ok(()),
+        Some(als) => Err(beendet_conflict(&als)),
+    }
+}
+
+/// Der 409 an beendetem Material (Lebenszyklus), je Endzustand.
+pub fn beendet_conflict(beendet_als: &str) -> AppError {
+    AppError::Conflict(match beendet_als {
+        "storniert" => "Das Material ist storniert; erst erneut disponieren".into(),
+        _ => "Das Material ist aus dem Einsatz genommen; erst erneut disponieren".into(),
+    })
+}
+
+/// Wie [`require_aktiv_tx`] für Schreibwege anderer Module, die die Zugehörigkeit zum Einsatz
+/// selbst prüfen: unbekanntes Material ist hier kein Fehler, beendetes der 409 aus
+/// [`beendet_conflict`] (design.md D6).
+pub async fn require_nicht_beendet(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<(), AppError> {
+    let ende: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT beendet_als FROM einsatz_material \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at IS NOT NULL",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?;
+    match ende.flatten() {
+        None => Ok(()),
+        Some(als) => Err(beendet_conflict(&als)),
+    }
+}
+
+/// Was das Herausnehmen über die Zeile hinaus berührt hat; der Aufrufer meldet es nach dem
+/// Commit und nennt die Einheit im ETB-Text.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Entlassen {
+    /// Einheit, der das Material angehörte (ID für das Ereignis, Name für den ETB-Text).
+    pub einheit: Option<(i64, String)>,
+    /// UHS, an der das Material lag.
+    pub uhs_id: Option<i64>,
+}
+
+/// Nimmt Material aus dem Einsatz (design.md D4, Wortlaut LLH-1093): die Zeile bleibt mit
+/// Zeitpunkt und handelnder Person stehen, Einheit und UHS werden gelöst. Keine Zeitachse (D5).
+/// `NotFound`/`Conflict` wie [`require_aktiv_tx`].
+pub async fn entlassen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Entlassen, AppError> {
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    let einheit: Option<(i64, String)> = sqlx::query_as(
+        "SELECT e.id, e.name FROM einsatz_material em \
+         JOIN einsatz_einheit e ON e.id = em.einheit_id \
+         WHERE em.id = ? AND em.einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let uhs_id: Option<i64> =
+        sqlx::query_scalar("SELECT uhs_id FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
+            .bind(em_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    sqlx::query(
+        "UPDATE einsatz_material SET einheit_id = NULL, uhs_id = NULL \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        em_id,
+        benutzer_id,
+        jetzt,
+        BeendetAls::Entlassen,
+    )
+    .await?;
+    Ok(Entlassen { einheit, uhs_id })
+}
+
+/// Setzt den Endzustand genau einmal; die Bedingung `beendet_at IS NULL` steht im UPDATE, so
+/// trifft ein gleichzeitiger zweiter Versuch keine Zeile mehr (`Conflict`).
+async fn set_beendet_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    als: BeendetAls,
+) -> Result<(), AppError> {
+    // `zuletzt_entlassen_at` überdauert das erneute Disponieren (Storno-Sperre, design.md D3).
+    let r = sqlx::query(
+        "UPDATE einsatz_material SET beendet_at = ?1, beendet_von = ?2, beendet_als = ?3, \
+             zuletzt_entlassen_at = CASE WHEN ?3 = 'entlassen' THEN ?1 \
+                                         ELSE zuletzt_entlassen_at END \
+         WHERE id = ?4 AND einsatz_id = ?5 AND beendet_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(als.as_str())
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "Das Material ist bereits aus dem Einsatz genommen".into(),
+        ));
     }
     Ok(())
 }
 
-/// Pool-Wrapper um [`entferne_tx`].
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, em_id: i64) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    entferne_tx(&mut conn, einsatz_id, em_id).await
+/// Storniert eine Fehldisposition (design.md D3): die Zeile endet als `storniert` und erscheint
+/// in keinem Nachweis. Nur solange das Material aktiv ist (sonst `Conflict`), nie aus dem
+/// Einsatz genommen war, an keiner Einheit und keiner UHS liegt und höchstens
+/// [`crate::entlassung::STORNO_FRIST_MINUTEN`] nach der Disposition; sonst 422 mit dem ersten
+/// verletzten Grund als Satz.
+pub async fn stornieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    require_aktiv_tx(conn, einsatz_id, em_id).await?;
+    if let Some(grund) = find_storno_hindernis_tx(conn, einsatz_id, em_id, jetzt).await? {
+        return Err(AppError::UnprocessableEntity(grund));
+    }
+    set_beendet_tx(
+        conn,
+        einsatz_id,
+        em_id,
+        benutzer_id,
+        jetzt,
+        BeendetAls::Storniert,
+    )
+    .await
+}
+
+/// Der erste Grund, der den Storno von Material verbietet (design.md D3), oder `None`.
+async fn find_storno_hindernis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    jetzt: &str,
+) -> Result<Option<String>, AppError> {
+    let (disponiert_at, einheit, uhs, entlassen_at): (
+        String,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "SELECT disponiert_at, einheit_id, uhs_id, zuletzt_entlassen_at \
+         FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    const AUSWEG: &str = "das Material lässt sich aus dem Einsatz nehmen";
+    if entlassen_at.is_some() {
+        return Ok(Some(format!(
+            "Das Material war schon einmal aus dem Einsatz genommen; {AUSWEG}"
+        )));
+    }
+    let bindung = if einheit.is_some() {
+        Some("Das Material gehört einer Einheit an")
+    } else if uhs.is_some() {
+        Some("Das Material liegt an einer UHS")
+    } else {
+        None
+    };
+    if let Some(b) = bindung {
+        return Ok(Some(format!(
+            "{b}; erst lösen oder das Material aus dem Einsatz nehmen"
+        )));
+    }
+    if !crate::entlassung::is_in_storno_frist(&disponiert_at, jetzt) {
+        return Ok(Some(format!(
+            "Stornieren geht nur in den ersten {} Minuten nach der Disposition; {AUSWEG}",
+            crate::entlassung::STORNO_FRIST_MINUTEN
+        )));
+    }
+    Ok(None)
+}
+
+/// Nimmt Material, das aus dem Einsatz genommen oder storniert war, wieder auf (design.md D7):
+/// Endzustand weg, Dispositionszeit neu. Menge und Status bleiben, sie beschreiben das Material
+/// selbst (ein defektes Gerät ist nach dem Wiederaufnehmen nicht einsatzbereit). Stamm-Material
+/// muss in Dienst sein, sein Snapshot wird erneuert. `NotFound` bei fremder Zeile, `Conflict`
+/// bei einer aktiven.
+pub async fn reaktivieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    let zeile: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT material_id, beendet_at FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (material_id, beendet_at) = zeile.ok_or(AppError::NotFound)?;
+    if beendet_at.is_none() {
+        return Err(AppError::Conflict(
+            "Das Material ist bereits in diesem Einsatz disponiert".into(),
+        ));
+    }
+    if let Some(mid) = material_id {
+        let (bezeichnung, kategorie, bestandsnummer, traeger) =
+            stamm_snapshot_tx(conn, org_id, mid)
+                .await
+                .map_err(|e| match e {
+                    // Ein Zustand der Stamm-Zeile, also 422 (`src/AGENTS.md`, Statuscode-Konvention).
+                    AppError::Validation(m) => AppError::UnprocessableEntity(m),
+                    e => e,
+                })?;
+        sqlx::query(
+            "UPDATE einsatz_material SET snap_bezeichnung = ?, snap_kategorie = ?, \
+                 snap_bestandsnummer = ?, snap_traegerorganisation = ? WHERE id = ?",
+        )
+        .bind(&bezeichnung)
+        .bind(&kategorie)
+        .bind(&bestandsnummer)
+        .bind(&traeger)
+        .bind(em_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    sqlx::query(
+        "UPDATE einsatz_material SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL, \
+             disponiert_at = datetime('now'), disponiert_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(benutzer_id)
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -511,7 +808,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aktualisiere_menge_status_bemerkung_dann_entferne() {
+    async fn aktualisiere_menge_status_bemerkung_dann_aus_dem_einsatz_nehmen() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
@@ -553,10 +850,25 @@ mod tests {
         assert_eq!(b.menge, 30, "Menge unveraendert");
         assert_eq!(b.status, MaterialStatus::Verbraucht);
 
-        entferne(&pool, einsatz, em).await.unwrap();
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        // Die Zeile bleibt mit Menge und Status (LLH-1079), fehlt aber in der Liste.
+        let c = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(c.beendet_als.as_deref(), Some("entlassen"));
+        assert_eq!((c.menge, c.status), (30, MaterialStatus::Verbraucht));
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert_eq!(
+            list_entlassene(&pool, einsatz, true).await.unwrap().len(),
+            1
+        );
         assert!(matches!(
-            laden_anzeige(&pool, einsatz, em, true).await.unwrap_err(),
-            AppError::NotFound
+            aktualisiere(&pool, einsatz, em, Some(1), None, None, None)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        assert!(matches!(
+            nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap_err(),
+            AppError::Conflict(_)
         ));
     }
 
@@ -692,5 +1004,188 @@ mod tests {
                 .unwrap()
                 .ist_demo
         );
+    }
+
+    // ── Lebenszustand (LLH-1079 Teil II) ──────────────────────────────────────────────
+
+    async fn nimm_heraus(
+        pool: &SqlitePool,
+        einsatz: i64,
+        em: i64,
+        benutzer: i64,
+    ) -> Result<Entlassen, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let e = entlassen_tx(&mut tx, einsatz, em, benutzer, "2099-01-01 00:00:00").await?;
+        tx.commit().await.unwrap();
+        Ok(e)
+    }
+
+    async fn storniere(pool: &SqlitePool, einsatz: i64, em: i64) -> Result<(), AppError> {
+        let jetzt: String = sqlx::query_scalar("SELECT datetime('now')")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        let mut tx = pool.begin().await.unwrap();
+        stornieren_tx(&mut tx, einsatz, em, 1, &jetzt).await?;
+        tx.commit().await.unwrap();
+        Ok(())
+    }
+
+    fn grund(e: AppError) -> String {
+        match e {
+            AppError::UnprocessableEntity(g) => g,
+            e => panic!("422 erwartet, bekam {e:?}"),
+        }
+    }
+
+    /// design.md D4: Herausnehmen löst Einheit und UHS und meldet beide.
+    #[tokio::test]
+    async fn herausnehmen_loest_einheit_und_uhs() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Trage"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 2, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let u: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_material SET einheit_id = ?, uhs_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(u)
+            .bind(em)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e = nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        assert_eq!(e.einheit, Some((einheit, "1. Zug".to_string())));
+        assert_eq!(e.uhs_id, Some(u));
+        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!((a.einheit_id, a.uhs_id), (None, None));
+        assert!(liste_je_uhs(&pool, einsatz, u, true)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    /// design.md D3: Storno direkt nach der Disposition; Einheit, UHS und Frist verhindern ihn.
+    #[tokio::test]
+    async fn storno_regeln_fuer_material() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Decke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 5, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(em)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            grund(storniere(&pool, einsatz, em).await.unwrap_err()),
+            "Das Material gehört einer Einheit an; erst lösen oder das Material aus dem Einsatz \
+             nehmen"
+        );
+        sqlx::query(
+            "UPDATE einsatz_material SET einheit_id = NULL, \
+             disponiert_at = datetime('now', '-20 minutes') WHERE id = ?",
+        )
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let frist = grund(storniere(&pool, einsatz, em).await.unwrap_err());
+        assert!(frist.contains("nur in den ersten 15 Minuten nach der Disposition"));
+        assert!(frist.ends_with("das Material lässt sich aus dem Einsatz nehmen"));
+        sqlx::query("UPDATE einsatz_material SET disponiert_at = datetime('now') WHERE id = ?")
+            .bind(em)
+            .execute(&pool)
+            .await
+            .unwrap();
+        storniere(&pool, einsatz, em).await.unwrap();
+        assert!(liste(&pool, einsatz, true).await.unwrap().is_empty());
+        assert!(list_entlassene(&pool, einsatz, true)
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(matches!(
+            storniere(&pool, einsatz, em).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    /// design.md D7: herausgenommenes Material kommt über `reaktivieren_tx` zurück, mit Menge und
+    /// Status; danach sperrt die frühere Herausnahme den Storno (Migration 0195).
+    #[tokio::test]
+    async fn reaktivieren_behaelt_menge_und_status_und_sperrt_storno() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Pumpe"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 3, benutzer)
+            .await
+            .unwrap();
+        aktualisiere(&pool, einsatz, em, None, Some("defekt"), None, None)
+            .await
+            .unwrap();
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+            .await
+            .unwrap();
+        assert!(matches!(
+            reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        drop(conn);
+        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(a.beendet_at, None);
+        assert_eq!((a.menge, a.status), (3, MaterialStatus::Defekt));
+        assert!(grund(storniere(&pool, einsatz, em).await.unwrap_err())
+            .starts_with("Das Material war schon einmal aus dem Einsatz genommen"));
+        // Außer Dienst gestelltes Stamm-Material kommt nicht zurück (422, Zustand).
+        nimm_heraus(&pool, einsatz, em, benutzer).await.unwrap();
+        sqlx::query("UPDATE material SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(m.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(matches!(
+            reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+                .await
+                .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
     }
 }

@@ -9,8 +9,8 @@ use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
-use axum::extract::State;
+use crate::routes::support::{deserialize_optional_field, parse_flag, pflicht, trimme, trimme_tri};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -24,14 +24,29 @@ pub(super) fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Material, "material_id", em_id);
 }
 
-/// GET /api/einsaetze/{id}/material — disponiertes Material (aufgelöst). Nur Lesezugriff.
+#[derive(Debug, Deserialize)]
+pub struct ListeParams {
+    /// `1` = statt des aktiven das aus dem Einsatz genommene Material (LLH-1079, Nachweis).
+    #[serde(default)]
+    entlassene: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/material — aktives Material (aufgelöst), mit `?entlassene=1` das aus
+/// dem Einsatz genommene (Spec `kraefte-entlassung`). Storniertes liefert keine der beiden. Nur
+/// Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Material>,
+    Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<EinsatzMaterialAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let aktiv = ctx.einsatz.ist_aktiv();
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
+        if parse_flag(params.entlassene.as_deref(), "entlassene")? {
+            disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
+        } else {
+            disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
+        },
     ))
 }
 
@@ -254,37 +269,111 @@ pub async fn aktualisieren(
     Ok(Json(nachher))
 }
 
-/// DELETE /api/einsaetze/{id}/material/{em_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
-pub async fn entfernen(
+/// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec
+/// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
+/// Zeile bleibt, Einheit und UHS gehen. Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
+/// Schreibt ETB-Eintrag; beendetes Material → 409. Liefert das herausgenommene Material.
+pub async fn entlassen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand und System-ETB atomar in EINER Tx; SSE erst
+    // nach dem Commit.
+    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let ergebnis =
+            disposition_repo::entlassen_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt)
+                .await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_aus_einsatz_genommen(
+                &vorher.bezeichnung,
+                vorher.menge,
+                ergebnis.einheit.as_ref().map(|(_, name)| name.as_str()),
+            ),
+        )
+        .await?;
+        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        Ok((ergebnis, anzeige))
+    })?;
+    sse_material(&state, einsatz_id, em_id);
+    // Einheit und UHS-Detail zeigen das Material; `material` erreicht ihre Leser ohne
+    // Materialrecht nicht (LLH-1182).
+    if let Some((einheit_id, _)) = ergebnis.einheit {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    if let Some(uhs_id) = ergebnis.uhs_id {
+        sse_uhs(&state, einsatz_id, uhs_id);
+    }
+    Ok(Json(anzeige))
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/stornieren — Fehldisposition stornieren (LLH-1079,
+/// design.md D3): nur ohne Einheit und UHS und in den ersten 15 Minuten, sonst 422 mit dem
+/// Grund; beendetes Material → 409. ETB-Eintrag.
+pub async fn stornieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
     PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
-
-    // F06/LFH-244 Tier-A: Löschung + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE +
-    // Retry). Der ETB-Text steht schon aus dem Vorzustand (`anzeige`, vor dem DELETE geladen)
-    // fest → vor der Tx berechnet und in die Closure gecaptured. SSE erst nach dem Commit.
-    let text = format!(
-        "Material «{}» aus dem Einsatz entfernt",
-        anzeige.bezeichnung
-    );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let entfernt = crate::write_retry!(&state.pool, |conn| {
-        let entfernt = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        disposition_repo::entferne_tx(conn, einsatz_id, em_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(entfernt)
+    let jetzt = crate::zeit::jetzt();
+    crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
+        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_storniert(&vorher.bezeichnung, vorher.menge),
+        )
+        .await?;
+        Ok(())
     })?;
     sse_material(&state, einsatz_id, em_id);
-    // Einheit und UHS-Detail zeigen das Material; `material` erreicht ihre Leser ohne
-    // Materialrecht nicht (LLH-1182).
-    if let Some(einheit_id) = entfernt.einheit_id {
-        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
-    }
-    if let Some(uhs_id) = entfernt.uhs_id {
-        sse_uhs(&state, einsatz_id, uhs_id);
-    }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/reaktivieren — herausgenommenes oder storniertes
+/// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“ und
+/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag.
+pub async fn reaktivieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::reaktivieren_tx(
+            conn,
+            einsatz_id,
+            ctx.einsatz.org_id,
+            em_id,
+            ctx.benutzer.id,
+        )
+        .await?;
+        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_erneut_disponiert(&anzeige.bezeichnung, anzeige.menge),
+        )
+        .await?;
+        Ok(anzeige)
+    })?;
+    sse_material(&state, einsatz_id, em_id);
+    Ok(Json(anzeige))
 }

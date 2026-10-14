@@ -475,13 +475,13 @@ async fn entlassen_loest_die_zuordnung() {
 
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
         &admin,
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT, "Vorbedingung: entlassen");
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: entlassen");
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1["fahrzeug_ids"],
         json!([])
@@ -504,8 +504,8 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
                 &admin,
                 None,
             )
@@ -513,9 +513,9 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
             .0
         }
     };
-    assert_eq!(entlassen(mtw).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(mtw).await, StatusCode::OK);
     assert_eq!(kopf_events(&mut rx), 0, "ohne Zuordnung kein Kopf-Ereignis");
-    assert_eq!(entlassen(elw).await, StatusCode::NO_CONTENT);
+    assert_eq!(entlassen(elw).await, StatusCode::OK);
     assert_eq!(
         kopf_events(&mut rx),
         1,

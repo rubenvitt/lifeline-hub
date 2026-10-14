@@ -375,7 +375,8 @@ pub async fn aus_fahrzeugstatus_tx(
         let offen: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM einsatz_fahrzeug f \
              LEFT JOIN fahrzeug_status s ON s.id = f.status_id \
-             WHERE f.einheit_id = ? AND s.zeitachse_marke IS NOT 'entlassung'",
+             WHERE f.einheit_id = ? AND f.beendet_at IS NULL \
+               AND s.zeitachse_marke IS NOT 'entlassung'",
         )
         .bind(einheit_id)
         .fetch_one(&mut *conn)

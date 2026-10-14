@@ -4,7 +4,7 @@ use serde_json::Value;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, objekt_ereignisse,
-    rolle_setzen, setup, setup_mit_live, system_etb_anzahl,
+    rolle_setzen, setup, setup_mit_live, system_etb_anzahl, system_etb_inhalte,
 };
 
 // ---------- Zusatz-Helfer ----------
@@ -307,17 +307,17 @@ async fn entfernen_schreibt_etb() {
     let em = json["id"].as_i64().unwrap();
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen"),
         &admin,
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(status, StatusCode::OK);
     assert_eq!(
         system_etb_anzahl(&app, &admin, einsatz).await,
         2,
-        "Disponieren + Entfernen"
+        "Disponieren + Aus dem Einsatz nehmen"
     );
 }
 
@@ -353,8 +353,8 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = anfrage(
         &app,
-        "DELETE",
-        &format!("/api/einsaetze/{einsatz}/material/999999"),
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/999999/entlassen"),
         &admin,
         None,
     )
@@ -819,8 +819,8 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
         async move {
             anfrage(
                 &app,
-                "DELETE",
-                &format!("/api/einsaetze/{einsatz}/material/{em}"),
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen"),
                 &admin,
                 None,
             )
@@ -829,15 +829,15 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
         }
     };
 
-    assert_eq!(entfernen(frei).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(frei).await, StatusCode::OK);
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "ohne Bezug");
-    assert_eq!(entfernen(im_zug).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(im_zug).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("einheit", einheit)],
         "Mitglied der Einheit"
     );
-    assert_eq!(entfernen(an_uhs).await, StatusCode::NO_CONTENT);
+    assert_eq!(entfernen(an_uhs).await, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("uhs", uhs)],
@@ -995,4 +995,106 @@ async fn material_in_einheit_und_an_uhs_meldet_beide_ansichten() {
         vec![ereignis("uhs", uhs)],
         "Bemerkung: nur UHS"
     );
+}
+
+// ── Aus dem Einsatz nehmen statt löschen (LLH-1079 Teil II) ───────────────────────────────
+
+async fn aktion(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    em: i64,
+    was: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/{was}"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+async fn bezeichnungen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> Vec<String> {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material{query}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    json.as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["bezeichnung"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Spec `kraefte-entlassung` für Material (Wortlaut „aus dem Einsatz genommen“, LLH-1093): die
+/// Zeile bleibt, fehlt in der Liste, steht unter `?entlassene=1`; Schreibwege sind 409, auch die
+/// Zuordnung zu einer Einheit; „Erneut disponieren“ holt sie zurück; ein Storno direkt nach dem
+/// Disponieren ist 204.
+#[tokio::test]
+async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let decke = material_disponieren(&app, &admin, einsatz, "Wolldecke").await;
+    let trage = material_disponieren(&app, &admin, einsatz, "Trage").await;
+
+    let (s, json) = aktion(&app, &admin, einsatz, decke, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["beendet_als"], "entlassen");
+    assert_eq!(bezeichnungen(&app, &admin, einsatz, "").await, ["Trage"]);
+    assert_eq!(
+        bezeichnungen(&app, &admin, einsatz, "?entlassene=1").await,
+        ["Wolldecke"]
+    );
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Material «Wolldecke» (×1) aus dem Einsatz genommen"));
+    assert_eq!(
+        aktion(&app, &admin, einsatz, decke, "entlassen").await.0,
+        StatusCode::CONFLICT
+    );
+    let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    for (methode, pfad, body) in [
+        ("PATCH", format!("material/{decke}"), Some(r#"{"menge":2}"#)),
+        ("PUT", format!("einheiten/{einheit}/material/{decke}"), None),
+    ] {
+        let (s, json) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            body,
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+    }
+
+    let (s, _) = aktion(&app, &admin, einsatz, decke, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK);
+    let mut aktiv = bezeichnungen(&app, &admin, einsatz, "").await;
+    aktiv.sort();
+    assert_eq!(aktiv, ["Trage", "Wolldecke"]);
+
+    assert_eq!(
+        aktion(&app, &admin, einsatz, trage, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        bezeichnungen(&app, &admin, einsatz, "").await,
+        ["Wolldecke"]
+    );
+    assert!(bezeichnungen(&app, &admin, einsatz, "?entlassene=1")
+        .await
+        .is_empty());
+    // Wer einmal herausgenommen war, lässt sich nicht stornieren.
+    let (s, json) = aktion(&app, &admin, einsatz, decke, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
 }

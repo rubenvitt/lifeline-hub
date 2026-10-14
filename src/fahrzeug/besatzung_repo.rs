@@ -7,22 +7,6 @@
 use crate::error::AppError;
 use sqlx::SqliteConnection;
 
-/// Prüft (auf offener Connection/Transaktion), ob ein Fahrzeug zum Einsatz gehört.
-/// `NotFound` sonst.
-async fn pruefe_fahrzeug_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    ef_id: i64,
-) -> Result<(), AppError> {
-    let t: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
-            .bind(ef_id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    t.map(|_| ()).ok_or(AppError::NotFound)
-}
-
 /// Ordnet eine Personal-Dispozeile einem Fahrzeug als Besatzung zu, auf einer offenen
 /// Connection/Transaktion (F06/LFH-244 Tier-A; exklusiv: eine bereits andernorts
 /// zugeordnete Kraft wechselt). `NotFound`, falls Dispozeile oder Fahrzeug nicht zum
@@ -33,7 +17,8 @@ pub async fn ordne_besatzung_zu_tx(
     ef_id: i64,
     ep_id: i64,
 ) -> Result<String, AppError> {
-    pruefe_fahrzeug_tx(&mut *conn, einsatz_id, ef_id).await?;
+    // Ein entlassenes oder storniertes Fahrzeug bekommt keine Besatzung (409, LLH-1079).
+    super::disposition_repo::require_aktiv_tx(&mut *conn, einsatz_id, ef_id).await?;
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
     )
