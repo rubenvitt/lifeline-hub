@@ -1,10 +1,11 @@
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Lagekarte, Personal};
+use crate::einsatz::modul::{Einheiten, Fahrzeuge, Lagekarte, Personal};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
@@ -176,6 +177,86 @@ pub async fn disponieren(
     super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &text).await;
     sse_personal(&state, einsatz_id, ep_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SammelBody {
+    /// Stamm-IDs, höchstens `kraefte_disposition::SAMMEL_MAX` (vor dem Entdoppeln).
+    pub personal_ids: Vec<i64>,
+    pub einheit_id: Option<i64>,
+    pub fahrzeug_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/personal/sammel — mehrere Stamm-Personen in einem Schritt
+/// disponieren und optional Einheit und Fahrzeug zuordnen (LLH-1100, Spec
+/// `kraefte-disposition`). Alles oder nichts: eine nicht disponierbare Person → 422 mit Gründen
+/// je Zeile. Mit Einheit gilt auch das Recht am Modul Einheiten, mit Fahrzeug das am Modul
+/// Fahrzeuge (403 vor jedem Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion,
+/// Ereignisse nach dem Commit. Liefert die disponierten Kräfte.
+pub async fn sammel_disponieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    JsonBody(body): JsonBody<SammelBody>,
+) -> Result<(StatusCode, Json<Vec<EinsatzPersonalAnzeige>>), AppError> {
+    if body.einheit_id.is_some() {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    if body.fahrzeug_id.is_some() {
+        ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
+    }
+    let wahl: Vec<kraefte_disposition::PersonalWahl> =
+        kraefte_disposition::check_ids(&body.personal_ids)?
+            .into_iter()
+            .map(|personal_id| kraefte_disposition::PersonalWahl {
+                personal_id,
+                staerke_position: None,
+            })
+            .collect();
+    let einsatz_id = ctx.einsatz.id;
+    let kontext = kraefte_disposition::Kontext {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+    };
+    let ziel = kraefte_disposition::Ziel {
+        einheit_id: body.einheit_id,
+        fahrzeug_id: body.fahrzeug_id,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (ergebnis, anzeigen) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = kraefte_disposition::disponiere_personal_tx(
+            conn,
+            kontext,
+            &wahl,
+            ziel,
+            kraefte_disposition::Regeln::SAMMEL,
+        )
+        .await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &kraefte_disposition::etb_text_personal(&ergebnis),
+        )
+        .await?;
+        let mut anzeigen = Vec::with_capacity(ergebnis.kraefte.len());
+        for k in &ergebnis.kraefte {
+            anzeigen
+                .push(disposition_repo::load_anzeige_tx(conn, einsatz_id, k.ep_id, true).await?);
+        }
+        Ok((ergebnis, anzeigen))
+    })?;
+    for k in &ergebnis.kraefte {
+        sse_personal(&state, einsatz_id, k.ep_id);
+    }
+    if let Some(e) = &ergebnis.einheit {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, e.id);
+    }
+    if let Some(f) = &ergebnis.fahrzeug {
+        super::einsatz_fahrzeug::sse_fahrzeug(&state, einsatz_id, f.id);
+    }
+    Ok((StatusCode::CREATED, Json(anzeigen)))
 }
 
 #[derive(Debug, Deserialize)]

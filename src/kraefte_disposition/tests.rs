@@ -472,6 +472,18 @@ fn etb_text_bei_einer_kraft_ist_der_einzelwortlaut() {
 }
 
 #[test]
+fn id_liste_ist_gedeckelt_vor_dem_entdoppeln() {
+    assert!(matches!(check_ids(&[]), Err(AppError::Validation(_))));
+    let voll: Vec<i64> = (1..=SAMMEL_MAX as i64).collect();
+    assert_eq!(check_ids(&voll).unwrap().len(), SAMMEL_MAX);
+    // 51 Einträge sind zu viel, auch wenn nach dem Entdoppeln weniger blieben.
+    let mut zu_viel = vec![1; SAMMEL_MAX];
+    zu_viel.push(2);
+    assert!(matches!(check_ids(&zu_viel), Err(AppError::Validation(_))));
+    assert_eq!(check_ids(&[5, 5, 6]).unwrap(), [5, 6]);
+}
+
+#[test]
 fn dedupe_behaelt_die_erste_reihenfolge() {
     assert_eq!(dedupe(&[3, 1, 3, 2, 1], |x| *x), [3, 1, 2]);
 }

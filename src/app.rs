@@ -859,6 +859,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fahrzeuge",
             post(routes::einsatz_fahrzeug::disponieren),
         )
+        // LLH-1100: mehrere Stamm-Fahrzeuge in einem Schritt, optional in eine Einheit.
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/sammel",
+            post(routes::einsatz_fahrzeug::sammel_disponieren),
+        )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
             patch(routes::einsatz_fahrzeug::aktualisieren),
@@ -882,6 +887,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personal",
             post(routes::einsatz_personal::disponieren),
+        )
+        // LLH-1100: mehrere Stamm-Personen in einem Schritt, optional in Einheit und Fahrzeug.
+        .route(
+            "/api/einsaetze/{id}/personal/sammel",
+            post(routes::einsatz_personal::sammel_disponieren),
         )
         .route(
             "/api/einsaetze/{id}/personal/{ep_id}",

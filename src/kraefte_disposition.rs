@@ -138,6 +138,20 @@ pub fn dedupe<T: Clone, K: PartialEq>(liste: &[T], schluessel: impl Fn(&T) -> K)
     aus
 }
 
+/// Prüft eine ID-Liste von außen vor jeder Abfrage (`src/AGENTS.md`, „Eingabegrenzen“): leer →
+/// 400, mehr als [`SAMMEL_MAX`] (gezählt vor dem Entdoppeln) → 400; liefert sie entdoppelt.
+pub fn check_ids(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    if ids.is_empty() {
+        return Err(AppError::Validation("Mindestens eine Kraft wählen".into()));
+    }
+    if ids.len() > SAMMEL_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {SAMMEL_MAX} Kräfte je Disposition"
+        )));
+    }
+    Ok(dedupe(ids, |id| *id))
+}
+
 fn ids_json(ids: &[i64]) -> String {
     serde_json::to_string(ids).expect("Zahlenliste ist serialisierbar")
 }
