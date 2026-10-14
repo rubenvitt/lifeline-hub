@@ -75,6 +75,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       // Die Stärke der UHS aus den Positionen ihrer Kräfte (LFH-1045).
       EINSATZ_KEYS.uhs,
       EINSATZ_KEYS.uhsDetail,
+      // Der Zustand jeder Person einer Vorlage im Einsatz (LLH-1049).
+      EINSATZ_KEYS.einheitAusVorlage,
     ]);
   });
 
@@ -86,6 +88,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       // Ein markierter Fahrzeugstatus schreibt die Zeitachse der Einheit (LFH-552).
       EINSATZ_KEYS.kraefteZeitachse,
+      // Der Zustand jedes Fahrzeugs einer Vorlage im Einsatz (LLH-1049).
+      EINSATZ_KEYS.einheitAusVorlage,
     ]);
   });
 
@@ -103,6 +107,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.kraefteZeitachse,
       // Die Kräftesummen des Lagemonitors (LFH-892).
       EINSATZ_KEYS.lagemonitor,
+      // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
+      EINSATZ_KEYS.einheitAusVorlage,
     ]);
   });
 
@@ -847,5 +853,33 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
         }
       }
     }
+  });
+});
+
+describe('einsatzKeys.einheitAusVorlage (LLH-1049)', () => {
+  it('baut den Key als [prefix, einsatzId, vorlageId] mit handgeschriebenem Prefix', () => {
+    expect(EINSATZ_KEYS.einheitAusVorlage).toBe('einsatz-einheit-aus-vorlage');
+    expect(einsatzKeys.einheitAusVorlage(1, 7)).toEqual(['einsatz-einheit-aus-vorlage', 1, 7]);
+  });
+
+  // `new QueryClient()`: siehe `einsatzKeys.schadenAnhaenge`.
+  it('ist live über einheit, fahrzeug und personal, und jedes davon trifft sie', async () => {
+    for (const ereignis of ['einheit', 'fahrzeug', 'personal'] as const) {
+      const qc = new QueryClient();
+      qc.setQueryData(einsatzKeys.einheitAusVorlage(1, 7), {});
+      qc.setQueryData(['einsatz-einheit-aus-vorlage', 9, 7], {});
+      for (const prefix of EINSATZ_STREAM_EVENTS[ereignis]) {
+        await qc.invalidateQueries({ queryKey: [prefix, 1] });
+      }
+      expect(
+        qc.getQueryState(['einsatz-einheit-aus-vorlage', 1, 7])?.isInvalidated,
+        ereignis,
+      ).toBe(true);
+      expect(qc.getQueryState(['einsatz-einheit-aus-vorlage', 9, 7])?.isInvalidated).toBe(false);
+    }
+  });
+
+  it('steht nicht im Lagebild offline: Bilden geht nur mit Server', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.einheitAusVorlage(1, 7))).toBe(false);
   });
 });

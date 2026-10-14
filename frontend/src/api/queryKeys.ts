@@ -37,6 +37,9 @@ export const EINSATZ_KEYS = {
   gefahrengebiete: 'gefahrengebiete',
   gefahrenmatrix: 'gefahrenmatrix',
   einheiten: 'einsatz-einheiten',
+  // Vorschau einer Einheiten-Vorlage im Einsatz (LLH-1049): eigener Prefix, damit sie NICHT mit
+  // den Einheiten auf die Platte geht (Bilden nur mit Server); live über einheit/fahrzeug/personal.
+  einheitAusVorlage: 'einsatz-einheit-aus-vorlage',
   fuehrungskraefte: 'einsatz-fuehrungskraefte',
   personal: 'einsatz-personal',
   abschnitte: 'einsatz-abschnitte',
@@ -185,6 +188,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.einheiten,
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.kraefteZeitachse,
+    // Der Zustand jedes Fahrzeugs einer Vorlage im Einsatz (LLH-1049).
+    EINSATZ_KEYS.einheitAusVorlage,
   ],
   // Das UHS-Detail trägt das dort verortete Material (LFH-892).
   material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
@@ -208,6 +213,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
     EINSATZ_KEYS.lagemonitor,
+    // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
+    EINSATZ_KEYS.einheitAusVorlage,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
   // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
@@ -250,6 +257,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // oder eine entlassene Kraft ändert Liste und Detail der UHS.
     EINSATZ_KEYS.uhs,
     EINSATZ_KEYS.uhsDetail,
+    // Der Zustand jeder Person einer Vorlage im Einsatz (LLH-1049).
+    EINSATZ_KEYS.einheitAusVorlage,
   ],
   lagebericht: [
     EINSATZ_KEYS.lageberichte,
@@ -575,6 +584,9 @@ export const einsatzKeys = {
   /** Aufgelöste Einheiten (LLH-1079); unter `einheiten`, weil das Auflösen `einheit` verteilt. */
   einheitenAufgeloeste: (einsatzId: number) =>
     [EINSATZ_KEYS.einheiten, einsatzId, 'aufgeloeste'] as const,
+  /** Vorschau einer Einheiten-Vorlage im Einsatz (LLH-1049): Baum und Zustand jeder Kraft. */
+  einheitAusVorlage: (einsatzId: number, vorlageId: number) =>
+    [EINSATZ_KEYS.einheitAusVorlage, einsatzId, vorlageId] as const,
   abschnitte: (einsatzId: number) => [EINSATZ_KEYS.abschnitte, einsatzId] as const,
   fahrzeuge: (einsatzId: number) => [EINSATZ_KEYS.fahrzeuge, einsatzId] as const,
   material: (einsatzId: number) => [EINSATZ_KEYS.material, einsatzId] as const,

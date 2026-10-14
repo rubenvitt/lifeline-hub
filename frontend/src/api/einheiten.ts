@@ -1,4 +1,4 @@
-import type { Einheit } from './types';
+import type { AusVorlageEingabe, AusVorlageErgebnis, Einheit, VorlageVorschau } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface EinheitEingabe {
@@ -51,6 +51,33 @@ export function verorteEinheit(
 
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten`, 'POST', daten);
+}
+
+/**
+ * Vorschau einer Einheiten-Vorlage im Einsatz (LLH-1049, Spec `einheit-vorlagen`, „Vorschau im
+ * Einsatz“): der Baum der Vorlage und je Fahrzeug und Person der Zustand. Schreibt nichts.
+ */
+export function loadEinheitAusVorlage(
+  einsatzId: number,
+  vorlageId: number,
+): Promise<VorlageVorschau> {
+  return apiGet<VorlageVorschau>(`/api/einsaetze/${einsatzId}/einheiten/aus-vorlage/${vorlageId}`);
+}
+
+/**
+ * Einheit samt Untereinheiten, Fahrzeugen und gewählter Stammbesetzung in einem Absenden bilden
+ * (LLH-1049, Spec `kraefte-disposition`): alles oder nichts. Eine Ablehnung trägt die Gründe je
+ * Kraft in `ApiError.zeilen`.
+ */
+export function createEinheitAusVorlage(
+  einsatzId: number,
+  eingabe: AusVorlageEingabe,
+): Promise<AusVorlageErgebnis> {
+  return apiSend<AusVorlageErgebnis>(
+    `/api/einsaetze/${einsatzId}/einheiten/aus-vorlage`,
+    'POST',
+    eingabe,
+  );
 }
 
 export function aktualisiereEinheit(
