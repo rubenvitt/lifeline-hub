@@ -15,17 +15,24 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep material`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   material.png              frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx
+ *   material.png              frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx,
+ *                             frontend/src/kraefte/MaterialVerdichtung.tsx,
+ *                             frontend/src/kraefte/MaterialOrt.tsx
  *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“)
  *   adhoc-material.png        frontend/src/pages/MaterialPage.tsx (Dialog „Ad-hoc-Material ohne
  *                             Stammeintrag“)
  *   aus-dem-einsatz.png       frontend/src/kraefte/EntlassenBlock.tsx (Block „Aus dem Einsatz
  *                             genommen“ unter der Liste)
+ *   angaben-aendern.png       frontend/src/kraefte/MaterialAngabenModal.tsx (Dialog „Angaben zu …
+ *                             ändern“)
+ *   aufteilen.png             frontend/src/kraefte/MaterialAufteilenModal.tsx (Dialog „… aufteilen“)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen Material nur im Stamm, keines ist im Einsatz. Die Spec
  * disponiert drei Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
  * dem Einsatz genommen“ disponiert sie einen weiteren Ad-hoc-Posten und nimmt ihn wieder heraus
- * (LLH-1079 Teil II).
+ * (LLH-1079 Teil II). Für die Spalte „Ort“ (LLH-1093) ordnet sie den Sanitätsrucksack der ersten
+ * Einheit des Demo-Einsatzes zu und verortet ihn an der ersten geplanten oder aktiven UHS; die
+ * Spende-Decken kommen an dieselbe Einheit.
  */
 
 const KAPITEL = 'material';
@@ -36,6 +43,16 @@ interface Stammmaterial {
 }
 interface EinsatzMaterial {
   id: number;
+}
+interface Einheit {
+  id: number;
+  name: string;
+  aufgeloest_at?: string | null;
+}
+interface Uhs {
+  id: number;
+  status: string;
+  storniert_at?: string | null;
 }
 
 test.describe(KAPITEL, () => {
@@ -61,7 +78,7 @@ test.describe(KAPITEL, () => {
         material_id: posten('Sanitätsrucksack'),
         menge: 4,
       });
-      await fuelle(api, 'post', pfad, {
+      const decken = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Spende-Decken', kategorie: 'Verbrauchsgut' },
         menge: 50,
       });
@@ -70,6 +87,25 @@ test.describe(KAPITEL, () => {
         bemerkung: 'Zündung defekt',
       });
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { status: 'im_einsatz' });
+      // Ort (LLH-1093): Einheit über den Einheiten-Weg, UHS über den Material-PATCH.
+      const einheiten = (await (
+        await api.get(`/api/einsaetze/${demo.id}/einheiten`)
+      ).json()) as Einheit[];
+      const einheit = einheiten.find((e) => !e.aufgeloest_at);
+      expect(einheit, 'Demo-Einheit').toBeDefined();
+      const uhsListe = (await (await api.get(`/api/einsaetze/${demo.id}/uhs`)).json()) as Uhs[];
+      const uhs = uhsListe.find(
+        (u) => (u.status === 'geplant' || u.status === 'aktiv') && !u.storniert_at,
+      );
+      expect(uhs, 'Demo-UHS').toBeDefined();
+      for (const em of [rucksack, decken]) {
+        await fuelle(
+          api,
+          'put',
+          `/api/einsaetze/${demo.id}/einheiten/${einheit!.id}/material/${em.id}`,
+        );
+      }
+      await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { uhs_id: uhs!.id });
       const pavillon = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
         menge: 2,
@@ -139,5 +175,36 @@ test.describe(KAPITEL, () => {
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(block, KAPITEL, 'aus-dem-einsatz');
+  });
+
+  test('Dialog „Angaben ändern“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/material`);
+    await page.getByRole('button', { name: 'Weitere Aktionen zu Spende-Decken' }).click();
+    await page.getByRole('menuitem', { name: 'Angaben ändern' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Angaben zu Spende-Decken ändern' });
+    await expect(dialog.getByLabel('Bezeichnung')).toHaveValue('Spende-Decken');
+    await dialog.getByLabel('Trägerorganisation').fill('Kleiderkammer');
+    await dialog.getByLabel('Trägerorganisation').blur();
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'angaben-aendern');
+  });
+
+  test('Dialog „Aufteilen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/material`);
+    await page.getByRole('button', { name: 'Weitere Aktionen zu Spende-Decken' }).click();
+    await page.getByRole('menuitem', { name: 'Aufteilen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Spende-Decken aufteilen' });
+    await dialog.getByRole('spinbutton', { name: 'Menge abteilen' }).fill('20');
+    await expect(dialog.getByText('Danach 30 + 20')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(300);
+    await fotografiere(dialog, KAPITEL, 'aufteilen');
   });
 });
