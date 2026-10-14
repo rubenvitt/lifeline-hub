@@ -1607,6 +1607,14 @@ export interface components {
              * @description BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
              */
             aktueller_br_id?: number | null;
+            beendet_als?: components["schemas"]["BeendetAls"] | null;
+            /**
+             * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
+             *     Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+             */
+            beendet_at?: string | null;
+            /** Format: int64 */
+            beendet_von?: number | null;
             bemerkung?: string | null;
             disponiert_at: string;
             /** Format: int64 */
@@ -1660,6 +1668,15 @@ export interface components {
          *     `menge` und `status` kommen **immer** aus der Dispositionszeile.
          */
         EinsatzMaterialAnzeige: {
+            beendet_als?: components["schemas"]["BeendetAls"] | null;
+            /**
+             * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.
+             *     Nur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene
+             *     (`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“).
+             */
+            beendet_at?: string | null;
+            /** Format: int64 */
+            beendet_von?: number | null;
             bemerkung?: string | null;
             bestandsnummer?: string | null;
             bezeichnung: string;
