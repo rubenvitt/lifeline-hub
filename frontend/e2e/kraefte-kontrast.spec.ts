@@ -286,10 +286,11 @@ for (const modus of ['light', 'dark']) {
 //
 // Derselbe Messkern wie oben ({@link kontrastVon}). Zwei Flächen:
 //
-// (1) DAS STATUSBAND DES MELDEBILDS: Zellen auf der NEUTRALEN Fläche, der Ton nur im
-//     8-px-Quadrat und in der Zahl (`zahlFarbe` in `components/instrument/Kennzahl.tsx`,
-//     am Tag über `normalText`/`achtungText`/`alarmText`). Hier gilt in BEIDEN Modi der
-//     Zielwert HART.
+// (1) DAS STATUSBAND DES MELDEBILDS: Kennzahlen auf der NEUTRALEN Fläche (LLH-1025). Die Zahl
+//     „Einheiten“ steht neutral, die Status liegen als Aufgliederung darunter: Farbe nur im
+//     Balken, Code und Zahl in der Legende (gedämpft). Ton trägt die Zahl der Kennzahl
+//     „keine Rückmeldung“ (`zahlFarbe` in `components/instrument/Kennzahl.tsx`, am Tag über
+//     `alarmText`). Hier gilt in BEIDEN Modi der Zielwert HART.
 //
 // (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: der Ton auf dem Text,
 //     über die Textrollen (`verdichtungsTextfarbe` in `kraefte/Verdichtungszeile.tsx`,
@@ -309,7 +310,7 @@ const ZIEL = { light: 7, dark: 5 } as const;
 /** Die drei Statusrollen, wie sie in der Verdichtungszeile ausgeschrieben stehen. */
 const ZEILEN_ZAHLEN = [/^\d+ verfügbar$/, /^\d+ gebunden$/, /^\d+ nicht verfügbar$/];
 
-/** Die drei Kategorien des FMS-Katalogs und der Ton, den das Band ihnen gibt. */
+/** Die drei Kategorien des FMS-Katalogs und der Ton ihres Segments in der Aufgliederung. */
 const BAND_TOENE = [
   { kategorie: 'verfuegbar', ton: 'normal' },
   { kategorie: 'gebunden', ton: 'achtung' },
@@ -360,29 +361,46 @@ for (const modus of ['light', 'dark'] as const) {
       expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(schranke);
     }
 
-    // (1) STATUSBAND — Zahl und Wort je Ton auf der neutralen Zellfläche. Die Zellen sind
-    // `Kennzahl`-Bausteine: `kennzahl` mit `data-ton`, Zahl `kennzahl-wert`, Wort als Notiz.
+    // (1) STATUSBAND — Zahl und Legende der Einheiten, Zahl und Wort der Kennzahl „keine
+    // Rückmeldung“ (alarm), je auf der neutralen Zellfläche.
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
-    const band = page.getByRole('region', { name: 'Einheiten je Status' });
-    for (const { ton } of BAND_TOENE) {
-      // `.first()` ist keine Mittelung: Status derselben Kategorie tragen dasselbe Paar.
-      const zelle = band.locator(`[data-lfh="kennzahl"][data-ton="${ton}"]`).first();
-      await expect(zelle, `Bandzelle mit Ton ${ton}`).toHaveCount(1);
-      await pruefe(
-        zelle.locator('[data-lfh="kennzahl-wert"]'),
-        'Statusband',
-        `Zahl ${ton}`,
-        ZIEL[modus],
-      );
-      await pruefe(
-        zelle.locator('[data-lfh="kennzahl-notiz"]'),
-        'Statusband',
-        `Wort ${ton}`,
-        ZIEL[modus],
-      );
-    }
+    const einheiten = page.getByRole('region', { name: 'Einheiten je Status' });
+    // Vorbedingung: alle drei Töne stehen in der Aufgliederung, sonst misst die Legende weniger.
+    await expect(
+      einheiten.locator('[data-lfh="aufgliederung"] [data-segment]'),
+      'drei Statussegmente',
+    ).toHaveCount(BAND_TOENE.length);
+    await pruefe(
+      einheiten.locator('[data-lfh="kennzahl-wert"]'),
+      'Statusband',
+      'Zahl Einheiten',
+      ZIEL[modus],
+    );
+    await pruefe(
+      einheiten.locator('[data-lfh="aufgliederung-legende"]'),
+      'Statusband',
+      'Legende Einheiten',
+      ZIEL[modus],
+    );
+    // Keine Einheit hat je zurückgemeldet: die Kennzahl steht im Ton alarm.
+    const rueckmeldung = page
+      .getByRole('region', { name: 'Einheiten ohne Rückmeldung' })
+      .locator('[data-lfh="kennzahl"][data-ton="alarm"]');
+    await expect(rueckmeldung, 'Kennzahl „keine Rückmeldung“ in alarm').toHaveCount(1);
+    await pruefe(
+      rueckmeldung.locator('[data-lfh="kennzahl-wert"]'),
+      'Statusband',
+      'Zahl alarm',
+      ZIEL[modus],
+    );
+    await pruefe(
+      rueckmeldung.locator('[data-lfh="kennzahl-notiz"]'),
+      'Statusband',
+      'Wort alarm',
+      ZIEL[modus],
+    );
 
     // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);

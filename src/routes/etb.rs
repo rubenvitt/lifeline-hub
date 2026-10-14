@@ -294,6 +294,7 @@ pub async fn auftrag_erteilen(
         ctx.einsatz.org_id,
         &ctx.benutzer,
         ctx.modul_rolle(),
+        ctx.geraet.as_ref(),
         std::slice::from_mut(&mut detail),
     )
     .await?;

@@ -120,6 +120,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   nur `anzeige/staerke.ts:staerkeText`. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
+- **Eine Baumlogik der Kräfte: `kraefte/kraeftebaumKern.ts`** (LLH-1025, Spec `kraeftebaum`).
+  Einheit → Untereinheiten, je Einheit Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, Material; jede
+  Kraft genau einmal, Elternstärke über `accumulateStaerke`. Meldebild (`meldebildRaster.ts`) und
+  Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
+  eigenen Baum.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 

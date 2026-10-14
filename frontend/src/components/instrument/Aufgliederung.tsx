@@ -94,7 +94,11 @@ export function Aufgliederung({ segmente, titel, hoehe = 5, legende, style }: Au
         ))}
       </div>
       {legendenInhalt != null && (
-        <div aria-hidden="true" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+        <div
+          aria-hidden="true"
+          data-lfh="aufgliederung-legende"
+          style={{ ...monoStil(11), color: rollen.gedaempft }}
+        >
           {legendenInhalt}
         </div>
       )}
