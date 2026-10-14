@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { setzeViewportBreite } from '../test/viewport';
@@ -12,7 +12,9 @@ import KraefteuebersichtPage, {
   LEERER_FILTER,
   meldebildMeta,
 } from './KraefteuebersichtPage';
-import { Routes, Route } from 'react-router';
+import { Routes, Route, useLocation } from 'react-router';
+import { einsatzKeys } from '../api/queryKeys';
+import { HERVORGEHOBEN } from '../components/Datensicht';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
@@ -1534,5 +1536,122 @@ describe('KraefteuebersichtPage Sprungziele (LFH-888)', () => {
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     // Gegenprobe im selben Bild: der Einheiten-Knopf bleibt frei.
     expect(screen.getByRole('button', { name: /^Einheit$/ })).toBeEnabled();
+  });
+});
+
+// ── Sprung auf eine Einheit (LLH-1049, Spec `kraeftebaum`) ────────────────────
+
+function Ort() {
+  const ort = useLocation();
+  return <div data-testid="ort">{ort.pathname + ort.search}</div>;
+}
+
+function setupMitSprung(suche: string, client = neuerQueryClient()) {
+  return renderMitProviders(
+    <>
+      <Routes>
+        <Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} />
+      </Routes>
+      <Ort />
+    </>,
+    { route: `/einsaetze/1/kraefteuebersicht${suche}`, client },
+  );
+}
+
+/** {@link mitBaum} und daneben ein zweiter Zug (40) mit Fahrzeug (31) und Gruppe (41). */
+function mitZweitemZug() {
+  mitBaum();
+  vi.mocked(listeEinheiten).mockResolvedValue([
+    {
+      ...EINHEIT_E10,
+      typ_label: 'Zug',
+      fuehrer_id: 2,
+      fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+    },
+    {
+      ...EINHEIT_E10,
+      id: 21,
+      name: '1. Gruppe',
+      typ_label: 'Gruppe',
+      abschnitt_id: null,
+      abschnitt_name: null,
+      ueber_einheit_id: 20,
+    },
+    {
+      ...EINHEIT_E10,
+      id: 40,
+      name: '2. Zug',
+      typ_label: 'Zug',
+      sortier: 2,
+      fahrzeug_mitglieder: [{ ef_id: 31, funkrufname: 'FW 1/44-2', fahrzeugtyp: 'LF 10' }],
+    },
+    {
+      ...EINHEIT_E10,
+      id: 41,
+      name: '2. Gruppe',
+      typ_label: 'Gruppe',
+      abschnitt_id: null,
+      abschnitt_name: null,
+      ueber_einheit_id: 40,
+    },
+  ]);
+  vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+    { ...FAHRZEUG_F1, soll_besatzung: { fuehrer: 1, unterfuehrer: 1, mannschaft: 7 } },
+    { ...FAHRZEUG_F1, id: 31, einheit_id: 40, funkrufname: 'FW 1/44-2', fahrzeugtyp: 'LF 10' },
+  ]);
+}
+
+const markiert = (z: HTMLElement | null) => z?.classList.contains(HERVORGEHOBEN) === true;
+
+describe('KraefteuebersichtPage — Sprung auf eine Einheit (LLH-1049)', () => {
+  it('öffnet den Zug bis „mit Fahrzeugen“, markiert ihn und räumt den Parameter', async () => {
+    mitZweitemZug();
+    const { container } = setupMitSprung('?einheit=20');
+    // Die Gruppe ohne Fahrzeug steht offen: ihre Person ist sichtbar.
+    await waitFor(() => expect(zeile(container, 'ep-3')).not.toBeNull());
+    expect(zeile(container, 'ef-30')).not.toBeNull();
+    // Fahrzeuge bleiben zu; der andere Zug bleibt in der Vorgabestufe offen.
+    expect(zeile(container, 'ep-2')).toBeNull();
+    expect(zeile(container, 'eh-41')).not.toBeNull();
+    expect(markiert(zeile(container, 'eh-20'))).toBe(true);
+    expect(markiert(zeile(container, 'eh-21'))).toBe(false);
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/kraefteuebersicht$/),
+    );
+  });
+
+  it('eine Untereinheit öffnet auch ihre übergeordnete Einheit', async () => {
+    mitZweitemZug();
+    const { container } = setupMitSprung('?einheit=21');
+    await waitFor(() => expect(zeile(container, 'ep-3')).not.toBeNull());
+    expect(markiert(zeile(container, 'eh-21'))).toBe(true);
+    expect(markiert(zeile(container, 'eh-20'))).toBe(false);
+  });
+
+  it('eine unbekannte Einheit lässt die Vorgabestufe ohne Markierung', async () => {
+    mitZweitemZug();
+    const { container } = setupMitSprung('?einheit=99');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/kraefteuebersicht$/),
+    );
+    await waitFor(() => expect(zeile(container, 'eh-21')).not.toBeNull());
+    expect(zeile(container, 'ep-3')).toBeNull();
+    expect(container.querySelector(`.${HERVORGEHOBEN}`)).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Einheiten' })).toBeChecked();
+  });
+
+  it('wartet auf frische Listen: im alten Cache fehlt die gerade gebildete Einheit', async () => {
+    mitZweitemZug();
+    const client = neuerQueryClient();
+    // Stand vor dem Bilden: nur der zweite Zug, als veraltet markiert wie nach `onSuccess`.
+    client.setQueryData(einsatzKeys.einheiten(1), [{ ...EINHEIT_E10, id: 40, name: '2. Zug' }]);
+    client.setQueryData(einsatzKeys.personal(1), []);
+    client.setQueryData(einsatzKeys.fahrzeuge(1), []);
+    void client.invalidateQueries({ queryKey: einsatzKeys.einheiten(1) });
+    void client.invalidateQueries({ queryKey: einsatzKeys.personal(1) });
+    void client.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(1) });
+    const { container } = setupMitSprung('?einheit=20', client);
+    await waitFor(() => expect(zeile(container, 'ep-3')).not.toBeNull());
+    expect(markiert(zeile(container, 'eh-20'))).toBe(true);
   });
 });

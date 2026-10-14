@@ -10,6 +10,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { auftraegePfad, einheitenPfad, lageberichtDetailPfad } from '../routing/deeplinks';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -58,6 +59,7 @@ import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZel
 import {
   besatzungZeilen,
   schluesselBisStufe,
+  schluesselZumSprung,
   stufeVon,
   type Ausklappstufe,
 } from '../kraefte/kraeftebaumKern';
@@ -68,7 +70,7 @@ import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -662,6 +664,8 @@ export default function KraefteuebersichtPage() {
   /** Die zuletzt gewählte Stufe: bei gleichen Schlüsselmengen gewinnt sie (`stufeVon`). */
   const [gewaehlteStufe, setGewaehlteStufe] = useState<Ausklappstufe | null>(null);
   const [filterOffen, setFilterOffen] = useState(false);
+  /** Per `?einheit=` angesprungene Einheitenzeile (LLH-1049), markiert nach `deeplink-hervorhebung`. */
+  const [sprungZeile, setSprungZeile] = useState<string | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -973,7 +977,27 @@ export default function KraefteuebersichtPage() {
     setExpandedKeys(null);
     setGewaehlteStufe(null);
     setFilter(LEERER_FILTER);
+    setSprungZeile(null);
   }, [einsatzId]);
+
+  // Sprung auf eine Einheit (LLH-1049, Spec `kraeftebaum`, „Sprung auf eine Einheit“): Vorfahren
+  // und Teilbaum bis „mit Fahrzeugen“ auf, die übrigen Zeilen in der Vorgabestufe. Erst mit
+  // frischen Listen: nach dem Bilden steht noch der alte Cache, in dem die Einheit fehlt. Steht
+  // NACH dem Rücksetzen oben, sonst räumte es beim ersten Bild den Sprung wieder ab. Eine
+  // unbekannte oder fremde ID lässt die Vorgabe ohne Markierung.
+  const listenFrisch = [einheitenQuery, personalQuery, fahrzeugeQuery].every(
+    (q) => q.isSuccess && !q.isFetching,
+  );
+  useQueryParamSelektion('einheit', listenFrisch, (eid) => {
+    const ziel = `eh-${eid}`;
+    const sprung = schluesselZumSprung(raster, ziel);
+    if (!sprung) return;
+    setExpandedKeys([...new Set([...offeneSchluessel.map(String), ...sprung])]);
+    setSprungZeile(ziel);
+  });
+  useEffect(() => {
+    if (sprungZeile != null) scrolleZurZeile(sprungZeile);
+  }, [sprungZeile]);
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -1302,9 +1326,14 @@ export default function KraefteuebersichtPage() {
             onAufgeklappt: setExpandedKeys,
           }}
           zeilenKlasse={(z) =>
-            istProblemZeile(z) || istRueckmeldungProblem(rueckmeldungJeZeile.get(z.key))
-              ? 'meldebild-problemzeile'
-              : undefined
+            [
+              istProblemZeile(z) || istRueckmeldungProblem(rueckmeldungJeZeile.get(z.key))
+                ? 'meldebild-problemzeile'
+                : null,
+              z.key === sprungZeile ? HERVORGEHOBEN : null,
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined
           }
           karte={{
             art: 'plan',
