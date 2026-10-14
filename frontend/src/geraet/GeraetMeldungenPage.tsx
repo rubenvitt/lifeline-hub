@@ -9,6 +9,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
 import { parseMeldungInhalt } from '../routing/deeplinks';
 import GeraetMeldungen from './GeraetMeldungen';
+import { useStellenName } from './stellenName';
 
 /**
  * Meldungen an die Einsatzleitung als eigener Bereich der Gerätehülle des Bereitstellungsraums
@@ -35,7 +36,7 @@ export default function GeraetMeldungenPage() {
     queryFn: () => ladeEinsatz(einsatzId),
     enabled: geraet != null,
   });
-  const stelle = geraet?.stelle || (geraet ? ANSICHT_LABEL[geraet.ansicht] : '');
+  const stelle = useStellenName(geraet) || (geraet ? ANSICHT_LABEL[geraet.ansicht] : '');
   const absender = [stelle, geraet?.bezeichnung].filter(Boolean).join(' · ');
   return (
     <EinsatzSeite titel="Melden" meta={stelle} dataUpdatedAt={einsatzQuery.dataUpdatedAt}>
