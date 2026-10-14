@@ -5,6 +5,7 @@ import {
   kopfFelder,
   zeilenAusloeser,
   zuordnungsKarte,
+  zuordnungsZiele,
 } from './einheit-fixture';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
@@ -417,7 +418,7 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const { pfad } = await einheitMitZuordnungen(page);
+  const { pfad, namen } = await einheitMitZuordnungen(page);
   const messwerte: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(pfad);
@@ -425,36 +426,26 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
     await detailBereit(page);
     const main = page.getByRole('main');
     const ziele = kopfFelder(page).map(({ name, huelle }) => ({ name, ziel: huelle }));
-    const aktionsreihen = [];
+    const zuordnung = zuordnungsZiele(page, namen);
+    // Nachbarn auf einer Zeile: FMS-Wahl und rotes „Aus Einheit lösen“, die beiden Auswahlfelder.
+    const aktionsreihen: Locator[][] = [...zuordnung.reihen];
     let kleinsteZeile = Infinity;
     let kleinsterAbstand = Infinity;
-    for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
-      const karte = zuordnungsKarte(page, titel);
-      const loesen = karte.getByRole('button', { name: 'Aus Einheit lösen', exact: true });
-      // Die Zeile trägt minHeight; die Schaltfläche darin ist ein eigenes Bedienziel.
-      const zeile = loesen.locator('xpath=ancestor::div[contains(@style,"space-between")][1]');
-      kleinsteZeile = Math.min(
-        kleinsteZeile,
-        await haeltStufe(zeile, soll, `${titel}-Zuordnungszeile (${dichte})`),
-      );
-      ziele.push({ name: `${titel} aus Einheit lösen`, ziel: loesen });
-      ziele.push({ name: `${titel} zuordnen`, ziel: karte.locator('.ant-select') });
-      if (titel === 'Personal') {
-        const fuehrer = karte.getByRole('button', { name: 'Als Einheitsführer' });
-        ziele.push({ name: 'Als Einheitsführer', ziel: fuehrer });
-        aktionsreihen.push([fuehrer, loesen]);
-      }
-      if (dichte !== 'kompakt') {
-        const r = (await zeile.boundingBox())!;
-        const auswahl = (await karte.locator('.ant-select').boundingBox())!;
+    for (const { name, zeile } of zuordnung.zeilen) {
+      // Die Zeile trägt minHeight; die Schaltflächen darin sind eigene Bedienziele.
+      kleinsteZeile = Math.min(kleinsteZeile, await haeltStufe(zeile, soll, `${name} (${dichte})`));
+    }
+    for (const { name, ziel } of zuordnung.ziele) ziele.push({ name, ziel });
+    if (dichte !== 'kompakt') {
+      for (const { name, aktion, auswahl } of zuordnung.stapel) {
         // Abstand ab letzter wirklicher Trefffläche, nicht ab der gepolsterten Zeilenhülle.
-        const knopf = (await loesen.boundingBox())!;
-        const abstand = auswahl.y - (knopf.y + knopf.height);
+        const knopf = (await aktion.boundingBox())!;
+        const feld = (await auswahl.boundingBox())!;
+        const abstand = feld.y - (knopf.y + knopf.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
-        expect(
-          abstand,
-          `${titel}: Abstand Aktion/Zuordnung ${dichte}, Zeilenhöhe ${r.height}`,
-        ).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+        expect(abstand, `${name}: Abstand Aktion/Zuordnung ${dichte}`).toBeGreaterThanOrEqual(
+          (dichte === 'handschuh' ? 16 : 8) - SUBPIXEL,
+        );
       }
     }
     ziele.push({

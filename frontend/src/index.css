@@ -187,6 +187,17 @@ mark.lfh-fundstelle {
   scroll-padding-block-end: var(--lfh-speicherleiste-fokusabstand, 0px);
 }
 
+/* Modulpanel: Fokusabstand zum klebenden Fuß „Einsatzdauer“ (LLH-1241, WCAG 2.4.11), aus demselben
+   gemessenen Grund `scroll-padding` am SCROLLPORT statt `scroll-margin` an den Zeilen: bei
+   1366 × 520 in `handschuh` blieben „Material“ und „Bereitstellungsräume“ getabbt ganz unter dem
+   Fuß. Nur solange der Fokus im Panel steht, sonst rollte jeder Fokus im Inhalt um die Fußhöhe zu
+   weit; der Browser rechnet den Stil mit dem neuen Fokus, bevor er das Ziel ins Bild rollt. Die
+   Höhe setzt `einsatz/fussFokusabstand.ts` am `<html>`. Schlägt die Speicherleiste-Regel darüber
+   (Spezifität): eine Speicherleiste steht im Inhalt, nicht unter dem Panel. */
+:root:has([data-lfh='modul-panel'] :focus) {
+  scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
+}
+
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).
    `scroll-padding-block-start` am SCROLLPORT, nicht `scroll-margin` an den Zielen: rückwärts
    getabbt bleibt ein Ziel, das schon im Fenster liegt, sonst ganz hinter dem Kopf (gemessen in

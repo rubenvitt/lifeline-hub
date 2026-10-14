@@ -1,12 +1,13 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
-import { waehleIn } from './auswahl-kern';
+import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { offeneAuswahl, waehleIn, waehleStehend } from './auswahl-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { FUEKW, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-kern';
 
 /**
  * Einheit-Ansicht (LLH-1036, Spec `einheit-ansicht`) am echten Backend, in `kompakt` und
  * `handschuh` am Fükw-Schirm: eine Angabe an ihrer Zeile ändern schickt genau ihr Feld, das
- * taktische Zeichen landet auch im Meldebild, und der Beobachter sieht nur die Ansicht.
+ * taktische Zeichen landet auch im Meldebild, Person und Fahrzeug kommen aus dem Stamm in die
+ * Einheit und die Person über ihr Menü auf das Fahrzeug, und der Beobachter sieht nur die Ansicht.
  *
  * Belegt wird je Handgriff der Körper der Anfrage: das alte Formular schickte den ganzen Stand vom
  * Öffnen und überschrieb so still, was ein anderer Arbeitsplatz geändert hatte. Die Treffflächen
@@ -14,6 +15,7 @@ import { FUEKW, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-ker
  */
 
 const DICHTEN = ['kompakt', 'handschuh'] as const;
+const LAUF = Date.now();
 
 /** Körper aller PATCH an diese Einheit (Angaben und Lageweg), in Reihenfolge. */
 function recordWrites(page: Page, einsatzId: string, einheitId: number) {
@@ -25,6 +27,33 @@ function recordWrites(page: Page, einsatzId: string, einheitId: number) {
     }
   });
   return bodies;
+}
+
+/** Körper aller Sammel-Dispositionen (LLH-1100) dieses Einsatzes, in Reihenfolge. */
+function recordSammel(page: Page, einsatzId: string) {
+  const bodies: { pfad: string; body: unknown }[] = [];
+  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/(personal|fahrzeuge)/sammel$`);
+  page.on('request', (r: Request) => {
+    if (r.method() === 'POST' && pattern.test(r.url())) {
+      bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
+    }
+  });
+  return bodies;
+}
+
+async function post(page: Page, pfad: string, data: unknown): Promise<number> {
+  const antwort = await page.request.post(pfad, { data });
+  expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
+  return ((await antwort.json()) as { id: number }).id;
+}
+
+/** Wählt im Auswahlfeld `feld` des Paneels die Option `titel`, mit dem Namen vorher gesucht. */
+async function ordneZu(paneel: Locator, feld: string, suche: string, titel: string) {
+  const eingabe = paneel.getByRole('combobox', { name: feld });
+  await eingabe.click();
+  await eingabe.fill(suche);
+  await waehleStehend(paneel.page(), titel);
+  await expect(offeneAuswahl(paneel.page())).toHaveCount(0);
 }
 
 async function createEinheit(page: Page, einsatzId: string, name: string): Promise<number> {
@@ -101,9 +130,59 @@ for (const dichte of DICHTEN) {
       );
     });
 
-    test('Beobachter: keine Stifte, keine Aufforderung, kein Auflösen', async ({ page }) => {
+    test('Person und Fahrzeug aus dem Stamm zuordnen, die Person über ihr Menü auf das Fahrzeug setzen', async ({
+      page,
+    }) => {
+      const einsatzId = await einsatzAnlegen(page, `E2E 1036 Stamm ${dichte} ${Date.now()}`);
+      const einheitId = await createEinheit(page, einsatzId, '4. Zug');
+      const person = `Stamm ${LAUF} ${dichte} Anna`;
+      const fahrzeug = `Stamm ${LAUF} ${dichte} 83-1`;
+      const personalId = await post(page, '/api/personal', { name: person });
+      const fahrzeugId = await post(page, '/api/fahrzeuge', {
+        funkrufname: fahrzeug,
+        fahrzeugtyp: 'RTW',
+      });
+      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
+      await stelleDichte(page, dichte);
+      const bodies = recordSammel(page, einsatzId);
+
+      const paneel = page.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
+      await expect(paneel).toContainText('—');
+      await ordneZu(paneel, 'Fahrzeug zuordnen', fahrzeug, `${fahrzeug} (RTW)`);
+      const aufFahrzeug = paneel.getByRole('group', { name: `Fahrzeug ${fahrzeug}` });
+      await expect(aufFahrzeug).toBeVisible();
+
+      await ordneZu(paneel, 'Person zuordnen', person, person);
+      const ohne = paneel.getByRole('group', { name: 'Ohne Fahrzeug' });
+      await expect(ohne.getByRole('link', { name: person })).toBeVisible();
+      expect(bodies).toEqual([
+        {
+          pfad: `/api/einsaetze/${einsatzId}/fahrzeuge/sammel`,
+          body: { fahrzeug_ids: [fahrzeugId], einheit_id: einheitId },
+        },
+        {
+          pfad: `/api/einsaetze/${einsatzId}/personal/sammel`,
+          body: { personal_ids: [personalId], einheit_id: einheitId, fahrzeug_id: null },
+        },
+      ]);
+
+      await paneel.getByRole('button', { name: `Aktionen zu Person ${person}` }).click();
+      await page.getByRole('menuitem', { name: `Auf ${fahrzeug}` }).click();
+      await expect(aufFahrzeug.getByRole('link', { name: person })).toBeVisible();
+      await expect(ohne).toHaveCount(0);
+    });
+
+    test('Beobachter: keine Stifte, kein Menü, keine Auswahl, kein Auflösen', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Beobachter ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '3. Zug');
+      // Ein Mitglied, damit „kein Menü“ nicht schon an der leeren Einheit wahr ist.
+      const epId = await post(page, `/api/einsaetze/${einsatzId}/personal`, {
+        adhoc: { name: 'Beo Mitglied' },
+      });
+      const zuordnung = await page.request.put(
+        `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+      );
+      expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
       await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
       await stelleDichte(page, dichte);
@@ -111,6 +190,12 @@ for (const dichte of DICHTEN) {
       const main = page.getByRole('main');
       // Erst der Inhaltsanker, sonst wäre „fehlt“ auch im Ladezustand wahr.
       await expect(main.getByRole('region', { name: 'Kopfdaten' })).toContainText('3. Zug');
+      await expect(
+        main.getByRole('region', { name: 'Fahrzeuge und Besatzung' }).getByText('Beo Mitglied'),
+      ).toBeVisible();
+      await expect(main.getByRole('button', { name: /^Aktionen zu Person / })).toHaveCount(0);
+      await expect(main.getByRole('combobox', { name: /zuordnen$/ })).toHaveCount(0);
+      await expect(main.getByRole('button', { name: 'Aus Einheit lösen' })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /(bearbeiten|eintragen)$/ })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /^Status von / })).toHaveCount(0);
       await expect(main.getByRole('region', { name: 'Einheit auflösen' })).toHaveCount(0);
