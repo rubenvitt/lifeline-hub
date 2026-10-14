@@ -5,8 +5,9 @@ import type { ExterneStelle, ExterneStelleArt } from '../api/types';
 
 /**
  * Vorschläge aus dem Katalog „Externe Stellen“ (LFH-1194, design.md D6) für die meldende Stelle
- * (`pages/EinsatzdatenPage.tsx`) und den Adressaten einer Nachforderung
- * (`nachforderungen/NachforderungFormular.tsx`). Gespeichert wird dort nur der Text; dieses
+ * (`pages/EinsatzdatenPage.tsx`), den Adressaten einer Nachforderung
+ * (`nachforderungen/NachforderungFormular.tsx`) und die externen Stellen des Kommunikationsplans
+ * (`stab/KommunikationsplanDialoge.tsx`, LLH-1165). Gespeichert wird dort nur der Text; dieses
  * Modul liefert die Auswahl. LFH-1284 macht daraus die Quelle `externeStellen` des Bausteins
  * `StammdatenFeld` — dann zieht nur diese Datei um.
  */

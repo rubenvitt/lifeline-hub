@@ -597,16 +597,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
-            retain("grundzeichen", G_ENUM),
-            retain("organisation", G_ENUM),
-            retain("fachaufgabe", G_ENUM),
-            retain("symbol", G_ENUM),
-            retain("einheit", G_ENUM),
-            retain("funktion", G_ENUM),
-            retain("farbe", G_ENUM),
             // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
             // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
-            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`.
+            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`. Altzeilen
+            // tragen die Hülle `{"v":1,"alt":{…}}` aus 0192 (LLH-1160): Katalog-Kennungen des
+            // Altpakets und eine Hexfarbe, ebenfalls kein Freitext.
             retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
             scrub("label", Strategie::NullSetzen, Z_EINSATZ),

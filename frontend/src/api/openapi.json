@@ -6176,12 +6176,13 @@
       },
       "FreiesZeichenAnzeige": {
         "type": "object",
-        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).\n\nGenau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit\nden Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client\nübersetzt die Altform beim Lesen (design.md D5).",
+        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).\n\nDie Form steht allein in `zeichen_spec` (LFH-836; seit LLH-1160 Pflicht, die Altspalten sind\nentfernt). Lage-Snapshots von vorher tragen noch die Altform; der Client übersetzt sie beim\nLesen (design.md D5).",
         "required": [
           "id",
           "einsatz_id",
           "lat",
           "lon",
+          "zeichen_spec",
           "erstellt_von",
           "erstellt_at",
           "geaendert_at"
@@ -6195,12 +6196,6 @@
             "format": "int64",
             "description": "Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar."
           },
-          "einheit": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
@@ -6212,33 +6207,8 @@
             "type": "integer",
             "format": "int64"
           },
-          "fachaufgabe": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "farbe": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "funktion": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "geaendert_at": {
             "type": "string"
-          },
-          "grundzeichen": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Altform: fehlt bei einem Zeichen mit `zeichen_spec`."
           },
           "id": {
             "type": "integer",
@@ -6258,24 +6228,9 @@
             "type": "number",
             "format": "double"
           },
-          "organisation": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "symbol": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "zeichen_spec": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet; fehlt bei einem Zeichen in Altform."
+            "type": "string",
+            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird."
           }
         }
       },

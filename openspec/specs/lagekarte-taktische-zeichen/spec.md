@@ -18,14 +18,19 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 - **Fahrzeug**: Kraftfahrzeug der Kategorie 1, ein Wasserfahrzeug, ein Luftfahrzeug oder ein
   Anhänger, je nach Fahrzeugtyp. Ein Krad oder Motorrad MUST als Landfahrzeug erscheinen.
   Rettungsdienstfahrzeuge (RTW, KTW, NEF, NAW, RTH) MUST das Sanitätszeichen tragen.
-- **Führungskraft**: Person in der Farbe ihrer Organisation und MUST ohne Fachaufgabe
-  gezeichnet werden.
+- **Führungskraft**: Person in der Farbe ihrer Organisation mit ihrer Fachaufgabe, soweit die
+  Bibliothek sie an der Person darstellt, auch wenn diese Darstellung nur abgeleitet und nicht
+  vermessen ist. Die Fachaufgabe kommt aus dem gespeicherten Wert oder aus der Funktion: Notarzt
+  oder Arzt ergibt Arzt, Rettungsdienst oder Sanitäter ergibt Sanität, Funk oder Fernmelde ergibt
+  IuK. Ein Funktionsindikator MUST NOT erscheinen.
 - **Einsatzabschnitt**: taktische Formation in der Farbe „Führung und Leitung“, ohne Kürzel.
 - **Einsatzort**: Zeichen „Ereignis“.
 - **Schaden**: Zeichen „Gefahr“. Die Füllung folgt dem Ausmaß: gering grün, mittel gelb, groß
   orange, katastrophal rot, unbekannt grau.
-- **Unfallhilfsstelle und Betreuungsstelle**: Stelle der Hilfsorganisation mit Arzt
-  (Behandlungsplatz), Sanität (sonstige) oder Betreuung (Betreuungsstelle).
+- **Unfallhilfsstelle und Betreuungsstelle**: Stelle mit Arzt (Behandlungsplatz), Sanität
+  (sonstige) oder Betreuung (Betreuungsstelle). Die Stelle trägt die Organisation des Betreibers,
+  also die Organisations-Vorgabe des Hubs. Ist keine hinterlegt, MUST sie ohne Organisation
+  stehen und MUST NOT fest als Hilfsorganisation erscheinen.
 
 #### Scenario: Rettungswagen
 - **WHEN** ein Fahrzeug des Typs „RTW“ einer Hilfsorganisation auf der Karte steht
@@ -33,7 +38,15 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 
 #### Scenario: Führungskraft mit Funktion Notarzt
 - **WHEN** eine Führungskraft mit der Funktion „Notarzt“ auf der Karte steht
-- **THEN** zeigt ihr Zeichen eine Person in der Farbe ihrer Organisation ohne Fachaufgabe
+- **THEN** zeigt ihr Zeichen eine Person in der Farbe ihrer Organisation mit dem Arztzeichen
+
+#### Scenario: Unfallhilfsstelle eines Feuerwehr-Hubs
+- **WHEN** die Organisations-Vorgabe des Hubs „Feuerwehr“ ist und eine UHS „sonstige“ auf der Karte steht
+- **THEN** zeigt ihr Zeichen die Stelle in der Farbe der Feuerwehr mit dem Sanitätszeichen
+
+#### Scenario: Betreuungsstelle ohne Organisations-Vorgabe
+- **WHEN** der Hub keine Organisations-Vorgabe hat und eine Betreuungsstelle auf der Karte steht
+- **THEN** zeigt ihr Zeichen die Stelle ohne Organisation mit dem Betreuungszeichen
 
 #### Scenario: Schaden mit großem Ausmaß
 - **WHEN** ein Schaden mit Ausmaß „groß“ verortet ist

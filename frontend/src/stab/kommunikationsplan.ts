@@ -2,7 +2,10 @@ import type { AbrufZustand } from '../api/abrufZustand';
 import type {
   Einheit,
   Einsatzabschnitt,
+  ExterneStelle,
+  ExterneStelleArt,
   KommunikationsStelle,
+  NeueVerbindung,
   SkizzenVerbindung,
   Stab,
   StellenKanal,
@@ -64,6 +67,57 @@ export const EXTERNE_STELLENARTEN: readonly Exclude<Stellenart, 'funktion'>[] = 
   'verbindungsperson',
   'sonstige',
 ];
+
+/**
+ * Planart einer Stelle aus dem Katalog „Externe Stellen“ (LLH-1165; Abbildung festgelegt in
+ * `openspec/changes/archive/2026-10-11-lfh-1194-externe-stellen-katalog/design.md`, D2). Der Plan
+ * kennt keine Polizei und keine Hilfsorganisation: Polizei ist Behörde, Hilfsorganisation sonstige
+ * Stelle. Eine Verbindungsperson ist ein Mensch und steht nie im Katalog.
+ */
+export const STELLENART_AUS_KATALOG: Record<
+  ExterneStelleArt,
+  Exclude<Stellenart, 'funktion' | 'verbindungsperson'>
+> = {
+  leitstelle: 'leitstelle',
+  polizei: 'behoerde',
+  behoerde: 'behoerde',
+  hilfsorganisation: 'sonstige',
+  sonstige: 'sonstige',
+};
+
+/** Die aktiven Katalogstellen, die als Planart `art` in den Plan kommen. */
+export function katalogStellenFuer(
+  art: Stellenart,
+  katalog: readonly ExterneStelle[],
+): ExterneStelle[] {
+  return katalog.filter((s) => s.aktiv && STELLENART_AUS_KATALOG[s.art] === art);
+}
+
+/**
+ * Vorschlag für die Lücke „Leitstelle“ (LLH-1165): die zuständige Leitstelle des Katalogs, solange
+ * der Plan gar keine Leitstelle führt. Steht schon eine da, fehlt ihr nur die Verbindung, und die
+ * gehört an diese Stelle, nicht an eine zweite.
+ */
+export function leitstellenVorschlag(
+  stellen: readonly KommunikationsStelle[],
+  katalog: readonly ExterneStelle[],
+): ExterneStelle | undefined {
+  if (stellen.some((s) => s.stellenart === 'leitstelle')) return undefined;
+  return katalog.find((s) => s.aktiv && s.zustaendig && s.art === 'leitstelle');
+}
+
+/**
+ * Die Rufnummer einer Katalogstelle als erste Verbindung der neuen Stelle, `undefined` ohne
+ * Nummer. Der Katalog unterscheidet Festnetz und Mobil nicht; Festnetz ist die Dienstnummer einer
+ * Stelle, das Mittel lässt sich danach ändern. Übernommen wird nur Text (Speicherform A): eine
+ * spätere Änderung im Katalog ändert den Plan nicht.
+ */
+export function verbindungAusRufnummer(
+  rufnummer: string | null | undefined,
+): NeueVerbindung | undefined {
+  const wert = rufnummer?.trim();
+  return wert ? { mittel: 'festnetz', wert } : undefined;
+}
 
 /** Festnetz und Mobil teilen die Labels mit Abschnitt und Einheit (`kommunikationsmittel.ts`). */
 export const VERBINDUNGSMITTEL_LABEL: Record<Verbindungsmittel, string> = {

@@ -2,7 +2,7 @@
 titel: Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/stab/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/stab/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -67,7 +67,15 @@ Einsatzleitung und Führungspersonal.
 2. „Stelle hinzufügen“ wählen.
 3. Unter „Art“ „Führungsfunktion“, „Leitstelle“, „Behörde“, „Verbindungsperson“ oder „Sonstige
    Stelle“ wählen, bei einer Führungsfunktion die „Funktion“, sonst die „Bezeichnung“.
-4. „Anlegen“ wählen.
+4. Bei einer externen Stelle bietet „Bezeichnung“ die passenden Stellen aus den
+   [Stammdaten](stammdaten.md) an. Eine davon wählen oder einen eigenen Text eintragen. Die Wahl
+   trägt die „Rufnummer“ der Stelle ein, sofern dort noch nichts von Hand steht.
+5. „Anlegen“ wählen. Eine eingetragene „Rufnummer“ steht danach als Festnetz-Verbindung an der
+   Stelle.
+
+Fehlt dem Plan jede Leitstelle, nennt das Paneel „Lücken“ die zuständige Leitstelle aus den
+Stammdaten als Knopf, etwa „ILS Nord hinzufügen“. Er öffnet „Stelle hinzufügen“ mit Art,
+Bezeichnung und Rufnummer vorbelegt.
 
 ### Eine Verbindung erfassen
 
@@ -117,6 +125,17 @@ Einsatzleiter, etwa „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ist k
 „Einsatzleiter nicht erfasst“. Gepflegt werden im
 Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
 einmal vor.
+
+### Stellen aus den Stammdaten
+
+Vorgeschlagen werden nur aktive externe Stellen der eigenen Organisation. Der Kommunikationsplan
+kennt weniger Arten als die Stammdaten: eine Polizeidienststelle kommt als „Behörde“ hinein, eine
+Hilfsorganisation als „Sonstige Stelle“. Übernommen werden Bezeichnung und Rufnummer als Text,
+nicht der Funkrufname, denn der Plan sammelt Verbindungen außerhalb des Funks. Wird die Stelle
+später in den Stammdaten umbenannt, geändert oder deaktiviert, bleibt der Kommunikationsplan, wie
+er ist. Die Rufnummer wird als „Festnetz“ übernommen; ist sie eine Mobilnummer, lässt sich das
+Mittel an der Verbindung ändern. Lässt sich die Rufnummer nicht speichern, steht die Stelle
+trotzdem im Plan, und über dem Plan steht „Rufnummer nicht übernommen“ mit Grund.
 
 ### Lücken
 
