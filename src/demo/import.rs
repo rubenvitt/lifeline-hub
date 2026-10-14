@@ -456,7 +456,7 @@ impl Ablauf<'_> {
                 .await?
                 .id;
                 self.fahrzeuge.insert(fahrzeug, ef_id);
-                let anzeige = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let anzeige = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
@@ -490,14 +490,14 @@ impl Ablauf<'_> {
                 let status_id = self.kataloge.id(Katalogeintrag::FahrzeugstatusFms(fms))?;
                 // Wie der Handler: Vorzustand lesen, setzen, frisch lesen, ETB nur bei einem
                 // echten Wechsel.
-                let vorher = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let vorher = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
                     true,
                 )
                 .await?;
-                crate::fahrzeug::disposition_repo::aktualisiere_tx(
+                crate::fahrzeug::disposition_repo::update_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,
@@ -505,7 +505,7 @@ impl Ablauf<'_> {
                     None,
                 )
                 .await?;
-                let nachher = crate::fahrzeug::disposition_repo::laden_anzeige_tx(
+                let nachher = crate::fahrzeug::disposition_repo::load_anzeige_tx(
                     conn,
                     self.einsatz_id,
                     ef_id,

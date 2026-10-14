@@ -436,7 +436,7 @@ pub async fn disponiere_fahrzeuge_tx(
         let funkrufname = match &einheit {
             Some(e) => mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, e.id, ef_id).await?,
             None => {
-                crate::fahrzeug::disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true)
+                crate::fahrzeug::disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true)
                     .await?
                     .funkrufname
             }

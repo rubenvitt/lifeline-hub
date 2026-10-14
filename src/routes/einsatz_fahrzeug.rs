@@ -154,7 +154,7 @@ pub async fn disponieren(
             })?,
         };
         let anzeige =
-            disposition_repo::laden_anzeige_tx(conn, einsatz_id, disponiert.id, true).await?;
+            disposition_repo::load_anzeige_tx(conn, einsatz_id, disponiert.id, true).await?;
         let text = if disponiert.reaktiviert {
             crate::fahrzeug::etb_text_erneut_disponiert(&anzeige.funkrufname)
         } else {
@@ -214,7 +214,7 @@ pub async fn sammel_disponieren(
         let mut anzeigen = Vec::with_capacity(ergebnis.fahrzeuge.len());
         for f in &ergebnis.fahrzeuge {
             anzeigen
-                .push(disposition_repo::laden_anzeige_tx(conn, einsatz_id, f.ef_id, true).await?);
+                .push(disposition_repo::load_anzeige_tx(conn, einsatz_id, f.ef_id, true).await?);
         }
         Ok((ergebnis, etb_id, anzeigen))
     })?;
@@ -239,7 +239,7 @@ pub struct DispoPatchBody {
 
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id} — Status und/oder Bemerkung.
 /// Status-Wechsel schreibt ETB-Eintrag.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
@@ -266,10 +266,10 @@ pub async fn aktualisieren(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     let (nachher, has_status_changed, beruehrt) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        disposition_repo::update_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
             .await?;
-        let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let has_status_changed = vorher.status_id != nachher.status_id;
         let mut beruehrt = Vec::new();
         if has_status_changed {
@@ -338,7 +338,7 @@ pub async fn entlassen(
     // Tx. Was das Fahrzeug außerhalb des Fahrzeugmoduls trug, liefert `entlassen_tx`; SSE erst
     // nach dem Commit.
     let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt)
                 .await?;
@@ -353,7 +353,7 @@ pub async fn entlassen(
             ),
         )
         .await?;
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         Ok((ergebnis, anzeige))
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
@@ -390,7 +390,7 @@ pub async fn stornieren(
     let jetzt = crate::zeit::jetzt();
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
-        let vorher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt).await?;
         crate::etb::system_audit_tx(
             conn,
@@ -425,7 +425,7 @@ pub async fn reaktivieren(
             ctx.benutzer.id,
         )
         .await?;
-        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -451,7 +451,7 @@ pub async fn besatzung_zuordnen(
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Zuordnung stabil). F06/LFH-244 Tier-A: Zuordnung + System-ETB atomar in EINER Tx.
     let fahrzeug =
-        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
+        disposition_repo::load_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
@@ -485,7 +485,7 @@ pub async fn besatzung_freigeben(
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Freigabe stabil). F06/LFH-244 Tier-A: Freigabe + System-ETB atomar in EINER Tx.
     let fahrzeug =
-        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
+        disposition_repo::load_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
@@ -540,7 +540,7 @@ pub async fn position(
     let eff_lon = body.lon.unwrap_or(vorher.1);
     pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
-    let nachher = disposition_repo::aktualisiere_position(
+    let nachher = disposition_repo::update_position(
         &state.pool,
         einsatz_id,
         ef_id,
