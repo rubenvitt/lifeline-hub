@@ -261,6 +261,9 @@ pub async fn sammel_disponieren(
     }
     if let Some(e) = &ergebnis.einheit {
         super::einsatz_einheit::sse_einheit(&state, einsatz_id, e.id);
+        // Steht die Einheit in einem Bereitstellungsraum, kommen ihre Fahrzeuge dorthin mit
+        // (LLH-1095, D7).
+        super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, e.id).await;
     }
     Ok((StatusCode::CREATED, Json(anzeigen)))
 }
@@ -403,9 +406,15 @@ pub async fn update(
         }
     }
     if has_angaben_changed {
-        if let Some(br_id) = nachher.aktueller_br_id {
-            super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
-        }
+        // Der eigene Raum eines einheitenlosen Fahrzeugs und der Raum seiner Einheit (LLH-1095,
+        // D7), je Raum einmal.
+        super::einsatz_bereitstellungsraum::sse_br_fuer(
+            &state,
+            einsatz_id,
+            nachher.aktueller_br_id.as_slice(),
+            nachher.einheit_id.as_slice(),
+        )
+        .await;
         if traegt_fuehrungsstelle {
             crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
         }
@@ -474,9 +483,15 @@ pub async fn entlassen(
     if ergebnis.trug_fuehrungsstelle {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
     }
-    if let Some(br_id) = ergebnis.br_id {
-        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
-    }
+    // Ebenso der Raum der Einheit, die das Fahrzeug verliert (LLH-1095, D7), je Raum einmal.
+    let einheit_vorher = ergebnis.einheit.as_ref().map(|(id, _)| *id);
+    super::einsatz_bereitstellungsraum::sse_br_fuer(
+        &state,
+        einsatz_id,
+        ergebnis.br_id.as_slice(),
+        einheit_vorher.as_slice(),
+    )
+    .await;
     if let Some((einheit_id, _)) = ergebnis.einheit {
         super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
     }

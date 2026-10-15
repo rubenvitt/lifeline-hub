@@ -85,6 +85,51 @@ pub(super) fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Bereitstellungsraum, "br_id", br_id);
 }
 
+/// Meldet `bereitstellungsraum` für die Räume `raeume` und für jeden Raum, in dem eine der
+/// `einheiten` steht, je Raum einmal (LLH-1095, design.md D7, Spec `bereitstellungsraum-belegung`,
+/// „Belegung bleibt live aktuell“): das Detail zeigt die Fahrzeuge seiner Einheiten, und Leser
+/// ohne Recht auf Einheiten oder Fahrzeuge erreicht `einheit`/`fahrzeug` nicht (LLH-1182). Liest
+/// nach dem Commit; scheitert das Lesen, bleibt es bei einer Warnung und den Räumen aus `raeume`
+/// (Muster `etb_system_degradiert`).
+pub(super) async fn sse_br_fuer(
+    state: &AppState,
+    einsatz_id: i64,
+    raeume: &[i64],
+    einheiten: &[i64],
+) {
+    let mut ziele: Vec<i64> = raeume.to_vec();
+    if !einheiten.is_empty() {
+        let ids = serde_json::to_string(einheiten).unwrap_or_else(|_| "[]".into());
+        match sqlx::query_scalar::<_, i64>(
+            "SELECT DISTINCT aktueller_br_id FROM einsatz_einheit \
+             WHERE einsatz_id = ? AND aktueller_br_id IS NOT NULL \
+               AND id IN (SELECT value FROM json_each(?))",
+        )
+        .bind(einsatz_id)
+        .bind(ids)
+        .fetch_all(&state.pool)
+        .await
+        {
+            Ok(gefunden) => ziele.extend(gefunden),
+            Err(e) => tracing::warn!(
+                einsatz_id,
+                fehler = %e,
+                "Bereitstellungsraum der Einheiten nicht lesbar, Live-Ereignis entfällt"
+            ),
+        }
+    }
+    ziele.sort_unstable();
+    ziele.dedup();
+    for br_id in ziele {
+        sse_br(state, einsatz_id, br_id);
+    }
+}
+
+/// [`sse_br_fuer`] für eine Einheit.
+pub(super) async fn sse_br_der_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
+    sse_br_fuer(state, einsatz_id, &[], &[einheit_id]).await;
+}
+
 // ---------- Detail-Helfer ----------
 
 async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<BrDetail, AppError> {

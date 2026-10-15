@@ -7,8 +7,8 @@ use serde_json::json;
 
 mod common;
 use common::{
-    anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen,
-    setup_mit_pool, setup_mit_pool_und_live,
+    anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie,
+    objekt_ereignisse, rolle_setzen, setup_mit_pool, setup_mit_pool_und_live,
 };
 
 // ---------- Harness ----------
@@ -1231,4 +1231,243 @@ async fn verlauf_modul_ausgeblendet_403() {
     let (s, _) = anfrage_json(&app, "GET", &pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     lesen(&app, &admin, &pfad).await;
+}
+
+const BR_EREIGNIS: &[(&str, &str)] = &[("bereitstellungsraum", "br_id")];
+
+fn br_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+) -> Vec<i64> {
+    let mut ids: Vec<i64> = objekt_ereignisse(rx, BR_EREIGNIS)
+        .into_iter()
+        .map(|(_, id)| id)
+        .collect();
+    ids.sort_unstable();
+    ids
+}
+
+/// Zuordnen eines Fahrzeugs an eine Einheit im Raum meldet den Raum; dieselbe Einheit noch
+/// einmal meldet nichts; eine Einheit in keinem Raum meldet keinen Raum.
+#[tokio::test]
+async fn fahrzeug_zuordnen_meldet_den_raum_der_einheit() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Live").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let draussen = einheit_bilden(&app, &cookie, eid, "Draußen").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+    let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1", None).await;
+    let fz2 = adhoc_fahrzeug(&app, &cookie, eid, "Florian 2", None).await;
+    let zuordnen =
+        |einheit: i64, ef: i64| format!("/api/einsaetze/{eid}/einheiten/{einheit}/fahrzeug/{ef}");
+
+    let mut rx = live.abonniere(eid);
+    let (s, _) = anfrage_json(&app, "PUT", &zuordnen(zug, fz), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Zuordnen meldet den Raum");
+
+    let (s, _) = anfrage_json(&app, "PUT", &zuordnen(zug, fz), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        br_ereignisse(&mut rx),
+        Vec::<i64>::new(),
+        "dieselbe Einheit"
+    );
+
+    let (s, _) = anfrage_json(&app, "PUT", &zuordnen(draussen, fz2), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        br_ereignisse(&mut rx),
+        Vec::<i64>::new(),
+        "Einheit ohne Raum"
+    );
+}
+
+/// Umhängen zwischen zwei Einheiten in zwei Räumen meldet beide Räume.
+#[tokio::test]
+async fn umhaengen_meldet_beide_raeume() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let br_b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR B").await;
+    let zug1 = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let zug2 = einheit_bilden(&app, &cookie, eid, "2. Zug").await;
+    belegen(&app, &cookie, eid, br_a, "einheit", zug1, "eintritt").await;
+    belegen(&app, &cookie, eid, br_b, "einheit", zug2, "eintritt").await;
+    let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1", Some(zug1)).await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, _) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{zug2}/fahrzeug/{fz}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let mut erwartet = vec![br_a, br_b];
+    erwartet.sort_unstable();
+    assert_eq!(br_ereignisse(&mut rx), erwartet);
+}
+
+/// Freigeben, Umbenennen der Einheit, Funkrufname eines Ad-hoc-Fahrzeugs der Einheit und
+/// Entlassen melden den Raum der Einheit, je einmal; ein PATCH ohne Namensänderung nicht.
+#[tokio::test]
+async fn weitere_wege_melden_den_raum_der_einheit() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Live").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+    let fz1 = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1", Some(zug)).await;
+    let fz2 = adhoc_fahrzeug(&app, &cookie, eid, "Florian 2", Some(zug)).await;
+    let mut rx = live.abonniere(eid);
+
+    let (s, _) = anfrage_json(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{eid}/einheiten/{zug}/fahrzeug/{fz1}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Freigeben");
+
+    let einheit = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &einheit,
+        &cookie,
+        Some(&json!({"name": "1. Zug Nord"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Umbenennen");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &einheit,
+        &cookie,
+        Some(&json!({"bemerkung": "Bereitschaft"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        br_ereignisse(&mut rx),
+        Vec::<i64>::new(),
+        "ohne Namensänderung"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{eid}/fahrzeuge/{fz2}"),
+        &cookie,
+        Some(&json!({"funkrufname": "Florian 2 neu"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Funkrufname");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/fahrzeuge/{fz2}/entlassen"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Entlassen");
+}
+
+/// Bilden aus einer Vorlage, das ein Fahrzeug aus einer Einheit im Raum umhängt, meldet den Raum.
+#[tokio::test]
+async fn aus_vorlage_umhaengen_meldet_den_raum() {
+    use lifeline_hub::einheit_vorlage::repo::{self as vrepo, NewVorlage};
+
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let typ: i64 =
+        sqlx::query_scalar("SELECT id FROM einheit_typ WHERE org_id = ? AND label = 'Zug'")
+            .bind(org)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let stamm: i64 = sqlx::query_scalar(
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (?, 'RTW 1') RETURNING id",
+    )
+    .bind(org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let vorlage = vrepo::create(
+        &pool,
+        org,
+        NewVorlage {
+            name: "Sanitätszug",
+            typ_id: typ,
+            ueber_vorlage_id: None,
+            funkrufname: None,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+            soll: None,
+            bemerkung: None,
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    vrepo::replace_fahrzeuge(&pool, org, vorlage, &[stamm])
+        .await
+        .unwrap();
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Vorlage").await;
+    let alt = einheit_bilden(&app, &cookie, eid, "Alter Zug").await;
+    belegen(&app, &cookie, eid, br, "einheit", alt, "eintritt").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/fahrzeuge"),
+        &cookie,
+        Some(&json!({"fahrzeug_id": stamm})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ef = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{alt}/fahrzeug/{ef}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/einheiten/aus-vorlage"),
+        &cookie,
+        Some(&json!({"vorlage_id": vorlage,
+                     "fahrzeuge": [{"fahrzeug_id": stamm, "umhaengen": true}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br]);
+    let d = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(d["belegung"]["fahrzeuge"], 0, "{d}");
 }

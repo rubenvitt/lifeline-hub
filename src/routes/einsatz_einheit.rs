@@ -401,6 +401,14 @@ pub async fn aus_vorlage_bilden(
     for alt in &gebildet.alte_einheiten {
         sse_einheit(&state, einsatz_id, *alt);
     }
+    // Ein umgehängtes Fahrzeug verlässt die Zeile seiner alten Einheit im Raum (LLH-1095, D7).
+    super::einsatz_bereitstellungsraum::sse_br_fuer(
+        &state,
+        einsatz_id,
+        &[],
+        &gebildet.alte_einheiten,
+    )
+    .await;
     for f in &gebildet.fahrzeuge {
         sse_fahrzeug(&state, einsatz_id, f.id);
     }
@@ -581,6 +589,10 @@ pub async fn update(
         super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &inhalt).await;
     }
     sse_einheit(&state, einsatz_id, eid);
+    // Das Detail des Bereitstellungsraums nennt die Einheit beim Namen (LLH-1095, D7).
+    if vorher.name != final_anzeige.name {
+        super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
+    }
     Ok(Json(final_anzeige))
 }
 
@@ -797,6 +809,11 @@ pub async fn fahrzeug_zuordnen(
         for (ep_id, _) in &zuordnung.besatzung {
             sse_personal(&state, einsatz_id, *ep_id);
         }
+        // Das Detail eines Bereitstellungsraums zeigt die Fahrzeuge seiner Einheiten: der Raum
+        // der neuen und der vorigen Einheit (LLH-1095, D7).
+        let mut einheiten = vec![eid];
+        einheiten.extend(zuordnung.vorher.as_ref().map(|(alt, _)| *alt));
+        super::einsatz_bereitstellungsraum::sse_br_fuer(&state, einsatz_id, &[], &einheiten).await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -825,6 +842,7 @@ pub async fn fahrzeug_freigeben(
     })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
+    super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
