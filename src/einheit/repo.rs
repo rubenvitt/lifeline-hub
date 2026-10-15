@@ -311,9 +311,9 @@ async fn zu_anzeige_batch(
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         let override_soll =
-            Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
+            Staerke::from_options(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
                 .unwrap_or(None);
-        let typ_soll = Staerke::aus_optionen(
+        let typ_soll = Staerke::from_options(
             row.typ_soll_fuehrer,
             row.typ_soll_unterfuehrer,
             row.typ_soll_mannschaft,

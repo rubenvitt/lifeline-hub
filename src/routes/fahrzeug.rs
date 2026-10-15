@@ -69,7 +69,7 @@ impl Normalisiert {
 
 fn normalisiere(body: FahrzeugBody) -> Result<Normalisiert, AppError> {
     let funkrufname = pflicht(&body.funkrufname, "Funkrufname")?;
-    let staerke = Staerke::aus_optionen(
+    let staerke = Staerke::from_options(
         body.staerke_fuehrer,
         body.staerke_unterfuehrer,
         body.staerke_mannschaft,
@@ -171,7 +171,7 @@ impl PatchNormalisiert {
 /// Validiert den Teil-Patch gegen den **Effektivzustand** (Patch gewinnt, sonst Bestand).
 ///
 /// Das Stärke-Trio trägt die Mehrspalten-Invariante „alle drei oder keiner"
-/// (`Staerke::aus_optionen`). Ein naiver Teil-Patch (`{"staerke_mannschaft":9}` auf ein
+/// (`Staerke::from_options`). Ein naiver Teil-Patch (`{"staerke_mannschaft":9}` auf ein
 /// Fahrzeug mit gesetztem Trio) würde die Prüfung mit zwei `None` füttern und die Änderung
 /// fälschlich als „Trio halb geleert" ablehnen. Deshalb prüfen wir das **gemergte** Trio —
 /// geschrieben wird trotzdem nur der Patch (Muster „PATCH-XOR-Effektivzustand").
@@ -192,7 +192,7 @@ fn normalisiere_patch(
         Some(v) => v,
         None => gespeichert,
     };
-    Staerke::aus_optionen(
+    Staerke::from_options(
         effektiv(body.staerke_fuehrer, bestand.0),
         effektiv(body.staerke_unterfuehrer, bestand.1),
         effektiv(body.staerke_mannschaft, bestand.2),

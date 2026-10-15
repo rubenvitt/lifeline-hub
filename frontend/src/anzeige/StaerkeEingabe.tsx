@@ -14,7 +14,7 @@ interface Props {
 
 /**
  * Koerziert die drei Felder zur Stärke: ist mindestens eines gesetzt, zählen leere als 0; sind
- * alle leer, `null` — wie `Staerke::aus_optionen` im Backend („alle drei oder keiner").
+ * alle leer, `null` — wie `Staerke::from_options` im Backend („alle drei oder keiner").
  */
 function koerziere(f: Feld, uf: Feld, m: Feld): Staerke | null {
   if (f == null && uf == null && m == null) return null;

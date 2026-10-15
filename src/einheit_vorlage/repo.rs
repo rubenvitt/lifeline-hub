@@ -199,7 +199,7 @@ struct PersonalRow {
 
 /// Soll aus drei Spalten; nur ein vollständiges Trio gilt.
 fn trio(f: Option<i64>, u: Option<i64>, m: Option<i64>) -> Option<Staerke> {
-    Staerke::aus_optionen(f, u, m).ok().flatten()
+    Staerke::from_options(f, u, m).ok().flatten()
 }
 
 /// Welche Köpfe [`load_where`] liefert.
@@ -569,7 +569,7 @@ pub async fn update_tx(
     // geschrieben wird nur der Patch.
     let effektiv =
         |patch: Option<Option<i64>>, gespeichert: Option<i64>| patch.unwrap_or(gespeichert);
-    Staerke::aus_optionen(
+    Staerke::from_options(
         effektiv(patch.soll_fuehrer, bestand.0),
         effektiv(patch.soll_unterfuehrer, bestand.1),
         effektiv(patch.soll_mannschaft, bestand.2),

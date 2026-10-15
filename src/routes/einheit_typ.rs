@@ -44,12 +44,12 @@ impl Normalisiert {
 }
 
 /// Trimmt das Label und validiert die Soll-Regel „alle drei oder keiner" über
-/// `Staerke::aus_optionen` (mappt String-Fehler auf `Validation`).
+/// `Staerke::from_options` (mappt String-Fehler auf `Validation`).
 fn normalisiere(body: TypBody) -> Result<Normalisiert, AppError> {
     let label = pflicht(&body.label, "Label")?;
     // Validierung der Vollständigkeit/Bereiche; Rückgabewert verwerfen wir, wir
-    // speichern die rohen Optionen (durch aus_optionen als konsistent bestätigt).
-    Staerke::aus_optionen(
+    // speichern die rohen Optionen (durch from_options als konsistent bestätigt).
+    Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
         body.soll_mannschaft,
@@ -103,7 +103,7 @@ impl PatchNormalisiert {
 
 /// Validiert den Teil-Patch gegen den **Effektivzustand** (Patch gewinnt, sonst Bestand).
 ///
-/// Das Soll-Trio trägt die Mehrspalten-Invariante „alle drei oder keiner" (`aus_optionen`).
+/// Das Soll-Trio trägt die Mehrspalten-Invariante „alle drei oder keiner" (`from_options`).
 /// Ein naiver Teil-Patch (`{"soll_mannschaft":20}` auf eine Zeile mit gesetztem Trio)
 /// würde die Prüfung mit zwei `None` füttern und die Änderung fälschlich als
 /// „Trio halb geleert" ablehnen. Deshalb prüfen wir das **gemergte** Trio — geschrieben
@@ -124,7 +124,7 @@ fn normalisiere_patch(
         Some(v) => v,
         None => gespeichert,
     };
-    Staerke::aus_optionen(
+    Staerke::from_options(
         effektiv(body.soll_fuehrer, bestand.0),
         effektiv(body.soll_unterfuehrer, bestand.1),
         effektiv(body.soll_mannschaft, bestand.2),

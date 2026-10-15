@@ -614,7 +614,7 @@ pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, 
         .into_iter()
         .flatten()
         .filter_map(|s| StaerkePosition::parse(&s));
-    Ok(Staerke::aus_positionen(iter))
+    Ok(Staerke::from_positions(iter))
 }
 
 /// Eigene Ist-Stärke ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
@@ -643,7 +643,7 @@ pub async fn ist_staerke_map(
     }
     Ok(positionen
         .into_iter()
-        .map(|(einheit_id, ps)| (einheit_id, Staerke::aus_positionen(ps.into_iter())))
+        .map(|(einheit_id, ps)| (einheit_id, Staerke::from_positions(ps.into_iter())))
         .collect())
 }
 

@@ -143,7 +143,7 @@ pub async fn bilden(
     let fahrzeug_ids = check_fahrzeug_ids(body.fahrzeug_ids.as_deref())?;
     // Der Name geht ins ETB (LLH-1073 design.md D8): Grenze vor jedem Schreiben.
     let name = pflicht_max(&body.name, "Name", crate::einheit::NAME_MAX)?;
-    Staerke::aus_optionen(
+    Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
         body.soll_mannschaft,
@@ -491,7 +491,7 @@ pub async fn update(
         Some(v) => v,
         None => gespeichert,
     };
-    Staerke::aus_optionen(
+    Staerke::from_options(
         effektiv(body.soll_fuehrer, bestand_soll.0),
         effektiv(body.soll_unterfuehrer, bestand_soll.1),
         effektiv(body.soll_mannschaft, bestand_soll.2),

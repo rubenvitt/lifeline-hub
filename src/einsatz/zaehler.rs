@@ -167,7 +167,7 @@ pub fn count_kraefte(kraefte: &[KraftMerkmale]) -> KraefteZaehler {
     let aktiv = || kraefte.iter().filter(|k| !k.beendet);
     KraefteZaehler {
         personal: aktiv().count() as i64,
-        staerke: Staerke::aus_positionen(aktiv().filter_map(|k| k.staerke_position)),
+        staerke: Staerke::from_positions(aktiv().filter_map(|k| k.staerke_position)),
     }
 }
 
