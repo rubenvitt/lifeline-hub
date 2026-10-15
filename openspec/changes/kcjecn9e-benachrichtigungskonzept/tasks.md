@@ -67,9 +67,9 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 9. Lagebesprechung steht an (D10, benötigt 1, 2) · LLH-1215
 
-- [ ] 9.1 Migration für die Merker am Termin anhängen; Setzen eines Termins leert sie; Test
-- [ ] 9.2 Scheduler meldet 10 min vorher und bei Termin an EL und S1–S7; Rust-Tests „Termin 14:00“, „Termin verschoben“
-- [ ] 9.3 Anwenderkapitel zur Lagebesprechung nachziehen
+- [x] 9.1 Migration für die Merker am Termin anhängen; Setzen eines Termins leert sie; Test
+- [x] 9.2 Scheduler meldet 10 min vorher und bei Termin an EL und S1–S7; Rust-Tests „Termin 14:00“, „Termin verschoben“
+- [x] 9.3 Anwenderkapitel zur Lagebesprechung nachziehen
 
 ## 10. Status einer Nachforderung (benötigt 1, 2) · LLH-1216
 
