@@ -487,3 +487,72 @@ async fn haengender_push_dienst_haelt_melden_nicht_auf() {
     );
     drop(stumm);
 }
+
+// ── Speicher: das Abo hängt an der Sitzung ───────────────────────────────────────────────
+
+async fn sitzung(pool: &sqlx::SqlitePool, benutzer: i64) -> String {
+    lifeline_hub::auth::session::anlegen(
+        pool,
+        benutzer,
+        None,
+        lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+    )
+    .await
+    .unwrap()
+}
+
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn abo_haengt_an_der_sitzung_und_faellt_mit_ihr() {
+    let (_app, pool, _live) = setup_mit_pool_und_live().await;
+    let benutzer = admin_id(&pool).await;
+    let token = sitzung(&pool, benutzer).await;
+    let hash = lifeline_hub::auth::session::hash_token(&token);
+    repo::anmelden(&pool, benutzer, &hash, FCM, "p", "a")
+        .await
+        .unwrap();
+    assert!(repo::hat_abo(&pool, &hash).await.unwrap());
+    assert_eq!(repo::abos_von(&pool, &[benutzer]).await.unwrap().len(), 1);
+
+    lifeline_hub::auth::session::loeschen(&pool, &token)
+        .await
+        .unwrap();
+    assert!(!repo::hat_abo(&pool, &hash).await.unwrap());
+    assert!(repo::abos_von(&pool, &[benutzer]).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
+    let (_app, pool, _live) = setup_mit_pool_und_live().await;
+    let benutzer = admin_id(&pool).await;
+    let alt = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
+    let neu = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
+    repo::anmelden(&pool, benutzer, &alt, FCM, "p1", "a1")
+        .await
+        .unwrap();
+    repo::anmelden(&pool, benutzer, &neu, FCM, "p2", "a2")
+        .await
+        .unwrap();
+    assert!(!repo::hat_abo(&pool, &alt).await.unwrap());
+    assert!(repo::hat_abo(&pool, &neu).await.unwrap());
+    let abos = repo::abos_von(&pool, &[benutzer]).await.unwrap();
+    assert_eq!(abos.len(), 1);
+    assert_eq!(
+        (abos[0].p256dh.as_str(), abos[0].auth.as_str()),
+        ("p2", "a2")
+    );
+
+    // Ein erloschenes Abo fällt nur, solange es denselben Endpunkt hat.
+    repo::erloschen(&pool, abos[0].id, "https://anders")
+        .await
+        .unwrap();
+    assert!(repo::hat_abo(&pool, &neu).await.unwrap());
+    repo::erloschen(&pool, abos[0].id, FCM).await.unwrap();
+    assert!(!repo::hat_abo(&pool, &neu).await.unwrap());
+}

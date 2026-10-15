@@ -1,4 +1,4 @@
-import { Button, Switch, Tag, Typography, theme } from 'antd';
+import { Button, Switch, Typography, theme } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import AdminPage from '../components/AdminPage';
 import { Paneel, PaneelZeile, PaneelZustand } from '../components/instrument';
@@ -80,7 +80,7 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
             )}
           </label>
           <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
-            {blockiert && <Tag color="warning">Vom Browser blockiert</Tag>}
+            {blockiert && <Typography.Text type="warning">Vom Browser blockiert</Typography.Text>}
             <Switch
               id={feldId}
               aria-label={PUSH_SCHALTER}

@@ -1,8 +1,8 @@
-//! Einheitstests von Web Push (LLH-1223): Endpunkt- und Kontaktprüfung, Speicher.
+//! Einheitstests von Web Push (LLH-1223): Endpunkt- und Kontaktprüfung, Schlüssel. Die Bindung
+//! des Abos an die Sitzung prüft `tests/web_push.rs` (unter `src/` legt nur die Anmeldung
+//! Sitzungen an, Guard `tests/anmelde_audit_guard.rs`).
 
 use super::*;
-use crate::auth::provider::Anmeldeweg;
-use crate::auth::session;
 
 #[test]
 fn endpunkte_bekannter_push_dienste_sind_erlaubt() {
@@ -64,81 +64,4 @@ async fn schluessel_wird_einmal_erzeugt_und_danach_gelesen() {
         .await
         .unwrap();
     assert_eq!(zeilen, 1);
-}
-
-async fn admin(pool: &SqlitePool) -> i64 {
-    crate::auth::bootstrap::bootstrap_admin(pool, "Org", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-}
-
-#[tokio::test]
-async fn abo_haengt_an_der_sitzung_und_faellt_mit_ihr() {
-    let pool = crate::db::test_pool().await;
-    let benutzer = admin(&pool).await;
-    let token = session::anlegen(&pool, benutzer, None, Anmeldeweg::Passwort)
-        .await
-        .unwrap();
-    let hash = session::hash_token(&token);
-    repo::anmelden(
-        &pool,
-        benutzer,
-        &hash,
-        "https://fcm.googleapis.com/x",
-        "p",
-        "a",
-    )
-    .await
-    .unwrap();
-    assert!(repo::hat_abo(&pool, &hash).await.unwrap());
-    assert_eq!(repo::abos_von(&pool, &[benutzer]).await.unwrap().len(), 1);
-
-    session::loeschen(&pool, &token).await.unwrap();
-    assert!(!repo::hat_abo(&pool, &hash).await.unwrap());
-    assert!(repo::abos_von(&pool, &[benutzer]).await.unwrap().is_empty());
-}
-
-#[tokio::test]
-async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
-    let pool = crate::db::test_pool().await;
-    let benutzer = admin(&pool).await;
-    let alt = session::hash_token(
-        &session::anlegen(&pool, benutzer, None, Anmeldeweg::Passwort)
-            .await
-            .unwrap(),
-    );
-    let neu = session::hash_token(
-        &session::anlegen(&pool, benutzer, None, Anmeldeweg::Passwort)
-            .await
-            .unwrap(),
-    );
-    let e = "https://fcm.googleapis.com/x";
-    repo::anmelden(&pool, benutzer, &alt, e, "p1", "a1")
-        .await
-        .unwrap();
-    repo::anmelden(&pool, benutzer, &neu, e, "p2", "a2")
-        .await
-        .unwrap();
-    assert!(!repo::hat_abo(&pool, &alt).await.unwrap());
-    assert!(repo::hat_abo(&pool, &neu).await.unwrap());
-    let abos = repo::abos_von(&pool, &[benutzer]).await.unwrap();
-    assert_eq!(abos.len(), 1);
-    assert_eq!(
-        (abos[0].p256dh.as_str(), abos[0].auth.as_str()),
-        ("p2", "a2")
-    );
-
-    // Ein erloschenes Abo fällt nur, solange es denselben Endpunkt hat.
-    repo::erloschen(&pool, abos[0].id, "https://anders")
-        .await
-        .unwrap();
-    assert!(repo::hat_abo(&pool, &neu).await.unwrap());
-    repo::erloschen(&pool, abos[0].id, e).await.unwrap();
-    assert!(!repo::hat_abo(&pool, &neu).await.unwrap());
-
-    repo::abmelden(&pool, &neu).await.unwrap();
 }
