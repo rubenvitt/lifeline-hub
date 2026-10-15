@@ -60,10 +60,10 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 8. Meldung an meine Funktion (D8, benötigt 1, 2) · LLH-1214
 
-- [ ] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme und ungültiger Code 422
-- [ ] 8.2 Erfassung bietet Empfängerfunktion an und füllt den Freitext vor; Vitest
-- [ ] 8.3 Erfassen meldet `meldung` an die Funktion, bei Sofortmeldung nur der Alarm; Rust-Tests „Meldung an S2“, „Sofortmeldung an S2“
-- [ ] 8.4 Anwenderkapitel `meldungen` (Empfängerfunktion) nachziehen
+- [x] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme und ungültiger Code 422
+- [x] 8.2 Erfassung bietet Empfängerfunktion an und füllt den Freitext vor; Vitest
+- [x] 8.3 Erfassen meldet `meldung` an die Funktion, bei Sofortmeldung nur der Alarm; Rust-Tests „Meldung an S2“, „Sofortmeldung an S2“
+- [x] 8.4 Anwenderkapitel `meldungen` (Empfängerfunktion) nachziehen
 
 ## 9. Lagebesprechung steht an (D10, benötigt 1, 2) · LLH-1215
 

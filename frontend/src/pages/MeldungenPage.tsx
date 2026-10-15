@@ -30,6 +30,7 @@ import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -109,6 +110,8 @@ export default function MeldungenPage() {
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
+  // Empfängerfunktion der Erfassung (LLH-1214): Katalog plus lesbare Besetzung.
+  const funktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
@@ -643,6 +646,7 @@ export default function MeldungenPage() {
             speicherung={anlegenSpeicherung}
             einheiten={einheitenQuery.data}
             abschnitte={abschnitteQuery.data}
+            funktionsVorschlaege={funktionsVorschlaege}
           />
         </Paneel>
       )}

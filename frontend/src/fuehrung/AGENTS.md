@@ -1,7 +1,7 @@
 # Führungsfunktionen — Regeln
 
 Gilt für `frontend/src/fuehrung/`, `src/fuehrung/` und jede Stelle, die eine Führungsfunktion
-speichert oder anzeigt (Erinnerung, Auftragsempfänger, Führungsstelle, ETB „An“); ergänzt
+speichert oder anzeigt (Erinnerung, Auftragsempfänger, Führungsstelle, Meldung, ETB „An“); ergänzt
 `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
 
 **Führungsfunktionen** (LFH-549, `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`):
@@ -9,7 +9,9 @@ geschlossener Katalog `fuehrung::Fuehrungsfunktion` (EL, S1–S7, Führungshilfs
 `art` abgeleitet), Mandantenlabels und S7-Schalter in `org_fuehrungsfunktion`, Client liest nur
 `GET /api/fuehrungsfunktionen` (keine zweite Labelliste). Erinnerung, Auftragsempfänger und
 Führungsstelle tragen eine **Codespalte neben dem Text** (Text = Freitext ohne Code bzw.
-Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); **kein Rückschluss vom Freitext auf
+Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); die Meldung trägt
+`empfaenger_funktion` ohne Bezeichnung, also nur EL und Sachgebiete (FHP/FB 422, LLH-1214), und
+die Wahl füllt einen leeren Freitext mit dem Kürzel vor; **kein Rückschluss vom Freitext auf
 einen Code**, auch nicht „S3“ (Kodierung `funktion:<code>` nur über `fuehrung/funktionsOptionenKern.ts`).
 Der Snapshot trägt nur das Label, **nie einen Personennamen** (er steht im ETB); die Besetzung löst
 der Server zur Lesezeit auf (`fuehrung::aufloesung`, nur mit Stab-Recht, `stab`-Ereignis invalidiert
