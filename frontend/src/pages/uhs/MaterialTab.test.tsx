@@ -5,324 +5,255 @@ import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { freigabenFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
-import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
-import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
+import type { EinsatzMaterial, MaterialStatus, ModulFreigaben, UhsDetail } from '../../api/types';
 import MaterialTab from './MaterialTab';
 
 /**
- * Der Materialreiter der UHS auf der Erfassungshülle. Geprüft werden:
- *
- * 1. Der Absende-Knopf liegt im `<form>`. „Enter im Auswahlfeld sendet ab" ist mit einem
- *    antd-`Select` unerreichbar: rc-select ruft bei jedem Enter `preventDefault()` (außer im Modus
- *    `combobox`) und öffnet die Liste. Belegt wird deshalb die Struktur, aus der die Zusicherung
- *    folgt — dieselbe Abfrage wie `Erfassung.test.tsx`.
- * 2. Escape setzt zurück. Das war schon vor der Hülle so (antds `Modal` ruft `onCancel` für alle
- *    vier Auswege); der Test ist der Riegel dagegen, dass der `Form`-Speicher der Hülle eine Lücke
- *    einbaut, die vorher nicht da war.
+ * Der Materialreiter der UHS als Hülle um den Baustein für Material am Ort (LLH-1225, design.md
+ * D12): die Posten kommen aus dem UHS-Detail (auch ohne Materialrecht), das Angebot von
+ * „Material zuordnen …“ aus der Materialliste (nur mit Freigabe Material, nicht am Gerät).
+ * Zuordnen und Lösen schicken den PATCH an die Disposition; Lösen ohne Rückfrage (LFH-363).
  */
-
-const uhs = { id: 3, einsatz_id: 1, plaetze: [], belegungen: [] } as unknown as UhsDetail;
 
 const basis = {
   einsatz_id: 1,
   material_id: 5,
   einheit_id: null,
+  einsatz_fahrzeug_id: null,
+  br_id: null,
   ist_adhoc: false,
   kategorie: 'Betreuung',
   bestandsnummer: null,
   traegerorganisation: null,
   status: 'einsatzbereit',
-  art: 'verbrauchsgut',
+  art: 'geraet',
   ausgegeben: 0,
+  menge: 1,
   bemerkung: null,
+  beendet_at: null,
   disponiert_at: '2026-07-30 09:00:00',
   disponiert_von: 1,
 };
 
-/** Frei verortbar (uhs_id === null) → steht im Auswahlfeld der Erfassungsmaske. */
+/** Ohne Ort → steht im Angebot. */
 const frei = {
   ...basis,
   id: 10,
   bezeichnung: 'Wolldecke',
+  art: 'verbrauchsgut',
   menge: 50,
   uhs_id: null,
 } as unknown as EinsatzMaterial;
-const freiZwei = {
-  ...basis,
-  id: 11,
-  bezeichnung: 'Zeltbahn',
-  menge: 4,
-  uhs_id: null,
-} as unknown as EinsatzMaterial;
-/** Dieser UHS zugeordnet → steht in der Tabelle. */
+/** An dieser UHS → steht in den Zeilen. */
 const verortet = {
   ...basis,
   id: 12,
   bezeichnung: 'Trage',
-  menge: 2,
   uhs_id: 3,
 } as unknown as EinsatzMaterial;
+const zweitesVerortet = {
+  ...verortet,
+  id: 13,
+  bezeichnung: 'Vakuummatratze',
+} as unknown as EinsatzMaterial;
+
+const uhsMit = (material: EinsatzMaterial[], status = 'aktiv') =>
+  ({ id: 3, einsatz_id: 1, status, plaetze: [], belegungen: [], material }) as unknown as UhsDetail;
 
 interface Patch {
   emId: number;
   body: unknown;
 }
 
+const GERAET_ME = {
+  id: 9,
+  anzeigename: 'UHS Nord · Laptop',
+  benutzername: 'geraet-3',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-10-04',
+  totp_aktiviert: false,
+  passwort_gesetzt: false,
+  geraet: {
+    kopplung_id: 3,
+    einsatz_id: 1,
+    ansicht: 'uhs-laptop',
+    uhs_id: 3,
+    stelle: 'UHS Nord',
+    bezeichnung: 'Laptop',
+    laeuft_ab_at: '2026-10-05 12:00:00',
+  },
+};
+
 /**
- * Rendert den Reiter und gibt die aufgezeichneten PATCHes zurück — geprüft wird der Weg bis zum
- * Request, nicht der Aufruf eines Doubles.
+ * Rendert den Reiter und gibt die aufgezeichneten PATCHes und Abrufe der Materialliste zurück —
+ * geprüft wird der Weg bis zum Request, nicht der Aufruf eines Doubles.
  */
-function render(
-  material: EinsatzMaterial[],
+function render({
+  hier = [verortet],
+  liste = [frei, verortet],
   schreibgeschuetzt = false,
-  // Hält den PATCH offen, bis der Test ihn freigibt — sonst antwortet MSW vor einem zweiten Klick,
-  // und der Riegel gegen Doppel-Absenden wäre nicht prüfbar.
-  anhalten?: { freigeben: () => void; versprechen: Promise<void> },
-) {
+  status = 'aktiv',
+  freigaben = freigabenFixture(),
+  listeKaputt = false,
+  patch,
+}: {
+  hier?: EinsatzMaterial[];
+  liste?: EinsatzMaterial[];
+  schreibgeschuetzt?: boolean;
+  status?: string;
+  freigaben?: ModulFreigaben;
+  listeKaputt?: boolean;
+  patch?: Parameters<typeof http.patch>[1];
+} = {}) {
   const patches: Patch[] = [];
+  const abrufe: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json(material)),
-    http.patch('/api/einsaetze/1/material/:emId', async ({ params, request }) => {
-      patches.push({ emId: Number(params.emId), body: await request.json() });
-      if (anhalten) await anhalten.versprechen;
-      return HttpResponse.json({ ...frei, id: Number(params.emId) });
+    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/material', () => {
+      abrufe.push('material');
+      return listeKaputt
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(liste);
+    }),
+    http.patch('/api/einsaetze/1/material/:emId', async (info) => {
+      patches.push({ emId: Number(info.params.emId), body: await info.request.clone().json() });
+      return patch ? patch(info) : HttpResponse.json({});
     }),
   );
   return {
     patches,
+    abrufe,
     ...renderMitProviders(
-      <CommandPaletteProvider>
-        <MaterialTab einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-      </CommandPaletteProvider>,
+      <MaterialTab
+        einsatzId={1}
+        uhs={uhsMit(hier, status)}
+        schreibgeschuetzt={schreibgeschuetzt}
+      />,
       { route: '/einsaetze/1/unfallhilfsstellen/3' },
     ),
   };
 }
 
-/** Öffnet „Material zuordnen" und wählt den ersten Eintrag im Auswahlfeld. */
-async function oeffnenUndWaehlen(user: ReturnType<typeof userEvent.setup>, label: string) {
-  await user.click(await screen.findByRole('button', { name: 'Material zuordnen' }));
-  const dialog = await screen.findByRole('dialog');
-  await user.click(within(dialog).getByRole('combobox'));
-  await user.click(await screen.findByTitle(label));
-  return dialog;
-}
+const zeile = (text: string) =>
+  screen.getByText(text).closest('[data-lfh="material-am-ort-zeile"]') as HTMLElement;
+const auswahl = () => screen.getByRole('combobox', { name: 'Material zuordnen' });
+/** Bedienbar erst, wenn `/me` feststeht (am Gerät bleibt der Reiter lesend). */
+const bereit = () => screen.findByRole('combobox', { name: 'Material zuordnen' });
+const toasts = () => document.querySelectorAll('.ant-message-notice').length;
 
-describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () => {
-  /**
-   * Die strukturell prüfbare Zusicherung (siehe Dateikopf): keine antd-Fußzeile und der Knopf hat
-   * ein `form` als Vorfahr.
-   */
-  it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
-    const user = userEvent.setup();
-    render([frei, verortet]);
-    await user.click(await screen.findByRole('button', { name: 'Material zuordnen' }));
-    const dialog = await screen.findByRole('dialog');
-
-    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Zuordnen' }).closest('form')).not.toBeNull();
+describe('MaterialTab · Posten aus dem UHS-Detail (LLH-1225 D12)', () => {
+  it('zeigt die Posten der UHS mit Kategorie, Menge, Status und Kopfzahl', async () => {
+    render({
+      hier: [
+        verortet,
+        { ...zweitesVerortet, status: 'defekt' as MaterialStatus },
+        { ...frei, id: 14, uhs_id: 3, ausgegeben: 20 } as EinsatzMaterial,
+      ],
+    });
+    expect(screen.getByTestId('material-am-ort-kopf')).toHaveTextContent('3 Posten · 1 Ausfall');
+    expect(zeile('Trage')).toHaveTextContent('Betreuung');
+    expect(zeile('Wolldecke')).toHaveTextContent('30 von 50 übrig');
+    expect(zeile('Vakuummatratze')).toHaveTextContent('defekt');
   });
 
-  /**
-   * Der Knopf ist ein `htmlType="submit"` im Formular und erreicht die Mutation über `onFinish`.
-   */
-  it('ordnet das gewählte Material dieser UHS zu', async () => {
-    const user = userEvent.setup();
-    const { patches } = render([frei, verortet]);
-    const dialog = await oeffnenUndWaehlen(user, 'Wolldecke (Betreuung) — 50×');
-
-    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toEqual({ emId: 10, body: { uhs_id: 3 } });
+  it('zeigt den Materialstatus als Etikett, nie den rohen Wire-Wert', () => {
+    render({ hier: [{ ...verortet, status: 'desinfektion_noetig' as MaterialStatus }] });
+    expect(screen.getByText('Desinfektion nötig')).toBeInTheDocument();
+    expect(screen.queryByText('desinfektion_noetig')).not.toBeInTheDocument();
   });
 
-  /**
-   * Ohne Auswahl: der Knopf ist bedienbar, die Pflichtprüfung meldet sich, und es geht kein Request
-   * raus.
-   */
-  it('sendet ohne Auswahl nicht ab, sondern meldet die Pflicht', async () => {
-    const user = userEvent.setup();
-    const { patches } = render([frei]);
-    await user.click(await screen.findByRole('button', { name: 'Material zuordnen' }));
-    const dialog = await screen.findByRole('dialog');
-
-    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
-
-    expect(await screen.findByText('Bitte Material auswählen')).toBeInTheDocument();
-    expect(patches).toHaveLength(0);
-  });
-
-  /**
-   * Der Reset-Beleg läuft über Escape (den `schliessen`-Umschlag in `ErfassungsModal`), nicht über
-   * den Knopf: nur dort könnte der Store von rc-field-form das Abhängen der Kinder überleben
-   * (`preserve` ist an) und beim nächsten Öffnen gegen `initialValues` gewinnen.
-   */
-  it('nach Escape ist beim Wiederöffnen nichts stehengeblieben', async () => {
-    const user = userEvent.setup();
-    render([frei, freiZwei]);
-    const dialog = await oeffnenUndWaehlen(user, 'Wolldecke (Betreuung) — 50×');
-    expect(within(dialog).getByTitle('Wolldecke (Betreuung) — 50×')).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
-
-    // Nicht auf „Dialog verschwunden" warten: antds Zoom-Animation läuft in jsdom nie zu Ende.
-    // Geprüft wird der Inhalt beim Wiederöffnen.
-    await user.click(screen.getByRole('button', { name: 'Material zuordnen' }));
-    const wieder = await screen.findByRole('dialog');
-    await within(wieder).findByRole('combobox');
-    // antd v6 trägt den gewählten Eintrag als `title` am Select-Inhalt; das Eingabefeld ist immer
-    // leer. Die Optionsliste hängt im Portal außerhalb des Dialogs — `within` trennt beides.
-    expect(within(wieder).queryByTitle('Wolldecke (Betreuung) — 50×')).not.toBeInTheDocument();
+  it('setzt die Menge in die Zahlenschrift, die Bezeichnung nicht', () => {
+    render();
+    const menge = within(zeile('Trage')).getByText('1');
+    expect(menge.style.fontFamily).toContain('JetBrains Mono');
+    expect(screen.getByText('Trage').style.fontFamily).toBe('');
   });
 });
 
-describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-363)', () => {
-  /**
-   * Eine gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber): der Klick patcht
-   * sofort, ohne Rückfrage.
-   */
+describe('MaterialTab · Zuordnen und Lösen über den einen Schreibweg (LLH-1225 D2)', () => {
+  it('„Material zuordnen …“ setzt den gewählten Posten an diese UHS', async () => {
+    const { patches } = render();
+    await userEvent.click(await bereit());
+    await userEvent.click(await screen.findByText('Wolldecke · 50'));
+    await waitFor(() => expect(patches).toEqual([{ emId: 10, body: { uhs_id: 3 } }]));
+  });
+
   it('löst ohne Rückfrage — ein Klick, ein PATCH', async () => {
-    const user = userEvent.setup();
-    const { patches } = render([verortet]);
-    await screen.findByText('Trage');
-
-    await user.click(screen.getByRole('button', { name: 'Lösen' }));
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toEqual({ emId: 12, body: { uhs_id: null } });
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    const { patches } = render();
+    await bereit();
+    await userEvent.click(screen.getByRole('button', { name: 'Trage lösen' }));
+    await waitFor(() => expect(patches).toEqual([{ emId: 12, body: { uhs_id: null } }]));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   /**
    * Ohne Rückfrage fängt ein `loading` je Zeile den zweiten Klick ab — sonst kostete jeder Klick
-   * einen PATCH samt Invalidierung, Live-Ereignis und Erfolgsmeldung. Je Zeile, weil `loesenMut`
-   * alle Zeilen bedient.
+   * einen PATCH samt Invalidierung, Live-Ereignis und Erfolgsmeldung.
    */
   it('nimmt keinen zweiten Klick an, solange der PATCH läuft', async () => {
-    const user = userEvent.setup();
     let freigeben!: () => void;
-    const versprechen = new Promise<void>((r) => {
-      freigeben = r;
+    const versprechen = new Promise<void>((r) => (freigeben = r));
+    const { patches } = render({
+      hier: [verortet, zweitesVerortet],
+      patch: async () => {
+        await versprechen;
+        return HttpResponse.json({});
+      },
     });
-    const { patches } = render([verortet, { ...verortet, id: 13, bezeichnung: 'Decke' }], false, {
-      freigeben,
-      versprechen,
-    });
-    await screen.findByText('Trage');
-    const [ersteZeile, zweiteZeile] = screen.getAllByRole('button', { name: 'Lösen' });
-
-    await user.click(ersteZeile);
+    await bereit();
+    const erste = screen.getByRole('button', { name: 'Trage lösen' });
+    await userEvent.click(erste);
     await waitFor(() => expect(patches).toHaveLength(1));
-    await user.click(ersteZeile);
-
+    await userEvent.click(erste);
     expect(patches).toHaveLength(1);
-    // Der Riegel liegt an dieser Zeile, nicht an der Spalte.
-    expect(zweiteZeile).toBeEnabled();
-
-    freigeben();
-    await waitFor(() => expect(ersteZeile).toBeEnabled());
+    // Der Riegel liegt an dieser Zeile.
+    expect(screen.getByRole('button', { name: 'Vakuummatratze lösen' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
+    await act(async () => freigeben());
+    await waitFor(() => expect(erste).not.toHaveClass('ant-btn-loading'));
   });
 
-  it('ohne Schreibrecht gibt es weder Lösen noch Zuordnen', async () => {
-    render([verortet, frei], true);
-    await screen.findByText('Trage');
-    expect(screen.queryByRole('button', { name: 'Lösen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Material zuordnen' })).not.toBeInTheDocument();
+  it('ohne Schreibrecht gibt es weder Lösen noch Zuordnen, und die Liste wird nicht abgefragt', () => {
+    const { abrufe } = render({ schreibgeschuetzt: true });
+    expect(zeile('Trage')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(abrufe).toEqual([]);
   });
 });
 
 /**
- * Statusspalte: Farbe und Beschriftung kommen aus `theme/statusFarben.ts` (`materialStatus`), wie
- * in `MaterialPage`.
+ * Sperrgrund statt stummer Sperre (LFH-970, U78): ohne anzubietendes Material steht neben der
+ * Auswahl, warum sie nicht geht, und der Sprung ins Modul Material.
  */
-describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
-  // Die Menge läuft Mono mit `tabular-nums`, die Bezeichnung bleibt Satzschrift.
-  it('setzt die Menge in die Zahlenschrift, die Bezeichnung nicht', async () => {
-    render([verortet]);
-    const menge = await screen.findByText('2');
-    expect(menge.style.fontFamily).toContain('JetBrains Mono');
-    expect(menge.style.fontVariantNumeric).toBe('tabular-nums');
-    expect(screen.getByText('Trage').style.fontFamily).toBe('');
-  });
-
-  it('zeigt den Materialstatus als Etikett, nie den rohen Wire-Wert', async () => {
-    render([{ ...verortet, status: 'desinfektion_noetig' as MaterialStatus }]);
-
-    expect(await screen.findByText('Desinfektion nötig')).toBeInTheDocument();
-    expect(screen.queryByText('desinfektion_noetig')).not.toBeInTheDocument();
-  });
-
-  it('lässt in keiner Statuszelle einen Unterstrich stehen', async () => {
-    const alleStatus: MaterialStatus[] = [
-      'einsatzbereit',
-      'im_einsatz',
-      'defekt',
-      'verbraucht',
-      'desinfektion_noetig',
-    ];
-    render(
-      alleStatus.map((status, i) => ({
-        ...verortet,
-        id: 20 + i,
-        bezeichnung: `Material ${i}`,
-        status,
-      })),
-    );
-
-    // Gegen die Zellen, nicht den ganzen Baum: ein Unterstrich in einer Bezeichnung wäre kein
-    // Befund.
-    const zellen = await screen.findAllByTestId('material-status-zelle');
-    expect(zellen.length).toBeGreaterThan(0);
-    for (const zelle of zellen) expect(zelle.textContent).not.toMatch(/_/);
-  });
-});
-
-/**
- * Sperrgrund statt stummer Sperre (LFH-970, U78): ohne freies Material steht neben dem Knopf, warum
- * er nicht geht, und der Sprung ins Modul Material als eine Zeile (`frontend/AGENTS.md`, „Ein
- * Sprung ist keine Handlung“).
- */
-describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
-  it('nennt den Grund und springt ins Modul Material, wenn kein freies Material da ist', async () => {
-    render([verortet]);
-    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
-    await waitFor(() => expect(knopf).toBeDisabled());
-
-    const grund = await screen.findByTestId('material-sperrgrund');
-    expect(grund).toHaveTextContent('Kein freies Material im Einsatz');
-    // Der Grund hängt am Knopf, nicht nur daneben: Vorleser hören ihn mit.
-    expect(knopf).toHaveAttribute('aria-describedby', grund.id);
-    const sprung = within(grund).getByRole('link', { name: /im Modul Material erfassen/ });
-    expect(sprung).toHaveAttribute('href', '/einsaetze/1/material');
-  });
-
-  it('frei heißt „ohne Ort“: Material an einer Einheit oder einem Fahrzeug zählt nicht (LLH-1224 D6)', async () => {
-    render([
-      verortet,
-      { ...frei, einheit_id: 4 } as EinsatzMaterial,
-      { ...freiZwei, einsatz_fahrzeug_id: 2 } as EinsatzMaterial,
-    ]);
-    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
-    await waitFor(() => expect(knopf).toBeDisabled());
-    expect(await screen.findByTestId('material-sperrgrund')).toHaveTextContent(
-      'Kein freies Material im Einsatz',
+describe('MaterialTab · Sperrgrund „Material zuordnen …“ (LFH-970)', () => {
+  it('nennt den Grund und springt ins Modul Material, wenn nichts anzubieten ist', async () => {
+    render({ liste: [verortet] });
+    await waitFor(() => expect(auswahl()).toBeDisabled());
+    expect(auswahl()).toHaveAccessibleDescription(/Kein Material ohne Ort/);
+    expect(screen.getByRole('link', { name: /im Modul Material erfassen/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/material',
     );
   });
 
-  it('zeigt keinen Sperrgrund, solange freies Material da ist', async () => {
-    render([frei, verortet]);
-    await waitFor(async () =>
-      expect(await screen.findByRole('button', { name: 'Material zuordnen' })).toBeEnabled(),
-    );
-    expect(screen.queryByTestId('material-sperrgrund')).not.toBeInTheDocument();
+  it('meldet einen gescheiterten Abruf als Fehler, nicht als stumme Sperre', async () => {
+    render({ listeKaputt: true });
+    expect(await screen.findByText('Material konnte nicht geladen werden')).toBeInTheDocument();
+    expect(auswahl()).toBeDisabled();
   });
 
   it('meldet keinen Fehler, wenn nur ein Abgleich im Hintergrund scheitert', async () => {
-    const { client } = render([frei, verortet]);
-    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
-    await waitFor(() => expect(knopf).toBeEnabled());
-
+    const { client } = render();
+    await bereit();
+    await waitFor(() => expect(auswahl()).toBeEnabled());
+    await screen.findByText('Trage');
     server.use(
       http.get('/api/einsaetze/1/material', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
@@ -337,154 +268,92 @@ describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
           .some((q) => q.state.status === 'error'),
       ).toBe(true),
     );
-
-    // Die alten Daten gelten: der Knopf bleibt bedienbar, daneben steht kein Fehlertext.
-    expect(knopf).toBeEnabled();
-    expect(screen.queryByTestId('material-sperrgrund')).not.toBeInTheDocument();
+    expect(auswahl()).toBeEnabled();
+    expect(screen.queryByText('Material konnte nicht geladen werden')).toBeNull();
   });
 
-  it('lässt den Sprung ohne Zugriff auf das Modul Material weg und sagt warum', async () => {
-    server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
-        HttpResponse.json(freigabenFixture({ material: { zugriff: false } })),
-      ),
-    );
-    render([verortet]);
-
-    const grund = await screen.findByTestId('material-sperrgrund');
-    await waitFor(() => expect(grund).toHaveTextContent('(Keine Berechtigung)'));
-    expect(within(grund).queryByRole('link')).not.toBeInTheDocument();
-    expect(grund).toHaveTextContent('Kein freies Material im Einsatz');
-  });
-
-  it('meldet einen gescheiterten Abruf als Fehler, nicht als stumme Sperre', async () => {
-    server.use(
-      http.get('/api/einsaetze/1/material', () =>
-        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
-      ),
-    );
-    renderMitProviders(
-      <CommandPaletteProvider>
-        <MaterialTab einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />
-      </CommandPaletteProvider>,
-      { route: '/einsaetze/1/unfallhilfsstellen/3' },
-    );
-
-    const grund = await screen.findByTestId('material-sperrgrund');
-    expect(grund).toHaveTextContent('Material konnte nicht geladen werden');
-    expect(within(grund).queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Material zuordnen' })).toBeDisabled();
+  it('ohne Freigabe Material: Posten stehen, Auswahl gesperrt mit Grund, die Liste wird nicht abgefragt', async () => {
+    const { abrufe } = render({ freigaben: freigabenFixture({ material: { zugriff: false } }) });
+    await waitFor(() => expect(auswahl()).toHaveAccessibleDescription('Modul Material gesperrt'));
+    expect(auswahl()).toBeDisabled();
+    expect(zeile('Trage')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Trage lösen' })).toBeNull();
+    expect(abrufe).toEqual([]);
   });
 });
 
 describe('MaterialTab · Speicherfehler am Ort (LFH-1077)', () => {
-  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
-  const zweitesVerortet = {
-    ...verortet,
-    id: 13,
-    bezeichnung: 'Vakuummatratze',
-  } as unknown as EinsatzMaterial;
-
-  function mitPatch(antwort: Parameters<typeof http.patch>[1]) {
-    server.use(http.patch('/api/einsaetze/1/material/:emId', antwort));
-  }
-
-  it('Zuordnen: der Grund steht im Dialog, das nächste Absenden räumt ihn, Abbrechen und Öffnen zeigen ihn nicht', async () => {
-    const user = userEvent.setup();
-    render([frei, verortet]);
-    let versuche = 0;
-    let frei2: () => void = () => {};
-    const zweiter = new Promise<void>((r) => (frei2 = r));
-    mitPatch(async () => {
-      versuche += 1;
-      if (versuche > 1) await zweiter;
-      return HttpResponse.json({ error: 'Material ist ausgegeben' }, { status: 409 });
+  it('Zuordnen: der Grund steht unter der Auswahl, kein Toast', async () => {
+    render({
+      patch: () => HttpResponse.json({ error: 'Material ist ausgegeben' }, { status: 409 }),
     });
-    const dialog = await oeffnenUndWaehlen(user, 'Wolldecke (Betreuung) — 50×');
-    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
-
-    const grund = await within(dialog).findByRole('alert');
-    expect(grund).toHaveTextContent('Nicht zugeordnet');
-    expect(grund).toHaveTextContent('Material ist ausgegeben');
-    expect(toasts()).toBe(0);
-
-    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
-    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
-    await act(async () => frei2());
-    await within(dialog).findByRole('alert');
-
-    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-    await user.click(screen.getByRole('button', { name: 'Material zuordnen' }));
-    await screen.findAllByRole('dialog');
-    expect(within(screen.getAllByRole('dialog').pop()!).queryByRole('alert')).toBeNull();
+    await userEvent.click(await bereit());
+    await userEvent.click(await screen.findByText('Wolldecke · 50'));
+    expect(await screen.findByText('Material ist ausgegeben')).toBeInTheDocument();
+    expect(screen.getByText('Nicht zugeordnet')).toBeInTheDocument();
     expect(toasts()).toBe(0);
   });
 
   it('Lösen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
-    render([verortet, zweitesVerortet]);
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
-    mitPatch(async ({ params }) => {
-      if (params.emId === '12') {
-        await ersteAblehnung;
-        return HttpResponse.json({ error: 'Material wird gerade verlegt' }, { status: 409 });
-      }
-      await delay('infinite');
-      return HttpResponse.json({});
+    render({
+      hier: [verortet, zweitesVerortet],
+      patch: async ({ params }) => {
+        if (params.emId === '12') {
+          await ersteAblehnung;
+          return HttpResponse.json({ error: 'Material wird gerade verlegt' }, { status: 409 });
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      },
     });
-    const trage = await screen.findByRole('row', { name: /Trage/ });
-    const matratze = screen.getByRole('row', { name: /Vakuummatratze/ });
-    await userEvent.click(within(trage).getByRole('button', { name: 'Lösen' }));
-    await userEvent.click(within(matratze).getByRole('button', { name: 'Lösen' }));
+    await bereit();
+    await userEvent.click(screen.getByRole('button', { name: 'Trage lösen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vakuummatratze lösen' }));
     await act(async () => lehneAb());
-
-    expect(await within(trage).findByRole('alert')).toHaveTextContent(
+    expect(await within(zeile('Trage')).findByRole('alert')).toHaveTextContent(
       'Material wird gerade verlegt',
     );
-    expect(within(matratze).queryByRole('alert')).toBeNull();
+    expect(within(zeile('Vakuummatratze')).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
-  });
-
-  it('Lösen: das nächste Lösen an der Zeile räumt den Grund', async () => {
-    render([verortet]);
-    let erster = true;
-    mitPatch(async () => {
-      if (erster) {
-        erster = false;
-        return HttpResponse.json({ error: 'Material wird gerade verlegt' }, { status: 409 });
-      }
-      await delay('infinite');
-      return HttpResponse.json({});
-    });
-    const trage = await screen.findByRole('row', { name: /Trage/ });
-    await userEvent.click(within(trage).getByRole('button', { name: 'Lösen' }));
-    await within(trage).findByRole('alert');
-
-    await userEvent.click(within(trage).getByRole('button', { name: /Lösen/ }));
-    await waitFor(() => expect(within(trage).queryByRole('alert')).toBeNull());
   });
 });
 
-/** LLH-1093, design.md D14: eine aufgelöste UHS nimmt kein Material mehr an (Server 422). */
+/** LLH-1093 D14: eine aufgelöste UHS nimmt kein Material mehr an (Server 422). */
 describe('MaterialTab · aufgelöste UHS (LLH-1093)', () => {
-  it('sperrt „Material zuordnen“ mit dem Grund „UHS aufgelöst“, Lösen bleibt', async () => {
-    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([frei, verortet])));
-    renderMitProviders(
-      <CommandPaletteProvider>
-        <MaterialTab
-          einsatzId={1}
-          uhs={{ ...uhs, status: 'aufgeloest' } as UhsDetail}
-          schreibgeschuetzt={false}
-        />
-      </CommandPaletteProvider>,
-      { route: '/einsaetze/1/unfallhilfsstellen/3' },
+  it('sperrt „Material zuordnen …“ mit dem Grund „UHS aufgelöst“, Lösen bleibt', async () => {
+    render({ status: 'aufgeloest' });
+    expect(await bereit()).toBeDisabled();
+    expect(auswahl()).toHaveAccessibleDescription('UHS aufgelöst');
+    expect(screen.getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+  });
+});
+
+/** Der UHS-Laptop liest das Material seiner UHS nur (LFH-892, Spec `material-am-ort`). */
+describe('MaterialTab · Gerät (UHS-Laptop)', () => {
+  it('zeigt die Posten ohne Bedienelemente und fragt weder Liste noch Freigaben ab', async () => {
+    const abgefragt: string[] = [];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)),
+      http.get('/api/einsaetze/1/material', () => {
+        abgefragt.push('material');
+        return HttpResponse.json([frei]);
+      }),
+      http.get('/api/einsaetze/1/modul-freigaben', () => {
+        abgefragt.push('freigaben');
+        return HttpResponse.json(freigabenFixture());
+      }),
     );
-    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
-    await screen.findByText('Trage');
-    expect(knopf).toBeDisabled();
-    const grund = screen.getByTestId('material-sperrgrund');
-    expect(grund).toHaveTextContent('UHS aufgelöst');
-    expect(knopf).toHaveAttribute('aria-describedby', grund.id);
-    expect(screen.getByRole('button', { name: 'Lösen' })).toBeEnabled();
+    renderMitProviders(
+      <MaterialTab einsatzId={1} uhs={uhsMit([verortet])} schreibgeschuetzt={false} />,
+      { route: '/geraet/3/uhs/3' },
+    );
+    // Die Sitzung des Geräts kommt mit `/me`; bis dahin ist der Reiter nur lesend.
+    await waitFor(() => expect(zeile('Trage')).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(abgefragt).toEqual([]);
   });
 });

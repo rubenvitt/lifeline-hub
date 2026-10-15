@@ -128,10 +128,5 @@ export function reaktiviereDisposition(einsatzId: number, emId: number): Promise
   );
 }
 
-export function ordneMaterialZu(einsatzId: number, eid: number, emId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/material/${emId}`, 'PUT');
-}
-
-export function gibMaterialFrei(einsatzId: number, eid: number, emId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/material/${emId}`, 'DELETE');
-}
+// Den Ort eines Postens schreibt nur der Material-PATCH (`updateDisposition`, LLH-1225 D2). Die
+// Einheiten-Routen `PUT/DELETE …/einheiten/{eid}/material/{em_id}` haben im Client keinen Aufrufer.

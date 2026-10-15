@@ -63,7 +63,7 @@ export function collectNachfahren(einheiten: readonly Einheit[], id: number): Se
 export interface EinheitRechte {
   /**
    * Schreiben + Einheiten: die Zeilen des Kopfs, Funk, Zeichen, Handstatus, „Als Einheitsführer“,
-   * „Aus Einheit lösen“ und „Einheit auflösen“.
+   * „Aus Einheit lösen“ (Personen, Fahrzeuge) und „Einheit auflösen“.
    */
   canEditEinheit: boolean;
   /** Schreiben + Einheiten + Personal: „Im Einsatz frei“ in „Person zuordnen …“. */
@@ -76,8 +76,13 @@ export interface EinheitRechte {
   canZuordnenFahrzeugStamm: boolean;
   /** Schreiben + Fahrzeuge: „Auf <Funkrufname>“, „Vom Fahrzeug lösen“, FMS-Status. */
   canEditBesatzung: boolean;
-  /** Schreiben + Einheiten + Material: „Material zuordnen …“. */
-  canZuordnenMaterial: boolean;
+  /**
+   * Schreiben + Material: „Material zuordnen …“, „Aus Einheit lösen“ und „Ausgeben“ (LLH-1225 D9:
+   * der Ort gehört dem Material, das Einheitenrecht zählt dafür nicht).
+   */
+  canEditMaterial: boolean;
+  /** Schreiben: „Material zuordnen …“ steht, ohne Freigabe Material gesperrt mit Grund. */
+  showMaterialAuswahl: boolean;
   /** Freigabe Personal: der Name einer Person als Link. */
   hasPersonalLink: boolean;
   /** Freigabe Fahrzeuge: der Funkrufname eines Fahrzeugs als Link. */
@@ -87,7 +92,7 @@ export interface EinheitRechte {
    * D5). Ohne sie stehen Fahrzeuge und Mitglieder flach, ohne Besatzungswege und FMS-Wahl.
    */
   hasBesatzung: boolean;
-  /** Freigabe Material: die Materialliste des Einsatzes wird abgefragt (Ausfall, freie Posten). */
+  /** Freigabe Material: die Materialliste des Einsatzes wird abgefragt (Angebot der Auswahl). */
   hasMaterialListe: boolean;
 }
 
@@ -112,7 +117,8 @@ export function buildEinheitRechte(
     canZuordnenFahrzeugEinsatz: einheiten && fahrzeuge,
     canZuordnenFahrzeugStamm: einheiten && fahrzeuge,
     canEditBesatzung: darfSchreiben && fahrzeuge,
-    canZuordnenMaterial: einheiten && isOffen('material'),
+    canEditMaterial: darfSchreiben && isOffen('material'),
+    showMaterialAuswahl: darfSchreiben,
     hasPersonalLink: personal,
     hasFahrzeugLink: fahrzeuge,
     hasBesatzung: personal && fahrzeuge,

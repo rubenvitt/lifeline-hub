@@ -5,8 +5,9 @@ import type {
   ModulFreigaben,
   Uhs,
 } from '../api/types';
-import type { EinheitOption } from './kraeftebaumKern';
+import { filterAktive, type EinheitOption } from './kraeftebaumKern';
 import {
+  mengeText,
   OHNE_ORT,
   OHNE_ORT_WERT,
   ortText,
@@ -233,3 +234,48 @@ export type OrtPosten = Pick<
   EinsatzMaterial,
   'id' | 'einheit_id' | 'einsatz_fahrzeug_id' | 'uhs_id' | 'br_id'
 >;
+
+/** Ein Posten, wie ihn „Material zuordnen …“ an einem Ort anbietet. */
+export type ZuordnenPosten = OrtPosten &
+  Pick<EinsatzMaterial, 'bezeichnung' | 'art' | 'menge' | 'ausgegeben' | 'beendet_at'>;
+
+/**
+ * Das Angebot von „Material zuordnen …“ an einem Ort (LLH-1225, design.md D8): Gruppe „Ohne Ort“
+ * („Wolldecke · 50“) und Gruppe „An anderem Ort“ mit dem bisherigen Ort im Etikett („Wolldecke ·
+ * 30 von 50 übrig · Staffel A“, ohne Leserecht „zugeordnet“), je nach Bezeichnung. Die Posten
+ * dieses Orts und herausgenommene fehlen; eine leere Gruppe fehlt. Der Wert ist die Kennung des
+ * Postens als Text.
+ */
+export function buildZuordnenOptions(
+  material: readonly ZuordnenPosten[],
+  ort: MaterialOrtRef,
+  namen: OrtNamen,
+): OrtOptionGruppe[] {
+  const hier = toOrtValue(ort);
+  const ohne: OrtOption[] = [];
+  const anderswo: OrtOption[] = [];
+  for (const em of filterAktive(material)) {
+    const bisher = ortVon(em);
+    if (toOrtValue(bisher) === hier) continue;
+    const teile = [em.bezeichnung, mengeText(em)];
+    if (bisher == null) ohne.push({ value: String(em.id), label: teile.join(' · ') });
+    else
+      anderswo.push({
+        value: String(em.id),
+        label: [...teile, ortText(bisher, namen)].join(' · '),
+      });
+  }
+  return (
+    [
+      ['ohne', 'Ohne Ort', ohne],
+      ['anderswo', 'An anderem Ort', anderswo],
+    ] as const
+  )
+    .filter(([, , options]) => options.length > 0)
+    .map(([key, label, options]) => ({
+      key,
+      label,
+      title: label,
+      options: options.sort(nachText),
+    }));
+}

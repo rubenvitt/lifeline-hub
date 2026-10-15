@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, ModulFreigaben } from '../api/types';
+import type { Einheit, EinsatzMaterial, ModulFreigaben } from '../api/types';
 import { buildEinheitOptions } from './kraeftebaumKern';
 import type { OrtNamen } from './materialPosten';
 import {
   buildOrtGruppierung,
   buildOrtOptions,
+  buildZuordnenOptions,
   ortFilter,
   type OrtOption,
   type OrtOptionGruppe,
@@ -167,5 +168,74 @@ describe('buildOrtGruppierung (LLH-1225 D4)', () => {
     const g = buildOrtGruppierung([{ einheit_id: 2 }, { einheit_id: 1 }, {}], {}, []);
     expect(g.reihenfolge).toEqual(['einheit:*', 'ohne']);
     expect(g.etikett('einheit:*')).toBe('Einheit zugeordnet');
+  });
+});
+
+describe('buildZuordnenOptions (LLH-1225 D8)', () => {
+  const em = (p: Partial<EinsatzMaterial>): EinsatzMaterial =>
+    ({
+      id: 0,
+      bezeichnung: 'Posten',
+      art: 'geraet',
+      menge: 1,
+      ausgegeben: 0,
+      status: 'einsatzbereit',
+      einheit_id: null,
+      einsatz_fahrzeug_id: null,
+      uhs_id: null,
+      br_id: null,
+      beendet_at: null,
+      ...p,
+    }) as EinsatzMaterial;
+  const material = [
+    em({
+      id: 1,
+      bezeichnung: 'Wolldecke',
+      art: 'verbrauchsgut',
+      menge: 50,
+      ausgegeben: 20,
+      einheit_id: 2,
+    }),
+    em({ id: 2, bezeichnung: 'Trage' }),
+    em({ id: 3, bezeichnung: 'Stromerzeuger', einsatz_fahrzeug_id: 4 }),
+    em({ id: 4, bezeichnung: 'Feldbett', uhs_id: 7 }),
+    em({ id: 5, bezeichnung: 'Beleuchtung', art: 'verbrauchsgut', menge: 3 }),
+    em({ id: 6, bezeichnung: 'Alt', beendet_at: '2026-10-14 10:00:00' }),
+  ];
+  const namenAlle: OrtNamen = {
+    einheit: (id) => (id === 2 ? 'Staffel A' : undefined),
+    fahrzeug: (id) => (id === 4 ? 'Florian 1' : undefined),
+    uhs: (id) => (id === 7 ? 'Turnhalle' : undefined),
+  };
+
+  it('Gruppen „Ohne Ort“ und „An anderem Ort“, der Ort im Etikett, nach Bezeichnung', () => {
+    const opts = buildZuordnenOptions(material, { art: 'uhs', id: 9 }, namenAlle);
+    expect(flach(opts)).toEqual([
+      'Ohne Ort: Beleuchtung · 3, Trage · 1',
+      'An anderem Ort: Feldbett · 1 · UHS Turnhalle, Stromerzeuger · 1 · Florian 1, Wolldecke · 30 von 50 übrig · Staffel A',
+    ]);
+    expect(gruppe(opts, 'Ohne Ort')!.options.map((o) => o.value)).toEqual(['5', '2']);
+  });
+
+  it('die Posten dieses Orts und herausgenommene fehlen', () => {
+    const opts = buildZuordnenOptions(material, { art: 'uhs', id: 7 }, namenAlle);
+    const alle = opts.flatMap((g) => g.options.map((o) => o.label));
+    expect(alle.some((l) => l.startsWith('Feldbett'))).toBe(false);
+    expect(alle.some((l) => l.startsWith('Alt'))).toBe(false);
+  });
+
+  it('ohne Leserecht auf den anderen Ort steht „zugeordnet“', () => {
+    const opts = buildZuordnenOptions(material, { art: 'bereitstellungsraum', id: 1 }, {});
+    expect(gruppe(opts, 'An anderem Ort')!.options.map((o) => o.label)).toContain(
+      'Stromerzeuger · 1 · zugeordnet',
+    );
+  });
+
+  it('eine leere Gruppe fehlt; nichts anzubieten heißt keine Gruppe', () => {
+    const nurHier = [em({ id: 1, bezeichnung: 'Trage', uhs_id: 7 })];
+    expect(buildZuordnenOptions(nurHier, { art: 'uhs', id: 7 }, namenAlle)).toEqual([]);
+    expect(flach(buildZuordnenOptions([em({ id: 2 })], { art: 'uhs', id: 7 }, {}))).toEqual([
+      'Ohne Ort: Posten · 1',
+    ]);
   });
 });

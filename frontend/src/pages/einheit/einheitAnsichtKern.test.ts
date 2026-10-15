@@ -64,7 +64,8 @@ const ALLES: EinheitRechte = {
   canZuordnenFahrzeugEinsatz: true,
   canZuordnenFahrzeugStamm: true,
   canEditBesatzung: true,
-  canZuordnenMaterial: true,
+  canEditMaterial: true,
+  showMaterialAuswahl: true,
   hasPersonalLink: true,
   hasFahrzeugLink: true,
   hasBesatzung: true,
@@ -112,18 +113,21 @@ describe('buildEinheitRechte (design.md D6)', () => {
     });
   });
 
-  it('Material gesperrt: nur „Material zuordnen …“ fällt weg', () => {
+  it('Material gesperrt: Zuordnen, Lösen und Ausgeben fallen weg, die Auswahl steht gesperrt', () => {
     expect(buildEinheitRechte(true, freigaben(['material']))).toEqual({
       ...ALLES,
-      canZuordnenMaterial: false,
+      canEditMaterial: false,
       hasMaterialListe: false,
     });
   });
 
-  it('Einheiten gesperrt: alles, was die Einheit schreibt, fällt weg; Besatzung und Links bleiben', () => {
+  /** LLH-1225 D9: der Ort gehört dem Material, das Einheitenrecht zählt dafür nicht. */
+  it('Einheiten gesperrt: alles, was die Einheit schreibt, fällt weg; Besatzung, Material und Links bleiben', () => {
     expect(buildEinheitRechte(true, freigaben(['einheiten']))).toEqual({
       ...Object.fromEntries(Object.keys(ALLES).map((k) => [k, false])),
       canEditBesatzung: true,
+      canEditMaterial: true,
+      showMaterialAuswahl: true,
       hasPersonalLink: true,
       hasFahrzeugLink: true,
       hasBesatzung: true,

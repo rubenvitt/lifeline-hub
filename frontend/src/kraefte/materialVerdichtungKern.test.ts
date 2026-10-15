@@ -4,6 +4,7 @@ import { materialStatus } from '../theme/statusFarben';
 import {
   isMaterialAusfall,
   materialAusfall,
+  materialKopfzahl,
   materialTopf,
   verdichteMaterial,
   type MaterialTopf,
@@ -97,5 +98,14 @@ describe('materialVerdichtung (LLH-1093, design.md D10)', () => {
       ausfall: 0,
       ausfallRolle: null,
     });
+  });
+});
+
+describe('materialKopfzahl (LLH-1225 D8)', () => {
+  it('„n Posten“, mit Ausfall „· k Ausfall“', () => {
+    expect(materialKopfzahl([])).toBe('0 Posten');
+    expect(materialKopfzahl([posten('einsatzbereit'), posten('defekt')])).toBe(
+      '2 Posten · 1 Ausfall',
+    );
   });
 });

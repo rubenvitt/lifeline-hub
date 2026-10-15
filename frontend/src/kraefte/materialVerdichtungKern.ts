@@ -52,6 +52,15 @@ export function materialAusfall(material: readonly MaterialZaehlZeile[]): number
   return material.filter(isMaterialAusfall).length;
 }
 
+/**
+ * Die Kopfzahl des Materials an einem Ort (LLH-1225, design.md D8): „3 Posten · 1 Ausfall“, ohne
+ * Ausfall nur „3 Posten“. Einheit-Ansicht, Beladung, UHS-Reiter und Bereitstellungsraum lesen sie.
+ */
+export function materialKopfzahl(material: readonly MaterialZaehlZeile[]): string {
+  const ausfall = materialAusfall(material);
+  return `${material.length} Posten${ausfall > 0 ? ` · ${ausfall} Ausfall` : ''}`;
+}
+
 export interface MaterialVerdichtungWerte {
   gesamt: number;
   einsatzbereit: number;
