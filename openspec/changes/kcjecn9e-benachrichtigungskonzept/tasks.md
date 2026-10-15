@@ -36,10 +36,10 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 4. Gekoppelte Geräte still und Lagemonitor (D12, benötigt 1) · LLH-1210
 
-- [ ] 4.1 Geräte-Layout ohne Ton; Vitest „Gerät mit Modul Meldungen“
-- [ ] 4.2 Verdichtete Lagemonitor-Antwort um offene Sofortmeldungen erweitern (ohne Text); Routentest, dass keine Meldungsfelder enthalten sind
-- [ ] 4.3 Kopfzahl „Sofortmeldungen offen“ und Hervorhebung 60 s bei Anstieg (Sofortmeldungen, SK I), ohne Blinken; Vitest „Neue Sofortmeldung“, „Sofortmeldung bestätigt“
-- [ ] 4.4 Anwenderkapitel `lagemonitor` und `geraet-bedienen` nachziehen
+- [x] 4.1 Geräte-Layout ohne Ton; Vitest „Gerät mit Modul Meldungen“
+- [x] 4.2 Verdichtete Lagemonitor-Antwort um offene Sofortmeldungen erweitern (ohne Text); Routentest, dass keine Meldungsfelder enthalten sind
+- [x] 4.3 Kopfzahl „Sofortmeldungen offen“ und Hervorhebung 60 s bei Anstieg (Sofortmeldungen, SK I), ohne Blinken; Vitest „Neue Sofortmeldung“, „Sofortmeldung bestätigt“
+- [x] 4.4 Anwenderkapitel `lagemonitor` und `geraet-bedienen` nachziehen
 
 ## 5. Native Meldung in der Desktop-App (D7, benötigt 2) · LLH-1211
 

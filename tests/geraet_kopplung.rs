@@ -3694,6 +3694,128 @@ async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
     assert_eq!(detail["kraefte"], json!([]), "{detail}");
 }
 
+/// Spec `lagemonitor`, „Zahl der offenen Sofortmeldungen“ (Change
+/// `kcjecn9e-benachrichtigungskonzept`, D12): offen heißt unbestätigt und nicht erledigt; als
+/// Sofortmeldung zählt die Meldungsart oder die Priorität „sofort“ (wie der Sofortalarm in
+/// `routes/meldung.rs`). Die Antwort trägt nur die Zahl, keinen Text, Absender oder Empfänger.
+#[tokio::test]
+async fn lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let offen = |v: &Value| v["sofortmeldungen_offen"].clone();
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(offen(&v), json!(0), "{v}");
+
+    let mut ids = Vec::new();
+    for (art, prio, inhalt) in [
+        ("sofortmeldung", "sofort", "Herr Geheimrat eingeklemmt"),
+        ("lagemeldung", "sofort", "Gasgeruch bei Familie Verborgen"),
+        (
+            "sofortmeldung",
+            "sofort",
+            "Dritte Sofortmeldung, später erledigt",
+        ),
+        ("lagemeldung", "normal", "Lage ruhig"),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &meldungen,
+            &admin,
+            Some(&json!({
+                "absender": "Melder Unbekannt",
+                "empfaenger": "Empfaengerin Vertraulich",
+                "meldeweg": "persoenlich",
+                "inhalt": inhalt,
+                "meldungsart": art,
+                "prioritaet": prio,
+                "ereigniszeit": "2026-10-04 10:00:00",
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        ids.push(v["id"].as_i64().unwrap());
+    }
+    // Erledigt ist nicht mehr offen, auch unbestätigt.
+    sqlx::query("UPDATE meldung SET status = 'erledigt' WHERE id = ?")
+        .bind(ids[2])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // „Zwei offene Sofortmeldungen“.
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(offen(&v), json!(2), "{v}");
+    // Nur die Zahl: kein Meldungstext, kein Absender, kein Empfänger, keine Meldungskennung.
+    let text = v.to_string();
+    for wort in [
+        "Geheimrat",
+        "Verborgen",
+        "später erledigt",
+        "Lage ruhig",
+        "Melder Unbekannt",
+        "Empfaengerin Vertraulich",
+    ] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+    for schluessel in [
+        "inhalt",
+        "absender",
+        "empfaenger",
+        "meldung_id",
+        "meldungen",
+        "lfd_nr",
+        "bearbeiter_name",
+    ] {
+        assert!(
+            !text.contains(&format!("\"{schluessel}\"")),
+            "Feld {schluessel} in der Antwort: {text}"
+        );
+    }
+
+    // „Sofortmeldung bestätigt“: die Zahl sinkt.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("{meldungen}/{}/bestaetigen", ids[0]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(offen(&v), json!(1), "{v}");
+
+    // Ein anderer Einsatz zählt nicht mit.
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{anderer}/meldungen"),
+        &admin,
+        Some(&json!({
+            "absender": "Fremd",
+            "meldeweg": "persoenlich",
+            "inhalt": "Fremde Sofortmeldung",
+            "meldungsart": "sofortmeldung",
+            "prioritaet": "sofort",
+            "ereigniszeit": "2026-10-04 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(offen(&v), json!(1), "{v}");
+}
+
 #[tokio::test]
 async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
