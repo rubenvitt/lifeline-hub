@@ -54,6 +54,17 @@ wire_enum! {
     }
 }
 
+impl StatusKategorie {
+    /// Ob ein Statuswechsel von `vorher` auf `nachher` die Kraft **wieder** verfügbar macht: aus
+    /// gebunden oder nicht verfügbar in verfügbar (Benachrichtigung `wieder_verfuegbar`, Change
+    /// `kcjecn9e-benachrichtigungskonzept`, design.md D11). Ohne vorherigen Status ist sie nicht
+    /// „wieder“ verfügbar; ein Wechsel innerhalb einer Kategorie zählt nie.
+    pub fn wird_wieder_verfuegbar(vorher: Option<Self>, nachher: Option<Self>) -> bool {
+        matches!(vorher, Some(Self::Gebunden | Self::NichtVerfuegbar))
+            && nachher == Some(Self::Verfuegbar)
+    }
+}
+
 // `kategorie` kommt sowohl non-null vor (PersonalStatus/FahrzeugStatus — direkt
 // query_as'te DTOs) als auch nullable (EinsatzPersonalAnzeige/EinsatzFahrzeugAnzeige.
 // status_kategorie, LEFT JOIN). Einheitlich `Type`/`Decode` direkt auf dem Enum, statt
@@ -98,6 +109,19 @@ mod tests {
     fn kategorie_validierung() {
         assert!(ist_gueltige_kategorie("gebunden"));
         assert!(!ist_gueltige_kategorie("irgendwas"));
+    }
+
+    #[test]
+    fn wieder_verfuegbar_nur_aus_gebunden_oder_nicht_verfuegbar() {
+        use StatusKategorie::*;
+        let w = StatusKategorie::wird_wieder_verfuegbar;
+        assert!(w(Some(Gebunden), Some(Verfuegbar)));
+        assert!(w(Some(NichtVerfuegbar), Some(Verfuegbar)));
+        assert!(!w(Some(Verfuegbar), Some(Verfuegbar)));
+        assert!(!w(None, Some(Verfuegbar)));
+        assert!(!w(Some(Gebunden), Some(Gebunden)));
+        assert!(!w(Some(Verfuegbar), Some(Gebunden)));
+        assert!(!w(Some(Gebunden), None));
     }
 
     #[test]

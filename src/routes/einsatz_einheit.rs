@@ -2,6 +2,7 @@ use super::einsatz_fahrzeug::sse_fahrzeug;
 use super::einsatz_material::sse_material;
 use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
+use crate::benachrichtigung::{BenachrichtigungBezugTyp, Bezug};
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{aus_vorlage, mitglied_repo, EinheitAnzeige};
 use crate::einsatz::einstellungen::etb_startwert;
@@ -10,6 +11,7 @@ use crate::einsatz::modul::{Einheiten, Fahrzeuge, Personal};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::katalog::StatusKategorie;
 use crate::live::LiveEvent;
 use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::routes::support::{
@@ -957,11 +959,14 @@ pub async fn status_setzen(
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let beruehrt = crate::write_retry!(&state.pool, |conn| {
+    let (beruehrt, wieder_verfuegbar) = crate::write_retry!(&state.pool, |conn| {
         let mut beruehrt = Vec::new();
+        let mut wieder_verfuegbar = false;
         if let Some(w) =
             einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
         {
+            wieder_verfuegbar =
+                StatusKategorie::wird_wieder_verfuegbar(w.vorher_kategorie, w.nachher_kategorie);
             // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
             if let Some(sid) = status_id {
                 if let Some((_, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
@@ -991,13 +996,24 @@ pub async fn status_setzen(
             )
             .await?;
         }
-        Ok(beruehrt)
+        Ok((beruehrt, wieder_verfuegbar))
     })?;
     sse_einheit(&state, einsatz_id, eid);
     // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
     // Personalrecht erreicht `einheit` nicht (LLH-1185).
     for ep_id in beruehrt {
         sse_personal(&state, einsatz_id, ep_id);
+    }
+    // Nur der Handstatus meldet für die Einheit (design.md D11): ihr aus Fahrzeugen abgeleiteter
+    // Status meldet nicht noch einmal, das tut schon das Fahrzeug.
+    if wieder_verfuegbar {
+        super::einsatz_fahrzeug::wieder_verfuegbar_melden(
+            &state,
+            einsatz_id,
+            Bezug::neu(BenachrichtigungBezugTyp::Einheit, eid),
+            ctx.benutzer.id,
+        )
+        .await;
     }
     Ok(Json(
         einheit_repo::laden(&state.pool, einsatz_id, eid).await?,

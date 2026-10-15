@@ -88,8 +88,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 13. Einheit oder Fahrzeug wieder verfügbar (D11, benötigt 1, 2) · LLH-1219
 
-- [ ] 13.1 Wechsel der Statuskategorie auf verfügbar meldet `wieder_verfuegbar` an EL und S3 (Fahrzeug immer, Einheit nur bei Handstatus); Rust-Tests „Fahrzeug einsatzbereit“, „Wechsel innerhalb gebunden“
-- [ ] 13.2 Anwenderkapitel zu Einheiten und Fahrzeugen nachziehen
+- [x] 13.1 Wechsel der Statuskategorie auf verfügbar meldet `wieder_verfuegbar` an EL und S3 (Fahrzeug immer, Einheit nur bei Handstatus); Rust-Tests „Fahrzeug einsatzbereit“, „Wechsel innerhalb gebunden“
+- [x] 13.2 Anwenderkapitel zu Einheiten und Fahrzeugen nachziehen
 
 ## 14. Chat-Erwähnung (D9, benötigt 1, 2) · LLH-1220
 
