@@ -47,6 +47,12 @@ async fn welt() -> Welt {
     rolle_setzen(&app, &admin, einsatz, anna, "fuehrungspersonal").await;
     rolle_setzen(&app, &admin, einsatz, bert, "fuehrungspersonal").await;
     rolle_setzen(&app, &admin, einsatz, carla, "beobachter").await;
+    // Die Aufnahmen oben melden `einsatz_aufnahme` (tasks.md 15.1, `tests/benachrichtigung_org.rs`);
+    // die Tests hier beginnen mit leerer Tabelle.
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
     let w = Welt {
         app,
         pool,
