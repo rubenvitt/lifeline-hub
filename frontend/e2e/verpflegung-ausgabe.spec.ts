@@ -1,0 +1,202 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenAlsAdmin } from './rollen-kern';
+
+/**
+ * Ausgabeansicht der Verpflegung am Stab (LLH-1032; Spec `kraefte-verpflegung`, „Ausgabe
+ * zählen“): Desktop in `kompakt`. Gezählt wird in eine Sammlung, die als EINE Ausgabe gebucht
+ * wird (nach Ruhe, über „Buchen“, ab 50 Portionen, beim Verlassen). Sonderkost zählt die Menge
+ * mit, also nie 422. Ohne Netz steht das Bündel als „ausstehend“ und läuft danach genau einmal
+ * ein.
+ *
+ * Seeding als Admin über die API. Kein `networkidle` (LFH-385).
+ *
+ * Mutationsproben: Sonderkost-Tipp ohne Mengenzuwachs (`ausgabeSammlung.ts`, `menge` zählt nur
+ * Normalkost) → 422, der Test „Sonderkost“ wird rot; die Sammelzeile nur bei offenem Bündel
+ * gerendert (`AusgabeAnsicht.tsx`) → die Lage der Zähltasten ändert sich beim ersten Tipp, der
+ * Test „Lage“ wird rot.
+ */
+
+interface Zeitfenster {
+  id: number;
+  ausgegeben: { gesamt: number; sonderkost: Record<string, number> };
+  ausgaben: { id: number; menge: number; zurueckgenommen_at?: string | null }[];
+}
+
+async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {
+  const antwort = await page.request.post(pfad, data === undefined ? {} : { data });
+  expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return (await antwort.json()) as T;
+}
+
+/** Ein Einsatz mit einem laufenden Zeitfenster „Mittag Deich“ (40 EP, davon 4 vegetarisch). */
+async function saeen(page: Page, minutenVon = -10, minutenBis = 110) {
+  await anmeldenAlsAdmin(page);
+  const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Ausgabe ${Date.now()}` }))
+    .id;
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  const zf = await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster`, {
+    bezeichnung: 'Mittag Deich',
+    von_at: zeit(minutenVon),
+    bis_at: zeit(minutenBis),
+    bedarf_kraefte: 30,
+    bedarf_betreute: 10,
+    sonderkost: { vegetarisch: 4 },
+  });
+  return { e, zf: zf.id };
+}
+
+async function zeitfenster(page: Page, e: number): Promise<Zeitfenster> {
+  const r = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
+  return ((await r.json()) as { zeitfenster: Zeitfenster[] }).zeitfenster[0];
+}
+
+/** Zählt die POSTs auf `…/zeitfenster/:id/ausgaben` samt Status. */
+function ausgabenZaehler(page: Page) {
+  const status: number[] = [];
+  page.on('response', (r) => {
+    if (
+      r.request().method() === 'POST' &&
+      /\/verpflegung\/zeitfenster\/\d+\/ausgaben$/.test(r.url())
+    ) {
+      status.push(r.status());
+    }
+  });
+  return status;
+}
+
+async function oeffne(page: Page, e: number, zf: number) {
+  await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+}
+
+const plus1 = (page: Page) =>
+  page.locator('[data-lfh="zaehltasten"]').getByRole('button', { name: '+1', exact: true });
+
+test('Sonderkost-Taste und „+1“: eine Ausgabe mit Sonderkost, keine 422; „−1“ erst nach dem Tipp frei; Rückgängig', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page);
+  const status = ausgabenZaehler(page);
+  await oeffne(page, e, zf);
+
+  const minus = page.getByRole('button', { name: '−1', exact: true });
+  await expect(minus).toBeDisabled();
+  await expect(page.locator('[data-lfh="zaehltasten-grund"]')).toHaveText('keine Sammlung');
+
+  await page.getByRole('button', { name: /^vegetarisch 0\/4/ }).click();
+  await expect(minus).toBeEnabled();
+  await plus1(page).click();
+  await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('2');
+  await page.getByRole('button', { name: 'Buchen', exact: true }).click();
+
+  await expect(
+    page.getByText('Gebucht: 2 EP zu ‚Mittag Deich‘ (davon 1 vegetarisch)'),
+  ).toBeVisible();
+  expect(status).toEqual([201]);
+  const nachher = await zeitfenster(page, e);
+  expect(nachher.ausgegeben.gesamt).toBe(2);
+  expect(nachher.ausgegeben.sonderkost.vegetarisch).toBe(1);
+
+  // Rückgängig nimmt genau diese Ausgabe zurück.
+  await page.getByRole('button', { name: 'Rückgängig' }).click();
+  await expect
+    .poll(async () => (await zeitfenster(page, e)).ausgegeben.gesamt, { timeout: 10_000 })
+    .toBe(0);
+});
+
+test('„Menge …“ 60 bucht sofort eine Ausgabe über 60 EP', async ({ page }) => {
+  const { e, zf } = await saeen(page);
+  await oeffne(page, e, zf);
+  await page.getByRole('button', { name: 'Menge …', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Menge zählen' });
+  await dialog.getByLabel('Menge (EP)').fill('60');
+  await dialog.getByRole('button', { name: 'Zählen' }).click();
+  // Sofort, nicht erst nach der Ruhe: die Höchstmenge 50 ist erreicht.
+  await expect(page.getByText('Gebucht: 60 EP zu ‚Mittag Deich‘')).toBeVisible({ timeout: 2_000 });
+  const z = await zeitfenster(page, e);
+  expect(z.ausgaben.map((a) => a.menge)).toEqual([60]);
+});
+
+test('vergangenes Zeitfenster: Zähltasten gesperrt, „Ausgabe nachtragen“ trägt nach', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page, -180, -60);
+  await oeffne(page, e, zf);
+  await expect(plus1(page)).toBeDisabled();
+  await expect(page.locator('[data-lfh="zaehltasten-grund"]')).toHaveText('Zeitfenster vorbei');
+  await page.getByRole('button', { name: 'Ausgabe nachtragen', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Ausgabe nachtragen: Mittag Deich' });
+  await dialog.getByLabel('Menge (EP)').fill('25');
+  await dialog.getByRole('button', { name: 'Nachtragen' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[data-lfh="ausgabe-zeile"]')).toContainText('25 EP');
+});
+
+test('ohne Netz: gezählt steht „ausstehend“, nach der Rückkehr läuft genau eine Ausgabe ein', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page);
+  await oeffne(page, e, zf);
+  await page.context().setOffline(true);
+  await expect(page.locator('[data-lfh="ausgabe-offline"]')).toHaveText('Offline vorgemerkt');
+  for (let i = 0; i < 3; i++) await plus1(page).click();
+  await page.getByRole('button', { name: 'Buchen', exact: true }).click();
+  await expect(page.getByText('Offline vorgemerkt: 3 EP zu ‚Mittag Deich‘')).toBeVisible();
+  await expect(page.locator('[data-lfh="ausgabe-ausstehend"]')).toHaveText('+ 3 ausstehend');
+  // Nicht in der Deckung: „fehlt“ zeigt weiter die Zahl des Servers.
+  await expect(
+    page
+      .locator('[data-lfh="kennzahl"]', { hasText: 'fehlt' })
+      .locator('[data-lfh="kennzahl-wert"]'),
+  ).toHaveText('40');
+
+  await page.context().setOffline(false);
+  await expect
+    .poll(async () => (await zeitfenster(page, e)).ausgaben.map((a) => a.menge), {
+      timeout: 30_000,
+    })
+    .toEqual([3]);
+  await expect(page.locator('[data-lfh="ausgabe-ausstehend"]')).toHaveText('+ 0 ausstehend');
+});
+
+test('Lage: der erste Tipp verschiebt keine Zähltaste', async ({ page }) => {
+  const { e, zf } = await saeen(page);
+  await oeffne(page, e, zf);
+  const tasten: Locator[] = [
+    page.getByRole('button', { name: '−1', exact: true }),
+    page.getByRole('button', { name: 'Menge …', exact: true }),
+    page.getByRole('button', { name: '+5', exact: true }),
+    page.getByRole('button', { name: '+10', exact: true }),
+    plus1(page),
+    page.getByRole('button', { name: /^vegetarisch/ }),
+    page.getByRole('button', { name: 'Buchen', exact: true }),
+  ];
+  const lage = async () => Promise.all(tasten.map(async (t) => (await t.boundingBox())!));
+  const vorher = await lage();
+  await page.getByRole('button', { name: /^vegetarisch/ }).click();
+  await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('1');
+  const nachher = await lage();
+  for (const [i, v] of vorher.entries()) {
+    expect(nachher[i], `Zähltaste ${i} vor/nach dem ersten Tipp`).toEqual(v);
+  }
+});
+
+test('4 × „+1“, dann sofort zur Modulseite: genau eine Ausgabe über 4 EP, kein Rückgängig-Toast', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page);
+  await oeffne(page, e, zf);
+  for (let i = 0; i < 4; i++) await plus1(page).click();
+  // Verlassen bucht: das Bündel geht ohne Hinweis in die Warteschlange und läuft von dort ein.
+  await page.getByRole('link', { name: 'Verpflegung' }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/verpflegung$`));
+  await expect
+    .poll(async () => (await zeitfenster(page, e)).ausgaben.map((a) => a.menge), {
+      timeout: 30_000,
+    })
+    .toEqual([4]);
+  await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
+  await expect(page.getByText(/^Gebucht:/)).toHaveCount(0);
+});

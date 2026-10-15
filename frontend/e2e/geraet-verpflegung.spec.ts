@@ -2,16 +2,18 @@ import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
- * Verpflegung (LFH-1044; Spec `funktionsansichten`): ein Tablet bei 1024 × 768, einsatzweit
- * ohne Stelle, bucht Portionen auf ein Zeitfenster und meldet die Fehlmenge an die
- * Einsatzleitung. Zeitfenster anlegen, Bedarf ändern, löschen und Nachfordern gibt es auf dem
- * Gerät nicht; nach dem Widerruf endet es ohne Neuladen.
+ * Verpflegung (LFH-1044; Spec `funktionsansichten`): ein Tablet bei 1280 × 800, einsatzweit
+ * ohne Stelle, zählt Portionen an der Ausgabe (LLH-1032: 20 × „+1“ ohne Anfrage, nach der Ruhe
+ * genau EINE Ausgabe über 20 EP) und meldet die Fehlmenge an die Einsatzleitung. Zeitfenster
+ * anlegen, Bedarf ändern, löschen und Nachfordern gibt es auf dem Gerät nicht; nach dem Widerruf
+ * endet es ohne Neuladen.
  *
  * Seeding als Admin über die API, die Gerätesitzung in einem eigenen Kontext. Kein `networkidle`
  * (LFH-385).
  *
- * Mutationsprobe: in `geraetSicht.ts` `verpflegung-planen` für Geräte auf `true` → der Schritt
- * „kein Zeitfenster anlegen“ wird rot.
+ * Mutationsproben: in `geraetSicht.ts` `verpflegung-planen` für Geräte auf `true` → der Schritt
+ * „kein Zeitfenster anlegen“ wird rot; `RUHE_MS` auf 0 in `verpflegung/ausgabeSammlung.ts` → der
+ * Request-Zähler steht vor der Ruhe nicht auf null.
  */
 
 async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {
@@ -44,7 +46,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     { ansicht: 'verpflegung', bezeichnung: 'Ausgabe Deich' },
   );
 
-  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const kontext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const tablet = await kontext.newPage();
   try {
     await tablet.goto(`/koppeln#${kopplung.code.code}`);
@@ -62,12 +64,54 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     await expect(tablet.getByRole('button', { name: /^Aktionen zu/ })).toHaveCount(0);
     await expect(tablet.getByText('Nachfordern')).toHaveCount(0);
 
-    await karte.getByRole('button', { name: /^Ausgabe erfassen zu/ }).click();
-    const dialog = tablet.getByRole('dialog', { name: /Ausgabe erfassen/ });
-    await dialog.getByLabel('Menge (EP)').fill('50');
-    await dialog.getByRole('button', { name: 'Erfassen' }).click();
-    await expect(dialog).toHaveCount(0);
+    // Zählen an der Ausgabe (LLH-1032): Sprung von der Karte in die Ausgabeansicht.
+    const anfragen: string[] = [];
+    tablet.on('request', (r) => {
+      if (r.method() === 'POST' && /\/verpflegung\/zeitfenster\/\d+\/ausgaben$/.test(r.url())) {
+        anfragen.push(r.url());
+      }
+    });
+    await karte.getByRole('link', { name: /^Ausgabe öffnen zu/ }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung/\\d+/ausgabe$`));
+    await expect(tablet.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    // Auf der Unterseite bleibt das Navigationsziel „Verpflegung“ aktiv.
+    await expect(nav.getByRole('link', { name: 'Verpflegung' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    const plus1 = tablet.getByRole('button', { name: '+1', exact: true });
+    for (let i = 0; i < 20; i++) await plus1.click();
+    // Gezählt wird lokal: noch keine Anfrage, die Sammlung steht bei 20.
+    expect(anfragen).toHaveLength(0);
+    await expect(tablet.locator('[data-lfh="sammlung-menge"]')).toHaveText('20');
+    // Nach der Ruhe (3 s) genau eine Ausgabe über 20 EP; Kopf und Liste zeigen sie.
+    await expect(tablet.getByText('Gebucht: 20 EP zu ‚Mittag Deich‘')).toBeVisible();
+    expect(anfragen).toHaveLength(1);
+    const kopf = tablet.locator('[data-lfh="ausgabe-kopf"]');
+    await expect(
+      kopf
+        .locator('[data-lfh="kennzahl"]', { hasText: 'ausgegeben' })
+        .locator('[data-lfh="kennzahl-wert"]'),
+    ).toHaveText('20');
+    await expect(tablet.locator('[data-lfh="sammlung-menge"]')).toHaveText('0');
+    const zeile = tablet.locator('[data-lfh="ausgabe-zeile"]');
+    await expect(zeile).toHaveCount(1);
+    await expect(zeile).toContainText('20 EP');
     // Die eigene Buchung lässt sich zurücknehmen (Rücknahme gehört zur Ansicht).
+    await zeile.getByRole('button', { name: /^Zurücknehmen: Ausgabe 20 EP/ }).click();
+    const rueckfrage = tablet.getByRole('dialog', { name: 'Ausgabe zurücknehmen?' });
+    await rueckfrage.getByRole('button', { name: 'Zurücknehmen' }).click();
+    await expect(rueckfrage).toHaveCount(0);
+    await expect(zeile).toHaveAttribute('data-zurueckgenommen', 'true');
+
+    // Nachtragen von der Liste: 50 EP über das Formular.
+    await nav.getByRole('link', { name: 'Verpflegung' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung$`));
+    await karte.getByRole('button', { name: /^Ausgabe nachtragen zu/ }).click();
+    const dialog = tablet.getByRole('dialog', { name: /Ausgabe nachtragen/ });
+    await dialog.getByLabel('Menge (EP)').fill('50');
+    await dialog.getByRole('button', { name: 'Nachtragen' }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(karte.getByRole('button', { name: /^Zurücknehmen: Ausgabe 50 EP/ })).toBeVisible();
 
     // 80 Bedarf, 50 ausgegeben: die Fehlmenge geht als Meldung an die Einsatzleitung.
@@ -87,6 +131,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     const verpflegung = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
     const zf = ((await verpflegung.json()) as { zeitfenster: { ausgegeben: { gesamt: number } }[] })
       .zeitfenster[0];
+    // 20 gezählt und zurückgenommen, 50 nachgetragen.
     expect(zf.ausgegeben.gesamt).toBe(50);
     const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];

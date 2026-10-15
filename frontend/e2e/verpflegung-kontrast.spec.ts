@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { kontrast, randKontrast } from './kontrast-kern';
+import { kontrast, pruefe, randKontrast } from './kontrast-kern';
 
 /**
  * Kriterium 5 der Prüfliste für `/einsaetze/:id/verpflegung`: Kontrast der ZUSAMMENGESETZTEN
@@ -23,6 +23,10 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * auf `bedien`, LFH-661) tragen den vollen Boden (Specs `textstufen-kontrast`,
  * `farbrollen-kontrast`).
  *
+ * AUSGABEANSICHT (LLH-1032): Kopf, Sonderkost-Tasten und Tastenfeld je Einstufung, Tag und
+ * Nacht, mit denselben Schranken; die gesperrte Taste „−1“ (ohne Sammlung) hält den
+ * Gesperrt-Boden ≥ 4,5 : 1 (Spec `textstufen-kontrast`, `gesperrt-kontrast.spec.ts`), Text in
+ * gesperrten Knöpfen zählt nur dort.
  * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
  * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
  * `aria-hidden` (Legende der Bedarfs-Aufgliederung) überspringt der Textbaum; er wird eigens
@@ -31,6 +35,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
 
 const TEXT = { light: 7, dark: 5 } as const;
 const ZUSTAND = 3;
+const GESPERRT_BODEN = 4.5;
 
 const KARTEN = [
   { stufe: 'unterdeckung', name: 'Frühstück Kontrast', wort: 'Unterdeckung' },
@@ -265,8 +270,11 @@ for (const modus of ['light', 'dark'] as const) {
         'Weitere Personen (EP)',
       ],
       [
-        unter.getByRole('button', { name: /^Ausgabe erfassen zu Frühstück Kontrast / }),
-        'Ausgabe erfassen: Frühstück Kontrast',
+        // Am Mittag (zwei Aktionen) steht „Ausgabe nachtragen“ als Knopf (LLH-1032, D8).
+        karteZu(page, 'Mittag Kontrast').getByRole('button', {
+          name: /^Ausgabe nachtragen zu Mittag Kontrast /,
+        }),
+        'Ausgabe nachtragen: Mittag Kontrast',
         'Weitere Angaben',
         'Bemerkung',
       ],
@@ -297,13 +305,14 @@ for (const modus of ['light', 'dark'] as const) {
       'fehlt 8 vegan',
       'fehlt 6 vegan',
       'Bedarf 12 · ausgegeben 4',
-      // Deckungszeile im Dialog „Ausgabe erfassen“: dort die einzige Angabe der Fehlmenge.
+      // Deckungszeile im Dialog „Ausgabe nachtragen“: dort die einzige Angabe der Fehlmenge.
       /^Bedarf \d+ · ausgegeben \d+ · fehlt \d+ EP$/,
       'vegan',
       '30 EP',
       'zurückgenommen',
       'Ausgabe',
-      'Ausgabe erfassen',
+      'Ausgabe öffnen',
+      'Ausgabe nachtragen',
       'Bedarf bearbeiten',
       'Zurücknehmen',
       'Verpflegung',
@@ -326,7 +335,7 @@ for (const modus of ['light', 'dark'] as const) {
       // Primärknöpfe: Kopfknopf und Absende-Knöpfe der Dialoge (LFH-661).
       'Zeitfenster anlegen',
       'Anlegen',
-      'Erfassen',
+      'Nachtragen',
       // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme.
       'Sonderkost',
       'Bedarf',
@@ -337,6 +346,131 @@ for (const modus of ['light', 'dark'] as const) {
       pruefeGesehen(tragend);
 
     await test.info().attach('kontrastwerte.json', {
+      body: JSON.stringify(messwerte, null, 2),
+      contentType: 'application/json',
+    });
+  });
+}
+
+/**
+ * Ausgabeansicht (LLH-1032, design.md D3/D9): je Einstufung der Kopf mit Rand und Etikett, jeder
+ * Text in Kopf, Sonderkost und Tastenfeld, die Legende der Aufgliederung (`aria-hidden`) und die
+ * gesperrte Taste „−1“.
+ */
+for (const modus of ['light', 'dark'] as const) {
+  test(`Ausgabeansicht: Kopf und Tasten — Text, Rand und gesperrte Taste im Modus ${modus}`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await anmelden(page);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 1032 Kontrast ${Date.now()}`,
+    });
+    const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+    const jetzt = Date.now();
+    const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+    const ids: Record<string, number> = {};
+    ids['Frühstück Kontrast'] = (
+      await post(page, `${basis}/zeitfenster`, {
+        bezeichnung: 'Frühstück Kontrast',
+        von_at: zeit(-40),
+        bis_at: zeit(80),
+        bedarf_kraefte: 60,
+        bedarf_betreute: 30,
+        sonderkost: { vegetarisch: 10, vegan: 12 },
+      })
+    ).id;
+    await post(page, `${basis}/zeitfenster/${ids['Frühstück Kontrast']}/ausgaben`, {
+      menge: 30,
+      zeitpunkt_at: zeit(-35),
+      sonderkost: { vegetarisch: 10, vegan: 4 },
+    });
+    ids['Mittag Kontrast'] = (
+      await post(page, `${basis}/zeitfenster`, {
+        bezeichnung: 'Mittag Kontrast',
+        von_at: zeit(-10),
+        bis_at: zeit(110),
+        bedarf_kraefte: 30,
+        bedarf_betreute: 10,
+      })
+    ).id;
+    await post(page, `${basis}/zeitfenster/${ids['Mittag Kontrast']}/ausgaben`, {
+      menge: 40,
+      zeitpunkt_at: zeit(-5),
+    });
+    ids['Abendessen Kontrast'] = (
+      await post(page, `${basis}/zeitfenster`, {
+        bezeichnung: 'Abendessen Kontrast',
+        von_at: zeit(180),
+        bis_at: zeit(240),
+        bedarf_kraefte: 50,
+        bedarf_betreute: 20,
+        sonderkost: { vegan: 6 },
+      })
+    ).id;
+
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+    const messwerte: Record<string, unknown>[] = [];
+    const gemessen: string[] = [];
+    for (const k of KARTEN) {
+      await page.goto(`/einsaetze/${einsatzId}/verpflegung/${ids[k.name]}/ausgabe`);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+      await expect(page.getByRole('heading', { level: 1, name: k.name })).toBeVisible();
+      await page.mouse.move(0, 0);
+
+      const kopf = page.locator('[data-lfh="ausgabe-kopf"]');
+      await expect(kopf).toHaveAttribute('data-einstufung', k.stufe);
+      await expect(kopf.locator('.ant-tag')).toHaveText(k.wort);
+      if (k.stufe !== 'offen') {
+        const rand = await randKontrast(kopf, 'left');
+        messwerte.push({ modus, karte: k.stufe, art: 'kopfrand', ...rand });
+        expect
+          .soft(rand.gegenInnen, `${modus}, ${k.stufe}, Kopfrand ${JSON.stringify(rand)}`)
+          .toBeGreaterThanOrEqual(ZUSTAND);
+      }
+      const tagRand = await randKontrast(kopf.locator('.ant-tag'), 'top');
+      expect
+        .soft(tagRand.gegenAussen, `${modus}, ${k.stufe}, Etikettrand ${JSON.stringify(tagRand)}`)
+        .toBeGreaterThanOrEqual(ZUSTAND);
+
+      // Legende: sichtbar, aber `aria-hidden`.
+      const legende = kopf.locator('[data-lfh="aufgliederung-legende"]');
+      const l = await kontrast(legende);
+      expect
+        .soft(l.verhaeltnis, `${modus}, ${k.stufe}, Legende ${JSON.stringify(l)}`)
+        .toBeGreaterThanOrEqual(TEXT[modus]);
+
+      // Jeder Text außerhalb gesperrter Knöpfe.
+      for (const bereich of ['ausgabe-kopf', 'ausgabe-sonderkost', 'zaehltasten'] as const) {
+        const knoten = await textknoten(page.locator(`[data-lfh="${bereich}"]`));
+        for (const { ziel, text } of knoten) {
+          if (await ziel.evaluate((el) => el.closest('button[disabled]') != null)) continue;
+          const m = await kontrast(ziel);
+          messwerte.push({ modus, karte: k.stufe, flaeche: bereich, wortlaut: text, ...m });
+          gemessen.push(text);
+          expect
+            .soft(
+              m.verhaeltnis,
+              `${modus}, ${k.stufe}, ${bereich}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1`,
+            )
+            .toBeGreaterThanOrEqual(TEXT[modus]);
+        }
+      }
+
+      // Gesperrte Taste: „−1“ ohne Sammlung, mit gestricheltem Rand.
+      const minus = page.getByRole('button', { name: '−1', exact: true });
+      await expect(minus).toBeDisabled();
+      await pruefe(minus, GESPERRT_BODEN, `${modus}/${k.stufe}/−1 gesperrt`);
+      await expect(minus).toHaveCSS('border-top-style', 'dashed');
+    }
+    for (const tragend of ['Sammlung', '+1', '+5', '+10', 'Menge …', 'Soll', 'fehlt']) {
+      expect(
+        gemessen.filter((t) => t === tragend).length,
+        `Text „${tragend}“ gemessen`,
+      ).toBeGreaterThan(0);
+    }
+    await test.info().attach('kontrastwerte-ausgabe.json', {
       body: JSON.stringify(messwerte, null, 2),
       contentType: 'application/json',
     });
