@@ -339,6 +339,12 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
 - Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen
   (quittiert nach 24 h, offen nach 12 h) läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen
   die Zeilen per `ON DELETE CASCADE`. Nachweis `tests/benachrichtigung.rs`.
+- **Web Push (LLH-1223, Spec `web-push`) nur aus `melden`:** nach `zustellen` dieselben
+  Ereignisse an die Abos der Empfänger (`web_push::WebPush::versenden`), nebenläufig, nie
+  abgewartet. Die Nutzlast ist das Live-Ereignis (nur Kennungen), verschlüsselt nach RFC 8291;
+  nie Text. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
+  Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
+  `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
 
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 

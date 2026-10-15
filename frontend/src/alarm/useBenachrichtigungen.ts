@@ -24,6 +24,7 @@ import {
 } from './benachrichtigungKatalog';
 import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
+import { schliessePushMeldungen } from './webPush';
 
 /**
  * Quittiert auf dem Server; der Server meldet es allen Verbindungen des Nutzers (Spec
@@ -33,6 +34,7 @@ import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 export function quittiereNachNutzer(id: number): void {
   if (quittiert.has(id)) return;
   quittiert.add(id);
+  void schliessePushMeldungen(id);
   quittiereBenachrichtigung(id).catch(() => quittiert.delete(id));
 }
 
@@ -112,7 +114,10 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
 
     const beiEreignis = async (ev: Event) => {
       const e = (ev as CustomEvent<BenachrichtigungEreignis>).detail;
-      if (!e || !passt(e, einsatzId)) return;
+      if (!e) return;
+      // Die Push-Meldung (LLH-1223) steht unabhängig davon, welche Zentrale sie zeigen würde.
+      if (e.quittiert) void schliessePushMeldungen(e.benachrichtigung_id);
+      if (!passt(e, einsatzId)) return;
       const id = e.benachrichtigung_id;
       if (e.quittiert) {
         quittiert.add(id);

@@ -32,6 +32,7 @@ import {
   type AusgangsAnlass,
 } from '../offline/geraetRaeumung';
 import { merkeGeraet } from '../geraet/geraetMarke';
+import { pushAbgleichen } from '../alarm/webPush';
 import {
   GATEWAY_NICHT_ERREICHBAR,
   istVerbindungsfehler,
@@ -112,6 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [laedt, setLaedt] = useState(true);
   const [konflikt, setKonflikt] = useState<BenutzerKonflikt | null>(null);
   const queryClient = useQueryClient();
+  const benutzerId = benutzer?.id ?? null;
+  const istGeraet = benutzer?.geraet != null;
+  // Web Push (LLH-1223): Das Abo fiel mit der alten Sitzung; hat diese Person Push auf diesem
+  // Browser gewählt, meldet die neue es wieder an. Wirft nie, fragt nie nach der Erlaubnis.
+  useEffect(() => {
+    if (benutzerId != null && !istGeraet) void pushAbgleichen(benutzerId);
+  }, [benutzerId, istGeraet]);
   // Refs für die Prüfung, die aus Fremd-Ereignissen läuft und nicht an einen Render gebunden
   // sein darf: sie muss den Benutzer von JETZT vergleichen, nicht den ihres Closures.
   const benutzerRef = useRef<MeAntwort | null>(null);

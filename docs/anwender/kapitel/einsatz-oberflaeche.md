@@ -121,6 +121,26 @@ Unter „Alarme“ stehen die Arten, die sich nicht abschalten lassen, mit „im
 Zeile „nicht gespeichert“, hat der Server die Änderung nicht angenommen; der Schalter steht wieder
 wie vorher.
 
+### Benachrichtigungen bei geschlossener App
+
+Damit Benachrichtigungen auch ankommen, wenn kein Tab der App offen ist, etwa auf dem Handy in
+der Tasche:
+
+1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen.
+2. Unter „Dieses Gerät“ den Schalter „Auch bei geschlossener App“ einschalten.
+3. Fragt der Browser, ob die Seite Benachrichtigungen zeigen darf, „Erlauben“ wählen.
+
+Der Schalter gilt für diesen Browser auf diesem Gerät, nicht für die Person; auf jedem Gerät, das
+melden soll, einmal einschalten. Nach dem Abmelden kommen keine Meldungen mehr; meldet sich
+dieselbe Person wieder an, gilt der Schalter wieder, ohne dass sie ihn neu setzt.
+
+Fehlt der Schalter, bietet ihn dieses Gerät nicht: Der Betrieb hat die Zustellung nicht
+eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop-App, die ohnehin selbst
+meldet. Auf dem iPhone und iPad erscheint er nur in der installierten App („Zum Home-Bildschirm“
+in Safari), nicht im Browser-Tab. Steht „Vom Browser blockiert“ daneben, hat der Browser die
+Erlaubnis verweigert; sie lässt sich nur in den Einstellungen des Browsers für diese Seite wieder
+geben.
+
 ## Hintergrund
 
 ### Die Kopfzeile
@@ -225,6 +245,14 @@ beim Öffnen eines Einsatzes: Was in den letzten zwölf Stunden kam und noch nic
 erscheint mit der Uhrzeit, zu der es kam. Für alle nachgeholten zusammen klingt höchstens einmal
 der kurze Ton. „Neuer Einsatz“ und „Aufnahme in einen Einsatz“ erscheinen auch außerhalb eines
 Einsatzes, in der Einsatzliste, im Profil und in der Verwaltung; „Öffnen“ führt in den Einsatz.
+
+Ist „Auch bei geschlossener App“ eingeschaltet, kommt eine Benachrichtigung auch ohne offenen
+Tab als Meldung des Betriebssystems, Alarme wie Hinweise; abgeschaltete Hinweis-Arten bleiben aus.
+Ein Tipp auf die Meldung öffnet die App beim Gegenstand. Ist ein Tab der App gerade vorn, zeigt er
+den Toast, und die Meldung des Betriebssystems entfällt. Quittiert die Person an einem anderen
+Gerät, geht die Meldung auf diesem Gerät nicht in jedem Fall von selbst weg; sie lässt sich dann
+wegwischen. Ohne Verbindung zum Server, etwa ohne VPN, zeigt die Meldung nur „Alarm“ oder „Neue
+Benachrichtigung“; den Inhalt zeigt die App nach dem Öffnen.
 
 Gekoppelte Geräte bekommen keine Benachrichtigungen.
 

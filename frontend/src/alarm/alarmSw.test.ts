@@ -132,3 +132,151 @@ describe('alarm-sw.js: Nachfrage der Seite', () => {
     expect(quelle.postMessage).toHaveBeenCalledWith({ typ: 'lfh-alarm-antwort' });
   });
 });
+
+describe('alarm-sw.js: Web Push (LLH-1223)', () => {
+  type Meldung = { titel: string; optionen: Record<string, unknown>; close: () => void };
+
+  function ladeMitPush(tabs: { focused: boolean }[]) {
+    const hoerer = new Map<string, (ev: unknown) => void>();
+    const gezeigt: Meldung[] = [];
+    const registration = {
+      scope: 'https://lfh.example/',
+      showNotification: vi.fn(async (titel: string, optionen: Record<string, unknown>) => {
+        const m: Meldung = {
+          titel,
+          optionen,
+          close: vi.fn(() => gezeigt.splice(gezeigt.indexOf(m), 1)),
+        };
+        gezeigt.push(m);
+      }),
+      getNotifications: vi.fn(async ({ tag }: { tag: string }) =>
+        gezeigt.filter((m) => m.optionen.tag === tag),
+      ),
+    };
+    const self = {
+      addEventListener: (typ: string, f: (ev: unknown) => void) => hoerer.set(typ, f),
+      registration,
+      clients: { matchAll: vi.fn(async () => tabs), openWindow: vi.fn() },
+    };
+    new Function('self', QUELLE)(self);
+    const push = async (nutzlast: unknown) => {
+      let arbeit: Promise<unknown> = Promise.resolve();
+      hoerer.get('push')?.({
+        data:
+          nutzlast === undefined
+            ? null
+            : {
+                json: () => {
+                  if (typeof nutzlast === 'string') throw new SyntaxError('kein JSON');
+                  return nutzlast;
+                },
+              },
+        waitUntil: (p: Promise<unknown>) => {
+          arbeit = p;
+        },
+      });
+      await arbeit;
+    };
+    return { push, gezeigt, registration };
+  }
+
+  const EREIGNIS = {
+    einsatz_id: 7,
+    benachrichtigung_id: 42,
+    art: 'sofortmeldung',
+    stufe: 'alarm',
+    bezug_typ: 'meldung',
+    bezug_id: 3,
+    quittiert: false,
+  };
+
+  function serverAntwort(antwort: Response | Error) {
+    const f = vi.fn(async () => {
+      if (antwort instanceof Error) throw antwort;
+      return antwort;
+    });
+    vi.stubGlobal('fetch', f);
+    return f;
+  }
+
+  it('holt den Text beim Server und zeigt die Meldung mit Sprung', async () => {
+    const f = serverAntwort(
+      new Response(
+        JSON.stringify({
+          titel: 'Sofortmeldung',
+          detail: 'Meldung #3',
+          pfad: '/einsaetze/7/meldungen?meldung=3',
+        }),
+      ),
+    );
+    const { push, gezeigt } = ladeMitPush([]);
+    await push(EREIGNIS);
+    expect(f).toHaveBeenCalledWith('/api/benachrichtigungen/42', expect.anything());
+    expect(gezeigt).toHaveLength(1);
+    expect(gezeigt[0]!.titel).toBe('Sofortmeldung');
+    expect(gezeigt[0]!.optionen).toMatchObject({
+      body: 'Meldung #3',
+      tag: '7-b-42',
+      requireInteraction: true,
+      data: {
+        art: 'lfh-alarm',
+        id: 'push-42',
+        benachrichtigung_id: 42,
+        ziel: 'https://lfh.example/einsaetze/7/meldungen?meldung=3',
+      },
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('zeigt ohne Antwort des Servers den Titel der Stufe', async () => {
+    serverAntwort(new TypeError('Failed to fetch'));
+    const { push, gezeigt } = ladeMitPush([]);
+    await push(EREIGNIS);
+    expect(gezeigt[0]!.titel).toBe('Alarm');
+    expect(gezeigt[0]!.optionen.body).toBeUndefined();
+    expect((gezeigt[0]!.optionen.data as { ziel: string }).ziel).toBe(
+      'https://lfh.example/einsaetze/7',
+    );
+
+    serverAntwort(new Response('', { status: 401 }));
+    const zweiter = ladeMitPush([]);
+    await zweiter.push({ ...EREIGNIS, stufe: 'hinweis', art: 'auftrag_erteilt' });
+    expect(zweiter.gezeigt[0]!.titel).toBe('Neue Benachrichtigung');
+    expect(zweiter.gezeigt[0]!.optionen.requireInteraction).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('schließt die Meldung sofort, wenn ein Tab der App fokussiert ist', async () => {
+    serverAntwort(new Response(JSON.stringify({ titel: 'Sofortmeldung', pfad: '/einsaetze/7' })));
+    const { push, gezeigt, registration } = ladeMitPush([{ focused: false }, { focused: true }]);
+    await push(EREIGNIS);
+    expect(registration.showNotification).toHaveBeenCalledOnce();
+    expect(gezeigt).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('schließt die Meldung sofort, wenn sie schon quittiert ist', async () => {
+    serverAntwort(
+      new Response(
+        JSON.stringify({ titel: 'Sofortmeldung', pfad: '/einsaetze/7', quittiert_at: 'x' }),
+      ),
+    );
+    const { push, gezeigt, registration } = ladeMitPush([{ focused: false }]);
+    await push(EREIGNIS);
+    expect(registration.showNotification).toHaveBeenCalledOnce();
+    expect(gezeigt).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('übergeht leere, kaputte und fremde Nutzlasten', async () => {
+    const f = serverAntwort(new Response('{}'));
+    const { push, registration } = ladeMitPush([]);
+    await push(undefined);
+    await push('kaputt');
+    await push({ etwas: 'anderes' });
+    await push({ ...EREIGNIS, quittiert: true });
+    expect(f).not.toHaveBeenCalled();
+    expect(registration.showNotification).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});

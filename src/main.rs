@@ -167,7 +167,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // Web Push nur mit Schalter (LLH-1223, design.md D1): Schlüssel laden oder erzeugen.
     if let Some(kontakt) = config.web_push_kontakt()? {
         let web_push = lifeline_hub::web_push::WebPush::einrichten(&pool, kontakt).await?;
-        tracing::info!(
+        tracing::warn!(
             "Web Push AKTIV: Benachrichtigungen gehen auch an die Push-Dienste der Browser \
              (Google, Apple, Mozilla, Microsoft)"
         );

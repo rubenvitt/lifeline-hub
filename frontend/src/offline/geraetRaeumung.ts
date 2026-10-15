@@ -151,6 +151,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung der Alarmtöne, ohne Personenbezug.',
   },
   {
+    ort: 'localStorage lfh:web-push:<benutzer>',
+    datei: 'alarm/webPush.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Nur „diese Person hat hier Push gewählt“ (LLH-1223), damit ihre nächste Sitzung das Abo wieder anmeldet; das Abo selbst liegt am Server und fällt mit der Sitzung.',
+  },
+  {
     ort: 'localStorage lfh:lagekarte:paneele',
     datei: 'pages/lagekarte/KlappPaneel.tsx',
     entscheidung: 'bleibt',
