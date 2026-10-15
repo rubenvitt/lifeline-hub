@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs]
 ---
 
 ## Überblick
@@ -207,6 +207,11 @@ ebenso „Material zuordnen …“.
 Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er von Hand gesetzt, im
 Meldebild oder auf der Seite der Einheit. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Meldebild
 und Kräfte-Zeitachse](meldebild.md)).
+
+Wechselt der Status einer Einheit ohne Fahrzeug von Hand aus gebunden oder nicht verfügbar in
+verfügbar, bekommen Einsatzleitung und S3 den Hinweis „Wieder verfügbar“ mit der Einheit, wie bei
+einem Fahrzeug (Kapitel [Fahrzeuge und FMS](fahrzeuge.md)). Folgt der Status den Fahrzeugen,
+meldet nur das Fahrzeug, die Einheit nicht noch einmal. Den eigenen Wechsel meldet die App nicht.
 
 ### Jede Angabe für sich
 

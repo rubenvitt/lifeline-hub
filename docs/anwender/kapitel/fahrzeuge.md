@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
 ---
 
 ## Überblick
@@ -194,6 +194,17 @@ Die Statuswerte pflegt die Organisation im Statuskatalog der Stammdaten. Ein Wer
 trägt seine Ziffer als Code („S3 · Auf Anfahrt“); nur er lässt sich im Tableau per Ziffer setzen.
 Ist eine Ziffer keinem oder mehreren Statuswerten zugeordnet, meldet das Tableau das und ändert
 nichts. Mit Strg, ⌘ oder Alt ist eine Ziffer kein Statuswechsel.
+
+### Hinweis „Wieder verfügbar“
+
+Wechselt ein Fahrzeug aus einem gebundenen oder nicht verfügbaren Status in einen verfügbaren,
+etwa von „3 – Auf Anfahrt“ auf „2 – Frei auf Wache“, bekommen Einsatzleitung und S3 einen Hinweis
+„Wieder verfügbar“ mit dem Funkrufnamen, der zum Fahrzeug führt. Wer EL und S3 ist, ergibt die
+Besetzung im Stab, sonst die Funktion im Einsatz; der Hinweis erreicht nur, wer das Modul
+Fahrzeuge lesen darf. Ob ein Status verfügbar, gebunden oder nicht verfügbar ist, legt seine
+Kategorie im Statuskatalog fest. Still bleiben ein Wechsel innerhalb einer Kategorie (etwa von 3
+auf 4), von einem verfügbaren Status in einen anderen, der erste Status eines Fahrzeugs ohne
+vorigen und der eigene Wechsel: wer ein Fahrzeug selbst freimeldet, bekommt keinen Hinweis.
 
 ### Besatzung und Einheit
 

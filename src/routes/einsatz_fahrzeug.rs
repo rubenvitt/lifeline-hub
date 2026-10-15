@@ -1,5 +1,8 @@
 use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::{Einheiten, Fahrzeuge};
@@ -11,6 +14,8 @@ use crate::fahrzeug::disposition_repo::{self, AdhocDaten, FahrzeugPatch};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use crate::fahrzeug::{ADHOC_TEXT_MAX, BEMERKUNG_MAX};
+use crate::fuehrung::Fuehrungsfunktion;
+use crate::katalog::StatusKategorie;
 use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::routes::support::{
@@ -27,6 +32,27 @@ pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
+}
+
+/// Meldet nach dem Commit, dass ein Fahrzeug oder eine Einheit mit Handstatus wieder verfügbar
+/// ist (Spec `benachrichtigungen`, „Einheit oder Fahrzeug wieder verfügbar“, design.md D11): an
+/// EL und S3, ohne den Auslöser. Ob der Wechsel zählt, entscheidet der Aufrufer mit
+/// [`StatusKategorie::wird_wieder_verfuegbar`] auf dem Vor- und Nachzustand seiner Transaktion.
+pub(super) async fn wieder_verfuegbar_melden(
+    state: &AppState,
+    einsatz_id: i64,
+    bezug: Bezug,
+    ausloeser: i64,
+) {
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(einsatz_id, BenachrichtigungArt::WiederVerfuegbar, bezug)
+            .von(ausloeser)
+            .an(Adressat::Funktion(Fuehrungsfunktion::El))
+            .an(Adressat::Funktion(Fuehrungsfunktion::S3)),
+    )
+    .await;
 }
 
 #[derive(Debug, Deserialize)]
@@ -383,6 +409,17 @@ pub async fn update(
     // Personalrecht erreicht weder `fahrzeug` noch `einheit` (LLH-1185).
     for ep_id in beruehrt {
         sse_personal(&state, einsatz_id, ep_id);
+    }
+    // Vor- und Nachzustand stammen aus der Transaktion: ein wiederholter Patch mit demselben
+    // Status meldet nicht noch einmal.
+    if StatusKategorie::wird_wieder_verfuegbar(vorher.status_kategorie, nachher.status_kategorie) {
+        wieder_verfuegbar_melden(
+            &state,
+            einsatz_id,
+            Bezug::neu(BenachrichtigungBezugTyp::Fahrzeug, ef_id),
+            ctx.benutzer.id,
+        )
+        .await;
     }
     Ok(Json(nachher))
 }
