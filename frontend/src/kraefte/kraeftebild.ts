@@ -23,7 +23,7 @@ import {
   type PersonImBaum,
   type EinheitKnoten,
 } from './kraeftebaumKern';
-import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
+import type { BeendeteKraft, MeldebildNachweis } from './entlassene';
 import { funktionText } from './einsatzfunktionKern';
 import { AUFGEBRAUCHT, isAufgebraucht, ortVon } from './materialPosten';
 import { materialAusfall } from './materialVerdichtungKern';
@@ -543,14 +543,43 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
   return zeilen.join('\n');
 }
 
+type MittelMarke = (typeof MITTEL_MARKE)[keyof typeof MITTEL_MARKE];
+
+/** Zeilen einer Art im Nachweis, nach Zeitpunkt des Endes; `null` sagt „nicht geladen“. */
+function nachweisZeilen(
+  marke: MittelMarke,
+  eintraege: readonly BeendeteKraft[] | null,
+  dtg: (iso: string) => string,
+): string[] {
+  if (eintraege === null) return [`- ${marke} — nicht geladen`];
+  return [...eintraege]
+    .sort((a, b) => (a.beendetAt ?? '').localeCompare(b.beendetAt ?? ''))
+    .map(
+      (k) =>
+        `- ${marke} ${k.name}${k.zusatz ? ` (${k.zusatz})` : ''}${k.beendetAt ? ` — ${dtg(k.beendetAt)}` : ''}`,
+    );
+}
+
+/** Ein Nachweis-Block: leer ohne Einträge, „— nicht geladen“, wenn keine seiner Listen da ist. */
+function nachweisBlock(
+  titel: string,
+  arten: readonly [MittelMarke, readonly BeendeteKraft[] | null][],
+  dtg: (iso: string) => string,
+): string[] {
+  if (arten.every(([, e]) => e === null)) return [`## ${titel}`, '', '— nicht geladen', ''];
+  const zeilen = arten.flatMap(([marke, e]) => nachweisZeilen(marke, e, dtg));
+  return zeilen.length === 0 ? [] : [`## ${titel}`, '', ...zeilen, ''];
+}
+
 /**
- * Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. Entlassene
- * Kräfte stehen als eigener Block darunter (LLH-1079); `null` heißt „nicht geladen“.
+ * Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. Beendete
+ * Kräfte stehen als Nachweis darunter (LLH-1079, LLH-1235): „Entlassen“ für Personen und
+ * Fahrzeuge, „Aus dem Einsatz genommen“ für Material, je mit Zeitpunkt.
  */
 export function rendereMeldebildMarkdown(
   bild: Kraeftebild,
   stand: string,
-  entlassene: readonly EntlasseneKraft[] | null = [],
+  nachweis?: MeldebildNachweis,
 ): string {
   const v = bild.verdichtung;
   const zeilen: string[] = [];
@@ -595,7 +624,20 @@ export function rendereMeldebildMarkdown(
       zeilen.push('');
     }
   }
-  zeilen.push(...renderEntlasseneMarkdown(entlassene));
+  if (nachweis) {
+    const { personal, fahrzeuge, material, dtg } = nachweis;
+    zeilen.push(
+      ...nachweisBlock(
+        'Entlassen',
+        [
+          [MITTEL_MARKE.person, personal],
+          [MITTEL_MARKE.fahrzeug, fahrzeuge],
+        ],
+        dtg,
+      ),
+      ...nachweisBlock('Aus dem Einsatz genommen', [[MITTEL_MARKE.material, material]], dtg),
+    );
+  }
 
   return zeilen.join('\n');
 }

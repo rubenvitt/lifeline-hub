@@ -2,15 +2,20 @@ import type { AbrufZustand } from '../api/abrufZustand';
 import { ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listEinsatzMaterial } from '../api/einsatzMaterial';
+import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { toEntlassene } from '../kraefte/entlassene';
+import {
+  type BeendeteKraft,
+  toEntlassene,
+  toEntlasseneFahrzeuge,
+  toHerausgenommenesMaterial,
+} from '../kraefte/entlassene';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
   baueFuehrungsorganisation,
@@ -61,6 +66,10 @@ function fehlt(zustaende: [Liste, AbrufZustand][]): string {
 const teilFehlt = (titel: string, zustaende: [Liste, AbrufZustand][]) =>
   `# ${titel}\n\n${fehlt(zustaende)}\n`;
 
+/** Eine Nachweis-Liste oder `null` („nicht geladen“), wenn ihr Abruf scheiterte. */
+const nachweis = <T>(liste: Geladen<T[]>, zu: (l: T[]) => BeendeteKraft[]) =>
+  liste.zustand === 'daten' ? zu(liste.daten) : null;
+
 /**
  * „Aus Meldebild und Führungsorganisation übernehmen“ im Abschnitt „Eigene Lage“ (LFH-870, Spec
  * `lagevortrag-uebernahme`). Beide Teile mit den Renderern der Einzelübernahmen, für den ganzen
@@ -94,19 +103,28 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
       personal,
       entlassene,
       fahrzeuge,
+      fahrzeugeEntlassene,
       material,
+      materialEntlassen,
       stab,
       fuehrungsstelle,
     ] = await Promise.all([
       lade('abschnitte', einsatzKeys.abschnitte(einsatzId), () => listeAbschnitte(einsatzId)),
       lade('einheiten', einsatzKeys.einheiten(einsatzId), () => listeEinheiten(einsatzId)),
       lade('personal', einsatzKeys.personal(einsatzId), () => listeEinsatzPersonal(einsatzId)),
-      // Nachweis der Entlassenen (LLH-1079): fehlt er, sagt der Block „nicht geladen“.
+      // Nachweis der beendeten Kräfte (LLH-1079, LLH-1235): fehlt eine Liste, sagt der Block
+      // „nicht geladen“.
       lade('personal', einsatzKeys.personalEntlassene(einsatzId), () =>
         listEntlassenesPersonal(einsatzId),
       ),
       lade('fahrzeuge', einsatzKeys.fahrzeuge(einsatzId), () => listeEinsatzFahrzeuge(einsatzId)),
+      lade('fahrzeuge', einsatzKeys.fahrzeugeEntlassene(einsatzId), () =>
+        listEntlasseneFahrzeuge(einsatzId),
+      ),
       lade('material', einsatzKeys.material(einsatzId), () => listEinsatzMaterial(einsatzId)),
+      lade('material', einsatzKeys.materialEntlassene(einsatzId), () =>
+        listEntlassenesMaterial(einsatzId),
+      ),
       stabFrei
         ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
         : Promise.resolve(null),
@@ -143,7 +161,12 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
             material.daten,
           ),
           stand(abschnitte, einheiten, personal, fahrzeuge, material),
-          entlassene.zustand === 'daten' ? toEntlassene(entlassene.daten) : null,
+          {
+            personal: nachweis(entlassene, toEntlassene),
+            fahrzeuge: nachweis(fahrzeugeEntlassene, toEntlasseneFahrzeuge),
+            material: nachweis(materialEntlassen, toHerausgenommenesMaterial),
+            dtg,
+          },
         )
       : teilFehlt('Kräftemeldebild', zustaende(MELDEBILD));
 

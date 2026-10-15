@@ -1,35 +1,56 @@
-import type { EinsatzPersonal } from '../api/types';
+import type { EinsatzFahrzeug, EinsatzMaterial, EinsatzPersonal } from '../api/types';
 import { funktionText } from './einsatzfunktionKern';
 
 /**
- * Eine entlassene Kraft im Nachweis des Meldebilds (LLH-1079, Spec `kraefte-entlassung`,
- * „Entlassene im Nachweis“): Name und Funktion. Die Einheit, aus der sie ging, steht nur im
- * ETB-Text (design.md, offene Frage 3); die Zeile kennt sie nach dem Entlassen nicht mehr. Als
- * Funktion steht die Einsatzfunktion, sonst die Qualifikation (LLH-1067).
+ * Eine beendete Kraft im Nachweis des Meldebilds (LLH-1079, Spec `kraefte-entlassung`,
+ * „Entlassene im Nachweis“): Kennung, Zusatz und Zeitpunkt des Endes. Die Einheit, aus der sie
+ * ging, steht nur im ETB-Text (design.md, offene Frage 3); die Zeile kennt sie nach dem Entlassen
+ * nicht mehr.
  */
-export interface EntlasseneKraft {
+export interface BeendeteKraft {
   name: string;
-  funktion?: string | null;
-}
-
-/** Die entlassenen Kräfte einer Liste; stornierte erscheinen in keinem Nachweis. */
-export function toEntlassene(personal: readonly EinsatzPersonal[]): EntlasseneKraft[] {
-  return personal
-    .filter((ep) => ep.beendet_als === 'entlassen')
-    .map((ep) => ({ name: ep.name, funktion: funktionText(ep) }));
+  /** Person: Einsatzfunktion, sonst Qualifikation (LLH-1067); Fahrzeug: Typ. */
+  zusatz?: string | null;
+  /** Zeitpunkt des Endes (Server, UTC). */
+  beendetAt?: string | null;
 }
 
 /**
- * Markdown-Block „Entlassen“ unter dem Meldebild: leer ohne Entlassene, „— nicht geladen“, wenn
- * die Liste fehlt (`null`), damit ein gescheiterter Abruf nicht wie „niemand entlassen“ aussieht.
+ * Der Nachweis unter dem Meldebild (LLH-1235): entlassene Personen und Fahrzeuge, aus dem Einsatz
+ * genommenes Material. `null` heißt „nicht geladen“, damit ein gescheiterter Abruf nicht wie
+ * „niemand entlassen“ aussieht.
  */
-export function renderEntlasseneMarkdown(entlassene: readonly EntlasseneKraft[] | null): string[] {
-  if (entlassene === null) return ['## Entlassen', '', '— nicht geladen', ''];
-  if (entlassene.length === 0) return [];
-  return [
-    '## Entlassen',
-    '',
-    ...entlassene.map((k) => `- ${k.name}${k.funktion ? ` (${k.funktion})` : ''}`),
-    '',
-  ];
+export interface MeldebildNachweis {
+  personal: readonly BeendeteKraft[] | null;
+  fahrzeuge: readonly BeendeteKraft[] | null;
+  material: readonly BeendeteKraft[] | null;
+  /** ISO-Zeitpunkt → taktische DTG, dieselbe Schreibweise wie der Stand. */
+  dtg: (iso: string) => string;
+}
+
+// Stornierte erscheinen in keinem Nachweis, auch wenn sie in eine Liste geraten.
+const entlassen = (x: { beendet_als?: string | null }) => x.beendet_als === 'entlassen';
+
+/** Die entlassenen Kräfte einer Liste. */
+export function toEntlassene(personal: readonly EinsatzPersonal[]): BeendeteKraft[] {
+  return personal
+    .filter(entlassen)
+    .map((ep) => ({ name: ep.name, zusatz: funktionText(ep), beendetAt: ep.beendet_at }));
+}
+
+/** Die entlassenen Fahrzeuge einer Liste. */
+export function toEntlasseneFahrzeuge(fahrzeuge: readonly EinsatzFahrzeug[]): BeendeteKraft[] {
+  return fahrzeuge
+    .filter(entlassen)
+    .map((ef) => ({ name: ef.funkrufname, zusatz: ef.fahrzeugtyp, beendetAt: ef.beendet_at }));
+}
+
+/**
+ * Das aus dem Einsatz genommene Material einer Liste (auf dem Draht `entlassen`). Die Menge steht
+ * wie in der Kräftegliederung hinter der Bezeichnung („Trage ×2“).
+ */
+export function toHerausgenommenesMaterial(material: readonly EinsatzMaterial[]): BeendeteKraft[] {
+  return material
+    .filter(entlassen)
+    .map((em) => ({ name: `${em.bezeichnung} ×${em.menge}`, beendetAt: em.beendet_at }));
 }
