@@ -619,7 +619,7 @@ async fn liste_gliederung_mitglieder_staerke_und_sprechgruppen_je_einheit() {
     let g21_m1 = kraft_anlegen(&app, &admin, einsatz, "Mann 2.1a", "mannschaft").await;
     personal_zuordnen(&app, &admin, einsatz, gruppe21, g21_m1).await;
 
-    // Kraft ohne Stärke-Position — Mitglied, zählt aber nicht in die Stärke.
+    // Kraft ohne Stärke-Position — Mitglied, zählt als Mannschaft (LLH-1234).
     let (s_ohne, ohne_json) = anfrage(
         &app,
         "POST",
@@ -677,8 +677,8 @@ async fn liste_gliederung_mitglieder_staerke_und_sprechgruppen_je_einheit() {
     assert_eq!(staerke(eintrag(&liste, stab), "ist"), (1, 0, 0));
     assert_eq!(staerke(eintrag(&liste, zug1), "ist"), (1, 0, 0));
     assert_eq!(staerke(eintrag(&liste, gruppe11), "ist"), (0, 1, 2));
-    // „Ohne Position" ist Mitglied, zählt aber nicht mit.
-    assert_eq!(staerke(eintrag(&liste, gruppe12), "ist"), (0, 1, 1));
+    // „Ohne Position" ist Mitglied und zählt als Mannschaft (LLH-1234).
+    assert_eq!(staerke(eintrag(&liste, gruppe12), "ist"), (0, 1, 2));
     assert_eq!(staerke(eintrag(&liste, trupp111), "ist"), (0, 0, 2));
     assert_eq!(staerke(eintrag(&liste, trupp112), "ist"), (0, 0, 0));
     assert_eq!(staerke(eintrag(&liste, zug2), "ist"), (0, 0, 0));
@@ -688,15 +688,15 @@ async fn liste_gliederung_mitglieder_staerke_und_sprechgruppen_je_einheit() {
 
     // Kumulierte Stärke über die Unterstellung.
     assert_eq!(staerke(eintrag(&liste, stab), "ist_kumuliert"), (1, 0, 0));
-    // 1. Zug: eigen 1/0/0 + G1.1 0/1/2 + T1.1.1 0/0/2 + T1.1.2 0/0/0 + G1.2 0/1/1
-    assert_eq!(staerke(eintrag(&liste, zug1), "ist_kumuliert"), (1, 2, 5));
+    // 1. Zug: eigen 1/0/0 + G1.1 0/1/2 + T1.1.1 0/0/2 + T1.1.2 0/0/0 + G1.2 0/1/2
+    assert_eq!(staerke(eintrag(&liste, zug1), "ist_kumuliert"), (1, 2, 6));
     assert_eq!(
         staerke(eintrag(&liste, gruppe11), "ist_kumuliert"),
         (0, 1, 4)
     );
     assert_eq!(
         staerke(eintrag(&liste, gruppe12), "ist_kumuliert"),
-        (0, 1, 1)
+        (0, 1, 2)
     );
     assert_eq!(
         staerke(eintrag(&liste, trupp111), "ist_kumuliert"),

@@ -86,7 +86,8 @@ export const OHNE_EINHEIT_KEY_PREFIX = 'eh-ohne';
 // ── Helfer ───────────────────────────────────────────────────────────────────
 
 // Person ohne Stärke-Position zählt als Mannschaft, damit die Summe der Köpfe
-// stets der Personenzahl entspricht (Stärkenachweis-Invariante).
+// stets der Personenzahl entspricht (Stärkenachweis-Invariante). Der Server zählt
+// genauso (`Staerke::from_positions`, LLH-1234; Fixture `regeln.json`, `kraefte`).
 const POS_NULL_FALLBACK: StaerkePosition = 'mannschaft';
 
 const leereStaerke = (): StaerkeSumme => ({

@@ -70,7 +70,7 @@ pub async fn create(
     let tz_fachaufgabe = optional_max(body.tz_fachaufgabe, "Fachaufgabe", TZ_MAX)?;
     let tz_organisation = optional_max(body.tz_organisation, "Organisation", TZ_MAX)?;
     let bemerkung = optional_max(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
-    let soll = Staerke::aus_optionen(
+    let soll = Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
         body.soll_mannschaft,

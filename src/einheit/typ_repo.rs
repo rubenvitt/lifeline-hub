@@ -4,7 +4,7 @@ use crate::staerke::Staerke;
 use sqlx::SqlitePool;
 
 /// Editierbare Katalog-Felder. Soll-Werte folgen der Regel „alle drei oder keiner"
-/// (im Handler über `Staerke::aus_optionen` validiert).
+/// (im Handler über `Staerke::from_options` validiert).
 #[derive(Debug)]
 pub struct TypDaten<'a> {
     pub label: &'a str,
@@ -30,7 +30,7 @@ const SPALTEN: &str = "id, label, soll_fuehrer, soll_unterfuehrer, soll_mannscha
 /// Baut die Anzeige; Soll wird best-effort aus den drei Spalten zusammengesetzt
 /// (gespeicherte Werte sind durch den Handler bereits konsistent).
 fn zu_typ(row: Row) -> EinheitTyp {
-    let soll = Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
+    let soll = Staerke::from_options(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
         .unwrap_or(None);
     EinheitTyp {
         id: row.id,

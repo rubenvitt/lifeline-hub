@@ -3847,6 +3847,26 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
         .await;
         assert_eq!(s, StatusCode::OK);
     }
+    // Eine Kraft ohne Stärke-Position zählt mit, als Mannschaft (LLH-1234).
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&json!({"adhoc": {"name": "Kraftohne"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ohne = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ohne}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
     let (s, v) = anfrage(
         &app,
         "GET",
@@ -3858,7 +3878,7 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     assert_eq!(s, StatusCode::OK, "{v}");
     let uhs = v["uhs"].as_array().unwrap();
     let zahl = |id: i64| uhs.iter().find(|u| u["id"] == id).unwrap()["kraefte"].clone();
-    assert_eq!(zahl(nord), json!(4));
+    assert_eq!(zahl(nord), json!(5));
     assert_eq!(zahl(sued), json!(0));
     let text = v.to_string();
     assert!(!text.contains("Kraft"), "Name in der Antwort: {text}");

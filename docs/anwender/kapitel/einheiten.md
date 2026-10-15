@@ -177,10 +177,11 @@ eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
 ### Stärke
 
 Die Ist-Stärke zählt das zugeordnete Personal nach seiner Stärke-Position (Führer, Unterführer,
-Mannschaft), die im Modul Personal gesetzt wird. Einheitsführer ist ein eigenes Merkmal: eine Person
-mit der Position „Führer“ ist dadurch noch nicht Einheitsführer. Je Einheit gibt es einen
-Einheitsführer, eine Person der Einheit; solange keiner gesetzt ist, steht im Kopf „Einheitsführer
-eintragen“. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten mit ein.
+Mannschaft), die im Modul Personal gesetzt wird. Eine Person ohne Stärke-Position zählt als
+Mannschaft, hier wie im Meldebild, an der UHS und im Einsatzbericht. Einheitsführer ist ein eigenes
+Merkmal: eine Person mit der Position „Führer“ ist dadurch noch nicht Einheitsführer. Je Einheit
+gibt es einen Einheitsführer, eine Person der Einheit; solange keiner gesetzt ist, steht im Kopf
+„Einheitsführer eintragen“. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten mit ein.
 
 In der Gliederung steht unter „Ist“ die kumulierte Ist-Stärke: ein Zug zählt seine Gruppen mit,
 jede Gruppe zeigt ihre eigene. Fehlt in einer Position (Führer, Unterführer oder Mannschaft) jemand

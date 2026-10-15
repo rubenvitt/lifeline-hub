@@ -44,7 +44,7 @@ impl Staerke {
     /// INTEGER). Regel: alle drei gesetzt **oder** alle drei `None`; Werte
     /// 0..=u16::MAX. Bei Verstoß `Err` mit deutscher Validierungsmeldung — der
     /// Aufrufer (Handler) mappt das auf `AppError::Validation`.
-    pub fn aus_optionen(
+    pub fn from_options(
         fuehrer: Option<i64>,
         unterfuehrer: Option<i64>,
         mannschaft: Option<i64>,
@@ -81,12 +81,15 @@ wire_enum! {
 }
 
 impl Staerke {
-    /// Aggregiert einzelne Positionen zu einer Stärke (zählt je Topf). Damit summiert
-    /// K&M‑3 die Einheiten-Stärke direkt aus den Dispositionszeilen, ohne neue Logik.
-    pub fn aus_positionen(positionen: impl Iterator<Item = StaerkePosition>) -> Staerke {
+    /// Aggregiert einzelne Positionen zu einer Stärke (zählt je Topf). Eine Person ohne
+    /// Stärke-Position zählt als Mannschaft (LLH-1234), damit jede Person genau einmal zählt und
+    /// Server und Client (`kraefte/kraeftebild.ts`, `verdichte`) dieselbe Stärke zeigen; Fixture
+    /// `tests/fixtures/verdichtung/regeln.json`, Abschnitt `kraefte`. Einzige Ausnahme im Server:
+    /// die UHS zählt ihre Stärke in SQL (`uhs/repo.rs`) und spiegelt die Regel dort.
+    pub fn from_positions(positionen: impl Iterator<Item = Option<StaerkePosition>>) -> Staerke {
         let (mut f, mut u, mut m) = (0u16, 0u16, 0u16);
         for p in positionen {
-            match p {
+            match p.unwrap_or(StaerkePosition::Mannschaft) {
                 StaerkePosition::Fuehrer => f += 1,
                 StaerkePosition::Unterfuehrer => u += 1,
                 StaerkePosition::Mannschaft => m += 1,
@@ -113,32 +116,32 @@ mod tests {
     }
 
     #[test]
-    fn aus_optionen_alle_none_ist_ok_none() {
-        assert_eq!(Staerke::aus_optionen(None, None, None).unwrap(), None);
+    fn from_options_alle_none_ist_ok_none() {
+        assert_eq!(Staerke::from_options(None, None, None).unwrap(), None);
     }
 
     #[test]
-    fn aus_optionen_alle_gesetzt_ist_ok_some() {
+    fn from_options_alle_gesetzt_ist_ok_some() {
         assert_eq!(
-            Staerke::aus_optionen(Some(1), Some(3), Some(18)).unwrap(),
+            Staerke::from_options(Some(1), Some(3), Some(18)).unwrap(),
             Some(Staerke::neu(1, 3, 18))
         );
     }
 
     #[test]
-    fn aus_optionen_teilweise_gesetzt_ist_fehler() {
-        assert!(Staerke::aus_optionen(Some(1), None, Some(2)).is_err());
-        assert!(Staerke::aus_optionen(None, Some(1), None).is_err());
+    fn from_options_teilweise_gesetzt_ist_fehler() {
+        assert!(Staerke::from_options(Some(1), None, Some(2)).is_err());
+        assert!(Staerke::from_options(None, Some(1), None).is_err());
     }
 
     #[test]
-    fn aus_optionen_negativ_ist_fehler() {
-        assert!(Staerke::aus_optionen(Some(-1), Some(0), Some(0)).is_err());
+    fn from_options_negativ_ist_fehler() {
+        assert!(Staerke::from_options(Some(-1), Some(0), Some(0)).is_err());
     }
 
     #[test]
-    fn aus_optionen_zu_gross_ist_fehler() {
-        assert!(Staerke::aus_optionen(Some(0), Some(0), Some(70000)).is_err());
+    fn from_options_zu_gross_ist_fehler() {
+        assert!(Staerke::from_options(Some(0), Some(0), Some(70000)).is_err());
     }
 
     #[test]
@@ -154,19 +157,29 @@ mod tests {
     }
 
     #[test]
-    fn aus_positionen_zaehlt_je_topf() {
+    fn from_positions_zaehlt_je_topf() {
         use StaerkePosition::*;
-        let s = Staerke::aus_positionen(
-            [Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft].into_iter(),
+        let s = Staerke::from_positions(
+            [Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft]
+                .into_iter()
+                .map(Some),
         );
         assert_eq!(s, Staerke::neu(1, 1, 3));
         assert_eq!(s.gesamt(), 5);
     }
 
     #[test]
-    fn aus_positionen_leer_ist_null() {
+    fn person_ohne_position_zaehlt_als_mannschaft() {
+        use StaerkePosition::*;
+        let s = Staerke::from_positions([Some(Fuehrer), None, Some(Mannschaft), None].into_iter());
+        assert_eq!(s, Staerke::neu(1, 0, 3));
+        assert_eq!(s.gesamt(), 4, "jede Person zählt genau einmal");
+    }
+
+    #[test]
+    fn from_positions_leer_ist_null() {
         assert_eq!(
-            Staerke::aus_positionen(std::iter::empty()),
+            Staerke::from_positions(std::iter::empty()),
             Staerke::neu(0, 0, 0)
         );
     }

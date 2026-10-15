@@ -8629,7 +8629,7 @@
           "kraefte": {
             "type": "integer",
             "format": "int64",
-            "description": "Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS\nzählen Kräfte ohne Position nicht."
+            "description": "Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS\nzählt jede aktive Kraft, auch ohne Position (LLH-1234)."
           },
           "lat": {
             "type": [

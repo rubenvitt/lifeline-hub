@@ -69,7 +69,7 @@ pub struct LagemonitorUhs {
     /// Plätze ohne Wartebereich.
     pub plaetze: i64,
     /// Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS
-    /// zählen Kräfte ohne Position nicht.
+    /// zählt jede aktive Kraft, auch ohne Position (LLH-1234).
     pub kraefte: i64,
 }
 
@@ -194,10 +194,7 @@ pub async fn lagebild(
                  WHERE pl.uhs_id = u.id AND pl.storniert_at IS NULL \
                    AND pl.typ <> 'wartebereich'), \
                (SELECT COUNT(*) FROM einsatz_personal ep \
-                 LEFT JOIN personal sp ON sp.id = ep.personal_id \
-                 WHERE ep.uhs_id = u.id AND ep.beendet_at IS NULL \
-                   AND COALESCE(ep.staerke_position, sp.staerke_position) \
-                   IN ('fuehrer', 'unterfuehrer', 'mannschaft')) \
+                 WHERE ep.uhs_id = u.id AND ep.beendet_at IS NULL) \
              FROM uhs u \
              WHERE u.einsatz_id = ? AND u.storniert_at IS NULL AND u.status <> 'aufgeloest' \
              ORDER BY u.bezeichnung COLLATE NOCASE, u.id",
