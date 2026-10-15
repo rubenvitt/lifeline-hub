@@ -12,8 +12,10 @@ import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 type Zeile = Pick<EinsatzMaterial, 'art' | 'menge' | 'ausgegeben'>;
 
 /**
- * Die Wörter der Art (D1), die eine Quelle für Stammtabelle, Stammformular und „Art ändern …“:
- * ein Gerät steht je Stück im Einsatz, ein Verbrauchsgut mit Menge.
+ * Die Wörter der Art (D1), die eine Quelle für Spalte und Filter der Stammtabelle
+ * (`stammdaten/MaterialTab.tsx`) und, über {@link ART_OPTIONEN}, für das Feld „Art“ im
+ * Stammformular und im Ad-hoc-Dialog der Materialliste (LLH-1225 D6): ein Gerät steht je Stück im
+ * Einsatz, ein Verbrauchsgut mit Menge.
  */
 export const ART_LABEL: Readonly<Record<MaterialArt, string>> = {
   geraet: 'Gerät',

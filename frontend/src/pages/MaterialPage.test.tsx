@@ -885,7 +885,31 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     });
   });
 
-  it('Art: „Gerät“ setzt die Menge auf 1 und sperrt sie; eine eigene Wahl bleibt', async () => {
+  it('Art: eine eigene Wahl bleibt, auch wenn die Menge danach die Vorgabe wechselte', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await openAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+    const art = (name: string) => within(dialog).getByRole('radio', { name });
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Verbandkasten');
+    // Bei Menge 1 wäre die Vorgabe „Gerät“; die Person wählt „Verbrauchsgut“.
+    await userEvent.click(art('Verbrauchsgut'));
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '3');
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '1');
+    expect(art('Verbrauchsgut')).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ menge: 1, art: 'verbrauchsgut' });
+  });
+
+  it('Art: „Gerät“ setzt die Menge auf 1 und sperrt sie', async () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
