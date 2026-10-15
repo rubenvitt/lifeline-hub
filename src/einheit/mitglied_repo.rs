@@ -600,7 +600,8 @@ pub async fn fahrzeug_mitglieder_map(
 }
 
 /// Eigene Ist-Stärke einer Einheit: Aggregation der aufgelösten Personal-Positionen der
-/// Mitglieder. Fahrzeuge zählen nicht in F/UF/M. Positionen ohne Wert werden ignoriert.
+/// Mitglieder. Fahrzeuge zählen nicht in F/UF/M; eine Person ohne Position zählt als Mannschaft
+/// (`Staerke::from_positions`, LLH-1234).
 pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, AppError> {
     let positionen: Vec<Option<String>> = sqlx::query_scalar(
         "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
@@ -612,14 +613,13 @@ pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, 
     .await?;
     let iter = positionen
         .into_iter()
-        .flatten()
-        .filter_map(|s| StaerkePosition::parse(&s));
+        .map(|s| s.as_deref().and_then(StaerkePosition::parse));
     Ok(Staerke::from_positions(iter))
 }
 
 /// Eigene Ist-Stärke ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
 /// LFH-225/F23), gruppiert je `einheit_id`. Gleiche Auflösung/Filterung wie
-/// `ist_staerke`; Einheiten ohne wertbare Kräfte fehlen in der Map — der Aufrufer
+/// `ist_staerke`; Einheiten ohne aktives Personal fehlen in der Map — der Aufrufer
 /// setzt dafür `0/0/0`.
 pub async fn ist_staerke_map(
     pool: &SqlitePool,
@@ -635,11 +635,12 @@ pub async fn ist_staerke_map(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let mut positionen: HashMap<i64, Vec<StaerkePosition>> = HashMap::new();
+    let mut positionen: HashMap<i64, Vec<Option<StaerkePosition>>> = HashMap::new();
     for (einheit_id, position) in zeilen {
-        if let Some(p) = position.as_deref().and_then(StaerkePosition::parse) {
-            positionen.entry(einheit_id).or_default().push(p);
-        }
+        positionen
+            .entry(einheit_id)
+            .or_default()
+            .push(position.as_deref().and_then(StaerkePosition::parse));
     }
     Ok(positionen
         .into_iter()
@@ -820,7 +821,7 @@ mod tests {
             let ep = person(&pool, einsatz, name, Some(pos)).await;
             zuordnen_personal(&pool, einsatz, a, ep).await.unwrap();
         }
-        // Person ohne Position zählt nicht.
+        // Person ohne Position zählt als Mannschaft (LLH-1234).
         let ohne = person(&pool, einsatz, "Ohne", None).await;
         zuordnen_personal(&pool, einsatz, a, ohne).await.unwrap();
         // Ein Fahrzeug zuordnen — darf die Stärke nicht beeinflussen.
@@ -828,7 +829,7 @@ mod tests {
             .bind(einsatz).fetch_one(&pool).await.unwrap();
         zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap();
 
-        assert_eq!(ist_staerke(&pool, a).await.unwrap(), Staerke::neu(1, 1, 2));
+        assert_eq!(ist_staerke(&pool, a).await.unwrap(), Staerke::neu(1, 1, 3));
     }
 
     #[tokio::test]
@@ -1019,7 +1020,8 @@ mod tests {
         assert_eq!(personal_map[&a].len(), 3);
         assert_eq!(personal_map[&b].len(), 2);
         assert!(!personal_map.contains_key(&leer));
-        assert_eq!(staerke_map[&a], Staerke::neu(0, 1, 1));
+        // „Ohne“ zählt als Mannschaft (LLH-1234).
+        assert_eq!(staerke_map[&a], Staerke::neu(0, 1, 2));
     }
 
     async fn an_einheit(pool: &SqlitePool, einsatz: i64, einheit: i64, em: i64) {

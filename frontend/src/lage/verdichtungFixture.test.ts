@@ -203,24 +203,35 @@ describe('Fixture: Stärke', () => {
   });
 });
 
-describe('Fixture: Kräfte (LLH-1079)', () => {
+describe('Fixture: Kräfte (LLH-1079, LLH-1234)', () => {
   const k = fixture.kraefte;
+  const personal = k.personal.map(
+    (p, i) =>
+      ({
+        id: i + 1,
+        einheit_id: 1,
+        staerke_position: p.staerke_position,
+        status_kategorie: 'verfuegbar',
+        beendet_als: p.beendet_als,
+        beendet_at: p.beendet_als ? '2026-10-13 10:00:00' : null,
+      }) as unknown as EinsatzPersonal,
+  );
 
-  it('verdichte zählt nur aktive Kräfte, auch wenn beendete hineinkommen', () => {
-    const personal = k.personal.map(
-      (p, i) =>
-        ({
-          id: i + 1,
-          staerke_position: p.staerke_position,
-          status_kategorie: 'verfuegbar',
-          beendet_als: p.beendet_als,
-          beendet_at: p.beendet_als ? '2026-10-13 10:00:00' : null,
-        }) as unknown as EinsatzPersonal,
-    );
+  it('verdichte zählt nur aktive Kräfte, ohne Position als Mannschaft', () => {
     const v = verdichte(personal, [], []);
     const { fuehrer, unterfuehrer, mannschaft } = v.staerke;
     expect({ fuehrer, unterfuehrer, mannschaft }).toEqual(alsStaerke(k.erwartet.staerke));
     expect(v.anzahlPersonal).toBe(k.erwartet.personal);
+  });
+
+  it('die Einheit im Meldebild zählt dieselbe Stärke wie der Server', () => {
+    const einheit = { id: 1, einsatz_id: 1, name: 'A', sortier: 0 } as unknown as Einheit;
+    const zeile = baueKraeftebild([], [einheit], personal, [], [])
+      .baum.flatMap((z) => [z, ...(z.children ?? [])])
+      .find((z) => z.key === 'eh-1');
+    expect(zeile, 'Einheit im Baum').toBeDefined();
+    const { fuehrer, unterfuehrer, mannschaft } = zeile!.staerke;
+    expect({ fuehrer, unterfuehrer, mannschaft }).toEqual(alsStaerke(k.erwartet.staerke));
   });
 
   it('summiereStaerke lässt aufgelöste Einheiten aus', () => {

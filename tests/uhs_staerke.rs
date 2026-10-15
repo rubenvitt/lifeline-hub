@@ -159,6 +159,38 @@ async fn kraft_einer_einheit_zaehlt_an_der_uhs_und_bleibt_in_ihrer_einheit() {
     );
 }
 
+/// LLH-1234: Eine Kraft ohne Stärke-Position zählt an der UHS als Mannschaft, wie in der Stärke
+/// der Einheit und im Meldebild (Fixture `regeln.json`, Abschnitt `kraefte`).
+#[tokio::test]
+async fn kraft_ohne_position_zaehlt_an_der_uhs_als_mannschaft() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nord = uhs_anlegen(&app, &admin, einsatz, "Nord").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&json!({"adhoc": {"name": "Ohne", "funktion": "Helfer"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert!(v["staerke_position"].is_null(), "{v}");
+    let ohne = v["id"].as_i64().unwrap();
+    let fuehrer = kraft(&app, &admin, einsatz, "Fritz", "fuehrer").await;
+    for ep in [ohne, fuehrer] {
+        assert_eq!(
+            zuordnen(&app, &admin, einsatz, nord, ep).await,
+            StatusCode::OK
+        );
+    }
+    assert_eq!(
+        detail(&app, &admin, einsatz, nord).await["staerke"],
+        staerke(1, 0, 1)
+    );
+}
+
 #[tokio::test]
 async fn position_und_wechsel_aendern_die_staerke_ohne_pflege() {
     let app = setup().await;

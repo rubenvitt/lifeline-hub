@@ -160,14 +160,15 @@ pub struct KraefteZaehler {
     pub staerke: Staerke,
 }
 
-/// Zählregel der Kräfte (Fixture `regeln.json`, Abschnitt `kraefte`): nur aktive Kräfte zählen;
-/// im Personal jede, in der Stärke nur die mit Position. Die Leser filtern beendete schon in SQL;
-/// die Regel lässt sie trotzdem aus, damit ein ungefilterter Aufrufer richtig zählt.
+/// Zählregel der Kräfte (Fixture `regeln.json`, Abschnitt `kraefte`): nur aktive Kräfte zählen,
+/// im Personal und in der Stärke jede; eine Kraft ohne Position zählt als Mannschaft (LLH-1234).
+/// Die Leser filtern beendete schon in SQL; die Regel lässt sie trotzdem aus, damit ein
+/// ungefilterter Aufrufer richtig zählt.
 pub fn count_kraefte(kraefte: &[KraftMerkmale]) -> KraefteZaehler {
     let aktiv = || kraefte.iter().filter(|k| !k.beendet);
     KraefteZaehler {
         personal: aktiv().count() as i64,
-        staerke: Staerke::from_positions(aktiv().filter_map(|k| k.staerke_position)),
+        staerke: Staerke::from_positions(aktiv().map(|k| k.staerke_position)),
     }
 }
 

@@ -81,12 +81,15 @@ wire_enum! {
 }
 
 impl Staerke {
-    /// Aggregiert einzelne Positionen zu einer Stärke (zählt je Topf). Damit summiert
-    /// K&M‑3 die Einheiten-Stärke direkt aus den Dispositionszeilen, ohne neue Logik.
-    pub fn from_positions(positionen: impl Iterator<Item = StaerkePosition>) -> Staerke {
+    /// Aggregiert einzelne Positionen zu einer Stärke (zählt je Topf). Eine Person ohne
+    /// Stärke-Position zählt als Mannschaft (LLH-1234), damit jede Person genau einmal zählt und
+    /// Server und Client (`kraefte/kraeftebild.ts`, `verdichte`) dieselbe Stärke zeigen; Fixture
+    /// `tests/fixtures/verdichtung/regeln.json`, Abschnitt `kraefte`. Einzige Ausnahme im Server:
+    /// die UHS zählt ihre Stärke in SQL (`uhs/repo.rs`) und spiegelt die Regel dort.
+    pub fn from_positions(positionen: impl Iterator<Item = Option<StaerkePosition>>) -> Staerke {
         let (mut f, mut u, mut m) = (0u16, 0u16, 0u16);
         for p in positionen {
-            match p {
+            match p.unwrap_or(StaerkePosition::Mannschaft) {
                 StaerkePosition::Fuehrer => f += 1,
                 StaerkePosition::Unterfuehrer => u += 1,
                 StaerkePosition::Mannschaft => m += 1,
@@ -157,10 +160,20 @@ mod tests {
     fn from_positions_zaehlt_je_topf() {
         use StaerkePosition::*;
         let s = Staerke::from_positions(
-            [Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft].into_iter(),
+            [Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft]
+                .into_iter()
+                .map(Some),
         );
         assert_eq!(s, Staerke::neu(1, 1, 3));
         assert_eq!(s.gesamt(), 5);
+    }
+
+    #[test]
+    fn person_ohne_position_zaehlt_als_mannschaft() {
+        use StaerkePosition::*;
+        let s = Staerke::from_positions([Some(Fuehrer), None, Some(Mannschaft), None].into_iter());
+        assert_eq!(s, Staerke::neu(1, 0, 3));
+        assert_eq!(s.gesamt(), 4, "jede Person zählt genau einmal");
     }
 
     #[test]

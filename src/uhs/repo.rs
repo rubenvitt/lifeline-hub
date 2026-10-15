@@ -3,8 +3,8 @@ use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Die Stärke zählt die zugeordneten Einsatzkräfte je aufgelöster Position (Dispo-Override vor
-/// Stamm-Default) wie `einheit::mitglied_repo::ist_staerke`; Kräfte ohne Position zählen nicht
-/// (LFH-1045, design.md D1).
+/// Stamm-Default) wie `einheit::mitglied_repo::ist_staerke` (LFH-1045, design.md D1); eine Kraft
+/// ohne Position zählt als Mannschaft wie in `Staerke::from_positions` (LLH-1234).
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, status, \
            lat, lon, \
@@ -18,7 +18,7 @@ const SELECT_ALLE: &str = "\
              AS unterfuehrer, \
            (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
              WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
-               AND COALESCE(ep.staerke_position, p.staerke_position) = 'mannschaft') \
+               AND COALESCE(ep.staerke_position, p.staerke_position, 'mannschaft') = 'mannschaft') \
              AS mannschaft \
     FROM uhs";
 

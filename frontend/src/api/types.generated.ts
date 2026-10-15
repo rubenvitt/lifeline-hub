@@ -3306,7 +3306,7 @@ export interface components {
             /**
              * Format: int64
              * @description Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS
-             *     zählen Kräfte ohne Position nicht.
+             *     zählt jede aktive Kraft, auch ohne Position (LLH-1234).
              */
             kraefte: number;
             /** Format: double */
