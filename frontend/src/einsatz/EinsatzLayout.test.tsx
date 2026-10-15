@@ -984,6 +984,10 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
               }
             />
             <Route path="stab/presse" element={<div>Presse-Inhalt</div>} />
+            <Route
+              path="verpflegung/:zeitfensterId/ausgabe"
+              element={<div>Ausgabeansicht-Inhalt</div>}
+            />
             <Route path="einsatzdaten" element={<div>Einsatzdaten-Inhalt</div>} />
             <Route path="ueberblick" element={<div>Überblick-Inhalt</div>} />
             <Route path="etb" element={<div>ETB-Inhalt</div>} />
@@ -1068,6 +1072,18 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     setupWaechter('/einsaetze/7/stab/presse', freigabenFixture({ stab: { zugriff: false } }));
     expect(await screen.findByRole('heading', { level: 1, name: /Stab/ })).toBeInTheDocument();
     expect(screen.queryByText('Presse-Inhalt')).not.toBeInTheDocument();
+  });
+
+  it('Ausgabeansicht eines ausgeblendeten Moduls Verpflegung zeigt die Sperre wie die Modulseite (LLH-1032)', async () => {
+    setupWaechter(
+      '/einsaetze/7/verpflegung/3/ausgabe',
+      freigabenFixture({ verpflegung: { sichtbar: false, zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Verpflegung/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('In diesem Einsatz ausgeblendet')).toBeInTheDocument();
+    expect(screen.queryByText('Ausgabeansicht-Inhalt')).not.toBeInTheDocument();
   });
 
   // LLH-1180, design.md D7: die Altadresse gehört dem Ziel ihrer Weiterleitung.

@@ -374,6 +374,7 @@ describe('modulZuRoute / modulAusPfad', () => {
     expect(modulAusPfad('/einsaetze/7/stab/presse')?.key).toBe('stab');
     // Der Einsatzbericht (LFH-726) erbt die Einsatzdaten: nie ausgeblendet, nie gesperrt.
     expect(modulAusPfad('/einsaetze/7/einsatzdaten/bericht')?.key).toBe('einsatzdaten');
+    expect(modulAusPfad('/einsaetze/7/verpflegung/3/ausgabe')?.key).toBe('verpflegung');
     // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.
     expect(modulAusPfad('/einsaetze/7/unfallhilfsstellen/liste')?.key).toBe('unfallhilfsstellen');
     expect(modulAusPfad('/einsaetze/7/personen/12')?.key).toBe('personen');
