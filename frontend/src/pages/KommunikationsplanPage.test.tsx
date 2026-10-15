@@ -152,6 +152,7 @@ const EINHEITEN = [
     kommunikationsmittel: 'mobil',
     erreichbarkeit: '0160 222',
     sortier: 1,
+    unangemeldet: false,
     sprechgruppen: [],
     fahrzeug_mitglieder: [],
     material_mitglieder: [],

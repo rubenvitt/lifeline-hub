@@ -126,6 +126,7 @@ const EINHEITEN = [
     abschnitt_id: 1,
     erreichbarkeit: '0160 GEHEIM',
     sortier: 1,
+    unangemeldet: false,
     sprechgruppen: [],
     fahrzeug_mitglieder: [],
     material_mitglieder: [],

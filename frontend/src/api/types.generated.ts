@@ -1107,11 +1107,15 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+            /** @description Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3). */
+            nicht_uebernommen_seit?: string | null;
             /**
              * @description Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne
              *     Zone); fehlt ohne passendes Ereignis.
              */
             seit_at?: string | null;
+            /** @description Herkunft „unangemeldet“, dauerhaft (D3). */
+            unangemeldet: boolean;
         };
         /** @description Schlanke Fahrzeug-Info für den Detail-Response. */
         BrFahrzeugKurz: {
@@ -1510,6 +1514,11 @@ export interface components {
             lon?: number | null;
             material_mitglieder: components["schemas"]["EinheitMitgliedMaterial"][];
             name: string;
+            /**
+             * @description Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,
+             *     nur solange die Übernahme offen ist (UTC ohne Zone).
+             */
+            nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
             soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
@@ -1524,6 +1533,8 @@ export interface components {
             tz_organisation?: string | null;
             /** Format: int64 */
             ueber_einheit_id?: number | null;
+            /** @description Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3). */
+            unangemeldet: boolean;
         };
         /** @description Fahrzeug-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedFahrzeug: {
@@ -2151,6 +2162,46 @@ export interface components {
          */
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
+         * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
+         *     `kraft` und `unangemeldet`.
+         */
+        EintreffenEingabe: {
+            /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
+            client_id?: string | null;
+            kraft?: components["schemas"]["KraftAngabe"] | null;
+            unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
+            /**
+             * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
+             *     der Zukunft. Ohne Angabe gilt „jetzt“.
+             */
+            zeitpunkt_at?: string | null;
+        };
+        /** @description Antwort 201 des Eintreffens (design.md D1), beim Replay aus dem Bestand rekonstruiert (D8). */
+        EintreffenErgebnis: {
+            /** @description Die Belegungszeile des Eintritts. */
+            belegung: components["schemas"]["BrBelegungAnzeige"];
+            /**
+             * Format: int64
+             * @description Die eingebuchte oder neu angelegte Einheit; fehlt bei einem Fahrzeug.
+             */
+            einheit_id?: number | null;
+            /** @description Aktive Fahrzeuge der Einheit bzw. das Fahrzeug selbst. */
+            fahrzeug_ids: number[];
+            /**
+             * Format: int64
+             * @description Meldung an die Einsatzleitung (nur unangemeldet).
+             */
+            meldung_id?: number | null;
+            /** @description Die Buchung hat die Kraft neu angelegt. */
+            unangemeldet: boolean;
+            zeitachse: components["schemas"]["EintreffenZeitachse"];
+        };
+        /**
+         * @description Was das Eintreffen in der Kräfte-Zeitachse bewirkt hat (design.md D1).
+         * @enum {string}
+         */
+        EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
          * @enum {string}
@@ -2500,6 +2551,13 @@ export interface components {
             traegerorganisation?: string | null;
             /** Format: int64 */
             tragenkapazitaet?: number | null;
+        };
+        /** @description Ein Fahrzeug der unangemeldeten Kraft (Ad-hoc-Fahrzeug). */
+        FahrzeugEingabe: {
+            fahrzeugtyp?: string | null;
+            funkrufname?: string;
+            /** @description Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug. */
+            traegerorganisation?: string | null;
         };
         /**
          * @description Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
@@ -3084,6 +3142,12 @@ export interface components {
         KopplungsCode: {
             code: string;
             laeuft_ab_at: string;
+        };
+        /** @description Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`. */
+        KraftAngabe: {
+            /** Format: int64 */
+            objekt_id: number;
+            objekt_typ: string;
         };
         /** @description Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden. */
         LageGesehenAnzeige: {
@@ -4971,6 +5035,15 @@ export interface components {
             /** Format: int32 */
             unterfuehrer: number;
         };
+        /** @description Stärke F/UF/M: alle drei oder keine. */
+        StaerkeEingabe: {
+            /** Format: int64 */
+            fuehrer?: number | null;
+            /** Format: int64 */
+            mannschaft?: number | null;
+            /** Format: int64 */
+            unterfuehrer?: number | null;
+        };
         /**
          * @description Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
          *     Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
@@ -5163,6 +5236,13 @@ export interface components {
             otpauth_url: string;
             secret_base32: string;
         };
+        /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
+        UebernahmeBody: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            /** Format: int64 */
+            ueber_einheit_id?: number | null;
+        };
         /**
          * @description Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die
          *     Datei ist nur über die UHS-Route ladbar.
@@ -5293,6 +5373,16 @@ export interface components {
          * @enum {string}
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
+        /** @description Unangemeldete Kraft (design.md D1/D2). */
+        UnangemeldetEingabe: {
+            /** @description Freitext an der Einheit; nie in Meldung oder ETB. */
+            bemerkung?: string | null;
+            /** @description 1 bis `SAMMEL_MAX` Fahrzeuge; das erste gibt der Einheit ihren Namen. */
+            fahrzeuge?: components["schemas"]["FahrzeugEingabe"][];
+            staerke?: components["schemas"]["StaerkeEingabe"] | null;
+            /** @description Neuanlage trotz gleichnamiger Kraft im Einsatz (D9). */
+            trotzdem_anlegen?: boolean;
+        };
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.

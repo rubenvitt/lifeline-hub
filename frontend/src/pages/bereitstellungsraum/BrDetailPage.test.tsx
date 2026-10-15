@@ -37,14 +37,19 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Test-Einsatz', meine_rolle: 'fuehrungspersonal', ...over });
 }
 
-type EinheitEingabe = Omit<BrEinheitKurz, 'fahrzeuge'> & Partial<Pick<BrEinheitKurz, 'fahrzeuge'>>;
+type EinheitEingabe = Omit<BrEinheitKurz, 'fahrzeuge' | 'unangemeldet'> &
+  Partial<Pick<BrEinheitKurz, 'fahrzeuge' | 'unangemeldet'>>;
 
 /** Ohne Angabe folgt `belegung` den Listen, wie der Server zählt (LLH-1095): Einheiten, dazu
  *  die einheitenlosen Fahrzeuge und die der Einheiten. */
 function brDetail(
   over: Omit<Partial<BrDetail>, 'einheiten'> & { einheiten?: EinheitEingabe[] } = {},
 ): BrDetail {
-  const einheiten = (over.einheiten ?? []).map((e) => ({ fahrzeuge: [], ...e }));
+  const einheiten = (over.einheiten ?? []).map((e) => ({
+    fahrzeuge: [],
+    unangemeldet: false,
+    ...e,
+  }));
   const fahrzeuge = over.fahrzeuge ?? [];
   const belegung = over.belegung ?? {
     einheiten: einheiten.length,
@@ -127,6 +132,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
     aktueller_br_id: null,
     sprechgruppen: [],
     status: { quelle: 'ohne', verteilung: [] },
+    unangemeldet: false,
     ...over,
   };
 }
