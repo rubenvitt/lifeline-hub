@@ -22,7 +22,11 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
   Bibliothek sie an der Person darstellt, auch wenn diese Darstellung nur abgeleitet und nicht
   vermessen ist. Die Fachaufgabe kommt aus dem gespeicherten Wert oder aus der Funktion: Notarzt
   oder Arzt ergibt Arzt, Rettungsdienst oder Sanitäter ergibt Sanität, Funk oder Fernmelde ergibt
-  IuK. Ein Funktionsindikator MUST NOT erscheinen.
+  IuK. Ist die Person Einheitsführer oder Abschnittsleiter, MUST sie den Führungskraft-Indikator
+  tragen (Raute mit schwarzer Kappe, ohne Kürzel), auch wenn die Bibliothek ihn nur abgeleitet
+  zeichnet; die Fachaufgabe steht dann im Indikator. Andere Personen MUST NOT einen
+  Funktionsindikator tragen. Lässt sich der Indikator nicht zeichnen, MUST die Person ohne ihn
+  erscheinen.
 - **Einsatzabschnitt**: taktische Formation in der Farbe „Führung und Leitung“, ohne Kürzel.
 - **Einsatzort**: Zeichen „Ereignis“.
 - **Schaden**: Zeichen „Gefahr“. Die Füllung folgt dem Ausmaß: gering grün, mittel gelb, groß
@@ -39,6 +43,14 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 #### Scenario: Führungskraft mit Funktion Notarzt
 - **WHEN** eine Führungskraft mit der Funktion „Notarzt“ auf der Karte steht
 - **THEN** zeigt ihr Zeichen eine Person in der Farbe ihrer Organisation mit dem Arztzeichen
+
+#### Scenario: Einheitsführer mit Funktion Notarzt
+- **WHEN** ein Einheitsführer mit der Funktion „Notarzt“ auf der Karte steht
+- **THEN** zeigt sein Zeichen eine Person in der Farbe seiner Organisation mit dem Führungskraft-Indikator und dem Arztzeichen
+
+#### Scenario: Person ohne Führungsfunktion
+- **WHEN** eine Person, die weder Einheitsführer noch Abschnittsleiter ist, auf der Karte steht
+- **THEN** trägt ihr Zeichen keinen Funktionsindikator
 
 #### Scenario: Unfallhilfsstelle eines Feuerwehr-Hubs
 - **WHEN** die Organisations-Vorgabe des Hubs „Feuerwehr“ ist und eine UHS „sonstige“ auf der Karte steht

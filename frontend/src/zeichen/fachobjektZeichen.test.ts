@@ -144,24 +144,52 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
     baueTzProps({ objekttyp: 'fuehrung', organisation: 'feuerwehr' }),
     { kind: 'person', organization: 'feuerwehr' },
   ],
-  // Die Fachaufgabe der Führungskraft kommt aus ihrer Funktion und ist an der Person nur
-  // abgeleitet gezeichnet (LLH-1161); der Funktionsindikator bleibt weg.
+  // Die Fachaufgabe der Person kommt aus ihrer Funktion und ist an der Person nur abgeleitet
+  // gezeichnet (LLH-1161). Einheitsführer und Abschnittsleiter tragen dazu den
+  // Führungskraft-Indikator, die Marke sitzt dann an der Hülle der Funktionsfassung (LLH-1231).
   ...(
     [
       ['Notarzt', 'physician'],
       ['Rettungssanitäter', 'medical-service'],
       ['Funk', 'information-communications'],
     ] as const
-  ).map(([funktion, marke]): [string, TzProps, SymbolSpec] => [
-    `Führungskraft ${funktion}: Person mit Fachaufgabe, ohne Funktionsindikator`,
-    baueTzProps({
-      objekttyp: 'fuehrung',
-      organisation: 'hilfsorganisation',
-      funktion,
-      istFuehrungskraft: true,
-    }),
-    { kind: 'person', organization: 'hilfsorganisation', bodyMarks: [marke] },
+  ).flatMap(([funktion, marke]): Array<[string, TzProps, SymbolSpec]> => [
+    [
+      `Führungskraft ${funktion}: Person mit Fachaufgabe und Funktionsindikator`,
+      baueTzProps({
+        objekttyp: 'fuehrung',
+        organisation: 'hilfsorganisation',
+        funktion,
+        istFuehrungskraft: true,
+      }),
+      {
+        kind: 'person',
+        organization: 'hilfsorganisation',
+        bodyMarks: [marke],
+        functionRole: 'leader',
+      },
+    ],
+    [
+      `Person ${funktion} ohne Führung: Person mit Fachaufgabe, ohne Funktionsindikator`,
+      baueTzProps({
+        objekttyp: 'fuehrung',
+        organisation: 'hilfsorganisation',
+        funktion,
+        istFuehrungskraft: false,
+      }),
+      { kind: 'person', organization: 'hilfsorganisation', bodyMarks: [marke] },
+    ],
   ]),
+  [
+    'Führungskraft ohne Funktion: Person mit Funktionsindikator',
+    baueTzProps({ objekttyp: 'fuehrung', organisation: 'thw', istFuehrungskraft: true }),
+    { kind: 'person', organization: 'thw', functionRole: 'leader' },
+  ],
+  [
+    'Führungskraft ohne Organisation: Person mit Funktionsindikator',
+    baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: true }),
+    { kind: 'person', functionRole: 'leader' },
+  ],
   [
     'Einsatzabschnitt neutral: Führung und Leitung ohne Kürzel',
     baueTzProps({ objekttyp: 'abschnitt', organisation: 'feuerwehr' }),
@@ -276,6 +304,47 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
       bodyMarks: ['information-communications'],
     });
     expect(fachobjektZeichen(tz)!.drawing.derivations).not.toHaveLength(0);
+  });
+
+  it('zeichnet den Führungskraft-Indikator an der Person stets abgeleitet', () => {
+    // `leader` hat kein eigenes Original (ESZ-116): Raute und Kappe des Einsatzleiters ohne Lauf.
+    const z = fachobjektZeichen(
+      baueTzProps({ objekttyp: 'fuehrung', organisation: 'feuerwehr', istFuehrungskraft: true }),
+    )!;
+    expect(z.spec).toEqual({ kind: 'person', organization: 'feuerwehr', functionRole: 'leader' });
+    expect(z.drawing.derivations).not.toHaveLength(0);
+    expect(z.schluessel).not.toBe(
+      fachobjektZeichen(baueTzProps({ objekttyp: 'fuehrung', organisation: 'feuerwehr' }))!
+        .schluessel,
+    );
+  });
+
+  it('lässt den Funktionsindikator weg, wo der Körper ihn nicht trägt', () => {
+    // Die Führungskraft ist eine Person; an der Formation komponiert `leader` nicht.
+    expect(
+      wirksam({
+        grundzeichen: 'taktische-formation',
+        organisation: 'feuerwehr',
+        einheit: 'gruppe',
+        fachaufgabe: 'brandbekaempfung',
+        funktion: 'fuehrungskraft',
+      }),
+    ).toEqual({
+      kind: 'formation',
+      organization: 'feuerwehr',
+      strength: 'gruppe',
+      bodyMarks: ['fire-fighting'],
+    });
+  });
+
+  it('ignoriert eine unbekannte Funktion', () => {
+    expect(
+      wirksam({
+        grundzeichen: 'person',
+        organisation: 'feuerwehr',
+        funktion: 'gibt-es-nicht' as TzProps['funktion'],
+      }),
+    ).toEqual({ kind: 'person', organization: 'feuerwehr' });
   });
 
   it('lässt eine am Körper unzulässige Stärke weg und behält die Organisation', () => {
@@ -451,6 +520,18 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
   // An der Person ist keine Fachaufgabe vermessen (LLH-1161): jede erscheint abgeleitet.
   it('abgeleitet an der Person (Führungskraft, Hilfsorganisation)', () => {
     expect(abgeleitet(PERSON)).toEqual(ALLE_FACHAUFGABEN.filter((f) => f !== 'fuehrung'));
+  });
+
+  // Mit Funktionsindikator (LLH-1231): jede Fachaufgabe komponiert weiter, und keine verdrängt
+  // den Indikator.
+  it('an der Person mit Führungskraft-Indikator (Hilfsorganisation)', () => {
+    const FUEHRUNGSKRAFT: TzProps = { ...PERSON, funktion: 'fuehrungskraft' };
+    expect(ohneFachaufgabe(FUEHRUNGSKRAFT)).toEqual(['fuehrung']);
+    const ohneIndikator = ALLE_FACHAUFGABEN.filter(
+      (fachaufgabe) =>
+        wirksam({ ...FUEHRUNGSKRAFT, fachaufgabe } as TzProps).functionRole !== 'leader',
+    );
+    expect(ohneIndikator).toEqual([]);
   });
 
   // Was UHS und Betreuungsstelle tragen, ist an der Stelle ohne Organisation vermessen.
