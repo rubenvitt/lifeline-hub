@@ -25,8 +25,10 @@ import {
 } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { ladeEinsatz } from '../api/einsaetze';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { listeNachforderungen } from '../api/nachforderungen';
+import { KennungsLink } from '../components/kennungsLink';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeMaterial } from '../api/material';
 import {
@@ -46,7 +48,7 @@ import {
 import { MATERIAL_ADHOC_TEXT_MAX, MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
-import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import { kraefteuebersichtPfad, nachforderungenPfad } from '../routing/deeplinks';
 import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
 import MaterialOrtAngabe, {
   ortSuchText,
@@ -62,9 +64,8 @@ import {
   materialStatusOptionen,
   mengeText,
   OHNE_ORT_WERT,
-  ortPatch,
+  ortPostFields,
   ortVon,
-  parseOrtValue,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
@@ -78,7 +79,7 @@ import DemoMarke from '../components/DemoMarke';
 import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
-import { modulName } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -120,12 +121,26 @@ function gruppenEtikett(w: string): string {
  * Fükw zu lesen ist (LLH-1093); die Marken teilen diese Zeile, statt eine dritte zu öffnen. Im
  * Kartenzweig nicht: dort trägt nur die Suche sie (design.md D13).
  */
-function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
+function BezeichnungZelle({
+  em,
+  herkunft,
+}: {
+  em: EinsatzMaterial;
+  herkunft?: (nachforderungId: number) => ReactNode;
+}) {
   const kategorieAusgeblendet = useSpalteAusgeblendet('kategorie');
   const marken = [
     em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
     em.ist_demo && <DemoMarke key="demo" />,
   ];
+  // Herkunft aus einer Nachforderung (LLH-1226 D11) als eigene Zeile darunter, auch im Kartenmodus.
+  // Dort rendert der Kartentitel diese Zelle in einem fetten `<strong>` (einem Inline-Element):
+  // deshalb ein Span als Block, im normalen Gewicht (Review).
+  const bezug = em.nachforderung_id != null && herkunft && (
+    <span data-lfh="material-herkunft" style={{ display: 'block', fontWeight: 'normal' }}>
+      {herkunft(em.nachforderung_id)}
+    </span>
+  );
   if (kategorieAusgeblendet && em.kategorie) {
     return (
       <>
@@ -136,15 +151,19 @@ function BezeichnungZelle({ em }: { em: EinsatzMaterial }) {
           </Typography.Text>
           {marken}
         </Space>
+        {bezug}
       </>
     );
   }
   // `wrap`: die Marken rutschen unter die Bezeichnung, statt die Spalte zu verbreitern.
   return (
-    <Space wrap>
-      {em.bezeichnung}
-      {marken}
-    </Space>
+    <>
+      <Space wrap>
+        {em.bezeichnung}
+        {marken}
+      </Space>
+      {bezug}
+    </>
   );
 }
 
@@ -169,12 +188,6 @@ type AdhocWerte = MaterialAdhocEingabe & { menge: number; art?: MaterialArt; ort
 /** Vorgabe der Art wie am Server (LLH-1224 D1): Menge über 1 → Verbrauchsgut, sonst Gerät. */
 function artVorgabe(menge: number | null | undefined): MaterialArt {
   return (menge ?? 1) > 1 ? 'verbrauchsgut' : 'geraet';
-}
-
-/** Der Ort-Auswahlwert als Feld des POST (D7); „ohne Ort“ und Unbekanntes senden keins. */
-function ortFeld(wert: string | undefined): MaterialOrtPatch | undefined {
-  const ziel = wert ? parseOrtValue(wert) : undefined;
-  return ziel ? (ortPatch(ziel, null) ?? undefined) : undefined;
 }
 
 /** Gruppierung der Liste (LLH-1225 D4): Vorgabe Ort, die Frage des Tickets ist „was ist wo“. */
@@ -258,6 +271,57 @@ export default function MaterialPage() {
     queryKey: globalKeys.materialListe('im-dienst'),
     queryFn: () => listeMaterial(true),
   });
+  /*
+   * Herkunft aus einer Nachforderung (LLH-1226 D8/D11): der Posten trägt nur die Kennung, den Namen
+   * löst die Liste der Nachforderungen auf — nur bei bedienbarem Modul (`istKeyFreigegeben` gibt
+   * Unbekanntes nicht frei, Muster `VerpflegungPage`) und nur, wenn ein Posten eine trägt. Ein 403
+   * bleibt still: dann „aus Nachforderung #4“ ohne Link.
+   */
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigabenQuery.data);
+  const hasHerkunft = (emQuery.data ?? []).some((m) => m.nachforderung_id != null);
+  const nachforderungenQuery = useQuery({
+    // Derselbe Schlüssel und Abruf wie `NachforderungenPage` — ein Cache-Fach, live.
+    queryKey: einsatzKeys.nachforderungen(einsatzId),
+    queryFn: () => listeNachforderungen(einsatzId, {}),
+    enabled: nachforderungenFrei && hasHerkunft,
+  });
+  const nachforderungNamen = useMemo(
+    () =>
+      nachforderungenFrei && !nachforderungenQuery.isError
+        ? new Map((nachforderungenQuery.data ?? []).map((n) => [n.id, n.bezeichnung]))
+        : new Map<number, string>(),
+    [nachforderungenFrei, nachforderungenQuery.isError, nachforderungenQuery.data],
+  );
+  /**
+   * Der Verweis: mit lesbarer Nachforderung als Link, sonst die Kennung als Text (Muster
+   * Verpflegung). Zwei Zeilen mit Auslassung (Muster `KraefteuebersichtPage`): die Spalte
+   * „Bezeichnung“ steht fest und ist am Tablet gut 110 px schmal, ein langer Bedarf machte die Zeile
+   * sonst sieben Zeilen hoch (Prüfliste LLH-1226). Der Volltext steht im `title`.
+   */
+  const herkunft = (nfId: number): ReactNode => {
+    const name = nachforderungNamen.get(nfId);
+    const text = `aus Nachforderung: ${name}`;
+    return name != null ? (
+      <KennungsLink to={nachforderungenPfad(einsatzId, { nachforderung: nfId })} title={text}>
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {text}
+        </span>
+      </KennungsLink>
+    ) : (
+      <Typography.Text type="secondary">aus Nachforderung #{nfId}</Typography.Text>
+    );
+  };
   // Ein Gerät steht je Stück im Einsatz (LLH-1224 D2): ist eines gewählt, steht die Menge fest
   // auf 1 und das Feld ist gesperrt; der Server lehnte jede andere Menge ab.
   const gewaehltesMaterial = Form.useWatch('material_id', stammForm);
@@ -318,7 +382,7 @@ export default function MaterialPage() {
           traegerorganisation: w.traegerorganisation,
         },
         art === 'geraet' ? 1 : (w.menge ?? 1),
-        { art, ort: ortFeld(w.ort) },
+        { art, ort: ortPostFields(w.ort) },
       );
     },
     // Nur invalidieren und melden: geschlossen wird über `onFertig`, geleert von der
@@ -665,7 +729,7 @@ export default function MaterialPage() {
       width: 170,
       sortWert: (m) => m.bezeichnung,
       suchText: (m) => m.bezeichnung,
-      render: (_, em) => <BezeichnungZelle em={em} />,
+      render: (_, em) => <BezeichnungZelle em={em} herkunft={herkunft} />,
     },
     {
       title: 'Kategorie',
@@ -1061,7 +1125,7 @@ export default function MaterialPage() {
           await disponiereMutation.mutateAsync({
             materialId: w.material_id,
             menge: geraet ? 1 : w.menge,
-            ort: ortFeld(stammOrt),
+            ort: ortPostFields(stammOrt),
           });
         }}
         onFertig={() => {

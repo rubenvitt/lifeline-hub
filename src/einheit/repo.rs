@@ -3,6 +3,7 @@ use super::{
     StatusAnteil, StatusWert,
 };
 use crate::error::AppError;
+use crate::katalog::StatusKategorie;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
@@ -61,7 +62,7 @@ struct Row {
     status_seit: Option<String>,
     hand_status_id: Option<i64>,
     hand_status_label: Option<String>,
-    hand_status_kategorie: Option<crate::katalog::StatusKategorie>,
+    hand_status_kategorie: Option<StatusKategorie>,
     hand_status_farbe: Option<String>,
     hand_status_fms_anker: Option<i64>,
     hand_status_sortier: Option<i64>,
@@ -707,6 +708,9 @@ pub struct HandStatusWechsel {
     pub name: String,
     pub vorher: Option<String>,
     pub nachher: Option<String>,
+    /// Kategorien vor und nach dem Setzen (Benachrichtigung `wieder_verfuegbar`, D11).
+    pub vorher_kategorie: Option<StatusKategorie>,
+    pub nachher_kategorie: Option<StatusKategorie>,
 }
 
 /// Setzt den Handstatus einer Einheit auf einer offenen Transaktion; `status_id` ist gegen den
@@ -719,8 +723,13 @@ pub async fn setze_hand_status_tx(
     id: i64,
     status_id: Option<i64>,
 ) -> Result<Option<HandStatusWechsel>, AppError> {
-    let (name, alt_id, alt_label): (String, Option<i64>, Option<String>) = sqlx::query_as(
-        "SELECT e.name, e.status_id, s.label FROM einsatz_einheit e \
+    let (name, alt_id, alt_label, alt_kategorie): (
+        String,
+        Option<i64>,
+        Option<String>,
+        Option<StatusKategorie>,
+    ) = sqlx::query_as(
+        "SELECT e.name, e.status_id, s.label, s.kategorie FROM einsatz_einheit e \
          LEFT JOIN fahrzeug_status s ON s.id = e.status_id \
          WHERE e.id = ? AND e.einsatz_id = ?",
     )
@@ -755,19 +764,22 @@ pub async fn setze_hand_status_tx(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    let neu_label: Option<String> = match status_id {
-        Some(sid) => {
-            sqlx::query_scalar("SELECT label FROM fahrzeug_status WHERE id = ?")
-                .bind(sid)
-                .fetch_optional(&mut *conn)
-                .await?
-        }
-        None => None,
+    let (neu_label, neu_kategorie): (Option<String>, Option<StatusKategorie>) = match status_id {
+        Some(sid) => sqlx::query_as::<_, (String, StatusKategorie)>(
+            "SELECT label, kategorie FROM fahrzeug_status WHERE id = ?",
+        )
+        .bind(sid)
+        .fetch_optional(&mut *conn)
+        .await?
+        .map_or((None, None), |(l, k)| (Some(l), Some(k))),
+        None => (None, None),
     };
     Ok(Some(HandStatusWechsel {
         name,
         vorher: alt_label,
         nachher: neu_label,
+        vorher_kategorie: alt_kategorie,
+        nachher_kategorie: neu_kategorie,
     }))
 }
 

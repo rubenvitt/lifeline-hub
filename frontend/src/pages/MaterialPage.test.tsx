@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { QueryClient } from '@tanstack/react-query';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -1821,5 +1822,114 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     for (const name of ['Bezeichnung', 'Kategorie', 'Trägerorganisation', 'Bestandsnummer']) {
       expect(within(dialog).getByLabelText(name)).toHaveAttribute('maxlength', '200');
     }
+  });
+});
+
+describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () => {
+  const uebernommen = { ...em, id: 21, ist_adhoc: true, material_id: null, nachforderung_id: 4 };
+  const nachforderung = {
+    id: 4,
+    einsatz_id: 1,
+    art: 'Tauchpumpe',
+    bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
+    status: 'eingetroffen',
+    material_ids: [21],
+  };
+
+  /** Zählt die Abrufe der Nachforderungsliste. */
+  function nachforderungen(antwort: () => Response): () => number {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/nachforderungen', () => {
+        abrufe += 1;
+        return antwort();
+      }),
+    );
+    return () => abrufe;
+  }
+
+  it('mit Freigabe: Link „aus Nachforderung: …“ auf die hervorgehobene Nachforderung', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const link = await screen.findByRole('link', {
+      name: 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße',
+    });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/nachforderungen?nachforderung=4');
+  });
+
+  it('ein langer Bedarf steht in höchstens zwei Zeilen, der Volltext im title (Prüfliste)', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const text = 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße';
+    const link = await screen.findByRole('link', { name: text });
+    expect(link).toHaveAttribute('title', text);
+    // Der innerste Span mit dem Text trägt die Auslassung (der äußere ist der Boden des Links).
+    const zeilen = Array.from(link.querySelectorAll('span')).filter((e) => e.textContent === text);
+    expect(zeilen[zeilen.length - 1]?.getAttribute('style')).toMatch(/line-clamp: 2/);
+  });
+
+  it('auch im Kartenmodus (390 px): neutral gesetzt, kein Block in der fetten Titelzeile', async () => {
+    setzeViewportBreite(390);
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    const { container } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const karte = await waitFor(() => {
+      const k = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]');
+      expect(k).toHaveTextContent('aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße');
+      return k as HTMLElement;
+    });
+    const herkunft = karte.querySelector<HTMLElement>('[data-lfh="material-herkunft"]');
+    // Der Kartentitel ist ein fettes `<strong>` in einem `<span>`: der Verweis ist dort ein Span
+    // ohne Block-Elemente und stünde sonst fett wie die Bezeichnung.
+    expect(herkunft?.closest('strong')).not.toBeNull();
+    expect(herkunft?.tagName).toBe('SPAN');
+    expect(herkunft?.querySelector('div')).toBeNull();
+    expect(herkunft).toHaveStyle({ fontWeight: 'normal', display: 'block' });
+  });
+
+  /**
+   * Abwesenheit erst prüfen, wenn sie etwas beweist: die Freigaben sind aufgelöst und ein Tick ist
+   * vergangen. Danach hätte ein Abruf, den nur die Freigabe aufhält, begonnen — die Query stünde
+   * auf `fetching`, auch bevor MSW den Handler erreicht.
+   */
+  async function keinAbrufNachFreigaben(client: QueryClient, abrufe: () => number) {
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const stand = client.getQueryState(einsatzKeys.nachforderungen(1));
+    expect(stand?.fetchStatus ?? 'idle').toBe('idle');
+    expect(stand?.dataUpdateCount ?? 0).toBe(0);
+    expect(abrufe()).toBe(0);
+  }
+
+  it('ohne Freigabe für Nachforderungen: „aus Nachforderung #4“ ohne Link, kein Abruf', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
+      ),
+    );
+    const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
+    const { client } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    await keinAbrufNachFreigaben(client, abrufe);
+    expect(screen.queryByRole('link', { name: /aus Nachforderung/ })).toBeNull();
+  });
+
+  it('Liste abgelehnt (403): still „aus Nachforderung #4“', async () => {
+    nachforderungen(() => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /aus Nachforderung/ })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ohne verknüpften Posten ruft die Seite keine Nachforderungen ab', async () => {
+    const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
+    const { client } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    await keinAbrufNachFreigaben(client, abrufe);
+    expect(screen.queryByText(/aus Nachforderung/)).toBeNull();
   });
 });
