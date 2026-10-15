@@ -9,6 +9,7 @@ fn main() {
             "vorbelegung",
             "drucken",
             "anmeldung_im_browser",
+            "benachrichtigung_zeigen",
         ]),
     ))
     .expect("tauri-build");
