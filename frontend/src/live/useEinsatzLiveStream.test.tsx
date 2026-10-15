@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { spieleAlarmTon } from '../alarm/alarmTon';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
@@ -12,6 +13,12 @@ import {
   BENACHRICHTIGUNG_WINDOW_EVENT,
   NACHREICHEN_WINDOW_EVENT,
 } from './benachrichtigungListener';
+
+vi.mock('../alarm/alarmTon', async (original) => ({
+  ...(await original<typeof import('../alarm/alarmTon')>()),
+  spieleAlarmTon: vi.fn(),
+}));
+const ton = vi.mocked(spieleAlarmTon);
 
 class FakeEventSource {
   static CONNECTING = 0;
@@ -61,6 +68,7 @@ class FakeEventSource {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  ton.mockClear();
   vi.unstubAllGlobals();
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
   FakeEventSource.instanzen = [];
@@ -172,12 +180,12 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  it('invalidiert einsatz-meldungen und feuert window-Alarm bei sofortmeldung-Event (LFH-97)', async () => {
+  it('sofortmeldung frischt nur die Meldungen auf: kein Ton, kein Toast (LLH-1209)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:sofortmeldung', alarm);
+    const zentrale = vi.fn();
+    window.addEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, zentrale);
     render(
       <QueryClientProvider client={client}>
         <Probe id={7} />
@@ -187,9 +195,11 @@ describe('useEinsatzLiveStream', () => {
     await waitFor(() => {
       const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
       expect(keys).toContain('einsatz-meldungen');
-      expect(alarm).toHaveBeenCalled();
     });
-    window.removeEventListener('lfh:sofortmeldung', alarm);
+    // Den Alarm trägt die Benachrichtigung; das Highlight allein meldet nichts an die Zentrale.
+    expect(zentrale).not.toHaveBeenCalled();
+    expect(ton).not.toHaveBeenCalled();
+    window.removeEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, zentrale);
   });
 
   it('invalidiert einsatz-tiere bei tier-Event (LFH-75)', async () => {
@@ -374,12 +384,10 @@ describe('useEinsatzLiveStream', () => {
 
   // Der lagged-Vollabgleich invalidiert breit (Union aller Event-Keys), löst aber BEWUSST keinen
   // Sofort-Alarm aus — sonst Fehlalarm ohne neue Sofortmeldung.
-  it('invalidiert breit und feuert KEINEN window-Alarm bei lagged-Event (LFH-122)', async () => {
+  it('invalidiert breit und spielt KEINEN Ton bei lagged-Event (LFH-122)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:sofortmeldung', alarm);
     render(
       <QueryClientProvider client={client}>
         <Probe id={5} />
@@ -393,8 +401,7 @@ describe('useEinsatzLiveStream', () => {
       expect(calls).toContainEqual(['einsatz-kartenbilder', 5]);
       expect(calls).toContainEqual(['einsatz-meldungen', 5]);
     });
-    expect(alarm).not.toHaveBeenCalled();
-    window.removeEventListener('lfh:sofortmeldung', alarm);
+    expect(ton).not.toHaveBeenCalled();
   });
 
   it('invalidiert einsatz-uhs bei uhs-Event (LFH-207: ersetzt useUhsStream)', async () => {
@@ -461,11 +468,12 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  it('feuert lfh:erinnerung-alarm bei erinnerung-Event ohne Bezug (reine Erinnerung)', async () => {
+  // Erinnerung und Ablösung alarmieren seit LLH-1209 als Benachrichtigung; ihre Ereignisse
+  // frischen nur noch Listen auf.
+  it('erinnerung-Event: Erinnerungen auffrischen, ohne Ton', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
-    const alarm = vi.fn();
-    window.addEventListener('lfh:erinnerung-alarm', alarm);
+    const spy = vi.spyOn(client, 'invalidateQueries');
     render(
       <QueryClientProvider client={client}>
         <Probe id={9} />
@@ -475,16 +483,17 @@ describe('useEinsatzLiveStream', () => {
       'erinnerung',
       JSON.stringify({ einsatz_id: 9, erinnerung_id: 5, bezug_typ: null, bezug_id: null }),
     );
-    await waitFor(() => expect(alarm).toHaveBeenCalled());
-    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
+    });
+    expect(ton).not.toHaveBeenCalled();
   });
 
-  it('invalidiert einsatz-auftraege und feuert Alarm bei erinnerung-Event mit bezug_typ=auftrag', async () => {
+  it('fällige Quittierfrist (bezug_typ=auftrag) frischt zusätzlich die Aufträge auf, ohne Ton', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:erinnerung-alarm', alarm);
     render(
       <QueryClientProvider client={client}>
         <Probe id={9} />
@@ -497,63 +506,34 @@ describe('useEinsatzLiveStream', () => {
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
       expect(calls).toContainEqual(['einsatz-auftraege', 9]);
-      expect(alarm).toHaveBeenCalled();
     });
-    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+    expect(ton).not.toHaveBeenCalled();
   });
 
-  it('LFH-635: abloesung mit art alarmiert, ohne art nur Refresh; Ablösungsfristen nicht als Erinnerung', async () => {
+  it('abloesung-Event, auch mit `art` vom Scheduler: nur Refresh, kein Ton (LFH-635, LLH-1209)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const abloesung = vi.fn();
-    const erinnerung = vi.fn();
-    window.addEventListener('lfh:abloesung-alarm', abloesung);
-    window.addEventListener('lfh:erinnerung-alarm', erinnerung);
     render(
       <QueryClientProvider client={client}>
         <Probe id={9} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emit('abloesung', JSON.stringify({ einsatz_id: 9 }));
-    await waitFor(() => {
-      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-      expect(calls).toContainEqual(['einsatz-abloesungen', 9]);
-    });
-    expect(abloesung).not.toHaveBeenCalled();
     FakeEventSource.letzte?.emit(
       'abloesung',
       JSON.stringify({ einsatz_id: 9, abloesung_id: 4, art: 'faellig', titel: 'x' }),
     );
-    await waitFor(() => expect(abloesung).toHaveBeenCalledTimes(1));
-    FakeEventSource.letzte?.emit(
-      'erinnerung',
-      JSON.stringify({ einsatz_id: 9, erinnerung_id: 8, bezug_typ: 'abloesung', bezug_id: 4 }),
-    );
-    FakeEventSource.letzte?.emit(
-      'erinnerung',
-      JSON.stringify({
-        einsatz_id: 9,
-        erinnerung_id: 9,
-        bezug_typ: 'abloesung_vorwarnung',
-        bezug_id: 4,
-      }),
-    );
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
+      expect(calls).toContainEqual(['einsatz-abloesungen', 9]);
     });
-    expect(erinnerung).not.toHaveBeenCalled();
-    window.removeEventListener('lfh:abloesung-alarm', abloesung);
-    window.removeEventListener('lfh:erinnerung-alarm', erinnerung);
+    expect(ton).not.toHaveBeenCalled();
   });
 
-  it('feuert KEINEN erinnerung-Alarm bei bezug_typ=meldung (Doppel-Alarm-Guard, sofortmeldung trägt)', async () => {
+  it('CRUD-Refresh ohne erinnerung_id frischt die Aufträge nicht auf (routes/erinnerung.rs sse())', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:erinnerung-alarm', alarm);
     render(
       <QueryClientProvider client={client}>
         <Probe id={9} />
@@ -561,40 +541,16 @@ describe('useEinsatzLiveStream', () => {
     );
     FakeEventSource.letzte?.emit(
       'erinnerung',
-      JSON.stringify({ einsatz_id: 9, erinnerung_id: 7, bezug_typ: 'meldung', bezug_id: 3 }),
+      JSON.stringify({ einsatz_id: 9, bezug_typ: 'auftrag', bezug_id: 12 }),
     );
-    // Registry-Invalidierung von einsatz-erinnerungen läuft trotzdem.
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
       expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
     });
-    expect(alarm).not.toHaveBeenCalled();
-    window.removeEventListener('lfh:erinnerung-alarm', alarm);
-  });
-
-  it('feuert KEINEN erinnerung-Alarm bei CRUD-Refresh ohne erinnerung_id (routes/erinnerung.rs sse())', async () => {
-    vi.stubGlobal('EventSource', FakeEventSource);
-    const client = neuerQueryClient();
-    const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:erinnerung-alarm', alarm);
-    render(
-      <QueryClientProvider client={client}>
-        <Probe id={9} />
-      </QueryClientProvider>,
-    );
-    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9 }));
-    // Registry-Invalidierung von einsatz-erinnerungen läuft trotzdem (separater Listener).
-    await waitFor(() => {
-      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
-    });
-    expect(alarm).not.toHaveBeenCalled();
     const auftraegeKeys = spy.mock.calls
       .map((c) => (c[0] as { queryKey: unknown[] }).queryKey)
       .filter((k) => k[0] === 'einsatz-auftraege');
     expect(auftraegeKeys).toHaveLength(0);
-    window.removeEventListener('lfh:erinnerung-alarm', alarm);
   });
 
   // Reconnect-Resync + sichtbarer Fehlerpfad.
@@ -808,24 +764,36 @@ describe('useEinsatzLiveStream', () => {
     expect(spy).not.toHaveBeenCalledWith(...abgleich(['etb', 3]));
   });
 
-  it('alarmiert bei sofortmeldung sofort, der Abgleich folgt im Fenster (LFH-922)', () => {
+  it('benachrichtigung geht sofort an die Zentrale, der Abgleich einer sofortmeldung folgt im Fenster (LFH-922)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
-    const alarm = vi.fn();
-    window.addEventListener('lfh:sofortmeldung', alarm);
+    const zentrale = vi.fn();
+    window.addEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, zentrale);
     render(
       <QueryClientProvider client={client}>
         <Probe id={7} />
       </QueryClientProvider>,
     );
     FakeEventSource.letzte!.emit('sofortmeldung', JSON.stringify({ einsatz_id: 7, meldung_id: 3 }));
-    expect(alarm).toHaveBeenCalledTimes(1);
+    FakeEventSource.letzte!.emit(
+      'benachrichtigung',
+      JSON.stringify({
+        einsatz_id: 7,
+        benachrichtigung_id: 50,
+        art: 'sofortmeldung',
+        stufe: 'alarm',
+        bezug_typ: 'meldung',
+        bezug_id: 3,
+        quittiert: false,
+      }),
+    );
+    expect(zentrale).toHaveBeenCalledTimes(1);
     expect(spy).not.toHaveBeenCalled();
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-meldungen', 7]));
-    window.removeEventListener('lfh:sofortmeldung', alarm);
+    window.removeEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, zentrale);
   });
 
   it('macht aus lagged direkt nach einem Vollabgleich nur eine Abrufwelle (LFH-922)', async () => {

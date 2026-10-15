@@ -25,6 +25,27 @@ export function leseAbgeschaltete(e: BenutzerEinstellungen | undefined): Benachr
   );
 }
 
+/**
+ * Ob die Hinweis-Art `art` für `benutzerId` an ist, aus demselben Cache-Fach wie die
+ * Einstellungsseite; `null`, solange es lädt. Ohne Nutzer oder bei einem Fehler: an. Lieber ein
+ * Hinweis zu viel als ein verlorener (wie der Server, `aufloesung::abgeschaltet_fuer`). Für
+ * Arten, die der Browser selbst erkennt (`unwetter`, design.md D4).
+ */
+export function useHinweisAn(
+  art: BenachrichtigungArt,
+  benutzerId: number | null | undefined,
+): boolean | null {
+  const { data, isPending, isError } = useQuery({
+    queryKey: globalKeys.benutzerEinstellungenVon(benutzerId ?? null),
+    queryFn: ladeBenutzerEinstellungen,
+    enabled: benutzerId != null,
+    staleTime: Infinity,
+  });
+  if (benutzerId == null || isError) return true;
+  if (isPending) return null;
+  return !leseAbgeschaltete(data).includes(art);
+}
+
 export interface BenachrichtigungsEinstellungen {
   geladen: boolean;
   fehler: boolean;

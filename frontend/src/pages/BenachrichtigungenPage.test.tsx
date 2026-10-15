@@ -49,12 +49,12 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     zeige();
     const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
     const alle = await within(hinweise).findAllByRole('switch');
-    expect(alle).toHaveLength(17);
+    expect(alle).toHaveLength(18);
     for (const s of alle) expect(s).toBeChecked();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Auftrag' })).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Einsatz' })).toBeInTheDocument();
-    // Unwetter prüft die Einstellung erst mit tasks.md 3.5; bis dahin kein Schalter ohne Wirkung.
-    expect(within(hinweise).queryByRole('switch', { name: 'Unwetterwarnung' })).toBeNull();
+    // Unwetter erkennt der Browser selbst und prüft diesen Schalter dort (LLH-1209).
+    expect(within(hinweise).getByRole('switch', { name: 'Unwetterwarnung' })).toBeInTheDocument();
   });
 
   it('zeigt die gespeicherten abgeschalteten Arten aus', async () => {
