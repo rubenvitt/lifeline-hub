@@ -618,7 +618,10 @@ pub async fn stornieren(
 
 /// POST /api/einsaetze/{id}/material/{em_id}/reaktivieren — herausgenommenes oder storniertes
 /// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“ und
-/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag.
+/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag. Ein stornierter Posten aus einer
+/// Nachforderung zählt danach wieder als Übernahme und verlangt wie diese eine eingetroffene
+/// Nachforderung (422, LLH-1226); ein schon vorhandener Posten sperrt nicht, das Reaktivieren ist
+/// bewusstes Rückgängigmachen des Stornos.
 pub async fn reaktivieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -627,6 +630,12 @@ pub async fn reaktivieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let storniert = vorher.beendet_als.as_deref()
+            == Some(crate::entlassung::BeendetAls::Storniert.as_str());
+        if let (true, Some(nid)) = (storniert, vorher.nachforderung_id) {
+            crate::nachforderung::repo::check_uebernahme_tx(conn, einsatz_id, nid, true).await?;
+        }
         disposition_repo::reaktivieren_tx(
             conn,
             einsatz_id,

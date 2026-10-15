@@ -2583,6 +2583,10 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        json["error"], "Die Einheit ist aufgelöst",
+        "der 409 kommt vom Ort, nicht von der zweiten Übernahme"
+    );
     assert_eq!(posten_count(&app, &admin, einsatz).await, posten_vorher);
     assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
     assert_eq!(
@@ -2922,4 +2926,107 @@ async fn patch_aendert_den_bezug_nicht() {
         assert_eq!(json["nachforderung_id"].as_i64(), bezug);
     }
     assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, zweite).await).is_empty());
+}
+
+/// Spec `nachforderung-material`, „Eingetroffenes Material übernehmen“ (design.md D1): der Bezug
+/// geht auch mit Stamm-Material; die Art kommt aus dem Stamm.
+#[tokio::test]
+async fn stamm_material_aus_nachforderung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let stamm = stamm_anlegen(&app, &admin, "Stromerzeuger", "geraet").await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Stromerzeuger",
+        "Strom für die Betreuungsstelle",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let system_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"material_id":{stamm},"nachforderung_id":{nid}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+    assert_eq!(json["material_id"], stamm);
+    assert_eq!(json["nachforderung_id"], nid);
+    assert_eq!(json["art"], "geraet");
+    assert_eq!(
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
+        vec![em]
+    );
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, system_vorher).await,
+        [
+            "Material «Stromerzeuger» (×1) disponiert, aus Nachforderung «Strom für die \
+          Betreuungsstelle»"
+        ]
+    );
+}
+
+/// design.md D9 (Nachtrag Review): Reaktivieren eines stornierten, verknüpften Postens ist eine
+/// Übernahme und verlangt eine eingetroffene Nachforderung. Wurde sie nach dem Storno auf
+/// „Unterwegs“ zurückgenommen, ist es 422, und sie bleibt ohne zählenden Posten. Ist sie
+/// eingetroffen, gelingt es auch neben einem schon vorhandenen Posten (bewusstes Rückgängig, kein
+/// 409).
+#[tokio::test]
+async fn reaktivieren_verlangt_eine_eingetroffene_nachforderung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "Pumpe Keller",
+        2,
+        "eingetroffen",
+    )
+    .await;
+    let (_, json) =
+        disponieren_roh(&app, &admin, einsatz, &uebernahme("Tauchpumpe", 1, nid, "")).await;
+    let erste = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, erste, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (s, json) = nachforderung_status(&app, &admin, einsatz, nid, "unterwegs").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Material wird erst nach dem Eintreffen übernommen"
+    );
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert_eq!(posten_count(&app, &admin, einsatz).await, 0);
+    let n = load_nachforderung(&app, &admin, einsatz, nid).await;
+    assert_eq!(n["status"], "unterwegs");
+    assert!(material_ids(&n).is_empty());
+
+    // Wieder eingetroffen, ein zweiter Posten übernommen: das Reaktivieren des ersten scheitert
+    // nicht an 409.
+    let (s, _) = nachforderung_status(&app, &admin, einsatz, nid, "eingetroffen").await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, json) =
+        disponieren_roh(&app, &admin, einsatz, &uebernahme("Tauchpumpe", 1, nid, "")).await;
+    let zweite = json["id"].as_i64().unwrap();
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
+        vec![erste, zweite]
+    );
 }
