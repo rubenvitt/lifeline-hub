@@ -5971,7 +5971,11 @@ mod tests {
 
         migriere_bis(&pool, 204).await;
 
-        assert_eq!(zeitachse_zeilen(&pool).await, vorher, "Bestand Zeile für Zeile");
+        assert_eq!(
+            zeitachse_zeilen(&pool).await,
+            vorher,
+            "Bestand Zeile für Zeile"
+        );
         let fks: Vec<(String, String, String)> = sqlx::query_as(
             "SELECT \"from\", \"table\", on_delete \
              FROM pragma_foreign_key_list('einsatz_kraft_zeitachse') ORDER BY \"from\"",

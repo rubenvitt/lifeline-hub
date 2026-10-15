@@ -10,18 +10,26 @@ const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von \
     FROM br_belegung";
 
+/// Eine Belegungsbuchung ohne Objekt und Raum: Art, Notiz und – für das Eintreffen (LLH-1075,
+/// design.md D8) – der Idempotenzschlüssel der Offline-Warteschlange und der vorgemerkte
+/// Erfassungszeitpunkt. Ohne Zeitpunkt gilt die Spaltenvorgabe „jetzt“.
+#[derive(Debug, Clone, Copy)]
+pub struct Buchung<'a> {
+    pub art: BrBelegungsArt,
+    pub notiz: Option<&'a str>,
+    pub client_id: Option<&'a str>,
+    pub zeitpunkt_at: Option<&'a str>,
+}
+
 /// Bucht ein Objekt (Einheit oder Fahrzeug) in einen Bereitstellungsraum ein,
-/// aus einem wechselt oder aus einem aus. Alle Vorab-Checks, Event-Insert und
-/// Cache-Update laufen in EINER Transaktion.
+/// aus einem wechselt oder aus einem aus. Pool-Hülle um [`belege_tx`] in EINER
+/// Transaktion (`write_retry!`).
 ///
 /// # Regeln (in Reihenfolge)
 /// 1. `objekt_typ` unbekannt → `Validation`
 /// 2. `art` unbekannt → `Validation`
-/// 3. Ziel-BR muss `aktiv` sein (via `repo::laden`) → `NotFound` oder `UnprocessableEntity`
-/// 4. Objekt muss im selben Einsatz existieren → `NotFound`
-/// 5. `fahrzeug`: `einheit_id` nicht NULL → `Conflict`
-/// 6. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss gesetzt sein
-/// 7. Event-Insert + Cache-Update in Tx
+/// 3. ab hier [`belege_tx`]
+#[allow(clippy::too_many_arguments)]
 pub async fn belege(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -40,49 +48,111 @@ pub async fn belege(
     let belegungs_art = BrBelegungsArt::parse(art)
         .ok_or_else(|| AppError::Validation(format!("Unbekannte art: '{art}'")))?;
 
-    // 3. Ziel-BR laden und auf aktiv prüfen (nutzt pool direkt, vor Tx).
-    // `repo::laden` liefert auch stornierte BRs; ein stornierter BR behält
-    // `status='aktiv'` (storniere setzt nur storniert_at), daher zusätzlich
-    // `storniert_at IS NULL` fordern — analog UHS (`pruefe_uhs_aktiv`).
-    let br = repo::laden(pool, einsatz_id, br_id).await?;
+    let buchung = Buchung {
+        art: belegungs_art,
+        notiz,
+        client_id: None,
+        zeitpunkt_at: None,
+    };
+    // read-then-write-Atomizität in einer Transaktion (F09: BEGIN IMMEDIATE + Retry)
+    let event_id = crate::write_retry!(pool, |conn| {
+        belege_tx(
+            &mut *conn,
+            einsatz_id,
+            br_id,
+            typ,
+            objekt_id,
+            &buchung,
+            benutzer_id,
+        )
+        .await
+    })?;
+    laden(pool, einsatz_id, event_id).await
+}
+
+/// Rumpf von [`belege`] in der Transaktion des Aufrufers (LLH-1075, design.md D2 Schritt 3):
+/// frei von Zeitachse und ETB, damit Eintreffen (LLH-1075) und Vollzug einer Ablösung
+/// (LLH-1132) ihn in ihre eigene Transaktion legen. Liefert die id der Belegungszeile.
+///
+/// # Regeln (in Reihenfolge)
+/// 1. Ziel-BR muss zum Einsatz gehören (`NotFound`), `aktiv` und nicht storniert sein
+///    (`UnprocessableEntity`) – in der Transaktion, gegen das Rennen mit „Auflösen“
+/// 2. Objekt muss im selben Einsatz existieren und aktiv sein → `NotFound` / `Conflict`
+/// 3. `fahrzeug`: `einheit_id` nicht NULL → `Conflict`
+/// 4. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss
+///    gesetzt sein
+/// 5. Event-Insert + Cache-Update
+pub async fn belege_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+    typ: ObjektTyp,
+    objekt_id: i64,
+    buchung: &Buchung<'_>,
+    benutzer_id: i64,
+) -> Result<i64, AppError> {
+    fordere_belegbar_tx(&mut *conn, einsatz_id, br_id).await?;
+    match typ {
+        ObjektTyp::Einheit => {
+            belege_einheit(
+                &mut *conn,
+                einsatz_id,
+                br_id,
+                objekt_id,
+                buchung,
+                benutzer_id,
+            )
+            .await
+        }
+        ObjektTyp::Fahrzeug => {
+            belege_fahrzeug(
+                &mut *conn,
+                einsatz_id,
+                br_id,
+                objekt_id,
+                buchung,
+                benutzer_id,
+            )
+            .await
+        }
+    }
+}
+
+/// Lädt den Raum in der Transaktion und verlangt „aktiv, nicht storniert“: fremd → `NotFound`,
+/// sonst `UnprocessableEntity` (422). `repo::laden_tx` liefert auch stornierte BRs; ein
+/// stornierter BR behält `status='aktiv'` (storniere setzt nur `storniert_at`), daher zusätzlich
+/// `storniert_at IS NULL` fordern — analog UHS (`pruefe_uhs_aktiv`).
+pub async fn fordere_belegbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+) -> Result<super::BrAnzeige, AppError> {
+    let br = repo::laden_tx(&mut *conn, einsatz_id, br_id).await?;
     if br.status != BrStatus::Aktiv || br.storniert_at.is_some() {
         return Err(AppError::UnprocessableEntity(format!(
             "Bereitstellungsraum hat Status '{}' — Belegung nur bei aktivem BR möglich",
             br.status.as_str()
         )));
     }
+    Ok(br)
+}
 
-    // 4-7: read-then-write-Atomizität in einer Transaktion (F09: BEGIN IMMEDIATE + Retry)
-    let event_id = crate::write_retry!(pool, |conn| {
-        let event_id = match typ {
-            ObjektTyp::Einheit => {
-                belege_einheit(
-                    &mut *conn,
-                    einsatz_id,
-                    br_id,
-                    objekt_id,
-                    belegungs_art,
-                    notiz,
-                    benutzer_id,
-                )
-                .await?
-            }
-            ObjektTyp::Fahrzeug => {
-                belege_fahrzeug(
-                    &mut *conn,
-                    einsatz_id,
-                    br_id,
-                    objekt_id,
-                    belegungs_art,
-                    notiz,
-                    benutzer_id,
-                )
-                .await?
-            }
-        };
-        Ok(event_id)
-    })?;
-    laden(pool, einsatz_id, event_id).await
+/// Belegungszeile mit dem Idempotenzschlüssel `client_id` im Einsatz (LLH-1075, design.md D8),
+/// für den Replay vor allen Zustandsprüfungen.
+pub async fn mit_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<BrBelegungAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ALLE} WHERE einsatz_id = ? AND client_id = ?"
+        )))
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await?,
+    )
 }
 
 /// Lädt ein einzelnes Belegungs-Event; `NotFound` außerhalb des Einsatzes.
@@ -415,8 +485,7 @@ async fn belege_einheit(
     einsatz_id: i64,
     br_id: i64,
     objekt_id: i64,
-    art: BrBelegungsArt,
-    notiz: Option<&str>,
+    buchung: &Buchung<'_>,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
     // Eine aufgelöste Einheit belegt keinen Raum mehr (409, LLH-1079); fremd → 404.
@@ -433,23 +502,22 @@ async fn belege_einheit(
     let aktueller_br_id = cache.ok_or(AppError::NotFound)?;
 
     // 6. Art-Vorbedingung
-    pruefe_art_vorbedingung(&art, aktueller_br_id, br_id)?;
+    pruefe_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
 
     // 7a. Event-Insert
-    let event_id = insert_event(
+    let event_id = insert_buchung(
         &mut *conn,
         einsatz_id,
         br_id,
         ObjektTyp::Einheit,
         objekt_id,
-        &art,
-        notiz,
+        buchung,
         benutzer_id,
     )
     .await?;
 
     // 7b. Cache aktualisieren
-    let neuer_br_id = cache_nach_art(&art, br_id);
+    let neuer_br_id = cache_nach_art(&buchung.art, br_id);
     sqlx::query("UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(neuer_br_id)
         .bind(objekt_id)
@@ -465,8 +533,7 @@ async fn belege_fahrzeug(
     einsatz_id: i64,
     br_id: i64,
     objekt_id: i64,
-    art: BrBelegungsArt,
-    notiz: Option<&str>,
+    buchung: &Buchung<'_>,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
     // Ein entlassenes oder storniertes Fahrzeug belegt keinen Raum mehr (409, LLH-1079);
@@ -492,23 +559,22 @@ async fn belege_fahrzeug(
     }
 
     // 6. Art-Vorbedingung
-    pruefe_art_vorbedingung(&art, aktueller_br_id, br_id)?;
+    pruefe_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
 
     // 7a. Event-Insert
-    let event_id = insert_event(
+    let event_id = insert_buchung(
         &mut *conn,
         einsatz_id,
         br_id,
         ObjektTyp::Fahrzeug,
         objekt_id,
-        &art,
-        notiz,
+        buchung,
         benutzer_id,
     )
     .await?;
 
     // 7b. Cache aktualisieren
-    let neuer_br_id = cache_nach_art(&art, br_id);
+    let neuer_br_id = cache_nach_art(&buchung.art, br_id);
     sqlx::query("UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(neuer_br_id)
         .bind(objekt_id)
@@ -556,6 +622,36 @@ fn cache_nach_art(art: &BrBelegungsArt, br_id: i64) -> Option<i64> {
         BrBelegungsArt::Eintritt | BrBelegungsArt::Wechsel => Some(br_id),
         BrBelegungsArt::Austritt => None,
     }
+}
+
+/// Event-Insert einer [`Buchung`]: mit Zeitpunkt explizit, sonst die Spaltenvorgabe.
+async fn insert_buchung(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+    objekt_typ: ObjektTyp,
+    objekt_id: i64,
+    buchung: &Buchung<'_>,
+    erfasst_von: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar::<_, i64>(
+        "INSERT INTO br_belegung \
+            (einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, erfasst_von, client_id, \
+             zeitpunkt_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, \
+                 COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now'))) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(br_id)
+    .bind(objekt_typ.as_str())
+    .bind(objekt_id)
+    .bind(buchung.art.as_str())
+    .bind(buchung.notiz)
+    .bind(erfasst_von)
+    .bind(buchung.client_id)
+    .bind(buchung.zeitpunkt_at)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 async fn insert_event(
@@ -1465,6 +1561,119 @@ mod tests {
             matches!(err, AppError::Conflict(_)),
             "Austritt ohne aktive Belegung → Conflict"
         );
+    }
+
+    // ─── LLH-1075: belege_tx ────────────────────────────────────────────────
+
+    fn eintritt<'a>() -> Buchung<'a> {
+        Buchung {
+            art: BrBelegungsArt::Eintritt,
+            notiz: None,
+            client_id: None,
+            zeitpunkt_at: None,
+        }
+    }
+
+    /// LLH-1075 (design.md D2, Schritt 1): die Prüfung „aktiv, nicht storniert“ liegt in der
+    /// Transaktion. Löst dieselbe Transaktion den Raum vorher auf, lehnt `belege_tx` ab (422)
+    /// statt in einen aufgelösten Raum zu buchen.
+    #[tokio::test]
+    async fn belege_tx_br_in_derselben_tx_aufgeloest_422() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Rennen").await;
+        let einheit = neue_einheit(&pool, e).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("UPDATE bereitstellungsraum SET status = 'aufgeloest' WHERE id = ?")
+            .bind(br)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let r = belege_tx(&mut tx, e, br, ObjektTyp::Einheit, einheit, &eintritt(), b).await;
+        assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+        let r = belege_tx(
+            &mut tx,
+            e,
+            br + 999,
+            ObjektTyp::Einheit,
+            einheit,
+            &eintritt(),
+            b,
+        )
+        .await;
+        assert!(matches!(r, Err(AppError::NotFound)), "{r:?}");
+        tx.rollback().await.unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query(
+            "UPDATE bereitstellungsraum SET storniert_at = '2026-05-28 10:00:00' WHERE id = ?",
+        )
+        .bind(br)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let r = belege_tx(&mut tx, e, br, ObjektTyp::Einheit, einheit, &eintritt(), b).await;
+        assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+        tx.rollback().await.unwrap();
+        assert_eq!(cache_einheit(&pool, einheit).await, None);
+    }
+
+    /// `client_id` und vorgemerkter Zeitpunkt landen an der Zeile; ohne Zeitpunkt gilt die
+    /// Spaltenvorgabe wie bisher.
+    #[tokio::test]
+    async fn belege_tx_traegt_client_id_und_zeitpunkt() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Schluessel").await;
+        let einheit = neue_einheit(&pool, e).await;
+        let fahrzeug = neues_fahrzeug_ohne_einheit(&pool, e).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        let buchung = Buchung {
+            client_id: Some("c-1"),
+            zeitpunkt_at: Some("2026-05-28 09:15:00"),
+            notiz: Some("am Tor"),
+            ..eintritt()
+        };
+        let id = belege_tx(&mut tx, e, br, ObjektTyp::Einheit, einheit, &buchung, b)
+            .await
+            .unwrap();
+        let ohne = belege_tx(
+            &mut tx,
+            e,
+            br,
+            ObjektTyp::Fahrzeug,
+            fahrzeug,
+            &eintritt(),
+            b,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let (cid, at, notiz): (Option<String>, String, Option<String>) =
+            sqlx::query_as("SELECT client_id, zeitpunkt_at, notiz FROM br_belegung WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(cid.as_deref(), Some("c-1"));
+        assert_eq!(at, "2026-05-28 09:15:00");
+        assert_eq!(notiz.as_deref(), Some("am Tor"));
+        let (cid, at): (Option<String>, String) =
+            sqlx::query_as("SELECT client_id, zeitpunkt_at FROM br_belegung WHERE id = ?")
+                .bind(ohne)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(cid, None);
+        assert!(!at.is_empty());
+        assert_eq!(cache_einheit(&pool, einheit).await, Some(br));
+        assert_eq!(cache_fahrzeug(&pool, fahrzeug).await, Some(br));
+        let gefunden = mit_client_id(&pool, e, "c-1").await.unwrap().unwrap();
+        assert_eq!(gefunden.id, id);
+        assert!(mit_client_id(&pool, e + 1, "c-1").await.unwrap().is_none());
     }
 
     #[tokio::test]
