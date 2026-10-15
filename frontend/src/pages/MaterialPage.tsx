@@ -88,7 +88,7 @@ import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
  * Diese Datei hält nur Reihenfolge und Filterwerte, abgeleitet aus der Vertragskarte — ein
- * Behandlungsweg für dieses Enum, gemeinsam mit `pages/uhs/MaterialTab.tsx`.
+ * Behandlungsweg für dieses Enum, gemeinsam mit `kraefte/MaterialAmOrt.tsx`.
  */
 const STATUS_REIHENFOLGE = Object.keys(materialStatus) as MaterialStatus[];
 
