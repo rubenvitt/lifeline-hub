@@ -2181,6 +2181,24 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
+        // Erwähnungen einer Nachricht (LLH-1220, migrations/0200, design.md D9): ein Nutzer oder
+        // ein Katalogcode, kein Freitext. Fällt mit der Nachricht (CASCADE), der `@Name` im Text
+        // geht mit `chat_nachricht.inhalt`.
+        tabelle: "chat_erwaehnung",
+        scoping: Scoping::UeberParent {
+            fk: "nachricht_id",
+            parent: "chat_nachricht",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("nachricht_id", G_FK),
+            retain("benutzer_id", G_FK),
+            retain("funktion", G_ENUM),
+        ],
+    },
+    TabellenRegel {
         // Junction (Linker auf `anhang`); die `anhang`-Regel (ZeileEinzelnLoeschen, LFH-905) löscht
         // die Verknüpfung im atomaren Vorgang, der Eintrag bleibt (G_ETB). Der Dateiname steht in
         // keinem ETB-Text. Belegt in
