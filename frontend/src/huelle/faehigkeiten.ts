@@ -5,7 +5,9 @@
  * Die macOS-Hülle setzt per Init-Skript (`src-tauri/src/faehigkeiten.js`) vor dem ersten Skript
  * der Seite `window.__LIFELINE_HUELLE__ = { passkey: false }`. Die Kennung geht der
  * Feature-Erkennung vor: WKWebView meldet über `getClientCapabilities()` einen Passkey, den es in
- * der Hülle nicht einlöst. Ohne Kennung (Browser, Windows-Hülle) bleibt alles wie bisher.
+ * der Hülle nicht einlöst. Jede Hülle, auch die unter Windows, trägt dort zudem die native Meldung
+ * ein (`src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7). Ohne Kennung (Browser)
+ * oder ohne Feld bleibt alles wie bisher.
  */
 
 declare global {
@@ -13,6 +15,7 @@ declare global {
     __LIFELINE_HUELLE__?: {
       readonly passkey?: boolean;
       readonly anmeldungImBrowser?: () => Promise<unknown>;
+      readonly benachrichtigungZeigen?: (titel: string, text?: string) => Promise<unknown>;
     };
   }
 }
@@ -42,3 +45,15 @@ export function huelleAnmeldungImBrowser(): (() => Promise<void>) | null {
 export const APP_ANMELDUNG_EREIGNIS = 'lifeline:app-anmeldung';
 
 export type AppAnmeldungErgebnis = 'angemeldet' | 'abgelehnt' | 'fehler' | 'abgebrochen';
+
+/**
+ * Native Meldung des Betriebssystems (Benachrichtigungskonzept D7): in der Hülle der Weg für eine
+ * Meldung bei verdecktem Fenster, statt der Web-Notification-API. `null` außerhalb der Hülle.
+ */
+export function huelleBenachrichtigung(): ((titel: string, text?: string) => Promise<void>) | null {
+  const zeigen = window.__LIFELINE_HUELLE__?.benachrichtigungZeigen;
+  if (typeof zeigen !== 'function') return null;
+  return async (titel, text) => {
+    await zeigen(titel, text);
+  };
+}

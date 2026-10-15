@@ -1,3 +1,5 @@
+import { huelleBenachrichtigung } from '../huelle/faehigkeiten';
+
 /**
  * Desktop-Benachrichtigung — NUR wenn der Tab im Hintergrund ist und die Permission erteilt
  * wurde. API fehlt oder Permission verweigert → No-op (der In-App-Toast trägt).
@@ -11,6 +13,12 @@
  * (Android), `ServiceWorkerRegistration.showNotification()`. Den Klick auf eine Meldung des
  * zweiten Wegs empfängt der Service Worker (`public/alarm-sw.js`); er holt den Tab nach vorn und
  * meldet den Klick hierher zurück.
+ *
+ * In der Desktop-App geht jede Meldung über die Hülle (Benachrichtigungskonzept D7,
+ * {@link huelleBenachrichtigung}): WKWebView bietet die Web-API nicht verlässlich, und das Plugin
+ * der Hülle ersetzt sie in jeder Seite durch einen Weg ohne Freigabe. Die native Meldung meldet
+ * keinen Klick an die Seite und lässt sich nicht schließen; ein Klick holt das Fenster nach vorn
+ * (Hülle), dort steht der Toast mit dem Sprung zur Quelle bereit.
  */
 function verfuegbar(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -66,6 +74,8 @@ let angefragt: ServiceWorker | null = null;
 export const DESKTOP_ZUSTAND_EVENT = 'lfh:desktop-zustand';
 
 export function desktopPermission(): NotificationPermission | 'unsupported' {
+  // Ob die App melden darf, regelt das Betriebssystem; die Seite erfährt es nicht.
+  if (huelleBenachrichtigung()) return 'granted';
   if (!verfuegbar()) return 'unsupported';
   if (!konstruktorNutzbar() && !serviceWorkerDa()) return 'unsupported';
   return Notification.permission;
@@ -73,6 +83,7 @@ export function desktopPermission(): NotificationPermission | 'unsupported' {
 
 /** Fragt die Permission an (nur sinnvoll aus einer User-Geste). Callback erhält das Ergebnis. */
 export function fordereDesktopPermission(beiErgebnis?: (p: NotificationPermission) => void): void {
+  if (huelleBenachrichtigung()) return;
   if (verfuegbar() && Notification.permission === 'default') {
     void Notification.requestPermission().then((p) => beiErgebnis?.(p));
   }
@@ -111,6 +122,8 @@ export function zeigeDesktopAlarm(titel: string, opts: AlarmOptionen = {}): Desk
     if (desktopPermission() !== 'granted') return null;
     if (!document.hidden) return null;
     if (opts.tag) schliesseDesktopAlarm(opts.tag);
+    const huelle = huelleBenachrichtigung();
+    if (huelle) return zeigeUeberHuelle(huelle, titel, opts);
     if (konstruktorNutzbar()) {
       try {
         return zeigeUeberKonstruktor(titel, opts);
@@ -144,6 +157,24 @@ function zeigeUeberKonstruktor(titel: string, opts: AlarmOptionen): DesktopMeldu
     opts.beiKlick?.();
     n.close();
   };
+  return meldung;
+}
+
+/**
+ * Native Meldung der Desktop-App. Sie bleibt im Buch der offenen Meldungen, damit das Abräumen
+ * überall gleich läuft; schließen kann die Seite sie nicht. `beiKlick` und `ziel` entfallen: den
+ * Sprung trägt der Toast.
+ */
+function zeigeUeberHuelle(
+  zeigen: (titel: string, text?: string) => Promise<void>,
+  titel: string,
+  opts: AlarmOptionen,
+): DesktopMeldung {
+  const meldung: DesktopMeldung = { tag: opts.tag, schliessen: () => undefined };
+  offen.add(meldung);
+  zeigen(titel, opts.koerper).catch(() => {
+    offen.delete(meldung);
+  });
   return meldung;
 }
 

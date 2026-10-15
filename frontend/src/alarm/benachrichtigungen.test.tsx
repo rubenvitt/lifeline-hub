@@ -12,6 +12,7 @@ import type {
 } from '../api/types';
 import AlarmZentrale from '../einsatz/AlarmZentrale';
 import { BENACHRICHTIGUNG_WINDOW_EVENT, meldeNachreichen } from '../live/benachrichtigungListener';
+import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
 import { server } from '../test/server';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import { spieleAlarmTon } from './alarmTon';
@@ -342,6 +343,88 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
       expect(screen.getByText('Auftrag #7')).toBeInTheDocument();
       expect(screen.queryByText('Quittierfrist überschritten')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('Desktop-App: native Meldung (tasks.md 5.2)', () => {
+  afterEach(beendeHuelle);
+
+  /** Die Hülle samt der Web-API, die das Notification-Plugin dort in jede Seite hängt. */
+  function inDerHuelle(start = starteMacHuelle) {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    start({ invoke });
+    return { invoke, ...stubMeldungen() };
+  }
+
+  const NATIVE_MELDUNG = {
+    titel: 'Auftrag überfällig',
+    text: 'Auftrag #7',
+  };
+
+  it('Fenster minimiert: der Alarm kommt als native Meldung, beim Aktivieren steht der Toast mit „Öffnen“ bereit', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    const s = serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle();
+    setzeHidden(true);
+    renderZentrale();
+    live(ueberfaellig);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', NATIVE_MELDUNG),
+    );
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
+
+    // Der Klick auf die Meldung holt das Fenster nach vorn (Hülle); die Seite wird sichtbar.
+    setzeHidden(false);
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    const oeffnen = within(notice('Auftrag überfällig')).getByRole('button', { name: 'Öffnen' });
+    expect(s.quittiert).toEqual([]);
+    await userEvent.click(oeffnen);
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=7');
+    await waitFor(() => expect(s.quittiert).toEqual([41]));
+    expect(invoke).toHaveBeenCalledOnce();
+  });
+
+  it('Fenster sichtbar: keine native Meldung, nur Toast und Ton', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle();
+    renderZentrale();
+    live(ueberfaellig);
+
+    expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('in der Windows-Hülle ebenso über den Command', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle(starteWindowsHuelle);
+    setzeHidden(true);
+    renderZentrale();
+    live(ueberfaellig);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', NATIVE_MELDUNG),
+    );
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('die Kopfleiste nennt die Benachrichtigung in der Hülle erlaubt, wie auch die Web-API steht', async () => {
+    // Auf macOS bleibt die Web-API, die das Plugin einhängt, unentschieden.
+    const { Ctor } = inDerHuelle();
+    Ctor.permission = 'default';
+    renderZentrale();
+    expect(
+      await screen.findByRole('button', { name: 'Benachrichtigung erlaubt' }),
+    ).toBeInTheDocument();
   });
 });
 
