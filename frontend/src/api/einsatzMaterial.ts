@@ -36,7 +36,7 @@ export interface DisponierEingabe {
 }
 
 /** Die Felder des Bezugs im POST-Körper; ohne Bezug keine. */
-function bezugFelder(o: DisponierEingabe) {
+function bezugFields(o: DisponierEingabe) {
   return {
     ...(o.nachforderungId != null ? { nachforderung_id: o.nachforderungId } : {}),
     ...(o.ergaenzen ? { ergaenzen: true } : {}),
@@ -53,7 +53,7 @@ export function disponiereMaterial(
     material_id: materialId,
     menge,
     ...optionen.ort,
-    ...bezugFelder(optionen),
+    ...bezugFields(optionen),
   });
 }
 
@@ -70,7 +70,7 @@ export function disponiereAdhoc(
     menge,
     ...(optionen.art ? { art: optionen.art } : {}),
     ...optionen.ort,
-    ...bezugFelder(optionen),
+    ...bezugFields(optionen),
   });
 }
 

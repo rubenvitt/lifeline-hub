@@ -64,7 +64,7 @@ import {
   materialStatusOptionen,
   mengeText,
   OHNE_ORT_WERT,
-  ortPostFeld,
+  ortPostFields,
   ortVon,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
@@ -279,12 +279,12 @@ export default function MaterialPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigabenQuery.data);
-  const hatHerkunft = (emQuery.data ?? []).some((m) => m.nachforderung_id != null);
+  const hasHerkunft = (emQuery.data ?? []).some((m) => m.nachforderung_id != null);
   const nachforderungenQuery = useQuery({
     // Derselbe Schlüssel und Abruf wie `NachforderungenPage` — ein Cache-Fach, live.
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
-    enabled: nachforderungenFrei && hatHerkunft,
+    enabled: nachforderungenFrei && hasHerkunft,
   });
   const nachforderungNamen = useMemo(
     () =>
@@ -379,7 +379,7 @@ export default function MaterialPage() {
           traegerorganisation: w.traegerorganisation,
         },
         art === 'geraet' ? 1 : (w.menge ?? 1),
-        { art, ort: ortPostFeld(w.ort) },
+        { art, ort: ortPostFields(w.ort) },
       );
     },
     // Nur invalidieren und melden: geschlossen wird über `onFertig`, geleert von der
@@ -1122,7 +1122,7 @@ export default function MaterialPage() {
           await disponiereMutation.mutateAsync({
             materialId: w.material_id,
             menge: geraet ? 1 : w.menge,
-            ort: ortPostFeld(stammOrt),
+            ort: ortPostFields(stammOrt),
           });
         }}
         onFertig={() => {

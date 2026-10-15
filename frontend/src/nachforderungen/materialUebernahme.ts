@@ -1,6 +1,6 @@
 import type { DisponierEingabe, MaterialAdhocEingabe } from '../api/einsatzMaterial';
 import type { EinsatzMaterial, MaterialArt, Nachforderung } from '../api/types';
-import { OHNE_ORT_WERT, ortPostFeld } from '../kraefte/materialPosten';
+import { OHNE_ORT_WERT, ortPostFields } from '../kraefte/materialPosten';
 
 /**
  * Übernahme einer eingetroffenen Nachforderung als Materialposten (LLH-1226, design.md D3, D5),
@@ -84,7 +84,7 @@ export function uebernahmeVorbelegung(
  * Live-Abgleich währenddessen bringt: sonst ergänzte ein Klick still, was ein anderer Platz gerade
  * übernommen hat (D3).
  */
-export function uebernahmeKoerper(
+export function uebernahmeBody(
   n: NachforderungBezug,
   w: UebernahmeWerte,
   ergaenzen: boolean,
@@ -98,7 +98,7 @@ export function uebernahmeKoerper(
     menge: w.art === 'geraet' ? 1 : w.menge,
     optionen: {
       art: w.art,
-      ort: ortPostFeld(w.ort),
+      ort: ortPostFields(w.ort),
       nachforderungId: n.id,
       ergaenzen,
     },

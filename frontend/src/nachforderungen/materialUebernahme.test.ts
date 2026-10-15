@@ -3,7 +3,7 @@ import type { EinsatzMaterial, Nachforderung } from '../api/types';
 import { OHNE_ORT_WERT } from '../kraefte/materialPosten';
 import {
   isErgaenzen,
-  uebernahmeKoerper,
+  uebernahmeBody,
   uebernahmeVorbelegung,
   uebernommenePosten,
   uebernommeneMenge,
@@ -84,10 +84,10 @@ describe('isErgaenzen (D3)', () => {
   });
 });
 
-describe('uebernahmeKoerper (D1, D3)', () => {
+describe('uebernahmeBody (D1, D3)', () => {
   it('Ad-hoc mit Bezug, Ort als Feld des POST, ohne ergaenzen bei der ersten Übernahme', () => {
     expect(
-      uebernahmeKoerper(nf(), { art: 'verbrauchsgut', menge: 1200, ort: 'einheit:3' }, false),
+      uebernahmeBody(nf(), { art: 'verbrauchsgut', menge: 1200, ort: 'einheit:3' }, false),
     ).toEqual({
       adhoc: { bezeichnung: 'Sandsäcke' },
       menge: 1200,
@@ -102,7 +102,7 @@ describe('uebernahmeKoerper (D1, D3)', () => {
 
   it('ein Gerät geht mit Menge 1, auch wenn im Feld mehr stand', () => {
     expect(
-      uebernahmeKoerper(
+      uebernahmeBody(
         nf({ art: 'Tauchpumpe' }),
         { art: 'geraet', menge: 3, ort: OHNE_ORT_WERT },
         false,
@@ -112,8 +112,8 @@ describe('uebernahmeKoerper (D1, D3)', () => {
 
   it('ergänzt nur mit der Absicht des Dialogs, nicht aus dem Stand der Nachforderung', () => {
     const w = { art: 'verbrauchsgut', menge: 800, ort: OHNE_ORT_WERT } as const;
-    expect(uebernahmeKoerper(nf({ material_ids: [7] }), w, true).optionen.ergaenzen).toBe(true);
+    expect(uebernahmeBody(nf({ material_ids: [7] }), w, true).optionen.ergaenzen).toBe(true);
     // Ein Live-Abgleich brachte den Posten eines anderen Platzes: ohne Absicht kein Ergänzen.
-    expect(uebernahmeKoerper(nf({ material_ids: [7] }), w, false).optionen.ergaenzen).toBe(false);
+    expect(uebernahmeBody(nf({ material_ids: [7] }), w, false).optionen.ergaenzen).toBe(false);
   });
 });

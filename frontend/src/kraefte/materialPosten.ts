@@ -154,7 +154,7 @@ export function parseOrtValue(wert: string): MaterialOrtRef | null | undefined {
  * Disponier-Dialoge der Materialliste und die Übernahme aus einer Nachforderung (LLH-1226) bauen
  * den Körper hierüber.
  */
-export function ortPostFeld(
+export function ortPostFields(
   wert: string | undefined,
 ): Partial<Record<OrtFeld, number | null>> | undefined {
   const ziel = wert ? parseOrtValue(wert) : undefined;

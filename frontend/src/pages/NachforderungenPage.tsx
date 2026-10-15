@@ -31,7 +31,7 @@ import NachforderungFormular from '../nachforderungen/NachforderungFormular';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
 import {
   isErgaenzen,
-  uebernahmeKoerper,
+  uebernahmeBody,
   type UebernahmeWerte,
 } from '../nachforderungen/materialUebernahme';
 import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
@@ -104,19 +104,19 @@ export default function NachforderungenPage() {
   // Karte Posten zeigt oder übernommen wird — sonst bliebe der Abruf ohne Leser.
   const materialFrei = istKeyFreigegeben('material', freigaben);
   const materialGesperrt = istSprungGesperrt('material', freigaben);
-  const brauchtMaterial =
+  const needsMaterial =
     uebernahme != null || (nfQuery.data ?? []).some((n) => n.material_ids.length > 0);
   // Derselbe Schlüssel und Abruf wie die Materialliste: ein Cache-Fach, live über `material`.
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listEinsatzMaterial(einsatzId),
-    enabled: materialFrei && brauchtMaterial,
+    enabled: materialFrei && needsMaterial,
   });
   // Aus dem Einsatz genommene Posten zählen weiter (D3/D9) und stehen mit ihrem Zustand.
   const entlasseneQuery = useQuery({
     queryKey: einsatzKeys.materialEntlassene(einsatzId),
     queryFn: () => listEntlassenesMaterial(einsatzId),
-    enabled: materialFrei && brauchtMaterial,
+    enabled: materialFrei && needsMaterial,
   });
   const materialListe = useMemo<EinsatzMaterial[]>(
     () => [...(materialQuery.data ?? []), ...(entlasseneQuery.data ?? [])],
@@ -223,7 +223,7 @@ export default function NachforderungenPage() {
       werte: UebernahmeWerte;
       ergaenzen: boolean;
     }) => {
-      const k = uebernahmeKoerper(n, werte, ergaenzen);
+      const k = uebernahmeBody(n, werte, ergaenzen);
       return disponiereAdhoc(einsatzId, k.adhoc, k.menge, k.optionen);
     },
     onSuccess: () => {
