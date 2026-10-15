@@ -2223,3 +2223,568 @@ async fn aufgeloester_br_behaelt_den_posten_und_storno_verlangt_ohne_ort() {
     let (s, json) = aktion(&app, &admin, einsatz, em, "stornieren").await;
     assert_eq!(s, StatusCode::NO_CONTENT, "ohne Ort: {json}");
 }
+
+// ── Nachforderung → Material (LLH-1226 Teil I) ──────────────────────────────────────────
+
+/// Setzt eine Nachforderung ab und schaltet sie bis `bis` weiter; liefert ihre id.
+async fn nachforderung_bis(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    art: &str,
+    bezeichnung: &str,
+    anzahl: i64,
+    bis: &str,
+) -> i64 {
+    let (s, n) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        cookie,
+        Some(
+            &serde_json::json!({
+                "art": art, "bezeichnung": bezeichnung, "anzahl": anzahl,
+                "adressat_kategorie": "leitstelle"
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{n}");
+    let id = n["id"].as_i64().unwrap();
+    for status in ["zugesagt", "unterwegs", "eingetroffen"] {
+        let (s, n) = nachforderung_status(app, cookie, einsatz, id, status).await;
+        assert_eq!(s, StatusCode::OK, "{n}");
+        if status == bis {
+            break;
+        }
+    }
+    id
+}
+
+async fn nachforderung_status(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    id: i64,
+    status: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/status"),
+        cookie,
+        Some(&format!(r#"{{"status":"{status}"}}"#)),
+    )
+    .await
+}
+
+/// Die Nachforderung `id` aus der Liste des Einsatzes.
+async fn nachforderung_laden(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value {
+    let (s, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste}");
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["id"] == id)
+        .cloned()
+        .unwrap_or_else(|| panic!("Nachforderung {id} fehlt"))
+}
+
+fn material_ids(n: &Value) -> Vec<i64> {
+    n["material_ids"]
+        .as_array()
+        .unwrap_or_else(|| panic!("ohne material_ids: {n}"))
+        .iter()
+        .map(|v| v.as_i64().unwrap())
+        .collect()
+}
+
+/// Anzahl aktiver und aus dem Einsatz genommener Posten: „nichts geschrieben“.
+async fn posten_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+    let mut n = 0;
+    for query in ["", "?entlassene=1"] {
+        let (s, json) = anfrage(
+            app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/material{query}"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{json}");
+        n += json.as_array().unwrap().len();
+    }
+    n
+}
+
+/// Ein ETB-Eintrag jeder Art (nicht nur System): die Nachforderung schreibt keinen eigenen.
+async fn etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array().unwrap().len()
+}
+
+fn uebernahme(bezeichnung: &str, menge: i64, nachforderung: i64, rest: &str) -> String {
+    format!(
+        r#"{{"adhoc":{{"bezeichnung":"{bezeichnung}"}},"menge":{menge},"nachforderung_id":{nachforderung}{rest}}}"#
+    )
+}
+
+/// Spec `nachforderung-material`, „Prüfung der Übernahme“ (design.md D2): 400 (Feldtyp) → 422
+/// (`ergaenzen` ohne Bezug) → 403 (Nachforderungen nicht freigegeben, gleich ob es sie gibt) →
+/// in der Transaktion 404 (fremd, unbekannt) → 422 (nicht eingetroffen). Keine Ablehnung schreibt
+/// etwas.
+#[tokio::test]
+async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let eingetroffen = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "3 Tauchpumpen",
+        3,
+        "eingetroffen",
+    )
+    .await;
+    let unterwegs = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Sandsäcke",
+        "Deich",
+        500,
+        "unterwegs",
+    )
+    .await;
+    let fremd = nachforderung_bis(
+        &app,
+        &admin,
+        anderer,
+        "Tauchpumpe",
+        "fremd",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+
+    let tauchpumpe = r#"{"adhoc":{"bezeichnung":"Tauchpumpe"}"#;
+    for (body, erwartet, grund) in [
+        (
+            format!(r#"{tauchpumpe},"nachforderung_id":"vier"}}"#),
+            StatusCode::BAD_REQUEST,
+            None,
+        ),
+        (
+            format!(r#"{tauchpumpe},"nachforderung_id":{eingetroffen},"ergaenzen":"ja"}}"#),
+            StatusCode::BAD_REQUEST,
+            None,
+        ),
+        (
+            format!(r#"{tauchpumpe},"ergaenzen":true}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Some("Ergänzen nur mit Nachforderung"),
+        ),
+        (
+            uebernahme("Tauchpumpe", 1, fremd, ""),
+            StatusCode::NOT_FOUND,
+            None,
+        ),
+        (
+            uebernahme("Tauchpumpe", 1, 999_999, ""),
+            StatusCode::NOT_FOUND,
+            None,
+        ),
+        (
+            uebernahme("Sandsäcke", 500, unterwegs, ""),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Some("Material wird erst nach dem Eintreffen übernommen"),
+        ),
+    ] {
+        let (s, json) = disponieren_roh(&app, &admin, einsatz, &body).await;
+        assert_eq!(s, erwartet, "{body}: {json}");
+        if let Some(grund) = grund {
+            assert_eq!(json["error"], grund, "{body}");
+        }
+    }
+
+    // Material schreiben darf sie, Nachforderungen sieht sie nicht: 403 vor jedem Lesen.
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for nid in [eingetroffen, fremd, 999_999] {
+        let (s, json) = disponieren_roh(
+            &app,
+            &frieda,
+            einsatz,
+            &uebernahme("Tauchpumpe", 1, nid, ""),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{nid}: {json}");
+    }
+    let (s, json) = disponieren_roh(
+        &app,
+        &frieda,
+        einsatz,
+        r#"{"adhoc":{"bezeichnung":"Ohne Bezug"}}"#,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "ohne Bezug braucht es die Freigabe nicht: {json}"
+    );
+    aktion(
+        &app,
+        &admin,
+        einsatz,
+        json["id"].as_i64().unwrap(),
+        "stornieren",
+    )
+    .await;
+
+    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, 0);
+    assert_eq!(
+        etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 2,
+        "nur Disponieren und Storno des Postens ohne Bezug"
+    );
+    assert!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, eingetroffen).await).is_empty()
+    );
+}
+
+/// Spec `nachforderung-material`, „Eingetroffenes Material übernehmen“ (design.md D2/D6): genau
+/// ein Posten mit Bezug und Ort, genau ein ETB-Eintrag mit Herkunft, die Nachforderung bleibt
+/// unverändert und trägt die Kennung. Gegenprobe: eine aufgelöste Einheit als Ort ist 409, und
+/// es bleibt weder Posten noch ETB noch Bezug.
+#[tokio::test]
+async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let staffel = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "3 Tauchpumpen für Keller Hauptstraße",
+        3,
+        "eingetroffen",
+    )
+    .await;
+    let vorher = nachforderung_laden(&app, &admin, einsatz, nid).await;
+    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let system_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme(
+            "Tauchpumpe",
+            1,
+            nid,
+            &format!(r#","art":"geraet","einheit_id":{staffel}"#),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+    assert_eq!(json["nachforderung_id"], nid);
+    assert_eq!(json["einheit_id"], staffel);
+    assert_eq!(json["art"], "geraet");
+    assert_eq!(json["ist_adhoc"], true);
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, em).await["nachforderung_id"],
+        nid
+    );
+
+    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher + 1);
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, system_vorher).await,
+        [
+            "Material «Tauchpumpe» (×1) disponiert, Ort Einheit «Staffel A», aus Nachforderung \
+          «3 Tauchpumpen für Keller Hauptstraße»"
+        ]
+    );
+    let nachher = nachforderung_laden(&app, &admin, einsatz, nid).await;
+    assert_eq!(material_ids(&nachher), vec![em]);
+    let ohne_ids = |mut n: Value| {
+        n.as_object_mut().unwrap().remove("material_ids");
+        n
+    };
+    assert_eq!(
+        ohne_ids(nachher),
+        ohne_ids(vorher),
+        "Nachforderung unverändert"
+    );
+
+    // Gegenprobe: aufgelöste Einheit (mit Spur, damit sie nicht gelöscht wird).
+    let aufgeloest = einheit_bilden(&app, &admin, einsatz, "Trupp weg").await;
+    let (s, spur) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"adhoc":{{"bezeichnung":"Spur"}},"einheit_id":{aufgeloest}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{spur}");
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{aufgeloest}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let posten_vorher = posten_anzahl(&app, &admin, einsatz).await;
+    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme(
+            "Tauchpumpe",
+            1,
+            nid,
+            &format!(r#","ergaenzen":true,"einheit_id":{aufgeloest}"#),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, posten_vorher);
+    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        vec![em]
+    );
+}
+
+/// Spec `nachforderung-material`, „Weitere Posten nur bewusst“ (design.md D3): ohne `ergaenzen`
+/// ist die zweite Übernahme 409 und schreibt nichts, mit `ergaenzen` gibt es einen zweiten Posten;
+/// ein stornierter Posten gibt die Nachforderung frei, ein aus dem Einsatz genommener zählt.
+#[tokio::test]
+async fn weitere_posten_nur_bewusst() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sand = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Sandsäcke",
+        "2 000 Sandsäcke",
+        2000,
+        "eingetroffen",
+    )
+    .await;
+
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Sandsäcke", 1200, sand, ""),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let erste = json["id"].as_i64().unwrap();
+
+    // Doppelklick: dieselbe Übernahme noch einmal.
+    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Sandsäcke", 1200, sand, ""),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        json["error"],
+        "Aus dieser Nachforderung ist schon Material übernommen"
+    );
+    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, 1);
+    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Sandsäcke", 1200, sand, r#","ergaenzen":false"#),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "ergaenzen false wie fehlend: {json}"
+    );
+
+    // Zweite Fuhr bewusst ergänzt.
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Sandsäcke", 800, sand, r#","ergaenzen":true"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let zweite = json["id"].as_i64().unwrap();
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, sand).await),
+        vec![erste, zweite]
+    );
+
+    // Fehlbuchung storniert: die Nachforderung ist wieder frei.
+    let pumpe = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "Pumpe Keller",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, pumpe, ""),
+    )
+    .await;
+    let fehl = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(material_ids(&nachforderung_laden(&app, &admin, einsatz, pumpe).await).is_empty());
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, pumpe, ""),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "nach dem Storno ohne ergaenzen: {json}"
+    );
+    let richtig = json["id"].as_i64().unwrap();
+
+    // Aus dem Einsatz genommen: war da, zählt weiter.
+    let (s, _) = aktion(&app, &admin, einsatz, richtig, "entlassen").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, pumpe).await),
+        vec![richtig]
+    );
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, pumpe, ""),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+}
+
+/// Spec `nachforderung-material`, „ETB und Live bei der Übernahme“ (design.md D7): nach dem
+/// Commit `material`, das Ereignis des Orts und `nachforderung`.
+#[tokio::test]
+async fn uebernahme_meldet_material_ort_und_nachforderung() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let staffel = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "3 Tauchpumpen",
+        3,
+        "eingetroffen",
+    )
+    .await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, nid, &format!(r#","einheit_id":{staffel}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+    let mut events = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        let data: Value = serde_json::from_str(&n.data).unwrap_or(Value::Null);
+        events.push((n.event.as_str().to_string(), data));
+    }
+    let tags: Vec<&str> = events.iter().map(|(t, _)| t.as_str()).collect();
+    assert!(
+        events
+            .iter()
+            .any(|(t, d)| t == "material" && d["material_id"] == em),
+        "{tags:?}"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|(t, d)| t == "einheit" && d["einheit_id"] == staffel),
+        "{tags:?}"
+    );
+    assert_eq!(
+        tags.iter().filter(|t| **t == "nachforderung").count(),
+        1,
+        "{tags:?}"
+    );
+
+    // Ohne Bezug kein `nachforderung`.
+    let mut rx = live.abonniere(einsatz);
+    let (s, _) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"adhoc":{"bezeichnung":"Decke"}}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let mut tags = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        tags.push(n.event.as_str().to_string());
+    }
+    assert!(!tags.iter().any(|t| t == "nachforderung"), "{tags:?}");
+}

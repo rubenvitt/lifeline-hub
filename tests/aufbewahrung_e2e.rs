@@ -506,6 +506,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Begründung als `veranlassung` der Anforderung",
     },
     Ausnahme {
+        datei: "src/routes/einsatz_material.rs",
+        funktion: "disponieren",
+        spalte: "nachforderung.bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Bedarf als Herkunft einer Übernahme („…, aus Nachforderung «…»“, LLH-1226 D6)",
+    },
+    Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "lagebericht.titel",

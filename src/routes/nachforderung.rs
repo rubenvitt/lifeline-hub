@@ -16,7 +16,7 @@ use serde::Deserialize;
 
 /// SSE-Notify: Nachforderungen des Einsatzes haben sich geändert (Tag `nachforderung`,
 /// auf der EINEN bestehenden /etb/stream-Verbindung).
-fn sse(state: &AppState, einsatz_id: i64) {
+pub(super) fn sse(state: &AppState, einsatz_id: i64) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Nachforderung);

@@ -165,6 +165,55 @@ pub async fn belongs_to_einsatz(
     Ok(treffer.is_some())
 }
 
+/// Trägt die Nachforderung mindestens einen übernommenen, nicht stornierten Materialposten
+/// (LLH-1226, design.md D3)? Ein aus dem Einsatz genommener Posten war da und zählt.
+pub async fn has_material<'e, E: sqlx::SqliteExecutor<'e>>(
+    exec: E,
+    id: i64,
+) -> Result<bool, AppError> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM einsatz_material em \
+         WHERE em.nachforderung_id = ? AND em.beendet_als IS NOT 'storniert')",
+    )
+    .bind(id)
+    .fetch_one(exec)
+    .await
+    .map_err(Into::into)
+}
+
+/// Prüft in der Transaktion einer Übernahme (LLH-1226, design.md D2/D3), ob aus der
+/// Nachforderung Material übernommen werden darf, und liefert ihre Bezeichnung für den
+/// ETB-Text. `NotFound`, wenn sie nicht zum Einsatz gehört; `UnprocessableEntity`, wenn sie nicht
+/// eingetroffen ist; `Conflict`, wenn sie schon einen zählenden Posten trägt und die Anfrage
+/// nicht ausdrücklich ergänzt (die Bitte beruht dann auf einem veralteten Stand). Die Zeile der
+/// Nachforderung bleibt unverändert.
+pub async fn check_uebernahme_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    ergaenzen: bool,
+) -> Result<String, AppError> {
+    let (status, bezeichnung): (String, String) = sqlx::query_as(
+        "SELECT status, bezeichnung FROM nachforderung WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if status != super::STATUS_EINGETROFFEN {
+        return Err(AppError::UnprocessableEntity(
+            "Material wird erst nach dem Eintreffen übernommen".into(),
+        ));
+    }
+    if !ergaenzen && has_material(&mut *conn, id).await? {
+        return Err(AppError::Conflict(
+            "Aus dieser Nachforderung ist schon Material übernommen".into(),
+        ));
+    }
+    Ok(bezeichnung)
+}
+
 /// Schaltet den Bedarfs-Status weiter (linear) und setzt den zugehörigen Zeitstempel
 /// (first-write-wins via COALESCE). `erwartet` ist der vom Handler geprüfte Bestandsstatus:
 /// das UPDATE greift NUR, wenn er unverändert ist (optimistische Sperre gegen TOCTOU —

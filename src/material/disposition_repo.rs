@@ -202,7 +202,8 @@ pub async fn load_anzeige_tx(
 /// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus, friert den
 /// Identitäts-Snapshot ein und kopiert die Art des Stamms an die Zeile (LLH-1224, design.md D1).
 /// `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity` bei außer Dienst und bei
-/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
+/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. `nachforderung_id` ist der
+/// vom Aufrufer geprüfte Bezug einer Übernahme (LLH-1226). Liefert die `em_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -210,6 +211,7 @@ pub async fn disponiere_stamm_tx(
     material_id: i64,
     menge: i64,
     disponiert_von: i64,
+    nachforderung_id: Option<i64>,
 ) -> Result<i64, AppError> {
     let ((bezeichnung, kategorie, bestandsnummer, traeger), art) =
         stamm_snapshot_tx(conn, org_id, material_id).await?;
@@ -217,8 +219,8 @@ pub async fn disponiere_stamm_tx(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
-             snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             snap_bestandsnummer, snap_traegerorganisation, disponiert_von, nachforderung_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(material_id)
@@ -229,6 +231,7 @@ pub async fn disponiere_stamm_tx(
     .bind(&bestandsnummer)
     .bind(&traeger)
     .bind(disponiert_von)
+    .bind(nachforderung_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -291,13 +294,15 @@ pub async fn disponiere_stamm(
         material_id,
         menge,
         disponiert_von,
+        None,
     )
     .await
 }
 
 /// Disponiert Ad-hoc-externes Material (`material_id = NULL`); `snap_*` sind die
 /// eigentlichen Daten. Ohne Art gilt die Vorgabe aus der Menge (LLH-1224, design.md D1); ein
-/// Gerät mit Menge über 1 ist `UnprocessableEntity` (D2). Liefert die neue `em_id`.
+/// Gerät mit Menge über 1 ist `UnprocessableEntity` (D2). `nachforderung_id` ist der vom Aufrufer
+/// geprüfte Bezug einer Übernahme (LLH-1226). Liefert die neue `em_id`.
 pub async fn disponiere_adhoc_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -305,14 +310,15 @@ pub async fn disponiere_adhoc_tx(
     art: Option<MaterialArt>,
     menge: i64,
     disponiert_von: i64,
+    nachforderung_id: Option<i64>,
 ) -> Result<i64, AppError> {
     let art = art.unwrap_or(MaterialArt::from_menge(menge));
     check_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
-             snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             snap_bestandsnummer, snap_traegerorganisation, disponiert_von, nachforderung_id) \
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(menge)
@@ -322,6 +328,7 @@ pub async fn disponiere_adhoc_tx(
     .bind(daten.bestandsnummer)
     .bind(daten.traegerorganisation)
     .bind(disponiert_von)
+    .bind(nachforderung_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -337,7 +344,16 @@ pub async fn disponiere_adhoc(
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_adhoc_tx(&mut conn, einsatz_id, daten, art, menge, disponiert_von).await
+    disponiere_adhoc_tx(
+        &mut conn,
+        einsatz_id,
+        daten,
+        art,
+        menge,
+        disponiert_von,
+        None,
+    )
+    .await
 }
 
 /// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
