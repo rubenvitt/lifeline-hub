@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
- * Materialliste (LLH-1093), Durchstich im Browser: Ort setzen und umhängen (das ETB nennt die
- * vorherige Einheit), eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen (50 → 30 + 20).
+ * Materialliste (LLH-1093, LLH-1225), Durchstich im Browser: Ort setzen und umhängen (das ETB nennt
+ * den vorherigen Ort), eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen (50 → 30 + 20).
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
@@ -46,31 +46,23 @@ test('Ort setzen und wechseln: ein Ort je Posten, das ETB nennt den vorherigen (
   await expect(liste(page).getByText('Wolldecke')).toBeVisible();
   const ort = liste(page).getByTestId('material-ort');
 
-  // Einheit eintragen: wählen, dann „Speichern“.
-  await liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }).click();
-  await page.getByRole('combobox', { name: 'Einheit zu Wolldecke' }).click();
-  await page.getByRole('option', { name: 'Staffel A' }).click();
-  await page.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }).click();
-  await expect(
-    liste(page).getByRole('button', { name: 'Einheit zu Wolldecke bearbeiten' }),
-  ).toHaveText(/Staffel A/);
+  // Die eine Ortsangabe (LLH-1225 D3): wählen, dann „Speichern“.
+  const ortWaehlen = async (option: string) => {
+    await liste(page).getByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }).click();
+    await page.getByRole('combobox', { name: 'Ort zu Wolldecke' }).click();
+    await page.getByRole('option', { name: option }).click();
+    await page.getByRole('button', { name: 'Ort zu Wolldecke speichern' }).click();
+  };
+  await ortWaehlen('Staffel A');
+  await expect(ort).toHaveText(/Staffel A/);
 
-  // UHS eintragen: der Posten wechselt an die UHS, die Einheit wird leer.
-  await liste(page).getByRole('button', { name: 'UHS zu Wolldecke eintragen' }).click();
-  await page.getByRole('combobox', { name: 'UHS zu Wolldecke' }).click();
-  await page.getByRole('option', { name: 'UHS Turnhalle' }).click();
-  await page.getByRole('button', { name: 'UHS zu Wolldecke speichern' }).click();
+  // An die UHS: der Posten wechselt, die Einheit geht.
+  await ortWaehlen('UHS Turnhalle');
   await expect(ort).toContainText('UHS Turnhalle');
   await expect(ort).not.toContainText('Staffel A');
-  await expect(
-    liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }),
-  ).toBeVisible();
 
-  // Zurück an eine Einheit: die UHS wird leer.
-  await liste(page).getByRole('button', { name: 'Einheit zu Wolldecke eintragen' }).click();
-  await page.getByRole('combobox', { name: 'Einheit zu Wolldecke' }).click();
-  await page.getByRole('option', { name: 'Staffel B' }).click();
-  await page.getByRole('button', { name: 'Einheit zu Wolldecke speichern' }).click();
+  // Zurück an eine Einheit: die UHS geht.
+  await ortWaehlen('Staffel B');
   await expect(ort).toContainText('Staffel B');
   await expect(ort).not.toContainText('Turnhalle');
 
@@ -92,7 +84,7 @@ test('eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen', async ({ page 
 
   // „Angaben ändern“ im Zeilenmenü.
   await liste(page).getByRole('button', { name: 'Weitere Aktionen zu Feldbeten' }).click();
-  await page.getByRole('menuitem', { name: 'Angaben ändern' }).click();
+  await page.getByRole('menuitem', { name: 'Angaben ändern …' }).click();
   const dialog = page.getByRole('dialog', { name: 'Angaben zu Feldbeten ändern' });
   const bezeichnung = dialog.getByLabel('Bezeichnung');
   await expect(bezeichnung).toHaveValue('Feldbeten');
@@ -106,16 +98,17 @@ test('eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen', async ({ page 
 
   // Aufteilen 50 → 30 + 20.
   await liste(page).getByRole('button', { name: 'Weitere Aktionen zu Feldbetten' }).click();
-  await page.getByRole('menuitem', { name: 'Aufteilen' }).click();
+  await page.getByRole('menuitem', { name: 'Aufteilen …' }).click();
   const aufteilen = page.getByRole('dialog', { name: 'Feldbetten aufteilen' });
   await aufteilen.getByRole('spinbutton', { name: 'Menge abteilen' }).fill('20');
   await expect(aufteilen.getByText('Danach 30 + 20')).toBeVisible();
   await aufteilen.getByRole('button', { name: 'Aufteilen' }).click();
   await expect(aufteilen).toHaveCount(0);
-  const mengen = liste(page).getByRole('button', { name: 'Menge zu Feldbetten bearbeiten' });
-  await expect(mengen).toHaveCount(2);
-  await expect(mengen.filter({ hasText: '30' })).toHaveCount(1);
-  await expect(mengen.filter({ hasText: '20' })).toHaveCount(1);
+  // Die Menge ist ein Wert in der Zeile, kein Feld (LLH-1225 D5).
+  const zeilen = liste(page).locator('[data-row-key]').filter({ hasText: 'Feldbetten' });
+  await expect(zeilen).toHaveCount(2);
+  await expect(zeilen.getByText('30', { exact: true })).toHaveCount(1);
+  await expect(zeilen.getByText('20', { exact: true })).toHaveCount(1);
   await expect(page.getByText('2 Posten')).toBeVisible();
   await expect
     .poll(() => etbInhalte(page, einsatzId))

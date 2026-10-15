@@ -1108,9 +1108,9 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen,
   ]);
 });
 
-// ── C14 · Materialliste (LLH-1093) ─────────────────────────────────────────────────────
-// Die Ort-Teile, die Menge und die Zeilenaktionen der umgebauten Materialliste (Prüfliste
-// Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
+// ── C14 · Materialliste (LLH-1093, LLH-1225) ───────────────────────────────────────────
+// Die eine Ortsangabe, „Ausgeben“, die Gruppierung und die Zeilenaktionen der Materialliste
+// (Prüfliste Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
 
 async function materialSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
@@ -1134,9 +1134,9 @@ async function materialSaeen(page: Page, einsatzId: string) {
 }
 
 const materialAnker = (page: Page) =>
-  inMain(page).getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' });
+  inMain(page).getByRole('button', { name: 'Wolldecke ausgeben' });
 
-test('C14 · Materialliste: Ort-Teile, Menge und Zeilenaktionen halten 72 px, kompakt bleibt kleiner', async ({
+test('C14 · Materialliste: Ort, Ausgeben, Gruppierung und Zeilenaktionen halten 72 px, kompakt bleibt kleiner', async ({
   page,
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 1093 Material ${Date.now()}`);
@@ -1147,11 +1147,16 @@ test('C14 · Materialliste: Ort-Teile, Menge und Zeilenaktionen halten 72 px, ko
       anker: materialAnker,
       ziele: [
         {
-          sorte: 'Material Ort-Teile',
-          ziele: knopf(/^(Einheit|UHS) zu (Wolldecke|Feldbett) (bearbeiten|eintragen)$/),
-          mindestens: 4,
+          sorte: 'Material Ort',
+          ziele: knopf(/^Ort zu (Wolldecke|Feldbett) bearbeiten$/),
+          mindestens: 2,
         },
-        { sorte: 'Material Menge', ziele: knopf(/^Menge zu .+ bearbeiten$/), mindestens: 2 },
+        { sorte: 'Material Ausgeben', ziele: knopf(/^.+ ausgeben$/), mindestens: 2 },
+        {
+          sorte: 'Material gruppieren',
+          ziele: segment(/^Nach (Ort|Status)$/),
+          mindestens: 2,
+        },
         {
           sorte: 'Material aus dem Einsatz nehmen',
           ziele: knopf(/^.+ aus dem Einsatz nehmen$/),
@@ -1180,7 +1185,7 @@ test('C14 · Materialliste (Beobachter): Schreibaktionen fehlen, die Ort-Links h
       anker: (page) => inMain(page).getByRole('link', { name: 'Staffel Ost' }),
       fehlt: (page) =>
         inMain(page).getByRole('button', {
-          name: / (bearbeiten|eintragen|aus dem Einsatz nehmen)$|^Weitere Aktionen zu /,
+          name: / (bearbeiten|ausgeben|aus dem Einsatz nehmen)$|^Weitere Aktionen zu /,
         }),
       ziele: [
         {

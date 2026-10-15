@@ -1503,7 +1503,8 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('Art wechseln ist gesperrt mit Grund, wo der Server ablehnte (LLH-1225 D6)', async () => {
     const adhoc = { ...em, ist_adhoc: true, material_id: null };
     render(einsatzAktiv, [
-      { ...adhoc, id: 10, bezeichnung: 'Decken' },
+      // Menge 2 ist die Grenze: schon eins mehr als ein Gerät trägt.
+      { ...adhoc, id: 10, bezeichnung: 'Decken', menge: 2, ausgegeben: 0 },
       { ...adhoc, id: 11, bezeichnung: 'Kanister', menge: 1, ausgegeben: 1 },
       { ...adhoc, id: 12, bezeichnung: 'Pumpe', art: 'geraet', menge: 1, status: 'verbraucht' },
       {
