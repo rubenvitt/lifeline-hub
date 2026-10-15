@@ -50,8 +50,11 @@ nichts, MUST kein Eintrag entstehen.
 
 ### Requirement: Einsatzfunktion vor Qualifikation
 Wo eine Person mit nur einer Funktionsangabe erscheint (Meldebild, Lagebericht-Übernahme,
-Druck-Anlage Personal, Auswahllisten), SHALL die Einsatzfunktion stehen und, wenn sie leer ist,
-die Qualifikation. Die Personalliste MUST beide zeigen, die Qualifikation nicht nur als Tooltip.
+Druck-Anlage Personal, Auswahllisten samt „Bestätigt von“, Unterzeile der Lagekarte), SHALL die
+Einsatzfunktion stehen und, wenn sie leer ist, die Qualifikation. Die Personalliste MUST beide
+zeigen, die Qualifikation nicht nur als Tooltip. Das taktische Zeichen einer Person auf der
+Lagekarte MUST allein aus der Qualifikation abgeleitet werden, nie aus der Einsatzfunktion
+(LLH-1239).
 
 #### Scenario: Meldebild
 - **WHEN** eine Notfallsanitäterin die Einsatzfunktion „Gruppenführerin“ hat
@@ -62,3 +65,12 @@ die Qualifikation. Die Personalliste MUST beide zeigen, die Qualifikation nicht 
   „Sanitäter“ zeigt
 - **THEN** steht „Sprechfunker“ im Feld „Funktion“ und „Sanitäter“ im Feld „Qualifikation“, nicht
   zu einer Angabe zusammengezogen
+
+#### Scenario: Lagekarte lenkt das Zeichen nicht um
+- **WHEN** auf der Lagekarte eine Notfallsanitäterin mit der Einsatzfunktion „Sprechfunker“ steht
+- **THEN** trägt ihr Zeichen die Fachaufgabe Rettungswesen, nicht IuK, und die Leiste nennt
+  „Sprechfunker“ als Funktion und „Notfallsanitäter“ als Qualifikation
+
+#### Scenario: Bestätigt von
+- **WHEN** am UHS-Gerät eine Person mit der Einsatzfunktion „Sprechfunker“ zur Auswahl steht
+- **THEN** lautet ihr Eintrag „Name · Sprechfunker“

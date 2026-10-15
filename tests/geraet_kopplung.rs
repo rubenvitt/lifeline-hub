@@ -3109,8 +3109,18 @@ async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
-    kraft(&app, &admin, einsatz, "Zander").await;
+    let zander = kraft(&app, &admin, einsatz, "Zander").await;
     kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    // LLH-1239: die Einsatzfunktion kommt neben der Qualifikation mit.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{zander}"),
+        &admin,
+        Some(&json!({"einsatzfunktion": "Sprechfunker"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
     let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
 
     let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
@@ -3123,6 +3133,9 @@ async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
         .collect();
     assert_eq!(namen, ["Dr. A. Muster", "Zander"]);
     assert_eq!(v[0]["funktion"], "Notärztin");
+    assert!(v[0].get("einsatzfunktion").is_none(), "{v}");
+    assert_eq!(v[1]["einsatzfunktion"], "Sprechfunker");
+    assert_eq!(v[1]["funktion"], "Notärztin");
 
     let (s, _) = anfrage(&app, "GET", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Personensitzung");

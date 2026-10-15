@@ -30,6 +30,7 @@ import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 import { staerkeText } from '../../anzeige/staerke';
+import { funktionText } from '../../kraefte/einsatzfunktionKern';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste — getrennt von `Sidebar.tsx`, damit Zähler,
@@ -247,7 +248,8 @@ const text = (w: string | null | undefined): string => (w && w.trim() ? w : '—
 
 /**
  * Mono-Unterzeile unter dem Namen: Objektart plus, wo die Daten es tragen, die Art im
- * Einzelnen (Einheitstyp, Fahrzeugtyp, Funktion).
+ * Einzelnen (Einheitstyp, Fahrzeugtyp, Funktion). Für Personal steht dort die eine
+ * Funktionsangabe, Einsatzfunktion vor Qualifikation (LLH-1239).
  */
 export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string {
   const art = OBJEKTART[marker.typ];
@@ -257,8 +259,10 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
         return roh.einheiten.find((e) => e.id === marker.id)?.typ_label;
       case 'fahrzeug':
         return roh.fahrzeuge.find((f) => f.id === marker.id)?.fahrzeugtyp;
-      case 'fuehrung':
-        return roh.fuehrungskraefte.find((p) => p.id === marker.id)?.funktion;
+      case 'fuehrung': {
+        const p = roh.fuehrungskraefte.find((x) => x.id === marker.id);
+        return p ? funktionText(p) : undefined;
+      }
       case 'uhs': {
         const u = roh.uhs.find((x) => x.id === marker.id);
         return u ? uhsTyp[u.typ]?.label : undefined;
@@ -340,7 +344,11 @@ export function auswahlRaster(
     case 'fuehrung': {
       const p = roh.fuehrungskraefte.find((x) => x.id === marker.id);
       if (!p) return [];
-      return [{ label: 'Funktion', wert: text(p.funktion), mono: false }];
+      // Getrennt wie in der Vorschau der Sprungpalette (LLH-1239, Spec `personal-einsatzangaben`).
+      return [
+        { label: 'Funktion', wert: text(p.einsatzfunktion), mono: false },
+        { label: 'Qualifikation', wert: text(p.funktion), mono: false },
+      ];
     }
     case 'uhs': {
       const u = roh.uhs.find((x) => x.id === marker.id);

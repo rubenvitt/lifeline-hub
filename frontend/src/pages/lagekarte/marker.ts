@@ -423,6 +423,8 @@ export function baueTaktischeMarker(
         fachaufgabe: p.tz_fachaufgabe,
         organisation: p.tz_organisation,
         orgDefault: q.orgDefault,
+        // Nur die Qualifikation, nie die Einsatzfunktion: ein Freitext wie „Sprechfunker“ lenkte
+        // das Zeichen sonst auf IuK um (LLH-1239). Die Einsatzfunktion steht als Text in der Leiste.
         funktion: p.funktion,
         istFuehrungskraft: p.ist_einheitsfuehrer || p.ist_abschnittsleiter,
       }),

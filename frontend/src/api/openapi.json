@@ -2442,11 +2442,19 @@
           "name"
         ],
         "properties": {
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1239); das Etikett nennt sie vor der Qualifikation."
+          },
           "funktion": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Qualifikation (Snapshot)."
           },
           "id": {
             "type": "integer",
@@ -6597,6 +6605,13 @@
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
+          },
+          "einsatzfunktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatzfunktion (LLH-1239): nur Text in Seitenleiste und Unterzeile, nie Quelle des\nZeichens, sonst lenkte ein Freitext wie „Sprechfunker“ es auf IuK um. Alte Lage-Stände\ntragen das Feld nicht."
           },
           "funktion": {
             "type": [

@@ -130,4 +130,23 @@ describe('Bestätigt von (LFH-1046)', () => {
       { value: 6, label: 'Zander' },
     ]);
   });
+
+  it('bestaetigerOptionen nennt die Einsatzfunktion vor der Qualifikation (LLH-1239)', () => {
+    expect(
+      bestaetigerOptionen([
+        {
+          id: 5,
+          name: 'Dr. A. Muster',
+          funktion: 'Notärztin',
+          einsatzfunktion: 'Leitende Notärztin',
+        },
+        { id: 6, name: 'Zander', einsatzfunktion: 'Sprechfunker' },
+        { id: 7, name: 'Ypsilon', funktion: 'Sanitäter', einsatzfunktion: '  ' },
+      ]),
+    ).toEqual([
+      { value: 5, label: 'Dr. A. Muster · Leitende Notärztin' },
+      { value: 6, label: 'Zander · Sprechfunker' },
+      { value: 7, label: 'Ypsilon · Sanitäter' },
+    ]);
+  });
 });

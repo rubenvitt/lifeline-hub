@@ -1317,6 +1317,35 @@ async fn einsatzfunktion_setzen_und_leeren() {
     }
 }
 
+/// LLH-1239: Die Kartensicht trägt die Einsatzfunktion neben der Qualifikation; `funktion` bleibt
+/// die Quelle des taktischen Zeichens.
+#[tokio::test]
+async fn kartensicht_traegt_einsatzfunktion_neben_der_qualifikation() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Erika Funk").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/karte/fuehrungskraefte");
+
+    let (s, karte) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{karte}");
+    assert!(karte[0].get("einsatzfunktion").is_none(), "{karte}");
+
+    let (s, json) = patch_kraft(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        r#"{"einsatzfunktion":"Sprechfunker"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let (s, karte) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{karte}");
+    assert_eq!(karte[0]["einsatzfunktion"], "Sprechfunker");
+    assert_eq!(karte[0]["funktion"], "Sanitäter");
+}
+
 #[tokio::test]
 async fn einsatzfunktion_ueber_200_zeichen_ist_400_und_aendert_nichts() {
     let app = setup().await;

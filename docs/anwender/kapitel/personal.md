@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -193,8 +193,11 @@ Zeichen lang sein, eine Bemerkung bis zu 2 000.
 Wo eine Person mit nur einer Angabe steht, nennt die App die Einsatzfunktion, ohne sie die
 Qualifikation: im Meldebild und seiner Übernahme in einen Lagebericht, im Block „Entlassen“, in
 der Anlage „Personal je Kopf“ des Einsatzberichts, in den Personenauswahlen von Stab-Besetzung,
-Einsatzleitung, Schäden und UHS und im Einsatztagebuch. Die Vorschau in der Sprungpalette zeigt
-beide. Entlassen und erneut disponiert, behält die Person ihre Einsatzfunktion.
+Einsatzleitung, Schäden und UHS, bei „Bestätigt von“ am UHS-Gerät, unter dem Namen einer auf der
+Lagekarte gewählten Person und im Einsatztagebuch. Die Vorschau in der Sprungpalette und die Leiste
+der Lagekarte zeigen beide. Das taktische Zeichen einer Person auf der Lagekarte folgt nur der
+Qualifikation: eine Einsatzfunktion wie „Sprechfunker“ ändert es nicht. Entlassen und erneut
+disponiert, behält die Person ihre Einsatzfunktion.
 
 ### Status
 

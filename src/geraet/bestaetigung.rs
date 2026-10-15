@@ -24,8 +24,12 @@ pub struct Bestaetiger {
     /// Kennung in `einsatz_personal`.
     pub id: i64,
     pub name: String,
+    /// Qualifikation (Snapshot).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub funktion: Option<String>,
+    /// Einsatzfunktion (LLH-1239); das Etikett nennt sie vor der Qualifikation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
 }
 
 /// Prüft eine angegebene Bestätigung und löst den Namen auf. Ohne Angabe `None`. Eine Angabe
@@ -65,7 +69,8 @@ pub async fn aufloesen(
 /// Das Personal des Einsatzes für die Auswahl, nach Name sortiert.
 pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Bestaetiger>, AppError> {
     Ok(sqlx::query_as::<_, Bestaetiger>(
-        "SELECT id, snap_name AS name, snap_funktion AS funktion FROM einsatz_personal \
+        "SELECT id, snap_name AS name, snap_funktion AS funktion, einsatzfunktion \
+         FROM einsatz_personal \
          WHERE einsatz_id = ? AND beendet_at IS NULL ORDER BY snap_name COLLATE NOCASE, id",
     )
     .bind(einsatz_id)
