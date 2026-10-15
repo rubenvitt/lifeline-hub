@@ -2,7 +2,7 @@ use super::einsatz_uhs::sse_uhs;
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Material;
+use crate::einsatz::modul::{Material, Nachforderungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -105,12 +105,21 @@ pub struct DisponierenBody {
     pub einsatz_fahrzeug_id: Option<i64>,
     pub uhs_id: Option<i64>,
     pub br_id: Option<i64>,
+    /// Übernahme aus einer eingetroffenen Nachforderung (LLH-1226, design.md D1): der Posten
+    /// verweist auf sie, der ETB-Eintrag nennt sie.
+    pub nachforderung_id: Option<i64>,
+    /// Weiterer Posten aus einer Nachforderung, die schon einen trägt (design.md D3); fehlt =
+    /// `false`, dann ist ein vorhandener Posten 409.
+    pub ergaenzen: Option<bool>,
 }
 
 /// POST /api/einsaetze/{id}/material — Stamm-Material disponieren ODER Ad-hoc anlegen, optional
-/// gleich an einen Ort (LLH-1224). Schreibberechtigt + aktiver Einsatz. Schreibt EINEN
-/// ETB-Eintrag (Menge, Ort). Reihenfolge: 400 (Feld) → 422 (Kombination: zwei Orte, Art am Stamm)
-/// → in der Transaktion 404/409/422 (Stamm, Gerät mit Menge über 1, Ziel).
+/// gleich an einen Ort (LLH-1224) und als Übernahme aus einer Nachforderung (LLH-1226).
+/// Schreibberechtigt + aktiver Einsatz. Schreibt EINEN ETB-Eintrag (Menge, Ort, Herkunft).
+/// Reihenfolge: 400 (Feld) → 422 (Kombination: `ergaenzen` ohne Bezug, zwei Orte, Art am Stamm) →
+/// 403 (Bezug ohne Freigabe der Nachforderungen) → in der Transaktion 404/422/409 (Nachforderung:
+/// fremd, nicht eingetroffen, schon übernommen) und 404/409/422 (Stamm, Gerät mit Menge über 1,
+/// Ziel).
 pub async fn disponieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -161,6 +170,12 @@ pub async fn disponieren(
         }
     };
     // Nach allen 400: die Feld-Kombinationen (422).
+    let ergaenzen = body.ergaenzen.unwrap_or(false);
+    if ergaenzen && body.nachforderung_id.is_none() {
+        return Err(AppError::UnprocessableEntity(
+            "Ergänzen nur mit Nachforderung".into(),
+        ));
+    }
     let ort_patch = OrtPatch {
         einheit_id: body.einheit_id.map(Some),
         einsatz_fahrzeug_id: body.einsatz_fahrzeug_id.map(Some),
@@ -174,6 +189,13 @@ pub async fn disponieren(
             "Die Art kommt aus dem Stamm".into(),
         ));
     }
+    // Ein Bezug liest die Nachforderung: erst die Freigabe ihres Moduls (403), sonst verriete
+    // 404 gegen 201 ihre Existenz (design.md D1, wie `routes/verpflegung.rs`).
+    let nachforderung_id = body.nachforderung_id;
+    if nachforderung_id.is_some() {
+        ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+            .await?;
+    }
 
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige (bei Stamm-
@@ -181,6 +203,15 @@ pub async fn disponieren(
     // Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
+        // Status und Übernahmen der Nachforderung erst hier: sie kippen sonst zwischen Prüfung
+        // und Schreiben (design.md D2).
+        let herkunft = match nachforderung_id {
+            Some(nid) => Some(
+                crate::nachforderung::repo::check_uebernahme_tx(conn, einsatz_id, nid, ergaenzen)
+                    .await?,
+            ),
+            None => None,
+        };
         let em_id = match &ziel {
             Ziel::Stamm(material_id) => {
                 disposition_repo::disponiere_stamm_tx(
@@ -190,6 +221,7 @@ pub async fn disponieren(
                     *material_id,
                     menge,
                     ctx.benutzer.id,
+                    nachforderung_id,
                 )
                 .await?
             }
@@ -201,6 +233,7 @@ pub async fn disponieren(
                     art,
                     menge,
                     ctx.benutzer.id,
+                    nachforderung_id,
                 )
                 .await?
             }
@@ -214,25 +247,34 @@ pub async fn disponieren(
             None => None,
         };
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::material::etb_text_disponiert(
-                &anzeige.bezeichnung,
-                anzeige.menge,
-                ort_text.as_deref(),
-            ),
-        )
-        .await?;
+        let text = crate::material::etb_text_disponiert(
+            &anzeige.bezeichnung,
+            anzeige.menge,
+            ort_text.as_deref(),
+        );
+        let text = match &herkunft {
+            Some(bezeichnung) => crate::material::etb_text_aus_nachforderung(&text, bezeichnung),
+            None => text,
+        };
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(anzeige)
     })?;
     sse_material(&state, einsatz_id, anzeige.id);
     if let Some(o) = anzeige.ort() {
         sse_ort(&state, einsatz_id, o);
     }
+    notify_nachforderung(&state, &anzeige);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// Die Karte einer Nachforderung zeigt ihre Posten (LLH-1226, design.md D7): `nachforderung`
+/// folgt, wenn ein verknüpfter Posten entsteht oder seine Zählung sich ändert (Übernahme,
+/// Aufteilen, Stornieren, Reaktivieren). Mengen, Status und Orte liest die Karte aus der
+/// Material-Query, die auf `material` hört.
+fn notify_nachforderung(state: &AppState, posten: &EinsatzMaterialAnzeige) {
+    if posten.nachforderung_id.is_some() {
+        super::nachforderung::sse(state, posten.einsatz_id);
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -491,6 +533,7 @@ pub async fn aufteilen(
     })?;
     sse_material(&state, einsatz_id, ausgang.id);
     sse_material(&state, einsatz_id, neu.id);
+    notify_nachforderung(&state, &ausgang);
     // Der Ort zeigt sein Material als Liste und bekommt eine Zeile dazu (`material` erreicht
     // seine Leser ohne Materialrecht nicht, LLH-1182).
     if let Some(o) = ausgang.ort() {
@@ -553,7 +596,7 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let vorher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
@@ -565,15 +608,20 @@ pub async fn stornieren(
             &crate::material::etb_text_storniert(&vorher.bezeichnung, vorher.menge),
         )
         .await?;
-        Ok(())
+        Ok(vorher)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    // Ein stornierter Posten zählt nicht mehr als Übernahme (LLH-1226, design.md D3).
+    notify_nachforderung(&state, &vorher);
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/reaktivieren — herausgenommenes oder storniertes
 /// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“ und
-/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag.
+/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag. Ein stornierter Posten aus einer
+/// Nachforderung zählt danach wieder als Übernahme und verlangt wie diese eine eingetroffene
+/// Nachforderung (422, LLH-1226); ein schon vorhandener Posten sperrt nicht, das Reaktivieren ist
+/// bewusstes Rückgängigmachen des Stornos.
 pub async fn reaktivieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -582,6 +630,12 @@ pub async fn reaktivieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let storniert = vorher.beendet_als.as_deref()
+            == Some(crate::entlassung::BeendetAls::Storniert.as_str());
+        if let (true, Some(nid)) = (storniert, vorher.nachforderung_id) {
+            crate::nachforderung::repo::check_uebernahme_tx(conn, einsatz_id, nid, true).await?;
+        }
         disposition_repo::reaktivieren_tx(
             conn,
             einsatz_id,
@@ -602,5 +656,6 @@ pub async fn reaktivieren(
         Ok(anzeige)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    notify_nachforderung(&state, &anzeige);
     Ok(Json(anzeige))
 }

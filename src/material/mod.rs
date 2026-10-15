@@ -175,6 +175,11 @@ pub struct EinsatzMaterialAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<crate::entlassung::BeendetAls>)]
     pub beendet_als: Option<String>,
+    /// Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec
+    /// `nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul
+    /// Nachforderungen. Fehlt ohne Bezug.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachforderung_id: Option<i64>,
 }
 
 impl EinsatzMaterialAnzeige {
@@ -336,6 +341,13 @@ pub fn etb_text_disponiert(bezeichnung: &str, menge: i64, ort: Option<&str>) -> 
         Some(o) => format!("Material «{bezeichnung}» (×{menge}) disponiert, Ort {o}"),
         None => format!("Material «{bezeichnung}» (×{menge}) disponiert"),
     }
+}
+
+/// Herkunft einer Übernahme aus einer Nachforderung (LLH-1226, design.md D6), angehängt an den
+/// Text aus [`etb_text_disponiert`]: „{basis}, aus Nachforderung «{bezeichnung}»“. Die Bezeichnung
+/// der Nachforderung ist auf [`crate::nachforderung::BEZEICHNUNG_MAX`] begrenzt.
+pub fn etb_text_aus_nachforderung(basis: &str, nachforderung_bezeichnung: &str) -> String {
+    format!("{basis}, aus Nachforderung «{nachforderung_bezeichnung}»")
 }
 
 /// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
@@ -524,6 +536,26 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_disponiert("Wolldecke", 50, Some("UHS «Turnhalle»")),
             "Material «Wolldecke» (×50) disponiert, Ort UHS «Turnhalle»"
+        );
+    }
+
+    /// LLH-1226, design.md D6: die Herkunft hängt am Disponier-Text, mit und ohne Ort.
+    #[test]
+    fn aus_nachforderung_haengt_die_bezeichnung_an() {
+        assert_eq!(
+            etb_text_aus_nachforderung(
+                &etb_text_disponiert("Tauchpumpe", 1, Some("Einheit «Staffel A»")),
+                "3 Tauchpumpen für Keller Hauptstraße"
+            ),
+            "Material «Tauchpumpe» (×1) disponiert, Ort Einheit «Staffel A», aus Nachforderung \
+             «3 Tauchpumpen für Keller Hauptstraße»"
+        );
+        assert_eq!(
+            etb_text_aus_nachforderung(
+                &etb_text_disponiert("Sandsäcke", 500, None),
+                "Sandsäcke Deich Nord"
+            ),
+            "Material «Sandsäcke» (×500) disponiert, aus Nachforderung «Sandsäcke Deich Nord»"
         );
     }
 

@@ -89,13 +89,35 @@ async fn personal_disponieren(pool: &SqlitePool, einsatz_id: i64, personal_id: i
     .unwrap();
 }
 
+/// Disponiert das Material als Übernahme aus einer Nachforderung desselben Einsatzes (LLH-1226):
+/// der Bezug darf das Entfernen nicht aufhalten.
 async fn material_disponieren(pool: &SqlitePool, einsatz_id: i64, material_id: i64) {
+    let erfasser: i64 = sqlx::query_scalar(
+        "SELECT b.id FROM benutzer b JOIN einsatz e ON e.org_id = b.org_id WHERE e.id = ? \
+         ORDER BY b.id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let nachforderung: i64 = sqlx::query_scalar(
+        "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+            angefordert_at, erstellt_von_id) \
+         VALUES (?, 'Material', 'Material nach', 'leitstelle', '2026-10-15 08:00:00', ?) \
+         RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(erfasser)
+    .fetch_one(pool)
+    .await
+    .unwrap();
     sqlx::query(
-        "INSERT INTO einsatz_material (einsatz_id, material_id, snap_bezeichnung, art) \
-         VALUES (?, ?, 'Material', 'geraet')",
+        "INSERT INTO einsatz_material (einsatz_id, material_id, snap_bezeichnung, art, \
+            nachforderung_id) VALUES (?, ?, 'Material', 'geraet', ?)",
     )
     .bind(einsatz_id)
     .bind(material_id)
+    .bind(nachforderung)
     .execute(pool)
     .await
     .unwrap();

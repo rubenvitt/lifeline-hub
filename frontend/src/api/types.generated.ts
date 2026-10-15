@@ -1809,6 +1809,13 @@ export interface components {
             material_id?: number | null;
             /** Format: int64 */
             menge: number;
+            /**
+             * Format: int64
+             * @description Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec
+             *     `nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul
+             *     Nachforderungen. Fehlt ohne Bezug.
+             */
+            nachforderung_id?: number | null;
             status: components["schemas"]["MaterialStatus"];
             traegerorganisation?: string | null;
             /**
@@ -3696,6 +3703,12 @@ export interface components {
             id: number;
             /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt'). */
             ist_offen: boolean;
+            /**
+             * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
+             *     Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
+             *     Bezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material.
+             */
+            material_ids: number[];
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
             unterwegs_at?: string | null;
