@@ -107,6 +107,15 @@ export function showsUmhaengen(zeile: Zeile, eintrag: WahlEintrag | undefined): 
   return zeile.zustand === 'gebunden' && (!eintrag?.an || eintrag.umhaengen);
 }
 
+/**
+ * Braucht die Zeile den Griff „umhängen“ (LLH-1237)? Ja, wenn die Kraft erst nach dem Anhaken
+ * gebunden wurde: das Häkchen steht ohne „umhängen“, und das Bilden würde wieder abgelehnt. Ein
+ * Klick auf den Griff ist die ausdrückliche Wahl (`setWahl`), nichts wird still umgehängt (D14).
+ */
+export function offersUmhaengen(zeile: Zeile, eintrag: WahlEintrag | undefined): boolean {
+  return zeile.zustand === 'gebunden' && eintrag?.an === true && !eintrag.umhaengen;
+}
+
 /** „umhängen aus «2. Zug»“ bzw. „umhängen von «83-4»“; `null` an einer nicht gebundenen Kraft. */
 export function umhaengenText(_art: ZeilenArt, zeile: Zeile): string | null {
   if (zeile.zustand !== 'gebunden') return null;

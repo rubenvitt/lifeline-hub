@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Checkbox, Form, Input, Typography } from 'antd';
+import { App, Breadcrumb, Button, Checkbox, Form, Input, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -35,6 +35,7 @@ import {
   gruendeJeZeile,
   isGesperrt,
   isNameVergeben,
+  offersUmhaengen,
   ohneFahrzeug,
   setWahl,
   umhaengenText,
@@ -523,6 +524,8 @@ function PersonZeile({
  * Eine Kraft: beschriftetes Kästchen (Name, an einer gebundenen Kraft „umhängen aus «X»“),
  * daneben der Zustand als Wort, darunter Hinweise und der Grund einer Ablehnung. Gesperrt
  * (außer Dienst) nur, solange nicht angehakt: ein vorher gesetztes Häkchen lässt sich lösen.
+ * Wurde die Kraft erst nach dem Anhaken gebunden, steht darunter der Griff „umhängen aus «X»“
+ * (LLH-1237): ein Klick übernimmt sie, statt das Häkchen zu lösen und neu zu setzen.
  */
 function KraftZeile({
   art,
@@ -551,6 +554,11 @@ function KraftZeile({
   const eintrag = (art === 'fahrzeug' ? wahl.fahrzeuge : wahl.personal).get(id);
   const an = eintrag?.an === true;
   const umhaengen = showsUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
+  const griff = !gesperrt && offersUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
+  const kennung =
+    art === 'fahrzeug'
+      ? (zeile as VorschauFahrzeug).funkrufname
+      : (zeile as VorschauPersonal).name;
   const zustandGesperrt = isGesperrt(art, zeile.zustand);
   return (
     <div
@@ -578,7 +586,7 @@ function KraftZeile({
       <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
         {zustandWort(art, zeile)}
       </Typography.Text>
-      {(hinweise.length > 0 || grund != null) && (
+      {(hinweise.length > 0 || grund != null || griff != null) && (
         <div style={{ flexBasis: '100%', paddingInlineStart: token.marginLG }}>
           {hinweise.length > 0 && (
             <Typography.Text type="secondary" style={{ display: 'block' }}>
@@ -586,6 +594,18 @@ function KraftZeile({
             </Typography.Text>
           )}
           <ZeilenFehler fehler={grund} />
+          {griff != null && (
+            <div>
+              <Button
+                type="link"
+                aria-label={`${griff} – ${kennung}`}
+                onClick={() => onWahl(art, zeile, true)}
+                style={{ paddingInline: 0 }}
+              >
+                {griff}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
