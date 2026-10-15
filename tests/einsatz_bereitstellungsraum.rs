@@ -1500,3 +1500,43 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
     let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
     assert_eq!(d["belegung"]["fahrzeuge"], 0, "{d}");
 }
+
+/// Sammel-Disposition an eine Einheit im Raum meldet den Raum (design.md D7): das Fahrzeug steht
+/// danach unter der Einheit, und „Fahrzeuge“ zählt es mit.
+#[tokio::test]
+async fn sammel_disposition_an_einheit_meldet_den_raum() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &cookie,
+        Some(&json!({"funkrufname": "RTW 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let stamm = v["id"].as_i64().unwrap();
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sammel").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/fahrzeuge/sammel"),
+        &cookie,
+        Some(&json!({"fahrzeug_ids": [stamm], "einheit_id": zug})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Sammel-Disposition");
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(d["belegung"]["fahrzeuge"], 1, "{d}");
+    assert_eq!(
+        d["einheiten"][0]["fahrzeuge"][0]["funkrufname"], "RTW 1",
+        "{d}"
+    );
+}
