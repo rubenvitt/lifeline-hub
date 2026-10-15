@@ -300,6 +300,21 @@ pub async fn freigeben<T: DokumentRoute>(
         state.live.publiziere(einsatz_id, etb_id);
     }
     sse::<T>(state, einsatz_id, id);
+    // Nach dem Commit und nur nach gelungener Freigabe (eine zweite scheitert oben mit 422):
+    // „Neuer Befehl“ bzw. „Neuer Lagebericht“ an die Funktionen im Verteiler der freigegebenen
+    // Fassung (LLH-1213, `src/AGENTS.md`, Benachrichtigungen).
+    if let Some(hinweis) = T::BENACHRICHTIGUNG {
+        crate::vorlagendokument::benachrichtigung::freigegeben(
+            &state.pool,
+            &state.live,
+            hinweis,
+            einsatz_id,
+            id,
+            benutzer.id,
+            &dok.verteiler,
+        )
+        .await;
+    }
     Ok(Json(dok.into()))
 }
 

@@ -1,4 +1,7 @@
 use crate::app::AppState;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Lagekarte;
@@ -168,6 +171,23 @@ pub async fn anlegen(
     sse_zone(&state, einsatz_id, z.id);
     if let Some(bid) = z.evakuierungsbezirk_id {
         sse_bezirk(&state, einsatz_id, bid);
+    }
+    // Spec `benachrichtigungen`, „Neue Gefahr“: ein neu gezeichnetes Gefahrengebiet (die Anlage
+    // legt immer eine eigene Gruppe an) meldet an die Leser der Lagekarte. Änderungen an
+    // bestehenden Gefahren (PATCH der Zone, Gebiet umbenennen, Matrix) bleiben still.
+    if let Some(gid) = z.gefahrengebiet_id {
+        benachrichtigung::melden(
+            &state.pool,
+            &state.live,
+            Anlass::neu(
+                einsatz_id,
+                BenachrichtigungArt::Gefahr,
+                Bezug::neu(BenachrichtigungBezugTyp::Gefahrengebiet, gid),
+            )
+            .von(ctx.benutzer.id)
+            .an(Adressat::ModulLeser("lagekarte")),
+        )
+        .await;
     }
     Ok((StatusCode::CREATED, Json(z)))
 }
