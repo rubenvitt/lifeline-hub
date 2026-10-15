@@ -13,6 +13,8 @@ Jede Benachrichtigung SHALL genau eine Stufe tragen. *Alarm*: lauter Ton, Toast,
 verdecktem Tab. *Hinweis*: dezenter Ton, Toast, OS-Meldung bei verdecktem Tab. *Still*: kein
 Ton, kein Toast, keine OS-Meldung; das Ereignis zeigt sich nur in Zählern, Marken und Listen.
 Toasts beider lauten Stufen MUST stehen bleiben, bis sie geschlossen oder geöffnet werden.
+Hat der Nutzer Push auf einem Gerät eingeschaltet, SHALL eine Benachrichtigung beider lauten
+Stufen dort auch bei geschlossener App als OS-Meldung erscheinen (Spec `web-push`).
 
 #### Scenario: Hinweis im sichtbaren Tab
 - **WHEN** eine Person mit sichtbarem Einsatz-Tab eine Benachrichtigung der Stufe Hinweis erhält
@@ -21,6 +23,10 @@ Toasts beider lauten Stufen MUST stehen bleiben, bis sie geschlossen oder geöff
 #### Scenario: Alarm im verdeckten Tab
 - **WHEN** eine Person mit verdecktem Einsatz-Tab und erlaubten OS-Meldungen einen Alarm erhält
 - **THEN** spielt der laute Ton, ein Toast erscheint, und eine OS-Meldung erscheint
+
+#### Scenario: Alarm bei geschlossener App
+- **WHEN** eine Person mit eingeschaltetem Push auf ihrem Handy einen Alarm erhält und die App dort geschlossen ist
+- **THEN** erscheint auf dem Handy eine OS-Meldung
 
 #### Scenario: Stilles Ereignis
 - **WHEN** eine Chat-Nachricht ohne Erwähnung eingeht

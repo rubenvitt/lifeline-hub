@@ -480,6 +480,18 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_DEMO_DATEN", default_value_t = false)]
     pub demo_daten: bool,
 
+    /// Web Push bei geschlossenem Tab (LLH-1223, Spec `web-push`). **Vorgabe AUS.** Push läuft
+    /// immer über den Dienst des Browser-Herstellers (Google, Apple, Mozilla, Microsoft) im
+    /// Internet; erst mit diesem Schalter baut der Server Verbindungen dorthin auf. Verlangt
+    /// `--web-push-kontakt`. Die Umgebungsvariable nimmt nur `true`/`false`.
+    #[arg(long, env = "LIFELINE_WEB_PUSH", default_value_t = false)]
+    pub web_push: bool,
+
+    /// Kontakt für die Push-Dienste im VAPID-Token (`mailto:betrieb@example.org` oder
+    /// `https://…`). Pflicht mit `--web-push`; Apple lehnt Pushes ohne gültigen Kontakt ab.
+    #[arg(long, env = "LIFELINE_WEB_PUSH_KONTAKT")]
+    pub web_push_kontakt: Option<String>,
+
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
     #[arg(long, env = "LIFELINE_TLS_CERT")]
@@ -617,6 +629,27 @@ impl clap::builder::TypedValueParser for BackupEmpfaengerParser {
 }
 
 impl Config {
+    /// Der Kontakt für Web Push, wenn `--web-push` an ist (LLH-1223, design.md D1); `None` ohne
+    /// Schalter. Mit Schalter ohne gültigen Kontakt bricht der Start mit Text ab.
+    pub fn web_push_kontakt(&self) -> anyhow::Result<Option<String>> {
+        if !self.web_push {
+            return Ok(None);
+        }
+        let kontakt = self
+            .web_push_kontakt
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("");
+        if kontakt.is_empty() {
+            anyhow::bail!(
+                "--web-push verlangt --web-push-kontakt (LIFELINE_WEB_PUSH_KONTAKT), \
+                 etwa mailto:betrieb@example.org"
+            );
+        }
+        crate::web_push::kontakt_pruefen(kontakt).map_err(anyhow::Error::msg)?;
+        Ok(Some(kontakt.to_owned()))
+    }
+
     /// Ob Cookies prozessweit `Secure` tragen (LFH-603): bei eigenem TLS oder mit
     /// `--cookie-secure`. Eine Quelle für den Serverstart, statt `Secure` am TLS-Zweig zu hängen;
     /// hinter einem Proxy kommt die Erkennung je Anfrage dazu (`auth::session::SichererTransport`).
@@ -761,6 +794,41 @@ mod tests {
             "nur parse_hermetisch/parse_mit_env/try_parse_mit_env dürfen Config parsen — \
              neue Tests nehmen parse_hermetisch"
         );
+    }
+
+    /// Web Push ist per Vorgabe aus (LLH-1223); mit Schalter ist der Kontakt Pflicht und muss
+    /// `mailto:` oder `https://` sein.
+    #[test]
+    fn web_push_vorgabe_aus_und_mit_schalter_kontakt_pflicht() {
+        let aus = parse_hermetisch(["lifeline-hub"]);
+        assert!(!aus.web_push);
+        assert_eq!(aus.web_push_kontakt().unwrap(), None);
+
+        let ohne = parse_hermetisch(["lifeline-hub", "--web-push"]);
+        let fehler = ohne.web_push_kontakt().unwrap_err().to_string();
+        assert!(fehler.contains("--web-push-kontakt"), "{fehler}");
+
+        let falsch = parse_hermetisch([
+            "lifeline-hub",
+            "--web-push",
+            "--web-push-kontakt",
+            "betrieb@example.org",
+        ]);
+        assert!(falsch.web_push_kontakt().is_err());
+        let http = parse_hermetisch([
+            "lifeline-hub",
+            "--web-push",
+            "--web-push-kontakt",
+            "http://example.org",
+        ]);
+        assert!(http.web_push_kontakt().is_err());
+
+        for gut in ["mailto:betrieb@example.org", "https://elw.example.org"] {
+            let c = parse_hermetisch(["lifeline-hub", "--web-push", "--web-push-kontakt", gut]);
+            assert_eq!(c.web_push_kontakt().unwrap().as_deref(), Some(gut));
+        }
+        assert!(parse_mit_env("LIFELINE_WEB_PUSH", "true", &["lifeline-hub"]).web_push);
+        assert!(try_parse_mit_env("LIFELINE_WEB_PUSH", "1", &["lifeline-hub"]).is_err());
     }
 
     /// Der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar. Die Env nimmt nur

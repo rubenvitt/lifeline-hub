@@ -53,6 +53,7 @@ use utoipa::OpenApi;
         crate::benachrichtigung::BenachrichtigungEreignis,
         crate::benachrichtigung::BenachrichtigungBezugTyp,
         crate::benachrichtigung::BenachrichtigungStufe,
+        crate::routes::web_push::WebPushStand,
         crate::benutzer_einstellungen::BenutzerEinstellungenAnzeige,
         crate::betreuung::BelegungKopfzahl,
         crate::betreuung::BelegungKopfzahlStelle,

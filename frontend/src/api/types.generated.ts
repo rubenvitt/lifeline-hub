@@ -5434,6 +5434,16 @@ export interface components {
          * @enum {string}
          */
         Warnstufe: "keine" | "niedrig" | "mittel" | "hoch" | "akut";
+        /** @description Stand von Web Push für diese Sitzung. */
+        WebPushStand: {
+            /** @description Diese Sitzung hat ein Abo. */
+            angemeldet: boolean;
+            /**
+             * @description Öffentlicher Schlüssel der Instanz (Base64url, unkomprimierter P-256-Punkt) für
+             *     `pushManager.subscribe({ applicationServerKey })`.
+             */
+            schluessel: string;
+        };
         /**
          * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle
          *     nicht liefert, fehlt — er wird nie zu 0.

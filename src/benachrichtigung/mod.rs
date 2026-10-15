@@ -370,6 +370,21 @@ async fn melden_mit_fehler(
         anlass.art,
         &ereignisse,
     );
+    // Web Push an die Geräte der Empfänger (LLH-1223, Spec `web-push`): dieselbe Nutzlast wie
+    // das Live-Ereignis, in einem eigenen Task; ohne `--web-push` nichts.
+    if let Some(web_push) = live.web_push() {
+        web_push.versenden(
+            pool,
+            ereignisse
+                .iter()
+                .map(|(benutzer_id, e)| crate::web_push::Sendung {
+                    benutzer_id: *benutzer_id,
+                    nutzlast: serde_json::to_string(e).expect("Nutzlast serialisierbar"),
+                    alarm: e.stufe == BenachrichtigungStufe::Alarm,
+                })
+                .collect(),
+        );
+    }
     Ok(aufgeloest.benutzer_ids)
 }
 

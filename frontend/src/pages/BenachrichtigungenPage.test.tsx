@@ -9,6 +9,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import BenachrichtigungenPage, {
   IMMER_AN,
+  PUSH_SCHALTER,
   TEST_TEXT,
   TEST_TITEL,
   TEST_WORT,
@@ -18,6 +19,22 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   ...(await original<typeof import('../alarm/alarmTon')>()),
   spieleAlarmTon: vi.fn(),
 }));
+
+const push = vi.hoisted(() => ({
+  ladePushZustand: vi.fn(async () => 'fehlt'),
+  pushEinschalten: vi.fn(async () => 'an'),
+  pushAusschalten: vi.fn(async () => 'aus'),
+}));
+vi.mock('../alarm/webPush', async (original) => ({
+  ...(await original<typeof import('../alarm/webPush')>()),
+  ...push,
+}));
+
+afterEach(() => {
+  push.ladePushZustand.mockReset().mockResolvedValue('fehlt');
+  push.pushEinschalten.mockReset().mockResolvedValue('an');
+  push.pushAusschalten.mockReset().mockResolvedValue('aus');
+});
 
 function zeige(aus: string[] | null = null) {
   const geschrieben: string[][] = [];
@@ -98,6 +115,48 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     expect(await screen.findByText('nicht gespeichert')).toBeInTheDocument();
     expect(await schalter('Neue Gefahr')).toBeChecked();
     expect(await schalter('Neuer Auftrag')).toBeChecked();
+  });
+});
+
+describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
+  it('fehlt, wenn Browser, Hülle oder Server kein Push bieten', async () => {
+    zeige();
+    await screen.findByRole('region', { name: 'Hinweise' });
+    await waitFor(() => expect(push.ladePushZustand).toHaveBeenCalled());
+    expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
+  });
+
+  it('schaltet ein und aus', async () => {
+    push.ladePushZustand.mockResolvedValue('aus');
+    zeige();
+    const s = await schalter(PUSH_SCHALTER);
+    expect(s).not.toBeChecked();
+    await userEvent.click(s);
+    await waitFor(async () => expect(await schalter(PUSH_SCHALTER)).toBeChecked());
+    expect(push.pushEinschalten).toHaveBeenCalledWith(benutzerFixture().id);
+
+    await userEvent.click(await schalter(PUSH_SCHALTER));
+    await waitFor(async () => expect(await schalter(PUSH_SCHALTER)).not.toBeChecked());
+    expect(push.pushAusschalten).toHaveBeenCalledWith(benutzerFixture().id);
+  });
+
+  it('blockierte Erlaubnis: Schalter aus und gesperrt, mit Marke', async () => {
+    push.ladePushZustand.mockResolvedValue('aus');
+    push.pushEinschalten.mockResolvedValue('blockiert');
+    zeige();
+    await userEvent.click(await schalter(PUSH_SCHALTER));
+    expect(await screen.findByText('Vom Browser blockiert')).toBeInTheDocument();
+    expect(await schalter(PUSH_SCHALTER)).not.toBeChecked();
+    expect(await schalter(PUSH_SCHALTER)).toBeDisabled();
+  });
+
+  it('scheitert das Einschalten, bleibt der Schalter aus und die Zeile sagt es', async () => {
+    push.ladePushZustand.mockResolvedValue('aus');
+    push.pushEinschalten.mockRejectedValue(new Error('kein Worker'));
+    zeige();
+    await userEvent.click(await schalter(PUSH_SCHALTER));
+    expect(await screen.findByText('nicht gespeichert')).toBeInTheDocument();
+    expect(await schalter(PUSH_SCHALTER)).not.toBeChecked();
   });
 });
 

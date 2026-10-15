@@ -78,7 +78,14 @@ export default tseslint.config(
     // Service-Worker-Zusatz (LFH-1062), von Workbox per `importScripts` geladen.
     files: ['public/**/*.js'],
     languageOptions: {
-      globals: { self: 'readonly' },
+      globals: {
+        self: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        AbortController: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+      },
     },
   },
   {

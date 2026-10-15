@@ -164,6 +164,15 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     }
 
     let live = LiveHub::new();
+    // Web Push nur mit Schalter (LLH-1223, design.md D1): Schlüssel laden oder erzeugen.
+    if let Some(kontakt) = config.web_push_kontakt()? {
+        let web_push = lifeline_hub::web_push::WebPush::einrichten(&pool, kontakt).await?;
+        tracing::warn!(
+            "Web Push AKTIV: Benachrichtigungen gehen auch an die Push-Dienste der Browser \
+             (Google, Apple, Mozilla, Microsoft)"
+        );
+        live.web_push_einrichten(web_push);
+    }
     // Live-Kanäle ohne Empfänger nach der Replay-Karenz abräumen (LFH-918).
     live.starte_kanal_sweep();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).

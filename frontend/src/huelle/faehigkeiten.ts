@@ -57,3 +57,11 @@ export function huelleBenachrichtigung(): ((titel: string, text?: string) => Pro
     await zeigen(titel, text);
   };
 }
+
+/**
+ * Läuft die Seite in der Desktop-Hülle? Dort meldet die Hülle selbst (D7); Web Push (LLH-1223)
+ * bietet die Seite dort nicht an.
+ */
+export function inHuelle(): boolean {
+  return window.__LIFELINE_HUELLE__ != null;
+}

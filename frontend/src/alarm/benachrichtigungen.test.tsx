@@ -18,6 +18,12 @@ import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import { spieleAlarmTon } from './alarmTon';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from './desktopAlarm';
+import { schliessePushMeldungen } from './webPush';
+
+vi.mock('./webPush', async (original) => ({
+  ...(await original<typeof import('./webPush')>()),
+  schliessePushMeldungen: vi.fn(async () => undefined),
+}));
 
 vi.mock('./alarmTon', async (original) => ({
   ...(await original<typeof import('./alarmTon')>()),
@@ -180,6 +186,7 @@ const ton = vi.mocked(spieleAlarmTon);
 beforeEach(() => {
   setzeViewportBreite(1366);
   ton.mockClear();
+  vi.mocked(schliessePushMeldungen).mockClear();
 });
 
 afterEach(() => {
@@ -404,6 +411,8 @@ describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
     );
     await waitFor(() => expect(s.quittiert).toEqual([40]));
     expect(meldungen[0].close).toHaveBeenCalled();
+    // Die Push-Meldung des Service Workers geht mit (LLH-1223, D7).
+    expect(schliessePushMeldungen).toHaveBeenCalledWith(40);
   });
 
   it('Zwei Tabs: im zweiten Tab verschwinden Toast und OS-Meldung auf das Quittier-Ereignis', async () => {
@@ -418,6 +427,7 @@ describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
     live(auftrag, true);
     await warteBisNotificationWeg('Neuer Auftrag');
     expect(meldungen[0].close).toHaveBeenCalled();
+    expect(schliessePushMeldungen).toHaveBeenCalledWith(40);
     expect(offeneDesktopAlarme()).toBe(0);
     // Dieser Tab quittiert nicht noch einmal, und ein Nachreichen bringt ihn nicht zurück.
     act(() => meldeNachreichen());
