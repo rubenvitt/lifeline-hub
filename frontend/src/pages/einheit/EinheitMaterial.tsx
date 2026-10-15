@@ -33,8 +33,14 @@ export default function EinheitMaterial({
   rechte,
   materialList,
 }: EinheitMaterialProps) {
-  // Das Einheit-DTO nennt die Zeile `em_id`.
-  const posten = einheit.material_mitglieder.map((m) => ({ ...m, id: m.em_id }));
+  // Das Einheit-DTO nennt die Zeile `em_id` und trägt keine Kategorie; die steht in der
+  // Materialliste, sofern sie abgefragt ist.
+  const kategorie = new Map((materialList.data ?? []).map((em) => [em.id, em.kategorie]));
+  const posten = einheit.material_mitglieder.map((m) => ({
+    ...m,
+    id: m.em_id,
+    kategorie: kategorie.get(m.em_id) ?? null,
+  }));
   return (
     <Paneel titel="Material" meta={materialKopfzahl(posten)} koerperPolster>
       <MaterialAmOrt

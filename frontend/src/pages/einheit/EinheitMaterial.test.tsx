@@ -65,6 +65,7 @@ const LISTE = [
     ausgegeben: 0,
     status: 'einsatzbereit',
     einheit_id: 10,
+    kategorie: 'Brandbekämpfung',
   },
 ] as unknown as EinsatzMaterial[];
 
@@ -119,6 +120,12 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     expect(paneel()).toHaveTextContent('3 Posten · 1 Ausfall');
     expect(zeile('Schlauch B')).toHaveTextContent('defekt');
     expect(zeile('Wolldecke')).toHaveTextContent('15 von 20 übrig');
+  });
+
+  /** Das Einheit-DTO trägt keine Kategorie: sie kommt aus der Materialliste, wenn sie da ist. */
+  it('Kategorie aus der Materialliste steht gedämpft an der Zeile', () => {
+    zeige();
+    expect(zeile('Tragkraftspritze')).toHaveTextContent('Brandbekämpfung');
   });
 
   it('„Aus Einheit lösen“ schickt den PATCH an die Disposition, ein Grund steht an der Zeile', async () => {
