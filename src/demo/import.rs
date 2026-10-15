@@ -986,6 +986,7 @@ impl Ablauf<'_> {
                     &crate::meldung::repo::MeldungDaten {
                         absender: v.absender,
                         empfaenger: v.empfaenger,
+                        empfaenger_funktion: None,
                         meldeweg: v.meldeweg,
                         inhalt: v.inhalt,
                         meldungsart: v.meldungsart,

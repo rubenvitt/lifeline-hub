@@ -9156,6 +9156,17 @@
               "null"
             ]
           },
+          "empfaenger_funktion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Empfängerfunktion aus dem Katalog (LLH-1214, design.md D8), neben dem Freitext\n`empfaenger`. Ihre Nutzer bekommen beim Erfassen den Hinweis „Neue Meldung“."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ereigniszeit": {
             "type": "string"
           },

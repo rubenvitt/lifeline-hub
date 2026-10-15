@@ -7,6 +7,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import { mitProzessZone } from '../test/prozessZone';
 import MeldungFormular, { vonZuBezug } from './MeldungFormular';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
+import { TEST_VORSCHLAEGE } from '../test/fuehrungsfunktionen';
 
 /** `onAnlegen` gibt eine Zusage zurück, auf die die Erfassungshülle wartet — wie `mutateAsync`. */
 function anlegenMock() {
@@ -243,6 +244,88 @@ describe('MeldungFormular', () => {
       expect(vonZuBezug('einheit:x')).toEqual({});
       expect(vonZuBezug(undefined)).toEqual({});
     });
+  });
+});
+
+/** LLH-1214 (design.md D8): Empfängerfunktion aus dem Katalog, füllt den freien Empfänger vor. */
+describe('MeldungFormular — Empfängerfunktion', () => {
+  function renderMitKatalog(onAnlegen = anlegenMock()) {
+    render(
+      <AntApp>
+        <MeldungFormular
+          senden={false}
+          onAnlegen={onAnlegen}
+          funktionsVorschlaege={TEST_VORSCHLAEGE}
+        />
+      </AntApp>,
+    );
+    return onAnlegen;
+  }
+
+  async function oeffneFunktionen() {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Empfängerfunktion' }));
+  }
+
+  async function waehleFunktion(label: string) {
+    await oeffneFunktionen();
+    const eintrag = await screen.findByText(
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === label,
+    );
+    await userEvent.click(eintrag);
+  }
+
+  it('bietet die Katalogfunktionen mit Besetzung an, ohne Fachberater', async () => {
+    renderMitKatalog();
+    await oeffneFunktionen();
+    await screen.findByText('Einsatzleitung');
+    const optionen = [...document.querySelectorAll('.ant-select-item-option-content')].map(
+      (o) => o.textContent,
+    );
+    expect(optionen).toEqual(['Einsatzleitung', 'S2 – Lage (Müller)', 'S3 – Einsatz']);
+  });
+
+  it('sendet die gewählte Funktion und füllt den leeren Empfänger mit ihrem Kürzel vor', async () => {
+    const onAnlegen = renderMitKatalog();
+    await waehleFunktion('S2 – Lage (Müller)');
+    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('S2');
+    await fuellePflichtfelder('RTW 2', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({
+      empfaenger_funktion: 's2',
+      empfaenger: 'S2',
+    });
+  });
+
+  it('lässt einen schon eingetragenen Empfänger stehen', async () => {
+    const onAnlegen = renderMitKatalog();
+    await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
+    await waehleFunktion('S3 – Einsatz');
+    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('ELW 1');
+    await fuellePflichtfelder('RTW 2', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({
+      empfaenger_funktion: 's3',
+      empfaenger: 'ELW 1',
+    });
+  });
+
+  it('ohne Wahl geht keine Funktion mit, und der Platzhalter nennt „keine“', async () => {
+    const onAnlegen = renderMitKatalog();
+    expect(screen.getByText('keine')).toBeInTheDocument();
+    await fuellePflichtfelder('RTW 2', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({ empfaenger_funktion: undefined });
+  });
+
+  it('ohne Katalog entfällt das Feld', () => {
+    renderFormular();
+    expect(screen.queryByRole('combobox', { name: 'Empfängerfunktion' })).not.toBeInTheDocument();
   });
 });
 

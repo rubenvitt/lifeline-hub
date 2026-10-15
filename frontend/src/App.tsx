@@ -36,6 +36,9 @@ import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
 import EinheitVorlageDetailPage from './stammdaten/EinheitVorlageDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
+// Nicht lazy: als eigener Chunk kippt er die Chunk-Aufteilung, und der Haupt-Chunk sprengt das
+// Precache-Limit (vite.config.ts, `maximumFileSizeToCacheInBytes`).
+import BenachrichtigungenPage from './pages/BenachrichtigungenPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
@@ -117,6 +120,7 @@ import { modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
+  BENACHRICHTIGUNGEN_PFAD,
   HILFE_PFAD,
   KOPPELN_PFAD,
   KOPPLUNG_BEENDET_PFAD,
@@ -324,6 +328,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="/profil" element={<ProfilPage />} />
+          <Route path={BENACHRICHTIGUNGEN_PFAD} element={<BenachrichtigungenPage />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
             {adminGruppen.map((g) => (

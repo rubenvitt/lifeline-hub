@@ -53,6 +53,15 @@ export type StichwortVorschlag = S['StichwortVorschlag'];
 export type BenutzerEinstellungen = S['BenutzerEinstellungenAnzeige'];
 export type VersionsstandAnzeige = S['VersionsstandAnzeige'];
 
+// ============================== Benachrichtigungen (kcjecn9e) ==============================
+export type BenachrichtigungArt = S['BenachrichtigungArt'];
+export type BenachrichtigungStufe = S['BenachrichtigungStufe'];
+export type BenachrichtigungBezugTyp = S['BenachrichtigungBezugTyp'];
+/** Eine Benachrichtigung mit dem Text, den der Server beim Lesen bildet. */
+export type BenachrichtigungAnzeige = S['BenachrichtigungAnzeige'];
+/** Nutzlast von `benachrichtigung` (Einsatz-Strom) und `org_benachrichtigung` (Org-Kanal). */
+export type BenachrichtigungEreignis = S['BenachrichtigungEreignis'];
+
 // ============================== Karten-/Anzeige-Defaults ==============================
 export type BasemapModus = S['BasemapModus'];
 export type Zeitformat = S['Zeitformat'];
@@ -982,6 +991,9 @@ export type MeldungKennzahlen = S['MeldungKennzahlen'];
 export interface NeueMeldung {
   absender: string;
   empfaenger?: string;
+  /** Empfängerfunktion aus dem Katalog (ohne Führungshilfspersonal/Fachberater); ihre Nutzer
+   * bekommen den Hinweis „Neue Meldung“. */
+  empfaenger_funktion?: Fuehrungsfunktion;
   meldeweg: MeldungMeldeweg;
   inhalt: string;
   meldungsart?: Meldungsart;

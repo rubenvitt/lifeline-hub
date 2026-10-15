@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -102,6 +102,25 @@ Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
 Die gewählte Stufe trägt ein Häkchen. Dieselben Einstellungen stehen in der Sprungpalette
 („Darstellung: …“, „Dichte: …“, „Helligkeit: …“).
 
+### Auf eine Benachrichtigung reagieren
+
+1. Den Toast lesen: Oben steht die Art, etwa „Neuer Auftrag“, darunter, wo vorhanden, die
+   Kennung, etwa „Auftrag #12“.
+2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder den Toast mit ✕ schließen.
+
+Beides quittiert die Benachrichtigung: Sie verschwindet auch in anderen Tabs und auf anderen
+Geräten derselben Person.
+
+### Benachrichtigungen einstellen
+
+1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen.
+2. Unter „Hinweise“ den Schalter einer Art ausschalten, deren Hinweise nicht mehr erscheinen
+   sollen, oder einschalten, um sie wieder zu bekommen. Die Änderung gilt sofort.
+
+Unter „Alarme“ stehen die Arten, die sich nicht abschalten lassen, mit „immer an“. Steht an einer
+Zeile „nicht gespeichert“, hat der Server die Änderung nicht angenommen; der Schalter steht wieder
+wie vorher.
+
 ## Hintergrund
 
 ### Die Kopfzeile
@@ -119,8 +138,8 @@ Von links nach rechts:
   „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung; was
   dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
-- **Benutzermenü** mit Name, Funktion im Einsatz, Profil, Abmelden, den Einstellungen des Geräts
-  und der Hilfe.
+- **Benutzermenü** mit Name, Funktion im Einsatz, Profil, Abmelden, den Einstellungen des Geräts,
+  den Benachrichtigungen und der Hilfe.
 
 Auf schmalen Schirmen zeigt die Kopfzeile Ruhezustände nur als Zeichen; jede Störung behält ihr
 Wort. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
@@ -176,6 +195,38 @@ Rolle schreiben darf.
 
 „Koordinaten: …“ in der Palette stellt das Koordinatenformat für dieses Gerät ein. Es gilt vor
 der Vorgabe des Einsatzes und der Organisation, bis eine andere Wahl getroffen wird.
+
+### Benachrichtigungen
+
+Eine Benachrichtigung geht an die Personen, die sie betrifft, nicht an alle im Einsatz. Sie hat
+eine von zwei Stufen:
+
+- **Alarm** („Sofortmeldung“, „Sofortmeldung unbestätigt“, „Auftrag überfällig“, „Ablösung
+  fällig“): Toast in Warnfarbe und Alarmton. Alarme lassen sich nicht abschalten.
+- **Hinweis**: Toast und ein kurzer, tieferer Ton. Jede Art lässt sich unter „Benachrichtigungen“
+  abschalten. Was eine abgeschaltete Art meldet, bleibt in den Zählern und Listen der Module
+  sichtbar; es kommt nur kein Toast mehr.
+
+Die Schalter gehören zur **Person**, nicht zum Gerät: Sie gelten auf jedem Gerät, an dem sie sich
+anmeldet. Stummschalten in der Alarmzentrale gehört dagegen zum Gerät und gilt für alle Töne.
+
+Toasts bleiben stehen, bis sie geöffnet oder geschlossen werden. Höchstens drei stehen einzeln
+da; ab dem vierten fasst ein Sammeltoast die älteren zusammen. Er nennt ihre Zahl, bei mehreren
+Arten je Art eine Zeile wie „2 × Neuer Auftrag“, und je Bereich einen Sprung, etwa „Zu Aufträgen“
+oder „Zu Befehlen“. Ein Sprung schließt alle Toasts und quittiert sie, ebenso ✕ am Sammeltoast.
+
+Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen („Benachrichtigung erlaubt“
+in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
+Tab wieder vorn ist; dann trägt der Toast.
+
+Geht eine Benachrichtigung unterwegs verloren, etwa während einer Störung der Verbindung oder
+eines Neustarts des Servers, holt die App sie nach, sobald die Verbindung wieder steht. Ebenso
+beim Öffnen eines Einsatzes: Was in den letzten zwölf Stunden kam und noch nicht quittiert ist,
+erscheint mit der Uhrzeit, zu der es kam. Für alle nachgeholten zusammen klingt höchstens einmal
+der kurze Ton. „Neuer Einsatz“ und „Aufnahme in einen Einsatz“ erscheinen auch außerhalb eines
+Einsatzes, in der Einsatzliste, im Profil und in der Verwaltung; „Öffnen“ führt in den Einsatz.
+
+Gekoppelte Geräte bekommen keine Benachrichtigungen.
 
 ### Einstellungen des Geräts
 

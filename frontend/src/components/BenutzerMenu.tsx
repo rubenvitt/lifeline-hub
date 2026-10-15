@@ -5,13 +5,14 @@ import {
   IconDokumente,
   IconGlocke,
   IconPerson,
+  IconPosteingang,
   type Icon,
 } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
-import { HILFE_PFAD } from '../routing/deeplinks';
+import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import {
   useDichte,
@@ -225,6 +226,8 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         };
       }),
     },
+    // Welche Hinweise kommen, stellt jede Person für sich ein (design.md D6).
+    { key: 'benachrichtigungen', icon: <IconPosteingang />, label: 'Benachrichtigungen' },
     // Die Neuigkeiten mit einem Punkt, solange die laufende Version noch nicht gelesen ist (Spec
     // `neuigkeiten`). Der Punkt trägt den Zustand, nicht die Farbe allein: der Eintrag bleibt benannt.
     {
@@ -266,6 +269,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
     else if (key === 'abmelden') void abmelden();
     else if (key === 'hilfe') navigate(HILFE_PFAD);
     else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
+    else if (key === 'benachrichtigungen') navigate(BENACHRICHTIGUNGEN_PFAD);
     else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);

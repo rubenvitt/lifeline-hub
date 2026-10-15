@@ -5,6 +5,10 @@ import { neuerQueryClient } from '../test/utils';
 import { useOrgLiveStream } from './useOrgLiveStream';
 import { meldeEinsatzStrom } from './einsatzStromStore';
 import { LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
+import {
+  BENACHRICHTIGUNG_WINDOW_EVENT,
+  NACHREICHEN_WINDOW_EVENT,
+} from './benachrichtigungListener';
 
 /** Zeichnet Verbindungen auf; `emit` spielt ein Ereignis oder `open` ein. */
 class FakeEventSource {
@@ -158,5 +162,30 @@ describe('useOrgLiveStream (LFH-734)', () => {
     expect(FakeEventSource.offene()).toEqual([]);
     unmount();
     expect(FakeEventSource.offene()).toEqual([]);
+  });
+
+  it('reicht `org_benachrichtigung` an die Org-Zentrale weiter und bittet nach `lagged` ums Nachreichen', () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const empfangen = vi.fn();
+    const nachreichen = vi.fn();
+    window.addEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, empfangen);
+    window.addEventListener(NACHREICHEN_WINDOW_EVENT, nachreichen);
+    mount(true);
+    const quelle = FakeEventSource.instanzen[0];
+    const ereignis = {
+      einsatz_id: 9,
+      benachrichtigung_id: 50,
+      art: 'einsatz_neu',
+      stufe: 'hinweis',
+      bezug_typ: 'einsatz',
+      bezug_id: 9,
+      quittiert: false,
+    };
+    quelle.emit('org_benachrichtigung', JSON.stringify(ereignis));
+    quelle.emit('lagged', 'resync');
+    window.removeEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, empfangen);
+    window.removeEventListener(NACHREICHEN_WINDOW_EVENT, nachreichen);
+    expect((empfangen.mock.calls[0][0] as CustomEvent).detail).toEqual(ereignis);
+    expect(nachreichen).toHaveBeenCalledOnce();
   });
 });

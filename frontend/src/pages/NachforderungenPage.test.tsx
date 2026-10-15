@@ -9,7 +9,11 @@ import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
 import { nachforderungenPfad } from '../routing/deeplinks';
-import type { Nachforderung } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import type { EinsatzMaterial, Nachforderung } from '../api/types';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
@@ -18,7 +22,9 @@ vi.mock('../api/einsaetze', () => ({
     status: 'aktiv',
     meine_rolle: 'einsatzleitung',
   }),
+  ladeModulFreigaben: (...a: unknown[]) => ladeModulFreigaben(...a),
 }));
+const ladeModulFreigaben = vi.fn();
 
 const listeNachforderungen = vi.fn();
 const legeNachforderungAn = vi.fn();
@@ -63,8 +69,12 @@ function OrtSonde() {
   return <output data-testid="ort">{ort.pathname + ort.search}</output>;
 }
 
+/** Der Query-Client des letzten `renderPage`, für Abwesenheits-Prüfungen am Cache. */
+let zuletztClient: QueryClient | null = null;
+
 function renderPage(url = '/einsaetze/1/nachforderungen') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  zuletztClient = client;
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -92,6 +102,7 @@ describe('NachforderungenPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listeNachforderungen.mockResolvedValue([nf()]);
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture());
   });
 
   it('zeigt offene Nachforderungen', async () => {
@@ -188,7 +199,7 @@ describe('NachforderungenPage', () => {
     expect(screen.queryByText('2 RTW zur Verstärkung')).not.toBeInTheDocument();
   });
 
-  it('eingetroffene Nachforderung zeigt keine Aktionen', async () => {
+  it('eingetroffene Nachforderung zeigt nur noch die Übernahme als Material (LLH-1226)', async () => {
     listeNachforderungen.mockResolvedValue([
       nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
     ]);
@@ -197,6 +208,12 @@ describe('NachforderungenPage', () => {
     await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await screen.findByText('2 RTW zur Verstärkung');
     expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
+    const karte = screen.getByText('2 RTW zur Verstärkung').closest('[data-lfh="komm-karte"]');
+    expect(
+      within(karte as HTMLElement)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Als Material übernehmen']);
     expect(
       screen.getByText('Eingetroffen', { selector: '[data-lfh="status-chip"] span' }),
     ).toBeInTheDocument();
@@ -590,5 +607,326 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     });
     expect(within(wieder).getByLabelText('Ablehnungsgrund')).toHaveValue('');
     expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () => {
+  const sandsaecke = (over: Partial<Nachforderung> = {}) =>
+    nf({
+      id: 4,
+      art: 'Sandsäcke',
+      bezeichnung: 'Sandsäcke Deich Nord',
+      anzahl: 2000,
+      status: 'eingetroffen',
+      ist_offen: false,
+      eingetroffen_at: '2026-06-12 10:00:00',
+      ...over,
+    });
+  const posten = (over: Partial<EinsatzMaterial> = {}) =>
+    ({
+      id: 7,
+      einsatz_id: 1,
+      bezeichnung: 'Sandsäcke',
+      art: 'verbrauchsgut',
+      menge: 1200,
+      ausgegeben: 0,
+      status: 'einsatzbereit',
+      ist_adhoc: true,
+      ist_demo: false,
+      einheit_id: null,
+      einsatz_fahrzeug_id: null,
+      uhs_id: null,
+      br_id: null,
+      beendet_at: null,
+      nachforderung_id: 4,
+      ...over,
+    }) as unknown as EinsatzMaterial;
+
+  /** Materialliste und Orte über MSW; liefert die gesendeten POST-Körper und gezählte Abrufe. */
+  function materialServer(liste: () => EinsatzMaterial[], post?: () => Response) {
+    const koerper: unknown[] = [];
+    const abrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/material', ({ request }) => {
+        abrufe.push(request.url);
+        return HttpResponse.json(
+          new URL(request.url).searchParams.has('entlassene') ? [] : liste(),
+        );
+      }),
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        koerper.push(await request.json());
+        return post ? post() : HttpResponse.json(posten({ id: 8 }), { status: 201 });
+      }),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+    return { koerper, abrufe };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+  });
+
+  it('übernimmt eine eingetroffene Nachforderung: vorbelegter Dialog, POST mit Bezug, Neuladen', async () => {
+    listeNachforderungen.mockResolvedValue([sandsaecke()]);
+    const { koerper } = materialServer(() => []);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('„Sandsäcke“ als Material übernehmen');
+    await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
+    const vorher = listeNachforderungen.mock.calls.length;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(koerper).toEqual([
+        {
+          adhoc: { bezeichnung: 'Sandsäcke' },
+          menge: 2000,
+          art: 'verbrauchsgut',
+          nachforderung_id: 4,
+        },
+      ]),
+    );
+    await waitFor(() => expect(listeNachforderungen.mock.calls.length).toBeGreaterThan(vorher));
+    await waitFor(() => expect(dialog.closest('.ant-zoom-leave')).not.toBeNull());
+    expect(await screen.findByText('Material übernommen')).toBeInTheDocument();
+  });
+
+  it('409: der Dialog bleibt, lädt neu und bietet „Weiteren Posten übernehmen“ mit dem Rest an', async () => {
+    let schonUebernommen = false;
+    listeNachforderungen.mockImplementation(() =>
+      Promise.resolve([sandsaecke({ material_ids: schonUebernommen ? [7] : [] })]),
+    );
+    let antwort409 = true;
+    const { koerper } = materialServer(
+      () => (schonUebernommen ? [posten()] : []),
+      () => {
+        if (antwort409) {
+          antwort409 = false;
+          schonUebernommen = true;
+          return HttpResponse.json(
+            { error: 'Aus dieser Nachforderung ist schon Material übernommen' },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json(posten({ id: 8, menge: 800 }), { status: 201 });
+      },
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+
+    expect(
+      await within(dialog).findByText(/Aus dieser Nachforderung ist schon Material übernommen/),
+    ).toBeInTheDocument();
+    const weiter = await within(dialog).findByRole('button', {
+      name: 'Weiteren Posten übernehmen',
+    });
+    await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('800'));
+    await userEvent.click(weiter);
+    await waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[1]).toMatchObject({ menge: 800, nachforderung_id: 4, ergaenzen: true });
+    expect(koerper[0]).not.toHaveProperty('ergaenzen');
+  });
+
+  it('mit Freigabe zeigt die Karte ihre Posten aus der Materialliste', async () => {
+    listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
+    materialServer(() => [posten()]);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('Sandsäcke · 1200 · ohne Ort')).toBeInTheDocument();
+    expect(screen.getByText('übernommen 1200 von 2000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeInTheDocument();
+  });
+
+  it('ohne Material-Freigabe: kein Abruf der Materialliste, Knopf gesperrt, nur die Zahl', async () => {
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture({ material: { zugriff: false } }));
+    listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
+    const { abrufe } = materialServer(() => [posten()]);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    const knopf = await screen.findByRole('button', { name: 'Weiteren Posten übernehmen' });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
+    expect(screen.getByText('1 Posten übernommen')).toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await freigabenAufgeloest();
+    keinMaterialAbruf(abrufe);
+  });
+
+  /**
+   * Wartet, bis die Freigaben aufgelöst sind und ein Tick vergangen ist: erst dann hätte ein
+   * Abruf, den nur die Freigabe-Bedingung aufhält, schon begonnen.
+   */
+  async function freigabenAufgeloest() {
+    await waitFor(() =>
+      expect(zuletztClient?.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  /** Die Materialliste wurde weder abgerufen noch begonnen (vor MSW sichtbar am Cache). */
+  function keinMaterialAbruf(abrufe: string[]) {
+    const stand = zuletztClient?.getQueryState(einsatzKeys.material(1));
+    expect(stand?.fetchStatus ?? 'idle').toBe('idle');
+    expect(stand?.dataUpdateCount ?? 0).toBe(0);
+    expect(abrufe).toEqual([]);
+  }
+
+  it('ohne Übernahme ruft die Seite die Materialliste nicht ab', async () => {
+    listeNachforderungen.mockResolvedValue([sandsaecke(), nf()]);
+    const { abrufe } = materialServer(() => []);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await freigabenAufgeloest();
+    keinMaterialAbruf(abrufe);
+  });
+
+  it('Modul Material ausgeblendet (nur Zugriff, etwa Admin): Knopf gesperrt, kein Abruf', async () => {
+    ladeModulFreigaben.mockResolvedValue(
+      freigabenFixture({ material: { sichtbar: false, zugriff: true } }),
+    );
+    listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
+    const { abrufe } = materialServer(() => [posten()]);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    const knopf = await screen.findByRole('button', { name: 'Weiteren Posten übernehmen' });
+    await freigabenAufgeloest();
+    expect(knopf).toBeDisabled();
+    expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    keinMaterialAbruf(abrufe);
+  });
+
+  it('solange die Freigaben laden, steht kein Übernahme-Knopf (auch kein gesperrter)', async () => {
+    ladeModulFreigaben.mockReturnValue(new Promise(() => {}));
+    listeNachforderungen.mockResolvedValue([sandsaecke()]);
+    materialServer(() => []);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await screen.findByText('Sandsäcke Deich Nord');
+    expect(screen.queryByRole('button', { name: 'Als Material übernehmen' })).toBeNull();
+    expect(screen.queryByText('Keine Berechtigung')).toBeNull();
+  });
+
+  it('422 „erst nach dem Eintreffen“: der Dialog bleibt offen auf „Übernehmen“ und nennt den Grund', async () => {
+    listeNachforderungen.mockResolvedValue([sandsaecke()]);
+    materialServer(
+      () => [],
+      () =>
+        HttpResponse.json(
+          { error: 'Material wird erst nach dem Eintreffen übernommen' },
+          { status: 422 },
+        ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    expect(
+      await within(dialog).findByText(/Material wird erst nach dem Eintreffen übernommen/),
+    ).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('„Sandsäcke“ als Material übernehmen');
+    expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeNull();
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+  });
+
+  it('?nachforderung= wählt die Ansicht der Nachforderung, hebt ihre Karte hervor und räumt den Parameter', async () => {
+    listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
+    materialServer(() => []);
+    renderPage(nachforderungenPfad(1, { nachforderung: 4 }));
+    const karte = await waitFor(() => {
+      const k = document.querySelector('[data-nachforderung-id="4"]');
+      expect(k).not.toBeNull();
+      return k as HTMLElement;
+    });
+    expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+    expect(screen.getByRole('radio', { name: /Abgeschlossen/ })).toBeChecked();
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+    );
+  });
+
+  it('?nachforderung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt', async () => {
+    listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
+    materialServer(() => []);
+    renderPage(nachforderungenPfad(1, { nachforderung: 99 }));
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+    );
+    expect(screen.getByRole('radio', { name: /Offen/ })).toBeChecked();
+    expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+  });
+
+  it('?nachforderung= beim Kaltstart: antwortet die Liste vor dem Einsatz, rollt die Karte trotzdem sofort ins Bild', async () => {
+    const scroll = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      let einsatzDa: () => void = () => {};
+      vi.mocked(ladeEinsatz).mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            einsatzDa = () =>
+              r({
+                id: 1,
+                bezeichnung: 'Lage',
+                status: 'aktiv',
+                meine_rolle: 'einsatzleitung',
+              } as Awaited<ReturnType<typeof ladeEinsatz>>);
+          }),
+      );
+      listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
+      materialServer(() => []);
+      renderPage(nachforderungenPfad(1, { nachforderung: 4 }));
+      await waitFor(() => expect(listeNachforderungen).toHaveBeenCalled());
+      await act(async () => {
+        await listeNachforderungen.mock.results[0]?.value;
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      await act(async () => einsatzDa());
+      const karte = await waitFor(() => {
+        const k = document.querySelector('[data-nachforderung-id="4"]');
+        expect(k).not.toBeNull();
+        return k as HTMLElement;
+      });
+      await waitFor(() => expect(scroll).toHaveBeenCalled());
+      expect(scroll.mock.contexts[0]).toBe(karte);
+      expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
+  it('Rücknahme nach Übernahme: der Grund steht im Seitenhinweis', async () => {
+    listeNachforderungen.mockResolvedValue([nf({ id: 4, status: 'unterwegs' })]);
+    setzeNachforderungStatus
+      .mockResolvedValueOnce(nf({ id: 4, status: 'eingetroffen' }))
+      .mockRejectedValueOnce(new ApiError(422, 'Aus der Nachforderung ist Material übernommen'));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen melden' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await waitFor(() => {
+      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+      expect(h).not.toBeNull();
+      return h as HTMLElement;
+    });
+    expect(await within(hinweis).findByRole('alert')).toHaveTextContent(
+      'Aus der Nachforderung ist Material übernommen',
+    );
   });
 });

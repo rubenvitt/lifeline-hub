@@ -721,15 +721,17 @@ export interface NachforderungVorbelegung {
 
 /**
  * Nachforderungsseite. `?neu=1` öffnet die Erfassung; eine `vorbelegung` setzt `neu=1` selbst
- * und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` kodiert an. Die Seite räumt alles
- * nach dem Lesen.
+ * und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` kodiert an. `?nachforderung=<id>`
+ * steuert eine Nachforderung an: die Seite wählt ihre Ansicht und hebt die Karte hervor (LLH-1226
+ * D10, Sprung aus der Materialzeile). Die Seite räumt alles nach dem Lesen.
  */
 export function nachforderungenPfad(
   einsatzId: number,
-  opts: { neu?: boolean; vorbelegung?: NachforderungVorbelegung } = {},
+  opts: { neu?: boolean; vorbelegung?: NachforderungVorbelegung; nachforderung?: number } = {},
 ): string {
   const v = opts.vorbelegung;
   return mitQuery(einsatzModulPfad(einsatzId, 'nachforderungen'), {
+    nachforderung: opts.nachforderung,
     neu: opts.neu || v ? 1 : undefined,
     art: v?.art,
     bezeichnung: v?.bezeichnung,
@@ -1016,6 +1018,11 @@ export function einsatzEinstellungenPfad(
 
 /** Einlöseseite eines Kopplungscodes. Ohne Einsatz-Präfix: das Gerät kennt seinen Einsatz erst
  *  nach dem Einlösen. */
+// ── Benachrichtigungen (kcjecn9e D6) ─────────────────────────────────────────────
+
+/** Einstellungen der eigenen Benachrichtigungen, im Benutzermenü. */
+export const BENACHRICHTIGUNGEN_PFAD = '/benachrichtigungen';
+
 // ── Hilfe (LFH-1096) ─────────────────────────────────────────────────────────
 
 /** Hilfe-Seite; offen ohne Anmeldung, auch für gekoppelte Geräte. */

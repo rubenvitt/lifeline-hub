@@ -3514,6 +3514,7 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             empfaenger?: string | null;
+            empfaenger_funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
             ereigniszeit: string;
             /** Format: int64 */
             erfasst_von_id: number;

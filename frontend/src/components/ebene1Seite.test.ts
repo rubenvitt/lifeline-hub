@@ -10,6 +10,13 @@ describe('ebene1Seite', () => {
     expect(ebene1Seite('/profil')).toEqual({ titel: ['Profil'], ort: ['Profil'] });
   });
 
+  it('Benachrichtigungen', () => {
+    expect(ebene1Seite('/benachrichtigungen')).toEqual({
+      titel: ['Benachrichtigungen'],
+      ort: ['Benachrichtigungen'],
+    });
+  });
+
   it('Verwaltung: Sektion aus der Admin-Registry, auch auf Detailadressen', () => {
     expect(ebene1Seite('/admin/stammdaten/fahrzeuge')).toEqual({
       titel: ['Fahrzeuge', 'Verwaltung'],

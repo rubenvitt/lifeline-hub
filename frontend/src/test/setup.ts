@@ -6,6 +6,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
 import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
 import { verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
+import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtigungGedaechtnis';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
@@ -136,6 +137,8 @@ afterEach(() => {
   // Der Verbindungszustand ist modulweit (LFH-723): ein Test mit Netzfehler färbte sonst den
   // Datenstand aller folgenden als „offline".
   verbindungZuruecksetzenFuerTests();
+  // Gezeigte und quittierte Benachrichtigungen merkt sich das Modul für den ganzen Tab.
+  benachrichtigungenZuruecksetzenFuerTests();
 });
 afterAll(() => server.close());
 

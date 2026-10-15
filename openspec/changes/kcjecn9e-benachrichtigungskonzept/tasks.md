@@ -18,12 +18,12 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 2. Fundament Client: Benachrichtigungszentrale (D5, D6) · LLH-1208
 
-- [ ] 2.1 `AlarmZentrale` hört auf `benachrichtigung`, holt den Text, Ton je Stufe, Toast im bestehenden Budget, OS-Meldung bei verdecktem Tab; Vitest für Stufe Hinweis und Alarm, sichtbar und verdeckt
-- [ ] 2.2 Quittieren beim Schließen oder Öffnen, Entfernen auf Quittier-Ereignis; Vitest „Zwei Tabs“
-- [ ] 2.3 Nachreichen nach `lagged`, nach eigenem Neuaufbau und beim Öffnen eines Einsatzes, mit Uhrzeit und höchstens einem dezenten Ton; Vitest „Server-Neustart“
-- [ ] 2.4 Sammeltoast nennt alle neuen Arten mit Sprung; Vitest „Fünf Hinweise“
-- [ ] 2.5 Org-Layout bekommt eine schlanke Zentrale für Org-Arten; Vitest
-- [ ] 2.6 Benutzermenü → „Benachrichtigungen“: Schalter je Hinweis-Art, Alarm-Arten „immer an“; Vitest und Anwenderkapitel `einsatz-oberflaeche` (Abschnitt Benachrichtigungen) nach `docs/anwender/AGENTS.md`
+- [x] 2.1 `AlarmZentrale` hört auf `benachrichtigung`, holt den Text, Ton je Stufe, Toast im bestehenden Budget, OS-Meldung bei verdecktem Tab; Vitest für Stufe Hinweis und Alarm, sichtbar und verdeckt
+- [x] 2.2 Quittieren beim Schließen oder Öffnen, Entfernen auf Quittier-Ereignis; Vitest „Zwei Tabs“
+- [x] 2.3 Nachreichen nach `lagged`, nach eigenem Neuaufbau und beim Öffnen eines Einsatzes, mit Uhrzeit und höchstens einem dezenten Ton; Vitest „Server-Neustart“
+- [x] 2.4 Sammeltoast nennt alle neuen Arten mit Sprung; Vitest „Fünf Hinweise“
+- [x] 2.5 Org-Layout bekommt eine schlanke Zentrale für Org-Arten; Vitest
+- [x] 2.6 Benutzermenü → „Benachrichtigungen“: Schalter je Hinweis-Art, Alarm-Arten „immer an“; Vitest und Anwenderkapitel `einsatz-oberflaeche` (Abschnitt Benachrichtigungen) nach `docs/anwender/AGENTS.md`
 
 ## 3. Bestehende Alarme auf den neuen Weg (benötigt 1, 2) · LLH-1209
 
@@ -60,10 +60,10 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 8. Meldung an meine Funktion (D8, benötigt 1, 2) · LLH-1214
 
-- [ ] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme und ungültiger Code 422
-- [ ] 8.2 Erfassung bietet Empfängerfunktion an und füllt den Freitext vor; Vitest
-- [ ] 8.3 Erfassen meldet `meldung` an die Funktion, bei Sofortmeldung nur der Alarm; Rust-Tests „Meldung an S2“, „Sofortmeldung an S2“
-- [ ] 8.4 Anwenderkapitel `meldungen` (Empfängerfunktion) nachziehen
+- [x] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme und ungültiger Code 422
+- [x] 8.2 Erfassung bietet Empfängerfunktion an und füllt den Freitext vor; Vitest
+- [x] 8.3 Erfassen meldet `meldung` an die Funktion, bei Sofortmeldung nur der Alarm; Rust-Tests „Meldung an S2“, „Sofortmeldung an S2“
+- [x] 8.4 Anwenderkapitel `meldungen` (Empfängerfunktion) nachziehen
 
 ## 9. Lagebesprechung steht an (D10, benötigt 1, 2) · LLH-1215
 
@@ -88,8 +88,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 13. Einheit oder Fahrzeug wieder verfügbar (D11, benötigt 1, 2) · LLH-1219
 
-- [ ] 13.1 Wechsel der Statuskategorie auf verfügbar meldet `wieder_verfuegbar` an EL und S3 (Fahrzeug immer, Einheit nur bei Handstatus); Rust-Tests „Fahrzeug einsatzbereit“, „Wechsel innerhalb gebunden“
-- [ ] 13.2 Anwenderkapitel zu Einheiten und Fahrzeugen nachziehen
+- [x] 13.1 Wechsel der Statuskategorie auf verfügbar meldet `wieder_verfuegbar` an EL und S3 (Fahrzeug immer, Einheit nur bei Handstatus); Rust-Tests „Fahrzeug einsatzbereit“, „Wechsel innerhalb gebunden“
+- [x] 13.2 Anwenderkapitel zu Einheiten und Fahrzeugen nachziehen
 
 ## 14. Chat-Erwähnung (D9, benötigt 1, 2) · LLH-1220
 
