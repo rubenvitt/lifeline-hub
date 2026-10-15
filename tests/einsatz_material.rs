@@ -2788,3 +2788,138 @@ async fn uebernahme_meldet_material_ort_und_nachforderung() {
     }
     assert!(!tags.iter().any(|t| t == "nachforderung"), "{tags:?}");
 }
+
+fn tags(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+) -> Vec<String> {
+    let mut tags = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        tags.push(n.event.as_str().to_string());
+    }
+    tags
+}
+
+/// Spec `nachforderung-material`, „Bezug über den Lebenszyklus des Postens“ (design.md D7/D9):
+/// Aufteilen gibt den Bezug an die neue Zeile weiter; Aufteilen, Stornieren und Reaktivieren eines
+/// verknüpften Postens melden `nachforderung`, an einem Posten ohne Bezug nicht.
+#[tokio::test]
+async fn lebenszyklus_eines_verknuepften_postens() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Wolldecke",
+        "50 Wolldecken",
+        50,
+        "eingetroffen",
+    )
+    .await;
+    let (s, json) =
+        disponieren_roh(&app, &admin, einsatz, &uebernahme("Wolldecke", 50, nid, "")).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":20}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let teil = json[1]["id"].as_i64().unwrap();
+    assert_eq!(json[1]["nachforderung_id"], nid);
+    assert_eq!(json[0]["nachforderung_id"], nid);
+    assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        vec![em, teil]
+    );
+
+    let mut rx = live.abonniere(einsatz);
+    assert_eq!(
+        aktion(&app, &admin, einsatz, teil, "stornieren").await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        vec![em]
+    );
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = aktion(&app, &admin, einsatz, teil, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        json["nachforderung_id"], nid,
+        "der Bezug bleibt über den Storno"
+    );
+    assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
+    assert_eq!(
+        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        vec![em, teil]
+    );
+
+    // Ohne Bezug: dieselben Wege, kein `nachforderung`.
+    let ohne = adhoc_disponieren(&app, &admin, einsatz, "Feldbetten", 10).await;
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = aufteilen(&app, &admin, einsatz, ohne, r#"{"menge":4}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let ohne_teil = json[1]["id"].as_i64().unwrap();
+    assert!(json[1].get("nachforderung_id").is_none());
+    aktion(&app, &admin, einsatz, ohne_teil, "stornieren").await;
+    aktion(&app, &admin, einsatz, ohne_teil, "reaktivieren").await;
+    let t = tags(&mut rx);
+    assert!(!t.iter().any(|t| t == "nachforderung"), "{t:?}");
+}
+
+/// design.md D9: PATCH setzt den Bezug nicht, ein mitgeschicktes `nachforderung_id` bleibt ohne
+/// Wirkung (nachträgliches Verknüpfen ist eine Folgeaufgabe).
+#[tokio::test]
+async fn patch_aendert_den_bezug_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let erste = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "Pumpe 1",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let zweite = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "Pumpe 2",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, erste, ""),
+    )
+    .await;
+    let em = json["id"].as_i64().unwrap();
+    let ohne = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
+
+    for (posten, bezug) in [(em, Some(erste)), (ohne, None)] {
+        let (s, json) = material_patch(
+            &app,
+            &admin,
+            einsatz,
+            posten,
+            &format!(r#"{{"nachforderung_id":{zweite},"bemerkung":"Keller"}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{json}");
+        assert_eq!(json["bemerkung"], "Keller");
+        assert_eq!(json["nachforderung_id"].as_i64(), bezug);
+    }
+    assert!(material_ids(&nachforderung_laden(&app, &admin, einsatz, zweite).await).is_empty());
+}

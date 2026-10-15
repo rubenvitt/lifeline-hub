@@ -493,7 +493,9 @@ pub async fn update(
 /// Dispositionsperson übernimmt und ohne Ausgabe beginnt (LLH-1224, design.md D14: die Teilzeile
 /// kommt aus dem Rest, die Ausgabe bleibt an der Ausgangszeile); so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
 /// und auch eine frühere Herausnahme (`zuletzt_entlassen_at`, Migration 0195) sperrt den Storno
-/// der Teilzeile wie den der Ausgangszeile. Die neue Zeile ist aktiv. `NotFound`/`Conflict` wie
+/// der Teilzeile wie den der Ausgangszeile. Den Bezug auf eine Nachforderung übernimmt sie auch:
+/// sie kam mit derselben Lieferung (LLH-1226, design.md D9). Die neue Zeile ist aktiv.
+/// `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`], `UnprocessableEntity` an einem Gerät, wenn `menge` nicht kleiner als die
 /// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400). Liefert die ID
 /// der neuen Zeile.
@@ -529,11 +531,11 @@ pub async fn teile_auf_tx(
             (einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, menge, \
              ausgegeben, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
              snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
-             zuletzt_entlassen_at) \
+             zuletzt_entlassen_at, nachforderung_id) \
          SELECT einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, ?, \
                 0, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
                 snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
-                zuletzt_entlassen_at \
+                zuletzt_entlassen_at, nachforderung_id \
          FROM einsatz_material WHERE id = ? AND einsatz_id = ? \
          RETURNING id",
     )

@@ -533,6 +533,7 @@ pub async fn aufteilen(
     })?;
     sse_material(&state, einsatz_id, ausgang.id);
     sse_material(&state, einsatz_id, neu.id);
+    notify_nachforderung(&state, &ausgang);
     // Der Ort zeigt sein Material als Liste und bekommt eine Zeile dazu (`material` erreicht
     // seine Leser ohne Materialrecht nicht, LLH-1182).
     if let Some(o) = ausgang.ort() {
@@ -595,7 +596,7 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let vorher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
@@ -607,9 +608,11 @@ pub async fn stornieren(
             &crate::material::etb_text_storniert(&vorher.bezeichnung, vorher.menge),
         )
         .await?;
-        Ok(())
+        Ok(vorher)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    // Ein stornierter Posten zählt nicht mehr als Übernahme (LLH-1226, design.md D3).
+    notify_nachforderung(&state, &vorher);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -644,5 +647,6 @@ pub async fn reaktivieren(
         Ok(anzeige)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    notify_nachforderung(&state, &anzeige);
     Ok(Json(anzeige))
 }
