@@ -14,7 +14,7 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -62,6 +62,10 @@ import { summiereStaerke } from '../../anzeige/staerke';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
+import { listEinsatzMaterial } from '../../api/einsatzMaterial';
+import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
+import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { useDruckModus } from '../../components/druck/useDruckModus';
 import {
   ordnungsschluessel,
@@ -105,7 +109,7 @@ const schluesselVon = (b: BelegungMitName) =>
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
-  const { geraet } = useAuth();
+  const { geraet, laedt: authLaedt } = useAuth();
   // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Bearbeiten, kein Auflösen
   // und Stornieren, keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
@@ -136,6 +140,21 @@ export default function BrDetailPage() {
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+  });
+  // Sektion „Material“ (LLH-1225, design.md D13): Posten aus der Materialliste (`br_id`), nur mit
+  // Freigabe Material. Das BR-Gerät liest das Modul Material nicht (D9): bis `/me` feststeht und am
+  // Gerät weder Sektion noch Abruf.
+  const materialMoeglich = !authLaedt && geraet == null;
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: materialMoeglich,
+  });
+  const materialFrei = materialMoeglich && istKeyFreigegeben('material', freigabenQuery.data);
+  const materialQuery = useQuery({
+    queryKey: einsatzKeys.material(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
+    enabled: materialFrei,
   });
 
   // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier. Ein
@@ -279,6 +298,7 @@ export default function BrDetailPage() {
   // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen. Ein BR-Gerät
   // führt seinen Raum, verwaltet ihn aber nicht.
   const bearbeitbar = verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest';
+  const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({
@@ -602,6 +622,24 @@ export default function BrDetailPage() {
               )}
             />
           </div>
+          {/* Unter der Halte-Fläche: eingeschobenes Material verschiebt keine Belegungszeile unter
+              dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
+          {materialFrei && (
+            <div data-testid="br-material" style={{ marginTop: abstand.lg }}>
+              <SektionHeader titel="Material" extra={materialKopfzahl(materialAmBr)} />
+              <MaterialAmOrt
+                einsatzId={einsatzId}
+                ort={{ art: 'bereitstellungsraum', id: br.id }}
+                posten={materialAmBr}
+                angebot={materialQuery}
+                darfSchreiben={darfImEinsatzSchreiben(einsatz)}
+                materialFrei={materialFrei}
+                loesenText="Lösen"
+                sperrgrund={br.status === 'aufgeloest' ? 'BR aufgelöst' : null}
+                kopfzahl={false}
+              />
+            </div>
+          )}
         </div>
 
         <KraefteOhneBrSidebar
