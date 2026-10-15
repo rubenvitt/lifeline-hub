@@ -22,6 +22,12 @@ use utoipa::ToSchema;
 /// `EINHEIT_NAME_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const NAME_MAX: usize = 200;
 
+/// Höchstlänge der Bemerkung einer Einheit nach dem Trimmen (LLH-1075 design.md D2, wie
+/// `einheit_vorlage::BEMERKUNG_MAX`). Gilt beim Erfassen einer unangemeldeten Kraft am
+/// Bereitstellungsraum; `bilden` und `PATCH` begrenzen sie noch nicht (Folgeaufgabe). Spiegel:
+/// `EINHEIT_BEMERKUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const BEMERKUNG_MAX: usize = 2_000;
+
 /// Default-Einheitstyp-Katalog je neu angelegter Organisation
 /// (label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier).
 /// **Muss mit dem Seed in `migrations/0015_einheit_typ.sql` übereinstimmen.**

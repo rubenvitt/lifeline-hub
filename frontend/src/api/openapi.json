@@ -14958,7 +14958,8 @@
           "einheit",
           "abloesung",
           "nachtrag",
-          "disposition"
+          "disposition",
+          "bereitstellungsraum"
         ]
       },
       "ZeitfensterAnzeige": {

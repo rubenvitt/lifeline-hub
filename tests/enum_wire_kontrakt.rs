@@ -953,6 +953,7 @@ fn zeitachse_quelle_wire() {
         Abloesung => "abloesung",
         Nachtrag => "nachtrag",
         Disposition => "disposition",
+        Bereitstellungsraum => "bereitstellungsraum",
     } in lifeline_hub::zeitachse::ZeitachseQuelle::ALLE);
 }
 

@@ -5826,7 +5826,7 @@ export interface components {
          * @description Herkunft eines Ereignisses. Wire == `as_str()`.
          * @enum {string}
          */
-        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition";
+        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition" | "bereitstellungsraum";
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;
