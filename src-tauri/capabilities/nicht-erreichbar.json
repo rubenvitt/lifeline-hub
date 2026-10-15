@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "nicht-erreichbar",
+  "description": "Nur die lokale Anzeige „nicht erreichbar“ (LLH-1283), in jedem Fenster: zeigen, prüfen, erneut laden, zur Maske. Setzt keine Adresse.",
+  "windows": ["main", "neben-*"],
+  "permissions": [
+    "core:default",
+    "allow-nicht-erreichbar",
+    "allow-check-server",
+    "allow-erneut-versuchen",
+    "allow-server-wechseln"
+  ]
+}

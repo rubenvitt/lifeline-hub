@@ -7,6 +7,7 @@ import {
   schliesseAlleDesktopAlarme,
   schliesseDesktopAlarm,
   schliesseDesktopMeldung,
+  showTestMeldung,
   zeigeDesktopAlarm,
   zielNavigation,
 } from './desktopAlarm';
@@ -589,5 +590,78 @@ describe('Desktop-App: native Meldung über die Hülle (tasks.md 5.2)', () => {
     zeigeDesktopAlarm('Titel', { koerper: 'Text' });
     expect(window.__LIFELINE_HUELLE__).toBeUndefined();
     expect(Ctor).toHaveBeenCalledExactlyOnceWith('Titel', { body: 'Text' });
+  });
+});
+
+// ── Testbenachrichtigung (LLH-1284) ───────────────────────────────────────────────────────
+
+describe('Testbenachrichtigung (LLH-1284)', () => {
+  it('geht in der Hülle über den Command, auch bei sichtbarem Fenster', () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    const { Ctor } = stubNotification('granted');
+    setzeHidden(false);
+    expect(showTestMeldung('Testbenachrichtigung', 'Lifeline Hub')).toBe(true);
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: 'Testbenachrichtigung',
+      text: 'Lifeline Hub',
+    });
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('der Alarmweg bleibt bei sichtbarem Fenster in der Hülle trotzdem still', () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    setzeHidden(false);
+    showTestMeldung('Testbenachrichtigung');
+    invoke.mockClear();
+    expect(zeigeDesktopAlarm('Auftrag überfällig')).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('geht im Browser mit Erlaubnis bei sichtbarem Tab über den Konstruktor, ohne tag', () => {
+    const { Ctor } = stubNotification('granted');
+    setzeHidden(false);
+    expect(showTestMeldung('Testbenachrichtigung', 'Lifeline Hub')).toBe(true);
+    expect(Ctor).toHaveBeenCalledExactlyOnceWith('Testbenachrichtigung', { body: 'Lifeline Hub' });
+  });
+
+  it('steht nicht im Buch der offenen Meldungen und bleibt beim Abräumen stehen', () => {
+    const { instances } = stubNotification('granted');
+    setzeHidden(false);
+    showTestMeldung('Testbenachrichtigung');
+    expect(offeneDesktopAlarme()).toBe(0);
+    schliesseAlleDesktopAlarme();
+    expect(instances[0].close).not.toHaveBeenCalled();
+  });
+
+  it('zeigt ohne Erlaubnis nichts und fragt selbst nicht an', () => {
+    for (const permission of ['default', 'denied'] as const) {
+      const { Ctor } = stubNotification(permission);
+      expect(showTestMeldung('Testbenachrichtigung')).toBe(false);
+      expect(Ctor).not.toHaveBeenCalled();
+      expect(Ctor.requestPermission).not.toHaveBeenCalled();
+    }
+  });
+
+  it('meldet ohne Notification-API, dass nichts ging', () => {
+    vi.stubGlobal('Notification', undefined);
+    Reflect.deleteProperty(window, 'Notification');
+    expect(showTestMeldung('Testbenachrichtigung')).toBe(false);
+  });
+
+  it('geht auf Android über den Service Worker, auch bei sichtbarem Tab', async () => {
+    const { Ctor } = stubNotification('granted');
+    const { registrierung } = stubServiceWorker();
+    await bestaetige();
+    setzeHidden(false);
+    expect(showTestMeldung('Testbenachrichtigung', 'Lifeline Hub')).toBe(true);
+    await abwarten();
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(registrierung.showNotification).toHaveBeenCalledWith('Testbenachrichtigung', {
+      body: 'Lifeline Hub',
+      data: expect.objectContaining({ art: 'lfh-alarm' }),
+    });
+    expect(offeneDesktopAlarme()).toBe(0);
   });
 });
