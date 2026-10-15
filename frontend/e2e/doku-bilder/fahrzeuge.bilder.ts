@@ -22,15 +22,16 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   personal-uebernehmen.png frontend/src/kraefte/BesatzungUebernehmenDialog.tsx,
  *                    frontend/src/kraefte/besatzungVorschlag.ts (Knopf im `BesatzungsBlock`)
  *
- * Demo-Lücke (D3): die Demo-Fahrzeuge haben keine Besatzung. Die Spec setzt Anna und Paul Probe
- * (Rettungsstaffel) und Lena Beispiel (andere Einheit) auf den RTW „83-1“. Für den Dialog
+ * Die Demo-Fahrzeuge tragen ihre Besatzung selbst (LLH-1230), Anna und Paul Probe sitzen auf dem
+ * RTW „83-1“. Die Spec setzt Lena Beispiel (andere Einheit) dazu. Für den Dialog
  * „Fahrzeuge disponieren“ legt sie zwei Stamm-Fahrzeuge an, die noch nicht im Einsatz sind
  * (LLH-1100): die Demo-Fahrzeuge sind alle disponiert. Für den Block „Entlassen“ disponiert sie
  * ein Ad-hoc-Fahrzeug und entlässt es (LLH-1079 Teil II); die Bilder davor zeigen es nicht. Für den
  * Dialog „Angaben ändern“ disponiert sie ein weiteres Ad-hoc-Fahrzeug (LLH-1073). Für den Dialog
  * „Als eigene Einheit führen“ disponiert sie zuletzt ein Ad-hoc-Fahrzeug einer Nachbarwehr mit zwei
  * Ad-hoc-Kräften als Besatzung (LLH-1073 Teil II). „Personal der Einheit übernehmen“ zeigt den RTW
- * „83-2“ der Rettungsstaffel mit ihren freien Kräften, ohne weitere Füllung. Für die Beladung
+ * „83-2“ der Rettungsstaffel mit ihren freien Kräften; dafür gibt die Spec seine Besatzung aus den
+ * Demo-Daten frei. Für die Beladung
  * (LLH-1225 Teil II) lädt sie Rettungsdecken und eine defekte Absaugpumpe auf den RTW „83-1“ und
  * legt einen freien Posten an.
  */
@@ -50,6 +51,7 @@ interface Fahrzeug {
 interface Person {
   id: number;
   name: string;
+  fahrzeug_id?: number | null;
 }
 
 async function liste<T>(api: APIRequestContext, pfad: string): Promise<T[]> {
@@ -72,21 +74,18 @@ test.describe(KAPITEL, () => {
   test('Besatzung eines Fahrzeugs', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    // Erst hier gefüllt: mit Besatzung wird die Liste breiter als die Fläche, das Listenbild
-    // davor zeigt den Stand der Demo-Daten.
+    // Erst hier gefüllt, das Listenbild davor zeigt den Stand der Demo-Daten.
     const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`);
     const rtw = fahrzeuge.find((f) => f.funkrufname.endsWith('83-1'));
     expect(rtw, 'RTW 83-1 im Demo-Einsatz').toBeDefined();
     const personal = await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personal`);
-    for (const name of ['Anna Probe', 'Paul Probe', 'Lena Beispiel']) {
-      const person = personal.find((p) => p.name === name);
-      expect(person, `${name} im Demo-Einsatz`).toBeDefined();
-      await fuelle(
-        page,
-        'put',
-        `/api/einsaetze/${demo.id}/fahrzeuge/${rtw!.id}/besatzung/${person!.id}`,
-      );
-    }
+    const lena = personal.find((p) => p.name === 'Lena Beispiel');
+    expect(lena, 'Lena Beispiel im Demo-Einsatz').toBeDefined();
+    await fuelle(
+      page,
+      'put',
+      `/api/einsaetze/${demo.id}/fahrzeuge/${rtw!.id}/besatzung/${lena!.id}`,
+    );
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     await page.getByRole('button', { name: /^Besatzung zu .*83-1$/ }).click();
@@ -249,6 +248,23 @@ test.describe(KAPITEL, () => {
   test('Dialog „Personal der Einheit übernehmen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
+    // Die Besatzung des RTW „83-2“ aus den Demo-Daten steigt aus, damit der Dialog zwei freie
+    // Kräfte der Staffel vorschlägt.
+    const rtw = (await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`)).find(
+      (f) => f.funkrufname.endsWith('83-2'),
+    );
+    expect(rtw, 'RTW 83-2 im Demo-Einsatz').toBeDefined();
+    const besatzung = (
+      await liste<Person>(page.request, `/api/einsaetze/${demo.id}/personal`)
+    ).filter((p) => p.fahrzeug_id === rtw!.id);
+    expect(besatzung, 'Besatzung des RTW 83-2').toHaveLength(2);
+    for (const p of besatzung) {
+      await fuelle(
+        page,
+        'delete',
+        `/api/einsaetze/${demo.id}/fahrzeuge/${rtw!.id}/besatzung/${p.id}`,
+      );
+    }
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
     await page.getByRole('button', { name: /^Besatzung zu .*83-2$/ }).click();

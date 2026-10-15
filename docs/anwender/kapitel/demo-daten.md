@@ -8,8 +8,8 @@ quellen: [frontend/src/admin/DemoDatenPage.tsx, frontend/src/admin/adminNav.tsx,
 ## Überblick
 
 Demo-Daten sind eine fertig befüllte Übungslage: ein Einsatz „ÜBUNG – Starkregen Musterstadt“
-mit Abschnitten, Einheiten, Fahrzeugen, Betroffenen, Betreuung, Meldungen, Aufträgen,
-Lagebericht und Einsatztagebuch, dazu die Fahrzeuge, das Personal und das Material, die er
+mit Abschnitten, Einheiten samt Untereinheiten, Fahrzeugen mit Besatzung, Material, Betroffenen,
+Betreuung, Meldungen, Aufträgen, Lagebericht und Einsatztagebuch, dazu die Fahrzeuge, das Personal und das Material, die er
 braucht, und eine Einheiten-Vorlage. Sie eignen sich zum Kennenlernen, für Schulungen und für Vorführungen. Ein System-Admin
 spielt sie ein, entfernt sie wieder oder setzt sie auf den Anfangsstand zurück.
 

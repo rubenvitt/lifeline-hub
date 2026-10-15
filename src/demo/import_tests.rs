@@ -183,8 +183,17 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
             .collect()
     };
 
+    let material_name = |schluessel: &str| {
+        szenario::MATERIAL
+            .iter()
+            .find(|m| m.schluessel == schluessel)
+            .unwrap()
+            .bezeichnung
+    };
+
     let mut einheiten = BTreeMap::new();
     let mut status: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut material_status = BTreeMap::new();
     let mut uhs = BTreeMap::new();
     let mut registrier_nr = 0;
     // Bezirk: (Bezeichnung, Plangröße, letzter Stand); Stelle: (Bezeichnung, Kapazität,
@@ -204,6 +213,40 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     personal_name(personal),
                 ),
             ),
+            Vorgang::Besatzung { fahrzeug, personal } => eintrag(
+                "system",
+                crate::fahrzeug::etb_text_besatzung_zugeordnet(
+                    funkruf(fahrzeug),
+                    &personal
+                        .iter()
+                        .map(|p| personal_name(p).to_string())
+                        .collect::<Vec<_>>(),
+                ),
+            ),
+            Vorgang::MaterialDisponieren { material, einheit } => {
+                material_status.insert(material, crate::material::MaterialStatus::Einsatzbereit);
+                eintrag(
+                    "system",
+                    crate::material::etb_text_disponiert(
+                        material_name(material),
+                        1,
+                        Some(&format!("Einheit «{}»", einheiten[einheit])),
+                    ),
+                );
+            }
+            Vorgang::MaterialStatus {
+                material,
+                status: neu,
+            } => {
+                let alt = material_status[material];
+                if alt != neu {
+                    eintrag(
+                        "system",
+                        crate::material::etb_text_status_wechsel(material_name(material), alt, neu),
+                    );
+                }
+                material_status.insert(material, neu);
+            }
             Vorgang::Einsatzleiter { personal } => eintrag(
                 "system",
                 format!("Einsatzleitung übernommen: {}", personal_name(personal)),
@@ -647,6 +690,98 @@ async fn fahrzeuge_und_personal_disponiert_fms_gemischt() {
     );
 }
 
+/// Kräftebaum (LLH-1230): Rettungsstaffel und Sanitätsgruppe UHS stehen unter dem Zug, die
+/// Fahrzeuge tragen Besatzung aus der eigenen Einheit, die Sanitäterin der UHS-Gruppe sitzt auf
+/// keinem Fahrzeug, und zwei Posten stehen bei Einheiten, einer davon mit Ausfall.
+#[tokio::test]
+async fn kraeftebaum_mit_unterstellung_besatzung_und_material() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+    let s = |x: &str| x.to_string();
+
+    let unterstellt: Vec<(String, String)> = sqlx::query_as(
+        "SELECT e.name, u.name FROM einsatz_einheit e \
+         JOIN einsatz_einheit u ON u.id = e.ueber_einheit_id \
+         WHERE e.einsatz_id = ? ORDER BY e.id",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        unterstellt,
+        vec![
+            (s("Rettungsstaffel"), s("Sanitätszug Musterstadt")),
+            (s("Sanitätsgruppe UHS"), s("Sanitätszug Musterstadt")),
+        ]
+    );
+
+    // Je Kraft: Fahrzeug der Besatzung (Funkrufname), Einheit der Kraft, Einheit des Fahrzeugs.
+    let besatzung: Vec<(String, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT ep.snap_name, ef.snap_funkrufname, e.name, fe.name \
+             FROM einsatz_personal ep \
+             LEFT JOIN einsatz_fahrzeug ef ON ef.id = ep.fahrzeug_id \
+             LEFT JOIN einsatz_einheit e ON e.id = ep.einheit_id \
+             LEFT JOIN einsatz_einheit fe ON fe.id = ef.einheit_id \
+             JOIN personal p ON p.id = ep.personal_id \
+             WHERE ep.einsatz_id = ? ORDER BY p.id",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    for (name, fahrzeug, einheit, fahrzeug_einheit) in &besatzung {
+        if fahrzeug.is_some() {
+            assert_eq!(
+                einheit, fahrzeug_einheit,
+                "{name}: Besatzung aus der eigenen Einheit"
+            );
+        }
+    }
+    let ohne: Vec<&str> = besatzung
+        .iter()
+        .filter(|(_, f, _, _)| f.is_none())
+        .map(|(n, _, _, _)| n.as_str())
+        .collect();
+    assert_eq!(ohne, vec!["Clara Muster"], "„Ohne Fahrzeug“");
+    let auf = |funkruf: &str| {
+        besatzung
+            .iter()
+            .filter(|(_, f, _, _)| f.as_deref() == Some(funkruf))
+            .count()
+    };
+    assert_eq!(auf("Musterstadt 11-1"), 2, "ELW");
+    assert_eq!(auf("Musterstadt 83-1"), 2, "RTW 1");
+    assert_eq!(auf("Musterstadt 64-1"), 1, "GW-San");
+    assert_eq!(auf("Musterstadt 85-1"), 0, "KTW 1");
+
+    let material: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT em.snap_bezeichnung, em.status, e.name FROM einsatz_material em \
+         JOIN einsatz_einheit e ON e.id = em.einheit_id \
+         WHERE em.einsatz_id = ? ORDER BY em.id",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        material,
+        vec![
+            (
+                s("Sanitätsrucksack"),
+                s("desinfektion_noetig"),
+                s("Rettungsstaffel")
+            ),
+            (
+                s("Feldbettensatz (20 Stück)"),
+                s("einsatzbereit"),
+                s("Betreuungsgruppe")
+            ),
+        ]
+    );
+}
+
 /// Der ETB folgt dem Drehbuch Eintrag für Eintrag: Typ, Wortlaut und Schrittzeit, in der
 /// Reihenfolge der laufenden Nummer. Das pinnt die System-Einträge je Vorgangsart (D5) und
 /// die Zeitfolge zugleich.
@@ -658,7 +793,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
 
     let ist = etb(&pool, erg.einsatz_id).await;
     let erwartet = erwartete_etb();
-    assert_eq!(ist.len(), 135, "Zahl der ETB-Einträge des Drehbuchs");
+    assert_eq!(ist.len(), 144, "Zahl der ETB-Einträge des Drehbuchs");
     assert_eq!(
         ist.iter()
             .map(|(_, typ, inhalt, zeit, _)| (typ.clone(), inhalt.clone(), zeit.clone()))
@@ -679,7 +814,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
     assert_eq!(je_typ("entscheidung"), 6);
     assert_eq!(je_typ("meldung"), 15);
     assert_eq!(je_typ("anordnung"), 6);
-    assert_eq!(je_typ("system"), 102);
+    assert_eq!(je_typ("system"), 111);
 
     // Einzelne Wortlaute als Literal, unabhängig von den Textfunktionen.
     let inhalte: Vec<&str> = ist.iter().map(|e| e.2.as_str()).collect();
@@ -701,6 +836,10 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         "Person R-009: Sichtung SK I",
         "Person R-001: Aufnahme in Turnhalle Musterstadt (Inbox)",
         "Person R-012 erfasst",
+        "Fahrzeug «Musterstadt 83-1»: 2 Kräfte als Besatzung zugeordnet: Anna Probe, Paul Probe",
+        "Fahrzeug «Musterstadt 64-1»: «Lena Beispiel» als Besatzung zugeordnet",
+        "Material «Sanitätsrucksack» (×1) disponiert, Ort Einheit «Rettungsstaffel»",
+        "Material «Sanitätsrucksack»: Status «einsatzbereit» → «desinfektion_noetig»",
     ] {
         assert!(inhalte.contains(&literal), "fehlt: {literal}");
     }

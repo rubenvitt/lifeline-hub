@@ -159,6 +159,7 @@ pub async fn importieren_tx(
         einheiten: BTreeMap::new(),
         fahrzeuge: BTreeMap::new(),
         personal: BTreeMap::new(),
+        material: BTreeMap::new(),
         uhs: BTreeMap::new(),
         bezirke: BTreeMap::new(),
         stellen: BTreeMap::new(),
@@ -268,6 +269,8 @@ struct Ablauf<'a> {
     fahrzeuge: BTreeMap<&'static str, i64>,
     /// `einsatz_personal.id` je Personal-Schlüssel.
     personal: BTreeMap<&'static str, i64>,
+    /// `einsatz_material.id` je Material-Schlüssel.
+    material: BTreeMap<&'static str, i64>,
     /// UHS-ID je Schlüssel.
     uhs: BTreeMap<&'static str, i64>,
     /// Evakuierungsbezirk-ID je Schlüssel.
@@ -409,6 +412,10 @@ impl Ablauf<'_> {
             }
             Vorgang::Einheit(v) => {
                 let abschnitt = frueher(&self.abschnitte, "Abschnitt", v.abschnitt)?;
+                let ueber = match v.ueber {
+                    Some(s) => Some(frueher(&self.einheiten, "Einheit", s)?.0),
+                    None => None,
+                };
                 let typ_id = self.kataloge.id(Katalogeintrag::Einheitstyp(v.typ))?;
                 let id = crate::einheit::repo::anlegen_tx(
                     conn,
@@ -417,7 +424,7 @@ impl Ablauf<'_> {
                     &crate::einheit::repo::EinheitDaten {
                         name: v.name,
                         abschnitt_id: Some(abschnitt),
-                        ueber_einheit_id: None,
+                        ueber_einheit_id: ueber,
                         typ_id: Some(typ_id),
                         soll_fuehrer: None,
                         soll_unterfuehrer: None,
@@ -576,6 +583,113 @@ impl Ablauf<'_> {
                     &crate::einheit::etb_text_personal_zugeordnet(einheit_name, &person),
                 )
                 .await
+            }
+            Vorgang::Besatzung { fahrzeug, personal } => {
+                // Wie `routes/einsatz_fahrzeug.rs::besatzung_uebernehmen` (LLH-1073 D12):
+                // Fahrzeug aktiv, Personen vorprüfen, ein UPDATE, ein ETB-Eintrag für alle.
+                let ef_id = frueher(&self.fahrzeuge, "Fahrzeug", fahrzeug)?;
+                let ep_ids = personal
+                    .iter()
+                    .map(|p| frueher(&self.personal, "Personal", p))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let anzeige = crate::fahrzeug::disposition_repo::load_anzeige_tx(
+                    conn,
+                    self.einsatz_id,
+                    ef_id,
+                    true,
+                )
+                .await?;
+                crate::fahrzeug::disposition_repo::require_aktiv_tx(conn, self.einsatz_id, ef_id)
+                    .await?;
+                let personen = crate::fahrzeug::besatzung_repo::check_besatzung_menge_tx(
+                    conn,
+                    self.einsatz_id,
+                    &ep_ids,
+                )
+                .await?;
+                crate::fahrzeug::besatzung_repo::zuordnen_besatzung_menge_tx(
+                    conn,
+                    self.einsatz_id,
+                    ef_id,
+                    &ep_ids,
+                )
+                .await?;
+                let namen: Vec<String> = personen.into_iter().map(|p| p.name).collect();
+                self.system_etb(
+                    conn,
+                    &crate::fahrzeug::etb_text_besatzung_zugeordnet(&anzeige.funkrufname, &namen),
+                )
+                .await
+            }
+            Vorgang::MaterialDisponieren { material, einheit } => {
+                // Wie `routes/einsatz_material.rs::disponieren` mit `einheit_id`: Stamm, Menge 1,
+                // Ort über den einen Schreibweg, ETB mit dem Ort.
+                let material_id = self.stamm.material(material)?;
+                let (einheit_id, _) = frueher(&self.einheiten, "Einheit", einheit)?;
+                let em_id = crate::material::disposition_repo::disponiere_stamm_tx(
+                    conn,
+                    self.einsatz_id,
+                    self.org_id,
+                    material_id,
+                    1,
+                    self.admin_id,
+                    None,
+                )
+                .await?;
+                let ort = crate::material::ort::MaterialOrt::Einheit(einheit_id);
+                crate::material::ort::set_ort_tx(conn, self.einsatz_id, em_id, Some(ort)).await?;
+                let ort_text =
+                    crate::material::ort::ort_text_tx(conn, self.einsatz_id, Some(ort)).await?;
+                self.material.insert(material, em_id);
+                let anzeige = crate::material::disposition_repo::load_anzeige_tx(
+                    conn,
+                    self.einsatz_id,
+                    em_id,
+                    true,
+                )
+                .await?;
+                self.system_etb(
+                    conn,
+                    &crate::material::etb_text_disponiert(
+                        &anzeige.bezeichnung,
+                        anzeige.menge,
+                        Some(&ort_text),
+                    ),
+                )
+                .await
+            }
+            Vorgang::MaterialStatus { material, status } => {
+                // Wie `routes/einsatz_material.rs::update` mit `status`: ETB nur bei einem Wechsel.
+                let em_id = frueher(&self.material, "Material", material)?;
+                let vorher = crate::material::disposition_repo::load_anzeige_tx(
+                    conn,
+                    self.einsatz_id,
+                    em_id,
+                    true,
+                )
+                .await?;
+                crate::material::disposition_repo::update_tx(
+                    conn,
+                    self.einsatz_id,
+                    em_id,
+                    crate::material::disposition_repo::MaterialPatch {
+                        status: Some(status),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                if vorher.status != status {
+                    self.system_etb(
+                        conn,
+                        &crate::material::etb_text_status_wechsel(
+                            &vorher.bezeichnung,
+                            vorher.status,
+                            status,
+                        ),
+                    )
+                    .await?;
+                }
+                Ok(())
             }
             Vorgang::Einsatzleiter { personal } => {
                 // Wie `routes/einsatz_fuehrungsstelle.rs::aendern` (LFH-1199): derselbe Patch

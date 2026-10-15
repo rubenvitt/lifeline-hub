@@ -33,8 +33,9 @@ import {
  *                             ändern“)
  *   aufteilen.png             frontend/src/kraefte/MaterialAufteilenModal.tsx (Dialog „… aufteilen“)
  *
- * Demo-Lücke (D3): die Demo-Daten tragen Material nur im Stamm, keines ist im Einsatz. Die Spec
- * disponiert drei Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
+ * Die Demo-Daten tragen zwei Posten im Einsatz (LLH-1230): den Sanitätsrucksack der
+ * Rettungsstaffel und den Feldbettensatz der Betreuungsgruppe. Die Spec disponiert zwei weitere
+ * Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
  * dem Einsatz genommen“ disponiert sie einen weiteren Ad-hoc-Posten und nimmt ihn wieder heraus
  * (LLH-1079 Teil II). Für die Gruppierung „Nach Ort“ (LLH-1225) liegt der Sanitätsrucksack an der
  * ersten geplanten oder aktiven UHS und die Spende-Decken bei der ersten Einheit des
@@ -49,6 +50,7 @@ interface Stammmaterial {
 }
 interface EinsatzMaterial {
   id: number;
+  bezeichnung: string;
 }
 interface Einheit {
   id: number;
@@ -81,10 +83,12 @@ test.describe(KAPITEL, () => {
       });
       // Stamm-Geräte stehen je Stück im Einsatz (LLH-1224 D2): Menge 1.
       await fuelle(api, 'post', pfad, { material_id: posten('Beleuchtungssatz'), menge: 1 });
-      const rucksack = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
-        material_id: posten('Sanitätsrucksack'),
-        menge: 1,
-      });
+      const imEinsatz = await api.get(pfad);
+      expect(imEinsatz.ok(), `Material im Einsatz: ${imEinsatz.status()}`).toBe(true);
+      const rucksack = ((await imEinsatz.json()) as EinsatzMaterial[]).find(
+        (m) => m.bezeichnung === 'Sanitätsrucksack',
+      );
+      expect(rucksack, 'Sanitätsrucksack im Demo-Einsatz').toBeDefined();
       const decken = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Spende-Decken', kategorie: 'Verbrauchsgut' },
         menge: 50,
@@ -93,7 +97,7 @@ test.describe(KAPITEL, () => {
         status: 'defekt',
         bemerkung: 'Zündung defekt',
       });
-      await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { status: 'im_einsatz' });
+      await fuelle(api, 'patch', `${pfad}/${rucksack!.id}`, { status: 'im_einsatz' });
       // Ausgabe (LLH-1224 D4): 20 von 50 Decken sind ausgegeben, die Menge zeigt den Rest.
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
       // Ein Ort je Posten (LLH-1224 D6), gesetzt über den einen Weg (LLH-1225 D2).
@@ -108,7 +112,7 @@ test.describe(KAPITEL, () => {
       );
       expect(uhs, 'Demo-UHS').toBeDefined();
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { einheit_id: einheit!.id });
-      await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { uhs_id: uhs!.id });
+      await fuelle(api, 'patch', `${pfad}/${rucksack!.id}`, { uhs_id: uhs!.id });
       const pavillon = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
         menge: 2,
