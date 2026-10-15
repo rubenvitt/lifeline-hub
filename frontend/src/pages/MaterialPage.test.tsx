@@ -1389,6 +1389,8 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(felder.some((t) => t.startsWith('Ort'))).toBe(true);
     expect(felder.some((t) => t.startsWith('Menge'))).toBe(true);
     expect(felder.some((t) => t.startsWith('Kategorie'))).toBe(false);
+    // „Ausgeben“ kommt mit der Mengenzelle auf die Karte (LLH-1225 D5).
+    expect(within(karte).getByRole('button', { name: 'Wolldecke ausgeben' })).toBeEnabled();
   });
 
   it('Zeilenmenü eines Stamm-Postens: „Angaben ändern · im Stamm pflegen“ gesperrt', async () => {
