@@ -5,7 +5,9 @@ Ein Bereitstellungsraum zeigt, wer wie lange wartet: je Kraft im Raum den Zeitpu
 sie dort steht, zu jeder Einheit ihre Fahrzeuge, je Raum die Kennzahlen der Belegung (Einheiten,
 Fahrzeuge einschließlich der Fahrzeuge der Einheiten, längste Wartezeit) und die vollständige
 Reihe seiner Belegungsereignisse. Liste und Detail lesen dieselben Kennzahlen, das gekoppelte
-Gerät des Raums liest den Verlauf des eigenen Raums mit.
+Gerät des Raums liest den Verlauf des eigenen Raums mit. Detailseite, Liste und Druck zeigen diese
+Werte mit laufender Wartezeit, die Belegung am längsten wartend zuerst und den Verlauf in einem
+Aufklappbereich, der erst beim Aufklappen lädt.
 
 ## Requirements
 
@@ -152,3 +154,79 @@ Einheit im Raum umbenannt wird. Ohne Änderung MUST kein Ereignis entstehen.
 #### Scenario: Einheit im Raum umbenannt
 - **WHEN** die Einheit „1. Zug“ im BR Sportplatz in „1. Zug Nord“ umbenannt wird
 - **THEN** erhalten die Leser des BR Sportplatz das Ereignis `bereitstellungsraum`
+
+### Requirement: Kennzahlen auf der Detailseite
+Die Detailseite eines Bereitstellungsraums SHALL die Kennzahlen „Bereitgestellt“ (Stärke),
+„Fahrzeuge“, „Einheiten“ und „Längste Wartezeit“ zeigen. „Fahrzeuge“, „Einheiten“ und „Längste
+Wartezeit“ MUST aus den Kennzahlen des Servers kommen, nicht aus der Länge der angezeigten
+Listen. Die Stärke MUST über dieselbe Summenfunktion wie die übrige Anwendung entstehen; fehlt
+eine Einheit des Raums in der Einheitenliste, MUST statt einer Zahl „—“ mit Grund stehen. Ohne
+frühesten „seit“-Zeitpunkt MUST „Längste Wartezeit“ „—“ zeigen. Die Zahl der Belegungen, die vor
+dem Auflösen genannt wird („noch n belegt“), MUST weiter nur Einheiten und einheitenlose
+Fahrzeuge zählen, wie die Sperre des Servers beim Auflösen.
+
+#### Scenario: Fahrzeuge 3
+- **WHEN** im Raum zwei Einheiten mit je einem Fahrzeug und ein Fahrzeug ohne Einheit stehen
+- **THEN** zeigt die Kennzahl „Fahrzeuge“ 3 und „Einheiten“ 2
+- **AND** nennt die Seite vor dem Auflösen „noch 3 belegt“
+
+### Requirement: Zeile je Kraft mit Wartezeit
+Die Detailseite SHALL je Einheit im Raum Name, Typ, Stärke, die Funkrufnamen ihrer Fahrzeuge und
+„seit <Uhrzeit> · <Dauer>“ zeigen, je einheitenlosem Fahrzeug Funkrufnamen, Typ und „seit …“. Die
+Dauer MUST ohne neuen Abruf mit der Uhr weiterlaufen (höchstens eine Minute Versatz) und MUST
+nie negativ sein. Ohne „seit“ MUST die Zeile keine Zeitangabe tragen.
+
+#### Scenario: Wartezeit läuft
+- **WHEN** eine Einheit seit 13:42 im Raum steht und die Seite um 14:30 offen ist
+- **THEN** zeigt ihre Zeile „seit 1342 · 48 min“
+- **AND** um 14:31 zeigt sie ohne neuen Abruf „49 min“
+
+### Requirement: Folge nach Wartezeit
+Die Detailseite SHALL die Einheiten und die einheitenlosen Fahrzeuge jeweils so ordnen, dass die
+am längsten wartende Kraft zuerst steht; Kräfte ohne „seit“ MUST am Ende stehen, gleiche
+Zeitpunkte nach Name. Eine neu eingetretene Kraft MUST damit ans Ende kommen. Die Schleuse für
+Zugänge anderer Arbeitsplätze, solange Zeiger oder Fokus in der Belegung stehen, MUST
+unverändert gelten.
+
+#### Scenario: Neue Kraft
+- **WHEN** zwei Einheiten seit 13:42 und 14:05 im Raum stehen und eine dritte eintritt
+- **THEN** steht die Einheit seit 13:42 oben und die neue Einheit unten
+
+### Requirement: Verlauf auf der Detailseite
+Die Detailseite SHALL einen beschrifteten Aufklappbereich „Verlauf“ unterhalb der Belegung
+anbieten, der seinen Zustand zugänglich meldet und ohne Schreibrecht und am Gerät verfügbar ist.
+Die Reihe MUST erst beim Aufklappen geladen werden. Jeder Eintrag MUST taktische Uhrzeit, Art als
+Wort, Objekt und gegebenenfalls Herkunft, Ziel und Notiz zeigen. Laden, Fehler und leere Reihe
+MUST in Worten erscheinen; ein Ladefehler MUST NOT als leere Reihe erscheinen. Bei geöffnetem
+Verlauf MUST ein neues Ereignis ohne Neuladen der Seite erscheinen. Der Druck MUST den Verlauf
+nicht aufklappen.
+
+#### Scenario: Aufklappen lädt
+- **WHEN** der Verlauf aufgeklappt wird
+- **THEN** wird die Reihe abgerufen und angezeigt
+- **AND** vor dem Aufklappen wurde sie nicht abgerufen
+
+#### Scenario: Ladefehler
+- **WHEN** der Abruf der Reihe scheitert
+- **THEN** nennt der Bereich den Fehler und nicht „Noch keine Belegung“
+
+### Requirement: Liste zeigt die Belegung
+Die Liste der Bereitstellungsräume SHALL je Raum neben Bezeichnung, Status und Standort die
+Spalten Abschnitt, Stärke, Fahrzeuge, Einheiten und Längste Wartezeit zeigen. Die Werte MUST
+denen der Detailseite desselben Raums gleichen; die Stärke MUST über dieselbe Summenfunktion und
+Formatierung wie die Detailseite entstehen. Ist die Einheitenliste nicht verfügbar oder fehlt
+eine Einheit des Raums darin, MUST „Stärke“ „—“ zeigen.
+
+#### Scenario: Liste und Detail
+- **WHEN** der BR Sportplatz zwei Einheiten (0/1/5//6 zusammen) mit je einem Fahrzeug und ein
+  Fahrzeug ohne Einheit trägt
+- **THEN** zeigt seine Zeile in der Liste Stärke 0/1/5//6, Fahrzeuge 3 und Einheiten 2, wie die
+  Detailseite
+
+### Requirement: Druck mit Wartezeiten
+Der Druck der Detailseite SHALL alle Kräfte des Raums ohne Zurückhalten durch die Schleuse zeigen,
+jede mit „seit“ und Dauer zum Druckzeitpunkt, dazu die Kennzahl „Längste Wartezeit“.
+
+#### Scenario: Drucken bei gehaltener Liste
+- **WHEN** ein Zugang hinter dem Sammelbanner wartet und die Seite gedruckt wird
+- **THEN** enthält der Druck auch diesen Zugang mit seiner Wartezeit
