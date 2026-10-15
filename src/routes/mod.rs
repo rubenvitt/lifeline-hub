@@ -78,6 +78,7 @@ pub mod uhs_plan;
 pub mod verpflegung;
 pub mod versionsstand;
 pub mod vorlagendokument;
+pub mod web_push;
 pub mod wetter;
 pub mod zeitachse;
 pub mod zugangsprotokoll;

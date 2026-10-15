@@ -69,7 +69,7 @@ pub fn neuer_token() -> String {
 
 /// SHA-256-Hex eines Session-Tokens für die At-Rest-Speicherung. In der DB steht nur dieser
 /// Hash; ein 256-Bit-Zufallstoken braucht kein Salt/Argon2.
-fn hash_token(token: &str) -> String {
+pub fn hash_token(token: &str) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(token.as_bytes())
         .iter()

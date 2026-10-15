@@ -145,6 +145,9 @@ const G_FK: &str =
     "Struktur-/Benutzer-FK (INTEGER-Referenz; System-Nutzer, kein Betroffenen-Freitext)";
 const G_SCOPE: &str = "Einsatz-Scope-FK (Struktur)";
 const G_ZEIT: &str = "Zeitstempel (Struktur/Audit, kein Personenbezug)";
+const G_WEB_PUSH: &str =
+    "Web-Push-Abo: nur Personensitzungen haben eins, Gerätesitzungen nie (403), \
+                          also keine Zeile im Einsatz-Scope";
 const G_ENUM: &str = "Enum/Katalog-Wert (CHECK-validiert, kein Personenbezug)";
 const G_GEO: &str = "Operatives Geo-/Positions-/Layout-Skelett (kein direkter Personenbezug)";
 const G_ZAEHLER: &str = "Laufende Nummer/Zähler/Menge (anonymes Statistik-Skelett)";
@@ -2531,6 +2534,29 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Anmeldeweg der Sitzung, Wire-Wert von auth::provider::Anmeldeweg (technisch, \
                  kein Personenbezug)",
             ),
+        ],
+    },
+    // ---------- Web Push (LLH-1223, migrations/0203, design.md D3) ----------
+    // Hängt per CASCADE an der Sitzung und damit formal an den Gerätesitzungen. Ein Gerätekonto
+    // bekommt aber nie ein Abo (403, Spec `web-push`), Personensitzungen sind nicht
+    // einsatz-scoped: im Einsatz-Scope liegt nie eine Zeile. Endet die Kopplung, fällt die
+    // Sitzung und mit ihr per CASCADE jedes Abo.
+    TabellenRegel {
+        tabelle: "web_push_abo",
+        scoping: Scoping::UeberParent {
+            fk: "session_token_hash",
+            parent: "session",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("benutzer_id", G_FK),
+            retain("session_token_hash", G_FK),
+            retain("endpoint", G_WEB_PUSH),
+            retain("p256dh", G_WEB_PUSH),
+            retain("auth", G_WEB_PUSH),
+            retain("erstellt_at", G_ZEIT),
         ],
     },
 ];

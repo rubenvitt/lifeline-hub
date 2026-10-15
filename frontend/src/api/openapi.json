@@ -14076,6 +14076,24 @@
           "akut"
         ]
       },
+      "WebPushStand": {
+        "type": "object",
+        "description": "Stand von Web Push für diese Sitzung.",
+        "required": [
+          "schluessel",
+          "angemeldet"
+        ],
+        "properties": {
+          "angemeldet": {
+            "type": "boolean",
+            "description": "Diese Sitzung hat ein Abo."
+          },
+          "schluessel": {
+            "type": "string",
+            "description": "Öffentlicher Schlüssel der Instanz (Base64url, unkomprimierter P-256-Punkt) für\n`pushManager.subscribe({ applicationServerKey })`."
+          }
+        }
+      },
       "WetterAktuell": {
         "type": "object",
         "description": "Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle\nnicht liefert, fehlt — er wird nie zu 0.",

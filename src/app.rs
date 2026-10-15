@@ -269,6 +269,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benachrichtigungen/{id}/quittieren",
             post(routes::benachrichtigung::quittieren),
         )
+        // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
+        .route("/api/web-push", get(routes::web_push::stand))
+        .route(
+            "/api/web-push/abo",
+            put(routes::web_push::anmelden).delete(routes::web_push::abmelden),
+        )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))

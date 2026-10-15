@@ -359,6 +359,10 @@ pub struct LiveHub {
     /// Zulassung und Lebensdauer der Live-Ströme (LFH-920): je Benutzer und insgesamt
     /// gedeckelt, jeder Strom endet nach seiner Lebensdauer.
     pub stroeme: strom::StromZulassung,
+    /// Web Push (LLH-1223), nur mit `--web-push` beim Start eingerichtet
+    /// ([`Self::web_push_einrichten`]). Hier, weil jede Benachrichtigung über den Hub zugestellt
+    /// wird und `benachrichtigung::melden` sonst an jedem Aufrufer einen Parameter mehr bräuchte.
+    web_push: Arc<std::sync::OnceLock<crate::web_push::WebPush>>,
 }
 
 impl Default for LiveHub {
@@ -434,7 +438,19 @@ impl LiveHub {
             kopplung_ende: broadcast::channel(256).0,
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
+            web_push: Arc::default(),
         }
+    }
+
+    /// Richtet Web Push für diesen Hub ein (LLH-1223, nur beim Start mit `--web-push`). Ein
+    /// zweiter Aufruf ändert nichts.
+    pub fn web_push_einrichten(&self, web_push: crate::web_push::WebPush) {
+        let _ = self.web_push.set(web_push);
+    }
+
+    /// Web Push, falls eingerichtet.
+    pub fn web_push(&self) -> Option<&crate::web_push::WebPush> {
+        self.web_push.get()
     }
 
     /// Meldet eine beendete Gerätekopplung (LFH-892): offene Live-Ströme dieser Kopplung enden.

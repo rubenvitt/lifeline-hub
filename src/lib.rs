@@ -78,6 +78,7 @@ pub mod verbindung;
 pub mod verpflegung;
 pub mod versionsstand;
 pub mod vorlagendokument;
+pub mod web_push;
 pub mod wetter;
 mod wire_enum;
 pub mod zeit;
