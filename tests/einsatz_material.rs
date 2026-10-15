@@ -2280,7 +2280,7 @@ async fn nachforderung_status(
 }
 
 /// Die Nachforderung `id` aus der Liste des Einsatzes.
-async fn nachforderung_laden(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value {
+async fn load_nachforderung(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value {
     let (s, liste) = anfrage(
         app,
         "GET",
@@ -2309,7 +2309,7 @@ fn material_ids(n: &Value) -> Vec<i64> {
 }
 
 /// Anzahl aktiver und aus dem Einsatz genommener Posten: „nichts geschrieben“.
-async fn posten_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+async fn posten_count(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
     let mut n = 0;
     for query in ["", "?entlassene=1"] {
         let (s, json) = anfrage(
@@ -2327,7 +2327,7 @@ async fn posten_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize 
 }
 
 /// Ein ETB-Eintrag jeder Art (nicht nur System): die Nachforderung schreibt keinen eigenen.
-async fn etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+async fn etb_count(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
     let (_, json) = anfrage(
         app,
         "GET",
@@ -2385,7 +2385,7 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
         "eingetroffen",
     )
     .await;
-    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
 
     let tauchpumpe = r#"{"adhoc":{"bezeichnung":"Tauchpumpe"}"#;
     for (body, erwartet, grund) in [
@@ -2471,14 +2471,14 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
     )
     .await;
 
-    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, 0);
+    assert_eq!(posten_count(&app, &admin, einsatz).await, 0);
     assert_eq!(
-        etb_anzahl(&app, &admin, einsatz).await,
+        etb_count(&app, &admin, einsatz).await,
         etb_vorher + 2,
         "nur Disponieren und Storno des Postens ohne Bezug"
     );
     assert!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, eingetroffen).await).is_empty()
+        material_ids(&load_nachforderung(&app, &admin, einsatz, eingetroffen).await).is_empty()
     );
 }
 
@@ -2502,8 +2502,8 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
         "eingetroffen",
     )
     .await;
-    let vorher = nachforderung_laden(&app, &admin, einsatz, nid).await;
-    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let vorher = load_nachforderung(&app, &admin, einsatz, nid).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
     let system_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
 
     let (s, json) = disponieren_roh(
@@ -2529,7 +2529,7 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
         nid
     );
 
-    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher + 1);
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher + 1);
     assert_eq!(
         neue_etb(&app, &admin, einsatz, system_vorher).await,
         [
@@ -2537,7 +2537,7 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
           «3 Tauchpumpen für Keller Hauptstraße»"
         ]
     );
-    let nachher = nachforderung_laden(&app, &admin, einsatz, nid).await;
+    let nachher = load_nachforderung(&app, &admin, einsatz, nid).await;
     assert_eq!(material_ids(&nachher), vec![em]);
     let ohne_ids = |mut n: Value| {
         n.as_object_mut().unwrap().remove("material_ids");
@@ -2568,8 +2568,8 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let posten_vorher = posten_anzahl(&app, &admin, einsatz).await;
-    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let posten_vorher = posten_count(&app, &admin, einsatz).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
     let (s, json) = disponieren_roh(
         &app,
         &admin,
@@ -2583,10 +2583,10 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
-    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, posten_vorher);
-    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+    assert_eq!(posten_count(&app, &admin, einsatz).await, posten_vorher);
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
         vec![em]
     );
 }
@@ -2621,7 +2621,7 @@ async fn weitere_posten_nur_bewusst() {
     let erste = json["id"].as_i64().unwrap();
 
     // Doppelklick: dieselbe Übernahme noch einmal.
-    let etb_vorher = etb_anzahl(&app, &admin, einsatz).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
     let (s, json) = disponieren_roh(
         &app,
         &admin,
@@ -2634,8 +2634,8 @@ async fn weitere_posten_nur_bewusst() {
         json["error"],
         "Aus dieser Nachforderung ist schon Material übernommen"
     );
-    assert_eq!(posten_anzahl(&app, &admin, einsatz).await, 1);
-    assert_eq!(etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+    assert_eq!(posten_count(&app, &admin, einsatz).await, 1);
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
     let (s, json) = disponieren_roh(
         &app,
         &admin,
@@ -2660,7 +2660,7 @@ async fn weitere_posten_nur_bewusst() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let zweite = json["id"].as_i64().unwrap();
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, sand).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, sand).await),
         vec![erste, zweite]
     );
 
@@ -2687,7 +2687,7 @@ async fn weitere_posten_nur_bewusst() {
         aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
         StatusCode::NO_CONTENT
     );
-    assert!(material_ids(&nachforderung_laden(&app, &admin, einsatz, pumpe).await).is_empty());
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, pumpe).await).is_empty());
     let (s, json) = disponieren_roh(
         &app,
         &admin,
@@ -2706,7 +2706,7 @@ async fn weitere_posten_nur_bewusst() {
     let (s, _) = aktion(&app, &admin, einsatz, richtig, "entlassen").await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, pumpe).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, pumpe).await),
         vec![richtig]
     );
     let (s, json) = disponieren_roh(
@@ -2830,7 +2830,7 @@ async fn lebenszyklus_eines_verknuepften_postens() {
     assert_eq!(json[0]["nachforderung_id"], nid);
     assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
         vec![em, teil]
     );
 
@@ -2841,7 +2841,7 @@ async fn lebenszyklus_eines_verknuepften_postens() {
     );
     assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
         vec![em]
     );
 
@@ -2854,7 +2854,7 @@ async fn lebenszyklus_eines_verknuepften_postens() {
     );
     assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
     assert_eq!(
-        material_ids(&nachforderung_laden(&app, &admin, einsatz, nid).await),
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
         vec![em, teil]
     );
 
@@ -2921,5 +2921,5 @@ async fn patch_aendert_den_bezug_nicht() {
         assert_eq!(json["bemerkung"], "Keller");
         assert_eq!(json["nachforderung_id"].as_i64(), bezug);
     }
-    assert!(material_ids(&nachforderung_laden(&app, &admin, einsatz, zweite).await).is_empty());
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, zweite).await).is_empty());
 }

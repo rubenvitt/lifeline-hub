@@ -290,7 +290,7 @@ async fn cross_einsatz_status_ist_404() {
 
 // ── Rücknahme nach einer Übernahme (LLH-1226, design.md D9) ─────────────────────────────
 
-async fn status_setzen(
+async fn set_status(
     app: &axum::Router,
     cookie: &str,
     e: i64,
@@ -319,10 +319,7 @@ async fn eingetroffen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     .await;
     let nid = n["id"].as_i64().unwrap();
     for s in ["zugesagt", "unterwegs", "eingetroffen"] {
-        assert_eq!(
-            status_setzen(app, cookie, e, nid, s).await.0,
-            StatusCode::OK
-        );
+        assert_eq!(set_status(app, cookie, e, nid, s).await.0, StatusCode::OK);
     }
     nid
 }
@@ -354,7 +351,7 @@ async fn ruecknahme_nach_uebernahme_ist_422() {
     let nid = eingetroffen(&app, &admin, e).await;
     let em = uebernehmen(&app, &admin, e, nid).await;
 
-    let (s, json) = status_setzen(&app, &admin, e, nid, "unterwegs").await;
+    let (s, json) = set_status(&app, &admin, e, nid, "unterwegs").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"],
@@ -369,7 +366,7 @@ async fn ruecknahme_nach_uebernahme_ist_422() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    let (s, _) = status_setzen(&app, &admin, e, nid, "unterwegs").await;
+    let (s, _) = set_status(&app, &admin, e, nid, "unterwegs").await;
     assert_eq!(
         s,
         StatusCode::UNPROCESSABLE_ENTITY,
@@ -394,7 +391,7 @@ async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let ohne = eingetroffen(&app, &admin, e).await;
-    let (s, json) = status_setzen(&app, &admin, e, ohne, "unterwegs").await;
+    let (s, json) = set_status(&app, &admin, e, ohne, "unterwegs").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["status"], "unterwegs");
 
@@ -409,6 +406,6 @@ async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (s, json) = status_setzen(&app, &admin, e, storniert, "unterwegs").await;
+    let (s, json) = set_status(&app, &admin, e, storniert, "unterwegs").await;
     assert_eq!(s, StatusCode::OK, "{json}");
 }
