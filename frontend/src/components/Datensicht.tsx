@@ -1,6 +1,6 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
 import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
-import type { HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
+import type { CSSProperties, HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
 import type { TableColumnType } from 'antd';
 import {
   createContext,
@@ -117,6 +117,52 @@ const BAUM_EINZUG_PX = 15;
  * seine Breite, es ist ein Bedienziel.
  */
 const BAUM_EINZUG_SCHMAL_PX = 8;
+
+/**
+ * Trefffläche des Aufklappsymbols im Baum (LLH-1240): antds Symbol misst fest ~17 px, in jeder
+ * Stufe. Der Knopf trägt deshalb den Boden der Staffel (Höhe `controlHeight`, Breite
+ * `controlHeightSM` wie `antdKnopf()`), das Symbol steht unverändert mittig darin.
+ *
+ * Der Text einer Zeile MIT Knopf steht in einem Block derselben Mindesthöhe, mittig
+ * (`baumTextStil`): ein Link mit Steuerhöhe füllt ihn, ein nackter Text („Ohne Einheit“) rückt in
+ * seine Mitte, und das Symbol steht in beiden Fällen neben der ersten Textzeile. Eine Ausrichtung
+ * an der Grundlinie trüge nicht: die Zelle eines Moduls (Zeichen vor dem Namen) legt sie an den
+ * Fuß ihres ersten Kinds. Im Druck fallen die Böden (`druck/druck.css`). Rein und exportiert,
+ * aufgelöste Tokens.
+ */
+export function baumSymbolZielStil(token: {
+  controlHeight: number;
+  controlHeightSM: number;
+}): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: '0 0 auto',
+    minWidth: token.controlHeightSM,
+    minHeight: token.controlHeight,
+    padding: 0,
+    border: 0,
+    background: 'transparent',
+    color: 'inherit',
+    font: 'inherit',
+    cursor: 'pointer',
+  };
+}
+
+/** Textblock einer Baumzeile; mit Knopf hält er dessen Höhe und mittet den Inhalt. */
+export function baumTextStil(token: { controlHeight: number }, mitKnopf: boolean): CSSProperties {
+  return mitKnopf
+    ? {
+        minWidth: 0,
+        flex: '1 1 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: token.controlHeight,
+      }
+    : { minWidth: 0, flex: '1 1 auto' };
+}
 
 // ── Formachse ────────────────────────────────────────────────────────────────────────
 /**
@@ -1559,8 +1605,9 @@ export default function Datensicht<T extends object, const K extends string>(
    * seiner Einheit und das Symbol allein darüber. Eine Block-Hülle neben den Floats genügt nicht:
    * Floats zählen nicht zur Mindestbreite der Zelle, im Druck des Meldebilds (Spalte ohne Breite)
    * blieben der Hülle ~12 px. Die Flex-Zeile trägt Einzug und Symbol in ihrer Mindestbreite.
-   * Breitere Spalten heilten nur das Symptom. Symbol und Platzhalter behalten antds Klassen und
-   * Verhalten (Klick stoppt die Weitergabe an den Zeilen-Riegel).
+   * Breitere Spalten heilten nur das Symptom. Symbol und Platzhalter behalten antds Klassen; das
+   * Symbol steht seit LLH-1240 in einem Knopf mit dem Boden der Staffel (`baumSymbolZielStil`),
+   * dessen Klick die Weitergabe an den Zeilen-Riegel stoppt.
    */
   const ersteSpalte = gezeigteSpalten[0];
   const baumTiefe = useMemo(() => {
@@ -1581,19 +1628,36 @@ export default function Datensicht<T extends object, const K extends string>(
     () => [...baumTiefe].map(([k, t]) => `${String(k)}:${t}`).join('|'),
     [baumTiefe],
   );
+  const hatBaumKinder = (zeile: T): boolean =>
+    ((zeile[baum!.kinder] as readonly T[] | undefined)?.length ?? 0) > 0;
   const baumSymbol = (zeile: T): ReactNode => {
     const klasse = `${tabellenPraefix}-row-expand-icon`;
-    const kinder = zeile[baum!.kinder] as readonly T[] | undefined;
-    // Blatt: antds unsichtbarer Platzhalter, damit Geschwister bündig stehen.
-    if (!kinder || kinder.length === 0) {
-      return <span aria-hidden className={`${klasse} ${klasse}-spaced`} />;
+    const ziel = baumSymbolZielStil(token);
+    // Blatt: antds unsichtbarer Platzhalter in der Breite des Knopfs, damit Geschwister bündig
+    // stehen. Ohne Höhe: ein Blatt hat nichts zu treffen.
+    if (!hatBaumKinder(zeile)) {
+      return (
+        <span
+          aria-hidden
+          data-lfh="datensicht-baum-platz"
+          style={{
+            display: 'inline-flex',
+            justifyContent: 'center',
+            flex: ziel.flex,
+            minWidth: ziel.minWidth,
+          }}
+        >
+          <span className={`${klasse} ${klasse}-spaced`} />
+        </span>
+      );
     }
     const k = schluessel(zeile);
     const offen = baum!.aufgeklappt.includes(k);
     return (
       <button
         type="button"
-        className={`${klasse} ${klasse}-${offen ? 'expanded' : 'collapsed'}`}
+        data-lfh="datensicht-baum-ziel"
+        style={ziel}
         aria-label={
           offen
             ? (tabellenText?.collapse ?? 'Zeile reduzieren')
@@ -1606,7 +1670,11 @@ export default function Datensicht<T extends object, const K extends string>(
             offen ? baum!.aufgeklappt.filter((x) => x !== k) : [...baum!.aufgeklappt, k],
           );
         }}
-      />
+      >
+        {/* Das Symbol selbst bleibt antds, mit Klassen und Zeichnung; `float` hebt der Knopf
+            als Flex-Hülle auf. */}
+        <span aria-hidden className={`${klasse} ${klasse}-${offen ? 'expanded' : 'collapsed'}`} />
+      </button>
     );
   };
   const ersteZelle = (wert: unknown, zeile: T, index: number): ReactNode => {
@@ -1671,18 +1739,14 @@ export default function Datensicht<T extends object, const K extends string>(
                     paddingInlineStart: (baumTiefe.get(schluessel(zeile)) ?? 0) * baumEinzug,
                   }}
                 >
-                  <span
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      flex: '0 0 auto',
-                      height: token.fontSize * token.lineHeight,
-                    }}
+                  {baumSymbol(zeile)}
+                  <div
+                    data-lfh="datensicht-baum-text"
+                    style={baumTextStil(token, hatBaumKinder(zeile))}
                   >
-                    {baumSymbol(zeile)}
-                  </span>
-                  <div data-lfh="datensicht-baum-text" style={{ minWidth: 0, flex: '1 1 auto' }}>
-                    {ersteZelle(wert, zeile, index)}
+                    {/* Eine Hülle im normalen Fluss: als Flex-Kinder bräche Inline-Inhalt
+                        (Text, Link, Marke) in getrennte Zeilen. */}
+                    <div>{ersteZelle(wert, zeile, index)}</div>
                   </div>
                 </div>
               ),

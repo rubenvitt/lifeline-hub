@@ -7,6 +7,7 @@ import {
   zuordnungsKarte,
   zuordnungsZiele,
 } from './einheit-fixture';
+import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
@@ -1725,6 +1726,7 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
     `/api/einsaetze/${einsatzId}/einheiten/${einheit}/fahrzeug/${fahrzeug}`,
   );
   expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
+  return { einheit };
 }
 
 test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
@@ -1822,6 +1824,85 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, Drucken ${druck}`,
     );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Aufklappsymbol der Baumtabellen (LLH-1240) ──────────────────────────────────────────
+//
+// antds Symbol misst fest ~17 px, in jeder Stufe; `Datensicht` setzt es in einen Knopf mit dem
+// Boden der Staffel (`baumSymbolZielStil`): Höhe 30 / 48 / 72, Breite 24 / 48 / 72 wie der
+// Knopfboden (`antdKnopf()`, `minWidth` = `controlHeightSM`). Gemessen am Knopf, nicht am
+// Symbol. Dazu je Stufe der hängende Einzug (`baum-einzug-kern.ts`): das Symbol steht neben der
+// ersten Textzeile, auch wenn der Text ein nackter Text ist („Ohne Einheit“) statt eines Links
+// mit Steuerhöhe — der Textblock einer Elternzeile hält dafür die Höhe des Knopfs und mittet.
+
+/** Knopfbreite je Stufe, als Literal wie {@link STAFFEL}. */
+const BAUM_ZIEL_BREITE = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
+
+/** Eine Baumtabelle je Route: Pfad, Name des Bereichs, Mindestzahl der Knöpfe, Einzugsvergleich. */
+const BAUMTABELLEN = [
+  // 1. Zug über der 1. Gruppe; Abschnitt und Fahrzeug stehen in der Gliederung als Spalten.
+  { modul: 'einheiten', bereich: 'Gliederung', knoepfe: 1, vergleich: 'inhalt' },
+  // 1. Zug (Fahrzeug, 1. Gruppe) und „Ohne Einheit“ mit der freien Kraft, beide auf der Wurzel.
+  { modul: 'kraefteuebersicht', bereich: 'Meldebild', knoepfe: 2, vergleich: 'inhalt' },
+  // Abschnitt Nord und 1. Zug.
+  { modul: 'fernmeldewesen', bereich: 'Funkplan', knoepfe: 2, vergleich: 'text' },
+] as const;
+
+test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Meldebild und Funkplan', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Baum`);
+  const { einheit } = await funkplanSaeen(page, einsatzId);
+  // Eine Untereinheit: die Gliederung der Einheiten kennt nur Einheiten als Ebenen.
+  await anlegen(
+    page,
+    einsatzId,
+    'einheiten',
+    { name: '1. Gruppe', ueber_einheit_id: einheit },
+    'Untereinheit',
+  );
+  // Eine freie Kraft: das Meldebild trägt dann die Sammelzeile „Ohne Einheit“ als nackten Text.
+  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Baum' } }, 'Personal');
+
+  const gemessen: string[] = [];
+  for (const { modul, bereich, knoepfe, vergleich } of BAUMTABELLEN) {
+    const je = new Map<string, number>();
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+      await stelleDichte(page, dichte);
+      const tabelle = page.getByRole('region', { name: bereich, exact: true });
+      // Datenanker: der 1. Zug steht erst, wenn die gesäten Daten geladen sind.
+      await expect(tabelle.getByText('1. Zug', { exact: true })).toHaveCount(1);
+      const ziele = tabelle.locator('[data-lfh="datensicht-baum-ziel"]');
+      const hoehe = await alleHaltenStufe(
+        ziele,
+        soll,
+        `${bereich}: Aufklappsymbol (${dichte})`,
+        knoepfe,
+      );
+      let breite = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < (await ziele.count()); i += 1) {
+        const kasten = (await ziele.nth(i).boundingBox())!;
+        expect(
+          kasten.width,
+          `${bereich}: Aufklappsymbol #${i + 1} (${dichte}, gemessen ${kasten.width}px breit, Soll ≥ ${BAUM_ZIEL_BREITE[dichte]})`,
+        ).toBeGreaterThanOrEqual(BAUM_ZIEL_BREITE[dichte] - SUBPIXEL);
+        breite = Math.min(breite, kasten.width);
+      }
+      pruefeHaengendenEinzug(
+        await baumLage(page, `[aria-label="${bereich}"]`),
+        `${bereich} (${dichte})`,
+        vergleich,
+      );
+      je.set(`${dichte} Aufklappsymbol`, hoehe);
+      gemessen.push(`${bereich} ${dichte} (Soll ≥ ${soll}): ${breite}×${hoehe}`);
+    }
+    gegenprobe(je, 'Aufklappsymbol');
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

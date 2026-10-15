@@ -7,9 +7,11 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
+import { dichten } from '../theme/tokens';
 import Datensicht, {
   MAX_SEKUNDAER,
   TIEFE_DECKEL,
+  baumSymbolZielStil,
   effektiveDaten,
   etikettVon,
   gruppiere,
@@ -2135,7 +2137,7 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     const onAufgeklappt = vi.fn();
     const { container } = rendereBaum(onAufgeklappt);
     const symbol = container.querySelector(
-      'tr[data-row-key="a"] .ant-table-row-expand-icon',
+      'tr[data-row-key="a"] [data-lfh="datensicht-baum-ziel"]',
     ) as HTMLElement;
     await userEvent.click(symbol);
     expect(onAufgeklappt).toHaveBeenCalledTimes(1);
@@ -2218,17 +2220,81 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     expect(text.parentElement).toBe(oben);
     expect(text.style.minWidth).toBe('0px');
     expect(text).toContainElement(screen.getByRole('link', { name: 'Abschnitt Nord' }));
-    const symbol = oben.querySelector('button.ant-table-row-expand-icon') as HTMLElement;
+    // Der Knopf trägt die Trefffläche, darin antds Symbol (LLH-1240).
+    const symbol = oben.querySelector('button[data-lfh="datensicht-baum-ziel"]') as HTMLElement;
     expect(symbol).toHaveAttribute('aria-expanded', 'true');
+    expect(symbol.querySelector('.ant-table-row-expand-icon-expanded')).not.toBeNull();
     expect(text.contains(symbol)).toBe(false);
     // Das Blatt trägt den unsichtbaren Platzhalter, keinen Knopf.
     expect(unten.querySelector('button')).toBeNull();
     expect(unten.querySelector('.ant-table-row-expand-icon-spaced')).not.toBeNull();
     // antds eigener Einzug und eigenes Symbol entfallen.
     expect(container.querySelector('td > button.ant-table-row-expand-icon')).toBeNull();
-    await userEvent.click(symbol);
+    // Mit Knopf hält der Text dessen Höhe und mittet sich darin: das Symbol steht neben der
+    // ersten Textzeile, ob Link oder nackter Text. Ein Blatt bleibt oben.
+    expect(text.style.justifyContent).toBe('center');
+    expect(text.style.minHeight).toBe(symbol.style.minHeight);
+    const blattText = unten.querySelector('[data-lfh="datensicht-baum-text"]') as HTMLElement;
+    expect(blattText.style.minHeight).toBe('');
+    // Ein Klick auf antds Symbol trifft den Knopf.
+    await userEvent.click(symbol.querySelector('.ant-table-row-expand-icon') as HTMLElement);
     expect(onAufgeklappt).toHaveBeenCalledTimes(1);
     expect(onAufgeklappt).toHaveBeenLastCalledWith([]);
+  });
+
+  /**
+   * Trefffläche des Aufklappsymbols (LLH-1240): antds Symbol misst ~17 px in jeder Stufe, der
+   * Knopf darum trägt die Staffel. Hier nur der Inline-Stil; jsdom rechnet kein Layout, die
+   * Messung je Route steht in `e2e/gate3-trefflaeche.spec.ts`. Böden als LITERALE.
+   */
+  it('der Knopf des Aufklappsymbols trägt die Staffel, Höhe 30 / 48 / 72, Breite 24 / 48 / 72', () => {
+    const fuer = (stufe: keyof typeof dichten) =>
+      baumSymbolZielStil({
+        controlHeight: dichten[stufe].zeilenhoehe,
+        controlHeightSM: dichten[stufe].kleineZeilenhoehe,
+      });
+    expect([
+      fuer('kompakt').minHeight,
+      fuer('komfortabel').minHeight,
+      fuer('handschuh').minHeight,
+    ]).toEqual([30, 48, 72]);
+    expect([
+      fuer('kompakt').minWidth,
+      fuer('komfortabel').minWidth,
+      fuer('handschuh').minWidth,
+    ]).toEqual([24, 48, 72]);
+    // Das Symbol mittig im Boden, ohne eigenen Rand und Grund des Knopfs.
+    const stil = fuer('handschuh');
+    expect(stil.display).toBe('inline-flex');
+    expect(stil.alignItems).toBe('center');
+    expect(stil.justifyContent).toBe('center');
+    expect(stil.border).toBe(0);
+    expect(stil.background).toBe('transparent');
+  });
+
+  it('der Platzhalter eines Blatts ist so breit wie der Knopf daneben', () => {
+    const { container } = renderMitProviders(
+      <Datensicht<Knoten, 'stelle'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={knotenSpalten}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: ['a'], onAufgeklappt: vi.fn() }}
+        karte={{ art: 'plan', titel: { spalte: 'stelle' }, sekundaer: [] }}
+      />,
+    );
+    const knopf = container.querySelector(
+      'tr[data-row-key="a"] [data-lfh="datensicht-baum-ziel"]',
+    ) as HTMLElement;
+    const platz = container.querySelector(
+      'tr[data-row-key="e"] [data-lfh="datensicht-baum-platz"]',
+    ) as HTMLElement;
+    expect(knopf.style.minWidth).not.toBe('');
+    expect(platz.style.minWidth).toBe(knopf.style.minWidth);
+    // Schrumpft nicht: im Druck fällt der Boden, die Breite des Symbols bleibt (Funkplan A4).
+    expect(platz.style.flex).toBe(knopf.style.flex);
+    expect(platz).toHaveAttribute('aria-hidden');
   });
 
   /**

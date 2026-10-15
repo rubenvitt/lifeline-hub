@@ -341,6 +341,16 @@
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
 }
+/* Aufklappsymbol im Baum der `Datensicht` (LLH-1240): der Knopf trägt den Boden der Staffel
+   inline (`baumSymbolZielStil`), hier nur, was inline nicht geht. Rand unter dem Zeiger wie antds
+   Symbol, das selbst nicht mehr das Ziel ist; Fokusring in `bedien` nach innen. */
+[data-lfh='datensicht-baum-ziel']:hover > .ant-table-row-expand-icon {
+  border-color: currentcolor;
+}
+[data-lfh='datensicht-baum-ziel']:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
 .ant-table-wrapper.lfh-katalog td.lfh-zahl-spalte {
   font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;

@@ -281,4 +281,13 @@
   [data-lfh='druckwurzel'] [data-lfh='datensicht-werkzeuge'] {
     display: none !important;
   }
+  /* Auf Papier trifft niemand ein Aufklappsymbol: der Boden der Staffel (LLH-1240, inline aus
+     `baumSymbolZielStil`/`baumTextStil`) fällt, Knopf und Blatt-Platzhalter sind so breit wie das
+     Symbol, und der Text einer Elternzeile steht wieder oben. */
+  [data-lfh='druckwurzel'] [data-lfh='datensicht-baum-ziel'],
+  [data-lfh='druckwurzel'] [data-lfh='datensicht-baum-platz'],
+  [data-lfh='druckwurzel'] [data-lfh='datensicht-baum-text'] {
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
 }
