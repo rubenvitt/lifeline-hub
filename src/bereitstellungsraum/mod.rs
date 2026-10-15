@@ -201,6 +201,90 @@ pub fn etb_text_status(bezeichnung: &str, neuer_status: &str) -> Option<String> 
     }
 }
 
+/// System-ETB beim stillen Eintritt in einen Raum (Seitenleiste „zuweisen“) und beim Eintreffen,
+/// dessen Zeitachsen-Ereignis ausgelassen wurde oder das ein Fahrzeug bucht (LLH-1075, D5).
+pub fn etb_text_eintritt(name: &str, bezeichnung: &str) -> String {
+    format!("{name} tritt in Bereitstellungsraum {bezeichnung} ein")
+}
+
+/// System-ETB beim Eintreffen einer bekannten Einheit, deren Eintreffen die Zeitachse geschrieben
+/// hat (LLH-1075, design.md D5).
+pub fn etb_text_eingetroffen(name: &str, bezeichnung: &str) -> String {
+    format!("{name} im BR {bezeichnung} eingetroffen")
+}
+
+/// Ein Fahrzeug einer unangemeldeten Kraft, so weit es in Meldung und ETB steht.
+#[derive(Debug, Clone, Copy)]
+pub struct FahrzeugAngabe<'a> {
+    pub funkrufname: &'a str,
+    pub fahrzeugtyp: Option<&'a str>,
+    pub organisation: Option<&'a str>,
+}
+
+/// Inhalt von Meldung und ETB einer unangemeldeten Kraft (LLH-1075, design.md D5/D6).
+#[derive(Debug, Clone, Copy)]
+pub struct UnangemeldetAngabe<'a> {
+    /// Mindestens ein Fahrzeug; das erste gibt Funkrufname, Organisation und Typ.
+    pub fahrzeuge: &'a [FahrzeugAngabe<'a>],
+    pub staerke: Option<crate::staerke::Staerke>,
+    pub br_bezeichnung: &'a str,
+    /// Abschnitt des Raums.
+    pub abschnitt: Option<&'a str>,
+}
+
+fn gesetzt(wert: Option<&str>) -> Option<&str> {
+    wert.map(str::trim).filter(|s| !s.is_empty())
+}
+
+/// „<Funkrufname> (<Organisation>, <Typ>) [mit <weitere>] unangemeldet im BR <Bezeichnung>
+/// eingetroffen, Stärke <F/UF/M//Σ>. Abschnitt <Name>. Übernahme offen.“ Teile ohne Wert entfallen.
+/// Die Bemerkung steht nie darin: sie ist freier Text an der Einheit und wird geschwärzt, das ETB
+/// nicht (design.md D5).
+pub fn meldung_text_unangemeldet(a: &UnangemeldetAngabe<'_>) -> String {
+    let mut text = absender_text(a.fahrzeuge);
+    if let Some(erstes) = a.fahrzeuge.first() {
+        let klammer: Vec<&str> = [gesetzt(erstes.organisation), gesetzt(erstes.fahrzeugtyp)]
+            .into_iter()
+            .flatten()
+            .collect();
+        if !klammer.is_empty() {
+            text.push_str(&format!(" ({})", klammer.join(", ")));
+        }
+    }
+    let weitere: Vec<&str> = a
+        .fahrzeuge
+        .iter()
+        .skip(1)
+        .map(|f| f.funkrufname.trim())
+        .collect();
+    if !weitere.is_empty() {
+        text.push_str(&format!(" mit {}", weitere.join(", ")));
+    }
+    text.push_str(&format!(
+        " unangemeldet im BR {} eingetroffen",
+        a.br_bezeichnung
+    ));
+    if let Some(s) = a.staerke {
+        text.push_str(&format!(", Stärke {}", s.anzeige()));
+    }
+    text.push('.');
+    if let Some(abschnitt) = gesetzt(a.abschnitt) {
+        text.push_str(&format!(" Abschnitt {abschnitt}."));
+    }
+    text.push_str(" Übernahme offen.");
+    text
+}
+
+/// Absender der Meldung: der Funkrufname des ersten Fahrzeugs (≤ `etb::PARTEI_MAX`, weil
+/// `fahrzeug::ADHOC_TEXT_MAX` kleiner ist). Der Raum steht im Inhalt, nicht im Absender: seine
+/// Bezeichnung ist unbegrenzt.
+pub fn absender_text(fahrzeuge: &[FahrzeugAngabe<'_>]) -> String {
+    fahrzeuge
+        .first()
+        .map(|f| f.funkrufname.trim().to_string())
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -216,5 +300,92 @@ mod etb_text_tests {
             Some("Bereitstellungsraum BR Sportplatz aufgelöst")
         );
         assert_eq!(etb_text_status("BR Sportplatz", "geplant"), None);
+    }
+
+    fn fz<'a>(fr: &'a str, typ: Option<&'a str>, org: Option<&'a str>) -> FahrzeugAngabe<'a> {
+        FahrzeugAngabe {
+            funkrufname: fr,
+            fahrzeugtyp: typ,
+            organisation: org,
+        }
+    }
+
+    #[test]
+    fn eintritt_und_eingetroffen() {
+        assert_eq!(
+            etb_text_eingetroffen("HLF 20 FF Musterstadt", "Sportplatz"),
+            "HLF 20 FF Musterstadt im BR Sportplatz eingetroffen"
+        );
+        assert_eq!(
+            etb_text_eintritt("HLF 20 FF Musterstadt", "Sportplatz"),
+            "HLF 20 FF Musterstadt tritt in Bereitstellungsraum Sportplatz ein"
+        );
+    }
+
+    #[test]
+    fn unangemeldet_alle_teile() {
+        let f = [fz("FL-MUS 1-44-1", Some("HLF 20"), Some("FF Musterstadt"))];
+        let a = UnangemeldetAngabe {
+            fahrzeuge: &f,
+            staerke: Some(crate::staerke::Staerke::neu(1, 1, 7)),
+            br_bezeichnung: "Sportplatz",
+            abschnitt: Some("Nord"),
+        };
+        assert_eq!(
+            meldung_text_unangemeldet(&a),
+            "FL-MUS 1-44-1 (FF Musterstadt, HLF 20) unangemeldet im BR Sportplatz eingetroffen, \
+             Stärke 1/1/7//9. Abschnitt Nord. Übernahme offen."
+        );
+        assert_eq!(absender_text(&f), "FL-MUS 1-44-1");
+    }
+
+    #[test]
+    fn unangemeldet_ohne_organisation_ohne_staerke_ohne_abschnitt() {
+        let f = [fz("FL-MUS 1-44-1", Some("HLF 20"), None)];
+        let a = UnangemeldetAngabe {
+            fahrzeuge: &f,
+            staerke: None,
+            br_bezeichnung: "Sportplatz",
+            abschnitt: None,
+        };
+        assert_eq!(
+            meldung_text_unangemeldet(&a),
+            "FL-MUS 1-44-1 (HLF 20) unangemeldet im BR Sportplatz eingetroffen. Übernahme offen."
+        );
+        let f = [fz("FL-MUS 1-44-1", Some("  "), Some(""))];
+        let a = UnangemeldetAngabe {
+            fahrzeuge: &f,
+            abschnitt: Some(" "),
+            ..a
+        };
+        assert_eq!(
+            meldung_text_unangemeldet(&a),
+            "FL-MUS 1-44-1 unangemeldet im BR Sportplatz eingetroffen. Übernahme offen."
+        );
+        let f = [fz("FL-MUS 1-44-1", None, Some("FF Musterstadt"))];
+        let a = UnangemeldetAngabe { fahrzeuge: &f, ..a };
+        assert!(meldung_text_unangemeldet(&a)
+            .starts_with("FL-MUS 1-44-1 (FF Musterstadt) unangemeldet"));
+    }
+
+    #[test]
+    fn unangemeldet_zwei_fahrzeuge() {
+        let f = [
+            fz("FL-MUS 1-44-1", Some("HLF 20"), Some("FF Musterstadt")),
+            fz("FL-MUS 1-19-1", Some("ELW 1"), Some("FF Musterstadt")),
+            fz("FL-MUS 1-11-1", None, None),
+        ];
+        let a = UnangemeldetAngabe {
+            fahrzeuge: &f,
+            staerke: None,
+            br_bezeichnung: "Sportplatz",
+            abschnitt: None,
+        };
+        assert_eq!(
+            meldung_text_unangemeldet(&a),
+            "FL-MUS 1-44-1 (FF Musterstadt, HLF 20) mit FL-MUS 1-19-1, FL-MUS 1-11-1 unangemeldet \
+             im BR Sportplatz eingetroffen. Übernahme offen."
+        );
+        assert_eq!(absender_text(&f), "FL-MUS 1-44-1");
     }
 }

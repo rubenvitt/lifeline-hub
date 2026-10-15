@@ -526,10 +526,7 @@ async fn belegungs_etb_text(
     };
 
     let text = match event.art.as_str() {
-        "eintritt" => format!(
-            "{} tritt in Bereitstellungsraum {} ein",
-            obj_name, br_bezeichnung
-        ),
+        "eintritt" => crate::bereitstellungsraum::etb_text_eintritt(&obj_name, br_bezeichnung),
         "wechsel" => format!(
             "{} wechselt zu Bereitstellungsraum {}",
             obj_name, br_bezeichnung
