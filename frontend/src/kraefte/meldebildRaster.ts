@@ -23,6 +23,7 @@ import {
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
 import { statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { isAufgebraucht, materialDarstellung, mengeText } from './materialPosten';
+import { materialAusfall } from './materialVerdichtungKern';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
 import {
   needsOhneFahrzeugKnoten,
@@ -162,9 +163,12 @@ export interface RasterZeile {
   besatzung: BesatzungAnzeige | null;
   /** Nur Personenzeilen. */
   person: PersonAnzeige | null;
-  /** Nur Gruppenzeilen („Ohne Fahrzeug“, „Material“): Anzahl und Ausfall. */
+  /** Nur Gruppenzeilen („Ohne Fahrzeug“, „Material“, „Beladung“): Anzahl und Ausfall. */
   gruppe: { anzahl: number; ausfall: number } | null;
-  /** Nur Einheitenzeilen: Materialausfall der EIGENEN Posten (D6, tönt die Zeile). */
+  /**
+   * Nur Einheitenzeilen: Materialausfall der EIGENEN Posten samt Beladung der eigenen Fahrzeuge
+   * (D6, LLH-1225 D14; tönt die Zeile).
+   */
   materialAusfall: number;
   children?: RasterZeile[];
 }
@@ -388,9 +392,10 @@ function personZeile(x: PersonImBaum): RasterZeile {
 }
 
 /**
- * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit Besatzung → „Ohne
- * Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen direkt) → Material als Gruppe.
- * `zweig` macht die Schlüssel der Gruppenzeilen eindeutig (`ofz-<id>`, `mtl-<id>`).
+ * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit Besatzung und Beladung
+ * (`bel-<Fahrzeug>`, LLH-1225 D14) → „Ohne Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen
+ * direkt) → Material als Gruppe. `zweig` macht die Schlüssel der Gruppenzeilen eindeutig
+ * (`ofz-<id>`, `mtl-<id>`).
  */
 function mittelZeilen(
   m: MittelDerEinheit,
@@ -399,7 +404,13 @@ function mittelZeilen(
 ): RasterZeile[] {
   const zeilen: RasterZeile[] = m.fahrzeuge.map((f): RasterZeile => {
     const ef = f.fahrzeug;
-    const besatzung = f.besatzung.map(personZeile);
+    // Nach der Besatzung die Beladung (LLH-1225 D14).
+    const kinder = [
+      ...f.besatzung.map(personZeile),
+      ...(f.beladung.length > 0
+        ? [materialGruppe(`bel-${ef.id}`, 'Beladung', f.beladung, f.beladungAusfall)]
+        : []),
+    ];
     return {
       ...LEER,
       key: `ef-${ef.id}`,
@@ -417,7 +428,7 @@ function mittelZeilen(
         organisation: ef.tz_organisation ?? null,
       },
       besatzung: { ist: f.ist, soll: f.soll, urteil: f.urteil, fremd: f.fremd },
-      children: besatzung.length > 0 ? besatzung : undefined,
+      children: kinder.length > 0 ? kinder : undefined,
     };
   });
   const personen = m.ohneFahrzeug.map(personZeile);
@@ -436,26 +447,39 @@ function mittelZeilen(
     zeilen.push(...personen);
   }
   if (m.material.length > 0) {
-    zeilen.push({
-      ...LEER,
-      key: `mtl-${zweig}`,
-      art: 'material-gruppe',
-      bezeichnung: 'Material',
-      zusatz: null,
-      status: null,
-      gruppe: { anzahl: m.material.length, ausfall: m.materialAusfall },
-      children: m.material.map((em): RasterZeile => ({
-        ...LEER,
-        key: `em-${em.id}`,
-        art: 'material',
-        mittelId: em.id,
-        bezeichnung: em.bezeichnung,
-        zusatz: null,
-        status: materialZustand(em),
-      })),
-    });
+    // Die Gruppe zählt nur ihre Posten; `m.materialAusfall` trägt auch die Beladung (D14).
+    zeilen.push(
+      materialGruppe(`mtl-${zweig}`, 'Material', m.material, materialAusfall(m.material)),
+    );
   }
   return zeilen;
+}
+
+/** Eine Gruppenzeile mit Posten: „Material“ eines Zweigs oder „Beladung“ eines Fahrzeugs. */
+function materialGruppe(
+  key: string,
+  bezeichnung: 'Material' | 'Beladung',
+  material: readonly EinsatzMaterial[],
+  ausfall: number,
+): RasterZeile {
+  return {
+    ...LEER,
+    key,
+    art: 'material-gruppe',
+    bezeichnung,
+    zusatz: null,
+    status: null,
+    gruppe: { anzahl: material.length, ausfall },
+    children: material.map((em): RasterZeile => ({
+      ...LEER,
+      key: `em-${em.id}`,
+      art: 'material',
+      mittelId: em.id,
+      bezeichnung: em.bezeichnung,
+      zusatz: null,
+      status: materialZustand(em),
+    })),
+  };
 }
 
 export interface RasterEingabe extends Rohdaten {

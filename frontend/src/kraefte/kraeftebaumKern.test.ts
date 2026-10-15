@@ -11,6 +11,7 @@ import {
   einheitenBaum,
   kraeftebaum,
   accumulateStaerke,
+  materialImBaum,
   mittelDerEinheit,
   schluesselBisStufe,
   schluesselZumSprung,
@@ -851,5 +852,105 @@ describe('schluesselZumSprung', () => {
   it('eine Einheit ohne Kinder öffnet nur ihre Vorfahren', () => {
     const flach: StufenZeile[] = [z('eh-1', 'einheit', [z('eh-2', 'einheit')])];
     expect(schluesselZumSprung(flach, 'eh-2')).toEqual(['eh-1']);
+  });
+});
+
+// ── LLH-1225 D14: Material dort, wo es ist ──────────────────────────────────
+
+/** Ein Posten an einem Ort (LLH-1224: genau eine Ort-Spalte gesetzt). */
+const mo = (
+  id: number,
+  ort: Partial<Pick<EinsatzMaterial, 'einheit_id' | 'einsatz_fahrzeug_id' | 'uhs_id' | 'br_id'>>,
+  status: EinsatzMaterial['status'] = 'einsatzbereit',
+) =>
+  ({
+    ...mt(id, null, status),
+    einsatz_fahrzeug_id: null,
+    uhs_id: null,
+    br_id: null,
+    ...ort,
+  }) as EinsatzMaterial;
+
+describe('materialImBaum (LLH-1225 D14)', () => {
+  const fahrzeuge = [fz(10, 1), fz(20, null)];
+
+  it('ordnet jeden Posten über seinen Ort: Einheit, Fahrzeug, ohne Ort; UHS und BR nicht', () => {
+    expect(materialImBaum(mo(1, { einheit_id: 1 }), fahrzeuge)).toEqual({
+      art: 'einheit',
+      einheitId: 1,
+    });
+    expect(materialImBaum(mo(2, { einsatz_fahrzeug_id: 10 }), fahrzeuge)).toEqual({
+      art: 'fahrzeug',
+      fahrzeugId: 10,
+    });
+    expect(materialImBaum(mo(3, {}), fahrzeuge)).toEqual({ art: 'ohne-einheit' });
+    expect(materialImBaum(mo(4, { uhs_id: 3 }), fahrzeuge)).toBeNull();
+    expect(materialImBaum(mo(5, { br_id: 2 }), fahrzeuge)).toBeNull();
+  });
+
+  it('Beladung eines Fahrzeugs, das nicht im Baum steht, steht auch nicht im Baum', () => {
+    expect(materialImBaum(mo(6, { einsatz_fahrzeug_id: 99 }), fahrzeuge)).toBeNull();
+  });
+});
+
+describe('kraeftebaum — Beladung und Material am Ort (LLH-1225 D14)', () => {
+  const einheiten = [eh(1, 10, null, { name: 'Zug' })];
+  const fahrzeuge = [fz(10, 1, 'LF 1'), fz(20, null, 'MTW')];
+  const material = [
+    mo(1, { einheit_id: 1 }),
+    mo(2, { einsatz_fahrzeug_id: 10 }, 'defekt'),
+    mo(3, { einsatz_fahrzeug_id: 10 }),
+    mo(4, { einsatz_fahrzeug_id: 20 }, 'verbraucht'),
+    mo(5, { uhs_id: 3 }, 'defekt'),
+    mo(6, { br_id: 2 }),
+    mo(7, {}),
+  ];
+  const wurzeln = kraeftebaum({
+    abschnitte: [ab(10)],
+    einheiten,
+    personal: [],
+    fahrzeuge,
+    material,
+  });
+  const zug = wurzeln[0];
+  const ohne = wurzeln[wurzeln.length - 1];
+  if (zug.art !== 'einheit' || ohne.art !== 'ohne-einheit') throw new Error('Wurzeln erwartet');
+
+  it('Beladung steht unter ihrem Fahrzeug, die Gruppe „Material“ trägt nur die eigenen Posten', () => {
+    expect(zug.knoten.mittel.material.map((m) => m.id)).toEqual([1]);
+    const lf = zug.knoten.mittel.fahrzeuge[0];
+    expect(lf.beladung.map((m) => m.id)).toEqual([2, 3]);
+    expect(lf.beladungAusfall).toBe(1);
+  });
+
+  it('defekte Beladung tönt die Einheit: ihr Ausfall zählt die Beladung der eigenen Fahrzeuge', () => {
+    expect(zug.knoten.mittel.materialAusfall).toBe(1);
+  });
+
+  it('ein Fahrzeug ohne Einheit trägt seine Beladung unter „Ohne Einheit“', () => {
+    expect(ohne.mittel.fahrzeuge[0].beladung.map((m) => m.id)).toEqual([4]);
+    expect(ohne.mittel.materialAusfall).toBe(1);
+  });
+
+  it('„Ohne Einheit“ nimmt nur Material ohne Ort; UHS und BR stehen nicht im Baum', () => {
+    expect(ohne.mittel.material.map((m) => m.id)).toEqual([7]);
+    const alle = [
+      ...zug.knoten.mittel.material,
+      ...zug.knoten.mittel.fahrzeuge.flatMap((f) => f.beladung),
+      ...ohne.mittel.material,
+      ...ohne.mittel.fahrzeuge.flatMap((f) => f.beladung),
+    ].map((m) => m.id);
+    expect(alle.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 7]);
+  });
+
+  it('mittelDerEinheit ordnet nach dem Ort: Beladung an den eigenen Fahrzeugen, keine fremde', () => {
+    const roh = { einheiten, personal: [], fahrzeuge, material };
+    const m = mittelDerEinheit(1, roh);
+    expect(m.material.map((x) => x.id)).toEqual([1]);
+    expect(m.fahrzeuge.map((f) => f.beladung.map((x) => x.id))).toEqual([[2, 3]]);
+    expect(m.materialAusfall).toBe(1);
+    const o = mittelDerEinheit(null, roh);
+    expect(o.material.map((x) => x.id)).toEqual([7]);
+    expect(o.fahrzeuge.map((f) => f.beladung.map((x) => x.id))).toEqual([[4]]);
   });
 });
