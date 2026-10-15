@@ -1,6 +1,7 @@
-//! Update der Hülle (desktop-auslieferung). Quelle ist `latest.json` am neuesten STABILEN
-//! Release (Endpunkt in `tauri.conf.json`); die Signatur prüft der Updater gegen den dort
-//! hinterlegten öffentlichen Schlüssel.
+//! Update der Hülle (desktop-auslieferung). Quelle ist `latest.json`: für eine stabile Hülle am
+//! neuesten STABILEN Release (Endpunkt in `tauri.conf.json`), für eine Hülle mit Vorabversion im
+//! Alpha-Kanal (`ALPHA_KANAL`, LLH-1280). Die Signatur prüft der Updater in beiden Fällen gegen
+//! den öffentlichen Schlüssel aus `tauri.conf.json`.
 //!
 //! Nie ohne Zustimmung, und zweimal gefragt: erst ob geladen wird, dann — wenn das Update da
 //! ist — ob JETZT neu gestartet wird. Der Download dauert im ELW-Uplink Sekunden bis Minuten, und
@@ -14,11 +15,32 @@ use std::time::Duration;
 
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
-use tauri_plugin_updater::{Update, UpdaterExt};
+use tauri_plugin_updater::{Update, Updater, UpdaterExt};
 
 /// Obergrenze für die Prüfung. Im Einsatz-LAN ohne Internet endet sie sonst erst mit dem
 /// TCP-Timeout des Systems.
 const FRIST: Duration = Duration::from_secs(10);
+
+/// Manifest des Alpha-Kanals, fortgeschrieben vom Job `desktop-kanal` in `artefakte.yml`. Es
+/// zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, auch auf ein stabiles: eine
+/// Alpha-Hülle wird so mit 1.0.0 zur stabilen und liest danach den stabilen Endpunkt.
+const ALPHA_KANAL: &str =
+    "https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json";
+
+/// Endpunkt für die installierte Version: der Alpha-Kanal bei einer Vorabversion (SemVer: `-`
+/// vor einem `+`), sonst `None` für den aus `tauri.conf.json`.
+fn kanal_fuer(version: &str) -> Option<&'static str> {
+    let ohne_build = version.split('+').next().unwrap_or(version);
+    ohne_build.contains('-').then_some(ALPHA_KANAL)
+}
+
+fn updater(app: &AppHandle) -> tauri_plugin_updater::Result<Updater> {
+    let mut builder = app.updater_builder().timeout(FRIST);
+    if let Some(kanal) = kanal_fuer(&app.package_info().version.to_string()) {
+        builder = builder.endpoints(vec![tauri::Url::parse(kanal)?])?;
+    }
+    builder.build()
+}
 
 /// Läuft gerade eine Prüfung, ein Dialog oder ein Download? Dann startet kein zweiter.
 static LAEUFT: AtomicBool = AtomicBool::new(false);
@@ -52,7 +74,7 @@ async fn pruefen(app: AppHandle, auf_wunsch: bool) {
     let Some(sperre) = Sperre::nehmen() else {
         return;
     };
-    let ergebnis = match app.updater_builder().timeout(FRIST).build() {
+    let ergebnis = match updater(&app) {
         Ok(updater) => updater.check().await,
         Err(fehler) => Err(fehler),
     };
@@ -161,4 +183,31 @@ fn melden(app: &AppHandle, art: MessageDialogKind, text: String) {
         .kind(art)
         .buttons(MessageDialogButtons::Ok)
         .show(|_| {});
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vorabversion_liest_den_alpha_kanal() {
+        assert_eq!(kanal_fuer("1.0.0-alpha.130"), Some(ALPHA_KANAL));
+        assert_eq!(kanal_fuer("1.1.0-beta.2+abc"), Some(ALPHA_KANAL));
+    }
+
+    #[test]
+    fn stabile_version_bleibt_beim_endpunkt_aus_der_konfiguration() {
+        assert_eq!(kanal_fuer("1.0.0"), None);
+        // Bindestrich nur in den Build-Metadaten: keine Vorabversion.
+        assert_eq!(kanal_fuer("1.0.0+build-7"), None);
+    }
+
+    #[test]
+    fn alpha_kanal_ist_https_und_parsebar() {
+        let url = tauri::Url::parse(ALPHA_KANAL).expect("feste URL");
+        assert_eq!(url.scheme(), "https");
+        assert!(url
+            .path()
+            .ends_with("/releases/download/desktop-alpha/latest.json"));
+    }
 }
