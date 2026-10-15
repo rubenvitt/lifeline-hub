@@ -5,7 +5,9 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
+use crate::nachforderung::{
+    repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT, STATUS_EINGETROFFEN,
+};
 use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
@@ -178,6 +180,14 @@ pub async fn status(
             "Übergang {} → {neu} nicht erlaubt",
             aktuell.status.as_str()
         )));
+    }
+    // Was übernommen ist, ist da (LLH-1226, design.md D9): keine Rücknahme mit Materialposten.
+    if aktuell.status.as_str() == STATUS_EINGETROFFEN
+        && repo::has_material(&state.pool, nachforderung_id).await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Aus der Nachforderung ist Material übernommen".into(),
+        ));
     }
     // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
     if !repo::update_status(

@@ -219,7 +219,10 @@ pub async fn check_uebernahme_tx(
 /// das UPDATE greift NUR, wenn er unverändert ist (optimistische Sperre gegen TOCTOU —
 /// die FSM ist back-edge-frei, daher kann der Guard keinen gültigen Übergang fälschlich
 /// abweisen). Liefert `true`, wenn eine Zeile geändert wurde; `false` = Status zwischenzeitlich
-/// geändert. `abgelehnt` läuft über [`lehne_ab`].
+/// geändert. `abgelehnt` läuft über [`lehne_ab`]. Die Rücknahme aus `eingetroffen` greift
+/// zusätzlich nur ohne zählenden Materialposten (LLH-1226, design.md D9), damit eine gleichzeitige
+/// Übernahme keine zurückgenommene Nachforderung mit Posten hinterlässt; die verständliche 422
+/// prüft der Handler vorher über [`has_material`].
 pub async fn update_status(
     pool: &SqlitePool,
     id: i64,
@@ -233,9 +236,15 @@ pub async fn update_status(
         super::STATUS_EINGETROFFEN => "eingetroffen_at",
         _ => return Err(AppError::Validation("Ungültiger Zielstatus".into())),
     };
+    let ohne_posten = if erwartet == super::STATUS_EINGETROFFEN {
+        " AND NOT EXISTS (SELECT 1 FROM einsatz_material em \
+           WHERE em.nachforderung_id = nachforderung.id AND em.beendet_als IS NOT 'storniert')"
+    } else {
+        ""
+    };
     let sql = format!(
         "UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) \
-         WHERE id = ? AND status = ?"
+         WHERE id = ? AND status = ?{ohne_posten}"
     );
     let r = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(neuer_status)
@@ -493,5 +502,58 @@ mod tests {
         };
         assert_eq!(aus_liste(n.id), vec![p1, p3]);
         assert_eq!(aus_liste(andere.id), vec![fremd]);
+    }
+
+    /// LLH-1226, design.md D9: das UPDATE der Rücknahme greift nicht, solange ein zählender
+    /// Posten verknüpft ist (gegen eine gleichzeitige Übernahme); ein stornierter sperrt nicht.
+    #[tokio::test]
+    async fn update_status_nimmt_eingetroffen_mit_posten_nicht_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("Tauchpumpe", "3 Tauchpumpen"))
+            .await
+            .unwrap();
+        for (neu, alt) in [
+            (STATUS_ZUGESAGT, STATUS_ANGEFORDERT),
+            (STATUS_UNTERWEGS, STATUS_ZUGESAGT),
+            (STATUS_EINGETROFFEN, STATUS_UNTERWEGS),
+        ] {
+            assert!(update_status(&pool, n.id, neu, alt, "2026-10-15 09:00:00")
+                .await
+                .unwrap());
+        }
+        let p = posten(&pool, e, n.id, None).await;
+        assert!(has_material(&pool, n.id).await.unwrap());
+        assert!(!update_status(
+            &pool,
+            n.id,
+            STATUS_UNTERWEGS,
+            STATUS_EINGETROFFEN,
+            "2026-10-15 09:10:00"
+        )
+        .await
+        .unwrap());
+        assert_eq!(
+            load(&pool, n.id).await.unwrap().status,
+            NachforderungStatus::Eingetroffen
+        );
+        sqlx::query(
+            "UPDATE einsatz_material SET beendet_at = '2026-10-15 09:05:00', \
+             beendet_als = 'storniert' WHERE id = ?",
+        )
+        .bind(p)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(!has_material(&pool, n.id).await.unwrap());
+        assert!(update_status(
+            &pool,
+            n.id,
+            STATUS_UNTERWEGS,
+            STATUS_EINGETROFFEN,
+            "2026-10-15 09:10:00"
+        )
+        .await
+        .unwrap());
     }
 }
