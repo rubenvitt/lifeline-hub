@@ -26,6 +26,7 @@ import { dauerText } from '../../kraefte/zeitachse';
 import { wartezeitMinuten } from './brBelegungKern';
 import BrAnlegenDrawer from './BrAnlegenDrawer';
 import { KennungsLink } from '../../components/kennungsLink';
+import { useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
 
 export default function BereitstellungsraeumePage() {
@@ -48,6 +49,7 @@ export default function BereitstellungsraeumePage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
   const jetzt = useUhr(60_000);
+  const { rollen } = useRollen();
 
   const [anlegen, setAnlegen] = useState(false);
 
@@ -109,8 +111,12 @@ export default function BereitstellungsraeumePage() {
       align: 'right',
       render: (_: unknown, br) => {
         const { staerke, unvollstaendig } = staerkeImRaum(br.einheit_ids, einheitenQuery.data);
+        // Der Grund steht sichtbar an der Zelle wie auf der Detailseite (Ton achtung), nie nur
+        // als Tooltip: sonst sähe „unvollständig“ aus wie ein leerer Raum (D1, Touch).
         return unvollstaendig ? (
-          <span title="Stärke unvollständig">—</span>
+          <span data-lfh="br-staerke-unvollstaendig" style={{ color: rollen.achtungText }}>
+            — unvollständig
+          </span>
         ) : (
           <StaerkeAnzeige wert={staerke} />
         );

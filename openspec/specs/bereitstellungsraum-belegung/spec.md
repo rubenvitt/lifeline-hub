@@ -215,7 +215,8 @@ Die Liste der Bereitstellungsräume SHALL je Raum neben Bezeichnung, Status und 
 Spalten Abschnitt, Stärke, Fahrzeuge, Einheiten und Längste Wartezeit zeigen. Die Werte MUST
 denen der Detailseite desselben Raums gleichen; die Stärke MUST über dieselbe Summenfunktion und
 Formatierung wie die Detailseite entstehen. Ist die Einheitenliste nicht verfügbar oder fehlt
-eine Einheit des Raums darin, MUST „Stärke“ „—“ zeigen.
+eine Einheit des Raums darin, MUST „Stärke“ „—“ mit dem sichtbaren Grund „unvollständig“ zeigen,
+nicht nur als Tooltip; ein leerer Raum zeigt nur „—“.
 
 #### Scenario: Liste und Detail
 - **WHEN** der BR Sportplatz zwei Einheiten (0/1/5//6 zusammen) mit je einem Fahrzeug und ein

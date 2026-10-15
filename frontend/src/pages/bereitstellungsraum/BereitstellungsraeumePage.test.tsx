@@ -490,11 +490,13 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('0/1/3//4'));
   });
 
-  it('ohne Einheitenliste (403) steht in „Stärke“ „—“ mit Grund', async () => {
+  it('ohne Einheitenliste (403) steht in „Stärke“ „—“ mit sichtbarem Grund', async () => {
     stelleBereit([SPORTPLATZ], () => new HttpResponse(null, { status: 403 }));
     renderPage();
-    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('—'));
-    expect(screen.getByTitle('Stärke unvollständig')).toBeInTheDocument();
+    // Sichtbar an der Zelle, nicht nur als Tooltip (Touch): ein leerer Raum zeigt nur „—“.
+    await waitFor(async () =>
+      expect((await zeileVon('BR Sportplatz')).Stärke).toBe('— unvollständig'),
+    );
     expect((await zeileVon('BR Sportplatz')).Fahrzeuge).toBe('3');
   });
 
@@ -509,7 +511,7 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
       Einheiten: '0',
       'Längste Wartezeit': '—',
     });
-    expect(screen.queryByTitle('Stärke unvollständig')).not.toBeInTheDocument();
+    expect(screen.queryByText(/unvollständig/)).not.toBeInTheDocument();
   });
 
   it.each(['Abschnitt', 'Standort'])(
