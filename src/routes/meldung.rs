@@ -7,6 +7,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveEvent;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
@@ -171,6 +172,9 @@ pub async fn detail(
 pub struct NeueMeldung {
     pub absender: String,
     pub empfaenger: Option<String>,
+    /// Empfängerfunktion aus dem Katalog (LLH-1214): nur Leitung und Sachgebiete, S7 nur mit
+    /// Org-Schalter ([`empfaenger_funktion_pruefen`]). Leer = keine.
+    pub empfaenger_funktion: Option<String>,
     pub meldeweg: String,
     pub inhalt: String,
     pub meldungsart: Option<String>,
@@ -238,6 +242,38 @@ async fn absender_bezug_aufloesen(
     Ok((einheit_id, abschnitt_id))
 }
 
+/// Prüft die Empfängerfunktion einer Meldung (Statuscode-Konvention, `src/AGENTS.md`): ein Code
+/// außerhalb des Katalogs ist ein unbekannter Enum-Wert (400). Führungshilfspersonal und
+/// Fachberater brauchen eine Bezeichnung, die die Meldung nicht trägt, und S7 gilt nur mit
+/// Org-Schalter: beides ist ein Fehler des Zusammenhangs (422). Leer = keine Funktion.
+async fn empfaenger_funktion_pruefen(
+    state: &AppState,
+    org_id: i64,
+    code: Option<&str>,
+) -> Result<Option<Fuehrungsfunktion>, AppError> {
+    let Some(code) = code.map(str::trim).filter(|c| !c.is_empty()) else {
+        return Ok(None);
+    };
+    let funktion = parse_enum(
+        Fuehrungsfunktion::parse,
+        code,
+        "Unbekannte Empfängerfunktion",
+    )?;
+    if funktion.bezeichnung_pflicht() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{} kann nicht Empfänger einer Meldung sein",
+            funktion.standard_label()
+        )));
+    }
+    let s7_aktiv = {
+        let mut conn = state.pool.acquire().await?;
+        crate::fuehrung::repo::labelkarte(&mut conn, org_id)
+            .await?
+            .s7_aktiv
+    };
+    Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
+}
+
 /// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
 /// Meldungsstand sicher. Dadurch repariert auch ein Replay nach verlorener/fehlgeschlagener
 /// Reminder-Anlage den abgeleiteten Datensatz, ohne geänderte Request-Felder zu übernehmen.
@@ -256,6 +292,9 @@ async fn auto_frist_erinnerung_sicherstellen(
 /// Liefert das Live-Buendel einer persistierten Meldung at-least-once aus. Der DB-Marker wird
 /// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
 /// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
+///
+/// Wer das Bündel zustellt, meldet danach auch die Benachrichtigung an die Empfängerfunktion
+/// (LLH-1214, `meldung::benachrichtigung`): so genau einmal je Meldung, auch bei einem Replay.
 async fn live_publikation_sicherstellen(
     state: &AppState,
     meldung: &MeldungAnzeige,
@@ -263,19 +302,22 @@ async fn live_publikation_sicherstellen(
     let einsatz_id = meldung.einsatz_id;
     let meldung_id = meldung.id;
     let etb_id = meldung.etb_meldung_id;
-    let ist_sofort = meldung.meldungsart.as_str() == ART_SOFORTMELDUNG
-        || meldung.prioritaet.as_str() == PRIO_SOFORT;
+    let ist_sofort = meldung.ist_sofort();
     let publiziert_at = jetzt();
-    repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
-        if let Some(etb_id) = etb_id {
-            state.live.publiziere(einsatz_id, etb_id);
-        }
-        sse(state, einsatz_id);
-        if ist_sofort {
-            sse_sofort(state, einsatz_id, meldung_id);
-        }
-    })
-    .await?;
+    let zugestellt =
+        repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
+            if let Some(etb_id) = etb_id {
+                state.live.publiziere(einsatz_id, etb_id);
+            }
+            sse(state, einsatz_id);
+            if ist_sofort {
+                sse_sofort(state, einsatz_id, meldung_id);
+            }
+        })
+        .await?;
+    if zugestellt {
+        crate::meldung::benachrichtigung::erfasst(&state.pool, &state.live, meldung).await;
+    }
     Ok(())
 }
 
@@ -367,6 +409,12 @@ pub async fn anlegen(
             ));
         }
     }
+    let empfaenger_funktion = empfaenger_funktion_pruefen(
+        &state,
+        ctx.einsatz.org_id,
+        req.empfaenger_funktion.as_deref(),
+    )
+    .await?;
     // Ein Abschnittsgerät (LFH-1043) meldet als sein Abschnitt; ein fremder Absender ist 403.
     let (einheit_id, abschnitt_id) =
         match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
@@ -416,6 +464,7 @@ pub async fn anlegen(
         repo::MeldungDaten {
             absender: &absender,
             empfaenger: trimme(&req.empfaenger),
+            empfaenger_funktion,
             meldeweg: req.meldeweg.trim(),
             inhalt: &inhalt,
             meldungsart,

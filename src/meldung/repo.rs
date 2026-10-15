@@ -8,6 +8,8 @@ use super::{meldungsart_gueltig, prioritaet_gueltig, LageMeldungAnzeige, Meldung
 pub struct MeldungDaten<'a> {
     pub absender: &'a str,
     pub empfaenger: Option<&'a str>,
+    /// Empfängerfunktion (LLH-1214), vom Handler gegen den Katalog geprüft.
+    pub empfaenger_funktion: Option<crate::fuehrung::Fuehrungsfunktion>,
     pub meldeweg: &'a str,
     pub inhalt: &'a str,
     pub meldungsart: &'a str,
@@ -70,7 +72,8 @@ macro_rules! quittung_join_sql {
 /// `ist_ueberfaellig` ist eine computed column mit `jetzt`-Vergleich → ihr `?` steht textuell
 /// VOR der WHERE-Klausel; alle Aufrufer binden `jetzt` als ERSTEN Parameter (Muster erinnerung).
 const ANZEIGE_SELECT: &str = concat!(
-    "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.meldeweg, m.inhalt, \
+    "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.empfaenger_funktion, \
+            m.meldeweg, m.inhalt, \
             m.meldungsart, m.prioritaet, m.richtung, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             EXISTS (SELECT 1 FROM auftrag a WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NOT NULL) \
@@ -362,10 +365,10 @@ async fn anlegen_mit_client_id_tx(
     // lfd_nr atomar je Einsatz (Muster etb/repo.rs); erste Nummer = Startwert aus Einstellungen.
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO meldung \
-           (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
-            prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
-            erfasst_von_id, client_id, einheit_id, abschnitt_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+           (einsatz_id, lfd_nr, absender, empfaenger, empfaenger_funktion, meldeweg, inhalt, \
+            meldungsart, prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, \
+            bestaetigung_frist_at, erfasst_von_id, client_id, einheit_id, abschnitt_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -373,6 +376,7 @@ async fn anlegen_mit_client_id_tx(
     .bind(meldung_startwert)
     .bind(daten.absender)
     .bind(daten.empfaenger)
+    .bind(daten.empfaenger_funktion.map(|f| f.as_str()))
     .bind(daten.meldeweg)
     .bind(daten.inhalt)
     .bind(daten.meldungsart)
@@ -1086,6 +1090,7 @@ mod tests {
         MeldungDaten {
             absender: "Florian Nord 1",
             empfaenger: Some("ELW 1"),
+            empfaenger_funktion: None,
             meldeweg: "funk",
             inhalt,
             meldungsart: ART_SOFORTMELDUNG,

@@ -982,6 +982,9 @@ export type MeldungKennzahlen = S['MeldungKennzahlen'];
 export interface NeueMeldung {
   absender: string;
   empfaenger?: string;
+  /** Empfängerfunktion aus dem Katalog (ohne Führungshilfspersonal/Fachberater); ihre Nutzer
+   * bekommen den Hinweis „Neue Meldung“. */
+  empfaenger_funktion?: Fuehrungsfunktion;
   meldeweg: MeldungMeldeweg;
   inhalt: string;
   meldungsart?: Meldungsart;
