@@ -1,4 +1,7 @@
 use crate::app::AppState;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
@@ -256,6 +259,11 @@ async fn auto_frist_erinnerung_sicherstellen(
 /// Liefert das Live-Buendel einer persistierten Meldung at-least-once aus. Der DB-Marker wird
 /// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
 /// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
+///
+/// Eine Sofortmeldung alarmiert danach über die Benachrichtigungen (LLH-1209, Spec
+/// `benachrichtigungen`, „Sofortmeldung alarmiert“): alle mit dem Modul Meldungen außer dem
+/// Erfasser. `melden` schreibt selbst, also erst nach dem Commit des Markers und nur, wenn
+/// dieser Aufruf ihn gesetzt hat: ein Replay alarmiert nicht noch einmal.
 async fn live_publikation_sicherstellen(
     state: &AppState,
     meldung: &MeldungAnzeige,
@@ -266,16 +274,31 @@ async fn live_publikation_sicherstellen(
     let ist_sofort = meldung.meldungsart.as_str() == ART_SOFORTMELDUNG
         || meldung.prioritaet.as_str() == PRIO_SOFORT;
     let publiziert_at = jetzt();
-    repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
-        if let Some(etb_id) = etb_id {
-            state.live.publiziere(einsatz_id, etb_id);
-        }
-        sse(state, einsatz_id);
-        if ist_sofort {
-            sse_sofort(state, einsatz_id, meldung_id);
-        }
-    })
-    .await?;
+    let jetzt_publiziert =
+        repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
+            if let Some(etb_id) = etb_id {
+                state.live.publiziere(einsatz_id, etb_id);
+            }
+            sse(state, einsatz_id);
+            if ist_sofort {
+                sse_sofort(state, einsatz_id, meldung_id);
+            }
+        })
+        .await?;
+    if jetzt_publiziert && ist_sofort {
+        benachrichtigung::melden(
+            &state.pool,
+            &state.live,
+            Anlass::neu(
+                einsatz_id,
+                BenachrichtigungArt::Sofortmeldung,
+                Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung_id),
+            )
+            .von(meldung.erfasst_von_id)
+            .an(Adressat::ModulLeser("meldungen")),
+        )
+        .await;
+    }
     Ok(())
 }
 
