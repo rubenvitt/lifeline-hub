@@ -2049,6 +2049,10 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
     const { client } = render(einsatz(), [], ef, [], [], { material: MATERIAL });
     await aufklappen();
     await screen.findByText('Kraft zur Besatzung …');
+    // Erst wenn die Freigaben geladen sind, sagt das Fehlen des Blocks etwas über das Gate.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(7))?.status).toBe('success'),
+    );
     expect(block()).toBeNull();
     // Nie abgefragt: weder Daten noch ein Abruf unter dem Schlüssel der Materialliste.
     expect(client.getQueryState(einsatzKeys.material(7))?.dataUpdatedAt ?? 0).toBe(0);

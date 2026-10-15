@@ -127,6 +127,23 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     expect(await screen.findByText('Wolldecke: 5 ausgegeben')).toBeInTheDocument();
   });
 
+  it('lehnt der Server „Ausgeben“ ab, bleibt der Dialog offen und nennt den Grund', async () => {
+    const gesendet = patchMitschnitt(() =>
+      HttpResponse.json({ error: 'Ausgabe übersteigt die Menge' }, { status: 422 }),
+    );
+    zeige();
+    await userEvent.click(
+      within(zeile('Wolldecke')).getByRole('button', { name: 'Wolldecke ausgeben' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge ausgeben' }), '5');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(await within(dialog).findByText('Ausgabe übersteigt die Menge')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(screen.queryByText('Wolldecke: 5 ausgegeben')).toBeNull();
+  });
+
   it('Lösen schickt das Ort-Feld leer, ohne Rückfrage; die Ablehnung steht an der Zeile', async () => {
     const gesendet = patchMitschnitt(() =>
       HttpResponse.json({ error: 'Material ist verliehen' }, { status: 409 }),

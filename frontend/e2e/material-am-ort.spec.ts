@@ -96,6 +96,8 @@ test('UHS-Reiter: Posten der Einheit zuordnen und Decken ausgeben; Einheit und E
   // Ausgeben an der UHS: die Zeile nennt den Rest.
   await zeile(page, 'Wolldecke').getByRole('button', { name: 'Wolldecke ausgeben' }).click();
   const ausgeben = page.getByRole('dialog', { name: 'Wolldecke ausgeben' });
+  // Erst nach der Zoom-Animation tippen: währenddessen kann der Klick ins Feld danebengehen.
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await ausgeben.getByRole('spinbutton', { name: 'Menge ausgeben' }).fill('5');
   await ausgeben.getByRole('button', { name: 'Ausgeben' }).click();
   await expect(ausgeben).toHaveCount(0);
