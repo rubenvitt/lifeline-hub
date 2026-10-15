@@ -215,6 +215,7 @@ async fn check_listen_entsprechen_dem_katalog() {
         ("einsatz_kommunikation_stelle", "funktion"),
         ("befehl_verteiler", "funktion"),
         ("lagebericht_verteiler", "funktion"),
+        ("chat_erwaehnung", "funktion"),
     ] {
         let sql: String =
             sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")

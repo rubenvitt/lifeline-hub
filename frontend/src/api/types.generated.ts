@@ -1451,6 +1451,13 @@ export interface components {
         };
         /** @description Material-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedMaterial: {
+            /**
+             * @description Gerät oder Verbrauchsgut (LLH-1224): mit `ausgegeben` erkennen Einheit-Ansicht und
+             *     Kräftebaum ohne Materialrecht ein aufgebrauchtes Verbrauchsgut.
+             */
+            art: components["schemas"]["MaterialArt"];
+            /** Format: int64 */
+            ausgegeben: number;
             bezeichnung: string;
             /**
              * Format: int64
@@ -1745,6 +1752,14 @@ export interface components {
          *     `menge` und `status` kommen **immer** aus der Dispositionszeile.
          */
         EinsatzMaterialAnzeige: {
+            /** @description Gerät oder Verbrauchsgut der Zeile, beim Disponieren aus dem Stamm kopiert (LLH-1224). */
+            art: components["schemas"]["MaterialArt"];
+            /**
+             * Format: int64
+             * @description Ausgegebene Menge eines Verbrauchsguts (0 bei Geräten); Rest = `menge − ausgegeben`. Ganz
+             *     ausgegeben heißt „aufgebraucht“ (LLH-1224, design.md D4).
+             */
+            ausgegeben: number;
             beendet_als?: components["schemas"]["BeendetAls"] | null;
             /**
              * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.
@@ -1757,14 +1772,25 @@ export interface components {
             bemerkung?: string | null;
             bestandsnummer?: string | null;
             bezeichnung: string;
+            /**
+             * Format: int64
+             * @description Ort Bereitstellungsraum; fehlt, wenn nicht gesetzt.
+             */
+            br_id?: number | null;
             disponiert_at: string;
             /** Format: int64 */
             disponiert_von?: number | null;
             /**
              * Format: int64
-             * @description Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position.
+             * @description Ort Einheit; höchstens eines von `einheit_id`, `einsatz_fahrzeug_id`, `uhs_id`, `br_id`
+             *     ist gesetzt, keines heißt „ohne Ort“ (LLH-1224, Spec `material-modell`).
              */
             einheit_id?: number | null;
+            /**
+             * Format: int64
+             * @description Ort Fahrzeug (Beladung, `einsatz_fahrzeug.id`); fehlt, wenn nicht gesetzt.
+             */
+            einsatz_fahrzeug_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */
@@ -1783,11 +1809,18 @@ export interface components {
             material_id?: number | null;
             /** Format: int64 */
             menge: number;
+            /**
+             * Format: int64
+             * @description Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec
+             *     `nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul
+             *     Nachforderungen. Fehlt ohne Bezug.
+             */
+            nachforderung_id?: number | null;
             status: components["schemas"]["MaterialStatus"];
             traegerorganisation?: string | null;
             /**
              * Format: int64
-             * @description Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet.
+             * @description Ort Unfallhilfsstelle.
              */
             uhs_id?: number | null;
         };
@@ -3212,6 +3245,11 @@ export interface components {
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
+            /**
+             * Format: int64
+             * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
+             */
+            sofortmeldungen_offen: number;
             /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
             stand_at: string;
             uhs: components["schemas"]["LagemonitorUhs"][];
@@ -3329,6 +3367,8 @@ export interface components {
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
+            /** @description Gerät oder Verbrauchsgut (LLH-1224); gilt für neue Dispositionen, nie rückwirkend. */
+            art: components["schemas"]["MaterialArt"];
             bemerkung?: string | null;
             bestandsnummer?: string | null;
             bezeichnung: string;
@@ -3341,6 +3381,14 @@ export interface components {
             standort?: string | null;
             traegerorganisation?: string | null;
         };
+        /**
+         * @description Art eines Materials (LLH-1224, Spec `material-modell`): ein einzeln verfolgtes Gerät steht
+         *     je Stück im Einsatz (Menge 1, alle fünf Status); ein Verbrauchsgut hat eine Menge, eine
+         *     Ausgabe und keine Status „verbraucht“ und „Desinfektion nötig“. Am Stamm die Vorgabe jeder
+         *     Disposition, an der Dispositionszeile eine eigene Spalte (design.md D1).
+         * @enum {string}
+         */
+        MaterialArt: "geraet" | "verbrauchsgut";
         /**
          * @description Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
          *     Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
@@ -3655,6 +3703,12 @@ export interface components {
             id: number;
             /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt'). */
             ist_offen: boolean;
+            /**
+             * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
+             *     Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
+             *     Bezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material.
+             */
+            material_ids: number[];
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
             unterwegs_at?: string | null;

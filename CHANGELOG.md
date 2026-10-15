@@ -1,3 +1,92 @@
+## [1.0.0-alpha.126](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.125...v1.0.0-alpha.126) (2026-10-15)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Für Benachrichtigungen kommt eine neue Tabelle hinzu. Sie wird beim Start automatisch eingespielt. Benachrichtigungen werden mit ihrem Einsatz gelöscht.
+- **Neue Schnittstellen für Benachrichtigungen:** Benachrichtigungen lassen sich auflisten, einzeln abrufen und quittieren. Neu ist auch eine Einstellung, mit der Nutzer einzelne Hinweis-Arten abschalten. Alarme lassen sich nicht abschalten.
+- **Personalliste ohne Zeilenaktionen:** Entlassen, Stornieren und die Zeitachse einer Person stehen jetzt in der neuen Personenansicht. Der Name in der Liste führt dorthin.
+- **Einheit-Ansicht ohne Formular:** Das Formular mit Speichern-Leiste entfällt. Jede Angabe wird einzeln an ihrem Wert bearbeitet und gespeichert.
+
+### Aufträge und Befehle
+
+- **Benachrichtigungen zu Aufträgen:** Wird ein Auftrag erteilt (direkt, aus dem Einsatztagebuch, aus einer Meldung oder aus dem Chat), erhalten Funktionen und Personen unter den Empfängern eine Benachrichtigung. Wird ein Auftrag berichtigt, werden nur neu hinzugekommene Empfänger benachrichtigt.
+- Der Auftraggeber erfährt, wenn ein Empfänger den Auftrag zum ersten Mal quittiert und wenn der Auftrag erledigt ist. Eine wiederholte Quittung löst keine weitere Benachrichtigung aus.
+- Wer selbst handelt, wird über die eigene Aktion nicht benachrichtigt.
+
+### Benachrichtigungen
+
+- Neues Grundgerüst für Benachrichtigungen mit festen Stufen je Art. Gerätekonten, inaktive Konten und Nutzer ohne Leserecht am Einsatz oder am betroffenen Modul erhalten keine Benachrichtigung.
+- Beim Lesen werden die Rechte erneut geprüft.
+- Benachrichtigungen werden automatisch aufgeräumt: quittierte nach 24 Stunden, offene nach 12 Stunden.
+- Benachrichtigungen an viele Empfänger gleichzeitig belasten die Live-Verbindungen anderer Nutzer nicht mehr. In großen Lagen wird damit ein vollständiger Neuabgleich im Moment eines Alarms vermieden.
+
+### Kräfte und Mittel
+
+#### Personal
+- **Neue Personenansicht** je Einsatzkraft mit den Bereichen:
+  - Einteilung: Status, Funktion, Einheit, Fahrzeug, Unfallhilfsstelle, Position, Bemerkung
+  - Person: Angaben von Ad-hoc-Personen berichtigen
+  - Zeitachse
+  - Aus dem Einsatz: Entlassen mit Rückgängig, Stornieren mit Rückfrage
+- Eine entlassene Person bleibt lesbar und kann erneut disponiert werden. Die Sprungpalette öffnet direkt die Personenansicht.
+- Die **Personalliste ist nach Einheit gruppiert**, „nicht eingeteilt“ steht zuerst. Einheit, Fahrzeug und Position werden direkt in der Zeile gewählt und mit „Speichern“ übernommen. Wird eine Änderung abgelehnt, steht der Grund an der Angabe.
+- Fahrzeuge der eigenen Einheit stehen in der Auswahl vorn. Fahrzeuge anderer Einheiten sind markiert.
+- Die Marke „Einheitsführer“ erscheint jetzt auch in der Liste.
+- Spalten für Module ohne Freigabe werden ausgeblendet.
+- Kann der Statuskatalog nicht geladen werden, zeigt die Personenansicht eine Fehlermeldung und bietet „Erneut abrufen“ an. Bisher blieb das Statusmenü ohne Hinweis leer.
+- Kopf und Karten passen auf schmale Bildschirme, ohne seitlich überzulaufen oder beim Laden zu springen.
+
+#### Fahrzeuge
+- Neue Spalten **Einheit, Abschnitt und „Seit“**. Die Einheit lässt sich direkt in der Zeile ändern. Beim Wechsel nennt das Einsatztagebuch die vorige Einheit.
+- Lange Einheitsnamen brechen nur an Silbengrenzen um.
+- **Zeilenmenü** mit „Entlassen“ als erstem Eintrag, „Angaben ändern …“, „Im Stamm ändern“ (für die Verwaltung) und „Stornieren“.
+- **Angaben von Ad-hoc-Fahrzeugen ändern:** Funkrufname, Typ, Kennzeichen, Träger und OPTA lassen sich im Einsatz ändern. Jede Änderung erzeugt einen Tagebucheintrag mit altem und neuem Wert. Stamm-Fahrzeuge werden weiterhin im Stamm gepflegt.
+- **„Als eigene Einheit führen …“:** Ein Fahrzeug ohne Einheit wird in einem Schritt zur Einheit. Die Besatzung kommt mit. Der Vorgang gelingt ganz oder gar nicht.
+- **„Personal der Einheit übernehmen“:** Freie Kräfte der Einheit werden in einem Schritt auf das Fahrzeug gesetzt, vorausgewählt bis zum Soll. Es entsteht genau ein Tagebucheintrag. Fällt eine vorgewählte Kraft zwischenzeitlich weg, wird sie nicht mehr mitgeschickt.
+- In der Besatzung heißt der Knopf jetzt „Vom Fahrzeug lösen“. Position und Funktion jeder Person werden angezeigt.
+- Das FMS-Tableau gliedert Untereinheiten ohne eigenen Abschnitt unter den Abschnitt der übergeordneten Einheit.
+- Neue Längengrenzen: 200 Zeichen für die Ad-hoc-Angaben, 2 000 Zeichen für die Bemerkung.
+
+#### Einheiten
+- **Neue Einheit-Ansicht:**
+  - Kopf mit Name, Typ, Funkrufname, Abschnitt, Über-Einheit, Einheitsführer, Soll-Stärke und Bemerkung, jede Angabe einzeln bearbeitbar
+  - Großes taktisches Zeichen, Ist-Stärke mit Bewertung gegen das Soll, Status mit „seit“
+  - Handstatus für Einheiten ohne Fahrzeug
+  - Änderungen anderer Arbeitsplätze werden nicht mehr überschrieben.
+- **Paneel „Fahrzeuge und Besatzung“:** Es ersetzt die bisherigen Paneele „Personal“ und „Fahrzeuge“.
+  - Je Fahrzeug: FMS-Wahl, Besatzung Ist/Soll und die zugehörigen Personen
+  - Menü je Person: „Als Einheitsführer“, „Auf …“ (Fahrzeug), „Vom Fahrzeug lösen“, „Aus Einheit lösen“
+  - Eine FMS-Wahl sperrt nur das eigene Fahrzeug.
+- **Zuordnen aus dem Stamm:** „Person zuordnen …“ und „Fahrzeug zuordnen …“ bieten Kräfte, die im Einsatz frei sind, Kräfte aus dem Stamm und Demo-Daten an.
+- Eigene Paneele für **Material**, **Funk und Kommunikation** und **Taktisches Zeichen**. Ist keine Organisation gesetzt, wird die Vorgabe der Organisation angezeigt.
+- **„Einheit auflösen“** steht abgesetzt im letzten Paneel und fragt vorher nach.
+- Ohne Freigabe für Personal oder Fahrzeuge wird die Ansicht ohne Besatzung angezeigt. Ein Hinweis nennt dann die gesperrten Module.
+- Der Einheitsname ist beim Bilden und Ändern auf die Längengrenze des Servers begrenzt. Eine gerade aufgelöste Einheit nimmt kein Fahrzeug mehr auf.
+
+#### Material
+- Die Liste zeigt eine **Materialverdichtung** („einsatzbereit · im Einsatz · Ausfall“). Als Ausfall zählen defekt, verbraucht und „Desinfektion nötig“.
+- Neue Spalte **„Ort“** mit Einheit und Unfallhilfsstelle, jeweils mit ausdrücklichem Speichern. Dazu kommen Filter „ohne Ort“, je Einheit und je Unfallhilfsstelle.
+- Beim Umhängen nennt das Einsatztagebuch die vorige Einheit.
+- Die **Menge** wird nur noch mit Enter oder „Speichern“ übernommen.
+- **Zeilenmenü:**
+  - „Angaben ändern“ für Ad-hoc-Posten
+  - „Aufteilen“: einen Posten in zwei teilen
+  - „Stornieren“: gesperrt, solange der Posten einer Einheit oder Unfallhilfsstelle zugeordnet ist
+- Eine aufgelöste Unfallhilfsstelle sperrt „Material zuordnen“ und nennt den Grund.
+- Die Tabelle passt auf Bildschirme mit 1366 px Breite. Die Kategorie rückt auf schmaleren Bildschirmen unter die Bezeichnung. Karten am Handy halten ausreichend Abstand.
+- Die Einheit-Auswahl ist in Material, Personal und Fahrzeugen einheitlich und nach Abschnitt gegliedert.
+
+### Bedienung und Oberfläche
+
+- **Gesperrte Bedienelemente** sind jetzt auch ohne Farbe erkennbar: Sie tragen einen gestrichelten Rand. Gestrichelt bedeutet damit nur noch „gesperrt“. Die bisher gestrichelten Knöpfe („Neuer Einsatz“, „Feld“ und „Anhang“ in der Schnellerfassung) sind normale Knöpfe.
+- In der Handschuh-Dichte springt der Kopfbereich bei mittleren Bildschirmbreiten beim Start nicht mehr zwischen ein- und zweizeiliger Darstellung.
+- Bei niedrigen Fensterhöhen verdecken der Fuß der Navigationsleiste und die Einsatzdauer-Leiste kein Element mehr, das per Tabulator angesprungen wird.
+- Besatzungs- und Materialzeilen halten den empfohlenen Abstand zwischen Bedienelementen ein, auch mit Handschuhen.
+
+### Betrieb und Sicherheit
+
+- Eine TLS-Komponente wurde wegen vier Sicherheitsmeldungen (RUSTSEC-2026-0346 bis 0349) aktualisiert.
+
 ## [1.0.0-alpha.125](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.124...v1.0.0-alpha.125) (2026-10-14)
 
 ### Wichtige Änderungen

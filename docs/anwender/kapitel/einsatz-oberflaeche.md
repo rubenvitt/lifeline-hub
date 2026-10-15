@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/live/LiveStatusBanner.tsx]
+quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -148,6 +148,21 @@ keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei
 vorgemerkten oder abgelehnten Einträgen und mit „Neue Version verfügbar.“, wenn eine neue
 Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie.
+
+### Hinweise auf der Einsatzliste
+
+Zwei Hinweise erreichen eine Person auch dann, wenn sie keinen Einsatz geöffnet hat:
+
+- **„Aufgenommen in …“** mit dem Namen des Einsatzes geht an die Person, die die
+  Einsatzleitung in einen Einsatz aufnimmt. Ein Wechsel der Rolle oder der Funktion bei einem
+  bestehenden Mitglied ist keine Aufnahme und bleibt still; wer entfernt und wieder aufgenommen
+  wird, erhält den Hinweis erneut.
+- **„Neuer Einsatz“** mit dem Namen des Einsatzes geht beim Anlegen an die Führungskräfte und
+  System-Admins der Organisation, die ihn lesen dürfen. Wer ihn nicht lesen darf, etwa ein
+  Konto ohne Rolle in der Organisation, erfährt von ihm nichts.
+
+Beide Hinweise führen in den Einsatz. Eigene Aktionen bleiben still: Wer den Einsatz anlegt,
+bekommt keinen Hinweis dazu. Auch das Einspielen der Demo-Daten meldet nichts.
 
 ### Was ein Einsatz zeigt
 

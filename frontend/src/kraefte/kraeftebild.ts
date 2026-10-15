@@ -25,6 +25,8 @@ import {
 } from './kraeftebaumKern';
 import { renderEntlasseneMarkdown, type EntlasseneKraft } from './entlassene';
 import { funktionText } from './einsatzfunktionKern';
+import { AUFGEBRAUCHT, isAufgebraucht, ortVon } from './materialPosten';
+import { materialAusfall } from './materialVerdichtungKern';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -66,7 +68,8 @@ interface Verdichtung {
   soll: StaerkeSumme | null;
   personalStatus: StatusVerteilung;
   fahrzeugStatus: StatusVerteilung;
-  materialStatus: Record<MaterialStatus, number>;
+  /** Posten je Status; ein aufgebrauchtes Verbrauchsgut zählt unter `aufgebraucht` (LLH-1224). */
+  materialStatus: Record<MaterialStatus | 'aufgebraucht', number>;
   anzahlPersonal: number;
   anzahlFahrzeuge: number;
   anzahlMaterialPositionen: number;
@@ -184,15 +187,21 @@ function personMittelZeile(x: PersonImBaum): MeldebildZeile {
 }
 
 /**
- * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit ihrer Besatzung als
- * Unterpunkten → „Ohne Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen direkt) →
+ * Die Mittelzeilen eines Zweigs in der Folge des Kerns (D7): Fahrzeuge mit ihrer Besatzung und
+ * Beladung (LLH-1225 D14) als Unterpunkten → „Ohne Fahrzeug“ (nur neben Fahrzeugen, D5; sonst die Personen direkt) →
  * Material als Gruppe mit Posten und Ausfall (D6). Dieselbe Gliederung wie das Raster am Schirm
  * (`meldebildRaster.ts`), damit Lagebericht und Meldebild nicht zwei Lesarten zeigen.
  */
 function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
   const zeilen: MeldebildZeile[] = m.fahrzeuge.map((f) => {
     const ef = f.fahrzeug;
-    const besatzung = f.besatzung.map(personMittelZeile);
+    // Nach der Besatzung die Beladung (LLH-1225 D14): „Beladung: 2 Posten, 1 Ausfall“.
+    const kinder = [
+      ...f.besatzung.map(personMittelZeile),
+      ...(f.beladung.length > 0
+        ? [materialGruppe(`bel-${ef.id}`, 'Beladung', f.beladung, f.beladungAusfall)]
+        : []),
+    ];
     const ist = f.urteil === 'nicht_erfasst' ? besatzungText(f) : `Besatzung ${besatzungText(f)}`;
     return {
       ...leereMittelZeile(),
@@ -203,7 +212,7 @@ function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
       statusKategorie: ef.status_kategorie ?? null,
       statusLabel: ef.status_label ?? null,
       zusatz: [ist, fremdText(f)].filter(Boolean).join(', '),
-      children: besatzung.length > 0 ? besatzung : undefined,
+      children: kinder.length > 0 ? kinder : undefined,
     };
   });
   const personen = m.ohneFahrzeug.map(personMittelZeile);
@@ -220,27 +229,39 @@ function mittelZeilen(m: MittelDerEinheit, zweig: string): MeldebildZeile[] {
     zeilen.push(...personen);
   }
   if (m.material.length > 0) {
-    zeilen.push({
-      ...leereMittelZeile(),
-      key: `mtl-${zweig}`,
-      mittelArt: 'material-gruppe',
-      bezeichnung: 'Material',
-      detail: [
-        `${m.material.length} Posten`,
-        ...(m.materialAusfall > 0 ? [`${m.materialAusfall} Ausfall`] : []),
-      ].join(', '),
-      children: m.material.map((em) => ({
-        ...leereMittelZeile(),
-        key: `em-${em.id}`,
-        mittelArt: 'material' as const,
-        bezeichnung: em.bezeichnung,
-        detail: null,
-        statusLabel: em.status,
-        menge: em.menge,
-      })),
-    });
+    // Die Gruppe zählt nur ihre Posten; `m.materialAusfall` trägt auch die Beladung (D14).
+    zeilen.push(
+      materialGruppe(`mtl-${zweig}`, 'Material', m.material, materialAusfall(m.material)),
+    );
   }
   return zeilen;
+}
+
+/** Gruppe mit Posten: „Material“ eines Zweigs oder „Beladung“ eines Fahrzeugs. */
+function materialGruppe(
+  key: string,
+  bezeichnung: 'Material' | 'Beladung',
+  material: readonly EinsatzMaterial[],
+  ausfall: number,
+): MeldebildZeile {
+  return {
+    ...leereMittelZeile(),
+    key,
+    mittelArt: 'material-gruppe',
+    bezeichnung,
+    detail: [`${material.length} Posten`, ...(ausfall > 0 ? [`${ausfall} Ausfall`] : [])].join(
+      ', ',
+    ),
+    children: material.map((em) => ({
+      ...leereMittelZeile(),
+      key: `em-${em.id}`,
+      mittelArt: 'material' as const,
+      bezeichnung: em.bezeichnung,
+      detail: null,
+      statusLabel: isAufgebraucht(em) ? AUFGEBRAUCHT : em.status,
+      menge: em.menge,
+    })),
+  };
 }
 
 // ── Aggregation ───────────────────────────────────────────────────────────────
@@ -420,6 +441,13 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
   const abschnittOk = (einheit_id: number | null | undefined) =>
     f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
   const traegerOk = (traeger: string | null | undefined) => !f.traeger || traeger === f.traeger;
+  const fahrzeugEinheit = new Map(roh.fahrzeuge.map((x) => [x.id, x.einheit_id ?? null]));
+  const einheitDesOrts = (em: EinsatzMaterial): number | null => {
+    const ort = ortVon(em);
+    if (ort?.art === 'einheit') return ort.id;
+    if (ort?.art === 'fahrzeug') return fahrzeugEinheit.get(ort.id) ?? null;
+    return null;
+  };
   const passt = (
     einheit_id: number | null | undefined,
     traeger: string | null | undefined,
@@ -447,10 +475,14 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
         x.fahrzeugtyp,
       ]),
     ),
-    // Material hat keine `status_kategorie` (eigene Achse) → nicht nach Kategorie filtern.
+    // Material hat keine `status_kategorie` (eigene Achse) → nicht nach Kategorie filtern. Der
+    // Abschnitt über die Einheit seines Orts (LLH-1225 D14): Fahrzeug → dessen Einheit; an UHS
+    // oder Bereitstellungsraum hat es keine und fällt bei einem Abschnittsfilter heraus.
     material: roh.material.filter(
       (x) =>
-        abschnittOk(x.einheit_id) && traegerOk(x.traegerorganisation) && treffer([x.bezeichnung]),
+        abschnittOk(einheitDesOrts(x)) &&
+        traegerOk(x.traegerorganisation) &&
+        treffer([x.bezeichnung]),
     ),
   };
 }
@@ -548,6 +580,8 @@ export function rendereMeldebildMarkdown(
       matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
     if (v.materialStatus.desinfektion_noetig > 0)
       matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
+    if (v.materialStatus.aufgebraucht > 0)
+      matTeile.push(`${AUFGEBRAUCHT}: ${v.materialStatus.aufgebraucht}`);
     if (matTeile.length > 0) material += ` (${matTeile.join(', ')})`;
   }
   zeilen.push(material);
@@ -587,12 +621,13 @@ export function verdichte(
   const staerke = leereStaerke();
   const personalStatus = leereVert();
   const fahrzeugStatus = leereVert();
-  const materialStatus: Record<MaterialStatus, number> = {
+  const materialStatus: Record<MaterialStatus | 'aufgebraucht', number> = {
     einsatzbereit: 0,
     im_einsatz: 0,
     defekt: 0,
     verbraucht: 0,
     desinfektion_noetig: 0,
+    aufgebraucht: 0,
   };
 
   for (const ep of personal) {
@@ -605,7 +640,8 @@ export function verdichte(
   }
 
   for (const em of material) {
-    materialStatus[em.status] += 1;
+    // LLH-1224, design.md D15: aufgebraucht statt unter dem Status, dieselbe Regel wie der Ausfall.
+    materialStatus[isAufgebraucht(em) ? AUFGEBRAUCHT : em.status] += 1;
   }
 
   return {
@@ -709,7 +745,9 @@ export function baueKraeftebild(
   // Mittel ohne `einheit_id`: Pseudo-Einheit „Ohne Einheit".
   const ohneEinheitPersonal = personalByEinheit.get(null) ?? [];
   const ohneEinheitFahrzeuge = fahrzeugeByEinheit.get(null) ?? [];
-  const ohneEinheitMaterial = material.filter((em) => em.einheit_id == null);
+  // Nur Material ohne Ort (D14): Beladung steht am Fahrzeug, Material an UHS und
+  // Bereitstellungsraum nicht im Baum.
+  const ohneEinheitMaterial = material.filter((em) => ortVon(em) == null);
 
   const hasOhne =
     ohneAbschnittEinheiten.length > 0 ||

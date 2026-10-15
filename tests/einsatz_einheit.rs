@@ -1648,9 +1648,10 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 6);
 }
 
-/// Spec `material-liste`, „Umhängen nennt die alte Einheit“ (LLH-1093, design.md D5): der
-/// ETB-Eintrag nennt beide Einheiten, beide werden live gemeldet; dieselbe Einheit noch einmal
-/// schreibt nichts; eine aufgelöste Zieleinheit ist 409.
+/// Spec `material-liste`, „Umhängen nennt die alte Einheit“ (LLH-1093, design.md D5), im
+/// Wortlaut des Ortswechsels (LLH-1224 D11): der ETB-Eintrag nennt beide Einheiten, beide werden
+/// live gemeldet; dieselbe Einheit noch einmal schreibt nichts; eine aufgelöste Zieleinheit ist
+/// 409.
 #[tokio::test]
 async fn material_umhaengen_nennt_die_alte_einheit() {
     let (app, live) = common::setup_mit_live().await;
@@ -1677,15 +1678,16 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(texte
         .iter()
-        .any(|t| t == "Einheit «Staffel A»: Material «Wolldecke» (×3) zugeordnet"));
+        .any(|t| t == "Material «Wolldecke» (×3): ohne Ort → Einheit «Staffel A»"));
 
     let mut rx = live.abonniere(einsatz);
     let (s, json) = zuordnen(b).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(
-        texte.iter().any(|t| t
-            == "Einheit «Staffel B»: Material «Wolldecke» (×3) zugeordnet, vorher «Staffel A»"),
+        texte
+            .iter()
+            .any(|t| t == "Material «Wolldecke» (×3): Einheit «Staffel A» → Einheit «Staffel B»"),
         "{texte:?}"
     );
     let mut gemeldet = common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]);

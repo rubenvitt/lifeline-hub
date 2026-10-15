@@ -1,6 +1,6 @@
 use super::{EinheitMitgliedFahrzeug, EinheitMitgliedMaterial, EinheitMitgliedPerson};
 use crate::error::AppError;
-use crate::material::MaterialStatus;
+use crate::material::{MaterialArt, MaterialStatus};
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
@@ -126,7 +126,7 @@ pub async fn load_betroffene_einheiten_tx(
 
 /// Ergebnis von [`zuordnen_fahrzeug_tx`]: der aufgelöste Funkrufname für den ETB-Text, die
 /// Einheit, der das Fahrzeug vorher angehörte (ID für das Ereignis, Name für den Text), und ob
-/// sich die Zuordnung geändert hat (LLH-1073, design.md D2; Muster [`MaterialZuordnung`]).
+/// sich die Zuordnung geändert hat (LLH-1073, design.md D2).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FahrzeugZuordnung {
     pub funkrufname: String,
@@ -333,97 +333,6 @@ pub async fn mitnehmen_besatzung_tx(
     Ok(personen)
 }
 
-/// Ergebnis von [`zuordnen_material_tx`]: Bezeichnung und Menge für den ETB-Text, die Einheit,
-/// der das Material vorher angehörte (ID für das Ereignis, Name für den Text), und ob sich die
-/// Zuordnung geändert hat (LLH-1093, design.md D5).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialZuordnung {
-    pub bezeichnung: String,
-    pub menge: i64,
-    pub vorher: Option<(i64, String)>,
-    pub is_changed: bool,
-}
-
-/// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
-/// sein), auf offener Connection/Tx. Eine Zeile, die schon einer anderen Einheit angehört,
-/// wechselt; dieselbe Einheit noch einmal schreibt nichts. `NotFound`, falls Dispozeile oder
-/// Einheit nicht zum Einsatz gehören, `Conflict` bei aufgelöster Einheit oder beendetem Material.
-pub async fn zuordnen_material_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    einheit_id: i64,
-    em_id: i64,
-) -> Result<MaterialZuordnung, AppError> {
-    // In der Transaktion: auch eine gerade aufgelöste Einheit nimmt kein Material mehr (409).
-    super::repo::require_aktiv_tx(conn, einsatz_id, einheit_id).await?;
-    let row: Option<(String, i64, Option<i64>)> = sqlx::query_as(
-        "SELECT snap_bezeichnung, menge, einheit_id FROM einsatz_material \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(em_id)
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (bezeichnung, menge, vorher_id) = row.ok_or(AppError::NotFound)?;
-    // Material, das aus dem Einsatz genommen ist, tritt keiner Einheit bei (409, LLH-1079).
-    crate::material::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, em_id).await?;
-    let vorher = match vorher_id {
-        Some(id) => {
-            let name: String = sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
-                .bind(id)
-                .fetch_one(&mut *conn)
-                .await?;
-            Some((id, name))
-        }
-        None => None,
-    };
-    let is_changed = vorher_id != Some(einheit_id);
-    if is_changed {
-        sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-            .bind(einheit_id)
-            .bind(em_id)
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?;
-    }
-    Ok(MaterialZuordnung {
-        bezeichnung,
-        menge,
-        vorher,
-        is_changed,
-    })
-}
-
-/// Pool-Wrapper.
-pub async fn zuordnen_material(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    einheit_id: i64,
-    em_id: i64,
-) -> Result<MaterialZuordnung, AppError> {
-    let mut conn = pool.acquire().await?;
-    zuordnen_material_tx(&mut conn, einsatz_id, einheit_id, em_id).await
-}
-
-/// Gibt eine Material-Dispozeile aus ihrer Einheit frei, auf offener Connection/Tx.
-/// `NotFound`, falls nicht zu dieser Einheit. Liefert (Bezeichnung, Menge).
-pub async fn freigeben_material_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    einheit_id: i64,
-    em_id: i64,
-) -> Result<(String, i64), AppError> {
-    let row: Option<(String, i64)> = sqlx::query_as(
-        "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
-    ).bind(em_id).bind(einsatz_id).bind(einheit_id).fetch_optional(&mut *conn).await?;
-    let row = row.ok_or(AppError::NotFound)?;
-    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE id = ?")
-        .bind(em_id)
-        .execute(&mut *conn)
-        .await?;
-    Ok(row)
-}
-
 #[derive(sqlx::FromRow)]
 struct MaterialRow {
     em_id: i64,
@@ -431,15 +340,19 @@ struct MaterialRow {
     menge: i64,
     #[sqlx(try_from = "String")]
     status: MaterialStatus,
+    #[sqlx(try_from = "String")]
+    art: MaterialArt,
+    ausgegeben: i64,
 }
 
-/// Material-Mitglieder einer Einheit (Snapshot-Bezeichnung + Menge + Status).
+/// Material am Ort Einheit (Snapshot-Bezeichnung, Menge, Status, Art und Ausgabe; LLH-1224). Den
+/// Ort setzt nur `material::ort::set_ort_tx`.
 pub async fn material_mitglieder(
     pool: &SqlitePool,
     einheit_id: i64,
 ) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {
     let rows = sqlx::query_as::<_, MaterialRow>(
-        "SELECT id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
+        "SELECT id AS em_id, snap_bezeichnung AS bezeichnung, menge, status, art, ausgegeben \
          FROM einsatz_material WHERE einheit_id = ? AND beendet_at IS NULL ORDER BY id",
     )
     .bind(einheit_id)
@@ -452,6 +365,8 @@ pub async fn material_mitglieder(
             bezeichnung: r.bezeichnung,
             menge: r.menge,
             status: r.status,
+            art: r.art,
+            ausgegeben: r.ausgegeben,
         })
         .collect())
 }
@@ -464,6 +379,9 @@ struct MaterialZeileMitEinheit {
     menge: i64,
     #[sqlx(try_from = "String")]
     status: MaterialStatus,
+    #[sqlx(try_from = "String")]
+    art: MaterialArt,
+    ausgegeben: i64,
 }
 
 /// Material-Mitglieder ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
@@ -475,7 +393,8 @@ pub async fn material_mitglieder_map(
     einsatz_id: i64,
 ) -> Result<HashMap<i64, Vec<EinheitMitgliedMaterial>>, AppError> {
     let zeilen = sqlx::query_as::<_, MaterialZeileMitEinheit>(
-        "SELECT einheit_id, id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
+        "SELECT einheit_id, id AS em_id, snap_bezeichnung AS bezeichnung, menge, status, art, \
+                ausgegeben \
          FROM einsatz_material \
          WHERE einheit_id IN (SELECT id FROM einsatz_einheit \
                               WHERE einsatz_id = ? AND aufgeloest_at IS NULL) \
@@ -494,6 +413,8 @@ pub async fn material_mitglieder_map(
                 bezeichnung: z.bezeichnung,
                 menge: z.menge,
                 status: z.status,
+                art: z.art,
+                ausgegeben: z.ausgegeben,
             });
     }
     Ok(map)
@@ -1056,14 +977,12 @@ mod tests {
         let mut materialien = Vec::new();
         for bez in ["Wolldecke", "Absperrband", "Trage"] {
             let em: i64 = sqlx::query_scalar(
-                "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, ?, 7) RETURNING id",
+                "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge, art) VALUES (?, ?, 7, 'verbrauchsgut') RETURNING id",
             ).bind(einsatz).bind(bez).fetch_one(&pool).await.unwrap();
             materialien.push(em);
         }
         for (idx, einheit) in [(1, a), (2, b), (0, a)] {
-            zuordnen_material(&pool, einsatz, einheit, materialien[idx])
-                .await
-                .unwrap();
+            an_einheit(&pool, einsatz, einheit, materialien[idx]).await;
         }
 
         let personal_map = personal_mitglieder_map(&pool, einsatz).await.unwrap();
@@ -1103,59 +1022,47 @@ mod tests {
         assert_eq!(staerke_map[&a], Staerke::neu(0, 1, 1));
     }
 
+    async fn an_einheit(pool: &SqlitePool, einsatz: i64, einheit: i64, em: i64) {
+        crate::material::ort::set_ort_tx(
+            &mut pool.acquire().await.unwrap(),
+            einsatz,
+            em,
+            Some(crate::material::ort::MaterialOrt::Einheit(einheit)),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Material einer Einheit ist, was am Ort Einheit liegt (LLH-1224): ein Wechsel an eine andere
+    /// Einheit oder eine UHS nimmt es heraus; Art und Ausgabe kommen mit.
     #[tokio::test]
-    async fn material_zuordnen_und_freigeben() {
+    async fn material_mitglieder_folgen_dem_einen_ort() {
         let pool = crate::db::test_pool().await;
         let (einsatz, a, b) = setup(&pool).await;
         let em: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
-
-        let z = zuordnen_material(&pool, einsatz, a, em).await.unwrap();
-        assert_eq!(
-            z,
-            MaterialZuordnung {
-                bezeichnung: "Wolldecke".into(),
-                menge: 50,
-                vorher: None,
-                is_changed: true,
-            }
-        );
-        assert_eq!(material_mitglieder(&pool, a).await.unwrap().len(), 1);
-
-        // Exklusiv: erneutes Zuordnen zu B wechselt und nennt A (LLH-1093, design.md D5).
-        let z = zuordnen_material(&pool, einsatz, b, em).await.unwrap();
-        assert_eq!(z.vorher, Some((a, "A".to_string())));
-        assert!(z.is_changed);
-        assert!(material_mitglieder(&pool, a).await.unwrap().is_empty());
-        assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
-        // Dieselbe Einheit noch einmal: nichts geändert.
-        let z = zuordnen_material(&pool, einsatz, b, em).await.unwrap();
-        assert_eq!(z.vorher, Some((b, "B".to_string())));
-        assert!(!z.is_changed);
-        // Eine aufgelöste Zieleinheit ist 409, in der Transaktion geprüft.
-        sqlx::query(
-            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-14 10:00:00' WHERE id = ?",
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge, art, ausgegeben) \
+             VALUES (?, 'Wolldecke', 50, 'verbrauchsgut', 20) RETURNING id",
         )
-        .bind(a)
-        .execute(&pool)
+        .bind(einsatz)
+        .fetch_one(&pool)
         .await
         .unwrap();
-        assert!(matches!(
-            zuordnen_material(&pool, einsatz, a, em).await.unwrap_err(),
-            AppError::Conflict(_)
-        ));
+        an_einheit(&pool, einsatz, a, em).await;
+        assert_eq!(
+            material_mitglieder(&pool, a).await.unwrap(),
+            [EinheitMitgliedMaterial {
+                em_id: em,
+                bezeichnung: "Wolldecke".into(),
+                menge: 50,
+                status: MaterialStatus::Einsatzbereit,
+                art: MaterialArt::Verbrauchsgut,
+                ausgegeben: 20,
+            }]
+        );
+        an_einheit(&pool, einsatz, b, em).await;
+        assert!(material_mitglieder(&pool, a).await.unwrap().is_empty());
         assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
-
-        // Freigeben aus falscher Einheit (a) → NotFound.
-        assert!(matches!(
-            freigeben_material_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, em)
-                .await
-                .unwrap_err(),
-            AppError::NotFound
-        ));
-        // Freigeben aus b.
-        freigeben_material_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, em)
+        crate::material::ort::set_ort_tx(&mut pool.acquire().await.unwrap(), einsatz, em, None)
             .await
             .unwrap();
         assert!(material_mitglieder(&pool, b).await.unwrap().is_empty());

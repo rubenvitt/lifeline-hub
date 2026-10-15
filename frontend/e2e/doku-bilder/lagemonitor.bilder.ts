@@ -63,10 +63,24 @@ async function kartengrundlage(geraet: Page) {
   await kachelnBeantworten(geraet, KACHEL_PRAEFIX, 'strassen');
 }
 
-/** Koppelt den Monitor, eigener Browserkontext, Uhr angehalten, Anzeige gestartet. */
-async function monitor(page: Page, browser: Browser) {
+/**
+ * Koppelt den Monitor, eigener Browserkontext, Uhr angehalten, Anzeige gestartet. Mit
+ * `sofortmeldung` liegt vorher eine unbestätigte Sofortmeldung an (die Demo-Sofortmeldung ist
+ * bestätigt), damit die Kachel „Meldungen“ eine Zahl zeigt; sie bleibt in der Temp-DB des Laufs.
+ */
+async function monitor(page: Page, browser: Browser, { sofortmeldung = false } = {}) {
   await anmelden(page);
   const demo = await demoEinsatz(page);
+  if (sofortmeldung) {
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/meldungen`, {
+      absender: 'EA Nord',
+      meldeweg: 'funk',
+      inhalt: 'Person unter Trümmern, Rettung läuft',
+      meldungsart: 'sofortmeldung',
+      prioritaet: 'sofort',
+      ereigniszeit: new Date().toISOString(),
+    });
+  }
   // Der Demo-Einsatz trägt keinen verorteten Einsatzort; ohne ihn bliebe die Kartenkachel leer
   // („Kein Einsatzort verortet“). Teil-PATCH des Einsatzkopfs; `orteZuruecksetzen` räumt ihn
   // wieder ab, damit kein anderes Kapitel ihn sieht.
@@ -132,10 +146,36 @@ async function orteZuruecksetzen(page: Page, einsatz: number, uhs: number, absch
 
 test.describe(KAPITEL, () => {
   test('Großbild mit Karte, Kacheln und Statusleiste', async ({ page, browser }) => {
-    const { kontext, geraet, einsatz, uhs, abschnitt } = await monitor(page, browser);
+    const { kontext, geraet, einsatz, uhs, abschnitt } = await monitor(page, browser, {
+      sofortmeldung: true,
+    });
     try {
+      await expect(
+        geraet.getByRole('region', { name: 'Meldungen' }).locator('[data-lfh="monitor-zahl"]'),
+      ).toContainText('1');
       // Gerendert heißt: Einsatzort, UHS und die Abschnittsfläche stehen als Marken auf der Karte.
       await expect(geraet.locator('.maplibregl-marker')).toHaveCount(3);
+      // Die Marken stehen vor den Flächen: erst wenn Gefahrengebiete und Abschnittsfläche
+      // gezeichnet sind, ist die Karte fertig (wie in `e2e/geraet-lagemonitor.spec.ts`).
+      await expect
+        .poll(() =>
+          geraet.evaluate(() => {
+            const map = (
+              window as unknown as {
+                __lfhKarte?: {
+                  isStyleLoaded(): boolean;
+                  queryRenderedFeatures(o: { layers: string[] }): unknown[];
+                };
+              }
+            ).__lfhKarte;
+            if (!map?.isStyleLoaded()) return false;
+            return (
+              map.queryRenderedFeatures({ layers: ['zonen-fill'] }).length > 0 &&
+              map.queryRenderedFeatures({ layers: ['abschnitte-fill'] }).length > 0
+            );
+          }),
+        )
+        .toBe(true);
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'lagemonitor');
     } finally {

@@ -16,6 +16,11 @@ Einstiege und prüfen `istSprungGesperrt('lagebesprechung')`.
 Geschrieben wird sie nur über `PUT …/lagebesprechung/termin` (Schnellwahl, freie Wahl, „kein
 Termin“, ohne ETB-Eintrag) und den Abschluss. Der Kopf-PATCH der Einsatzdaten lehnt das Feld mit
 400 ab, laut statt still. Das Kopf-Ereignis `einsatz` geht nur bei einer echten Änderung.
+Beide Wege setzen den Termin über `SQL_TERMIN_SETZEN` in `src/lagebesprechung/repo.rs`; die
+Anweisung leert bei einer echten Änderung auch die Merker der Ankündigung
+(`lagebesprechung_angekuendigt_*_at`, LLH-1215). Ein neuer Schreibweg nimmt sie mit, sonst gilt
+die Ankündigung dem alten Termin. Angekündigt wird nur im Erinnerungs-Scheduler
+(`src/lagebesprechung/ankuendigung.rs`), je Termin einmal und nur im Zeitfenster.
 
 **Vorbereitung der Lagebesprechung** (LFH-550, `lagebesprechung/VorbereitungPaneel.tsx`,
 `lagebesprechung/vorbereitung.ts`): Paneel der Seite Lagebesprechung, rechnet keine Zahl selbst

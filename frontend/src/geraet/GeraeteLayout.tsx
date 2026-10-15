@@ -397,6 +397,8 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
  * Widerruf. Keine Schreib-Warteschlange: der Monitor schreibt nichts.
  */
 function MonitorHuelle({ geraet }: { geraet: GeraetAnzeige }) {
+  // Ein Gerät spielt keinen Ton (Spec `benachrichtigungen`, „Gekoppelte Geräte bleiben still“):
+  // der Strom spielt keinen, und Benachrichtigungen erreichen Gerätekonten nicht.
   useEinsatzLiveStream(geraet.einsatz_id);
   return (
     <EinsatzPfadeProvider pfade={GERAET_PFADE}>
@@ -409,7 +411,8 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   const { benutzer, konflikt } = useAuth();
   // Der Einsatzstrom hält die Daten live und trägt das Ende der Kopplung: schließt der Server ihn
   // nach einem Widerruf, prüft der Client die Sitzung, und der 401 führt auf „Kopplung beendet“
-  // (design.md D7). Kein Org-Strom: `/api/live` gehört nicht zur Ansicht.
+  // (design.md D7). Kein Org-Strom: `/api/live` gehört nicht zur Ansicht. Kein Ton: gekoppelte
+  // Geräte bleiben still (Spec `benachrichtigungen`), der Strom spielt keinen.
   useEinsatzLiveStream(geraet.einsatz_id);
   // Die Warteschlange bleibt an: eine Aufnahme ohne Netz geht nicht verloren (design.md D8).
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));

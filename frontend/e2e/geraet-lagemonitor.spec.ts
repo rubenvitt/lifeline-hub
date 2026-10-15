@@ -111,6 +111,15 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     },
   );
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
+  // D12 (Change `kcjecn9e-benachrichtigungskonzept`): eine offene Sofortmeldung kommt nur als Zahl.
+  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+    absender: 'EA Nord',
+    meldeweg: 'funk',
+    inhalt: 'Keller Familie Erste überflutet',
+    meldungsart: 'sofortmeldung',
+    prioritaet: 'sofort',
+    ereigniszeit: new Date().toISOString(),
+  });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -154,6 +163,10 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     );
     expect(Math.round(zeilen)).toBe(2);
     await expect(monitor.getByText('Erste')).toHaveCount(0);
+    await expect(
+      monitor.getByRole('region', { name: 'Meldungen' }).locator('[data-lfh="monitor-zahl"]'),
+    ).toHaveText('1Sofortmeldungen offen');
+    await expect(monitor.getByText('Keller', { exact: false })).toHaveCount(0);
     const betroffene = monitor.getByRole('region', { name: 'Betroffene' });
     await expect(betroffene.getByText('gesamt')).toBeVisible();
 
@@ -164,7 +177,13 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     }));
     expect(masse.hoehe).toBeLessThanOrEqual(1080);
     expect(masse.breite).toBeLessThanOrEqual(1920);
-    for (const kachel of ['Betroffene', 'Kräfte', 'Belegung der Unfallhilfsstellen', 'Lagekarte']) {
+    for (const kachel of [
+      'Betroffene',
+      'Kräfte',
+      'Belegung der Unfallhilfsstellen',
+      'Lagekarte',
+      'Meldungen',
+    ]) {
       await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
     }
     // … und keine Kachel schneidet ihren Inhalt ab (sie läuft nicht still in sich über).

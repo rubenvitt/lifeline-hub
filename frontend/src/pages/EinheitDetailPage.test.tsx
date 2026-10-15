@@ -89,6 +89,8 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    // Namen der Orte im Angebot von „Material zuordnen …“ (LLH-1225 D8).
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     // Stamm im Dienst (Gruppe „Aus dem Stamm“, LLH-1036 Teil II): leer.
     http.get('/api/personal', () => HttpResponse.json([])),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])),
@@ -191,7 +193,7 @@ const zeileVon = (text: string) =>
   screen
     .getByText(text, { exact: false })
     .closest(
-      '[data-lfh="einheit-person"], [data-lfh="einheit-fahrzeug"], [data-lfh="einheit-zuordnung"]',
+      '[data-lfh="einheit-person"], [data-lfh="einheit-fahrzeug"], [data-lfh="material-am-ort-zeile"]',
     ) as HTMLElement;
 
 /**
@@ -885,14 +887,17 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
         '/api/einsaetze/1/einheiten/10/fahrzeug/30',
         abgelehnt('Fahrzeug ist im Einsatz gebunden'),
       ),
-      http.delete('/api/einsaetze/1/einheiten/10/material/40', abgelehnt('Material ist verliehen')),
+      // Material löst der eine Schreibweg des Materials (LLH-1225 D2), nicht die Einheiten-Route.
+      http.patch('/api/einsaetze/1/material/40', abgelehnt('Material ist verliehen')),
     );
     await screen.findByText('FW 1/44-1');
     await userEvent.click(
       within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
     );
     await userEvent.click(
-      within(zeileVon('Tragkraftspritze')).getByRole('button', { name: 'Aus Einheit lösen' }),
+      within(zeileVon('Tragkraftspritze')).getByRole('button', {
+        name: 'Tragkraftspritze aus Einheit lösen',
+      }),
     );
 
     expect(

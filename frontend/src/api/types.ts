@@ -228,6 +228,7 @@ export type FahrzeugVorschlaege = S['FahrzeugVorschlaege'];
 export type FahrzeugStatus = S['FahrzeugStatus'];
 export type EinsatzFahrzeug = S['EinsatzFahrzeugAnzeige'];
 export type MaterialStatus = S['MaterialStatus'];
+export type MaterialArt = S['MaterialArt'];
 export type Material = S['MaterialAnzeige'];
 export type EinsatzMaterial = S['EinsatzMaterialAnzeige'];
 export type StaerkePosition = S['StaerkePosition'];
@@ -415,6 +416,11 @@ export type ChatKanal = S['ChatKanalAnzeige'];
 export type Anhang = S['AnhangAnzeige'];
 export type ChatNachricht = S['ChatNachrichtAnzeige'];
 export type BezugTyp = S['BezugTyp'];
+/**
+ * Eine Erwähnung beim Senden einer Nachricht (LLH-1220, handgepflegt wie alle Request-DTOs): ein
+ * Mitglied oder eine Führungsfunktion. Der Text trägt nur `@Anzeige`.
+ */
+export type ChatErwaehnung = { benutzer_id: number } | { funktion: Fuehrungsfunktion };
 
 // ============================== E‑5 Schäden ==============================
 export type SchadenStatus = S['SchadenStatus'];

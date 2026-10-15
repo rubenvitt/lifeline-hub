@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::geraet::bestaetigung::Bestaetigung;
+use crate::person::Sichtungskategorie;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
@@ -80,6 +81,25 @@ pub async fn erfassen_tx(
     .execute(&mut *conn)
     .await?;
     laden_tx(conn, einsatz_id, id).await
+}
+
+/// Die aktuelle Sichtungskategorie einer Person (Cache `aktuelle_sichtung`) auf der offenen
+/// Verbindung des Aufrufers: in derselben Transaktion VOR [`erfassen_tx`] gelesen, ist sie der
+/// Vorzustand, an dem eine Hochstufung auf SK I erkannt wird (Spec `benachrichtigungen`, „Neue
+/// Person der Sichtungskategorie I“). `None` ohne Sichtung; `NotFound`, falls fremd.
+pub async fn aktuelle_kategorie_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<Option<Sichtungskategorie>, AppError> {
+    sqlx::query_scalar::<_, Option<Sichtungskategorie>>(
+        "SELECT aktuelle_sichtung FROM einsatz_person WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Pool-Wrapper: erfasst eine Sichtung in EINER eigenen Transaktion (Status-Hub, INSERT und

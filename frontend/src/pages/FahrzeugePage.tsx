@@ -89,6 +89,8 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
 import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
+import MaterialAmOrt from '../kraefte/MaterialAmOrt';
+import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { besatzungKandidaten, besatzungVorschlag } from '../kraefte/besatzungVorschlag';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
@@ -350,6 +352,14 @@ export default function FahrzeugePage() {
   });
   const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
   const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data);
+  // Beladung im Aufklapper (LLH-1225, design.md D11): Fahrzeuge haben kein eigenes Material-DTO,
+  // die Posten kommen aus der Materialliste. Ohne Freigabe Material weder Block noch Abruf (D9).
+  const materialFrei = istKeyFreigegeben('material', freigabenQuery.data);
+  const materialQuery = useQuery({
+    queryKey: einsatzKeys.material(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
+    enabled: materialFrei,
+  });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
@@ -1014,28 +1024,50 @@ export default function FahrzeugePage() {
                 etikett: 'Besatzung',
                 zugaenglicherName: (ef) => `Besatzung zu ${ef.funkrufname}`,
                 inhalt: (ef) => (
-                  <BesatzungsBlock
-                    ef={ef}
-                    personal={personal}
-                    darfSchreiben={darfSchreiben}
-                    freiInhalt={besatzungInhalt}
-                    onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                    onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
-                    zuordnenFehler={zuordnenFehler.grund(ef.id)}
-                    freigebenFehler={freigebenFehler.grund}
-                    uebernehmen={
-                      ef.einheit_id != null
-                        ? {
-                            kandidaten: besatzungKandidaten(personal, ef).length,
-                            onOeffnen: () =>
-                              setUebernehmenFuer({
-                                fahrzeug: ef,
-                                vorgewaehlt: vorschlagFuer(ef).vorgewaehlt,
-                              }),
-                          }
-                        : null
-                    }
-                  />
+                  <>
+                    <BesatzungsBlock
+                      ef={ef}
+                      personal={personal}
+                      darfSchreiben={darfSchreiben}
+                      freiInhalt={besatzungInhalt}
+                      onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+                      onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                      zuordnenFehler={zuordnenFehler.grund(ef.id)}
+                      freigebenFehler={freigebenFehler.grund}
+                      uebernehmen={
+                        ef.einheit_id != null
+                          ? {
+                              kandidaten: besatzungKandidaten(personal, ef).length,
+                              onOeffnen: () =>
+                                setUebernehmenFuer({
+                                  fahrzeug: ef,
+                                  vorgewaehlt: vorschlagFuer(ef).vorgewaehlt,
+                                }),
+                            }
+                          : null
+                      }
+                    />
+                    {materialFrei && (
+                      <div
+                        data-lfh="beladung-block"
+                        style={{ paddingLeft: 8, marginTop: abstand.md }}
+                      >
+                        <MaterialAmOrt
+                          einsatzId={einsatzId}
+                          ort={{ art: 'fahrzeug', id: ef.id }}
+                          posten={(materialQuery.data ?? []).filter(
+                            (em) => em.einsatz_fahrzeug_id === ef.id,
+                          )}
+                          angebot={materialQuery}
+                          darfSchreiben={darfSchreiben}
+                          materialFrei={materialFrei}
+                          titel="Beladung"
+                          loesenText="Vom Fahrzeug lösen"
+                          leerText="Keine Beladung"
+                        />
+                      </div>
+                    )}
+                  </>
                 ),
               }}
               karte={{
