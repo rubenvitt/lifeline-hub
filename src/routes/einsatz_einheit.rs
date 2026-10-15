@@ -759,8 +759,9 @@ pub async fn personal_freigeben(
 }
 
 /// PUT .../einheiten/{eid}/fahrzeug/{ef_id} — Fahrzeug zuordnen oder umhängen. ETB-Eintrag mit
-/// dem aufgelösten Funkrufnamen, der beim Umhängen die vorige Einheit nennt; beide Einheiten und
-/// das Fahrzeug werden gemeldet. Dieselbe Einheit noch einmal schreibt und meldet nichts
+/// dem aufgelösten Funkrufnamen, der beim Umhängen die vorige Einheit nennt; die Besatzung kommt
+/// mit und steht im selben Eintrag (LLH-1238). Beide Einheiten, das Fahrzeug und die
+/// mitgekommenen Personen werden gemeldet. Dieselbe Einheit noch einmal schreibt und meldet nichts
 /// (LLH-1073, design.md D2, Muster LLH-1093 am Material).
 pub async fn fahrzeug_zuordnen(
     State(state): State<AppState>,
@@ -780,6 +781,8 @@ pub async fn fahrzeug_zuordnen(
                 }
                 None => crate::einheit::etb_text_fahrzeug_zugeordnet(&einheit, &z.funkrufname),
             };
+            let namen: Vec<String> = z.besatzung.iter().map(|(_, n)| n.clone()).collect();
+            let text = crate::einheit::etb_text_mit_besatzung(text, &namen);
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;
         }
@@ -787,10 +790,13 @@ pub async fn fahrzeug_zuordnen(
     })?;
     if zuordnung.is_changed {
         sse_einheit(&state, einsatz_id, eid);
-        if let Some((alt, _)) = zuordnung.vorher {
-            sse_einheit(&state, einsatz_id, alt);
+        if let Some((alt, _)) = &zuordnung.vorher {
+            sse_einheit(&state, einsatz_id, *alt);
         }
         sse_fahrzeug(&state, einsatz_id, ef_id);
+        for (ep_id, _) in &zuordnung.besatzung {
+            sse_personal(&state, einsatz_id, *ep_id);
+        }
     }
     Ok(StatusCode::NO_CONTENT)
 }

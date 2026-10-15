@@ -169,7 +169,8 @@ anderen Ort wird ohne Rückfrage umgehängt, und das Einsatztagebuch nennt den a
 Ort. Material auf einem Fahrzeug der Einheit steht nicht im Paneel „Material“, sondern als
 „Beladung“ am Fahrzeug in der Fahrzeugliste und im [Meldebild](meldebild.md).
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
-Fahrzeug dabei aus seiner bisherigen Einheit um. Ein Fahrzeug ohne Einheit lässt sich dort auch als
+Fahrzeug dabei aus seiner bisherigen Einheit um. Seine Besatzung aus der bisherigen oder ohne
+Einheit kommt mit, außer dem Einheitsführer der bisherigen Einheit. Ein Fahrzeug ohne Einheit lässt sich dort auch als
 eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
 [Fahrzeuge und FMS](fahrzeuge.md)).
 
@@ -270,7 +271,8 @@ Der Zustand je Zeile:
 - „im Einsatz“: im Einsatz, ohne Einheit; sie kommt in die neue Einheit.
 - „in «2. Zug»“ bzw. „auf «RTW 3»“: gehört schon einer Einheit an oder sitzt auf einem anderen
   Fahrzeug. Wählbar nur als „umhängen aus «2. Zug»“ bzw. „umhängen von «RTW 3»“; sie verlässt dann
-  ihre Einheit oder ihr Fahrzeug.
+  ihre Einheit oder ihr Fahrzeug. Ein umgehängtes Fahrzeug nimmt seine Besatzung mit, auch wer
+  nicht in der Vorlage steht; das Einsatztagebuch zählt sie zu den Kräften.
 - „außer Dienst“: nicht wählbar.
 - „entlassen, wird wieder aufgenommen“: aus dem Einsatz entlassen; die Kraft wird beim Bilden
   erneut in den Einsatz geholt. Ein entlassenes Fahrzeug ist vorab gewählt, eine Person nicht.

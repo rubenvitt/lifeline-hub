@@ -1880,6 +1880,105 @@ async fn fahrzeug_umhaengen_nennt_die_alte_einheit() {
     );
 }
 
+/// LLH-1238: Ein Fahrzeug, das von «Zug 1» nach «Zug 2» umgehängt wird, nimmt seine Besatzung
+/// mit, die «Zug 1» oder keiner Einheit angehörte; der Führer von «Zug 1» bleibt dort, ebenso wer
+/// einer dritten Einheit angehört. Ein ETB-Eintrag nennt Fahrzeug, vorige Einheit und Besatzung;
+/// gemeldet werden beide Einheiten, das Fahrzeug und jede mitgekommene Person.
+#[tokio::test]
+async fn fahrzeug_umhaengen_nimmt_die_besatzung_mit() {
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let zug1 = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let zug2 = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let zug3 = einheit_bilden(&app, &admin, einsatz, "Zug 3").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, zug1, ef).await;
+    let anna = kraft_anlegen(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    let berta = kraft_anlegen(&app, &admin, einsatz, "Berta", "mannschaft").await;
+    let chef = kraft_anlegen(&app, &admin, einsatz, "Chef", "fuehrer").await;
+    let dora = kraft_anlegen(&app, &admin, einsatz, "Dora", "mannschaft").await;
+    let emil = kraft_anlegen(&app, &admin, einsatz, "Emil", "mannschaft").await;
+    for ep in [anna, berta, chef] {
+        personal_zuordnen(&app, &admin, einsatz, zug1, ep).await;
+    }
+    personal_zuordnen(&app, &admin, einsatz, zug3, dora).await;
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{zug1}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{chef}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    for ep in [anna, berta, chef, dora, emil] {
+        besatzung_zuordnen(&app, &admin, einsatz, ef, ep).await;
+    }
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let mut rx = live.abonniere(einsatz);
+
+    fahrzeug_zuordnen(&app, &admin, einsatz, zug2, ef).await;
+
+    assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, Some(zug2));
+    for ep in [anna, berta, emil] {
+        assert_eq!(bezug_der_person(&pool, ep).await, (Some(zug2), Some(ef)));
+    }
+    assert_eq!(bezug_der_person(&pool, chef).await, (Some(zug1), Some(ef)));
+    assert_eq!(bezug_der_person(&pool, dora).await, (Some(zug3), Some(ef)));
+    let fuehrer: Option<i64> =
+        sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+            .bind(zug1)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(fuehrer, Some(chef), "«Zug 1» behält seinen Führer");
+
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    let erwartet = "Einheit «Zug 2»: Fahrzeug «83-1» zugeordnet, vorher «Zug 1»; \
+                    Besatzung kommt mit: Anna, Berta, Emil";
+    assert!(texte.iter().any(|t| t == erwartet), "{texte:?}");
+
+    let mut gemeldet = common::objekt_ereignisse(
+        &mut rx,
+        &[
+            ("einheit", "einheit_id"),
+            ("fahrzeug", "fahrzeug_id"),
+            ("personal", "personal_id"),
+        ],
+    );
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("einheit".to_string(), zug1),
+        ("einheit".to_string(), zug2),
+        ("fahrzeug".to_string(), ef),
+        ("personal".to_string(), anna),
+        ("personal".to_string(), berta),
+        ("personal".to_string(), emil),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet);
+
+    // Die Liste zeigt die Besatzung in «Zug 2»; in «Zug 1» bleibt nur der Führer.
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        namen(&eintrag(&liste, zug2)["personal_mitglieder"], "name"),
+        ["Anna", "Berta", "Emil"]
+    );
+    assert_eq!(
+        namen(&eintrag(&liste, zug1)["personal_mitglieder"], "name"),
+        ["Chef"]
+    );
+}
+
 /// Der ETB nennt den aufgelösten Funkrufnamen, nicht den Namen vom Disponieren (design.md D2):
 /// ein im Stamm umbenanntes Fahrzeug steht im Eintrag mit seinem jetzigen Namen.
 #[tokio::test]

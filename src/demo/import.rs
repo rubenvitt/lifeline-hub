@@ -479,17 +479,20 @@ impl Ablauf<'_> {
             Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
                 let ef_id = frueher(&self.fahrzeuge, "Fahrzeug", fahrzeug)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let funkrufname = crate::einheit::mitglied_repo::zuordnen_fahrzeug_tx(
+                let z = crate::einheit::mitglied_repo::zuordnen_fahrzeug_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,
                     ef_id,
                 )
-                .await?
-                .funkrufname;
+                .await?;
+                let namen: Vec<String> = z.besatzung.into_iter().map(|(_, n)| n).collect();
                 self.system_etb(
                     conn,
-                    &crate::einheit::etb_text_fahrzeug_zugeordnet(einheit_name, &funkrufname),
+                    &crate::einheit::etb_text_mit_besatzung(
+                        crate::einheit::etb_text_fahrzeug_zugeordnet(einheit_name, &z.funkrufname),
+                        &namen,
+                    ),
                 )
                 .await
             }

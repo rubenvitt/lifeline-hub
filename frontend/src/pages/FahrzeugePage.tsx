@@ -484,7 +484,8 @@ export default function FahrzeugePage() {
   /**
    * Einheit eines Fahrzeugs über die Zuordnungswege des Moduls Einheiten (design.md D2): Wechsel =
    * PUT auf die neue Einheit (der Server hängt um und meldet beide), Leeren = DELETE über die
-   * bisherige, unverändert = nichts (das hält schon `InlineAngabe`). Erfüllt erst, wenn die neue
+   * bisherige, unverändert = nichts (das hält schon `InlineAngabe`). Beim Wechsel kommt die
+   * Besatzung mit (LLH-1238), daher auch das Personal neu. Erfüllt erst, wenn die neue
    * Fahrzeugliste im Cache steht; eine Ablehnung bleibt an der Angabe.
    */
   async function saveEinheit(efId: number, neu: number | null, alt: number | null) {
@@ -492,6 +493,7 @@ export default function FahrzeugePage() {
     if (neu != null) await ordneFahrzeugZu(einsatzId, neu, efId);
     else if (alt != null) await gibFahrzeugFrei(einsatzId, alt, efId);
     void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
   }
