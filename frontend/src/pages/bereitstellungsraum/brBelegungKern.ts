@@ -51,7 +51,7 @@ export function ordnungsschluessel(name: string): string {
  * Gleichstand nach Name. Eine neu eingetretene Kraft hat das jüngste „seit“ und kommt ans Ende.
  */
 export function folgeSchluessel(seitAt: string | null | undefined, name: string): string {
-  return `${seitAt ?? '￿'}\u0000${ordnungsschluessel(name)}`;
+  return `${seitAt ?? '\uffff'}\u0000${ordnungsschluessel(name)}`;
 }
 
 /** Art eines Verlaufseintrags als Wort, ein Wechsel mit dem anderen Raum (D12). */
