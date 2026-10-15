@@ -1,3 +1,46 @@
+## [1.0.0-alpha.129](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.128...v1.0.0-alpha.129) (2026-10-15)
+
+### Wichtige Änderungen
+
+- **Neue Startoption für Web Push:** Mit `--web-push` stellt der Server Benachrichtigungen auch an Browser zu, in denen die App geschlossen ist. Die Option ist ab Werk aus. Wer sie einschaltet, muss zusätzlich `--web-push-kontakt` angeben.
+- **Datenbank:** Neue Tabellen für den Schlüssel der Instanz und für die Web-Push-Abos. Der Schlüssel wird beim ersten Start erzeugt.
+- **Schnittstelle:** Neue Endpunkte zum Abfragen und Verwalten von Web-Push-Abos. Ist Web Push ausgeschaltet, antworten sie mit „nicht gefunden“. Gerätekonten haben keinen Zugriff.
+
+### Benachrichtigungen
+
+- **Auch bei geschlossener App:** Auf der Seite „Benachrichtigungen“ lässt sich Web Push für jeden Browser einzeln einschalten. Hat der Browser die Erlaubnis blockiert, zeigt die Seite einen Warnhinweis. Ein Klick auf die Meldung quittiert sie. Nach jeder Anmeldung wird das Abo erneuert, wenn dieselbe Person Web Push auf diesem Browser eingeschaltet hatte.
+- Ein Abo gilt immer nur für die Sitzung, in der es angelegt wurde. Abmelden, Ablauf oder Beenden der Sitzung entfernt es. Abos, die der Push-Dienst nicht mehr kennt, werden automatisch gelöscht. Der Server nimmt nur Adressen bekannter Push-Dienste an.
+- **Testbenachrichtigung:** Ein neuer Knopf auf der Seite „Benachrichtigungen“ löst eine Meldung des Systems samt Hinweiston aus, auch bei sichtbarem Fenster. Hat der Browser noch nicht entschieden, fragt der Klick zuerst nach der Erlaubnis. Danach steht am Knopf, wie es ausging: „gesendet“, „blockiert“, „nicht verfügbar“ oder „aus“.
+
+### Kräfte und Mittel
+
+- **Besatzung wechselt mit dem Fahrzeug:** Wird ein Fahrzeug einer Einheit zugeordnet oder in eine andere Einheit umgehängt, wechselt seine aktive Besatzung mit. Das gilt auch beim Disponieren und beim Bilden aus einer Vorlage. Der Führer der bisherigen Einheit bleibt dort, ebenso Personen, die einer dritten Einheit angehören. Der ETB-Eintrag nennt die Personen, die mitgewechselt sind.
+- **Umhängen mit einem Klick:** Wird eine angehakte Kraft zwischen Öffnen und Absenden schon anderswo gebunden, lehnt der Server ab. Unter der Zeile steht dann „umhängen aus «…»“ bzw. „umhängen von «…»“, und ein Klick übernimmt die Kraft. Still umgehängt wird nichts.
+- **Bilden aus Vorlage:** Entlassene Fahrzeuge der Vorlage werden wieder aufgenommen statt abgelehnt. Die Seite zeigt sie als „entlassen, wird wieder aufgenommen“.
+- **Nachweis im Meldebild:** In der Kräfteübersicht, im Druck und bei der Übernahme in einen Lagebericht stehen unter „Entlassen“ jetzt auch entlassene Fahrzeuge. Unter „Aus dem Einsatz genommen“ steht das herausgenommene Material. Jeder Eintrag trägt die DTG seines Endes, stornierte Einträge erscheinen nicht.
+- **Stärke einheitlich gezählt:** Eine Person ohne Stärke-Position zählt jetzt überall als Mannschaft. Bisher ließ der Server sie weg, das Meldebild zählte sie dagegen mit. Einheiten-Seite, Einsatzabschnitte, UHS, Lagemonitor und Einsatzbericht zeigen damit dieselbe Stärke wie das Meldebild.
+- **„Bestätigt von“** zeigt Personen jetzt wie die übrigen Personenauswahlen als „Name · Funktion“.
+
+### Lagekarte
+
+- **Kennzeichen für Führungskräfte:** Einheitsführer und Abschnittsleiter tragen im taktischen Zeichen den Indikator für Führungskräfte (Raute mit schwarzer Kappe). Alle anderen Personen bleiben ohne.
+- Die Seitenleiste nennt unter dem Namen einer Person ihre Einsatzfunktion und zeigt Funktion und Qualifikation getrennt. Das taktische Zeichen richtet sich weiter nach der Qualifikation.
+
+### Bedienung
+
+- Das Aufklappsymbol in Baumtabellen (Einheiten, Meldebild, Funkplan, Kommunikationsplan) wächst jetzt mit der eingestellten Bediendichte und ist damit auch bei großer Darstellung gut zu treffen.
+
+### Desktop-App
+
+- **Mehrere Fenster:** Über das Menü „Neues Fenster“ (⌘N bzw. Strg+N) öffnet sich ein weiteres Fenster mit derselben Seite. Schließt man das erste Fenster, bleiben die anderen offen. Kommt dieselbe Meldung aus mehreren Fenstern, erscheint sie nur einmal.
+- **Serverauswahl:** Die Verbindungsmaske merkt sich bis zu acht zuletzt verbundene Server. Ein Klick verbindet, „×“ entfernt einen Server aus der Liste.
+- **„Server nicht erreichbar“:** Antwortet der Server nicht, zeigt das Fenster eine eigene Anzeige mit „Erneut versuchen“ und „Server wechseln“. Sobald der Server wieder antwortet, lädt die Seite von selbst.
+
+### Demo und Dokumentation
+
+- Der Demo-Einsatz enthält jetzt einen Sanitätszug mit Untereinheiten, besetzten Fahrzeugen und zwei Materialposten. Einer davon hat einen Ausfall.
+- Die Anwenderdokumentation beschreibt Web Push, die Testbenachrichtigung und den neuen Nachweis im Meldebild. Die Bilder sind auf den aktuellen Stand gebracht, darunter Baumtabellen, Kräftebaum und gesperrte Steuerelemente mit gestricheltem Rand.
+
 ## [1.0.0-alpha.128](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.127...v1.0.0-alpha.128) (2026-10-15)
 
 ### Betrieb und Installation
