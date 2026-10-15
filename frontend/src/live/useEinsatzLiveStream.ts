@@ -9,6 +9,7 @@ import {
   type EinsatzStreamEvent,
   type LiveAbgleich,
 } from '../api/queryKeys';
+import { benachrichtigungListener, meldeNachreichen } from './benachrichtigungListener';
 import { meldeEinsatzStrom } from './einsatzStromStore';
 import { erzeugeLiveSammler, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
@@ -28,7 +29,8 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  *
  * Listener, Invalidierung und lagged-Vollabgleich werden aus `EINSATZ_STREAM_EVENTS`
  * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Nur Ereignisse
- * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung) und `lagged` stehen explizit hier.
+ * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung), die Benachrichtigungen (an die
+ * Zentrale, `benachrichtigungListener.ts`) und `lagged` stehen explizit hier.
  * Invalidiert wird gebündelt über den Sammler der Verbindung (LFH-922, `liveInvalidierung.ts`),
  * die Modulzähler über einen zweiten mit längerem Fenster (LFH-935); Ton und Toast laufen sofort.
  * Trägt die Payload eine Objekt-Kennung, ordnet `EINSATZ_STREAM_ZIELE` gezielt zu (nur Detail,
@@ -86,13 +88,17 @@ export function useEinsatzLiveStream(
     // lagged (Reconnect/Overflow) → alle Registry-Keys refetchen. Bewusst OHNE Ton, sonst
     // Fehlalarm ohne neue Sofortmeldung.
     const alleKeys = [...new Set(Object.values(EINSATZ_STREAM_EVENTS).flat())];
+    // Verlorene Benachrichtigungen holt die Zentrale über die offene Liste nach (design.md D5).
     const vollabgleich = () => {
       invalAlle(alleKeys);
       invalidiereOrgLiveKeys(sammler);
+      meldeNachreichen();
     };
     listeners.push(['lagged', vollabgleich]);
     // Org-Ereignisse auf derselben Verbindung (LFH-734).
     listeners.push(...orgListener(sammler));
+    // Benachrichtigungen (Einsatz- und Org-Arten) gehen an die Zentrale im Layout.
+    listeners.push(...benachrichtigungListener());
 
     // Sofortmeldung: Listen aktualisieren UND alarmieren (Ton + Toast). Der Toast läuft über ein
     // window-CustomEvent (AlarmZentrale im Layout). NICHT im lagged-Fan-out.

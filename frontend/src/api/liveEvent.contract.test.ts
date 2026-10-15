@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { EINSATZ_STREAM_EVENTS } from './queryKeys';
 import type { EinsatzStreamEvent } from './queryKeys';
 import type { LiveEvent } from './types';
+import {
+  BENACHRICHTIGUNG_EREIGNIS,
+  benachrichtigungListener,
+} from '../live/benachrichtigungListener';
 
 /**
  * Cross-Language-Kontrakt der SSE-Wire-Event-Namen. Das Rust-`LiveEvent`-Enum ist die
  * Wahrheitsquelle und MUSS exakt decken, was das Frontend kennt: {@link EINSATZ_STREAM_EVENTS}
  * ∪ {sofortmeldung, lagged, benachrichtigung} (die behandelt der Client außerhalb der Registry;
- * `benachrichtigung` ist empfängergebunden und invalidiert keinen Cache, LLH-1207).
+ * `benachrichtigung` ist empfängergebunden, invalidiert keinen Cache und geht an die
+ * Benachrichtigungszentrale, `live/benachrichtigungListener.ts`).
  *
  * Der Drift-Schutz ist TYP-LEVEL (`AssertEqual` unten, greift in `tsc`): ein neues Backend-Event
  * oder ein toter FE-Key bricht den Typcheck. `LiveEvent` ist ein reiner Typ, deshalb pinnen die
@@ -15,7 +20,7 @@ import type { LiveEvent } from './types';
  */
 
 /** Wire-Events, die der Client fest verdrahtet behandelt, ohne Registry-Eintrag. */
-const NICHT_REGISTRY = ['sofortmeldung', 'lagged', 'benachrichtigung'] as const;
+const NICHT_REGISTRY = ['sofortmeldung', 'lagged', BENACHRICHTIGUNG_EREIGNIS] as const;
 
 /** Alle Wire-Event-Namen, die das Frontend kennt: Registry-Keys ∪ {@link NICHT_REGISTRY}. */
 type FeWireEvent = EinsatzStreamEvent | (typeof NICHT_REGISTRY)[number];
@@ -38,5 +43,9 @@ describe('LiveEvent ↔ EINSATZ_STREAM_EVENTS (LFH-298 Cross-Language-Kontrakt)'
   it('bildet die FE-Wire-Event-Menge duplikatfrei (Registry ∪ NICHT_REGISTRY)', () => {
     const feWireEvents = [...Object.keys(EINSATZ_STREAM_EVENTS), ...NICHT_REGISTRY];
     expect(new Set(feWireEvents).size).toBe(feWireEvents.length);
+  });
+
+  it('verdrahtet `benachrichtigung` am Einsatz-Strom (Benachrichtigungszentrale)', () => {
+    expect(benachrichtigungListener().map(([ev]) => ev)).toContain(BENACHRICHTIGUNG_EREIGNIS);
   });
 });

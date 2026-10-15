@@ -1018,6 +1018,11 @@ export function einsatzEinstellungenPfad(
 
 /** Einlöseseite eines Kopplungscodes. Ohne Einsatz-Präfix: das Gerät kennt seinen Einsatz erst
  *  nach dem Einlösen. */
+// ── Benachrichtigungen (kcjecn9e D6) ─────────────────────────────────────────────
+
+/** Einstellungen der eigenen Benachrichtigungen, im Benutzermenü. */
+export const BENACHRICHTIGUNGEN_PFAD = '/benachrichtigungen';
+
 // ── Hilfe (LFH-1096) ─────────────────────────────────────────────────────────
 
 /** Hilfe-Seite; offen ohne Anmeldung, auch für gekoppelte Geräte. */

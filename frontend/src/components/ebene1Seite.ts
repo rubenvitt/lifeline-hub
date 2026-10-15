@@ -34,6 +34,9 @@ export function ebene1Seite(pathname: string): Ebene1Ort {
   const teile = pathname.split('/').filter(Boolean);
   if (teile[0] === 'einsaetze' && teile.length === 1) return { titel: ['Einsätze'], ort: null };
   if (teile[0] === 'profil') return { titel: ['Profil'], ort: ['Profil'] };
+  if (teile[0] === 'benachrichtigungen') {
+    return { titel: ['Benachrichtigungen'], ort: ['Benachrichtigungen'] };
+  }
   if (teile[0] === 'admin') {
     const sektion = verwaltungsSektion(teile.slice(1));
     return sektion

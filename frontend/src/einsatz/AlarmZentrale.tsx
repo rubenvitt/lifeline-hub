@@ -7,18 +7,8 @@ import {
 } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
-import { App, Button, Dropdown, Tooltip, theme } from 'antd';
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
-import { useNavigate } from 'react-router';
+import { Button, Dropdown, Tooltip, theme } from 'antd';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   ALARM_TON_STATUS_EVENT,
   alarmTonStatus,
@@ -32,12 +22,11 @@ import {
   DESKTOP_ZUSTAND_EVENT,
   desktopPermission,
   fordereDesktopPermission,
-  type DesktopMeldung,
   schliesseAlleDesktopAlarme,
   schliesseDesktopAlarm,
-  schliesseDesktopMeldung,
-  zeigeDesktopAlarm,
 } from '../alarm/desktopAlarm';
+import { useAlarmToasts } from '../alarm/useAlarmToasts';
+import { quittiereNachNutzer, useBenachrichtigungen } from '../alarm/useBenachrichtigungen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
@@ -124,41 +113,11 @@ type ErinnerungDetail = {
   bezug_id?: number | null;
 };
 
-type AlarmToast = {
-  key: string;
-  art: 'warning' | 'info';
-  titel: string;
-  beschreibung?: string;
-  aktion: ReactNode;
-  ziel: AlarmZiel;
-};
-
-const MAX_SICHTBARE_TOASTS = 3;
-
 /** Längster Wortlaut des Ton-Knopfs; das Wort hält seine Breite (LLH-1158). */
 const TON_WORT_LAENGSTES = 'Ton wird geprüft';
 
 /** Zustand einer Sofortmeldung in Toast und OS-Meldung (LFH-1078: Zustand statt Bitte). */
 const SOFORT_ZUSTAND = 'Bestätigung ausstehend';
-
-type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung' | 'wetter-pegel';
-
-type AlarmScope = {
-  keyPrefix: string;
-  sammelKey: string;
-  aktiv: boolean;
-  zaehler: number;
-  einzelneToastKeys: string[];
-  einzelneToastZiele: Map<string, AlarmZiel>;
-  gebuendelteToastZiele: Map<string, AlarmZiel>;
-  eigeneToastKeys: Set<string>;
-  /** Key des zuletzt gezeigten Unwetterhinweises — ein neuer ersetzt ihn (ein Platz im Budget). */
-  unwetterKey: string | null;
-  /** `tag` der Desktop-Meldung zum letzten Unwetterhinweis — ein neuer ersetzt auch sie. */
-  unwetterTag: string | null;
-  /** Desktop-Meldung je Toast-Key: Quittieren im Toast schließt sie mit (LFH-951). */
-  desktopMeldungen: Map<string, DesktopMeldung>;
-};
 
 /**
  * Zustand der Benachrichtigungen (LFH-950). `nicht-verfuegbar` ist eine Eigenschaft des Geräts
@@ -204,221 +163,29 @@ const GESTE_GILT_MS = 2000;
 const DOPPELKLICK_MS = 500;
 
 /**
- * Einsatzweite Alarm-Zentrale: lauscht auf `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die
- * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) sowie auf `lfh:unwetter-alarm` (vom
- * Rahmen, `wetter/useUnwetterHinweis.ts`) und zeigt NICHT selbst-schließende
- * Toasts mit Deeplink zur Quelle, optional eine Desktop-Benachrichtigung bei Hintergrund-Tab.
+ * Einsatzweite Benachrichtigungszentrale (design.md D5): zeigt die Benachrichtigungen des
+ * Servers (`alarm/useBenachrichtigungen.ts`) und, bis tasks.md 3.5, die Sonderwege
+ * `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die Ablösungshinweise (von
+ * useEinsatzLiveStream ausgelöst) sowie `lfh:unwetter-alarm` (vom Rahmen,
+ * `wetter/useUnwetterHinweis.ts`). Alle teilen EIN Budget nicht selbst-schließender Toasts mit
+ * Deeplink zur Quelle (`alarm/useAlarmToasts.tsx`), optional eine OS-Meldung bei Hintergrund-Tab.
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
  * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
  */
 export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
-  const { notification } = App.useApp();
-  const navigate = useNavigate();
   const zone = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
-  const instanzId = useId();
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
-  // Jede Instanz verwaltet pro Einsatz einen eigenen Scope, damit langlebige Notices beim
-  // Einsatzwechsel gezielt abgeräumt werden können, ohne fremde Notifications anzutasten.
-  const alarmScope = useMemo<AlarmScope>(() => {
-    const keyPrefix = `alarm-${einsatzId}-${instanzId}`;
-    return {
-      keyPrefix,
-      sammelKey: `${keyPrefix}-zusammenfassung`,
-      aktiv: true,
-      zaehler: 0,
-      einzelneToastKeys: [],
-      einzelneToastZiele: new Map(),
-      gebuendelteToastZiele: new Map(),
-      eigeneToastKeys: new Set(),
-      unwetterKey: null,
-      unwetterTag: null,
-      desktopMeldungen: new Map(),
-    };
-  }, [einsatzId, instanzId]);
-
-  const alleToastsSchliessen = useCallback(() => {
-    for (const key of alarmScope.eigeneToastKeys) {
-      notification.destroy(key);
-    }
-    alarmScope.eigeneToastKeys.clear();
-    alarmScope.einzelneToastKeys = [];
-    alarmScope.einzelneToastZiele.clear();
-    alarmScope.gebuendelteToastZiele.clear();
-    alarmScope.desktopMeldungen.clear();
-    // Mit den Toasts gehen die OS-Meldungen: Einsatzwechsel, Unmount und „Zu …" (LFH-951).
-    schliesseAlleDesktopAlarme();
-  }, [alarmScope, notification]);
-
-  /**
-   * Schließt die OS-Meldung zum Toast `key` (LFH-951). Über das Objekt, nicht den `tag`: zum
-   * selben Bezug kann inzwischen eine neuere Meldung stehen, die niemand quittiert hat.
-   */
-  const desktopMeldungSchliessen = useCallback(
-    (key: string) => {
-      const desktop = alarmScope.desktopMeldungen.get(key);
-      if (!desktop) return;
-      alarmScope.desktopMeldungen.delete(key);
-      schliesseDesktopMeldung(desktop);
-    },
-    [alarmScope],
-  );
-
-  /**
-   * Ein Einzel-Toast ist erledigt (✕ oder „Öffnen"): Buchführung aufräumen, OS-Meldung schließen.
-   * „Öffnen" ruft das selbst, denn `notification.destroy` ruft kein `onClose`; ein in die
-   * Zusammenfassung verdrängter Toast geht ebenfalls über `destroy` und bleibt so unquittiert.
-   */
-  const toastErledigt = useCallback(
-    (key: string) => {
-      desktopMeldungSchliessen(key);
-      alarmScope.eigeneToastKeys.delete(key);
-      alarmScope.einzelneToastZiele.delete(key);
-      alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter((k) => k !== key);
-    },
-    [alarmScope, desktopMeldungSchliessen],
-  );
-
-  const zielPfad = useCallback(
-    (ziel: AlarmZiel) => {
-      if (ziel === 'auftraege') return auftraegePfad(einsatzId);
-      if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
-      if (ziel === 'abloesung') return abloesungPfad(einsatzId);
-      if (ziel === 'wetter-pegel') return wetterPegelPfad(einsatzId);
-      return meldungenPfad(einsatzId);
-    },
-    [einsatzId],
-  );
-
-  const zeigeZusammenfassung = useCallback(() => {
-    if (!alarmScope.aktiv) return;
-    const anzahl = alarmScope.gebuendelteToastZiele.size;
-    const ziele = new Set(alarmScope.gebuendelteToastZiele.values());
-    const nurSofortmeldungen = ziele.size === 1 && ziele.has('meldungen');
-    const nurAuftraege = ziele.size === 1 && ziele.has('auftraege');
-    const nurErinnerungen = ziele.size === 1 && ziele.has('erinnerungen');
-    const nurAbloesungen = ziele.size === 1 && ziele.has('abloesung');
-    // Zahl und Art im Titel, das Ziel am Knopf (LFH-1078): kein Bittsatz darunter. Die Art trägt
-    // den Zustand mit, den sonst die Beschreibung nannte („überfällig“, „fällig“).
-    let titel = `${anzahl} weitere Alarme`;
-    if (nurSofortmeldungen) titel = `${anzahl} weitere Sofortmeldungen`;
-    else if (nurAuftraege) titel = `${anzahl} weitere überfällige Aufträge`;
-    else if (nurErinnerungen) titel = `${anzahl} weitere fällige Erinnerungen`;
-    else if (nurAbloesungen) titel = `${anzahl} weitere Ablösungen`;
-    const zielKonfiguration: Array<{ ziel: AlarmZiel; text: string }> = [
-      { ziel: 'meldungen', text: 'Zu Meldungen' },
-      { ziel: 'auftraege', text: 'Zu Aufträgen' },
-      { ziel: 'erinnerungen', text: 'Zu Erinnerungen' },
-      { ziel: 'abloesung', text: 'Zu Ablösungen' },
-      { ziel: 'wetter-pegel', text: 'Zu Wetter & Pegel' },
-    ];
-
-    alarmScope.eigeneToastKeys.add(alarmScope.sammelKey);
-    notification.warning({
-      key: alarmScope.sammelKey,
-      title: titel,
-      duration: 0,
-      actions: (
-        <>
-          {zielKonfiguration
-            .filter(({ ziel }) => ziele.has(ziel))
-            .map(({ ziel, text }, index) => (
-              <Button
-                key={ziel}
-                type={index === 0 ? 'primary' : 'default'}
-                onClick={() => {
-                  if (!alarmScope.aktiv) return;
-                  navigate(zielPfad(ziel));
-                  alleToastsSchliessen();
-                }}
-              >
-                {text}
-              </Button>
-            ))}
-        </>
-      ),
-      onClose: () => {
-        alarmScope.eigeneToastKeys.delete(alarmScope.sammelKey);
-        // Mit der Zusammenfassung sind ihre Alarme quittiert, auch die OS-Meldungen dazu.
-        for (const key of alarmScope.gebuendelteToastZiele.keys()) desktopMeldungSchliessen(key);
-        alarmScope.gebuendelteToastZiele.clear();
-      },
-    });
-  }, [
-    alarmScope,
-    alleToastsSchliessen,
-    desktopMeldungSchliessen,
-    navigate,
-    notification,
-    zielPfad,
-  ]);
-
-  /**
-   * Höchstens drei sichtbare Notices, unabhängig von der globalen AntApp-Konfiguration: beim
-   * vierten Ereignis werden die drei vorherigen zusammengefasst und der neueste bleibt einzeln;
-   * danach wandert je neuem Ereignis der bisher neueste in die Zusammenfassung.
-   */
-  const zeigeAlarmToast = useCallback(
-    (toast: AlarmToast) => {
-      if (!alarmScope.aktiv) return;
-      const toastEntfernen = () => toastErledigt(toast.key);
-      if (alarmScope.einzelneToastKeys.includes(toast.key)) {
-        alarmScope.eigeneToastKeys.add(toast.key);
-        notification[toast.art]({
-          key: toast.key,
-          title: toast.titel,
-          description: toast.beschreibung,
-          duration: 0,
-          actions: toast.aktion,
-          onClose: toastEntfernen,
-        });
-        return;
-      }
-      if (alarmScope.gebuendelteToastZiele.has(toast.key)) return;
-
-      if (
-        alarmScope.gebuendelteToastZiele.size > 0 ||
-        alarmScope.einzelneToastKeys.length >= MAX_SICHTBARE_TOASTS
-      ) {
-        for (const verdraengt of alarmScope.einzelneToastKeys) {
-          const ziel = alarmScope.einzelneToastZiele.get(verdraengt);
-          if (ziel) alarmScope.gebuendelteToastZiele.set(verdraengt, ziel);
-          notification.destroy(verdraengt);
-          alarmScope.eigeneToastKeys.delete(verdraengt);
-        }
-        alarmScope.einzelneToastKeys = [];
-        alarmScope.einzelneToastZiele.clear();
-        zeigeZusammenfassung();
-      }
-
-      alarmScope.einzelneToastKeys.push(toast.key);
-      alarmScope.einzelneToastZiele.set(toast.key, toast.ziel);
-      alarmScope.eigeneToastKeys.add(toast.key);
-      notification[toast.art]({
-        key: toast.key,
-        title: toast.titel,
-        description: toast.beschreibung,
-        duration: 0,
-        actions: toast.aktion,
-        onClose: toastEntfernen,
-      });
-    },
-    [alarmScope, notification, toastErledigt, zeigeZusammenfassung],
-  );
-
-  // `duration: 0`-Notices überleben sonst ihre Komponente. Bei Logout/Unmount und vor dem nächsten
-  // Einsatz werden deshalb nur die Keys dieses Scopes zerstört.
-  useEffect(() => {
-    // StrictMode führt Setup → Cleanup → Setup aus; der zweite Setup muss denselben Scope wieder
-    // freigeben.
-    alarmScope.aktiv = true;
-    return () => {
-      alarmScope.aktiv = false;
-      alleToastsSchliessen();
-    };
-  }, [alarmScope, alleToastsSchliessen]);
+  // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Sonderwege und Benachrichtigungen teilen
+  // es und, über den fachlichen Schlüssel, ihren Toast.
+  const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
+  useBenachrichtigungen(einsatzId, toasts);
+  // Schlüssel ohne fachliche Kennung (Ereignis ohne ID) zählen hoch.
+  const zaehlerRef = useRef(0);
+  /** Letzter Unwetterhinweis dieses Einsatzes: ein neuer ersetzt ihn (ein Platz im Budget). */
+  const unwetterRef = useRef<{ einsatzId: number; schluessel: string; tag: string } | null>(null);
 
   // Stummer Einsatz-Einstiegstest + Statusabgleich mit späteren Abspielversuchen.
   useEffect(() => {
@@ -458,216 +225,129 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
   }, []);
 
+  // ── Sonderwege (bis tasks.md 3.5) ──────────────────────────────────────────────────────
+  // Sofortmeldung, Erinnerung und Ablösung kommen noch als eigene Live-Ereignisse; Ton spielt
+  // `useEinsatzLiveStream`. Ihre Schlüssel gleichen denen der Benachrichtigung derselben Art
+  // (`toastSchluessel`), damit beide Wege einen Toast teilen.
+
   // Sofortmeldung.
   useEffect(() => {
     const onSofort = (ev: Event) => {
       const detail = (ev as CustomEvent<{ meldung_id?: number }>).detail ?? {};
-      const fachKey =
-        detail.meldung_id != null
-          ? `sofort-${detail.meldung_id}`
-          : `sofort-${++alarmScope.zaehler}`;
-      const key = `${alarmScope.keyPrefix}-${fachKey}`;
-      // `tag` nur mit fachlichem Schlüssel; der Zähler ist keiner (LFH-951).
-      const desktopTag =
-        detail.meldung_id != null ? `${einsatzId}-sofort-${detail.meldung_id}` : undefined;
-      const oeffnen = () => {
-        if (!alarmScope.aktiv) return;
-        navigate(meldungenPfad(einsatzId));
-        notification.destroy(key);
-        toastErledigt(key);
-      };
-      zeigeAlarmToast({
-        key,
+      const id = detail.meldung_id;
+      const schluessel = id != null ? `sofort-${id}` : `sofort-z${++zaehlerRef.current}`;
+      toasts.melde({
+        schluessel,
         art: 'warning',
         titel: 'Sofortmeldung eingegangen',
         // Der Zustand, nicht die Bitte (LFH-1078); bestätigt wird über „Öffnen“ in den Meldungen.
         // Den Betreff trägt das Live-Ereignis nicht (nur `meldung_id`).
         beschreibung: SOFORT_ZUSTAND,
-        aktion: (
-          <Button type="primary" onClick={oeffnen}>
-            Öffnen
-          </Button>
-        ),
+        pfad: meldungenPfad(einsatzId),
         ziel: 'meldungen',
+        gruppe: 'sofort',
+        name: 'Sofortmeldung',
+        stufe: 'alarm',
+        // `tag` nur mit fachlichem Schlüssel; der Zähler ist keiner (LFH-951).
+        desktop: { tag: id != null ? `${einsatzId}-${schluessel}` : undefined },
       });
-      const desktop = zeigeDesktopAlarm('Sofortmeldung eingegangen', {
-        koerper: SOFORT_ZUSTAND,
-        tag: desktopTag,
-        ziel: meldungenPfad(einsatzId),
-        beiKlick: () => {
-          if (alarmScope.aktiv) navigate(meldungenPfad(einsatzId));
-        },
-      });
-      if (desktop) alarmScope.desktopMeldungen.set(key, desktop);
     };
     window.addEventListener('lfh:sofortmeldung', onSofort);
     return () => window.removeEventListener('lfh:sofortmeldung', onSofort);
-  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
+  }, [einsatzId, toasts]);
 
   // Fällige Erinnerung / Auftrags-Eskalation.
   useEffect(() => {
     const onErinnerung = (ev: Event) => {
       const detail = (ev as CustomEvent<ErinnerungDetail>).detail ?? {};
       const istAuftrag = detail.bezug_typ === 'auftrag';
-      const fachKey = istAuftrag
-        ? detail.bezug_id != null
-          ? `auftrag-${detail.bezug_id}`
-          : `auftrag-${++alarmScope.zaehler}`
-        : detail.erinnerung_id != null
-          ? `erinnerung-${detail.erinnerung_id}`
-          : `erinnerung-${++alarmScope.zaehler}`;
-      const key = `${alarmScope.keyPrefix}-${fachKey}`;
       const fachId = istAuftrag ? detail.bezug_id : detail.erinnerung_id;
-      const desktopTag =
-        fachId != null
-          ? `${einsatzId}-${istAuftrag ? 'auftrag' : 'erinnerung'}-${fachId}`
-          : undefined;
+      const art = istAuftrag ? 'auftrag' : 'erinnerung';
+      const schluessel = fachId != null ? `${art}-${fachId}` : `${art}-z${++zaehlerRef.current}`;
       const titel = istAuftrag ? 'Auftrag überfällig' : 'Erinnerung fällig';
-      // Den Titel des Auftrags bzw. der Erinnerung trägt das Live-Ereignis nicht (nur Kennungen).
-      const beschreibung = istAuftrag ? 'Quittierfrist überschritten' : undefined;
-      const ziel =
-        istAuftrag && detail.bezug_id != null
-          ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
-          : erinnerungenPfad(einsatzId);
-      const oeffnen = () => {
-        if (!alarmScope.aktiv) return;
-        navigate(ziel);
-        notification.destroy(key);
-        toastErledigt(key);
-      };
-      zeigeAlarmToast({
-        key,
+      toasts.melde({
+        schluessel,
         art: istAuftrag ? 'warning' : 'info',
         titel,
-        beschreibung,
-        aktion: (
-          <Button type="primary" onClick={oeffnen}>
-            Öffnen
-          </Button>
-        ),
+        // Den Titel des Auftrags bzw. der Erinnerung trägt das Live-Ereignis nicht (nur Kennungen).
+        beschreibung: istAuftrag ? 'Quittierfrist überschritten' : undefined,
+        pfad:
+          istAuftrag && detail.bezug_id != null
+            ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
+            : erinnerungenPfad(einsatzId),
         ziel: istAuftrag ? 'auftraege' : 'erinnerungen',
+        gruppe: istAuftrag ? 'auftrag-ueberfaellig' : 'erinnerung',
+        name: titel,
+        stufe: 'alarm',
+        desktop: { tag: fachId != null ? `${einsatzId}-${schluessel}` : undefined },
       });
-      const desktop = zeigeDesktopAlarm(titel, {
-        koerper: beschreibung,
-        tag: desktopTag,
-        ziel,
-        beiKlick: () => {
-          if (alarmScope.aktiv) navigate(ziel);
-        },
-      });
-      if (desktop) alarmScope.desktopMeldungen.set(key, desktop);
     };
     window.addEventListener('lfh:erinnerung-alarm', onErinnerung);
     return () => window.removeEventListener('lfh:erinnerung-alarm', onErinnerung);
-  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
+  }, [einsatzId, toasts]);
 
-  // Fällige oder anstehende Ablösung — durch DENSELBEN Budget-Weg (`zeigeAlarmToast`), ein
-  // eigener Zähler hebelte das gemeinsame Budget aus. Vorwarnung und Fälligkeit sind zwei
-  // Hinweise (eigener Key je Art), der Scheduler löst je Frist einmal aus.
+  // Fällige oder anstehende Ablösung — durch DASSELBE Budget. Vorwarnung und Fälligkeit sind
+  // zwei Hinweise (eigener Schlüssel je Art), der Scheduler löst je Frist einmal aus.
   useEffect(() => {
     const onAbloesung = (ev: Event) => {
       const detail = (ev as CustomEvent<AbloesungAlarmDetail>).detail ?? {};
-      const fachKey =
+      const schluessel =
         detail.abloesung_id != null
           ? `abloesung-${detail.abloesung_id}-${detail.art ?? 'faellig'}`
-          : `abloesung-${++alarmScope.zaehler}`;
-      const key = `${alarmScope.keyPrefix}-${fachKey}`;
-      const desktopTag =
-        detail.abloesung_id != null
-          ? `${einsatzId}-abloesung-${detail.abloesung_id}-${detail.art ?? 'faellig'}`
-          : undefined;
+          : `abloesung-z${++zaehlerRef.current}`;
       const { titel, beschreibung } = abloesungAlarmText(detail, zone);
-      const ziel = abloesungPfad(einsatzId);
-      const oeffnen = () => {
-        if (!alarmScope.aktiv) return;
-        navigate(ziel);
-        notification.destroy(key);
-        toastErledigt(key);
-      };
-      zeigeAlarmToast({
-        key,
+      toasts.melde({
+        schluessel,
         art: detail.art === 'vorwarnung' ? 'info' : 'warning',
         titel,
         beschreibung,
-        aktion: (
-          <Button type="primary" onClick={oeffnen}>
-            Öffnen
-          </Button>
-        ),
+        pfad: abloesungPfad(einsatzId),
         ziel: 'abloesung',
-      });
-      const desktop = zeigeDesktopAlarm(titel, {
-        koerper: beschreibung,
-        tag: desktopTag,
-        ziel,
-        beiKlick: () => {
-          if (alarmScope.aktiv) navigate(ziel);
+        gruppe: 'abloesung',
+        name: titel,
+        stufe: 'alarm',
+        desktop: {
+          tag: detail.abloesung_id != null ? `${einsatzId}-${schluessel}` : undefined,
         },
       });
-      if (desktop) alarmScope.desktopMeldungen.set(key, desktop);
     };
     window.addEventListener('lfh:abloesung-alarm', onAbloesung);
     return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
-  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast, zone]);
+  }, [einsatzId, toasts, zone]);
 
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
   // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
   // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
   // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
-  // Plätze. Eigener Key je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
+  // Plätze. Eigener Schlüssel je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
   useEffect(() => {
     const onUnwetter = (ev: Event) => {
       const detail = (ev as CustomEvent<UnwetterDetail>).detail ?? {};
-      // Je Auslösung ein eigener Key: läge der alte Hinweis desselben Paars noch gebündelt in der
-      // Zusammenfassung, verschluckte „schon gebündelt" sonst den neuen.
-      const key = `${alarmScope.keyPrefix}-unwetter-${detail.schluessel ?? 'ohne'}-${++alarmScope.zaehler}`;
-      const vorher = alarmScope.unwetterKey;
-      if (vorher && alarmScope.einzelneToastKeys.includes(vorher)) {
-        notification.destroy(vorher);
-        toastErledigt(vorher);
-      }
-      alarmScope.unwetterKey = key;
+      const paar = detail.schluessel ?? 'ohne';
+      const schluessel = `unwetter-${paar}-${++zaehlerRef.current}`;
+      const vorher = unwetterRef.current?.einsatzId === einsatzId ? unwetterRef.current : null;
+      if (vorher && toasts.istEinzeln(vorher.schluessel)) toasts.entferne(vorher.schluessel);
       // Die OS-Meldung zieht mit dem Toast gleich (LFH-951): die neue ersetzt die ältere, auch
       // wenn das Paar ein anderes ist. Dasselbe Paar ersetzt sie schon über den `tag`.
-      const desktopTag = `${einsatzId}-unwetter-${detail.schluessel ?? 'ohne'}`;
-      if (alarmScope.unwetterTag && alarmScope.unwetterTag !== desktopTag) {
-        schliesseDesktopAlarm(alarmScope.unwetterTag);
-      }
-      alarmScope.unwetterTag = desktopTag;
-      const titel = detail.titel ?? 'Unwetterwarnung';
-      const beschreibung = detail.beschreibung ?? 'Unwetterwarnung für den Einsatzort';
-      const ziel = wetterPegelPfad(einsatzId);
-      const oeffnen = () => {
-        if (!alarmScope.aktiv) return;
-        navigate(ziel);
-        notification.destroy(key);
-        toastErledigt(key);
-      };
-      zeigeAlarmToast({
-        key,
+      const tag = `${einsatzId}-unwetter-${paar}`;
+      if (vorher && vorher.tag !== tag) schliesseDesktopAlarm(vorher.tag);
+      unwetterRef.current = { einsatzId, schluessel, tag };
+      toasts.melde({
+        schluessel,
         art: 'warning',
-        titel,
-        beschreibung,
-        aktion: (
-          <Button type="primary" onClick={oeffnen}>
-            Öffnen
-          </Button>
-        ),
+        titel: detail.titel ?? 'Unwetterwarnung',
+        beschreibung: detail.beschreibung ?? 'Unwetterwarnung für den Einsatzort',
+        pfad: wetterPegelPfad(einsatzId),
         ziel: 'wetter-pegel',
+        gruppe: 'unwetter',
+        name: 'Unwetterwarnung',
+        stufe: 'alarm',
+        desktop: { tag },
       });
-      const desktop = zeigeDesktopAlarm(titel, {
-        koerper: beschreibung,
-        tag: desktopTag,
-        ziel,
-        beiKlick: () => {
-          if (alarmScope.aktiv) navigate(ziel);
-        },
-      });
-      if (desktop) alarmScope.desktopMeldungen.set(key, desktop);
     };
     window.addEventListener('lfh:unwetter-alarm', onUnwetter);
     return () => window.removeEventListener('lfh:unwetter-alarm', onUnwetter);
-  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
+  }, [einsatzId, toasts]);
 
   // Freischaltung bei der ersten Bediengeste irgendwo in der App (LFH-950): ein Klick auf die
   // Karte genügt, niemand muss die Glocke finden. Der Zuhörer merkt sich außerdem den Zustand

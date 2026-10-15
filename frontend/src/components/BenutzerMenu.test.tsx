@@ -184,6 +184,23 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     expect(await screen.findByRole('heading', { name: 'Hilfe-Seite' })).toBeInTheDocument();
   });
 
+  it('„Benachrichtigungen“ öffnet die eigenen Einstellungen (kcjecn9e D6)', async () => {
+    server.use(meHandler(benutzer));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <Routes>
+          <Route path="/" element={<BenutzerMenu />} />
+          <Route path="/benachrichtigungen" element={<h1>Benachrichtigungen-Seite</h1>} />
+        </Routes>
+      </ThemeModeProvider>,
+    );
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: /^Benachrichtigungen$/ }));
+    expect(
+      await screen.findByRole('heading', { name: 'Benachrichtigungen-Seite' }),
+    ).toBeInTheDocument();
+  });
+
   it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {
     zeige();
     await oeffne();

@@ -9,6 +9,7 @@ import { leseLetztenOrt } from '../einsatz/letzterOrt';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
 import BenutzerMenu from './BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from './rahmenOben';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
@@ -203,6 +204,7 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      <OrgBenachrichtigungen />
       <Header
         ref={kopfRef}
         data-lfh="rahmen-kopf"
