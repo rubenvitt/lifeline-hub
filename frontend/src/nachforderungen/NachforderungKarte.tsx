@@ -1,6 +1,6 @@
 import { Button, Flex, Space, Typography } from 'antd';
-import { memo, type ReactNode } from 'react';
-import type { Nachforderung, NachforderungStatus } from '../api/types';
+import { memo, useId, type ReactNode } from 'react';
+import type { EinsatzMaterial, Nachforderung, NachforderungStatus } from '../api/types';
 import {
   NACHFORDERUNG_HANDLUNG,
   NACHFORDERUNG_STATUS,
@@ -12,6 +12,12 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
+import { KennungsLink } from '../components/kennungsLink';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
+import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
+import { materialPfad } from '../routing/deeplinks';
+import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 
 const { Text } = Typography;
 
@@ -29,6 +35,64 @@ const NAECHSTER: Partial<Record<NachforderungStatus, NachforderungStatus>> = {
   unterwegs: 'eingetroffen',
 };
 
+/** Ein übernommener Posten, wie die Karte ihn aus der Material-Query liest (LLH-1226 D10). */
+export type UebernahmePosten = Pick<
+  EinsatzMaterial,
+  | 'id'
+  | 'bezeichnung'
+  | 'art'
+  | 'menge'
+  | 'ausgegeben'
+  | 'einheit_id'
+  | 'einsatz_fahrzeug_id'
+  | 'uhs_id'
+  | 'br_id'
+  | 'beendet_at'
+>;
+
+/** Zustand eines aus dem Einsatz genommenen Postens, Wortlaut der Materialliste (LLH-1093). */
+const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
+
+/**
+ * Die übernommenen Posten mit Bezeichnung, Menge und Ort (D10), darunter „übernommen 1200 von
+ * 2000“ und der Sprung in die Materialliste. Eigene Komponente, damit die Orte (Einheiten, UHS …)
+ * nur geladen werden, wenn eine Karte Posten zeigt; die Abrufe teilen die Schlüssel der
+ * Materialliste.
+ */
+function UebernommenePosten({
+  nachforderung: n,
+  posten,
+}: {
+  nachforderung: Pick<Nachforderung, 'einsatz_id' | 'anzahl' | 'material_ids'>;
+  posten: readonly UebernahmePosten[];
+}) {
+  const { kontext } = useMaterialOrtKontext(n.einsatz_id, false, posten);
+  return (
+    <div data-lfh="nachforderung-posten">
+      {posten.map((p) => (
+        <Text key={p.id} style={{ display: 'block', fontSize: 13 }}>
+          {[
+            p.bezeichnung,
+            mengeText(p),
+            p.beendet_at ? AUS_DEM_EINSATZ : ortText(ortVon(p), kontext.namen),
+          ].join(' · ')}
+        </Text>
+      ))}
+      {n.anzahl != null && (
+        <Text type="secondary" style={{ display: 'block', fontSize: 13 }}>
+          übernommen {uebernommeneMenge(n, posten)} von {n.anzahl}
+        </Text>
+      )}
+      {/* Ein Sprung ist keine Handlung (LFH-616): eine Zeile, abgesetzt von den Knöpfen. */}
+      <div data-lfh="inspector-sprung">
+        <KennungsLink to={materialPfad(n.einsatz_id)}>
+          Material <span aria-hidden="true">↗</span>
+        </KennungsLink>
+      </div>
+    </div>
+  );
+}
+
 interface NachforderungKarteProps {
   nachforderung: Nachforderung;
   /** Steuert die Übergangs-Zeitstempel/Grund-Zeilen in der Abgeschlossen-Ansicht. */
@@ -38,6 +102,18 @@ interface NachforderungKarteProps {
   onAblehnen?: (id: number) => void;
   /** Grund der zuletzt abgelehnten Fortschaltung, aus `components/useZeilenFehler.ts`. */
   fehlerGrund?: ZeilenGrund | null;
+  /**
+   * Bekannte Posten der Materialliste je Kennung (LLH-1226 D8/D10), stabil über den Datenstand
+   * der Seite. `null`/fehlend: Modul Material nicht freigegeben oder Liste nicht da — dann nur
+   * die Zahl der übernommenen Posten.
+   */
+  materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
+  /** Freigabe `material` meldet `zugriff: false`: „Als Material übernehmen“ steht gesperrt. */
+  materialGesperrt?: boolean;
+  /** Öffnet den Dialog „Als Material übernehmen“ (an eingetroffenen Karten). */
+  onMaterialUebernehmen?: (id: number) => void;
+  /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10, Spec `deeplink-hervorhebung`). */
+  hervorgehoben?: boolean;
 }
 
 /**
@@ -54,8 +130,13 @@ function NachforderungKarte({
   onStatus,
   onAblehnen,
   fehlerGrund,
+  materialJeId,
+  materialGesperrt = false,
+  onMaterialUebernehmen,
+  hervorgehoben = false,
 }: NachforderungKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
+  const sperrgrundId = useId();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const istAbg = ansicht === 'abgeschlossen';
@@ -82,10 +163,40 @@ function NachforderungKarte({
           ) : null,
         ].filter(Boolean)
       : [];
+  /*
+   * Übernahme an der eingetroffenen Karte (D10): der Knopf nennt die Handlung, „Weiteren Posten
+   * übernehmen“, sobald schon einer verknüpft ist (LFH-959). Ohne Freigabe für Material steht er
+   * gesperrt mit dem Grund sichtbar daneben, nicht nur im Tooltip (M16, LFH-1078).
+   */
+  if (darfSchreiben && n.status === 'eingetroffen' && onMaterialUebernehmen) {
+    const etikett = isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen';
+    aktionen.push(
+      materialGesperrt ? (
+        <Space key="material" size={8}>
+          <Button disabled title={KEINE_BERECHTIGUNG} aria-describedby={sperrgrundId}>
+            {etikett}
+          </Button>
+          <Text type="secondary" id={sperrgrundId}>
+            {KEINE_BERECHTIGUNG}
+          </Text>
+        </Space>
+      ) : (
+        <Button key="material" onClick={() => onMaterialUebernehmen(n.id)}>
+          {etikett}
+        </Button>
+      ),
+    );
+  }
+  const posten = materialJeId ? uebernommenePosten(n, [...materialJeId.values()]) : [];
 
   return (
     // Die Anforderungszeit führt links in Mono; abgelehnt trägt den Alarmrand.
-    <KommKarte alarm={abgelehnt} zeit={<ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />}>
+    <KommKarte
+      alarm={abgelehnt}
+      hervorgehoben={hervorgehoben}
+      data-nachforderung-id={n.id}
+      zeit={<ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />}
+    >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
           <PrioBadge prio={n.prioritaet} />
@@ -128,6 +239,16 @@ function NachforderungKarte({
               </Text>
             )}
           </Space>
+        )}
+        {/* Übernommenes Material (D10): mit Freigabe je Posten, sonst nur die Zahl. */}
+        {posten.length > 0 ? (
+          <UebernommenePosten nachforderung={n} posten={posten} />
+        ) : (
+          n.material_ids.length > 0 && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              {n.material_ids.length} Posten übernommen
+            </Text>
+          )
         )}
         {abgelehnt && (
           <Text type="danger">
