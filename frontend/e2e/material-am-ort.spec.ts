@@ -58,13 +58,22 @@ const zeile = (page: Page, bezeichnung: string) =>
 /**
  * Wählt im Auswahlfeld „Material zuordnen“ einen Posten. Geklickt wird der sichtbare Eintrag (sein
  * `title` ist das Etikett); antds `role="option"` liegt in einer unsichtbaren Zugänglichkeitsliste.
+ * Vorher: kein Eintrag ist abgeschnitten — der Ort steht am Ende des Etiketts und unterscheidet
+ * gleichnamige Posten (Prüfliste Teil II).
  */
 async function zuordnen(bereich: Locator, page: Page, etikett: string) {
   await bereich.getByRole('combobox', { name: 'Material zuordnen' }).click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-    .and(page.getByTitle(etikett, { exact: true }))
-    .click();
+  const eintraege = page.locator(
+    '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+  );
+  await expect(eintraege.first()).toBeVisible();
+  const abgeschnitten = await eintraege
+    .locator('.ant-select-item-option-content')
+    .evaluateAll((els) =>
+      els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent),
+    );
+  expect(abgeschnitten, 'abgeschnittene Einträge').toEqual([]);
+  await eintraege.and(page.getByTitle(etikett, { exact: true })).click();
 }
 
 test.beforeEach(async ({ page }) => {

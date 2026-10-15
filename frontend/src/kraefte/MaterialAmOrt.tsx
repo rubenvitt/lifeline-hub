@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { App, Button, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateDisposition } from '../api/einsatzMaterial';
@@ -73,7 +73,18 @@ function loesenName(bezeichnung: string, loesenText: string): string {
   return `${bezeichnung} ${loesenText.charAt(0).toLowerCase()}${loesenText.slice(1)}`;
 }
 
-const AUSWAHL_STIL = { width: '100%', maxWidth: 420 } as const;
+/**
+ * Die Auswahl füllt ihre Zeile bis 420 px (schmal die ganze Breite), ein Grund daneben bricht
+ * darunter. Ihre Einträge brechen um statt abzuschneiden: der Ort steht am Ende des Etiketts
+ * („Wolldecke · 30 von 50 übrig · Staffel A“) und unterscheidet gleichnamige Posten
+ * (Prüfliste Teil II).
+ */
+const AUSWAHL_STIL = { flex: '1 1 240px', maxWidth: 420, minWidth: 0 } as const;
+const auswahlZeile = (gap: number) =>
+  ({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap }) as const;
+const umbrechen = (o: { label?: ReactNode }) => (
+  <span style={{ whiteSpace: 'normal' }}>{o.label}</span>
+);
 
 export default function MaterialAmOrt({
   einsatzId,
@@ -247,7 +258,7 @@ export default function MaterialAmOrt({
       {darfSchreiben && (
         <div style={{ marginTop: token.marginSM }}>
           {sperre != null || !angebot ? (
-            <Space wrap size="small" align="center" style={{ display: 'flex' }}>
+            <div style={auswahlZeile(token.marginXS)}>
               <Select
                 style={AUSWAHL_STIL}
                 placeholder="Material zuordnen …"
@@ -261,7 +272,7 @@ export default function MaterialAmOrt({
                   {sperre}
                 </Typography.Text>
               )}
-            </Space>
+            </div>
           ) : (
             <ZuordnenAuswahl
               einsatzId={einsatzId}
@@ -315,6 +326,7 @@ interface ZuordnenAuswahlProps {
  */
 function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: ZuordnenAuswahlProps) {
   const grundId = useId();
+  const { token } = useRollen();
   const { kontext } = useMaterialOrtKontext(einsatzId, false, angebot.data);
   const materialGesperrt = useSprungSperre(einsatzId)('material');
   const optionen = useMemo(
@@ -326,7 +338,7 @@ function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: Zuordne
   const fehler = angebot.data === undefined && angebot.isError;
   const leer = angebot.data !== undefined && optionen.length === 0;
   return (
-    <Space wrap size="small" align="center" style={{ display: 'flex' }}>
+    <div style={auswahlZeile(token.marginXS)}>
       <Select<string>
         style={AUSWAHL_STIL}
         placeholder="Material zuordnen …"
@@ -336,6 +348,7 @@ function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: Zuordne
         disabled={fehler || leer}
         aria-describedby={fehler || leer ? grundId : undefined}
         options={optionen}
+        optionRender={umbrechen}
         onSelect={(wert) => {
           const p = angebot.data?.find((x) => String(x.id) === wert);
           if (p) onWaehlen(p);
@@ -359,6 +372,6 @@ function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: Zuordne
           )}
         </Typography.Text>
       )}
-    </Space>
+    </div>
   );
 }
