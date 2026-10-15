@@ -664,6 +664,53 @@ async fn entlassene_person_wird_erneut_disponiert() {
     assert_eq!(zeitachse_je_kraft(&pool, ep).await, zeitachse_vorher + 1);
 }
 
+/// LLH-1236: ein entlassenes Fahrzeug der Vorlage kommt wieder mit, in derselben Zeile, und
+/// trägt seine Besatzung aus der Vorlage.
+#[tokio::test]
+async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+    let v = vorlage(&pool, org).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_im_einsatz(&app, &admin, einsatz, v.rtw1, None).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, json) = vorschau(&app, &admin, einsatz, v.staffel).await;
+    assert_eq!(json["knoten"][0]["fahrzeuge"][0]["fahrzeug_id"], v.rtw1);
+    assert_eq!(json["knoten"][0]["fahrzeuge"][0]["zustand"], "entlassen");
+
+    let (s, json) = bilden(
+        &app,
+        &admin,
+        einsatz,
+        &json!({
+            "vorlage_id": v.staffel,
+            "fahrzeuge": fz(&[v.rtw1]),
+            "personal": pers(&[v.notarzt]),
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["fahrzeuge"], json!([ef]), "dieselbe Zeile");
+    let staffel = json["einheit_id"].clone();
+    let fahrzeuge = liste(&app, &admin, einsatz, "fahrzeuge").await;
+    assert_eq!(fahrzeuge.len(), 1, "kein zweiter Datensatz");
+    assert_eq!(fahrzeuge[0]["id"], ef);
+    assert_eq!(fahrzeuge[0]["einheit_id"], staffel);
+    let personal = liste(&app, &admin, einsatz, "personal").await;
+    assert_eq!(personal[0]["fahrzeug_id"], ef, "Besatzung nach der Vorlage");
+    let entlassene = liste(&app, &admin, einsatz, "fahrzeuge?entlassene=1").await;
+    assert!(entlassene.is_empty(), "{entlassene:?}");
+}
+
 #[tokio::test]
 async fn fremde_unbekannte_und_deaktivierte_vorlage() {
     let (app, pool) = setup_mit_pool().await;

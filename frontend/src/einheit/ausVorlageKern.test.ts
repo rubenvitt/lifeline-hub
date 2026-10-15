@@ -20,6 +20,7 @@ import {
   setWahl,
   umhaengenText,
   verlaesstFahrzeug,
+  vorgabeAn,
   showsUmhaengen,
   zeilenSchluessel,
   zusammenfassung,
@@ -95,7 +96,7 @@ describe('Vorgaben der Häkchen (D4)', () => {
     expect(zusammenfassung(v, wahl)).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte');
   });
 
-  it('nimmt „im Einsatz“ an, „gebunden“, „außer Dienst“ und ein entlassenes Fahrzeug nicht', () => {
+  it('nimmt „im Einsatz“ an, „gebunden“ und „außer Dienst“ nicht', () => {
     const v = sanitaetszug({
       10: { zustand: 'frei', ef_id: 5 },
       20: { zustand: 'gebunden', einheit_id: 9, einheit_name: '2. Zug' },
@@ -105,12 +106,24 @@ describe('Vorgaben der Häkchen (D4)', () => {
     expect(wahl.fahrzeuge.get(10)?.an).toBe(true);
     expect(wahl.fahrzeuge.get(20)?.an).toBe(false);
     expect(wahl.fahrzeuge.get(21)?.an).toBe(false);
-    // Fahrzeuge erneut zu disponieren kommt erst mit LLH-1079 Teil II; bis dahin lehnt der Server ab.
-    expect(isGesperrt('fahrzeug', 'entlassen')).toBe(true);
-    expect(isGesperrt('personal', 'entlassen')).toBe(false);
     expect(isGesperrt('fahrzeug', 'ausser_dienst')).toBe(true);
     expect(isGesperrt('personal', 'ausser_dienst')).toBe(true);
     expect(isGesperrt('fahrzeug', 'gebunden')).toBe(false);
+  });
+
+  it('hakt ein entlassenes Fahrzeug an, es kommt wieder mit (LLH-1236); eine Person nicht', () => {
+    const v = sanitaetszug({ 20: { zustand: 'entlassen' } });
+    const wahl = reconcileWahl(LEERE_WAHL, v);
+    const rtw1 = v.knoten[1].fahrzeuge[0];
+    expect(rtw1.fahrzeug_id).toBe(20);
+    expect(wahl.fahrzeuge.get(20)).toEqual({ an: true, umhaengen: false });
+    expect(isGesperrt('fahrzeug', 'entlassen')).toBe(false);
+    expect(isGesperrt('personal', 'entlassen')).toBe(false);
+    expect(kommtMit(rtw1, wahl)).toBe(true);
+    expect(zusammenfassung(v, wahl)).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte');
+    const body = buildAnfrage({ vorlageId: 1, name: 'Zug', abschnittId: null, vorschau: v, wahl });
+    expect(body.fahrzeuge).toContainEqual({ fahrzeug_id: 20, umhaengen: false });
+    expect(vorgabeAn('personal', 'entlassen')).toBe(false);
   });
 
   it('zählt mehrere Einheiten desselben Typs mit Mal-Zeichen, eine Kraft im Singular', () => {
@@ -189,7 +202,12 @@ describe('Zustand als Wort (D4)', () => {
       zustandWort('personal', ps(1, 'X', { zustand: 'gebunden', fahrzeug_name: '83-4' })),
     ).toBe('auf «83-4»');
     expect(zustandWort('personal', ps(1, 'X', { zustand: 'ausser_dienst' }))).toBe('außer Dienst');
-    expect(zustandWort('personal', ps(1, 'X', { zustand: 'entlassen' }))).toBe('entlassen');
+    expect(zustandWort('personal', ps(1, 'X', { zustand: 'entlassen' }))).toBe(
+      'entlassen, wird wieder aufgenommen',
+    );
+    expect(zustandWort('fahrzeug', fz(1, 'X', { zustand: 'entlassen' }))).toBe(
+      'entlassen, wird wieder aufgenommen',
+    );
   });
 });
 
