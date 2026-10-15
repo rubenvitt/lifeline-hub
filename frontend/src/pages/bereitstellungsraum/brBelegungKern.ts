@@ -47,7 +47,7 @@ export function ordnungsschluessel(name: string): string {
 
 /**
  * Folge der Belegung: am längsten wartend zuerst (D11). Das Format `YYYY-MM-DD HH:MM:SS` sortiert
- * als Text chronologisch; ohne „seit“ ans Ende (`￿` steht hinter jeder Ziffer), bei
+ * als Text chronologisch; ohne „seit“ ans Ende (`\uffff` steht hinter jeder Ziffer), bei
  * Gleichstand nach Name. Eine neu eingetretene Kraft hat das jüngste „seit“ und kommt ans Ende.
  */
 export function folgeSchluessel(seitAt: string | null | undefined, name: string): string {
