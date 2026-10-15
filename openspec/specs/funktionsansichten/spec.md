@@ -200,7 +200,10 @@ darf.
 
 Die Funktionsansicht `bereitstellungsraum` SHALL an genau einen Bereitstellungsraum des Einsatzes
 gebunden sein und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben;
-was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung.
+was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung. Das
+Anlegen einer unangemeldeten Kraft beim Eintreffen ist die einzige Änderung an Einheiten und
+Fahrzeugen, die das Gerät darf; sie verlangt wie am Desktop die Freigabe der Module Einheiten und
+Fahrzeuge.
 
 | Modul / Bereich | Bereitstellungsraum |
 | --- | --- |
@@ -208,10 +211,12 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 | `bereitstellungsraeume`: eigener BR mit Belegung | L |
 | `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
 | `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt) | S |
+| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung) | S |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
 | `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
 | `einheiten`, `fahrzeuge`: Liste des Einsatzes | L |
-| `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen | — |
+| `einheiten`: Zeitachsen-Übersicht der Einheiten (Perioden je Einheit) | L |
+| `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen, Übernehmen, Abweisen | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
 
@@ -257,6 +262,21 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 - **WHEN** das Gerät des BR Sportplatz eine Einheit mit Austritt aus dem BR Sportplatz bucht
 - **THEN** steht die Einheit in keinem BR mehr
 
+#### Scenario: Unangemeldete Kraft am Gerät
+
+- **WHEN** das Gerät des BR Sportplatz am BR Sportplatz eine unangemeldete Kraft bucht
+- **THEN** gibt es eine neue Einheit mit ihrem Fahrzeug im BR Sportplatz und eine Meldung an die Einsatzleitung
+
+#### Scenario: Eintreffen am fremden BR
+
+- **WHEN** das Gerät des BR Sportplatz ein Eintreffen am BR Schule bucht
+- **THEN** antwortet der Server mit 404, und nichts ist angelegt
+
+#### Scenario: Zeitachsen-Übersicht lesen
+
+- **WHEN** das Gerät die Zeitachsen-Übersicht der Einheiten abruft
+- **THEN** erhält es die Perioden je Einheit
+
 #### Scenario: In Betrieb nehmen
 
 - **WHEN** das Gerät seinen geplanten BR auf `aktiv` setzt
@@ -270,6 +290,11 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 #### Scenario: Einheit ändern
 
 - **WHEN** das Gerät eine Einheit des Einsatzes ändert
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Übernehmen am Gerät
+
+- **WHEN** das Gerät eine nicht übernommene Einheit übernehmen oder abweisen will
 - **THEN** antwortet der Server mit 403
 
 #### Scenario: Nur eigene Meldungen
