@@ -158,9 +158,18 @@ Zustand nicht prüft.
 ### Requirement: Entlassene im Nachweis
 
 Meldebild-Druck, die Übernahme des Meldebilds in einen Lagebericht und der Einsatzbericht SHALL
-entlassene Personen als eigenen Block „Entlassen“ führen. Stornierte Kräfte MUST in keinem
-Nachweis erscheinen.
+entlassene Personen als eigenen Block „Entlassen“ führen. Meldebild-Druck und die Übernahme des
+Meldebilds SHALL dort auch entlassene Fahrzeuge führen und aus dem Einsatz genommenes Material als
+eigenen Block „Aus dem Einsatz genommen“, jeden Eintrag mit dem Zeitpunkt seines Endes. Scheitert
+eine dieser Listen, MUST der Block das sagen („nicht geladen“), statt sie wegzulassen. Stornierte
+Kräfte MUST in keinem Nachweis erscheinen.
 
 #### Scenario: Meldebild nennt Entlassene
 - **WHEN** das Meldebild mit zwei entlassenen Personen in einen Lagebericht übernommen wird
 - **THEN** enthält der Text einen Block „Entlassen“ mit beiden, und die Stärke zählt sie nicht
+
+#### Scenario: Fahrzeug und Material im Nachweis
+- **WHEN** das Meldebild übernommen wird, nachdem ein Fahrzeug entlassen, ein zweites storniert
+  und ein Materialposten aus dem Einsatz genommen wurde
+- **THEN** steht das entlassene Fahrzeug mit Zeitpunkt im Block „Entlassen“, der Materialposten mit
+  Zeitpunkt im Block „Aus dem Einsatz genommen“, und das stornierte Fahrzeug fehlt

@@ -290,7 +290,8 @@ Entlassen ist der Normalweg: Das Fahrzeug verlässt seine Einheit, die Führungs
 Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fahrzeug. Seine
 Beladung bleibt im Einsatz zurück, ohne Ort; das Einsatztagebuch nennt, wie viele Posten. Aufträge
 nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
-zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter. Erneut disponiert,
+zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter, ebenso das Meldebild
+und seine Übernahme in einen Lagebericht. Erneut disponiert,
 steht es wieder in der Liste, mit dem Anfangsstatus wie beim Disponieren; Besatzung, Einheit und
 Bereitstellungsraum kommen nicht zurück.
 

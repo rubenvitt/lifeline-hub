@@ -3,14 +3,15 @@ import { QueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listEinsatzMaterial } from '../api/einsatzMaterial';
+import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { ladeStab } from '../api/stab';
 import { ladeFuehrungsstelle } from '../api/einsaetze';
 import type {
   Einheit,
   EinsatzFahrzeug,
+  EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
   Stab,
@@ -30,8 +31,14 @@ vi.mock('../api/einsatzPersonal', () => ({
   listeEinsatzPersonal: vi.fn(),
   listEntlassenesPersonal: vi.fn(),
 }));
-vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
-vi.mock('../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));
+vi.mock('../api/einsatzFahrzeuge', () => ({
+  listeEinsatzFahrzeuge: vi.fn(),
+  listEntlasseneFahrzeuge: vi.fn(),
+}));
+vi.mock('../api/einsatzMaterial', () => ({
+  listEinsatzMaterial: vi.fn(),
+  listEntlassenesMaterial: vi.fn(),
+}));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
 
@@ -111,7 +118,9 @@ beforeEach(() => {
   vi.mocked(listeEinsatzPersonal).mockReset().mockResolvedValue(PERSONAL);
   vi.mocked(listEntlassenesPersonal).mockReset().mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockReset().mockResolvedValue(FAHRZEUGE);
+  vi.mocked(listEntlasseneFahrzeuge).mockReset().mockResolvedValue([]);
   vi.mocked(listEinsatzMaterial).mockReset().mockResolvedValue([]);
+  vi.mocked(listEntlassenesMaterial).mockReset().mockResolvedValue([]);
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
   vi.mocked(ladeFuehrungsstelle)
     .mockReset()
@@ -119,7 +128,12 @@ beforeEach(() => {
 });
 
 const MELDEBILD = () =>
-  rendereMeldebildMarkdown(baueKraeftebild(ABSCHNITTE, EINHEITEN, PERSONAL, FAHRZEUGE, []), STAND);
+  rendereMeldebildMarkdown(baueKraeftebild(ABSCHNITTE, EINHEITEN, PERSONAL, FAHRZEUGE, []), STAND, {
+    personal: [],
+    fahrzeuge: [],
+    material: [],
+    dtg,
+  });
 const ORG = (
   opts: Partial<Parameters<typeof rendereFuehrungsorganisationMarkdown>[1]> = {},
   einheiten: Einheit[] | null = EINHEITEN,
@@ -158,7 +172,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     ] as unknown as EinsatzPersonal[];
     vi.mocked(listEntlassenesPersonal).mockResolvedValue(weg);
     const text = await erzeuge();
-    expect(text).toContain('## Entlassen\n\n- Bert Weg (Sanitäter)\n');
+    expect(text).toContain('## Entlassen\n\n- Pers. Bert Weg (Sanitäter) — STAND\n');
     expect(text.indexOf('## Entlassen')).toBeLessThan(text.indexOf('# Führungsorganisation'));
   });
 
@@ -166,7 +180,63 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     vi.mocked(listEntlassenesPersonal).mockRejectedValue(new Error('500'));
     const text = await erzeuge();
     expect(text).toContain('Erika Muster');
-    expect(text).toContain('## Entlassen\n\n— nicht geladen\n');
+    expect(text).toContain('## Entlassen\n\n- Pers. — nicht geladen\n');
+  });
+
+  it('führt entlassene Fahrzeuge und herausgenommenes Material mit Zeitpunkt, stornierte nicht (LLH-1235)', async () => {
+    const zeit = (iso: string) => `DTG ${iso.slice(11, 16)}`;
+    vi.mocked(listEntlasseneFahrzeuge).mockResolvedValue([
+      {
+        id: 6,
+        einsatz_id: 1,
+        einheit_id: null,
+        funkrufname: 'Florian 2',
+        fahrzeugtyp: 'RTW',
+        status_kategorie: 'verfuegbar',
+        beendet_at: '2026-10-13 11:00:00',
+        beendet_als: 'entlassen',
+      },
+      {
+        id: 7,
+        einsatz_id: 1,
+        einheit_id: null,
+        funkrufname: 'Florian 3',
+        fahrzeugtyp: 'KTW',
+        status_kategorie: 'verfuegbar',
+        beendet_at: '2026-10-13 11:05:00',
+        beendet_als: 'storniert',
+      },
+    ] as unknown as EinsatzFahrzeug[]);
+    vi.mocked(listEntlassenesMaterial).mockResolvedValue([
+      {
+        id: 8,
+        einsatz_id: 1,
+        bezeichnung: 'Trage',
+        menge: 2,
+        beendet_at: '2026-10-13 12:00:00',
+        beendet_als: 'entlassen',
+      },
+    ] as unknown as EinsatzMaterial[]);
+    const text = await EIGENE_LAGE_QUELLE.erzeuge({
+      qc: new QueryClient(),
+      einsatzId: 1,
+      freigaben: freigabenFixture(),
+      dtg: zeit,
+    });
+    expect(text).toContain('## Entlassen\n\n- Fzg. Florian 2 (RTW) — DTG 11:00\n');
+    expect(text).toContain('## Aus dem Einsatz genommen\n\n- Mtl. Trage ×2 — DTG 12:00\n');
+    expect(text).not.toContain('Florian 3');
+    expect(text.indexOf('## Aus dem Einsatz genommen')).toBeLessThan(
+      text.indexOf('# Führungsorganisation'),
+    );
+  });
+
+  it('sagt „nicht geladen“, wenn Fahrzeug- und Materialnachweis scheitern (LLH-1235)', async () => {
+    vi.mocked(listEntlasseneFahrzeuge).mockRejectedValue(new Error('500'));
+    vi.mocked(listEntlassenesMaterial).mockRejectedValue(new Error('500'));
+    const text = await erzeuge();
+    expect(text).toContain('## Entlassen\n\n- Fzg. — nicht geladen\n');
+    expect(text).toContain('## Aus dem Einsatz genommen\n\n— nicht geladen\n');
   });
 
   it('führt ein Kräftemeldebild ohne Personal-Freigabe als „—“ mit Grund, nie als 0', async () => {

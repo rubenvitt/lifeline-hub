@@ -19,8 +19,8 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listEinsatzMaterial } from '../api/einsatzMaterial';
+import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
@@ -33,6 +33,8 @@ import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte'
 import type {
   Auftrag,
   EinsatzAnzeige,
+  EinsatzFahrzeug,
+  EinsatzMaterial,
   EinsatzPersonal,
   FahrzeugStatus,
   LetzteRueckmeldung,
@@ -47,8 +49,14 @@ vi.mock('../api/einsatzPersonal', () => ({
   listeEinsatzPersonal: vi.fn(),
   listEntlassenesPersonal: vi.fn(),
 }));
-vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
-vi.mock('../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));
+vi.mock('../api/einsatzFahrzeuge', () => ({
+  listeEinsatzFahrzeuge: vi.fn(),
+  listEntlasseneFahrzeuge: vi.fn(),
+}));
+vi.mock('../api/einsatzMaterial', () => ({
+  listEinsatzMaterial: vi.fn(),
+  listEntlassenesMaterial: vi.fn(),
+}));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/auftraege', () => ({ listeOffeneAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
@@ -218,7 +226,9 @@ beforeEach(() => {
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
   vi.mocked(listEntlassenesPersonal).mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
+  vi.mocked(listEntlasseneFahrzeuge).mockResolvedValue([]);
   vi.mocked(listEinsatzMaterial).mockResolvedValue([]);
+  vi.mocked(listEntlassenesMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
   vi.mocked(listeOffeneAuftraege).mockResolvedValue([]);
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
@@ -1160,7 +1170,53 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
         expect.objectContaining({
           abschnitte: [
             expect.objectContaining({
-              text: expect.stringContaining('## Entlassen\n\n- Bert Weg (Sanitäter)'),
+              text: expect.stringMatching(
+                /## Entlassen\n\n- Pers\. Bert Weg \(Sanitäter\) — \d{6}OKT2026\n/,
+              ),
+            }),
+          ],
+        }),
+      ),
+    );
+  });
+
+  it('führt entlassene Fahrzeuge und herausgenommenes Material unter dem Raster und im Lagebericht (LLH-1235)', async () => {
+    vi.mocked(legeLageberichtAn).mockClear();
+    vi.mocked(listEntlasseneFahrzeuge).mockResolvedValue([
+      {
+        id: 7,
+        einsatz_id: 1,
+        einheit_id: null,
+        funkrufname: 'Florian 2',
+        fahrzeugtyp: 'RTW',
+        status_kategorie: 'verfuegbar',
+        beendet_at: '2026-10-13 11:00:00',
+        beendet_als: 'entlassen',
+      } as unknown as EinsatzFahrzeug,
+    ]);
+    vi.mocked(listEntlassenesMaterial).mockResolvedValue([
+      {
+        id: 7,
+        einsatz_id: 1,
+        bezeichnung: 'Trage',
+        menge: 2,
+        beendet_at: '2026-10-13 12:00:00',
+        beendet_als: 'entlassen',
+      } as unknown as EinsatzMaterial,
+    ]);
+    setup();
+    expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
+    expect(await screen.findByText('Aus dem Einsatz genommen (1)')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    await waitFor(() =>
+      expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          abschnitte: [
+            expect.objectContaining({
+              text: expect.stringMatching(
+                /## Entlassen\n\n- Fzg\. Florian 2 \(RTW\) — \d{6}OKT2026\n\n## Aus dem Einsatz genommen\n\n- Mtl\. Trage ×2 — \d{6}OKT2026\n/,
+              ),
             }),
           ],
         }),

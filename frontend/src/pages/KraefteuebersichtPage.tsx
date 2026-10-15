@@ -16,8 +16,8 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listEinsatzMaterial } from '../api/einsatzMaterial';
+import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { holeRueckmeldungen } from '../api/meldungen';
@@ -77,7 +77,11 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
-import { toEntlassene } from '../kraefte/entlassene';
+import {
+  toEntlassene,
+  toEntlasseneFahrzeuge,
+  toHerausgenommenesMaterial,
+} from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -663,11 +667,20 @@ export default function KraefteuebersichtPage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  // Nachweis der Entlassenen (LLH-1079): Block unter dem Raster und im Lagebericht. Scheitert
-  // der Abruf, fehlt am Schirm nur der Block; der Lagebericht sagt „nicht geladen“.
+  // Nachweis der beendeten Kräfte (LLH-1079, LLH-1235): Blöcke unter dem Raster und im
+  // Lagebericht. Scheitert ein Abruf, fehlt am Schirm nur sein Teil; der Lagebericht sagt
+  // „nicht geladen“.
   const entlasseneQuery = useQuery({
     queryKey: einsatzKeys.personalEntlassene(einsatzId),
     queryFn: () => listEntlassenesPersonal(einsatzId),
+  });
+  const fahrzeugeEntlasseneQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeugeEntlassene(einsatzId),
+    queryFn: () => listEntlasseneFahrzeuge(einsatzId),
+  });
+  const materialEntlassenQuery = useQuery({
+    queryKey: einsatzKeys.materialEntlassene(einsatzId),
+    queryFn: () => listEntlassenesMaterial(einsatzId),
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
@@ -932,12 +945,22 @@ export default function KraefteuebersichtPage() {
         },
       );
       // Gefiltert gilt der Bericht einer Auswahl; die Entlassenen gehören zu keiner mehr.
-      const entlassene = gefiltert
-        ? []
-        : entlasseneQuery.data
-          ? toEntlassene(entlasseneQuery.data)
-          : null;
-      const md = rendereMeldebildMarkdown(bild, stand, entlassene);
+      const md = rendereMeldebildMarkdown(
+        bild,
+        stand,
+        gefiltert
+          ? undefined
+          : {
+              personal: entlasseneQuery.data ? toEntlassene(entlasseneQuery.data) : null,
+              fahrzeuge: fahrzeugeEntlasseneQuery.data
+                ? toEntlasseneFahrzeuge(fahrzeugeEntlasseneQuery.data)
+                : null,
+              material: materialEntlassenQuery.data
+                ? toHerausgenommenesMaterial(materialEntlassenQuery.data)
+                : null,
+              dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+            },
+      );
       // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das
       // frühere POST + PATCH ließ bei gescheitertem PATCH einen leeren Entwurf stehen.
       const lb = await legeLageberichtAn(einsatzId, {
@@ -1327,17 +1350,41 @@ export default function KraefteuebersichtPage() {
           }}
         />
         {!gefiltert && (
-          <EntlassenBlock
-            titel="Entlassen"
-            endeWort="entlassen"
-            aufgeklappt={druckt}
-            eintraege={(entlasseneQuery.data ?? []).map((ep) => ({
-              id: ep.id,
-              name: ep.name,
-              zusatz: funktionText(ep),
-              beendetAt: ep.beendet_at,
-            }))}
-          />
+          <>
+            {/* Personen und Fahrzeuge in einem Block wie im Lagebericht (LLH-1235). */}
+            <EntlassenBlock
+              titel="Entlassen"
+              endeWort="entlassen"
+              aufgeklappt={druckt}
+              eintraege={[
+                ...(entlasseneQuery.data ?? []).map((ep) => ({
+                  id: ep.id,
+                  schluessel: `person-${ep.id}`,
+                  name: ep.name,
+                  zusatz: funktionText(ep),
+                  beendetAt: ep.beendet_at,
+                })),
+                ...(fahrzeugeEntlasseneQuery.data ?? []).map((ef) => ({
+                  id: ef.id,
+                  schluessel: `fahrzeug-${ef.id}`,
+                  name: ef.funkrufname,
+                  zusatz: ef.fahrzeugtyp,
+                  beendetAt: ef.beendet_at,
+                })),
+              ]}
+            />
+            <EntlassenBlock
+              titel="Aus dem Einsatz genommen"
+              endeWort="aus dem Einsatz genommen"
+              aufgeklappt={druckt}
+              eintraege={(materialEntlassenQuery.data ?? []).map((em) => ({
+                id: em.id,
+                name: em.bezeichnung,
+                zusatz: `×${em.menge}`,
+                beendetAt: em.beendet_at,
+              }))}
+            />
+          </>
         )}
       </EinsatzSeite>
     </div>

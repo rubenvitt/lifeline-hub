@@ -8,6 +8,8 @@ import { abstand } from '../theme/tokens';
 /** Ein beendeter Eintrag des Blocks: Kennung, Zusatz (Funktion o. ä.) und Ende. */
 export interface BeendeterEintrag {
   id: number;
+  /** React-Schlüssel, wenn ein Block mehrere Arten führt und `id` doppelt vorkommen kann. */
+  schluessel?: string;
   name: string;
   zusatz?: string | null;
   /** Zeitpunkt des Endes (Server, UTC). */
@@ -76,7 +78,7 @@ export default function EntlassenBlock({
               style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: abstand.sm }}
             >
               {sortiert.map((e) => (
-                <li key={e.id}>
+                <li key={e.schluessel ?? e.id}>
                   <Space wrap size="middle">
                     <span>
                       {ziel ? <KennungsLink to={ziel(e.id)}>{e.name}</KennungsLink> : e.name}
