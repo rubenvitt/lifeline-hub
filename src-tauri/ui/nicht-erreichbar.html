@@ -1,0 +1,28 @@
+<!doctype html>
+<!--
+  Anzeige „nicht erreichbar“ der Desktop-Hülle (LLH-1283): ein Fenster wollte den Server laden,
+  und es kam keine Seite an. Ohne sie bliebe das Fenster auf macOS leer. Die Hülle setzt sie in
+  das betroffene Fenster (src-tauri/src/main.rs, `show_nicht_erreichbar`); prüfen und laden
+  entscheidet die Hülle, hier steht nur die Bedienung. Gestaltung in stil.css.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lifeline Hub – Server nicht erreichbar</title>
+    <link rel="stylesheet" href="stil.css" />
+    <script src="nicht-erreichbar.js" defer></script>
+  </head>
+  <body>
+    <main class="karte">
+      <p class="augenbraue">Lifeline Hub</p>
+      <h1>Server nicht erreichbar</h1>
+      <p><code id="adresse"></code></p>
+      <p id="fehler" role="alert"></p>
+      <div class="aktionen">
+        <button type="button" id="erneut" class="primaer">Erneut versuchen</button>
+        <button type="button" id="wechseln" class="sekundaer">Server wechseln</button>
+      </div>
+    </main>
+  </body>
+</html>

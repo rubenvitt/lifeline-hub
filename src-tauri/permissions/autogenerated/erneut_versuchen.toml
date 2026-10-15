@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-erneut-versuchen"
+description = "Enables the erneut_versuchen command without any pre-configured scope."
+commands.allow = ["erneut_versuchen"]
+
+[[permission]]
+identifier = "deny-erneut-versuchen"
+description = "Denies the erneut_versuchen command without any pre-configured scope."
+commands.deny = ["erneut_versuchen"]

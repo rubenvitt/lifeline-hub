@@ -219,6 +219,7 @@ async fn vorpruefung_fahrzeuge_nennt_je_id_einen_grund() {
         k.einsatz_id,
         1,
         &[frei, fremd, ruhend, dabei, entlassen, storniert],
+        Regeln::SAMMEL,
     )
     .await
     .unwrap();
@@ -232,6 +233,18 @@ async fn vorpruefung_fahrzeuge_nennt_je_id_einen_grund() {
         ]
     );
     assert!(zeilen.iter().all(|z| z.art == ZeilenArt::Fahrzeug));
+
+    // Das Bilden aus einer Vorlage nimmt ein entlassenes Fahrzeug wieder auf (LLH-1236).
+    let einzel = check_fahrzeuge_tx(
+        &mut conn,
+        k.einsatz_id,
+        1,
+        &[entlassen, dabei],
+        Regeln::EINZEL,
+    )
+    .await
+    .unwrap();
+    assert_eq!(gruende(&einzel), [(dabei, GRUND_SCHON_DISPONIERT)]);
 }
 
 #[tokio::test]
@@ -431,7 +444,7 @@ async fn storniertes_fahrzeug_wird_wieder_aufgenommen() {
     .await
     .unwrap();
     let mut conn = pool.acquire().await.unwrap();
-    let e = disponiere_fahrzeuge_tx(&mut conn, k, &[f], None)
+    let e = disponiere_fahrzeuge_tx(&mut conn, k, &[f], None, Regeln::SAMMEL)
         .await
         .unwrap();
     assert_eq!(e.fahrzeuge[0].ef_id, ef, "dieselbe Zeile");
@@ -454,7 +467,7 @@ async fn fahrzeuge_in_eine_einheit() {
     let f1 = fahrzeug(&pool, 1, "83-1").await;
     let f2 = fahrzeug(&pool, 1, "83-2").await;
     let mut tx = pool.begin().await.unwrap();
-    let e = disponiere_fahrzeuge_tx(&mut tx, k, &[f1, f2], Some(zug))
+    let e = disponiere_fahrzeuge_tx(&mut tx, k, &[f1, f2], Some(zug), Regeln::SAMMEL)
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -487,7 +500,7 @@ async fn ein_abgelehntes_fahrzeug_legt_keines_an() {
     let f2 = fahrzeug(&pool, 1, "83-2").await;
     ausser_dienst(&pool, "fahrzeug", f2).await;
     let mut conn = pool.acquire().await.unwrap();
-    let fehler = disponiere_fahrzeuge_tx(&mut conn, k, &[f1, f2], None)
+    let fehler = disponiere_fahrzeuge_tx(&mut conn, k, &[f1, f2], None, Regeln::SAMMEL)
         .await
         .unwrap_err();
     assert!(matches!(fehler, AppError::Zeilen { .. }), "{fehler:?}");

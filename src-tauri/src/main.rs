@@ -3,7 +3,8 @@
 //! Update — keine zweite Anwendungslogik. Anforderungen: `openspec/specs/desktop-huelle/` und
 //! `openspec/specs/desktop-auslieferung/`; Entscheidungen im Design des Changes LFH-721.
 //!
-//! RECHTE: Die lokale Erststart-Maske darf die Adresse setzen (Capability `lokal`). Die
+//! RECHTE: Die lokale Erststart-Maske darf die Adresse setzen (Capability `lokal`), die lokale
+//! Anzeige „nicht erreichbar“ nur prüfen, neu laden und zur Maske führen (`nicht-erreichbar`). Die
 //! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken`,
 //! `anmeldung_im_browser` (LFH-818) und `benachrichtigung_zeigen` (D7 des
 //! Benachrichtigungskonzepts) — sie kann die Hülle nicht auf einen anderen Server umlenken.
@@ -14,6 +15,7 @@ mod anmeldung;
 #[cfg(target_os = "macos")]
 mod aswas;
 mod deeplink;
+mod erreichbar;
 mod kanal;
 mod links;
 mod menue;
@@ -21,20 +23,25 @@ mod pkce;
 mod update;
 mod verbindung;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::webview::{DownloadEvent, NewWindowResponse};
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
+};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_notification::{ActionPerformed, NotificationExt};
 
 use crate::adresse::pruefe_adresse;
 use crate::deeplink::{deute, entscheide, Aktion};
+use crate::erreichbar::Grund;
 use crate::links::Ziel;
 
 const FENSTER: &str = "main";
@@ -59,6 +66,12 @@ const MASKE: &str = "http://tauri.localhost/index.html";
 #[cfg(not(windows))]
 const MASKE: &str = "tauri://localhost/index.html";
 
+/// Lokale Anzeige „nicht erreichbar“ (LLH-1283), in jedem Fenster möglich.
+#[cfg(windows)]
+const NICHT_ERREICHBAR: &str = "http://tauri.localhost/nicht-erreichbar.html";
+#[cfg(not(windows))]
+const NICHT_ERREICHBAR: &str = "tauri://localhost/nicht-erreichbar.html";
+
 /// `window.print()` erreicht in WKWebView keinen Dialog (LFH-720, Befund 17) — auf macOS
 /// leitet die Hülle den Aufruf auf den nativen Druck um.
 #[cfg(target_os = "macos")]
@@ -80,6 +93,41 @@ struct Vorbelegung {
     adresse: Option<String>,
     /// Es gibt eine gespeicherte Adresse, zu der „Abbrechen“ zurückführt.
     abbrechbar: bool,
+    /// Die zuletzt verbundenen Server zur Auswahl (LLH-1282), der verbundene zuerst.
+    bekannt: Vec<BekannterServer>,
+}
+
+#[derive(Clone, Serialize)]
+struct BekannterServer {
+    adresse: String,
+    host: String,
+    /// Der verbundene Server: ihn kann die Maske nicht vergessen.
+    verbunden: bool,
+}
+
+fn bekannte_server(app: &AppHandle) -> Vec<BekannterServer> {
+    let dir = konfig_dir(app);
+    let verbunden = verbindung::lesen(&dir);
+    verbindung::bekannte(&dir)
+        .into_iter()
+        .map(|url| BekannterServer {
+            host: url.host_str().unwrap_or_default().to_string(),
+            verbunden: verbunden.as_ref() == Some(&url),
+            adresse: url.into(),
+        })
+        .collect()
+}
+
+/// Eine laufende Wache über das Laden des Servers in einem Fenster (LLH-1283).
+struct Watch {
+    nummer: u32,
+}
+
+/// Ein Fenster zeigt die Anzeige „nicht erreichbar“: was es laden wollte und warum es nicht kam.
+#[derive(Clone)]
+struct Ausfall {
+    ziel: Url,
+    grund: Grund,
 }
 
 #[derive(Default)]
@@ -95,6 +143,15 @@ struct Zustand {
     anmeldung: Mutex<Option<Ausstehend>>,
     /// Zähler der Vorgänge, damit der Handler einer ersetzten Sitzung nichts mehr bewirkt.
     anmeldungen: AtomicU32,
+    /// Je Fenster die Wache über das letzte Laden des Servers (LLH-1283); fort, sobald eine Seite
+    /// ankommt.
+    watches: Mutex<HashMap<String, Watch>>,
+    watch_nummer: AtomicU32,
+    /// Je Fenster, das die Anzeige „nicht erreichbar“ zeigt, Ziel und Grund.
+    ausfaelle: Mutex<HashMap<String, Ausfall>>,
+    /// Zuletzt gezeigte native Meldungen: mehrere Fenster desselben Einsatzes melden dasselbe
+    /// Ereignis je einmal (LLH-1281).
+    meldungen: Mutex<Vec<(String, Instant)>>,
 }
 
 /// Ein gestarteter Vorgang „Im Browser anmelden“. Der `verifier` verlässt die Hülle nur im
@@ -114,6 +171,17 @@ fn konfig_dir(app: &AppHandle) -> PathBuf {
 
 fn fenster(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(FENSTER)
+}
+
+/// Das Fenster, das vorn ist; sonst das Hauptfenster, sonst irgendeines (LLH-1281: die Fenster
+/// sind gleichrangig, das Hauptfenster kann schon geschlossen sein).
+fn front_fenster(app: &AppHandle) -> Option<WebviewWindow> {
+    let alle = app.webview_windows();
+    alle.values()
+        .find(|fenster| fenster.is_focused().unwrap_or(false))
+        .or_else(|| alle.get(FENSTER))
+        .or_else(|| alle.values().next())
+        .cloned()
 }
 
 /// Kennung und URL-Muster der Laufzeit-Freigabe für die Origin von `server`.
@@ -172,48 +240,187 @@ fn fuers_protokoll(url: &Url) -> String {
 fn lade_server(app: &AppHandle, server: &Url) -> Result<(), String> {
     // Nebenfenster eines anderen Servers gehören nach dem Wechsel zu keinem mehr. Beim Abbrechen
     // oder Verbinden mit derselben Adresse bleiben sie — `close()` fragt nicht nach, ein offener
-    // Entwurf verlöre sonst, was der Autosave noch nicht hat.
+    // Entwurf verlöre sonst, was der Autosave noch nicht hat. Ein Nebenfenster mit der Anzeige
+    // „nicht erreichbar“ zählt mit dem Server, den es laden wollte.
     for (label, nebenfenster) in app.webview_windows() {
-        let bleibt = nebenfenster
-            .url()
-            .is_ok_and(|seite| links::gehoert_zum_server(server, &seite));
+        let ausgefallen = app
+            .state::<Zustand>()
+            .ausfaelle
+            .lock()
+            .unwrap()
+            .get(&label)
+            .map(|ausfall| ausfall.ziel.clone());
+        let bleibt = ausgefallen
+            .or_else(|| nebenfenster.url().ok())
+            .is_some_and(|seite| links::gehoert_zum_server(server, &seite));
         if label.starts_with(NEBENFENSTER_PRAEFIX) && !bleibt {
             let _ = nebenfenster.close();
         }
     }
     server_freigeben(app, server);
-    let fenster = fenster(app).ok_or("Hauptfenster fehlt")?;
-    fenster.navigate(server.clone()).map_err(|e| e.to_string())
+    match fenster(app) {
+        Some(fenster) => load_in_fenster(app, &fenster, server.clone()),
+        // Das Hauptfenster ist zu (LLH-1281), etwa bei einem Deeplink: neu bauen.
+        None => {
+            // Die Wache vor dem Bau: eine Seite aus dem Service Worker kann ankommen, bevor
+            // `build()` zurückkehrt.
+            start_watch(app, FENSTER, server.clone());
+            baue_fenster(app, FENSTER, WebviewUrl::External(server.clone()), None)
+                .map_err(|e| e.to_string())?;
+            Ok(())
+        }
+    }
 }
 
-/// Öffnet die Erststart-Maske, vorbelegt mit `adresse` (sonst mit der gespeicherten).
+/// Lädt `ziel` im Fenster und wacht darüber, dass eine Seite ankommt (LLH-1283).
+fn load_in_fenster(app: &AppHandle, fenster: &WebviewWindow, ziel: Url) -> Result<(), String> {
+    start_watch(app, fenster.label(), ziel.clone());
+    fenster.navigate(ziel).map_err(|e| e.to_string())
+}
+
+/// Öffnet die Erststart-Maske, vorbelegt mit `adresse` (sonst mit der gespeicherten). Sie läuft
+/// immer im Hauptfenster (Capability `lokal`); ist es zu, entsteht es neu.
 pub(crate) fn zeige_maske(app: &AppHandle, adresse: Option<Url>) {
     let gespeichert = verbindung::lesen(&konfig_dir(app));
     let vorbelegung = Vorbelegung {
         adresse: adresse.or_else(|| gespeichert.clone()).map(String::from),
         abbrechbar: gespeichert.is_some(),
+        bekannt: bekannte_server(app),
     };
     *app.state::<Zustand>().vorbelegung.lock().unwrap() = vorbelegung;
-    if let Some(fenster) = fenster(app) {
-        let _ = fenster.navigate(MASKE.parse().expect("Adresse der Maske"));
-        let _ = fenster.set_focus();
+    // Die Maske beendet jede Wache des Hauptfensters: sie ist selbst die Anzeige.
+    app.state::<Zustand>()
+        .watches
+        .lock()
+        .unwrap()
+        .remove(FENSTER);
+    app.state::<Zustand>()
+        .ausfaelle
+        .lock()
+        .unwrap()
+        .remove(FENSTER);
+    let fenster = match fenster(app) {
+        Some(fenster) => {
+            let _ = fenster.navigate(MASKE.parse().expect("Adresse der Maske"));
+            fenster
+        }
+        None => match baue_fenster(app, FENSTER, WebviewUrl::App("index.html".into()), None) {
+            Ok(fenster) => fenster,
+            Err(fehler) => {
+                log::error!("Hauptfenster für die Maske nicht gebaut: {fehler}");
+                return;
+            }
+        },
+    };
+    nach_vorn(&fenster);
+}
+
+// ── Erreichbarkeit (LLH-1283) ────────────────────────────────────────────────────────
+
+/// Wacht über das Laden von `ziel` im Fenster `label`: kommt keine Seite an, zeigt das Fenster
+/// die Anzeige „nicht erreichbar“. Eine neuere Wache desselben Fensters ersetzt diese.
+fn start_watch(app: &AppHandle, label: &str, ziel: Url) {
+    let zustand = app.state::<Zustand>();
+    let nummer = zustand.watch_nummer.fetch_add(1, Ordering::Relaxed) + 1;
+    zustand
+        .watches
+        .lock()
+        .unwrap()
+        .insert(label.to_string(), Watch { nummer });
+    let (app, label) = (app.clone(), label.to_string());
+    std::thread::spawn(move || {
+        let grund = erreichbar::grund(erreichbar::check_erreichbar(
+            &ziel,
+            erreichbar::CHECK_TIMEOUT,
+        ));
+        std::thread::sleep(erreichbar::deadline(grund));
+        let offen = {
+            let zustand = app.state::<Zustand>();
+            let mut watches = zustand.watches.lock().unwrap();
+            let offen = watches.get(&label).is_some_and(|w| w.nummer == nummer);
+            if offen {
+                watches.remove(&label);
+            }
+            offen
+        };
+        if offen {
+            show_nicht_erreichbar(&app, &label, ziel, grund);
+        }
+    });
+}
+
+/// Eine Seite kommt im Fenster an: die Wache ist erledigt, eine Anzeige vorbei.
+fn seite_angekommen(app: &AppHandle, label: &str, seite: &Url) {
+    if !erreichbar::is_loaded(seite) {
+        return;
     }
+    let zustand = app.state::<Zustand>();
+    zustand.watches.lock().unwrap().remove(label);
+    zustand.ausfaelle.lock().unwrap().remove(label);
+}
+
+fn show_nicht_erreichbar(app: &AppHandle, label: &str, ziel: Url, grund: Grund) {
+    let Some(fenster) = app.get_webview_window(label) else {
+        return;
+    };
+    log::warn!(
+        "Server nicht erreichbar ({grund:?}): {}",
+        fuers_protokoll(&ziel)
+    );
+    app.state::<Zustand>()
+        .ausfaelle
+        .lock()
+        .unwrap()
+        .insert(label.to_string(), Ausfall { ziel, grund });
+    let _ = fenster.navigate(NICHT_ERREICHBAR.parse().expect("Adresse der Anzeige"));
 }
 
 // ── Fenster und Links ────────────────────────────────────────────────────────────────
 
+/// Lage eines neuen Fensters: versetzt zum Fenster, das vorn ist, in dessen Größe (LLH-1281).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Platz {
+    position: LogicalPosition<f64>,
+    groesse: LogicalSize<f64>,
+}
+
+/// So weit rückt ein neues Fenster gegenüber dem vorderen nach rechts unten.
+const VERSATZ: f64 = 30.0;
+
+fn platz_neben(position: LogicalPosition<f64>, groesse: LogicalSize<f64>) -> Platz {
+    Platz {
+        position: LogicalPosition::new(position.x + VERSATZ, position.y + VERSATZ),
+        groesse,
+    }
+}
+
+fn platz_neben_front(app: &AppHandle) -> Option<Platz> {
+    let vorn = front_fenster(app)?;
+    let faktor = vorn.scale_factor().ok()?;
+    let position = vorn.outer_position().ok()?.to_logical(faktor);
+    let groesse = vorn.inner_size().ok()?.to_logical(faktor);
+    Some(platz_neben(position, groesse))
+}
+
 /// Baut ein Fenster der Hülle — das Hauptfenster wie jedes Nebenfenster, damit Link-Behandlung,
 /// Drosselung und Druckweg überall gleich sind.
-fn baue_fenster(app: &AppHandle, label: &str, start: WebviewUrl) -> tauri::Result<WebviewWindow> {
+fn baue_fenster(
+    app: &AppHandle,
+    label: &str,
+    start: WebviewUrl,
+    platz: Option<Platz>,
+) -> tauri::Result<WebviewWindow> {
     let (fuer_fenster, fuer_navigation) = (app.clone(), app.clone());
     let (label_fenster, label_navigation) = (label.to_string(), label.to_string());
     let builder = WebviewWindowBuilder::new(app, label, start)
         .title("Lifeline Hub")
-        .inner_size(1366.0, 860.0)
         .min_inner_size(800.0, 560.0)
-        // Im Protokoll steht, welche Seite geladen wurde — beim Support die erste Frage
-        // („Maske oder Server? Welcher?“).
-        .on_page_load(|_fenster, seite| {
+        .on_page_load(|fenster, seite| {
+            // Jede nicht-lokale Seite beendet die Wache (LLH-1283): auch eine aus dem Service
+            // Worker, auch die eines Identitätsanbieters.
+            seite_angekommen(fenster.app_handle(), fenster.label(), seite.url());
+            // Im Protokoll steht, welche Seite geladen wurde — beim Support die erste Frage
+            // („Maske oder Server? Welcher?“).
             if matches!(seite.event(), tauri::webview::PageLoadEvent::Finished) {
                 log::info!("Seite geladen: {}", fuers_protokoll(seite.url()));
             }
@@ -241,6 +448,12 @@ fn baue_fenster(app: &AppHandle, label: &str, start: WebviewUrl) -> tauri::Resul
         .on_navigation(move |ziel| navigation(&fuer_navigation, &label_navigation, ziel))
         // Vor `faehigkeiten.js`: beide ergänzen dieselbe Kennung `__LIFELINE_HUELLE__`.
         .initialization_script(BENACHRICHTIGUNG_SKRIPT);
+    let builder = match platz {
+        Some(platz) => builder
+            .inner_size(platz.groesse.width, platz.groesse.height)
+            .position(platz.position.x, platz.position.y),
+        None => builder.inner_size(1366.0, 860.0),
+    };
     #[cfg(target_os = "macos")]
     let builder = builder
         // WKWebView suspendiert ein verdecktes Fenster nach ~3 s, Live-Ereignisse
@@ -256,26 +469,65 @@ fn verbundener_server(app: &AppHandle) -> Option<Url> {
     verbindung::lesen(&konfig_dir(app))
 }
 
+/// Baut ein Nebenfenster mit `ziel`, versetzt zum vorderen, und wacht über sein Laden. Nicht
+/// in einem Ereignis des Webviews selbst aufrufen: ein synchroner Fensterbau darin blockiert
+/// unter Windows.
+fn open_nebenfenster(app: &AppHandle, ziel: Url) {
+    let nummer = app
+        .state::<Zustand>()
+        .nebenfenster
+        .fetch_add(1, Ordering::Relaxed)
+        + 1;
+    let label = nebenfenster_label(nummer);
+    let platz = platz_neben_front(app);
+    // Die Wache vor dem Bau, wie in `lade_server`.
+    start_watch(app, &label, ziel.clone());
+    match baue_fenster(app, &label, WebviewUrl::External(ziel), platz) {
+        Ok(fenster) => {
+            let _ = fenster.set_focus();
+        }
+        Err(fehler) => log::error!("Nebenfenster {label} nicht gebaut: {fehler}"),
+    }
+}
+
+/// Was ein neues Fenster aus dem Menü zeigt (LLH-1281): die Seite des vorderen Fensters, wenn sie
+/// zum Server gehört — ein zweiter Bildschirm beginnt dort, wo man ist —, sonst die Startseite.
+fn ziel_neues_fenster(server: &Url, vorn: Option<&Url>) -> Url {
+    vorn.filter(|seite| links::gehoert_zum_server(server, seite))
+        .cloned()
+        .unwrap_or_else(|| server.clone())
+}
+
+/// Menü „Neues Fenster“ (LLH-1281). Ohne verbundenen Server gibt es nichts zu öffnen: dann die
+/// Maske.
+pub(crate) fn neues_fenster_aus_menue(app: &AppHandle) {
+    let Some(server) = verbundener_server(app) else {
+        zeige_maske(app, None);
+        return;
+    };
+    let vorn = front_fenster(app).and_then(|fenster| {
+        // Eine Anzeige „nicht erreichbar“ meint das Ziel, das sie laden wollte.
+        let ausfall = app
+            .state::<Zustand>()
+            .ausfaelle
+            .lock()
+            .unwrap()
+            .get(fenster.label())
+            .map(|ausfall| ausfall.ziel.clone());
+        ausfall.or_else(|| fenster.url().ok())
+    });
+    let ziel = ziel_neues_fenster(&server, vorn.as_ref());
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move { open_nebenfenster(&app, ziel) });
+}
+
 fn neues_fenster(app: &AppHandle, label: &str, ziel: Url) {
     match links::entscheide_neues_fenster(verbundener_server(app).as_ref(), &ziel) {
         Ziel::Nebenfenster => {
             // Nicht im Handler selbst bauen: der läuft im Ereignis des Webviews, und ein
             // synchroner Fensterbau darin blockiert unter Windows.
             let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let nummer = app
-                    .state::<Zustand>()
-                    .nebenfenster
-                    .fetch_add(1, Ordering::Relaxed)
-                    + 1;
-                let label = nebenfenster_label(nummer);
-                match baue_fenster(&app, &label, WebviewUrl::External(ziel)) {
-                    Ok(fenster) => {
-                        let _ = fenster.set_focus();
-                    }
-                    Err(fehler) => log::error!("Nebenfenster {label} nicht gebaut: {fehler}"),
-                }
-            });
+            tauri::async_runtime::spawn(async move { open_nebenfenster(&app, ziel) });
         }
         Ziel::Download => herunterladen(app, label, &ziel),
         Ziel::System => im_system_oeffnen(&ziel),
@@ -360,6 +612,75 @@ fn abbrechen(app: AppHandle) -> Result<(), String> {
     lade_server(&app, &server)
 }
 
+/// Nur Maske (LLH-1282): einen bekannten Server aus der Auswahl nehmen. Gibt die neue Liste.
+#[tauri::command]
+fn vergessen(app: AppHandle, adresse: String) -> Result<Vec<BekannterServer>, String> {
+    verbindung::vergessen(&konfig_dir(&app), &adresse)
+        .map_err(|fehler| format!("Die Liste ließ sich nicht speichern: {fehler}"))?;
+    Ok(bekannte_server(&app))
+}
+
+/// Was die Anzeige „nicht erreichbar“ zeigt.
+#[derive(Serialize)]
+struct NichtErreichbar {
+    /// Origin des Servers, den das Fenster laden wollte.
+    adresse: String,
+    /// Die Anzeige prüft selbst weiter (der Port antwortete nicht).
+    automatisch: bool,
+}
+
+fn ausfall(app: &AppHandle, fenster: &WebviewWindow) -> Option<Ausfall> {
+    app.state::<Zustand>()
+        .ausfaelle
+        .lock()
+        .unwrap()
+        .get(fenster.label())
+        .cloned()
+}
+
+/// Nur Anzeige „nicht erreichbar“ (LLH-1283): was sie zeigt.
+#[tauri::command]
+fn nicht_erreichbar(app: AppHandle, fenster: WebviewWindow) -> Result<NichtErreichbar, String> {
+    let ausfall = ausfall(&app, &fenster).ok_or("Kein Ausfall in diesem Fenster.")?;
+    Ok(NichtErreichbar {
+        adresse: ausfall.ziel.origin().ascii_serialization(),
+        automatisch: ausfall.grund == Grund::NichtErreichbar,
+    })
+}
+
+/// Nur Anzeige „nicht erreichbar“: antwortet der Server jetzt? Ohne Laden — die Anzeige lädt erst,
+/// wenn ja, damit das Fenster nicht zwischen leer und Anzeige springt.
+#[tauri::command]
+async fn check_server(app: AppHandle, fenster: WebviewWindow) -> Result<bool, String> {
+    let ausfall = ausfall(&app, &fenster).ok_or("Kein Ausfall in diesem Fenster.")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        erreichbar::check_erreichbar(&ausfall.ziel, erreichbar::CHECK_TIMEOUT)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Nur Anzeige „nicht erreichbar“: lädt erneut, was das Fenster laden wollte. Wurde inzwischen auf
+/// einen anderen Server gewechselt, dessen Startseite.
+#[tauri::command]
+fn erneut_versuchen(app: AppHandle, fenster: WebviewWindow) -> Result<(), String> {
+    let Some(server) = verbundener_server(&app) else {
+        zeige_maske(&app, None);
+        return Ok(());
+    };
+    let ziel = ausfall(&app, &fenster)
+        .map(|ausfall| ausfall.ziel)
+        .filter(|ziel| links::gehoert_zum_server(&server, ziel))
+        .unwrap_or(server);
+    load_in_fenster(&app, &fenster, ziel)
+}
+
+/// Nur Anzeige „nicht erreichbar“: zur Maske (im Hauptfenster).
+#[tauri::command]
+fn server_wechseln(app: AppHandle) {
+    zeige_maske(&app, None);
+}
+
 /// Serverseite (nur macOS genutzt): nativer Druckdialog für die aktuelle Seite.
 #[tauri::command]
 fn drucken(fenster: WebviewWindow) -> Result<(), String> {
@@ -377,6 +698,15 @@ fn benachrichtigung_zeigen(
     titel: String,
     text: Option<String>,
 ) -> Result<(), String> {
+    let schluessel = format!("{titel}\n{}", text.as_deref().unwrap_or_default());
+    let neu = neu_gemeldet(
+        &mut app.state::<Zustand>().meldungen.lock().unwrap(),
+        schluessel,
+        Instant::now(),
+    );
+    if !neu {
+        return Ok(());
+    }
     let meldung = app
         .notification()
         .builder()
@@ -387,6 +717,20 @@ fn benachrichtigung_zeigen(
         None => meldung,
     };
     meldung.show().map_err(|e| e.to_string())
+}
+
+/// So lange gilt eine gleiche Meldung aus einem weiteren Fenster als dieselbe (LLH-1281).
+const DOPPEL_FRIST: Duration = Duration::from_secs(3);
+
+/// Ist die Meldung mit `schluessel` (Titel und Text) neu? Mehrere Fenster desselben Einsatzes
+/// melden ein Ereignis je für sich; das System zeigt es einmal. Merkt sie sich, wenn ja.
+fn neu_gemeldet(letzte: &mut Vec<(String, Instant)>, schluessel: String, jetzt: Instant) -> bool {
+    letzte.retain(|(_, zeit)| jetzt.duration_since(*zeit) < DOPPEL_FRIST);
+    if letzte.iter().any(|(bekannt, _)| *bekannt == schluessel) {
+        return false;
+    }
+    letzte.push((schluessel, jetzt));
+    true
 }
 
 /// Schlüssel in den Zusatzdaten einer Meldung: das Fenster, das sie gezeigt hat.
@@ -538,8 +882,8 @@ fn deeplinks_verarbeiten(app: &AppHandle, links: Vec<Url>) {
             Aktion::Vorbelegen(ziel) => zeige_maske(app, Some(ziel)),
             Aktion::Bestaetigen(ziel) => bestaetige_wechsel(app, gespeichert, ziel),
             Aktion::Nichts => {
-                if let Some(fenster) = fenster(app) {
-                    let _ = fenster.set_focus();
+                if let Some(fenster) = front_fenster(app) {
+                    nach_vorn(&fenster);
                 }
             }
         }
@@ -583,7 +927,7 @@ fn main() {
         // Zuerst: ein zweiter Start (auch per Deeplink) geht an die laufende Instanz. Den Link
         // selbst reicht das Plugin über `on_open_url` weiter (Feature `deep-link`).
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(fenster) = fenster(app) {
+            if let Some(fenster) = front_fenster(app) {
                 nach_vorn(&fenster);
             }
         }))
@@ -601,21 +945,25 @@ fn main() {
             vorbelegung,
             verbinden,
             abbrechen,
+            vergessen,
+            nicht_erreichbar,
+            check_server,
+            erneut_versuchen,
+            server_wechseln,
             drucken,
             anmeldung_im_browser,
             benachrichtigung_zeigen
         ])
         .menu(menue::bauen)
         .on_menu_event(menue::behandeln)
-        // Ohne Hauptfenster liefen Maske, Deeplink und Serverwechsel ins Leere: es geht, und die
-        // Nebenfenster gehen mit — die App endet, statt kopflos weiterzulaufen.
+        // Die Fenster sind gleichrangig (LLH-1281): schließt eins, bleiben die anderen. Maske,
+        // Deeplink und Serverwechsel bauen das Hauptfenster bei Bedarf neu; mit dem letzten
+        // Fenster endet die App. Ein geschlossenes Fenster nimmt Wache und Anzeige mit.
         .on_window_event(|fenster, ereignis| {
-            if fenster.label() == FENSTER && matches!(ereignis, tauri::WindowEvent::Destroyed) {
-                for (label, nebenfenster) in fenster.app_handle().webview_windows() {
-                    if label.starts_with(NEBENFENSTER_PRAEFIX) {
-                        let _ = nebenfenster.close();
-                    }
-                }
+            if matches!(ereignis, tauri::WindowEvent::Destroyed) {
+                let zustand = fenster.app_handle().state::<Zustand>();
+                zustand.watches.lock().unwrap().remove(fenster.label());
+                zustand.ausfaelle.lock().unwrap().remove(fenster.label());
             }
         })
         .setup(|app| {
@@ -637,7 +985,11 @@ fn main() {
                 None => WebviewUrl::App("index.html".into()),
             };
 
-            baue_fenster(&handle, FENSTER, start)?;
+            // Die Wache vor dem Bau, wie in `lade_server`.
+            if let Some(server) = gespeichert {
+                start_watch(&handle, FENSTER, server);
+            }
+            baue_fenster(&handle, FENSTER, start, None)?;
 
             // Ein Klick auf eine native Meldung holt ihr Fenster nach vorn, auch aus dem Dock
             // (D7): macOS aktiviert die App, holt ein minimiertes Fenster aber nicht zurück. Den
@@ -649,7 +1001,7 @@ fn main() {
                 };
                 if let Some(fenster) = fuer_klick
                     .get_webview_window(&label)
-                    .or_else(|| fenster(&fuer_klick))
+                    .or_else(|| front_fenster(&fuer_klick))
                 {
                     nach_vorn(&fenster);
                 }
@@ -810,6 +1162,90 @@ mod tests {
         assert!(skript.contains(&format!("a.href = {literal};")), "{skript}");
         assert!(skript.contains("a.download = '';"), "{skript}");
         assert!(!skript.contains('\n'), "{skript}");
+    }
+
+    /// Die Anzeige „nicht erreichbar“ gilt nur lokal (keine `remote`-Origin) und darf keine Adresse
+    /// setzen; die Serverseite bekommt keinen ihrer Commands.
+    #[test]
+    fn anzeige_nicht_erreichbar_ist_lokal_und_setzt_keine_adresse() {
+        let anzeige: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/nicht-erreichbar.json")).unwrap();
+        assert!(anzeige.get("remote").is_none(), "{anzeige}");
+        let rechte: Vec<&str> = anzeige["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|recht| recht.as_str().unwrap())
+            .collect();
+        assert!(!rechte.contains(&"allow-verbinden"), "{rechte:?}");
+        assert!(!rechte.contains(&"allow-vergessen"), "{rechte:?}");
+        let fenster = anzeige["windows"].as_array().unwrap();
+        let [haupt, neben] = freigabe_fenster();
+        assert!(fenster.contains(&haupt.into()) && fenster.contains(&neben.into()));
+        for recht in rechte.iter().filter(|recht| recht.starts_with("allow-")) {
+            assert!(!SERVER_RECHTE.contains(recht), "{recht}");
+        }
+        let lokal = include_str!("../capabilities/lokal.json");
+        assert!(lokal.contains("\"allow-vergessen\""), "{lokal}");
+        assert!(!lokal.contains("remote"), "{lokal}");
+    }
+
+    /// Ein neues Fenster aus dem Menü beginnt auf der Seite des vorderen Fensters, wenn sie zum
+    /// Server gehört; sonst (Maske, Anbieter, anderer Server) auf der Startseite.
+    #[test]
+    fn neues_fenster_beginnt_auf_der_seite_des_vorderen() {
+        let server = Url::parse("https://elw.local:8443/").unwrap();
+        let seite = Url::parse("https://elw.local:8443/einsaetze/4/lagekarte?ebene=2").unwrap();
+        assert_eq!(ziel_neues_fenster(&server, Some(&seite)), seite);
+        for fremd in [
+            "tauri://localhost/index.html",
+            "https://id.example.org/login",
+            "https://elw.local:9443/einsaetze/4",
+        ] {
+            let fremd = Url::parse(fremd).unwrap();
+            assert_eq!(ziel_neues_fenster(&server, Some(&fremd)), server, "{fremd}");
+        }
+        assert_eq!(ziel_neues_fenster(&server, None), server);
+    }
+
+    #[test]
+    fn neues_fenster_rueckt_versetzt_in_gleicher_groesse() {
+        let platz = platz_neben(
+            LogicalPosition::new(100.0, 80.0),
+            LogicalSize::new(1200.0, 800.0),
+        );
+        assert_eq!(platz.position, LogicalPosition::new(130.0, 110.0));
+        assert_eq!(platz.groesse, LogicalSize::new(1200.0, 800.0));
+    }
+
+    /// Zwei Fenster desselben Einsatzes melden dasselbe Ereignis: das System zeigt es einmal. Nach
+    /// der Frist oder mit anderem Text ist es eine neue Meldung.
+    #[test]
+    fn gleiche_meldung_aus_zwei_fenstern_erscheint_einmal() {
+        let mut letzte = Vec::new();
+        let start = Instant::now();
+        assert!(neu_gemeldet(
+            &mut letzte,
+            "Auftrag überfällig\nA-12".into(),
+            start
+        ));
+        assert!(!neu_gemeldet(
+            &mut letzte,
+            "Auftrag überfällig\nA-12".into(),
+            start + Duration::from_millis(200)
+        ));
+        assert!(neu_gemeldet(
+            &mut letzte,
+            "Auftrag überfällig\nA-13".into(),
+            start + Duration::from_millis(300)
+        ));
+        assert!(neu_gemeldet(
+            &mut letzte,
+            "Auftrag überfällig\nA-12".into(),
+            start + DOPPEL_FRIST + Duration::from_millis(1)
+        ));
+        // Alte Einträge fallen heraus, die Liste wächst nicht.
+        assert!(letzte.len() <= 2, "{}", letzte.len());
     }
 
     /// Jedes Nebenfenster fällt unter das Muster der Druckfreigabe; die Maske bleibt außen vor.

@@ -49,7 +49,8 @@ wire_enum! {
         Gebunden => "gebunden",
         /// Im Stamm außer Dienst und nicht im Einsatz: gesperrt.
         AusserDienst => "ausser_dienst",
-        /// Aus dem Einsatz entlassen: wird erneut disponiert (Fahrzeuge erst mit LLH-1079 II).
+        /// Aus dem Einsatz entlassen: wird in derselben Zeile erneut disponiert (LLH-1079 D7,
+        /// Fahrzeuge seit LLH-1236).
         Entlassen => "entlassen",
     }
     try_from = |s| format!("Ungültiger Zustand: {s}");
@@ -193,16 +194,17 @@ pub struct Plan {
     pub personal: HashMap<i64, PersonalLage>,
 }
 
-/// Zustand eines Stamm-Fahrzeugs (D4). `zeile` ist die Dispositionszeile im Einsatz
-/// (`beendet`, Einheit vorhanden). Eine aktive Zeile zählt vor dem Dienststatus des Stamms: das
-/// Fahrzeug ist schon im Einsatz.
-pub fn fahrzeug_zustand(in_dienst: bool, zeile: Option<(bool, bool)>) -> VorschauZustand {
+/// Zustand eines Stamm-Fahrzeugs (D4). `beendet_als` ist der Endzustand einer beendeten
+/// Dispositionszeile (`None` = aktiv), dazu ob sie einer Einheit angehört. Eine aktive Zeile zählt
+/// vor dem Dienststatus des Stamms: das Fahrzeug ist schon im Einsatz. Eine stornierte Zeile gilt
+/// wie bei der Person als nicht im Einsatz (`neu`).
+pub fn fahrzeug_zustand(in_dienst: bool, zeile: Option<(Option<&str>, bool)>) -> VorschauZustand {
     match zeile {
-        Some((false, true)) => VorschauZustand::Gebunden,
-        Some((false, false)) => VorschauZustand::Frei,
+        Some((None, true)) => VorschauZustand::Gebunden,
+        Some((None, false)) => VorschauZustand::Frei,
         _ if !in_dienst => VorschauZustand::AusserDienst,
-        Some((true, _)) => VorschauZustand::Entlassen,
-        None => VorschauZustand::Neu,
+        Some((Some("entlassen"), _)) => VorschauZustand::Entlassen,
+        _ => VorschauZustand::Neu,
     }
 }
 
@@ -237,6 +239,7 @@ struct FahrzeugZeile {
     dienststatus: String,
     ef_id: Option<i64>,
     ef_beendet_at: Option<String>,
+    ef_beendet_als: Option<String>,
     einheit_id: Option<i64>,
     einheit_name: Option<String>,
 }
@@ -257,8 +260,8 @@ struct PersonalZeile {
 }
 
 /// Lage aller Stamm-Fahrzeuge in **einer** Anweisung. Eine aufgelöste Einheit zählt nicht. Liest
-/// absichtlich auch beendete Zeilen (entlassen gegen neu); Ausnahme mit Grund in der ALLOWLIST
-/// des Wächters (`src/entlassung.rs`).
+/// absichtlich auch beendete Zeilen (entlassen gegen storniert); Ausnahme mit Grund in der
+/// ALLOWLIST des Wächters (`src/entlassung.rs`).
 async fn load_fahrzeug_lagen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -267,7 +270,8 @@ async fn load_fahrzeug_lagen_tx(
 ) -> Result<HashMap<i64, FahrzeugLage>, AppError> {
     let zeilen: Vec<FahrzeugZeile> = sqlx::query_as(
         "SELECT j.value AS fahrzeug_id, f.dienststatus, ef.id AS ef_id, \
-                ef.beendet_at AS ef_beendet_at, e.id AS einheit_id, e.name AS einheit_name \
+                ef.beendet_at AS ef_beendet_at, ef.beendet_als AS ef_beendet_als, \
+                e.id AS einheit_id, e.name AS einheit_name \
          FROM json_each(?1) j \
          JOIN fahrzeug f ON f.id = j.value AND f.org_id = ?2 \
          LEFT JOIN einsatz_fahrzeug ef ON ef.fahrzeug_id = j.value AND ef.einsatz_id = ?3 \
@@ -281,12 +285,20 @@ async fn load_fahrzeug_lagen_tx(
     Ok(zeilen
         .into_iter()
         .map(|z| {
-            let einheit = bezug(z.einheit_id, z.einheit_name);
-            let zeile = z
-                .ef_id
-                .map(|_| (z.ef_beendet_at.is_some(), einheit.is_some()));
-            let zustand = fahrzeug_zustand(z.dienststatus == DIENSTSTATUS_IN_DIENST, zeile);
             let aktiv = z.ef_id.is_some() && z.ef_beendet_at.is_none();
+            // An einer beendeten Zeile hängt nichts mehr (LLH-1079 löst die Einheit).
+            let einheit = if aktiv {
+                bezug(z.einheit_id, z.einheit_name)
+            } else {
+                None
+            };
+            let ende = if aktiv {
+                None
+            } else {
+                Some(z.ef_beendet_als.as_deref().unwrap_or("entlassen"))
+            };
+            let zeile = z.ef_id.map(|_| (ende, einheit.is_some()));
+            let zustand = fahrzeug_zustand(z.dienststatus == DIENSTSTATUS_IN_DIENST, zeile);
             (
                 z.fahrzeug_id,
                 FahrzeugLage {
@@ -504,9 +516,9 @@ pub fn grund_gebunden(einheit: Option<&Bezug>, fahrzeug: Option<&Bezug>) -> Stri
 }
 
 /// Abgleich Anfrage ↔ Plan (D6, Schritt 2), rein und **vor dem ersten Schreiben**: je Zeile ein
-/// Grund für „nicht in der Vorlage“, „außer Dienst“, ein entlassenes Fahrzeug (noch ohne
-/// erneutes Disponieren, LLH-1079 II) und „gebunden ohne umhängen“; Fahrzeuge vor Personen, in
-/// der Reihenfolge der Anfrage. Leer = alles übernehmbar.
+/// Grund für „nicht in der Vorlage“, „außer Dienst“ und „gebunden ohne umhängen“; Fahrzeuge vor
+/// Personen, in der Reihenfolge der Anfrage. Eine entlassene Kraft ist übernehmbar, sie wird
+/// erneut disponiert (D4). Leer = alles übernehmbar.
 pub fn check_against_plan(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) -> Vec<ZeilenGrund> {
     let mut zeilen = Vec::new();
     let zeile = |art, id, grund: String| ZeilenGrund { art, id, grund };
@@ -516,9 +528,6 @@ pub fn check_against_plan(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) ->
             Some(l) => match l.zustand {
                 VorschauZustand::AusserDienst => {
                     Some(kraefte_disposition::GRUND_AUSSER_DIENST.to_string())
-                }
-                VorschauZustand::Entlassen => {
-                    Some(kraefte_disposition::GRUND_ENTLASSEN.to_string())
                 }
                 VorschauZustand::Gebunden if !w.umhaengen => {
                     Some(grund_gebunden(l.einheit.as_ref(), None))
@@ -689,16 +698,28 @@ pub async fn bilde_tx(
             .map(|f| f.fahrzeug_id)
             .filter(|id| fahrzeug_wahl.contains_key(id))
             .collect();
+        // Neu oder erneut: ein entlassenes Fahrzeug nimmt der Baustein in derselben Zeile wieder
+        // auf (LLH-1236).
         let neu: Vec<i64> = gewaehlt
             .iter()
             .copied()
-            .filter(|id| plan.fahrzeuge[id].zustand == VorschauZustand::Neu)
+            .filter(|id| {
+                matches!(
+                    plan.fahrzeuge[id].zustand,
+                    VorschauZustand::Neu | VorschauZustand::Entlassen
+                )
+            })
             .collect();
         let mut neue: HashMap<i64, Bezug> = HashMap::new();
         if !neu.is_empty() {
-            let ergebnis =
-                kraefte_disposition::disponiere_fahrzeuge_tx(conn, kontext, &neu, Some(eid))
-                    .await?;
+            let ergebnis = kraefte_disposition::disponiere_fahrzeuge_tx(
+                conn,
+                kontext,
+                &neu,
+                Some(eid),
+                Regeln::EINZEL,
+            )
+            .await?;
             for (fid, f) in neu.iter().zip(ergebnis.fahrzeuge) {
                 neue.insert(
                     *fid,

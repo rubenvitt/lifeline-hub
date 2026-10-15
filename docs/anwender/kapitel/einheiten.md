@@ -274,8 +274,8 @@ Der Zustand je Zeile:
   ihre Einheit oder ihr Fahrzeug. Ein umgehängtes Fahrzeug nimmt seine Besatzung mit, auch wer
   nicht in der Vorlage steht; das Einsatztagebuch zählt sie zu den Kräften.
 - „außer Dienst“: nicht wählbar.
-- „entlassen“: eine entlassene Person wird erneut in den Einsatz geholt; ein entlassenes Fahrzeug
-  ist nicht wählbar.
+- „entlassen, wird wieder aufgenommen“: aus dem Einsatz entlassen; die Kraft wird beim Bilden
+  erneut in den Einsatz geholt. Ein entlassenes Fahrzeug ist vorab gewählt, eine Person nicht.
 
 Eine gewählte Person, deren Fahrzeug nicht mitkommt, steht mit „ohne Fahrzeug“ und kommt ohne
 Fahrzeug in die Einheit. Sitzt eine Person ohne Einheit schon auf ihrem Fahrzeug aus der Vorlage und wird dieses

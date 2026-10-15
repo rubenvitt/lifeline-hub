@@ -1,9 +1,11 @@
-//! Anwendungsmenü der Hülle: „Server wechseln…“ und „Nach Updates suchen…“ (desktop-huelle,
-//! desktop-auslieferung) neben den Standardeinträgen.
+//! Anwendungsmenü der Hülle: „Server wechseln…“, „Nach Updates suchen…“ (desktop-huelle,
+//! desktop-auslieferung) und „Neues Fenster“ (LLH-1281) neben den Standardeinträgen.
 //!
 //! Keine eigenen Tastenkürzel: ein Menükürzel fängt die Taste ab, bevor die Anwendung sie sieht,
-//! und die Anwendung hat eigene (Sprungpalette u. a.). „Bearbeiten“ gibt es nur auf macOS — dort
-//! gehen Kopieren/Einfügen im Webview nur über Menüeinträge; WebView2 kann es selbst.
+//! und die Anwendung hat eigene (Sprungpalette u. a.). Einzige Ausnahme ist ⌘N/Strg+N für „Neues
+//! Fenster“: im Browser gehört die Taste dem Browser, die Anwendung kann sie also nie belegen.
+//! „Bearbeiten“ gibt es nur auf macOS — dort gehen Kopieren/Einfügen im Webview nur über
+//! Menüeinträge; WebView2 kann es selbst.
 
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Manager};
@@ -11,6 +13,7 @@ use tauri::{AppHandle, Manager};
 const SERVER_WECHSELN: &str = "server-wechseln";
 const UPDATES_SUCHEN: &str = "updates-suchen";
 const NEU_LADEN: &str = "neu-laden";
+const NEUES_FENSTER: &str = "neues-fenster";
 
 pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let wechseln = MenuItem::with_id(app, SERVER_WECHSELN, "Server wechseln…", true, None::<&str>)?;
@@ -23,6 +26,13 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     )?;
     // Ohne Browserleiste der einzige Weg, eine Seite nach einem Netzausfall neu anzufordern.
     let neu_laden = MenuItem::with_id(app, NEU_LADEN, "Neu laden", true, None::<&str>)?;
+    let neues_fenster = MenuItem::with_id(
+        app,
+        NEUES_FENSTER,
+        "Neues Fenster",
+        true,
+        Some("CmdOrCtrl+N"),
+    )?;
     let trenner = || PredefinedMenuItem::separator(app);
 
     #[cfg(target_os = "macos")]
@@ -65,6 +75,7 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             "Fenster",
             true,
             &[
+                &neues_fenster,
                 &neu_laden,
                 &trenner()?,
                 &PredefinedMenuItem::minimize(app, Some("Im Dock ablegen"))?,
@@ -84,6 +95,7 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             "Lifeline Hub",
             true,
             &[
+                &neues_fenster,
                 &wechseln,
                 &neu_laden,
                 &updates,
@@ -99,6 +111,7 @@ pub fn behandeln(app: &AppHandle, ereignis: MenuEvent) {
     match ereignis.id().as_ref() {
         SERVER_WECHSELN => crate::zeige_maske(app, None),
         UPDATES_SUCHEN => crate::update::auf_wunsch_pruefen(app.clone()),
+        NEUES_FENSTER => crate::neues_fenster_aus_menue(app),
         // Das Fenster mit Fokus — mit Nebenfenstern (LFH-782) ist das nicht immer das Hauptfenster.
         NEU_LADEN => {
             let fenster = app

@@ -3,7 +3,8 @@
 Die Desktop-App „Lifeline Hub“ ist eine **Hülle** um die Webanwendung (LFH-721, Variante A
 aus LFH-720). Sie lädt die https-Adresse des Einsatzservers, genau wie ein Browser. Die
 Anwendung selbst, die Daten und die Anmeldung liegen weiter auf dem Server. Die Hülle bringt
-ein eigenes Fenster, die Serveradresse beim ersten Start, den Deeplink aus „Geräte verbinden“,
+eigene Fenster, die Serverauswahl beim ersten Start, die Anzeige „Server nicht erreichbar“, den
+Deeplink aus „Geräte verbinden“,
 den Druck auf dem Mac, die Behandlung neuer Fenster und fremder Links, die Mitteilungen des
 Betriebssystems sowie das Update mit.
 
@@ -51,17 +52,38 @@ Beim ersten Start fragt die App nach der **Serveradresse**, zum Beispiel
 `https://elw.local:8443`. Angenommen wird nur `https` mit Hostnamen und ohne Name/Passwort vor
 „@“, denn Offline-Betrieb (Service Worker) und Passkeys brauchen eine gesicherte Verbindung. Das Zertifikat des Servers
 muss der Rechner kennen, so wie bei einem Browser (mkcert-CA oder ein öffentliches Zertifikat,
-siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst bleibt das Fenster leer (macOS) oder zeigt eine
-Fehlerseite (Windows). Nach einem Netzausfall fordert Menü „Lifeline Hub“ → „Neu laden“ (macOS:
-Menü „Fenster“) die Seite neu an.
+siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst kommt keine Seite an (siehe „Server nicht
+erreichbar“). Nach einem Netzausfall fordert Menü „Lifeline Hub“ → „Neu laden“ (macOS: Menü
+„Fenster“) die Seite neu an.
 
 Die Adresse bleibt gespeichert, und jeder weitere Start lädt sie direkt:
 - macOS: `~/Library/Application Support/dev.rubeen.lifeline.desktop/verbindung.json`
 - Windows: `%APPDATA%\dev.rubeen.lifeline.desktop\verbindung.json`
 
-**Server wechseln:** Menü „Lifeline Hub“ → „Server wechseln…“. Die Maske ist mit der
-bisherigen Adresse vorbelegt, und „Abbrechen“ führt dorthin zurück. Das hilft auch, wenn der
-Server nicht erreichbar ist oder sein Zertifikat abgelehnt wird.
+**Server wechseln:** Menü „Lifeline Hub“ → „Server wechseln…“. Seit LLH-1282 merkt sich die App
+die zuletzt verbundenen Server (bis zu acht, in `verbindung.json` unter `bekannt`). Die Maske
+zeigt sie zur Auswahl, ein Klick verbindet; der verbundene trägt „verbunden“. Mit „×“ verschwindet
+ein anderer Server aus der Liste. Darunter lässt sich eine neue Adresse eingeben. „Abbrechen“
+führt zum verbundenen Server zurück.
+
+### Server nicht erreichbar (LLH-1283)
+
+Kommt beim Laden des Servers keine Seite an, zeigt das Fenster **„Server nicht erreichbar“** mit
+der Adresse, „Erneut versuchen“ und „Server wechseln“, statt leer zu bleiben. Das gilt für jedes
+Fenster und jedes Laden, das die App selbst anstößt (Start, Verbinden, Abbrechen, neues Fenster):
+
+- **Der Server antwortet gar nicht** (aus, falsche Adresse, kein Netz): die Anzeige kommt nach
+  wenigen Sekunden. Sie prüft alle 5 Sekunden weiter und lädt die Seite, sobald der Server
+  antwortet, ohne Zutun.
+- **Der Server antwortet, aber es kommt keine Seite** (abgelehntes Zertifikat, hängender Server):
+  die Anzeige kommt nach 20 Sekunden. Weiter geht es dann nur mit „Erneut versuchen“, sonst lüde
+  das Fenster im Kreis.
+- **Die App war schon einmal geladen:** Dann liefert sie der Service Worker ohne Server, die App
+  startet offline wie bisher, und die Anzeige erscheint nicht. Den Netzzustand zeigt dann die
+  Anwendung selbst.
+
+Unter Windows zeigt WebView2 bei einem Fehler eine eigene Fehlerseite; dort bleibt es dabei. Ob
+der Server antwortet, prüft die App über eine TCP-Verbindung zu Host und Port, ohne TLS.
 
 ## Deeplink „Geräte verbinden“ (Vertrag für LFH-38)
 
@@ -81,7 +103,20 @@ Form erzeugen. Das Verhalten:
 - **Gleiche Adresse, anderer Pfad, fehlendes oder unsicheres `server`:** keine Wirkung.
 
 Die App läuft immer nur einmal. Ein zweiter Start oder ein Link bei laufender App holt das
-vorhandene Fenster nach vorn.
+erste Fenster nach vorn, ist es geschlossen, ein anderes.
+
+## Mehrere Fenster (LLH-1281)
+
+**Menü „Fenster“ → „Neues Fenster“** (Windows: Menü „Lifeline Hub“), auch mit ⌘N bzw. Strg+N,
+öffnet ein weiteres Fenster, etwa für einen zweiten Bildschirm. Es beginnt auf der Seite des
+Fensters, das vorn ist, liegt leicht versetzt darüber und hat dessen Größe. Ohne verbundenen
+Server öffnet sich stattdessen die Maske.
+
+Alle Fenster sind gleichrangig: Schließt man eines, auch das erste, bleiben die anderen offen.
+Mit dem letzten Fenster endet die App. „Server wechseln…“ öffnet die Maske im ersten Fenster und
+baut es neu, wenn es schon geschlossen war. Zeigen mehrere Fenster denselben Einsatz, meldet jedes
+eine Benachrichtigung für sich; als Mitteilung des Systems erscheint dieselbe Meldung (gleicher
+Titel und Text) innerhalb von 3 Sekunden nur einmal.
 
 ## Neue Fenster, fremde Links, Dateien (LFH-782)
 
@@ -90,8 +125,8 @@ selbst, wohin ein Link geht:
 
 - **Seite des eigenen Servers in neuem Fenster** (etwa „in neuem Tab öffnen“ in der
   Sprungpalette, Strg/⌘+↵): Die App öffnet ein **weiteres Fenster**, angemeldet und mit Druck.
-  Das bisherige Fenster bleibt, wo es war. Ein Serverwechsel schließt die weiteren Fenster,
-  ebenso das Schließen des Hauptfensters. „Neu laden“ wirkt auf das Fenster, das vorn ist.
+  Das bisherige Fenster bleibt, wo es war. Ein Serverwechsel schließt die weiteren Fenster eines
+  anderen Servers. „Neu laden“ wirkt auf das Fenster, das vorn ist.
 - **Fremde Website** (Links im Fachebenen-Inspector, Lizenzhinweise): Sie öffnet der
   **Standardbrowser** des Systems. `mailto:`- und `tel:`-Links gehen an das zuständige
   Programm.
@@ -115,7 +150,9 @@ Ist das Fenster minimiert oder verdeckt, erscheint eine Benachrichtigung (etwa �
 darauf holt das Fenster nach vorn. Dort steht die Benachrichtigung mit „Öffnen“, wie sie ohne
 Mitteilung stünde. Bei sichtbarem Fenster gibt es keine Mitteilung, nur Hinweis und Ton in der
 App. Im Kopf des Einsatzes steht in der App immer „Benachrichtigung erlaubt“; ob das System die
-Mitteilung zeigt, erfährt die App nicht.
+Mitteilung zeigt, erfährt die App nicht. Ob das System Mitteilungen der App durchlässt, zeigt
+„Testbenachrichtigung“ unter Benutzermenü → „Benachrichtigungen“: sie erscheint auch bei
+sichtbarem Fenster; bleibt sie trotz „gesendet“ aus, hält das System sie zurück.
 
 Ob und wie Mitteilungen erscheinen, regelt das Betriebssystem je App:
 - **macOS:** Systemeinstellungen → Mitteilungen → „Lifeline Hub“: „Mitteilungen erlauben“ an.

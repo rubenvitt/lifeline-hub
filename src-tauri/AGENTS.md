@@ -7,7 +7,9 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
 - **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720): der Webview lädt die
   https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
   Command), nicht ins Frontend.
-- **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
+- **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`, nur Fenster
+  `main`); die lokale Anzeige „nicht erreichbar“ (`capabilities/nicht-erreichbar.json`, jedes
+  Fenster) darf nur prüfen, neu laden und zur Maske führen; die Serverseite
   bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
   `anmeldung_im_browser`, `benachrichtigung_zeigen`; `server_freigeben`). Jeder neue Command steht
   im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen. Commands eines Plugins
@@ -25,7 +27,19 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   Origin-Prüfung, Server `POST /api/auth/app-code[/einloesen]` (einheitlich 401, Audit
   `systembrowser`). Ein `lifeline://anmeldung` von außen bleibt wirkungslos.
 - Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
-  reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
+  reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`). `verbindung.json`
+  trägt neben `server` die Liste `bekannt` (LLH-1282, neuester zuerst, höchstens
+  `MAX_BEKANNT`); der verbundene Server lässt sich nicht vergessen.
+- **Fenster sind gleichrangig** (LLH-1281): Schließen des Hauptfensters schließt nichts mit;
+  Maske und Serverwechsel bauen `main` bei Bedarf neu (`zeige_maske`, `lade_server`), alles
+  andere nimmt `front_fenster`. „Neues Fenster“ (Menü, ⌘N/Strg+N als einziges Menükürzel) baut
+  ein `neben-*` über `open_nebenfenster`, versetzt zum vorderen. Gleiche native Meldungen aus
+  mehreren Fenstern fasst `neu_gemeldet` zusammen (`DOPPEL_FRIST`).
+- **Wache über jedes Laden des Servers** (LLH-1283, `erreichbar.rs`): Wer den Server in ein
+  Fenster lädt, geht über `load_in_fenster` bzw. `start_watch`, sonst bleibt das Fenster bei
+  einem Ausfall auf macOS leer. Angekommen ist jede nicht-lokale Seite (auch aus dem Service
+  Worker oder beim Identitätsanbieter); die Anzeige lädt erst neu, wenn `check_server` den Port
+  erreicht.
 - **Neue Fenster und Links** (LFH-782) entscheidet `links.rs` rein, den Server liest es bei
   jedem Aufruf frisch: eigene Origin → Nebenfenster (`neben-*`, gleicher Fensterbau
   `baue_fenster`, Druckfreigabe per Muster), `/api/` → Download, **außer `/api/auth/`** (OIDC
