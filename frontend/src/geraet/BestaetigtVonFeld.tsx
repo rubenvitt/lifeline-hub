@@ -5,6 +5,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Bestaetiger, GeraetAnzeige } from '../api/types';
 import { useAuthOptional } from '../auth/AuthContext';
 import { Select } from '../components/Select';
+import { personLabel } from '../kraefte/einsatzfunktionKern';
 
 /** Formularname des Felds; der Wert ist die Kennung im Einsatzpersonal. */
 export const BESTAETIGT_FELD = 'bestaetigt_personal_id';
@@ -15,11 +16,10 @@ export function kannBestaetigen(geraet: GeraetAnzeige | null): boolean {
   return geraet?.ansicht === 'uhs-tablet' || geraet?.ansicht === 'uhs-laptop';
 }
 
+/** Etikett „Name · Funktion“, Einsatzfunktion vor Qualifikation wie jede Personenauswahl
+ *  (LLH-1239). */
 export function bestaetigerOptionen(liste: readonly Bestaetiger[]) {
-  return liste.map((b) => ({
-    value: b.id,
-    label: b.funktion ? `${b.name} · ${b.funktion}` : b.name,
-  }));
+  return liste.map((b) => ({ value: b.id, label: personLabel(b) }));
 }
 
 /**

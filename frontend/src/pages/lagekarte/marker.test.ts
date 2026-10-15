@@ -369,6 +369,38 @@ describe('baueTaktischeMarker', () => {
     expect(tz?.funktion).toBe('fuehrungskraft');
     expect(tz?.fachaufgabe).toBe('rettungswesen');
   });
+
+  it('leitet das Zeichen nur aus der Qualifikation ab, nie aus der Einsatzfunktion (LLH-1239)', () => {
+    const person = (id: number, funktion: string | null) => ({
+      id,
+      name: `Person ${id}`,
+      lat: 50.4,
+      lon: 8.9,
+      tz_fachaufgabe: null,
+      tz_organisation: null,
+      funktion,
+      einsatzfunktion: 'Sprechfunker',
+      ist_einheitsfuehrer: false,
+      ist_abschnittsleiter: false,
+    });
+    const { verortet } = baueTaktischeMarker(
+      {
+        einheiten: [],
+        fahrzeuge: [],
+        fuehrungskraefte: [
+          person(4, 'Notfallsanitäter'),
+          person(5, null),
+        ] as unknown as TaktischeQuelle['fuehrungskraefte'],
+        orgDefault: null,
+      },
+      token,
+    );
+    const mitQualifikation = verortet.find((m) => m.schluessel === 'fuehrung-4');
+    // „Sprechfunker“ ergäbe über `fachaufgabeAusFunktion` IuK.
+    expect(mitQualifikation?.tz?.fachaufgabe).toBe('rettungswesen');
+    expect(mitQualifikation?.label).toBe('Person 4');
+    expect(verortet.find((m) => m.schluessel === 'fuehrung-5')?.tz?.fachaufgabe).toBe('fuehrung');
+  });
 });
 
 function freiesZeichen(partial: Partial<FreiesZeichen>): FreiesZeichen {

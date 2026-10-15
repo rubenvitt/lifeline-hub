@@ -4,6 +4,7 @@ import type {
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
+  FuehrungskraftKarte,
   Schaden,
   Uhs,
 } from '../../api/types';
@@ -508,5 +509,51 @@ describe('Kartengrundlage', () => {
     });
     expect(grundlageAufloesen('blind')).toEqual({ basemap: 'blind', stilName: null });
     expect(grundlageAufloesen('offline')).toEqual({ basemap: 'offline', stilName: null });
+  });
+});
+
+describe('Personal in der Leiste — Einsatzfunktion als Text (LLH-1239)', () => {
+  const person = (teil: Partial<FuehrungskraftKarte>): FuehrungskraftKarte => ({
+    id: 3,
+    einsatz_id: 1,
+    name: 'Erika Funk',
+    lat: 50,
+    lon: 8,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
+    funktion: 'Sanitäter',
+    ist_einheitsfuehrer: false,
+    ist_abschnittsleiter: false,
+    ...teil,
+  });
+  const zeit = () => '—';
+
+  it('Unterzeile nennt die Einsatzfunktion, ohne sie die Qualifikation', () => {
+    const mit = {
+      ...LEERE_ROHDATEN,
+      fuehrungskraefte: [person({ einsatzfunktion: 'Sprechfunker' })],
+    };
+    expect(auswahlUnterzeile(marker('fuehrung', 3), mit)).toBe('Personal · Sprechfunker');
+    const ohne = { ...LEERE_ROHDATEN, fuehrungskraefte: [person({})] };
+    expect(auswahlUnterzeile(marker('fuehrung', 3), ohne)).toBe('Personal · Sanitäter');
+    const leer = { ...LEERE_ROHDATEN, fuehrungskraefte: [person({ funktion: null })] };
+    expect(auswahlUnterzeile(marker('fuehrung', 3), leer)).toBe('Personal');
+  });
+
+  it('Raster zeigt Funktion und Qualifikation getrennt', () => {
+    const mit = {
+      ...LEERE_ROHDATEN,
+      fuehrungskraefte: [person({ einsatzfunktion: 'Sprechfunker' })],
+    };
+    expect(auswahlRaster(marker('fuehrung', 3), mit, zeit)).toEqual([
+      { label: 'Funktion', wert: 'Sprechfunker', mono: false },
+      { label: 'Qualifikation', wert: 'Sanitäter', mono: false },
+    ]);
+    // Alter Lage-Stand ohne das Feld: Funktion leer, Qualifikation bleibt.
+    const ohne = { ...LEERE_ROHDATEN, fuehrungskraefte: [person({})] };
+    expect(auswahlRaster(marker('fuehrung', 3), ohne, zeit)).toEqual([
+      { label: 'Funktion', wert: '—', mono: false },
+      { label: 'Qualifikation', wert: 'Sanitäter', mono: false },
+    ]);
   });
 });

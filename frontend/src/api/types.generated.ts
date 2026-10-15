@@ -914,6 +914,9 @@ export interface components {
         BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
         /** @description Ein Eintrag der Auswahlliste „Bestätigt von“. */
         Bestaetiger: {
+            /** @description Einsatzfunktion (LLH-1239); das Etikett nennt sie vor der Qualifikation. */
+            einsatzfunktion?: string | null;
+            /** @description Qualifikation (Snapshot). */
             funktion?: string | null;
             /**
              * Format: int64
@@ -2524,6 +2527,12 @@ export interface components {
         FuehrungskraftKarte: {
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * @description Einsatzfunktion (LLH-1239): nur Text in Seitenleiste und Unterzeile, nie Quelle des
+             *     Zeichens, sonst lenkte ein Freitext wie „Sprechfunker“ es auf IuK um. Alte Lage-Stände
+             *     tragen das Feld nicht.
+             */
+            einsatzfunktion?: string | null;
             /**
              * @description Qualifikationen/Funktion als flacher Text (Snapshot). Quelle für die FE-Ableitung der
              *     Fachaufgabe des Personen-Zeichens (LFH-172); `tz_fachaufgabe` bleibt vorrangig.

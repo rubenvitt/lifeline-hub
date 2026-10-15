@@ -223,6 +223,11 @@ pub struct FuehrungskraftKarte {
     /// Qualifikationen/Funktion als flacher Text (Snapshot). Quelle für die FE-Ableitung der
     /// Fachaufgabe des Personen-Zeichens (LFH-172); `tz_fachaufgabe` bleibt vorrangig.
     pub funktion: Option<String>,
+    /// Einsatzfunktion (LLH-1239): nur Text in Seitenleiste und Unterzeile, nie Quelle des
+    /// Zeichens, sonst lenkte ein Freitext wie „Sprechfunker“ es auf IuK um. Alte Lage-Stände
+    /// tragen das Feld nicht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
     pub ist_einheitsfuehrer: bool,
     pub ist_abschnittsleiter: bool,
 }
