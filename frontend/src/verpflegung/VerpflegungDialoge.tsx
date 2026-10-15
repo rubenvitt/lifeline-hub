@@ -148,8 +148,8 @@ export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
 
 // ── Bausteine ───────────────────────────────────────────────────────────────────────────
 
-function anzahlFeld(min = 0, max?: number) {
-  return <InputNumber min={min} max={max} precision={0} style={{ width: '100%' }} />;
+function anzahlFeld(min = 0) {
+  return <InputNumber min={min} precision={0} style={{ width: '100%' }} />;
 }
 
 /** Eingeklappter Bereich — `forceRender` ist TRAGEND (sonst fehlen die Werte in `onFinish`). */
@@ -445,9 +445,17 @@ export function AusgabeDialog({
       <Form.Item<AusgabeWerte>
         name="menge"
         label="Menge (EP)"
-        rules={[{ required: true, message: 'Bitte eine Menge angeben' }]}
+        rules={[
+          { required: true, message: 'Bitte eine Menge angeben' },
+          // Regel statt `max` am Feld: das kappte still auf die Grenze und buchte trotzdem.
+          {
+            type: 'number',
+            max: VERPFLEGUNG_EP_MAX,
+            message: `Höchstens ${VERPFLEGUNG_EP_MAX} EP`,
+          },
+        ]}
       >
-        {anzahlFeld(1, VERPFLEGUNG_EP_MAX)}
+        {anzahlFeld(1)}
       </Form.Item>
       <Form.Item<AusgabeWerte>
         name="ort"

@@ -475,10 +475,22 @@ describe('AusgabeDialog', () => {
     expect(within(dialog).getByLabelText('Nachforderung')).toBeInTheDocument();
   });
 
-  it('die Menge lässt nicht mehr zu als der Server (VERPFLEGUNG_EP_MAX)', async () => {
+  it('die Menge lässt nicht mehr zu als der Server (VERPFLEGUNG_EP_MAX): zu viel bleibt mit Grund stehen, nichts wird gesendet', async () => {
     const { onErfassen } = zeige(null);
     const dialog = await screen.findByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '100001');
+    const feld = within(dialog).getByLabelText('Menge (EP)');
+    await userEvent.type(feld, '150000');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+    expect(await within(dialog).findByText('Höchstens 100000 EP')).toBeInTheDocument();
+    // Nicht still gekappt: die eingegebene Zahl steht weiter im Feld.
+    expect(feld).toHaveValue('150000');
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('die Grenze selbst wird angenommen', async () => {
+    const { onErfassen } = zeige(null);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '100000');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ menge: 100_000 }));
   });
