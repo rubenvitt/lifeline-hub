@@ -16,6 +16,7 @@ import {
   isGesperrt,
   isNameVergeben,
   kommtMit,
+  offersUmhaengen,
   ohneFahrzeug,
   setWahl,
   umhaengenText,
@@ -171,6 +172,21 @@ describe('Wahl je Stamm-ID über Abgleiche hinweg (D14)', () => {
       wahl: danach,
     });
     expect(body.fahrzeuge).toContainEqual({ fahrzeug_id: 21, umhaengen: false });
+  });
+
+  it('bietet an einer gebunden gewordenen, angehakten Kraft „umhängen“ an; ein Klick setzt es (LLH-1237)', () => {
+    const gebunden = sanitaetszug({ 21: { zustand: 'gebunden', einheit_name: '2. Zug' } });
+    const f = gebunden.knoten[1].fahrzeuge[1];
+    const danach = reconcileWahl(reconcileWahl(LEERE_WAHL, sanitaetszug()), gebunden);
+    expect(offersUmhaengen(f, danach.fahrzeuge.get(21))).toBe(true);
+    const umgehaengt = setWahl(danach, 'fahrzeug', f, true);
+    expect(umgehaengt.fahrzeuge.get(21)).toEqual({ an: true, umhaengen: true });
+    expect(offersUmhaengen(f, umgehaengt.fahrzeuge.get(21))).toBe(false);
+    expect(showsUmhaengen(f, umgehaengt.fahrzeuge.get(21))).toBe(true);
+    // Nicht angehakt trägt das Kästchen selbst „umhängen“; eine freie Kraft braucht keinen Griff.
+    expect(offersUmhaengen(f, { an: false, umhaengen: false })).toBe(false);
+    expect(offersUmhaengen(f, undefined)).toBe(false);
+    expect(offersUmhaengen(fz(20, 'RTW 1'), { an: true, umhaengen: false })).toBe(false);
   });
 
   it('ein Häkchen an einer gebundenen Kraft heißt umhängen', () => {

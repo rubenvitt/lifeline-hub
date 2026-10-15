@@ -281,8 +281,9 @@ abgewählt, steht an ihr „verlässt «…»“: sie steigt beim Bilden aus.
 
 Das Bilden gelingt ganz oder gar nicht. Hat sich seit dem Öffnen der Seite etwas geändert, etwa
 ein Fahrzeug ist inzwischen einem anderen Zug zugeordnet, entsteht nichts; der Grund steht an der
-Zeile, und die Zeilen zeigen den neuen Stand. Ein gesetztes Häkchen bleibt dabei stehen; wer die Kraft
-trotzdem übernehmen will, nimmt es weg und setzt es neu, dann als „umhängen“. Je Bildung sind höchstens 50 Fahrzeuge und
+Zeile, und die Zeilen zeigen den neuen Stand. Ein gesetztes Häkchen bleibt dabei stehen, die Kraft
+wird nicht still umgehängt; unter ihr steht „umhängen aus «2. Zug»“ bzw. „umhängen von «RTW 3»“, und
+ein Klick darauf übernimmt sie beim nächsten Bilden. Je Bildung sind höchstens 50 Fahrzeuge und
 50 Personen möglich; darüber bleibt „Einheit bilden“ gesperrt und nennt die Grenze. Eine Vorlage
 mit mehr als 20 Einheiten lässt sich nicht bilden.
 

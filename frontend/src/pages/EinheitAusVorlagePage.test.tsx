@@ -447,11 +447,61 @@ describe('EinheitAusVorlagePage · Absenden', () => {
     expect(zeile('fahrzeug-20')).not.toHaveTextContent('gehört zu');
     await waitFor(() => expect(zustand('fahrzeug-21')).toBe('in «2. Zug»'));
     expect(abrufe).toBe(2);
-    // Die getroffene Wahl bleibt; das Umhängen setzt die Seite nicht still.
+    // Die getroffene Wahl bleibt; das Umhängen setzt die Seite nicht still, sie bietet es an.
     expect(kaestchen('fahrzeug-21')).toBeChecked();
-    expect(zeile('fahrzeug-21')).not.toHaveTextContent('umhängen');
+    expect(kaestchen('fahrzeug-21')).not.toHaveAccessibleName(/umhängen/);
+    expect(
+      within(zeile('fahrzeug-21')).getByRole('button', { name: /^umhängen aus «2\. Zug»/ }),
+    ).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(screen.queryByTestId('ort')).not.toBeInTheDocument();
+  });
+
+  it('nach einer Ablehnung hängt ein Klick die inzwischen gebundene Kraft um (LLH-1237)', async () => {
+    let abrufe = 0;
+    const bodies: AusVorlageEingabe[] = [];
+    zeige(
+      http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () => {
+        abrufe += 1;
+        return HttpResponse.json(
+          abrufe === 1
+            ? sanitaetszug()
+            : sanitaetszug({
+                21: { zustand: 'gebunden', einheit_id: 9, einheit_name: '2. Zug' },
+              }),
+        );
+      }),
+      http.post('/api/einsaetze/1/einheiten/aus-vorlage', async ({ request }) => {
+        bodies.push((await request.json()) as AusVorlageEingabe);
+        return bodies.length === 1
+          ? HttpResponse.json(
+              {
+                error: 'Nicht alle Kräfte lassen sich übernehmen',
+                zeilen: [{ art: 'fahrzeug', id: 21, grund: 'in «2. Zug»' }],
+              },
+              { status: 422 },
+            )
+          : HttpResponse.json(
+              { einheit_id: 77, einheit_ids: [77], fahrzeuge: [], personal: [] },
+              { status: 201 },
+            );
+      }),
+    );
+    await warteAufBaum();
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    const griff = await within(zeile('fahrzeug-21')).findByRole('button', {
+      name: /^umhängen aus «2\. Zug»/,
+    });
+    expect(griff).toHaveAccessibleName(/RTW 2/);
+
+    await userEvent.click(griff);
+    expect(kaestchen('fahrzeug-21')).toBeChecked();
+    expect(kaestchen('fahrzeug-21')).toHaveAccessibleName(/RTW 2.*umhängen aus «2\. Zug»/);
+    expect(within(zeile('fahrzeug-21')).queryByRole('button')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1].fahrzeuge).toContainEqual({ fahrzeug_id: 21, umhaengen: true });
   });
 
   it('Abbrechen ist gesperrt, solange das Bilden läuft, und führt sonst zurück', async () => {
