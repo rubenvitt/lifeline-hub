@@ -1,0 +1,99 @@
+/*
+  Gemeinsame Gestaltung der lokalen Seiten der Hülle (Maske, Anzeige „nicht erreichbar“). In
+  beiden Lichtlagen dunkel, Text hält deshalb die Tag-Schwelle 7 : 1 (LFH-434): Werte aus
+  `rahmenFarben` in frontend/src/theme/tokens.ts; der Primärknopf füllt mit `bedienText`
+  (10,6 : 1), weil keine Beschriftung auf `bedien` 7 : 1 erreicht. Radius 0.
+*/
+:root {
+  color-scheme: dark;
+  --grund: #0c0e11;
+  --paneel: #0c0e11;
+  --feld: #14171b;
+  --linie: #22262b;
+  --text: #e8ebee;
+  --text2: #a0a8b1;
+  --rahmen: #626a73;
+  --bedien: #4d94d6;
+  --bedien-text: #8ec2f0;
+  --alarm: #ff7070;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--grund);
+  color: var(--text);
+  font: 15px/1.5 Archivo, -apple-system, 'Segoe UI', system-ui, sans-serif;
+}
+form, .karte {
+  width: min(520px, 100%);
+  background: var(--paneel);
+  border: 1px solid var(--linie);
+  padding: 24px;
+}
+.augenbraue {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+p { margin: 0 0 16px; color: var(--text2); }
+label { display: block; margin-bottom: 6px; font-weight: 600; }
+input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  background: var(--feld);
+  color: var(--text);
+  border: 1px solid var(--rahmen);
+  border-radius: 0;
+  font: 15px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+input[aria-invalid='true'] { border-color: var(--alarm); }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--bedien); outline-offset: 2px; }
+#fehler { min-height: 1.5em; margin: 8px 0 0; color: var(--alarm); }
+.aktionen { display: flex; gap: 12px; margin-top: 16px; }
+button {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button[type='submit'], .primaer { background: var(--bedien-text); color: var(--grund); border: 1px solid var(--bedien-text); }
+.sekundaer { background: transparent; color: var(--text); border: 1px solid var(--rahmen); }
+button:disabled { opacity: 0.8; cursor: progress; }
+code { font-family: var(--mono); }
+
+/* Auswahl bekannter Server (LLH-1282) */
+#bekannt { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+#bekannt li { display: flex; gap: 8px; }
+.eintrag {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--feld);
+  color: var(--text);
+  border: 1px solid var(--rahmen);
+}
+.eintrag .host { font-weight: 600; }
+.eintrag code { color: var(--text2); font-size: 13px; overflow-wrap: anywhere; }
+.eintrag .marke { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bedien-text); }
+.entfernen {
+  min-width: 48px;
+  padding: 0;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--linie);
+}

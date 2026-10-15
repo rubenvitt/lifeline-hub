@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-wechseln"
+description = "Enables the server_wechseln command without any pre-configured scope."
+commands.allow = ["server_wechseln"]
+
+[[permission]]
+identifier = "deny-server-wechseln"
+description = "Denies the server_wechseln command without any pre-configured scope."
+commands.deny = ["server_wechseln"]
