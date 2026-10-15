@@ -556,9 +556,7 @@ function KraftZeile({
   const umhaengen = showsUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
   const griff = !gesperrt && offersUmhaengen(zeile, eintrag) ? umhaengenText(art, zeile) : null;
   const kennung =
-    art === 'fahrzeug'
-      ? (zeile as VorschauFahrzeug).funkrufname
-      : (zeile as VorschauPersonal).name;
+    art === 'fahrzeug' ? (zeile as VorschauFahrzeug).funkrufname : (zeile as VorschauPersonal).name;
   const zustandGesperrt = isGesperrt(art, zeile.zustand);
   return (
     <div
