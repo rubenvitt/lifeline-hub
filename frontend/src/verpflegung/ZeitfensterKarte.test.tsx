@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it, vi } from 'vitest';
 import type { VerpflegungZeitfenster } from '../api/types';
+import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import { renderMitProviders } from '../test/utils';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
 import ZeitfensterKarte, { type ZeitfensterKarteProps } from './ZeitfensterKarte';
@@ -14,23 +15,31 @@ dayjs.extend(utc);
 /** „Mittag" beginnt 10:00 UTC — absolute Zeitpunkte, unabhängig von der Zone der Maschine. */
 const VORHER = dayjs('2026-09-24T08:00:00Z');
 const LAUFEND = dayjs('2026-09-24T10:30:00Z');
+const VORBEI = dayjs('2026-09-24T12:00:00Z');
 
 const kennung = zeitfensterKennung(zeitfenster());
 
-function zeige(zf: VerpflegungZeitfenster, over: Partial<ZeitfensterKarteProps> = {}) {
+function zeige(
+  zf: VerpflegungZeitfenster,
+  over: Partial<ZeitfensterKarteProps> = {},
+  geraet = false,
+) {
   const props: ZeitfensterKarteProps = {
     zeitfenster: zf,
     jetzt: LAUFEND,
     darfSchreiben: true,
     nachforderungenFrei: true,
-    onAusgabeErfassen: vi.fn(),
+    onAusgabeNachtragen: vi.fn(),
     onBearbeiten: vi.fn(),
     onNachfordern: vi.fn(),
     onLoeschen: vi.fn(),
     onZuruecknehmen: vi.fn(),
     ...over,
   };
-  renderMitProviders(<ZeitfensterKarte {...props} />);
+  const karte = <ZeitfensterKarte {...props} />;
+  renderMitProviders(
+    geraet ? <EinsatzPfadeProvider pfade={GERAET_PFADE}>{karte}</EinsatzPfadeProvider> : karte,
+  );
   return { props, karte: screen.getByRole('article') };
 }
 
@@ -218,24 +227,93 @@ describe('ZeitfensterKarte — ausstehende Ausgaben (LFH-688)', () => {
 });
 
 describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
-  it('ohne Schreibrecht keine Aktionen, auch keine Rücknahme', () => {
+  it('ohne Schreibrecht keine Aktionen, auch keine Rücknahme und kein Sprung zur Ausgabe', () => {
     const { karte } = zeige(zeitfenster(), { darfSchreiben: false });
     expect(within(karte).queryByRole('button')).toBeNull();
+    expect(within(karte).queryByRole('link')).toBeNull();
     expect(karte.querySelector('[data-lfh="verpflegung-aktionen"]')).toBeNull();
   });
 
-  it('drei Aktionen: „Ausgabe erfassen" sichtbar, der Rest im Menü; Nachfordern meldet sich', async () => {
+  it('laufend: Sprung „Ausgabe öffnen" als Link mit Steuerhöhe, „Ausgabe nachtragen" als Aktion (LLH-1032, D8)', async () => {
     const zf = zeitfenster();
     const { props } = zeige(zf);
-    expect(
-      screen.getByRole('button', { name: `Ausgabe erfassen zu ${kennung}` }),
-    ).toBeInTheDocument();
+    const sprung = screen.getByRole('link', { name: `Ausgabe öffnen zu ${kennung}` });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/verpflegung/1/ausgabe');
+    // Bedienziel-Boden: ein `<a>` erbt keine Steuerhöhe, der Sprung ist ein antd-Knopf mit href.
+    expect(sprung).toHaveClass('ant-btn');
     const menue = await oeffneMenue();
+    await userEvent.click(within(menue).getByText('Ausgabe nachtragen'));
+    expect(props.onAusgabeNachtragen).toHaveBeenCalledWith(zf);
+  });
+
+  it('anstehend: der Sprung steht auch vor Beginn', () => {
+    zeige(zeitfenster(), { jetzt: VORHER });
+    expect(screen.getByRole('link', { name: `Ausgabe öffnen zu ${kennung}` })).toBeInTheDocument();
+  });
+
+  it('vergangen: kein Sprung, nur „Ausgabe nachtragen"', async () => {
+    const zf = zeitfenster({
+      ausgegeben: { gesamt: 250, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+      fehlmenge: { gesamt: 0, sonderkost: KEINE_SONDERKOST },
+    });
+    const { props } = zeige(zf, { jetzt: VORBEI, onBearbeiten: undefined });
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: `Ausgabe nachtragen zu ${kennung}` }));
+    expect(props.onAusgabeNachtragen).toHaveBeenCalledWith(zf);
+  });
+
+  it('Stab mit drei Aktionen: alle im Menü, daneben nur der Sprung; Nachfordern meldet sich', async () => {
+    const zf = zeitfenster();
+    const { props, karte } = zeige(zf);
+    const zeile = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-aktionen"]')!;
+    // Neben dem Menü steht nur der Sprung, kein Knopf „Ausgabe nachtragen".
+    expect(within(zeile).queryByRole('button', { name: /^Ausgabe nachtragen/ })).toBeNull();
+    expect(within(zeile).getAllByRole('button')).toHaveLength(1);
+    expect(within(zeile).getAllByRole('link')).toHaveLength(1);
+    const menue = await oeffneMenue();
+    expect(within(menue).getByText('Ausgabe nachtragen')).toBeInTheDocument();
     expect(within(menue).getByText('Bedarf bearbeiten')).toBeInTheDocument();
     // Löschen nur ohne gültige Ausgabe — hier gibt es eine.
     expect(within(menue).queryByText('Löschen')).toBeNull();
     await userEvent.click(within(menue).getByText('Nachfordern'));
     expect(props.onNachfordern).toHaveBeenCalledWith(zf);
+  });
+
+  it('Stab mit vier Aktionen: alle vier im Menü', async () => {
+    zeige(
+      zeitfenster({
+        ausgaben: [ausgabe({ id: 11, zurueckgenommen_at: '2026-09-24 09:50:00' })],
+      }),
+    );
+    expect(screen.queryByRole('button', { name: /^Ausgabe nachtragen/ })).toBeNull();
+    const menue = await oeffneMenue();
+    expect(
+      [...menue.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent?.trim()),
+    ).toEqual(['Ausgabe nachtragen', 'Bedarf bearbeiten', 'Nachfordern', 'Löschen']);
+  });
+
+  it('Gerät mit zwei Aktionen: Sprung auf den Gerätepfad, beide Aktionen als Knöpfe, kein Menü', () => {
+    zeige(
+      zeitfenster(),
+      {
+        nachforderungenFrei: false,
+        nachschub: 'melden',
+        onBearbeiten: undefined,
+        onLoeschen: undefined,
+      },
+      true,
+    );
+    expect(screen.getByRole('link', { name: `Ausgabe öffnen zu ${kennung}` })).toHaveAttribute(
+      'href',
+      '/geraet/1/verpflegung/1/ausgabe',
+    );
+    expect(
+      screen.getByRole('button', { name: `Ausgabe nachtragen zu ${kennung}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: `Fehlmenge melden zu ${kennung}` }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
   });
 
   it('ohne gültige Ausgabe: Löschen rot hinter dem Trenner', async () => {
@@ -258,6 +336,9 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
       }),
     );
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: `Ausgabe nachtragen zu ${kennung}` }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: `Bedarf bearbeiten zu ${kennung}` }),
     ).toBeInTheDocument();

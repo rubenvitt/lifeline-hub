@@ -13,10 +13,8 @@ import {
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
-import { listeNachforderungen } from '../api/nachforderungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
-  AusgabeEingabe,
   VerpflegungAusgabe,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
@@ -36,10 +34,8 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import { erfasseVerpflegungsausgabeOfflineFaehig } from '../offline/schreiben';
 import { useVorgemerkteAusgaben, type VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { geraetMeldungenPfad, nachforderungenPfad } from '../routing/deeplinks';
 import {
@@ -47,10 +43,11 @@ import {
   LoeschenDialog,
   RuecknahmeDialog,
   ZeitfensterDialog,
-  type NachforderungOption,
 } from '../verpflegung/VerpflegungDialoge';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
+import { useAusgabeNachtragen } from '../verpflegung/useAusgabeNachtragen';
+import { useNachforderungWahl } from '../verpflegung/useNachforderungWahl';
 import {
   meldungVorbelegung,
   nachforderungVorbelegung,
@@ -144,8 +141,6 @@ export default function VerpflegungPage() {
 
   const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast (`rueckgaengigMut`).
-  const [ruecknahmeFehler, setRuecknahmeFehler] = useState<unknown>(null);
   // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
   // alle Zeitfenster des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
@@ -168,28 +163,12 @@ export default function VerpflegungPage() {
   const freigaben = freigabenQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
 
-  // Nachforderungen nur bei bedienbarem Modul — und erst, wenn die Freigaben bekannt sind
-  // (`istKeyFreigegeben` gibt bei unbekannten Freigaben nichts frei). Ein 403 bleibt still.
-  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigaben);
-  const nachforderungenQuery = useQuery({
-    // Derselbe Schlüssel und dieselbe Abfrage wie `NachforderungenPage` — ein Cache-Fach, eine Form.
-    queryKey: einsatzKeys.nachforderungen(einsatzId),
-    queryFn: () => listeNachforderungen(einsatzId, {}),
-    enabled: nachforderungenFrei,
-    retry: false,
-  });
-  const nachforderungen = useMemo(
-    () =>
-      nachforderungenFrei && !nachforderungenQuery.isError ? (nachforderungenQuery.data ?? []) : [],
-    [nachforderungenFrei, nachforderungenQuery.isError, nachforderungenQuery.data],
-  );
-  const nachforderungNamen = useMemo(
-    () => new Map(nachforderungen.map((n) => [n.id, n.bezeichnung])),
-    [nachforderungen],
-  );
-  const nachforderungOptionen: NachforderungOption[] | null = nachforderungenFrei
-    ? nachforderungen.map((n) => ({ value: n.id, label: n.bezeichnung }))
-    : null;
+  // Nachforderungen nur bei bedienbarem Modul und bekannten Freigaben; ein 403 bleibt still.
+  const {
+    frei: nachforderungenFrei,
+    namen: nachforderungNamen,
+    optionen: nachforderungOptionen,
+  } = useNachforderungWahl(einsatzId, freigaben);
 
   const alle = useMemo(() => verpflegungQuery.data?.zeitfenster ?? [], [verpflegungQuery.data]);
   // Auf diesem Gerät vorgemerkte Ausgaben je Zeitfenster — „ausstehend“, außerhalb der Deckung
@@ -274,41 +253,9 @@ export default function VerpflegungPage() {
       message.success(`Zeitfenster ${zitat(zf.bezeichnung)} gelöscht`);
     },
   });
-  // Rückgängig aus dem Toast: kein Dialog, und die Karte ist oft nicht mehr zu sehen — der Grund
-  // einer Ablehnung steht im Hinweis der Seite, bis zur nächsten Rücknahme (LFH-1077). Aus den
-  // Callbacks statt aus `mutation.error`: der kennt nur den letzten Aufruf.
-  const rueckgaengigMut = useMutation({
-    mutationFn: (ausgabeId: number) => nimmAusgabeZurueck(einsatzId, ausgabeId),
-    onMutate: () => setRuecknahmeFehler(null),
-    onSuccess: () => {
-      invalidiere(false);
-      message.success('Ausgabe zurückgenommen');
-    },
-    onError: (e) => {
-      setRuecknahmeFehler(e);
-      invalidiere(false);
-    },
-  });
-  const ausgabeMut = useMutation({
-    mutationFn: ({ zf, body }: { zf: VerpflegungZeitfenster; body: AusgabeEingabe }) => {
-      if (!benutzer) throw new Error('Nicht angemeldet');
-      return erfasseVerpflegungsausgabeOfflineFaehig(benutzer.id, einsatzId, zf, body);
-    },
-    onSuccess: (ergebnis, { zf, body }) => {
-      // Vorgemerkt gibt es noch keine Ausgabe auf dem Server — also kein „Rückgängig“ (D9).
-      if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
-        return;
-      }
-      // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage.
-      invalidiere(false);
-      zeigeRueckgaengig(
-        message,
-        `Ausgabe erfasst: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`,
-        () => rueckgaengigMut.mutate(ergebnis.daten.ausgabe_id),
-      );
-    },
-  });
+  // Nachtragen samt Rückgängig- und Vormerk-Hinweis, geteilt mit der Ausgabeansicht (LLH-1032).
+  const nachtrag = useAusgabeNachtragen(einsatzId);
+  const ruecknahmeFehler = nachtrag.ruecknahmeFehler;
   // Rücknahme aus der Liste: endgültig, mit Rückfrage; der Fehler steht im Dialog.
   const ruecknahmeMut = useMutation({
     mutationFn: (ausgabeId: number) => nimmAusgabeZurueck(einsatzId, ausgabeId),
@@ -473,8 +420,8 @@ export default function VerpflegungPage() {
               darfSchreiben={darfSchreiben}
               nachforderungenFrei={nachforderungenFrei}
               nachforderungName={(nfId) => nachforderungNamen.get(nfId)}
-              onAusgabeErfassen={(x) => {
-                ausgabeMut.reset();
+              onAusgabeNachtragen={(x) => {
+                nachtrag.zuruecksetzen();
                 setDialog({ art: 'ausgabe', zf: x });
               }}
               onBearbeiten={
@@ -539,9 +486,9 @@ export default function VerpflegungPage() {
           key={`a-${dialog.zf.id}`}
           zeitfenster={alle.find((zf) => zf.id === dialog.zf.id) ?? dialog.zf}
           nachforderungen={nachforderungOptionen}
-          laeuft={ausgabeMut.isPending}
-          fehler={ausgabeMut.error}
-          onErfassen={(body) => ausgabeMut.mutateAsync({ zf: dialog.zf, body })}
+          laeuft={nachtrag.laeuft}
+          fehler={nachtrag.fehler}
+          onErfassen={(body) => nachtrag.nachtragen(dialog.zf, body)}
           onSchliessen={schliesse}
         />
       )}

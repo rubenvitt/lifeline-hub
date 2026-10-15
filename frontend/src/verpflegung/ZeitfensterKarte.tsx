@@ -1,13 +1,9 @@
 import { Button, Flex, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import type {
-  Sonderkost,
-  SonderkostEingabe,
-  VerpflegungAusgabe,
-  VerpflegungZeitfenster,
-} from '../api/types';
+import type { VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
 import {
   Augenbraue,
@@ -16,40 +12,23 @@ import {
   Zeitachseneintrag,
   monoStil,
   useRollen,
-  type KennzahlTon,
 } from '../components/instrument';
 import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
-import { rollenFarbe, verpflegungDeckung, type VerpflegungDeckung } from '../theme/statusFarben';
-import { deckungEinstufung } from './deckung';
+import { useEinsatzPfade } from '../routing/EinsatzPfade';
+import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
+import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import {
   KOSTFORM_LABEL,
   belegteKostformen,
   nachforderungsAnzahl,
   sonderkostText,
+  sonderkostVoll,
   uhrzeit,
   zeitfensterKennung,
   zeitraumText,
 } from './verpflegungText';
 
 const { Text } = Typography;
-
-/** Eine vorgemerkte Ausgabe trägt nur die belegten Kostformen; fehlende sind 0. */
-function sonderkostVoll(sk: SonderkostEingabe | undefined): Sonderkost {
-  return {
-    vegetarisch: sk?.vegetarisch ?? 0,
-    vegan: sk?.vegan ?? 0,
-    ohne_schwein: sk?.ohne_schwein ?? 0,
-    diaet_allergenarm: sk?.diaet_allergenarm ?? 0,
-    saeugling_kleinkind: sk?.saeugling_kleinkind ?? 0,
-  };
-}
-
-/** Ton der Fehlmenge — folgt der Einstufung („offen" ohne Alarm). */
-const FEHLT_TON: Record<VerpflegungDeckung, KennzahlTon> = {
-  gedeckt: 'normal',
-  offen: 'neutral',
-  unterdeckung: 'alarm',
-};
 
 export interface ZeitfensterKarteProps {
   zeitfenster: VerpflegungZeitfenster;
@@ -62,7 +41,8 @@ export interface ZeitfensterKarteProps {
   nachforderungenFrei: boolean;
   /** Aufgelöster Name einer Nachforderung — nur bei freiem Modul befragt. */
   nachforderungName?: (id: number) => string | undefined;
-  onAusgabeErfassen?: (zf: VerpflegungZeitfenster) => void;
+  /** „Ausgabe nachtragen“: das Formular mit Zeitpunkt, Ort und Bemerkung (LLH-1032, D8). */
+  onAusgabeNachtragen?: (zf: VerpflegungZeitfenster) => void;
   onBearbeiten?: (zf: VerpflegungZeitfenster) => void;
   onNachfordern?: (zf: VerpflegungZeitfenster) => void;
   /**
@@ -81,7 +61,7 @@ export interface ZeitfensterKarteProps {
   ausstehend?: readonly VorgemerkteAusgabe[];
 }
 
-type Aktionsschluessel = 'bearbeiten' | 'nachfordern' | 'loeschen';
+type Aktionsschluessel = 'nachtragen' | 'bearbeiten' | 'nachfordern' | 'loeschen';
 
 interface Aktion {
   key: Aktionsschluessel;
@@ -99,8 +79,12 @@ interface Aktion {
  * Sonderkost: nur belegte Kostformen. Eine fehlende Kostform wird ausdrücklich genannt
  * („fehlt 3 vegan"), sonst sähe eine Unterdeckung bei gedeckter Gesamtzahl gedeckt aus.
  *
- * Aktionen: „Ausgabe erfassen" ist sichtbar; ab drei Aktionen nach der Rechteprüfung liegen die
- * übrigen im Dreipunkt-Menü, „Löschen" rot hinter dem Trenner. Ohne Schreibrecht fällt die
+ * Aktionen (LLH-1032, design.md D8): Erfasst wird in der Ausgabeansicht; dorthin führt der Sprung
+ * „Ausgabe öffnen“, nur bei laufendem oder anstehendem Zeitfenster und mit Schreibrecht. Als
+ * Sprung (LFH-616) zählt er nicht zu den Aktionen und trägt die Steuerhöhe über `SprungKnopf`.
+ * „Ausgabe nachtragen“, „Bedarf bearbeiten“, „Nachfordern“ bzw. „Fehlmenge melden“ und „Löschen“
+ * sind gleichrangige Aktionen: ab drei nach der Rechteprüfung liegen ALLE im Dreipunkt-Menü,
+ * „Löschen" rot hinter dem Trenner, daneben steht nur der Sprung. Ohne Schreibrecht fällt die
  * Aktionszeile weg. Jeder zugängliche Name trägt die Zeilenkennung (Bezeichnung + Zeitraum).
  */
 export default function ZeitfensterKarte({
@@ -109,7 +93,7 @@ export default function ZeitfensterKarte({
   darfSchreiben,
   nachforderungenFrei,
   nachforderungName,
-  onAusgabeErfassen,
+  onAusgabeNachtragen,
   onBearbeiten,
   onNachfordern,
   nachschub = 'nachfordern',
@@ -119,6 +103,7 @@ export default function ZeitfensterKarte({
 }: ZeitfensterKarteProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
+  const pfade = useEinsatzPfade();
   const stufe = deckungEinstufung(zf, jetzt);
   const darstellung = verpflegungDeckung[stufe];
   const kante = stufe === 'offen' ? rollen.linie : rollenFarbe(darstellung.rolle, token);
@@ -127,8 +112,9 @@ export default function ZeitfensterKarte({
 
   // ── Aktionen, gezählt NACH der Rechteprüfung ──────────────────────────────────────────
   const hatGueltigeAusgabe = zf.ausgaben.some((a) => a.zurueckgenommen_at == null);
-  const weitere: Aktion[] = darfSchreiben
+  const aktionen: Aktion[] = darfSchreiben
     ? ([
+        onAusgabeNachtragen && { key: 'nachtragen', label: 'Ausgabe nachtragen' },
         onBearbeiten && { key: 'bearbeiten', label: 'Bedarf bearbeiten' },
         onNachfordern &&
           (nachschub === 'melden' || nachforderungenFrei) &&
@@ -139,9 +125,10 @@ export default function ZeitfensterKarte({
         onLoeschen && !hatGueltigeAusgabe && { key: 'loeschen', label: 'Löschen', danger: true },
       ].filter(Boolean) as Aktion[])
     : [];
-  const erfassen = darfSchreiben && onAusgabeErfassen != null;
-  const gebuendelt = (erfassen ? 1 : 0) + weitere.length >= 3;
+  const sprung = darfSchreiben && !istVergangen(zf, jetzt);
+  const gebuendelt = aktionen.length >= 3;
   const fuehreAus = (key: Aktionsschluessel) => {
+    if (key === 'nachtragen') onAusgabeNachtragen?.(zf);
     if (key === 'bearbeiten') onBearbeiten?.(zf);
     if (key === 'nachfordern') onNachfordern?.(zf);
     if (key === 'loeschen') onLoeschen?.(zf);
@@ -324,7 +311,7 @@ export default function ZeitfensterKarte({
         </ul>
       )}
 
-      {(erfassen || weitere.length > 0) && (
+      {(sprung || aktionen.length > 0) && (
         // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
         <Flex
           justify="flex-end"
@@ -333,18 +320,18 @@ export default function ZeitfensterKarte({
           data-lfh="verpflegung-aktionen"
           style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
         >
-          {erfassen && (
+          {sprung && (
             // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf.
-            <Button
-              aria-label={`Ausgabe erfassen zu ${kennung}`}
-              onClick={() => onAusgabeErfassen?.(zf)}
+            <SprungKnopf
+              to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id)}
+              zugaenglicherName={`Ausgabe öffnen zu ${kennung}`}
             >
-              Ausgabe erfassen
-            </Button>
+              Ausgabe öffnen
+            </SprungKnopf>
           )}
           {gebuendelt ? (
             <MenueAusloeser
-              eintraege={weitere.map((a) => ({
+              eintraege={aktionen.map((a) => ({
                 key: a.key,
                 label: a.label,
                 ...(a.danger ? { gefahr: true as const } : {}),
@@ -353,7 +340,7 @@ export default function ZeitfensterKarte({
               onWahl={fuehreAus}
             />
           ) : (
-            weitere.map((a) => (
+            aktionen.map((a) => (
               <Button
                 key={a.key}
                 danger={a.danger}

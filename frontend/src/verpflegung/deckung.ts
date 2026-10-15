@@ -10,6 +10,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { Kostform, VerpflegungZeitfenster } from '../api/types';
+import type { KennzahlTon } from '../components/instrument';
 import type { VerpflegungDeckung } from '../theme/statusFarben';
 
 dayjs.extend(utc);
@@ -56,3 +57,10 @@ export function istVergangen(zf: VerpflegungZeitfenster, jetzt: Dayjs): boolean 
   const bis = wireZeit(zf.bis_at);
   return bis !== null && bis.valueOf() < jetzt.valueOf();
 }
+
+/** Ton der Fehlmenge — folgt der Einstufung („offen" ohne Alarm); Karte und Ausgabeansicht. */
+export const FEHLT_TON: Record<VerpflegungDeckung, KennzahlTon> = {
+  gedeckt: 'normal',
+  offen: 'neutral',
+  unterdeckung: 'alarm',
+};

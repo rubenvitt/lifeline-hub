@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Dichte } from '../theme/dichte';
-import { antdToken, farbenDunkel } from '../theme/tokens';
+import { antdToken, farbenDunkel, type Dichte } from '../theme/tokens';
 import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
 
 /** Aufgelöste Tokens je Stufe, wie sie der `ConfigProvider` setzt. */
@@ -11,7 +10,10 @@ function token(dichte: Dichte) {
 
 describe('zaehltasteStil (LLH-1032, design.md D9)', () => {
   it('„+1“ ist in jeder Stufe mindestens 72 px hoch und breit', () => {
-    expect(zaehltasteStil(token('kompakt'), 'plus1')).toMatchObject({ minHeight: 72, minWidth: 72 });
+    expect(zaehltasteStil(token('kompakt'), 'plus1')).toMatchObject({
+      minHeight: 72,
+      minWidth: 72,
+    });
     expect(zaehltasteStil(token('komfortabel'), 'plus1')).toMatchObject({
       minHeight: 72,
       minWidth: 72,
