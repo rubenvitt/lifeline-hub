@@ -26,10 +26,8 @@ import {
  * für zwei Einheiten Alarmierung und Eintreffen nach und streicht ein falsches Eintreffen, damit
  * Spalte „Im Einsatz“ und die Zeitachse etwas zeigen.
  *
- * Demo-Lücke Kräftebaum (LLH-1025): die Demo-Daten tragen weder Unterstellung noch Besatzung. Die
- * Spec stellt Rettungsstaffel und Sanitätsgruppe UHS unter den Sanitätszug und setzt je Fahrzeug
- * des Zugs und der Staffel bis zu zwei Kräfte der Einheit als Besatzung, damit das Meldebild
- * einen Baum mit Besatzung zeigt. (Die Demo-Daten selbst nachzuziehen ist eine Folgeaufgabe.)
+ * Den Kräftebaum (Untereinheiten unter dem Sanitätszug, Besatzung, „Ohne Fahrzeug“, Material mit
+ * Ausfall) tragen die Demo-Daten selbst (LLH-1230).
  */
 
 const KAPITEL = 'meldebild';
@@ -37,11 +35,6 @@ const KAPITEL = 'meldebild';
 interface Einheit {
   id: number;
   name: string;
-}
-interface Mittel {
-  id: number;
-  einheit_id: number | null;
-  fahrzeug_id?: number | null;
 }
 interface Zeitachse {
   ereignisse: { id: number; art: string; zeitpunkt_at: string }[];
@@ -96,27 +89,6 @@ test.describe(KAPITEL, () => {
 
       const uhs = await einheitNamens(api, demo.id, 'Sanitätsgruppe UHS');
       await nachtrag(uhs.id, 'eintreffen', vor(jetzt, 241));
-
-      // Kräftebaum: Unterstellung unter den Zug und Besatzung der Fahrzeuge.
-      const basis = `/api/einsaetze/${demo.id}`;
-      for (const kind of [rettung, uhs]) {
-        await fuelle(api, 'patch', `${basis}/einheiten/${kind.id}`, { ueber_einheit_id: zug.id });
-      }
-      const liste = async (pfad: string) => {
-        const antwort = await api.get(`${basis}${pfad}`);
-        expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
-        return (await antwort.json()) as Mittel[];
-      };
-      const fahrzeuge = await liste('/fahrzeuge');
-      const personal = await liste('/personal');
-      for (const einheit of [zug, rettung]) {
-        const frei = personal.filter((p) => p.einheit_id === einheit.id && p.fahrzeug_id == null);
-        for (const f of fahrzeuge.filter((x) => x.einheit_id === einheit.id)) {
-          for (const p of frei.splice(0, 2)) {
-            await fuelle(api, 'put', `${basis}/fahrzeuge/${f.id}/besatzung/${p.id}`);
-          }
-        }
-      }
     } finally {
       await api.dispose();
     }

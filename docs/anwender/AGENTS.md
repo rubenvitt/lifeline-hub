@@ -89,8 +89,9 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
 - **Ausschnitt statt Seite:** fotografiert wird das Element, um das es geht (Maske, Liste,
   Dialog); ganze Seiten nur für den Überblick eines Moduls. **PNG, höchstens 300 KB**
   (`fotografiere` und der Wächter prüfen das). Kein WebP, kein `sharp`.
-- **Daten:** die Demo-Daten tragen Einsatzkopf, Abschnitte, Kräfte, UHS, Betroffene, Betreuung,
-  Meldungen, Aufträge, Befehl, Lagebericht, Erinnerungen, ETB und Gefahrengebiete. Was fehlt,
+- **Daten:** die Demo-Daten tragen Einsatzkopf, Abschnitte, Kräfte (mit Untereinheiten, Besatzung
+  und zwei Materialposten, LLH-1230), UHS, Betroffene, Betreuung, Meldungen, Aufträge, Befehl,
+  Lagebericht, Erinnerungen, ETB und Gefahrengebiete. Was fehlt,
   füllt die Bilder-Spec selbst über die API (`fuelle`, `demoEinsatz`); das Demo-Szenario wird
   dafür nicht erweitert. Kartenkacheln aus `e2e/kartenFixture.ts`.
 - **Kein Bildvergleich, kein Gate auf Pixel:** die Bilder sind Doku. Ihre Frische trägt die

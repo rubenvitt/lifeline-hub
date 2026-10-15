@@ -361,6 +361,19 @@ pub fn etb_text_ort_gewechselt(
     format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
 }
 
+/// System-ETB bei einem Statuswechsel eines Postens, mit den Wire-Werten des Status.
+pub fn etb_text_status_wechsel(
+    bezeichnung: &str,
+    vorher: MaterialStatus,
+    nachher: MaterialStatus,
+) -> String {
+    format!(
+        "Material «{bezeichnung}»: Status «{}» → «{}»",
+        vorher.as_str(),
+        nachher.as_str()
+    )
+}
+
 /// System-ETB bei geänderter Ausgabe eines Verbrauchsguts (LLH-1224, design.md D11), mit Rest.
 pub fn etb_text_ausgabe(bezeichnung: &str, vorher: i64, nachher: i64, menge: i64) -> String {
     format!(

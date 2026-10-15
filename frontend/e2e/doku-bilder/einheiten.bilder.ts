@@ -33,10 +33,10 @@ import {
  *                       frontend/src/pages/einheit/ZuordnenAuswahl.tsx)
  *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)
  *
- * Demo-Lücke (D3): die Demo-Einheiten stehen alle auf einer Ebene und haben keinen
- * Einheitsführer, und niemand sitzt auf einem Fahrzeug. Die Spec unterstellt die Rettungsstaffel
- * dem Sanitätszug, setzt Anna Probe als ihre Einheitsführerin und setzt drei ihrer vier Kräfte
- * auf ihre beiden RTW (LLH-1036 Teil II); die vierte steht unter „Ohne Fahrzeug“. Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
+ * Demo-Lücke (D3): die Demo-Einheiten haben keinen Einheitsführer. Die Spec setzt Anna Probe als
+ * Einheitsführerin der Rettungsstaffel. Unterstellung und Besatzung tragen die Demo-Daten
+ * (LLH-1230); die Spec gibt die vierte Kraft der Staffel aus dem RTW frei, damit sie unter „Ohne
+ * Fahrzeug“ steht (LLH-1036 Teil II). Für den Block „Aufgelöst“ bildet sie eine Einheit, gibt ihr eine
  * Alarmierung (eine Spur, sonst löschte das Auflösen sie ganz) und löst sie auf (LLH-1079).
  * Die Vorschau zeigt die Demo-Vorlage „Sanitätszug Musterstadt“ gegen den Demo-Einsatz, in dem
  * ihre Kräfte schon den gleichnamigen Einheiten angehören: die Zeilen tragen „in «…»“ und
@@ -54,10 +54,7 @@ interface Person {
   id: number;
   name: string;
   einheit_id: number | null;
-}
-interface Fahrzeug {
-  id: number;
-  einheit_id: number | null;
+  fahrzeug_id: number | null;
 }
 
 async function einheitNamens(api: APIRequestContext, einsatzId: number, name: string) {
@@ -73,40 +70,28 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     try {
       const demo = await demoEinsatz(api);
-      const zug = await einheitNamens(api, demo.id, 'Sanitätszug Musterstadt');
       const rettung = await einheitNamens(api, demo.id, 'Rettungsstaffel');
       const personal = await api.get(`/api/einsaetze/${demo.id}/personal`);
       expect(personal.ok(), `Personal: ${personal.status()}`).toBe(true);
       const anna = ((await personal.json()) as Person[]).find((p) => p.name === 'Anna Probe');
       expect(anna, 'Anna Probe im Demo-Einsatz').toBeDefined();
       await fuelle(api, 'patch', `/api/einsaetze/${demo.id}/einheiten/${rettung.id}`, {
-        ueber_einheit_id: zug.id,
         fuehrer_id: anna!.id,
       });
-      // Besatzung: zwei auf den ersten RTW, eine auf den zweiten, die vierte ohne Fahrzeug.
-      const fahrzeuge = await api.get(`/api/einsaetze/${demo.id}/fahrzeuge`);
-      expect(fahrzeuge.ok(), `Fahrzeuge: ${fahrzeuge.status()}`).toBe(true);
-      const rtw = ((await fahrzeuge.json()) as Fahrzeug[])
-        .filter((f) => f.einheit_id === rettung.id)
-        .sort((a, b) => a.id - b.id);
+      // Besatzung aus den Demo-Daten: zwei auf jedem RTW; die vierte Kraft steigt aus.
       const staffel = (
         (await (await api.get(`/api/einsaetze/${demo.id}/personal`)).json()) as Person[]
       )
         .filter((p) => p.einheit_id === rettung.id)
         .sort((a, b) => a.id - b.id);
-      expect(rtw, 'zwei RTW der Rettungsstaffel').toHaveLength(2);
       expect(staffel, 'vier Kräfte der Rettungsstaffel').toHaveLength(4);
-      for (const [fz, person] of [
-        [rtw[0], staffel[0]],
-        [rtw[0], staffel[1]],
-        [rtw[1], staffel[2]],
-      ] as const) {
-        await fuelle(
-          api,
-          'put',
-          `/api/einsaetze/${demo.id}/fahrzeuge/${fz.id}/besatzung/${person.id}`,
-        );
-      }
+      const vierte = staffel[3];
+      expect(vierte.fahrzeug_id, 'vierte Kraft sitzt auf einem RTW').toBeTruthy();
+      await fuelle(
+        api,
+        'delete',
+        `/api/einsaetze/${demo.id}/fahrzeuge/${vierte.fahrzeug_id}/besatzung/${vierte.id}`,
+      );
 
       const alt = await fuelle<Einheit>(api, 'post', `/api/einsaetze/${demo.id}/einheiten`, {
         name: 'Erkundungstrupp',

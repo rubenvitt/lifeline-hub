@@ -15,6 +15,7 @@ use crate::betreuung::{BetreuungsstelleArt, Erhebung};
 use crate::einsatzabschnitt::AbschnittLagezustand;
 use crate::gefahr::Warnstufe;
 use crate::katalog::StatusKategorie;
+use crate::material::MaterialStatus;
 use crate::person::Sichtungskategorie;
 use crate::staerke::StaerkePosition;
 use crate::uhs::{PlatzTyp, UhsTyp};
@@ -368,13 +369,15 @@ pub struct AbschnittVorlage {
 }
 
 /// Einheit des Drehbuchs. `typ` ist das Label aus dem Einheitstyp-Katalog, `abschnitt` der
-/// Schlüssel eines früher angelegten Abschnitts.
+/// Schlüssel eines früher angelegten Abschnitts, `ueber` der Schlüssel einer früher gebildeten
+/// Einheit (Untereinheit, LLH-1230).
 #[derive(Debug, Clone, Copy)]
 pub struct EinheitSchritt {
     pub schluessel: &'static str,
     pub name: &'static str,
     pub typ: &'static str,
     pub abschnitt: &'static str,
+    pub ueber: Option<&'static str>,
     pub sortier: i64,
 }
 
@@ -565,6 +568,25 @@ pub enum Vorgang {
         personal: &'static str,
         einheit: &'static str,
     },
+    /// Disponierte Kräfte als Besatzung eines disponierten Fahrzeugs zuordnen, in einem Schritt wie
+    /// „Personal der Einheit übernehmen“ (LLH-1073 D12, LLH-1230). ETB: „Fahrzeug «…»: «…» als
+    /// Besatzung zugeordnet“ bzw. „… n Kräfte als Besatzung zugeordnet: …“.
+    Besatzung {
+        fahrzeug: &'static str,
+        personal: &'static [&'static str],
+    },
+    /// Stamm-Material (Menge 1) disponieren und einer gebildeten Einheit zuordnen (LLH-1230).
+    /// ETB: „Material «…» (×1) disponiert, Ort Einheit «…»“.
+    MaterialDisponieren {
+        material: &'static str,
+        einheit: &'static str,
+    },
+    /// Status eines disponierten Postens setzen. ETB nur bei einem echten Wechsel:
+    /// „Material «…»: Status «…» → «…»“.
+    MaterialStatus {
+        material: &'static str,
+        status: MaterialStatus,
+    },
     /// Disponierte Kraft als Einsatzleiter der Führungsstelle setzen (LFH-1199), „seit“ =
     /// Schrittzeit. ETB: „Einsatzleitung übernommen: …“.
     Einsatzleiter { personal: &'static str },
@@ -696,9 +718,46 @@ const fn einheit(
             name,
             typ,
             abschnitt,
+            ueber: None,
             sortier,
         }),
     )
+}
+
+/// Einheit unter einer früher gebildeten Einheit (`ueber`).
+#[allow(clippy::too_many_arguments)]
+const fn untereinheit(
+    vor_min: i64,
+    schluessel: &'static str,
+    name: &'static str,
+    typ: &'static str,
+    abschnitt: &'static str,
+    ueber: &'static str,
+    sortier: i64,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Einheit(EinheitSchritt {
+            schluessel,
+            name,
+            typ,
+            abschnitt,
+            ueber: Some(ueber),
+            sortier,
+        }),
+    )
+}
+
+const fn besatzung(
+    vor_min: i64,
+    fahrzeug: &'static str,
+    personal: &'static [&'static str],
+) -> Schritt {
+    s(vor_min, Vorgang::Besatzung { fahrzeug, personal })
+}
+
+const fn material(vor_min: i64, material: &'static str, einheit: &'static str) -> Schritt {
+    s(vor_min, Vorgang::MaterialDisponieren { material, einheit })
 }
 
 const fn personal_zu(vor_min: i64, personal: &'static str, einheit: &'static str) -> Schritt {
@@ -935,6 +994,10 @@ const RING_KIRCHBERG: &[Punkt] = &[
 /// die laufende ETB-Nummer der Zeit folgt.
 ///
 /// Endstand FMS: ELW, RTW 1, GW-San, MTW 4 · RTW 2, LKW 3 · KTW 1 2 · KTW 2 6.
+/// Endstand Kräftebaum (LLH-1230): Rettungsstaffel und Sanitätsgruppe UHS unter dem Sanitätszug;
+/// Besatzung auf ELW, RTW 1 und 2, GW-San, MTW und LKW, die KTW ohne Besatzung, eine Sanitäterin
+/// der UHS-Gruppe ohne Fahrzeug; Sanitätsrucksack der Rettungsstaffel „Desinfektion nötig“,
+/// Feldbettensatz der Betreuungsgruppe einsatzbereit.
 /// Endstand Kommunikation: acht Meldungen (Rückmeldung Logistiktrupp überfällig, vier frisch,
 /// Sofortmeldung bestätigt), fünf Aufträge (drei vollzogen, zwei offen ohne Frist), drei
 /// Erinnerungen (zwei erledigt, eine in +20 min).
@@ -996,7 +1059,15 @@ pub const DREHBUCH: &[Schritt] = &[
         }),
     ),
     einheit(290, "zug", "Sanitätszug Musterstadt", "Zug", "ea1", 10),
-    einheit(290, "rettung", "Rettungsstaffel", "Staffel", "ea1", 20),
+    untereinheit(
+        290,
+        "rettung",
+        "Rettungsstaffel",
+        "Staffel",
+        "ea1",
+        "zug",
+        20,
+    ),
     einheit(290, "betreuung", "Betreuungsgruppe", "Gruppe", "ea2", 30),
     einheit(290, "logistik", "Logistiktrupp", "Trupp", "ea3", 40),
     dispo_fahrzeug(285, "elw"),
@@ -1027,6 +1098,8 @@ pub const DREHBUCH: &[Schritt] = &[
     personal_zu(276, "notsan1", "rettung"),
     personal_zu(276, "rettsan1", "rettung"),
     personal_zu(276, "rettsan2", "rettung"),
+    besatzung(275, "rtw1", &["notarzt", "notsan1"]),
+    besatzung(275, "rtw2", &["rettsan1", "rettsan2"]),
     s(275, Vorgang::Befehl(BEFEHL)),
     auftrag(
         272,
@@ -1036,6 +1109,7 @@ pub const DREHBUCH: &[Schritt] = &[
          Unterstadt.",
         Some("Marktplatz Musterstadt"),
     ),
+    material(271, "sanrucksack", "rettung"),
     fms(270, "elw", 4),
     fms(270, "rtw1", 4),
     fms(270, "rtw2", 4),
@@ -1074,7 +1148,15 @@ pub const DREHBUCH: &[Schritt] = &[
             plaetze: UHS_PLAETZE,
         }),
     ),
-    einheit(246, "uhs", "Sanitätsgruppe UHS", "Gruppe", "ea11", 50),
+    untereinheit(
+        246,
+        "uhs",
+        "Sanitätsgruppe UHS",
+        "Gruppe",
+        "ea11",
+        "zug",
+        50,
+    ),
     dispo_fahrzeug(245, "ktw1"),
     dispo_fahrzeug(245, "ktw2"),
     zu_einheit(244, "gwsan", "uhs"),
@@ -1093,6 +1175,12 @@ pub const DREHBUCH: &[Schritt] = &[
     personal_zu(242, "truppfuehrer", "logistik"),
     personal_zu(242, "san2", "logistik"),
     personal_zu(242, "funker", "zug"),
+    besatzung(242, "elw", &["zugfuehrer", "funker"]),
+    // Die Sanitäterin der UHS-Gruppe arbeitet in der Turnhalle und sitzt auf keinem Fahrzeug
+    // („Ohne Fahrzeug“ im Meldebild); die KTW bleiben ohne Besatzung.
+    besatzung(242, "gwsan", &["gruppenfuehrer_san"]),
+    besatzung(242, "mtw", &["gruppenfuehrer_bt", "san3"]),
+    besatzung(242, "lkw", &["truppfuehrer", "san2"]),
     personal_an_uhs(241, "gruppenfuehrer_san", "turnhalle"),
     personal_an_uhs(241, "san1", "turnhalle"),
     personal_an_uhs(241, "notarzt", "turnhalle"),
@@ -1165,6 +1253,7 @@ pub const DREHBUCH: &[Schritt] = &[
         Some(Sichtungskategorie::Sk2),
         Some("turnhalle"),
     ),
+    material(223, "feldbetten", "betreuung"),
     auftrag(
         222,
         "a_betreuung",
@@ -1351,6 +1440,13 @@ pub const DREHBUCH: &[Schritt] = &[
         Some(Sichtungskategorie::Sk1),
         Some("turnhalle"),
     ),
+    s(
+        105,
+        Vorgang::MaterialStatus {
+            material: "sanrucksack",
+            status: MaterialStatus::DesinfektionNoetig,
+        },
+    ),
     rueckmeldung(
         100,
         "Logistiktrupp",
@@ -1504,6 +1600,9 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
             Vorgang::Abschnitt(_)
             | Vorgang::FahrzeugZuEinheit { .. }
             | Vorgang::PersonalZuEinheit { .. }
+            | Vorgang::Besatzung { .. }
+            | Vorgang::MaterialDisponieren { .. }
+            | Vorgang::MaterialStatus { .. }
             | Vorgang::PersonalAnUhs { .. }
             | Vorgang::Einsatzleiter { .. }
             | Vorgang::Gefahrengebiet(_)
@@ -1741,6 +1840,11 @@ mod tests {
         let mut erledigt = BTreeSet::new();
         let mut an_uhs = BTreeSet::new();
         let mut einsatzleiter = 0;
+        // Einheit je Fahrzeug und je Kraft, für die Besatzung (D4 von LLH-1025: unter dem
+        // Fahrzeug stehen nur Kräfte der eigenen Einheit).
+        let mut einheit_von: std::collections::BTreeMap<&str, &str> = Default::default();
+        let mut besatzung = BTreeSet::new();
+        let mut material = BTreeSet::new();
         for schritt in DREHBUCH {
             match schritt.vorgang {
                 Vorgang::PersonalZuEinheit {
@@ -1750,6 +1854,34 @@ mod tests {
                     assert!(personal.contains(p), "{p} nicht disponiert");
                     assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
                     assert!(zugeordnet.insert(p), "{p} doppelt zugeordnet");
+                    einheit_von.insert(p, einheit);
+                }
+                Vorgang::Besatzung {
+                    fahrzeug,
+                    personal: kraefte,
+                } => {
+                    assert!(!kraefte.is_empty(), "{fahrzeug}: Besatzung leer");
+                    let einheit = einheit_von.get(fahrzeug).copied();
+                    assert!(einheit.is_some(), "{fahrzeug} keiner Einheit zugeordnet");
+                    for p in kraefte {
+                        assert_eq!(
+                            einheit_von.get(p).copied(),
+                            einheit,
+                            "{p} nicht in der Einheit von {fahrzeug}"
+                        );
+                        assert!(besatzung.insert(*p), "{p} doppelt als Besatzung");
+                    }
+                }
+                Vorgang::MaterialDisponieren {
+                    material: m,
+                    einheit,
+                } => {
+                    assert!(MATERIAL.iter().any(|v| v.schluessel == m), "Material {m}");
+                    assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
+                    assert!(material.insert(m), "{m} doppelt disponiert");
+                }
+                Vorgang::MaterialStatus { material: m, .. } => {
+                    assert!(material.contains(m), "{m} nicht disponiert");
                 }
                 Vorgang::PersonalAnUhs {
                     personal: p,
@@ -1826,6 +1958,9 @@ mod tests {
                 }
                 Vorgang::Einheit(v) => {
                     assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
+                    if let Some(ueber) = v.ueber {
+                        assert!(einheiten.contains(ueber), "{ueber} vor {}", v.schluessel);
+                    }
                     assert!(einheiten.insert(v.schluessel), "{} doppelt", v.schluessel);
                 }
                 Vorgang::FahrzeugDisponieren { fahrzeug } => {
@@ -1835,6 +1970,7 @@ mod tests {
                 Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
                     assert!(fahrzeuge.contains(fahrzeug), "{fahrzeug} nicht disponiert");
                     assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
+                    einheit_von.insert(fahrzeug, einheit);
                 }
                 Vorgang::FmsStatus { fahrzeug, fms } => {
                     assert!(fahrzeuge.contains(fahrzeug), "{fahrzeug} nicht disponiert");
@@ -1849,6 +1985,58 @@ mod tests {
         }
         // Ein zweiter Schritt schriebe eine Übergabe statt der Übernahme (LLH-1169).
         assert_eq!(einsatzleiter, 1, "genau ein Einsatzleiter");
+    }
+
+    /// Das Meldebild zeigt in der Demo einen Kräftebaum (LLH-1230): ein Zug mit zwei
+    /// Untereinheiten, Fahrzeuge mit Besatzung, eine Kraft „Ohne Fahrzeug“ in einer Einheit mit
+    /// Fahrzeugen und ein Posten mit Ausfall (Status mit Rolle `alarm` oder `achtung`).
+    #[test]
+    fn drehbuch_traegt_den_kraeftebaum() {
+        let mut ueber: Vec<(&str, &str)> = Vec::new();
+        let mut einheit_von: std::collections::BTreeMap<&str, &str> = Default::default();
+        let mut mit_fahrzeug = BTreeSet::new();
+        let mut besatzung = BTreeSet::new();
+        let mut ausfall = Vec::new();
+        for schritt in DREHBUCH {
+            match schritt.vorgang {
+                Vorgang::Einheit(EinheitSchritt {
+                    schluessel,
+                    ueber: Some(u),
+                    ..
+                }) => ueber.push((u, schluessel)),
+                Vorgang::FahrzeugZuEinheit { einheit, .. } => {
+                    mit_fahrzeug.insert(einheit);
+                }
+                Vorgang::PersonalZuEinheit { personal, einheit } => {
+                    einheit_von.insert(personal, einheit);
+                }
+                Vorgang::Besatzung { personal, .. } => besatzung.extend(personal.iter().copied()),
+                Vorgang::MaterialStatus { material, status } => {
+                    if matches!(
+                        status,
+                        MaterialStatus::Defekt
+                            | MaterialStatus::Verbraucht
+                            | MaterialStatus::DesinfektionNoetig
+                    ) {
+                        ausfall.push(material);
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(
+            ueber,
+            vec![("zug", "rettung"), ("zug", "uhs")],
+            "zwei Untereinheiten unter dem Zug"
+        );
+        assert!(besatzung.len() >= 2, "Besatzung: {besatzung:?}");
+        let ohne_fahrzeug: Vec<_> = einheit_von
+            .iter()
+            .filter(|(p, e)| mit_fahrzeug.contains(*e) && !besatzung.contains(*p))
+            .map(|(p, _)| *p)
+            .collect();
+        assert_eq!(ohne_fahrzeug, vec!["san1"], "„Ohne Fahrzeug“");
+        assert_eq!(ausfall, vec!["sanrucksack"], "Posten mit Ausfall");
     }
 
     /// Der Einsatz-Bedarf folgt dem Drehbuch: jeder Einheitstyp und jeder FMS-Anker, der

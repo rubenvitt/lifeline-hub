@@ -414,11 +414,10 @@ pub async fn update(
             ));
         }
         if vorher.status != nachher.status {
-            texte.push(format!(
-                "Material «{}»: Status «{}» → «{}»",
-                nachher.bezeichnung,
-                vorher.status.as_str(),
-                nachher.status.as_str()
+            texte.push(crate::material::etb_text_status_wechsel(
+                &nachher.bezeichnung,
+                vorher.status,
+                nachher.status,
             ));
         }
         if vorher.art != nachher.art {
