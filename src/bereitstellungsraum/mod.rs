@@ -93,9 +93,71 @@ pub struct BrBelegungAnzeige {
     pub erfasst_von: i64,
 }
 
+/// Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec
+/// `bereitstellungsraum-belegung`, „Kennzahlen der Belegung“). Liste und Detail lesen sie aus
+/// demselben Baustein [`belegung_repo::kennzahlen_je_raum`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BrBelegungKennzahlen {
+    /// Einheiten im Raum; eine Untereinheit, die selbst im Raum steht, zählt einzeln.
+    pub einheiten: i64,
+    /// Verschiedene aktive Fahrzeuge im Raum: einheitenlose und die der Einheiten im Raum.
+    pub fahrzeuge: i64,
+    /// Frühestes „seit“ über Einheiten und einheitenlose Fahrzeuge (UTC ohne Zone); fehlt, wenn
+    /// keine Kraft ein „seit“ hat.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub laengste_seit_at: Option<String>,
+}
+
+wire_enum! {
+    /// Art eines Eintrags im Verlauf eines Raums (LLH-1095, design.md D5). Anders als
+    /// [`BrBelegungsArt`] aus Sicht des gelesenen Raums: ein `wechsel` ist für den Zielraum
+    /// `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BrVerlaufArt {
+        Eintritt => "eintritt",
+        WechselHerein => "wechsel_herein",
+        WechselHinaus => "wechsel_hinaus",
+        Austritt => "austritt",
+    }
+    try_from = |s| format!("Ungültige BrVerlaufArt: {s}");
+}
+
+/// Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
+/// `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BrVerlaufEintrag {
+    /// Kennung des Belegungsereignisses (`br_belegung.id`).
+    pub id: i64,
+    /// UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`).
+    pub zeitpunkt_at: String,
+    pub art: BrVerlaufArt,
+    pub objekt_typ: ObjektTyp,
+    pub objekt_id: i64,
+    /// Aktueller Name der Einheit bzw. Funkrufname des Fahrzeugs, auch aufgelöst oder entlassen.
+    pub objekt_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notiz: Option<String>,
+    /// Bezeichnung des Raums, aus dem ein `wechsel_herein` kam.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub herkunft: Option<String>,
+    /// Bezeichnung des Raums, in den ein `wechsel_hinaus` ging.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn verlauf_art_roundtrip() {
+        for a in ["eintritt", "wechsel_herein", "wechsel_hinaus", "austritt"] {
+            let art = BrVerlaufArt::parse(a).unwrap();
+            assert_eq!(art.as_str(), a);
+            assert_eq!(serde_json::to_value(art).unwrap(), serde_json::json!(a));
+        }
+        assert!(BrVerlaufArt::parse("wechsel").is_none());
+    }
 
     #[test]
     fn status_roundtrip_und_uebergaenge() {

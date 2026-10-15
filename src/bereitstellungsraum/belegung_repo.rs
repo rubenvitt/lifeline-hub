@@ -1,6 +1,10 @@
-use super::{repo, BrBelegungAnzeige, BrBelegungsArt, BrStatus, ObjektTyp};
+use super::{
+    repo, BrBelegungAnzeige, BrBelegungKennzahlen, BrBelegungsArt, BrStatus, BrVerlaufArt,
+    BrVerlaufEintrag, ObjektTyp,
+};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::HashMap;
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von \
@@ -177,6 +181,231 @@ pub async fn austritt_fahrzeug_bei_entlassung_tx(
     .execute(&mut *conn)
     .await?;
     Ok(Some(br_id))
+}
+
+// ─── Lesen: Wartezeit, Kennzahlen, Verlauf (LLH-1095) ───────────────────────
+
+/// Jüngstes Belegungsereignis eines Objekts, das gerade in einem Raum steht (LLH-1095,
+/// design.md D3). „Jüngst“ heißt größte `id`, nicht `zeitpunkt_at`: das löst nur Sekunden auf.
+/// Baustein auch für LLH-1085 („abgerufen“) und LLH-1107.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LetztesEreignis {
+    pub objekt_typ: ObjektTyp,
+    pub objekt_id: i64,
+    /// Raum, in dem das Objekt laut Cache steht (`aktueller_br_id`).
+    pub aktueller_br_id: i64,
+    /// Raum des jüngsten Ereignisses.
+    pub br_id: i64,
+    pub art: BrBelegungsArt,
+    pub zeitpunkt_at: String,
+}
+
+impl LetztesEreignis {
+    /// „Seit“ (Spec `bereitstellungsraum-belegung`, „Wartezeit je Kraft im Raum“): nur wenn das
+    /// jüngste Ereignis ein Eintritt oder Wechsel in genau den Raum ist, in dem das Objekt steht.
+    /// Sonst (Bestand ohne Ereignis, Demo, inkonsistenter Cache) keine Schätzung.
+    pub fn seit_at(&self) -> Option<&str> {
+        let herein = matches!(self.art, BrBelegungsArt::Eintritt | BrBelegungsArt::Wechsel);
+        (herein && self.br_id == self.aktueller_br_id).then_some(self.zeitpunkt_at.as_str())
+    }
+}
+
+/// Je Objekt, das gerade in einem Raum des Einsatzes steht (`br_id = None`) bzw. in genau diesem
+/// Raum (`Some`), sein jüngstes Belegungsereignis. EINE Abfrage, getrieben von den Objekten im
+/// Raum, damit `idx_br_belegung_objekt` greift (`br_belegung` hat keinen Index auf
+/// `einsatz_id`). Ein Objekt ohne jedes Ereignis fehlt in der Antwort.
+pub async fn letztes_je_objekt(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    br_id: Option<i64>,
+) -> Result<Vec<LetztesEreignis>, AppError> {
+    let zeilen: Vec<(String, i64, i64, i64, String, String)> = sqlx::query_as(
+        "SELECT 'einheit', e.id, e.aktueller_br_id, b.br_id, b.art, b.zeitpunkt_at \
+         FROM einsatz_einheit e \
+         JOIN br_belegung b ON b.id = ( \
+             SELECT MAX(x.id) FROM br_belegung x \
+             WHERE x.objekt_typ = 'einheit' AND x.objekt_id = e.id \
+               AND x.einsatz_id = e.einsatz_id) \
+         WHERE e.einsatz_id = ?1 AND e.aktueller_br_id IS NOT NULL \
+           AND e.aufgeloest_at IS NULL AND (?2 IS NULL OR e.aktueller_br_id = ?2) \
+         UNION ALL \
+         SELECT 'fahrzeug', f.id, f.aktueller_br_id, b.br_id, b.art, b.zeitpunkt_at \
+         FROM einsatz_fahrzeug f \
+         JOIN br_belegung b ON b.id = ( \
+             SELECT MAX(x.id) FROM br_belegung x \
+             WHERE x.objekt_typ = 'fahrzeug' AND x.objekt_id = f.id \
+               AND x.einsatz_id = f.einsatz_id) \
+         WHERE f.einsatz_id = ?1 AND f.aktueller_br_id IS NOT NULL \
+           AND f.beendet_at IS NULL AND (?2 IS NULL OR f.aktueller_br_id = ?2)",
+    )
+    .bind(einsatz_id)
+    .bind(br_id)
+    .fetch_all(pool)
+    .await?;
+    zeilen
+        .into_iter()
+        .map(
+            |(typ, objekt_id, aktueller_br_id, br_id, art, zeitpunkt_at)| {
+                Ok(LetztesEreignis {
+                    objekt_typ: ObjektTyp::try_from(typ).map_err(AppError::Internal)?,
+                    objekt_id,
+                    aktueller_br_id,
+                    br_id,
+                    art: BrBelegungsArt::try_from(art).map_err(AppError::Internal)?,
+                    zeitpunkt_at,
+                })
+            },
+        )
+        .collect()
+}
+
+/// Kennzahlen der Belegung je Raum (LLH-1095, design.md D1/D2): Einheiten, Fahrzeuge (verschieden,
+/// einheitenlose und die der Einheiten im Raum) und frühestes „seit“. `br_id = None` für alle Räume
+/// des Einsatzes (Liste), `Some` für einen (Detail); je Kennzahlart EINE Abfrage, unabhängig von
+/// der Zahl der Räume. Ein Raum ohne Belegung fehlt in der Karte (Kennzahlen `Default`).
+pub async fn kennzahlen_je_raum(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    br_id: Option<i64>,
+) -> Result<HashMap<i64, BrBelegungKennzahlen>, AppError> {
+    let letzte = letztes_je_objekt(pool, einsatz_id, br_id).await?;
+    kennzahlen_aus(pool, einsatz_id, br_id, &letzte).await
+}
+
+/// Wie [`kennzahlen_je_raum`] mit schon geladenem [`letztes_je_objekt`] desselben Zuschnitts
+/// (das Detail braucht die Ereignisse ohnehin für „seit“ je Zeile).
+pub async fn kennzahlen_aus(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    br_id: Option<i64>,
+    letzte: &[LetztesEreignis],
+) -> Result<HashMap<i64, BrBelegungKennzahlen>, AppError> {
+    let mut karte: HashMap<i64, BrBelegungKennzahlen> = HashMap::new();
+    let einheiten: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT aktueller_br_id, COUNT(*) FROM einsatz_einheit \
+         WHERE einsatz_id = ?1 AND aktueller_br_id IS NOT NULL AND aufgeloest_at IS NULL \
+           AND (?2 IS NULL OR aktueller_br_id = ?2) \
+         GROUP BY aktueller_br_id",
+    )
+    .bind(einsatz_id)
+    .bind(br_id)
+    .fetch_all(pool)
+    .await?;
+    for (raum, zahl) in einheiten {
+        karte.entry(raum).or_default().einheiten = zahl;
+    }
+    // D2: Vereinigung aus (a) einheitenlosen Fahrzeugen im Raum und (b) aktiven Fahrzeugen der
+    // Einheiten im Raum; `DISTINCT` hält ein doppelt geführtes Fahrzeug (Scope-Frage 6) einfach.
+    let fahrzeuge: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT br_id, COUNT(DISTINCT ef_id) FROM ( \
+             SELECT f.aktueller_br_id AS br_id, f.id AS ef_id FROM einsatz_fahrzeug f \
+             WHERE f.einsatz_id = ?1 AND f.aktueller_br_id IS NOT NULL \
+               AND f.beendet_at IS NULL AND (?2 IS NULL OR f.aktueller_br_id = ?2) \
+             UNION ALL \
+             SELECT e.aktueller_br_id AS br_id, f.id AS ef_id \
+             FROM einsatz_einheit e JOIN einsatz_fahrzeug f ON f.einheit_id = e.id \
+             WHERE e.einsatz_id = ?1 AND e.aktueller_br_id IS NOT NULL \
+               AND e.aufgeloest_at IS NULL AND f.beendet_at IS NULL \
+               AND (?2 IS NULL OR e.aktueller_br_id = ?2)) \
+         GROUP BY br_id",
+    )
+    .bind(einsatz_id)
+    .bind(br_id)
+    .fetch_all(pool)
+    .await?;
+    for (raum, zahl) in fahrzeuge {
+        karte.entry(raum).or_default().fahrzeuge = zahl;
+    }
+    for ereignis in letzte {
+        let Some(seit) = ereignis.seit_at() else {
+            continue;
+        };
+        let k = karte.entry(ereignis.aktueller_br_id).or_default();
+        if k.laengste_seit_at
+            .as_deref()
+            .is_none_or(|bisher| seit < bisher)
+        {
+            k.laengste_seit_at = Some(seit.to_string());
+        }
+    }
+    Ok(karte)
+}
+
+#[derive(sqlx::FromRow)]
+struct VerlaufZeile {
+    id: i64,
+    zeitpunkt_at: String,
+    art: String,
+    br_id: i64,
+    objekt_typ: String,
+    objekt_id: i64,
+    notiz: Option<String>,
+    objekt_name: String,
+    vorher_bezeichnung: Option<String>,
+    ziel_bezeichnung: Option<String>,
+}
+
+/// Verlauf eines Raums (LLH-1095, design.md D5, Spec `bereitstellungsraum-belegung`, „Verlauf
+/// eines Raums lesen“): jedes Ereignis mit `br_id = bid` und jeder Wechsel aus `bid` hinaus,
+/// ungeblättert, neueste zuerst nach `id`. EINE Abfrage über die ganzen Reihen nur der Objekte,
+/// die je in `bid` standen; `LAG` liefert den Raum davor. Der Aufrufer prüft Einsatz und Raum.
+pub async fn verlauf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    br_id: i64,
+) -> Result<Vec<BrVerlaufEintrag>, AppError> {
+    let zeilen: Vec<VerlaufZeile> = sqlx::query_as(
+        "WITH objekte AS ( \
+             SELECT DISTINCT objekt_typ, objekt_id FROM br_belegung \
+             WHERE br_id = ?2 AND einsatz_id = ?1), \
+         reihe AS ( \
+             SELECT b.id, b.br_id, b.objekt_typ, b.objekt_id, b.art, b.notiz, b.zeitpunkt_at, \
+                    LAG(b.br_id) OVER w AS vorher_br_id, LAG(b.art) OVER w AS vorher_art \
+             FROM objekte o \
+             JOIN br_belegung b ON b.objekt_typ = o.objekt_typ AND b.objekt_id = o.objekt_id \
+             WHERE b.einsatz_id = ?1 \
+             WINDOW w AS (PARTITION BY b.objekt_typ, b.objekt_id ORDER BY b.id)) \
+         SELECT r.id, r.zeitpunkt_at, r.art, r.br_id, r.objekt_typ, r.objekt_id, r.notiz, \
+                COALESCE(CASE r.objekt_typ WHEN 'einheit' THEN e.name \
+                                           ELSE f.snap_funkrufname END, '') AS objekt_name, \
+                CASE WHEN r.vorher_art <> 'austritt' THEN vb.bezeichnung END \
+                    AS vorher_bezeichnung, \
+                zb.bezeichnung AS ziel_bezeichnung \
+         FROM reihe r \
+         LEFT JOIN einsatz_einheit e ON r.objekt_typ = 'einheit' AND e.id = r.objekt_id \
+         LEFT JOIN einsatz_fahrzeug f ON r.objekt_typ = 'fahrzeug' AND f.id = r.objekt_id \
+         LEFT JOIN bereitstellungsraum vb ON vb.id = r.vorher_br_id \
+         LEFT JOIN bereitstellungsraum zb ON zb.id = r.br_id \
+         WHERE r.br_id = ?2 \
+            OR (r.art = 'wechsel' AND r.vorher_br_id = ?2 AND r.vorher_art <> 'austritt') \
+         ORDER BY r.id DESC",
+    )
+    .bind(einsatz_id)
+    .bind(br_id)
+    .fetch_all(pool)
+    .await?;
+    zeilen
+        .into_iter()
+        .map(|z| {
+            let (art, herkunft, ziel) = match z.art.as_str() {
+                "eintritt" => (BrVerlaufArt::Eintritt, None, None),
+                "austritt" => (BrVerlaufArt::Austritt, None, None),
+                _ if z.br_id == br_id => (BrVerlaufArt::WechselHerein, z.vorher_bezeichnung, None),
+                _ => (BrVerlaufArt::WechselHinaus, None, z.ziel_bezeichnung),
+            };
+            Ok(BrVerlaufEintrag {
+                id: z.id,
+                zeitpunkt_at: z.zeitpunkt_at,
+                art,
+                objekt_typ: ObjektTyp::try_from(z.objekt_typ).map_err(AppError::Internal)?,
+                objekt_id: z.objekt_id,
+                objekt_name: z.objekt_name,
+                notiz: z.notiz,
+                herkunft,
+                ziel,
+            })
+        })
+        .collect()
 }
 
 // ─── Interne Helpers ────────────────────────────────────────────────────────
@@ -680,6 +909,434 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+
+    // ─── LLH-1095: „seit“, Kennzahlen, Verlauf ─────────────────────────────
+
+    async fn einheit_namens(pool: &SqlitePool, einsatz_id: i64, name: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(name)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn fahrzeug_namens(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        funkrufname: &str,
+        einheit_id: Option<i64>,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) \
+             VALUES (?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(funkrufname)
+        .bind(einheit_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Setzt den Zeitpunkt eines Ereignisses (die Tabelle löst nur Sekunden auf, Tests laufen
+    /// schneller).
+    async fn zeitpunkt(pool: &SqlitePool, ereignis: i64, at: &str) {
+        sqlx::query("UPDATE br_belegung SET zeitpunkt_at = ? WHERE id = ?")
+            .bind(at)
+            .bind(ereignis)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn kennzahlen(pool: &SqlitePool, e: i64, br: i64) -> BrBelegungKennzahlen {
+        kennzahlen_je_raum(pool, e, Some(br))
+            .await
+            .unwrap()
+            .remove(&br)
+            .unwrap_or_default()
+    }
+
+    async fn seit(pool: &SqlitePool, e: i64, typ: ObjektTyp, id: i64) -> Option<String> {
+        letztes_je_objekt(pool, e, None)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|l| l.objekt_typ == typ && l.objekt_id == id)
+            .and_then(|l| l.seit_at().map(str::to_string))
+    }
+
+    /// Akzeptanzkriterium LLH-1095: zwei Einheiten mit je einem Fahrzeug und ein Fahrzeug ohne
+    /// Einheit ergeben „Fahrzeuge 3“ und „Einheiten 2“.
+    #[tokio::test]
+    async fn fahrzeuge_der_einheiten_zaehlen_mit() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Sportplatz").await;
+        for (name, fz) in [("1. Zug", "Florian 1/44-1"), ("2. Zug", "Florian 1/44-2")] {
+            let einheit = einheit_namens(&pool, e, name).await;
+            fahrzeug_namens(&pool, e, fz, Some(einheit)).await;
+            belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
+                .await
+                .unwrap();
+        }
+        let einzeln = fahrzeug_namens(&pool, e, "Florian 1/83-1", None).await;
+        belege(&pool, e, br, "fahrzeug", einzeln, "eintritt", None, b)
+            .await
+            .unwrap();
+
+        let k = kennzahlen(&pool, e, br).await;
+        assert_eq!((k.einheiten, k.fahrzeuge), (2, 3), "{k:?}");
+        // Liste und Detail rechnen über denselben Baustein.
+        let alle = kennzahlen_je_raum(&pool, e, None).await.unwrap();
+        assert_eq!(alle.get(&br), Some(&k));
+    }
+
+    /// Ein BR-Fahrzeug, das danach einer Einheit im Raum zugeordnet wurde, behält
+    /// `aktueller_br_id` (Scope-Frage 6) und zählt trotzdem einmal.
+    #[tokio::test]
+    async fn doppelt_gefuehrtes_fahrzeug_zaehlt_einmal() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Doppel").await;
+        let einheit = einheit_namens(&pool, e, "1. Zug").await;
+        belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
+            .await
+            .unwrap();
+        let fz = fahrzeug_namens(&pool, e, "Florian 1", None).await;
+        belege(&pool, e, br, "fahrzeug", fz, "eintritt", None, b)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(fz)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(kennzahlen(&pool, e, br).await.fahrzeuge, 1);
+    }
+
+    /// Fahrzeuge einer Untereinheit zählen nur, wenn die Untereinheit selbst im Raum steht; eine
+    /// Untereinheit im Raum zählt als Einheit; ein entlassenes Fahrzeug zählt nicht.
+    #[tokio::test]
+    async fn untereinheit_und_entlassenes_fahrzeug() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Baum").await;
+        let zug = einheit_namens(&pool, e, "1. Zug").await;
+        let gruppe_aussen = einheit_namens(&pool, e, "Gruppe 2").await;
+        let gruppe_innen = einheit_namens(&pool, e, "Gruppe 1").await;
+        for g in [gruppe_aussen, gruppe_innen] {
+            sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE id = ?")
+                .bind(zug)
+                .bind(g)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        fahrzeug_namens(&pool, e, "Florian Zug", Some(zug)).await;
+        fahrzeug_namens(&pool, e, "Florian Aussen", Some(gruppe_aussen)).await;
+        fahrzeug_namens(&pool, e, "Florian Innen", Some(gruppe_innen)).await;
+        let entlassen = fahrzeug_namens(&pool, e, "Florian Weg", Some(zug)).await;
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET beendet_at = '2026-05-28 10:00:00', \
+             beendet_als = 'entlassen' WHERE id = ?",
+        )
+        .bind(entlassen)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for einheit in [zug, gruppe_innen] {
+            belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
+                .await
+                .unwrap();
+        }
+
+        let k = kennzahlen(&pool, e, br).await;
+        assert_eq!(k.einheiten, 2, "Zug und Gruppe 1 stehen im Raum: {k:?}");
+        assert_eq!(
+            k.fahrzeuge, 2,
+            "Zug und Gruppe 1, nicht Gruppe 2, nicht entlassen: {k:?}"
+        );
+    }
+
+    /// „Seit“ nach einem Wechsel A → B ist der Wechsel; die längste Wartezeit ist das früheste
+    /// „seit“ über Einheiten und einheitenlose Fahrzeuge.
+    #[tokio::test]
+    async fn seit_nach_wechsel_und_laengste_wartezeit() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br_a = aktiven_br(&pool, e, b, "BR A").await;
+        let br_b = aktiven_br(&pool, e, b, "BR B").await;
+        let zug = einheit_namens(&pool, e, "1. Zug").await;
+        let fz = fahrzeug_namens(&pool, e, "Florian 1", None).await;
+
+        let ein = belege(&pool, e, br_a, "einheit", zug, "eintritt", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, ein.id, "2026-05-28 11:42:00").await;
+        let fz_ein = belege(&pool, e, br_b, "fahrzeug", fz, "eintritt", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, fz_ein.id, "2026-05-28 12:05:00").await;
+        let wechsel = belege(&pool, e, br_b, "einheit", zug, "wechsel", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, wechsel.id, "2026-05-28 12:10:00").await;
+
+        assert_eq!(
+            seit(&pool, e, ObjektTyp::Einheit, zug).await.as_deref(),
+            Some("2026-05-28 12:10:00"),
+            "seit in B ist der Wechsel, nicht der Eintritt in A"
+        );
+        let k = kennzahlen(&pool, e, br_b).await;
+        assert_eq!(k.laengste_seit_at.as_deref(), Some("2026-05-28 12:05:00"));
+        assert_eq!(
+            kennzahlen(&pool, e, br_a).await,
+            BrBelegungKennzahlen::default()
+        );
+    }
+
+    /// Ist das jüngste Ereignis ein Austritt oder eines in einem anderen Raum (inkonsistenter
+    /// Cache, Bestand), fehlt „seit“, und ohne „seit“ fehlt die längste Wartezeit.
+    #[tokio::test]
+    async fn ohne_passendes_ereignis_kein_seit() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br_a = aktiven_br(&pool, e, b, "BR A").await;
+        let br_b = aktiven_br(&pool, e, b, "BR B").await;
+        let raus = einheit_namens(&pool, e, "Raus").await;
+        let anders = einheit_namens(&pool, e, "Anders").await;
+        let ohne = einheit_namens(&pool, e, "Ohne").await;
+        belege(&pool, e, br_a, "einheit", raus, "eintritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, br_a, "einheit", raus, "austritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, br_b, "einheit", anders, "eintritt", None, b)
+            .await
+            .unwrap();
+        // Cache von Hand auf A: jüngstes Ereignis Austritt bzw. anderer Raum, eine ohne Ereignis.
+        for einheit in [raus, anders, ohne] {
+            sqlx::query("UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ?")
+                .bind(br_a)
+                .bind(einheit)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+
+        for einheit in [raus, anders, ohne] {
+            assert_eq!(seit(&pool, e, ObjektTyp::Einheit, einheit).await, None);
+        }
+        let k = kennzahlen(&pool, e, br_a).await;
+        assert_eq!(k.einheiten, 3);
+        assert_eq!(k.laengste_seit_at, None);
+    }
+
+    /// Ereignisse eines anderen Einsatzes (auch mit derselben Objektkennung) ändern weder
+    /// „seit“ noch Kennzahlen.
+    #[tokio::test]
+    async fn fremder_einsatz_aendert_nichts() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at, einsatzart, angelegt_at) \
+             VALUES (1, 'Andere Lage', 'aktiv', '2026-05-28', 'realeinsatz', '2026-05-28') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let br = aktiven_br(&pool, e, b, "BR Eigen").await;
+        let br_fremd = aktiven_br(&pool, fremd, b, "BR Fremd").await;
+        let zug = einheit_namens(&pool, e, "1. Zug").await;
+        let ein = belege(&pool, e, br, "einheit", zug, "eintritt", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, ein.id, "2026-05-28 11:42:00").await;
+        // Ein jüngeres Ereignis eines fremden Einsatzes mit derselben Objektkennung.
+        sqlx::query(
+            "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von) \
+             VALUES (?, ?, 'einheit', ?, 'austritt', ?)",
+        )
+        .bind(fremd)
+        .bind(br_fremd)
+        .bind(zug)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            seit(&pool, e, ObjektTyp::Einheit, zug).await.as_deref(),
+            Some("2026-05-28 11:42:00")
+        );
+        let alle = kennzahlen_je_raum(&pool, e, None).await.unwrap();
+        assert_eq!(alle.len(), 1, "nur der eigene Raum: {alle:?}");
+        assert!(verlauf(&pool, e, br_fremd).await.unwrap().is_empty());
+    }
+
+    fn kurz(v: &[BrVerlaufEintrag]) -> Vec<(BrVerlaufArt, &str, Option<&str>, Option<&str>)> {
+        v.iter()
+            .map(|e| {
+                (
+                    e.art,
+                    e.objekt_name.as_str(),
+                    e.herkunft.as_deref().or(e.ziel.as_deref()),
+                    e.notiz.as_deref(),
+                )
+            })
+            .collect()
+    }
+
+    /// Verlauf: Eintritt, Wechsel A → B (in A hinaus mit Ziel, in B herein mit Herkunft),
+    /// Austritt mit Notiz, neueste zuerst; ein leerer Raum ist leer.
+    #[tokio::test]
+    async fn verlauf_mit_wechsel_und_austritt() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let sportplatz = aktiven_br(&pool, e, b, "BR Sportplatz").await;
+        let schule = aktiven_br(&pool, e, b, "BR Schule").await;
+        let leer = aktiven_br(&pool, e, b, "BR Leer").await;
+        let zug = einheit_namens(&pool, e, "1. Zug").await;
+        belege(&pool, e, sportplatz, "einheit", zug, "eintritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, schule, "einheit", zug, "wechsel", None, b)
+            .await
+            .unwrap();
+        belege(
+            &pool,
+            e,
+            schule,
+            "einheit",
+            zug,
+            "austritt",
+            Some("abgerückt"),
+            b,
+        )
+        .await
+        .unwrap();
+
+        use BrVerlaufArt::*;
+        let a = verlauf(&pool, e, sportplatz).await.unwrap();
+        assert_eq!(
+            kurz(&a),
+            vec![
+                (WechselHinaus, "1. Zug", Some("BR Schule"), None),
+                (Eintritt, "1. Zug", None, None),
+            ]
+        );
+        let s = verlauf(&pool, e, schule).await.unwrap();
+        assert_eq!(
+            kurz(&s),
+            vec![
+                (Austritt, "1. Zug", None, Some("abgerückt")),
+                (WechselHerein, "1. Zug", Some("BR Sportplatz"), None),
+            ]
+        );
+        assert!(s[0].id > s[1].id, "neueste zuerst");
+        assert_eq!(s[0].objekt_typ, ObjektTyp::Einheit);
+        assert_eq!(s[0].objekt_id, zug);
+        assert!(verlauf(&pool, e, leer).await.unwrap().is_empty());
+    }
+
+    /// Auflösen einer Einheit im Raum steht als Austritt „Einheit aufgelöst“ mit ihrem Namen im
+    /// Verlauf, auch nachdem sie aufgelöst ist.
+    #[tokio::test]
+    async fn verlauf_zeigt_aufloesung_mit_namen() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Sportplatz").await;
+        let zug = einheit_namens(&pool, e, "1. Zug").await;
+        belege(&pool, e, br, "einheit", zug, "eintritt", None, b)
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        austritt_bei_aufloesung_tx(&mut conn, e, zug, b)
+            .await
+            .unwrap();
+        drop(conn);
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-05-28 13:00:00' WHERE id = ?",
+        )
+        .bind(zug)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let v = verlauf(&pool, e, br).await.unwrap();
+        assert_eq!(
+            kurz(&v)[0],
+            (
+                BrVerlaufArt::Austritt,
+                "1. Zug",
+                None,
+                Some("Einheit aufgelöst")
+            )
+        );
+    }
+
+    /// Fahrzeug und Einheit mit gleicher Kennung bleiben getrennte Reihen; ein Austritt aus A und
+    /// ein späterer Eintritt in B steht in A nicht als Wechsel.
+    #[tokio::test]
+    async fn verlauf_trennt_objekte_und_erfindet_keinen_wechsel() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br_a = aktiven_br(&pool, e, b, "BR A").await;
+        let br_b = aktiven_br(&pool, e, b, "BR B").await;
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (id, einsatz_id, name) VALUES (500, ?, 'Zug 500')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (id, einsatz_id, snap_funkrufname) \
+             VALUES (500, ?, 'Florian 500')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        belege(&pool, e, br_a, "einheit", 500, "eintritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, br_b, "fahrzeug", 500, "eintritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, br_a, "einheit", 500, "austritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, br_b, "einheit", 500, "eintritt", None, b)
+            .await
+            .unwrap();
+
+        use BrVerlaufArt::*;
+        let a = verlauf(&pool, e, br_a).await.unwrap();
+        assert_eq!(
+            kurz(&a),
+            vec![
+                (Austritt, "Zug 500", None, None),
+                (Eintritt, "Zug 500", None, None)
+            ]
+        );
+        let bb = verlauf(&pool, e, br_b).await.unwrap();
+        assert_eq!(
+            kurz(&bb),
+            vec![
+                (Eintritt, "Zug 500", None, None),
+                (Eintritt, "Florian 500", None, None),
+            ]
+        );
+        assert_eq!(bb[1].objekt_typ, ObjektTyp::Fahrzeug);
     }
 
     // ─── Validierungs-Tests ─────────────────────────────────────────────────

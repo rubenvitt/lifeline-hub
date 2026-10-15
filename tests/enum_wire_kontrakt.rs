@@ -286,6 +286,12 @@ fn serde_wire_gleich_as_str() {
         Wechsel,
         Austritt,
     });
+    enum_wire_as_str!(lifeline_hub::bereitstellungsraum::BrVerlaufArt {
+        Eintritt,
+        WechselHerein,
+        WechselHinaus,
+        Austritt,
+    });
 
     // chat
     enum_wire_as_str!(lifeline_hub::chat::BezugTyp {
