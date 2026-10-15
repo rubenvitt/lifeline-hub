@@ -66,7 +66,7 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     await expect(laptop).toHaveURL(new RegExp(`/geraet/${e}/stelle$`));
     await expect(laptop.getByRole('group', { name: 'Plätze in Zahlen' })).toBeVisible();
     await laptop.getByRole('tab', { name: 'Material' }).click();
-    await expect(laptop.getByText('Kein Material dieser UHS zugeordnet')).toBeVisible();
+    await expect(laptop.getByText('Kein Material', { exact: true })).toBeVisible();
     await expect(laptop.getByRole('button', { name: 'Material zuordnen' })).toHaveCount(0);
 
     await laptop.getByRole('tab', { name: 'Meldungen' }).click();
