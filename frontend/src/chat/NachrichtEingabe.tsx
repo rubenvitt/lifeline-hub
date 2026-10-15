@@ -1,5 +1,5 @@
 import { IconBueroklammer } from '../icons';
-import { Button, Mentions, Space, Upload } from 'antd';
+import { Button, Mentions, Space, Upload, theme } from 'antd';
 import { ERWAEHNUNGEN_MAX, ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { ChatErwaehnung } from '../api/types';
 import { istZuLang, zeichenGrenze, Zeichenzaehler } from '../components/zeichenGrenze';
@@ -50,6 +50,7 @@ export default function NachrichtEingabe({
   vorschlaege = KEINE_VORSCHLAEGE,
 }: Props) {
   const { rollen } = useRollen();
+  const { token } = theme.useToken();
   const [text, setText] = useState('');
   // Aus der Auswahl übernommene Vorschläge. Nur sie zählen: ein von Hand getipptes „@S4“ wird
   // nie zum Code (`frontend/src/fuehrung/AGENTS.md`, kein Rückschluss vom Freitext).
@@ -116,6 +117,19 @@ export default function NachrichtEingabe({
           // die 72-px-Trefffläche im Handschuh-Betrieb; der Zähler steht unter der Zeile.
           count={zeichenGrenze(ETB_INHALT_MAX, { zaehler: false })}
           autoSize={{ minRows: 1, maxRows: 4 }}
+          // Im Mentions-Feld trägt das Gehäuse den Rahmen, und antd zieht ihn von der Höhe des
+          // Textfelds ab. Die Trefffläche ist aber das Textfeld: eine Zeile samt Polster hält die
+          // volle Zeilenhöhe der Dichte (72 px im Handschuh-Betrieb). Ein `minHeight` hälfe nicht,
+          // `autoSize` überschreibt es. Das Gehäuse ist damit um den Rahmen höher; der Knopf
+          // daneben zieht mit.
+          styles={{
+            textarea: {
+              paddingBlock: Math.max(
+                (token.controlHeight - token.fontSize * token.lineHeight) / 2,
+                0,
+              ),
+            },
+          }}
           // Enter bei offener Auswahl übernimmt den Vorschlag; gesendet wird erst danach.
           onPressEnter={(e) => {
             if (!e.shiftKey) {
@@ -129,6 +143,7 @@ export default function NachrichtEingabe({
           loading={senden}
           disabled={zuLang || zuViele}
           onClick={() => void absenden()}
+          style={{ height: token.controlHeight + 2 * token.lineWidth }}
         >
           Senden
         </Button>
