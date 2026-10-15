@@ -203,6 +203,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             retain("begonnen_at", G_ZEIT),
             retain("naechste_lagebesprechung_at", G_ZEIT),
+            // Merker der Ankündigung am Termin (LLH-1215, design.md D10).
+            retain("lagebesprechung_angekuendigt_vorher_at", G_ZEIT),
+            retain("lagebesprechung_angekuendigt_faellig_at", G_ZEIT),
             retain("abgeschlossen_at", G_ZEIT),
             retain("abgeschlossen_von", G_FK),
             retain("einsatzart", G_ENUM),
