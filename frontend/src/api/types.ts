@@ -412,6 +412,12 @@ export type BrDetail = S['BrDetail'];
 export type BrEinheitKurz = S['BrEinheitKurz'];
 export type BrFahrzeugKurz = S['BrFahrzeugKurz'];
 export type BrBelegung = S['BrBelegungAnzeige'];
+// LLH-1095: Kennzahlen, Fahrzeuge der Einheiten, Liste mit Belegung, Verlauf.
+export type BrBelegungKennzahlen = S['BrBelegungKennzahlen'];
+export type BrEinheitFahrzeug = S['BrEinheitFahrzeug'];
+export type BrListenEintrag = S['BrListenEintrag'];
+export type BrVerlaufArt = S['BrVerlaufArt'];
+export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
 
 // ============================== Chat / Anhänge ==============================
 export type ChatKanal = S['ChatKanalAnzeige'];

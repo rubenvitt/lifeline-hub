@@ -2789,6 +2789,33 @@
           }
         }
       },
+      "BrBelegungKennzahlen": {
+        "type": "object",
+        "description": "Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec\n`bereitstellungsraum-belegung`, „Kennzahlen der Belegung“). Liste und Detail lesen sie aus\ndemselben Baustein [`belegung_repo::kennzahlen_je_raum`].",
+        "required": [
+          "einheiten",
+          "fahrzeuge"
+        ],
+        "properties": {
+          "einheiten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einheiten im Raum; eine Untereinheit, die selbst im Raum steht, zählt einzeln."
+          },
+          "fahrzeuge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Verschiedene aktive Fahrzeuge im Raum: einheitenlose und die der Einheiten im Raum."
+          },
+          "laengste_seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Frühestes „seit“ über Einheiten und einheitenlose Fahrzeuge (UTC ohne Zone); fehlt, wenn\nkeine Kraft ein „seit“ hat."
+          }
+        }
+      },
       "BrBelegungsArt": {
         "type": "string",
         "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0061_br_belegung.sql`. Append-only.",
@@ -2807,9 +2834,13 @@
             "type": "object",
             "required": [
               "einheiten",
-              "fahrzeuge"
+              "fahrzeuge",
+              "belegung"
             ],
             "properties": {
+              "belegung": {
+                "$ref": "#/components/schemas/BrBelegungKennzahlen"
+              },
               "einheiten": {
                 "type": "array",
                 "items": {
@@ -2820,27 +2851,60 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/BrFahrzeugKurz"
-                }
+                },
+                "description": "Einheitenlose Fahrzeuge im Raum (`aktueller_br_id`); die Fahrzeuge der Einheiten stehen an\nder Einheit."
               }
             }
           }
         ],
-        "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge."
+        "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +\neinheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4)."
+      },
+      "BrEinheitFahrzeug": {
+        "type": "object",
+        "description": "Aktives Fahrzeug einer Einheit im Raum.",
+        "required": [
+          "id",
+          "funkrufname"
+        ],
+        "properties": {
+          "funkrufname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "BrEinheitKurz": {
         "type": "object",
         "description": "Schlanke Einheiten-Info für den Detail-Response.",
         "required": [
           "id",
-          "name"
+          "name",
+          "fahrzeuge"
         ],
         "properties": {
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BrEinheitFahrzeug"
+            },
+            "description": "Aktive Fahrzeuge der Einheit."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
           },
           "name": {
             "type": "string"
+          },
+          "seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne\nZone); fehlt ohne passendes Ereignis."
           }
         }
       },
@@ -2858,8 +2922,48 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wie [`BrEinheitKurz::seit_at`]."
           }
         }
+      },
+      "BrListenEintrag": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BrAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "belegung",
+              "einheit_ids"
+            ],
+            "properties": {
+              "abschnitt_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "belegung": {
+                "$ref": "#/components/schemas/BrBelegungKennzahlen"
+              },
+              "einheit_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`summiereStaerke`)."
       },
       "BrStatus": {
         "type": "string",
@@ -2869,6 +2973,73 @@
           "aktiv",
           "aufgeloest"
         ]
+      },
+      "BrVerlaufArt": {
+        "type": "string",
+        "description": "Art eines Eintrags im Verlauf eines Raums (LLH-1095, design.md D5). Anders als\n[`BrBelegungsArt`] aus Sicht des gelesenen Raums: ein `wechsel` ist für den Zielraum\n`wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.",
+        "enum": [
+          "eintritt",
+          "wechsel_herein",
+          "wechsel_hinaus",
+          "austritt"
+        ]
+      },
+      "BrVerlaufEintrag": {
+        "type": "object",
+        "description": "Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec\n`bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).",
+        "required": [
+          "id",
+          "zeitpunkt_at",
+          "art",
+          "objekt_typ",
+          "objekt_id",
+          "objekt_name"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BrVerlaufArt"
+          },
+          "herkunft": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Raums, aus dem ein `wechsel_herein` kam."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung des Belegungsereignisses (`br_belegung.id`)."
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "objekt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objekt_name": {
+            "type": "string",
+            "description": "Aktueller Name der Einheit bzw. Funkrufname des Fahrzeugs, auch aufgelöst oder entlassen."
+          },
+          "objekt_typ": {
+            "$ref": "#/components/schemas/ObjektTyp"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "ziel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Raums, in den ein `wechsel_hinaus` ging."
+          }
+        }
       },
       "BuildJob": {
         "type": "object",

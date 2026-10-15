@@ -2,7 +2,9 @@ import type {
   Bereitstellungsraum,
   BrDetail,
   BrBelegung,
+  BrListenEintrag,
   BrStatus,
+  BrVerlaufEintrag,
   ObjektTyp,
   BrBelegungsArt,
 } from './types';
@@ -10,12 +12,13 @@ import { apiGet, apiSend, mitParametern } from './client';
 
 // ---------- Bereitstellungsräume ----------
 
+/** Räume mit Abschnittsname, Kennzahlen der Belegung und Einheiten im Raum (LLH-1095). */
 export function listeBr(
   einsatzId: number,
   status?: BrStatus,
   abschnittId?: number,
-): Promise<Bereitstellungsraum[]> {
-  return apiGet<Bereitstellungsraum[]>(
+): Promise<BrListenEintrag[]> {
+  return apiGet<BrListenEintrag[]>(
     mitParametern(`/api/einsaetze/${einsatzId}/bereitstellungsraeume`, {
       status,
       abschnitt_id: abschnittId,
@@ -25,6 +28,13 @@ export function listeBr(
 
 export function ladeBr(einsatzId: number, brId: number): Promise<BrDetail> {
   return apiGet<BrDetail>(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`);
+}
+
+/** Belegungsreihe eines Raums, ungeblättert, neueste zuerst (LLH-1095). */
+export function ladeBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlaufEintrag[]> {
+  return apiGet<BrVerlaufEintrag[]>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/verlauf`,
+  );
 }
 
 export interface BrEingabe {

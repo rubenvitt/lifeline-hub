@@ -1054,27 +1054,82 @@ export interface components {
             zeitpunkt_at: string;
         };
         /**
+         * @description Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec
+         *     `bereitstellungsraum-belegung`, „Kennzahlen der Belegung“). Liste und Detail lesen sie aus
+         *     demselben Baustein [`belegung_repo::kennzahlen_je_raum`].
+         */
+        BrBelegungKennzahlen: {
+            /**
+             * Format: int64
+             * @description Einheiten im Raum; eine Untereinheit, die selbst im Raum steht, zählt einzeln.
+             */
+            einheiten: number;
+            /**
+             * Format: int64
+             * @description Verschiedene aktive Fahrzeuge im Raum: einheitenlose und die der Einheiten im Raum.
+             */
+            fahrzeuge: number;
+            /**
+             * @description Frühestes „seit“ über Einheiten und einheitenlose Fahrzeuge (UTC ohne Zone); fehlt, wenn
+             *     keine Kraft ein „seit“ hat.
+             */
+            laengste_seit_at?: string | null;
+        };
+        /**
          * @description Art eines BR-Belegungs-Events. String = CHECK-Constraint in
          *     `migrations/0061_br_belegung.sql`. Append-only.
          * @enum {string}
          */
         BrBelegungsArt: "eintritt" | "wechsel" | "austritt";
-        /** @description Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge. */
+        /**
+         * @description Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +
+         *     einheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4).
+         */
         BrDetail: components["schemas"]["BrAnzeige"] & {
+            belegung: components["schemas"]["BrBelegungKennzahlen"];
             einheiten: components["schemas"]["BrEinheitKurz"][];
+            /**
+             * @description Einheitenlose Fahrzeuge im Raum (`aktueller_br_id`); die Fahrzeuge der Einheiten stehen an
+             *     der Einheit.
+             */
             fahrzeuge: components["schemas"]["BrFahrzeugKurz"][];
+        };
+        /** @description Aktives Fahrzeug einer Einheit im Raum. */
+        BrEinheitFahrzeug: {
+            funkrufname: string;
+            /** Format: int64 */
+            id: number;
         };
         /** @description Schlanke Einheiten-Info für den Detail-Response. */
         BrEinheitKurz: {
+            /** @description Aktive Fahrzeuge der Einheit. */
+            fahrzeuge: components["schemas"]["BrEinheitFahrzeug"][];
             /** Format: int64 */
             id: number;
             name: string;
+            /**
+             * @description Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne
+             *     Zone); fehlt ohne passendes Ereignis.
+             */
+            seit_at?: string | null;
         };
         /** @description Schlanke Fahrzeug-Info für den Detail-Response. */
         BrFahrzeugKurz: {
             funkrufname: string;
             /** Format: int64 */
             id: number;
+            /** @description Wie [`BrEinheitKurz::seit_at`]. */
+            seit_at?: string | null;
+        };
+        /**
+         * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
+         *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
+         *     `summiereStaerke`).
+         */
+        BrListenEintrag: components["schemas"]["BrAnzeige"] & {
+            abschnitt_name?: string | null;
+            belegung: components["schemas"]["BrBelegungKennzahlen"];
+            einheit_ids: number[];
         };
         /**
          * @description Status eines Bereitstellungsraums. String = CHECK-Constraint in
@@ -1082,6 +1137,37 @@ export interface components {
          * @enum {string}
          */
         BrStatus: "geplant" | "aktiv" | "aufgeloest";
+        /**
+         * @description Art eines Eintrags im Verlauf eines Raums (LLH-1095, design.md D5). Anders als
+         *     [`BrBelegungsArt`] aus Sicht des gelesenen Raums: ein `wechsel` ist für den Zielraum
+         *     `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
+         * @enum {string}
+         */
+        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt";
+        /**
+         * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
+         *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
+         */
+        BrVerlaufEintrag: {
+            art: components["schemas"]["BrVerlaufArt"];
+            /** @description Bezeichnung des Raums, aus dem ein `wechsel_herein` kam. */
+            herkunft?: string | null;
+            /**
+             * Format: int64
+             * @description Kennung des Belegungsereignisses (`br_belegung.id`).
+             */
+            id: number;
+            notiz?: string | null;
+            /** Format: int64 */
+            objekt_id: number;
+            /** @description Aktueller Name der Einheit bzw. Funkrufname des Fahrzeugs, auch aufgelöst oder entlassen. */
+            objekt_name: string;
+            objekt_typ: components["schemas"]["ObjektTyp"];
+            /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+            /** @description Bezeichnung des Raums, in den ein `wechsel_hinaus` ging. */
+            ziel?: string | null;
+        };
         /**
          * @description Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit
          *     läuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher

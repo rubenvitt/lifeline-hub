@@ -3,10 +3,12 @@ import { useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from './SeitenZustand';
 
-interface AnlegenSlot<T> {
+/** Der Drawer liefert den angelegten Datensatz, nicht einen Listeneintrag (beim BR trägt die
+ *  Liste mehr als die Anlage, LLH-1095); geführt wird nur über die Kennung. */
+interface AnlegenSlot {
   open: boolean;
   onClose: () => void;
-  onAngelegt: (eintrag: T) => void;
+  onAngelegt: (eintrag: { id: number }) => void;
 }
 
 interface DirekteinstiegProps<T extends { id: number }> {
@@ -19,7 +21,7 @@ interface DirekteinstiegProps<T extends { id: number }> {
   leerTitel: string;
   leerAktionLabel: string;
   /** Der Anlegen-Drawer des Moduls; er läuft über lokalen Zustand, nicht über eine Route. */
-  anlegen: (slot: AnlegenSlot<T>) => ReactNode;
+  anlegen: (slot: AnlegenSlot) => ReactNode;
 }
 
 /**
