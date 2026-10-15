@@ -68,14 +68,13 @@ import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { useDruckModus } from '../../components/druck/useDruckModus';
 import {
-  ordnungsschluessel,
+  einheitFolge,
+  fahrzeugFolge,
   useBelegungZufluss,
   useHalteFlaeche,
   zuflussText,
 } from './belegungZufluss';
 
-const EINHEIT_SCHLUESSEL = (e: BrEinheitKurz) => ordnungsschluessel(e.name);
-const FAHRZEUG_SCHLUESSEL = (f: BrFahrzeugKurz) => ordnungsschluessel(f.funkrufname);
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
 
@@ -180,13 +179,13 @@ export default function BrDetailPage() {
   const halten = gehalten && !druckt;
   const einheitenZufluss = useBelegungZufluss(
     detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
-    EINHEIT_SCHLUESSEL,
+    einheitFolge,
     halten,
     brId,
   );
   const fahrzeugeZufluss = useBelegungZufluss(
     detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
-    FAHRZEUG_SCHLUESSEL,
+    fahrzeugFolge,
     halten,
     brId,
   );
