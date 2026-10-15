@@ -135,11 +135,13 @@ der installierten Version (LLH-1280):
 - **Stabile App** (`1.2.0`): liest
   `https://github.com/rubenvitt/lifeline-hub/releases/latest/download/latest.json`. GitHub lässt
   Vorabversionen bei „latest“ aus, eine stabile App bekommt also nie eine Alpha angeboten.
-- **Alpha-App** (`1.0.0-alpha.N`): liest den **Alpha-Kanal**
+- **Alpha-App** (einmal als `…-alpha.N` installiert): liest den **Alpha-Kanal**
   `https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json`. Er
-  zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, Alpha oder stabil. Mit dem
-  ersten stabilen Release wird eine Alpha-App also zur stabilen und folgt danach dem stabilen
-  Kanal. Wer wieder Alphas will, installiert eine Alpha-`.dmg` von Hand.
+  zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, Alpha oder stabil; eine
+  höhere Version ist immer neuer als die Alphas davor (`1.0.0` nach `1.0.0-alpha.N`, `1.1.0`
+  nach `1.0.1-alpha.N`). Die App merkt sich den Kanal in `kanal.json` neben
+  `verbindung.json` und bleibt auch nach einem stabilen Update im Alpha-Kanal. Zurück zum
+  stabilen Kanal: `kanal.json` löschen und eine stabile `.dmg` installieren.
 
 - **Ohne Internet** (Einsatz-LAN) scheitert die Prüfung nach höchstens 10 s still. Die App
   läuft normal weiter, eine Fehlermeldung erscheint nicht.

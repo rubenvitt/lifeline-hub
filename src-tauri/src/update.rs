@@ -1,6 +1,6 @@
 //! Update der Hülle (desktop-auslieferung). Quelle ist `latest.json`: für eine stabile Hülle am
-//! neuesten STABILEN Release (Endpunkt in `tauri.conf.json`), für eine Hülle mit Vorabversion im
-//! Alpha-Kanal (`ALPHA_KANAL`, LLH-1280). Die Signatur prüft der Updater in beiden Fällen gegen
+//! neuesten STABILEN Release (Endpunkt in `tauri.conf.json`), für eine Hülle im Alpha-Kanal
+//! (`ALPHA_KANAL`, `kanal.rs`, LLH-1280). Die Signatur prüft der Updater in beiden Fällen gegen
 //! den öffentlichen Schlüssel aus `tauri.conf.json`.
 //!
 //! Nie ohne Zustimmung, und zweimal gefragt: erst ob geladen wird, dann — wenn das Update da
@@ -13,31 +13,36 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::{Update, Updater, UpdaterExt};
+
+use crate::kanal::{self, Kanal};
 
 /// Obergrenze für die Prüfung. Im Einsatz-LAN ohne Internet endet sie sonst erst mit dem
 /// TCP-Timeout des Systems.
 const FRIST: Duration = Duration::from_secs(10);
 
 /// Manifest des Alpha-Kanals, fortgeschrieben vom Job `desktop-kanal` in `artefakte.yml`. Es
-/// zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, auch auf ein stabiles: eine
-/// Alpha-Hülle wird so mit 1.0.0 zur stabilen und liest danach den stabilen Endpunkt.
+/// zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, auch auf ein stabiles.
 const ALPHA_KANAL: &str =
     "https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json";
 
-/// Endpunkt für die installierte Version: der Alpha-Kanal bei einer Vorabversion (SemVer: `-`
-/// vor einem `+`), sonst `None` für den aus `tauri.conf.json`.
-fn kanal_fuer(version: &str) -> Option<&'static str> {
-    let ohne_build = version.split('+').next().unwrap_or(version);
-    ohne_build.contains('-').then_some(ALPHA_KANAL)
-}
-
+/// Der Updater für den Kanal der Hülle (`kanal.rs`): Alpha liest `ALPHA_KANAL`, stabil den
+/// Endpunkt aus `tauri.conf.json`. Ein Alpha-Kanal wird gemerkt, damit die Hülle nach einem
+/// stabilen Update dort bleibt; scheitert das Merken, prüft sie trotzdem.
 fn updater(app: &AppHandle) -> tauri_plugin_updater::Result<Updater> {
     let mut builder = app.updater_builder().timeout(FRIST);
-    if let Some(kanal) = kanal_fuer(&app.package_info().version.to_string()) {
-        builder = builder.endpoints(vec![tauri::Url::parse(kanal)?])?;
+    let konfig_dir = app.path().app_config_dir().ok();
+    let gemerkt = konfig_dir.as_deref().and_then(kanal::lesen);
+    let kanal = kanal::bestimmen(&app.package_info().version.to_string(), gemerkt);
+    if kanal == Kanal::Alpha {
+        if let (Some(dir), None) = (&konfig_dir, gemerkt) {
+            if let Err(fehler) = kanal::schreiben(dir, Kanal::Alpha) {
+                log::warn!("Update-Kanal nicht gemerkt: {fehler}");
+            }
+        }
+        builder = builder.endpoints(vec![tauri::Url::parse(ALPHA_KANAL)?])?;
     }
     builder.build()
 }
@@ -188,19 +193,6 @@ fn melden(app: &AppHandle, art: MessageDialogKind, text: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn vorabversion_liest_den_alpha_kanal() {
-        assert_eq!(kanal_fuer("1.0.0-alpha.130"), Some(ALPHA_KANAL));
-        assert_eq!(kanal_fuer("1.1.0-beta.2+abc"), Some(ALPHA_KANAL));
-    }
-
-    #[test]
-    fn stabile_version_bleibt_beim_endpunkt_aus_der_konfiguration() {
-        assert_eq!(kanal_fuer("1.0.0"), None);
-        // Bindestrich nur in den Build-Metadaten: keine Vorabversion.
-        assert_eq!(kanal_fuer("1.0.0+build-7"), None);
-    }
 
     #[test]
     fn alpha_kanal_ist_https_und_parsebar() {

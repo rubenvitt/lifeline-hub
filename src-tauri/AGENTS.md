@@ -39,8 +39,8 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `version_kommt_aus_dem_workspace`).
 - Pakete + `latest.json` an jedem Tag (`desktop.yml`, aus `artefakte.yml`): stabil vor der
   Freigabe, ein roter Bau hält sie auf (Job `freigeben`, LFH-1054); Alpha danach (`desktop-alpha`,
-  LLH-1280), Alpha-Hüllen lesen den Kanal `desktop-alpha` (`update.rs`, `kanal_fuer`, Job
-  `desktop-kanal`, `scripts/release/desktop-kanal.mjs`);
+  LLH-1280), Alpha-Hüllen lesen den Kanal `desktop-alpha` und merken ihn sich (`kanal.rs`, `update.rs`,
+  Job `desktop-kanal`, `scripts/release/desktop-kanal.mjs`);
   `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
   außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
   `tauri.conf.json`.
