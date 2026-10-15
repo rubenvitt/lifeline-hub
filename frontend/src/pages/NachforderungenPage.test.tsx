@@ -9,6 +9,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
 import { nachforderungenPfad } from '../routing/deeplinks';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, Nachforderung } from '../api/types';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
@@ -68,8 +69,12 @@ function OrtSonde() {
   return <output data-testid="ort">{ort.pathname + ort.search}</output>;
 }
 
+/** Der Query-Client des letzten `renderPage`, für Abwesenheits-Prüfungen am Cache. */
+let zuletztClient: QueryClient | null = null;
+
 function renderPage(url = '/einsaetze/1/nachforderungen') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  zuletztClient = client;
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -753,16 +758,90 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     expect(screen.getByText('1 Posten übernommen')).toBeInTheDocument();
     await userEvent.click(knopf);
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(abrufe).toEqual([]);
+    await freigabenAufgeloest();
+    keinMaterialAbruf(abrufe);
   });
+
+  /**
+   * Wartet, bis die Freigaben aufgelöst sind und ein Tick vergangen ist: erst dann hätte ein
+   * Abruf, den nur die Freigabe-Bedingung aufhält, schon begonnen.
+   */
+  async function freigabenAufgeloest() {
+    await waitFor(() =>
+      expect(zuletztClient?.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  /** Die Materialliste wurde weder abgerufen noch begonnen (vor MSW sichtbar am Cache). */
+  function keinMaterialAbruf(abrufe: string[]) {
+    const stand = zuletztClient?.getQueryState(einsatzKeys.material(1));
+    expect(stand?.fetchStatus ?? 'idle').toBe('idle');
+    expect(stand?.dataUpdateCount ?? 0).toBe(0);
+    expect(abrufe).toEqual([]);
+  }
 
   it('ohne Übernahme ruft die Seite die Materialliste nicht ab', async () => {
     listeNachforderungen.mockResolvedValue([sandsaecke(), nf()]);
     const { abrufe } = materialServer(() => []);
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
-    expect(abrufe).toEqual([]);
+    await freigabenAufgeloest();
+    keinMaterialAbruf(abrufe);
+  });
+
+  it('Modul Material ausgeblendet (nur Zugriff, etwa Admin): Knopf gesperrt, kein Abruf', async () => {
+    ladeModulFreigaben.mockResolvedValue(
+      freigabenFixture({ material: { sichtbar: false, zugriff: true } }),
+    );
+    listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
+    const { abrufe } = materialServer(() => [posten()]);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    const knopf = await screen.findByRole('button', { name: 'Weiteren Posten übernehmen' });
+    await freigabenAufgeloest();
+    expect(knopf).toBeDisabled();
+    expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    keinMaterialAbruf(abrufe);
+  });
+
+  it('solange die Freigaben laden, steht kein Übernahme-Knopf (auch kein gesperrter)', async () => {
+    ladeModulFreigaben.mockReturnValue(new Promise(() => {}));
+    listeNachforderungen.mockResolvedValue([sandsaecke()]);
+    materialServer(() => []);
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await screen.findByText('Sandsäcke Deich Nord');
+    expect(screen.queryByRole('button', { name: 'Als Material übernehmen' })).toBeNull();
+    expect(screen.queryByText('Keine Berechtigung')).toBeNull();
+  });
+
+  it('422 „erst nach dem Eintreffen“: der Dialog bleibt offen auf „Übernehmen“ und nennt den Grund', async () => {
+    listeNachforderungen.mockResolvedValue([sandsaecke()]);
+    materialServer(
+      () => [],
+      () =>
+        HttpResponse.json(
+          { error: 'Material wird erst nach dem Eintreffen übernommen' },
+          { status: 422 },
+        ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    expect(
+      await within(dialog).findByText(/Material wird erst nach dem Eintreffen übernommen/),
+    ).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('„Sandsäcke“ als Material übernehmen');
+    expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeNull();
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
   });
 
   it('?nachforderung= wählt die Ansicht der Nachforderung, hebt ihre Karte hervor und räumt den Parameter', async () => {
@@ -779,6 +858,58 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     await waitFor(() =>
       expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
     );
+  });
+
+  it('?nachforderung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt', async () => {
+    listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
+    materialServer(() => []);
+    renderPage(nachforderungenPfad(1, { nachforderung: 99 }));
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+    );
+    expect(screen.getByRole('radio', { name: /Offen/ })).toBeChecked();
+    expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+  });
+
+  it('?nachforderung= beim Kaltstart: antwortet die Liste vor dem Einsatz, rollt die Karte trotzdem sofort ins Bild', async () => {
+    const scroll = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      let einsatzDa: () => void = () => {};
+      vi.mocked(ladeEinsatz).mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            einsatzDa = () =>
+              r({
+                id: 1,
+                bezeichnung: 'Lage',
+                status: 'aktiv',
+                meine_rolle: 'einsatzleitung',
+              } as Awaited<ReturnType<typeof ladeEinsatz>>);
+          }),
+      );
+      listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
+      materialServer(() => []);
+      renderPage(nachforderungenPfad(1, { nachforderung: 4 }));
+      await waitFor(() => expect(listeNachforderungen).toHaveBeenCalled());
+      await act(async () => {
+        await listeNachforderungen.mock.results[0]?.value;
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      await act(async () => einsatzDa());
+      const karte = await waitFor(() => {
+        const k = document.querySelector('[data-nachforderung-id="4"]');
+        expect(k).not.toBeNull();
+        return k as HTMLElement;
+      });
+      await waitFor(() => expect(scroll).toHaveBeenCalled());
+      expect(scroll.mock.contexts[0]).toBe(karte);
+      expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 
   it('Rücknahme nach Übernahme: der Grund steht im Seitenhinweis', async () => {

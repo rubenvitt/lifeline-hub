@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { QueryClient } from '@tanstack/react-query';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -1867,16 +1868,41 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     expect(zeilen[zeilen.length - 1]?.getAttribute('style')).toMatch(/line-clamp: 2/);
   });
 
-  it('auch im Kartenmodus (390 px)', async () => {
+  it('auch im Kartenmodus (390 px): neutral gesetzt, kein Block in der fetten Titelzeile', async () => {
     setzeViewportBreite(390);
     nachforderungen(() => HttpResponse.json([nachforderung]));
     const { container } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
-    await waitFor(() =>
-      expect(container.querySelector('[data-lfh="datensicht-karte"]')).toHaveTextContent(
-        'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße',
-      ),
-    );
+    const karte = await waitFor(() => {
+      const k = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]');
+      expect(k).toHaveTextContent('aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße');
+      return k as HTMLElement;
+    });
+    const herkunft = karte.querySelector<HTMLElement>('[data-lfh="material-herkunft"]');
+    // Der Kartentitel ist ein fettes `<strong>` in einem `<span>`: der Verweis ist dort ein Span
+    // ohne Block-Elemente und stünde sonst fett wie die Bezeichnung.
+    expect(herkunft?.closest('strong')).not.toBeNull();
+    expect(herkunft?.tagName).toBe('SPAN');
+    expect(herkunft?.querySelector('div')).toBeNull();
+    expect(herkunft).toHaveStyle({ fontWeight: 'normal', display: 'block' });
   });
+
+  /**
+   * Abwesenheit erst prüfen, wenn sie etwas beweist: die Freigaben sind aufgelöst und ein Tick ist
+   * vergangen. Danach hätte ein Abruf, den nur die Freigabe aufhält, begonnen — die Query stünde
+   * auf `fetching`, auch bevor MSW den Handler erreicht.
+   */
+  async function keinAbrufNachFreigaben(client: QueryClient, abrufe: () => number) {
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const stand = client.getQueryState(einsatzKeys.nachforderungen(1));
+    expect(stand?.fetchStatus ?? 'idle').toBe('idle');
+    expect(stand?.dataUpdateCount ?? 0).toBe(0);
+    expect(abrufe()).toBe(0);
+  }
 
   it('ohne Freigabe für Nachforderungen: „aus Nachforderung #4“ ohne Link, kein Abruf', async () => {
     server.use(
@@ -1885,10 +1911,10 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
       ),
     );
     const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
-    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const { client } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
     expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    await keinAbrufNachFreigaben(client, abrufe);
     expect(screen.queryByRole('link', { name: /aus Nachforderung/ })).toBeNull();
-    expect(abrufe()).toBe(0);
   });
 
   it('Liste abgelehnt (403): still „aus Nachforderung #4“', async () => {
@@ -1901,9 +1927,9 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
 
   it('ohne verknüpften Posten ruft die Seite keine Nachforderungen ab', async () => {
     const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
-    render(einsatzAktiv, [em]);
+    const { client } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    expect(abrufe()).toBe(0);
+    await keinAbrufNachFreigaben(client, abrufe);
     expect(screen.queryByText(/aus Nachforderung/)).toBeNull();
   });
 });

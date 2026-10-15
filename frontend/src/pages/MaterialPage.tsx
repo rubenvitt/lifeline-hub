@@ -133,10 +133,13 @@ function BezeichnungZelle({
     em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
     em.ist_demo && <DemoMarke key="demo" />,
   ];
-  // Herkunft aus einer Nachforderung (LLH-1226 D11) als eigene Zeile darunter, auch im Kartenmodus
-  // (der Kartentitel rendert diese Zelle).
+  // Herkunft aus einer Nachforderung (LLH-1226 D11) als eigene Zeile darunter, auch im Kartenmodus.
+  // Dort rendert der Kartentitel diese Zelle in einem fetten `<strong>` (einem Inline-Element):
+  // deshalb ein Span als Block, im normalen Gewicht (Review).
   const bezug = em.nachforderung_id != null && herkunft && (
-    <div data-lfh="material-herkunft">{herkunft(em.nachforderung_id)}</div>
+    <span data-lfh="material-herkunft" style={{ display: 'block', fontWeight: 'normal' }}>
+      {herkunft(em.nachforderung_id)}
+    </span>
   );
   if (kategorieAusgeblendet && em.kategorie) {
     return (

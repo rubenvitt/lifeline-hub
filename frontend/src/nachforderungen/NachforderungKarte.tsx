@@ -108,7 +108,7 @@ interface NachforderungKarteProps {
    * die Zahl der übernommenen Posten.
    */
   materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
-  /** Freigabe `material` meldet `zugriff: false`: „Als Material übernehmen“ steht gesperrt. */
+  /** Modul Material nicht bedienbar (`istKeyFreigegeben`): „Als Material übernehmen“ steht gesperrt. */
   materialGesperrt?: boolean;
   /** Öffnet den Dialog „Als Material übernehmen“ (an eingetroffenen Karten). */
   onMaterialUebernehmen?: (id: number) => void;

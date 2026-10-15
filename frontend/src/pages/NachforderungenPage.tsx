@@ -34,7 +34,7 @@ import {
   uebernahmeBody,
   type UebernahmeWerte,
 } from '../nachforderungen/materialUebernahme';
-import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -103,7 +103,14 @@ export default function NachforderungenPage() {
   // (`istKeyFreigegeben` gibt Unbekanntes nicht frei, Muster `VerpflegungPage`); und nur, wenn eine
   // Karte Posten zeigt oder übernommen wird — sonst bliebe der Abruf ohne Leser.
   const materialFrei = istKeyFreigegeben('material', freigaben);
-  const materialGesperrt = istSprungGesperrt('material', freigaben);
+  /*
+   * Knopf und Abruf hängen an derselben Bedingung (Review): bedienbar nur bei `materialFrei`. Sonst
+   * stünde er etwa für einen Admin bei ausgeblendetem Modul (`sichtbar: false`, `zugriff: true`)
+   * frei, öffnete aber einen Dialog ohne Posten und ohne Rest. Gesperrt mit demselben Grund wie
+   * ohne Freigabe; solange die Freigaben noch nicht feststehen, steht er gar nicht.
+   */
+  const freigabenBekannt = !freigabenQuery.isPending;
+  const materialGesperrt = freigabenBekannt && !materialFrei;
   const needsMaterial =
     uebernahme != null || (nfQuery.data ?? []).some((n) => n.material_ids.length > 0);
   // Derselbe Schlüssel und Abruf wie die Materialliste: ein Cache-Fach, live über `material`.
@@ -327,7 +334,9 @@ export default function NachforderungenPage() {
    */
   const [hervorgehobenId, setHervorgehobenId] = useState<number | null>(null);
   const [scrollZiel, setScrollZiel] = useState<number | null>(null);
-  useQueryParamSelektion('nachforderung', nfQuery.isSuccess, (nfId) => {
+  // Erst wenn auch der Einsatz da ist: vorher stehen statt der Karten nur der Ladekreis, und der
+  // Bildlauf fände keine Karte, bis ein späterer Datenstand den Effekt erneut anstößt (Review).
+  useQueryParamSelektion('nachforderung', nfQuery.isSuccess && einsatzQuery.isSuccess, (nfId) => {
     const n = nfQuery.data?.find((x) => x.id === nfId);
     if (!n) return;
     setAnsicht(
@@ -388,7 +397,7 @@ export default function NachforderungenPage() {
     kartenFehler: kartenFehler.grund,
     materialJeId,
     materialGesperrt,
-    onMaterialUebernehmen,
+    onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
     hervorgehobenId,
   };
   // Der Dialog liest die Nachforderung im aktuellen Stand (Posten, Rest der Anzahl).
