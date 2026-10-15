@@ -1862,10 +1862,9 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     const text = 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße';
     const link = await screen.findByRole('link', { name: text });
     expect(link).toHaveAttribute('title', text);
-    const zeilen = Array.from(link.querySelectorAll('span'))
-      .filter((e) => e.textContent === text)
-      .at(-1);
-    expect(zeilen?.getAttribute('style')).toMatch(/line-clamp: 2/);
+    // Der innerste Span mit dem Text trägt die Auslassung (der äußere ist der Boden des Links).
+    const zeilen = Array.from(link.querySelectorAll('span')).filter((e) => e.textContent === text);
+    expect(zeilen[zeilen.length - 1]?.getAttribute('style')).toMatch(/line-clamp: 2/);
   });
 
   it('auch im Kartenmodus (390 px)', async () => {
