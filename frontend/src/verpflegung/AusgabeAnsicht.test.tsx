@@ -309,7 +309,7 @@ describe('AusgabeAnsicht — Buchen, Rückgängig, Ablehnung (D6)', () => {
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 
-  it('Rücknahme aus dem Toast abgelehnt: Grund im Seitenhinweis „Nicht zurückgenommen“', async () => {
+  it('Rücknahme aus dem Toast abgelehnt: Grund „Nicht zurückgenommen“ unter den Sonderkost-Tasten, nicht über den Tasten', async () => {
     erfasseAusgabe.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
     nimmAusgabeZurueck.mockRejectedValue(new ApiError(409, 'Ausgabe bereits zurückgenommen'));
     zeige();
@@ -317,13 +317,11 @@ describe('AusgabeAnsicht — Buchen, Rückgängig, Ablehnung (D6)', () => {
     await userEvent.click(taste('+1'));
     await userEvent.click(taste('Buchen'));
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
-    const hinweis = await waitFor(() => {
-      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
-      expect(h).not.toBeNull();
-      return h!;
-    });
-    expect(await within(hinweis).findByRole('alert')).toHaveTextContent('Nicht zurückgenommen');
-    expect(hinweis).toHaveTextContent('Ausgabe bereits zurückgenommen');
+    // Fester Platz unter den Sonderkost-Tasten: der Grund verschiebt keine Zähltaste (Spec).
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="ausgabe-ablehnung"]')!;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent('Nicht zurückgenommen');
+    expect(zeile).toHaveTextContent('Ausgabe bereits zurückgenommen');
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 

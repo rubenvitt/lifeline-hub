@@ -6,9 +6,10 @@
  *   (`offline/AGENTS.md`, „Schreiben ohne Netz“). Gesendet: Rückgängig-Toast; vorgemerkt:
  *   Hinweis ohne „Rückgängig“.
  * - **Rückgängig** aus dem Toast: kein Dialog, und die Karte ist oft nicht mehr zu sehen. Der
- *   Grund einer Ablehnung steht deshalb als `ruecknahmeFehler` im Hinweis der Seite, bis zur
- *   nächsten Rücknahme (LFH-1077). Aus den Callbacks statt aus `mutation.error`: der kennt nur
- *   den letzten Aufruf.
+ *   Grund einer Ablehnung steht deshalb als `ruecknahmeFehler` an einem festen Platz der Seite
+ *   (Modulseite: Seitenhinweis; Ausgabeansicht: unter den Sonderkost-Tasten, damit keine
+ *   Zähltaste springt), bis zur nächsten Rücknahme (LFH-1077). Aus den Callbacks statt aus
+ *   `mutation.error`: der kennt nur den letzten Aufruf.
  * - **Toasts mit festem Schlüssel:** der Rückgängig-Toast ersetzt den vorigen
  *   (`lfh-rueckgaengig`), der Vormerk-Hinweis ebenso ({@link VORGEMERKT_SCHLUESSEL}); bei 20
  *   Bündeln je Mahlzeit stapelt sich nichts (D6).

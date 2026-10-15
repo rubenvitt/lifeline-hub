@@ -280,17 +280,10 @@ export default function AusgabeAnsicht() {
               },
         ],
       }}
-      hinweis={
-        (!darfSchreiben || nachtrag.ruecknahmeFehler != null) && (
-          <SeitenHinweise
-            rechteFehlt={!darfSchreiben}
-            rechteText={rechteText}
-            fehler={nachtrag.ruecknahmeFehler}
-            fehlerTitel="Nicht zurückgenommen"
-            fehlerFallback="Rücknahme fehlgeschlagen"
-          />
-        )
-      }
+      // Nur der Rechtehinweis: er steht ab dem ersten Bild. Der Grund einer abgelehnten Rücknahme
+      // käme erst später und schöbe hier alle Tasten nach unten; er steht unter den
+      // Sonderkost-Tasten (Spec: eine Ablehnung verschiebt keine Zähltaste).
+      hinweis={!darfSchreiben && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
     >
       <div
         data-lfh="ausgabe-ansicht"
@@ -439,8 +432,15 @@ export default function AusgabeAnsicht() {
           </Flex>
         </section>
 
-        {/* ── Ablehnung: unter den Sonderkost-Tasten, bis zum nächsten Abschluss (D6) ──── */}
+        {/* ── Ablehnungen: unter den Sonderkost-Tasten, damit sie keine Taste verschieben (D6):
+             die eines Bündels bis zum nächsten Abschluss, die einer Rücknahme aus dem Hinweis
+             „Rückgängig“ bis zur nächsten Rücknahme. ─────────────────────────────────────── */}
         <div data-lfh="ausgabe-ablehnung">
+          <SpeicherFehler
+            fehler={nachtrag.ruecknahmeFehler}
+            titel="Nicht zurückgenommen"
+            fallback="Rücknahme fehlgeschlagen"
+          />
           {sammlung.ablehnung && (
             <SpeicherFehler
               fehler={sammlung.ablehnung.fehler}
