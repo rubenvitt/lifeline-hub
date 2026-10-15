@@ -1856,6 +1856,18 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     expect(link).toHaveAttribute('href', '/einsaetze/1/nachforderungen?nachforderung=4');
   });
 
+  it('ein langer Bedarf steht in höchstens zwei Zeilen, der Volltext im title (Prüfliste)', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const text = 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße';
+    const link = await screen.findByRole('link', { name: text });
+    expect(link).toHaveAttribute('title', text);
+    const zeilen = Array.from(link.querySelectorAll('span'))
+      .filter((e) => e.textContent === text)
+      .at(-1);
+    expect(zeilen?.getAttribute('style')).toMatch(/line-clamp: 2/);
+  });
+
   it('auch im Kartenmodus (390 px)', async () => {
     setzeViewportBreite(390);
     nachforderungen(() => HttpResponse.json([nachforderung]));

@@ -293,12 +293,27 @@ export default function MaterialPage() {
         : new Map<number, string>(),
     [nachforderungenFrei, nachforderungenQuery.isError, nachforderungenQuery.data],
   );
-  /** Der Verweis: mit lesbarer Nachforderung als Link, sonst die Kennung als Text (Muster Verpflegung). */
+  /**
+   * Der Verweis: mit lesbarer Nachforderung als Link, sonst die Kennung als Text (Muster
+   * Verpflegung). Zwei Zeilen mit Auslassung (Muster `KraefteuebersichtPage`): die Spalte
+   * „Bezeichnung“ steht fest und ist am Tablet gut 110 px schmal, ein langer Bedarf machte die Zeile
+   * sonst sieben Zeilen hoch (Prüfliste LLH-1226). Der Volltext steht im `title`.
+   */
   const herkunft = (nfId: number): ReactNode => {
     const name = nachforderungNamen.get(nfId);
+    const text = `aus Nachforderung: ${name}`;
     return name != null ? (
-      <KennungsLink to={nachforderungenPfad(einsatzId, { nachforderung: nfId })}>
-        aus Nachforderung: {name}
+      <KennungsLink to={nachforderungenPfad(einsatzId, { nachforderung: nfId })} title={text}>
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {text}
+        </span>
       </KennungsLink>
     ) : (
       <Typography.Text type="secondary">aus Nachforderung #{nfId}</Typography.Text>
