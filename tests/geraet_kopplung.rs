@@ -4794,3 +4794,161 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_verpflegung_ohne_etb() {
     );
     assert!(!beim_geraet.iter().any(|e| e == "etb"), "{beim_geraet:?}");
 }
+
+/// LLH-1075 (Spec `funktionsansichten`, design.md D7): das BR-Gerät bucht das Eintreffen einer
+/// erwarteten und einer unangemeldeten Kraft am eigenen Raum und sieht seine Meldung; am fremden
+/// Raum 404 ohne Anlage; es liest die Perioden der Einheiten; Übernehmen und Abweisen bleiben der
+/// Führung (403); die Wiederholung einer fremden Erfassung ist 409; das Abschnittsgerät bucht
+/// kein Eintreffen.
+#[tokio::test]
+async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/eintreffen");
+    let einheiten = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "bekannt: {v}");
+    assert_eq!(v["zeitachse"], "geschrieben");
+
+    let vorher = einheiten().await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(schule),
+        &geraet,
+        Some(&json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "FL 9"}]}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+    assert_eq!(einheiten().await, vorher, "nichts angelegt");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({
+            "unangemeldet": {"fahrzeuge": [{"funkrufname": "FL-MUS 1-44-1"}]},
+            "client_id": "g1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "unangemeldet: {v}");
+    let neu = v["einheit_id"].as_i64().unwrap();
+    let meldung = v["meldung_id"].as_i64().unwrap();
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste}");
+    assert!(
+        liste.as_array().unwrap().iter().any(|m| m["id"] == meldung),
+        "die eigene Meldung steht in der Liste des Geräts: {liste}"
+    );
+    let geraet_benutzer: i64 =
+        sqlx::query_scalar("SELECT erfasst_von_id FROM meldung WHERE id = ?")
+            .bind(meldung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let an_geraet: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE benutzer_id = ?")
+            .bind(geraet_benutzer)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(an_geraet, 0, "keine Benachrichtigung an das Gerät");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten/zeitachse"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    for aktion in ["uebernehmen", "abweisen"] {
+        let (s, _) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{neu}/{aktion}"),
+            &geraet,
+            Some(&json!({})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{aktion}");
+    }
+
+    // Die Erfassung einer Person mit derselben client_id gibt das Gerät nicht heraus (409).
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &admin,
+        Some(&json!({
+            "kraft": {"objekt_typ": "einheit", "objekt_id": einheit_bilden(&app, &admin, einsatz, "RTW 1").await},
+            "client_id": "p1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}, "client_id": "p1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "fremde Wiederholung am Gerät");
+
+    // Abschnittsgerät: kein Eintreffen (403).
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(&json!({"name": "Nord"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, ea) = abschnittsgeraet(&app, &admin, einsatz, v["id"].as_i64().unwrap()).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &ea,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Abschnittsgerät");
+}
