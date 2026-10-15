@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import BereitstellungsraeumePage from './BereitstellungsraeumePage';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Bereitstellungsraum, EinsatzAnzeige } from '../../api/types';
+import type { BrListenEintrag, Einheit, EinsatzAnzeige } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../../test/fixtures';
 
@@ -15,7 +15,7 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Lage', ...over });
 }
 
-function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
+function br(over: Partial<BrListenEintrag> = {}): BrListenEintrag {
   return {
     id: 1,
     einsatz_id: 1,
@@ -29,6 +29,9 @@ function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
+    abschnitt_name: null,
+    belegung: { einheiten: 0, fahrzeuge: 0, laengste_seit_at: null },
+    einheit_ids: [],
     ...over,
   };
 }
@@ -385,5 +388,145 @@ describe('BereitstellungsraeumePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume/23'),
     );
+  });
+});
+
+/** Einheit der Einheitenliste, nur mit dem, was die Stärke braucht. */
+function einheit(over: Partial<Einheit> & Pick<Einheit, 'id'>): Einheit {
+  return {
+    einsatz_id: 1,
+    abschnitt_id: null,
+    abschnitt_name: null,
+    ueber_einheit_id: null,
+    typ_id: null,
+    typ_label: null,
+    name: `Einheit ${over.id}`,
+    fuehrer_id: null,
+    fuehrer_name: null,
+    bemerkung: null,
+    sortier: 0,
+    soll: null,
+    ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    personal_mitglieder: [],
+    fahrzeug_mitglieder: [],
+    material_mitglieder: [],
+    lat: null,
+    lon: null,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
+    aktueller_br_id: null,
+    sprechgruppen: [],
+    status: { quelle: 'ohne', verteilung: [] },
+    ...over,
+  };
+}
+
+describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)', () => {
+  // 14:30 Berliner Sommerzeit; nur `Date` und das Intervall der Uhr sind gefälscht.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(new Date('2026-10-15T14:30:00+02:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // Dieselbe Fixture wie die Detailseite (BrDetailPage.test.tsx, „Kennzahlenband der Belegung“):
+  // zwei Einheiten (0/1/5//6) mit je einem Fahrzeug und ein Fahrzeug ohne Einheit.
+  const ZUG = einheit({ id: 10, ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 } });
+  const TRUPP = einheit({ id: 11, ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 } });
+  const GRUPPE = einheit({
+    id: 12,
+    ueber_einheit_id: 10,
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
+  });
+  const SPORTPLATZ = br({
+    id: 1,
+    bezeichnung: 'BR Sportplatz',
+    abschnitt_id: 4,
+    abschnitt_name: 'Nord',
+    standort: 'Sportplatz',
+    einheit_ids: [10, 11],
+    belegung: { einheiten: 2, fahrzeuge: 3, laengste_seit_at: '2026-10-15 11:42:00' },
+  });
+
+  function stelleBereit(raeume: BrListenEintrag[], einheiten: () => Response) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(raeume)),
+      http.get('/api/einsaetze/1/einheiten', einheiten),
+    );
+  }
+
+  /** Zellen der Zeile eines Raums, je Spaltenkopf. */
+  async function zeileVon(bezeichnung: string): Promise<Record<string, string>> {
+    const zeile = (await screen.findByText(bezeichnung)).closest('tr')!;
+    const koepfe = screen
+      .getAllByRole('columnheader')
+      .map((k) => k.textContent ?? '')
+      .filter((k) => k !== '');
+    const zellen = within(zeile).getAllByRole('cell');
+    return Object.fromEntries(koepfe.map((k, i) => [k, zellen[i]?.textContent ?? '']));
+  }
+
+  it('zeigt Abschnitt, Stärke, Fahrzeuge, Einheiten und längste Wartezeit wie die Detailseite', async () => {
+    stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP, GRUPPE]));
+    renderPage();
+    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('0/1/5//6'));
+    expect(await zeileVon('BR Sportplatz')).toMatchObject({
+      Abschnitt: 'Nord',
+      Standort: 'Sportplatz',
+      Fahrzeuge: '3',
+      Einheiten: '2',
+      'Längste Wartezeit': '48 min',
+    });
+  });
+
+  it('zählt eine Untereinheit nicht doppelt, wenn ihre Obereinheit mit im Raum steht', async () => {
+    stelleBereit([{ ...SPORTPLATZ, einheit_ids: [10, 12] }], () =>
+      HttpResponse.json([ZUG, TRUPP, GRUPPE]),
+    );
+    renderPage();
+    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('0/1/3//4'));
+  });
+
+  it('ohne Einheitenliste (403) steht in „Stärke“ „—“ mit Grund', async () => {
+    stelleBereit([SPORTPLATZ], () => new HttpResponse(null, { status: 403 }));
+    renderPage();
+    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('—'));
+    expect(screen.getByTitle('Stärke unvollständig')).toBeInTheDocument();
+    expect((await zeileVon('BR Sportplatz')).Fahrzeuge).toBe('3');
+  });
+
+  it('ohne Abschnitt und ohne Belegung „—“, ein leerer Raum ist nicht unvollständig', async () => {
+    stelleBereit([br({ bezeichnung: 'BR Ost' })], () => HttpResponse.json([]));
+    renderPage();
+    const zeile = await zeileVon('BR Ost');
+    expect(zeile).toMatchObject({
+      Abschnitt: '—',
+      Stärke: '—',
+      Fahrzeuge: '0',
+      Einheiten: '0',
+      'Längste Wartezeit': '—',
+    });
+    expect(screen.queryByTitle('Stärke unvollständig')).not.toBeInTheDocument();
+  });
+
+  it('Abschnitt und Standort lassen sich ausblenden', async () => {
+    stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP]));
+    renderPage();
+    await screen.findByText('BR Sportplatz');
+    expect(
+      screen.getByRole('button', { name: /Spalten.*Bereitstellungsräume/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('die Wartezeit läuft mit der Uhr ohne neuen Abruf', async () => {
+    stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP]));
+    renderPage();
+    await waitFor(async () =>
+      expect((await zeileVon('BR Sportplatz'))['Längste Wartezeit']).toBe('48 min'),
+    );
+    act(() => vi.advanceTimersByTime(60_000));
+    expect((await zeileVon('BR Sportplatz'))['Längste Wartezeit']).toBe('49 min');
   });
 });
