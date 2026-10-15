@@ -18,6 +18,10 @@ Führung einer Einheit, Leitung eines Abschnitts, Stab, Einsatzleitung, Führung
 Bereitstellungsraum) und MUST ihre Historie behalten (Auftragsempfänger, Schadensbezug,
 Bestätigungen). Entlassen einer Person MUST das Zeitachsen-Ereignis `entlassung` mit Quelle
 `disposition` schreiben, sofern sie eine offene Periode hat. Entlassen MUST einen ETB-Eintrag erzeugen und erfordert keine Rückfrage.
+Material aus dem Einsatz zu nehmen MUST seinen Ort lösen; danach liegt es ohne Ort (LLH-1224).
+Entlassen eines Fahrzeugs MUST seine Beladung (Material auf dem Fahrzeug) im Einsatz lassen und
+ohne Ort stellen; der ETB-Eintrag des Fahrzeugs MUST dann „Beladung ohne Ort: n Posten“ nennen,
+und jeder freigegebene Posten MUST live aktualisiert werden.
 
 #### Scenario: Zeitachse überlebt Entlassen
 - **WHEN** eine Person mit Alarmierung 06:10 und Eintreffen 06:40 um 14:00 entlassen wird
@@ -36,8 +40,12 @@ Bestätigungen). Entlassen einer Person MUST das Zeitachsen-Ereignis `entlassung
 - **THEN** sind beide Personen weiter im Einsatz, nur ohne Fahrzeug, das Fahrzeug gehört keiner Einheit mehr an, und der Bereitstellungsraum verzeichnet seinen Austritt
 
 #### Scenario: Material aus dem Einsatz genommen
-- **WHEN** ein Materialposten einer Einheit und einer UHS aus dem Einsatz genommen wird
-- **THEN** gehört er weder der Einheit noch der UHS an, und das Tagebuch nennt ihn „aus dem Einsatz genommen“
+- **WHEN** ein Materialposten an einer UHS aus dem Einsatz genommen wird
+- **THEN** liegt er ohne Ort, und das Tagebuch nennt ihn „aus dem Einsatz genommen“
+
+#### Scenario: Fahrzeug mit Beladung entlassen
+- **WHEN** ein Fahrzeug mit zwei geladenen Materialposten entlassen wird
+- **THEN** bleiben beide Posten im Einsatz, ohne Ort, und das Tagebuch nennt „Beladung ohne Ort: 2 Posten“
 
 #### Scenario: Bereits entlassen
 - **WHEN** eine entlassene Kraft erneut entlassen werden soll
@@ -68,7 +76,8 @@ mit dem Grund „Fehldisposition storniert“ streichen. Ein Storno MUST nur gel
 Kraft aktiv ist, nie entlassen war, keine Bindung hat, keine andere Spur als die Ereignisse aus
 der Disposition trägt und die Disposition höchstens 15 Minuten zurückliegt. Bei einem Fahrzeug
 MUST auch ein Statuswechsel, eine Belegung eines Bereitstellungsraums, die Führungsstelle und ein
-Auftrag als Spur gelten. Sonst MUST das System mit 422 und
+Auftrag als Spur gelten, ebenso eine Beladung mit Material. Ein Materialposten MUST für einen
+Storno ohne Ort sein (LLH-1224). Sonst MUST das System mit 422 und
 dem Grund als Satz antworten, bei einer schon beendeten Kraft mit 409. Die Oberfläche MUST vor dem
 Storno mit einem Satz zur Folge rückfragen.
 
@@ -83,6 +92,14 @@ Storno mit einem Satz zur Folge rückfragen.
 #### Scenario: Fahrzeug mit Statuswechsel
 - **WHEN** ein Fahrzeug fünf Minuten nach dem Disponieren auf „Auf Anfahrt“ steht und storniert werden soll
 - **THEN** antwortet das System mit 422, und das Fahrzeug lässt sich entlassen
+
+#### Scenario: Fahrzeug mit Beladung
+- **WHEN** ein Fahrzeug, auf dem ein Materialposten liegt, storniert werden soll
+- **THEN** antwortet das System mit 422 „Das Fahrzeug hat Material geladen; erst lösen oder das Fahrzeug entlassen“
+
+#### Scenario: Material an einem Ort
+- **WHEN** ein Materialposten an einer Einheit storniert werden soll
+- **THEN** antwortet das System mit 422, und der Posten bleibt an der Einheit
 
 #### Scenario: Frist abgelaufen
 - **WHEN** eine Person 20 Minuten nach dem Disponieren storniert werden soll
@@ -108,7 +125,7 @@ Gestrichene Ereignisse MUST gestrichen bleiben.
 
 #### Scenario: Material kommt zurück
 - **WHEN** ein defekter Posten mit Menge 4 aus dem Einsatz genommen und erneut disponiert wird
-- **THEN** steht er wieder in der Liste, mit Menge 4 und Status „defekt“, ohne Einheit und UHS
+- **THEN** steht er wieder in der Liste, mit Menge 4 und Status „defekt“, ohne Ort
 
 ### Requirement: Beendete Kräfte in Listen und Zahlen
 

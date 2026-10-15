@@ -1,4 +1,4 @@
-use super::{Material, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
+use super::{Material, MaterialArt, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -6,7 +6,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// `ist_demo` liest die Demo-Marke live (LFH-733, design.md D1); `material.id` qualifiziert,
 /// damit der Unterselect an die äußere Zeile bindet.
 const SPALTEN: &str = "id, org_id, bezeichnung, kategorie, bestandsnummer, \
-     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at, \
+     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at, art, \
      EXISTS(SELECT 1 FROM demo_herkunft dh \
             WHERE dh.tabelle = 'material' AND dh.datensatz_id = material.id) AS ist_demo";
 
@@ -19,6 +19,8 @@ pub struct MaterialDaten<'a> {
     pub traegerorganisation: Option<&'a str>,
     pub standort: Option<&'a str>,
     pub bemerkung: Option<&'a str>,
+    /// Gerät oder Verbrauchsgut (LLH-1224); die Route setzt ohne Angabe die Vorgabe Gerät.
+    pub art: MaterialArt,
 }
 
 /// Übersetzt einen Unique-Verstoß auf dem Bestandsnummer-Index in `Conflict`.
@@ -104,8 +106,9 @@ pub async fn anlegen_tx(
 ) -> Result<Material, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO material \
-            (org_id, bezeichnung, kategorie, bestandsnummer, traegerorganisation, standort, bemerkung) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (org_id, bezeichnung, kategorie, bestandsnummer, traegerorganisation, standort, \
+             bemerkung, art) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.bezeichnung)
@@ -114,6 +117,7 @@ pub async fn anlegen_tx(
     .bind(daten.traegerorganisation)
     .bind(daten.standort)
     .bind(daten.bemerkung)
+    .bind(daten.art.as_str())
     .fetch_one(&mut *conn)
     .await;
 
@@ -134,6 +138,8 @@ pub struct MaterialPatch<'a> {
     pub traegerorganisation: Option<Option<&'a str>>,
     pub standort: Option<Option<&'a str>>,
     pub bemerkung: Option<Option<&'a str>>,
+    /// Art (LLH-1224): `None` = unverändert; wirkt nur auf neue Dispositionen.
+    pub art: Option<MaterialArt>,
 }
 
 /// Teil-Patch der editierbaren Felder (org-scoped); `NotFound` bei fremder Org, `Conflict` bei
@@ -156,7 +162,8 @@ pub async fn patche(
             bestandsnummer = CASE WHEN ?5 IS NULL THEN bestandsnummer ELSE ?6 END, \
             traegerorganisation = CASE WHEN ?7 IS NULL THEN traegerorganisation ELSE ?8 END, \
             standort = CASE WHEN ?9 IS NULL THEN standort ELSE ?10 END, \
-            bemerkung = CASE WHEN ?11 IS NULL THEN bemerkung ELSE ?12 END \
+            bemerkung = CASE WHEN ?11 IS NULL THEN bemerkung ELSE ?12 END, \
+            art = COALESCE(?15, art) \
          WHERE id = ?13 AND org_id = ?14",
     )
     .bind(patch.bezeichnung.map(|_| 1_i64))
@@ -173,6 +180,7 @@ pub async fn patche(
     .bind(patch.bemerkung.and_then(|v| v))
     .bind(id)
     .bind(org_id)
+    .bind(patch.art.map(|a| a.as_str()))
     .execute(pool)
     .await;
 
@@ -199,7 +207,7 @@ pub async fn aktualisiere(
     let ergebnis = sqlx::query(
         "UPDATE material SET \
             bezeichnung = ?, kategorie = ?, bestandsnummer = ?, \
-            traegerorganisation = ?, standort = ?, bemerkung = ? \
+            traegerorganisation = ?, standort = ?, bemerkung = ?, art = ? \
          WHERE id = ? AND org_id = ?",
     )
     .bind(daten.bezeichnung)
@@ -208,6 +216,7 @@ pub async fn aktualisiere(
     .bind(daten.traegerorganisation)
     .bind(daten.standort)
     .bind(daten.bemerkung)
+    .bind(daten.art.as_str())
     .bind(id)
     .bind(org_id)
     .execute(pool)
@@ -273,6 +282,7 @@ mod tests {
             traegerorganisation: None,
             standort: None,
             bemerkung: None,
+            art: MaterialArt::Geraet,
         }
     }
 
@@ -459,6 +469,7 @@ mod tests {
                 traegerorganisation: Some(Some("T-Wert")),
                 standort: Some(Some("S-Wert")),
                 bemerkung: Some(Some("M-Wert")),
+                art: Some(MaterialArt::Verbrauchsgut),
             },
         )
         .await
@@ -469,6 +480,7 @@ mod tests {
         assert_eq!(g.traegerorganisation.as_deref(), Some("T-Wert"));
         assert_eq!(g.standort.as_deref(), Some("S-Wert"));
         assert_eq!(g.bemerkung.as_deref(), Some("M-Wert"));
+        assert_eq!(g.art, MaterialArt::Verbrauchsgut);
     }
 
     /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
@@ -487,6 +499,7 @@ mod tests {
                 traegerorganisation: Some("DRK"),
                 standort: Some("Halle 1"),
                 bemerkung: Some("geprüft"),
+                art: MaterialArt::Verbrauchsgut,
             },
         )
         .await
@@ -510,6 +523,7 @@ mod tests {
         assert_eq!(g.traegerorganisation.as_deref(), Some("DRK"), "unberührt");
         assert_eq!(g.standort.as_deref(), Some("Halle 1"), "unberührt");
         assert_eq!(g.bemerkung.as_deref(), Some("geprüft"), "unberührt");
+        assert_eq!(g.art, MaterialArt::Verbrauchsgut, "unberührt");
 
         // Leerer Patch → alles bleibt, insbesondere kein NotFound.
         let u = patche(&pool, 1, m.id, MaterialPatch::default())

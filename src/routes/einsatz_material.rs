@@ -2,13 +2,16 @@ use super::einsatz_uhs::sse_uhs;
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Material;
+use crate::einsatz::modul::{Material, Nachforderungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
-use crate::material::{EinsatzMaterialAnzeige, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX};
+use crate::material::ort::{self, MaterialOrt, OrtPatch};
+use crate::material::{
+    EinsatzMaterialAnzeige, MaterialArt, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX,
+};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
 };
@@ -24,6 +27,35 @@ pub(super) fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Material, "material_id", em_id);
+}
+
+/// Live-Ereignis des Orts eines Postens (LLH-1224, Spec `material-modell`, „Ortswechsel live“):
+/// `material` erreicht die Leser von Einheit, Fahrzeug, UHS und Bereitstellungsraum ohne
+/// Materialrecht nicht (LLH-1182); sie laden über das Ereignis ihres Orts nach.
+pub(super) fn sse_ort(state: &AppState, einsatz_id: i64, ort: MaterialOrt) {
+    match ort {
+        MaterialOrt::Einheit(id) => super::einsatz_einheit::sse_einheit(state, einsatz_id, id),
+        MaterialOrt::Fahrzeug(id) => super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, id),
+        MaterialOrt::Uhs(id) => sse_uhs(state, einsatz_id, id),
+        MaterialOrt::Bereitstellungsraum(id) => {
+            super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, id)
+        }
+    }
+}
+
+/// Nach einem Ortswechsel: alter und neuer Ort melden.
+pub(super) fn sse_ortswechsel(state: &AppState, einsatz_id: i64, wechsel: ort::OrtWechsel) {
+    if wechsel.is_changed() {
+        for o in [wechsel.vorher, wechsel.nachher].into_iter().flatten() {
+            sse_ort(state, einsatz_id, o);
+        }
+    }
+}
+
+/// Art aus dem Body: unbekannt → 400 (Statuscode-Konvention, unbekannter Enum-Wert).
+fn parse_art(art: Option<&str>) -> Result<Option<MaterialArt>, AppError> {
+    art.map(|a| MaterialArt::parse(a).ok_or_else(|| AppError::Validation("Unbekannte Art".into())))
+        .transpose()
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,7 +79,7 @@ pub async fn liste(
         if parse_flag(params.entlassene.as_deref(), "entlassene")? {
             disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
         } else {
-            disposition_repo::liste(&state.pool, einsatz_id, aktiv).await?
+            disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
         },
     ))
 }
@@ -65,10 +97,29 @@ pub struct DisponierenBody {
     pub material_id: Option<i64>,
     pub adhoc: Option<AdhocBody>,
     pub menge: Option<i64>,
+    /// Nur Ad-hoc (LLH-1224, design.md D1): fehlt = Vorgabe aus der Menge; neben `material_id`
+    /// 422, die Art kommt dann aus dem Stamm.
+    pub art: Option<String>,
+    /// Ort beim Disponieren, höchstens eines der vier Felder (design.md D7).
+    pub einheit_id: Option<i64>,
+    pub einsatz_fahrzeug_id: Option<i64>,
+    pub uhs_id: Option<i64>,
+    pub br_id: Option<i64>,
+    /// Übernahme aus einer eingetroffenen Nachforderung (LLH-1226, design.md D1): der Posten
+    /// verweist auf sie, der ETB-Eintrag nennt sie.
+    pub nachforderung_id: Option<i64>,
+    /// Weiterer Posten aus einer Nachforderung, die schon einen trägt (design.md D3); fehlt =
+    /// `false`, dann ist ein vorhandener Posten 409.
+    pub ergaenzen: Option<bool>,
 }
 
-/// POST /api/einsaetze/{id}/material — Stamm-Material disponieren ODER Ad-hoc anlegen.
-/// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag (inkl. Menge).
+/// POST /api/einsaetze/{id}/material — Stamm-Material disponieren ODER Ad-hoc anlegen, optional
+/// gleich an einen Ort (LLH-1224) und als Übernahme aus einer Nachforderung (LLH-1226).
+/// Schreibberechtigt + aktiver Einsatz. Schreibt EINEN ETB-Eintrag (Menge, Ort, Herkunft).
+/// Reihenfolge: 400 (Feld) → 422 (Kombination: `ergaenzen` ohne Bezug, zwei Orte, Art am Stamm) →
+/// 403 (Bezug ohne Freigabe der Nachforderungen) → in der Transaktion 404/422/409 (Nachforderung:
+/// fremd, nicht eingetroffen, schon übernommen) und 404/409/422 (Stamm, Gerät mit Menge über 1,
+/// Ziel).
 pub async fn disponieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -79,6 +130,7 @@ pub async fn disponieren(
     if menge < 1 {
         return Err(AppError::Validation("Menge muss mindestens 1 sein".into()));
     }
+    let art = parse_art(body.art.as_deref())?;
 
     // Vor der Tx: XOR Stamm/Ad-hoc bestimmen + Ad-hoc-Felder validieren/trimmen (Reinheits-
     // Kontrakt: Validierung + Body-Konsum vor der Tx). Die Owned-Holder überleben die
@@ -117,6 +169,33 @@ pub async fn disponieren(
             ))
         }
     };
+    // Nach allen 400: die Feld-Kombinationen (422).
+    let ergaenzen = body.ergaenzen.unwrap_or(false);
+    if ergaenzen && body.nachforderung_id.is_none() {
+        return Err(AppError::UnprocessableEntity(
+            "Ergänzen nur mit Nachforderung".into(),
+        ));
+    }
+    let ort_patch = OrtPatch {
+        einheit_id: body.einheit_id.map(Some),
+        einsatz_fahrzeug_id: body.einsatz_fahrzeug_id.map(Some),
+        uhs_id: body.uhs_id.map(Some),
+        br_id: body.br_id.map(Some),
+    };
+    ort_patch.validate()?;
+    let ort_ziel = ort_patch.ziel(None).flatten();
+    if art.is_some() && matches!(ziel, Ziel::Stamm(_)) {
+        return Err(AppError::UnprocessableEntity(
+            "Die Art kommt aus dem Stamm".into(),
+        ));
+    }
+    // Ein Bezug liest die Nachforderung: erst die Freigabe ihres Moduls (403), sonst verriete
+    // 404 gegen 201 ihre Existenz (design.md D1, wie `routes/verpflegung.rs`).
+    let nachforderung_id = body.nachforderung_id;
+    if nachforderung_id.is_some() {
+        ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+            .await?;
+    }
 
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige (bei Stamm-
@@ -124,6 +203,15 @@ pub async fn disponieren(
     // Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
+        // Status und Übernahmen der Nachforderung erst hier: sie kippen sonst zwischen Prüfung
+        // und Schreiben (design.md D2).
+        let herkunft = match nachforderung_id {
+            Some(nid) => Some(
+                crate::nachforderung::repo::check_uebernahme_tx(conn, einsatz_id, nid, ergaenzen)
+                    .await?,
+            ),
+            None => None,
+        };
         let em_id = match &ziel {
             Ziel::Stamm(material_id) => {
                 disposition_repo::disponiere_stamm_tx(
@@ -133,6 +221,7 @@ pub async fn disponieren(
                     *material_id,
                     menge,
                     ctx.benutzer.id,
+                    nachforderung_id,
                 )
                 .await?
             }
@@ -141,38 +230,75 @@ pub async fn disponieren(
                     conn,
                     einsatz_id,
                     *daten,
+                    art,
                     menge,
                     ctx.benutzer.id,
+                    nachforderung_id,
                 )
                 .await?
             }
         };
+        // Der Ort über den einen Schreibweg (design.md D9), mit der Prüfung des Ziels (D8).
+        let ort_text = match ort_ziel {
+            Some(o) => {
+                ort::set_ort_tx(conn, einsatz_id, em_id, Some(o)).await?;
+                Some(ort::ort_text_tx(conn, einsatz_id, Some(o)).await?)
+            }
+            None => None,
+        };
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::material::etb_text_disponiert(&anzeige.bezeichnung, anzeige.menge),
-        )
-        .await?;
+        let text = crate::material::etb_text_disponiert(
+            &anzeige.bezeichnung,
+            anzeige.menge,
+            ort_text.as_deref(),
+        );
+        let text = match &herkunft {
+            Some(bezeichnung) => crate::material::etb_text_aus_nachforderung(&text, bezeichnung),
+            None => text,
+        };
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(anzeige)
     })?;
     sse_material(&state, einsatz_id, anzeige.id);
+    if let Some(o) = anzeige.ort() {
+        sse_ort(&state, einsatz_id, o);
+    }
+    notify_nachforderung(&state, &anzeige);
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// Die Karte einer Nachforderung zeigt ihre Posten (LLH-1226, design.md D7): `nachforderung`
+/// folgt, wenn ein verknüpfter Posten entsteht oder seine Zählung sich ändert (Übernahme,
+/// Aufteilen, Stornieren, Reaktivieren). Mengen, Status und Orte liest die Karte aus der
+/// Material-Query, die auf `material` hört.
+fn notify_nachforderung(state: &AppState, posten: &EinsatzMaterialAnzeige) {
+    if posten.nachforderung_id.is_some() {
+        super::nachforderung::sse(state, posten.einsatz_id);
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub menge: Option<i64>,
+    /// Ausgegebene Menge eines Verbrauchsguts als neuer Gesamtwert (LLH-1224, design.md D4).
+    pub ausgegeben: Option<i64>,
     pub status: Option<String>,
+    /// Art der Zeile (LLH-1224, design.md D10); `null` → 400 (eine Zeile hat immer eine Art).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub art: Option<Option<String>>,
     /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
-    /// Verortung an einer UHS, Tri-State; ein neuer Wert muss eine UHS des Einsatzes in `geplant`
-    /// oder `aktiv` sein (LLH-1093, design.md D4).
+    /// Der eine Ort (LLH-1224, design.md D7), je Feld Tri-State: fehlt = unverändert, Wert =
+    /// dorthin (der bisherige Ort geht), `null` = von diesem Ort lösen. Mehr als ein Wert → 422.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einheit_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatz_fahrzeug_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub uhs_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub br_id: Option<Option<i64>>,
     /// Ad-hoc-Angaben (LLH-1093, design.md D6), symmetrisch zum Ad-hoc-Body; an einem
     /// Stamm-Posten 422. `bezeichnung` ist Pflicht: `null` oder leer → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -185,11 +311,12 @@ pub struct DispoPatchBody {
     pub traegerorganisation: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/material/{em_id} — Menge, Status, Bemerkung, UHS und bei
-/// Ad-hoc-Posten Bezeichnung, Kategorie, Bestandsnummer und Träger (LLH-1093).
-/// Mengen-Änderung und Status-Wechsel schreiben je einen ETB-Eintrag, geänderte Angaben zusammen
-/// einen weiteren; eine reine Bemerkungs- oder UHS-Änderung schreibt keinen. Reihenfolge: 400
-/// (Feld) → 404 (Zeile) → 409 (beendet) → 422 (Stamm-Posten, UHS aufgelöst).
+/// PATCH /api/einsaetze/{id}/material/{em_id} — Menge, Ausgabe, Status, Art, Bemerkung, der eine
+/// Ort und bei Ad-hoc-Posten Bezeichnung, Kategorie, Bestandsnummer und Träger (LLH-1093,
+/// LLH-1224). Je geändertem Aspekt ein ETB-Eintrag in der Folge Menge, Ausgabe, Status, Art,
+/// Angaben, Ort (design.md D11); eine reine Bemerkung schreibt keinen. Reihenfolge: 400 (Feld) →
+/// 422 (zwei Orte) → 404 (Zeile) → 409 (beendet) → 422 (Stamm-Posten, Art/Menge/Ausgabe/Status)
+/// → 404/409/422 (Ziel).
 pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -202,19 +329,31 @@ pub async fn update(
             return Err(AppError::Validation("Menge muss mindestens 1 sein".into()));
         }
     }
-    // Status validieren (festes Enum). Ungültig → Validation.
-    let status = match &body.status {
-        Some(s) => {
-            let parsed = MaterialStatus::parse(s)
-                .ok_or_else(|| AppError::Validation("Unbekannter Status".into()))?;
-            Some(parsed.as_str())
+    if let Some(ausgegeben) = body.ausgegeben {
+        if ausgegeben < 0 {
+            return Err(AppError::Validation(
+                "Ausgabe darf nicht negativ sein".into(),
+            ));
         }
+    }
+    // Status validieren (festes Enum). Ungültig → Validation.
+    let status = body
+        .status
+        .as_deref()
+        .map(|s| {
+            MaterialStatus::parse(s)
+                .ok_or_else(|| AppError::Validation("Unbekannter Status".into()))
+        })
+        .transpose()?;
+    let art = match body.art {
+        Some(None) => return Err(AppError::Validation("Art darf nicht leer sein".into())),
+        Some(Some(a)) => parse_art(Some(&a))?,
         None => None,
     };
 
     // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
     // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
-    // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
+    // der Route, das Repo bleibt dumm.
     let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
     let bezeichnung = body
         .bezeichnung
@@ -227,94 +366,126 @@ pub async fn update(
         "Trägerorganisation",
         ADHOC_TEXT_MAX,
     )?;
+    // Nach allen 400: zwei Orte mit Wert sind eine Feld-Kombination (422), vor der Transaktion.
+    let ort_patch = OrtPatch {
+        einheit_id: body.einheit_id,
+        einsatz_fahrzeug_id: body.einsatz_fahrzeug_id,
+        uhs_id: body.uhs_id,
+        br_id: body.br_id,
+    };
+    ort_patch.validate()?;
     fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
         w.as_ref().map(|o| o.as_deref())
     }
     let patch = MaterialPatch {
         menge: body.menge,
+        ausgegeben: body.ausgegeben,
         status,
+        art,
         bemerkung: tri(&bemerkung),
-        uhs_id: body.uhs_id,
+        ort: ort_patch,
         bezeichnung: bezeichnung.as_deref(),
         kategorie: tri(&kategorie),
         bestandsnummer: tri(&bestandsnummer),
         traegerorganisation: tri(&traeger),
     };
 
-    // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu drei) System-ETB-Einträge atomar in
-    // EINER Tx (BEGIN IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload
-    // (`nachher`) liefert die frischen Werte für ETB-Texte UND Response; ein Menge-Wechsel und
-    // ein Status-Wechsel schreiben je einen Eintrag (eine reine Bemerkungsänderung keinen). SSE
-    // erst nach dem Commit.
+    // F06/LFH-244 Tier-A: Domänen-Update und die System-ETB-Einträge atomar in EINER Tx (BEGIN
+    // IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload (`nachher`) liefert
+    // die frischen Werte für ETB-Texte UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::update_tx(conn, einsatz_id, em_id, patch).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let mut texte = Vec::new();
         if vorher.menge != nachher.menge {
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &format!(
-                    "Material «{}»: Menge {} → {}",
-                    nachher.bezeichnung, vorher.menge, nachher.menge
-                ),
-            )
-            .await?;
+            texte.push(format!(
+                "Material «{}»: Menge {} → {}",
+                nachher.bezeichnung, vorher.menge, nachher.menge
+            ));
+        }
+        if vorher.ausgegeben != nachher.ausgegeben {
+            texte.push(crate::material::etb_text_ausgabe(
+                &nachher.bezeichnung,
+                vorher.ausgegeben,
+                nachher.ausgegeben,
+                nachher.menge,
+            ));
         }
         if vorher.status != nachher.status {
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &format!(
-                    "Material «{}»: Status «{}» → «{}»",
-                    nachher.bezeichnung,
-                    vorher.status.as_str(),
-                    nachher.status.as_str()
-                ),
-            )
-            .await?;
+            texte.push(format!(
+                "Material «{}»: Status «{}» → «{}»",
+                nachher.bezeichnung,
+                vorher.status.as_str(),
+                nachher.status.as_str()
+            ));
+        }
+        if vorher.art != nachher.art {
+            texte.push(crate::material::etb_text_art_geaendert(
+                &nachher.bezeichnung,
+                vorher.art,
+                nachher.art,
+            ));
         }
         // LLH-1093, design.md D6: ein Eintrag für alle geänderten Ad-hoc-Angaben.
         if let Some(text) = crate::material::etb_text_angaben(&vorher, &nachher) {
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
+            texte.push(text);
+        }
+        if vorher.ort() != nachher.ort() {
+            texte.push(crate::material::etb_text_ort_gewechselt(
+                &nachher.bezeichnung,
+                nachher.menge,
+                &ort::ort_text_tx(conn, einsatz_id, vorher.ort()).await?,
+                &ort::ort_text_tx(conn, einsatz_id, nachher.ort()).await?,
+            ));
+        }
+        for text in &texte {
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text).await?;
         }
         Ok((vorher, nachher))
     })?;
     sse_material(&state, einsatz_id, em_id);
-    // `material` erreicht Einheiten- und UHS-Leser ohne Materialrecht nicht (LLH-1182). Die
-    // Einheit zeigt Bezeichnung, Menge und Status ihres Materials, das UHS-Detail die ganze Zeile
-    // des dort verorteten Materials (LFH-892); beim Umverorten ändern sich alte und neue UHS.
-    if let Some(einheit_id) = nachher.einheit_id {
-        if vorher.menge != nachher.menge
-            || vorher.status != nachher.status
-            || vorher.bezeichnung != nachher.bezeichnung
-        {
-            super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
-        }
+    notify_orte(&state, einsatz_id, &vorher, &nachher);
+    Ok(Json(nachher))
+}
+
+/// Nach einer Änderung an einer Zeile die Leser ihres Orts melden (`material` erreicht sie ohne
+/// Materialrecht nicht, LLH-1182). Wechselt der Ort, gehen alter und neuer Ort. Sonst die Einheit
+/// nur bei dem, was sie zeigt (Bezeichnung, Menge, Ausgabe, Status, Art), die übrigen Orte bei
+/// jeder Änderung der Zeile (das UHS-Detail zeigt die ganze Zeile, LFH-892).
+fn notify_orte(
+    state: &AppState,
+    einsatz_id: i64,
+    vorher: &EinsatzMaterialAnzeige,
+    nachher: &EinsatzMaterialAnzeige,
+) {
+    let wechsel = ort::OrtWechsel {
+        vorher: vorher.ort(),
+        nachher: nachher.ort(),
+    };
+    if wechsel.is_changed() {
+        sse_ortswechsel(state, einsatz_id, wechsel);
+        return;
     }
-    let has_row_changed = vorher.menge != nachher.menge
+    let Some(o) = nachher.ort() else { return };
+    let einheit_sieht = vorher.menge != nachher.menge
+        || vorher.ausgegeben != nachher.ausgegeben
         || vorher.status != nachher.status
+        || vorher.art != nachher.art
+        || vorher.bezeichnung != nachher.bezeichnung;
+    let zeile = einheit_sieht
         || vorher.bemerkung != nachher.bemerkung
-        || vorher.uhs_id != nachher.uhs_id
-        || vorher.bezeichnung != nachher.bezeichnung
         || vorher.kategorie != nachher.kategorie
         || vorher.bestandsnummer != nachher.bestandsnummer
         || vorher.traegerorganisation != nachher.traegerorganisation;
-    if has_row_changed {
-        if let Some(uhs_id) = vorher.uhs_id {
-            sse_uhs(&state, einsatz_id, uhs_id);
-        }
-        if let Some(uhs_id) = nachher.uhs_id.filter(|u| Some(*u) != vorher.uhs_id) {
-            sse_uhs(&state, einsatz_id, uhs_id);
-        }
+    let melden = match o {
+        MaterialOrt::Einheit(_) => einheit_sieht,
+        _ => zeile,
+    };
+    if melden {
+        sse_ort(state, einsatz_id, o);
     }
-    Ok(Json(nachher))
 }
 
 #[derive(Debug, Deserialize)]
@@ -326,9 +497,10 @@ pub struct AufteilenBody {
 
 /// POST /api/einsaetze/{id}/material/{em_id}/aufteilen — einen Posten auf zwei Zeilen aufteilen
 /// (LLH-1093, design.md D8): die Ausgangszeile wird um `menge` gemindert, eine neue Zeile mit
-/// `menge` übernimmt Angaben, Status, Bemerkung, Ort und Dispositionszeitpunkt. Ein ETB-Eintrag in
-/// derselben Transaktion. 400 bei `menge` < 1, 404 bei fremder Zeile, 409 bei beendetem Material,
-/// 422 bei `menge` ab der Menge des Postens. Liefert 201 mit `[Ausgang, neu]`.
+/// `menge` übernimmt Angaben, Art, Status, Bemerkung, Ort und Dispositionszeitpunkt und beginnt
+/// ohne Ausgabe (LLH-1224 D14). Ein ETB-Eintrag in derselben Transaktion. 400 bei `menge` < 1, 404
+/// bei fremder Zeile, 409 bei beendetem Material, 422 an einem Gerät, bei `menge` ab der Menge des
+/// Postens und über dem Rest. Liefert 201 mit `[Ausgang, neu]`.
 pub async fn aufteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -361,20 +533,18 @@ pub async fn aufteilen(
     })?;
     sse_material(&state, einsatz_id, ausgang.id);
     sse_material(&state, einsatz_id, neu.id);
-    // Die Einheit zeigt ihr Material als Liste, das UHS-Detail die Zeilen der UHS; beide bekommen
-    // eine Zeile dazu (`material` erreicht ihre Leser ohne Materialrecht nicht, LLH-1182).
-    if let Some(einheit_id) = ausgang.einheit_id {
-        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
-    }
-    if let Some(uhs_id) = ausgang.uhs_id {
-        sse_uhs(&state, einsatz_id, uhs_id);
+    notify_nachforderung(&state, &ausgang);
+    // Der Ort zeigt sein Material als Liste und bekommt eine Zeile dazu (`material` erreicht
+    // seine Leser ohne Materialrecht nicht, LLH-1182).
+    if let Some(o) = ausgang.ort() {
+        sse_ort(&state, einsatz_id, o);
     }
     Ok((StatusCode::CREATED, Json(vec![ausgang, neu])))
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
-/// Zeile bleibt, Einheit und UHS gehen. Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
+/// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
 /// Schreibt ETB-Eintrag; beendetes Material → 409. Liefert das herausgenommene Material.
 pub async fn entlassen(
     State(state): State<AppState>,
@@ -407,19 +577,16 @@ pub async fn entlassen(
         Ok((ergebnis, anzeige))
     })?;
     sse_material(&state, einsatz_id, em_id);
-    // Einheit und UHS-Detail zeigen das Material; `material` erreicht ihre Leser ohne
-    // Materialrecht nicht (LLH-1182).
-    if let Some((einheit_id, _)) = ergebnis.einheit {
-        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
-    }
-    if let Some(uhs_id) = ergebnis.uhs_id {
-        sse_uhs(&state, einsatz_id, uhs_id);
+    // Der Ort zeigt das Material; `material` erreicht seine Leser ohne Materialrecht nicht
+    // (LLH-1182).
+    if let Some(o) = ergebnis.ort {
+        sse_ort(&state, einsatz_id, o);
     }
     Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/stornieren — Fehldisposition stornieren (LLH-1079,
-/// design.md D3): nur ohne Einheit und UHS und in den ersten 15 Minuten, sonst 422 mit dem
+/// design.md D3): nur ohne Ort (LLH-1224 D13) und in den ersten 15 Minuten, sonst 422 mit dem
 /// Grund; beendetes Material → 409. ETB-Eintrag.
 pub async fn stornieren(
     State(state): State<AppState>,
@@ -429,7 +596,7 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let vorher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
@@ -441,15 +608,20 @@ pub async fn stornieren(
             &crate::material::etb_text_storniert(&vorher.bezeichnung, vorher.menge),
         )
         .await?;
-        Ok(())
+        Ok(vorher)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    // Ein stornierter Posten zählt nicht mehr als Übernahme (LLH-1226, design.md D3).
+    notify_nachforderung(&state, &vorher);
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/reaktivieren — herausgenommenes oder storniertes
 /// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“ und
-/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag.
+/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag. Ein stornierter Posten aus einer
+/// Nachforderung zählt danach wieder als Übernahme und verlangt wie diese eine eingetroffene
+/// Nachforderung (422, LLH-1226); ein schon vorhandener Posten sperrt nicht, das Reaktivieren ist
+/// bewusstes Rückgängigmachen des Stornos.
 pub async fn reaktivieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -458,6 +630,12 @@ pub async fn reaktivieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let storniert = vorher.beendet_als.as_deref()
+            == Some(crate::entlassung::BeendetAls::Storniert.as_str());
+        if let (true, Some(nid)) = (storniert, vorher.nachforderung_id) {
+            crate::nachforderung::repo::check_uebernahme_tx(conn, einsatz_id, nid, true).await?;
+        }
         disposition_repo::reaktivieren_tx(
             conn,
             einsatz_id,
@@ -478,5 +656,6 @@ pub async fn reaktivieren(
         Ok(anzeige)
     })?;
     sse_material(&state, einsatz_id, em_id);
+    notify_nachforderung(&state, &anzeige);
     Ok(Json(anzeige))
 }

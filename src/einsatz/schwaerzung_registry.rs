@@ -203,6 +203,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             retain("begonnen_at", G_ZEIT),
             retain("naechste_lagebesprechung_at", G_ZEIT),
+            // Merker der Ankündigung am Termin (LLH-1215, design.md D10).
+            retain("lagebesprechung_angekuendigt_vorher_at", G_ZEIT),
+            retain("lagebesprechung_angekuendigt_faellig_at", G_ZEIT),
             retain("abgeschlossen_at", G_ZEIT),
             retain("abgeschlossen_von", G_FK),
             retain("einsatzart", G_ENUM),
@@ -1048,6 +1051,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Letzte Entlassung, überdauert das erneute Disponieren (Storno-Sperre, LLH-1079).
             retain("zuletzt_entlassen_at", G_ZEIT),
             retain("uhs_id", G_FK),
+            // Material-Modell (LLH-1224): Art der Zeile, ausgegebene Menge, zwei weitere Orte.
+            retain("art", G_ENUM),
+            retain("ausgegeben", G_ZAEHLER),
+            retain("einsatz_fahrzeug_id", G_FK),
+            retain("br_id", G_FK),
+            // Herkunft aus einer Nachforderung (LLH-1226), nur die Kennung.
+            retain("nachforderung_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -2181,6 +2191,24 @@ pub const TABELLEN: &[TabellenRegel] = &[
         zeilenfilter: None,
         person_bezug: None,
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
+    },
+    TabellenRegel {
+        // Erwähnungen einer Nachricht (LLH-1220, migrations/0200, design.md D9): ein Nutzer oder
+        // ein Katalogcode, kein Freitext. Fällt mit der Nachricht (CASCADE), der `@Name` im Text
+        // geht mit `chat_nachricht.inhalt`.
+        tabelle: "chat_erwaehnung",
+        scoping: Scoping::UeberParent {
+            fk: "nachricht_id",
+            parent: "chat_nachricht",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("nachricht_id", G_FK),
+            retain("benutzer_id", G_FK),
+            retain("funktion", G_ENUM),
+        ],
     },
     TabellenRegel {
         // Junction (Linker auf `anhang`); die `anhang`-Regel (ZeileEinzelnLoeschen, LFH-905) löscht

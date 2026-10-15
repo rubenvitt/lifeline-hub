@@ -3878,9 +3878,19 @@
           "em_id",
           "bezeichnung",
           "menge",
-          "status"
+          "status",
+          "art",
+          "ausgegeben"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut (LLH-1224): mit `ausgegeben` erkennen Einheit-Ansicht und\nKräftebaum ohne Materialrecht ein aufgebrauchtes Verbrauchsgut."
+          },
+          "ausgegeben": {
+            "type": "integer",
+            "format": "int64"
+          },
           "bezeichnung": {
             "type": "string"
           },
@@ -4660,14 +4670,25 @@
         "required": [
           "id",
           "einsatz_id",
+          "art",
           "ist_adhoc",
           "bezeichnung",
           "menge",
+          "ausgegeben",
           "status",
           "disponiert_at",
           "ist_demo"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut der Zeile, beim Disponieren aus dem Stamm kopiert (LLH-1224)."
+          },
+          "ausgegeben": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Ausgegebene Menge eines Verbrauchsguts (0 bei Geräten); Rest = `menge − ausgegeben`. Ganz\nausgegeben heißt „aufgebraucht“ (LLH-1224, design.md D4)."
+          },
           "beendet_als": {
             "oneOf": [
               {
@@ -4707,6 +4728,14 @@
           "bezeichnung": {
             "type": "string"
           },
+          "br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ort Bereitstellungsraum; fehlt, wenn nicht gesetzt."
+          },
           "disponiert_at": {
             "type": "string"
           },
@@ -4723,7 +4752,15 @@
               "null"
             ],
             "format": "int64",
-            "description": "Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position."
+            "description": "Ort Einheit; höchstens eines von `einheit_id`, `einsatz_fahrzeug_id`, `uhs_id`, `br_id`\nist gesetzt, keines heißt „ohne Ort“ (LLH-1224, Spec `material-modell`)."
+          },
+          "einsatz_fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ort Fahrzeug (Beladung, `einsatz_fahrzeug.id`); fehlt, wenn nicht gesetzt."
           },
           "einsatz_id": {
             "type": "integer",
@@ -4758,6 +4795,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec\n`nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul\nNachforderungen. Fehlt ohne Bezug."
+          },
           "status": {
             "$ref": "#/components/schemas/MaterialStatus"
           },
@@ -4773,7 +4818,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet."
+            "description": "Ort Unfallhilfsstelle."
           }
         }
       },
@@ -8414,7 +8459,8 @@
           "kraefte",
           "uhs",
           "zonen",
-          "abschnitte"
+          "abschnitte",
+          "sofortmeldungen_offen"
         ],
         "properties": {
           "abschnitte": {
@@ -8429,6 +8475,11 @@
           },
           "kraefte": {
             "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "sofortmeldungen_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl."
           },
           "stand_at": {
             "type": "string",
@@ -8703,11 +8754,16 @@
           "bezeichnung",
           "dienststatus",
           "angelegt_at",
+          "art",
           "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
             "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt",
+            "description": "Gerät oder Verbrauchsgut (LLH-1224); gilt für neue Dispositionen, nie rückwirkend."
           },
           "bemerkung": {
             "type": [
@@ -8754,6 +8810,14 @@
             ]
           }
         }
+      },
+      "MaterialArt": {
+        "type": "string",
+        "description": "Art eines Materials (LLH-1224, Spec `material-modell`): ein einzeln verfolgtes Gerät steht\nje Stück im Einsatz (Menge 1, alle fünf Status); ein Verbrauchsgut hat eine Menge, eine\nAusgabe und keine Status „verbraucht“ und „Desinfektion nötig“. Am Stamm die Vorgabe jeder\nDisposition, an der Dispositionszeile eine eigene Spalte (design.md D1).",
+        "enum": [
+          "geraet",
+          "verbrauchsgut"
+        ]
       },
       "MaterialStatus": {
         "type": "string",
@@ -9483,7 +9547,8 @@
           "angefordert_at",
           "erstellt_von_id",
           "erstellt_at",
-          "ist_offen"
+          "ist_offen",
+          "material_ids"
         ],
         "properties": {
           "abgelehnt_at": {
@@ -9567,6 +9632,14 @@
           "ist_offen": {
             "type": "boolean",
             "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt')."
+          },
+          "material_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten\nMaterialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:\nBezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"

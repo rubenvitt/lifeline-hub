@@ -989,6 +989,26 @@ pub async fn count_lage_neu(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, A
     .map_err(Into::into)
 }
 
+/// Offene Sofortmeldungen für den Lagemonitor (Change `kcjecn9e-benachrichtigungskonzept`, D12):
+/// Sofortmeldung ist, was den Sofortalarm auslöst (Meldungsart `sofortmeldung` oder Priorität
+/// `sofort`, `routes/meldung.rs`), offen ist sie, solange sie unbestätigt und nicht erledigt ist.
+/// Nur die Zahl, ohne Texte.
+pub async fn count_sofort_offen(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, AppError> {
+    sqlx::query_scalar(concat!(
+        "SELECT COUNT(*) FROM meldung m",
+        quittung_join_sql!(),
+        " WHERE m.einsatz_id = ? \
+           AND (m.meldungsart = 'sofortmeldung' OR m.prioritaet = 'sofort') AND ",
+        ist_offen_sql!(),
+        " AND NOT ",
+        ist_bestaetigt_sql!()
+    ))
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await
+    .map_err(Into::into)
+}
+
 /// Jüngste an eine Einheit gebundene Meldung je Einheit des Einsatzes (LFH-610).
 /// Gleichstand in `ereigniszeit` entscheidet die höhere id (später erfasst).
 /// `faellig_at` bleibt leer; der Handler setzt es aus der effektiven Frist.

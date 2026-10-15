@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachrichtEingabe, { sendeFehlerKopf } from './NachrichtEingabe';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
+import { ERWAEHNUNGEN_MAX } from '../api/eingabegrenzen';
+import type { ErwaehnungVorschlag } from './erwaehnung';
 
 describe('NachrichtEingabe', () => {
   it('sendet getrimmten Text und leert das Feld', async () => {
@@ -12,7 +14,7 @@ describe('NachrichtEingabe', () => {
     const feld = screen.getByPlaceholderText('Nachricht…');
     await userEvent.type(feld, '  Lagebild aktualisiert  ');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    expect(onSenden).toHaveBeenCalledWith('Lagebild aktualisiert', []);
+    expect(onSenden).toHaveBeenCalledWith('Lagebild aktualisiert', [], []);
   });
 
   it('leert Text und Anhänge erst nach erfolgreichem Senden (LFH-795)', async () => {
@@ -167,4 +169,106 @@ describe('sendeFehlerKopf (LFH-1021)', () => {
   it('eine Ablehnung des Servers trägt dessen Meldung', () => {
     expect(sendeFehlerKopf(new ApiError(413, 'Zu groß'))).toEqual({ titel: 'Nicht gesendet' });
   });
+});
+
+describe('NachrichtEingabe — Erwähnungen (LLH-1220)', () => {
+  // jsdom kennt kein `scrollIntoView`; die Auswahl holt damit den aktiven Vorschlag in den Blick.
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  const vorschlaege: ErwaehnungVorschlag[] = [
+    { wert: 'S4', label: 'S4 – Versorgung', erwaehnung: { funktion: 's4' } },
+    { wert: 'Bert Brandt', label: 'Bert Brandt · S2 Lage', erwaehnung: { benutzer_id: 12 } },
+  ];
+
+  it('schlägt nach @ besetzte Funktionen und Mitglieder vor und sendet die Erwähnten mit', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={vorschlaege} />,
+    );
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, '@');
+    expect(await screen.findByText('S4 – Versorgung')).toBeInTheDocument();
+    expect(screen.getByText('Bert Brandt · S2 Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('S4 – Versorgung'));
+    expect(feld).toHaveValue('@S4 ');
+    await userEvent.type(feld, 'bitte Verpflegung klären');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(onSenden).toHaveBeenCalledWith('@S4 bitte Verpflegung klären', [], [{ funktion: 's4' }]);
+  });
+
+  it('Enter bei offener Auswahl übernimmt den Vorschlag und sendet nicht', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={vorschlaege} />,
+    );
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, '@Ber');
+    expect(await screen.findByText('Bert Brandt · S2 Lage')).toBeInTheDocument();
+    // rc-mentions liest `which`; userEvent setzt es nicht.
+    const enter = () =>
+      fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+    enter();
+    expect(onSenden).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('@Bert Brandt ');
+    enter();
+    await waitFor(() => expect(onSenden).toHaveBeenCalledTimes(1));
+    expect(onSenden).toHaveBeenCalledWith('@Bert Brandt', [], [{ benutzer_id: 12 }]);
+  });
+
+  it('eine Nachricht ohne @ erwähnt niemanden', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={vorschlaege} />,
+    );
+    await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'S4 bitte melden{Enter}');
+    expect(onSenden).toHaveBeenCalledWith('S4 bitte melden', [], []);
+  });
+
+  it('ein von Hand getipptes @S4 ohne Auswahl erwähnt niemanden (kein Rückschluss vom Text)', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={vorschlaege} />,
+    );
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    fireEvent.change(feld, { target: { value: '@S4 bitte' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(onSenden).toHaveBeenCalledWith('@S4 bitte', [], []);
+  });
+
+  it('ein gewählter, dann gelöschter Name ist nicht mehr erwähnt', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={vorschlaege} />,
+    );
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, '@S');
+    await userEvent.click(await screen.findByText('S4 – Versorgung'));
+    fireEvent.change(feld, { target: { value: 'doch nicht' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(onSenden).toHaveBeenCalledWith('doch nicht', [], []);
+  });
+
+  it(`über ${ERWAEHNUNGEN_MAX} Erwähnungen sperrt das Senden, der Text bleibt`, async () => {
+    const viele: ErwaehnungVorschlag[] = Array.from({ length: ERWAEHNUNGEN_MAX + 1 }, (_, i) => ({
+      wert: `X${i}y`,
+      label: `X${i}y`,
+      erwaehnung: { benutzer_id: i + 1 },
+    }));
+    const onSenden = vi.fn();
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} vorschlaege={viele} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    for (const v of viele) {
+      await userEvent.type(feld, '@');
+      await userEvent.click(await screen.findByRole('menuitem', { name: v.wert }));
+    }
+    expect(
+      screen.getByText(`${ERWAEHNUNGEN_MAX + 1} / ${ERWAEHNUNGEN_MAX} Erwähnungen · zu viele`),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    expect(onSenden).not.toHaveBeenCalled();
+    expect(feld).toHaveValue(viele.map((v) => `@${v.wert} `).join(''));
+  }, 30_000);
 });

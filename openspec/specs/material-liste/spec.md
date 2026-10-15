@@ -2,42 +2,62 @@
 
 ## Purpose
 Die Materialliste zeigt, was an Material im Einsatz ist, wo es liegt und was davon ausgefallen ist,
-und lässt es dort ändern: Ort aus Einheit und Unfallhilfsstelle, Menge mit ausdrücklichem
-Speichern, Korrektur der Angaben eines Ad-hoc-Postens, Aufteilen einer Menge auf zwei Zeilen und
-die Zeilenaktionen mit dem Wortlaut „Aus dem Einsatz nehmen“. Eingeführt mit LLH-1093.
+und lässt es dort ändern: der eine Ort je Posten als eine Angabe (LLH-1224, LLH-1225), gruppiert
+nach Ort oder Status, Ausgabe eines Verbrauchsguts, Menge und Art über das Zeilenmenü, Korrektur
+der Angaben eines Ad-hoc-Postens, Aufteilen einer Menge auf zwei Zeilen, Art und Ort beim
+Disponieren und die Zeilenaktionen mit dem Wortlaut „Aus dem Einsatz nehmen“. Eingeführt mit
+LLH-1093.
 
 ## Requirements
 
 ### Requirement: Ort eines Postens in der Materialliste
 
-Die Materialliste SHALL je Posten eine Spalte „Ort“ zeigen, die die zugeordnete Einheit und die
-zugeordnete Unfallhilfsstelle nennt, beide zugleich, wenn beide gesetzt sind. Kann die Person das
-Modul der Einheit oder der UHS nicht lesen, MUST der Teil „zugeordnet“ zeigen statt eines Namens
-und nie „—“. Die Liste MUST nach Ort filterbar sein („ohne Ort“, je Einheit, je UHS); ein Posten an
-Einheit und UHS MUST beiden Filterwerten entsprechen.
+Die Materialliste SHALL je Posten eine Spalte „Ort“ zeigen, die den einen Ort des Postens nennt:
+eine Einheit, ein Fahrzeug, eine Unfallhilfsstelle, einen Bereitstellungsraum oder „ohne Ort“. Kann
+die Person das Modul des Orts nicht lesen, MUST die Spalte „zugeordnet“ zeigen statt eines Namens
+und nie „—“. Die Liste MUST nach Ort filterbar sein („ohne Ort“, je Einheit, je Fahrzeug, je UHS,
+je Bereitstellungsraum); ein Posten MUST genau einem Filterwert entsprechen.
 
-#### Scenario: Einheit und UHS zugleich
-- **WHEN** ein Posten der Einheit „Rettungsstaffel“ und der UHS „Turnhalle“ zugeordnet ist
-- **THEN** zeigt seine Zeile den Ort „Rettungsstaffel · UHS Turnhalle“
+#### Scenario: Posten an einer UHS
+- **WHEN** ein Posten der UHS „Turnhalle“ zugeordnet ist
+- **THEN** zeigt seine Zeile den Ort „UHS Turnhalle“
+
+#### Scenario: Posten auf einem Fahrzeug
+- **WHEN** ein Posten dem Fahrzeug „Florian 1/83-1“ zugeordnet ist
+- **THEN** zeigt seine Zeile den Ort „Florian 1/83-1“ und keinen Strich
 
 #### Scenario: Ohne Leserecht auf Einheiten
 - **WHEN** eine Person ohne Zugriff auf das Modul Einheiten die Materialliste öffnet
 - **THEN** steht beim Posten einer Einheit „zugeordnet“ und kein Strich
 
+#### Scenario: Filter Bereitstellungsraum
+- **WHEN** die Person in der Spalte „Ort“ nach dem Bereitstellungsraum „BR Nord“ filtert
+- **THEN** stehen nur die Posten in „BR Nord“ in der Liste
+
 ### Requirement: Ort in der Liste ändern
 
-Die Materialliste SHALL Einheit und UHS eines Postens in der Zeile ändern lassen, jeden Teil mit
-ausdrücklichem Speichern. Die Einheit MUST über den Zuordnungsweg der Einheiten geändert werden und
-dessen Recht verlangen, die UHS über die Material-Disposition. Ein Teil, dessen Modul die Person
-nicht nutzen darf, MUST nur lesbar sein.
+Die Materialliste SHALL den Ort eines Postens in der Zeile als eine Angabe ändern lassen, mit
+ausdrücklichem Speichern. Die Auswahl MUST „ohne Ort“ und je Ortsart (Einheiten, Fahrzeuge,
+Unfallhilfsstellen, Bereitstellungsräume) die wählbaren Orte anbieten; eine Ortsart, deren Modul die
+Person nicht lesen darf, MUST fehlen. Setzt die Person einen neuen Ort, MUST der bisherige in
+derselben Anfrage gelöst werden. Die Änderung MUST über die Material-Disposition laufen und das
+Recht auf Material verlangen, nicht das Recht des Zielmoduls.
 
 #### Scenario: Umhängen aus der Liste
-- **WHEN** die Einsatzleitung beim Posten „Wolldecke“ die Einheit von „Staffel A“ auf „Staffel B“ ändert
-- **THEN** gehört der Posten zu „Staffel B“, und seine UHS bleibt unverändert
+- **WHEN** die Einsatzleitung beim Posten „Wolldecke“ den Ort von „Staffel A“ auf „Staffel B“ ändert
+- **THEN** gehört der Posten zu „Staffel B“ und zu keinem anderen Ort
 
-#### Scenario: Einheiten-Modul gesperrt
-- **WHEN** eine Person Material schreiben darf, das Modul Einheiten aber nicht nutzen darf
-- **THEN** ist der Einheit-Teil des Orts nur lesbar und der UHS-Teil bedienbar
+#### Scenario: Von der Einheit an die UHS
+- **WHEN** die Einsatzleitung beim Posten „Wolldecke“ an der Einheit „Staffel A“ den Ort „UHS Turnhalle“ wählt und speichert
+- **THEN** liegt der Posten an der UHS „Turnhalle“ und an keiner Einheit mehr
+
+#### Scenario: Verlassen ohne Speichern
+- **WHEN** die Person die Ort-Angabe öffnet, einen anderen Ort wählt und daneben tippt
+- **THEN** wird nichts gesendet
+
+#### Scenario: Ohne Leserecht auf Bereitstellungsräume
+- **WHEN** eine Person ohne Zugriff auf das Modul Bereitstellungsräume die Ort-Angabe öffnet
+- **THEN** bietet die Auswahl keine Bereitstellungsräume an, und die übrigen Ortsarten stehen da
 
 ### Requirement: UHS-Verortung prüft das Ziel
 
@@ -60,13 +80,13 @@ geschrieben werden. Das Lösen der UHS und ein unveränderter Wert MUST ohne die
 
 ### Requirement: Umhängen nennt die alte Einheit
 
-Wird ein Posten von einer Einheit an eine andere gehängt, SHALL der ETB-Eintrag beide Einheiten
-nennen, und beide Einheiten MUST live aktualisiert werden. Die Zuordnung an dieselbe Einheit MUST
+Wechselt ein Posten seinen Ort, SHALL der ETB-Eintrag den alten und den neuen Ort nennen, und beide
+Orte MUST live aktualisiert werden. Die Zuordnung an den Ort, an dem der Posten schon ist, MUST
 nichts schreiben.
 
 #### Scenario: Von A nach B
 - **WHEN** „Wolldecke“ (×20) von „Staffel A“ an „Staffel B“ gehängt wird
-- **THEN** steht im ETB „Einheit «Staffel B»: Material «Wolldecke» (×20) zugeordnet, vorher «Staffel A»“, und die Ansicht von „Staffel A“ zeigt den Posten nicht mehr
+- **THEN** steht im ETB „Material «Wolldecke» (×20): Einheit «Staffel A» → Einheit «Staffel B»“, und die Ansicht von „Staffel A“ zeigt den Posten nicht mehr
 
 #### Scenario: Dieselbe Einheit
 - **WHEN** ein Posten erneut seiner eigenen Einheit zugeordnet wird
@@ -113,24 +133,34 @@ mit altem und neuem Wert nennt. Ändert sich keine Angabe, MUST kein Eintrag ent
 
 ### Requirement: Posten aufteilen
 
-Das System SHALL die Menge eines Postens auf zwei Zeilen aufteilen. Das Aufteilen MUST in einer
-Transaktion die Ausgangszeile mindern und eine neue Zeile mit der abgeteilten Menge anlegen, die
-Bezeichnung, Stammbezug, Status, Bemerkung, Einheit, UHS und Dispositionszeitpunkt übernimmt, und
-genau einen ETB-Eintrag schreiben. Die Summe beider Mengen MUST der Ausgangsmenge gleichen.
+Das System SHALL die Menge eines Verbrauchsguts auf zwei Zeilen aufteilen. Das Aufteilen MUST in
+einer Transaktion die Ausgangszeile mindern und eine neue Zeile mit der abgeteilten Menge anlegen,
+die Bezeichnung, Stammbezug, Art, Status, Bemerkung, Ort und Dispositionszeitpunkt übernimmt, ohne
+Ausgabe beginnt und genau einen ETB-Eintrag schreibt. Die Ausgabe MUST an der Ausgangszeile bleiben.
+Die Summe beider Mengen MUST der Ausgangsmenge gleichen.
 
 #### Scenario: 50 Decken
 - **WHEN** von 50 Wolldecken 20 abgeteilt werden
 - **THEN** gibt es zwei Zeilen mit 30 und 20, beide mit demselben Ort, und das ETB nennt „aufgeteilt: 50 → 30 + 20“
 
+#### Scenario: Teilweise ausgegeben
+- **WHEN** von 50 Wolldecken mit Ausgabe 20 genau 20 abgeteilt werden
+- **THEN** trägt die Ausgangszeile Menge 30 mit Ausgabe 20 und die neue Zeile Menge 20 ohne Ausgabe
+
 ### Requirement: Grenzen des Aufteilens
 
-Die abgeteilte Menge SHALL mindestens 1 und kleiner als die Menge des Postens sein. Unter 1 MUST
-der Server mit 400 antworten, bei einer Menge ab der Ausgangsmenge mit 422, an einem aus dem Einsatz
-genommenen oder stornierten Posten mit 409; in keinem Fall MUST etwas geschrieben werden.
+Die abgeteilte Menge SHALL mindestens 1, kleiner als die Menge und höchstens der Rest des Postens
+sein. Unter 1 MUST der Server mit 400 antworten; bei einer Menge ab der Ausgangsmenge, über dem Rest
+oder an einem Gerät mit 422; an einem aus dem Einsatz genommenen oder stornierten Posten mit 409; in
+keinem Fall MUST etwas geschrieben werden.
 
 #### Scenario: Menge 1
 - **WHEN** ein Posten mit Menge 1 aufgeteilt werden soll
 - **THEN** antwortet der Server mit 422, und die Liste bietet „Aufteilen“ für ihn nur gesperrt mit dem Grund an
+
+#### Scenario: Mehr als der Rest
+- **WHEN** von 50 Wolldecken mit Ausgabe 40 genau 20 abgeteilt werden sollen
+- **THEN** antwortet der Server mit 422
 
 #### Scenario: Beendeter Posten
 - **WHEN** ein aus dem Einsatz genommener Posten aufgeteilt werden soll
@@ -138,26 +168,35 @@ genommenen oder stornierten Posten mit 409; in keinem Fall MUST etwas geschriebe
 
 ### Requirement: Menge mit ausdrücklichem Speichern
 
-Die Materialliste SHALL die Menge eines Postens als Wert zeigen, der erst auf eine Handlung zum
-Bearbeiten wird. Eine geänderte Menge MUST nur mit Enter oder „Speichern“ gesendet werden, nie beim
-Verlassen des Felds.
+Die Materialliste SHALL die Menge eines Postens als Wert ohne Eingabefeld in der Zeile zeigen. Die
+Gesamtmenge eines Verbrauchsguts MUST über „Menge ändern …“ im Zeilenmenü in einem Dialog geändert
+werden, der nur mit Enter oder „Speichern“ sendet. Die Menge eines Geräts MUST ohne Bedienung
+stehen.
 
 #### Scenario: Wisch auf dem Tablet
-- **WHEN** die Person das Mengenfeld öffnet, eine Ziffer ändert und daneben tippt
+- **WHEN** die Person auf dem Tablet über die Mengenzelle wischt und daneben tippt
 - **THEN** wird nichts gesendet, und die Menge bleibt unverändert
+
+#### Scenario: Menge eines Verbrauchsguts erhöhen
+- **WHEN** die Person bei 50 Wolldecken „Menge ändern …“ wählt, 80 einträgt und „Speichern“ drückt
+- **THEN** trägt der Posten die Menge 80
 
 ### Requirement: Materialverdichtung
 
 Über der Materialliste SHALL eine Verdichtung die aktiven Posten nach einsatzbereit, im Einsatz und
 Ausfall zählen; die Gesamtzahl der Posten MUST im Seitenkopf stehen. Ausfall MUST jeden Status
 umfassen, dessen Rolle im Statusvertrag Alarm oder Achtung ist (defekt, verbraucht, Desinfektion
-nötig). Gezählt MUST in Posten werden, nicht in Mengen, mit derselben Funktion, die die
-Material-Gruppenzeile im Meldebild zählt. Personal- oder Fahrzeugzahlen MUST NOT auf der
-Materialseite stehen.
+nötig), und jedes aufgebrauchte Verbrauchsgut. Gezählt MUST in Posten werden, nicht in Mengen, mit
+derselben Funktion, die die Material-Gruppenzeile im Meldebild zählt. Personal- oder Fahrzeugzahlen
+MUST NOT auf der Materialseite stehen.
 
 #### Scenario: Zählung
-- **WHEN** von zwölf Posten sieben einsatzbereit, drei im Einsatz, einer defekt und einer verbraucht sind
+- **WHEN** von zwölf Posten sieben einsatzbereit, drei im Einsatz, einer defekt und ein Verbrauchsgut aufgebraucht sind
 - **THEN** steht über der Liste „7 einsatzbereit · 3 im Einsatz · 2 Ausfall“ und im Kopf „12 Posten“
+
+#### Scenario: Teilweise ausgegeben
+- **WHEN** ein einsatzbereites Verbrauchsgut 30 von 50 übrig hat
+- **THEN** zählt es als einsatzbereit, nicht als Ausfall
 
 #### Scenario: Jeder Status in genau einem Topf
 - **WHEN** der Statusvertrag des Materials geprüft wird
@@ -166,10 +205,13 @@ Materialseite stehen.
 ### Requirement: Zeilenaktionen der Materialliste
 
 Jede Zeile der Materialliste SHALL für schreibberechtigte Personen „Aus dem Einsatz nehmen“
-sichtbar anbieten und „Angaben ändern“, „Aufteilen“ und „Stornieren“ in einem Zeilenmenü bündeln,
-dessen Name den Posten nennt. Ein gerade nicht möglicher Eintrag MUST gesperrt mit seinem Grund im
-Etikett stehen. „Stornieren“ MUST rot hinter einem Trenner stehen und vor dem Senden in einem
-Dialog mit dem Knopf „Stornieren“ rückfragen.
+sichtbar anbieten und die übrigen Handlungen in einem Zeilenmenü bündeln, dessen Name den Posten
+nennt: bei einem Verbrauchsgut „Menge ändern …“, „Ausgabe zurücknehmen …“, „Aufteilen …“, „Als
+Gerät führen“, „Angaben ändern …“ und „Stornieren“; bei einem Gerät „Als Verbrauchsgut führen“,
+„Angaben ändern …“ und „Stornieren“. Die Einträge zur Art MUST nur ein Ad-hoc-Posten tragen; ein
+Stamm-Posten trägt die Art seines Stammeintrags (LLH-1224). Ein Eintrag, den es für die Art gibt, der aber gerade nicht
+möglich ist, MUST gesperrt mit seinem Grund im Etikett stehen. „Stornieren“ MUST rot hinter einem
+Trenner stehen und vor dem Senden in einem Dialog mit dem Knopf „Stornieren“ rückfragen.
 
 #### Scenario: Stamm-Posten im Menü
 - **WHEN** die Person das Zeilenmenü eines Stamm-Postens öffnet
@@ -178,6 +220,79 @@ Dialog mit dem Knopf „Stornieren“ rückfragen.
 #### Scenario: Stornieren fragt im Dialog
 - **WHEN** die Person im Zeilenmenü „Stornieren“ wählt
 - **THEN** öffnet sich ein Dialog mit dem Knopf „Stornieren“, und erst dieser sendet
+
+#### Scenario: Nichts ausgegeben
+- **WHEN** die Person das Zeilenmenü eines Verbrauchsguts ohne Ausgabe öffnet
+- **THEN** steht „Ausgabe zurücknehmen · nichts ausgegeben“ gesperrt darin
+
+#### Scenario: Gerät ohne Mengeneinträge
+- **WHEN** die Person das Zeilenmenü eines Geräts öffnet
+- **THEN** stehen darin weder „Menge ändern …“ noch „Ausgabe zurücknehmen …“ noch „Aufteilen …“
+
+### Requirement: Gruppierung nach Ort oder Status
+
+Die Materialliste SHALL sich nach Ort oder nach Status gruppieren lassen, mit der Vorgabe Ort. Nach
+Ort MUST jeder Posten in genau einer Gruppe stehen, in der Folge Einheiten, Fahrzeuge,
+Unfallhilfsstellen, Bereitstellungsräume und zuletzt „ohne Ort“. Die Verdichtung über der Liste
+MUST unabhängig von der Gruppierung dieselben Zahlen zeigen.
+
+#### Scenario: Vorgabe beim Öffnen
+- **WHEN** die Person die Materialliste öffnet
+- **THEN** ist die Liste nach Ort gruppiert, und „ohne Ort“ steht als letzte Gruppe
+
+#### Scenario: Umschalten auf Status
+- **WHEN** die Person „Nach Status“ wählt
+- **THEN** ist die Liste nach Status gruppiert, und die Verdichtung bleibt unverändert
+
+### Requirement: Ausgabe in der Liste
+
+Die Materialliste SHALL bei einem Verbrauchsgut die Menge mit dem Rest zeigen („30 von 50 übrig“)
+und, solange ein Rest bleibt, in der Mengenzelle „Ausgeben“ anbieten. Der Dialog MUST die
+auszugebende Menge zwischen 1 und dem Rest nehmen und den Rest danach zeigen; „Ausgabe
+zurücknehmen …“ MUST eine Menge zwischen 1 und der Ausgabe zurücknehmen. Beide MUST ohne Rückfrage
+senden und eine Ablehnung im Dialog zeigen.
+
+#### Scenario: Decken ausgeben
+- **WHEN** die Person bei 50 Wolldecken ohne Ausgabe „Ausgeben“ wählt und 20 ausgibt
+- **THEN** zeigt die Zeile „30 von 50 übrig“, und das ETB nennt „Ausgabe 0 → 20 (Rest 30 von 50)“
+
+#### Scenario: Aufgebraucht
+- **WHEN** von 50 Wolldecken alle ausgegeben sind
+- **THEN** zeigt die Zeile „0 von 50 übrig“ ohne „Ausgeben“, und der Status heißt „aufgebraucht“
+
+#### Scenario: Mehr als der Rest
+- **WHEN** die Person bei einem Rest von 30 die Menge 40 ausgeben will
+- **THEN** sendet der Dialog nicht und nennt die Grenze
+
+### Requirement: Art eines Postens in der Liste wechseln
+
+Die Materialliste SHALL die Art eines Ad-hoc-Postens im Zeilenmenü wechseln lassen, ohne Rückfrage. Ist
+der Wechsel nicht möglich, MUST der Eintrag gesperrt mit dem Grund stehen: zu Gerät bei einer Menge
+über 1 oder einer gebuchten Ausgabe, zu Verbrauchsgut bei Status „verbraucht“ oder „Desinfektion
+nötig“.
+
+#### Scenario: Ad-hoc-Wolldecke als Gerät angelegt
+- **WHEN** die Person bei einem Ad-hoc-Posten „Wolldecke“ (Gerät, Menge 1) „Als Verbrauchsgut führen“ wählt
+- **THEN** ist der Posten ein Verbrauchsgut, und seine Mengenzelle bietet „Ausgeben“ an
+
+#### Scenario: Verbrauchsgut mit Menge 50
+- **WHEN** die Person das Zeilenmenü von 50 Ad-hoc-Wolldecken öffnet
+- **THEN** steht „Als Gerät führen · Menge über 1“ gesperrt darin
+
+### Requirement: Art und Ort beim Disponieren
+
+Die Disponier-Dialoge SHALL optional einen Ort mit derselben Auswahl wie die Spalte „Ort“ nehmen;
+der Posten MUST nach dem Disponieren an diesem Ort stehen. Der Ad-hoc-Dialog MUST eine Art anbieten,
+deren Vorgabe der Menge folgt (über 1 Verbrauchsgut, sonst Gerät), bis die Person selbst wählt; bei
+Gerät MUST die Menge 1 betragen und gesperrt sein.
+
+#### Scenario: Anlieferung an die UHS
+- **WHEN** die Person im Stamm-Dialog „Wolldecke“ mit Menge 50 und Ort „UHS Turnhalle“ disponiert
+- **THEN** steht der neue Posten an der UHS „Turnhalle“, und im Serienmodus bleibt der Ort für den nächsten Eintrag stehen
+
+#### Scenario: Ad-hoc-Sandsäcke
+- **WHEN** die Person Ad-hoc-Material „Sandsäcke“ mit Menge 200 erfasst, ohne die Art zu wählen
+- **THEN** zeigt der Dialog „Verbrauchsgut“, und der Posten wird als Verbrauchsgut angelegt
 
 ### Requirement: Wortlaut für Material
 

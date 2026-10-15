@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs]
 ---
 
 ## Überblick
@@ -34,7 +34,9 @@ System-Admins. Führungskräfte der Organisation sehen sie zum Nachschlagen.
    stehen.
 
 Personal („Person anlegen“) und Material („Material anlegen“) werden auf dieselbe Weise
-angelegt.
+angelegt. Material trägt dazu die „Art“: „Gerät“ (Vorgabe) oder „Verbrauchsgut“. Mit „Speichern
+und nächste“ und „Werte behalten“ bleibt auch die Art für das nächste Material stehen. Die
+Materialliste lässt sich nach „Art“ filtern.
 
 ### Ein Fahrzeug außer Dienst nehmen
 
@@ -135,6 +137,13 @@ Verwaltung nicht.
   zeigt den Stand von damals; nach „Wieder in Dienst nehmen“ wieder die aktuellen Stammdaten.
 - **Deaktivieren** nimmt einen Katalogeintrag aus der Auswahl. Bestehende Zuordnungen bleiben
   gültig.
+
+### Gerät und Verbrauchsgut
+
+Die Art eines Materials entscheidet, wie es im Einsatz steht: ein Gerät je Stück mit Menge 1 und
+allen fünf Status, ein Verbrauchsgut mit Menge, Ausgabe und den Status einsatzbereit, im Einsatz
+und defekt (Kapitel [Material](material.md)). Sie geht beim Disponieren auf den Posten über; eine
+spätere Änderung am Stamm gilt nur für neue Dispositionen.
 
 ### Externe Stellen
 

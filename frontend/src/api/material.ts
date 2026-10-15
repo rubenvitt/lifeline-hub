@@ -1,4 +1,4 @@
-import type { Material } from './types';
+import type { Material, MaterialArt } from './types';
 import { apiGet, apiSend } from './client';
 import { setzeDienststatusUnter } from './katalogApi';
 
@@ -10,6 +10,8 @@ export interface MaterialEingabe {
   traegerorganisation: string | null;
   standort: string | null;
   bemerkung: string | null;
+  /** Gerät oder Verbrauchsgut (LLH-1224); gilt für neue Dispositionen, nie rückwirkend. */
+  art: MaterialArt;
 }
 
 export function listeMaterial(nurImDienst = false): Promise<Material[]> {

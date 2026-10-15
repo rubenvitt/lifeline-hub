@@ -33,6 +33,12 @@ export const MENUE_ZU_MS = 30_000;
  */
 export const ABRUF_TAKT_MS = 30_000;
 
+/**
+ * So lange hebt der Monitor eine gestiegene Zahl hervor (Spec `lagemonitor`, „Neue Dringlichkeit
+ * sichtbar hervorheben“, Change `kcjecn9e-benachrichtigungskonzept` D12).
+ */
+export const HERVORHEBUNG_MS = 60_000;
+
 /** Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`). */
 export const GROSS = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as const;
 
@@ -89,6 +95,28 @@ export function useBildschirmWach(gestartet: boolean): WachZustand {
   return an ? 'an' : 'aus';
 }
 
+/**
+ * Ob `wert` gerade hervorgehoben ist: {@link HERVORHEBUNG_MS} lang nach jedem Anstieg gegenüber
+ * dem zuletzt gezeigten Stand; ein weiterer Anstieg beginnt die Frist neu. Der erste Stand nach
+ * dem Laden, ein gleicher und ein kleinerer Wert heben nichts hervor, und bei 0 ist nichts mehr
+ * hervorzuheben. Verglichen wird im Browser, der Server liefert nur die Zahl.
+ */
+export function useAnstieg(wert: number | undefined): boolean {
+  const vorher = useRef(wert);
+  const frist = useRef<number | undefined>(undefined);
+  const [an, setAn] = useState(false);
+  useEffect(() => {
+    const alt = vorher.current;
+    vorher.current = wert;
+    if (wert === undefined || alt === undefined || wert <= alt) return;
+    setAn(true);
+    window.clearTimeout(frist.current);
+    frist.current = window.setTimeout(() => setAn(false), HERVORHEBUNG_MS);
+  }, [wert]);
+  useEffect(() => () => window.clearTimeout(frist.current), []);
+  return an && wert !== undefined && wert > 0;
+}
+
 function useJetzt(taktMs: number): number {
   const [jetzt, setJetzt] = useState(() => Date.now());
   useEffect(() => {
@@ -101,12 +129,15 @@ function useJetzt(taktMs: number): number {
 function Kachel({
   titel,
   zusatz,
+  zusatzAlarm = false,
   children,
   style,
 }: {
   titel: string;
   /** Kurzer Text rechts in der Titelzeile, ohne eigene Zeile. */
   zusatz?: string;
+  /** Der Zusatz ist das Wort einer Hervorhebung und steht in der Alarmfarbe. */
+  zusatzAlarm?: boolean;
   children: ReactNode;
   style?: CSSProperties;
 }) {
@@ -147,7 +178,8 @@ function Kachel({
               fontSize: GROSS.text,
               lineHeight: 1.2,
               fontVariantNumeric: 'tabular-nums',
-              color: rollen.text,
+              fontWeight: zusatzAlarm ? 700 : 400,
+              color: zusatzAlarm ? rollen.alarmText : rollen.text,
               whiteSpace: 'nowrap',
             }}
           >
@@ -166,6 +198,7 @@ function Zahl({
   groesse = GROSS.kennzahlKlein,
   farbe,
   zeilen = 1,
+  hervorgehoben,
 }: {
   wert: number | string;
   bezeichnung: string;
@@ -173,10 +206,28 @@ function Zahl({
   farbe?: string;
   /** Zeilen der Bezeichnung; ein UHS-Name bricht um, statt in der Mitte abzureißen. */
   zeilen?: 1 | 2;
+  /**
+   * Nur an Zahlen, die bei einem Anstieg hervortreten ({@link useAnstieg}): Alarmfläche ohne
+   * Animation. Die Fläche reicht per `box-shadow` über den Rand, damit nichts verrutscht.
+   */
+  hervorgehoben?: boolean;
 }) {
   const { rollen } = useRollen();
   return (
-    <div data-lfh="monitor-zahl" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+    <div
+      data-lfh="monitor-zahl"
+      data-hervorgehoben={hervorgehoben === undefined ? undefined : hervorgehoben ? 'ja' : 'nein'}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        ...(hervorgehoben && {
+          background: rollen.alarmFuellung,
+          boxShadow: `0 0 0 8px ${rollen.alarmFuellung}`,
+          borderRadius: 2,
+        }),
+      }}
+    >
       <span
         style={{
           fontFamily: schrift.zahl,
@@ -184,7 +235,7 @@ function Zahl({
           fontSize: groesse,
           lineHeight: 1,
           fontWeight: 600,
-          color: farbe ?? rollen.text,
+          color: hervorgehoben ? rollen.alarmText : (farbe ?? rollen.text),
         }}
       >
         {wert}
@@ -194,7 +245,7 @@ function Zahl({
           zeilen === 1
             ? {
                 fontSize: GROSS.text,
-                color: rollen.gedaempft,
+                color: hervorgehoben ? rollen.alarmText : rollen.gedaempft,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -202,7 +253,7 @@ function Zahl({
             : {
                 fontSize: GROSS.text,
                 lineHeight: 1.2,
-                color: rollen.gedaempft,
+                color: hervorgehoben ? rollen.alarmText : rollen.gedaempft,
                 display: '-webkit-box',
                 WebkitLineClamp: zeilen,
                 WebkitBoxOrient: 'vertical',
@@ -220,7 +271,7 @@ function Zahl({
 /** So viele UHS passen ohne Bildlauf in die Kachel; der Rest steht als „+n weitere“. */
 const UHS_SICHTBAR = 6;
 
-function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
+function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }) {
   const { rollen } = useRollen();
   const b = lage.betroffene;
   const k = lage.kraefte;
@@ -233,7 +284,7 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
   const anUhs = lage.uhs.reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
-      <Kachel titel="Betroffene">
+      <Kachel titel="Betroffene" zusatz={sk1Neu ? 'Neu in SK I' : undefined} zusatzAlarm={sk1Neu}>
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
           <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse={GROSS.kennzahl} />
           <Zahl wert={b.patienten} bezeichnung="Patienten" groesse={GROSS.kennzahl} />
@@ -245,7 +296,12 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
           />
         </div>
         <div style={{ display: 'flex', gap: 32 }}>
-          <Zahl wert={b.sk1} bezeichnung="SK I" farbe={b.sk1 > 0 ? rollen.alarmText : undefined} />
+          <Zahl
+            wert={b.sk1}
+            bezeichnung="SK I"
+            farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
+            hervorgehoben={sk1Neu}
+          />
           <Zahl wert={b.sk2} bezeichnung="SK II" />
           <Zahl wert={b.sk3} bezeichnung="SK III" />
           <Zahl wert={b.sk4} bezeichnung="SK IV" />
@@ -293,6 +349,27 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
         )}
       </Kachel>
     </>
+  );
+}
+
+/**
+ * Offene Sofortmeldungen als Kopfzahl unter der Karte (D12): nur die Zahl, die der Server
+ * verdichtet; der Monitor kennt weder Text noch Absender. Steigt sie, steht das Wort in der
+ * Titelzeile.
+ */
+function MeldungenKachel({ offen, neu }: { offen: number | undefined; neu: boolean }) {
+  const { rollen } = useRollen();
+  return (
+    <Kachel titel="Meldungen" zusatz={neu ? 'Neue Sofortmeldung' : undefined} zusatzAlarm={neu}>
+      <div style={{ display: 'flex' }}>
+        <Zahl
+          wert={offen ?? '–'}
+          bezeichnung="Sofortmeldungen offen"
+          farbe={offen != null && offen > 0 ? rollen.alarmText : undefined}
+          hervorgehoben={neu}
+        />
+      </div>
+    </Kachel>
   );
 }
 
@@ -510,6 +587,8 @@ export default function LagemonitorPage() {
   });
   const einsatz = einsatzQuery.data;
   const lage = lageQuery.data;
+  const sofortNeu = useAnstieg(lage?.sofortmeldungen_offen);
+  const sk1Neu = useAnstieg(lage?.betroffene.sk1);
   const schliesseMenue = useCallback(() => setMenueOffen(false), []);
 
   if (!geraet) return null;
@@ -541,19 +620,22 @@ export default function LagemonitorPage() {
           pointerEvents: 'none',
         }}
       >
-        <Kachel titel="Lagekarte">
-          <div style={{ flex: '1 1 0', minHeight: 0 }}>
-            <LagemonitorKarte
-              einsatzort={einsatzort}
-              uhs={lage?.uhs ?? []}
-              zonen={lage?.zonen}
-              abschnitte={lage?.abschnitte}
-            />
-          </div>
-        </Kachel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
+            <div style={{ flex: '1 1 0', minHeight: 0 }}>
+              <LagemonitorKarte
+                einsatzort={einsatzort}
+                uhs={lage?.uhs ?? []}
+                zonen={lage?.zonen}
+                abschnitte={lage?.abschnitte}
+              />
+            </div>
+          </Kachel>
+          <MeldungenKachel offen={lage?.sofortmeldungen_offen} neu={sofortNeu} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
           {lage ? (
-            <Kacheln lage={lage} />
+            <Kacheln lage={lage} sk1Neu={sk1Neu} />
           ) : (
             <Kachel titel="Lagebild">
               <span style={{ fontSize: GROSS.text }}>

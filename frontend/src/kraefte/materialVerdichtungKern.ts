@@ -1,5 +1,6 @@
-import type { EinsatzMaterial, MaterialStatus } from '../api/types';
+import type { EinsatzMaterial } from '../api/types';
 import { materialStatus, type Statusrolle } from '../theme/statusFarben';
+import { isAufgebraucht } from './materialPosten';
 
 /**
  * Die eine Zählung des Materials (LLH-1093, design.md D10; Entscheidung 13.10.2026 Nr. 2), rein.
@@ -8,7 +9,9 @@ import { materialStatus, type Statusrolle } from '../theme/statusFarben';
  * `materialStatus` (`theme/statusFarben.ts`), nie nach dem Statuswert: `normal` → einsatzbereit,
  * `bedien` → im Einsatz, `alarm` oder `achtung` → Ausfall (defekt, verbraucht, Desinfektion
  * nötig). Bekommt ein Status eine andere Rolle, scheitert `materialVerdichtungKern.test.ts`:
- * dann ist die Regel neu zu entscheiden, nicht still zu erweitern.
+ * dann ist die Regel neu zu entscheiden, nicht still zu erweitern. Ein aufgebrauchtes
+ * Verbrauchsgut ist Ausfall in der Rolle von „verbraucht“, gleich welcher Status (LLH-1224,
+ * design.md D15: das frühere „verbraucht“ eines Verbrauchsguts heißt jetzt „aufgebraucht“).
  *
  * Abnehmer: die Materialseite (`MaterialVerdichtung.tsx`) und die Material-Gruppenzeile des
  * Meldebilds über `kraeftebaumKern.ts` (LLH-1025); keiner zählt Material selbst.
@@ -23,22 +26,39 @@ const TOPF_DER_ROLLE: Partial<Record<Statusrolle, MaterialTopf>> = {
   achtung: 'ausfall',
 };
 
-/** Der Topf eines Status über seine Rolle; `undefined` nur bei einer unentschiedenen Rolle. */
-export function materialTopf(status: MaterialStatus): MaterialTopf | undefined {
-  return TOPF_DER_ROLLE[materialStatus[status].rolle];
+/** Was die Zählung von einer Zeile braucht: Status, Art und Ausgabe. */
+export type MaterialZaehlZeile = Pick<EinsatzMaterial, 'status' | 'art' | 'menge' | 'ausgegeben'>;
+
+/** Die Rolle, nach der ein Posten zählt: aufgebraucht wie „verbraucht“, sonst sein Status. */
+function zaehlRolle(em: MaterialZaehlZeile): Statusrolle {
+  return isAufgebraucht(em) ? materialStatus.verbraucht.rolle : materialStatus[em.status].rolle;
+}
+
+/** Der Topf eines Postens über seine Rolle; `undefined` nur bei einer unentschiedenen Rolle. */
+export function materialTopf(em: MaterialZaehlZeile): MaterialTopf | undefined {
+  return TOPF_DER_ROLLE[zaehlRolle(em)];
 }
 
 /**
- * Ausfall eines Materialpostens (Option A aus LLH-1087): die Status mit Rolle `alarm` oder
- * `achtung` im Vertrag — defekt, verbraucht, Desinfektion nötig.
+ * Ausfall eines Materialpostens (Option A aus LLH-1087, LLH-1224): die Status mit Rolle `alarm`
+ * oder `achtung` im Vertrag — defekt, verbraucht, Desinfektion nötig — oder aufgebraucht.
  */
-export function isMaterialAusfall(status: MaterialStatus): boolean {
-  return materialTopf(status) === 'ausfall';
+export function isMaterialAusfall(em: MaterialZaehlZeile): boolean {
+  return materialTopf(em) === 'ausfall';
 }
 
 /** Zahl der ausgefallenen Posten (nicht Mengen). */
-export function materialAusfall(material: readonly Pick<EinsatzMaterial, 'status'>[]): number {
-  return material.filter((m) => isMaterialAusfall(m.status)).length;
+export function materialAusfall(material: readonly MaterialZaehlZeile[]): number {
+  return material.filter(isMaterialAusfall).length;
+}
+
+/**
+ * Die Kopfzahl des Materials an einem Ort (LLH-1225, design.md D8): „3 Posten · 1 Ausfall“, ohne
+ * Ausfall nur „3 Posten“. Einheit-Ansicht, Beladung, UHS-Reiter und Bereitstellungsraum lesen sie.
+ */
+export function materialKopfzahl(material: readonly MaterialZaehlZeile[]): string {
+  const ausfall = materialAusfall(material);
+  return `${material.length} Posten${ausfall > 0 ? ` · ${ausfall} Ausfall` : ''}`;
 }
 
 export interface MaterialVerdichtungWerte {
@@ -51,7 +71,7 @@ export interface MaterialVerdichtungWerte {
 }
 
 export function verdichteMaterial(
-  material: readonly Pick<EinsatzMaterial, 'status'>[],
+  material: readonly MaterialZaehlZeile[],
 ): MaterialVerdichtungWerte {
   const v: MaterialVerdichtungWerte = {
     gesamt: material.length,
@@ -61,12 +81,12 @@ export function verdichteMaterial(
     ausfallRolle: null,
   };
   for (const m of material) {
-    const topf = materialTopf(m.status);
+    const topf = materialTopf(m);
     if (topf === 'einsatzbereit') v.einsatzbereit += 1;
     else if (topf === 'imEinsatz') v.imEinsatz += 1;
     else if (topf === 'ausfall') {
       v.ausfall += 1;
-      const rolle = materialStatus[m.status].rolle;
+      const rolle = zaehlRolle(m);
       if (rolle === 'alarm' || (rolle === 'achtung' && v.ausfallRolle === null)) {
         v.ausfallRolle = rolle;
       }

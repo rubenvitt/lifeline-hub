@@ -306,6 +306,28 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
+        // Aus einer Nachforderung übernommenes Material (LLH-1226): der Bezug hält das Löschen
+        // nicht auf (`ON DELETE SET NULL`).
+        let nachforderung: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+                angefordert_at, erstellt_von_id) \
+             VALUES (?, 'Tauchpumpe', '3 Tauchpumpen', 'leitstelle', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(abgeschlossen_at)
+        .bind(erfasser)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, nachforderung_id) \
+             VALUES (?, 'Tauchpumpe', 'geraet', ?)",
+        )
+        .bind(e)
+        .bind(nachforderung)
+        .execute(pool)
+        .await
+        .unwrap();
         e
     }
 

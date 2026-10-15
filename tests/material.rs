@@ -374,3 +374,74 @@ async fn kategorien_endpunkt_liefert_distinct() {
         "DISTINCT: Betreuung, Hochwasser"
     );
 }
+
+// ---------- LLH-1224: Art am Stamm ----------
+
+/// Spec `material-modell`, „Art am Stamm“: ohne Angabe ein Gerät, eine gesendete Art bleibt
+/// stehen, bis ein PATCH sie ändert; unbekannte Art und `null` sind 400 und schreiben nichts.
+#[tokio::test]
+async fn art_am_stamm_vorgabe_geraet_und_grenzen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Stromerzeuger"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(json["art"], "geraet", "Vorgabe Gerät");
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Wolldecke","art":"verbrauchsgut"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(json["art"], "verbrauchsgut");
+    let id = json["id"].as_i64().unwrap();
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Fass","art":"fass"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+    let pfad = format!("/api/material/{id}");
+    for body in [r#"{"art":"fass"}"#, r#"{"art":null}"#] {
+        let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(body)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"bemerkung":"Lager"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["art"], "verbrauchsgut", "absente Art bleibt");
+    let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"art":"geraet"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["art"], "geraet");
+    let (_, liste) = anfrage(&app, "GET", "/api/material", &admin, None).await;
+    let arten: Vec<_> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["art"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        arten,
+        ["geraet", "geraet"],
+        "Liste trägt die Art; kein Fass angelegt"
+    );
+}
