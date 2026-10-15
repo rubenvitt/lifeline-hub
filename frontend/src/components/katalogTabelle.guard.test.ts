@@ -50,10 +50,10 @@ const SRC = (() => {
 })();
 
 /**
- * Die neunzehn Tabellen hinter dem Primitiv — vierzehn Kataloge (elf Stammdaten-Reiter, zwei
- * Karten-Sektionen, Benutzer) und fünf Einsatz-/Verwaltungstabellen als Überlaufschutz.
+ * Die achtzehn Tabellen hinter dem Primitiv — vierzehn Kataloge (elf Stammdaten-Reiter, zwei
+ * Karten-Sektionen, Benutzer) und vier Einsatz-/Verwaltungstabellen als Überlaufschutz.
  *
- * Die fünf sind KEINE `Datensicht`-Konsumenten: sie bekommen nur Scrollcontainer, stehende
+ * Die vier sind KEINE `Datensicht`-Konsumenten: sie bekommen nur Scrollcontainer, stehende
  * Kopfzeile und fixierte Kennung, ihr Guard-Ort ist deshalb dieses Inventar. Das ETB ist eine
  * Zeitachse und läuft über keines der beiden Primitive.
  */
@@ -75,7 +75,7 @@ const KATALOGE = [
 ];
 
 /**
- * Die fünf Nachzügler des Überlaufschutzes, getrennt gehalten, weil die Blätterungsschwelle nur
+ * Die vier Nachzügler des Überlaufschutzes, getrennt gehalten, weil die Blätterungsschwelle nur
  * für die Kataloge gilt. Wer über `Datensicht` rendert (`SchaedenPage`, `PersonenPage`,
  * `TierePage`), gehört nach `datensicht.guard.test.ts`, nicht hierher.
  */
@@ -83,7 +83,6 @@ const UEBERLAUF_NACHZUG = [
   'pages/bereitstellungsraum/BereitstellungsraeumePage.tsx',
   'pages/UnfallhilfsstellenPage.tsx',
   'pages/PersonenDetailPage.tsx',
-  'pages/uhs/MaterialTab.tsx',
   'pages/MitgliederAbschnitt.tsx',
 ];
 
@@ -302,8 +301,8 @@ export function rohtabellenBefunde(dateien: Record<string, string>, ausnahmen: s
 const KORPUS = lieseKorpus(SRC);
 
 describe('KatalogTabelle-Inventar', () => {
-  it('alle 19 Tabellen laufen über das Primitiv', () => {
-    expect(QUELLEN).toHaveLength(19);
+  it('alle 18 Tabellen laufen über das Primitiv', () => {
+    expect(QUELLEN).toHaveLength(18);
 
     const ohnePrimitiv = QUELLEN.filter(
       (q) => treffer(q.text, elementMuster('KatalogTabelle')) < 1,
@@ -378,7 +377,7 @@ describe('KatalogTabelle-Inventar', () => {
 });
 
 describe('KatalogTabelle-Ordnung', () => {
-  /** Nur die vierzehn Kataloge — die fünf Nachzügler tragen die Ordnung ausdrücklich nicht. */
+  /** Nur die vierzehn Kataloge — die vier Nachzügler tragen die Ordnung ausdrücklich nicht. */
   const KATALOG_QUELLEN = QUELLEN.filter((q) => KATALOGE.includes(q.pfad));
 
   it('die vierzehn Kataloge sind vollzählig', () => {
@@ -591,7 +590,7 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
  * Objektliteralen; dieser Guard schließt die Lücke je Konsumentendatei. Die Doppelpunkt-Form
  * trifft `overflow: 'hidden'` nicht.
  *
- * BLINDE FLECKEN: gelesen werden nur die neunzehn Konsumentendateien. Eine ausgelagerte
+ * BLINDE FLECKEN: gelesen werden nur die achtzehn Konsumentendateien. Eine ausgelagerte
  * Spaltenliste (Muster `personen/personenSpalten.tsx`) sieht er nicht, und eine Typassertion
  * (`[…] as KatalogSpalte<X>[]`) hebelt die Typsperre aus. Wer eine Spaltenliste auslagert,
  * nimmt die Datei hier mit auf.

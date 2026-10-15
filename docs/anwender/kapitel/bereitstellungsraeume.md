@@ -2,14 +2,14 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs]
 ---
 
 ## Überblick
 
 Ein **Bereitstellungsraum** (BR) ist der Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz
-warten. Das Modul zeigt je Raum, wer dort bereitsteht und mit welcher Stärke, und welche Kräfte noch
-keinem Raum zugewiesen sind.
+warten. Das Modul zeigt je Raum, wer dort bereitsteht und mit welcher Stärke, welche Kräfte noch
+keinem Raum zugewiesen sind und welches Material dort liegt.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder
@@ -68,6 +68,20 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 
 4. Rückt eine Kraft aus, bei ihr „entfernen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
 
+### Material im Raum führen
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist, auch in einem
+geplanten Raum:
+
+1. Den Raum öffnen. Unter den bereitgestellten Fahrzeugen steht „Material“ mit der Zahl der Posten
+   und, falls vorhanden, dem Ausfall, je Posten Menge und Status.
+2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
+   anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Der
+   Posten liegt danach im Raum.
+3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
+   „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
+4. Mit „Lösen“ einen Posten aus dem Raum lösen. Er bleibt ohne Ort im Einsatz.
+
 ### Einen Bereitstellungsraum auflösen oder stornieren
 
 Für Einsatzleitung und Führungspersonal:
@@ -84,7 +98,9 @@ Für Einsatzleitung und Führungspersonal:
 ### Status eines Raums
 
 Ein Raum durchläuft „geplant“, „aktiv“ und „aufgelöst“. Kräfte lassen sich nur einem aktiven Raum
-zuweisen. Bezeichnung, Standort und Notiz lassen sich ändern, solange der Raum geplant oder aktiv
+zuweisen, Material schon einem geplanten: so lässt sich ein Raum vorbereiten. Ein aufgelöster Raum
+nimmt kein Material mehr an; „Material zuordnen …“ steht dort gesperrt mit „BR aufgelöst“, und
+Material, das noch dort liegt, lässt sich lösen. Bezeichnung, Standort und Notiz lassen sich ändern, solange der Raum geplant oder aktiv
 ist; ein aufgelöster Raum ist nur zu lesen.
 
 ### Wer zugewiesen werden kann
@@ -93,6 +109,14 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Eine Kraft steht
 höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten entfernt. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
+
+### Material im Raum
+
+Material liegt an genau einem Ort (Kapitel [Material](material.md)); ein Posten von einem anderen
+Ort wird ohne Rückfrage umgehängt, und das Einsatztagebuch nennt den alten und den neuen Ort.
+Material in einem Bereitstellungsraum steht nicht im [Meldebild](meldebild.md). Zuordnen, Lösen
+und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; ohne die
+Freigabe fehlt die Sektion „Material“. Am gekoppelten Tablet eines Raums fehlt sie ebenso.
 
 ### Einsatztagebuch
 

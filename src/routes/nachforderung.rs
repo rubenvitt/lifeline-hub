@@ -5,7 +5,9 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
+use crate::nachforderung::{
+    repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT, STATUS_EINGETROFFEN,
+};
 use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
@@ -16,7 +18,7 @@ use serde::Deserialize;
 
 /// SSE-Notify: Nachforderungen des Einsatzes haben sich geändert (Tag `nachforderung`,
 /// auf der EINEN bestehenden /etb/stream-Verbindung).
-fn sse(state: &AppState, einsatz_id: i64) {
+pub(super) fn sse(state: &AppState, einsatz_id: i64) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Nachforderung);
@@ -54,7 +56,7 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültiger Status-Filter".into()));
         }
     }
-    Ok(Json(repo::liste(&state.pool, einsatz_id, status).await?))
+    Ok(Json(repo::list(&state.pool, einsatz_id, status).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,7 +115,7 @@ pub async fn anlegen(
         None => jetzt(),
     };
 
-    let n = repo::anlegen(
+    let n = repo::create(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -145,7 +147,7 @@ async fn fordere_bearbeitbar(
     einsatz_id: i64,
     nachforderung_id: i64,
 ) -> Result<(), AppError> {
-    if !repo::gehoert_zu_einsatz(&state.pool, nachforderung_id, einsatz_id).await? {
+    if !repo::belongs_to_einsatz(&state.pool, nachforderung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
     Ok(())
@@ -172,15 +174,23 @@ pub async fn status(
             "Ablehnung erfolgt über den /ablehnen-Endpoint".into(),
         ));
     }
-    let aktuell = repo::laden(&state.pool, nachforderung_id).await?;
+    let aktuell = repo::load(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), neu) {
         return Err(AppError::UnprocessableEntity(format!(
             "Übergang {} → {neu} nicht erlaubt",
             aktuell.status.as_str()
         )));
     }
+    // Was übernommen ist, ist da (LLH-1226, design.md D9): keine Rücknahme mit Materialposten.
+    if aktuell.status.as_str() == STATUS_EINGETROFFEN
+        && repo::has_material(&state.pool, nachforderung_id).await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Aus der Nachforderung ist Material übernommen".into(),
+        ));
+    }
     // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
-    if !repo::setze_status(
+    if !repo::update_status(
         &state.pool,
         nachforderung_id,
         neu,
@@ -193,7 +203,7 @@ pub async fn status(
             "Status wurde zwischenzeitlich geändert".into(),
         ));
     }
-    let n = repo::laden(&state.pool, nachforderung_id).await?;
+    let n = repo::load(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
     Ok(Json(n))
 }
@@ -212,7 +222,7 @@ pub async fn ablehnen(
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     fordere_bearbeitbar(&state, einsatz_id, nachforderung_id).await?;
-    let aktuell = repo::laden(&state.pool, nachforderung_id).await?;
+    let aktuell = repo::load(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ABGELEHNT) {
         return Err(AppError::UnprocessableEntity(
             "Nachforderung kann in diesem Zustand nicht abgelehnt werden".into(),
@@ -231,7 +241,7 @@ pub async fn ablehnen(
             "Status wurde zwischenzeitlich geändert".into(),
         ));
     }
-    let n = repo::laden(&state.pool, nachforderung_id).await?;
+    let n = repo::load(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
     Ok(Json(n))
 }

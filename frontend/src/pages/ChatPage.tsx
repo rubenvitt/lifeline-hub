@@ -1,6 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Col, Row, Spin } from 'antd';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
@@ -27,7 +27,7 @@ import { listeLageberichte } from '../api/lageberichte';
 import { listeMeldungen } from '../api/meldungen';
 import { listeAuftraege } from '../api/auftraege';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
+import type { BezugTyp, ChatErwaehnung, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -39,6 +39,7 @@ import HeraufstufenModal from '../chat/HeraufstufenModal';
 import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
 import BearbeitenModal from '../chat/BearbeitenModal';
 import BezugDialog from '../chat/BezugDialog';
+import { useErwaehnungsVorschlaege } from '../chat/useErwaehnungsVorschlaege';
 import {
   auftragInfo,
   auftragLabel,
@@ -74,6 +75,7 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { anzahl } from '../anzeige/anzahl';
 import { modulName } from '../einsatz/modulRegistry';
+import { parseRouteId } from '../routing/deeplinks';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -144,7 +146,22 @@ export default function ChatPage() {
   });
 
   const kanaele = kanaeleQuery.data ?? [];
-  const ausgewaehlterKanal = kanalAuswahl?.einsatzId === einsatzId ? kanalAuswahl.kanalId : null;
+  // `?kanal=` (Sprung einer Erwähnung, `chatPfad`) wählt den Kanal; ein neuer Sprung wählt neu,
+  // auch wenn vorher von Hand ein anderer Kanal gewählt war.
+  const [suchParams] = useSearchParams();
+  const kanalAusUrl = parseRouteId(suchParams.get('kanal') ?? undefined);
+  const [gesehenerUrlKanal, setGesehenerUrlKanal] = useState(kanalAusUrl);
+  if (gesehenerUrlKanal !== kanalAusUrl) {
+    setGesehenerUrlKanal(kanalAusUrl);
+    setKanalAuswahl(kanalAusUrl === null ? null : { einsatzId, kanalId: kanalAusUrl });
+  }
+  const ausgewaehlterKanal =
+    kanalAuswahl?.einsatzId === einsatzId ? kanalAuswahl.kanalId : kanalAusUrl;
+  const erwaehnungsVorschlaege = useErwaehnungsVorschlaege(
+    einsatzId,
+    einsatzQuery.data,
+    benutzer?.id,
+  );
   // Beim Routewechsel darf die Kanal-ID des vorherigen Einsatzes nicht einmal für einen
   // Zwischen-Render in die neue URL geraten. Erst die erfolgreich geladene, aktuelle Kanalliste
   // gibt eine Auswahl oder ihren ersten Kanal frei.
@@ -281,7 +298,15 @@ export default function ChatPage() {
   const sendenMutation = useMutation({
     // Zweistufig: erst Anhänge hochladen (falls vorhanden, mit Fortschritt; LFH-1021), dann
     // Nachricht mit den resultierenden anhang_ids senden.
-    mutationFn: async ({ text, dateien }: { text: string; dateien: File[] }) => {
+    mutationFn: async ({
+      text,
+      dateien,
+      erwaehnungen,
+    }: {
+      text: string;
+      dateien: File[];
+      erwaehnungen: ChatErwaehnung[];
+    }) => {
       const anhaenge =
         dateien.length > 0
           ? await anhangFortschritt.begleite((onFortschritt) =>
@@ -293,6 +318,7 @@ export default function ChatPage() {
         kanalId as number,
         text,
         anhaenge.map((a) => a.id),
+        erwaehnungen,
       );
     },
     onSuccess: () => {
@@ -572,7 +598,10 @@ export default function ChatPage() {
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe
-              onSenden={(t, d) => sendenMutation.mutateAsync({ text: t, dateien: d })}
+              onSenden={(t, d, e) =>
+                sendenMutation.mutateAsync({ text: t, dateien: d, erwaehnungen: e })
+              }
+              vorschlaege={erwaehnungsVorschlaege}
               senden={sendenMutation.isPending}
               fortschritt={sendenMutation.isPending ? anhangFortschritt.stand : null}
               fehler={sendenMutation.error}

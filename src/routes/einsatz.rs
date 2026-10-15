@@ -1,5 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige;
 use crate::einsatz::berechtigung::ist_fristverkuerzung;
 use crate::einsatz::kontext::{
@@ -144,6 +147,20 @@ pub async fn anlegen(
     )
     .await?;
     einsatzliste_melden(&state.pool, &state.live, einsatz.id, &[]).await;
+    // Spec `benachrichtigungen`, „Neuer Einsatz“: an die Führungskräfte der Org, die ihn lesen
+    // dürfen; wer ihn nicht lesen darf, erfährt nichts (Auflösung, `src/AGENTS.md`).
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            einsatz.id,
+            BenachrichtigungArt::EinsatzNeu,
+            Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz.id),
+        )
+        .von(benutzer.id)
+        .an(Adressat::Fuehrungskraefte),
+    )
+    .await;
     Ok((
         StatusCode::CREATED,
         Json(einsatz.anzeige(
@@ -970,7 +987,7 @@ pub async fn mitglied_setzen(
         }
     }
 
-    repo::setze_mitgliedschaft(
+    let aufgenommen = repo::setze_mitgliedschaft(
         &state.pool,
         id,
         ziel_id,
@@ -981,6 +998,23 @@ pub async fn mitglied_setzen(
     // Die Liste des neuen Mitglieds bekommt den Einsatz, die der übrigen eine neue `meine_*`-Lage;
     // der Kopf auf dem Schirm der betroffenen Person ihr neues Schreibrecht (LFH-854).
     kopf_geaendert_fuer(&state, id, &[ziel_id]).await;
+    // Nur eine neue Mitgliedschaft ist eine Aufnahme (Spec `benachrichtigungen`, „Aufnahme in
+    // einen Einsatz“); Rollenwechsel und Wiederholung bleiben still. Org-Art: erreicht die
+    // Person auch auf der Einsatzliste (`src/AGENTS.md`, Benachrichtigungen).
+    if aufgenommen {
+        benachrichtigung::melden(
+            &state.pool,
+            &state.live,
+            Anlass::neu(
+                id,
+                BenachrichtigungArt::EinsatzAufnahme,
+                Bezug::neu(BenachrichtigungBezugTyp::Einsatz, id),
+            )
+            .von(ctx.benutzer.id)
+            .an(Adressat::Nutzer(ziel_id)),
+        )
+        .await;
+    }
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 

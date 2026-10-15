@@ -57,12 +57,13 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         BenachrichtigungBezugTyp::Person => Some(("einsatz_person", "registrier_nr")),
         BenachrichtigungBezugTyp::Einheit => Some(("einsatz_einheit", "name")),
         BenachrichtigungBezugTyp::Fahrzeug => Some(("einsatz_fahrzeug", "snap_funkrufname")),
+        // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
+        BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
+        BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
         // Mehr als eine Spalte: eigener Weg über `AUFTRAG_EMPFAENGER_SPALTEN`.
         BenachrichtigungBezugTyp::AuftragEmpfaenger => None,
         // Titel und Freitexte dieser Objekte sind Scrub-Werte; ihr Titel genügt.
-        BenachrichtigungBezugTyp::Befehl
-        | BenachrichtigungBezugTyp::Lagebericht
-        | BenachrichtigungBezugTyp::Erinnerung
+        BenachrichtigungBezugTyp::Erinnerung
         | BenachrichtigungBezugTyp::Abloesung
         | BenachrichtigungBezugTyp::Lagebesprechung
         | BenachrichtigungBezugTyp::Gefahrengebiet
@@ -75,6 +76,9 @@ fn detail_formen(typ: BenachrichtigungBezugTyp, wert: String) -> String {
     match typ {
         BenachrichtigungBezugTyp::Meldung => format!("Meldung #{wert}"),
         BenachrichtigungBezugTyp::Auftrag => format!("Auftrag #{wert}"),
+        BenachrichtigungBezugTyp::Befehl | BenachrichtigungBezugTyp::Lagebericht => {
+            format!("Version {wert}")
+        }
         BenachrichtigungBezugTyp::Nachforderung => format!("Status: {}", wert.replace('_', " ")),
         BenachrichtigungBezugTyp::Person => match wert.parse::<i64>() {
             Ok(nr) => format!("Person {}", crate::person::registrier_anzeige(nr)),
@@ -108,8 +112,44 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         BenachrichtigungBezugTyp::Person => format!("{basis}/personen/{id}"),
         BenachrichtigungBezugTyp::Einheit => format!("{basis}/einheiten/{id}"),
         BenachrichtigungBezugTyp::Fahrzeug => format!("{basis}/fahrzeuge?fahrzeug={id}"),
+        // Ohne gelesene Zeile der Chat; `bilden` setzt den Kanal der Nachricht ein.
         BenachrichtigungBezugTyp::ChatNachricht => format!("{basis}/chat"),
     }
+}
+
+/// Was der Sprung zu einer Chat-Nachricht liest (Erwähnung, LLH-1220): nur den Kanal, kein
+/// Inhalt und kein Kanalname (Scrub-Werte). Guard
+/// `sprung_zur_chat_nachricht_liest_nur_retain_spalten`.
+pub const CHAT_NACHRICHT_SPALTEN: &[(&str, &str)] = &[
+    ("chat_nachricht", "kanal_id"),
+    ("chat_nachricht", "einsatz_id"),
+];
+
+/// Die Abfrage des Sprungs; liest nur [`CHAT_NACHRICHT_SPALTEN`].
+pub const CHAT_NACHRICHT_SQL: &str =
+    "SELECT kanal_id FROM chat_nachricht WHERE id = ? AND einsatz_id = ?";
+
+/// Text zu einer Chat-Nachricht: ohne Detailzeile (Inhalt und Kanalname sind Scrub-Werte), der
+/// Sprung öffnet den Kanal der Nachricht (`chatPfad` in `frontend/src/routing/deeplinks.ts`).
+async fn chat_nachricht_text(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    bezug: Bezug,
+) -> Result<Text, AppError> {
+    let kanal: Option<i64> = sqlx::query_scalar(CHAT_NACHRICHT_SQL)
+        .bind(bezug.id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(Text {
+        titel: titel(art).to_string(),
+        detail: None,
+        pfad: match kanal {
+            Some(k) => format!("/einsaetze/{einsatz_id}/chat?kanal={k}"),
+            None => pfad(einsatz_id, bezug),
+        },
+    })
 }
 
 /// Was die Detailzeile einer Empfänger-Zeile liest (Quittung, LLH-1212), als `(Tabelle,
@@ -220,6 +260,9 @@ pub async fn bilden(
     if bezug.typ == BenachrichtigungBezugTyp::AuftragEmpfaenger {
         return auftrag_empfaenger_text(pool, einsatz_id, art, bezug).await;
     }
+    if bezug.typ == BenachrichtigungBezugTyp::ChatNachricht {
+        return chat_nachricht_text(pool, einsatz_id, art, bezug).await;
+    }
     let detail = match detail_quelle(bezug.typ) {
         None => None,
         Some((tabelle, spalte)) => {
@@ -241,6 +284,19 @@ pub async fn bilden(
                 .map(|w| detail_formen(bezug.typ, w))
         }
     };
+    // Die Aufnahme nennt den Einsatz im Titel („Aufgenommen in Hochwasser“, Spec „Aufnahme in
+    // einen Einsatz“); die Detailzeile wiederholte ihn nur. Ohne Bezeichnung bleibt der Titel
+    // der Art.
+    if art == BenachrichtigungArt::EinsatzAufnahme && bezug.typ == BenachrichtigungBezugTyp::Einsatz
+    {
+        if let Some(name) = detail {
+            return Ok(Text {
+                titel: format!("Aufgenommen in {name}"),
+                detail: None,
+                pfad: pfad(einsatz_id, bezug),
+            });
+        }
+    }
     Ok(Text {
         titel: titel(art).to_string(),
         detail,

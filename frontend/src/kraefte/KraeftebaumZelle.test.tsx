@@ -45,8 +45,24 @@ const person = (
     status_kategorie: 'gebunden',
   }) as EinsatzPersonal;
 const MATERIAL = [
-  { id: 1, einheit_id: 1, bezeichnung: 'Pumpe', menge: 1, status: 'defekt' },
-  { id: 2, einheit_id: 1, bezeichnung: 'Sauger', menge: 1, status: 'einsatzbereit' },
+  {
+    id: 1,
+    einheit_id: 1,
+    bezeichnung: 'Pumpe',
+    menge: 1,
+    status: 'defekt',
+    art: 'geraet',
+    ausgegeben: 0,
+  },
+  {
+    id: 2,
+    einheit_id: 1,
+    bezeichnung: 'Sauger',
+    menge: 1,
+    status: 'einsatzbereit',
+    art: 'geraet',
+    ausgegeben: 0,
+  },
 ] as EinsatzMaterial[];
 
 /** Zug mit Fahrzeug (EF und eine Person aus Gr 2 darauf), einer Person ohne Fahrzeug, Material. */

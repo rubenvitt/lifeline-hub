@@ -4,7 +4,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::material::repo::{self, MaterialDaten, MaterialPatch};
-use crate::material::MaterialAnzeige;
+use crate::material::{MaterialAnzeige, MaterialArt};
 use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -21,6 +21,13 @@ pub struct MaterialBody {
     pub traegerorganisation: Option<String>,
     pub standort: Option<String>,
     pub bemerkung: Option<String>,
+    /// `geraet` oder `verbrauchsgut` (LLH-1224); fehlt = Gerät, unbekannt = 400.
+    pub art: Option<String>,
+}
+
+/// Art aus dem Body: unbekannt → 400 (Statuscode-Konvention, unbekannter Enum-Wert).
+fn parse_art(art: &str) -> Result<MaterialArt, AppError> {
+    MaterialArt::parse(art).ok_or_else(|| AppError::Validation("Unbekannte Art".into()))
 }
 
 /// Owned, validierte Felder; `MaterialDaten` borgt daraus.
@@ -31,6 +38,7 @@ struct Normalisiert {
     traegerorganisation: Option<String>,
     standort: Option<String>,
     bemerkung: Option<String>,
+    art: MaterialArt,
 }
 
 impl Normalisiert {
@@ -42,6 +50,7 @@ impl Normalisiert {
             traegerorganisation: self.traegerorganisation.as_deref(),
             standort: self.standort.as_deref(),
             bemerkung: self.bemerkung.as_deref(),
+            art: self.art,
         }
     }
 }
@@ -55,6 +64,12 @@ fn normalisiere(body: MaterialBody) -> Result<Normalisiert, AppError> {
         traegerorganisation: trimme(body.traegerorganisation),
         standort: trimme(body.standort),
         bemerkung: trimme(body.bemerkung),
+        art: body
+            .art
+            .as_deref()
+            .map(parse_art)
+            .transpose()?
+            .unwrap_or(MaterialArt::Geraet),
     })
 }
 
@@ -76,6 +91,9 @@ pub struct PatchMaterial {
     pub standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
+    /// Art (LLH-1224): fehlt = unverändert; `null` oder unbekannt = 400.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub art: Option<Option<String>>,
 }
 
 /// Owned, validierte Patch-Felder; `MaterialPatch` borgt daraus.
@@ -86,6 +104,7 @@ struct PatchNormalisiert {
     traegerorganisation: Option<Option<String>>,
     standort: Option<Option<String>>,
     bemerkung: Option<Option<String>>,
+    art: Option<MaterialArt>,
 }
 
 impl PatchNormalisiert {
@@ -97,6 +116,7 @@ impl PatchNormalisiert {
             traegerorganisation: self.traegerorganisation.as_ref().map(|v| v.as_deref()),
             standort: self.standort.as_ref().map(|v| v.as_deref()),
             bemerkung: self.bemerkung.as_ref().map(|v| v.as_deref()),
+            art: self.art,
         }
     }
 }
@@ -119,6 +139,11 @@ fn normalisiere_patch(body: PatchMaterial) -> Result<PatchNormalisiert, AppError
         traegerorganisation: trimme_tri(body.traegerorganisation),
         standort: trimme_tri(body.standort),
         bemerkung: trimme_tri(body.bemerkung),
+        art: match body.art {
+            None => None,
+            Some(None) => return Err(AppError::Validation("Art darf nicht leer sein".into())),
+            Some(Some(a)) => Some(parse_art(&a)?),
+        },
     })
 }
 

@@ -12,6 +12,7 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
+pub mod ankuendigung;
 pub mod repo;
 
 /// Höchstlänge des Entschlusses (LLH-1111, design.md D10), wie der Auftragstext. Nicht die

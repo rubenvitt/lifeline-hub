@@ -144,7 +144,7 @@ pub async fn detail(
         (Vec::new(), Vec::new())
     } else {
         (
-            material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
+            material_repo::list_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
                 .await?,
             crate::uhs::kraefte::liste(
                 &state.pool,

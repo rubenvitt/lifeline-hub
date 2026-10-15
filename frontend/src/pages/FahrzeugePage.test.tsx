@@ -80,7 +80,11 @@ function render(
   efObj: Record<string, unknown> | Record<string, unknown>[] = ef,
   entlasseneDaten: unknown[] = [],
   einheitenDaten: unknown[] = [],
-  optionen: { benutzer?: ReturnType<typeof benutzerFixture>; weitereRouten?: ReactNode } = {},
+  optionen: {
+    benutzer?: ReturnType<typeof benutzerFixture>;
+    weitereRouten?: ReactNode;
+    material?: unknown[];
+  } = {},
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
@@ -98,6 +102,9 @@ function render(
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
+    // Beladung im Aufklapper (LLH-1225 D11): Materialliste und die Namen der Orte im Angebot.
+    http.get('/api/einsaetze/7/material', () => HttpResponse.json(optionen.material ?? [])),
+    http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -1961,5 +1968,103 @@ describe('FahrzeugePage · Personal der Einheit übernehmen (LLH-1073 Teil II, d
     await waitFor(() => expect(urteil()).not.toHaveAttribute('data-urteil', 'nicht_erfasst'));
     expect(urteil()).toHaveTextContent('Ist');
     expect(urteil()).toHaveTextContent('Soll');
+  });
+});
+
+describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D11)', () => {
+  const posten = (p: Record<string, unknown>) => ({
+    einsatz_id: 7,
+    material_id: null,
+    ist_adhoc: true,
+    kategorie: null,
+    art: 'geraet',
+    menge: 1,
+    ausgegeben: 0,
+    status: 'einsatzbereit',
+    einheit_id: null,
+    einsatz_fahrzeug_id: null,
+    uhs_id: null,
+    br_id: null,
+    beendet_at: null,
+    disponiert_at: '2026-05-26 09:10:00',
+    ...p,
+  });
+  const MATERIAL = [
+    posten({ id: 50, bezeichnung: 'Stromerzeuger', einsatz_fahrzeug_id: 10, status: 'defekt' }),
+    posten({ id: 51, bezeichnung: 'Trage' }),
+  ];
+  async function aufklappen() {
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Besatzung zu Florian 1' }));
+  }
+  const block = () =>
+    document.querySelector<HTMLElement>('[data-lfh="beladung-block"]') as HTMLElement;
+
+  it('zeigt die Beladung unter der Besatzung mit Kopfzahl, Menge und Status', async () => {
+    render(einsatz(), [], ef, [], [], { material: MATERIAL });
+    await aufklappen();
+    await waitFor(() => expect(block()).not.toBeNull());
+    expect(within(block()).getByText('Beladung')).toBeInTheDocument();
+    expect(block()).toHaveTextContent('1 Posten · 1 Ausfall');
+    expect(within(block()).getByText('Stromerzeuger')).toBeInTheDocument();
+    expect(within(block()).queryByText('Trage')).toBeNull();
+    // Unter der Besatzung: der Besatzungsblock steht vorher im Dokument.
+    const besatzung = document.querySelector('[data-lfh="besatzung-block"]')!;
+    expect(
+      besatzung.compareDocumentPosition(block()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('„Vom Fahrzeug lösen“ und „Material zuordnen …“ schicken den PATCH an die Disposition', async () => {
+    const gesendet: { url: string; body: unknown }[] = [];
+    render(einsatz(), [], ef, [], [], { material: MATERIAL });
+    server.use(
+      http.patch('/api/einsaetze/7/material/:emId', async ({ request }) => {
+        gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+        return HttpResponse.json({});
+      }),
+    );
+    await aufklappen();
+    await userEvent.click(
+      await within(await waitFor(block)).findByRole('button', {
+        name: 'Stromerzeuger vom Fahrzeug lösen',
+      }),
+    );
+    await userEvent.click(within(block()).getByRole('combobox', { name: 'Material zuordnen' }));
+    await userEvent.click(await screen.findByText('Trage · 1'));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/7/material/50', body: { einsatz_fahrzeug_id: null } },
+        { url: '/api/einsaetze/7/material/51', body: { einsatz_fahrzeug_id: 10 } },
+      ]),
+    );
+  });
+
+  it('ohne Freigabe Material: kein Block „Beladung“, und die Materialliste wird nicht abgefragt', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ material: { zugriff: false } })),
+      ),
+    );
+    const { client } = render(einsatz(), [], ef, [], [], { material: MATERIAL });
+    await aufklappen();
+    await screen.findByText('Kraft zur Besatzung …');
+    // Erst wenn die Freigaben geladen sind, sagt das Fehlen des Blocks etwas über das Gate.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(7))?.status).toBe('success'),
+    );
+    expect(block()).toBeNull();
+    // Nie abgefragt: weder Daten noch ein Abruf unter dem Schlüssel der Materialliste.
+    expect(client.getQueryState(einsatzKeys.material(7))?.dataUpdatedAt ?? 0).toBe(0);
+    expect(client.getQueryState(einsatzKeys.material(7))?.fetchStatus ?? 'idle').toBe('idle');
+  });
+
+  it('erreicht die Beladung auch im Kartenzweig unter md', async () => {
+    setzeViewportBreite(390);
+    render(einsatz(), [], ef, [], [], { material: MATERIAL });
+    await aufklappen();
+    // Unter md ist der Bereich als Region nach seinem Auslöser benannt (LFH-697).
+    const bereich = screen.getByRole('region', { name: 'Besatzung zu Florian 1' });
+    expect(await within(bereich).findByText('Stromerzeuger')).toBeInTheDocument();
   });
 });

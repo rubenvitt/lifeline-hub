@@ -4,7 +4,9 @@ use crate::vorlagendokument::{self as kern, Abschnittsart, Dokumentart};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::benachrichtigung::{BenachrichtigungArt, BenachrichtigungBezugTyp};
 use crate::vorlagendokument::anlage::AnlagenTabelle;
+use crate::vorlagendokument::benachrichtigung::FreigabeHinweis;
 use crate::vorlagendokument::verteiler::VerteilerTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
@@ -140,6 +142,11 @@ impl Dokumentart for Lagebericht {
     const VERTEILER: Option<&'static VerteilerTabelle> = Some(&VerteilerTabelle {
         tabelle: "lagebericht_verteiler",
         dokument_spalte: "lagebericht_id",
+    });
+    /// „Neuer Lagebericht“ an die Funktionen im Verteiler (LLH-1213); Modul Lageberichte.
+    const BENACHRICHTIGUNG: Option<FreigabeHinweis> = Some(FreigabeHinweis {
+        art: BenachrichtigungArt::Lagebericht,
+        bezug_typ: BenachrichtigungBezugTyp::Lagebericht,
     });
 }
 
