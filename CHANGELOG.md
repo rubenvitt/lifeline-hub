@@ -1,3 +1,11 @@
+## [1.0.0-alpha.128](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.127...v1.0.0-alpha.128) (2026-10-15)
+
+### Betrieb und Installation
+
+- **Desktop-App jetzt auch für Vorabversionen:** Auch Alpha-Versionen gibt es jetzt als Desktop-App, für macOS als notarisierte DMG und für Windows. Die Pakete erscheinen kurz nach der Freigabe einer Alpha-Version. Release und Deployment warten dabei nicht mehr auf die Prüfung durch Apple.
+- **Eigener Update-Kanal für Alpha:** Eine Desktop-App mit Vorabversion bezieht ihre Updates automatisch aus dem Alpha-Kanal. Eine stabil installierte App bleibt bei den stabilen Versionen. Der Alpha-Kanal bietet nur neuere Versionen an und erst dann, wenn die Pakete für alle Plattformen bereitstehen.
+- **App bleibt in ihrem Kanal:** Eine Desktop-App, die einmal als Vorabversion lief, merkt sich den Alpha-Kanal. Sie bleibt dort auch dann, wenn sie über diesen Kanal eine stabile Version erhalten hat. Eine stabil installierte App wechselt nie von selbst in den Alpha-Kanal.
+
 ## [1.0.0-alpha.127](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.126...v1.0.0-alpha.127) (2026-10-15)
 
 ### Wichtige Änderungen
