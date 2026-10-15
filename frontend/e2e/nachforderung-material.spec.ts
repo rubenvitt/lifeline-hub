@@ -59,6 +59,9 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
   // Erste Übernahme: vorbelegt mit Menge 3 als Verbrauchsgut; die Person führt ein Gerät.
   await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
   const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
+  // Erst nach der Zoom-Animation eingeben: sonst fängt der aufgehende Dialog den Klick ab.
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('3');
   await expect(dialog.getByRole('radio', { name: 'Verbrauchsgut' })).toBeChecked();
   await dialog.getByRole('radio', { name: 'Gerät' }).click();
@@ -78,6 +81,8 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
   // Zweiter Weg: bewusst ergänzen, Menge ist der Rest.
   await karte.getByRole('button', { name: 'Weiteren Posten übernehmen' }).click();
   const weiter = page.getByRole('dialog', { name: 'Weiteren Posten „Tauchpumpe“ übernehmen' });
+  await expect(weiter).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await expect(weiter.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('2');
   await weiter.getByRole('radio', { name: 'Gerät' }).click();
   await weiter.getByRole('button', { name: 'Weiteren Posten übernehmen' }).click();

@@ -169,6 +169,8 @@ test.describe(KAPITEL, () => {
     });
     await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
     const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
     await dialog.getByRole('radio', { name: 'Gerät' }).click();
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('1');
     await waehleIn(dialog.getByRole('combobox', { name: 'Ort' }), 'Rettungsstaffel');
