@@ -2,7 +2,8 @@ import { huelleBenachrichtigung } from '../huelle/faehigkeiten';
 
 /**
  * Desktop-Benachrichtigung — NUR wenn der Tab im Hintergrund ist und die Permission erteilt
- * wurde. API fehlt oder Permission verweigert → No-op (der In-App-Toast trägt).
+ * wurde. API fehlt oder Permission verweigert → No-op (der In-App-Toast trägt). Einzige Ausnahme
+ * vom Hintergrund: die Testbenachrichtigung ({@link showTestMeldung}, LLH-1284).
  *
  * Offene Meldungen führt das Modul selbst (LFH-951): eine OS-Meldung, die niemand anklickt,
  * bliebe sonst im Benachrichtigungs-Center stehen, auch wenn ihr Alarm in der App längst
@@ -121,25 +122,50 @@ export function zeigeDesktopAlarm(titel: string, opts: AlarmOptionen = {}): Desk
   try {
     if (desktopPermission() !== 'granted') return null;
     if (!document.hidden) return null;
-    if (opts.tag) schliesseDesktopAlarm(opts.tag);
-    const huelle = huelleBenachrichtigung();
-    if (huelle) return zeigeUeberHuelle(huelle, titel, opts);
-    if (konstruktorNutzbar()) {
-      try {
-        return zeigeUeberKonstruktor(titel, opts);
-      } catch (fehler) {
-        // Ein TypeError heißt: es gibt den Konstruktor nicht (Android), die Kopfleiste darf nicht
-        // weiter „erlaubt" melden — es sei denn, der Service Worker springt ein (LFH-1062).
-        if (!(fehler instanceof TypeError)) return null;
-        wirftBeiKonstruktor = Notification;
-        if (!serviceWorkerDa()) return null;
-      }
-    }
-    return zeigeUeberServiceWorker(titel, opts);
+    return showMeldung(titel, opts);
   } catch {
     // Notification-API blockiert/unavailable → still.
     return null;
   }
+}
+
+/**
+ * Testbenachrichtigung (LLH-1284): dieselben Wege wie {@link zeigeDesktopAlarm} (Hülle,
+ * Konstruktor, Service Worker), aber auch bei sichtbarem Fenster. Sie zeigt, ob das System
+ * Meldungen der App durchlässt. Sie gehört zu keinem Alarm und steht deshalb nicht im Buch der
+ * offenen Meldungen: das Abräumen beim Zurückkehren ins Fenster (LFH-951) nähme sie sonst gleich
+ * wieder weg, etwa nach der Abfrage der Erlaubnis. Ohne `tag`, damit jeder Klick neu erscheint.
+ * `true`, wenn die Meldung auf den Weg ging.
+ */
+export function showTestMeldung(titel: string, koerper?: string): boolean {
+  try {
+    if (desktopPermission() !== 'granted') return false;
+    const meldung = showMeldung(titel, { koerper });
+    if (meldung == null) return false;
+    offen.delete(meldung);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Der erste verfügbare Weg zur Meldung; wirft, wenn die API es tut. */
+function showMeldung(titel: string, opts: AlarmOptionen): DesktopMeldung | null {
+  if (opts.tag) schliesseDesktopAlarm(opts.tag);
+  const huelle = huelleBenachrichtigung();
+  if (huelle) return zeigeUeberHuelle(huelle, titel, opts);
+  if (konstruktorNutzbar()) {
+    try {
+      return zeigeUeberKonstruktor(titel, opts);
+    } catch (fehler) {
+      // Ein TypeError heißt: es gibt den Konstruktor nicht (Android), die Kopfleiste darf nicht
+      // weiter „erlaubt" melden — es sei denn, der Service Worker springt ein (LFH-1062).
+      if (!(fehler instanceof TypeError)) return null;
+      wirftBeiKonstruktor = Notification;
+      if (!serviceWorkerDa()) return null;
+    }
+  }
+  return zeigeUeberServiceWorker(titel, opts);
 }
 
 function zeigeUeberKonstruktor(titel: string, opts: AlarmOptionen): DesktopMeldung {

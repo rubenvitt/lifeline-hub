@@ -121,6 +121,12 @@ Unter „Alarme“ stehen die Arten, die sich nicht abschalten lassen, mit „im
 Zeile „nicht gespeichert“, hat der Server die Änderung nicht angenommen; der Schalter steht wieder
 wie vorher.
 
+„Testbenachrichtigung“ unter „Test“ zeigt sofort eine Meldung des Betriebssystems und spielt den
+kurzen Ton (nicht bei „Ton stumm“), auch wenn der Tab vorn ist; hat der Browser noch nicht nach der
+Erlaubnis gefragt, fragt er zuerst. Daneben erscheint „gesendet“ oder, warum keine Meldung kam,
+„blockiert“ (im Browser verweigert), „nicht verfügbar“ (das Gerät kann keine zeigen) oder „aus“
+(die Frage blieb ohne Antwort).
+
 ## Hintergrund
 
 ### Die Kopfzeile

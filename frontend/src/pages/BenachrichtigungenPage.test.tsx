@@ -1,11 +1,23 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { spieleAlarmTon } from '../alarm/alarmTon';
+import { beendeHuelle, starteMacHuelle } from '../test/huelle';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
-import BenachrichtigungenPage, { IMMER_AN } from './BenachrichtigungenPage';
+import BenachrichtigungenPage, {
+  IMMER_AN,
+  TEST_TEXT,
+  TEST_TITEL,
+  TEST_WORT,
+} from './BenachrichtigungenPage';
+
+vi.mock('../alarm/alarmTon', async (original) => ({
+  ...(await original<typeof import('../alarm/alarmTon')>()),
+  spieleAlarmTon: vi.fn(),
+}));
 
 function zeige(aus: string[] | null = null) {
   const geschrieben: string[][] = [];
@@ -86,5 +98,92 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     expect(await screen.findByText('nicht gespeichert')).toBeInTheDocument();
     expect(await schalter('Neue Gefahr')).toBeChecked();
     expect(await schalter('Neuer Auftrag')).toBeChecked();
+  });
+});
+
+/**
+ * Web-API wie im Browser: `requestPermission` beantwortet die Frage mit `antwort` und setzt
+ * danach `permission`, wie der Browser es tut.
+ */
+function stubNotification(
+  permission: NotificationPermission,
+  antwort: NotificationPermission = 'granted',
+) {
+  const Ctor = vi.fn(function (this: { close: () => void }) {
+    this.close = vi.fn();
+  }) as unknown as typeof Notification & {
+    permission: NotificationPermission;
+    requestPermission: ReturnType<typeof vi.fn>;
+  };
+  Ctor.permission = permission;
+  Ctor.requestPermission = vi.fn(() => {
+    Ctor.permission = antwort;
+    return Promise.resolve(antwort);
+  });
+  vi.stubGlobal('Notification', Ctor);
+  return Ctor;
+}
+
+async function testKnopf() {
+  const paneel = await screen.findByRole('region', { name: 'Test' });
+  return within(paneel).getByRole('button', { name: TEST_TITEL });
+}
+
+describe('Testbenachrichtigung (LLH-1284)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(spieleAlarmTon).mockClear();
+    beendeHuelle();
+  });
+
+  it('in der Desktop-App geht die Meldung über die Hülle, mit Ton und „gesendet“', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    zeige();
+    await userEvent.click(await testKnopf());
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: TEST_TITEL,
+      text: TEST_TEXT,
+    });
+    expect(spieleAlarmTon).toHaveBeenCalledExactlyOnceWith('dezent');
+    expect(await screen.findByRole('status')).toHaveTextContent(TEST_WORT.gesendet);
+  });
+
+  it('im Browser ohne Entscheidung fragt der Klick erst an und zeigt dann die Meldung', async () => {
+    const Ctor = stubNotification('default', 'granted');
+    zeige();
+    await userEvent.click(await testKnopf());
+    expect(Ctor.requestPermission).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(Ctor).toHaveBeenCalledExactlyOnceWith(TEST_TITEL, { body: TEST_TEXT }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(TEST_WORT.gesendet);
+  });
+
+  it('wird die Anfrage verweigert, steht „blockiert“ am Knopf und es kommt keine Meldung', async () => {
+    const Ctor = stubNotification('default', 'denied');
+    zeige();
+    await userEvent.click(await testKnopf());
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(TEST_WORT.blockiert));
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
+  });
+
+  it('bei schon verweigerter Erlaubnis „blockiert“, ohne erneut zu fragen', async () => {
+    const Ctor = stubNotification('denied');
+    zeige();
+    await userEvent.click(await testKnopf());
+    expect(screen.getByRole('status')).toHaveTextContent(TEST_WORT.blockiert);
+    expect(Ctor.requestPermission).not.toHaveBeenCalled();
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('ohne Notification-API „nicht verfügbar“', async () => {
+    vi.stubGlobal('Notification', undefined);
+    Reflect.deleteProperty(window, 'Notification');
+    zeige();
+    await userEvent.click(await testKnopf());
+    expect(screen.getByRole('status')).toHaveTextContent(TEST_WORT['nicht-verfuegbar']);
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
   });
 });

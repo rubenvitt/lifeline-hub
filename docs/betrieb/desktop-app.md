@@ -150,7 +150,9 @@ Ist das Fenster minimiert oder verdeckt, erscheint eine Benachrichtigung (etwa �
 darauf holt das Fenster nach vorn. Dort steht die Benachrichtigung mit „Öffnen“, wie sie ohne
 Mitteilung stünde. Bei sichtbarem Fenster gibt es keine Mitteilung, nur Hinweis und Ton in der
 App. Im Kopf des Einsatzes steht in der App immer „Benachrichtigung erlaubt“; ob das System die
-Mitteilung zeigt, erfährt die App nicht.
+Mitteilung zeigt, erfährt die App nicht. Ob das System Mitteilungen der App durchlässt, zeigt
+„Testbenachrichtigung“ unter Benutzermenü → „Benachrichtigungen“: sie erscheint auch bei
+sichtbarem Fenster; bleibt sie trotz „gesendet“ aus, hält das System sie zurück.
 
 Ob und wie Mitteilungen erscheinen, regelt das Betriebssystem je App:
 - **macOS:** Systemeinstellungen → Mitteilungen → „Lifeline Hub“: „Mitteilungen erlauben“ an.
