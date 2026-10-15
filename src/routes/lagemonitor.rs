@@ -11,6 +11,11 @@
 //! Einsatzabschnitte (LLH-1153), damit der Monitor bei diesem einen Abruf bleibt: `/zonen` trägt
 //! Notizen und Bezirke, `/abschnitte` den Leiternamen. Zonen kommen nur als Typ und Geometrie,
 //! Abschnitte nur mit Bezeichnung und Fläche.
+//!
+//! Die offenen Sofortmeldungen kommen nur als Zahl (Change `kcjecn9e-benachrichtigungskonzept`,
+//! D12): kein Text, kein Absender, kein Empfänger; gepinnt von
+//! `lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder`. Den Anstieg erkennt der
+//! Client selbst.
 
 use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
@@ -100,6 +105,8 @@ pub struct LagemonitorAnzeige {
     pub zonen: Vec<LagemonitorZone>,
     /// Einsatzabschnitte mit gezeichneter Fläche.
     pub abschnitte: Vec<LagemonitorAbschnitt>,
+    /// Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
+    pub sofortmeldungen_offen: i64,
 }
 
 /// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -248,6 +255,8 @@ pub async fn lagebild(
     )
     .collect();
 
+    let sofortmeldungen_offen = crate::meldung::repo::count_sofort_offen(pool, einsatz_id).await?;
+
     Ok(Json(LagemonitorAnzeige {
         stand_at: crate::zeit::jetzt(),
         betroffene,
@@ -259,5 +268,6 @@ pub async fn lagebild(
         uhs,
         zonen,
         abschnitte,
+        sofortmeldungen_offen,
     }))
 }

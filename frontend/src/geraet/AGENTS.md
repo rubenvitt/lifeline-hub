@@ -44,8 +44,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   wie am UHS-Laptop; der Betreuungszähler fehlt wie Personen- und Meldungszähler.
 - **Eigene Hülle** (`geraet/GeraeteLayout.tsx`): keine Modulleiste, kein Benutzermenü, keine
   Sprungpalette (`CommandPaletteProvider` öffnet bei `geraet` nicht), kein Org-Strom (`/api/live`
-  steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403). Der
-  Einsatzstrom ist Pflicht: schließt ihn der Server nach einem Widerruf, endet das Gerät ohne
+  steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403), kein Ton
+  und keine Benachrichtigung: beide Hüllen öffnen den Einsatzstrom mit `stumm` (Spec
+  `benachrichtigungen`, „Gekoppelte Geräte bleiben still“; Nachweis `geraet/GeraetAbschnitt.test.tsx`,
+  `geraet/LagemonitorPage.test.tsx`). Der Einsatzstrom ist Pflicht: schließt ihn der Server nach einem Widerruf, endet das Gerät ohne
   Neuladen (Nachweis `e2e/geraet-uhs-tablet.spec.ts`).
 - **Vorhandene Flächen statt eigener Seiten.** Seiten, die die Hülle einbindet, führen ihre Wege
   über `useEinsatzPfade()` (`routing/EinsatzPfade.tsx`), nie direkt über `personDetailPfad`,
@@ -78,8 +80,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
-  (Bezeichnung und Fläche) für die Karte (LLH-1153); `/zonen` und `/abschnitte` bleiben ihm
-  gesperrt, sie tragen Notizen und Leiternamen. Personen-Ereignisse erreichen ihn nicht, deshalb holt
+  (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen Sofortmeldungen nur als
+  Zahl (`sofortmeldungen_offen`, D12 der Change `kcjecn9e-benachrichtigungskonzept`); `/zonen`
+  und `/abschnitte` bleiben ihm gesperrt, sie tragen Notizen und Leiternamen. Steigt diese Zahl
+  oder SK I gegenüber dem letzten Stand, hebt `useAnstieg` sie 60 s mit Farbe und Wort hervor,
+  ohne Ton und Blinken. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte

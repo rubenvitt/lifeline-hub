@@ -769,9 +769,10 @@ async fn einsatzliste_erreicht_auf_der_leitung_nur_die_leser() {
 
     let leser = frames(&sse_anfang_lesen(leser.into_body(), 300).await);
     let ohne = frames(&sse_anfang_lesen(ohne.into_body(), 300).await);
+    // Dazu der Hinweis „Neuer Einsatz“ (`org_benachrichtigung`, tasks.md 15.2) nur an sie.
     assert_eq!(
         events(&leser),
-        vec!["einsatzliste"],
+        vec!["einsatzliste", "org_benachrichtigung"],
         "Gegenprobe: Führungskraft der Org"
     );
     assert_eq!(leser[0].data, "{}");

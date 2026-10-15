@@ -225,6 +225,10 @@ fn serde_wire_gleich_as_str() {
     });
 
     // material
+    enum_wire_as_str!(lifeline_hub::material::MaterialArt {
+        Geraet,
+        Verbrauchsgut,
+    });
     enum_wire_as_str!(lifeline_hub::material::MaterialStatus {
         Einsatzbereit,
         ImEinsatz,

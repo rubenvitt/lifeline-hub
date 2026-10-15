@@ -350,6 +350,8 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     bestandsnummer: null,
     traegerorganisation: null,
     status: 'einsatzbereit',
+    art: 'verbrauchsgut',
+    ausgegeben: 0,
     bemerkung: null,
     uhs_id: 2,
     disponiert_at: '2026-10-04 08:00:00',

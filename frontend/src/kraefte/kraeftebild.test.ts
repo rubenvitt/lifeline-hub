@@ -203,7 +203,10 @@ const mat = (
   einheit_id: number | null,
   status: EinsatzMaterial['status'],
   menge = 1,
+  ausgegeben = 0,
 ): EinsatzMaterial => ({
+  art: menge > 1 || ausgegeben > 0 ? 'verbrauchsgut' : 'geraet',
+  ausgegeben,
   id,
   einsatz_id: 1,
   material_id: null,
@@ -233,6 +236,37 @@ it('verdichtet Material nach Status', () => {
   expect(bild.verdichtung.materialStatus.einsatzbereit).toBe(2);
   expect(bild.verdichtung.materialStatus.defekt).toBe(1);
   expect(bild.verdichtung.anzahlMaterialPositionen).toBe(3);
+});
+
+// LLH-1224, design.md D15: ein aufgebrauchtes Verbrauchsgut zählt unter „aufgebraucht“, nicht
+// unter seinem Status; der Lagebericht nennt es so, ein teilweise ausgegebenes nicht.
+it('zählt aufgebrauchte Verbrauchsgüter unter „aufgebraucht“ und nennt sie im Lagebericht', () => {
+  const bild = baueKraeftebild(
+    [],
+    [],
+    [],
+    [],
+    [
+      mat(1, null, 'einsatzbereit', 50, 50),
+      mat(2, null, 'im_einsatz', 50, 20),
+      mat(3, null, 'defekt'),
+      mat(4, null, 'einsatzbereit', 10, 10),
+    ],
+  );
+  expect(bild.verdichtung.materialStatus).toEqual({
+    einsatzbereit: 0,
+    im_einsatz: 1,
+    defekt: 1,
+    verbraucht: 0,
+    desinfektion_noetig: 0,
+    aufgebraucht: 2,
+  });
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  expect(md).toContain(
+    '- **Material (Positionen):** 4 (im Einsatz: 1, defekt: 1, aufgebraucht: 2)',
+  );
+  expect(md).toContain('- Mtl. M1 ×50 [aufgebraucht]');
+  expect(md).toContain('- Mtl. M2 ×50 [im_einsatz]');
 });
 
 it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {
@@ -349,6 +383,71 @@ it('der Lagebericht-Text folgt dem Kräftebaum: Fahrzeug mit Besatzung, „Ohne 
     '  - **E20** (Gruppe) — Stärke: 0/0/1//1',
     '    - Pers. P3 [gebunden] — fährt auf F1',
   ]);
+});
+
+// LLH-1225, design.md D14: Material dort, wo es ist.
+const amOrt = (
+  m: EinsatzMaterial,
+  ort: Partial<Pick<EinsatzMaterial, 'einsatz_fahrzeug_id' | 'uhs_id' | 'br_id'>>,
+): EinsatzMaterial => ({ ...m, einheit_id: null, einsatz_fahrzeug_id: null, br_id: null, ...ort });
+
+it('der Lagebericht-Text nennt die Beladung als Unterpunkt des Fahrzeugs (LLH-1225 D14)', () => {
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1)],
+    [{ ...p(1, 10, 'fuehrer'), fahrzeug_id: 1 }],
+    [fz(1, 10)],
+    [
+      amOrt(mat(1, null, 'defekt'), { einsatz_fahrzeug_id: 1 }),
+      amOrt(mat(2, null, 'einsatzbereit'), { einsatz_fahrzeug_id: 1 }),
+      mat(3, 10, 'einsatzbereit'),
+    ],
+  );
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  const teil = md.slice(md.indexOf('  - Fzg. F1'), md.indexOf('    - Mtl. M3'));
+  expect(teil.trimEnd().split('\n')).toEqual([
+    '  - Fzg. F1 (LF) [2] — Besatzung Ist 1/0/0//1',
+    '    - Pers. P1 [gebunden]',
+    '    - Beladung: 2 Posten, 1 Ausfall',
+    '      - Mtl. M1 ×1 [defekt]',
+    '      - Mtl. M2 ×1 [einsatzbereit]',
+    '  - Material: 1 Posten',
+  ]);
+});
+
+it('„Ohne Einheit“ nimmt nur Material ohne Ort; Material an UHS oder BR zählt nur im Kopf (D14)', () => {
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1)],
+    [],
+    [],
+    [amOrt(mat(1, null, 'defekt'), { uhs_id: 3 }), amOrt(mat(2, null, 'defekt'), { br_id: 2 })],
+  );
+  expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
+  expect(bild.verdichtung.anzahlMaterialPositionen).toBe(2);
+  const mitOhneOrt = baueKraeftebild([ab(1)], [eh(10, 1)], [], [], [mat(3, null, 'defekt')]);
+  expect(mitOhneOrt.baum.map((z) => z.key)).toEqual(['ab-1', OHNE_ABSCHNITT_KEY]);
+});
+
+it('Abschnitts-Filter ordnet Material über die Einheit seines Orts (D14)', () => {
+  const abschnitte = [ab(1), ab(2)];
+  const einheiten = [eh(10, 1), eh(20, 2)];
+  const fahrzeuge = [fz(1, 10), fz(2, null)];
+  const material = [
+    mat(1, 10, 'einsatzbereit'),
+    amOrt(mat(2, null, 'einsatzbereit'), { einsatz_fahrzeug_id: 1 }),
+    amOrt(mat(3, null, 'einsatzbereit'), { einsatz_fahrzeug_id: 2 }),
+    amOrt(mat(4, null, 'einsatzbereit'), { uhs_id: 3 }),
+    mat(5, 20, 'einsatzbereit'),
+  ];
+  const nach = (abschnittId: number | null) =>
+    filtereKraefte(
+      { abschnitte, einheiten, personal: [], fahrzeuge, material },
+      { traeger: null, abschnittId, kategorie: null, suche: '' },
+    ).material.map((m) => m.id);
+  expect(nach(1)).toEqual([1, 2]);
+  expect(nach(2)).toEqual([5]);
+  expect(nach(null)).toEqual([1, 2, 3, 4, 5]);
 });
 
 // LLH-1067: Lagebericht-Übernahme und Meldebild nennen die Einsatzfunktion vor der Qualifikation.

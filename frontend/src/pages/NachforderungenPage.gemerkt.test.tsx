@@ -68,6 +68,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_at: '2026-06-12 09:00:00',
   erstellt_von_name: 'Leit',
   ist_offen: true,
+  material_ids: [],
   ...over,
 });
 

@@ -23,9 +23,13 @@ export async function einheitMitZuordnungen(page: Page) {
         adhoc: Object.fromEntries(
           Object.entries(adhoc).map(([k, v]) => [k, `${v}${frei ? ' frei' : ''}`]),
         ),
-        ...(modul === 'material' ? { menge: 3 } : {}),
+        // Material bekommt seinen Ort beim Disponieren (LLH-1225, ein Schreibweg), nicht über die
+        // Einheiten-Route.
+        ...(modul === 'material' ? { menge: 3, ...(frei ? {} : { einheit_id: einheitId }) } : {}),
       });
-      if (!frei) {
+      if (!frei && modul === 'material') {
+        zugeordnet[modul] = id;
+      } else if (!frei) {
         const antwort = await page.request.put(
           `${basis}/einheiten/${einheitId}/${zuordnung}/${id}`,
         );
@@ -109,7 +113,8 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
   });
   const personZuordnen = besatzung.getByRole('combobox', { name: 'Person zuordnen' });
   const fahrzeugZuordnen = besatzung.getByRole('combobox', { name: 'Fahrzeug zuordnen' });
-  const materialLoesen = material.getByRole('button', { name: 'Aus Einheit lösen', exact: true });
+  // Der Baustein Material am Ort nennt den Posten im Namen („Messkiste 446 aus Einheit lösen“).
+  const materialLoesen = material.getByRole('button', { name: /aus Einheit lösen$/ });
   const materialZuordnen = material.getByRole('combobox', { name: 'Material zuordnen' });
   /** Die Hülle des antd-Felds: sie ist das Bedienziel, nicht das innere Eingabefeld. */
   const huelle = (feld: Locator) =>
@@ -129,7 +134,7 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
     zeilen: [
       { name: 'Fahrzeugzeile', zeile: besatzung.locator('[data-lfh="einheit-fahrzeug"]') },
       { name: 'Personenzeile', zeile: besatzung.locator('[data-lfh="einheit-person"]') },
-      { name: 'Materialzeile', zeile: material.locator('[data-lfh="einheit-zuordnung"]') },
+      { name: 'Materialzeile', zeile: material.locator('[data-lfh="material-am-ort-zeile"]') },
     ],
     reihen: [
       [fmsStatus, fahrzeugLoesen],
@@ -158,9 +163,6 @@ export async function detailBereit(page: Page) {
     besatzung.getByRole('button', { name: 'Aktionen zu Person Messperson 446' }),
   ).toHaveCount(1);
   await expect(
-    zuordnungsKarte(page, 'Material').getByRole('button', {
-      name: 'Aus Einheit lösen',
-      exact: true,
-    }),
+    zuordnungsKarte(page, 'Material').getByRole('button', { name: /aus Einheit lösen$/ }),
   ).toHaveCount(1);
 }

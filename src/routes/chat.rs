@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::chat::erwaehnung::{self, ErwaehnungEingabe};
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -154,10 +155,16 @@ pub struct NeueNachricht {
     /// mindestens einen Anhang trägt.
     #[serde(default)]
     pub anhang_ids: Vec<i64>,
+    /// Erwähnte Nutzer und Funktionen (LLH-1220, design.md D9); der Text trägt nur `@Anzeige`.
+    /// Optional; beim Bearbeiten ignoriert: eine Änderung bleibt still (Spec
+    /// `benachrichtigungen`).
+    #[serde(default)]
+    pub erwaehnungen: Vec<ErwaehnungEingabe>,
 }
 
 /// POST /api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten — Nachricht senden.
-/// Schreibrecht + aktiv. Cross-Einsatz-Schutz auf den Kanal.
+/// Schreibrecht + aktiv. Cross-Einsatz-Schutz auf den Kanal. Nach dem Commit erhalten die
+/// Erwähnten den Hinweis `chat_erwaehnung` (`chat::erwaehnung::melden`).
 pub async fn nachricht_erfassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Chat>,
@@ -183,18 +190,31 @@ pub async fn nachricht_erfassen(
     let mut anhang_ids = req.anhang_ids;
     anhang_ids.sort_unstable();
     anhang_ids.dedup();
+    let erwaehnungen =
+        erwaehnung::pruefen_fuer_einsatz(&state.pool, einsatz_id, &req.erwaehnungen).await?;
 
-    // Nachricht + Anhang-Verknüpfung atomar; fremde/unbekannte Anhänge → Rollback.
-    let nachricht = repo::anlegen_mit_anhaengen(
+    // Nachricht + Anhang-Verknüpfung + Erwähnungen atomar; fremde/unbekannte Anhänge oder ein
+    // erwähntes Nicht-Mitglied → Rollback.
+    let nachricht = repo::anlegen_mit_erwaehnungen(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
         kanal_id,
         inhalt,
         &anhang_ids,
+        &erwaehnungen,
     )
     .await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
+    erwaehnung::melden(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        nachricht.id,
+        ctx.benutzer.id,
+        &erwaehnungen,
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(nachricht)))
 }
 
