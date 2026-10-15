@@ -634,6 +634,8 @@ pub struct Entlassen {
     pub besatzung: Vec<i64>,
     /// Trug das Fahrzeug die Führungsstelle?
     pub trug_fuehrungsstelle: bool,
+    /// Beladung, die ohne Ort zurückbleibt (`einsatz_material.id`, LLH-1224 D13).
+    pub material: Vec<i64>,
 }
 
 /// Entlässt ein Fahrzeug aus dem Einsatz (design.md D4): die Zeile bleibt mit Zeitpunkt und
@@ -663,6 +665,16 @@ pub async fn entlassen_tx(
     let br_id =
         belegung_repo::austritt_fahrzeug_bei_entlassung_tx(conn, einsatz_id, ef_id, benutzer_id)
             .await?;
+    // Die Beladung bleibt ohne Ort im Einsatz (LLH-1224 D13): sie verschwindet nicht still mit
+    // dem Fahrzeug. Beendete Posten haben keinen Ort mehr.
+    let material: Vec<i64> = sqlx::query_scalar(
+        "UPDATE einsatz_material SET einsatz_fahrzeug_id = NULL \
+         WHERE einsatz_fahrzeug_id = ? AND einsatz_id = ? AND beendet_at IS NULL RETURNING id",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
     for sql in [
         "UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE fahrzeug_id = ? AND einsatz_id = ?",
         "DELETE FROM einsatz_fuehrungsstelle_fahrzeug \
@@ -689,6 +701,7 @@ pub async fn entlassen_tx(
         br_id,
         besatzung,
         trug_fuehrungsstelle,
+        material,
     })
 }
 
@@ -807,8 +820,19 @@ async fn find_storno_hindernis_tx(
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
+    let hat_beladung: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM einsatz_material \
+                       WHERE einsatz_fahrzeug_id = ?1 AND einsatz_id = ?2 AND beendet_at IS NULL)",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
     let bindung = if hat_besatzung {
         Some("Das Fahrzeug hat eine Besatzung")
+    } else if hat_beladung {
+        // LLH-1224 D13: wie die Besatzung; die Beladung löst erst das Entlassen.
+        Some("Das Fahrzeug hat Material geladen")
     } else if einheit.is_some() {
         Some("Das Fahrzeug gehört einer Einheit an")
     } else if br.is_some() {

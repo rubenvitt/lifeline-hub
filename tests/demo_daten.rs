@@ -1088,7 +1088,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     .await;
     let mat = post(
         "/api/material".into(),
-        r#"{"bezeichnung":"Nachbar-Decke","kategorie":"Betreuung"}"#.into(),
+        r#"{"bezeichnung":"Nachbar-Decke","kategorie":"Betreuung","art":"verbrauchsgut"}"#.into(),
     )
     .await;
     post(

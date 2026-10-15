@@ -52,6 +52,8 @@ pub struct MaterialVorlage {
     /// Freitext wie im Stamm (Combobox, kein Katalog; `migrations/0018_material.sql`).
     pub kategorie: &'static str,
     pub bestandsnummer: &'static str,
+    /// Gerät oder Verbrauchsgut (LLH-1224, design.md D19); die Demo-Materialien sind Geräte.
+    pub art: crate::material::MaterialArt,
 }
 
 /// Standort aller Demo-Fahrzeuge und -Materialien.
@@ -221,24 +223,28 @@ pub const MATERIAL: [MaterialVorlage; 4] = [
         bezeichnung: "Stromerzeuger 8 kVA",
         kategorie: "Technik",
         bestandsnummer: "DEMO-M-001",
+        art: crate::material::MaterialArt::Geraet,
     },
     MaterialVorlage {
         schluessel: "beleuchtung",
         bezeichnung: "Beleuchtungssatz",
         kategorie: "Technik",
         bestandsnummer: "DEMO-M-002",
+        art: crate::material::MaterialArt::Geraet,
     },
     MaterialVorlage {
         schluessel: "feldbetten",
         bezeichnung: "Feldbettensatz (20 Stück)",
         kategorie: "Betreuung",
         bestandsnummer: "DEMO-M-003",
+        art: crate::material::MaterialArt::Geraet,
     },
     MaterialVorlage {
         schluessel: "sanrucksack",
         bezeichnung: "Sanitätsrucksack",
         kategorie: "Sanität",
         bestandsnummer: "DEMO-M-004",
+        art: crate::material::MaterialArt::Geraet,
     },
 ];
 

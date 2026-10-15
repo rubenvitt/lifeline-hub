@@ -219,6 +219,7 @@ export type FahrzeugVorschlaege = S['FahrzeugVorschlaege'];
 export type FahrzeugStatus = S['FahrzeugStatus'];
 export type EinsatzFahrzeug = S['EinsatzFahrzeugAnzeige'];
 export type MaterialStatus = S['MaterialStatus'];
+export type MaterialArt = S['MaterialArt'];
 export type Material = S['MaterialAnzeige'];
 export type EinsatzMaterial = S['EinsatzMaterialAnzeige'];
 export type StaerkePosition = S['StaerkePosition'];

@@ -9,19 +9,25 @@ use common::{
 
 // ---------- Zusatz-Helfer ----------
 
-/// Legt Stamm-Material an (Admin) und liefert dessen id.
+/// Legt Stamm-Verbrauchsgut an (Admin, Mengen über 1) und liefert dessen id.
 async fn material_anlegen(app: &axum::Router, admin: &str, bezeichnung: &str) -> i64 {
+    stamm_anlegen(app, admin, bezeichnung, "verbrauchsgut").await
+}
+
+/// Legt Stamm-Material der Art `art` an (Admin) und liefert dessen id.
+async fn stamm_anlegen(app: &axum::Router, admin: &str, bezeichnung: &str, art: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
         "/api/material",
         admin,
         Some(&format!(
-            r#"{{"bezeichnung":"{bezeichnung}","kategorie":"Betreuung"}}"#
+            r#"{{"bezeichnung":"{bezeichnung}","kategorie":"Betreuung","art":"{art}"}}"#
         )),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    assert_eq!(json["art"], art);
     json["id"].as_i64().unwrap()
 }
 
@@ -985,10 +991,11 @@ async fn aendern_feuert_einheit_und_uhs_nur_wenn_deren_ansicht_sich_aendert() {
     );
 }
 
-/// Material in einer Einheit und zugleich an einer UHS: ein Statuswechsel ändert beide Ansichten,
-/// eine Bemerkung nur das UHS-Detail.
+/// LLH-1224 D6/D9: ein Posten hat höchstens einen Ort. Wechselt er von der Einheit an eine UHS,
+/// melden alte Einheit und neue UHS, der ETB nennt beide Orte, und die Einheit zählt ihn nicht
+/// mehr; danach meldet ein Statuswechsel nur noch die UHS.
 #[tokio::test]
-async fn material_in_einheit_und_an_uhs_meldet_beide_ansichten() {
+async fn wechsel_von_der_einheit_an_die_uhs_loest_die_einheit() {
     let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -996,7 +1003,9 @@ async fn material_in_einheit_und_an_uhs_meldet_beide_ansichten() {
     let einheit = in_einheit(&app, &admin, einsatz, em).await;
     let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
     let pfad = format!("/api/einsaetze/{einsatz}/material/{em}");
-    let (s, _) = anfrage(
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = anfrage(
         &app,
         "PATCH",
         &pfad,
@@ -1004,29 +1013,30 @@ async fn material_in_einheit_und_an_uhs_meldet_beide_ansichten() {
         Some(&format!(r#"{{"uhs_id":{uhs}}}"#)),
     )
     .await;
-    assert_eq!(s, StatusCode::OK);
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        (json["uhs_id"].as_i64(), json["einheit_id"].as_i64()),
+        (Some(uhs), None)
+    );
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit), ereignis("uhs", uhs)],
+        "Ortswechsel: alte Einheit und neue UHS"
+    );
+    let texte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Material «Trage» (×1): Einheit «1. Zug» → UHS «UHS 1»"),
+        "{texte:?}"
+    );
 
-    let mut rx = live.abonniere(einsatz);
     let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"status":"defekt"}"#)).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
-        vec![ereignis("einheit", einheit), ereignis("uhs", uhs)],
-        "Status: Einheit und UHS"
-    );
-    let (s, _) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"bemerkung":"Gurt"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(
-        objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("uhs", uhs)],
-        "Bemerkung: nur UHS"
+        "Status: nur noch die UHS"
     );
 }
 
@@ -1414,34 +1424,85 @@ async fn adhoc_angaben_grenzen_und_beendeter_posten() {
 }
 
 /// Die Einheit zeigt die Bezeichnung ihres Materials, das UHS-Detail die ganze Zeile: eine
-/// korrigierte Bezeichnung meldet beide, eine Kategorie nur die UHS.
+/// korrigierte Bezeichnung meldet den Ort des Postens, eine Kategorie nur die UHS (LLH-1224:
+/// ein Ort je Posten).
 #[tokio::test]
 async fn angaben_melden_einheit_und_uhs_wenn_deren_ansicht_sich_aendert() {
     let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let em = adhoc_disponieren(&app, &admin, einsatz, "Feldbeten", 4).await;
-    let einheit = in_einheit(&app, &admin, einsatz, em).await;
+    let im_zug = adhoc_disponieren(&app, &admin, einsatz, "Feldbeten", 4).await;
+    let an_uhs = adhoc_disponieren(&app, &admin, einsatz, "Liegen", 4).await;
+    let einheit = in_einheit(&app, &admin, einsatz, im_zug).await;
     let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
-    let (s, _) = material_patch(&app, &admin, einsatz, em, &format!(r#"{{"uhs_id":{uhs}}}"#)).await;
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        an_uhs,
+        &format!(r#"{{"uhs_id":{uhs}}}"#),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
 
     let mut rx = live.abonniere(einsatz);
-    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"bezeichnung":"Feldbetten"}"#).await;
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        im_zug,
+        r#"{"bezeichnung":"Feldbetten"}"#,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
-        vec![ereignis("einheit", einheit), ereignis("uhs", uhs)],
-        "Bezeichnung: Einheit und UHS"
+        vec![ereignis("einheit", einheit)],
+        "Bezeichnung in der Einheit"
     );
-    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"kategorie":"Betreuung"}"#).await;
+    let (s, _) = material_patch(&app, &admin, einsatz, an_uhs, r#"{"bezeichnung":"Liege"}"#).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
         objekt_ereignisse(&mut rx, FREMD),
         vec![ereignis("uhs", uhs)],
-        "Kategorie: nur UHS"
+        "Bezeichnung an der UHS"
     );
-    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"kategorie":"Betreuung"}"#).await;
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        im_zug,
+        r#"{"kategorie":"Betreuung"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![],
+        "Kategorie: die Einheit zeigt sie nicht"
+    );
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        an_uhs,
+        r#"{"kategorie":"Betreuung"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("uhs", uhs)],
+        "Kategorie: UHS"
+    );
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        an_uhs,
+        r#"{"kategorie":"Betreuung"}"#,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(objekt_ereignisse(&mut rx, FREMD), vec![], "unverändert");
 }
@@ -1571,16 +1632,23 @@ async fn aufteilen(
 }
 
 /// Spec `material-liste`, „Posten aufteilen“: 201 mit `[Ausgang, neu]`, beide Zeilen am selben
-/// Ort, Summe gleich, genau ein ETB-Eintrag; Einheit und UHS werden gemeldet.
+/// Ort, Summe gleich, genau ein ETB-Eintrag; der Ort wird gemeldet. Die Teilzeile kommt aus dem
+/// Rest und startet ohne Ausgabe (LLH-1224 D14).
 #[tokio::test]
 async fn aufteilen_legt_zweite_zeile_an_und_schreibt_einen_etb_eintrag() {
     let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 50).await;
-    let einheit = in_einheit(&app, &admin, einsatz, em).await;
     let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
-    let (s, _) = material_patch(&app, &admin, einsatz, em, &format!(r#"{{"uhs_id":{uhs}}}"#)).await;
+    let (s, _) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"uhs_id":{uhs},"ausgegeben":10}}"#),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     let etb = system_etb_anzahl(&app, &admin, einsatz).await;
 
@@ -1594,10 +1662,19 @@ async fn aufteilen_legt_zweite_zeile_an_und_schreibt_einen_etb_eintrag() {
         (zeilen[0]["menge"].as_i64(), zeilen[1]["menge"].as_i64()),
         (Some(30), Some(20))
     );
+    assert_eq!(
+        (
+            zeilen[0]["ausgegeben"].as_i64(),
+            zeilen[1]["ausgegeben"].as_i64()
+        ),
+        (Some(10), Some(0)),
+        "die Ausgabe bleibt an der Ausgangszeile"
+    );
     let neu = zeilen[1]["id"].as_i64().unwrap();
     for z in zeilen {
-        assert_eq!(z["einheit_id"], einheit);
+        assert!(z["einheit_id"].is_null());
         assert_eq!(z["uhs_id"], uhs);
+        assert_eq!(z["art"], "verbrauchsgut");
         assert_eq!(z["bezeichnung"], "Wolldecke");
     }
     assert_eq!(zeilen[0]["disponiert_at"], zeilen[1]["disponiert_at"]);
@@ -1618,7 +1695,6 @@ async fn aufteilen_legt_zweite_zeile_an_und_schreibt_einen_etb_eintrag() {
         vec![
             ereignis("material", em),
             ereignis("material", neu),
-            ereignis("einheit", einheit),
             ereignis("uhs", uhs)
         ]
     );
@@ -1679,4 +1755,471 @@ async fn aufteilen_braucht_schreibrecht() {
     let (s, _) = aufteilen(&app, &erika, einsatz, em, r#"{"menge":1}"#).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     assert_eq!(material_zeile(&app, &admin, einsatz, em).await["menge"], 5);
+}
+
+// ── Material-Modell A (LLH-1224) ──────────────────────────────────────────────────────────
+
+/// Die System-ETB-Einträge, die nach den ersten `vorher` hinzugekommen sind, in der Folge ihres
+/// Entstehens (die Liste kommt neueste zuerst).
+async fn neue_etb(app: &axum::Router, cookie: &str, einsatz: i64, vorher: usize) -> Vec<String> {
+    let alle = system_etb_inhalte(app, cookie, einsatz).await;
+    let mut neu = alle[..alle.len() - vorher].to_vec();
+    neu.reverse();
+    neu
+}
+
+async fn disponieren_roh(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+/// Spec `material-modell`, „Art einer Zeile“ (design.md D2/D5): der Stamm gibt die Art vor, ein
+/// Ad-hoc-Posten nennt sie oder bekommt sie aus der Menge; ein Gerät steht je Stück im Einsatz.
+/// Jede Ablehnung schreibt nichts.
+#[tokio::test]
+async fn disponieren_kopiert_die_art_und_prueft_die_menge() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let geraet = stamm_anlegen(&app, &admin, "Stromerzeuger", "geraet").await;
+    let decke = material_anlegen(&app, &admin, "Wolldecke").await;
+
+    let abgelehnt = [
+        (
+            format!(r#"{{"material_id":{geraet},"menge":2}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Ein Gerät steht je Stück im Einsatz",
+        ),
+        (
+            format!(r#"{{"material_id":{decke},"menge":5,"art":"verbrauchsgut"}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Die Art kommt aus dem Stamm",
+        ),
+        (
+            r#"{"adhoc":{"bezeichnung":"Pumpe"},"menge":3,"art":"geraet"}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Ein Gerät steht je Stück im Einsatz",
+        ),
+        (
+            r#"{"adhoc":{"bezeichnung":"Fass"},"art":"fass"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+            "Unbekannte Art",
+        ),
+    ];
+    for (body, status, grund) in &abgelehnt {
+        let (s, json) = disponieren_roh(&app, &admin, einsatz, body).await;
+        assert_eq!(s, *status, "{body}: {json}");
+        assert!(
+            json["error"].as_str().unwrap_or_default().contains(grund),
+            "{body}: {json}"
+        );
+    }
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        0,
+        "nichts geschrieben"
+    );
+
+    let faelle = [
+        (format!(r#"{{"material_id":{geraet}}}"#), "geraet"),
+        (
+            format!(r#"{{"material_id":{decke},"menge":50}}"#),
+            "verbrauchsgut",
+        ),
+        (
+            r#"{"adhoc":{"bezeichnung":"Feldbett"},"menge":200}"#.to_string(),
+            "verbrauchsgut",
+        ),
+        (r#"{"adhoc":{"bezeichnung":"Trage"}}"#.to_string(), "geraet"),
+        (
+            r#"{"adhoc":{"bezeichnung":"Sandsack"},"art":"verbrauchsgut"}"#.to_string(),
+            "verbrauchsgut",
+        ),
+    ];
+    for (body, art) in &faelle {
+        let (s, json) = disponieren_roh(&app, &admin, einsatz, body).await;
+        assert_eq!(s, StatusCode::CREATED, "{body}: {json}");
+        assert_eq!(json["art"], *art, "{body}");
+        assert_eq!(json["ausgegeben"], 0, "{body}");
+    }
+}
+
+/// Spec `material-modell`, „Ausgabe eines Verbrauchsguts“ (design.md D4/D11): absolute Ausgabe
+/// mit ETB-Eintrag samt Rest, Rücknahme erlaubt, ohne Änderung kein Eintrag; die Regeln der
+/// Ergebniszeile sind 422, falsche Werte 400, beides ohne zu schreiben.
+#[tokio::test]
+async fn ausgabe_schreibt_den_rest_ins_etb_und_prueft_die_zeile() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 50).await;
+
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"ausgegeben":20}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["ausgegeben"], 20);
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"ausgegeben":30}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, vorher).await,
+        ["Material «Wolldecke»: Ausgabe 20 → 30 (Rest 20 von 50)"]
+    );
+
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    for (body, status, grund) in [
+        (
+            r#"{"ausgegeben":60}"#,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Ausgabe größer als die Menge",
+        ),
+        (
+            r#"{"menge":20}"#,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Menge kleiner als die Ausgabe",
+        ),
+        (
+            r#"{"status":"verbraucht"}"#,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Status «verbraucht» gibt es nur für Geräte",
+        ),
+        (
+            r#"{"art":"geraet"}"#,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Ein Gerät steht je Stück im Einsatz",
+        ),
+        (r#"{"ausgegeben":-1}"#, StatusCode::BAD_REQUEST, "Ausgabe"),
+        (
+            r#"{"art":"fass","ausgegeben":60}"#,
+            StatusCode::BAD_REQUEST,
+            "Unbekannte Art",
+        ),
+        (r#"{"art":null}"#, StatusCode::BAD_REQUEST, "Art"),
+    ] {
+        let (s, json) = material_patch(&app, &admin, einsatz, em, body).await;
+        assert_eq!(s, status, "{body}: {json}");
+        assert!(
+            json["error"].as_str().unwrap_or_default().contains(grund),
+            "{body}: {json}"
+        );
+    }
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(
+        (
+            zeile["menge"].as_i64(),
+            zeile["ausgegeben"].as_i64(),
+            zeile["art"].as_str()
+        ),
+        (Some(50), Some(30), Some("verbrauchsgut")),
+        "nichts geschrieben"
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher);
+
+    // Rücknahme: eine kleinere Ausgabe geht; derselbe Wert schreibt nichts.
+    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"ausgegeben":25}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"ausgegeben":25}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, vorher).await,
+        ["Material «Wolldecke»: Ausgabe 30 → 25 (Rest 25 von 50)"]
+    );
+
+    // Je Aspekt ein Eintrag, in der Reihenfolge Menge, Ausgabe, Status.
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"status":"defekt","ausgegeben":60,"menge":80}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let neu = neue_etb(&app, &admin, einsatz, vorher).await;
+    assert_eq!(neu.len(), 3, "{neu:?}");
+    assert!(neu[0].contains("80"), "Menge zuerst: {neu:?}");
+    assert_eq!(
+        neu[1],
+        "Material «Wolldecke»: Ausgabe 25 → 60 (Rest 20 von 80)"
+    );
+    assert!(neu[2].contains("defekt"), "Status zuletzt: {neu:?}");
+}
+
+/// design.md D10: die Art einer Zeile lässt sich korrigieren; der ETB nennt beide Arten.
+#[tokio::test]
+async fn art_wechsel_schreibt_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Sandsack", 1).await;
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, em).await["art"],
+        "geraet"
+    );
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"art":"verbrauchsgut","menge":40}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let neu = neue_etb(&app, &admin, einsatz, vorher).await;
+    assert_eq!(neu.len(), 2, "{neu:?}");
+    assert_eq!(neu[1], "Material «Sandsack»: Art Gerät → Verbrauchsgut");
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(
+        (zeile["art"].as_str(), zeile["menge"].as_i64()),
+        (Some("verbrauchsgut"), Some(40))
+    );
+
+    // Zurück zum Gerät geht nur mit Menge 1 im selben PATCH („Art ändern …“ schickt beides).
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"art":"geraet"}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) =
+        material_patch(&app, &admin, einsatz, em, r#"{"art":"geraet","menge":1}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        (json["art"].as_str(), json["menge"].as_i64()),
+        (Some("geraet"), Some(1))
+    );
+    let neu = neue_etb(&app, &admin, einsatz, vorher).await;
+    assert_eq!(neu.len(), 2, "{neu:?}");
+    assert_eq!(neu[1], "Material «Sandsack»: Art Verbrauchsgut → Gerät");
+}
+
+/// Die Einheit zeigt Art und Ausgabe ihres Materials (Ausfall „aufgebraucht“): beide melden sie.
+#[tokio::test]
+async fn ausgabe_meldet_die_einheit() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 10).await;
+    let einheit = in_einheit(&app, &admin, einsatz, em).await;
+    let mut rx = live.abonniere(einsatz);
+    let (s, _) = material_patch(&app, &admin, einsatz, em, r#"{"ausgegeben":10}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)]
+    );
+}
+
+async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        cookie,
+        Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn br_status(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, status: &str) {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        cookie,
+        Some(&format!(r#"{{"status":"{status}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{status}: {json}");
+}
+
+async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufname: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&format!(r#"{{"adhoc":{{"funkrufname":"{funkrufname}"}}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+const ORTE: &[(&str, &str)] = &[
+    ("einheit", "einheit_id"),
+    ("uhs", "uhs_id"),
+    ("fahrzeug", "fahrzeug_id"),
+    ("bereitstellungsraum", "br_id"),
+];
+
+/// Spec `material-modell`, „Ein Ort je Posten“ (design.md D6/D7/D9/D11): Ort beim Disponieren,
+/// Wechsel über alle Ortsarten mit je einem ETB-Eintrag und Meldung an alten und neuen Ort; zwei
+/// Orte sind 422 ohne zu schreiben; `null` an einem fremden Ort ändert nichts.
+#[tokio::test]
+async fn ein_ort_je_posten_ueber_alle_ortsarten() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = create_uhs(&app, &admin, einsatz, "Turnhalle").await;
+    let br = br_anlegen(&app, &admin, einsatz, "BR Nord").await;
+    let ef = adhoc_fahrzeug(&app, &admin, einsatz, "Florian 1/83-1").await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"adhoc":{{"bezeichnung":"Wolldecke"}},"menge":20,"uhs_id":{uhs}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+    assert_eq!(json["uhs_id"], uhs);
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Material «Wolldecke» (×20) disponiert, Ort UHS «Turnhalle»"));
+    assert_eq!(objekt_ereignisse(&mut rx, ORTE), vec![ereignis("uhs", uhs)]);
+
+    // Zwei Orte mit Wert: 422 vor der Transaktion, nichts geschrieben.
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"uhs_id":{uhs},"einheit_id":{einheit},"bemerkung":"x"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(json["error"], "Ein Posten hat höchstens einen Ort");
+    let (s, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &format!(
+            r#"{{"adhoc":{{"bezeichnung":"Liege"}},"br_id":{br},"einsatz_fahrzeug_id":{ef}}}"#
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher);
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(
+        (zeile["uhs_id"].as_i64(), zeile["bemerkung"].as_str()),
+        (Some(uhs), None)
+    );
+
+    // `null` an einem Ort, an dem der Posten nicht ist: keine Wirkung.
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"einheit_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["uhs_id"], uhs);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher);
+    assert_eq!(objekt_ereignisse(&mut rx, ORTE), vec![]);
+
+    let wege = [
+        (
+            format!(r#"{{"br_id":{br}}}"#),
+            "UHS «Turnhalle» → Bereitstellungsraum «BR Nord»",
+            vec![ereignis("uhs", uhs), ereignis("bereitstellungsraum", br)],
+        ),
+        (
+            format!(r#"{{"einsatz_fahrzeug_id":{ef}}}"#),
+            "Bereitstellungsraum «BR Nord» → Fahrzeug «Florian 1/83-1»",
+            vec![
+                ereignis("bereitstellungsraum", br),
+                ereignis("fahrzeug", ef),
+            ],
+        ),
+        (
+            format!(r#"{{"einheit_id":{einheit}}}"#),
+            "Fahrzeug «Florian 1/83-1» → Einheit «Staffel A»",
+            vec![ereignis("fahrzeug", ef), ereignis("einheit", einheit)],
+        ),
+        (
+            r#"{"einheit_id":null}"#.to_string(),
+            "Einheit «Staffel A» → ohne Ort",
+            vec![ereignis("einheit", einheit)],
+        ),
+    ];
+    for (body, text, ereignisse) in wege {
+        let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+        let (s, json) = material_patch(&app, &admin, einsatz, em, &body).await;
+        assert_eq!(s, StatusCode::OK, "{body}: {json}");
+        assert_eq!(
+            neue_etb(&app, &admin, einsatz, vorher).await,
+            [format!("Material «Wolldecke» (×20): {text}")],
+            "{body}"
+        );
+        let mut gemeldet = objekt_ereignisse(&mut rx, ORTE);
+        gemeldet.sort();
+        let mut erwartet = ereignisse;
+        erwartet.sort();
+        assert_eq!(gemeldet, erwartet, "{body}");
+        let gesetzt = ["einheit_id", "einsatz_fahrzeug_id", "uhs_id", "br_id"]
+            .iter()
+            .filter(|f| json.get(**f).is_some_and(|v| !v.is_null()))
+            .count();
+        assert!(gesetzt <= 1, "{body}: {json}");
+    }
+}
+
+/// design.md D8/D13: an einem aufgelösten Bereitstellungsraum bleibt der Posten; der unveränderte
+/// Wert und das Lösen gehen, ein neuer Posten dorthin ist 422. Stornieren verlangt „ohne Ort“.
+#[tokio::test]
+async fn aufgeloester_br_behaelt_den_posten_und_storno_verlangt_ohne_ort() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let br = br_anlegen(&app, &admin, einsatz, "BR Nord").await;
+    br_status(&app, &admin, einsatz, br, "aktiv").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    let zweiter = adhoc_disponieren(&app, &admin, einsatz, "Liege", 5).await;
+    let (s, json) =
+        material_patch(&app, &admin, einsatz, em, &format!(r#"{{"br_id":{br}}}"#)).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+
+    let (s, json) = aktion(&app, &admin, einsatz, em, "stornieren").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Bereitstellungsraum"),
+        "{json}"
+    );
+
+    br_status(&app, &admin, einsatz, br, "aufgeloest").await;
+    assert_eq!(material_zeile(&app, &admin, einsatz, em).await["br_id"], br);
+    let (s, json) =
+        material_patch(&app, &admin, einsatz, em, &format!(r#"{{"br_id":{br}}}"#)).await;
+    assert_eq!(s, StatusCode::OK, "unveränderter Wert: {json}");
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        zweiter,
+        &format!(r#"{{"br_id":{br}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(json["error"], "Bereitstellungsraum ist aufgelöst");
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"br_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "Lösen: {json}");
+    assert!(json.get("br_id").is_none_or(|v| v.is_null()));
+    let (s, json) = aktion(&app, &admin, einsatz, em, "stornieren").await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "ohne Ort: {json}");
 }

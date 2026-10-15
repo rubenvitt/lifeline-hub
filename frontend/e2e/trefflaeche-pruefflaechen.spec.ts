@@ -1108,9 +1108,9 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen,
   ]);
 });
 
-// ── C14 · Materialliste (LLH-1093) ─────────────────────────────────────────────────────
-// Die Ort-Teile, die Menge und die Zeilenaktionen der umgebauten Materialliste (Prüfliste
-// Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
+// ── C14 · Materialliste (LLH-1093, LLH-1225) ───────────────────────────────────────────
+// Die eine Ortsangabe, „Ausgeben“, die Gruppierung und die Zeilenaktionen der Materialliste
+// (Prüfliste Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
 
 async function materialSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
@@ -1120,19 +1120,23 @@ async function materialSaeen(page: Page, einsatzId: string) {
     adhoc: { bezeichnung: 'Wolldecke' },
     menge: 50,
   });
-  await seed(page, `${E}/material`, { adhoc: { bezeichnung: 'Feldbett' }, menge: 4 });
+  // Ein Ort je Posten (LLH-1224): die Wolldecke bei der Einheit, das Feldbett an der UHS.
+  const feldbett = await seed(page, `${E}/material`, {
+    adhoc: { bezeichnung: 'Feldbett' },
+    menge: 4,
+  });
   const zuordnung = await page.request.put(`${E}/einheiten/${einheit.id}/material/${verortet.id}`);
   expect(zuordnung.ok(), `Einheit zuordnen: ${zuordnung.status()}`).toBe(true);
-  const verortung = await page.request.patch(`${E}/material/${verortet.id}`, {
+  const verortung = await page.request.patch(`${E}/material/${feldbett.id}`, {
     data: { uhs_id: uhs.id },
   });
   expect(verortung.ok(), `UHS verorten: ${verortung.status()}`).toBe(true);
 }
 
 const materialAnker = (page: Page) =>
-  inMain(page).getByRole('button', { name: 'Menge zu Wolldecke bearbeiten' });
+  inMain(page).getByRole('button', { name: 'Wolldecke ausgeben' });
 
-test('C14 · Materialliste: Ort-Teile, Menge und Zeilenaktionen halten 72 px, kompakt bleibt kleiner', async ({
+test('C14 · Materialliste: Ort, Ausgeben, Gruppierung und Zeilenaktionen halten 72 px, kompakt bleibt kleiner', async ({
   page,
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 1093 Material ${Date.now()}`);
@@ -1143,11 +1147,16 @@ test('C14 · Materialliste: Ort-Teile, Menge und Zeilenaktionen halten 72 px, ko
       anker: materialAnker,
       ziele: [
         {
-          sorte: 'Material Ort-Teile',
-          ziele: knopf(/^(Einheit|UHS) zu (Wolldecke|Feldbett) (bearbeiten|eintragen)$/),
-          mindestens: 4,
+          sorte: 'Material Ort',
+          ziele: knopf(/^Ort zu (Wolldecke|Feldbett) bearbeiten$/),
+          mindestens: 2,
         },
-        { sorte: 'Material Menge', ziele: knopf(/^Menge zu .+ bearbeiten$/), mindestens: 2 },
+        { sorte: 'Material Ausgeben', ziele: knopf(/^.+ ausgeben$/), mindestens: 2 },
+        {
+          sorte: 'Material gruppieren',
+          ziele: segment(/^Nach (Ort|Status)$/),
+          mindestens: 2,
+        },
         {
           sorte: 'Material aus dem Einsatz nehmen',
           ziele: knopf(/^.+ aus dem Einsatz nehmen$/),
@@ -1176,13 +1185,122 @@ test('C14 · Materialliste (Beobachter): Schreibaktionen fehlen, die Ort-Links h
       anker: (page) => inMain(page).getByRole('link', { name: 'Staffel Ost' }),
       fehlt: (page) =>
         inMain(page).getByRole('button', {
-          name: / (bearbeiten|eintragen|aus dem Einsatz nehmen)$|^Weitere Aktionen zu /,
+          name: / (bearbeiten|ausgeben|aus dem Einsatz nehmen)$|^Weitere Aktionen zu /,
         }),
       ziele: [
         {
           sorte: 'Material Ort-Links',
           ziele: (page) =>
             inMain(page).getByRole('link', { name: /^(Staffel Ost|UHS Turnhalle)$/ }),
+          mindestens: 2,
+        },
+      ],
+    },
+  ]);
+});
+
+// ── C15 · Material am Ort (LLH-1225 Teil II) ──────────────────────────────────────────
+// Derselbe Baustein an Einheit, Fahrzeug (Block „Beladung“), UHS und Bereitstellungsraum: die
+// Auswahl „Material zuordnen …“ (antd-Hülle), Lösen und „Ausgeben“ je Ort (Prüfliste
+// Einsatztauglichkeit der Orte, Kriterium 2).
+
+async function materialAmOrtSaeen(page: Page, einsatzId: string) {
+  const E = `/api/einsaetze/${einsatzId}`;
+  const einheit = await seed(page, `${E}/einheiten`, { name: 'Staffel West' });
+  const fahrzeug = await seed(page, `${E}/fahrzeuge`, { adhoc: { funkrufname: 'Florian 15' } });
+  const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
+  const br = await seed(page, `${E}/bereitstellungsraeume`, { bezeichnung: 'BR West' });
+  const orte = [
+    ['Einheit', { einheit_id: einheit.id }],
+    ['Fahrzeug', { einsatz_fahrzeug_id: fahrzeug.id }],
+    ['UHS', { uhs_id: uhs.id }],
+    ['BR', { br_id: br.id }],
+  ] as const;
+  // Je Ort ein Verbrauchsgut (trägt „Ausgeben“) und ein Gerät; dazu ein Posten ohne Ort fürs
+  // Angebot der Auswahl.
+  for (const [name, ort] of orte) {
+    await seed(page, `${E}/material`, {
+      adhoc: { bezeichnung: `Decken ${name}` },
+      menge: 20,
+      art: 'verbrauchsgut',
+      ...ort,
+    });
+    await seed(page, `${E}/material`, { adhoc: { bezeichnung: `Trage ${name}` }, ...ort });
+  }
+  await seed(page, `${E}/material`, { adhoc: { bezeichnung: 'Stromerzeuger' } });
+  return { einheitId: einheit.id, uhsId: uhs.id, brId: br.id };
+}
+
+/** Die Hülle des antd-Auswahlfelds „Material zuordnen“, nicht das innere Eingabefeld. */
+const materialAuswahl = (page: Page) =>
+  inMain(page)
+    .getByRole('combobox', { name: 'Material zuordnen' })
+    .locator(
+      'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]',
+    );
+
+function materialAmOrtFlaechen(
+  einsatzId: string,
+  ids: { einheitId: number; uhsId: number; brId: number },
+): Flaeche[] {
+  const R = `/einsaetze/${einsatzId}`;
+  const ziele = (ort: string, loesen: RegExp): Ziel[] => [
+    { sorte: `${ort}: Material zuordnen`, ziele: materialAuswahl, mindestens: 1 },
+    { sorte: `${ort}: Material lösen`, ziele: knopf(loesen), mindestens: 2 },
+    { sorte: `${ort}: Material ausgeben`, ziele: knopf(/^Decken .+ ausgeben$/), mindestens: 1 },
+  ];
+  return [
+    {
+      pfad: `${R}/einheiten/${ids.einheitId}`,
+      anker: knopf('Decken Einheit ausgeben'),
+      ziele: ziele('Einheit', /^(Decken|Trage) Einheit aus Einheit lösen$/),
+    },
+    {
+      pfad: `${R}/fahrzeuge`,
+      anker: knopf('Besatzung zu Florian 15'),
+      vorbereiten: async (page) => {
+        await knopf('Besatzung zu Florian 15')(page).click();
+        await expect(knopf('Decken Fahrzeug ausgeben')(page)).toBeVisible();
+      },
+      ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),
+    },
+    {
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      anker: knopf('Decken UHS ausgeben'),
+      ziele: ziele('UHS', /^(Decken|Trage) UHS lösen$/),
+    },
+    {
+      pfad: `${R}/bereitstellungsraeume/${ids.brId}`,
+      anker: knopf('Decken BR ausgeben'),
+      ziele: ziele('BR', /^(Decken|Trage) BR lösen$/),
+    },
+  ];
+}
+
+test('C15 · Material am Ort: Auswahl, Lösen und Ausgeben halten 72 px an jedem Ort, kompakt bleibt kleiner', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1225 Material am Ort ${Date.now()}`);
+  const ids = await materialAmOrtSaeen(page, einsatzId);
+  await messeFlaechen(page, materialAmOrtFlaechen(einsatzId, ids));
+});
+
+test('C15 · Material am Ort (Beobachter): Bedienung fehlt, die Posten stehen', async ({ page }) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1225 Material am OrtB ${Date.now()}`);
+  const ids = await materialAmOrtSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  const R = `/einsaetze/${einsatzId}`;
+  // Ohne Schreibrecht trägt der Baustein kein Bedienziel (Vorbedingung: Lösen und Ausgeben
+  // fehlen); gemessen wird, was auf der Fläche bleibt: die Reiter der UHS.
+  await messeImRollenzweig(page, 'beobachter', [
+    {
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      anker: (page) => inMain(page).locator('[data-lfh="material-am-ort-zeile"]').first(),
+      fehlt: (page) => inMain(page).getByRole('button', { name: / (lösen|ausgeben)$/ }),
+      ziele: [
+        {
+          sorte: 'UHS Reiter (Beobachter)',
+          ziele: segment(/^(Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
           mindestens: 2,
         },
       ],

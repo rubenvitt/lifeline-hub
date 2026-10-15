@@ -10,6 +10,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   fahrzeuge.png    frontend/src/pages/FahrzeugePage.tsx (Ansicht „Liste“),
  *                    frontend/src/components/Datensicht.tsx
  *   besatzung.png    frontend/src/pages/FahrzeugePage.tsx (`BesatzungsBlock`)
+ *   beladung.png     frontend/src/pages/FahrzeugePage.tsx (Block „Beladung“ im Aufklapper),
+ *                    frontend/src/kraefte/MaterialAmOrt.tsx
  *   fahrzeuge-disponieren.png frontend/src/kraefte/FahrzeugeDisponierenModal.tsx
  *   fms-tableau.png  frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts
  *   entlassen.png    frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Liste)
@@ -28,7 +30,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * Dialog „Angaben ändern“ disponiert sie ein weiteres Ad-hoc-Fahrzeug (LLH-1073). Für den Dialog
  * „Als eigene Einheit führen“ disponiert sie zuletzt ein Ad-hoc-Fahrzeug einer Nachbarwehr mit zwei
  * Ad-hoc-Kräften als Besatzung (LLH-1073 Teil II). „Personal der Einheit übernehmen“ zeigt den RTW
- * „83-2“ der Rettungsstaffel mit ihren freien Kräften, ohne weitere Füllung.
+ * „83-2“ der Rettungsstaffel mit ihren freien Kräften, ohne weitere Füllung. Für die Beladung
+ * (LLH-1225 Teil II) lädt sie Rettungsdecken und eine defekte Absaugpumpe auf den RTW „83-1“ und
+ * legt einen freien Posten an.
  */
 
 const KAPITEL = 'fahrzeuge';
@@ -90,6 +94,40 @@ test.describe(KAPITEL, () => {
     await expect(block.getByText('andere Einheit')).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(block, KAPITEL, 'besatzung');
+  });
+
+  test('Beladung eines Fahrzeugs', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    // Demo-Lücke (LLH-1225): kein Demo-Fahrzeug trägt Material. Die Spec lädt zwei Posten auf den
+    // RTW „83-1“, einen davon defekt, gibt von den Decken einen Teil aus und legt einen freien
+    // Posten an, den die Auswahl anbietet.
+    const fahrzeuge = await liste<Fahrzeug>(page.request, `/api/einsaetze/${demo.id}/fahrzeuge`);
+    const rtw = fahrzeuge.find((f) => f.funkrufname.endsWith('83-1'));
+    expect(rtw, 'RTW 83-1 im Demo-Einsatz').toBeDefined();
+    const basis = `/api/einsaetze/${demo.id}/material`;
+    const decken = await fuelle<{ id: number }>(page, 'post', basis, {
+      adhoc: { bezeichnung: 'Rettungsdecken' },
+      menge: 10,
+      art: 'verbrauchsgut',
+      einsatz_fahrzeug_id: rtw!.id,
+    });
+    await fuelle(page, 'patch', `${basis}/${decken.id}`, { ausgegeben: 4 });
+    const absauger = await fuelle<{ id: number }>(page, 'post', basis, {
+      adhoc: { bezeichnung: 'Absaugpumpe' },
+      einsatz_fahrzeug_id: rtw!.id,
+    });
+    await fuelle(page, 'patch', `${basis}/${absauger.id}`, { status: 'defekt' });
+    // Ein freier Posten, damit „Material zuordnen …“ etwas anbietet.
+    await fuelle(page, 'post', basis, { adhoc: { bezeichnung: 'Stromerzeuger' } });
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
+    await page.getByRole('button', { name: /^Besatzung zu .*83-1$/ }).click();
+    const block = page.locator('[data-lfh="beladung-block"]');
+    await expect(block.getByText('6 von 10 übrig')).toBeVisible();
+    await expect(block.getByRole('combobox', { name: 'Material zuordnen' })).toBeEnabled();
+    await page.mouse.move(0, 0);
+    await fotografiere(block, KAPITEL, 'beladung');
   });
 
   test('FMS-Tableau', async ({ page }) => {

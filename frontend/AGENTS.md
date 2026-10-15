@@ -528,7 +528,7 @@ anwendbar), „nicht geprüft" ist keins.
   `components/instrument/statusFlaeche.ts`; gesetzte `status_farbe` erzwingt `rand`
   (`wirksameDarstellungsart`). Gemessen in `kraefte-kontrast.spec.ts`.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
-  `pages/MaterialPage.tsx` und `pages/uhs/MaterialTab.tsx` lesen beide von dort — zwei
+  `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
   Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.

@@ -109,6 +109,8 @@ const mt = (id: number, einheit_id: number | null) =>
     bezeichnung: `M${id}`,
     menge: 2,
     status: 'defekt',
+    art: 'verbrauchsgut',
+    ausgegeben: 0,
   }) as EinsatzMaterial;
 
 /** Katalog wie im Seed: das Label trägt die Ziffer selbst. */
@@ -459,6 +461,67 @@ describe('Raster als Kräftebaum', () => {
     expect(zug.materialAusfall).toBe(1);
     expect(istProblemZeile(zug)).toBe(true);
     expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+  });
+
+  it('ein Posten zeigt Status und Menge über materialPosten; aufgebraucht ist Ausfall (LLH-1224)', () => {
+    const e = eingabe({
+      einheiten: [eh(1, null)],
+      material: [
+        { ...mt(1, 1), status: 'einsatzbereit', menge: 50, ausgegeben: 50 },
+        { ...mt(2, 1), status: 'im_einsatz', menge: 50, ausgegeben: 20 },
+        { ...mt(3, 1), status: 'einsatzbereit', art: 'geraet', menge: 1 },
+      ],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    const posten = zug.children![0].children!;
+    expect(posten.map((z) => [z.status?.wort, z.status?.ton])).toEqual([
+      ['aufgebraucht ×50', 'alarm'],
+      ['im Einsatz · 30 von 50 übrig', 'bedien'],
+      ['einsatzbereit ×1', 'normal'],
+    ]);
+    expect(zug.materialAusfall).toBe(1);
+  });
+
+  /** LLH-1225 D14: Beladung unter dem Fahrzeug, nach der Besatzung. */
+  it('Beladung ist eine Gruppenzeile unter dem Fahrzeug nach der Besatzung; sie tönt die Einheit', () => {
+    const am = (id: number, ort: Partial<EinsatzMaterial>, status: EinsatzMaterial['status']) =>
+      ({
+        ...mt(id, null),
+        einsatz_fahrzeug_id: null,
+        uhs_id: null,
+        br_id: null,
+        ...ort,
+        status,
+      }) as EinsatzMaterial;
+    const e = eingabe({
+      einheiten: [eh(1, null)],
+      personal: [{ ...p(1, 1, 'gebunden'), fahrzeug_id: 5 } as EinsatzPersonal],
+      fahrzeuge: [fz(5, 1, null)],
+      material: [
+        am(1, { einheit_id: 1 }, 'einsatzbereit'),
+        am(2, { einsatz_fahrzeug_id: 5 }, 'defekt'),
+        am(3, { einsatz_fahrzeug_id: 5 }, 'einsatzbereit'),
+        am(4, { uhs_id: 3 }, 'defekt'),
+      ],
+    });
+    const [zug] = baueMeldebildRaster(e);
+    const [fahrzeug, material] = zug.children!;
+    expect(fahrzeug.children!.map((z) => z.key)).toEqual(['ep-1', 'bel-5']);
+    const beladung = fahrzeug.children![1];
+    expect(beladung).toMatchObject({ art: 'material-gruppe', bezeichnung: 'Beladung' });
+    expect(beladung.gruppe).toEqual({ anzahl: 2, ausfall: 1 });
+    expect(beladung.children!.map((z) => [z.key, z.status?.wort])).toEqual([
+      ['em-2', 'defekt ×2'],
+      ['em-3', 'einsatzbereit ×2'],
+    ]);
+    // Die Gruppe „Material“ zählt nur ihre Posten; die Einheit tönt durch die Beladung.
+    expect(material).toMatchObject({ key: 'mtl-1', bezeichnung: 'Material' });
+    expect(material.gruppe).toEqual({ anzahl: 1, ausfall: 0 });
+    expect(zug.materialAusfall).toBe(1);
+    expect(istProblemZeile(zug)).toBe(true);
+    expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+    // Material an der UHS steht nicht im Baum.
+    expect(alleZeilen([zug]).some((z) => z.key === 'em-4')).toBe(false);
   });
 
   it('die Kachel „keine Rückmeldung“ zählt auch Untereinheiten', () => {

@@ -91,8 +91,8 @@ async fn personal_disponieren(pool: &SqlitePool, einsatz_id: i64, personal_id: i
 
 async fn material_disponieren(pool: &SqlitePool, einsatz_id: i64, material_id: i64) {
     sqlx::query(
-        "INSERT INTO einsatz_material (einsatz_id, material_id, snap_bezeichnung) \
-         VALUES (?, ?, 'Material')",
+        "INSERT INTO einsatz_material (einsatz_id, material_id, snap_bezeichnung, art) \
+         VALUES (?, ?, 'Material', 'geraet')",
     )
     .bind(einsatz_id)
     .bind(material_id)

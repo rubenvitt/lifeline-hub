@@ -1,23 +1,11 @@
-import { useId, useState } from 'react';
-import { Button, Space, Form, App, Typography } from 'antd';
-import { Select } from '../../components/Select';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listEinsatzMaterial, updateDisposition } from '../../api/einsatzMaterial';
-import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
+import { useQuery } from '@tanstack/react-query';
+import { ladeModulFreigaben } from '../../api/einsaetze';
+import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { einsatzKeys } from '../../api/queryKeys';
-import KatalogTabelle from '../../components/KatalogTabelle';
-import { ErfassungsModal } from '../../components/Erfassung';
-import Datenstand from '../../components/Datenstand';
-import StatusTag from '../../components/StatusTag';
-import { monoStil } from '../../components/instrument';
-import { materialStatus } from '../../theme/statusFarben';
-import { ZeilenFehler } from '../../components/SpeicherHinweis';
-import { useZeilenFehler } from '../../components/useZeilenFehler';
+import type { UhsDetail } from '../../api/types';
 import { useAuthOptional } from '../../auth/AuthContext';
-import { KennungsLink } from '../../components/kennungsLink';
-import { sprungGesperrtText } from '../../components/Sprung';
-import { useSprungSperre } from '../../einsatz/useSprungSperre';
-import { materialPfad } from '../../routing/deeplinks';
+import { istSprungGesperrt } from '../../einsatz/modulRegistry';
+import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
 
 interface Props {
   einsatzId: number;
@@ -25,219 +13,52 @@ interface Props {
   schreibgeschuetzt: boolean;
 }
 
-/** Die eine Angabe der Erfassungsmaske. Eigener Typ, damit die Hülle generisch bleibt. */
-interface ZuordnenWerte {
-  em_id: number;
-}
-
+/**
+ * Reiter „Material“ der UHS (LLH-1225, design.md D12): eine Hülle um den Baustein für Material am
+ * Ort. Die Posten kommen aus dem UHS-Detail (`uhs.material`), das auch Leser ohne Materialrecht
+ * bekommen (LLH-1182) und das die Live-Meldung `material` nachlädt. Das Angebot von „Material
+ * zuordnen …“ kommt aus der Materialliste: nur mit Schreibrecht und Freigabe Material abgefragt,
+ * nie am Gerät.
+ *
+ * Ein Gerät (UHS-Laptop) liest nur das Material seiner UHS: die Einsatzliste ist ihm verwehrt
+ * (403), Zuordnen und Lösen ebenso (LFH-892). Bis `/me` sagt, ob ein Gerät angemeldet ist, bleibt
+ * der Reiter deshalb lesend und fragt nichts ab.
+ *
+ * Eine aufgelöste oder stornierte UHS nimmt kein Material mehr an (LLH-1093 D14, Server 422): der
+ * Grund steht an der Auswahl, Ausgeben fehlt; Lösen bleibt (LLH-1224 D13).
+ */
 export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props) {
-  const qc = useQueryClient();
-  const { message } = App.useApp();
-  const [zuordnenOffen, setZuordnenOffen] = useState(false);
-  const [form] = Form.useForm<ZuordnenWerte>();
-  // Ein Gerät (UHS-Laptop) liest nur das Material seiner UHS, und das steht schon im Detail: die
-  // Einsatzliste ist ihm verwehrt (403), Zuordnen und Lösen ebenso (LFH-892, Scope-Matrix).
-  const nurDetail = useAuthOptional()?.geraet != null;
-  const bedienbar = !schreibgeschuetzt && !nurDetail;
+  const auth = useAuthOptional();
+  const nurLesen = auth != null && (auth.laedt || auth.geraet != null);
+  const darfSchreiben = !schreibgeschuetzt && !nurLesen;
 
+  // Derselbe Schlüssel wie `useModulFreigaben`; der Abruf hier sagt zusätzlich, ob sie feststehen.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: darfSchreiben,
+  });
+  // Unbekannt heißt offen (wie `istSprungGesperrt`); abgefragt wird erst, wenn sie feststehen.
+  const materialFrei = !istSprungGesperrt('material', freigabenQuery.data);
+  const freigabenFest = freigabenQuery.isSuccess || freigabenQuery.isError;
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listEinsatzMaterial(einsatzId),
-    enabled: !nurDetail,
+    enabled: darfSchreiben && freigabenFest && materialFrei,
   });
-
-  const material = materialQuery.data ?? [];
-  const verortet = nurDetail ? uhs.material : material.filter((em) => em.uhs_id === uhs.id);
-  const freiVerortbar = material.filter((em) => em.uhs_id == null);
-  // Sperrgrund statt stummer Sperre (LFH-970, U78; `frontend/AGENTS.md`, M16): ohne freies
-  // Material nennt eine Zeile neben dem Knopf den Grund und springt ins Modul Material, ein
-  // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
-  // daneben. Scheitert nur ein Abgleich im Hintergrund, bleiben die alten Daten maßgeblich: ein
-  // Fehlertext neben einem bedienbaren Knopf widerspräche ihm.
-  //
-  // Eine aufgelöste UHS nimmt kein Material mehr an (LLH-1093, design.md D14; der Server antwortet
-  // 422): der Grund steht am Knopf, statt erst im Dialog. Lösen bleibt.
-  const aufgeloest = uhs.status === 'aufgeloest';
-  const sperrgrund: 'aufgeloest' | 'fehler' | 'leer' | null = aufgeloest
-    ? 'aufgeloest'
-    : materialQuery.data === undefined
-      ? materialQuery.isError
-        ? 'fehler'
-        : null
-      : freiVerortbar.length === 0
-        ? 'leer'
-        : null;
-  const sperrgrundId = useId();
-  // Ein Sprung in ein gesperrtes Modul entfällt, die Beschriftung bleibt (Spec `modul-freigabe`).
-  const materialGesperrt = useSprungSperre(einsatzId)('material');
-
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
-  }
-
-  // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“):
-  // Lösen meldet an der Zeile, Zuordnen im Dialog.
-  const loesenZeilen = useZeilenFehler<number>();
-
-  const loesenMut = useMutation({
-    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: null }),
-    onMutate: (emId) => loesenZeilen.beginne(emId),
-    onSuccess: () => {
-      message.success('Material gelöst');
-      invalidate();
-    },
-    onError: (e, emId) => loesenZeilen.melde(emId, e, 'Lösen fehlgeschlagen'),
-  });
-
-  const zuordnenMut = useMutation({
-    mutationFn: (emId: number) => updateDisposition(einsatzId, emId, { uhs_id: uhs.id }),
-    onSuccess: () => {
-      message.success('Material zugeordnet');
-      invalidate();
-    },
-  });
-
-  const columns = [
-    { title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bezeichnung' },
-    {
-      title: 'Kategorie',
-      dataIndex: 'kategorie',
-      key: 'kategorie',
-      render: (v: string | null) => v ?? '—',
-    },
-    {
-      title: 'Menge',
-      dataIndex: 'menge',
-      key: 'menge',
-      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      // Farbe und Beschriftung aus `theme/statusFarben.ts` — dieselbe Quelle wie `MaterialPage`,
-      // damit dasselbe Enum nicht zwei Farbbehandlungen bekommt.
-      render: (status: MaterialStatus) => (
-        <span data-testid="material-status-zelle">
-          <StatusTag darstellung={materialStatus[status]} />
-        </span>
-      ),
-    },
-    // Am Gerät gibt es keine Aktion, also auch keine leere Spalte.
-    ...(nurDetail
-      ? []
-      : [
-          {
-            title: 'Aktion',
-            key: 'aktion',
-            render: (_: unknown, em: EinsatzMaterial) => {
-              // Keine Rückfrage: die gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber),
-              // also `danger` und Abstand, aber keine zusätzliche Reibung.
-              if (!bedienbar) return null;
-              const grund = loesenZeilen.grund(em.id);
-              return (
-                <Space orientation="vertical" size={4}>
-                  {/* Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle
-                      wächst mit. `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle
-                      Zeilen): es fängt den zweiten Klick ab, den sonst die Rückfrage abgefangen
-                      hätte. */}
-                  <Button
-                    danger
-                    loading={loesenMut.isPending && loesenMut.variables === em.id}
-                    onClick={() => loesenMut.mutate(em.id)}
-                  >
-                    Lösen
-                  </Button>
-                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
-                </Space>
-              );
-            },
-          },
-        ]),
-  ];
 
   return (
-    <Space orientation="vertical" style={{ width: '100%' }}>
-      {!nurDetail && <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />}
-      {bedienbar && (
-        <Space wrap size="small" align="center">
-          <Button
-            onClick={() => setZuordnenOffen(true)}
-            disabled={aufgeloest || freiVerortbar.length === 0}
-            aria-describedby={sperrgrund ? sperrgrundId : undefined}
-          >
-            Material zuordnen
-          </Button>
-          {sperrgrund === 'aufgeloest' && (
-            <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
-              UHS aufgelöst
-            </Typography.Text>
-          )}
-          {sperrgrund === 'fehler' && (
-            <Typography.Text type="danger" id={sperrgrundId} data-testid="material-sperrgrund">
-              Material konnte nicht geladen werden – Zuordnen ist gerade nicht möglich.
-            </Typography.Text>
-          )}
-          {sperrgrund === 'leer' && (
-            // Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf; der Link trägt
-            // die Steuerhöhe über `KennungsLink`.
-            <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
-              Kein freies Material im Einsatz –{' '}
-              {materialGesperrt ? (
-                sprungGesperrtText('im Modul Material erfassen')
-              ) : (
-                <KennungsLink to={materialPfad(einsatzId)}>
-                  im Modul Material erfassen <span aria-hidden="true">↗</span>
-                </KennungsLink>
-              )}
-            </Typography.Text>
-          )}
-        </Space>
-      )}
-      <KatalogTabelle<EinsatzMaterial>
-        rowKey="id"
-        dataSource={verortet}
-        columns={columns}
-        size="small"
-        pagination={false}
-        locale={{ emptyText: 'Kein Material dieser UHS zugeordnet' }}
-        loading={!nurDetail && materialQuery.isLoading}
-      />
-      {/* Erfassungshülle: Absende-Knopf im `<form>`, Fokus im Auswahlfeld, Reset auf jedem Weg
-          hinaus. Enter sendet hier trotzdem nicht ab — rc-select ruft bei jedem Enter
-          `preventDefault()` (siehe `MaterialTab.test.tsx`). Kein `serie`: Material wird einzeln
-          zugeordnet. */}
-      <ErfassungsModal<ZuordnenWerte>
-        offen={zuordnenOffen}
-        titel="Material zuordnen"
-        form={form}
-        erfassenText="Zuordnen"
-        laeuft={zuordnenMut.isPending}
-        speicherung={zuordnenMut}
-        speicherFehlerTitel="Nicht zugeordnet"
-        speicherFehlerFallback="Zuordnen fehlgeschlagen"
-        // `mutateAsync`: ein abgelehnter PATCH lässt die Auswahl stehen.
-        onErfassen={(werte) => zuordnenMut.mutateAsync(werte.em_id)}
-        onFertig={() => setZuordnenOffen(false)}
-        onAbbrechen={() => setZuordnenOffen(false)}
-      >
-        <Form.Item<ZuordnenWerte>
-          name="em_id"
-          label="Material"
-          // Pflicht statt eines deaktivierten Absende-Knopfes, der nicht sagt, warum er nicht geht.
-          rules={[{ required: true, message: 'Bitte Material auswählen' }]}
-        >
-          <Select
-            style={{ width: '100%' }}
-            placeholder="Material auswählen…"
-            options={freiVerortbar.map((em) => ({
-              value: em.id,
-              label: `${em.bezeichnung}${em.kategorie ? ` (${em.kategorie})` : ''} — ${em.menge}×`,
-            }))}
-          />
-        </Form.Item>
-      </ErfassungsModal>
-    </Space>
+    <MaterialAmOrt
+      einsatzId={einsatzId}
+      ort={{ art: 'uhs', id: uhs.id }}
+      posten={uhs.material}
+      angebot={darfSchreiben && materialFrei ? materialQuery : undefined}
+      darfSchreiben={darfSchreiben}
+      materialFrei={materialFrei}
+      loesenText="Lösen"
+      sperrgrund={
+        uhs.storniert_at ? 'UHS storniert' : uhs.status === 'aufgeloest' ? 'UHS aufgelöst' : null
+      }
+    />
   );
 }

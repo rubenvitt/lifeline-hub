@@ -646,8 +646,10 @@ async fn etb_text_enthaelt_nur_pseudonym_keinen_namen() {
     }
 }
 
+/// LLH-1224 D11: die Verortung an einer UHS ist ein Ortswechsel und schreibt genau einen
+/// ETB-Eintrag mit altem und neuem Ort (bis LLH-1224 schrieb sie keinen).
 #[tokio::test]
-async fn material_verortung_schreibt_keinen_etb() {
+async fn material_verortung_schreibt_den_ortswechsel() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
@@ -664,7 +666,7 @@ async fn material_verortung_schreibt_keinen_etb() {
     assert_eq!(s, StatusCode::CREATED);
     let em = v["id"].as_i64().unwrap();
     // Snapshot NACH Disponierung — wir messen nur die Wirkung der Verortung:
-    let vorher = etb_inhalte(&app, &cookie, einsatz).await.len();
+    let vorher = etb_inhalte(&app, &cookie, einsatz).await;
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
@@ -674,10 +676,12 @@ async fn material_verortung_schreibt_keinen_etb() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let nachher = etb_inhalte(&app, &cookie, einsatz).await.len();
+    let nachher = etb_inhalte(&app, &cookie, einsatz).await;
+    let neu: Vec<_> = nachher.iter().filter(|t| !vorher.contains(t)).collect();
     assert_eq!(
-        vorher, nachher,
-        "Material-Verortung allein schreibt KEINEN ETB-Eintrag"
+        neu,
+        ["Material «Wolldecke» (×10): ohne Ort → UHS «BHP 50»"],
+        "genau ein Eintrag für den Ortswechsel"
     );
 }
 

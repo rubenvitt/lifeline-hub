@@ -6305,4 +6305,417 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0, "ON DELETE CASCADE auf einsatz wirkt weiter");
     }
+
+    /// LLH-1224, design.md D6/D12: `material.art` aus Bestandsnummer und Mengen, Neubau von
+    /// `einsatz_material` mit Art, Ausgabe, vier Ort-Spalten und den CHECKs, Übernahme jeder Zeile
+    /// (verbrauchtes Verbrauchsgut ganz ausgegeben, Desinfektion → defekt, Einheit und UHS → UHS mit
+    /// Bemerkung).
+    #[tokio::test]
+    async fn migration_0197_material_modell_uebernimmt_art_ausgabe_und_einen_ort() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 195).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Rettungsstaffel') \
+             RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'patientenablage', 'Turnhalle', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stamm = |bez: &'static str, nr: Option<&'static str>| {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO material (org_id, bezeichnung, bestandsnummer) VALUES (1, ?, ?) \
+                 RETURNING id",
+            )
+            .bind(bez)
+            .bind(nr)
+        };
+        let mit_nummer = stamm("Stromerzeuger", Some("INV-1"))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let decke = stamm("Wolldecke", None).fetch_one(&pool).await.unwrap();
+        let funk = stamm("Funkgerät", None).fetch_one(&pool).await.unwrap();
+        // (material_id, einheit, uhs, menge, status, bemerkung, beendet)
+        type Alt = (
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            i64,
+            &'static str,
+            Option<&'static str>,
+            bool,
+        );
+        let alt: [Alt; 10] = [
+            // Stamm mit Bestandsnummer, auch mit Menge 4: der Stamm bleibt Gerät.
+            (Some(mit_nummer), None, None, 1, "verbraucht", None, false),
+            (
+                Some(decke),
+                Some(einheit),
+                None,
+                50,
+                "verbraucht",
+                None,
+                false,
+            ),
+            (
+                Some(decke),
+                None,
+                None,
+                1,
+                "desinfektion_noetig",
+                Some("nass"),
+                false,
+            ),
+            (Some(funk), None, Some(uhs), 1, "einsatzbereit", None, false),
+            (
+                None,
+                Some(einheit),
+                Some(uhs),
+                200,
+                "im_einsatz",
+                None,
+                false,
+            ),
+            (
+                None,
+                Some(einheit),
+                Some(uhs),
+                1,
+                "defekt",
+                Some("B"),
+                false,
+            ),
+            (None, None, None, 3, "einsatzbereit", None, true),
+            (None, Some(einheit), None, 1, "im_einsatz", None, false),
+            (
+                None,
+                Some(einheit),
+                Some(uhs),
+                10,
+                "desinfektion_noetig",
+                Some("X"),
+                false,
+            ),
+            (
+                Some(mit_nummer),
+                None,
+                None,
+                4,
+                "einsatzbereit",
+                None,
+                false,
+            ),
+        ];
+        let mut ids = Vec::new();
+        for (mid, eh, u, menge, status, bem, beendet) in alt {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_material \
+                    (einsatz_id, material_id, einheit_id, uhs_id, menge, status, \
+                     snap_bezeichnung, bemerkung, disponiert_von, beendet_at, beendet_von, \
+                     beendet_als, zuletzt_entlassen_at) \
+                 VALUES (?, ?, ?, ?, ?, ?, 'Posten', ?, ?, ?, ?, ?, ?) RETURNING id",
+            )
+            .bind(e)
+            .bind(mid)
+            .bind(eh)
+            .bind(u)
+            .bind(menge)
+            .bind(status)
+            .bind(bem)
+            .bind(b)
+            .bind(beendet.then_some("2026-10-13 10:00:00"))
+            .bind(beendet.then_some(b))
+            .bind(beendet.then_some("entlassen"))
+            .bind(beendet.then_some("2026-10-13 10:00:00"))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        let spalten_vorher: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('einsatz_material') ORDER BY cid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, 197).await;
+
+        let art_stamm = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, String>("SELECT art FROM material WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(art_stamm(mit_nummer).await, "geraet", "Bestandsnummer");
+        assert_eq!(
+            art_stamm(decke).await,
+            "verbrauchsgut",
+            "einmal mit Menge 50"
+        );
+        assert_eq!(art_stamm(funk).await, "geraet", "Vorgabe");
+
+        #[derive(Debug, PartialEq, sqlx::FromRow)]
+        struct Neu {
+            art: String,
+            menge: i64,
+            ausgegeben: i64,
+            status: String,
+            einheit_id: Option<i64>,
+            uhs_id: Option<i64>,
+            einsatz_fahrzeug_id: Option<i64>,
+            br_id: Option<i64>,
+            bemerkung: Option<String>,
+            beendet_als: Option<String>,
+            zuletzt_entlassen_at: Option<String>,
+        }
+        let neu = |art: &str,
+                   menge: i64,
+                   ausgegeben: i64,
+                   status: &str,
+                   einheit_id: Option<i64>,
+                   uhs_id: Option<i64>,
+                   bemerkung: Option<&str>| Neu {
+            art: art.into(),
+            menge,
+            ausgegeben,
+            status: status.into(),
+            einheit_id,
+            uhs_id,
+            einsatz_fahrzeug_id: None,
+            br_id: None,
+            bemerkung: bemerkung.map(Into::into),
+            beendet_als: None,
+            zuletzt_entlassen_at: None,
+        };
+        let zeilen: Vec<Neu> = sqlx::query_as(
+            "SELECT art, menge, ausgegeben, status, einheit_id, uhs_id, einsatz_fahrzeug_id, \
+                    br_id, bemerkung, beendet_als, zuletzt_entlassen_at \
+             FROM einsatz_material ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let einheit_text = "Umstellung Material-Modell: vorher zugleich Einheit «Rettungsstaffel»";
+        let status_text = "Umstellung Material-Modell: Status vorher «Desinfektion nötig»";
+        assert_eq!(
+            zeilen,
+            [
+                neu("geraet", 1, 0, "verbraucht", None, None, None),
+                neu(
+                    "verbrauchsgut",
+                    50,
+                    50,
+                    "einsatzbereit",
+                    Some(einheit),
+                    None,
+                    None
+                ),
+                neu(
+                    "verbrauchsgut",
+                    1,
+                    0,
+                    "defekt",
+                    None,
+                    None,
+                    Some(&format!("nass\n{status_text}"))
+                ),
+                neu("geraet", 1, 0, "einsatzbereit", None, Some(uhs), None),
+                neu(
+                    "verbrauchsgut",
+                    200,
+                    0,
+                    "im_einsatz",
+                    None,
+                    Some(uhs),
+                    Some(einheit_text)
+                ),
+                neu(
+                    "geraet",
+                    1,
+                    0,
+                    "defekt",
+                    None,
+                    Some(uhs),
+                    Some(&format!("B\n{einheit_text}"))
+                ),
+                Neu {
+                    beendet_als: Some("entlassen".into()),
+                    zuletzt_entlassen_at: Some("2026-10-13 10:00:00".into()),
+                    ..neu("verbrauchsgut", 3, 0, "einsatzbereit", None, None, None)
+                },
+                neu("geraet", 1, 0, "im_einsatz", Some(einheit), None, None),
+                neu(
+                    "verbrauchsgut",
+                    10,
+                    0,
+                    "defekt",
+                    None,
+                    Some(uhs),
+                    Some(&format!("X\n{status_text}\n{einheit_text}"))
+                ),
+                neu("verbrauchsgut", 4, 0, "einsatzbereit", None, None, None),
+            ]
+        );
+        let ids_nachher: Vec<i64> =
+            sqlx::query_scalar("SELECT id FROM einsatz_material ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ids_nachher, ids, "jede Zeile behält ihre ID");
+
+        let spalten_nachher: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('einsatz_material') ORDER BY cid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut erwartet = spalten_vorher.clone();
+        erwartet.extend(["art", "ausgegeben", "einsatz_fahrzeug_id", "br_id"].map(String::from));
+        assert_eq!(
+            spalten_nachher, erwartet,
+            "dieselben Spalten plus die vier neuen"
+        );
+        let fks: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"from\", \"table\", on_delete \
+             FROM pragma_foreign_key_list('einsatz_material') ORDER BY \"from\"",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let fk = |spalte: &str| {
+            fks.iter()
+                .find(|(f, _, _)| f == spalte)
+                .map(|(_, t, d)| (t.as_str(), d.as_str()))
+                .unwrap_or_else(|| panic!("FK {spalte} fehlt: {fks:?}"))
+        };
+        assert_eq!(fk("einsatz_id"), ("einsatz", "CASCADE"));
+        assert_eq!(fk("material_id"), ("material", "NO ACTION"));
+        assert_eq!(fk("einheit_id"), ("einsatz_einheit", "NO ACTION"));
+        assert_eq!(fk("einsatz_fahrzeug_id"), ("einsatz_fahrzeug", "NO ACTION"));
+        assert_eq!(fk("uhs_id"), ("uhs", "NO ACTION"));
+        assert_eq!(fk("br_id"), ("bereitstellungsraum", "NO ACTION"));
+        assert_eq!(fk("disponiert_von"), ("benutzer", "NO ACTION"));
+        assert_eq!(fk("beendet_von"), ("benutzer", "NO ACTION"));
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_index_list('einsatz_material') \
+             WHERE origin = 'c' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            [
+                "idx_einsatz_material_br",
+                "idx_einsatz_material_einheit",
+                "idx_einsatz_material_einsatz",
+                "idx_einsatz_material_fahrzeug",
+                "idx_einsatz_material_uhs"
+            ]
+        );
+
+        // Jede CHECK mit einem verbotenen INSERT, daneben ein erlaubter.
+        let einfuegen = |art: Option<&'static str>,
+                         menge: i64,
+                         ausgegeben: i64,
+                         status: &'static str,
+                         einheit_id: Option<i64>,
+                         uhs_id: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_material \
+                        (einsatz_id, snap_bezeichnung, art, menge, ausgegeben, status, \
+                         einheit_id, uhs_id) \
+                     VALUES (?, 'Probe', ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(e)
+                .bind(art)
+                .bind(menge)
+                .bind(ausgegeben)
+                .bind(status)
+                .bind(einheit_id)
+                .bind(uhs_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        let g = Some("geraet");
+        let v = Some("verbrauchsgut");
+        einfuegen(v, 50, 20, "einsatzbereit", None, Some(uhs))
+            .await
+            .expect("Verbrauchsgut mit Ausgabe an einer UHS");
+        einfuegen(g, 1, 0, "desinfektion_noetig", Some(einheit), None)
+            .await
+            .expect("Gerät zur Desinfektion an einer Einheit");
+        for (fall, ergebnis) in [
+            (
+                "ohne Art",
+                einfuegen(None, 1, 0, "einsatzbereit", None, None).await,
+            ),
+            (
+                "unbekannte Art",
+                einfuegen(Some("fass"), 1, 0, "einsatzbereit", None, None).await,
+            ),
+            (
+                "Gerät mit Menge 2",
+                einfuegen(g, 2, 0, "einsatzbereit", None, None).await,
+            ),
+            (
+                "Gerät mit Ausgabe",
+                einfuegen(g, 1, 1, "einsatzbereit", None, None).await,
+            ),
+            (
+                "Ausgabe über der Menge",
+                einfuegen(v, 5, 6, "einsatzbereit", None, None).await,
+            ),
+            (
+                "negative Ausgabe",
+                einfuegen(v, 5, -1, "einsatzbereit", None, None).await,
+            ),
+            (
+                "Verbrauchsgut verbraucht",
+                einfuegen(v, 5, 0, "verbraucht", None, None).await,
+            ),
+            (
+                "Verbrauchsgut zur Desinfektion",
+                einfuegen(v, 5, 0, "desinfektion_noetig", None, None).await,
+            ),
+            (
+                "zwei Orte",
+                einfuegen(v, 5, 0, "einsatzbereit", Some(einheit), Some(uhs)).await,
+            ),
+        ] {
+            assert!(ergebnis.is_err(), "{fall} muss abgelehnt werden");
+        }
+        assert!(
+            sqlx::query("UPDATE material SET art = 'fass' WHERE id = ?")
+                .bind(decke)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "Stamm-Art hat einen CHECK"
+        );
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Material und Orte in einer Anweisung mit");
+    }
 }

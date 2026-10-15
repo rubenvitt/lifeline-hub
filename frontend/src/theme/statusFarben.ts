@@ -237,7 +237,8 @@ export const uhsTyp: Record<UhsTyp, StatusDarstellung> = {
  * Status eines Einsatzmaterials. `im_einsatz` ist `bedien`: die Rolle steht in dieser Datei
  * schon für aktive Beziehungen (`verfuegbarkeit.reserviert`, `belegungsArt.wechsel`,
  * `etbTyp.meldung`). `defekt` und `verbraucht` teilen sich `alarm`, unterschieden über `label`.
- * `pages/MaterialPage.tsx` und `pages/uhs/MaterialTab.tsx` lesen beide von hier.
+ * `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort, über
+ * `materialDarstellung`) lesen beide von hier.
  */
 export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
   einsatzbereit: { rolle: 'normal', label: 'einsatzbereit' },
