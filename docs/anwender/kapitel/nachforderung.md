@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
+quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -53,6 +53,39 @@ Für Einsatzleitung und Führungspersonal:
 Ein Hinweis bietet nach jedem Schritt sechs Sekunden lang „Rückgängig“. Eine eingetroffene
 Nachforderung steht in der Ansicht „Abgeschlossen“.
 
+### Eingetroffenes Material übernehmen
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
+
+1. In der Ansicht „Abgeschlossen“ an der Karte der eingetroffenen Nachforderung „Als Material
+   übernehmen“ wählen.
+2. Der Dialog nennt im Titel die Art der Nachforderung, etwa „„Tauchpumpe“ als Material
+   übernehmen“, darunter den Bedarf. Unter „Art“ „Gerät“ oder „Verbrauchsgut“ wählen.
+
+   ![Dialog „„Tauchpumpe“ als Material übernehmen“ mit dem Bedarf, Art „Gerät“, Menge 1 gesperrt und der Einheit „Rettungsstaffel“ unter „Ort“](../bilder/nachforderung/nachforderung-material-uebernehmen.png)
+
+3. Unter „Menge“ die Menge prüfen. Bei einem Gerät steht sie fest auf 1.
+4. Unter „Ort“ eine Einheit, ein Fahrzeug, eine UHS oder einen Bereitstellungsraum wählen, oder
+   „ohne Ort“ stehen lassen.
+5. „Übernehmen“ wählen.
+
+Die Karte zeigt danach je übernommenem Posten Bezeichnung, Menge und Ort, bei einer
+Nachforderung mit Anzahl etwa „übernommen 1 von 3“, und „Material ↗“ führt in die
+[Materialliste](material.md).
+
+### Weiteren Posten übernehmen
+
+Für Einsatzleitung und Führungspersonal, etwa für die zweite von drei Tauchpumpen oder die
+nächste Fuhre Sandsäcke:
+
+1. An der Karte „Weiteren Posten übernehmen“ wählen.
+
+   ![Karte einer eingetroffenen Nachforderung „Sandsäcke“ mit dem übernommenen Posten „Sandsäcke · 1200 · Rettungsstaffel“, „übernommen 1200 von 2000“, „Material ↗“ und dem Knopf „Weiteren Posten übernehmen“](../bilder/nachforderung/nachforderung-material-posten.png)
+
+2. Art, Menge und Ort wie beim ersten Posten setzen. Die Menge ist mit dem Rest der Anzahl
+   vorbelegt.
+3. „Weiteren Posten übernehmen“ wählen.
+
 ### Eine Nachforderung ablehnen
 
 Für Einsatzleitung und Führungspersonal:
@@ -92,4 +125,36 @@ Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). Die Felder ble
 Die Stufen laufen vorwärts, jeweils um eine: Angefordert, Zugesagt, Unterwegs, Eingetroffen.
 „Rückgängig“ nimmt den letzten Schritt um genau eine Stufe zurück, solange der Hinweis steht.
 Ablehnen geht aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird nicht mehr
-abgelehnt.
+abgelehnt. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
+zurücknehmen; die App nennt den Grund über der Liste. Wer versehentlich übernommen hat, storniert
+zuerst den Posten in der [Materialliste](material.md) und nimmt dann zurück.
+
+### Übernommenes Material
+
+Jede Übernahme legt genau einen Ad-hoc-Posten in der Materialliste an, der auf die Nachforderung
+verweist. Seine Bezeichnung ist die Art der Nachforderung, etwa „Tauchpumpe“; Kategorie,
+Trägerorganisation und Bestandsnummer bleiben leer und lassen sich an der Materialzeile über
+„Angaben ändern …“ nachtragen. Vorbelegt sind als Menge die Anzahl der Nachforderung abzüglich
+dessen, was schon übernommen ist (mindestens 1, ohne Anzahl 1), als Art „Verbrauchsgut“ bei einer
+Menge über 1, sonst „Gerät“, und als Ort „ohne Ort“; die Nachforderung selbst kennt keinen Ort.
+
+Ein Gerät steht je Stück im Einsatz: Drei Tauchpumpen sind drei Übernahmen. Auch Verbrauchsgut,
+das in mehreren Fuhren kommt, wird je Fuhre übernommen. Einen weiteren Posten legt die App nur
+ausdrücklich über „Weiteren Posten übernehmen“ an. Hat ein anderer Platz inzwischen übernommen,
+lehnt sie „Übernehmen“ ab und nennt den Grund im Dialog; der Dialog bleibt offen und bietet dann
+„Weiteren Posten übernehmen“ mit der neu gerechneten Menge an. So steht dieselbe Lieferung nicht
+versehentlich zweimal im Bestand.
+
+Ein stornierter Posten zählt nicht als übernommen, ein aus dem Einsatz genommener schon; die
+Karte nennt ihn dann mit „aus dem Einsatz genommen“. Wird ein übernommener Posten aufgeteilt,
+verweisen beide Teile auf die Nachforderung. Die Nachforderung selbst ändert sich durch die
+Übernahme nicht.
+
+Übernehmen dürfen Einsatzleitung und Führungspersonal, wenn das Modul Material für sie
+freigegeben ist. Ist es gesperrt, steht der Knopf gesperrt mit „Keine Berechtigung“, und die
+Karte zeigt statt der Posten nur ihre Zahl, etwa „2 Posten übernommen“.
+
+Jede Übernahme schreibt einen Eintrag ins Einsatztagebuch, etwa „Material «Tauchpumpe» (×1)
+disponiert, Ort Einheit «Rettungsstaffel», aus Nachforderung «3 Tauchpumpen für Keller
+Hauptstraße»“, ohne Ort ohne den Ort-Teil. Die Nachforderung schreibt dafür keinen eigenen
+Eintrag.

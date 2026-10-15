@@ -2,6 +2,7 @@
 //! (digitaler Meldekopf). Strukturierte Erfassung (Nachrichtenvordruck),
 //! linearer Triage-Status, ETB-Kopplung. Baut auf dem Kommunikations-Unterbau
 //! (`MeldeWeg`-Vokabular, LFH-84) und spiegelt das Aufträge-Template (LFH-52).
+pub mod benachrichtigung;
 pub mod repo;
 
 use crate::wire_enum::wire_enum;
@@ -112,6 +113,11 @@ pub struct MeldungAnzeige {
     pub lfd_nr: i64,
     pub absender: String,
     pub empfaenger: Option<String>,
+    /// Empfängerfunktion aus dem Katalog (LLH-1214, design.md D8), neben dem Freitext
+    /// `empfaenger`. Ihre Nutzer bekommen beim Erfassen den Hinweis „Neue Meldung“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::fuehrung::Fuehrungsfunktion>)]
+    pub empfaenger_funktion: Option<String>,
     pub meldeweg: MeldeWeg,
     pub inhalt: String,
     #[sqlx(try_from = "String")]
@@ -166,6 +172,14 @@ pub struct MeldungAnzeige {
     /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+}
+
+impl MeldungAnzeige {
+    /// Sofortmeldung (LFH-97, Spec „Sofortmeldung alarmiert“): Meldungsart Sofortmeldung oder
+    /// Priorität sofort.
+    pub fn ist_sofort(&self) -> bool {
+        self.meldungsart == Meldungsart::Sofortmeldung || self.prioritaet == Prioritaet::Sofort
+    }
 }
 
 /// Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).

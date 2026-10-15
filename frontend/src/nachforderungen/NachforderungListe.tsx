@@ -1,6 +1,6 @@
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
-import NachforderungKarte from './NachforderungKarte';
+import NachforderungKarte, { type UebernahmePosten } from './NachforderungKarte';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface NachforderungListeProps {
@@ -16,6 +16,12 @@ interface NachforderungListeProps {
    * übrigen bleiben gemerkt (LFH-1077).
    */
   kartenFehler?: (id: number) => ZeilenGrund | null;
+  /** Übernahme als Material (LLH-1226 D10), unverändert an jede Karte; stabil halten (memo). */
+  materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
+  materialGesperrt?: boolean;
+  onMaterialUebernehmen?: (id: number) => void;
+  /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10). */
+  hervorgehobenId?: number | null;
 }
 
 /** Kartenboard der Nachforderungen; Darstellung und Logik liegen in der Karte. */
@@ -26,6 +32,10 @@ export default function NachforderungListe({
   onStatus,
   onAblehnen,
   kartenFehler,
+  materialJeId,
+  materialGesperrt,
+  onMaterialUebernehmen,
+  hervorgehobenId,
 }: NachforderungListeProps) {
   if (nachforderungen.length === 0) return <SeitenLeer titel="Keine Nachforderungen" />;
   return (
@@ -39,6 +49,10 @@ export default function NachforderungListe({
           onStatus={onStatus}
           onAblehnen={onAblehnen}
           fehlerGrund={kartenFehler?.(n.id) ?? null}
+          materialJeId={materialJeId}
+          materialGesperrt={materialGesperrt}
+          onMaterialUebernehmen={onMaterialUebernehmen}
+          hervorgehoben={n.id === hervorgehobenId}
         />
       ))}
     </>

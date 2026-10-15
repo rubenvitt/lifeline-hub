@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, request, test, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
 
 /**
@@ -96,6 +96,32 @@ export async function wechsleZu(page: Page, konto: Pick<Konto, 'benutzername' | 
 }
 
 /**
+ * Quittiert alle offenen Benachrichtigungen von `konto` in einem eigenen API-Kontext. Die Aufnahme
+ * in einen Einsatz meldet „Aufgenommen in …“ (Spec `benachrichtigungen`); ohne Quittung stünde
+ * dieser Toast über der Oberfläche, die ein Rollen-Gate gerade misst oder antippt.
+ */
+export async function benachrichtigungenQuittieren(
+  konto: Pick<Konto, 'benutzername' | 'passwort'>,
+) {
+  const person = await request.newContext({ baseURL: test.info().project.use.baseURL });
+  try {
+    const login = await person.post('/api/auth/login', {
+      data: { benutzername: konto.benutzername, passwort: konto.passwort },
+    });
+    expect(login.ok(), `Anmelden ${konto.benutzername}: ${login.status()}`).toBe(true);
+    const liste = await person.get('/api/benachrichtigungen?offen=true');
+    expect(liste.ok(), `Benachrichtigungen: ${liste.status()}`).toBe(true);
+    for (const { id } of (await liste.json()) as { id: number }[]) {
+      const quittiert = await person.post(`/api/benachrichtigungen/${id}/quittieren`);
+      expect(quittiert.ok(), `Quittieren ${id}: ${quittiert.status()}`).toBe(true);
+    }
+    expect((await person.post('/api/auth/logout')).ok()).toBe(true);
+  } finally {
+    await person.dispose();
+  }
+}
+
+/**
  * Legt den Benutzer der Rolle an, trägt ihn (bei Einsatzrollen) in `einsatzId` ein und wechselt
  * die Sitzung auf ihn. Die aktuelle Sitzung muss der Admin sein, der den Einsatz angelegt hat.
  */
@@ -105,6 +131,7 @@ export async function wechsleZuRolle(page: Page, rolle: Rolle, einsatzId?: strin
     if (!einsatzId) throw new Error(`Rolle ${rolle} braucht einen Einsatz`);
     await mitgliedEintragen(page, einsatzId, konto.id, rolle);
   }
+  await benachrichtigungenQuittieren(konto);
   await wechsleZu(page, konto);
   return konto;
 }

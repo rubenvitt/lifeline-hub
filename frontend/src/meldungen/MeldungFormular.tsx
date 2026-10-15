@@ -11,9 +11,15 @@ import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { useEffect, useRef, useState } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
+import {
+  KEINE_VORSCHLAEGE,
+  optionsLabel,
+  type FunktionsVorschlaege,
+} from '../fuehrung/funktionsOptionenKern';
 import type {
   Einheit,
   Einsatzabschnitt,
+  Fuehrungsfunktion,
   Meldungsart,
   MeldungMeldeweg,
   MeldungPrioritaet,
@@ -28,6 +34,8 @@ interface MeldungFormWerte {
   von?: string;
   absender: string;
   empfaenger?: string;
+  /** Empfängerfunktion aus dem Katalog (LLH-1214): ihre Nutzer bekommen „Neue Meldung“. */
+  empfaenger_funktion?: Fuehrungsfunktion;
   meldeweg: MeldungMeldeweg;
   meldungsart: Meldungsart;
   prioritaet: MeldungPrioritaet;
@@ -42,6 +50,7 @@ const DEFAULTS: MeldungFormWerte = {
   von: undefined,
   absender: '',
   empfaenger: '',
+  empfaenger_funktion: undefined,
   meldeweg: 'funk',
   meldungsart: 'sonstige',
   prioritaet: 'normal',
@@ -64,6 +73,7 @@ const UEBERNAHME: (keyof MeldungFormWerte & string)[] = [
   'absender',
   'meldeweg',
   'empfaenger',
+  'empfaenger_funktion',
 ];
 
 const MELDEWEG_OPTIONEN: { value: MeldungMeldeweg; label: string }[] = [
@@ -121,6 +131,7 @@ export default function MeldungFormular({
   card = true,
   einheiten = [],
   abschnitte = [],
+  funktionsVorschlaege = KEINE_VORSCHLAEGE,
   speicherung,
 }: {
   senden: boolean;
@@ -134,6 +145,8 @@ export default function MeldungFormular({
   /** Auswahl für den strukturierten Absender. Leer ⇒ das Feld entfällt. */
   einheiten?: Einheit[];
   abschnitte?: Einsatzabschnitt[];
+  /** Katalog der Führungsfunktionen für die Empfängerfunktion. Leer ⇒ das Feld entfällt. */
+  funktionsVorschlaege?: FunktionsVorschlaege;
   /**
    * Die Anlege-Mutation, an die Erfassungshülle durchgereicht (LFH-1077): sie zeigt den Grund einer
    * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen.
@@ -182,6 +195,7 @@ export default function MeldungFormular({
       ...vonZuBezug(w.von),
       absender: w.absender.trim(),
       empfaenger: w.empfaenger?.trim() || undefined,
+      empfaenger_funktion: w.empfaenger_funktion,
       meldeweg: w.meldeweg,
       inhalt: w.inhalt.trim(),
       meldungsart: w.meldungsart,
@@ -212,6 +226,21 @@ export default function MeldungFormular({
   const vonGewaehlt = (von: string | undefined) => {
     const name = von ? vonName.get(von) : undefined;
     if (name) form.setFieldValue('absender', name);
+  };
+
+  // Nur Funktionen ohne Pflicht-Bezeichnung: Führungshilfspersonal und Fachberater nimmt eine
+  // Meldung nicht an (der Server antwortet 422). S7 steht nur im Katalog, wenn eingeschaltet.
+  const funktionsKatalog = funktionsVorschlaege.katalog.filter((e) => !e.bezeichnung_pflicht);
+  const funktionsOptionen = funktionsKatalog.map((e) => ({
+    value: e.funktion,
+    label: optionsLabel(e, funktionsVorschlaege.besetzung),
+  }));
+
+  /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
+  const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
+    const eintrag = funktionsKatalog.find((e) => e.funktion === funktion);
+    if (!eintrag || form.getFieldValue('empfaenger')?.trim()) return;
+    form.setFieldValue('empfaenger', eintrag.kuerzel ?? eintrag.label);
   };
 
   /** Jeder Wert, der von der Vorgabe abweicht, steht im Kopf — eingeklappt bleibt nichts verborgen. */
@@ -281,7 +310,7 @@ export default function MeldungFormular({
         />
       </Form.Item>
       <Row gutter={16}>
-        <Col xs={24} sm={12}>
+        <Col xs={24} sm={12} lg={funktionsOptionen.length > 0 ? 8 : 12}>
           <Form.Item
             name="absender"
             label="Absender (Funkrufname/Stelle)"
@@ -290,7 +319,20 @@ export default function MeldungFormular({
             <Input aria-label="Absender" maxLength={ETB_PARTEI_MAX} />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={12}>
+        {funktionsOptionen.length > 0 && (
+          <Col xs={24} sm={12} lg={8}>
+            <Form.Item name="empfaenger_funktion" label="Empfängerfunktion">
+              <Select<Fuehrungsfunktion>
+                aria-label="Empfängerfunktion"
+                allowClear
+                placeholder="keine"
+                options={funktionsOptionen}
+                onChange={funktionGewaehlt}
+              />
+            </Form.Item>
+          </Col>
+        )}
+        <Col xs={24} sm={12} lg={funktionsOptionen.length > 0 ? 8 : 12}>
           <Form.Item name="empfaenger" label="Empfänger / Adressat">
             <Input placeholder="z. B. ELW 1, S3" maxLength={ETB_PARTEI_MAX} />
           </Form.Item>

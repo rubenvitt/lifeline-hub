@@ -3,20 +3,39 @@ import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
+import { istKonflikt } from '../api/client';
+import {
+  disponiereAdhoc,
+  listEinsatzMaterial,
+  listEntlassenesMaterial,
+} from '../api/einsatzMaterial';
 import {
   legeNachforderungAn,
   lehneNachforderungAb,
   listeNachforderungen,
   setzeNachforderungStatus,
 } from '../api/nachforderungen';
-import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
+import type {
+  EinsatzMaterial,
+  Nachforderung,
+  NachforderungStatus,
+  NeueNachforderung,
+} from '../api/types';
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
+import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
+import {
+  isErgaenzen,
+  uebernahmeBody,
+  type UebernahmeWerte,
+} from '../nachforderungen/materialUebernahme';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -26,7 +45,6 @@ import {
   type NachforderungVorbelegung,
 } from '../routing/deeplinks';
 import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
-import { modulName } from '../einsatz/modulRegistry';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -67,6 +85,58 @@ export default function NachforderungenPage() {
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
   });
+
+  /*
+   * Übernahme als Material (LLH-1226, design.md D10). Die Absicht „ergänzen“ steht beim Öffnen fest
+   * und wechselt nur nach einer 409 (D3); der Stand der Nachforderung beim Öffnen hält den Dialog,
+   * falls sie aus der Liste fällt.
+   */
+  const [uebernahme, setUebernahme] = useState<{ n: Nachforderung; ergaenzen: boolean } | null>(
+    null,
+  );
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const freigaben = freigabenQuery.data;
+  // Posten lesen nur bei bedienbarem Modul Material, erst wenn die Freigaben feststehen
+  // (`istKeyFreigegeben` gibt Unbekanntes nicht frei, Muster `VerpflegungPage`); und nur, wenn eine
+  // Karte Posten zeigt oder übernommen wird — sonst bliebe der Abruf ohne Leser.
+  const materialFrei = istKeyFreigegeben('material', freigaben);
+  /*
+   * Knopf und Abruf hängen an derselben Bedingung (Review): bedienbar nur bei `materialFrei`. Sonst
+   * stünde er etwa für einen Admin bei ausgeblendetem Modul (`sichtbar: false`, `zugriff: true`)
+   * frei, öffnete aber einen Dialog ohne Posten und ohne Rest. Gesperrt mit demselben Grund wie
+   * ohne Freigabe; solange die Freigaben noch nicht feststehen, steht er gar nicht.
+   */
+  const freigabenBekannt = !freigabenQuery.isPending;
+  const materialGesperrt = freigabenBekannt && !materialFrei;
+  const needsMaterial =
+    uebernahme != null || (nfQuery.data ?? []).some((n) => n.material_ids.length > 0);
+  // Derselbe Schlüssel und Abruf wie die Materialliste: ein Cache-Fach, live über `material`.
+  const materialQuery = useQuery({
+    queryKey: einsatzKeys.material(einsatzId),
+    queryFn: () => listEinsatzMaterial(einsatzId),
+    enabled: materialFrei && needsMaterial,
+  });
+  // Aus dem Einsatz genommene Posten zählen weiter (D3/D9) und stehen mit ihrem Zustand.
+  const entlasseneQuery = useQuery({
+    queryKey: einsatzKeys.materialEntlassene(einsatzId),
+    queryFn: () => listEntlassenesMaterial(einsatzId),
+    enabled: materialFrei && needsMaterial,
+  });
+  const materialListe = useMemo<EinsatzMaterial[]>(
+    () => [...(materialQuery.data ?? []), ...(entlasseneQuery.data ?? [])],
+    [materialQuery.data, entlasseneQuery.data],
+  );
+  // Gemerkt über den Datenstand (LFH-949): die Karten sind `memo`.
+  const materialJeId = useMemo(
+    () =>
+      materialFrei && materialQuery.isSuccess
+        ? new Map(materialListe.map((em) => [em.id, em]))
+        : null,
+    [materialFrei, materialQuery.isSuccess, materialListe],
+  );
 
   const invalidiere = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
@@ -144,6 +214,45 @@ export default function NachforderungenPage() {
   });
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
 
+  /*
+   * Übernehmen (D1): ein Material-POST mit Bezug. Ablehnungen stehen im Dialog (`speicherung`).
+   * Eine 409 heißt „schon übernommen“ (D3): die Seite lädt Nachforderungen und Material neu und
+   * schaltet den Dialog erst danach auf „Weiteren Posten übernehmen“, damit die Menge aus dem
+   * frischen Stand gerechnet wird. Die Person entscheidet dann bewusst.
+   */
+  const uebernahmeMutation = useMutation({
+    mutationFn: ({
+      n,
+      werte,
+      ergaenzen,
+    }: {
+      n: Nachforderung;
+      werte: UebernahmeWerte;
+      ergaenzen: boolean;
+    }) => {
+      const k = uebernahmeBody(n, werte, ergaenzen);
+      return disponiereAdhoc(einsatzId, k.adhoc, k.menge, k.optionen);
+    },
+    onSuccess: () => {
+      message.success('Material übernommen');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      return invalidiere();
+    },
+    onError: async (e, { n }) => {
+      if (!istKonflikt(e)) {
+        void invalidiere();
+        return;
+      }
+      await Promise.all([
+        invalidiere(),
+        qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) }),
+        qc.invalidateQueries({ queryKey: einsatzKeys.materialEntlassene(einsatzId) }),
+      ]);
+      setUebernahme((u) => (u && u.n.id === n.id ? { ...u, ergaenzen: true } : u));
+    },
+  });
+
   /**
    * Erfassung per Deeplink: `?neu=1` öffnet sie, eine Vorbelegung
    * (`art`/`bezeichnung`/`anzahl`/`begruendung`) füllt sie. Apply-then-clean wie der
@@ -207,6 +316,44 @@ export default function NachforderungenPage() {
     const vorher = stand.current.alle?.find((n) => n.id === nfId)?.status;
     stand.current.statusMutation.mutate({ nfId, status, vorher });
   }, []);
+  // Öffnen räumt den Grund einer früheren Ablehnung; die Absicht steht ab hier fest (D3).
+  const uebernahmeRef = useRef(uebernahmeMutation);
+  uebernahmeRef.current = uebernahmeMutation;
+  const onMaterialUebernehmen = useCallback((nfId: number) => {
+    const n = stand.current.alle?.find((x) => x.id === nfId);
+    if (!n) return;
+    const m = uebernahmeRef.current;
+    if (!m.isPending && m.error != null) m.reset();
+    setUebernahme({ n, ergaenzen: isErgaenzen(n) });
+  }, []);
+
+  /*
+   * `?nachforderung=<id>` (D10, Sprung aus der Materialzeile): die Ansicht, in der sie steht, die
+   * Karte hervorgehoben und einmal ins Bild gerollt; der Parameter wird geräumt
+   * (`useQueryParamSelektion`). Eine unbekannte Kennung ändert nichts.
+   */
+  const [hervorgehobenId, setHervorgehobenId] = useState<number | null>(null);
+  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
+  // Erst wenn auch der Einsatz da ist: vorher stehen statt der Karten nur der Ladekreis, und der
+  // Bildlauf fände keine Karte, bis ein späterer Datenstand den Effekt erneut anstößt (Review).
+  useQueryParamSelektion('nachforderung', nfQuery.isSuccess && einsatzQuery.isSuccess, (nfId) => {
+    const n = nfQuery.data?.find((x) => x.id === nfId);
+    if (!n) return;
+    setAnsicht(
+      istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen')
+        ? 'abgeschlossen'
+        : 'offen',
+    );
+    setHervorgehobenId(nfId);
+    setScrollZiel(nfId);
+  });
+  useEffect(() => {
+    if (scrollZiel == null) return;
+    const karte = document.querySelector(`[data-nachforderung-id="${scrollZiel}"]`);
+    if (!karte) return;
+    karte.scrollIntoView?.({ block: 'center' });
+    setScrollZiel(null);
+  }, [scrollZiel, ansicht, nfQuery.data]);
   // Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung; eine laufende Mutation bleibt
   // unberührt, `reset()` hängte ihr Ergebnis ab.
   const ablehnenRef = useRef(ablehnenMutation);
@@ -243,7 +390,20 @@ export default function NachforderungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const listenProps = { darfSchreiben, onStatus, onAblehnen, kartenFehler: kartenFehler.grund };
+  const listenProps = {
+    darfSchreiben,
+    onStatus,
+    onAblehnen,
+    kartenFehler: kartenFehler.grund,
+    materialJeId,
+    materialGesperrt,
+    onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
+    hervorgehobenId,
+  };
+  // Der Dialog liest die Nachforderung im aktuellen Stand (Posten, Rest der Anzahl).
+  const uebernahmeN = uebernahme
+    ? (nfQuery.data?.find((n) => n.id === uebernahme.n.id) ?? uebernahme.n)
+    : null;
   /*
    * Nach einer Ablehnung lädt `onError` neu; die Karte kann dabei in die andere Ansicht wandern
    * (ein anderer Arbeitsplatz hat schon fortgeschaltet). Ihr Grund hätte dann keinen Ort mehr und
@@ -374,6 +534,24 @@ export default function NachforderungenPage() {
           {...listenProps}
         />
       )}
+      {/* Außerhalb der Karten-`map` (LFH-683): ein Dialog für alle Karten. */}
+      <MaterialUebernahmeModal
+        einsatzId={einsatzId}
+        nachforderung={darfSchreiben ? uebernahmeN : null}
+        ergaenzen={uebernahme?.ergaenzen ?? false}
+        material={materialListe}
+        laeuft={uebernahmeMutation.isPending}
+        speicherung={uebernahmeMutation}
+        onUebernehmen={(werte) => {
+          if (!uebernahmeN || !uebernahme) return Promise.resolve();
+          return uebernahmeMutation.mutateAsync({
+            n: uebernahmeN,
+            werte,
+            ergaenzen: uebernahme.ergaenzen,
+          });
+        }}
+        onSchliessen={() => setUebernahme(null)}
+      />
       <Modal
         open={ablehnenId != null}
         title="Nachforderung ablehnen"

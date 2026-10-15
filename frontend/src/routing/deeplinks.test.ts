@@ -837,6 +837,12 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
     expect(nachforderungenPfad(E, { neu: true })).toBe('/einsaetze/5/nachforderungen?neu=1');
   });
 
+  it('?nachforderung= steuert eine Nachforderung an und übersteht den Round-Trip (LLH-1226 D10)', () => {
+    const pfad = nachforderungenPfad(E, { nachforderung: 4 });
+    expect(pfad).toBe('/einsaetze/5/nachforderungen?nachforderung=4');
+    expect(parseRouteId(params(pfad).get('nachforderung') ?? undefined)).toBe(4);
+  });
+
   it('eine Vorbelegung setzt neu=1 und übersteht den Round-Trip durch URLSearchParams', () => {
     const pfad = nachforderungenPfad(E, { vorbelegung });
     expect(pfad.startsWith('/einsaetze/5/nachforderungen?neu=1&')).toBe(true);

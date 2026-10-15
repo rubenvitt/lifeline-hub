@@ -2,14 +2,15 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
 
 Das Modul „Meldungen (eingehend)“ sammelt, was von außen oder aus den eigenen Einheiten an die
 Führung kommt: Funksprüche, Anrufe, persönliche Meldungen. Jede Meldung hat einen Wortlaut, einen
-Absender, auf Wunsch einen Empfänger, eine Meldungsart und eine Priorität. Sie durchläuft die
+Absender, auf Wunsch einen Empfänger und eine Empfängerfunktion, eine Meldungsart und eine
+Priorität. Sie durchläuft die
 Stufen **Neu**, **Gesichtet**, **In Bearbeitung** und **Erledigt**.
 
 Eine **Sofortmeldung** verlangt eine Bestätigung. Bleibt sie über die Frist hinaus unbestätigt,
@@ -45,10 +46,12 @@ Für Einsatzleitung und Führungspersonal:
    „Sofort“ und schaltet die Bestätigung ein. „Lagemeldung (extern)“ belegt die Meldungsart
    „Lagemeldung“ und die Richtung „Extern“ vor.
 
-   ![Formular „Neue Meldung erfassen“ als Sofortmeldung mit Wortlaut, Absender, Empfänger und aufgeklappten weiteren Angaben samt Bestätigungsschalter](../bilder/meldungen/meldung-erfassen.png)
+   ![Formular „Neue Meldung erfassen“ als Sofortmeldung mit Wortlaut, Absender, Empfängerfunktion, Empfänger und aufgeklappten weiteren Angaben samt Bestätigungsschalter](../bilder/meldungen/meldung-erfassen.png)
 
-3. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ ausfüllen, bei Bedarf „Empfänger /
-   Adressat“.
+3. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ ausfüllen. Ist die Meldung an eine
+   Funktion im Stab gerichtet, unter „Empfängerfunktion“ die Einsatzleitung oder das Sachgebiet
+   wählen; ein leeres „Empfänger / Adressat“ füllt sich dabei mit dem Kürzel, etwa „S2“. Bei
+   Bedarf „Empfänger / Adressat“ frei eintragen oder ändern.
 4. Unter „Weitere Angaben“ bei Bedarf „Von Einheit / Abschnitt“ (belegt den Absender vor),
    „Meldeweg“, „Meldungsart“, „Priorität“, „Richtung“, „Zeitpunkt des Ereignisses“ und die Frist
    der Bestätigung setzen.
@@ -56,7 +59,7 @@ Für Einsatzleitung und Führungspersonal:
 
 Für mehrere Meldungen hintereinander speichert „Speichern und nächste“ (Strg+Enter, am Mac
 ⌘+Enter) und leert das Formular. Mit dem Häkchen „Werte behalten“ bleiben dabei „Von Einheit /
-Abschnitt“, Absender, Meldeweg und Empfänger stehen.
+Abschnitt“, Absender, Meldeweg, Empfängerfunktion und Empfänger stehen.
 
 ### Eine Sofortmeldung bestätigen
 
@@ -121,6 +124,24 @@ Person, die die Sofortmeldung erfasst hat. „Bestätigung ausstehend“ bekomme
 auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benachrichtigungen“ nicht
 abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche
 Meldung löst keinen Alarm aus.
+
+### Benachrichtigung an die Empfängerfunktion
+
+Trägt eine Meldung eine Empfängerfunktion, erhalten beim Erfassen die Personen dieser Funktion
+den Hinweis **„Neue Meldung“** mit der Nummer der Meldung, etwa „Meldung #12“, und einem Sprung
+zu ihr. Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht
+besetzt oder ihr Personal mit keinem Konto verknüpft, gilt die Funktion in der Mitgliedschaft
+des Einsatzes. Wer das Modul „Meldungen (eingehend)“ nicht sehen darf, bekommt keinen Hinweis.
+
+- Ohne Empfängerfunktion bleibt die Meldung still, auch wenn im freien Empfänger „S2“ steht.
+- Eine Sofortmeldung an eine Funktion löst nur ihren Alarm aus, keinen zweiten Hinweis.
+- Eigene Aktionen bleiben still: Wer als S2 eine Meldung an S2 erfasst, bekommt dazu nichts.
+- Jede Meldung meldet sich einmal; eine ohne Netz erfasste Meldung, die beim Wiederverbinden noch
+  einmal gesendet wird, löst keinen zweiten Hinweis aus.
+
+Als Empfängerfunktion stehen die Einsatzleitung und die Sachgebiete zur Wahl, S7 nur, wenn die
+Organisation sie eingeschaltet hat. Führungshilfspersonal und Fachberater sind keine
+Empfängerfunktion einer Meldung; für sie bleibt der freie Empfänger.
 
 ### Meldungen im Einsatztagebuch
 

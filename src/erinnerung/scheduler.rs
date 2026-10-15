@@ -440,6 +440,7 @@ mod tests {
             crate::meldung::repo::MeldungDaten {
                 absender: "Florian Nord 1",
                 empfaenger: None,
+                empfaenger_funktion: None,
                 meldeweg: "funk",
                 inhalt: "MANV",
                 meldungsart: crate::meldung::ART_SOFORTMELDUNG,
@@ -501,6 +502,7 @@ mod tests {
             crate::meldung::repo::MeldungDaten {
                 absender: "Florian Nord 1",
                 empfaenger: None,
+                empfaenger_funktion: None,
                 meldeweg: "funk",
                 inhalt: "MANV",
                 meldungsart: crate::meldung::ART_SOFORTMELDUNG,
@@ -555,6 +557,7 @@ mod tests {
             crate::meldung::repo::MeldungDaten {
                 absender: "Florian Nord 1",
                 empfaenger: None,
+                empfaenger_funktion: None,
                 meldeweg: "funk",
                 inhalt: "MANV",
                 meldungsart: crate::meldung::ART_SOFORTMELDUNG,
@@ -851,6 +854,7 @@ mod tests {
             crate::meldung::repo::MeldungDaten {
                 absender: "Florian Nord 1",
                 empfaenger: None,
+                empfaenger_funktion: None,
                 meldeweg: "funk",
                 inhalt: "MANV",
                 meldungsart: crate::meldung::ART_SOFORTMELDUNG,

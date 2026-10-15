@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
 ---
 
 ## Überblick
@@ -265,6 +265,20 @@ Zeile beginnt ohne Ausgabe. Die
 Auswahl beim Disponieren bietet den Materialstamm an, soweit er in Dienst steht; Demo-Posten stehen
 in einer eigenen Gruppe am Ende.
 
+### Material aus einer Nachforderung
+
+Material, das auf eine Nachforderung hin eingetroffen ist, legt man an ihrer Karte mit „Als
+Material übernehmen“ an (Kapitel [Nachforderung](nachforderung.md)). Es steht dann als
+Ad-hoc-Posten in der Liste und trägt unter der Bezeichnung den Verweis „aus Nachforderung: 3
+Tauchpumpen für Keller Hauptstraße“. Der Verweis öffnet die Nachforderungen in der Ansicht
+„Abgeschlossen“ und hebt die Karte hervor. Wer das Modul Nachforderungen nicht sieht, liest nur
+„aus Nachforderung #4“, ohne Link.
+
+Der Posten verhält sich wie jeder andere: Ort, Menge, Status und Angaben lassen sich ändern.
+Aufgeteilt verweisen beide Teile auf die Nachforderung; storniert oder aus dem Einsatz genommen
+behält er den Verweis. Der Eintrag im Einsatztagebuch beim Übernehmen nennt die Herkunft (Abschnitt
+„Einsatztagebuch“).
+
 ### Status
 
 Ein disponierter Posten beginnt mit „einsatzbereit“. Die fünf Statuswerte sind fest und gelten für
@@ -298,6 +312,9 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
 - Art wechseln: „Material «Wolldecke»: Art Gerät → Verbrauchsgut“.
 - Aufteilen: „Material «Wolldecke» aufgeteilt: 50 → 30 + 20“.
 - Angaben ändern: ein Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt.
+- Aus einer Nachforderung übernehmen: der Eintrag des Disponierens mit der Herkunft, etwa
+  „Material «Tauchpumpe» (×1) disponiert, Ort Einheit «Rettungsstaffel», aus Nachforderung «3
+  Tauchpumpen für Keller Hauptstraße»“.
 
 Eine Bemerkung ändert das Einsatztagebuch nicht.
 

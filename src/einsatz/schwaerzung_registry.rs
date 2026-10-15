@@ -1838,6 +1838,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // ETB-Wortlaut (`etb_eintrag.von`/`an`/`inhalt`, G_ETB); die Meldung ist Arbeitsstand.
             scrub("absender", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             scrub("empfaenger", Strategie::NullSetzen, Z_EINSATZ),
+            // Katalogcode der Empfängerfunktion (LLH-1214), kein Personenbezug.
+            retain("empfaenger_funktion", G_ENUM),
             retain("meldeweg", G_ENUM),
             scrub("inhalt", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("meldungsart", G_ENUM),

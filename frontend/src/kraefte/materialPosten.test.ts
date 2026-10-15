@@ -6,6 +6,7 @@ import {
   materialDarstellung,
   materialStatusOptionen,
   mengeText,
+  OHNE_ORT_WERT,
   ortPatch,
   ortText,
   ortVon,
@@ -13,6 +14,7 @@ import {
   toOrtValue,
   type MaterialOrtRef,
   type OrtNamen,
+  ortPostFields,
 } from './materialPosten';
 
 const ALLE: MaterialStatus[] = [
@@ -168,5 +170,15 @@ describe('ortPatch (LLH-1225 D2)', () => {
   it('gleicher Ort oder ohne zu ohne sendet nichts', () => {
     expect(ortPatch({ art: 'einheit', id: 1 }, einheit)).toBeNull();
     expect(ortPatch(null, null)).toBeNull();
+  });
+});
+
+describe('ortPostFields (LLH-1225 D7, LLH-1226)', () => {
+  it('ein Ort wird sein Feld, „ohne Ort“ und Unbekanntes senden keins', () => {
+    expect(ortPostFields('einheit:3')).toEqual({ einheit_id: 3 });
+    expect(ortPostFields('br:2')).toEqual({ br_id: 2 });
+    expect(ortPostFields(OHNE_ORT_WERT)).toBeUndefined();
+    expect(ortPostFields('quatsch')).toBeUndefined();
+    expect(ortPostFields(undefined)).toBeUndefined();
   });
 });

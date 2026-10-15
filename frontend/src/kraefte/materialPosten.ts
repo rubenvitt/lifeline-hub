@@ -150,6 +150,18 @@ export function parseOrtValue(wert: string): MaterialOrtRef | null | undefined {
 }
 
 /**
+ * Der Ort-Auswahlwert als Feld des POST (LLH-1225 D7): „ohne Ort“ und Unbekanntes senden keins.
+ * Disponier-Dialoge der Materialliste und die Übernahme aus einer Nachforderung (LLH-1226) bauen
+ * den Körper hierüber.
+ */
+export function ortPostFields(
+  wert: string | undefined,
+): Partial<Record<OrtFeld, number | null>> | undefined {
+  const ziel = wert ? parseOrtValue(wert) : undefined;
+  return ziel ? (ortPatch(ziel, null) ?? undefined) : undefined;
+}
+
+/**
  * Namen je Ortsart, die der Aufrufer aus seinen Listen auflöst: Einheit → Name, Fahrzeug →
  * Funkrufname, UHS → Bezeichnung, Bereitstellungsraum → Bezeichnung. Eine fehlende Funktion heißt
  * „ohne Leserecht“; `undefined` heißt „unbekannt“.
