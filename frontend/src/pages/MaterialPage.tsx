@@ -62,9 +62,8 @@ import {
   materialStatusOptionen,
   mengeText,
   OHNE_ORT_WERT,
-  ortPatch,
+  ortPostFeld,
   ortVon,
-  parseOrtValue,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
@@ -169,12 +168,6 @@ type AdhocWerte = MaterialAdhocEingabe & { menge: number; art?: MaterialArt; ort
 /** Vorgabe der Art wie am Server (LLH-1224 D1): Menge über 1 → Verbrauchsgut, sonst Gerät. */
 function artVorgabe(menge: number | null | undefined): MaterialArt {
   return (menge ?? 1) > 1 ? 'verbrauchsgut' : 'geraet';
-}
-
-/** Der Ort-Auswahlwert als Feld des POST (D7); „ohne Ort“ und Unbekanntes senden keins. */
-function ortFeld(wert: string | undefined): MaterialOrtPatch | undefined {
-  const ziel = wert ? parseOrtValue(wert) : undefined;
-  return ziel ? (ortPatch(ziel, null) ?? undefined) : undefined;
 }
 
 /** Gruppierung der Liste (LLH-1225 D4): Vorgabe Ort, die Frage des Tickets ist „was ist wo“. */
@@ -318,7 +311,7 @@ export default function MaterialPage() {
           traegerorganisation: w.traegerorganisation,
         },
         art === 'geraet' ? 1 : (w.menge ?? 1),
-        { art, ort: ortFeld(w.ort) },
+        { art, ort: ortPostFeld(w.ort) },
       );
     },
     // Nur invalidieren und melden: geschlossen wird über `onFertig`, geleert von der
@@ -1061,7 +1054,7 @@ export default function MaterialPage() {
           await disponiereMutation.mutateAsync({
             materialId: w.material_id,
             menge: geraet ? 1 : w.menge,
-            ort: ortFeld(stammOrt),
+            ort: ortPostFeld(stammOrt),
           });
         }}
         onFertig={() => {
