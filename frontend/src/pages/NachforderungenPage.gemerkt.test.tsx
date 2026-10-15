@@ -8,6 +8,10 @@ import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Nachforderung } from '../api/types';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
+import userEvent from '@testing-library/user-event';
 
 /**
  * Gemerktes Rendern der Nachforderungen (LFH-949, D7): ein Live-Ereignis mit einer geänderten
@@ -33,6 +37,7 @@ vi.mock('../api/einsaetze', () => ({
     status: 'aktiv',
     meine_rolle: 'einsatzleitung',
   }),
+  ladeModulFreigaben: () => Promise.resolve(freigabenFixture()),
 }));
 
 const listeNachforderungen = vi.fn();
@@ -102,6 +107,56 @@ describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
     listeNachforderungen.mockResolvedValue(zehn);
     const client = renderPage();
     await screen.findByText('Bedarf 10');
+    gezeichnet.mockClear();
+    act(() => {
+      client.setQueryData(
+        einsatzKeys.nachforderungen(1),
+        zehn.map((n) => (n.id === 4 ? { ...n, bezeichnung: 'Geändert' } : n)),
+      );
+    });
+    expect(await screen.findByText('Geändert')).toBeInTheDocument();
+    expect(gezeichnet).toHaveBeenCalledTimes(1);
+  });
+
+  it('mit übernommenem Material bleiben die Karten gemerkt (LLH-1226)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/material', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('entlassene')
+            ? []
+            : [
+                {
+                  id: 7,
+                  bezeichnung: 'Sandsäcke',
+                  art: 'verbrauchsgut',
+                  menge: 1200,
+                  ausgegeben: 0,
+                  einheit_id: null,
+                  einsatz_fahrzeug_id: null,
+                  uhs_id: null,
+                  br_id: null,
+                  beendet_at: null,
+                },
+              ],
+        ),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    const zehn = Array.from({ length: 10 }, (_, i) =>
+      nf({
+        id: i + 1,
+        bezeichnung: `Bedarf ${i + 1}`,
+        status: 'eingetroffen',
+        ist_offen: false,
+        eingetroffen_at: '2026-06-12 10:00:00',
+        material_ids: i === 0 ? [7] : [],
+      }),
+    );
+    listeNachforderungen.mockResolvedValue(zehn);
+    const client = renderPage();
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
+    await screen.findByText('Sandsäcke · 1200 · ohne Ort');
     gezeichnet.mockClear();
     act(() => {
       client.setQueryData(
