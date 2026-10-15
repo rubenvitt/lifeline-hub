@@ -1823,3 +1823,76 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     }
   });
 });
+
+describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () => {
+  const uebernommen = { ...em, id: 21, ist_adhoc: true, material_id: null, nachforderung_id: 4 };
+  const nachforderung = {
+    id: 4,
+    einsatz_id: 1,
+    art: 'Tauchpumpe',
+    bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
+    status: 'eingetroffen',
+    material_ids: [21],
+  };
+
+  /** Zählt die Abrufe der Nachforderungsliste. */
+  function nachforderungen(antwort: () => Response): () => number {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/nachforderungen', () => {
+        abrufe += 1;
+        return antwort();
+      }),
+    );
+    return () => abrufe;
+  }
+
+  it('mit Freigabe: Link „aus Nachforderung: …“ auf die hervorgehobene Nachforderung', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    const link = await screen.findByRole('link', {
+      name: 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße',
+    });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/nachforderungen?nachforderung=4');
+  });
+
+  it('auch im Kartenmodus (390 px)', async () => {
+    setzeViewportBreite(390);
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    const { container } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    await waitFor(() =>
+      expect(container.querySelector('[data-lfh="datensicht-karte"]')).toHaveTextContent(
+        'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße',
+      ),
+    );
+  });
+
+  it('ohne Freigabe für Nachforderungen: „aus Nachforderung #4“ ohne Link, kein Abruf', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
+      ),
+    );
+    const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /aus Nachforderung/ })).toBeNull();
+    expect(abrufe()).toBe(0);
+  });
+
+  it('Liste abgelehnt (403): still „aus Nachforderung #4“', async () => {
+    nachforderungen(() => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }));
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /aus Nachforderung/ })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ohne verknüpften Posten ruft die Seite keine Nachforderungen ab', async () => {
+    const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
+    render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    expect(abrufe()).toBe(0);
+    expect(screen.queryByText(/aus Nachforderung/)).toBeNull();
+  });
+});
