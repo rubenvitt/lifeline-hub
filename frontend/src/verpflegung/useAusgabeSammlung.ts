@@ -14,8 +14,9 @@
  *
  * Der Abschluss leert die Sammlung im selben Schritt, in dem er sie herausgibt: zwei Auslöser im
  * selben Takt ergeben genau einen Schreibvorgang. Ein gesendetes, noch unbeantwortetes Bündel zählt
- * weiter in `menge`, bis die Antwort das Zeitfenster in den Cache geschrieben hat (wie der Sync,
- * `offline/useOfflineSync.ts`); sonst sänke die angezeigte Zahl für die Dauer einer Anfrage.
+ * weiter in `menge` seines Zeitfensters, bis die Antwort das Zeitfenster in den Cache geschrieben
+ * hat (wie der Sync, `offline/useOfflineSync.ts`); sonst sänke die angezeigte Zahl für die Dauer
+ * einer Anfrage. Nach einem Wechsel des Zeitfensters zählt es dort nicht mit.
  *
  * Bewusst keine TanStack-Mutation: es gibt nichts zu pausieren, und jede Sammlung ist ein eigener,
  * unabhängiger Aufruf. Die Regel `networkMode: 'always'` (`offline/AGENTS.md`) greift deshalb nicht.
@@ -72,6 +73,8 @@ export interface AusgabeSammlungStand {
 
 interface Unterwegs {
   schluessel: number;
+  /** Zeitfenster, für das das Bündel gesendet wurde; es zählt nur in dessen „Sammlung“. */
+  zeitfensterId: number;
   buendel: Buendel;
 }
 
@@ -123,7 +126,7 @@ export function useAusgabeSammlung({
       }
       setAblehnung(null);
       const schluessel = ++zaehler.current;
-      setUnterwegs((u) => [...u, { schluessel, buendel }]);
+      setUnterwegs((u) => [...u, { schluessel, zeitfensterId: ziel.id, buendel }]);
       const entferne = () => setUnterwegs((u) => u.filter((x) => x.schluessel !== schluessel));
       // Rückmeldung nur am Ort der Handlung: dasselbe Zeitfenster, Ansicht noch da (LFH-1077).
       const amOrt = () => montiert.current && aktuell.current.zeitfenster?.id === ziel.id;
@@ -226,9 +229,11 @@ export function useAusgabeSammlung({
 
   useEffect(() => stoppeZeitgeber, [stoppeZeitgeber]);
 
-  // Offene Sammlung plus gesendete, unbeantwortete Bündel; je Render neu, die Mengen sind klein.
+  // Offene Sammlung plus gesendete, unbeantwortete Bündel DIESES Zeitfensters (nach einem Wechsel
+  // gehört ein noch laufendes Bündel zum alten); je Render neu, die Mengen sind klein.
   const summe = { menge: sammlung.menge, sonderkost: sammlung.sonderkost };
   for (const u of unterwegs) {
+    if (u.zeitfensterId !== zfId) continue;
     summe.menge += u.buendel.menge;
     addiere(summe.sonderkost, u.buendel);
   }

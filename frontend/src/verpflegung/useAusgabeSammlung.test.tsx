@@ -141,6 +141,24 @@ describe('useAusgabeSammlung (LLH-1032, design.md D2/D5)', () => {
     expect(onVorgemerkt).not.toHaveBeenCalled();
   });
 
+  it('Wechsel des Zeitfensters bei laufender Anfrage: das gesendete Bündel zählt nur beim alten', async () => {
+    let antwort!: (v: unknown) => void;
+    erfasse.mockImplementationOnce(() => new Promise((r) => (antwort = r)));
+    const { result, rerender } = aufbau();
+    act(() => result.current.tippe(1, 'vegetarisch'));
+    tippe(result, 1, 2);
+    await act(async () => result.current.buchen());
+    expect(result.current.menge).toBe(3);
+    rerender({ zeitfenster: ABEND });
+    expect(result.current.menge).toBe(0);
+    expect(result.current.sonderkost.vegetarisch).toBe(0);
+    // Zurück, solange die Antwort aussteht: dort zählt es wieder.
+    rerender({ zeitfenster: MITTAG });
+    expect(result.current.menge).toBe(3);
+    await act(async () => antwort({ zustand: 'gesendet', daten: gebucht(55, 3) }));
+    expect(result.current.menge).toBe(0);
+  });
+
   it('Unmount merkt die Sammlung vor, ohne Sendeversuch und ohne Hinweis', async () => {
     const { result, unmount, onVorgemerkt } = aufbau();
     tippe(result, 1, 4);
