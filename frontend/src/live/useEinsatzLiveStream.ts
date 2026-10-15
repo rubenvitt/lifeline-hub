@@ -1,6 +1,6 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { spieleAlarmTon } from '../alarm/alarmTon';
+import { spieleAlarmTon as spieleTon } from '../alarm/alarmTon';
 import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
@@ -38,10 +38,17 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * bleibt es bei dieser einen Verbindung, der Org-Strom `/api/live` ruht so lange
  * (`einsatzStromStore.ts`). `lagged` und jeder Wiederaufbau frischen auch die Org-Keys auf.
  * Verbindungsbau, Backoff und Status: `liveVerbindung.ts`.
+ *
+ * `stumm`: kein Ton (gekoppelte Geräte, Spec `benachrichtigungen`, „Gekoppelte Geräte bleiben
+ * still“); Abgleich und Endzustand laufen wie sonst.
  */
-export function useEinsatzLiveStream(einsatzId: number): void {
+export function useEinsatzLiveStream(
+  einsatzId: number,
+  { stumm = false }: { stumm?: boolean } = {},
+): void {
   const qc = useQueryClient();
   useEffect(() => {
+    const spieleAlarmTon: typeof spieleTon = stumm ? () => undefined : spieleTon;
     const sammler = erzeugeLiveSammler(qc);
     // Die Modulzähler bekommen ein eigenes, längeres Fenster (LFH-935): ein Burst kostet je Tab
     // einen Zählerabruf, die Listen bleiben beim kurzen Fenster.
@@ -228,5 +235,5 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       zaehlerSammler.raeumen();
       abmelden();
     };
-  }, [einsatzId, qc]);
+  }, [einsatzId, qc, stumm]);
 }

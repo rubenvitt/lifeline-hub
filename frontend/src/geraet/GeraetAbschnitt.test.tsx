@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -25,6 +25,13 @@ import { ordneEinheiten } from './GeraetAbschnittPage';
 import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
+import { spieleAlarmTon } from '../alarm/alarmTon';
+
+// Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
+vi.mock('../alarm/alarmTon', async (original) => ({
+  ...(await original<typeof import('../alarm/alarmTon')>()),
+  spieleAlarmTon: vi.fn(),
+}));
 
 /**
  * Die Abschnittsansicht in der Gerätehülle (LFH-1043, Spec `funktionsansichten`): Startseite,
@@ -161,6 +168,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.mocked(spieleAlarmTon).mockClear();
+  FakeEventSource.zuruecksetzen();
   localStorage.clear();
 });
 
@@ -220,6 +229,28 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
           .map((l) => l.textContent),
       ).toEqual(['Abschnitt', 'Melden']),
     );
+  });
+});
+
+describe('Abschnittsgerät — still (Spec `benachrichtigungen`, „Gekoppelte Geräte bleiben still“)', () => {
+  it('Gerät mit Modul Meldungen: eine Sofortmeldung spielt keinen Ton', async () => {
+    stelleBereit();
+    renderApp('/geraet/7/abschnitt');
+    expect(await screen.findByRole('heading', { level: 1, name: 'EA Nord' })).toBeVisible();
+    const strom = FakeEventSource.instanzen.find(
+      (q) => q.url === '/api/einsaetze/7/live' && !q.closed,
+    );
+    expect(strom, 'der Einsatzstrom des Geräts ist offen').toBeDefined();
+    act(() => {
+      strom!.emit('sofortmeldung', JSON.stringify({ einsatz_id: 7, meldung_id: 3 }));
+      // Auch die übrigen Alarme des Einsatzstroms bleiben am Gerät stumm.
+      strom!.emit(
+        'erinnerung',
+        JSON.stringify({ einsatz_id: 7, erinnerung_id: 4, bezug_typ: 'auftrag', bezug_id: 31 }),
+      );
+      strom!.emit('abloesung', JSON.stringify({ einsatz_id: 7, art: 'faellig' }));
+    });
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
   });
 });
 
