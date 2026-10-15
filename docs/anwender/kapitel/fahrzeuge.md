@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
@@ -154,6 +154,19 @@ Für Einsatzleitung und Führungspersonal, wenn das Fahrzeug einer Einheit angeh
    übernommen. Lehnt die App eine Person dennoch ab, steht der Grund an ihr und niemand ist
    zugeordnet.
 
+### Material auf ein Fahrzeug laden
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
+
+1. In der Liste beim Fahrzeug „Besatzung“ aufklappen. Unter der Besatzung steht „Beladung“ mit der
+   Zahl der Posten und, falls vorhanden, dem Ausfall, je Posten Menge und Status.
+2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
+   anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Der
+   Posten steht danach in der Beladung.
+3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
+   „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
+4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz.
+
 ### Ein Fahrzeug aus dem Einsatz entlassen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug den Einsatz verlässt:
@@ -230,6 +243,14 @@ abzüglich der Besatzung, die schon sitzt; eine Kraft ohne Position zählt als M
 Fahrzeug kein Soll, etwa ein Ad-hoc-Fahrzeug, sind alle angehakt. Ein Absenden ordnet höchstens 50
 Personen zu und gilt ganz oder gar nicht.
 
+### Beladung
+
+Die Beladung ist das Material, dessen Ort das Fahrzeug ist (Kapitel [Material](material.md)). Sie
+steht im Meldebild unter dem Fahrzeug nach der Besatzung, und ein ausgefallener Posten darin tönt
+die Einheit des Fahrzeugs. Ein Posten von einem anderen Ort wird ohne Rückfrage umgehängt; das
+Einsatztagebuch nennt den alten und den neuen Ort. Ohne Freigabe des Moduls Material fehlt der
+Block „Beladung“.
+
 ### Abschnitt
 
 Ein Fahrzeug hat keinen eigenen Abschnitt; die Spalte „Abschnitt“ zeigt den der Einheit, und hat
@@ -286,6 +307,7 @@ Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schr
 Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen oder aus der
 Einheit übernehmen, entlassen und stornieren dürfen Einsatzleitung und Führungspersonal, solange
 der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit wählen und ein
-Fahrzeug als eigene Einheit führen darf nur, wer im Modul Einheiten schreiben darf.
+Fahrzeug als eigene Einheit führen darf nur, wer im Modul Einheiten schreiben darf. Material laden,
+abladen und ausgeben verlangt Schreibrecht im Einsatz und die Freigabe des Moduls Material.
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
 [Ohne Netz](ohne-netz.md)).

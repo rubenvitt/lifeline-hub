@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -34,13 +34,14 @@ setzen Status, tragen nach und streichen.
    nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
 4. Die Tiefe des Baums in der Werkzeugzeile wählen. Das Meldebild öffnet auf „Einheiten“:
    Untereinheiten stehen unter ihrer Einheit, Fahrzeuge sind zugeklappt. „mit Fahrzeugen“ öffnet
-   jede Einheit, „alles“ auch die Besatzung jedes Fahrzeugs. Mit „+“ vor einer Zeile oder einem
+   jede Einheit, „alles“ auch Besatzung und Beladung jedes Fahrzeugs. Mit „+“ vor einer Zeile oder einem
    Klick auf die Zeile klappt sie einzeln auf oder zu.
 
    ![Meldebild mit Statusband, Werkzeugzeile und Kräftebaum: Sanitätszug mit Fahrzeug und aufgeklappter Besatzung, darunter Rettungsstaffel und Sanitätsgruppe als Untereinheiten](../bilder/meldebild/meldebild.png)
 
 5. Unter einer Einheit lesen, was zu ihr gehört: zuerst ihre Fahrzeuge, in der Spalte „Stärke“
-   mit der Besatzung „Ist … · Soll …“, aufgeklappt mit den Personen darauf; dann „Ohne Fahrzeug“
+   mit der Besatzung „Ist … · Soll …“, aufgeklappt mit den Personen darauf und danach „Beladung“
+   mit der Zahl der Posten auf dem Fahrzeug und der Ausfälle; dann „Ohne Fahrzeug“
    mit ihrem Personal, das auf keinem ihrer Fahrzeuge sitzt; dann „Material“ mit der Zahl der
    Posten und der Ausfälle; zuletzt die Untereinheiten. Hat die Einheit kein Fahrzeug, steht ihr
    Personal direkt darunter. Vor jeder Person steht ihre Stärkeposition („F“, „UF“, „M“, ohne
@@ -55,8 +56,9 @@ setzen Status, tragen nach und streichen.
    Zahl links, etwa „20 von 20 Kräften“, nennt, wie viele Kräfte die Auswahl zeigt; „Filter
    zurücksetzen“ hebt alle Filter auf.
 
-Die Zeile „Ohne Einheit“ sammelt Fahrzeuge, Personal und Material, die keiner Einheit zugeordnet
-sind. Unter „Spalten“ lassen sich Spalten aus- und einblenden; „Funkrufname“ und „Fahrzeuge und
+Die Zeile „Ohne Einheit“ sammelt Fahrzeuge und Personal, die keiner Einheit zugeordnet sind, und
+Material ohne Ort; ein Fahrzeug ohne Einheit bringt seine Beladung mit. Material an einer UHS oder
+in einem Bereitstellungsraum steht nicht im Meldebild; es zählt im Modul [Material](material.md). Unter „Spalten“ lassen sich Spalten aus- und einblenden; „Funkrufname“ und „Fahrzeuge und
 Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschirmen und nicht im Druck.
 
 ### Das Meldebild in den Lagebericht übernehmen oder drucken
@@ -64,8 +66,8 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
 1. Das Meldebild wie gewünscht eingrenzen.
 2. „In Lagebericht übernehmen“ wählen. Die App legt aus der Auswahl einen Lagebericht
    „Kräftemeldebild“ mit Datum-Zeit-Gruppe an und öffnet ihn. Er ist nach Abschnitten gegliedert,
-   darin wie das Meldebild: Einheit, Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, „Material“ mit
-   Posten und Ausfall, Untereinheiten.
+   darin wie das Meldebild: Einheit, Fahrzeuge mit Besatzung und „Beladung“, „Ohne Fahrzeug“,
+   „Material“ mit Posten und Ausfall, Untereinheiten.
 3. Für Papier „Drucken / als PDF“ wählen. Der Druck klappt den ganzen Baum auf und nennt im Kopf
    Stand, Umfang und die gewählte Auswahl.
 
@@ -125,9 +127,12 @@ aus Rettungsstaffel“. Das „Soll“ kommt aus dem Fahrzeugstamm (Kapitel [Fah
 
 Status, Mittelverteilung und Tönung bleiben bei der eigenen Zeile: ein Ausfall in einer
 Untereinheit tönt nur sie. Material, das defekt, verbraucht, „Desinfektion nötig“ oder aufgebraucht
-ist, zählt als Ausfall und tönt die Einheit, der es gehört. Der Filter „Abschnitt“ richtet sich nach dem
-Abschnitt der obersten Einheit: eine Untereinheit bleibt unter ihrer Einheit, auch wenn sie selbst
-keinen oder einen anderen Abschnitt trägt.
+ist, zählt als Ausfall und tönt die Einheit, an der es liegt; ein Ausfall in der Beladung tönt die
+Einheit des Fahrzeugs. Die Gruppen „Material“ und „Beladung“ zählen nur ihre eigenen Posten. Der
+Filter „Abschnitt“ richtet sich nach dem Abschnitt der obersten Einheit: eine Untereinheit bleibt
+unter ihrer Einheit, auch wenn sie selbst keinen oder einen anderen Abschnitt trägt. Beladung
+zählt beim Abschnitt der Einheit ihres Fahrzeugs; Material an einer UHS oder in einem
+Bereitstellungsraum fällt bei einem gewählten Abschnitt heraus.
 
 ### Rückmeldung und Frist
 

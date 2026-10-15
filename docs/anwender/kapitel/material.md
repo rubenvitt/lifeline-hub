@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
 ---
 
 ## Überblick
@@ -210,8 +210,21 @@ Ad-hoc-Posten bekommt die Art aus dem Dialog und wechselt sie über das Zeilenme
 
 Ein Posten liegt bei einer Einheit, auf einem Fahrzeug, an einer UHS, in einem Bereitstellungsraum
 oder „ohne Ort“, nie an zweien zugleich. Ein neuer Ort löst den bisherigen; jede Ortsart wird
-auf demselben Weg gespeichert. Im UHS-Reiter „Material“ bietet „Material zuordnen“ nur Posten ohne
-Ort an.
+auf demselben Weg gespeichert.
+
+### Material an Einheit, Fahrzeug, UHS und Bereitstellungsraum
+
+Jeder Ort zeigt sein Material selbst, mit Menge, Status und der Zahl der Posten: die Seite einer
+Einheit im Paneel „Material“, die Fahrzeugliste im Aufklapper unter „Beladung“, eine UHS im Reiter
+„Material“ und ein Bereitstellungsraum in der Sektion „Material“ (Kapitel [Einheiten](einheiten.md),
+[Fahrzeuge und FMS](fahrzeuge.md), [Unfallhilfsstellen](unfallhilfsstellen.md),
+[Bereitstellungsräume](bereitstellungsraeume.md)). Dort holt „Material zuordnen …“ Posten ohne
+Ort und Posten von einem anderen Ort her, der Knopf zum Lösen („Aus Einheit lösen“, „Vom Fahrzeug
+lösen“, „Lösen“) setzt den Posten auf „ohne Ort“, und „Ausgeben“ öffnet denselben Dialog wie in der
+Liste. Jeder dieser Wege speichert den Ort genauso wie die Angabe „Ort“ in der Liste. Zuordnen,
+Lösen und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; das
+Recht auf das Modul des Orts, etwa Einheiten, genügt dafür nicht. Einheit und UHS zeigen ihr
+Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht.
 
 Endet ein Ort, bleibt der Posten im Einsatz:
 
@@ -220,8 +233,8 @@ Endet ein Ort, bleibt der Posten im Einsatz:
   stornieren.
 - Wird eine Einheit aufgelöst, steht ihr Material ohne Ort.
 - Eine aufgelöste UHS oder ein aufgelöster Bereitstellungsraum nimmt kein Material mehr an;
-  Material, das schon dort liegt, bleibt dort und lässt sich lösen. Im UHS-Reiter „Material“ ist
-  „Material zuordnen“ an einer aufgelösten UHS gesperrt, mit dem Grund „UHS aufgelöst“.
+  Material, das schon dort liegt, bleibt dort und lässt sich lösen. „Material zuordnen …“ ist dort
+  gesperrt, mit dem Grund „UHS aufgelöst“ bzw. „BR aufgelöst“.
 
 ### Umstellung des Bestands
 
