@@ -15,7 +15,7 @@ const SELECT_AUFGELOEST: &str = "\
            em.snap_bezeichnung, em.snap_kategorie, em.snap_bestandsnummer, \
            em.snap_traegerorganisation, em.bemerkung, em.disponiert_at, em.disponiert_von, \
            em.beendet_at, em.beendet_von, em.beendet_als, \
-           em.art, em.ausgegeben, em.einsatz_fahrzeug_id, em.br_id, \
+           em.art, em.ausgegeben, em.einsatz_fahrzeug_id, em.br_id, em.nachforderung_id, \
            m.bezeichnung AS live_bezeichnung, m.kategorie AS live_kategorie, \
            m.bestandsnummer AS live_bestandsnummer, m.traegerorganisation AS live_traegerorganisation, \
            m.dienststatus AS live_dienststatus, \
@@ -49,6 +49,7 @@ struct Row {
     ausgegeben: i64,
     einsatz_fahrzeug_id: Option<i64>,
     br_id: Option<i64>,
+    nachforderung_id: Option<i64>,
     live_bezeichnung: Option<String>,
     live_kategorie: Option<String>,
     live_bestandsnummer: Option<String>,
@@ -107,6 +108,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
         beendet_at: row.beendet_at,
         beendet_von: row.beendet_von,
         beendet_als: row.beendet_als,
+        nachforderung_id: row.nachforderung_id,
     }
 }
 
@@ -200,7 +202,8 @@ pub async fn load_anzeige_tx(
 /// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus, friert den
 /// Identitäts-Snapshot ein und kopiert die Art des Stamms an die Zeile (LLH-1224, design.md D1).
 /// `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity` bei außer Dienst und bei
-/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. Liefert die `em_id`.
+/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. `nachforderung_id` ist der
+/// vom Aufrufer geprüfte Bezug einer Übernahme (LLH-1226). Liefert die `em_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -208,6 +211,7 @@ pub async fn disponiere_stamm_tx(
     material_id: i64,
     menge: i64,
     disponiert_von: i64,
+    nachforderung_id: Option<i64>,
 ) -> Result<i64, AppError> {
     let ((bezeichnung, kategorie, bestandsnummer, traeger), art) =
         stamm_snapshot_tx(conn, org_id, material_id).await?;
@@ -215,8 +219,8 @@ pub async fn disponiere_stamm_tx(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
-             snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             snap_bestandsnummer, snap_traegerorganisation, disponiert_von, nachforderung_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(material_id)
@@ -227,6 +231,7 @@ pub async fn disponiere_stamm_tx(
     .bind(&bestandsnummer)
     .bind(&traeger)
     .bind(disponiert_von)
+    .bind(nachforderung_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -289,13 +294,15 @@ pub async fn disponiere_stamm(
         material_id,
         menge,
         disponiert_von,
+        None,
     )
     .await
 }
 
 /// Disponiert Ad-hoc-externes Material (`material_id = NULL`); `snap_*` sind die
 /// eigentlichen Daten. Ohne Art gilt die Vorgabe aus der Menge (LLH-1224, design.md D1); ein
-/// Gerät mit Menge über 1 ist `UnprocessableEntity` (D2). Liefert die neue `em_id`.
+/// Gerät mit Menge über 1 ist `UnprocessableEntity` (D2). `nachforderung_id` ist der vom Aufrufer
+/// geprüfte Bezug einer Übernahme (LLH-1226). Liefert die neue `em_id`.
 pub async fn disponiere_adhoc_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -303,14 +310,15 @@ pub async fn disponiere_adhoc_tx(
     art: Option<MaterialArt>,
     menge: i64,
     disponiert_von: i64,
+    nachforderung_id: Option<i64>,
 ) -> Result<i64, AppError> {
     let art = art.unwrap_or(MaterialArt::from_menge(menge));
     check_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
-             snap_bestandsnummer, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             snap_bestandsnummer, snap_traegerorganisation, disponiert_von, nachforderung_id) \
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(menge)
@@ -320,6 +328,7 @@ pub async fn disponiere_adhoc_tx(
     .bind(daten.bestandsnummer)
     .bind(daten.traegerorganisation)
     .bind(disponiert_von)
+    .bind(nachforderung_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -335,7 +344,16 @@ pub async fn disponiere_adhoc(
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
     let mut conn = pool.acquire().await?;
-    disponiere_adhoc_tx(&mut conn, einsatz_id, daten, art, menge, disponiert_von).await
+    disponiere_adhoc_tx(
+        &mut conn,
+        einsatz_id,
+        daten,
+        art,
+        menge,
+        disponiert_von,
+        None,
+    )
+    .await
 }
 
 /// Änderungen an einer Dispositionszeile (PATCH), schon getrimmt und geprüft in der Route.
@@ -475,7 +493,9 @@ pub async fn update(
 /// Dispositionsperson übernimmt und ohne Ausgabe beginnt (LLH-1224, design.md D14: die Teilzeile
 /// kommt aus dem Rest, die Ausgabe bleibt an der Ausgangszeile); so bleibt die Storno-Frist (LLH-1079 D3) die der Ausgangszeile,
 /// und auch eine frühere Herausnahme (`zuletzt_entlassen_at`, Migration 0195) sperrt den Storno
-/// der Teilzeile wie den der Ausgangszeile. Die neue Zeile ist aktiv. `NotFound`/`Conflict` wie
+/// der Teilzeile wie den der Ausgangszeile. Den Bezug auf eine Nachforderung übernimmt sie auch:
+/// sie kam mit derselben Lieferung (LLH-1226, design.md D9). Die neue Zeile ist aktiv.
+/// `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`], `UnprocessableEntity` an einem Gerät, wenn `menge` nicht kleiner als die
 /// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400). Liefert die ID
 /// der neuen Zeile.
@@ -511,11 +531,11 @@ pub async fn teile_auf_tx(
             (einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, menge, \
              ausgegeben, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
              snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
-             zuletzt_entlassen_at) \
+             zuletzt_entlassen_at, nachforderung_id) \
          SELECT einsatz_id, material_id, einheit_id, einsatz_fahrzeug_id, uhs_id, br_id, ?, \
                 0, art, status, snap_bezeichnung, snap_kategorie, snap_bestandsnummer, \
                 snap_traegerorganisation, bemerkung, disponiert_at, disponiert_von, \
-                zuletzt_entlassen_at \
+                zuletzt_entlassen_at, nachforderung_id \
          FROM einsatz_material WHERE id = ? AND einsatz_id = ? \
          RETURNING id",
     )
@@ -837,6 +857,53 @@ mod tests {
             art: MaterialArt::Geraet,
             ..mat_daten(bezeichnung)
         }
+    }
+
+    /// LLH-1226, design.md D8: die Anzeige trägt von der Nachforderung nur die Kennung, ohne
+    /// Bezug fehlt das Feld (Norm LFH-265).
+    #[tokio::test]
+    async fn anzeige_traegt_nur_die_kennung_der_nachforderung() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let daten = AdhocDaten {
+            bezeichnung: "Tauchpumpe",
+            kategorie: None,
+            bestandsnummer: None,
+            traegerorganisation: None,
+        };
+        let ohne = disponiere_adhoc(&pool, einsatz, daten, None, 1, benutzer)
+            .await
+            .unwrap();
+        let a = load_anzeige(&pool, einsatz, ohne, true).await.unwrap();
+        assert_eq!(a.nachforderung_id, None);
+        let json = serde_json::to_value(&a).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("nachforderung_id"));
+
+        let n: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+                angefordert_at, erstellt_von_id) \
+             VALUES (?, 'Tauchpumpe', '3 Tauchpumpen', 'leitstelle', '2026-10-15 08:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_material SET nachforderung_id = ? WHERE id = ?")
+            .bind(n)
+            .bind(ohne)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let a = load_anzeige(&pool, einsatz, ohne, true).await.unwrap();
+        assert_eq!(a.nachforderung_id, Some(n));
+        let json = serde_json::to_value(&a).unwrap();
+        assert_eq!(json["nachforderung_id"], serde_json::json!(n));
+        assert_eq!(
+            list(&pool, einsatz, true).await.unwrap()[0].nachforderung_id,
+            Some(n)
+        );
     }
 
     #[tokio::test]

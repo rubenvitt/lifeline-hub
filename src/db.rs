@@ -6718,4 +6718,116 @@ mod tests {
             .await
             .expect("das Löschen des Einsatzes nimmt Material und Orte in einer Anweisung mit");
     }
+
+    /// LLH-1226, design.md D4: `einsatz_material.nachforderung_id` per ADD COLUMN nach dem Neubau
+    /// aus 0197, `ON DELETE SET NULL` wie `verpflegung_ausgabe` (0120), Teilindex; der Bestand bleibt
+    /// ohne Bezug, und weder das Löschen einer Nachforderung noch das des Einsatzes bleibt am Bezug
+    /// hängen.
+    #[tokio::test]
+    async fn migration_0198_haengt_nachforderung_an_material() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 197).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, disponiert_von) \
+             VALUES (?, 'Wolldecke', 'verbrauchsgut', 50, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, 198).await;
+
+        let bezug: Option<i64> =
+            sqlx::query_scalar("SELECT nachforderung_id FROM einsatz_material WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bezug, None, "der Bestand bleibt ohne Bezug");
+        let fk: Vec<(String, String)> = sqlx::query_as(
+            "SELECT \"table\", on_delete FROM pragma_foreign_key_list('einsatz_material') \
+             WHERE \"from\" = 'nachforderung_id'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fk,
+            vec![("nachforderung".to_string(), "SET NULL".to_string())]
+        );
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_einsatz_material_nachforderung'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        let index = index.expect("Teilindex angelegt");
+        assert!(
+            index.contains("WHERE nachforderung_id IS NOT NULL"),
+            "{index}"
+        );
+
+        let nachforderung = |bez: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+                         angefordert_at, erstellt_von_id) \
+                     VALUES (?, 'Wolldecke', ?, 'leitstelle', '2026-10-15 08:00:00', ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(bez)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let n1 = nachforderung("50 Wolldecken").await;
+        let n2 = nachforderung("Decken Halle").await;
+        let posten = |n: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_material \
+                        (einsatz_id, snap_bezeichnung, art, menge, disponiert_von, nachforderung_id) \
+                     VALUES (?, 'Wolldecke', 'verbrauchsgut', 30, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(b)
+                .bind(n)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let p1 = posten(n1).await;
+        posten(n2).await;
+        sqlx::query("DELETE FROM nachforderung WHERE id = ?")
+            .bind(n1)
+            .execute(&pool)
+            .await
+            .expect("der Bezug hält das Löschen der Nachforderung nicht auf");
+        let bezug: Option<i64> =
+            sqlx::query_scalar("SELECT nachforderung_id FROM einsatz_material WHERE id = ?")
+                .bind(p1)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bezug, None, "ON DELETE SET NULL");
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Material und Nachforderung mit");
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_material")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0);
+    }
 }
