@@ -6,6 +6,7 @@
 //! bleiben je Art eigene Structs, weil sie eigene OpenAPI-Schemanamen tragen.
 
 pub mod anlage;
+pub mod benachrichtigung;
 pub mod repo;
 pub mod verteiler;
 
@@ -71,6 +72,10 @@ pub trait Dokumentart: Send + Sync + 'static {
     /// [`verteiler::quittieren_tx`]); `None` = die Art wird nicht quittiert. Setzt
     /// [`Self::VERTEILER`] voraus.
     const QUITTUNG: Option<&'static str> = None;
+    /// Benachrichtigung bei der Freigabe an die Funktionen im Verteiler (LLH-1213,
+    /// [`benachrichtigung::freigegeben`]); `None` = die Freigabe benachrichtigt niemanden. Setzt
+    /// [`Self::VERTEILER`] voraus.
+    const BENACHRICHTIGUNG: Option<benachrichtigung::FreigabeHinweis> = None;
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.
