@@ -175,6 +175,11 @@ pub struct EinsatzMaterialAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<crate::entlassung::BeendetAls>)]
     pub beendet_als: Option<String>,
+    /// Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec
+    /// `nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul
+    /// Nachforderungen. Fehlt ohne Bezug.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachforderung_id: Option<i64>,
 }
 
 impl EinsatzMaterialAnzeige {

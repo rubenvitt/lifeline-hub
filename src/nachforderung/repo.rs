@@ -16,16 +16,20 @@ pub struct NachforderungDaten<'a> {
     pub angefordert_at: &'a str,
 }
 
-/// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer) und abgeleitetem `ist_offen`.
-/// Reihenfolge der Spalten = Struct (FromRow positional). Keine computed-time-Spalte → kein
-/// `jetzt`-Bind nötig.
+/// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer), abgeleitetem `ist_offen` und den
+/// übernommenen Materialposten (LLH-1226: nicht stornierte, also auch aus dem Einsatz genommene,
+/// design.md D3). Reihenfolge der Spalten = Struct (FromRow positional). Keine
+/// computed-time-Spalte → kein `jetzt`-Bind nötig.
 const ANZEIGE_SELECT: &str =
     "SELECT n.id, n.einsatz_id, n.art, n.bezeichnung, n.anzahl, n.adressat_kategorie, \
             n.adressat_bezeichnung, n.begruendung, n.prioritaet, n.status, \
             n.zugesagt_at, n.unterwegs_at, n.eingetroffen_at, n.abgelehnt_at, n.abgelehnt_grund, \
             n.angefordert_at, n.etb_nachforderung_id, n.erstellt_von_id, n.erstellt_at, \
             b.anzeigename AS erstellt_von_name, \
-            (n.status NOT IN ('eingetroffen', 'abgelehnt')) AS ist_offen \
+            (n.status NOT IN ('eingetroffen', 'abgelehnt')) AS ist_offen, \
+            (SELECT json_group_array(em.id ORDER BY em.id) FROM einsatz_material em \
+             WHERE em.nachforderung_id = n.id AND em.beendet_als IS NOT 'storniert') \
+              AS material_ids \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -379,5 +383,66 @@ mod tests {
         let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
         assert!(belongs_to_einsatz(&pool, n.id, e).await.unwrap());
         assert!(!belongs_to_einsatz(&pool, n.id, 999).await.unwrap());
+    }
+
+    /// Ein Materialposten der Nachforderung `n` (LLH-1226), optional mit Endzustand.
+    async fn posten(pool: &SqlitePool, e: i64, n: i64, beendet_als: Option<&str>) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, \
+                nachforderung_id, beendet_at, beendet_als) \
+             VALUES (?, 'Tauchpumpe', 'geraet', 1, ?, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(n)
+        .bind(beendet_als.map(|_| "2026-10-15 09:00:00"))
+        .bind(beendet_als)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn material_ids_sind_ohne_uebernahme_leer() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("Tauchpumpe", "3 Tauchpumpen"))
+            .await
+            .unwrap();
+        assert_eq!(n.material_ids.0, Vec::<i64>::new());
+        let json = serde_json::to_value(&n).unwrap();
+        assert_eq!(json["material_ids"], serde_json::json!([]));
+    }
+
+    /// LLH-1226, design.md D3/D8: aufsteigend, storniert fehlt, aus dem Einsatz genommen bleibt.
+    #[tokio::test]
+    async fn material_ids_zaehlen_nicht_stornierte_posten_aufsteigend() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("Tauchpumpe", "3 Tauchpumpen"))
+            .await
+            .unwrap();
+        let andere = create(&pool, e, b, daten("Sandsäcke", "Deich"))
+            .await
+            .unwrap();
+        let p1 = posten(&pool, e, n.id, None).await;
+        posten(&pool, e, n.id, Some("storniert")).await;
+        let p3 = posten(&pool, e, n.id, Some("entlassen")).await;
+        let fremd = posten(&pool, e, andere.id, None).await;
+
+        assert_eq!(
+            load(&pool, n.id).await.unwrap().material_ids.0,
+            vec![p1, p3]
+        );
+        let alle = list(&pool, e, None).await.unwrap();
+        let aus_liste = |id: i64| {
+            alle.iter()
+                .find(|x| x.id == id)
+                .unwrap()
+                .material_ids
+                .0
+                .clone()
+        };
+        assert_eq!(aus_liste(n.id), vec![p1, p3]);
+        assert_eq!(aus_liste(andere.id), vec![fremd]);
     }
 }

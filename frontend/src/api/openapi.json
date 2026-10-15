@@ -4794,6 +4794,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nachforderung, aus der der Posten übernommen wurde (LLH-1226, Spec\n`nachforderung-material`); nur die Kennung, den Inhalt liest die Oberfläche aus dem Modul\nNachforderungen. Fehlt ohne Bezug."
+          },
           "status": {
             "$ref": "#/components/schemas/MaterialStatus"
           },
@@ -9521,7 +9529,8 @@
           "angefordert_at",
           "erstellt_von_id",
           "erstellt_at",
-          "ist_offen"
+          "ist_offen",
+          "material_ids"
         ],
         "properties": {
           "abgelehnt_at": {
@@ -9605,6 +9614,14 @@
           "ist_offen": {
             "type": "boolean",
             "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt')."
+          },
+          "material_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten\nMaterialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:\nBezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
