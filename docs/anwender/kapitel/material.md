@@ -288,7 +288,8 @@ jede Organisation; „verbraucht“ und „Desinfektion nötig“ gibt es nur f�
 
 Aus dem Einsatz nehmen ist der Normalweg: Der Posten verlässt seinen Ort. In
 Auswahllisten, im Meldebild und in der UHS zählt er nicht mehr; der Block „Aus dem Einsatz
-genommen“ unter der Liste führt ihn weiter. Erneut disponiert, steht er wieder in der Liste, mit
+genommen“ unter der Liste führt ihn weiter, ebenso das Meldebild und seine Übernahme in einen
+Lagebericht. Erneut disponiert, steht er wieder in der Liste, mit
 derselben Menge und demselben Status, aber ohne Ort. „Material disponieren“
 legt dagegen immer eine neue Zeile an.
 
