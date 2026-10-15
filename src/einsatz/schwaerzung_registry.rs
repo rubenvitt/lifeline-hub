@@ -1053,6 +1053,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("ausgegeben", G_ZAEHLER),
             retain("einsatz_fahrzeug_id", G_FK),
             retain("br_id", G_FK),
+            // Herkunft aus einer Nachforderung (LLH-1226), nur die Kennung.
+            retain("nachforderung_id", G_FK),
         ],
     },
     TabellenRegel {
