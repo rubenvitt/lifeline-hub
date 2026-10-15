@@ -156,6 +156,20 @@ async fn detail_der_auftrag_empfaenger_zeile_liest_nur_retain_spalten() {
     }
 }
 
+/// Dasselbe für den Sprung zu einer Chat-Nachricht (Erwähnung, LLH-1220): nur der Kanal.
+#[test]
+fn sprung_zur_chat_nachricht_liest_nur_retain_spalten() {
+    for &(tabelle, spalte) in text::CHAT_NACHRICHT_SPALTEN {
+        assert!(
+            matches!(
+                klassifikation_von(tabelle, spalte),
+                Some(Klassifikation::Retain(_))
+            ),
+            "{tabelle}.{spalte} ist kein Retain-Wert"
+        );
+    }
+}
+
 #[test]
 fn jede_tabellenspalte_der_benachrichtigung_ist_retain() {
     for spalte in [

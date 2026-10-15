@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
 ---
 
 ## Überblick
@@ -52,6 +52,19 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 
 Auf einem breiten Bildschirm stehen Wartebereich, Fläche und Transport nebeneinander; dann lassen
 sich Patienten auch mit der Maus auf einen Platz ziehen.
+
+### Material an der Stelle führen
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
+
+1. Die Stelle öffnen und unter dem Grundriss „Material“ wählen. Der Reiter zeigt jeden Posten mit
+   Menge und Status, im Kopf die Zahl der Posten und, falls vorhanden, den Ausfall.
+2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
+   anderem Ort“ Posten, die schon an einem anderen Ort liegen, etwa bei einer Einheit, mit diesem
+   Ort im Eintrag. Der Posten liegt danach an der Stelle.
+3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
+   „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „30 von 50 übrig“.
+4. Mit „Lösen“ einen Posten von der Stelle lösen. Er bleibt ohne Ort im Einsatz.
 
 ### Einen Patienten aufnehmen und einem Platz zuweisen
 
@@ -115,9 +128,15 @@ zugeordnet oder von ihr abgezogen werden, stehen ebenfalls dort.
 
 Der Kopf der Stelle nennt ihre Stärke. Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
-Unter „Material“ ordnet „Material zuordnen“ Material des Einsatzes der Stelle zu; erfasst wird es
-im Modul „Material“. Zugeordnet wird an eine geplante oder aktive Stelle; eine aufgelöste nimmt
-kein Material mehr an. Material, das schon dort liegt, bleibt änderbar und lässt sich lösen.
+Unter „Material“ holt „Material zuordnen …“ Material des Einsatzes an die Stelle: Posten ohne Ort
+und Posten an einem anderen Ort, die ohne Rückfrage umgehängt werden; das Einsatztagebuch nennt den
+alten und den neuen Ort. Erfasst wird Material im Modul [Material](material.md). Zugeordnet wird an
+eine geplante oder aktive Stelle; an einer aufgelösten steht „Material zuordnen …“ gesperrt mit
+„UHS aufgelöst“, Material, das schon dort liegt, lässt sich weiter lösen. Material an einer
+Unfallhilfsstelle steht nicht im [Meldebild](meldebild.md). Zuordnen, Lösen und Ausgeben verlangen
+Schreibrecht im Einsatz und die Freigabe des Moduls Material; ohne die Freigabe stehen die Posten
+lesbar da, und „Material zuordnen …“ steht gesperrt mit „Modul Material gesperrt“. Ein UHS-Laptop
+zeigt das Material seiner Stelle nur lesend.
 
 ### Rechte
 

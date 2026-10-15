@@ -21,7 +21,8 @@ import '../../theme/sprache.css';
  * tabindex).
  *
  * BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI Angaben aus
- * LFH-365 ({@link segmentStil}). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze.
+ * LFH-365 ({@link segmentStil}). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze — als
+ * Mindesthöhe und Mindestbreite (LLH-1224), das Wort steht mittig.
  *
  * ZIELABSTAND (LFH-865, Muster LFH-630, Bedien-Leitlinie Kriterium 2): die Fuge bleibt 1 px,
  * und jedes Segment steht in einer eigenen Rasterzelle (`data-lfh="segment-zelle"`, Grund
@@ -70,7 +71,10 @@ export function segmentStil(token: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: token.marginXS,
+    justifyContent: 'center',
     minHeight: token.controlHeight,
+    // Die Staffel auch in der Breite (LLH-1224): ein kurzes Wort bliebe sonst schmaler als hoch.
+    minWidth: token.controlHeight,
     paddingInline: token.paddingSM - zielEinzug(token),
     paddingBlock: 0,
   };

@@ -2,18 +2,22 @@
 
 ## Purpose
 Das Meldebild zeigt die Kräfte als einen Baum: Einheit mit Untereinheiten, darunter ihre Fahrzeuge
-mit Besatzung, ihr Personal ohne Fahrzeug und ihr Material. Eine Baumlogik trägt Schirm,
-Lagebericht-Text und Druck, damit jede Kraft genau einmal steht und die Stärke der Elternzeile
-mit dem Seitenkopf übereinstimmt.
+mit Besatzung und Beladung, ihr Personal ohne Fahrzeug und ihr Material. Eine Baumlogik trägt
+Schirm, Lagebericht-Text und Druck, damit jede Kraft genau einmal steht und die Stärke der
+Elternzeile mit dem Seitenkopf übereinstimmt.
 
 ## Requirements
 ### Requirement: Gliederung des Kräftebaums
 
 Das Meldebild SHALL die Kräfte als Baum zeigen: Einheiten mit ihren Untereinheiten als
-eingerückte Kinder, unter jeder Einheit ihre Fahrzeuge mit Besatzung, ihr Personal ohne Fahrzeug
-und ihr Material als eine verdichtete Gruppenzeile. Kräfte ohne Einheit MUST unter einer letzten
-Wurzel „Ohne Einheit“ mit derselben Unterstruktur stehen. Hat eine Einheit kein Fahrzeug, MUST ihr
-Personal direkt unter ihr stehen.
+eingerückte Kinder, unter jeder Einheit ihre Fahrzeuge mit Besatzung und Beladung, ihr Personal
+ohne Fahrzeug und ihr Material als eine verdichtete Gruppenzeile. Die Beladung eines Fahrzeugs MUST
+als Gruppenzeile „Beladung“ unter dem Fahrzeug nach seiner Besatzung stehen und MUST NOT zusätzlich
+in der Material-Gruppe der Einheit zählen. Kräfte ohne Einheit und Material ohne Ort MUST unter
+einer letzten Wurzel „Ohne Einheit“ mit derselben Unterstruktur stehen. Material an einer
+Unfallhilfsstelle oder in einem Bereitstellungsraum MUST NOT im Baum stehen. Hat eine Einheit kein
+Fahrzeug, MUST ihr Personal direkt unter ihr stehen. Ausfall in der Beladung eines eigenen
+Fahrzeugs MUST die Einheit tönen wie Ausfall in ihrem Material.
 
 #### Scenario: Zug mit Gruppen
 - **WHEN** der Einheit „Zug 1“ die Gruppen „Gr 1“ und „Gr 2“ unterstellt sind
@@ -26,6 +30,14 @@ Personal direkt unter ihr stehen.
 #### Scenario: Material verdichtet
 - **WHEN** einer Einheit drei Materialposten zugeordnet sind, einer davon defekt
 - **THEN** zeigt sie eine Zeile „Material · 3 Posten · 1 Ausfall“, aufklappbar zu den Posten
+
+#### Scenario: Beladung unter dem Fahrzeug
+- **WHEN** dem Fahrzeug „Florian 1-44-1“ der Einheit „Gr 1“ ein defekter Stromerzeuger zugeordnet ist
+- **THEN** steht unter dem Fahrzeug nach der Besatzung „Beladung · 1 Posten · 1 Ausfall“, und „Gr 1“ ist als Problemzeile getönt
+
+#### Scenario: Material an einer UHS
+- **WHEN** 50 Wolldecken an der UHS „Turnhalle“ liegen
+- **THEN** stehen sie weder unter einer Einheit noch unter „Ohne Einheit“
 
 ### Requirement: Material-Ausfall wie in der Materialliste
 
@@ -116,12 +128,16 @@ erscheinen, wenn es sie gibt.
 ### Requirement: Lagebericht-Text folgt dem Kräftebaum
 
 Der Text, den „In Lagebericht übernehmen“ aus dem Meldebild erzeugt, SHALL dieselbe Gliederung
-tragen wie der Schirm: Fahrzeug mit Besatzung als Unterpunkt, Personal ohne Fahrzeug, Material
-verdichtet, gegliedert nach Abschnitten.
+tragen wie der Schirm: Fahrzeug mit Besatzung und Beladung als Unterpunkte, Personal ohne Fahrzeug,
+Material verdichtet, gegliedert nach Abschnitten.
 
 #### Scenario: Besatzung im Text
 - **WHEN** das Meldebild mit einem besetzten Fahrzeug übernommen wird
 - **THEN** nennt der Text die Besatzung als Unterpunkt des Fahrzeugs
+
+#### Scenario: Beladung im Text
+- **WHEN** das Meldebild mit einem Fahrzeug übernommen wird, das zwei Posten geladen hat, einer davon defekt
+- **THEN** nennt der Text unter dem Fahrzeug „Beladung: 2 Posten, 1 Ausfall“
 
 ### Requirement: Sprung auf eine Einheit
 

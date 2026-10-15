@@ -2,7 +2,7 @@
 titel: Chat
 gruppen: [alle]
 reihenfolge: 70
-quellen: [frontend/src/pages/ChatPage.tsx, frontend/src/chat/KanalListe.tsx, frontend/src/chat/KanalAnlegenDialog.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/chat/NachrichtEingabe.tsx, frontend/src/chat/HeraufstufenModal.tsx, frontend/src/chat/HeraufstufenAuftragModal.tsx, frontend/src/chat/BezugDialog.tsx, frontend/src/chat/BearbeitenModal.tsx, frontend/src/chat/bezug.ts, frontend/src/einsatz/useModulZaehler.ts, frontend/src/components/nurAnsicht.ts, src/routes/chat.rs, src/chat/]
+quellen: [frontend/src/pages/ChatPage.tsx, frontend/src/chat/KanalListe.tsx, frontend/src/chat/KanalAnlegenDialog.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/chat/NachrichtEingabe.tsx, frontend/src/chat/erwaehnung.ts, frontend/src/chat/HeraufstufenModal.tsx, frontend/src/chat/HeraufstufenAuftragModal.tsx, frontend/src/chat/BezugDialog.tsx, frontend/src/chat/BearbeitenModal.tsx, frontend/src/chat/bezug.ts, frontend/src/einsatz/useModulZaehler.ts, frontend/src/components/nurAnsicht.ts, src/routes/chat.rs, src/chat/, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -11,6 +11,9 @@ Der **Chat** ist die schnelle, formlose Absprache im Einsatz: kurze Nachrichten 
 Wunsch mit Anhang. Er steht im Einsatz unter „Kommunikation“. Was festgehalten werden muss,
 übernimmt der Chat als Eintrag ins Einsatztagebuch (ETB) oder als Auftrag; die Nachricht selbst
 ist kein Tagebuch.
+
+Mit „@“ erwähnt eine Nachricht Mitglieder oder besetzte Funktionen; wer erwähnt ist, bekommt
+einen Hinweis.
 
 Lesen kann jedes Mitglied des Einsatzes. Schreiben, Kanäle anlegen und Nachrichten übernehmen
 können Einsatzleitung und Führungspersonal, solange der Einsatz läuft.
@@ -27,6 +30,13 @@ können Einsatzleitung und Führungspersonal, solange der Einsatz läuft.
 4. Mit Enter oder „Senden“ abschicken.
 
    ![Chat mit der Kanalliste „Allgemein“ und „Abschnitt Nord“ (eine ungelesene Nachricht), dem Verlauf in „Allgemein“ und dem Eingabefeld mit „Senden“ und „Anhang“](../bilder/chat/chat.png)
+
+### Jemanden erwähnen
+
+1. In „Nachricht…“ „@“ tippen. Eine Auswahl zeigt die besetzten Funktionen, etwa „S4 –
+   Versorgung“, und die Mitglieder des Einsatzes; weitere Buchstaben grenzen sie ein.
+2. Den Eintrag anklicken oder mit Enter übernehmen. Im Text steht dann etwa „@S4“.
+3. Die Nachricht wie gewohnt mit Enter oder „Senden“ abschicken.
 
 ### Einen Kanal anlegen
 
@@ -118,6 +128,22 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 - Neue Nachrichten erscheinen ohne Neuladen. Wer gerade weiter oben liest, bleibt dort; unten
   erscheint „1 neue Nachricht“ oder „n neue Nachrichten“ und führt ans Ende.
 - Lange Verläufe lädt „Ältere laden“ am oberen Ende nach.
+
+### Erwähnungen
+
+- Eine erwähnte Person bekommt den Hinweis „Erwähnt im Chat“; er führt in den Kanal der
+  Nachricht. Eine erwähnte Funktion erreicht, wer sie in der Stab-Besetzung trägt und
+  dort mit einem Konto verknüpft ist, sonst wer sie in seiner Mitgliedschaft trägt. Ist die
+  Funktion nicht besetzt, erreicht der Hinweis niemanden.
+- Den Hinweis bekommt nur, wer den Chat sehen darf. Wer sich selbst oder die eigene Funktion
+  erwähnt, bekommt nichts.
+- Eine Nachricht ohne Erwähnung bleibt still: sie zählt nur am Modul „Chat“. Erwähnt ist nur,
+  wer aus der Auswahl übernommen wurde und beim Senden noch im Text steht; ein von Hand
+  getipptes „@S4“ erwähnt niemanden.
+- Bearbeiten benachrichtigt nicht, auch wenn danach ein neuer Name im Text steht.
+- Vorgeschlagen werden die Funktionen EL und S1 bis S6 (S7, wenn die Organisation sie führt),
+  soweit jemand sie trägt, und die übrigen Mitglieder des Einsatzes. Höchstens 20 Erwähnungen gehen mit einer Nachricht; darüber sperrt
+  „Senden“, und unter dem Feld steht „zu viele“.
 
 ### Länge, Anhänge, ohne Netz
 

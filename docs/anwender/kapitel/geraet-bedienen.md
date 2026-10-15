@@ -2,7 +2,7 @@
 titel: Gerät bedienen
 gruppen: [geraete]
 reihenfolge: 710
-quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -99,6 +99,13 @@ trägt Stelle und Gerätebezeichnung als Absender.
 
 Ein Widerruf wirkt sofort: Der Server schließt die Verbindung, und das Gerät wechselt ohne
 Neuladen auf „Kopplung beendet“.
+
+### Kein Ton, keine Benachrichtigungen
+
+Ein gekoppeltes Gerät spielt keinen Ton und zeigt keine Benachrichtigungen, auch nicht bei einer
+neuen Sofortmeldung, die es in seiner Meldungsliste sieht. Alarme erreichen die Personen an ihren
+eigenen Arbeitsplätzen. Der Lagemonitor zeigt neue Sofortmeldungen nur als hervorgehobene Zahl
+(siehe [Lagemonitor](lagemonitor.md)).
 
 ### Abmelden ist kein Widerruf
 

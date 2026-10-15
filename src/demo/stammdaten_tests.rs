@@ -261,9 +261,10 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
 
     for m in szenario::MATERIAL {
         let id = erg.material(m.schluessel).unwrap();
-        let (org, bez, kat, nummer): (i64, String, Option<String>, Option<String>) =
+        let (org, bez, kat, nummer, art): (i64, String, Option<String>, Option<String>, String) =
             sqlx::query_as(
-                "SELECT org_id, bezeichnung, kategorie, bestandsnummer FROM material WHERE id = ?",
+                "SELECT org_id, bezeichnung, kategorie, bestandsnummer, art FROM material \
+                 WHERE id = ?",
             )
             .bind(id)
             .fetch_one(&pool)
@@ -273,6 +274,8 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
         assert_eq!(bez, m.bezeichnung);
         assert_eq!(kat.as_deref(), Some(m.kategorie));
         assert_eq!(nummer.as_deref(), Some(m.bestandsnummer));
+        assert_eq!(art, m.art.as_str(), "Art aus der Vorlage (LLH-1224)");
+        assert_eq!(art, "geraet", "die Demo-Materialien sind Geräte (D19)");
         assert_eq!(marke(&pool, "material", id).await, Some(a.kopf), "{bez}");
     }
 

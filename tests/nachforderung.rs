@@ -287,3 +287,125 @@ async fn cross_einsatz_status_ist_404() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ── Rücknahme nach einer Übernahme (LLH-1226, design.md D9) ─────────────────────────────
+
+async fn set_status(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    nid: i64,
+    status: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+        cookie,
+        Some(&format!(r#"{{"status":"{status}"}}"#)),
+    )
+    .await
+}
+
+/// Setzt eine Nachforderung ab und meldet sie eingetroffen; liefert ihre id.
+async fn eingetroffen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
+    let (_, n) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        cookie,
+        Some(&body()),
+    )
+    .await;
+    let nid = n["id"].as_i64().unwrap();
+    for s in ["zugesagt", "unterwegs", "eingetroffen"] {
+        assert_eq!(set_status(app, cookie, e, nid, s).await.0, StatusCode::OK);
+    }
+    nid
+}
+
+/// Übernimmt einen Posten aus der Nachforderung; liefert die `em_id`.
+async fn uebernehmen(app: &axum::Router, cookie: &str, e: i64, nid: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/material"),
+        cookie,
+        Some(&format!(
+            r#"{{"adhoc":{{"bezeichnung":"RTW-Ausstattung"}},"nachforderung_id":{nid}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Spec `nachforderung-material`, „Rücknahme nach Übernahme gesperrt“: mit einem zählenden
+/// Posten bleibt die Nachforderung eingetroffen (422 mit Grund), auch ein aus dem Einsatz
+/// genommener Posten sperrt.
+#[tokio::test]
+async fn ruecknahme_nach_uebernahme_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nid = eingetroffen(&app, &admin, e).await;
+    let em = uebernehmen(&app, &admin, e, nid).await;
+
+    let (s, json) = set_status(&app, &admin, e, nid, "unterwegs").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Aus der Nachforderung ist Material übernommen"
+    );
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/material/{em}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let (s, _) = set_status(&app, &admin, e, nid, "unterwegs").await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "entlassen zählt weiter"
+    );
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["status"], "eingetroffen");
+}
+
+/// Ohne Posten und mit nur storniertem Posten bleibt die Rücknahme (LFH-343 C8) erlaubt.
+#[tokio::test]
+async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ohne = eingetroffen(&app, &admin, e).await;
+    let (s, json) = set_status(&app, &admin, e, ohne, "unterwegs").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status"], "unterwegs");
+
+    let storniert = eingetroffen(&app, &admin, e).await;
+    let em = uebernehmen(&app, &admin, e, storniert).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/material/{em}/stornieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, json) = set_status(&app, &admin, e, storniert, "unterwegs").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+}

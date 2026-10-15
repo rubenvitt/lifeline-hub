@@ -11,8 +11,22 @@ import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import type { GeraetAnzeige, LagemonitorAnzeige } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
-import { alterText, istVeraltet, LANG_DRUECKEN_MS, MENUE_ZU_MS } from './LagemonitorPage';
+import {
+  ABRUF_TAKT_MS,
+  alterText,
+  HERVORHEBUNG_MS,
+  istVeraltet,
+  LANG_DRUECKEN_MS,
+  MENUE_ZU_MS,
+} from './LagemonitorPage';
 import { monitorAusschnitt } from './LagemonitorKarte';
+import { spieleAlarmTon } from '../alarm/alarmTon';
+
+// Ob der Monitor einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
+vi.mock('../alarm/alarmTon', async (original) => ({
+  ...(await original<typeof import('../alarm/alarmTon')>()),
+  spieleAlarmTon: vi.fn(),
+}));
 
 // jsdom hat kein WebGL: die Karte selbst gehört nach `e2e/geraet-lagemonitor.spec.ts`.
 vi.mock('./LagemonitorKarte', async (original) => ({
@@ -67,6 +81,7 @@ const lage: LagemonitorAnzeige = {
   ],
   zonen: [],
   abschnitte: [],
+  sofortmeldungen_offen: 0,
 };
 
 let lagebildAntwort: () => Response;
@@ -124,6 +139,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.mocked(spieleAlarmTon).mockClear();
+  FakeEventSource.zuruecksetzen();
   wakeRequest.mockReset();
   delete (navigator as { wakeLock?: unknown }).wakeLock;
   localStorage.clear();
@@ -251,6 +268,133 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
       'aria-pressed',
       'true',
     );
+  });
+});
+
+/**
+ * Spec `lagemonitor`, „Zahl der offenen Sofortmeldungen“ und „Neue Dringlichkeit sichtbar
+ * hervorheben“ (Change `kcjecn9e-benachrichtigungskonzept`, D12): die Zahl kommt verdichtet vom
+ * Server; steigt sie oder SK I gegenüber dem letzten Stand, ist sie 60 s hervorgehoben, mit Farbe
+ * und Wort, ohne Blinken und ohne Ton.
+ */
+describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => {
+  const zahl = (region: string, bezeichnung: string) => {
+    const kachel = screen.getByRole('region', { name: region });
+    return within(kachel).getByText(bezeichnung).closest<HTMLElement>('[data-lfh="monitor-zahl"]')!;
+  };
+  const hervorgehoben = (region: string, bezeichnung: string) =>
+    zahl(region, bezeichnung).getAttribute('data-hervorgehoben');
+  /** Der nächste Abruf im Takt bringt `naechste`. */
+  async function naechsterStand(naechste: LagemonitorAnzeige) {
+    lagebildAntwort = () => HttpResponse.json(naechste);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ABRUF_TAKT_MS);
+    });
+  }
+
+  it('Zwei offene Sofortmeldungen: „Sofortmeldungen offen 2“', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    const meldungen = screen.getByRole('region', { name: 'Meldungen' });
+    const z = within(meldungen).getByText('Sofortmeldungen offen');
+    expect(z.closest('[data-lfh="monitor-zahl"]')).toHaveTextContent('2Sofortmeldungen offen');
+    // Der erste Stand nach dem Laden ist kein Anstieg.
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+  });
+
+  it('Neue Sofortmeldung: 60 s hervorgehoben mit Wort, ohne Blinken und ohne Ton', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    renderApp('/geraet/7/monitor');
+    // Die Kacheln rechts stehen erst mit dem ersten Stand.
+    await screen.findByRole('region', { name: 'Betroffene' });
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+
+    await naechsterStand({ ...lage, sofortmeldungen_offen: 1 });
+    await waitFor(() => expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('ja'));
+    const meldungen = screen.getByRole('region', { name: 'Meldungen' });
+    expect(within(meldungen).getByText('Neue Sofortmeldung')).toBeInTheDocument();
+    const z = zahl('Meldungen', 'Sofortmeldungen offen');
+    expect(z).toHaveTextContent('1Sofortmeldungen offen');
+    // Kein Blinken: weder Animation noch Übergang.
+    for (const el of [z, ...z.querySelectorAll<HTMLElement>('*')]) {
+      expect(el.style.animation).toBe('');
+      expect(el.style.transition).toBe('');
+    }
+    // SK I ist nicht gestiegen und bleibt ruhig.
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+
+    // Der nächste gleiche Stand verlängert nicht, nach 60 s ist die Hervorhebung weg.
+    await naechsterStand({ ...lage, sofortmeldungen_offen: 1 });
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('ja');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HERVORHEBUNG_MS - ABRUF_TAKT_MS + 1_000);
+    });
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+    expect(within(meldungen).queryByText('Neue Sofortmeldung')).toBeNull();
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
+  });
+
+  it('Sofortmeldung bestätigt: sinkt die Zahl, entsteht keine Hervorhebung', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });
+    renderApp('/geraet/7/monitor');
+    // Die Kacheln rechts stehen erst mit dem ersten Stand.
+    await screen.findByRole('region', { name: 'Betroffene' });
+
+    await naechsterStand({ ...lage, sofortmeldungen_offen: 1 });
+    await waitFor(() =>
+      expect(zahl('Meldungen', 'Sofortmeldungen offen')).toHaveTextContent(
+        '1Sofortmeldungen offen',
+      ),
+    );
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+    expect(screen.queryByText('Neue Sofortmeldung')).toBeNull();
+  });
+
+  it('SK I steigt: hervorgehoben mit Wort; sinkt sie, nicht', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+
+    const mehr = { ...lage, betroffene: { ...lage.betroffene, sk1: 2 } };
+    await naechsterStand(mehr);
+    await waitFor(() => expect(hervorgehoben('Betroffene', 'SK I')).toBe('ja'));
+    const betroffene = screen.getByRole('region', { name: 'Betroffene' });
+    expect(within(betroffene).getByText('Neu in SK I')).toBeInTheDocument();
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HERVORHEBUNG_MS);
+    });
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+
+    await naechsterStand({ ...lage, betroffene: { ...lage.betroffene, sk1: 1 } });
+    await waitFor(() => expect(zahl('Betroffene', 'SK I')).toHaveTextContent('1SK I'));
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+    expect(within(betroffene).queryByText('Neu in SK I')).toBeNull();
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
+  });
+
+  it('der Monitor spielt keinen Ton, auch wenn sein Einsatzstrom alarmiert', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    // Die Kacheln rechts stehen erst mit dem ersten Stand.
+    await screen.findByRole('region', { name: 'Betroffene' });
+    const strom = FakeEventSource.instanzen.find(
+      (q) => q.url === '/api/einsaetze/7/live' && !q.closed,
+    );
+    expect(strom, 'der Einsatzstrom des Monitors ist offen').toBeDefined();
+    act(() => {
+      strom!.emit('sofortmeldung', JSON.stringify({ einsatz_id: 7, meldung_id: 3 }));
+      strom!.emit('abloesung', JSON.stringify({ einsatz_id: 7, art: 'faellig' }));
+    });
+    expect(spieleAlarmTon).not.toHaveBeenCalled();
   });
 });
 

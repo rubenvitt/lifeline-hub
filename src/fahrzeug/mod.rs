@@ -297,11 +297,18 @@ pub fn etb_text_erneut_disponiert(funkrufname: &str) -> String {
 }
 
 /// System-ETB beim Entlassen (LLH-1079, design.md D4): der Name der Einheit steht nur hier, die
-/// Zeile behält keinen eingefrorenen Einheitsbezug.
-pub fn etb_text_entlassen(funkrufname: &str, einheit: Option<&str>) -> String {
-    match einheit {
+/// Zeile behält keinen eingefrorenen Einheitsbezug. Hatte das Fahrzeug Material geladen, nennt
+/// der Eintrag die Zahl der Posten, die ohne Ort zurückbleiben (LLH-1224, design.md D13); einen
+/// eigenen Eintrag je Posten gibt es nicht.
+pub fn etb_text_entlassen(funkrufname: &str, einheit: Option<&str>, beladung: usize) -> String {
+    let text = match einheit {
         Some(e) => format!("Fahrzeug «{funkrufname}» (Einheit «{e}») aus dem Einsatz entlassen"),
         None => format!("Fahrzeug «{funkrufname}» aus dem Einsatz entlassen"),
+    };
+    if beladung == 0 {
+        text
+    } else {
+        format!("{text}; Beladung ohne Ort: {beladung} Posten")
     }
 }
 
@@ -404,12 +411,21 @@ mod etb_text_tests {
     #[test]
     fn entlassen_storniert_erneut() {
         assert_eq!(
-            etb_text_entlassen("Florian 1", Some("1. Zug")),
+            etb_text_entlassen("Florian 1", Some("1. Zug"), 0),
             "Fahrzeug «Florian 1» (Einheit «1. Zug») aus dem Einsatz entlassen"
         );
         assert_eq!(
-            etb_text_entlassen("Florian 1", None),
+            etb_text_entlassen("Florian 1", None, 0),
             "Fahrzeug «Florian 1» aus dem Einsatz entlassen"
+        );
+        assert_eq!(
+            etb_text_entlassen("Florian 1", None, 1),
+            "Fahrzeug «Florian 1» aus dem Einsatz entlassen; Beladung ohne Ort: 1 Posten"
+        );
+        assert_eq!(
+            etb_text_entlassen("Florian 1", Some("1. Zug"), 3),
+            "Fahrzeug «Florian 1» (Einheit «1. Zug») aus dem Einsatz entlassen; \
+             Beladung ohne Ort: 3 Posten"
         );
         assert_eq!(
             etb_text_storniert("Florian 1"),

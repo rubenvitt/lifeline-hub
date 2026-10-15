@@ -1346,11 +1346,16 @@ pub async fn setze_rolle(
     benutzer_id: i64,
     rolle: EinsatzRolle,
 ) -> Result<(), AppError> {
-    setze_mitgliedschaft(pool, einsatz_id, benutzer_id, rolle, None).await
+    setze_mitgliedschaft(pool, einsatz_id, benutzer_id, rolle, None)
+        .await
+        .map(|_| ())
 }
 
-/// Rolle und optional die Führungsstelle in EINEM Statement aktualisieren.
-/// Fehlendes Feld erhält den Bestand; explizites null löscht die Stelle.
+/// Rolle und optional die Führungsstelle setzen. Fehlendes Feld erhält den Bestand; explizites
+/// null löscht die Stelle. Liefert `true`, wenn die Person dabei neu aufgenommen wurde, `false`
+/// bei einer bestehenden Mitgliedschaft (Rollenwechsel, Wiederholung). Daran hängt die
+/// Benachrichtigung `einsatz_aufnahme` (`routes::einsatz::mitglied_setzen`): sie kommt genau
+/// einmal je Aufnahme.
 pub async fn setze_mitgliedschaft(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -1359,30 +1364,53 @@ pub async fn setze_mitgliedschaft(
     // `None` = Bestand behalten; `Some` setzt Code und Text als Paar (LFH-549), eine leere
     // Angabe leert beide.
     fuehrungsstelle: Option<&crate::fuehrung::Funktionsangabe>,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     // Org-Guard IM SQL (F05/LFH-232), nicht im Handler: dies ist einer von nur zwei
     // produktiven INSERTs in `einsatz_mitgliedschaft` und damit ein Chokepoint der
     // Mandanten-Grenze. Eine org-fremde Mitgliedschaft würde die Isolation aus LFH-115
     // vollständig aushebeln — `darf_lesen` prüft bei vorhandener Rolle die Org nicht mehr.
-    // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen.
+    // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen; er steht im INSERT
+    // und im UPDATE.
     // Ein Gerätekonto (LFH-892) ist nie Mitglied; seine Rolle kommt aus der Ansicht.
-    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
+    //
+    // Zwei Anweisungen statt eines UPSERT, damit feststeht, ob die Person neu ist: das
+    // INSERT ändert nur ohne bestehende Zeile etwas, sonst greift das UPDATE. Unter zwei
+    // gleichzeitigen Aufnahmen derselben Person gewinnt genau ein INSERT.
+    let guard = format!(
+        "EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
+                 WHERE b.id = ?2 AND b.org_id = e.org_id AND {})",
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    );
+    let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_mitgliedschaft \
             (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
-         SELECT ?1, ?2, ?3, ?4, ?6 \
-         WHERE EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
-                       WHERE b.id = ?2 AND b.org_id = e.org_id AND {}) \
-         ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle, \
-         fuehrungsstelle = CASE WHEN ?5 THEN excluded.fuehrungsstelle ELSE einsatz_mitgliedschaft.fuehrungsstelle END, \
-         fuehrungsfunktion = CASE WHEN ?5 THEN excluded.fuehrungsfunktion ELSE einsatz_mitgliedschaft.fuehrungsfunktion END",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+         SELECT ?1, ?2, ?3, ?4, ?5 WHERE {guard} \
+         ON CONFLICT(einsatz_id, benutzer_id) DO NOTHING"
     )))
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(rolle.as_str())
     .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
-    .bind(fuehrungsstelle.is_some())
     .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if eingefuegt > 0 {
+        return Ok(true);
+    }
+
+    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = ?3, \
+             fuehrungsstelle = CASE WHEN ?6 THEN ?4 ELSE fuehrungsstelle END, \
+             fuehrungsfunktion = CASE WHEN ?6 THEN ?5 ELSE fuehrungsfunktion END \
+         WHERE einsatz_id = ?1 AND benutzer_id = ?2 AND {guard}"
+    )))
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .bind(rolle.as_str())
+    .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
+    .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
+    .bind(fuehrungsstelle.is_some())
     .execute(pool)
     .await?
     .rows_affected();
@@ -1393,7 +1421,7 @@ pub async fn setze_mitgliedschaft(
         // dem bestehenden „Ziel-Benutzer unbekannt"-Pfad in `mitglied_setzen`).
         return Err(AppError::NotFound);
     }
-    Ok(())
+    Ok(false)
 }
 
 /// Entfernt eine Mitgliedschaft (idempotent).
