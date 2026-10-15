@@ -304,7 +304,7 @@ pub async fn kennzahlen_aus(
              UNION ALL \
              SELECT e.aktueller_br_id AS br_id, f.id AS ef_id \
              FROM einsatz_einheit e JOIN einsatz_fahrzeug f ON f.einheit_id = e.id \
-             WHERE e.einsatz_id = ?1 AND e.aktueller_br_id IS NOT NULL \
+             WHERE e.einsatz_id = ?1 AND f.einsatz_id = ?1 AND e.aktueller_br_id IS NOT NULL \
                AND e.aufgeloest_at IS NULL AND f.beendet_at IS NULL \
                AND (?2 IS NULL OR e.aktueller_br_id = ?2)) \
          GROUP BY br_id",
