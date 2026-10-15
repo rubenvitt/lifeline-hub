@@ -18,7 +18,7 @@ async function etbInhalte(page: Page, einsatzId: string): Promise<string[]> {
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
-async function seede(page: Page, bezeichnung: string, menge: number) {
+async function seed(page: Page, bezeichnung: string, menge: number) {
   const { id } = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Materialliste ${Date.now()}`,
   });
@@ -41,28 +41,28 @@ test.beforeEach(async ({ page }) => {
 test('Ort setzen und wechseln: ein Ort je Posten, das ETB nennt den vorherigen (LLH-1224)', async ({
   page,
 }) => {
-  const einsatzId = await seede(page, 'Wolldecke', 20);
+  const einsatzId = await seed(page, 'Wolldecke', 20);
   await page.goto(`/einsaetze/${einsatzId}/material`);
   await expect(liste(page).getByText('Wolldecke')).toBeVisible();
   const ort = liste(page).getByTestId('material-ort');
 
   // Die eine Ortsangabe (LLH-1225 D3): wählen, dann „Speichern“.
-  const ortWaehlen = async (option: string) => {
+  const selectOrt = async (option: string) => {
     await liste(page).getByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }).click();
     await page.getByRole('combobox', { name: 'Ort zu Wolldecke' }).click();
     await page.getByRole('option', { name: option }).click();
     await page.getByRole('button', { name: 'Ort zu Wolldecke speichern' }).click();
   };
-  await ortWaehlen('Staffel A');
+  await selectOrt('Staffel A');
   await expect(ort).toHaveText(/Staffel A/);
 
   // An die UHS: der Posten wechselt, die Einheit geht.
-  await ortWaehlen('UHS Turnhalle');
+  await selectOrt('UHS Turnhalle');
   await expect(ort).toContainText('UHS Turnhalle');
   await expect(ort).not.toContainText('Staffel A');
 
   // Zurück an eine Einheit: die UHS geht.
-  await ortWaehlen('Staffel B');
+  await selectOrt('Staffel B');
   await expect(ort).toContainText('Staffel B');
   await expect(ort).not.toContainText('Turnhalle');
 
@@ -78,7 +78,7 @@ test('Ort setzen und wechseln: ein Ort je Posten, das ETB nennt den vorherigen (
 });
 
 test('eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen', async ({ page }) => {
-  const einsatzId = await seede(page, 'Feldbeten', 50);
+  const einsatzId = await seed(page, 'Feldbeten', 50);
   await page.goto(`/einsaetze/${einsatzId}/material`);
   await expect(liste(page).getByText('Feldbeten')).toBeVisible();
 

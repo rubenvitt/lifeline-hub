@@ -546,7 +546,7 @@ export default function MaterialPage() {
     );
     return eintraege;
   };
-  const oeffneAusgabe = (em: EinsatzMaterial, modus: AusgabeModus) => {
+  const openAusgabe = (em: EinsatzMaterial, modus: AusgabeModus) => {
     ausgabeMutation.reset();
     setAusgabeFuer({ posten: em, modus });
   };
@@ -558,7 +558,7 @@ export default function MaterialPage() {
       mengeMutation.reset();
       setMengeFuer(em);
     } else if (key === 'zuruecknehmen') {
-      oeffneAusgabe(em, 'zuruecknehmen');
+      openAusgabe(em, 'zuruecknehmen');
     } else if (key === 'art') {
       artMutation.mutate({ emId: em.id, art: em.art === 'geraet' ? 'verbrauchsgut' : 'geraet' });
     } else if (key === 'aufteilen') {
@@ -725,7 +725,7 @@ export default function MaterialPage() {
             <Button
               aria-label={`${em.bezeichnung} ausgeben`}
               disabled={isZeileBusy(em.id)}
-              onClick={() => oeffneAusgabe(em, 'ausgeben')}
+              onClick={() => openAusgabe(em, 'ausgeben')}
             >
               Ausgeben
             </Button>

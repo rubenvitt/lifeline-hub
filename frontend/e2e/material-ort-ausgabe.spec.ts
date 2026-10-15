@@ -20,7 +20,7 @@ async function etbInhalte(page: Page, einsatzId: string): Promise<string[]> {
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
-async function seede(page: Page) {
+async function seed(page: Page) {
   const { id } = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Material Ort Ausgabe ${Date.now()}`,
   });
@@ -48,7 +48,7 @@ test.beforeEach(async ({ page }) => {
 test('ausgeben, zurücknehmen und den Ort wechseln: Rest, ETB und Gruppe folgen (LLH-1225)', async ({
   page,
 }) => {
-  const einsatzId = await seede(page);
+  const einsatzId = await seed(page);
   await page.goto(`/einsaetze/${einsatzId}/material`);
   const zeile = liste(page).locator('[data-row-key]').filter({ hasText: 'Wolldecke' });
   await expect(zeile.getByText('50', { exact: true })).toBeVisible();

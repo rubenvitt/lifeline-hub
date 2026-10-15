@@ -38,7 +38,7 @@ function kontext(freigaben?: ModulFreigaben, namen = true): MaterialOrtKontext {
   };
 }
 
-function zeige(
+function renderAngabe(
   p: {
     ort?: MaterialOrtRef | null;
     darfSchreiben?: boolean;
@@ -85,7 +85,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('ohne Leserecht „zugeordnet“, ohne Ort „ohne Ort“, nie ein Strich', () => {
-    zeige({
+    renderAngabe({
       ort: { art: 'einheit', id: 3 },
       darfSchreiben: false,
       kontext: kontext(undefined, false),
@@ -95,12 +95,12 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('ohne Ort und ohne Schreibrecht: „ohne Ort“', () => {
-    zeige({ darfSchreiben: false });
+    renderAngabe({ darfSchreiben: false });
     expect(screen.getByTestId('material-ort')).toHaveTextContent(/^ohne Ort$/);
   });
 
   it('EINE Angabe: der Auslöser nennt den Ort, auch „ohne Ort“', () => {
-    zeige({ ort: { art: 'uhs', id: 7 } });
+    renderAngabe({ ort: { art: 'uhs', id: 7 } });
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.getByRole('button', { name: `${NAME} bearbeiten` })).toHaveTextContent(
       'UHS Turnhalle',
@@ -108,7 +108,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('Verlassen ohne Speichern sendet nichts; „Speichern“ sendet das Ziel', async () => {
-    const { onSpeichern } = zeige({ ort: { art: 'einheit', id: 1 } });
+    const { onSpeichern } = renderAngabe({ ort: { art: 'einheit', id: 1 } });
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
     await waehle(NAME, 'UHS Turnhalle');
     fireEvent.blur(screen.getByRole('combobox', { name: NAME }));
@@ -119,7 +119,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('Enter sendet; „ohne Ort“ löst', async () => {
-    const { onSpeichern } = zeige({ ort: { art: 'bereitstellungsraum', id: 6 } });
+    const { onSpeichern } = renderAngabe({ ort: { art: 'bereitstellungsraum', id: 6 } });
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
     await waehle(NAME, 'ohne Ort');
     fireEvent.submit(screen.getByRole('combobox', { name: NAME }).closest('form')!);
@@ -127,7 +127,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('bietet je Ortsart eine Gruppe; ohne Leserecht auf ein Modul fehlt seine', async () => {
-    zeige({
+    renderAngabe({
       kontext: kontext({ bereitstellungsraeume: { zugriff: false } } as unknown as ModulFreigaben),
     });
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
@@ -148,7 +148,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
   });
 
   it('ein aufgelöster aktueller Ort steht gesperrt mit Namen in der Auswahl', async () => {
-    zeige({ ort: { art: 'uhs', id: 9 } });
+    renderAngabe({ ort: { art: 'uhs', id: 9 } });
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
     await oeffne(NAME);
     expect(optionenVon(NAME, '-disabled')).toEqual(['UHS Zelt Nord']);
@@ -156,7 +156,7 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
 
   it('eine Ablehnung steht an der Angabe', async () => {
     const onSpeichern = vi.fn().mockRejectedValue(new ApiError(422, 'UHS ist aufgelöst'));
-    zeige({ onSpeichern });
+    renderAngabe({ onSpeichern });
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
     await waehle(NAME, 'UHS Turnhalle');
     await userEvent.click(screen.getByRole('button', { name: `${NAME} speichern` }));

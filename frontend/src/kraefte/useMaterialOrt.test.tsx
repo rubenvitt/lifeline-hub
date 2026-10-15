@@ -22,7 +22,7 @@ const posten = (ort: Partial<Record<string, number>> = {}) => ({
   ...ort,
 });
 
-function starte() {
+function renderSetOrt() {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
     http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
@@ -55,21 +55,21 @@ describe('useMaterialOrt (LLH-1225 D2)', () => {
   ];
   for (const [name, em, ziel, koerper] of faelle) {
     it(`schickt den Körper des Ortswechsels ${name} an die Disposition`, async () => {
-      const { setOrt, gesendet } = starte();
+      const { setOrt, gesendet } = renderSetOrt();
       await setOrt(em, ziel);
       expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/10', body: koerper }]);
     });
   }
 
   it('sendet nichts, wenn der Ort gleich bleibt', async () => {
-    const { setOrt, gesendet } = starte();
+    const { setOrt, gesendet } = renderSetOrt();
     await setOrt(posten({ uhs_id: 7 }), { art: 'uhs', id: 7 });
     await setOrt(posten(), null);
     expect(gesendet).toEqual([]);
   });
 
   it('gleicht Material, Einheiten, UHS, den alten und neuen Ort und das ETB ab', async () => {
-    const { setOrt, keys } = starte();
+    const { setOrt, keys } = renderSetOrt();
     await setOrt(posten({ uhs_id: 7 }), { art: 'bereitstellungsraum', id: 4 });
     const erwartet = [
       einsatzKeys.material(1),
