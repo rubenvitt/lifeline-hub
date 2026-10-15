@@ -100,9 +100,9 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 15. Org-Ebene: Aufnahme und neuer Einsatz (benötigt 1, 2.5) · LLH-1221
 
-- [ ] 15.1 Aufnahme in einen Einsatz meldet `einsatz_aufnahme` an den Aufgenommenen über den Org-Kanal; Rust-Test „Aufnahme außerhalb eines Einsatzes“
-- [ ] 15.2 Anlegen eines Einsatzes meldet `einsatz_neu` an Führungskräfte mit Leserecht, ohne den Anleger; Rust-Test „Neuer Einsatz“
-- [ ] 15.3 Anwenderkapitel zur Einsatzliste nachziehen
+- [x] 15.1 Aufnahme in einen Einsatz meldet `einsatz_aufnahme` an den Aufgenommenen über den Org-Kanal; Rust-Test „Aufnahme außerhalb eines Einsatzes“
+- [x] 15.2 Anlegen eines Einsatzes meldet `einsatz_neu` an Führungskräfte mit Leserecht, ohne den Anleger; Rust-Test „Neuer Einsatz“
+- [x] 15.3 Anwenderkapitel zur Einsatzliste nachziehen
 
 ## 16. Abschluss · LLH-1222
 

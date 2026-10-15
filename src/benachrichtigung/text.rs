@@ -280,6 +280,19 @@ pub async fn bilden(
                 .map(|w| detail_formen(bezug.typ, w))
         }
     };
+    // Die Aufnahme nennt den Einsatz im Titel („Aufgenommen in Hochwasser“, Spec „Aufnahme in
+    // einen Einsatz“); die Detailzeile wiederholte ihn nur. Ohne Bezeichnung bleibt der Titel
+    // der Art.
+    if art == BenachrichtigungArt::EinsatzAufnahme && bezug.typ == BenachrichtigungBezugTyp::Einsatz
+    {
+        if let Some(name) = detail {
+            return Ok(Text {
+                titel: format!("Aufgenommen in {name}"),
+                detail: None,
+                pfad: pfad(einsatz_id, bezug),
+            });
+        }
+    }
     Ok(Text {
         titel: titel(art).to_string(),
         detail,
