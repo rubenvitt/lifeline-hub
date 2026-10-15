@@ -29,7 +29,7 @@ const ANZEIGE_SELECT: &str =
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
-pub async fn laden(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, AppError> {
+pub async fn load(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, AppError> {
     sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{ANZEIGE_SELECT} WHERE n.id = ?"
     )))
@@ -42,7 +42,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, A
 /// Legt eine Nachforderung an und erzeugt im selben Commit den ETB-Eintrag (typ='meldung':
 /// die Nachforderung ist eine ausgehende Anforderung; Pattern B mit beidseitigem Backlink).
 /// Liefert die neue id. `daten` ist vom Handler validiert.
-pub async fn anlegen_tx(
+pub async fn create_tx(
     tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
@@ -110,7 +110,7 @@ pub async fn anlegen_tx(
 }
 
 /// Legt eine Nachforderung an (eigener Commit) und liefert die Anzeige.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,
     ersteller_id: i64,
@@ -118,14 +118,14 @@ pub async fn anlegen(
 ) -> Result<NachforderungAnzeige, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
+    let id = create_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
     tx.commit().await?;
-    laden(pool, id).await
+    load(pool, id).await
 }
 
 /// Listet Nachforderungen eines Einsatzes (optional Status-Filter). Sortierung:
 /// Priorität (sofort→normal), dann neueste Anforderung zuerst, dann id.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     einsatz_id: i64,
     status_filter: Option<&str>,
@@ -147,7 +147,7 @@ pub async fn liste(
 }
 
 /// Cross-Einsatz-Schutz: gehört die Nachforderung zum Einsatz?
-pub async fn gehoert_zu_einsatz(
+pub async fn belongs_to_einsatz(
     pool: &SqlitePool,
     id: i64,
     einsatz_id: i64,
@@ -167,7 +167,7 @@ pub async fn gehoert_zu_einsatz(
 /// die FSM ist back-edge-frei, daher kann der Guard keinen gültigen Übergang fälschlich
 /// abweisen). Liefert `true`, wenn eine Zeile geändert wurde; `false` = Status zwischenzeitlich
 /// geändert. `abgelehnt` läuft über [`lehne_ab`].
-pub async fn setze_status(
+pub async fn update_status(
     pool: &SqlitePool,
     id: i64,
     neuer_status: &str,
@@ -261,7 +261,7 @@ mod tests {
     async fn anlegen_setzt_default_status_und_erzeugt_etb_mit_backlink() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let n = anlegen(&pool, e, b, daten("RTW", "2 RTW zur Verstärkung"))
+        let n = create(&pool, e, b, daten("RTW", "2 RTW zur Verstärkung"))
             .await
             .unwrap();
         assert_eq!(n.status, NachforderungStatus::Angefordert);
@@ -284,18 +284,18 @@ mod tests {
     async fn liste_sortiert_nach_prio_und_filtert_status() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen(&pool, e, b, daten("RTW", "normal")).await.unwrap();
+        create(&pool, e, b, daten("RTW", "normal")).await.unwrap();
         let sofort = NachforderungDaten {
             prioritaet: super::super::PRIO_SOFORT,
             ..daten("SEG", "sofort")
         };
-        anlegen(&pool, e, b, sofort).await.unwrap();
-        let alle = liste(&pool, e, None).await.unwrap();
+        create(&pool, e, b, sofort).await.unwrap();
+        let alle = list(&pool, e, None).await.unwrap();
         assert_eq!(alle.len(), 2);
         assert_eq!(alle[0].bezeichnung, "sofort", "sofort vor normal");
-        let offen = liste(&pool, e, Some("angefordert")).await.unwrap();
+        let offen = list(&pool, e, Some("angefordert")).await.unwrap();
         assert_eq!(offen.len(), 2);
-        assert!(liste(&pool, e, Some("eingetroffen"))
+        assert!(list(&pool, e, Some("eingetroffen"))
             .await
             .unwrap()
             .is_empty());
@@ -305,8 +305,8 @@ mod tests {
     async fn setze_status_schaltet_weiter_und_haelt_zeitstempel() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        assert!(setze_status(
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        assert!(update_status(
             &pool,
             n.id,
             STATUS_ZUGESAGT,
@@ -315,7 +315,7 @@ mod tests {
         )
         .await
         .unwrap());
-        assert!(setze_status(
+        assert!(update_status(
             &pool,
             n.id,
             STATUS_UNTERWEGS,
@@ -324,13 +324,13 @@ mod tests {
         )
         .await
         .unwrap());
-        let nach = laden(&pool, n.id).await.unwrap();
+        let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Unterwegs);
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
         assert_eq!(nach.unterwegs_at.as_deref(), Some("2026-06-12 09:10:00"));
         assert!(nach.ist_offen);
         // eingetroffen → terminal, nicht mehr offen.
-        assert!(setze_status(
+        assert!(update_status(
             &pool,
             n.id,
             STATUS_EINGETROFFEN,
@@ -339,9 +339,9 @@ mod tests {
         )
         .await
         .unwrap());
-        assert!(!laden(&pool, n.id).await.unwrap().ist_offen);
+        assert!(!load(&pool, n.id).await.unwrap().ist_offen);
         // Optimistische Sperre: erneuter Übergang mit veraltetem `erwartet` greift nicht.
-        assert!(!setze_status(
+        assert!(!update_status(
             &pool,
             n.id,
             STATUS_ZUGESAGT,
@@ -356,7 +356,7 @@ mod tests {
     async fn lehne_ab_setzt_grund_und_terminal() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
         assert!(lehne_ab(
             &pool,
             n.id,
@@ -366,7 +366,7 @@ mod tests {
         )
         .await
         .unwrap());
-        let nach = laden(&pool, n.id).await.unwrap();
+        let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Abgelehnt);
         assert_eq!(nach.abgelehnt_grund.as_deref(), Some("keine Reserven"));
         assert!(!nach.ist_offen);
@@ -376,8 +376,8 @@ mod tests {
     async fn gehoert_zu_einsatz_schuetzt_cross_einsatz() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        assert!(gehoert_zu_einsatz(&pool, n.id, e).await.unwrap());
-        assert!(!gehoert_zu_einsatz(&pool, n.id, 999).await.unwrap());
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        assert!(belongs_to_einsatz(&pool, n.id, e).await.unwrap());
+        assert!(!belongs_to_einsatz(&pool, n.id, 999).await.unwrap());
     }
 }

@@ -267,7 +267,7 @@ pub async fn ausgabe_erfassen(
     // Vor der Transaktion: die Prüfung nimmt den Pool, und Nachforderungen werden nicht
     // gelöscht oder umgehängt.
     if let Some(nid) = req.nachforderung_id {
-        if !crate::nachforderung::repo::gehoert_zu_einsatz(&state.pool, nid, einsatz_id).await? {
+        if !crate::nachforderung::repo::belongs_to_einsatz(&state.pool, nid, einsatz_id).await? {
             return Err(AppError::NotFound);
         }
     }
