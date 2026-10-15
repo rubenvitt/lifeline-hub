@@ -94,3 +94,5 @@ export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;
 export const SAMMEL_MAX = 50;
 /** Name der obersten Einheit beim Bilden aus einer Vorlage (LLH-1049). */
 export const EINHEIT_NAME_MAX = 200;
+/** Erwähnungen je Chat-Nachricht im Request (LLH-1220, vor dem Entdoppeln). */
+export const ERWAEHNUNGEN_MAX = 20;

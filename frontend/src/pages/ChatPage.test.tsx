@@ -48,7 +48,7 @@ const nachricht: ChatNachricht = {
   anhaenge: [],
 };
 
-function setup(ungelesen = 0, onGelesen?: () => void) {
+function setup(ungelesen = 0, onGelesen?: () => void, mitglieder: unknown[] = []) {
   const nachrichten: ChatNachricht[] = [nachricht];
   server.use(
     meHandler(nutzer),
@@ -62,6 +62,7 @@ function setup(ungelesen = 0, onGelesen?: () => void) {
       ]),
     ),
     http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+    http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
       onGelesen?.();
       return new HttpResponse(null, { status: 204 });
@@ -95,6 +96,71 @@ describe('ChatPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'Neue Meldung');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
+  });
+
+  it('schickt die Erwähnten eines Mitglieds mit (LLH-1220)', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    let body: unknown;
+    setup(0, undefined, [
+      {
+        benutzer_id: 12,
+        anzeigename: 'Bert Brandt',
+        benutzername: 'bert',
+        einsatz_rolle: 'fuehrungspersonal',
+        zugewiesen_at: '2026-10-15 08:00:00',
+      },
+    ]);
+    server.use(
+      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(
+          { ...nachricht, id: 6, inhalt: '@Bert Brandt hallo' },
+          {
+            status: 201,
+          },
+        );
+      }),
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, '@Ber');
+    await userEvent.click(await screen.findByText('Bert Brandt'));
+    await userEvent.type(feld, 'hallo');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() =>
+      expect(body).toEqual({
+        inhalt: '@Bert Brandt hallo',
+        anhang_ids: [],
+        erwaehnungen: [{ benutzer_id: 12 }],
+      }),
+    );
+  });
+
+  it('öffnet mit ?kanal= den Kanal einer Erwähnung (LLH-1220)', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/chat/kanaele', () =>
+        HttpResponse.json([kanal, { ...kanal, id: 2, name: 'Versorgung' }]),
+      ),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      http.get('/api/einsaetze/7/chat/kanaele/2/nachrichten', () =>
+        HttpResponse.json([{ ...nachricht, id: 9, kanal_id: 2, inhalt: '@S4 bitte klären' }]),
+      ),
+      http.post(
+        '/api/einsaetze/7/chat/kanaele/:kid/gelesen',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/chat?kanal=2' },
+    );
+    expect(await screen.findByText('@S4 bitte klären')).toBeInTheDocument();
+    expect(screen.queryByText('Erste Lage')).not.toBeInTheDocument();
   });
 
   it('behält die Nachricht im Feld, wenn der Server das Senden ablehnt (LFH-795)', async () => {

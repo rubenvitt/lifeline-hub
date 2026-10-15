@@ -93,10 +93,10 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 14. Chat-Erwähnung (D9, benötigt 1, 2) · LLH-1220
 
-- [ ] 14.1 Migration `chat_erwaehnung` anhängen, Nachricht nimmt die Liste der Erwähnungen an (Grenzen nach `src/AGENTS.md`, Eingabegrenzen); Routentests
-- [ ] 14.2 `@`-Vervollständigung aus Mitgliedern und besetzten Funktionen in der Chat-Eingabe; Vitest
-- [ ] 14.3 Erwähnung meldet `chat_erwaehnung` an Nutzer, die den Kanal sehen dürfen; Rust-Test „Erwähnung einer Funktion“
-- [ ] 14.4 Anwenderkapitel `chat` nachziehen
+- [x] 14.1 Migration `chat_erwaehnung` anhängen, Nachricht nimmt die Liste der Erwähnungen an (Grenzen nach `src/AGENTS.md`, Eingabegrenzen); Routentests
+- [x] 14.2 `@`-Vervollständigung aus Mitgliedern und besetzten Funktionen in der Chat-Eingabe; Vitest
+- [x] 14.3 Erwähnung meldet `chat_erwaehnung` an Nutzer, die den Kanal sehen dürfen; Rust-Test „Erwähnung einer Funktion“
+- [x] 14.4 Anwenderkapitel `chat` nachziehen
 
 ## 15. Org-Ebene: Aufnahme und neuer Einsatz (benötigt 1, 2.5) · LLH-1221
 

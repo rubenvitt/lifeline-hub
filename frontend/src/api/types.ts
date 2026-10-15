@@ -407,6 +407,11 @@ export type ChatKanal = S['ChatKanalAnzeige'];
 export type Anhang = S['AnhangAnzeige'];
 export type ChatNachricht = S['ChatNachrichtAnzeige'];
 export type BezugTyp = S['BezugTyp'];
+/**
+ * Eine Erwähnung beim Senden einer Nachricht (LLH-1220, handgepflegt wie alle Request-DTOs): ein
+ * Mitglied oder eine Führungsfunktion. Der Text trägt nur `@Anzeige`.
+ */
+export type ChatErwaehnung = { benutzer_id: number } | { funktion: Fuehrungsfunktion };
 
 // ============================== E‑5 Schäden ==============================
 export type SchadenStatus = S['SchadenStatus'];
