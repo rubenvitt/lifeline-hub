@@ -15,14 +15,18 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep material`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   material.png              frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx,
+ *   material.png              frontend/src/pages/MaterialPage.tsx (Gruppierung „Nach Ort“, Mengenzelle
+ *                             mit „Ausgeben“), frontend/src/components/Datensicht.tsx,
+ *                             frontend/src/components/instrument/Segmentleiste.tsx,
  *                             frontend/src/kraefte/MaterialVerdichtung.tsx,
- *                             frontend/src/kraefte/MaterialOrt.tsx,
- *                             frontend/src/kraefte/EinheitAngabe.tsx,
+ *                             frontend/src/kraefte/MaterialOrtAngabe.tsx,
+ *                             frontend/src/kraefte/materialOrtWahl.ts,
  *                             frontend/src/kraefte/kraeftebaumKern.ts
- *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“)
+ *   material-ausgeben.png     frontend/src/kraefte/MaterialAusgabeModal.tsx (Dialog „… ausgeben“)
+ *   material-disponieren.png  frontend/src/pages/MaterialPage.tsx (Dialog „Material disponieren“,
+ *                             Feld „Ort“ aus frontend/src/kraefte/materialOrtWahl.ts)
  *   adhoc-material.png        frontend/src/pages/MaterialPage.tsx (Dialog „Ad-hoc-Material ohne
- *                             Stammeintrag“)
+ *                             Stammeintrag“ mit Feld „Art“)
  *   aus-dem-einsatz.png       frontend/src/kraefte/EntlassenBlock.tsx (Block „Aus dem Einsatz
  *                             genommen“ unter der Liste)
  *   angaben-aendern.png       frontend/src/kraefte/MaterialAngabenModal.tsx (Dialog „Angaben zu …
@@ -32,9 +36,9 @@ import {
  * Demo-Lücke (D3): die Demo-Daten tragen Material nur im Stamm, keines ist im Einsatz. Die Spec
  * disponiert drei Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
  * dem Einsatz genommen“ disponiert sie einen weiteren Ad-hoc-Posten und nimmt ihn wieder heraus
- * (LLH-1079 Teil II). Für die Spalte „Ort“ (LLH-1093) ordnet sie den Sanitätsrucksack der ersten
- * Einheit des Demo-Einsatzes zu und verortet ihn an der ersten geplanten oder aktiven UHS; die
- * Spende-Decken kommen an dieselbe Einheit.
+ * (LLH-1079 Teil II). Für die Gruppierung „Nach Ort“ (LLH-1225) liegt der Sanitätsrucksack an der
+ * ersten geplanten oder aktiven UHS und die Spende-Decken bei der ersten Einheit des
+ * Demo-Einsatzes, beides über den einen Ort-Weg (PATCH der Disposition).
  */
 
 const KAPITEL = 'material';
@@ -92,7 +96,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { status: 'im_einsatz' });
       // Ausgabe (LLH-1224 D4): 20 von 50 Decken sind ausgegeben, die Menge zeigt den Rest.
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
-      // Ein Ort je Posten (LLH-1224 D6): Einheit über den Einheiten-Weg, UHS über den PATCH.
+      // Ein Ort je Posten (LLH-1224 D6), gesetzt über den einen Weg (LLH-1225 D2).
       const einheiten = (await (
         await api.get(`/api/einsaetze/${demo.id}/einheiten`)
       ).json()) as Einheit[];
@@ -103,11 +107,7 @@ test.describe(KAPITEL, () => {
         (u) => (u.status === 'geplant' || u.status === 'aktiv') && !u.storniert_at,
       );
       expect(uhs, 'Demo-UHS').toBeDefined();
-      await fuelle(
-        api,
-        'put',
-        `/api/einsaetze/${demo.id}/einheiten/${einheit!.id}/material/${decken.id}`,
-      );
+      await fuelle(api, 'patch', `${pfad}/${decken.id}`, { einheit_id: einheit!.id });
       await fuelle(api, 'patch', `${pfad}/${rucksack.id}`, { uhs_id: uhs!.id });
       const pavillon = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
@@ -133,6 +133,7 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/material`);
+    await expect(page.getByRole('radio', { name: 'Nach Ort' })).toBeChecked();
     await page.getByRole('button', { name: 'Material disponieren' }).click();
     const dialog = page.getByRole('dialog', { name: 'Material disponieren' });
     // Demo-Stammdaten stehen mit Marke in eigener Gruppe; ihre Option trägt keinen Titel, der
@@ -145,6 +146,15 @@ test.describe(KAPITEL, () => {
     // Ein Gerät steht je Stück im Einsatz (LLH-1224 D2): die Menge bleibt 1 und gesperrt.
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeDisabled();
     await expect(dialog.getByText('Ein Gerät steht je Stück im Einsatz')).toBeVisible();
+    // Ort (LLH-1225 D7): die erste Einheit der Auswahl.
+    await dialog.getByRole('combobox', { name: 'Ort' }).click();
+    const orte = await stehendeAuswahl(page);
+    await orte.locator('.ant-select-item-group', { hasText: 'Einheiten' }).waitFor();
+    await orte
+      .locator('.ant-select-item-group:has-text("Einheiten") ~ .ant-select-item-option')
+      .first()
+      .click();
+    await expect(orte).toBeHidden();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'material-disponieren');
@@ -159,9 +169,10 @@ test.describe(KAPITEL, () => {
     const dialog = page.getByRole('dialog', { name: 'Ad-hoc-Material ohne Stammeintrag' });
     await dialog.getByLabel('Bezeichnung').fill('Sandsäcke');
     await dialog.getByRole('spinbutton', { name: 'Menge' }).fill('200');
-    await dialog.getByLabel('Kategorie').fill('Verbrauchsgut');
-    await dialog.getByLabel('Trägerorganisation').fill('THW');
-    await dialog.getByLabel('Trägerorganisation').blur();
+    await dialog.getByLabel('Kategorie').fill('Hochwasser');
+    await dialog.getByLabel('Kategorie').blur();
+    // Art (LLH-1225 D6): die Vorgabe folgt der Menge.
+    await expect(dialog.getByRole('radio', { name: 'Verbrauchsgut' })).toBeChecked();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'adhoc-material');
@@ -187,7 +198,7 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/material`);
     await page.getByRole('button', { name: 'Weitere Aktionen zu Spende-Decken' }).click();
-    await page.getByRole('menuitem', { name: 'Angaben ändern' }).click();
+    await page.getByRole('menuitem', { name: 'Angaben ändern …' }).click();
     const dialog = page.getByRole('dialog', { name: 'Angaben zu Spende-Decken ändern' });
     await expect(dialog.getByLabel('Bezeichnung')).toHaveValue('Spende-Decken');
     await dialog.getByLabel('Trägerorganisation').fill('Kleiderkammer');
@@ -203,12 +214,26 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/material`);
     await page.getByRole('button', { name: 'Weitere Aktionen zu Spende-Decken' }).click();
-    await page.getByRole('menuitem', { name: 'Aufteilen' }).click();
+    await page.getByRole('menuitem', { name: 'Aufteilen …' }).click();
     const dialog = page.getByRole('dialog', { name: 'Spende-Decken aufteilen' });
     await dialog.getByRole('spinbutton', { name: 'Menge abteilen' }).fill('20');
     await expect(dialog.getByText('Danach 30 + 20')).toBeVisible();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(300);
     await fotografiere(dialog, KAPITEL, 'aufteilen');
+  });
+
+  test('Dialog „Ausgeben“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/material`);
+    await page.getByRole('button', { name: 'Spende-Decken ausgeben' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Spende-Decken ausgeben' });
+    await dialog.getByRole('spinbutton', { name: 'Menge ausgeben' }).fill('10');
+    await expect(dialog.getByTestId('ausgabe-danach')).toHaveText('Danach 20 von 50 übrig');
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(300);
+    await fotografiere(dialog, KAPITEL, 'material-ausgeben');
   });
 });

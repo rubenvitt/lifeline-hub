@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrt.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialArtModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/routes/einsatz_einheit.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql]
 ---
 
 ## Überblick
@@ -25,13 +25,17 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
    „Meldebild“ führt ins Meldebild.
 
-   ![Materialliste mit vier Posten; darüber „2 einsatzbereit · 1 im Einsatz · 1 Ausfall“, unter jeder Bezeichnung gedämpft die Kategorie, in der Spalte „Ort“ der Sanitätsrucksack an der „UHS Turnhalle Musterstadt“ und die Spende-Decken beim „Sanitätszug Musterstadt“, in der Spalte „Menge“ „30 von 50 übrig“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
+   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
 
-3. Die Liste ist nach Status gruppiert. In „Bezeichnung, Kategorie, Ort“ suchen oder nach „Ort“
-   und „Status“ filtern. Der Filter „Ort“ kennt „ohne Ort“ und jede Einheit, jedes Fahrzeug, jede
-   UHS und jeden Bereitstellungsraum der Liste. Der Filter „Status“ kennt zusätzlich
-   „aufgebraucht“.
-4. Auf schmaleren Schirmen, auch am Fükw, ist die Spalte „Kategorie“ ausgeblendet; die Kategorie
+3. Die Liste ist nach Ort gruppiert: erst die Einheiten in der Folge des Kräftebaums, dann
+   Fahrzeuge, Unfallhilfsstellen und Bereitstellungsräume, „ohne Ort“ zuletzt. Über der Tabelle
+   steht je Ort die Zahl der Posten, auf schmalen Schirmen über jeder Gruppe. „Nach Status“ im
+   Kopf gruppiert nach den Status, „aufgebraucht“ zuletzt; „Nach Ort“ kehrt zurück. Die Wahl
+   gilt für diesen Einsatz, bis die Seite verlassen wird.
+4. In „Bezeichnung, Kategorie, Ort“ suchen oder nach „Ort“ und „Status“ filtern. Der Filter „Ort“
+   kennt „ohne Ort“ und jede Einheit, jedes Fahrzeug, jede UHS und jeden Bereitstellungsraum der
+   Liste. Der Filter „Status“ kennt zusätzlich „aufgebraucht“.
+5. Auf schmaleren Schirmen, auch am Fükw, ist die Spalte „Kategorie“ ausgeblendet; die Kategorie
    steht dann gedämpft unter der Bezeichnung. „Spalten“ zeigt, wie viele Spalten fehlen, und
    blendet sie wieder ein.
 
@@ -42,61 +46,100 @@ Für Einsatzleitung und Führungspersonal:
 1. „Material disponieren“ wählen.
 2. Unter „Material“ einen Posten wählen und bei einem Verbrauchsgut die „Menge“ eingeben. Bei
    einem Gerät steht die Menge fest auf 1, mit dem Hinweis „Ein Gerät steht je Stück im Einsatz“.
+3. Unter „Ort“ eine Einheit, ein Fahrzeug, eine UHS oder einen Bereitstellungsraum wählen, oder
+   „ohne Ort“ stehen lassen.
 
-   ![Dialog „Material disponieren“ mit dem Feldbettensatz, einem Gerät: die Menge steht gesperrt auf 1, darunter „Ein Gerät steht je Stück im Einsatz“](../bilder/material/material-disponieren.png)
+   ![Dialog „Material disponieren“ mit dem Feldbettensatz, einem Gerät: die Menge steht gesperrt auf 1, darunter „Ein Gerät steht je Stück im Einsatz“, im Feld „Ort“ eine Einheit](../bilder/material/material-disponieren.png)
 
-3. „Disponieren“ wählen, oder „Speichern und nächste“ für den nächsten Posten.
+4. „Disponieren“ wählen, oder „Speichern und nächste“ für den nächsten Posten. Der Ort bleibt
+   dabei stehen, weil eine Anlieferung meist an einen Ort geht.
 
 ### Ad-hoc-Material erfassen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Posten nicht im Materialstamm steht:
 
 1. „Ad-hoc-Material“ wählen.
-2. „Bezeichnung“ und „Menge“ eingeben, bei Bedarf „Kategorie“, „Trägerorganisation“ und unter
-   „Weitere Angaben“ die „Bestandsnummer“.
+2. „Bezeichnung“ und „Menge“ eingeben. Unter „Art“ steht bei Menge 1 „Gerät“, ab Menge 2
+   „Verbrauchsgut“; eine eigene Wahl bleibt stehen, auch wenn sich die Menge danach ändert.
+   „Gerät“ setzt die Menge auf 1 und sperrt sie.
+3. Bei Bedarf „Kategorie“ eingeben und unter „Weitere Angaben“ „Trägerorganisation“,
+   „Bestandsnummer“ und „Ort“.
 
-   ![Dialog „Ad-hoc-Material ohne Stammeintrag“ mit Sandsäcken, Menge 200, Kategorie und Trägerorganisation](../bilder/material/adhoc-material.png)
+   ![Dialog „Ad-hoc-Material ohne Stammeintrag“ mit Sandsäcken, Menge 200, Art „Verbrauchsgut“ und Kategorie](../bilder/material/adhoc-material.png)
 
-3. „Disponieren“ wählen. Mit „Speichern und nächste“ und „Werte behalten“ bleiben Kategorie und
+4. „Disponieren“ wählen. Mit „Speichern und nächste“ und „Werte behalten“ bleiben Kategorie und
    Trägerorganisation für den nächsten Posten stehen.
 
-Ad-hoc-Posten tragen in der Liste die Marke „ad-hoc“. Ein Ad-hoc-Posten mit Menge 1 gilt als
-Gerät, ab Menge 2 als Verbrauchsgut.
+Ad-hoc-Posten tragen in der Liste die Marke „ad-hoc“.
 
 ### Den Ort ändern
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Spalte „Ort“ den Einheitsnamen wählen, oder „Einheit eintragen“, wenn der Posten noch
-   keiner Einheit gehört.
-2. Eine Einheit wählen, oder „keine Einheit“ (erste Wahl), um den Posten von seiner Einheit zu
-   lösen. Die Auswahl ist nach Abschnitt gegliedert, unterstellte Einheiten stehen mit ihrem Pfad.
-3. „Speichern“ wählen. Escape oder „Abbrechen“ lässt den Ort unverändert.
-4. Für die UHS ebenso: den UHS-Namen oder „UHS eintragen“ wählen, eine UHS oder „keine UHS“
-   wählen und speichern. Angeboten werden geplante und aktive UHS; eine aufgelöste UHS, an der
-   der Posten noch steht, steht gesperrt vorn in der Liste.
+1. In der Spalte „Ort“ den Ort des Postens wählen, bei einem Posten ohne Ort „ohne Ort“.
+2. Den neuen Ort wählen. Die Auswahl bietet „ohne Ort“ zuerst, dann je eine Gruppe
+   „Einheiten“, „Fahrzeuge“, „Unfallhilfsstellen“ und „Bereitstellungsräume“; unterstellte
+   Einheiten stehen mit ihrem Pfad. Tippen sucht in der Auswahl.
+3. „Speichern“ wählen oder Enter drücken. Escape, „Abbrechen“ oder ein Klick daneben lässt den Ort
+   unverändert.
 
-Ein Posten liegt an einem Ort: Wer eine UHS einträgt, löst ihn von seiner Einheit, und wer eine
-Einheit einträgt, löst ihn von seiner UHS. Liegt ein Posten auf einem Fahrzeug oder in einem
-Bereitstellungsraum, nennt die Spalte dessen Namen; eine Einheit oder UHS einzutragen, holt ihn
-von dort.
+Angeboten werden laufende Fahrzeuge sowie geplante und aktive UHS und Bereitstellungsräume. Ein
+Ort, der nicht mehr wählbar ist, an dem der Posten aber noch liegt, steht gesperrt vorn in der
+Auswahl. Lehnt die App ab, steht der Grund an der Angabe.
 
-### Menge, Status und Bemerkung ändern
+### Material ausgeben
+
+Für Einsatzleitung und Führungspersonal, wenn von einem Verbrauchsgut etwas ausgeht, etwa Decken
+an Betroffene:
+
+1. In der Spalte „Menge“ „Ausgeben“ wählen.
+2. Unter „Menge ausgeben“ eintragen, wie viel ausgeht, von 1 bis zum Rest. Darunter steht der
+   Stand danach, etwa „Danach 20 von 50 übrig“.
+
+   ![Dialog „Spende-Decken ausgeben“ mit „Menge ausgeben“ 10 und darunter „Danach 20 von 50 übrig“](../bilder/material/material-ausgeben.png)
+
+3. „Ausgeben“ wählen. Die Spalte „Menge“ zeigt den Rest, etwa „20 von 50 übrig“.
+
+Gerechnet wird mit dem Stand beim Öffnen des Dialogs. Ist alles ausgegeben, fehlt „Ausgeben“, und
+der Posten heißt „aufgebraucht“. Ein Gerät zeigt in der Spalte „Menge“ nur „1“.
+
+Eine Ausgabe zurücknehmen, etwa bei einer Fehlbuchung oder wenn Decken zurückkommen:
+
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Ausgabe zurücknehmen …“ wählen.
+2. Unter „Menge zurücknehmen“ eintragen, wie viel zurückkommt, von 1 bis zur Ausgabe.
+3. „Zurücknehmen“ wählen.
+
+Ist nichts ausgegeben, steht der Eintrag gesperrt als „Ausgabe zurücknehmen · nichts
+ausgegeben“.
+
+### Menge und Art ändern
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Bei einem Verbrauchsgut in der Spalte „Menge“ die Zahl wählen, die neue Menge eingeben und mit
-   „Speichern“ oder Enter bestätigen. Verlassen ohne Speichern ändert nichts. Die Menge ist
-   mindestens 1 und nie kleiner als die ausgegebene Menge. Ein Gerät zeigt „1“ ohne Bearbeiten.
-2. In der Spalte „Status“ einen Status wählen. Ein Gerät kennt einsatzbereit, im Einsatz, defekt,
+1. Bei einem Verbrauchsgut in der Zeile „Weitere Aktionen“ öffnen und „Menge ändern …“ wählen.
+2. Unter „Menge“ die neue Gesamtmenge eintragen, mindestens 1 und nie weniger als die
+   ausgegebene Menge, und „Speichern“ wählen.
+3. Die Art eines Ad-hoc-Postens wechselt im selben Menü: „Als Gerät führen“ bei einem
+   Verbrauchsgut, „Als Verbrauchsgut führen“ bei einem Gerät. Der Wechsel gilt sofort.
+
+Ein Verbrauchsgut wird nur mit Menge 1 und ohne Ausgabe ein Gerät; sonst steht der Eintrag
+gesperrt mit dem Grund, etwa „Als Gerät führen · Menge über 1“. Ein Gerät mit „verbraucht“ oder
+„Desinfektion nötig“ wird kein Verbrauchsgut: „Als Verbrauchsgut führen · Status verbraucht“.
+Ein Posten aus dem Materialstamm hat keine Art-Einträge, seine Art steht im Materialstamm.
+
+### Status und Bemerkung ändern
+
+Für Einsatzleitung und Führungspersonal:
+
+1. In der Spalte „Status“ einen Status wählen. Ein Gerät kennt einsatzbereit, im Einsatz, defekt,
    verbraucht und Desinfektion nötig, ein Verbrauchsgut einsatzbereit, im Einsatz und defekt.
-3. In der Spalte „Bemerkung“ „Bemerkung hinzufügen“ wählen und den Text eintragen.
+2. In der Spalte „Bemerkung“ „Bemerkung hinzufügen“ wählen und den Text eintragen.
 
 ### Angaben eines Ad-hoc-Postens korrigieren
 
 Für Einsatzleitung und Führungspersonal, etwa bei einem Tippfehler in der Bezeichnung:
 
-1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Angaben ändern“ wählen.
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Angaben ändern …“ wählen.
 2. „Bezeichnung“, „Kategorie“, „Trägerorganisation“ oder unter „Weitere Angaben“ die
    „Bestandsnummer“ ändern. Ein geleertes Feld löscht die Angabe; die Bezeichnung ist Pflicht.
 
@@ -107,23 +150,11 @@ Für Einsatzleitung und Führungspersonal, etwa bei einem Tippfehler in der Beze
 Bei einem Posten aus dem Materialstamm heißt der Eintrag „Angaben ändern · im Stamm pflegen“ und
 ist gesperrt: seine Angaben stehen im Materialstamm.
 
-### Die Art eines Ad-hoc-Postens ändern
-
-Für Einsatzleitung und Führungspersonal, etwa wenn ein Ad-hoc-Posten mit Menge 1 als Gerät
-angelegt wurde und mehr davon kommt:
-
-1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Art ändern …“ wählen.
-2. Unter „Art“ „Gerät“ oder „Verbrauchsgut“ wählen und beim Verbrauchsgut die „Menge“ eintragen.
-   Ein Gerät hat immer Menge 1; ein Verbrauchsgut mit Ausgabe wird kein Gerät mehr.
-3. „Speichern“ wählen. Das Einsatztagebuch nennt beide Arten.
-
-Ein Posten aus dem Materialstamm hat den Eintrag nicht: seine Art steht im Materialstamm.
-
 ### Einen Posten aufteilen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebraucht wird:
 
-1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Aufteilen“ wählen.
+1. Bei einem Verbrauchsgut in der Zeile „Weitere Aktionen“ öffnen und „Aufteilen …“ wählen.
 2. Unter „Menge abteilen“ die Menge für die neue Zeile eingeben, von 1 bis eins unter der
    Menge und höchstens den Rest, der noch nicht ausgegeben ist. Darunter steht das Ergebnis, etwa
    „Danach 30 + 20“.
@@ -132,8 +163,8 @@ Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebr
 
 3. „Aufteilen“ wählen. Die neue Zeile steht in der Liste; ihren Ort in der Spalte „Ort“ ändern.
 
-Bei Menge 1 heißt der Eintrag „Aufteilen · Menge 1“ und ist gesperrt, bei einem Gerät
-„Aufteilen · Gerät“, bei einem aufgebrauchten Verbrauchsgut „Aufteilen · aufgebraucht“.
+Bleibt nur eins zum Abteilen, heißt der Eintrag „Aufteilen · Rest 1“ und ist gesperrt, bei einem
+aufgebrauchten Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
 
 ### Material aus dem Einsatz nehmen
 
@@ -164,21 +195,23 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten versehentlich disponi
 ### Gerät und Verbrauchsgut
 
 Die Art steht am Materialstamm (Kapitel [Stammdaten](stammdaten.md)) und geht beim Disponieren
-auf den Posten über; eine spätere Änderung am Stamm ändert disponierte Posten nicht.
+auf den Posten über; eine spätere Änderung am Stamm ändert disponierte Posten nicht. Ein
+Ad-hoc-Posten bekommt die Art aus dem Dialog und wechselt sie über das Zeilenmenü.
 
 - **Gerät:** steht je Stück im Einsatz, mit Menge 1 und einem der fünf Status. Wer zwei Tragen
   braucht, disponiert sie zweimal.
 - **Verbrauchsgut:** steht mit seiner Menge im Einsatz und kennt nur einsatzbereit, im Einsatz und
-  defekt. Was davon ausgegeben ist, zeigt die Mengenzelle als Rest, etwa „30 von 50 übrig“. Ist
+  defekt. Was davon ausgegeben ist, zeigt die Mengenzelle als Rest, etwa „30 von 50 übrig“;
+  ohne Ausgabe steht nur die Menge. Ist
   alles ausgegeben, heißt der Posten „aufgebraucht“, in der Farbe von „verbraucht“; das ist kein
   eigener Status, sondern folgt aus der Ausgabe.
 
 ### Ein Ort je Posten
 
 Ein Posten liegt bei einer Einheit, auf einem Fahrzeug, an einer UHS, in einem Bereitstellungsraum
-oder „ohne Ort“, nie an zweien zugleich. Ein neuer Ort löst den bisherigen. Die Einheit wird über
-das Modul [Einheiten](einheiten.md) gespeichert, dasselbe wie die Zuordnung dort. Im UHS-Reiter
-„Material“ bietet „Material zuordnen“ nur Posten ohne Ort an.
+oder „ohne Ort“, nie an zweien zugleich. Ein neuer Ort löst den bisherigen; jede Ortsart wird
+auf demselben Weg gespeichert. Im UHS-Reiter „Material“ bietet „Material zuordnen“ nur Posten ohne
+Ort an.
 
 Endet ein Ort, bleibt der Posten im Einsatz:
 
@@ -248,7 +281,8 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
 - Ort wechseln, auf jedem Weg und für jede Ortsart: „Material «Wolldecke» (×20): Einheit
   «Staffel A» → UHS «Turnhalle»“, beim ersten Ort „ohne Ort → Einheit «Staffel A»“, beim Lösen
   „… → ohne Ort“.
-- Ausgabe ändern: „Material «Wolldecke»: Ausgabe 20 → 30 (Rest 20 von 50)“.
+- Ausgeben und zurücknehmen: „Material «Wolldecke»: Ausgabe 0 → 20 (Rest 30 von 50)“.
+- Art wechseln: „Material «Wolldecke»: Art Gerät → Verbrauchsgut“.
 - Aufteilen: „Material «Wolldecke» aufgeteilt: 50 → 30 + 20“.
 - Angaben ändern: ein Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt.
 
@@ -258,8 +292,9 @@ Eine Bemerkung ändert das Einsatztagebuch nicht.
 
 Lesen darf, wer das Modul Material sieht. Disponieren, ändern, aufteilen, aus dem Einsatz nehmen und
 stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
-[Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit im Ort ändert nur, wer auch das Modul
-Einheiten nutzen darf, die UHS nur, wer das Modul Unfallhilfsstellen nutzen darf; sonst ist der
-jeweilige Teil nur lesbar. Wer ein Modul nicht sieht, liest an seiner Stelle „zugeordnet“.
+[Rechte im Einsatz](rechte-im-einsatz.md)). Der Ort gehört dem Material: Wer Material ändern
+darf, setzt jede Ortsart, auch eine Einheit ohne Recht auf das Modul Einheiten. Wer ein Modul
+nicht sieht, liest an seiner Stelle „zugeordnet“, und die Auswahl bietet diese Ortsart nicht an.
+Ohne Schreibrecht führt der Name des Orts in sein Modul.
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts (Kapitel
 [Ohne Netz](ohne-netz.md)).
