@@ -3212,6 +3212,11 @@ export interface components {
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
+            /**
+             * Format: int64
+             * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
+             */
+            sofortmeldungen_offen: number;
             /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
             stand_at: string;
             uhs: components["schemas"]["LagemonitorUhs"][];
