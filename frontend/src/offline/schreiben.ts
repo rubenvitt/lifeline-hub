@@ -103,6 +103,29 @@ interface SchreibZiel {
 }
 
 /**
+ * Setzt die `client_id` einmal und nimmt den Erfassungszeitpunkt nach der Serveruhr (LFH-705);
+ * `vormerkenMitZeit` schreibt die Kopie mit diesem Zeitpunkt in die Queue, falls keiner
+ * eingetragen ist. Geteilt vom Senden-oder-Vormerken und vom direkten Vormerken (LLH-1032).
+ */
+function vormerkbar<E extends { client_id?: string; zeitpunkt_at?: string }>(
+  benutzerId: number,
+  einsatzId: number,
+  eingabe: E,
+  aktion: (daten: E) => Parameters<typeof schreibaktionEinreihen>[2],
+) {
+  const erfasst = alsBackendZeit(serverJetzt());
+  const daten: E = { ...eingabe, client_id: clientId(eingabe.client_id) };
+  const vormerkenMitZeit = () =>
+    vormerken(
+      benutzerId,
+      einsatzId,
+      aktion({ ...daten, zeitpunkt_at: daten.zeitpunkt_at ?? erfasst }),
+      daten.client_id!,
+    );
+  return { daten, vormerkenMitZeit };
+}
+
+/**
  * Gemeinsamer Ablauf für Schreibvorgänge mit Erfassungszeitpunkt: Stand- und
  * Belegungsmeldungen (LFH-675), Verpflegungsausgaben (LFH-688). Die `client_id` wird EINMAL vor dem
  * Senden gesetzt: Online-Versuch und vorgemerkte Kopie tragen denselben Schlüssel, ein Timeout
@@ -124,15 +147,7 @@ async function mitErfassungszeitOfflineFaehig<
   senden: (daten: E) => Promise<T>,
   aktion: (daten: E) => Parameters<typeof schreibaktionEinreihen>[2],
 ): Promise<OfflineSchreibErgebnis<T>> {
-  const erfasst = alsBackendZeit(serverJetzt());
-  const daten: E = { ...eingabe, client_id: clientId(eingabe.client_id) };
-  const vormerkenMitZeit = () =>
-    vormerken(
-      benutzerId,
-      einsatzId,
-      aktion({ ...daten, zeitpunkt_at: daten.zeitpunkt_at ?? erfasst }),
-      daten.client_id!,
-    );
+  const { daten, vormerkenMitZeit } = vormerkbar(benutzerId, einsatzId, eingabe, aktion);
   if (!navigator.onLine) return vormerkenMitZeit();
   try {
     return { zustand: 'gesendet', daten: await senden(daten) };
@@ -175,6 +190,16 @@ export function erfasseBelegungOfflineFaehig(
   );
 }
 
+/** Queue-Aktion einer Verpflegungsausgabe; die Bezeichnung steht nur in der Anzeige der Queue. */
+function ausgabeAktion(zeitfenster: SchreibZiel) {
+  return (daten: AusgabeEingabe): Parameters<typeof schreibaktionEinreihen>[2] => ({
+    art: 'ausgabe',
+    zeitfenster_id: zeitfenster.id,
+    bezeichnung: zeitfenster.bezeichnung,
+    daten,
+  });
+}
+
 /** Verpflegungsausgabe senden oder mit Erfassungszeitpunkt vormerken (LFH-688). Vorgemerkt gibt
  * es noch keine `ausgabe_id` und damit kein „Rückgängig“. */
 export function erfasseVerpflegungsausgabeOfflineFaehig(
@@ -189,11 +214,23 @@ export function erfasseVerpflegungsausgabeOfflineFaehig(
     eingabe,
     (daten) =>
       erfasseAusgabe(einsatzId, zeitfenster.id, daten, { offlineQueueBenutzerId: benutzerId }),
-    (daten) => ({
-      art: 'ausgabe',
-      zeitfenster_id: zeitfenster.id,
-      bezeichnung: zeitfenster.bezeichnung,
-      daten,
-    }),
+    ausgabeAktion(zeitfenster),
   );
+}
+
+/**
+ * Verpflegungsausgabe OHNE Sendeversuch vormerken (LLH-1032, design.md D5): eine Sammlung, deren
+ * Abschluss keinen Ort mehr für Erfolg oder Ablehnung hat (Wechsel des Zeitfensters, Verlassen der
+ * Ansicht, verborgene Seite). Dieselbe Aktion und `client_id`-Vergabe wie oben, Erfassungszeit nach
+ * der Serveruhr; das Einreihen löst `OFFLINE_QUEUE_EVENT` aus, und `useOfflineSync` sendet sofort,
+ * wenn Netz da ist. Eine Ablehnung landet im Wiederherstellungsbereich. Kein `sendBeacon`: das
+ * umginge `apiSend` (CSRF, Sitzung, Serveruhr).
+ */
+export function merkeVerpflegungsausgabeVor(
+  benutzerId: number,
+  einsatzId: number,
+  zeitfenster: SchreibZiel,
+  eingabe: AusgabeEingabe,
+): Promise<{ zustand: 'vorgemerkt'; client_id: string }> {
+  return vormerkbar(benutzerId, einsatzId, eingabe, ausgabeAktion(zeitfenster)).vormerkenMitZeit();
 }
