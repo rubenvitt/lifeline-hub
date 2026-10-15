@@ -1540,3 +1540,691 @@ async fn sammel_disposition_an_einheit_meldet_den_raum() {
         "{d}"
     );
 }
+
+// ============================== Eintreffen (LLH-1075) ==============================
+
+fn eintreffen_pfad(einsatz: i64, br: i64) -> String {
+    format!("{}/eintreffen", br_pfad(einsatz, br))
+}
+
+async fn eintreffen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage_json(
+        app,
+        "POST",
+        &eintreffen_pfad(einsatz, br),
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+fn unangemeldet_body(funkrufname: &str) -> serde_json::Value {
+    json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": funkrufname}]}})
+}
+
+/// (Belegungen, Zeitachsen-Ereignisse, ETB-Einträge, Einheiten, Fahrzeuge, Meldungen)
+async fn bestand(pool: &sqlx::SqlitePool, e: i64) -> [i64; 6] {
+    let mut z = [0; 6];
+    for (i, t) in [
+        "br_belegung",
+        "einsatz_kraft_zeitachse",
+        "etb_eintrag",
+        "einsatz_einheit",
+        "einsatz_fahrzeug",
+        "meldung",
+    ]
+    .iter()
+    .enumerate()
+    {
+        z[i] = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT COUNT(*) FROM {t} WHERE einsatz_id = ?"
+        )))
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    }
+    z
+}
+
+fn differenz(nachher: [i64; 6], vorher: [i64; 6]) -> [i64; 6] {
+    let mut d = [0; 6];
+    for i in 0..6 {
+        d[i] = nachher[i] - vorher[i];
+    }
+    d
+}
+
+async fn auto_etb_setzen(pool: &sqlx::SqlitePool, e: i64, an: bool) {
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, auto_etb_eintraege) VALUES (?, ?) \
+         ON CONFLICT(einsatz_id) DO UPDATE SET auto_etb_eintraege = excluded.auto_etb_eintraege",
+    )
+    .bind(e)
+    .bind(i64::from(an))
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Spec „Erwartete Einheit trifft ein“: Eintritt, Eintreffen mit Quelle `bereitstellungsraum`,
+/// genau ein ETB „… im BR … eingetroffen“; ein zweites Eintreffen nach Austritt wird ausgelassen.
+#[tokio::test]
+async fn eintreffen_bekannte_einheit_und_zweites_ausgelassen() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "HLF 20 FF Musterstadt").await;
+    let vorher = bestand(&pool, eid).await;
+
+    let (s, v) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zeitachse"], "geschrieben");
+    assert_eq!(v["einheit_id"], einheit);
+    assert_eq!(v["unangemeldet"], false);
+    assert!(v.get("meldung_id").is_none(), "{v}");
+    assert_eq!(v["belegung"]["br_id"], br);
+    assert_eq!(
+        differenz(bestand(&pool, eid).await, vorher),
+        [1, 1, 1, 0, 0, 0]
+    );
+    assert!(etb_inhalte(&app, &cookie, eid)
+        .await
+        .contains(&"HLF 20 FF Musterstadt im BR Sportplatz eingetroffen".to_string()));
+    let quelle: String = sqlx::query_scalar(
+        "SELECT quelle FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = 'eintreffen'",
+    )
+    .bind(einheit)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(quelle, "bereitstellungsraum");
+
+    // Schon in einem Raum → 409, nichts geschrieben.
+    let schule = br_anlegen_und_aktivieren(&app, &cookie, eid, "Schule").await;
+    let vorher = bestand(&pool, eid).await;
+    let (s, _) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        schule,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(bestand(&pool, eid).await, vorher);
+
+    // Nach dem Austritt: Eintritt gelingt, Eintreffen ausgelassen, ETB nennt den Eintritt.
+    belegen(&app, &cookie, eid, br, "einheit", einheit, "austritt").await;
+    let (s, v) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        schule,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zeitachse"], "ausgelassen");
+    let etb = etb_inhalte(&app, &cookie, eid).await;
+    assert!(
+        etb.contains(&"HLF 20 FF Musterstadt tritt in Bereitstellungsraum Schule ein".to_string()),
+        "{etb:?}"
+    );
+    assert_eq!(
+        etb.iter().filter(|t| t.contains("eingetroffen")).count(),
+        1,
+        "{etb:?}"
+    );
+}
+
+/// Körper: weder Kraft noch unangemeldet 400, beides 422, Fremd-Einsatz 404.
+#[tokio::test]
+async fn eintreffen_koerper_und_fremde_kraft() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let andere = common::einsatz_anlegen_mit(&app, &cookie, "Andere Lage").await;
+    let fremde = einheit_bilden(&app, &cookie, andere, "Fremd").await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let vorher = bestand(&pool, eid).await;
+
+    let (s, _) = eintreffen(&app, &cookie, eid, br, json!({})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let mut beides = unangemeldet_body("FL 1");
+    beides["kraft"] = json!({"objekt_typ": "einheit", "objekt_id": fremde});
+    let (s, _) = eintreffen(&app, &cookie, eid, br, beides).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": fremde}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = eintreffen(&app, &cookie, eid, br, unangemeldet_body(&"x".repeat(201))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Funkrufname 201 Zeichen");
+    assert_eq!(bestand(&pool, eid).await, vorher);
+}
+
+/// D5: genau ein ETB-Eintrag je unangemeldeter Buchung — mit Auto-ETB der Eintrag der Meldung,
+/// ohne ein Systemeintrag mit ihrem Inhalt.
+#[tokio::test]
+async fn eintreffen_unangemeldet_ein_etb_eintrag_in_beiden_einstellungen() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+
+    for (an, funkrufname) in [(true, "FL-MUS 1-44-1"), (false, "FL-MUS 1-19-1")] {
+        auto_etb_setzen(&pool, eid, an).await;
+        let vorher = bestand(&pool, eid).await;
+        let system_vorher = etb_inhalte(&app, &cookie, eid).await.len();
+        let (s, v) = eintreffen(
+            &app,
+            &cookie,
+            eid,
+            br,
+            json!({"unangemeldet": {
+                "fahrzeuge": [{"funkrufname": funkrufname, "fahrzeugtyp": "HLF 20",
+                               "traegerorganisation": "FF Musterstadt"}],
+                "staerke": {"fuehrer": 1, "unterfuehrer": 1, "mannschaft": 7},
+                "bemerkung": "nur intern"
+            }}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        assert_eq!(v["unangemeldet"], true);
+        assert!(v["meldung_id"].as_i64().is_some(), "{v}");
+        assert_eq!(v["fahrzeug_ids"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            differenz(bestand(&pool, eid).await, vorher),
+            [1, 1, 1, 1, 1, 1],
+            "Auto-ETB {an}"
+        );
+        let system = etb_inhalte(&app, &cookie, eid).await;
+        assert_eq!(
+            system.len(),
+            system_vorher + usize::from(!an),
+            "Auto-ETB {an}"
+        );
+        let letzter: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? ORDER BY id DESC LIMIT 1",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            letzter.contains("unangemeldet") && letzter.contains("1/1/7"),
+            "{letzter}"
+        );
+        assert!(!letzter.contains("nur intern"), "{letzter}");
+    }
+}
+
+/// D8: Replay mit derselben `client_id` liefert dieselbe Einheit, legt nichts an und meldet die
+/// Einsatzleitung nicht doppelt; nach Auflösen des Raums und nach Einsatzabschluss weiter 201.
+#[tokio::test]
+async fn eintreffen_replay_nach_aufloesen_und_abschluss() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let schule = br_anlegen_und_aktivieren(&app, &cookie, eid, "Schule").await;
+    let mut body = unangemeldet_body("FL-MUS 1-44-1");
+    body["client_id"] = json!("a1");
+
+    let (s, erst) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{erst}");
+    let nach_erst = bestand(&pool, eid).await;
+    let (s, zweit) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{zweit}");
+    assert_eq!(zweit, erst, "Replay liefert dasselbe Ergebnis");
+    assert_eq!(bestand(&pool, eid).await, nach_erst);
+
+    // Dieselbe client_id an einem anderen Raum → 422.
+    let (s, _) = eintreffen(&app, &cookie, eid, schule, body.clone()).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Raum aufgelöst: Replay weiter 201.
+    sqlx::query("UPDATE bereitstellungsraum SET status = 'aufgeloest' WHERE id = ?")
+        .bind(br)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, dritt) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{dritt}");
+    assert_eq!(dritt["einheit_id"], erst["einheit_id"]);
+
+    // Einsatz abgeschlossen: Replay 201, neue Erfassung 409.
+    sqlx::query(
+        "UPDATE einsatz SET status = 'abgeschlossen', \
+         abgeschlossen_at = strftime('%Y-%m-%d %H:%M:%S','now') WHERE id = ?",
+    )
+    .bind(eid)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, viert) = eintreffen(&app, &cookie, eid, br, body).await;
+    assert_eq!(s, StatusCode::CREATED, "{viert}");
+    assert_eq!(viert["einheit_id"], erst["einheit_id"]);
+    let mut neu = unangemeldet_body("FL-MUS 1-19-1");
+    neu["client_id"] = json!("a2");
+    let (s, _) = eintreffen(&app, &cookie, eid, schule, neu).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(bestand(&pool, eid).await, nach_erst);
+}
+
+/// D8: Grenzen der Offline-Felder und die Kopfzeile der Warteschlange.
+#[tokio::test]
+async fn eintreffen_offline_felder() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+    let vorher = bestand(&pool, eid).await;
+
+    let mut body = json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}});
+    body["client_id"] = json!("c".repeat(65));
+    let (s, _) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "client_id 65 Zeichen");
+
+    body["client_id"] = json!("k1");
+    let zukunft = (chrono::Utc::now() + chrono::Duration::seconds(65))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    body["zeitpunkt_at"] = json!(zukunft);
+    let (s, _) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
+    // Mehr als 60 s voraus (65 s: die Sekunde des Formats und die Laufzeit liegen dazwischen).
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt +65 s");
+
+    let (s, _) = common::anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &eintreffen_pfad(eid, br),
+        &cookie,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}).to_string()),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED, "fremde Kopfzeile");
+    assert_eq!(bestand(&pool, eid).await, vorher);
+
+    // Vorgemerkter Zeitpunkt gilt für Belegung und Eintreffen; der Replay meldet `zeitachse`
+    // wie die Erstantwort.
+    body["zeitpunkt_at"] = json!("2026-05-28 14:12:00");
+    let (s, erst) = common::anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &eintreffen_pfad(eid, br),
+        &cookie,
+        Some(&body.to_string()),
+        admin_id(&pool).await,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erst}");
+    assert_eq!(erst["belegung"]["zeitpunkt_at"], "2026-05-28 14:12:00");
+    let at: String = sqlx::query_scalar(
+        "SELECT zeitpunkt_at FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = 'eintreffen'",
+    )
+    .bind(einheit)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(at, "2026-05-28 14:12:00");
+    let (s, zweit) = eintreffen(&app, &cookie, eid, br, body).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(zweit, erst);
+    assert_eq!(zweit["zeitachse"], "geschrieben");
+}
+
+/// D12/Spec „Einsatzleitung erfährt es“: „Neue Meldung“ an die Einsatzleitung genau einmal, auch
+/// beim Replay; die Meldung nennt Raum und Abschnitt.
+#[tokio::test]
+async fn eintreffen_unangemeldet_benachrichtigt_einsatzleitung_einmal() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let elke = benutzer_anlegen(&app, &admin, "elkeleiter", "keine").await;
+    rolle_setzen(&app, &admin, eid, elke, "fuehrungspersonal").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(&json!({"name": "Elke Leiter", "benutzer_id": elke})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/personal"),
+        &admin,
+        Some(&json!({"personal_id": v["id"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ep = v["id"].as_i64().unwrap();
+    let geaendert = sqlx::query(
+        "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_art = 'personal', \
+             einsatzleiter_personal_id = ?, einsatzleiter_name = 'Elke', \
+             einsatzleiter_seit = '2026-01-01 00:00:00' WHERE einsatz_id = ?",
+    )
+    .bind(ep)
+    .bind(eid)
+    .execute(&pool)
+    .await
+    .unwrap()
+    .rows_affected();
+    if geaendert == 0 {
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, einsatzleiter_art, \
+                 einsatzleiter_personal_id, einsatzleiter_name, einsatzleiter_seit) \
+             VALUES (?, 'personal', ?, 'Elke', '2026-01-01 00:00:00')",
+        )
+        .bind(eid)
+        .bind(ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &admin,
+        Some(&json!({"bezeichnung": "Sportplatz", "abschnitt_id": nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let br = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/status", br_pfad(eid, br)),
+        &admin,
+        Some(&json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let mut body = unangemeldet_body("FL-MUS 1-44-1");
+    body["client_id"] = json!("b1");
+    for _ in 0..2 {
+        let (s, v) = eintreffen(&app, &admin, eid, br, body.clone()).await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let meldung_id: i64 = sqlx::query_scalar("SELECT id FROM meldung WHERE einsatz_id = ?")
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let zeilen: Vec<(i64, String, String, i64)> = sqlx::query_as(
+        "SELECT benutzer_id, art, bezug_typ, bezug_id FROM benachrichtigung ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeilen,
+        vec![(
+            elke,
+            "meldung".to_string(),
+            "meldung".to_string(),
+            meldung_id
+        )]
+    );
+    let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM meldung WHERE id = ?")
+        .bind(meldung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(
+        inhalt.contains("BR Sportplatz") && inhalt.contains("Abschnitt Nord"),
+        "{inhalt}"
+    );
+}
+
+/// D12: der Hub empfängt `bereitstellungsraum`, `einheit` und für eine bekannte Einheit mit
+/// Besatzung `personal` je Person; bei unangemeldet auch `fahrzeug` und `meldung`.
+#[tokio::test]
+async fn eintreffen_live() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+    let anna = common::stammpersonal_disponieren(&app, &cookie, eid, "Anna").await;
+    sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+        .bind(einheit)
+        .bind(anna)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let mut rx = live.abonniere(eid);
+    let (s, _) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let mut gesehen = objekt_ereignisse(
+        &mut rx,
+        &[
+            ("bereitstellungsraum", "br_id"),
+            ("einheit", "einheit_id"),
+            ("personal", "personal_id"),
+        ],
+    );
+    gesehen.sort();
+    assert_eq!(
+        gesehen,
+        vec![
+            ("bereitstellungsraum".to_string(), br),
+            ("einheit".to_string(), einheit),
+            ("personal".to_string(), anna),
+        ]
+    );
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = eintreffen(&app, &cookie, eid, br, unangemeldet_body("FL 1")).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mut tags = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        tags.push(n.event.as_str().to_string());
+    }
+    for tag in [
+        "bereitstellungsraum",
+        "einheit",
+        "fahrzeug",
+        "meldung",
+        "etb",
+    ] {
+        assert!(tags.iter().any(|t| t == tag), "{tag} fehlt: {tags:?}");
+    }
+}
+
+/// AK „alles oder nichts“ (D2): scheitert der Belegungseintrag nach dem Anlegen der Einheit oder
+/// der ETB-Eintrag als letzter Schritt (mit und ohne Auto-ETB), bleibt nichts bestehen.
+#[tokio::test]
+async fn eintreffen_alles_oder_nichts() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let vorher = bestand(&pool, eid).await;
+
+    sqlx::query(
+        "CREATE TRIGGER belegung_klemmt BEFORE INSERT ON br_belegung \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler: Belegung'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, v) = eintreffen(&app, &cookie, eid, br, unangemeldet_body("FL 1")).await;
+    assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR, "{v}");
+    assert_eq!(bestand(&pool, eid).await, vorher);
+    sqlx::query("DROP TRIGGER belegung_klemmt")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    sqlx::query(
+        "CREATE TRIGGER etb_klemmt BEFORE INSERT ON etb_eintrag \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler: ETB'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    for an in [true, false] {
+        auto_etb_setzen(&pool, eid, an).await;
+        let (s, v) = eintreffen(&app, &cookie, eid, br, unangemeldet_body("FL 2")).await;
+        assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR, "Auto-ETB {an}: {v}");
+        assert_eq!(bestand(&pool, eid).await, vorher, "Auto-ETB {an}");
+    }
+    let einheit = einheit_bilden_ohne_etb(&pool, eid).await;
+    let vorher = bestand(&pool, eid).await;
+    let (s, _) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(bestand(&pool, eid).await, vorher, "bekannte Kraft");
+}
+
+async fn einheit_bilden_ohne_etb(pool: &sqlx::SqlitePool, eid: i64) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Raum geplant oder storniert 422; ohne Recht am Modul Einheiten 403 und nichts angelegt;
+/// Beobachter 403; eine bekannte Kraft braucht das Recht Einheiten nicht.
+#[tokio::test]
+async fn eintreffen_raum_und_rechte() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &admin,
+        Some(&json!({"bezeichnung": "Geplant"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let geplant = v["id"].as_i64().unwrap();
+    let storniert = br_anlegen_und_aktivieren(&app, &admin, eid, "Storniert").await;
+    let (s, _) = anfrage_json(&app, "DELETE", &br_pfad(eid, storniert), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let br = br_anlegen_und_aktivieren(&app, &admin, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &admin, eid, "HLF 20").await;
+    let vorher = bestand(&pool, eid).await;
+    for raum in [geplant, storniert] {
+        let (s, _) = eintreffen(&app, &admin, eid, raum, unangemeldet_body("FL 1")).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, frieda, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    for modul in ["einheiten", "fahrzeuge"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &admin,
+            Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        let (s, _) = eintreffen(&app, &frieda, eid, br, unangemeldet_body("FL 1")).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "ohne {modul}");
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &admin,
+            Some(&json!({"sichtbar": true, "benoetigte_rolle": null})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, eid, beob, "beobachter").await;
+    let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, _) = eintreffen(
+        &app,
+        &beob,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Beobachter");
+    assert_eq!(bestand(&pool, eid).await, vorher);
+
+    // Eine bekannte Kraft verlangt nur das BR-Recht.
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/modul-overrides/einheiten"),
+        &admin,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = eintreffen(
+        &app,
+        &frieda,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
