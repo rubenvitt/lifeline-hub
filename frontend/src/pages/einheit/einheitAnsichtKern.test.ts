@@ -64,7 +64,6 @@ const ALLES: EinheitRechte = {
   canZuordnenFahrzeugEinsatz: true,
   canZuordnenFahrzeugStamm: true,
   canEditBesatzung: true,
-  canEditMaterial: true,
   showMaterialAuswahl: true,
   hasPersonalLink: true,
   hasFahrzeugLink: true,
@@ -113,10 +112,9 @@ describe('buildEinheitRechte (design.md D6)', () => {
     });
   });
 
-  it('Material gesperrt: Zuordnen, Lösen und Ausgeben fallen weg, die Auswahl steht gesperrt', () => {
+  it('Material gesperrt: keine Materialliste, die Auswahl steht gesperrt (Bedienung fällt weg)', () => {
     expect(buildEinheitRechte(true, freigaben(['material']))).toEqual({
       ...ALLES,
-      canEditMaterial: false,
       hasMaterialListe: false,
     });
   });
@@ -126,7 +124,6 @@ describe('buildEinheitRechte (design.md D6)', () => {
     expect(buildEinheitRechte(true, freigaben(['einheiten']))).toEqual({
       ...Object.fromEntries(Object.keys(ALLES).map((k) => [k, false])),
       canEditBesatzung: true,
-      canEditMaterial: true,
       showMaterialAuswahl: true,
       hasPersonalLink: true,
       hasFahrzeugLink: true,

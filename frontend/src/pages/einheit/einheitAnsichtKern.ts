@@ -77,11 +77,11 @@ export interface EinheitRechte {
   /** Schreiben + Fahrzeuge: „Auf <Funkrufname>“, „Vom Fahrzeug lösen“, FMS-Status. */
   canEditBesatzung: boolean;
   /**
-   * Schreiben + Material: „Material zuordnen …“, „Aus Einheit lösen“ und „Ausgeben“ (LLH-1225 D9:
-   * der Ort gehört dem Material, das Einheitenrecht zählt dafür nicht).
+   * Schreiben: „Material zuordnen …“ steht, ohne Freigabe Material gesperrt mit Grund. Bedient
+   * („Material zuordnen …“, „Aus Einheit lösen“, „Ausgeben“) wird nur zusammen mit
+   * `hasMaterialListe`, das prüft der Baustein `MaterialAmOrt` (LLH-1225 D9: der Ort gehört dem
+   * Material, das Einheitenrecht zählt dafür nicht).
    */
-  canEditMaterial: boolean;
-  /** Schreiben: „Material zuordnen …“ steht, ohne Freigabe Material gesperrt mit Grund. */
   showMaterialAuswahl: boolean;
   /** Freigabe Personal: der Name einer Person als Link. */
   hasPersonalLink: boolean;
@@ -117,7 +117,6 @@ export function buildEinheitRechte(
     canZuordnenFahrzeugEinsatz: einheiten && fahrzeuge,
     canZuordnenFahrzeugStamm: einheiten && fahrzeuge,
     canEditBesatzung: darfSchreiben && fahrzeuge,
-    canEditMaterial: darfSchreiben && isOffen('material'),
     showMaterialAuswahl: darfSchreiben,
     hasPersonalLink: personal,
     hasFahrzeugLink: fahrzeuge,
