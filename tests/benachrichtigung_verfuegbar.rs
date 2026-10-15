@@ -48,6 +48,12 @@ async fn welt() -> Welt {
         assert_eq!(s, StatusCode::OK, "{v}");
         ids.push(id);
     }
+    // Die Aufnahmen oben melden `einsatz_aufnahme` (tasks.md 15.1, `tests/benachrichtigung_org.rs`);
+    // die Tests hier beginnen mit leerer Tabelle.
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
     Welt {
         app,
         pool,
