@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-nicht-erreichbar"
+description = "Enables the nicht_erreichbar command without any pre-configured scope."
+commands.allow = ["nicht_erreichbar"]
+
+[[permission]]
+identifier = "deny-nicht-erreichbar"
+description = "Denies the nicht_erreichbar command without any pre-configured scope."
+commands.deny = ["nicht_erreichbar"]
