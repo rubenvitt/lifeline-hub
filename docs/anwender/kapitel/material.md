@@ -163,8 +163,8 @@ Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebr
 
 3. „Aufteilen“ wählen. Die neue Zeile steht in der Liste; ihren Ort in der Spalte „Ort“ ändern.
 
-Bleibt nur eins zum Abteilen, heißt der Eintrag „Aufteilen · Rest 1“ und ist gesperrt, bei einem
-aufgebrauchten Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
+Bei Menge 1 heißt der Eintrag „Aufteilen · Rest 1“ und ist gesperrt, bei einem aufgebrauchten
+Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
 
 ### Material aus dem Einsatz nehmen
 
