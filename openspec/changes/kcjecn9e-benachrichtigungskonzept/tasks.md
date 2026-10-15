@@ -27,12 +27,12 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 3. Bestehende Alarme auf den neuen Weg (benötigt 1, 2) · LLH-1209
 
-- [ ] 3.1 Sofortmeldung und Eskalation melden über `melden` (Erfasser ausgenommen, Eskalation ohne Auslöser); Rust-Tests „Neue Sofortmeldung“, „Eskalation“, „Eigene Sofortmeldung“
-- [ ] 3.2 Überfälliger Auftrag an Auftraggeber und nicht quittierende Empfänger; Rust-Tests „Auftrag an S2 überfällig“, „Empfänger hat quittiert“
-- [ ] 3.3 Fällige Erinnerung an die Empfängerfunktion, sonst den Ersteller; Rust-Tests „Erinnerung an S1“, „Erinnerung ohne Empfänger“
-- [ ] 3.4 Ablösung (Vorwarnung, fällig) über `melden` an Modul-Leser, kein Doppel mit der Erinnerung; bestehende Szenarien in `kraefte-abloesung` bleiben grün
-- [ ] 3.5 Sonderwege für Ton und Toast in `useEinsatzLiveStream` entfernen, Unwetter prüft die Einstellung und nutzt das Budget; bestehende Vitest-Fälle angepasst, `e2e/alarm-verdeckung.spec.ts` grün
-- [ ] 3.6 Anwenderkapitel `meldungen`, `erinnerungen`, `abloesung`, `wetter-pegel` auf Adressierung und „eigene Aktionen still“ nachziehen
+- [x] 3.1 Sofortmeldung und Eskalation melden über `melden` (Erfasser ausgenommen, Eskalation ohne Auslöser); Rust-Tests „Neue Sofortmeldung“, „Eskalation“, „Eigene Sofortmeldung“
+- [x] 3.2 Überfälliger Auftrag an Auftraggeber und nicht quittierende Empfänger; Rust-Tests „Auftrag an S2 überfällig“, „Empfänger hat quittiert“
+- [x] 3.3 Fällige Erinnerung an die Empfängerfunktion, sonst den Ersteller; Rust-Tests „Erinnerung an S1“, „Erinnerung ohne Empfänger“
+- [x] 3.4 Ablösung (Vorwarnung, fällig) über `melden` an Modul-Leser, kein Doppel mit der Erinnerung; bestehende Szenarien in `kraefte-abloesung` bleiben grün
+- [x] 3.5 Sonderwege für Ton und Toast in `useEinsatzLiveStream` entfernen, Unwetter prüft die Einstellung und nutzt das Budget; bestehende Vitest-Fälle angepasst, `e2e/alarm-verdeckung.spec.ts` grün
+- [x] 3.6 Anwenderkapitel `meldungen`, `erinnerungen`, `abloesung`, `wetter-pegel` auf Adressierung und „eigene Aktionen still“ nachziehen
 
 ## 4. Gekoppelte Geräte still und Lagemonitor (D12, benötigt 1) · LLH-1210
 
