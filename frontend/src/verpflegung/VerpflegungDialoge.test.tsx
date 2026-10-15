@@ -453,11 +453,11 @@ describe('AusgabeDialog', () => {
     return { onErfassen, onSchliessen };
   }
 
-  it('drei Felder sichtbar, der Rest eingeklappt; Knopf im <form>; sendet Menge und Ort', async () => {
+  it('„Ausgabe nachtragen“ (LLH-1032 D8): drei Felder sichtbar, der Rest eingeklappt; Knopf im <form>; sendet Menge und Ort', async () => {
     const { onErfassen, onSchliessen } = zeige(NF);
-    const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+    const dialog = await screen.findByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
     await budgetUndAufklappen(dialog, 3, /Weitere Angaben/);
-    const knopf = pruefeFormStruktur(dialog, 'Erfassen');
+    const knopf = pruefeFormStruktur(dialog, 'Nachtragen');
     // Leer heißt jetzt — kein vorbelegter Client-Zeitpunkt.
     expect(within(dialog).getByPlaceholderText('jetzt')).toHaveValue('');
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '120');
@@ -473,6 +473,14 @@ describe('AusgabeDialog', () => {
     zeige(NF);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText('Nachforderung')).toBeInTheDocument();
+  });
+
+  it('die Menge lässt nicht mehr zu als der Server (VERPFLEGUNG_EP_MAX)', async () => {
+    const { onErfassen } = zeige(null);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '100001');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ menge: 100_000 }));
   });
 
   it('ohne bedienbares Modul Nachforderungen gibt es das Feld nicht', async () => {
@@ -498,7 +506,7 @@ describe('AusgabeDialog', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '2');
     await userEvent.type(within(dialog).getByLabelText('vegan'), '3');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 2, sonderkost: { vegan: 3 } }),
     );
@@ -551,14 +559,14 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     const ort = within(dialog).getByLabelText('Ort');
     fireEvent.change(ort, { target: { value: 'o'.repeat(501) } });
     expect(within(dialog).getByText('501 / 500 · zu lang')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     expect(
       await within(dialog).findByText('Ort darf höchstens 500 Zeichen lang sein'),
     ).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
     expect(ort).toHaveValue('o'.repeat(501));
     fireEvent.change(ort, { target: { value: 'o'.repeat(500) } });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 5, ort: 'o'.repeat(500) }),
     );
@@ -575,7 +583,7 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     expect(within(dialog).getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
     await userEvent.click(klappe);
     await waitFor(() => expect(klappe).toHaveAttribute('aria-expanded', 'false'));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() => expect(klappe).toHaveAttribute('aria-expanded', 'true'));
     expect(
       await within(dialog).findByText('Bemerkung darf höchstens 2.000 Zeichen lang sein'),
@@ -821,7 +829,7 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     await userEvent.click(feld);
     await userEvent.type(feld, '2026-09-24 12:15');
     await userEvent.keyboard('{Enter}');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 120, zeitpunkt_at: '2026-09-24 10:15:00' }),
     );
