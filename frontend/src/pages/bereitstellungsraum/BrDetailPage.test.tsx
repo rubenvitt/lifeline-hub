@@ -1251,7 +1251,12 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     {
       freigaben,
       rolle = 'fuehrungspersonal',
-    }: { freigaben?: Record<string, { zugriff: boolean }>; rolle?: string } = {},
+      material = MATERIAL,
+    }: {
+      freigaben?: Record<string, { zugriff: boolean }>;
+      rolle?: string;
+      material?: ReturnType<typeof posten>[];
+    } = {},
   ) {
     const abrufe: string[] = [];
     const gesendet: { url: string; body: unknown }[] = [];
@@ -1272,7 +1277,7 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => {
         abrufe.push('material');
-        return HttpResponse.json(MATERIAL);
+        return HttpResponse.json(material);
       }),
       http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
@@ -1329,6 +1334,27 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     const feld = within(sektion()).getByRole('combobox', { name: 'Material zuordnen' });
     expect(feld).toBeDisabled();
     expect(feld).toHaveAccessibleDescription('BR aufgelöst');
+    expect(
+      within(zeile('Lichtmast')).getByRole('button', { name: 'Lichtmast lösen' }),
+    ).toBeEnabled();
+  });
+
+  it('stornierter Raum: Zuordnen und Ausgeben gesperrt mit Grund, Lösen geht', async () => {
+    const decken = posten({
+      id: 63,
+      bezeichnung: 'Wolldecke',
+      art: 'verbrauchsgut',
+      menge: 20,
+      br_id: 1,
+    });
+    seite(brDetail({ storniert_at: '2026-10-15 08:00:00' }), {
+      material: [...MATERIAL, decken],
+    });
+    await screen.findByText('Wolldecke');
+    const feld = within(sektion()).getByRole('combobox', { name: 'Material zuordnen' });
+    expect(feld).toBeDisabled();
+    expect(feld).toHaveAccessibleDescription('BR storniert');
+    expect(within(zeile('Wolldecke')).queryByRole('button', { name: /ausgeben$/ })).toBeNull();
     expect(
       within(zeile('Lichtmast')).getByRole('button', { name: 'Lichtmast lösen' }),
     ).toBeEnabled();

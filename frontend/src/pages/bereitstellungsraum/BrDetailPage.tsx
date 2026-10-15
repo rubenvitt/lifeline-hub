@@ -144,13 +144,13 @@ export default function BrDetailPage() {
   // Sektion „Material“ (LLH-1225, design.md D13): Posten aus der Materialliste (`br_id`), nur mit
   // Freigabe Material. Das BR-Gerät liest das Modul Material nicht (D9): bis `/me` feststeht und am
   // Gerät weder Sektion noch Abruf.
-  const materialMoeglich = !authLaedt && geraet == null;
+  const canLoadMaterial = !authLaedt && geraet == null;
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
-    enabled: materialMoeglich,
+    enabled: canLoadMaterial,
   });
-  const materialFrei = materialMoeglich && istKeyFreigegeben('material', freigabenQuery.data);
+  const materialFrei = canLoadMaterial && istKeyFreigegeben('material', freigabenQuery.data);
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listEinsatzMaterial(einsatzId),
@@ -635,7 +635,13 @@ export default function BrDetailPage() {
                 darfSchreiben={darfImEinsatzSchreiben(einsatz)}
                 materialFrei={materialFrei}
                 loesenText="Lösen"
-                sperrgrund={br.status === 'aufgeloest' ? 'BR aufgelöst' : null}
+                sperrgrund={
+                  br.storniert_at
+                    ? 'BR storniert'
+                    : br.status === 'aufgeloest'
+                      ? 'BR aufgelöst'
+                      : null
+                }
                 kopfzahl={false}
               />
             </div>

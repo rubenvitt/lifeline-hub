@@ -24,8 +24,8 @@ interface Props {
  * (403), Zuordnen und Lösen ebenso (LFH-892). Bis `/me` sagt, ob ein Gerät angemeldet ist, bleibt
  * der Reiter deshalb lesend und fragt nichts ab.
  *
- * Eine aufgelöste UHS nimmt kein Material mehr an (LLH-1093 D14, Server 422): der Grund steht an
- * der Auswahl; Lösen bleibt (LLH-1224 D13).
+ * Eine aufgelöste oder stornierte UHS nimmt kein Material mehr an (LLH-1093 D14, Server 422): der
+ * Grund steht an der Auswahl, Ausgeben fehlt; Lösen bleibt (LLH-1224 D13).
  */
 export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props) {
   const auth = useAuthOptional();
@@ -56,7 +56,9 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       darfSchreiben={darfSchreiben}
       materialFrei={materialFrei}
       loesenText="Lösen"
-      sperrgrund={uhs.status === 'aufgeloest' ? 'UHS aufgelöst' : null}
+      sperrgrund={
+        uhs.storniert_at ? 'UHS storniert' : uhs.status === 'aufgeloest' ? 'UHS aufgelöst' : null
+      }
     />
   );
 }

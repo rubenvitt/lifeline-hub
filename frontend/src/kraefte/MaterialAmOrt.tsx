@@ -82,7 +82,7 @@ function loesenName(bezeichnung: string, loesenText: string): string {
 const AUSWAHL_STIL = { flex: '1 1 240px', maxWidth: 420, minWidth: 0 } as const;
 const auswahlZeile = (gap: number) =>
   ({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap }) as const;
-const umbrechen = (o: { label?: ReactNode }) => (
+const wrapLabel = (o: { label?: ReactNode }) => (
   <span style={{ whiteSpace: 'normal' }}>{o.label}</span>
 );
 
@@ -104,7 +104,7 @@ export default function MaterialAmOrt({
   const { token, rollen } = useRollen();
   const { setOrt } = useMaterialOrt(einsatzId);
   const grundId = useId();
-  const bedienbar = darfSchreiben && materialFrei;
+  const isBedienbar = darfSchreiben && materialFrei;
 
   /** Der Posten mit dem Ort-Feld dieses Orts: daraus baut `setOrt` das Lösen. */
   const amOrt = (id: number): OrtPosten => ({
@@ -120,7 +120,7 @@ export default function MaterialAmOrt({
   const zuordnenFehler = useZeilenFehler<'zuordnen'>();
   // Was gerade gelöst wird, je Posten: die Rückmeldung steht am Knopf vor der Antwort.
   const [loesend, setLoesend] = useState<ReadonlySet<number>>(() => new Set());
-  const markiere = (id: number, an: boolean) =>
+  const mark = (id: number, an: boolean) =>
     setLoesend((alt) => {
       const neu = new Set(alt);
       if (an) neu.add(id);
@@ -132,11 +132,11 @@ export default function MaterialAmOrt({
     mutationFn: (p: MaterialAmOrtPosten) => setOrt(amOrt(p.id), null),
     onMutate: (p) => {
       zeilen.beginne(p.id);
-      markiere(p.id, true);
+      mark(p.id, true);
     },
     onSuccess: (_d, p) => void message.success(`${p.bezeichnung} gelöst`),
     onError: (e, p) => zeilen.melde(p.id, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, p) => markiere(p.id, false),
+    onSettled: (_d, _e, p) => mark(p.id, false),
   });
   const zuordnen = useMutation({
     mutationFn: (p: ZuordnenPosten) => setOrt(p, ort),
@@ -191,8 +191,8 @@ export default function MaterialAmOrt({
       )}
       {posten.map((p) => {
         const grund = zeilen.grund(p.id);
-        const ausgebbar =
-          bedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
+        const isAusgebbar =
+          isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
         return (
           <div
             key={p.id}
@@ -224,9 +224,9 @@ export default function MaterialAmOrt({
               <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
               <StatusTag darstellung={materialDarstellung(p)} />
             </span>
-            {bedienbar && (
+            {isBedienbar && (
               <Space size="middle" wrap>
-                {ausgebbar && (
+                {isAusgebbar && (
                   <Button
                     aria-label={`${p.bezeichnung} ausgeben`}
                     onClick={() => {
@@ -294,7 +294,7 @@ export default function MaterialAmOrt({
         </div>
       )}
       {/* Außerhalb der Zeilen-`map`: ein Dialog für alle Posten (`frontend/AGENTS.md`, „Aktionen“). */}
-      {bedienbar && (
+      {isBedienbar && (
         <MaterialAusgabeModal
           posten={ausgabePosten}
           modus="ausgeben"
@@ -348,7 +348,7 @@ function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: Zuordne
         disabled={fehler || leer}
         aria-describedby={fehler || leer ? grundId : undefined}
         options={optionen}
-        optionRender={umbrechen}
+        optionRender={wrapLabel}
         onSelect={(wert) => {
           const p = angebot.data?.find((x) => String(x.id) === wert);
           if (p) onWaehlen(p);

@@ -57,8 +57,16 @@ const zweitesVerortet = {
   bezeichnung: 'Vakuummatratze',
 } as unknown as EinsatzMaterial;
 
-const uhsMit = (material: EinsatzMaterial[], status = 'aktiv') =>
-  ({ id: 3, einsatz_id: 1, status, plaetze: [], belegungen: [], material }) as unknown as UhsDetail;
+const uhsMit = (material: EinsatzMaterial[], status = 'aktiv', storniertAt: string | null = null) =>
+  ({
+    id: 3,
+    einsatz_id: 1,
+    status,
+    storniert_at: storniertAt,
+    plaetze: [],
+    belegungen: [],
+    material,
+  }) as unknown as UhsDetail;
 
 interface Patch {
   emId: number;
@@ -95,6 +103,7 @@ function render({
   liste = [frei, verortet],
   schreibgeschuetzt = false,
   status = 'aktiv',
+  storniertAt = null,
   freigaben = freigabenFixture(),
   listeKaputt = false,
   patch,
@@ -103,6 +112,7 @@ function render({
   liste?: EinsatzMaterial[];
   schreibgeschuetzt?: boolean;
   status?: string;
+  storniertAt?: string | null;
   freigaben?: ModulFreigaben;
   listeKaputt?: boolean;
   patch?: Parameters<typeof http.patch>[1];
@@ -131,7 +141,7 @@ function render({
     ...renderMitProviders(
       <MaterialTab
         einsatzId={1}
-        uhs={uhsMit(hier, status)}
+        uhs={uhsMit(hier, status, storniertAt)}
         schreibgeschuetzt={schreibgeschuetzt}
       />,
       { route: '/einsaetze/1/unfallhilfsstellen/3' },
@@ -326,6 +336,20 @@ describe('MaterialTab · aufgelöste UHS (LLH-1093)', () => {
     render({ status: 'aufgeloest' });
     expect(await bereit()).toBeDisabled();
     expect(auswahl()).toHaveAccessibleDescription('UHS aufgelöst');
+    expect(screen.getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+  });
+});
+
+/** Review LLH-1225: eine stornierte UHS sperrt wie eine aufgelöste. */
+describe('MaterialTab · stornierte UHS', () => {
+  it('sperrt Zuordnen und Ausgeben mit dem Grund „UHS storniert“, Lösen bleibt', async () => {
+    render({
+      hier: [verortet, { ...frei, id: 14, uhs_id: 3 } as EinsatzMaterial],
+      storniertAt: '2026-10-15 08:00:00',
+    });
+    expect(await bereit()).toBeDisabled();
+    expect(auswahl()).toHaveAccessibleDescription('UHS storniert');
+    expect(screen.queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
   });
 });
