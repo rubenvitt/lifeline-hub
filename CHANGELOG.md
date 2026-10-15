@@ -1,3 +1,76 @@
+## [1.0.0-alpha.127](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.126...v1.0.0-alpha.127) (2026-10-15)
+
+### Wichtige Änderungen
+
+- **Neues Benachrichtigungssystem:** Alarme und Hinweise laufen jetzt über eine gemeinsame Benachrichtigungszentrale. Ton und Einblendung bei Sofortmeldung, Erinnerung und Ablösung kommen nur noch über diesen Weg. Wer welche Benachrichtigung bekommt, hängt von Funktion und Modulrechten ab.
+- **Material-Modell umgestellt (Datenbankmigration):** Jeder Materialposten ist jetzt entweder **Gerät** oder **Verbrauchsgut** und hat **höchstens einen Ort**: Einheit, Fahrzeug, Unfallhilfsstelle (UHS) oder Bereitstellungsraum (BR). Die Migration ordnet den vorhandenen Bestand automatisch zu. Die Art ergibt sich dabei aus Bestandsnummer und Menge, und jede Umstellung ist in der Bemerkung des Postens vermerkt.
+- **Geänderte Rechte beim Material:** Zum Zuordnen, Lösen und Ausgeben braucht man jetzt Schreibrecht und die Freigabe für Material. Das Recht auf die Einheit oder den Ort genügt nicht mehr.
+- **Fahrzeuge mit Beladung:** Ein Fahrzeug mit Beladung lässt sich nicht mehr stornieren. Wird es entlassen, bleibt seine Beladung ohne Ort im Einsatz.
+- **Nachforderungen:** Ist aus einer Nachforderung Material übernommen, lässt sie sich nicht mehr von „Eingetroffen“ auf „Unterwegs“ zurücksetzen.
+- **Desktop-App:** Benachrichtigungen erscheinen als native Systemmeldung. Unter macOS und Windows muss das Betriebssystem dafür die Berechtigung erteilen.
+- Mehrere neue Datenbankmigrationen werden beim Start automatisch eingespielt.
+
+### Benachrichtigungen
+
+- **Einblendungen:** Höchstens drei einzelne Einblendungen gleichzeitig. Alles Weitere fasst ein Sammelhinweis zusammen, etwa „4 weitere Hinweise“ oder „2 × Neuer Auftrag“, mit einem Sprung je Bereich.
+- **Quittieren:** Mit ✕ oder „Öffnen“. Dieselbe Benachrichtigung erscheint nie doppelt.
+- **Verpasste Benachrichtigungen:** Nach einem Verbindungsabbruch oder beim Öffnen eines Einsatzes werden offene Benachrichtigungen mit Uhrzeit nachgereicht, dazu höchstens ein dezenter Ton.
+- **Systemmeldung:** Ist der Browser-Tab verdeckt, kommt zusätzlich eine Meldung des Betriebssystems.
+- **Einstellungen:** Neuer Eintrag „Benachrichtigungen“ im Benutzermenü. Alarme sind immer an, Hinweise lassen sich je Art abschalten, auch die Unwetterwarnung.
+- **Neue Anlässe:**
+  - Sofortmeldung und Eskalation an alle mit dem Modul Meldungen; die eigene Sofortmeldung bleibt still.
+  - Überschrittene Quittierfrist eines Auftrags an den Auftraggeber und an alle, die noch nicht quittiert haben.
+  - Fällige Erinnerung an die Empfängerfunktion, sonst an den Ersteller.
+  - Vorwarnung und Fälligkeit einer Ablösung, mit Einheit und Uhrzeit.
+  - „Neue Meldung“ an die Nutzer der Funktion, an die eine Meldung gerichtet ist.
+  - Statuswechsel einer Nachforderung an Ersteller und S4.
+  - Freigabe von Befehl oder Lagebericht an die Funktionen im Verteiler.
+  - Neues Gefahrengebiet an alle, die die Lagekarte lesen.
+  - Neue oder hochgestufte Person der Sichtungskategorie I an alle, die das Modul Personen lesen; genannt wird nur die Registriernummer.
+  - Lagebesprechung 10 Minuten vorher und bei Fälligkeit an EL und S1 bis S7.
+  - Einheit oder Fahrzeug wieder verfügbar, an EL und S3.
+  - Erwähnung im Chat.
+  - „Aufgenommen in …“ bei der Aufnahme in einen Einsatz; neuer Einsatz an die Führungskräfte der Organisation.
+
+### Kräfte und Mittel
+
+- **Ort des Materials:** Die Materialliste zeigt den Ort in einer einzigen Angabe über alle Ortsarten. Sie lässt sich nach Ort oder Status gruppieren; die Wahl gilt je Einsatz. Jeder Ortswechsel steht im Einsatztagebuch (ETB).
+- **Ausgabe:** Verbrauchsgut lässt sich ausgeben und zurücknehmen, mit Restanzeige („30 von 50 übrig“). Die Menge ist über „Menge ändern …“ anpassbar. Aufgebrauchtes Verbrauchsgut zählt als Ausfall.
+- **Geräte und Art:** Geräte werden je Stück geführt, Menge 1. Ad-hoc-Posten bieten „Art ändern …“ zwischen Gerät und Verbrauchsgut. Stammdaten führen das Feld „Art“ als Spalte und Filter.
+- **Material am Ort:** Einheiten, UHS und Bereitstellungsräume zeigen ihr Material mit Menge und Status. Fahrzeuge zeigen ihre Beladung im eigenen Block „Beladung“. An allen diesen Stellen lässt sich Material zuordnen, lösen und ausgeben, auch im geplanten Bereitstellungsraum.
+- **Gesperrte Orte:** Stornierte oder aufgelöste UHS und Bereitstellungsräume erlauben nur noch das Lösen.
+- **Kräftebaum:** Das Material steht dort, wo es ist: Beladung unter dem Fahrzeug, Material ohne Ort unter „Ohne Einheit“. Material an UHS und Bereitstellungsräumen erscheint nicht im Baum. Der Lagebericht nennt „Beladung: n Posten, k Ausfall“.
+- **Einheiten:** Sie erscheinen in den Material-Dialogen in derselben Reihenfolge wie im Kräftebaum.
+- **Auswahl „Material zuordnen“:** Sie nutzt die volle Breite, damit gleichnamige Posten am Ort unterscheidbar bleiben.
+
+### Nachforderungen
+
+- **„Als Material übernehmen“:** Eine eingetroffene Nachforderung lässt sich direkt als Materialposten übernehmen. Bezeichnung und Menge sind vorbelegt, der Ort ist wählbar. Mit „Weiteren Posten übernehmen“ lassen sich bewusst weitere Posten ergänzen.
+- **Übernommene Posten an der Karte:** Die Nachforderungskarte zeigt die übernommenen Posten mit Menge, Ort und „übernommen x von y“ und springt ins Material.
+- **Verweis zurück:** Übernommenes Material verweist in der Materialliste mit „aus Nachforderung: …“ zurück auf die Nachforderung. Der Verweis bleibt auch beim Aufteilen und Stornieren erhalten.
+- **Einsatztagebuch:** Die Übernahme erzeugt genau einen ETB-Eintrag mit Herkunft.
+- **Storno rückgängig machen:** Ein stornierter Posten aus einer Nachforderung lässt sich nur wieder aktivieren, wenn die Nachforderung noch „Eingetroffen“ ist.
+
+### Kommunikation
+
+- **Meldungen an eine Funktion:** Meldungen lassen sich an eine Funktion aus dem Katalog richten. Die Erfassung bietet die besetzten Funktionen an und füllt den Empfänger mit dem Kürzel vor.
+- **Erwähnungen im Chat:** Nach „@“ schlägt der Chat Mitglieder und besetzte Funktionen vor, höchstens 20 je Nachricht.
+- **Handschuh-Betrieb:** Das Chat-Eingabefeld hat dort wieder die volle Trefffläche.
+
+### Lagemonitor und gekoppelte Geräte
+
+- **Kachel „Meldungen“:** Neu im Lagemonitor, mit der Zahl offener Sofortmeldungen. Steigt diese Zahl oder die Zahl der Personen in Sichtungskategorie I, wird sie 60 Sekunden lang hervorgehoben, ohne Blinken und ohne Ton.
+- **Gekoppelte Geräte:** Sie spielen keine Töne mehr.
+
+### Bedienung
+
+- **Segmentschalter:** Sie sind jetzt mindestens so breit wie hoch, auch bei kurzen Beschriftungen in den Größen „komfortabel“ und „Handschuh“.
+
+### Betrieb und Installation
+
+- **Desktop-App:** Sie meldet sich bei verdecktem Fenster über eine native Systemmeldung. Ein Klick darauf holt das Fenster nach vorn. Das Betriebshandbuch beschreibt die nötige Berechtigung unter macOS und Windows.
+- **Anwenderdokumentation:** Die Kapitel zu Benachrichtigungen, Material, Nachforderungen, Meldungen, Chat, Lagemonitor und Lagebesprechung sind samt Bildern aktualisiert.
+
 ## [1.0.0-alpha.126](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.125...v1.0.0-alpha.126) (2026-10-15)
 
 ### Wichtige Änderungen
