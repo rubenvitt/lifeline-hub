@@ -6,7 +6,8 @@
  * - D1: Übersetzt wird beim Lesen. DB-Spalten `tz_*`, Snapshots und Offline-Stände behalten die
  *   alten Kennungen; eine Migration erreichte Snapshots und Geräte nicht.
  * - D2: Abbildungstabellen unten; die fachlichen Entscheidungen vom 29.09.2026 stehen dort, die
- *   Stelle und die Person seit LLH-1161 ohne die Notlösungen für LFH-829/LFH-830.
+ *   Stelle und die Person seit LLH-1161 ohne die Notlösungen für LFH-829/LFH-830, die
+ *   Führungskraft seit LLH-1231 mit Funktionsindikator.
  * - D3: Welche Kombination sich zeichnen lässt, entscheidet allein die Komposition — nicht
  *   `validateSpec` und keine gepflegte Accepts-Liste. Deshalb eine Rückfallkaskade: jede Fassung
  *   der Fachaufgabe, dann ohne Fachaufgabe, ohne Stärke, ohne Organisation, Körper allein.
@@ -137,6 +138,13 @@ const VERSORGUNG: Record<string, Teil> = {
   'versorgung-elektrizitaet': { bodyVariant: 'foot-band', bodyMarks: ['power-supply'] },
 };
 
+// Hub-Funktion → Funktionsrolle. Die Führungskraft (Einheitsführer, Abschnittsleiter) trägt Raute
+// und schwarze Kappe der Leitungsrollen ohne Kürzel (`leader`, ESZ-116). Die Rolle hat kein eigenes
+// Original, der Motor zeichnet sie stets abgeleitet (LLH-1231).
+const FUNKTIONSROLLE: Record<string, Teil> = {
+  fuehrungskraft: { functionRole: 'leader' },
+};
+
 // Symbole haben in SymbolSpec keine Achse (LFH-834). Die UHS-Typen Patientenablage und
 // Verletztensammelstelle werden bis dahin wie „sonstige“ gezeichnet; der Typ steht in der
 // Unterzeile des Inspectors.
@@ -250,6 +258,7 @@ function kandidaten(tz: TzProps): SymbolSpec[][] | null {
   const staerke = eigen(STAERKE, tz.einheit);
   // Die Person (Führungskraft) trägt ihre Fachaufgabe; der Motor zeichnet sie dort nur abgeleitet,
   // die Kaskade nimmt die abgeleitete Fassung (LLH-1161, bis dahin entfiel sie wegen LFH-830).
+  // Mit Funktionsindikator sitzt die Marke an der Hülle der Funktionsfassung (LLH-1231).
   const fachaufgabe = tz.fachaufgabe ?? eigen(SYMBOL_ERSATZ, tz.symbol);
   const farbe: Teil = tz.farbe ? { technicalFill: eigen(FARBE_TOKEN, tz.farbe) ?? 'grau' } : {};
 
@@ -260,7 +269,11 @@ function kandidaten(tz: TzProps): SymbolSpec[][] | null {
   liste.push([verbinde(koerper, org, farbe)]);
   liste.push([verbinde(koerper, farbe, { organization: undefined })]);
   liste.push([verbinde({ kind: koerper.kind })]);
-  return liste;
+  // Der Funktionsindikator geht allem anderen vor: erst die ganze Kaskade mit Indikator, dann
+  // dieselbe ohne ihn (LLH-1231).
+  const rolle = eigen(FUNKTIONSROLLE, tz.funktion);
+  if (!rolle) return liste;
+  return [...liste.map((stufe) => stufe.map((spec) => verbinde(spec, rolle))), ...liste];
 }
 
 /**
