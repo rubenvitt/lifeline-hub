@@ -1,4 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
+import { waehleIn } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -19,6 +20,11 @@ import {
  *                                frontend/src/nachforderungen/NachforderungKarte.tsx
  *   nachforderung-absetzen.png   frontend/src/nachforderungen/NachforderungFormular.tsx
  *   nachforderung-ablehnen.png   frontend/src/pages/NachforderungenPage.tsx (Ablehnen)
+ *   nachforderung-material-uebernehmen.png
+ *                                frontend/src/nachforderungen/MaterialUebernahmeModal.tsx
+ *   nachforderung-material-posten.png
+ *                                frontend/src/nachforderungen/NachforderungKarte.tsx
+ *                                (übernommene Posten)
  */
 
 const KAPITEL = 'nachforderung';
@@ -59,6 +65,44 @@ async function nachforderungenFuellen(api: APIRequestContext) {
   });
   await fuelle(api, 'post', `${basis}/${seg.id}/status`, { status: 'zugesagt' });
   await fuelle(api, 'post', `${basis}/${seg.id}/status`, { status: 'unterwegs' });
+
+  // Zwei eingetroffene für „Als Material übernehmen“ (LLH-1226): Tauchpumpen noch ohne Posten,
+  // Sandsäcke mit einer Teillieferung, die schon als Posten an der Rettungsstaffel steht.
+  const eintreffen = async (id: number) => {
+    for (const status of ['zugesagt', 'unterwegs', 'eingetroffen']) {
+      await fuelle(api, 'post', `${basis}/${id}/status`, { status });
+    }
+  };
+  const pumpen = await anlegen({
+    art: 'Tauchpumpe',
+    anzahl: 3,
+    bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
+    adressat_kategorie: 'leitstelle',
+    prioritaet: 'dringend',
+  });
+  await eintreffen(pumpen.id);
+  const saecke = await anlegen({
+    art: 'Sandsäcke',
+    anzahl: 2000,
+    bezeichnung: 'Sandsäcke für Deich Nord',
+    adressat_kategorie: 'uebergeordnet',
+    adressat_bezeichnung: 'Kreisbereitschaftsleitung',
+    prioritaet: 'dringend',
+  });
+  await eintreffen(saecke.id);
+  const antwort = await api.get(`/api/einsaetze/${demo.id}/einheiten`);
+  expect(antwort.ok(), `Einheiten: ${antwort.status()}`).toBe(true);
+  const staffel = ((await antwort.json()) as { id: number; name: string }[]).find(
+    (e) => e.name === 'Rettungsstaffel',
+  );
+  expect(staffel, 'Demo-Einheit „Rettungsstaffel“ fehlt').toBeTruthy();
+  await fuelle(api, 'post', `/api/einsaetze/${demo.id}/material`, {
+    adhoc: { bezeichnung: 'Sandsäcke' },
+    menge: 1200,
+    art: 'verbrauchsgut',
+    einheit_id: staffel!.id,
+    nachforderung_id: saecke.id,
+  });
 }
 
 /** Öffnet die Nachforderungen des Demo-Einsatzes. */
@@ -115,5 +159,30 @@ test.describe(KAPITEL, () => {
       .fill('Keine Sandsäcke im Lager, Anforderung über Nachbarkreis.');
     await fokusWeg(page);
     await fotografiere(dialog, KAPITEL, 'nachforderung-ablehnen');
+  });
+
+  test('Dialog „Als Material übernehmen“', async ({ page }) => {
+    await nachforderungenOeffnen(page);
+    await page.getByRole('radio', { name: /Abgeschlossen/ }).click();
+    const karte = page.locator('[data-nachforderung-id]', {
+      hasText: '3 Tauchpumpen für Keller Hauptstraße',
+    });
+    await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
+    const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
+    await dialog.getByRole('radio', { name: 'Gerät' }).click();
+    await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('1');
+    await waehleIn(dialog.getByRole('combobox', { name: 'Ort' }), 'Rettungsstaffel');
+    await fokusWeg(page);
+    await fotografiere(dialog, KAPITEL, 'nachforderung-material-uebernehmen');
+  });
+
+  test('Karte mit übernommenem Posten', async ({ page }) => {
+    await nachforderungenOeffnen(page);
+    await page.getByRole('radio', { name: /Abgeschlossen/ }).click();
+    const karte = page.locator('[data-nachforderung-id]', { hasText: 'Sandsäcke für Deich Nord' });
+    await expect(karte).toContainText('übernommen 1200 von 2000');
+    await expect(karte.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeVisible();
+    await fokusWeg(page);
+    await fotografiere(karte, KAPITEL, 'nachforderung-material-posten');
   });
 });
