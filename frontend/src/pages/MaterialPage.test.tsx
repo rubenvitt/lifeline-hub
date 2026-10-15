@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { Link, Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -55,7 +55,7 @@ function render(
   einsatzObj: typeof einsatzAktiv,
   materialListe: (typeof em)[],
   entlasseneDaten: unknown[] = [],
-  orte: { fahrzeuge?: unknown[]; br?: unknown[] } = {},
+  orte: { einheiten?: unknown[]; fahrzeuge?: unknown[]; br?: unknown[] } = {},
 ) {
   server.use(
     meHandler(admin),
@@ -69,7 +69,7 @@ function render(
     http.get('/api/material', () => HttpResponse.json([])),
     // Die Spalte „Ort“ löst Namen über Einheiten und UHS auf. Ohne diese Handler fiele ihre Query
     // auf `isError` (`onUnhandledRequest: 'error'`), und der Ort hieße nur „zugeordnet“.
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(orte.einheiten ?? EINHEITEN)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(orte.fahrzeuge ?? FAHRZEUGE)),
     http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(orte.br ?? BR)),
@@ -88,6 +88,22 @@ function render(
     </Routes>,
     { route: '/einsaetze/1/material' },
   );
+}
+
+/**
+ * Zählt die GET-Abrufe je Pfad ab jetzt bis zum Ende des Tests (Spec `material-liste`, „Ort eines
+ * Postens“: eine gesperrte Ortsart erzeugt keinen Abruf).
+ */
+function countRequests(): (pfad: string) => number {
+  const pfade: string[] = [];
+  const listener = ({ request }: { request: Request }) => {
+    if (request.method === 'GET') pfade.push(new URL(request.url).pathname);
+  };
+  server.events.on('request:start', listener);
+  onTestFinished(() => {
+    server.events.removeListener('request:start', listener);
+  });
+  return (pfad) => pfade.filter((p) => p === pfad).length;
 }
 
 /**
@@ -299,6 +315,47 @@ describe('MaterialPage', () => {
     for (const gruppe of ['Staffel A', 'Florian 1/83-1', 'UHS Turnhalle', 'BR Nord', 'ohne Ort']) {
       expect(within(werkzeuge).getByText(`1 ${gruppe}`)).toBeInTheDocument();
     }
+  });
+
+  it('Einheiten stehen in der Folge des Kräftebaums: der Rang der Abschnitte, nicht die Anlage (D3/D4)', async () => {
+    // Staffel B (Abschnitt B) ist zuerst angelegt; Abschnitt A steht im Baum vor B.
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () =>
+        HttpResponse.json([
+          { id: 32, name: 'Abschnitt A', ueber_abschnitt_id: null },
+          { id: 31, name: 'Abschnitt B', ueber_abschnitt_id: null },
+        ]),
+      ),
+    );
+    const { container } = render(
+      einsatzAktiv,
+      [
+        { ...em, id: 20, bezeichnung: 'Decke B', einheit_id: 1 },
+        { ...em, id: 21, bezeichnung: 'Decke A', einheit_id: 2 },
+      ],
+      [],
+      {
+        einheiten: [
+          { id: 1, name: 'Staffel B', ueber_einheit_id: null, abschnitt_id: 31 },
+          { id: 2, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: 32 },
+        ],
+      },
+    );
+    await screen.findByText('Decke A');
+    await waitFor(() =>
+      expect(
+        [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
+          r.getAttribute('data-row-key'),
+        ),
+      ).toEqual(['21', '20']),
+    );
+    // Dieselbe Folge in der Gruppe „Einheiten“ der Auswahl.
+    await userEvent.click(screen.getByRole('button', { name: 'Ort zu Decke A bearbeiten' }));
+    await oeffne('Ort zu Decke A');
+    const einheiten = [
+      ...listeVon('Ort zu Decke A')!.querySelectorAll('.ant-select-item-option'),
+    ].map((o) => o.textContent);
+    expect(einheiten.indexOf('Staffel A')).toBeLessThan(einheiten.indexOf('Staffel B'));
   });
 
   it('„Nach Status“ gruppiert um, die Verdichtung bleibt dieselbe', async () => {
@@ -1300,6 +1357,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
         }),
       ),
     );
+    const abrufe = countRequests();
     const { container } = render(einsatzAktiv, [
       { ...em, einsatz_fahrzeug_id: 4 },
       { ...em, id: 11, bezeichnung: 'Zeltbahn', br_id: 6 },
@@ -1313,6 +1371,40 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(ort(10)).toHaveTextContent(/^Florian 1\/83-1$/));
     await waitFor(() => expect(ort(11)).toHaveTextContent(/^BR Nord$/));
     expect(ort(12)).toHaveTextContent(/^ohne Ort$/);
+    // Gesperrte Ortsarten erzeugen keinen Abruf (D3), die freien je einen.
+    expect(abrufe('/api/einsaetze/1/einheiten')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/uhs')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/fahrzeuge')).toBeGreaterThan(0);
+    expect(abrufe('/api/einsaetze/1/bereitstellungsraeume')).toBeGreaterThan(0);
+  });
+
+  it('Ort: ohne Zugriff auf Fahrzeuge und Bereitstellungsräume kein Abruf, auch mit Posten dort', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json({
+          ...freigabenFixture(),
+          fahrzeuge: { sichtbar: true, zugriff: false },
+          bereitstellungsraeume: { sichtbar: true, zugriff: false },
+        }),
+      ),
+    );
+    const abrufe = countRequests();
+    const { container } = render(einsatzAktiv, [
+      { ...em, einsatz_fahrzeug_id: 4 },
+      { ...em, id: 11, bezeichnung: 'Zeltbahn', br_id: 6 },
+    ]);
+    await screen.findByText('Wolldecke');
+    const ort = (id: number) =>
+      within(container.querySelector(`[data-row-key="${id}"]`) as HTMLElement).getByTestId(
+        'material-ort',
+      );
+    await waitFor(() => expect(abrufe('/api/einsaetze/1/einheiten')).toBeGreaterThan(0));
+    expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0);
+    expect(ort(10)).toHaveTextContent(/zugeordnet/);
+    expect(ort(11)).toHaveTextContent(/zugeordnet/);
+    expect(abrufe('/api/einsaetze/1/fahrzeuge')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/bereitstellungsraeume')).toBe(0);
   });
 
   it('Ort: Umhängen geht in EINER Anfrage über die Disposition, nie über die Einheiten (LLH-1225 D2)', async () => {
@@ -1364,11 +1456,15 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
         }),
       ),
     );
+    const abrufe = countRequests();
     const { container } = render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     const knopf = await within(zeile).findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' });
     await waitFor(() => expect(knopf).toHaveTextContent(/^zugeordnet$/));
+    await waitFor(() => expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0));
+    expect(abrufe('/api/einsaetze/1/einheiten')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
     await userEvent.click(knopf);
     await oeffne('Ort zu Wolldecke');
     const gruppen = [

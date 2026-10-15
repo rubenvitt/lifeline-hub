@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { ladeModulFreigaben } from '../api/einsaetze';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -9,7 +11,6 @@ import type { EinsatzMaterial } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
-import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import {
   bereitstellungsraumDetailPfad,
   einheitDetailPfad,
@@ -58,27 +59,42 @@ export function ortSuchText(em: Parameters<typeof ortVon>[0], k: MaterialOrtKont
 /**
  * Lädt, was Angabe, Filter und Gruppierung brauchen, unter denselben Schlüsseln wie die Seiten der
  * Module (live über deren Ereignisse) und nur mit Lesezugriff auf das Modul: eine gesperrte Ortsart
- * erzeugt keinen Abruf. Fahrzeuge und Bereitstellungsräume lädt die Seite, wenn sie schreiben darf
- * (Auswahl) oder ein Posten dort liegt (Name). Unbekannte Freigaben heißen offen.
+ * erzeugt keinen Abruf. Deshalb wartet jeder Abruf, bis die Freigaben feststehen (geladen oder
+ * gescheitert); eine fehlende oder gescheiterte Freigabe heißt offen, der Server prüft selbst.
+ * Fahrzeuge und Bereitstellungsräume lädt die Seite, wenn sie schreiben darf (Auswahl) oder ein
+ * Posten dort liegt (Name). Die Abschnitte ordnen die Einheiten wie den Kräftebaum (D3/D4, wie
+ * `FahrzeugePage.tsx`); ohne Freigabe auf Einheiten oder Abschnitte bleibt die Anlagefolge.
  */
 export function useMaterialOrtKontext(
   einsatzId: number,
   darfSchreiben: boolean,
   posten: readonly Pick<EinsatzMaterial, 'einsatz_fahrzeug_id' | 'br_id'>[] = [],
 ): { kontext: MaterialOrtKontext; einheitFolge: OrtWahlQuellen['einheiten'] } {
-  const freigaben = useModulFreigaben(einsatzId);
+  // Derselbe Schlüssel wie `useModulFreigaben`; der Abruf hier liefert zusätzlich, ob sie feststehen.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const freigaben = freigabenQuery.data;
+  const fest = freigabenQuery.isSuccess || freigabenQuery.isError;
   const lesbar = {
-    einheit: isOrtLesbar('einheit', freigaben),
-    fahrzeug: isOrtLesbar('fahrzeug', freigaben),
-    uhs: isOrtLesbar('uhs', freigaben),
-    bereitstellungsraum: isOrtLesbar('bereitstellungsraum', freigaben),
+    einheit: fest && isOrtLesbar('einheit', freigaben),
+    fahrzeug: fest && isOrtLesbar('fahrzeug', freigaben),
+    uhs: fest && isOrtLesbar('uhs', freigaben),
+    bereitstellungsraum: fest && isOrtLesbar('bereitstellungsraum', freigaben),
   };
+  const abschnitteLesbar = lesbar.einheit && freigaben?.einsatzabschnitte?.zugriff !== false;
   const brauchtFahrzeuge = darfSchreiben || posten.some((p) => p.einsatz_fahrzeug_id != null);
   const brauchtBr = darfSchreiben || posten.some((p) => p.br_id != null);
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
     enabled: lesbar.einheit,
+  });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteLesbar,
   });
   const uhsQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
@@ -96,9 +112,10 @@ export function useMaterialOrtKontext(
     enabled: lesbar.bereitstellungsraum && brauchtBr,
   });
   const einheiten = einheitenQuery.data;
+  const abschnitte = abschnitteQuery.data;
   const einheitOptionen = useMemo(
-    () => (einheiten ? buildEinheitOptions(einheiten, []) : undefined),
-    [einheiten],
+    () => (einheiten ? buildEinheitOptions(einheiten, abschnitte ?? []) : undefined),
+    [einheiten, abschnitte],
   );
   const uhs = uhsQuery.data;
   const fahrzeuge = fahrzeugQuery.data;
