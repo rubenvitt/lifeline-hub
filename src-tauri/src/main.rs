@@ -14,6 +14,7 @@ mod anmeldung;
 #[cfg(target_os = "macos")]
 mod aswas;
 mod deeplink;
+mod kanal;
 mod links;
 mod menue;
 mod pkce;

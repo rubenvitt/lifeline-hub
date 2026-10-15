@@ -271,6 +271,9 @@ schritt_8() {
   # Das Update-Manifest der Desktop-Hülle (LFH-721): ein falscher Eintrag lässt jede installierte
   # Hülle ins Leere laden oder bietet ein Update an, das keins ist — beides still.
   mise exec -- node --test "$ROOT/scripts/release/desktop-manifest.test.mjs"
+  # Der Alpha-Kanal der Hülle (LLH-1280): nur vorwärts und nur vollständig — ein Rückschritt
+  # oder eine fehlende Plattform bliebe an jeder Alpha-Hülle still hängen.
+  mise exec -- node --test "$ROOT/scripts/release/desktop-kanal.test.mjs"
   # Die PR-Kommentare nach der Freigabe (LFH-1054): ab welchem Release gerechnet wird und dass
   # kein PR zweimal kommentiert wird — beides fiele erst an echten PRs auf.
   mise exec -- node --test "$ROOT/scripts/release/pr-kommentare.test.mjs"

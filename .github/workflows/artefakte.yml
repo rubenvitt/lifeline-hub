@@ -1,7 +1,10 @@
 # Release-Artefakte — vier Binaries, zwei Container-Abbilder (lifeline-hub und
-# karten-service), bei Alpha-Releases danach ein GitHub-Deployment. Bei STABILEN Releases
-# zusätzlich die Desktop-Hülle (LFH-721): Pakete für macOS arm64 und Windows x64 plus das
-# Update-Manifest latest.json, das installierte Hüllen über …/releases/latest/download/ lesen.
+# karten-service), bei Alpha-Releases danach ein GitHub-Deployment. Dazu die Desktop-Hülle
+# (LFH-721, desktop.yml): Pakete für macOS arm64 und Windows x64 plus das Update-Manifest
+# latest.json. Stabile Hüllen lesen es über …/releases/latest/download/, Alpha-Hüllen über den
+# Alpha-Kanal …/releases/download/desktop-alpha/ (LLH-1280, Job `desktop-kanal`). Bei stabilen
+# Tags entsteht die Hülle vor der Freigabe und hält sie bei rotem Bau auf, bei Alpha-Tags erst
+# danach, ohne Release oder Deployment aufzuhalten.
 #
 # EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
 # und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
@@ -35,7 +38,7 @@ on:
         type: boolean
         default: false
       desktop:
-        description: 'Desktop-Hülle auch für eine Vorabversion bauen (Prüflauf vor dem ersten stabilen Release)'
+        description: 'Desktop-Hülle bei einer Vorabversion schon vor der Freigabe bauen (Nachbau eines Alpha-Releases)'
         required: false
         type: boolean
         default: false
@@ -79,8 +82,9 @@ jobs:
           else
             echo "vorab=true" >> "$GITHUB_OUTPUT"
           fi
-          # Die Desktop-Hülle hat EINEN Kanal, den stabilen (Entscheidung 25.09.2026): gebaut
-          # wird bei einem Tag ohne Vorabkennung — oder per Dispatch ausdrücklich.
+          # `desktop`: Hülle VOR der Freigabe bauen — bei einem Tag ohne Vorabkennung oder per
+          # Dispatch ausdrücklich. Alpha-Tags bauen sie sonst danach (Job `desktop-alpha`,
+          # LLH-1280).
           if [ "${ROH_TAG#*-}" = "$ROH_TAG" ] || [ "$DESKTOP_ERZWUNGEN" = "true" ]; then
             echo "desktop=true" >> "$GITHUB_OUTPUT"
           else
@@ -295,291 +299,42 @@ jobs:
           ls -lh versand
           gh release upload "$TAG" versand/* --clobber
 
-  # ── Desktop-Hülle (LFH-721) ─────────────────────────────────────────────────────────
-  # Nativ je Plattform: die NSIS-Bündelung und WebView2 laufen auf dem Windows-Runner, nicht
-  # als Cross-Build wie die Server-Binary. Hängt nur an `vorbereiten`, nie an `bauen` — ein
-  # roter Server-Build hält den Bau der Hülle nicht auf und umgekehrt; veröffentlicht wird das
-  # Release trotzdem erst, wenn beide grün sind (Job `freigeben`). Kein MSI: MSI nimmt keine
-  # Vorabversion an, und Prüfläufe per Dispatch tragen eine.
+  # ── Desktop-Hülle (LFH-721, Bau in desktop.yml) ──────────────────────────────────────
+  # Hängt nur an `vorbereiten`, nie an `bauen` — ein roter Server-Build hält den Bau der Hülle
+  # nicht auf und umgekehrt. Stabile Tags (und Prüfläufe mit `desktop: true`) bauen VOR der
+  # Freigabe, ein roter Bau hält die Veröffentlichung auf (Job `freigeben`).
   desktop:
-    name: ${{ matrix.name }}
+    name: Desktop-Hülle
     needs: vorbereiten
     if: needs.vorbereiten.outputs.desktop == 'true'
-    runs-on: ${{ matrix.runs-on }}
-    # Bau plus zwei Wartezeiten bei Apple (Notarisierung von App und .dmg, LFH-722).
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # `apple`: Developer ID und Notarisierung (LFH-722). Nur dieser Eintrag bekommt die
-          # APPLE_*-Secrets; Windows signiert noch nicht (LFH-875).
-          - name: desktop-macos-arm64
-            runs-on: macos-latest
-            target: aarch64-apple-darwin
-            bundles: app,dmg
-            apple: true
-          - name: desktop-windows-x86_64
-            runs-on: windows-latest
-            target: x86_64-pc-windows-msvc
-            bundles: nsis
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.vorbereiten.outputs.tag }}
-
-      - name: Rust-Toolchain (stable, Ziel ${{ matrix.target }})
-        run: |
-          rustup toolchain install stable --profile minimal --no-self-update
-          rustup default stable
-          rustup target add ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          key: desktop-${{ matrix.target }}
-
-      # Gepinnt wie cargo-cyclonedx; dieselbe Minor wie die tauri-Crate in src-tauri/Cargo.toml.
-      - name: Tauri-CLI
-        run: |
-          cargo tauri --version 2>/dev/null | grep -qx 'tauri-cli 2.12.0' \
-            || cargo install tauri-cli --locked --version 2.12.0
-
-      - name: Bauen
-        working-directory: src-tauri
-        env:
-          # Ohne den privaten Schlüssel entstehen keine .sig-Dateien und damit kein Update.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS (LFH-722): Tauri importiert das Zertifikat selbst in einen Wegwerf-Schlüsselbund
-          # und notarisiert die App. Die Identität schlägt `"-"` aus tauri.conf.json, lokale Bauten
-          # bleiben ad hoc. Ohne sie bräche Tauri ab, weil "-" nicht im Zertifikat vorkommt.
-          APPLE_SIGNING_IDENTITY: "${{ matrix.apple && 'Developer ID Application: Ruben Vitt (H95J852PKP)' || '' }}"
-          APPLE_CERTIFICATE: ${{ matrix.apple && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.apple && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_API_ISSUER: ${{ matrix.apple && secrets.APPLE_API_ISSUER || '' }}
-          APPLE_API_KEY: ${{ matrix.apple && secrets.APPLE_API_KEY || '' }}
-          APPLE_API_KEY_P8: ${{ matrix.apple && secrets.APPLE_API_KEY_P8 || '' }}
-          VERSION: ${{ needs.vorbereiten.outputs.version }}
-          ZIEL: ${{ matrix.target }}
-          BUNDLES: ${{ matrix.bundles }}
-        run: |
-          set -euo pipefail
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "FEHLER: Secret TAURI_SIGNING_PRIVATE_KEY fehlt (docs/betrieb/desktop-app.md)." >&2
-            exit 1
-          fi
-          # Fehlen die Zugangsdaten der Notarisierung, warnt Tauri nur und baut ein nicht
-          # notarisiertes Paket. Das darf nie ans Release.
-          if [[ "$ZIEL" == *apple-darwin ]]; then
-            fehlt=()
-            for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
-              [ -n "${!v:-}" ] || fehlt+=("$v")
-            done
-            if [ "${#fehlt[@]}" -gt 0 ]; then
-              echo "FEHLER: Secrets für Signierung/Notarisierung fehlen: ${fehlt[*]} (docs/betrieb/desktop-app.md)." >&2
-              exit 1
-            fi
-            export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-            ( umask 077; printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH" )
-            unset APPLE_API_KEY_P8
-          fi
-          # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch. Sie
-          # erbt sie aus [workspace.package] (gesetzt von release.config.mjs); gefragt wird Cargo,
-          # nicht die Datei — die trägt nur `version.workspace = true` und unter Windows CRLF.
-          ist="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).packages.find((p) => p.name === "lifeline-desktop").version')"
-          [ "$ist" = "$VERSION" ] \
-            || { echo "FEHLER: lifeline-desktop trägt $ist, erwartet $VERSION." >&2; exit 1; }
-          cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
-
-      # Tauri notarisiert nur die App, das .dmg signiert es bloß. Gatekeeper beurteilt beim ersten
-      # Öffnen aber das geladene Image (LFH-722, D5 in
-      # openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md). Vor dem Einsammeln, weil
-      # Stapling die Bytes und damit die .sha256 ändert.
-      - name: Disk-Image notarisieren (macOS)
-        if: matrix.apple
-        env:
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          ZIEL: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          trap 'rm -f "$RUNNER_TEMP/AuthKey.p8"' EXIT
-          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
-          dmgs=("$target_dir/$ZIEL/release/bundle/dmg"/*.dmg)
-          [ "${#dmgs[@]}" -eq 1 ] && [ -f "${dmgs[0]}" ] \
-            || { echo "FEHLER: erwartet genau ein .dmg, gefunden: ${dmgs[*]}" >&2; exit 1; }
-          # `--wait` endet auch bei „Invalid“ mit 0; maßgeblich ist der Status im JSON. Endet es doch
-          # einmal anders, soll das Protokoll trotzdem folgen.
-          rc=0
-          ergebnis="$(xcrun notarytool submit "${dmgs[0]}" --key "$RUNNER_TEMP/AuthKey.p8" \
-            --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --timeout 30m --output-format json)" || rc=$?
-          echo "$ergebnis"
-          status="$(node -p 'try { JSON.parse(process.argv[1]).status } catch { "unlesbar" }' "$ergebnis")"
-          [ "$rc" = 0 ] || status="$status (notarytool Exit $rc)"
-          if [ "$status" != "Accepted" ]; then
-            id="$(node -p 'try { JSON.parse(process.argv[1]).id } catch { "" }' "$ergebnis")"
-            [ -z "$id" ] || xcrun notarytool log "$id" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" || true
-            echo "FEHLER: Notarisierung des .dmg: $status" >&2
-            exit 1
-          fi
-          xcrun stapler staple "${dmgs[0]}"
-
-      # Belegt vor dem Einsammeln, was ans Release geht: Developer ID, Hardened Runtime und
-      # angeheftetes Ticket für App, .dmg, die App darin und die App im Update-Archiv (LFH-722, D6
-      # in openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md). Inline statt
-      # Repo-Skript, weil der Job den Tag auscheckt und ein neues Skript dort fehlte.
-      - name: Signatur und Notarisierung prüfen (macOS)
-        if: matrix.apple
-        env:
-          ZIEL: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
-          bundle="$target_dir/$ZIEL/release/bundle"
-          team="H95J852PKP"
-          # Gatekeeper-Urteil nur, wenn der Runner es fällt; sonst tragen Ticket und Signatur.
-          gatekeeper=1
-          [[ "$(spctl --status 2>&1)" == *"assessments enabled"* ]] \
-            || { gatekeeper=0; echo "::warning::Gatekeeper auf dem Runner aus, spctl entfällt"; }
-          gatekeeper_urteil() {
-            local datei="$1" urteil; shift
-            urteil="$(spctl -a -vv "$@" "$datei" 2>&1)" || { echo "$urteil" >&2; exit 1; }
-            echo "$urteil"
-            grep -q 'source=Notarized Developer ID' <<<"$urteil" \
-              || { echo "FEHLER: $datei nicht als notarisiert anerkannt" >&2; exit 1; }
-          }
-          pruefe_app() {
-            local app="$1" info
-            codesign --verify --deep --strict --verbose=2 "$app"
-            info="$(codesign -dv --verbose=4 "$app" 2>&1)"
-            grep -qx "Authority=Developer ID Application: .* ($team)" <<<"$info" \
-              || { echo "FEHLER: $app nicht mit Developer ID ($team) signiert" >&2; exit 1; }
-            grep -Eq 'flags=0x[0-9a-f]+\([^)]*runtime' <<<"$info" \
-              || { echo "FEHLER: $app ohne Hardened Runtime" >&2; exit 1; }
-            xcrun stapler validate "$app"
-            [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$app" -t exec
-          }
-          genau_eine() {
-            local treffer=("$@")
-            [ "${#treffer[@]}" -eq 1 ] && [ -e "${treffer[0]}" ] \
-              || { echo "FEHLER: erwartet genau eine Datei, gefunden: ${treffer[*]}" >&2; exit 1; }
-            printf '%s' "${treffer[0]}"
-          }
-          pruefe_app "$(genau_eine "$bundle"/macos/*.app)"
-          dmg="$(genau_eine "$bundle"/dmg/*.dmg)"
-          codesign --verify --strict --verbose=2 "$dmg"
-          # In eine Variable statt `| grep -q`: grep endet früh, und pipefail wertete das SIGPIPE
-          # von codesign als Fehler.
-          info="$(codesign -dv --verbose=4 "$dmg" 2>&1)"
-          grep -qx "Authority=Developer ID Application: .* ($team)" <<<"$info" \
-            || { echo "FEHLER: .dmg nicht mit Developer ID ($team) signiert" >&2; exit 1; }
-          xcrun stapler validate "$dmg"
-          [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$dmg" -t open --context context:primary-signature
-          eingehaengt="$(mktemp -d)"
-          hdiutil attach -nobrowse -readonly -mountpoint "$eingehaengt" "$dmg" > /dev/null
-          trap 'hdiutil detach -quiet "$eingehaengt" || true' EXIT
-          pruefe_app "$(genau_eine "$eingehaengt"/*.app)"
-          entpackt="$(mktemp -d)"
-          tar -xzf "$(genau_eine "$bundle"/macos/*.app.tar.gz)" -C "$entpackt"
-          pruefe_app "$(genau_eine "$entpackt"/*.app)"
-          echo "macOS-Pakete signiert (Developer ID $team) und notarisiert."
-
-      # Scheitert der Bau nach dem Schreiben der .p8, läuft der DMG-Schritt mit seinem `trap` nicht.
-      - name: API-Schlüssel entfernen (macOS)
-        if: always() && matrix.apple
-        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
-
-      # Kanonische Dateinamen: Tauris eigene tragen Leerzeichen, die GitHub beim Hochladen still
-      # durch Punkte ersetzt — die URL in latest.json zeigte dann ins Leere.
-      - name: Pakete einsammeln
-        env:
-          VERSION: ${{ needs.vorbereiten.outputs.version }}
-          ZIEL: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
-          # Auf dem Windows-Runner liefert Cargo `D:\a\…`; im Bash-Glob unten wäre der Backslash
-          # ein Maskierzeichen.
-          if command -v cygpath > /dev/null; then target_dir="$(cygpath -u "$target_dir")"; fi
-          bundle="$target_dir/$ZIEL/release/bundle"
-          name="lifeline-hub-desktop-$VERSION"
-          genau_eine() {
-            local treffer=("$@")
-            [ "${#treffer[@]}" -eq 1 ] && [ -f "${treffer[0]}" ] \
-              || { echo "FEHLER: erwartet genau eine Datei, gefunden: ${treffer[*]}" >&2; exit 1; }
-            printf '%s' "${treffer[0]}"
-          }
-          mkdir -p versand
-          case "$ZIEL" in
-            *apple-darwin)
-              archiv="$(genau_eine "$bundle"/macos/*.app.tar.gz)"
-              cp "$archiv" "versand/$name-macos-arm64.app.tar.gz"
-              cp "$archiv.sig" "versand/$name-macos-arm64.app.tar.gz.sig"
-              cp "$(genau_eine "$bundle"/dmg/*.dmg)" "versand/$name-macos-arm64.dmg"
-              ;;
-            *windows*)
-              installer="$(genau_eine "$bundle"/nsis/*-setup.exe)"
-              cp "$installer" "versand/$name-windows-x64-setup.exe"
-              cp "$installer.sig" "versand/$name-windows-x64-setup.exe.sig"
-              ;;
-          esac
-          ( cd versand && for f in *; do
-              case "$f" in *.sig) continue ;; esac
-              if command -v sha256sum > /dev/null; then sha256sum "$f" > "$f.sha256"; else shasum -a 256 "$f" > "$f.sha256"; fi
-            done )
-          ls -l versand
-
-      # Eigener Präfix `desktop-`: `veroeffentlichen` lädt `versand-*` und soll diese Dateien
-      # nicht je nach Laufreihenfolge mitnehmen.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ${{ matrix.name }}
-          path: versand/
-          retention-days: 7
-
-  # latest.json entsteht aus dem, was TATSÄCHLICH gebaut wurde: `!cancelled()`, damit eine
-  # gescheiterte Plattform nur aus dem Manifest fällt, statt die andere mitzunehmen. Ein
-  # ABGEBROCHENER Lauf veröffentlicht nichts — sonst zeigte „latest“ bis zum nächsten Release auf
-  # ein Manifest mit nur der Plattform, die zufällig schon fertig war. Ohne ein
-  # einziges Paket bricht das Skript ab (scripts/release/desktop-manifest.mjs, Selbsttest in
-  # Schritt 8 von check-all.sh).
-  desktop-veroeffentlichen:
-    name: Desktop-Pakete und latest.json ans Release hängen
-    needs: [vorbereiten, desktop]
-    if: ${{ !cancelled() && needs.vorbereiten.outputs.desktop == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.vorbereiten.outputs.tag }}
+    uses: ./.github/workflows/desktop.yml
+    with:
+      tag: ${{ needs.vorbereiten.outputs.tag }}
+      version: ${{ needs.vorbereiten.outputs.version }}
+    secrets: inherit
 
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: desktop-*
-          merge-multiple: true
-          path: versand
-
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
-        with:
-          version: 2026.9.1
-          cache: true
-
-      - name: latest.json erzeugen und hochladen
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.vorbereiten.outputs.tag }}
-        run: |
-          set -euo pipefail
-          mise exec -- node scripts/release/desktop-manifest.mjs --dir versand --tag "$TAG" --repo "$GH_REPO"
-          ls -lh versand
-          gh release upload "$TAG" versand/* --clobber
+  # Alpha-Kanal (LLH-1280): Alpha-Tags bauen die Hülle erst NACH der Freigabe ans schon
+  # veröffentlichte Release. Bau und Notarisierung dauern länger als die Server-Artefakte und
+  # hängen an Apple; so verzögern sie weder Veröffentlichung noch Deployment, und ein roter Bau
+  # kostet nur die Desktop-App dieses Releases. Nur aus release.yml (`freigeben`), ein Nachbau
+  # baut die Hülle über `desktop: true` vor der (dann ausbleibenden) Freigabe.
+  desktop-alpha:
+    name: Desktop-Hülle (Alpha-Kanal)
+    needs: [vorbereiten, freigeben]
+    if: >-
+      ${{ !cancelled() && inputs.freigeben
+      && needs.freigeben.result == 'success'
+      && needs.vorbereiten.outputs.vorab == 'true'
+      && needs.vorbereiten.outputs.desktop != 'true' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop.yml
+    with:
+      tag: ${{ needs.vorbereiten.outputs.tag }}
+      version: ${{ needs.vorbereiten.outputs.version }}
+    secrets: inherit
 
   docker:
     name: Container-Abbild
@@ -718,14 +473,14 @@ jobs:
 
   # ── Freigabe (LFH-1054) ───────────────────────────────────────────────────────────
   # Der einzige Weg zu einem veröffentlichten Release. `!cancelled()` plus Einzelprüfung statt
-  # der Vorgabe „alle needs grün“, weil die Desktop-Jobs bei Vorabversionen `skipped` sind.
-  # `desktop` steht eigens in `needs`: `desktop-veroeffentlichen` läuft mit `!cancelled()` und
-  # wird auch grün, wenn eine Plattform fehlt — dann hinge ein Teilmanifest am Release.
+  # der Vorgabe „alle needs grün“, weil `desktop` bei Vorabversionen `skipped` ist. `desktop`
+  # ist der ganze Aufruf von desktop.yml: fehlt eine Plattform, ist er rot, auch wenn das
+  # Teilmanifest schon am Entwurf hängt.
   # Jeder Schritt ist wiederholbar: schon veröffentlicht, `latest` schon gesetzt, Kommentar schon
   # da — alles kein Fehler.
   freigeben:
     name: Release freigeben
-    needs: [vorbereiten, bauen, windows-smoke, veroeffentlichen, desktop, desktop-veroeffentlichen, docker, docker-karten]
+    needs: [vorbereiten, bauen, windows-smoke, veroeffentlichen, desktop, docker, docker-karten]
     if: >-
       ${{ !cancelled() && inputs.freigeben
       && needs.vorbereiten.result == 'success'
@@ -734,8 +489,7 @@ jobs:
       && needs.veroeffentlichen.result == 'success'
       && needs.docker.result == 'success'
       && needs.docker-karten.result == 'success'
-      && (needs.vorbereiten.outputs.desktop != 'true'
-          || (needs.desktop.result == 'success' && needs.desktop-veroeffentlichen.result == 'success')) }}
+      && (needs.vorbereiten.outputs.desktop != 'true' || needs.desktop.result == 'success') }}
     runs-on: ubuntu-latest
     # Das erste stabile Release kommentiert die ganze Historie; die Kommentare laufen der Reihe
     # nach und warten bei GitHubs Ratenbegrenzung.
@@ -824,8 +578,8 @@ jobs:
   # ein älteres Release ausrollen.
   #
   # `!cancelled()` plus `needs.freigeben.result` statt der Vorgabe `success()`: die prüft ALLE
-  # Vorgänger bis zur Wurzel, nicht nur `needs`. Bei Vorabversionen sind die Desktop-Jobs
-  # `skipped`, und `freigeben` hängt an ihnen — mit der Vorgabe fiel das Deployment still aus,
+  # Vorgänger bis zur Wurzel, nicht nur `needs`. Bei Vorabversionen ist `desktop`
+  # `skipped`, und `freigeben` hängt daran — mit der Vorgabe fiel das Deployment still aus,
   # obwohl `freigeben` grün war (alpha.99 und alpha.100, LFH-1137).
   deployment:
     name: Deployment alpha anlegen
@@ -839,3 +593,68 @@ jobs:
     uses: ./.github/workflows/deployment.yml
     with:
       tag: ${{ needs.vorbereiten.outputs.tag }}
+
+  # ── Alpha-Kanal der Desktop-Hülle (LLH-1280) ─────────────────────────────────────────
+  # Hüllen mit einer Vorabversion lesen `releases/download/desktop-alpha/latest.json`
+  # (src-tauri/src/update.rs), stabile weiter `releases/latest/download/latest.json`. Dieser Job
+  # schreibt den Kanal fort, sobald ein Release mit Desktop-Paketen veröffentlicht ist, auch ein
+  # stabiles. Nur vorwärts und nur vollständig (scripts/release/desktop-kanal.mjs). Das Release
+  # `desktop-alpha` legt er beim ersten Mal selbst an: Vorabversion, nie „latest“, Tag ohne `v`,
+  # damit semantic-release und pr-kommentare.mjs es übergehen. Eine Gruppe für alle Läufe, damit
+  # zwei Releases den Kanal nicht gleichzeitig schreiben.
+  desktop-kanal:
+    name: Alpha-Kanal der Desktop-Hülle fortschreiben
+    needs: [vorbereiten, freigeben, desktop, desktop-alpha]
+    if: >-
+      ${{ !cancelled()
+      && (needs.desktop.result == 'success' || needs.desktop-alpha.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: desktop-kanal
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+          persist-credentials: false
+
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.9.1
+          cache: true
+
+      - name: Fortschreiben
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+          KANAL: desktop-alpha
+        run: |
+          set -euo pipefail
+          # Ein Entwurf (Nachbau ohne Freigabe, rote Freigabe) hat Download-URLs, die nur
+          # Berechtigte erreichen; der Kanal zeigte für alle anderen ins Leere.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "false" ]; then
+            echo "::notice::$TAG ist nicht veröffentlicht, der Alpha-Kanal bleibt."
+            exit 0
+          fi
+          mkdir -p neu kanal
+          gh release download "$TAG" --pattern latest.json --dir neu
+          if gh release view "$KANAL" > /dev/null 2>&1; then
+            # Kein `|| true` ums Laden: ein Netzfehler hieße sonst „Kanal leer“ und könnte ihn
+            # zurückdrehen.
+            if gh release view "$KANAL" --json assets --jq '.assets[].name' | grep -qx latest.json; then
+              gh release download "$KANAL" --pattern latest.json --dir kanal
+            fi
+          else
+            gh release create "$KANAL" --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Desktop-App: Alpha-Kanal" \
+              --notes "Update-Manifest für Desktop-Apps mit Vorabversion (LLH-1280). Die Pakete liegen am jeweiligen Release; dieses Release trägt nur latest.json und wird bei jeder Freigabe fortgeschrieben."
+          fi
+          entscheidung="$(mise exec -- node scripts/release/desktop-kanal.mjs --neu neu/latest.json --alt kanal/latest.json)"
+          if [ "$entscheidung" = "hochladen" ]; then
+            gh release upload "$KANAL" neu/latest.json --clobber
+            echo "::notice::Alpha-Kanal zeigt auf $TAG."
+          fi

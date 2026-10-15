@@ -5,7 +5,7 @@
  *   node scripts/release/desktop-manifest.mjs --dir versand --tag v1.2.0 --repo owner/name
  *
  * Liest die gebauten Update-Archive samt `.sig` aus `--dir` und schreibt dort `latest.json`.
- * Aufgerufen vom Job `desktop-veroeffentlichen` in `.github/workflows/artefakte.yml`; der
+ * Aufgerufen vom Job `desktop-veroeffentlichen` in `.github/workflows/desktop.yml`; der
  * Selbsttest (`desktop-manifest.test.mjs`) läuft in Schritt 8 von `scripts/check-all.sh`.
  *
  * AUFGENOMMEN WIRD NUR, WAS WIRKLICH AM RELEASE HÄNGT: je Plattform genau ein Archiv der
@@ -13,7 +13,7 @@
  * ein Eintrag, dessen Archiv fehlt, ließe jede installierte Hülle ins Leere laden. Ohne ein
  * einziges Paar bricht das Skript ab.
  *
- * Die Dateinamen setzt artefakte.yml beim Einsammeln (`lifeline-hub-desktop-<version>-…`):
+ * Die Dateinamen setzt desktop.yml beim Einsammeln (`lifeline-hub-desktop-<version>-…`):
  * Tauris eigene Namen tragen Leerzeichen, und GitHub ersetzt die beim Hochladen still durch
  * Punkte — die URL im Manifest zeigte dann auf eine Datei, die es nicht gibt.
  */

@@ -12,8 +12,12 @@ Quellcode: `src-tauri/`.
 
 ## Bezug
 
-Pakete gibt es nur an **stabilen** Releases (`vX.Y.Z` ohne Vorabkennung), unter
-[Releases](https://github.com/rubenvitt/lifeline-hub/releases):
+Pakete hängen an jedem Release unter
+[Releases](https://github.com/rubenvitt/lifeline-hub/releases), an stabilen (`vX.Y.Z`) und seit
+LLH-1280 auch an Alpha-Releases (`vX.Y.Z-alpha.N`). Am Alpha-Release erscheinen sie erst einige
+Zeit nach der Veröffentlichung, weil Bau und Notarisierung danach laufen (siehe
+„Release-Ablauf“). Scheitert der Desktop-Bau eines Alpha-Releases, fehlen dort die Pakete, das
+Release selbst bleibt gültig.
 
 | System | Datei |
 |---|---|
@@ -125,9 +129,19 @@ Herleitung: `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonze
 
 ## Update
 
-Nach jedem Start prüft die App im Hintergrund, ob es ein neueres **stabiles** Release gibt.
-Sie liest dazu `https://github.com/rubenvitt/lifeline-hub/releases/latest/download/latest.json`,
-und GitHub lässt Vorabversionen bei „latest“ aus.
+Nach jedem Start prüft die App im Hintergrund, ob es ein neueres Release gibt. Welches, hängt an
+der installierten Version (LLH-1280):
+
+- **Stabile App** (`1.2.0`): liest
+  `https://github.com/rubenvitt/lifeline-hub/releases/latest/download/latest.json`. GitHub lässt
+  Vorabversionen bei „latest“ aus, eine stabile App bekommt also nie eine Alpha angeboten.
+- **Alpha-App** (einmal als `…-alpha.N` installiert): liest den **Alpha-Kanal**
+  `https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json`. Er
+  zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, Alpha oder stabil; eine
+  höhere Version ist immer neuer als die Alphas davor (`1.0.0` nach `1.0.0-alpha.N`, `1.1.0`
+  nach `1.0.1-alpha.N`). Die App merkt sich den Kanal in `kanal.json` neben
+  `verbindung.json` und bleibt auch nach einem stabilen Update im Alpha-Kanal. Zurück zum
+  stabilen Kanal: `kanal.json` löschen und eine stabile `.dmg` installieren.
 
 - **Ohne Internet** (Einsatz-LAN) scheitert die Prüfung nach höchstens 10 s still. Die App
   läuft normal weiter, eine Fehlermeldung erscheint nicht.
@@ -145,8 +159,8 @@ und GitHub lässt Vorabversionen bei „latest“ aus.
 
 ## Signaturschlüssel des Updaters
 
-Die Update-Archive signiert der Release-Lauf (`.github/workflows/artefakte.yml`, Job
-`desktop`) mit einem Ed25519-Schlüssel (minisign). Den öffentlichen Teil trägt jede
+Die Update-Archive signiert der Release-Lauf (`.github/workflows/desktop.yml`,
+aus `artefakte.yml`) mit einem Ed25519-Schlüssel (minisign). Den öffentlichen Teil trägt jede
 installierte App.
 
 | Secret (GitHub, Repository) | Inhalt |
@@ -242,12 +256,20 @@ unberührt.
 - Server und App tragen dieselbe Version aus `[workspace.package]` der Wurzel-`Cargo.toml`;
   `semantic-release` setzt sie (`prepareCmd` in `release.config.mjs`). `tauri.conf.json` trägt
   keine eigene, der Test `version_kommt_aus_dem_workspace` in `src-tauri` pinnt das.
-- `artefakte.yml` baut die App nur bei stabilen Tags. Vor dem ersten stabilen Release lässt sich
-  der Bau per „Run workflow“ mit einem Alpha-Tag und `desktop: true` prüfen — mit einem Tag,
-  der **nach** dem Merge von LFH-721 entstanden ist; ältere Tags haben weder `src-tauri/` noch
-  das Manifest-Skript. Dabei entsteht
-  auch ein `latest.json` am Alpha-Release. Das ist unschädlich, weil die Apps nur das stabile
-  „latest“ lesen.
+- Den Bau trägt `.github/workflows/desktop.yml`, aufgerufen aus `artefakte.yml`. Bei
+  **stabilen** Tags läuft er vor der Freigabe (Job `desktop`), ein roter Bau hält das Release
+  auf. Bei **Alpha**-Tags läuft er erst nach der Freigabe ans schon veröffentlichte Release (Job
+  `desktop-alpha`, LLH-1280): Bau und zwei Notarisierungen dauern länger als die
+  Server-Artefakte und hängen an Apple, Release und Deployment warten deshalb nicht darauf.
+- **Alpha-Kanal:** Danach schreibt der Job `desktop-kanal` das `latest.json` des Releases in das
+  Release `desktop-alpha` (Vorabversion, nie „latest“, legt der Job beim ersten Mal selbst an).
+  Nur vorwärts und nur vollständig: ein älteres Release (überholter Lauf, Nachbau) oder eines,
+  dem eine Plattform fehlt, lässt den Kanal stehen (`scripts/release/desktop-kanal.mjs`). Ein
+  Entwurf schreibt nie in den Kanal. Das Release `desktop-alpha` nicht löschen, sonst finden
+  Alpha-Apps kein Update mehr, bis das nächste Alpha-Release es neu anlegt.
+- **Nachbau eines Alpha-Releases** mit Desktop: „Run workflow“ mit dem Tag und `desktop: true`,
+  ohne `freigeben`. Ist das Release veröffentlicht und neuer als der Kanal, schreibt der Lauf
+  ihn auch fort.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten
   Paketen. Scheitert eine Plattform, fehlt sie im Manifest, statt ins Leere zu zeigen.
 - **Ein Release erscheint erst, wenn alles gebaut ist** (LFH-1054). `semantic-release` legt es
