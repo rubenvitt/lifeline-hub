@@ -209,8 +209,8 @@ Wechselt eine Nachforderung ihren Status (zugesagt, unterwegs, eingetroffen, abg
 Ersteller und die Nutzer von S4 einen Hinweis mit dem neuen Status erhalten.
 
 #### Scenario: Nachforderung eingetroffen
-- **WHEN** die Nachforderung „2 RTW“ von Person A auf eingetroffen wechselt
-- **THEN** erhalten A und S4 einen Hinweis „Nachforderung eingetroffen: 2 RTW“
+- **WHEN** eine Nachforderung von Person A über zwei Einheiten an die Leitstelle auf eingetroffen wechselt
+- **THEN** erhalten A und S4 einen Hinweis „Nachforderung eingetroffen“ mit der Zeile „2× an Leitstelle“
 
 ### Requirement: Neue Gefahr
 
@@ -275,12 +275,13 @@ Hinweis erhalten. Wer ihn nicht lesen darf, MUST NOT von ihm erfahren.
 ### Requirement: Gemeinsames Budget und Bündelung
 
 Alle Benachrichtigungen SHALL ein gemeinsames Budget teilen: höchstens drei einzelne Toasts sind
-sichtbar, ab der vierten fasst ein Sammeltoast alle zusammen und nennt je Art die Zahl und einen
-Sprung. Dieselbe Benachrichtigung MUST höchstens einmal erscheinen.
+sichtbar. Ab der vierten fasst ein Sammeltoast die älteren zusammen und nennt je Art die Zahl und
+einen Sprung; die jüngste bleibt einzeln stehen. Dieselbe Benachrichtigung MUST höchstens einmal
+erscheinen.
 
 #### Scenario: Fünf Hinweise
 - **WHEN** binnen kurzer Zeit zwei neue Aufträge, ein Befehl und zwei Nachforderungs-Hinweise eintreffen
-- **THEN** zeigt die Oberfläche einen Sammeltoast „5 weitere …“ mit je einem Sprung zu Aufträge, Befehle und Nachforderungen
+- **THEN** steht der jüngste einzeln, und ein Sammeltoast „4 weitere Hinweise“ nennt die übrigen mit je einem Sprung zu Aufträge, Befehle und Nachforderungen
 
 ### Requirement: Quittieren gilt für alle Verbindungen des Nutzers
 

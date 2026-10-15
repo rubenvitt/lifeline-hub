@@ -235,19 +235,21 @@ Höhe behalten, solange die Zeile mindestens 226 px Platz für Text hat.
 
 ### Requirement: Hinweis in der AlarmZentrale
 
-Die Oberfläche SHALL auf ein Live-Ereignis `abloesung` mit Art `vorwarnung` oder `faellig`
-genau einen Hinweis in der AlarmZentrale zeigen, mit Einheit, Uhrzeit und einem Sprung zur
-Seite Ablösung. Der Hinweis MUST dem bestehenden Budget der AlarmZentrale unterliegen
-(höchstens drei sichtbar, der Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit
-darf nicht zusätzlich als allgemeine Erinnerung alarmieren.
+Die Oberfläche SHALL zur Vorwarnung und zur Fälligkeit einer Schicht genau einen Toast zeigen,
+mit Einheit, Uhrzeit und einem Sprung zur Seite Ablösung. Er kommt als Benachrichtigung
+(`abloesung_vorwarnung` als Hinweis, `abloesung_faellig` als Alarm, Spec `benachrichtigungen`)
+an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
+Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
+Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
+Erinnerung alarmieren.
 
 #### Scenario: Fälligkeit erreicht
-- **WHEN** das Live-Ereignis für die Fälligkeit der Schicht von „Florian 1“ eintrifft
-- **THEN** erscheint ein Hinweis „Ablösung fällig: Florian 1, 15:30“ mit Sprung zur Seite Ablösung
+- **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
+- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zur Seite Ablösung
 
 #### Scenario: Kein Doppelalarm
-- **WHEN** zur selben Fälligkeit auch ein Erinnerungs-Ereignis mit Bezug Ablösung eintrifft
-- **THEN** entsteht dafür kein zweiter Hinweis
+- **WHEN** zur selben Fälligkeit auch eine Erinnerung mit Bezug Ablösung fällig wird
+- **THEN** entsteht dafür keine zweite Benachrichtigung
 
 ### Requirement: Marke im Überblick und Modulzähler
 

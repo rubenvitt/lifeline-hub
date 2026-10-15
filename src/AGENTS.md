@@ -315,7 +315,7 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
 
 ## Backend — Benachrichtigungen (LLH-1207)
 
-Spec `benachrichtigungen`, Herleitung `openspec/changes/kcjecn9e-benachrichtigungskonzept/design.md`
+Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonzept/design.md`
 (D1–D4, D6); `src/benachrichtigung/`, `src/routes/benachrichtigung.rs`.
 - **Ein Schreibweg oder Scheduler meldet nach dem Commit nur über `benachrichtigung::melden`**
   mit einem `Anlass` (Art, Bezug, Auslöser per `von`, Adressaten per `an`). Wer etwas bekommt,

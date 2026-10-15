@@ -54,8 +54,11 @@ erreicht.
 - `lagemonitor`: neue Anforderung zur sichtbaren Hervorhebung neuer Sofortmeldungen und neuer
   Personen der Sichtungskategorie I, ohne Ton und ohne Personenbezug.
 
-`live-abgleich`, `kraefte-abloesung` und `lage-wetter-pegel` behalten ihre Anforderungen: Ablösung
-und Unwetter bleiben, wie sie sind, und die Sofortmeldung wirkt weiter ohne Sammelfenster.
+- `kraefte-abloesung`: der Hinweis zur Vorwarnung und Fälligkeit kommt als Benachrichtigung statt
+  über das Live-Ereignis `abloesung`, das nur noch die Liste auffrischt.
+
+`live-abgleich` und `lage-wetter-pegel` behalten ihre Anforderungen: Unwetter bleibt, wie es ist,
+und die Sofortmeldung wirkt weiter ohne Sammelfenster.
 
 ## Impact
 

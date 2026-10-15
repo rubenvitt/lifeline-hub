@@ -60,7 +60,7 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 8. Meldung an meine Funktion (D8, benötigt 1, 2) · LLH-1214
 
-- [x] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme und ungültiger Code 422
+- [x] 8.1 Migration `meldung.empfaenger_funktion` anhängen, DTO, Codegen; Routentest Annahme, ungültiger Code 400, Fachberater/FüHiPers/S7 422
 - [x] 8.2 Erfassung bietet Empfängerfunktion an und füllt den Freitext vor; Vitest
 - [x] 8.3 Erfassen meldet `meldung` an die Funktion, bei Sofortmeldung nur der Alarm; Rust-Tests „Meldung an S2“, „Sofortmeldung an S2“
 - [x] 8.4 Anwenderkapitel `meldungen` (Empfängerfunktion) nachziehen
@@ -106,8 +106,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 16. Abschluss · LLH-1222
 
-- [ ] 16.1 `./scripts/check-all.sh` grün (lokal oder als CI-Lauf des PRs belegt)
-- [ ] 16.2 Mutationsprobe an der Empfängerauflösung (Auslöser-Ausschluss und Ersatz über Mitgliedschaft auskommentieren → Tests rot)
+- [x] 16.1 `./scripts/check-all.sh` grün (lokal oder als CI-Lauf des PRs belegt): als CI-Lauf des Abschluss-PRs
+- [x] 16.2 Mutationsprobe an der Empfängerauflösung (Auslöser-Ausschluss und Ersatz über Mitgliedschaft auskommentieren → Tests rot): Auslöser nicht ausgenommen → 19 Tests rot, ohne Ersatz über die Mitgliedschaft → 16 Tests rot
 
 ## Workflow follow-up
 
