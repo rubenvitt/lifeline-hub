@@ -4,6 +4,25 @@
 //! `openspec/specs/kraefte-disposition`, „Einheit aus Vorlage bilden“, und
 //! `openspec/specs/einheit-vorlagen`, „Vorschau im Einsatz“).
 
+/// Kennzeichen „nicht übernommen“ (LLH-1075, design.md D3) als SQL über `einsatz_einheit` mit
+/// Alias `e`: der Beginn der offenen Übernahme, nur solange sie offen ist (nicht übernommen, nicht
+/// aufgelöst). Eine Quelle für `EinheitAnzeige` und `BrEinheitKurz`.
+macro_rules! nicht_uebernommen_seit_sql {
+    () => {
+        "CASE WHEN e.uebernahme_offen_seit IS NOT NULL AND e.uebernommen_at IS NULL \
+              AND e.aufgeloest_at IS NULL THEN e.uebernahme_offen_seit END"
+    };
+}
+pub(crate) use nicht_uebernommen_seit_sql;
+
+/// Herkunft „unangemeldet“ (D3): dauerhaft, auch nach der Übernahme. Alias `e` wie oben.
+macro_rules! unangemeldet_sql {
+    () => {
+        "(e.uebernahme_offen_seit IS NOT NULL)"
+    };
+}
+pub(crate) use unangemeldet_sql;
+
 pub mod aus_vorlage;
 pub mod mitglied_repo;
 pub mod repo;
@@ -205,6 +224,12 @@ pub struct EinheitAnzeige {
     pub aufgeloest_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgeloest_von: Option<i64>,
+    /// Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,
+    /// nur solange die Übernahme offen ist (UTC ohne Zone).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nicht_uebernommen_seit: Option<String>,
+    /// Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3).
+    pub unangemeldet: bool,
 }
 
 #[cfg(test)]
@@ -340,9 +365,76 @@ pub fn etb_text_aus_vorlage(
     teile.join("; ")
 }
 
+/// System-ETB beim Übernehmen einer unangemeldeten Einheit (LLH-1075, design.md D10): nennt die
+/// gewählte Unterstellung; der Eintrag „Abschnitt zugeordnet“ des PATCH entsteht nicht zusätzlich.
+pub fn etb_text_uebernommen(name: &str, abschnitt: Option<&str>, ueber: Option<&str>) -> String {
+    let mut text = format!("Einheit «{name}» übernommen");
+    if let Some(a) = abschnitt {
+        text.push_str(&format!(", Abschnitt {a}"));
+    }
+    if let Some(u) = ueber {
+        text.push_str(&format!(", unterstellt «{u}»"));
+    }
+    text
+}
+
+/// System-ETB beim Abweisen einer unangemeldeten Einheit (LLH-1075, design.md D11): verlässt den
+/// Raum, aufgelöst, Fahrzeuge entlassen; Beladung ohne Ort als Zahl der Posten (Spec
+/// `kraefte-entlassung`). Leere Teile entfallen.
+pub fn etb_text_abgewiesen(
+    name: &str,
+    br: Option<&str>,
+    fahrzeuge: &[String],
+    beladung: usize,
+) -> String {
+    let mut teile = Vec::new();
+    if let Some(b) = br {
+        teile.push(format!("verlässt BR {b}"));
+    }
+    teile.push("aufgelöst".to_string());
+    if !fahrzeuge.is_empty() {
+        teile.push(format!("Fahrzeuge entlassen: {}", fahrzeuge.join(", ")));
+    }
+    let mut text = format!("Einheit «{name}» abgewiesen: {}", teile.join(", "));
+    if beladung > 0 {
+        text.push_str(&format!("; Beladung ohne Ort: {beladung} Posten"));
+    }
+    text
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn uebernommen_und_abgewiesen() {
+        assert_eq!(
+            etb_text_uebernommen("FL-MUS 1-44-1", None, None),
+            "Einheit «FL-MUS 1-44-1» übernommen"
+        );
+        assert_eq!(
+            etb_text_uebernommen("FL-MUS 1-44-1", Some("Nord"), None),
+            "Einheit «FL-MUS 1-44-1» übernommen, Abschnitt Nord"
+        );
+        assert_eq!(
+            etb_text_uebernommen("FL-MUS 1-44-1", Some("Nord"), Some("1. Zug")),
+            "Einheit «FL-MUS 1-44-1» übernommen, Abschnitt Nord, unterstellt «1. Zug»"
+        );
+        assert_eq!(
+            etb_text_abgewiesen(
+                "FL-MUS 1-44-1",
+                Some("Sportplatz"),
+                &["FL-MUS 1-44-1".into()],
+                0
+            ),
+            "Einheit «FL-MUS 1-44-1» abgewiesen: verlässt BR Sportplatz, aufgelöst, \
+             Fahrzeuge entlassen: FL-MUS 1-44-1"
+        );
+        assert_eq!(
+            etb_text_abgewiesen("X", None, &[], 3),
+            "Einheit «X» abgewiesen: aufgelöst; Beladung ohne Ort: 3 Posten"
+        );
+    }
 
     #[test]
     fn gebildet_und_fahrzeug_zugeordnet() {

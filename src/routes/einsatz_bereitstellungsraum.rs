@@ -50,6 +50,11 @@ pub struct BrEinheitKurz {
     pub seit_at: Option<String>,
     /// Aktive Fahrzeuge der Einheit.
     pub fahrzeuge: Vec<BrEinheitFahrzeug>,
+    /// Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nicht_uebernommen_seit: Option<String>,
+    /// Herkunft „unangemeldet“, dauerhaft (D3).
+    pub unangemeldet: bool,
 }
 
 /// Aktives Fahrzeug einer Einheit im Raum.
@@ -146,10 +151,14 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
             .find(|l| l.objekt_typ == typ && l.objekt_id == id)
             .and_then(|l| l.seit_at().map(str::to_string))
     };
-    let einheiten: Vec<(i64, String)> = sqlx::query_as(
-        "SELECT id, name FROM einsatz_einheit \
-         WHERE aktueller_br_id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
-    )
+    let einheiten: Vec<(i64, String, Option<String>, bool)> = sqlx::query_as(concat!(
+        "SELECT e.id, e.name, ",
+        crate::einheit::nicht_uebernommen_seit_sql!(),
+        ", ",
+        crate::einheit::unangemeldet_sql!(),
+        " FROM einsatz_einheit e \
+         WHERE e.aktueller_br_id = ? AND e.einsatz_id = ? AND e.aufgeloest_at IS NULL",
+    ))
     .bind(br_id)
     .bind(einsatz_id)
     .fetch_all(&state.pool)
@@ -168,19 +177,23 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
     .await?;
     let einheiten = einheiten
         .into_iter()
-        .map(|(id, name)| BrEinheitKurz {
-            id,
-            name,
-            seit_at: seit(ObjektTyp::Einheit, id),
-            fahrzeuge: einheit_fahrzeuge
-                .iter()
-                .filter(|(einheit, _, _)| *einheit == id)
-                .map(|(_, id, funkrufname)| BrEinheitFahrzeug {
-                    id: *id,
-                    funkrufname: funkrufname.clone(),
-                })
-                .collect(),
-        })
+        .map(
+            |(id, name, nicht_uebernommen_seit, unangemeldet)| BrEinheitKurz {
+                id,
+                name,
+                nicht_uebernommen_seit,
+                unangemeldet,
+                seit_at: seit(ObjektTyp::Einheit, id),
+                fahrzeuge: einheit_fahrzeuge
+                    .iter()
+                    .filter(|(einheit, _, _)| *einheit == id)
+                    .map(|(_, id, funkrufname)| BrEinheitFahrzeug {
+                        id: *id,
+                        funkrufname: funkrufname.clone(),
+                    })
+                    .collect(),
+            },
+        )
         .collect();
     let fahrzeuge: Vec<(i64, String)> = sqlx::query_as(
         "SELECT id, snap_funkrufname FROM einsatz_fahrzeug \

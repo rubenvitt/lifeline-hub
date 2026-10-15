@@ -2228,3 +2228,367 @@ async fn eintreffen_raum_und_rechte() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
 }
+
+// ============================== Übernehmen und Abweisen (LLH-1075) ==============================
+
+/// Bucht eine unangemeldete Kraft und liefert (einheit_id, meldung_id, fahrzeug_id).
+async fn unangemeldet_buchen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    funkrufname: &str,
+) -> (i64, i64, i64) {
+    let (s, v) = eintreffen(app, cookie, einsatz, br, unangemeldet_body(funkrufname)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    (
+        v["einheit_id"].as_i64().unwrap(),
+        v["meldung_id"].as_i64().unwrap(),
+        v["fahrzeug_ids"][0].as_i64().unwrap(),
+    )
+}
+
+async fn meldung_bestaetigt(pool: &sqlx::SqlitePool, meldung: i64) -> bool {
+    sqlx::query_scalar::<_, Option<String>>(
+        "SELECT quittiert_at FROM kommunikation_status \
+         WHERE objekt_typ = 'meldung' AND objekt_id = ?",
+    )
+    .bind(meldung)
+    .fetch_optional(pool)
+    .await
+    .unwrap()
+    .flatten()
+    .is_some()
+}
+
+fn einheit_pfad(einsatz: i64, einheit: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/einheiten/{einheit}")
+}
+
+async fn einheit_json(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    einheit: i64,
+) -> serde_json::Value {
+    let liste = fetch_json(app, cookie, &format!("/api/einsaetze/{einsatz}/einheiten")).await;
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .cloned()
+        .unwrap_or(serde_json::Value::Null)
+}
+
+/// 4.3: Kennzeichen und Herkunft an Einheiten-Antwort und Belegung des Raums; nach der Übernahme
+/// (mit Abschnitt) ist das Kennzeichen weg, die Herkunft bleibt, die Einheit steht weiter im Raum,
+/// die Meldung ist bestätigt und das ETB trägt genau einen Eintrag mit der Unterstellung.
+#[tokio::test]
+async fn uebernehmen_mit_abschnitt() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let bekannt = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+    belegen(&app, &cookie, eid, br, "einheit", bekannt, "eintritt").await;
+    let (einheit, meldung, _) = unangemeldet_buchen(&app, &cookie, eid, br, "FL-MUS 1-44-1").await;
+
+    let e = einheit_json(&app, &cookie, eid, einheit).await;
+    assert!(e["nicht_uebernommen_seit"].is_string(), "{e}");
+    assert_eq!(e["unangemeldet"], true);
+    let b = einheit_json(&app, &cookie, eid, bekannt).await;
+    assert!(b.get("nicht_uebernommen_seit").is_none(), "{b}");
+    assert_eq!(b["unangemeldet"], false);
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    let zeile = |d: &serde_json::Value, id: i64| {
+        d["einheiten"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == id)
+            .cloned()
+            .unwrap()
+    };
+    assert!(zeile(&detail, einheit)["nicht_uebernommen_seit"].is_string());
+    assert_eq!(zeile(&detail, einheit)["unangemeldet"], true);
+    assert_eq!(zeile(&detail, bekannt)["unangemeldet"], false);
+
+    // Bekannte Einheit: keine offene Übernahme → 422.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, bekannt)),
+        &cookie,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let etb_vorher = bestand(&pool, eid).await[2];
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, einheit)),
+        &cookie,
+        Some(&json!({"abschnitt_id": nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("nicht_uebernommen_seit").is_none(), "{v}");
+    assert_eq!(v["unangemeldet"], true);
+    assert_eq!(v["abschnitt_id"], nord);
+    assert_eq!(v["aktueller_br_id"], br, "bleibt im Raum");
+    assert!(meldung_bestaetigt(&pool, meldung).await);
+    assert_eq!(
+        bestand(&pool, eid).await[2],
+        etb_vorher + 1,
+        "genau ein ETB"
+    );
+    assert!(etb_inhalte(&app, &cookie, eid)
+        .await
+        .contains(&"Einheit «FL-MUS 1-44-1» übernommen, Abschnitt Nord".to_string()));
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert!(zeile(&detail, einheit)
+        .get("nicht_uebernommen_seit")
+        .is_none());
+    assert_eq!(zeile(&detail, einheit)["unangemeldet"], true);
+    let mut tags = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        tags.push(n.event.as_str().to_string());
+    }
+    for tag in ["einheit", "bereitstellungsraum", "meldung", "etb"] {
+        assert!(tags.iter().any(|t| t == tag), "{tag} fehlt: {tags:?}");
+    }
+
+    // Zweimal → 422.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, einheit)),
+        &cookie,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Übernehmen mit Über-Einheit; Zyklus 400, fremder Abschnitt 404, Meldung schon quittiert
+/// gelingt, aufgelöst 409, ohne Recht Einheiten 403.
+#[tokio::test]
+async fn uebernehmen_bezuege_und_zustaende() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let andere = common::einsatz_anlegen_mit(&app, &cookie, "Andere Lage").await;
+    let fremder_abschnitt = abschnitt_anlegen(&app, &cookie, andere, "Fremd").await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let (einheit, meldung, _) = unangemeldet_buchen(&app, &cookie, eid, br, "FL 1").await;
+    let pfad = format!("{}/uebernehmen", einheit_pfad(eid, einheit));
+
+    // Zyklus: der Zug hängt unter der neuen Einheit.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &einheit_pfad(eid, zug),
+        &cookie,
+        Some(&json!({"ueber_einheit_id": einheit})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let vorher = bestand(&pool, eid).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"ueber_einheit_id": zug})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Zyklus");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"abschnitt_id": fremder_abschnitt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Abschnitt");
+    assert_eq!(bestand(&pool, eid).await, vorher);
+    assert!(!meldung_bestaetigt(&pool, meldung).await);
+
+    // Ohne Recht Einheiten 403.
+    let frieda = benutzer_anlegen(&app, &cookie, "frieda", "keine").await;
+    rolle_setzen(&app, &cookie, eid, frieda, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/modul-overrides/einheiten"),
+        &cookie,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage_json(&app, "POST", &pfad, &frieda, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    // Meldung schon quittiert: Übernahme gelingt; mit Über-Einheit.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/meldungen/{meldung}/bestaetigen"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let neuer_zug = einheit_bilden(&app, &cookie, eid, "2. Zug").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"ueber_einheit_id": neuer_zug})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ueber_einheit_id"], neuer_zug);
+    assert!(etb_inhalte(&app, &cookie, eid)
+        .await
+        .contains(&"Einheit «FL 1» übernommen, unterstellt «2. Zug»".to_string()));
+
+    // Aufgelöst → 409.
+    let (zweite, _, _) = unangemeldet_buchen(&app, &cookie, eid, br, "FL 2").await;
+    sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = '2026-05-28 10:00:00' WHERE id = ?")
+        .bind(zweite)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, zweite)),
+        &cookie,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+/// D11: Abweisen schreibt Austritt (Notiz „Einheit aufgelöst“), Zeitachsen-Entlassung (Quelle
+/// `disposition`), entlässt das Fahrzeug, bestätigt die Meldung und genau einen ETB-Eintrag.
+#[tokio::test]
+async fn abweisen_loest_auf_und_entlaesst() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let (einheit, meldung, fahrzeug) =
+        unangemeldet_buchen(&app, &cookie, eid, br, "FL-MUS 1-44-1").await;
+    let pfad = format!("{}/abweisen", einheit_pfad(eid, einheit));
+
+    // Ohne Recht Fahrzeuge 403, nichts geändert.
+    let frieda = benutzer_anlegen(&app, &cookie, "frieda", "keine").await;
+    rolle_setzen(&app, &cookie, eid, frieda, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/modul-overrides/fahrzeuge"),
+        &cookie,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let vorher = bestand(&pool, eid).await;
+    let (s, _) = anfrage_json(&app, "POST", &pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(bestand(&pool, eid).await, vorher);
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(&app, "POST", &pfad, &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let nachher = bestand(&pool, eid).await;
+    assert_eq!(nachher[2], vorher[2] + 1, "genau ein ETB-Eintrag");
+    let (art, notiz): (String, Option<String>) = sqlx::query_as(
+        "SELECT art, notiz FROM br_belegung WHERE objekt_typ = 'einheit' AND objekt_id = ? \
+         ORDER BY id DESC LIMIT 1",
+    )
+    .bind(einheit)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (art.as_str(), notiz.as_deref()),
+        ("austritt", Some("Einheit aufgelöst"))
+    );
+    let quelle: String = sqlx::query_scalar(
+        "SELECT quelle FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = 'entlassung'",
+    )
+    .bind(einheit)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(quelle, "disposition");
+    let beendet_als: Option<String> =
+        sqlx::query_scalar("SELECT beendet_als FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(fahrzeug)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(beendet_als.as_deref(), Some("entlassen"));
+    let aufgeloest: Option<String> =
+        sqlx::query_scalar("SELECT aufgeloest_at FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(aufgeloest.is_some());
+    assert!(meldung_bestaetigt(&pool, meldung).await);
+    assert!(etb_inhalte(&app, &cookie, eid).await.contains(
+        &"Einheit «FL-MUS 1-44-1» abgewiesen: verlässt BR Sportplatz, aufgelöst, \
+          Fahrzeuge entlassen: FL-MUS 1-44-1"
+            .to_string()
+    ));
+    let mut tags = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        tags.push(n.event.as_str().to_string());
+    }
+    for tag in [
+        "einheit",
+        "bereitstellungsraum",
+        "fahrzeug",
+        "meldung",
+        "etb",
+    ] {
+        assert!(tags.iter().any(|t| t == tag), "{tag} fehlt: {tags:?}");
+    }
+
+    // Aufgelöst → 409; übernommene Einheit → 422.
+    let (s, _) = anfrage_json(&app, "POST", &pfad, &cookie, None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (zweite, _, _) = unangemeldet_buchen(&app, &cookie, eid, br, "FL 2").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, zweite)),
+        &cookie,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/abweisen", einheit_pfad(eid, zweite)),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}

@@ -279,6 +279,7 @@ use utoipa::OpenApi;
         crate::routes::einsatz_bereitstellungsraum::BrEinheitKurz,
         crate::routes::einsatz_bereitstellungsraum::BrFahrzeugKurz,
         crate::routes::einsatz_bereitstellungsraum::BrListenEintrag,
+        crate::routes::einsatz_einheit::UebernahmeBody,
         crate::routes::einsatz_person::PersonDetail,
         crate::routes::einsatz_uhs::UhsDetail,
         crate::uhs::kraefte::UhsKraft,

@@ -1831,6 +1831,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_einheit::stornieren),
         )
         .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
+            post(routes::einsatz_einheit::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/abweisen",
+            post(routes::einsatz_einheit::abweisen),
+        )
+        .route(
             "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",
             put(routes::einsatz_einheit::personal_zuordnen),
         )

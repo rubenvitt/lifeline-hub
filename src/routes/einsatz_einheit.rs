@@ -656,6 +656,121 @@ pub async fn stornieren(
     end_einheit(&state, &ctx, eid, einheit_repo::Aufloesung::Stornieren).await
 }
 
+/// Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct UebernahmeBody {
+    #[serde(default)]
+    pub abschnitt_id: Option<i64>,
+    #[serde(default)]
+    pub ueber_einheit_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/einheiten/{eid}/uebernehmen — eine unangemeldete Einheit übernehmen
+/// (LLH-1075, design.md D10, Spec `bereitstellungsraum-belegung`): Kennzeichen aufheben, gewählte
+/// Unterstellung, Meldung des Eintreffens bestätigen, genau ein ETB. Bleibt im Raum.
+pub async fn uebernehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<UebernahmeBody>,
+) -> Result<Json<EinheitAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let org_id = ctx.einsatz.org_id;
+    let u = einheit_repo::Uebernahme {
+        abschnitt_id: body.abschnitt_id,
+        ueber_einheit_id: body.ueber_einheit_id,
+    };
+    einheit_repo::pruefe_uebernahme(&state.pool, einsatz_id, org_id, eid, &u).await?;
+    let jetzt = crate::zeit::jetzt();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis =
+            einheit_repo::uebernehmen_tx(conn, org_id, einsatz_id, eid, &u, benutzer_id, &jetzt)
+                .await?;
+        let text = crate::einheit::etb_text_uebernommen(
+            &ergebnis.name,
+            ergebnis.abschnitt.as_deref(),
+            ergebnis.ueber.as_deref(),
+        );
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &text).await?;
+        Ok((ergebnis, etb_id))
+    })?;
+    // D12: das Ereignis `einheit` frischt das Detail des Raums nicht auf, das Kennzeichen an der
+    // Belegungszeile bliebe sonst stehen.
+    state.live.publiziere(einsatz_id, etb_id);
+    sse_einheit(&state, einsatz_id, eid);
+    if let Some(br_id) = ergebnis.br_id {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+    }
+    if ergebnis.meldung_id.is_some() {
+        crate::meldung::sse(&state, einsatz_id);
+    }
+    Ok(Json(
+        einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
+    ))
+}
+
+/// POST /api/einsaetze/{id}/einheiten/{eid}/abweisen — eine unangemeldete Einheit abweisen
+/// (LLH-1075, design.md D11): auflösen (Austritt, Zeitachsen-Entlassung), jedes ihrer Fahrzeuge
+/// entlassen, Meldung bestätigen, genau ein ETB. Verlangt zusätzlich das Recht Fahrzeuge.
+pub async fn abweisen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let org_id = ctx.einsatz.org_id;
+    let jetzt = crate::zeit::jetzt();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis =
+            einheit_repo::abweisen_tx(conn, org_id, einsatz_id, eid, benutzer_id, &jetzt).await?;
+        let fahrzeuge: Vec<String> = ergebnis
+            .entlassen
+            .iter()
+            .map(|(_, funkrufname, _)| funkrufname.clone())
+            .collect();
+        let beladung = ergebnis
+            .entlassen
+            .iter()
+            .map(|(_, _, e)| e.material.len())
+            .sum();
+        let text = crate::einheit::etb_text_abgewiesen(
+            &ergebnis.name,
+            ergebnis.br_bezeichnung.as_deref(),
+            &fahrzeuge,
+            beladung,
+        );
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &text).await?;
+        Ok((ergebnis, etb_id))
+    })?;
+    state.live.publiziere(einsatz_id, etb_id);
+    notify_aufgeloest(&state, einsatz_id, eid, &ergebnis.aufgeloest);
+    let mut fuehrungsstelle = false;
+    for (ef_id, _, e) in &ergebnis.entlassen {
+        sse_fahrzeug(&state, einsatz_id, *ef_id);
+        for ep_id in &e.besatzung {
+            sse_personal(&state, einsatz_id, *ep_id);
+        }
+        for em_id in &e.material {
+            sse_material(&state, einsatz_id, *em_id);
+        }
+        fuehrungsstelle |= e.trug_fuehrungsstelle;
+    }
+    if fuehrungsstelle {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    if ergebnis.meldung_id.is_some() {
+        crate::meldung::sse(&state, einsatz_id);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Auflösen und Stornieren teilen Ablauf und Meldeweg.
 async fn end_einheit(
     state: &AppState,
