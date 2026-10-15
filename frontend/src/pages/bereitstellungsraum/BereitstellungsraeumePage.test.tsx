@@ -10,6 +10,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { BrListenEintrag, Einheit, EinsatzAnzeige } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../../test/fixtures';
+import { setzeViewportBreite } from '../../test/viewport';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Lage', ...over });
@@ -511,12 +512,52 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     expect(screen.queryByTitle('Stärke unvollständig')).not.toBeInTheDocument();
   });
 
-  it('Abschnitt und Standort lassen sich ausblenden', async () => {
+  it.each(['Abschnitt', 'Standort'])(
+    '%s lässt sich ausblenden, die Zahlspalten bleiben',
+    async (spalte) => {
+      setzeViewportBreite(1024);
+      stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP]));
+      renderPage();
+      await screen.findByText('BR Sportplatz');
+      expect(screen.getByRole('columnheader', { name: spalte })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: /Spalten.*Bereitstellungsräume/ }));
+      const menue = await waitFor(() => {
+        const m = document.querySelector<HTMLElement>(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        );
+        expect(m).not.toBeNull();
+        return m!;
+      });
+      const eintraege = within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent?.trim());
+      for (const zahl of ['Stärke', 'Fahrzeuge', 'Einheiten', 'Längste Wartezeit']) {
+        expect(eintraege).not.toContain(zahl);
+      }
+      await userEvent.click(within(menue).getByRole('menuitem', { name: spalte }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('columnheader', { name: spalte })).not.toBeInTheDocument(),
+      );
+      for (const bleibt of ['Fahrzeuge', 'Einheiten', 'Längste Wartezeit']) {
+        expect(screen.getByRole('columnheader', { name: bleibt })).toBeInTheDocument();
+      }
+    },
+  );
+
+  it('unter md weichen Abschnitt und Standort, die Zahlspalten bleiben', async () => {
+    setzeViewportBreite(390);
     stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP]));
     renderPage();
     await screen.findByText('BR Sportplatz');
+    expect(screen.queryByRole('columnheader', { name: 'Abschnitt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Standort' })).not.toBeInTheDocument();
+    for (const bleibt of ['Stärke', 'Fahrzeuge', 'Einheiten', 'Längste Wartezeit']) {
+      expect(screen.getByRole('columnheader', { name: bleibt })).toBeInTheDocument();
+    }
     expect(
-      screen.getByRole('button', { name: /Spalten.*Bereitstellungsräume/ }),
+      screen.getByRole('button', { name: /Spalten · 2 ausgeblendet.*Bereitstellungsräume/ }),
     ).toBeInTheDocument();
   });
 
