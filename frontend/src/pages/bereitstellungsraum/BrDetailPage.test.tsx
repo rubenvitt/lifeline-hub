@@ -12,6 +12,7 @@ import { setzeViewportBreite } from '../../test/viewport';
 import type {
   BrDetail,
   BrEinheitKurz,
+  BrVerlaufEintrag,
   EinsatzAnzeige,
   Einheit,
   EinsatzFahrzeug,
@@ -40,15 +41,21 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
 type EinheitEingabe = Omit<BrEinheitKurz, 'fahrzeuge'> & Partial<Pick<BrEinheitKurz, 'fahrzeuge'>>;
 
 /** Ohne Angabe folgt `belegung` den Listen, wie der Server zählt (LLH-1095): Einheiten, dazu
- *  die einheitenlosen Fahrzeuge und die der Einheiten. */
+ *  die einheitenlosen Fahrzeuge und die der Einheiten, die längste Wartezeit ab dem frühesten
+ *  „seit“. */
 function brDetail(
   over: Omit<Partial<BrDetail>, 'einheiten'> & { einheiten?: EinheitEingabe[] } = {},
 ): BrDetail {
   const einheiten = (over.einheiten ?? []).map((e) => ({ fahrzeuge: [], ...e }));
   const fahrzeuge = over.fahrzeuge ?? [];
+  const seit = [...einheiten, ...fahrzeuge]
+    .map((k) => k.seit_at)
+    .filter((t): t is string => t != null)
+    .sort();
   const belegung = over.belegung ?? {
     einheiten: einheiten.length,
     fahrzeuge: einheiten.reduce((n, e) => n + e.fahrzeuge.length, fahrzeuge.length),
+    laengste_seit_at: seit[0] ?? null,
   };
   return {
     id: 1,
@@ -147,6 +154,18 @@ function renderBrDetail(brId = 1): QueryClient {
     </QueryClientProvider>,
   );
   return qc;
+}
+
+/** Text einer Kennzahl des Belegungsbands, gefunden über ihre Augenbraue. */
+function kennzahl(titel: string): HTMLElement {
+  const zellen = screen
+    .getByTestId('br-summe')
+    .querySelectorAll<HTMLElement>('[data-lfh="kennzahl"]');
+  const zelle = [...zellen].find(
+    (z) => z.querySelector('.lfh-kennzahl__titel')?.textContent === titel,
+  );
+  if (!zelle) throw new Error(`Kennzahl „${titel}“ fehlt`);
+  return zelle;
 }
 
 function renderBrBei(route: string) {
@@ -392,9 +411,9 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
 
     renderBrDetail();
 
-    const summe = await screen.findByTestId('br-summe');
-    expect(summe).toHaveTextContent(/Bereitgestellt\s*1\/4\/20\/\/25/);
-    expect(summe).toHaveTextContent(/Fahrzeug\s*1$/);
+    await screen.findByTestId('br-summe');
+    expect(kennzahl('Bereitgestellt')).toHaveTextContent('1/4/20//25');
+    expect(kennzahl('Fahrzeug')).toHaveTextContent(/^Fahrzeug1$/);
     expect(screen.getByText('Zug')).toBeInTheDocument();
     expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByText('LF 20')).toBeInTheDocument();
@@ -524,8 +543,8 @@ describe('BrDetailPage — Fahrzeuge der Einheiten zählen mit (LLH-1095)', () =
 
   it('Fahrzeuge 3', async () => {
     renderBrDetail();
-    const summe = await screen.findByTestId('br-summe');
-    expect(summe).toHaveTextContent(/Fahrzeuge\s*3$/);
+    await screen.findByTestId('br-summe');
+    expect(kennzahl('Fahrzeuge')).toHaveTextContent(/^Fahrzeuge3$/);
   });
 
   it('noch 3 belegt, nicht 5', async () => {
@@ -1437,5 +1456,395 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByTestId('br-material')).toBeNull();
     expect(abrufe).toEqual([]);
+  });
+});
+
+/** 14:30 Berliner Sommerzeit (12:30 UTC) am 15.10.2026. */
+const JETZT = new Date('2026-10-15T14:30:00+02:00');
+
+/**
+ * Nur `Date` und das Intervall der Uhr sind gefälscht: MSW, react-query und antd laufen auf echten
+ * Timern (`setTimeout`), die Wartezeit rückt mit `vi.advanceTimersByTime` vor.
+ */
+function mitUhr() {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(JETZT);
+    return () => vi.useRealTimers();
+  });
+}
+
+/** Zeile einer Kraft der Belegung (Liste „Bereitgestellte …“). */
+const belegungsZeile = (name: string) =>
+  within(screen.getByTestId('br-belegung'))
+    .getByText(name)
+    .closest<HTMLElement>('.listen-eintrag')!;
+
+/** Belegung aus der Fixture der Spec: zwei Einheiten (0/1/5//6) mit je einem Fahrzeug, ein
+ *  Fahrzeug ohne Einheit. */
+const ZUG = einheit({
+  id: 10,
+  name: '1. Zug',
+  typ_label: 'Zug',
+  ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
+});
+const TRUPP = einheit({
+  id: 11,
+  name: 'Trupp 2',
+  typ_label: 'Trupp',
+  ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
+});
+const BELEGT = brDetail({
+  einheiten: [
+    {
+      id: 10,
+      name: '1. Zug',
+      seit_at: '2026-10-15 11:42:00',
+      fahrzeuge: [{ id: 21, funkrufname: 'Florian 1/44-1' }],
+    },
+    {
+      id: 11,
+      name: 'Trupp 2',
+      seit_at: '2026-10-15 12:05:00',
+      fahrzeuge: [{ id: 22, funkrufname: 'Florian 1/44-2' }],
+    },
+  ],
+  fahrzeuge: [{ id: 23, funkrufname: 'Florian 1/83-1', seit_at: '2026-10-15 12:10:00' }],
+});
+
+function stelleBelegtBereit(br: BrDetail = BELEGT, zaehler?: { detail: number }) {
+  server.use(
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+    http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+      if (zaehler) zaehler.detail += 1;
+      return HttpResponse.json(br);
+    }),
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
+    http.get('/api/einsaetze/1/fahrzeuge', () =>
+      HttpResponse.json([
+        fahrzeug({
+          id: 23,
+          funkrufname: 'Florian 1/83-1',
+          fahrzeugtyp: 'GW-San',
+          aktueller_br_id: 1,
+        }),
+      ]),
+    ),
+  );
+}
+
+describe('BrDetailPage — Kennzahlenband der Belegung (LLH-1095 D9)', () => {
+  mitUhr();
+
+  it('zeigt Stärke, Fahrzeuge, Einheiten und längste Wartezeit', async () => {
+    stelleBelegtBereit();
+    renderBrDetail();
+    await screen.findByTestId('br-summe');
+    expect(kennzahl('Bereitgestellt')).toHaveTextContent('0/1/5//6');
+    expect(kennzahl('Fahrzeuge')).toHaveTextContent(/^Fahrzeuge3$/);
+    expect(kennzahl('Einheiten')).toHaveTextContent(/^Einheiten2$/);
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('48 min');
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('seit 1342');
+  });
+
+  it('Fahrzeuge und Einheiten kommen vom Server, nicht aus der Länge der Listen', async () => {
+    stelleBelegtBereit({
+      ...BELEGT,
+      belegung: { einheiten: 4, fahrzeuge: 7, laengste_seit_at: null },
+    });
+    renderBrDetail();
+    await screen.findByTestId('br-summe');
+    expect(kennzahl('Fahrzeuge')).toHaveTextContent(/^Fahrzeuge7$/);
+    expect(kennzahl('Einheiten')).toHaveTextContent(/^Einheiten4$/);
+  });
+
+  it('ohne frühestes „seit“ zeigt „Längste Wartezeit“ „—“ ohne Notiz', async () => {
+    stelleBelegtBereit({ ...BELEGT, belegung: { ...BELEGT.belegung, laengste_seit_at: null } });
+    renderBrDetail();
+    await screen.findByTestId('br-summe');
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent(/^Längste Wartezeit—$/);
+  });
+
+  it('das Band hält seine Notizhöhe fest: eine kommende oder gehende Notiz schiebt nichts', async () => {
+    stelleBelegtBereit();
+    renderBrDetail();
+    const band = await screen.findByRole('group', { name: 'Bereitgestellte Kräfte' });
+    expect(band).toHaveClass('lfh-kennzahlenband--notizfest');
+    expect(band).toHaveClass('lfh-kennzahlenband--notizzeilen');
+  });
+});
+
+describe('BrDetailPage — Zeile je Kraft mit Wartezeit (LLH-1095 D10)', () => {
+  mitUhr();
+
+  it('„seit 1342 · 48 min“, nach 60 s „49 min“ ohne neuen Abruf', async () => {
+    const zaehler = { detail: 0 };
+    stelleBelegtBereit(BELEGT, zaehler);
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    expect(belegungsZeile('1. Zug')).toHaveTextContent('seit 1342 · 48 min');
+    const abrufe = zaehler.detail;
+
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(belegungsZeile('1. Zug')).toHaveTextContent('seit 1342 · 49 min');
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('49 min');
+    expect(zaehler.detail).toBe(abrufe);
+  });
+
+  it('Einheit mit Typ, Stärke und den Funkrufnamen ihrer Fahrzeuge', async () => {
+    stelleBelegtBereit();
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    const zeile = belegungsZeile('1. Zug');
+    expect(zeile).toHaveTextContent('Zug');
+    expect(zeile).toHaveTextContent('0/1/3//4');
+    expect(zeile).toHaveTextContent('Florian 1/44-1');
+    expect(zeile).not.toHaveTextContent('Florian 1/44-2');
+  });
+
+  it('Fahrzeug ohne Einheit mit Typ und „seit …“', async () => {
+    stelleBelegtBereit();
+    renderBrDetail();
+    await screen.findByText('Florian 1/83-1');
+    const zeile = belegungsZeile('Florian 1/83-1');
+    expect(zeile).toHaveTextContent('GW-San');
+    expect(zeile).toHaveTextContent('seit 1410 · 20 min');
+  });
+
+  it('ohne „seit“ keine Zeitangabe, ohne Fahrzeug keine Funkrufnamen', async () => {
+    stelleBelegtBereit(brDetail({ einheiten: [{ id: 10, name: '1. Zug' }] }));
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    const zeile = belegungsZeile('1. Zug');
+    expect(zeile).not.toHaveTextContent('seit');
+    expect(zeile.querySelector('[data-lfh="br-einheit-fahrzeuge"]')).toBeNull();
+  });
+
+  it('Folge: am längsten wartend zuerst, eine neue Kraft kommt ans Ende', async () => {
+    const stand = { br: BELEGT };
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+    const qc = renderBrDetail();
+    await screen.findByText('Trupp 2');
+    // „Aachen“ stünde nach Name vorn; sie ist eben eingetreten und kommt ans Ende.
+    stand.br = brDetail({
+      einheiten: [...BELEGT.einheiten, { id: 12, name: 'Aachen', seit_at: '2026-10-15 12:29:00' }],
+    });
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+    await screen.findByText('Aachen');
+    const namen = within(screen.getByTestId('br-belegung'))
+      .getAllByText(/^(1\. Zug|Trupp 2|Aachen)$/)
+      .map((el) => el.textContent);
+    expect(namen).toEqual(['1. Zug', 'Trupp 2', 'Aachen']);
+  });
+});
+
+describe('BrDetailPage — Verlauf (LLH-1095 D12)', () => {
+  const VERLAUF: BrVerlaufEintrag[] = [
+    {
+      id: 7,
+      zeitpunkt_at: '2026-10-15 12:10:00',
+      art: 'wechsel_hinaus',
+      objekt_typ: 'einheit',
+      objekt_id: 11,
+      objekt_name: 'Trupp 2',
+      ziel: 'BR Schule',
+    },
+    {
+      id: 5,
+      zeitpunkt_at: '2026-10-15 12:00:00',
+      art: 'austritt',
+      objekt_typ: 'fahrzeug',
+      objekt_id: 24,
+      objekt_name: 'Florian 1/19-1',
+      notiz: 'Fahrzeug entlassen',
+    },
+    {
+      id: 3,
+      zeitpunkt_at: '2026-10-15 11:42:00',
+      art: 'eintritt',
+      objekt_typ: 'einheit',
+      objekt_id: 10,
+      objekt_name: '1. Zug',
+    },
+  ];
+
+  function stelleVerlaufBereit(
+    antwort: () => Response,
+    { einsatzDaten = einsatz(), zaehler = { verlauf: 0 } } = {},
+  ) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzDaten)),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+        HttpResponse.json({ ...BELEGT, id: Number(params.brId) }),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId/verlauf', () => {
+        zaehler.verlauf += 1;
+        return antwort();
+      }),
+    );
+    return zaehler;
+  }
+
+  const kopf = () =>
+    screen.getByRole('button', { name: 'Verlauf des Bereitstellungsraums BR Alpha' });
+
+  it('lädt erst beim Aufklappen, genau einmal, und zeigt Zeit, Art, Objekt und Notiz', async () => {
+    const zaehler = stelleVerlaufBereit(() => HttpResponse.json(VERLAUF));
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    expect(kopf()).toHaveAttribute('aria-expanded', 'false');
+    // Sichtbar steht nur „Verlauf“, der Rest des Namens ist für Vorleser.
+    expect(kopf()).toHaveTextContent(/^Verlauf des Bereitstellungsraums BR Alpha$/);
+    expect(zaehler.verlauf).toBe(0);
+
+    await userEvent.click(kopf());
+    expect(kopf()).toHaveAttribute('aria-expanded', 'true');
+    const reihe = await screen.findByRole('list', { name: 'Verlauf' });
+    const zeilen = within(reihe).getAllByRole('listitem');
+    expect(zeilen.map((z) => z.textContent)).toEqual([
+      expect.stringMatching(/Wechsel nach BR Schule.*Trupp 2/),
+      expect.stringMatching(/Austritt.*Florian 1\/19-1.*Fahrzeug entlassen/),
+      expect.stringMatching(/Eintritt.*1\. Zug/),
+    ]);
+    expect(zaehler.verlauf).toBe(1);
+  });
+
+  it('ein Ladefehler nennt den Fehler, nicht „Noch keine Belegung“', async () => {
+    stelleVerlaufBereit(() => new HttpResponse(null, { status: 500 }));
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    await userEvent.click(kopf());
+    expect(await screen.findByText(/Verlauf konnte nicht geladen werden/)).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Belegung')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+
+  it('leere Reihe: „Noch keine Belegung“', async () => {
+    stelleVerlaufBereit(() => HttpResponse.json([]));
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    await userEvent.click(kopf());
+    expect(await screen.findByText('Noch keine Belegung')).toBeInTheDocument();
+  });
+
+  it('ein Live-Ereignis bringt bei offenem Verlauf die neue Zeile ohne Neuladen', async () => {
+    const stand = { reihe: VERLAUF.slice(1) };
+    stelleVerlaufBereit(() => HttpResponse.json(stand.reihe));
+    const qc = renderBrDetail();
+    await screen.findByText('1. Zug');
+    await userEvent.click(kopf());
+    const reihe = await screen.findByRole('list', { name: 'Verlauf' });
+    expect(within(reihe).getAllByRole('listitem')).toHaveLength(2);
+
+    stand.reihe = VERLAUF;
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brVerlauf(1, 1) }));
+    expect(await within(reihe).findByText('Wechsel nach BR Schule')).toBeInTheDocument();
+  });
+
+  it('der Wechsel in einen anderen Raum klappt den Verlauf zu', async () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/bereitstellungsraeume/2')}>
+          Zum zweiten Raum
+        </button>
+      );
+    }
+    const zaehler = stelleVerlaufBereit(() => HttpResponse.json(VERLAUF));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume/1']}>
+              <Wechsel />
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/bereitstellungsraeume/:brId"
+                  element={<BrDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    await screen.findByText('1. Zug');
+    await userEvent.click(kopf());
+    await screen.findByRole('list', { name: 'Verlauf' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Raum' }));
+    await waitFor(() => expect(kopf()).toHaveAttribute('aria-expanded', 'false'));
+    expect(zaehler.verlauf).toBe(1);
+  });
+
+  it('steht auch ohne Schreibrecht zur Verfügung', async () => {
+    stelleVerlaufBereit(() => HttpResponse.json(VERLAUF), {
+      einsatzDaten: einsatz({ meine_rolle: 'beobachter' }),
+    });
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    await userEvent.click(kopf());
+    expect(await screen.findByRole('list', { name: 'Verlauf' })).toBeInTheDocument();
+  });
+
+  it('steht als letzter Abschnitt unter der Belegung', async () => {
+    stelleVerlaufBereit(() => HttpResponse.json(VERLAUF));
+    renderBrDetail();
+    await screen.findByText('1. Zug');
+    expect(
+      screen.getByTestId('br-belegung').compareDocumentPosition(kopf()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
+describe('BrDetailPage — Druck mit Wartezeiten (LLH-1095 D14)', () => {
+  mitUhr();
+
+  it('druckt einen gehaltenen Zugang mit „seit … · n min“, die längste Wartezeit, ohne Verlauf', async () => {
+    const stand = { br: BELEGT };
+    const zaehler = { verlauf: 0 };
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([ZUG, TRUPP])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1/verlauf', () => {
+        zaehler.verlauf += 1;
+        return HttpResponse.json([]);
+      }),
+    );
+    const qc = renderBrDetail();
+    await screen.findByText('1. Zug');
+
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    stand.br = brDetail({
+      einheiten: [...BELEGT.einheiten, { id: 12, name: 'Aachen', seit_at: '2026-10-15 12:20:00' }],
+      fahrzeuge: BELEGT.fahrzeuge,
+    });
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+    await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(screen.queryByText('Aachen')).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(belegungsZeile('Aachen')).toHaveTextContent('seit 1420 · 10 min');
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('48 min');
+    expect(
+      screen.getByRole('button', { name: 'Verlauf des Bereitstellungsraums BR Alpha' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(zaehler.verlauf).toBe(0);
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
   });
 });
