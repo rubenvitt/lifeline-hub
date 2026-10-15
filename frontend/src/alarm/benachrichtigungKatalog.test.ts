@@ -31,14 +31,13 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(new Set(namen).size).toBe(namen.length);
   });
 
-  it('die Arten der Sonderwege teilen deren Toast-Schlüssel, alle anderen haben einen eigenen', () => {
-    const e = { bezug_id: 7, benachrichtigung_id: 40 };
-    expect(toastSchluessel({ ...e, art: 'sofortmeldung' })).toBe('sofort-7');
-    expect(toastSchluessel({ ...e, art: 'auftrag_ueberfaellig' })).toBe('auftrag-7');
-    expect(toastSchluessel({ ...e, art: 'erinnerung_faellig' })).toBe('erinnerung-7');
-    expect(toastSchluessel({ ...e, art: 'abloesung_faellig' })).toBe('abloesung-7-faellig');
-    expect(toastSchluessel({ ...e, art: 'abloesung_vorwarnung' })).toBe('abloesung-7-vorwarnung');
-    expect(toastSchluessel({ ...e, art: 'auftrag_erteilt' })).toBe('b-40');
+  it('jede Benachrichtigung hat ihren eigenen Toast-Schlüssel, auch zwei zum selben Bezug', () => {
+    expect(toastSchluessel({ benachrichtigung_id: 40 })).toBe('b-40');
+    expect(toastSchluessel({ benachrichtigung_id: 41 })).toBe('b-41');
+  });
+
+  it('auch Unwetter steht als Schalter in den Einstellungen', () => {
+    expect(BENACHRICHTIGUNG_ARTEN.unwetter).toMatchObject({ stufe: 'hinweis', einstellbar: true });
   });
 
   it('jeder Sprung führt in den Einsatz, außerhalb in die Einsatzliste', () => {

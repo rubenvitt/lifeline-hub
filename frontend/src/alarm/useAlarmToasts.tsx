@@ -20,9 +20,9 @@ import {
 /** Höchstens so viele einzelne Toasts; ab dem nächsten bündelt der Sammeltoast die älteren. */
 export const MAX_SICHTBARE_TOASTS = 3;
 
-/** Ein Toast, wie ihn Sonderweg und Benachrichtigung gleichermaßen melden. */
+/** Ein Toast, wie ihn eine Benachrichtigung oder der Unwetterhinweis meldet. */
 export type AlarmToastEintrag = {
-  /** Fachlicher Schlüssel ohne Präfix, etwa `sofort-12` oder `b-40`. Gleicher Schlüssel, ein Toast. */
+  /** Fachlicher Schlüssel ohne Präfix, etwa `b-40` oder `unwetter-…`. Gleicher Schlüssel, ein Toast. */
   schluessel: string;
   art: 'warning' | 'info';
   titel: string;
@@ -47,7 +47,7 @@ export type AlarmToastEintrag = {
 
 /**
  * `neu`: der Toast steht neu da, der Aufrufer darf einen Ton spielen. `vorhanden`: derselbe
- * Schlüssel stand schon (Replay, zweiter Weg zur selben Benachrichtigung), kein zweiter Ton.
+ * Schlüssel stand schon (Replay, Nachreichen), kein zweiter Ton.
  */
 export type MeldeErgebnis = 'neu' | 'vorhanden' | 'inaktiv';
 
@@ -81,8 +81,8 @@ export interface AlarmToasts {
 /**
  * Das gemeinsame Toast-Budget der Zentralen (LFH-663, design.md D5): höchstens drei einzelne
  * Toasts; beim vierten wandern die drei vorherigen in einen Sammeltoast, der neueste bleibt
- * einzeln, danach wandert je neuem Toast der bisher neueste hinein. Sonderwege und
- * Benachrichtigungen teilen dieses eine Budget und, über den fachlichen Schlüssel, ihren Toast.
+ * einzeln, danach wandert je neuem Toast der bisher neueste hinein. Benachrichtigungen und
+ * Unwetterhinweise teilen dieses eine Budget; ein Schlüssel ist ein Toast.
  *
  * Quittiert wird nur, was der Nutzer wegnimmt: ✕, „Öffnen“, ✕ am Sammeltoast und dessen Sprung.
  * Was beim Verlassen des Layouts oder beim Einsatzwechsel geht, bleibt offen und kommt beim
@@ -264,29 +264,8 @@ export function useAlarmToasts(
     (neu: AlarmToastEintrag): MeldeErgebnis => {
       if (!scope.aktiv) return 'inaktiv';
       const id = neu.benachrichtigungId;
-      const vorhanden = scope.eintraege.get(neu.schluessel);
-      if (vorhanden) {
-        // Dieselbe Benachrichtigung noch einmal (Replay, Nachreichen): nichts.
-        if (id != null && vorhanden.ids.has(id)) return 'vorhanden';
-        // Der Sonderweg nach der Benachrichtigung: deren Text bleibt stehen.
-        if (id == null && vorhanden.ids.size > 0) return 'vorhanden';
-        if (id != null) {
-          // Die Benachrichtigung nach dem Sonderweg: sie übernimmt den Toast samt Text, ohne
-          // zweiten Ton und ohne zweite OS-Meldung.
-          const { desktop: _ohneDesktop, ...text } = neu;
-          void _ohneDesktop;
-          Object.assign(vorhanden, text);
-          vorhanden.ids.add(id);
-          if (scope.einzeln.includes(neu.schluessel)) zeigeEinzeln(vorhanden);
-          else zeigeZusammenfassung();
-          return 'vorhanden';
-        }
-        // Derselbe Sonderweg erneut: Text erneuern, OS-Meldung ersetzt die ältere.
-        Object.assign(vorhanden, neu);
-        if (scope.einzeln.includes(neu.schluessel)) zeigeEinzeln(vorhanden);
-        zeigeDesktop(vorhanden);
-        return 'vorhanden';
-      }
+      // Dieselbe Benachrichtigung noch einmal (Replay, Nachreichen): nichts.
+      if (scope.eintraege.has(neu.schluessel)) return 'vorhanden';
 
       if (scope.gebuendelt.size > 0 || scope.einzeln.length >= MAX_SICHTBARE_TOASTS) {
         for (const verdraengt of scope.einzeln) {

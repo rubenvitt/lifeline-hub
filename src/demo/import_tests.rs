@@ -1493,9 +1493,14 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
     assert_eq!(ausgeloest, 1, "die eine künftige Erinnerung (T+20)");
     let n = rx.recv().await.unwrap();
     assert_eq!(n.event.as_str(), "erinnerung");
+    // Daneben nur die Benachrichtigung „Erinnerung fällig“ an ihre Empfänger (LLH-1209).
+    let mut rest = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        rest.push(n.event.as_str().to_string());
+    }
     assert!(
-        rx.try_recv().is_err(),
-        "kein zweites Ereignis auf demselben Takt"
+        rest.iter().all(|e| e == "benachrichtigung"),
+        "kein zweites Ereignis auf demselben Takt: {rest:?}"
     );
 }
 

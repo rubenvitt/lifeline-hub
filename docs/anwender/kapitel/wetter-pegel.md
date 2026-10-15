@@ -2,7 +2,7 @@
 titel: Wetter und Pegel
 gruppen: [fuehrung]
 reihenfolge: 240
-quellen: [frontend/src/pages/WetterPegelPage.tsx, frontend/src/wetter/PegelPaneel.tsx, frontend/src/wetter/WetterPaneele.tsx, frontend/src/wetter/wetterStand.ts, frontend/src/wetter/unwetter.ts, frontend/src/wetter/useUnwetterHinweis.ts, frontend/src/wetter/UnwetterHinweis.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzPegel.tsx, frontend/src/pages/einstellungen/PegelPrognoseModal.tsx, frontend/src/pegel/pegelKennzahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/WetterPegelPage.tsx, frontend/src/wetter/PegelPaneel.tsx, frontend/src/wetter/WetterPaneele.tsx, frontend/src/wetter/wetterStand.ts, frontend/src/wetter/unwetter.ts, frontend/src/wetter/useUnwetterHinweis.ts, frontend/src/wetter/UnwetterHinweis.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungsEinstellungen.ts, frontend/src/pages/einstellungen/EinsatzPegel.tsx, frontend/src/pages/einstellungen/PegelPrognoseModal.tsx, frontend/src/pegel/pegelKennzahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -101,7 +101,11 @@ die App von selbst.
 Der Hinweis „Unwetterwarnung“ erscheint bei einer neuen, gültigen Warnung der amtlichen Stufe
 schwer oder extrem am Einsatzort, mit einem dezenten Ton, auf jeder Seite des Einsatzes und, wenn
 Benachrichtigungen erlaubt sind, auch im verdeckten Tab. Je Person und Einsatz meldet die App
-dieselbe Warnung nur einmal. Warnungen geringer und mäßiger Stufe stehen nur auf der Seite. Der
+dieselbe Warnung nur einmal. Wer unter „Benachrichtigungen“ den Schalter „Unwetterwarnung“
+ausschaltet, bekommt den Hinweis nicht mehr (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)); die Warnung steht weiter auf der
+Seite. Kommen viele Hinweise zugleich, fasst die App sie wie alle Benachrichtigungen zu einem
+Sammelhinweis zusammen. Warnungen geringer und mäßiger Stufe stehen nur auf der Seite. Der
 Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“.
 
 ### Rechte und ohne Netz

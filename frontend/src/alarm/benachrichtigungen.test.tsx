@@ -233,7 +233,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(Ctor).not.toHaveBeenCalled();
   });
 
-  it('Alarm, Tab verdeckt: OS-Meldung unter dem tag des bisherigen Alarms', async () => {
+  it('Alarm, Tab verdeckt: OS-Meldung unter dem tag der Benachrichtigung', async () => {
     const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
     serverMit([ueberfaellig]);
     const { Ctor } = stubMeldungen();
@@ -244,7 +244,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(Ctor).toHaveBeenCalledExactlyOnceWith('Auftrag überfällig', {
       body: 'Auftrag #7',
-      tag: '1-auftrag-7',
+      tag: '1-b-41',
     });
     expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
   });
@@ -302,47 +302,6 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
-  });
-
-  describe('neben dem Sonderweg bis tasks.md 3.5: dieselbe Benachrichtigung nur einmal', () => {
-    it('erst der Sonderweg, dann die Benachrichtigung: ein Toast mit dem Text des Servers', async () => {
-      const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
-      serverMit([ueberfaellig]);
-      renderZentrale();
-      act(() => {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: 3, bezug_typ: 'auftrag', bezug_id: 7 },
-          }),
-        );
-      });
-      expect(await screen.findByText('Quittierfrist überschritten')).toBeInTheDocument();
-      live(ueberfaellig);
-
-      expect(await screen.findByText('Auftrag #7')).toBeInTheDocument();
-      expect(screen.getAllByText('Auftrag überfällig')).toHaveLength(1);
-      // Den Ton spielt der Sonderweg in `useEinsatzLiveStream`, hier kein zweiter.
-      expect(ton).not.toHaveBeenCalled();
-    });
-
-    it('erst die Benachrichtigung, dann der Sonderweg: der Toast bleibt, wie er ist', async () => {
-      const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
-      serverMit([ueberfaellig]);
-      renderZentrale();
-      live(ueberfaellig);
-      expect(await screen.findByText('Auftrag #7')).toBeInTheDocument();
-      act(() => {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: 3, bezug_typ: 'auftrag', bezug_id: 7 },
-          }),
-        );
-      });
-
-      expect(screen.getAllByText('Auftrag überfällig')).toHaveLength(1);
-      expect(screen.getByText('Auftrag #7')).toBeInTheDocument();
-      expect(screen.queryByText('Quittierfrist überschritten')).not.toBeInTheDocument();
-    });
   });
 });
 
@@ -584,14 +543,17 @@ describe('Sammeltoast (tasks.md 2.4)', () => {
     await waitFor(() => expect([...s.quittiert].sort()).toEqual([61, 62, 63, 64, 65]));
   });
 
-  it('teilt das Budget mit den Sonderwegen: Sofortmeldungen und Hinweise bündeln gemeinsam', async () => {
+  it('alle Arten teilen ein Budget: Sofortmeldungen und Hinweise bündeln gemeinsam', async () => {
+    const sofort = [1, 2].map((n) =>
+      benachrichtigung(80 + n, 'sofortmeldung', 'meldung', n, {
+        titel: 'Sofortmeldung eingegangen',
+      }),
+    );
     const liste = [1, 2].map((n) => benachrichtigung(70 + n, 'auftrag_erteilt', 'auftrag', n));
-    serverMit(liste);
+    serverMit([...sofort, ...liste]);
     renderZentrale();
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 1 } }));
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 2 } }));
-    });
+    for (const b of sofort) live(b);
+    await waitFor(() => expect(screen.getAllByText('Sofortmeldung eingegangen')).toHaveLength(2));
     for (const b of liste) {
       live(b);
       await screen.findByText(`Auftrag #${b.bezug_id}`);

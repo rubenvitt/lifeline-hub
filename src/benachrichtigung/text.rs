@@ -59,6 +59,9 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         BenachrichtigungBezugTyp::Person => Some(("einsatz_person", "registrier_nr")),
         BenachrichtigungBezugTyp::Einheit => Some(("einsatz_einheit", "name")),
         BenachrichtigungBezugTyp::Fahrzeug => Some(("einsatz_fahrzeug", "snap_funkrufname")),
+        // Die Schicht hat keine eigene Bezeichnung: Einheit und Uhrzeit liest
+        // `detail_abloesung` über [`DETAIL_ABLOESUNG_SPALTEN`].
+        BenachrichtigungBezugTyp::Abloesung => None,
         // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
         BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
@@ -71,11 +74,49 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::NachforderungAbgelehnt => None,
         // Titel und Freitexte dieser Objekte sind Scrub-Werte; ihr Titel genügt.
         BenachrichtigungBezugTyp::Erinnerung
-        | BenachrichtigungBezugTyp::Abloesung
         | BenachrichtigungBezugTyp::Lagebesprechung
         | BenachrichtigungBezugTyp::Gefahrengebiet
         | BenachrichtigungBezugTyp::ChatNachricht => None,
     }
+}
+
+/// Die Spalten der Detailzeile einer Ablösung, „Florian 1, 15:30“ (Spec `kraefte-abloesung`,
+/// „Hinweis in der AlarmZentrale“): Name der Einheit und Fälligkeit der Schicht, beide Retain
+/// (Guard `detail_liest_nur_retain_spalten`).
+pub const DETAIL_ABLOESUNG_SPALTEN: [(&str, &str); 2] = [
+    ("einsatz_einheit", "name"),
+    ("einsatz_abloesung", "faellig_at"),
+];
+
+/// Detailzeile einer Ablösungsschicht: Einheit und Uhrzeit der Fälligkeit (auch bei der
+/// Vorwarnung) in der Anzeigezone des Einsatzes, wie die Oberfläche sie zeigt (Einsatz, sonst
+/// Organisation, sonst `einsatz::nummer::ZEITZONE_VORGABE`).
+async fn detail_abloesung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    abloesung_id: i64,
+) -> Result<Option<String>, AppError> {
+    let zeile = sqlx::query_as::<_, (String, String, Option<String>)>(
+        "SELECT ee.name, a.faellig_at, \
+                COALESCE(NULLIF(TRIM(es.zeitzone), ''), oe.zeitzone) \
+         FROM einsatz_abloesung a \
+         JOIN einsatz_einheit ee ON ee.id = a.einheit_id \
+         JOIN einsatz e ON e.id = a.einsatz_id \
+         LEFT JOIN einsatz_einstellungen es ON es.einsatz_id = e.id \
+         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id \
+         WHERE a.id = ? AND a.einsatz_id = ?",
+    )
+    .bind(abloesung_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(zeile.map(|(einheit, faellig_at, zone)| {
+        let zone = crate::einsatz::nummer::zone_oder_vorgabe(zone.as_deref());
+        match crate::zeit::parse_utc(&faellig_at) {
+            Some(t) => format!("{einheit}, {}", t.with_timezone(&zone).format("%H:%M")),
+            None => einheit,
+        }
+    }))
 }
 
 /// Formt den gelesenen Wert zur Detailzeile.
@@ -348,6 +389,9 @@ pub async fn bilden(
         return chat_nachricht_text(pool, einsatz_id, art, bezug).await;
     }
     let detail = match detail_quelle(bezug.typ) {
+        None if bezug.typ == BenachrichtigungBezugTyp::Abloesung => {
+            detail_abloesung(pool, einsatz_id, bezug.id).await?
+        }
         None => None,
         Some((tabelle, spalte)) => {
             // Tabelle und Spalte sind Konstanten aus `detail_quelle`, nie Eingaben.

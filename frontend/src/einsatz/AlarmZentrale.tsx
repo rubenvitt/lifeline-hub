@@ -5,8 +5,6 @@ import {
   IconMonitor,
   IconVerbotsschild,
 } from '../icons';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
 import { Button, Dropdown, Tooltip, theme } from 'antd';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
@@ -27,15 +25,7 @@ import {
 } from '../alarm/desktopAlarm';
 import { useAlarmToasts } from '../alarm/useAlarmToasts';
 import { quittiereNachNutzer, useBenachrichtigungen } from '../alarm/useBenachrichtigungen';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import {
-  abloesungPfad,
-  auftraegePfad,
-  erinnerungenPfad,
-  meldungenPfad,
-  wetterPegelPfad,
-} from '../routing/deeplinks';
+import { wetterPegelPfad } from '../routing/deeplinks';
 import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
 import { useDichte } from '../theme/ThemeModeProvider';
@@ -64,38 +54,6 @@ export function sammelWortStil(steuerHoehe: number, schmal: boolean): CSSPropert
   return { whiteSpace: 'normal', width: 'min-content', lineHeight: 1.25, textAlign: 'start' };
 }
 
-dayjs.extend(utc);
-
-/** Payload des Scheduler-Hinweises `abloesung` (`src/erinnerung/scheduler.rs`). */
-type AbloesungAlarmDetail = {
-  abloesung_id?: number;
-  art?: 'vorwarnung' | 'faellig';
-  /** „Ablösung fällig: Florian 1" — Titel der Frist, trägt den Einheitsnamen. */
-  titel?: string;
-  /** Fälligkeit der Schicht (UTC-Wire), auch bei der Vorwarnung. */
-  faellig_at?: string;
-};
-
-/**
- * Toast-Text eines Ablösungshinweises: Einheit und Uhrzeit der Fälligkeit in der Anzeigezone
- * (LFH-692; `zone` `null` = Browserzone). Rein, getestet.
- */
-function abloesungAlarmText(
-  detail: AbloesungAlarmDetail,
-  zone: string | null,
-): {
-  titel: string;
-  beschreibung: string;
-} {
-  const einheit = detail.titel?.split(': ').slice(1).join(': ') || 'eine Einheit';
-  const f = alsZeitpunkt(detail.faellig_at);
-  const uhrzeit = f ? zuWanduhr(f, zone).format('HH:mm') : null;
-  const bei = uhrzeit ? `${einheit}, ${uhrzeit}` : einheit;
-  return detail.art === 'vorwarnung'
-    ? { titel: 'Ablösung in 30 min', beschreibung: `Ablösung bald fällig: ${bei}` }
-    : { titel: 'Ablösung fällig', beschreibung: `Ablösung fällig: ${bei}` };
-}
-
 /**
  * Payload von `lfh:unwetter-alarm` (`wetter/useUnwetterHinweis.ts`, LFH-663). Die Texte baut der
  * Auslöser, weil nur er die Anzeige-Konventionen des Einsatzes kennt; `schluessel` ist das Paar
@@ -107,17 +65,8 @@ type UnwetterDetail = {
   beschreibung?: string;
 };
 
-type ErinnerungDetail = {
-  erinnerung_id?: number;
-  bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
-  bezug_id?: number | null;
-};
-
 /** Längster Wortlaut des Ton-Knopfs; das Wort hält seine Breite (LLH-1158). */
 const TON_WORT_LAENGSTES = 'Ton wird geprüft';
-
-/** Zustand einer Sofortmeldung in Toast und OS-Meldung (LFH-1078: Zustand statt Bitte). */
-const SOFORT_ZUSTAND = 'Bestätigung ausstehend';
 
 /**
  * Zustand der Benachrichtigungen (LFH-950). `nicht-verfuegbar` ist eine Eigenschaft des Geräts
@@ -164,25 +113,22 @@ const DOPPELKLICK_MS = 500;
 
 /**
  * Einsatzweite Benachrichtigungszentrale (design.md D5): zeigt die Benachrichtigungen des
- * Servers (`alarm/useBenachrichtigungen.ts`) und, bis tasks.md 3.5, die Sonderwege
- * `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die Ablösungshinweise (von
- * useEinsatzLiveStream ausgelöst) sowie `lfh:unwetter-alarm` (vom Rahmen,
- * `wetter/useUnwetterHinweis.ts`). Alle teilen EIN Budget nicht selbst-schließender Toasts mit
+ * Servers (`alarm/useBenachrichtigungen.ts`), darunter seit LLH-1209 auch Sofortmeldung,
+ * überfälliger Auftrag, fällige Erinnerung und Ablösung, sowie `lfh:unwetter-alarm` (vom Rahmen,
+ * `wetter/useUnwetterHinweis.ts`; die Wetterwarnung erkennt der Browser selbst). Alle teilen EIN Budget nicht selbst-schließender Toasts mit
  * Deeplink zur Quelle (`alarm/useAlarmToasts.tsx`), optional eine OS-Meldung bei Hintergrund-Tab.
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
  * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
  */
 export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
-  const zone = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
-  // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Sonderwege und Benachrichtigungen teilen
-  // es und, über den fachlichen Schlüssel, ihren Toast.
+  // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen es.
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
   useBenachrichtigungen(einsatzId, toasts);
-  // Schlüssel ohne fachliche Kennung (Ereignis ohne ID) zählen hoch.
+  // Jede Unwetter-Auslösung bekommt einen eigenen Schlüssel.
   const zaehlerRef = useRef(0);
   /** Letzter Unwetterhinweis dieses Einsatzes: ein neuer ersetzt ihn (ein Platz im Budget). */
   const unwetterRef = useRef<{ einsatzId: number; schluessel: string; tag: string } | null>(null);
@@ -225,99 +171,10 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
   }, []);
 
-  // ── Sonderwege (bis tasks.md 3.5) ──────────────────────────────────────────────────────
-  // Sofortmeldung, Erinnerung und Ablösung kommen noch als eigene Live-Ereignisse; Ton spielt
-  // `useEinsatzLiveStream`. Ihre Schlüssel gleichen denen der Benachrichtigung derselben Art
-  // (`toastSchluessel`), damit beide Wege einen Toast teilen.
-
-  // Sofortmeldung.
-  useEffect(() => {
-    const onSofort = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ meldung_id?: number }>).detail ?? {};
-      const id = detail.meldung_id;
-      const schluessel = id != null ? `sofort-${id}` : `sofort-z${++zaehlerRef.current}`;
-      toasts.melde({
-        schluessel,
-        art: 'warning',
-        titel: 'Sofortmeldung eingegangen',
-        // Der Zustand, nicht die Bitte (LFH-1078); bestätigt wird über „Öffnen“ in den Meldungen.
-        // Den Betreff trägt das Live-Ereignis nicht (nur `meldung_id`).
-        beschreibung: SOFORT_ZUSTAND,
-        pfad: meldungenPfad(einsatzId),
-        ziel: 'meldungen',
-        gruppe: 'sofort',
-        name: 'Sofortmeldung',
-        stufe: 'alarm',
-        // `tag` nur mit fachlichem Schlüssel; der Zähler ist keiner (LFH-951).
-        desktop: { tag: id != null ? `${einsatzId}-${schluessel}` : undefined },
-      });
-    };
-    window.addEventListener('lfh:sofortmeldung', onSofort);
-    return () => window.removeEventListener('lfh:sofortmeldung', onSofort);
-  }, [einsatzId, toasts]);
-
-  // Fällige Erinnerung / Auftrags-Eskalation.
-  useEffect(() => {
-    const onErinnerung = (ev: Event) => {
-      const detail = (ev as CustomEvent<ErinnerungDetail>).detail ?? {};
-      const istAuftrag = detail.bezug_typ === 'auftrag';
-      const fachId = istAuftrag ? detail.bezug_id : detail.erinnerung_id;
-      const art = istAuftrag ? 'auftrag' : 'erinnerung';
-      const schluessel = fachId != null ? `${art}-${fachId}` : `${art}-z${++zaehlerRef.current}`;
-      const titel = istAuftrag ? 'Auftrag überfällig' : 'Erinnerung fällig';
-      toasts.melde({
-        schluessel,
-        art: istAuftrag ? 'warning' : 'info',
-        titel,
-        // Den Titel des Auftrags bzw. der Erinnerung trägt das Live-Ereignis nicht (nur Kennungen).
-        beschreibung: istAuftrag ? 'Quittierfrist überschritten' : undefined,
-        pfad:
-          istAuftrag && detail.bezug_id != null
-            ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
-            : erinnerungenPfad(einsatzId),
-        ziel: istAuftrag ? 'auftraege' : 'erinnerungen',
-        gruppe: istAuftrag ? 'auftrag-ueberfaellig' : 'erinnerung',
-        name: titel,
-        stufe: 'alarm',
-        desktop: { tag: fachId != null ? `${einsatzId}-${schluessel}` : undefined },
-      });
-    };
-    window.addEventListener('lfh:erinnerung-alarm', onErinnerung);
-    return () => window.removeEventListener('lfh:erinnerung-alarm', onErinnerung);
-  }, [einsatzId, toasts]);
-
-  // Fällige oder anstehende Ablösung — durch DASSELBE Budget. Vorwarnung und Fälligkeit sind
-  // zwei Hinweise (eigener Schlüssel je Art), der Scheduler löst je Frist einmal aus.
-  useEffect(() => {
-    const onAbloesung = (ev: Event) => {
-      const detail = (ev as CustomEvent<AbloesungAlarmDetail>).detail ?? {};
-      const schluessel =
-        detail.abloesung_id != null
-          ? `abloesung-${detail.abloesung_id}-${detail.art ?? 'faellig'}`
-          : `abloesung-z${++zaehlerRef.current}`;
-      const { titel, beschreibung } = abloesungAlarmText(detail, zone);
-      toasts.melde({
-        schluessel,
-        art: detail.art === 'vorwarnung' ? 'info' : 'warning',
-        titel,
-        beschreibung,
-        pfad: abloesungPfad(einsatzId),
-        ziel: 'abloesung',
-        gruppe: 'abloesung',
-        name: titel,
-        stufe: 'alarm',
-        desktop: {
-          tag: detail.abloesung_id != null ? `${einsatzId}-${schluessel}` : undefined,
-        },
-      });
-    };
-    window.addEventListener('lfh:abloesung-alarm', onAbloesung);
-    return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
-  }, [einsatzId, toasts, zone]);
-
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
   // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
-  // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
+  // der Rahmen erkennt „neu" selbst, prüft die Einstellung `unwetter` und meldet es hierher, der
+  // Ton spielt dort. Die Stufe ist Hinweis (design.md D4). Ein neuer Hinweis
   // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
   // Plätze. Eigener Schlüssel je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
   useEffect(() => {
@@ -341,7 +198,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         ziel: 'wetter-pegel',
         gruppe: 'unwetter',
         name: 'Unwetterwarnung',
-        stufe: 'alarm',
+        stufe: 'hinweis',
         desktop: { tag },
       });
     };

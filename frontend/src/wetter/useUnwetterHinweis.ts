@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
+import { useHinweisAn } from '../alarm/useBenachrichtigungsEinstellungen';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
@@ -22,10 +23,15 @@ interface Args {
  * D2/D6). Kein Live-Ereignis: die Quelle ist extern, der Rahmen fragt nach — dieselbe Abfrage wie
  * Modulseite und Modulzähler, also kein zusätzlicher Abruf.
  *
- * Ton (`dezent`, D1) und Fenster-Ereignis `lfh:unwetter-alarm` wie beim Live-Stream: Ton beim
- * Auslöser, Hinweis in der AlarmZentrale. „Neu" entscheidet `erkenneNeue` gegen das Gedächtnis
+ * Ton (`dezent`, D1) und Fenster-Ereignis `lfh:unwetter-alarm`: Ton beim Auslöser, Hinweis im
+ * gemeinsamen Budget der AlarmZentrale. „Neu" entscheidet `erkenneNeue` gegen das Gedächtnis
  * je Person und Einsatz; es wird im selben synchronen Zug gelesen und geschrieben, damit Tabs
  * desselben Browsers nicht doppelt melden.
+ *
+ * Hat die Person „Unwetterwarnung“ in ihren Benachrichtigungen abgeschaltet (Schlüssel
+ * `benachrichtigungen_aus`, LLH-1209), bleibt es still; das Gedächtnis läuft weiter, ein späteres
+ * Einschalten meldet die schon bekannten Warnungen nicht nach. Solange die Einstellung lädt,
+ * wartet die Erkennung.
  */
 export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): void {
   // Nur bei bekannter Freigabe des Servers (LFH-669): unbekannte Freigaben geben nichts frei, ein
@@ -46,9 +52,10 @@ export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): vo
   const konventionenBereit = einstellungen.isSuccess || einstellungen.isError;
   const { konventionen } = useAnzeigeKonventionen();
   const benutzerId = benutzer?.id;
+  const an = useHinweisAn('unwetter', benutzerId);
 
   useEffect(() => {
-    if (!aktiv || benutzerId == null || !data || !konventionenBereit) return;
+    if (!aktiv || benutzerId == null || !data || !konventionenBereit || an === null) return;
     const jetzt = Date.now();
     const lage = unwetterLage(data.warnungen, jetzt);
     // Ohne verwertbaren Stand bleibt auch das Gedächtnis unberührt: eine Lücke ist kein „weg".
@@ -59,7 +66,7 @@ export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): vo
       jetzt,
     );
     speichereGedaechtnis(benutzerId, einsatzId, ergebnis.gedaechtnis);
-    if (!ergebnis.neu) return;
+    if (!ergebnis.neu || !an) return;
     spieleAlarmTon('dezent');
     window.dispatchEvent(
       new CustomEvent('lfh:unwetter-alarm', {
@@ -71,5 +78,5 @@ export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): vo
     );
     // Die Konventionen formen nur den Text; ein Wechsel ist kein neuer Stand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aktiv, benutzerId, einsatzId, data, konventionenBereit]);
+  }, [aktiv, benutzerId, einsatzId, data, konventionenBereit, an]);
 }

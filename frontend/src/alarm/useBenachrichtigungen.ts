@@ -78,7 +78,7 @@ function eintragVon(
     name: BENACHRICHTIGUNG_ARTEN[a.art]?.name ?? a.titel,
     stufe: a.stufe,
     benachrichtigungId: a.id,
-    // Derselbe `tag` wie beim Sonderweg (`<einsatz>-<schlüssel>`): eine OS-Meldung je Bezug.
+    // `tag` `<einsatz>-<schlüssel>`: dieselbe Benachrichtigung ersetzt ihre OS-Meldung.
     desktop: opts.desktop ? { tag: `${a.einsatz_id}-${schluessel}` } : undefined,
   };
 }

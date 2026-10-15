@@ -297,8 +297,14 @@ pub struct FaelligeErinnerung {
     /// Fremdtabellen zu pollen.
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
-    /// Titel der Erinnerung; der Ablösungs-Hinweis trägt ihn in die AlarmZentrale.
+    /// Titel der Erinnerung; das Live-Ereignis `abloesung` trägt ihn (Spec `kraefte-abloesung`).
     pub titel: String,
+    /// `manuell` oder `auto_frist`: nur die Auto-Frist eines Auftrags ist ein überfälliger
+    /// Auftrag (LLH-1209).
+    pub quelle: String,
+    /// Empfängerfunktion (Katalogcode); ohne sie erreicht die Benachrichtigung den Ersteller.
+    pub empfaenger_funktion_code: Option<String>,
+    pub erstellt_von_id: i64,
 }
 
 /// Offene, fällige Erinnerungen (`faellig_at <= jetzt`), die für ihren aktuellen Slot noch nicht
@@ -316,7 +322,7 @@ pub async fn faellige_zum_ausloesen(
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
     sqlx::query_as::<_, FaelligeErinnerung>(
         "SELECT e.id, e.einsatz_id, e.faellig_at, e.intervall_minuten, e.bezug_typ, \
-                e.bezug_id, e.titel \
+                e.bezug_id, e.titel, e.quelle, e.empfaenger_funktion_code, e.erstellt_von_id \
          FROM erinnerung e \
          JOIN einsatz ei ON ei.id = e.einsatz_id \
          WHERE e.status = 'offen' AND e.faellig_at <= ? \

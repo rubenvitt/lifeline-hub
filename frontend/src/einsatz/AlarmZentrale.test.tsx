@@ -1,21 +1,126 @@
 import { render, screen, waitFor, act, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate, useParams } from 'react-router';
 import AlarmZentrale, { sammelWortStil } from './AlarmZentrale';
-import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { mitProzessZone } from '../test/prozessZone';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from '../alarm/desktopAlarm';
 import { setzeViewportBreite, setzeZeigerGrob, VIEWPORT_STANDARD } from '../test/viewport';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { http, HttpResponse } from 'msw';
+import type {
+  BenachrichtigungAnzeige,
+  BenachrichtigungArt,
+  BenachrichtigungBezugTyp,
+} from '../api/types';
+import { BENACHRICHTIGUNG_ARTEN } from '../alarm/benachrichtigungKatalog';
+import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
+import { server } from '../test/server';
 
-dayjs.extend(utc);
+/**
+ * Was der Server zu `GET /api/benachrichtigungen/{id}` liefert. Seit LLH-1209 kommen Sofortmeldung,
+ * überfälliger Auftrag, Erinnerung und Ablösung nur noch als Benachrichtigung; Titel, Detailzeile
+ * und Pfad bildet der Server (`src/benachrichtigung/text.rs`).
+ */
+const bekannt = new Map<number, BenachrichtigungAnzeige>();
+beforeEach(() => {
+  bekannt.clear();
+  server.use(
+    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+      const b = bekannt.get(Number(params.id));
+      return b
+        ? HttpResponse.json(b)
+        : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
+    }),
+    http.post(
+      '/api/benachrichtigungen/:id/quittieren',
+      () => new HttpResponse(null, { status: 204 }),
+    ),
+  );
+});
+
+/** Meldet eine Benachrichtigung, wie der Live-Strom sie an die Zentrale weiterreicht. */
+function benachrichtige(
+  id: number,
+  art: BenachrichtigungArt,
+  bezug: [BenachrichtigungBezugTyp, number],
+  text: { titel: string; detail?: string; pfad: string },
+  einsatz_id = 1,
+) {
+  const [bezug_typ, bezug_id] = bezug;
+  const stufe = BENACHRICHTIGUNG_ARTEN[art].stufe;
+  bekannt.set(id, {
+    id,
+    einsatz_id,
+    art,
+    stufe,
+    bezug_typ,
+    bezug_id,
+    erstellt_at: '2026-10-14 12:00:00',
+    ...text,
+  });
+  act(() => {
+    window.dispatchEvent(
+      new CustomEvent(BENACHRICHTIGUNG_WINDOW_EVENT, {
+        detail: {
+          einsatz_id,
+          benachrichtigung_id: id,
+          art,
+          stufe,
+          bezug_typ,
+          bezug_id,
+          quittiert: false,
+        },
+      }),
+    );
+  });
+}
+
+/** Sofortmeldung `meldung`, als Benachrichtigung `id` (Vorgabe: dieselbe Zahl). */
+function sofortmeldung(meldung: number, { id = meldung, einsatz = 1 } = {}) {
+  benachrichtige(
+    id,
+    'sofortmeldung',
+    ['meldung', meldung],
+    {
+      titel: 'Sofortmeldung eingegangen',
+      detail: `Meldung #${meldung}`,
+      pfad: `/einsaetze/${einsatz}/meldungen?meldung=${meldung}`,
+    },
+    einsatz,
+  );
+}
+
+function auftragUeberfaellig(auftrag: number) {
+  benachrichtige(100 + auftrag, 'auftrag_ueberfaellig', ['auftrag', auftrag], {
+    titel: 'Auftrag überfällig',
+    detail: `Auftrag #${auftrag}`,
+    pfad: `/einsaetze/1/auftraege?auftrag=${auftrag}`,
+  });
+}
+
+function erinnerungFaellig(erinnerung: number) {
+  benachrichtige(200 + erinnerung, 'erinnerung_faellig', ['erinnerung', erinnerung], {
+    titel: 'Erinnerung fällig',
+    pfad: '/einsaetze/1/erinnerungen',
+  });
+}
+
+function abloesung(schicht: number, art: 'abloesung_vorwarnung' | 'abloesung_faellig') {
+  benachrichtige(
+    300 + schicht * 2 + (art === 'abloesung_faellig' ? 1 : 0),
+    art,
+    ['abloesung', schicht],
+    {
+      titel: art === 'abloesung_faellig' ? 'Ablösung fällig' : 'Ablösung steht an',
+      detail: `Florian ${schicht}, 15:30`,
+      pfad: '/einsaetze/1/abloesung',
+    },
+  );
+}
 
 function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
   const { notification } = AntApp.useApp();
@@ -146,27 +251,18 @@ describe('AlarmZentrale', () => {
   // (1024 px) liegt darunter.
   beforeEach(() => setzeViewportBreite(1366));
 
-  it('zeigt einen Toast bei window-Event lfh:sofortmeldung', async () => {
+  it('zeigt eine Sofortmeldung mit dem Text des Servers und „Öffnen“', async () => {
     renderAlarm();
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
-    });
+    sofortmeldung(3);
     await waitFor(() => expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument());
-    // LFH-1078: der Zustand statt der Bitte; der Bestätigungsweg bleibt „Öffnen“.
-    expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
+    expect(screen.getByText('Meldung #3')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
     expect(screen.queryByText(/bitte sichten/i)).not.toBeInTheDocument();
   });
 
-  it('zeigt einen Erinnerungs-Toast bei lfh:erinnerung-alarm ohne Bezug', async () => {
+  it('zeigt eine fällige Erinnerung ohne Detailzeile', async () => {
     renderAlarm();
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 5, bezug_typ: null, bezug_id: null },
-        }),
-      );
-    });
+    erinnerungFaellig(5);
     await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
     // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
     const toast = screen
@@ -176,18 +272,13 @@ describe('AlarmZentrale', () => {
     expect(within(toast).getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
   });
 
-  it('zeigt einen Auftrags-Toast bei lfh:erinnerung-alarm mit bezug_typ=auftrag', async () => {
+  it('zeigt einen überfälligen Auftrag und springt zum Auftrag', async () => {
     renderAlarm();
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 },
-        }),
-      );
-    });
+    auftragUeberfaellig(12);
     await waitFor(() => expect(screen.getByText('Auftrag überfällig')).toBeInTheDocument());
-    expect(screen.getByText('Quittierfrist überschritten')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
+    expect(screen.getByText('Auftrag #12')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=12');
   });
 
   it('globaler Mute-Toggle persistiert in localStorage', async () => {
@@ -238,11 +329,7 @@ describe('AlarmZentrale', () => {
 
   it('bündelt beim vierten Sofort-Ereignis die drei vorherigen und behält das neueste einzeln', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      for (let meldung_id = 1; meldung_id <= 4; meldung_id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id } }));
-      }
-    });
+    for (let meldung = 1; meldung <= 4; meldung += 1) sofortmeldung(meldung);
 
     expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
     // LFH-1078: Zahl und Art im Titel, das Ziel am Knopf — kein Bittsatz darunter.
@@ -260,11 +347,8 @@ describe('AlarmZentrale', () => {
 
   it('räumt beim Einsatzwechsel und Unmount nur die eigenen langlebigen Toasts ab', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start', mitSteuerung: true, strictMode: true });
-    act(() => {
-      for (let meldung_id = 1; meldung_id <= 4; meldung_id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id } }));
-      }
-    });
+    for (let meldung = 1; meldung <= 4; meldung += 1) sofortmeldung(meldung);
+    expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
     expect(await screen.findByText('Sofortmeldung eingegangen')).toBeInTheDocument();
     expect(screen.getByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
     const alteSammelAktion = screen.getByRole('button', { name: 'Zu Meldungen' });
@@ -282,18 +366,14 @@ describe('AlarmZentrale', () => {
     expect(screen.getByText('Fremde Notification')).toBeInTheDocument();
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/start');
 
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 4 } }));
-    });
+    sofortmeldung(4, { id: 14, einsatz: 2 });
     expect(await screen.findByText('Sofortmeldung eingegangen')).toBeInTheDocument();
     expect(screen.queryByText('3 weitere Sofortmeldungen')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/meldungen');
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
 
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 4 } }));
-    });
+    sofortmeldung(4, { id: 24, einsatz: 2 });
     expect(await screen.findByText('Sofortmeldung eingegangen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Alarm-Zentrale ausblenden' }));
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
@@ -302,15 +382,10 @@ describe('AlarmZentrale', () => {
 
   it('bündelt vier Aufträge mit dem korrekten Auftrags-Ziel', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      for (let id = 1; id <= 4; id += 1) {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: id, bezug_typ: 'auftrag', bezug_id: id },
-          }),
-        );
-      }
-    });
+    for (let id = 1; id <= 4; id += 1) {
+      auftragUeberfaellig(id);
+      await screen.findByText(`Auftrag #${id}`);
+    }
 
     expect(await screen.findByText('3 weitere überfällige Aufträge')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
@@ -321,15 +396,7 @@ describe('AlarmZentrale', () => {
 
   it('bündelt vier Erinnerungen mit dem korrekten Erinnerungs-Ziel', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      for (let id = 1; id <= 4; id += 1) {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: id, bezug_typ: null, bezug_id: null },
-          }),
-        );
-      }
-    });
+    for (let id = 1; id <= 4; id += 1) erinnerungFaellig(id);
 
     expect(await screen.findByText('3 weitere fällige Erinnerungen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
@@ -340,53 +407,27 @@ describe('AlarmZentrale', () => {
 
   it('zeigt einen Ablösungs-Hinweis mit Einheit und Uhrzeit und springt zur Ablösung (LFH-635)', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent('lfh:abloesung-alarm', {
-          detail: {
-            abloesung_id: 9,
-            art: 'faellig',
-            titel: 'Ablösung fällig: Florian 1',
-            faellig_at: '2026-09-22 13:30:00',
-          },
-        }),
-      );
-    });
+    abloesung(1, 'abloesung_faellig');
     expect(await screen.findByText('Ablösung fällig')).toBeInTheDocument();
-    const uhrzeit = dayjs.utc('2026-09-22 13:30:00').local().format('HH:mm');
-    expect(screen.getByText(`Ablösung fällig: Florian 1, ${uhrzeit}`)).toBeInTheDocument();
+    expect(screen.getByText('Florian 1, 15:30')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
   });
 
   it('Ablösung: Vorwarnung und Fälligkeit sind zwei Hinweise, die Wiederholung derselben keiner', async () => {
     renderAlarm();
-    const senden = (art: 'vorwarnung' | 'faellig') =>
-      window.dispatchEvent(
-        new CustomEvent('lfh:abloesung-alarm', {
-          detail: { abloesung_id: 9, art, titel: 'Ablösung fällig: Florian 1' },
-        }),
-      );
-    act(() => {
-      senden('vorwarnung');
-      senden('faellig');
-      senden('faellig');
-    });
-    expect(await screen.findByText('Ablösung in 30 min')).toBeInTheDocument();
+    abloesung(9, 'abloesung_vorwarnung');
+    abloesung(9, 'abloesung_faellig');
+    expect(await screen.findByText('Ablösung steht an')).toBeInTheDocument();
+    expect(await screen.findByText('Ablösung fällig')).toBeInTheDocument();
+    abloesung(9, 'abloesung_faellig');
+    await act(async () => {});
     expect(screen.getAllByText('Ablösung fällig')).toHaveLength(1);
   });
 
   it('bündelt vier Ablösungen mit dem Ablösungs-Ziel — dasselbe Budget wie alle Quellen', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      for (let id = 1; id <= 4; id += 1) {
-        window.dispatchEvent(
-          new CustomEvent('lfh:abloesung-alarm', {
-            detail: { abloesung_id: id, art: 'faellig', titel: `Ablösung fällig: F${id}` },
-          }),
-        );
-      }
-    });
+    for (let id = 1; id <= 4; id += 1) abloesung(id, 'abloesung_faellig');
     expect(await screen.findByText('3 weitere Ablösungen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Ablösungen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
@@ -394,20 +435,13 @@ describe('AlarmZentrale', () => {
 
   it('bietet bei gemischter Bündelung getrennte Aktionen nur für betroffene Module', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 1 } }));
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 2, bezug_typ: 'auftrag', bezug_id: 2 },
-        }),
-      );
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 3, bezug_typ: null, bezug_id: null },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 4 } }));
-    });
+    sofortmeldung(1);
+    await screen.findByText('Meldung #1');
+    auftragUeberfaellig(2);
+    await screen.findByText('Auftrag #2');
+    erinnerungFaellig(3);
+    await screen.findByText('Erinnerung fällig');
+    sofortmeldung(4);
 
     expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zu Meldungen' })).toBeInTheDocument();
@@ -462,16 +496,17 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
 
   it('unterliegt dem gemeinsamen Budget: drei Sofortmeldungen und ein Unwetter → Zusammenfassung', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
-      for (let id = 1; id <= 3; id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
-      }
+    for (let id = 1; id <= 3; id += 1) {
+      sofortmeldung(id);
+      await screen.findByText(`Meldung #${id}`);
+    }
+    act(() =>
       unwetter({
         schluessel: 'schwer|DAUERREGEN',
         titel: 'Unwetterwarnung',
         beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
-      });
-    });
+      }),
+    );
     expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
     expect(screen.getByText('Unwetterwarnung')).toBeInTheDocument();
   });
@@ -483,30 +518,30 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
       titel: 'Unwetterwarnung',
       beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
     };
-    act(() => {
-      unwetter(detail);
-      for (let id = 1; id <= 3; id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
-      }
-    });
+    act(() => unwetter(detail));
+    for (let id = 1; id <= 3; id += 1) {
+      sofortmeldung(id);
+      await screen.findByText(`Meldung #${id}`);
+    }
     expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
-    expect(screen.queryByText('Unwetterwarnung')).not.toBeInTheDocument();
+    await warteBisNotificationWeg('Unwetterwarnung');
     act(() => unwetter({ ...detail, beschreibung: 'Dauerregen, seit 15:00 · bis 23:00' }));
     expect(await screen.findByText('Dauerregen, seit 15:00 · bis 23:00')).toBeInTheDocument();
   });
 
   it('die Zusammenfassung bietet den Weg zu Wetter & Pegel, wenn ein Unwetter darin steckt', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
-    act(() => {
+    act(() =>
       unwetter({
         schluessel: 'schwer|DAUERREGEN',
         titel: 'Unwetterwarnung',
         beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
-      });
-      for (let id = 1; id <= 3; id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
-      }
-    });
+      }),
+    );
+    for (let id = 1; id <= 3; id += 1) {
+      sofortmeldung(id);
+      await screen.findByText(`Meldung #${id}`);
+    }
     expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Wetter & Pegel' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/wetter-pegel');
@@ -810,38 +845,6 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
   });
 });
 
-/** LFH-692 (Spec `zeiteingabe`, „Zeit in Texten“): Browser auf UTC, Einsatz auf Europe/Berlin. */
-describe('AlarmZentrale — Uhrzeit der Ablösung in der Anzeigezone (LFH-692)', () => {
-  mitProzessZone('UTC');
-
-  it('13:30 UTC erscheint im Hinweis als 15:30', async () => {
-    render(
-      <AntApp>
-        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
-          <MemoryRouter initialEntries={['/einsaetze/1/start']}>
-            <Routes>
-              <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={false} />} />
-            </Routes>
-          </MemoryRouter>
-        </AnzeigeKonventionenProvider>
-      </AntApp>,
-    );
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent('lfh:abloesung-alarm', {
-          detail: {
-            abloesung_id: 9,
-            art: 'faellig',
-            titel: 'Ablösung fällig: Florian 1',
-            faellig_at: '2026-09-22 13:30:00',
-          },
-        }),
-      );
-    });
-    expect(await screen.findByText('Ablösung fällig: Florian 1, 15:30')).toBeInTheDocument();
-  });
-});
-
 /**
  * LFH-950: Auf dem Führungs-Tablet mit Finger bündelt die Zentrale wie auf dem Handschirm. Ein
  * Tooltip erschiene erst nach dem Tipp, und der Tipp auf die Glocke schaltete sofort stumm.
@@ -990,22 +993,18 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     setzeViewportBreite(VIEWPORT_STANDARD);
   });
 
-  function sofortmeldung(meldung_id: number) {
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id } }));
-    });
-  }
-
   it('wird der Tab wieder sichtbar, schließen sich die offenen Desktop-Meldungen', async () => {
     stubAudioReady();
     const { Ctor, meldungen } = stubMeldungen();
     setzeHidden(true);
     renderAlarm();
     sofortmeldung(3);
-    expect(Ctor).toHaveBeenCalledWith('Sofortmeldung eingegangen', {
-      body: 'Bestätigung ausstehend',
-      tag: '1-sofort-3',
-    });
+    await waitFor(() =>
+      expect(Ctor).toHaveBeenCalledWith('Sofortmeldung eingegangen', {
+        body: 'Meldung #3',
+        tag: '1-b-3',
+      }),
+    );
     expect(offeneDesktopAlarme()).toBe(1);
 
     setzeHidden(false);
@@ -1018,55 +1017,48 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument();
   });
 
-  it('dieselbe Sofortmeldung erneut ersetzt die Desktop-Meldung, statt sie zu stapeln', () => {
+  it('dieselbe Benachrichtigung erneut (Replay) zeigt keine zweite Desktop-Meldung', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
     renderAlarm();
     sofortmeldung(3);
+    await waitFor(() => expect(meldungen).toHaveLength(1));
     sofortmeldung(3);
-    expect(meldungen).toHaveLength(2);
-    expect(meldungen[0].close).toHaveBeenCalledOnce();
+    await act(async () => {});
+    expect(meldungen).toHaveLength(1);
     expect(offeneDesktopAlarme()).toBe(1);
   });
 
-  it('jede Quelle trägt ihren fachlichen tag', () => {
+  it('jede Quelle trägt ihren fachlichen tag', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
     renderAlarm();
+    erinnerungFaellig(5);
+    await waitFor(() => expect(meldungen).toHaveLength(1));
+    auftragUeberfaellig(12);
+    await waitFor(() => expect(meldungen).toHaveLength(2));
+    abloesung(9, 'abloesung_vorwarnung');
+    await waitFor(() => expect(meldungen).toHaveLength(3));
     act(() => {
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 5, bezug_typ: null, bezug_id: null },
-        }),
-      );
-      window.dispatchEvent(
-        new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 },
-        }),
-      );
-      window.dispatchEvent(
-        new CustomEvent('lfh:abloesung-alarm', {
-          detail: { abloesung_id: 9, art: 'vorwarnung', titel: 'Ablösung fällig: Florian 1' },
-        }),
-      );
       window.dispatchEvent(
         new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-2' } }),
       );
     });
+    // Benachrichtigungen unter ihrer Kennung, der Unwetterhinweis unter seinem Paar.
     expect(meldungen.map((m) => m.tag)).toEqual([
-      '1-erinnerung-5',
-      '1-auftrag-12',
-      '1-abloesung-9-vorwarnung',
+      '1-b-205',
+      '1-b-112',
+      '1-b-318',
       '1-unwetter-sturm-2',
     ]);
 
     // LFH-1078: die OS-Meldung nennt Gegenstand und Zustand, keine Bitte.
     expect(meldungen.map((m) => [m.titel, m.body])).toEqual([
       ['Erinnerung fällig', undefined],
-      ['Auftrag überfällig', 'Quittierfrist überschritten'],
-      ['Ablösung in 30 min', 'Ablösung bald fällig: Florian 1'],
+      ['Auftrag überfällig', 'Auftrag #12'],
+      ['Ablösung steht an', 'Florian 9, 15:30'],
       ['Unwetterwarnung', 'Unwetterwarnung für den Einsatzort'],
     ]);
   });
@@ -1098,6 +1090,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     renderAlarm();
     sofortmeldung(3);
     sofortmeldung(4);
+    await waitFor(() => expect(meldungen).toHaveLength(2));
     // Sichtbar machen ohne Ereignis: so prüft der Test den Weg über den Toast allein.
     setzeHidden(false);
     const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
@@ -1115,6 +1108,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     renderAlarm();
     sofortmeldung(3);
     sofortmeldung(4);
+    await waitFor(() => expect(meldungen).toHaveLength(2));
     setzeHidden(false);
     const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
       '.ant-notification-notice',
@@ -1126,7 +1120,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
   });
 
-  it('Öffnen schließt genau die Desktop-Meldung seines Toasts, auch ohne fachlichen Schlüssel', async () => {
+  it('Öffnen schließt genau die Desktop-Meldung seines Toasts, nicht die des Unwetters', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
@@ -1135,9 +1129,11 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
       window.dispatchEvent(
         new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-1' } }),
       );
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: {} }));
     });
-    expect(meldungen.map((m) => m.tag)).toEqual(['1-unwetter-sturm-1', '']);
+    sofortmeldung(3);
+    await waitFor(() =>
+      expect(meldungen.map((m) => m.tag)).toEqual(['1-unwetter-sturm-1', '1-b-3']),
+    );
     setzeHidden(false);
     const toast = (await screen.findByText('Sofortmeldung eingegangen')).closest<HTMLElement>(
       '.ant-notification-notice',
@@ -1153,7 +1149,10 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
     renderAlarm();
-    for (const id of [1, 2, 3, 4]) sofortmeldung(id);
+    for (const id of [1, 2, 3, 4]) {
+      sofortmeldung(id);
+      await waitFor(() => expect(meldungen).toHaveLength(id));
+    }
     setzeHidden(false);
     const sammel = (await screen.findByText('3 weitere Sofortmeldungen')).closest<HTMLElement>(
       '.ant-notification-notice',
@@ -1161,22 +1160,20 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     await userEvent.click(sammel.querySelector<HTMLElement>('.ant-notification-notice-close')!);
     await waitFor(() => expect(offeneDesktopAlarme()).toBe(1));
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0).map((m) => m.tag)).toEqual([
-      '1-sofort-1',
-      '1-sofort-2',
-      '1-sofort-3',
+      '1-b-1',
+      '1-b-2',
+      '1-b-3',
     ]);
   });
 
-  it('der Unmount der Alarmzentrale schließt alle Desktop-Meldungen', () => {
+  it('der Unmount der Alarmzentrale schließt alle Desktop-Meldungen', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
     const { unmount } = renderAlarm();
     sofortmeldung(3);
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: {} }));
-    });
-    expect(meldungen.map((m) => m.tag)).toEqual(['1-sofort-3', '']);
+    sofortmeldung(4);
+    await waitFor(() => expect(meldungen.map((m) => m.tag)).toEqual(['1-b-3', '1-b-4']));
     unmount();
     expect(meldungen.every((m) => m.close.mock.calls.length === 1)).toBe(true);
     expect(offeneDesktopAlarme()).toBe(0);
@@ -1257,13 +1254,13 @@ describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
     ).toBeInTheDocument();
 
     setzeHidden(true);
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
-    });
+    sofortmeldung(3);
     await waitFor(() => expect(sw).toHaveLength(1));
     expect(Ctor).not.toHaveBeenCalled();
-    expect(sw[0]).toMatchObject({ titel: 'Sofortmeldung eingegangen', tag: '1-sofort-3' });
-    expect(sw[0].data.ziel).toBe(new URL('/einsaetze/1/meldungen', window.location.href).href);
+    expect(sw[0]).toMatchObject({ titel: 'Sofortmeldung eingegangen', tag: '1-b-3' });
+    expect(sw[0].data.ziel).toBe(
+      new URL('/einsaetze/1/meldungen?meldung=3', window.location.href).href,
+    );
     const id = sw[0].data.id;
 
     // Der Service Worker holt den Tab nach vorn, der räumt ab; dann kommt der Klick.
@@ -1273,7 +1270,7 @@ describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
     });
     await waitFor(() => expect(sw).toHaveLength(0));
     act(() => klick(id));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen');
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 });
 

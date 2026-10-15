@@ -2,7 +2,7 @@
 titel: Erinnerungen
 gruppen: [fuehrung]
 reihenfolge: 130
-quellen: [frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs]
+quellen: [frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -54,8 +54,7 @@ Ansicht „Abgeschlossen“ zeigt, wann eine Erinnerung erledigt oder erübrigt 
 
 ### Auf eine fällige Erinnerung reagieren
 
-1. Zur fälligen Zeit erscheint der Hinweis „Erinnerung fällig“, dazu eine Mitteilung des
-   Betriebssystems, sofern der Browser sie erlaubt.
+1. Zur fälligen Zeit erscheint der Hinweis „Erinnerung fällig“ mit einem dezenten Ton.
 2. „Öffnen“ führt zu den Erinnerungen; die fällige Karte trägt „fällig“.
 3. Die Erinnerung wie oben erledigen oder erübrigen.
 
@@ -81,6 +80,18 @@ Ablösung nur „↗ Ablösung“:
 
 Sie schließen sich selbst, wenn ihr Anlass erledigt ist, etwa wenn die Sofortmeldung bestätigt
 ist oder alle Empfänger den Auftrag quittiert haben.
+
+Die automatischen Erinnerungen melden sich nicht als „Erinnerung fällig“, sondern mit dem Hinweis
+ihres Anlasses: „Bestätigung ausstehend“, „Auftrag überfällig“, „Ablösung steht an“ oder
+„Ablösung fällig“. Wer ihn bekommt, steht im Kapitel des Anlasses.
+
+### Wer den Hinweis bekommt
+
+„Erinnerung fällig“ geht an die Personen, die im Einsatz die unter „Empfänger/Funktion (optional)“
+gewählte Funktion besetzen. Ist dort keine Funktion gewählt, sondern ein Name eingetippt oder
+nichts, bekommt ihn nur, wer die Erinnerung angelegt hat. Der Hinweis lässt sich unter „Benachrichtigungen“ abschalten (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)); die Erinnerung selbst bleibt in der
+Liste.
 
 Eine Wiedervorlage aus dem Einsatztagebuch ist eine gewöhnliche Erinnerung mit Verweis auf den
 ETB-Eintrag (siehe [Einsatztagebuch](einsatztagebuch.md)).

@@ -1,3 +1,4 @@
+mod benachrichtigung;
 pub mod faelligkeit;
 pub mod repo;
 pub mod scheduler;

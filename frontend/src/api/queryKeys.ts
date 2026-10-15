@@ -164,8 +164,8 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
 /**
  * Wire-Event-Name (SSE `type`) → die Query-Key-Prefixe, die das Event invalidiert.
  * NICHT enthalten:
- * - `sofortmeldung`: hat Seiteneffekte (Ton + window-CustomEvent) → im Hook als Escape-Hatch,
- *   invalidiert die `meldung`-Keys.
+ * - `sofortmeldung`: im Hook, invalidiert die `meldung`-Keys, aber nicht im lagged-Fan-out
+ *   (Ton und Toast trägt die Benachrichtigung, design.md D5).
  * - `lagged`: rein abgeleitet (Union aller Keys hier, dedupliziert) → im Hook.
  */
 export const EINSATZ_STREAM_EVENTS = {
@@ -300,7 +300,7 @@ export const EINSATZ_STREAM_EVENTS = {
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
-  // das Ereignis `art`, stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Hook).
+  // das Ereignis `art`, stammt es vom Scheduler; alarmiert wird über die Benachrichtigung.
   // Der Vollzug beendet die Einsatzperiode der abgelösten Einheit (LFH-552).
   abloesung: [EINSATZ_KEYS.abloesungen, EINSATZ_KEYS.kraefteZeitachse],
   // Bezirke, Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und
