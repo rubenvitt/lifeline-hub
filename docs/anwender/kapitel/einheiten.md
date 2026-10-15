@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs]
 ---
 
 ## Überblick
@@ -125,15 +125,18 @@ Für Einsatzleitung und Führungspersonal:
 6. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
    löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
 
-### Material zuordnen
+### Material zuordnen, lösen und ausgeben
 
-Für Einsatzleitung und Führungspersonal:
+Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
 
-1. Die Einheit öffnen.
-2. Im Paneel „Material“ unter „Material zuordnen …“ einen freien Posten wählen. Die Kopfzeile des
-   Paneels zählt die Posten und, falls vorhanden, den Ausfall; ein ausgefallener Posten trägt
-   seinen Status als Wort.
-3. Mit „Aus Einheit lösen“ einen Posten wieder lösen.
+1. Die Einheit öffnen. Das Paneel „Material“ zeigt jeden Posten mit Menge und Status; die
+   Kopfzeile zählt die Posten und, falls vorhanden, den Ausfall.
+2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
+   anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Die Wahl
+   holt den Posten an die Einheit.
+3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, im Dialog die „Menge ausgeben“ eingeben und
+   mit „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „15 von 20 übrig“.
+4. Mit „Aus Einheit lösen“ einen Posten wieder lösen. Er bleibt ohne Ort im Einsatz.
 
 ### Eine Einheit auflösen
 
@@ -159,7 +162,12 @@ die weder im Einsatz stehen noch aus ihm entlassen wurden; eine entlassene Kraft
 die Module [Personal](personal.md) und [Fahrzeuge und FMS](fahrzeuge.md) zurück. Eine Stamm-Kraft
 wird mit der Wahl disponiert und zugeordnet, ganz oder gar nicht: ist sie inzwischen außer Dienst
 oder schon im Einsatz, geschieht nichts, und der Grund steht unter dem Auswahlfeld. Material kommt
-nur über das Modul [Material](material.md) in den Einsatz.
+nur über das Modul [Material](material.md) in den Einsatz. Ein Materialposten liegt an höchstens
+einem Ort: an einer Einheit, auf einem Fahrzeug, an einer UHS oder in einem Bereitstellungsraum.
+„Material zuordnen …“ bietet Posten ohne Ort und Posten an anderen Orten an; ein Posten von einem
+anderen Ort wird ohne Rückfrage umgehängt, und das Einsatztagebuch nennt den alten und den neuen
+Ort. Material auf einem Fahrzeug der Einheit steht nicht im Paneel „Material“, sondern als
+„Beladung“ am Fahrzeug in der Fahrzeugliste und im [Meldebild](meldebild.md).
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
 Fahrzeug dabei aus seiner bisherigen Einheit um. Ein Fahrzeug ohne Einheit lässt sich dort auch als
 eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
@@ -199,8 +207,9 @@ Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide 
 sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
 „Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
 dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
-„Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund; ohne Freigabe Material
-ebenso „Material zuordnen …“.
+„Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund. Ohne Freigabe Material
+stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuordnen …“ steht gesperrt mit
+„Modul Material gesperrt“, und „Aus Einheit lösen“ und „Ausgeben“ fehlen.
 
 ### Status und Zeitachse
 
@@ -289,6 +298,9 @@ Lesen darf, wer das Modul Einheiten sieht. Bilden, ändern, zuordnen und auflös
 Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im
 Einsatz](rechte-im-einsatz.md)). Ohne dieses Recht zeigt die Seite einer Einheit nur die Werte,
 leere als „—“, ohne Statuswahl, ohne Menü an den Personen, ohne Auswahlfelder, ohne Lösen und
-ohne das Paneel „Einheit auflösen“. Ohne Netz
+ohne das Paneel „Einheit auflösen“. Material zuordnen, lösen und ausgeben verlangt nicht das Recht
+auf Einheiten, sondern Schreibrecht im Einsatz und die Freigabe des Moduls Material: der Ort gehört
+zum Material (Kapitel [Material](material.md)). Eine aufgelöste Einheit nimmt kein Material mehr
+an; „Material zuordnen …“ steht dort gesperrt mit „Einheit aufgelöst“, Lösen bleibt. Ohne Netz
 bleiben Gliederung und Einheiten mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts,
 und eine Vorlage lässt sich weder ansehen noch bilden (Kapitel [Ohne Netz](ohne-netz.md)).

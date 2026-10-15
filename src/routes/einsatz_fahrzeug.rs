@@ -453,6 +453,7 @@ pub async fn entlassen(
             &crate::fahrzeug::etb_text_entlassen(
                 &vorher.funkrufname,
                 ergebnis.einheit.as_ref().map(|(_, name)| name.as_str()),
+                ergebnis.material.len(),
             ),
         )
         .await?;
@@ -476,6 +477,10 @@ pub async fn entlassen(
     }
     for ep_id in ergebnis.besatzung {
         sse_personal(&state, einsatz_id, ep_id);
+    }
+    // Die Beladung steht jetzt ohne Ort (LLH-1224 D13): Live je Posten.
+    for em_id in ergebnis.material {
+        super::einsatz_material::sse_material(&state, einsatz_id, em_id);
     }
     Ok(Json(anzeige))
 }

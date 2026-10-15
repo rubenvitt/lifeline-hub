@@ -140,6 +140,22 @@ describe('Segmentleiste', () => {
   });
 
   /**
+   * Die Staffel gilt auch in der Breite (LLH-1224, Prüfliste Kriterium 1): ein kurzes Wort wie
+   * „Gerät“ ergab sonst 44–46 px und blieb unter 48 bzw. 72 px.
+   */
+  it('Bedienziel: Mindestbreite 30 / 48 / 72 je Segment, das Wort steht mittig', () => {
+    const t = (s: keyof typeof dichten) => ({
+      controlHeight: dichten[s].zeilenhoehe,
+      paddingSM: dichten[s].abstand.sm,
+      marginXS: dichten[s].abstand.xs,
+    });
+    expect(segmentStil(t('kompakt')).minWidth).toBe(30);
+    expect(segmentStil(t('komfortabel')).minWidth).toBe(48);
+    expect(segmentStil(t('handschuh')).minWidth).toBe(72);
+    expect(segmentStil(t('handschuh')).justifyContent).toBe('center');
+  });
+
+  /**
    * Zielabstand (LFH-865, Muster LFH-630): die Fuge bleibt 1 px, das Segment rückt in seiner
    * Zelle ein. Soll als Literale aus der Bedien-Leitlinie (Kriterium 2).
    */

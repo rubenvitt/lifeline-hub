@@ -24,6 +24,17 @@ const SELECT_BESPRECHUNGEN: &str =
             etb_eintrag_id, erfasst_von_id, erfasst_at \
      FROM einsatz_lagebesprechung WHERE einsatz_id = ? ORDER BY lfd_nr DESC";
 
+/// Setzt den Termin am Einsatz, beide Schreibwege (Termin, Abschluss) über diese eine Anweisung.
+///
+/// Das `IS NOT`-Prädikat ist die Änderungserkennung: ein gleicher Wert (auch NULL auf NULL) trifft
+/// keine Zeile. Nur eine echte Änderung leert die Merker der Ankündigung (LLH-1215, design.md D10,
+/// [`super::ankuendigung`]), damit sie für den neuen Termin gilt; derselbe Termin noch einmal
+/// gesetzt kündigt nicht doppelt an.
+const SQL_TERMIN_SETZEN: &str = "UPDATE einsatz SET naechste_lagebesprechung_at = ?1, \
+            lagebesprechung_angekuendigt_vorher_at = NULL, \
+            lagebesprechung_angekuendigt_faellig_at = NULL \
+     WHERE id = ?2 AND naechste_lagebesprechung_at IS NOT ?1";
+
 /// Lädt den Stand: nächster Termin, Zahl und letzte Besprechung.
 ///
 /// ALLE drei Abfragen in EINER Lesetransaktion. Einzeln gegen den Pool gefahren könnten sie
@@ -94,15 +105,12 @@ pub async fn set_termin(
 ) -> Result<bool, AppError> {
     write_retry!(pool, |conn| {
         crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        let geaendert = sqlx::query(
-            "UPDATE einsatz SET naechste_lagebesprechung_at = ?1 \
-             WHERE id = ?2 AND naechste_lagebesprechung_at IS NOT ?1",
-        )
-        .bind(termin)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?
-        .rows_affected()
+        let geaendert = sqlx::query(SQL_TERMIN_SETZEN)
+            .bind(termin)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected()
             == 1;
         Ok(geaendert)
     })
@@ -252,15 +260,12 @@ pub async fn abschliessen(
         //    die Zeit normalisiert, andere Schreibweisen desselben Zeitpunkts sind hier gleich.
         let termin_geaendert = match &eingabe.naechste_at {
             Some(wert) => {
-                sqlx::query(
-                    "UPDATE einsatz SET naechste_lagebesprechung_at = ?1 \
-                     WHERE id = ?2 AND naechste_lagebesprechung_at IS NOT ?1",
-                )
-                .bind(wert.as_deref())
-                .bind(einsatz_id)
-                .execute(&mut *conn)
-                .await?
-                .rows_affected()
+                sqlx::query(SQL_TERMIN_SETZEN)
+                    .bind(wert.as_deref())
+                    .bind(einsatz_id)
+                    .execute(&mut *conn)
+                    .await?
+                    .rows_affected()
                     == 1
             }
             None => false,

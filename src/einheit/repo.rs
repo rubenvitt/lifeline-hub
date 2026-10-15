@@ -1997,7 +1997,7 @@ mod tests {
         .await
         .unwrap();
         let em: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge) VALUES (?, ?, 'Wolldecke', 50) RETURNING id",
+            "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge, art) VALUES (?, ?, 'Wolldecke', 50, 'verbrauchsgut') RETURNING id",
         ).bind(einsatz).bind(gruppe.id).fetch_one(&pool).await.unwrap();
 
         aufloesen(&pool, einsatz, gruppe.id, b).await.unwrap();
@@ -2320,11 +2320,16 @@ mod tests {
             .await
             .unwrap();
         let em: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge, art) VALUES (?, 'Wolldecke', 50, 'verbrauchsgut') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
-        mitglied_repo::zuordnen_material(&pool, einsatz, zug.id, em)
-            .await
-            .unwrap();
+        crate::material::ort::set_ort_tx(
+            &mut pool.acquire().await.unwrap(),
+            einsatz,
+            em,
+            Some(crate::material::ort::MaterialOrt::Einheit(zug.id)),
+        )
+        .await
+        .unwrap();
         let kat = crate::sprechgruppe::repo::anlegen_katalog(
             &pool,
             1,

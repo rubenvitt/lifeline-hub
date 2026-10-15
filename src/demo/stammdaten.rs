@@ -219,6 +219,7 @@ pub async fn stammdaten_importieren_tx(
                     traegerorganisation: None,
                     standort: Some(szenario::STANDORT),
                     bemerkung: Some(szenario::BEMERKUNG),
+                    art: vorlage.art,
                 };
                 let id = material_repo::anlegen_tx(conn, org_id, &daten).await?.id;
                 markieren(conn, import_id, DemoStammdatenArt::Material, id).await?;

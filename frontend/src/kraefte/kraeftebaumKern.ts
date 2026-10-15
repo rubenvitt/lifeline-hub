@@ -12,6 +12,7 @@ import { type BesatzungsUrteil, type EinheitStaerkeUrteil } from '../theme/statu
 import type { StaerkeSumme } from './kraeftebild';
 // Ausfall zählt die eine Material-Zählung (LLH-1093, design.md D10), nicht der Kern.
 import { materialAusfall } from './materialVerdichtungKern';
+import { ortVon } from './materialPosten';
 
 /**
  * Der Kräftebaum — EINE Baumlogik der Kräfte (LLH-1025, Spec `kraeftebaum`), rein.
@@ -351,14 +352,82 @@ export interface FahrzeugImBaum {
   urteil: BesatzungsUrteil;
   /** Die mitgezählten Kräfte anderer Einheiten — „davon n aus …“. */
   fremd: FremdeBesatzung[];
+  /** Material auf diesem Fahrzeug (Ort Fahrzeug, LLH-1225 D14), Gruppe „Beladung“. */
+  beladung: EinsatzMaterial[];
+  beladungAusfall: number;
 }
 
 export interface MittelDerEinheit {
   fahrzeuge: FahrzeugImBaum[];
   /** Personal ohne Fahrzeug in diesem Zweig, auch „fährt auf …“. */
   ohneFahrzeug: PersonImBaum[];
+  /** Die Gruppe „Material“: nur Posten mit Ort bei dieser Einheit (ohne Einheit: ohne Ort). */
   material: EinsatzMaterial[];
+  /**
+   * Ausfall der eigenen Gruppe „Material“ UND der Beladung der eigenen Fahrzeuge (LLH-1225 D14):
+   * das eigene Fahrzeug ist ein eigenes Mittel, eine defekte Beladung tönt die Einheit.
+   */
   materialAusfall: number;
+}
+
+/**
+ * Wo ein Posten im Kräftebaum steht (LLH-1225, design.md D14), allein über seinen Ort: Einheit →
+ * Gruppe „Material“ der Einheit, Fahrzeug → Gruppe „Beladung“ unter dem Fahrzeug, ohne Ort →
+ * Gruppe „Material“ unter „Ohne Einheit“. `null`: nicht im Baum — Material an UHS oder
+ * Bereitstellungsraum (die Wurzel zeigt Kräfte ohne Einheit, nicht das Lager einer UHS) und
+ * Beladung eines Fahrzeugs, das nicht unter `fahrzeuge` steht.
+ */
+export type MaterialImBaum =
+  | { art: 'einheit'; einheitId: number }
+  | { art: 'fahrzeug'; fahrzeugId: number }
+  | { art: 'ohne-einheit' };
+
+export function materialImBaum(
+  em: Parameters<typeof ortVon>[0],
+  fahrzeuge: readonly Pick<EinsatzFahrzeug, 'id'>[],
+): MaterialImBaum | null {
+  const ort = ortVon(em);
+  if (ort == null) return { art: 'ohne-einheit' };
+  switch (ort.art) {
+    case 'einheit':
+      return { art: 'einheit', einheitId: ort.id };
+    case 'fahrzeug':
+      return fahrzeuge.some((f) => f.id === ort.id)
+        ? { art: 'fahrzeug', fahrzeugId: ort.id }
+        : null;
+    case 'uhs':
+    case 'bereitstellungsraum':
+      return null;
+  }
+}
+
+/**
+ * Teilt Material nach {@link materialImBaum}: die Beladung je Fahrzeug und die Posten der Gruppen
+ * „Material“ je Schlüssel (`gruppeVon` liefert ihn; `undefined` lässt den Posten weg).
+ */
+function splitMaterial(
+  material: readonly EinsatzMaterial[],
+  fahrzeuge: readonly Pick<EinsatzFahrzeug, 'id'>[],
+  gruppeVon: (z: Exclude<MaterialImBaum, { art: 'fahrzeug' }>) => number | null | undefined,
+): { gruppen: Map<number | null, EinsatzMaterial[]>; beladung: Map<number, EinsatzMaterial[]> } {
+  const gruppen = new Map<number | null, EinsatzMaterial[]>();
+  const beladung = new Map<number, EinsatzMaterial[]>();
+  const push = <K>(m: Map<K, EinsatzMaterial[]>, k: K, em: EinsatzMaterial) => {
+    const l = m.get(k);
+    if (l) l.push(em);
+    else m.set(k, [em]);
+  };
+  for (const em of material) {
+    const z = materialImBaum(em, fahrzeuge);
+    if (z == null) continue;
+    if (z.art === 'fahrzeug') {
+      push(beladung, z.fahrzeugId, em);
+      continue;
+    }
+    const k = gruppeVon(z);
+    if (k !== undefined) push(gruppen, k, em);
+  }
+  return { gruppen, beladung };
 }
 
 /** Die ungefilterten Listen: Namensquelle für „fährt auf“ und Zählquelle der Besatzung Ist. */
@@ -427,13 +496,16 @@ export function needsOhneFahrzeugKnoten(m: MittelDerEinheit): boolean {
 }
 
 /**
- * Ordnet die EIGENEN Mittel eines Zweigs (schon nach Einheit gruppiert): Fahrzeug → Besatzung,
- * „Ohne Fahrzeug“, Material. `fuehrerId` markiert den Einheitsführer.
+ * Ordnet die EIGENEN Mittel eines Zweigs (schon nach Einheit gruppiert): Fahrzeug → Besatzung und
+ * Beladung, „Ohne Fahrzeug“, Material. `eigene.material` ist schon die Gruppe „Material“,
+ * `beladungJe` die Beladung je Fahrzeug ({@link materialImBaum}). `fuehrerId` markiert den
+ * Einheitsführer.
  */
 function sortMittel(
   eigene: MittelListen,
   fuehrerId: number | null,
   quelle: MittelQuelle,
+  beladungJe: ReadonlyMap<number, readonly EinsatzMaterial[]>,
 ): MittelDerEinheit {
   const fahrzeugName = new Map(quelle.fahrzeuge.map((f) => [f.id, f.funkrufname]));
   for (const f of eigene.fahrzeuge)
@@ -481,6 +553,7 @@ function sortMittel(
         const name = k != null ? einheitName.get(k)! : 'ohne Einheit';
         fremdJe.set(name, (fremdJe.get(name) ?? 0) + 1);
       }
+      const beladung = [...(beladungJe.get(f.id) ?? [])];
       return {
         fahrzeug: f,
         besatzung: (besatzungJe.get(f.id) ?? []).sort(comparePersonen),
@@ -488,6 +561,8 @@ function sortMittel(
         soll,
         urteil: besatzungsUrteilVon(alle.length, ist, soll),
         fremd: [...fremdJe].map(([einheit, anzahl]) => ({ einheit, anzahl })),
+        beladung,
+        beladungAusfall: materialAusfall(beladung),
       };
     });
 
@@ -495,7 +570,8 @@ function sortMittel(
     fahrzeuge,
     ohneFahrzeug: ohneFahrzeug.sort(comparePersonen),
     material: [...eigene.material],
-    materialAusfall: materialAusfall(eigene.material),
+    materialAusfall:
+      materialAusfall(eigene.material) + fahrzeuge.reduce((n, f) => n + f.beladungAusfall, 0),
   };
 }
 
@@ -523,14 +599,21 @@ export function mittelDerEinheit(
   roh = aktiveEingabe(roh);
   const einheit = einheitId != null ? roh.einheiten.find((e) => e.id === einheitId) : undefined;
   const hier = (x: { einheit_id?: number | null }) => (x.einheit_id ?? null) === einheitId;
+  const fahrzeuge = roh.fahrzeuge.filter(hier);
+  // Material nach seinem Ort (D14): die Gruppe nimmt nur Posten dieser Einheit (ohne Einheit: ohne
+  // Ort), die Beladung nur die der eigenen Fahrzeuge.
+  const { gruppen, beladung } = splitMaterial(roh.material, fahrzeuge, (z) =>
+    (z.art === 'einheit' ? z.einheitId : null) === einheitId ? einheitId : undefined,
+  );
   return sortMittel(
     {
       personal: roh.personal.filter(hier),
-      fahrzeuge: roh.fahrzeuge.filter(hier),
-      material: roh.material.filter(hier),
+      fahrzeuge,
+      material: gruppen.get(einheitId) ?? [],
     },
     einheit?.fuehrer_id ?? null,
     vollQuelle(roh, quelle),
+    beladung,
   );
 }
 
@@ -588,7 +671,10 @@ export function kraeftebaum(eingabe: KraeftebaumEingabe): KraeftebaumWurzel[] {
   const bekannt = new Set(e.einheiten.map((x) => x.id));
   const personalJe = groupByEinheit(e.personal, bekannt);
   const fahrzeugeJe = groupByEinheit(e.fahrzeuge, bekannt);
-  const materialJe = groupByEinheit(e.material, bekannt);
+  // Material nach seinem Ort (D14); eine unbekannte Einheit zählt wie keine (wie `groupByEinheit`).
+  const { gruppen: materialJe, beladung } = splitMaterial(e.material, e.fahrzeuge, (z) =>
+    z.art === 'einheit' && bekannt.has(z.einheitId) ? z.einheitId : null,
+  );
   const mittelVon = (id: number | null, fuehrerId: number | null) =>
     sortMittel(
       {
@@ -598,6 +684,7 @@ export function kraeftebaum(eingabe: KraeftebaumEingabe): KraeftebaumWurzel[] {
       },
       fuehrerId,
       quelle,
+      beladung,
     );
   const mitMitteln = (k: EinheitKnoten): KraeftebaumKnoten => ({
     einheit: k.einheit,

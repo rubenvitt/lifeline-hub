@@ -115,6 +115,26 @@ pub struct NachforderungAnzeige {
     pub erstellt_von_name: Option<String>,
     /// Abgeleitet: status NOT IN ('eingetroffen','abgelehnt').
     pub ist_offen: bool,
+    /// Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
+    /// Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
+    /// Bezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material.
+    #[sqlx(try_from = "String")]
+    #[schema(value_type = Vec<i64>)]
+    pub material_ids: MaterialIds,
+}
+
+/// Kennungen übernommener Materialposten, gelesen aus dem JSON-Array der Unterabfrage in
+/// `repo::ANZEIGE_SELECT`; auf dem Draht ein Array von Zahlen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct MaterialIds(pub Vec<i64>);
+
+impl TryFrom<String> for MaterialIds {
+    type Error = serde_json::Error;
+
+    fn try_from(json: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&json).map(MaterialIds)
+    }
 }
 
 #[cfg(test)]

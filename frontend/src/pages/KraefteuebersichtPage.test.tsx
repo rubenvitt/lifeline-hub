@@ -954,6 +954,8 @@ describe('KraefteuebersichtPage — Kräftebaum (LLH-1025)', () => {
         bezeichnung: 'Tauchpumpe',
         menge: 1,
         status: 'defekt',
+        art: 'geraet',
+        ausgegeben: 0,
       },
     ] as Awaited<ReturnType<typeof listEinsatzMaterial>>);
     // Beide in der Frist: die Tönung kommt allein aus dem Material.

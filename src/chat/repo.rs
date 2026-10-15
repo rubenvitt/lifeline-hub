@@ -1,3 +1,4 @@
+use super::erwaehnung::Erwaehnung;
 use super::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
 use crate::anhang::AnhangAnzeige;
 use crate::error::AppError;
@@ -330,6 +331,47 @@ pub async fn anlegen_mit_anhaengen(
     inhalt: &str,
     anhang_ids: &[i64],
 ) -> Result<ChatNachrichtAnzeige, AppError> {
+    anlegen_mit_erwaehnungen(
+        pool,
+        einsatz_id,
+        autor_id,
+        kanal_id,
+        inhalt,
+        anhang_ids,
+        &[],
+    )
+    .await
+}
+
+/// Wie [`anlegen_mit_anhaengen`], dazu die geprüften Erwähnungen (`chat::erwaehnung::pruefen`)
+/// in derselben Transaktion (LLH-1220, design.md D9). Ein erwähnter Nutzer muss Mitglied des
+/// Einsatzes sein, sonst Rollback und 422. Prüfen und Schreiben brauchen je Art eine Anweisung,
+/// gleich wie lang die Liste ist (`json_each`, `src/AGENTS.md`, Eingabegrenzen).
+pub async fn anlegen_mit_erwaehnungen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    autor_id: i64,
+    kanal_id: i64,
+    inhalt: &str,
+    anhang_ids: &[i64],
+    erwaehnungen: &[Erwaehnung],
+) -> Result<ChatNachrichtAnzeige, AppError> {
+    let nutzer: Vec<i64> = erwaehnungen
+        .iter()
+        .filter_map(|e| match e {
+            Erwaehnung::Nutzer(id) => Some(*id),
+            Erwaehnung::Funktion(_) => None,
+        })
+        .collect();
+    let funktionen: Vec<&str> = erwaehnungen
+        .iter()
+        .filter_map(|e| match e {
+            Erwaehnung::Funktion(f) => Some(f.as_str()),
+            Erwaehnung::Nutzer(_) => None,
+        })
+        .collect();
+    let nutzer_json = serde_json::to_string(&nutzer).expect("ID-Liste serialisierbar");
+    let funktionen_json = serde_json::to_string(&funktionen).expect("Codeliste serialisierbar");
     let id = crate::write_retry!(pool, |conn| {
         for &aid in anhang_ids {
             // Modulgebundene Anhänge (Dokument LFH-632, ETB LFH-117, Schaden LFH-21) sind nicht
@@ -369,6 +411,24 @@ pub async fn anlegen_mit_anhaengen(
             crate::anhang::pruefe_mime(&mime, crate::anhang::ERLAUBTE_MIME)?;
         }
 
+        // Nach den Anhängen: ihr 400 geht dem 422 des Zusammenhangs vor.
+        if !nutzer.is_empty() {
+            let fremd: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM json_each(?) j WHERE NOT EXISTS \
+                   (SELECT 1 FROM einsatz_mitgliedschaft m \
+                     WHERE m.einsatz_id = ? AND m.benutzer_id = j.value)",
+            )
+            .bind(&nutzer_json)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if fremd > 0 {
+                return Err(AppError::UnprocessableEntity(
+                    "Erwähnte Person gehört nicht zum Einsatz".into(),
+                ));
+            }
+        }
+
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt) \
              VALUES (?, ?, ?, ?) RETURNING id",
@@ -386,6 +446,27 @@ pub async fn anlegen_mit_anhaengen(
             )
             .bind(id)
             .bind(aid)
+            .execute(&mut *conn)
+            .await?;
+        }
+
+        if !nutzer.is_empty() {
+            sqlx::query(
+                "INSERT INTO chat_erwaehnung (nachricht_id, benutzer_id) \
+                 SELECT ?, value FROM json_each(?)",
+            )
+            .bind(id)
+            .bind(&nutzer_json)
+            .execute(&mut *conn)
+            .await?;
+        }
+        if !funktionen.is_empty() {
+            sqlx::query(
+                "INSERT INTO chat_erwaehnung (nachricht_id, funktion) \
+                 SELECT ?, value FROM json_each(?)",
+            )
+            .bind(id)
+            .bind(&funktionen_json)
             .execute(&mut *conn)
             .await?;
         }

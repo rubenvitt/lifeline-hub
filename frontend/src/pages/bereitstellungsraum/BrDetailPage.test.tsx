@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,12 +10,22 @@ import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
-import { einsatzFixture } from '../../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 
 // `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
 // diese Datei testet die Seiten-Komposition, nicht den Switcher.
 vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
+
+// Sektion „Material“ (LLH-1225 D13): mit offener Freigabe fragt die Seite die Materialliste und
+// für die Namen im Angebot die UHS ab. Leer ist ein echter Serverzustand; Tests mit Material
+// überschreiben per `server.use()`.
+beforeEach(() => {
+  server.use(
+    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+  );
+});
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Test-Einsatz', meine_rolle: 'fuehrungspersonal', ...over });
@@ -996,7 +1006,18 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     const qc = renderBrDetail();
     return { stand, qc };
   }
-  const dialog = () => screen.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
+  /**
+   * Der Dialog über seinen Titel, nicht über `getByRole('dialog', { name })`: antd vergibt im
+   * Testmodus jedem Knoten die id „test-id“, und `aria-labelledby` zeigte auf das erste Auswahlfeld
+   * der Seite (seit LLH-1225 „Material zuordnen“ in der Sektion „Material“).
+   */
+  const dialog = () =>
+    screen
+      .getAllByRole('dialog')
+      .find(
+        (d) =>
+          d.querySelector('.ant-modal-title')?.textContent === 'Bereitstellungsraum bearbeiten',
+      )!;
   const feld = (name: string) => within(dialog()).getByLabelText(name);
   // jsdom kennt kein `transitionend`: antd beginnt das Ausblenden (`ant-zoom-leave`) und bleibt
   // dort stehen (Muster `stammdaten/verwaltungstabellen.test.tsx`).
@@ -1172,5 +1193,195 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     seite(brDetail({ status: 'aktiv' }), { rolle: 'beobachter' });
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Sektion „Material“ unter der Belegung (LLH-1225 Teil II, design.md D13): der Baustein für Material
+ * am Ort mit Ort Bereitstellungsraum. Die Posten kommen aus der Materialliste (`br_id`), abgefragt
+ * nur mit Freigabe Material und nie am Gerät (D9). Bedienbar auch im Zustand `geplant`.
+ */
+describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
+  const posten = (p: Record<string, unknown>) => ({
+    einsatz_id: 1,
+    material_id: null,
+    ist_adhoc: true,
+    kategorie: null,
+    art: 'geraet',
+    menge: 1,
+    ausgegeben: 0,
+    status: 'einsatzbereit',
+    einheit_id: null,
+    einsatz_fahrzeug_id: null,
+    uhs_id: null,
+    br_id: null,
+    beendet_at: null,
+    disponiert_at: '2026-05-26 09:10:00',
+    ...p,
+  });
+  const MATERIAL = [
+    posten({ id: 60, bezeichnung: 'Lichtmast', br_id: 1, status: 'defekt' }),
+    posten({ id: 61, bezeichnung: 'Stromerzeuger' }),
+    posten({ id: 62, bezeichnung: 'Trage', br_id: 2 }),
+  ];
+
+  const GERAET_BR_ME = {
+    id: 9,
+    anzeigename: 'BR Alpha · Tablet',
+    benutzername: 'geraet-4',
+    system_rolle: 'keiner',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-10-04',
+    totp_aktiviert: false,
+    passwort_gesetzt: false,
+    geraet: {
+      kopplung_id: 4,
+      einsatz_id: 1,
+      ansicht: 'bereitstellungsraum',
+      br_id: 1,
+      stelle: 'BR Alpha',
+      bezeichnung: 'Tablet',
+      laeuft_ab_at: '2026-10-05 12:00:00',
+    },
+  };
+
+  function seite(
+    br: BrDetail,
+    {
+      freigaben,
+      rolle = 'fuehrungspersonal',
+      material = MATERIAL,
+    }: {
+      freigaben?: Record<string, { zugriff: boolean }>;
+      rolle?: string;
+      material?: ReturnType<typeof posten>[];
+    } = {},
+  ) {
+    const abrufe: string[] = [];
+    const gesendet: { url: string; body: unknown }[] = [];
+    server.use(
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json(einsatz({ meine_rolle: rolle as EinsatzAnzeige['meine_rolle'] })),
+      ),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([
+          { ...br, id: 1 },
+          { ...br, id: 2, bezeichnung: 'BR Bravo' },
+        ]),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/material', () => {
+        abrufe.push('material');
+        return HttpResponse.json(material);
+      }),
+      http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
+        gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+        return HttpResponse.json({});
+      }),
+    );
+    if (freigaben) {
+      server.use(
+        http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture(freigaben)),
+        ),
+      );
+    }
+    renderBrDetail();
+    return { abrufe, gesendet };
+  }
+
+  const sektion = () => screen.getByTestId('br-material');
+  const zeile = (text: string) =>
+    within(sektion()).getByText(text).closest('[data-lfh="material-am-ort-zeile"]') as HTMLElement;
+
+  it('steht unter der Belegung mit Kopfzahl und den Posten dieses Raums', async () => {
+    seite(brDetail());
+    expect(await screen.findByText('Lichtmast')).toBeInTheDocument();
+    expect(sektion()).toHaveTextContent('1 Posten · 1 Ausfall');
+    expect(within(sektion()).queryByText('Trage')).toBeNull();
+    const belegung = screen.getByTestId('br-belegung');
+    expect(
+      belegung.compareDocumentPosition(sektion()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(belegung.contains(sektion())).toBe(false);
+  });
+
+  it('im geplanten Raum: Lösen und Zuordnen schicken den PATCH an die Disposition', async () => {
+    const { gesendet } = seite(brDetail({ status: 'geplant' }));
+    await userEvent.click(
+      within(await waitFor(() => zeile('Lichtmast'))).getByRole('button', {
+        name: 'Lichtmast lösen',
+      }),
+    );
+    await userEvent.click(within(sektion()).getByRole('combobox', { name: 'Material zuordnen' }));
+    await userEvent.click(await screen.findByText('Stromerzeuger · 1'));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/60', body: { br_id: null } },
+        { url: '/api/einsaetze/1/material/61', body: { br_id: 1 } },
+      ]),
+    );
+  });
+
+  it('aufgelöster Raum: Zuordnen gesperrt mit Grund, Lösen geht', async () => {
+    seite(brDetail({ status: 'aufgeloest' }));
+    await screen.findByText('Lichtmast');
+    const feld = within(sektion()).getByRole('combobox', { name: 'Material zuordnen' });
+    expect(feld).toBeDisabled();
+    expect(feld).toHaveAccessibleDescription('BR aufgelöst');
+    expect(
+      within(zeile('Lichtmast')).getByRole('button', { name: 'Lichtmast lösen' }),
+    ).toBeEnabled();
+  });
+
+  it('stornierter Raum: Zuordnen und Ausgeben gesperrt mit Grund, Lösen geht', async () => {
+    const decken = posten({
+      id: 63,
+      bezeichnung: 'Wolldecke',
+      art: 'verbrauchsgut',
+      menge: 20,
+      br_id: 1,
+    });
+    seite(brDetail({ storniert_at: '2026-10-15 08:00:00' }), {
+      material: [...MATERIAL, decken],
+    });
+    await screen.findByText('Wolldecke');
+    const feld = within(sektion()).getByRole('combobox', { name: 'Material zuordnen' });
+    expect(feld).toBeDisabled();
+    expect(feld).toHaveAccessibleDescription('BR storniert');
+    expect(within(zeile('Wolldecke')).queryByRole('button', { name: /ausgeben$/ })).toBeNull();
+    expect(
+      within(zeile('Lichtmast')).getByRole('button', { name: 'Lichtmast lösen' }),
+    ).toBeEnabled();
+  });
+
+  it('ohne Schreibrecht: die Posten stehen, Bedienung fehlt', async () => {
+    seite(brDetail(), { rolle: 'beobachter' });
+    await screen.findByText('Lichtmast');
+    expect(within(sektion()).queryByRole('button', { name: /lösen$/ })).toBeNull();
+    expect(within(sektion()).queryByRole('combobox')).toBeNull();
+  });
+
+  it('ohne Freigabe Material: keine Sektion und kein Abruf der Materialliste', async () => {
+    const { abrufe } = seite(brDetail(), { freigaben: { material: { zugriff: false } } });
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    // Die Freigaben sind da (das Belegen hängt nicht an ihnen), die Sektion bleibt weg.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId('br-material')).toBeNull();
+    expect(abrufe).toEqual([]);
+  });
+
+  it('am BR-Gerät: keine Sektion und kein Abruf der Materialliste', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(GERAET_BR_ME)));
+    const { abrufe } = seite(brDetail());
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId('br-material')).toBeNull();
+    expect(abrufe).toEqual([]);
   });
 });

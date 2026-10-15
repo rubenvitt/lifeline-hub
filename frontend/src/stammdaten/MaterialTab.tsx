@@ -13,10 +13,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { listeKategorien, listeMaterial, setzeDienststatus } from '../api/material';
-import type { Material } from '../api/types';
+import type { Material, MaterialArt } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { ART_LABEL } from '../kraefte/materialPosten';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 
 export default function MaterialTab() {
@@ -64,6 +65,19 @@ export default function MaterialTab() {
       ),
     },
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
+    {
+      // Art des Stamms (LLH-1224): Vorgabe jeder neuen Disposition. Filterwerte fest aus dem
+      // Wire-Enum, nicht aus den geladenen Zeilen (Begründung in `SprechgruppenTab`).
+      title: 'Art',
+      dataIndex: 'art',
+      key: 'art',
+      filters: (Object.keys(ART_LABEL) as MaterialArt[]).map((a) => ({
+        text: ART_LABEL[a],
+        value: a,
+      })),
+      onFilter: (wert, m) => m.art === wert,
+      render: (a: MaterialArt) => ART_LABEL[a],
+    },
     {
       title: 'Bestandsnummer',
       dataIndex: 'bestandsnummer',

@@ -89,7 +89,9 @@ async function seedeAlles(page: Page, einsatzId: string): Promise<number> {
     page,
     einsatzId,
     'material',
-    { adhoc: { bezeichnung: MATERIAL, menge: 12 } },
+    // Menge > 1: ein Verbrauchsgut, dessen Menge bearbeitbar ist (LLH-1224 D2; ein Gerät zeigt
+    // „1“ ohne Bearbeiten). Die Menge steht neben `adhoc`, nicht darin.
+    { adhoc: { bezeichnung: MATERIAL }, menge: 12 },
     'Material',
   );
   await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');
@@ -346,14 +348,14 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
       ).toHaveCount(0);
     }
 
-    // Material: das Mengenfeld der Zeile bzw. Karte hat einen Namen, der Dialog sein Feld „Menge".
-    // Die Menge ist erst ein Wert und wird auf „bearbeiten“ zum Feld (LLH-1093, design.md D9).
+    // Material: die Menge ist in Zeile und Karte ein Wert ohne Feld (LLH-1093 D9); „Ausgeben“
+    // öffnet einen Dialog mit benanntem Feld (LLH-1225 D5), der Disponier-Dialog sein Feld „Menge".
     await page.goto(`/einsaetze/${einsatzId}/material`);
-    await page.getByRole('button', { name: `Menge zu ${MATERIAL} bearbeiten` }).click();
-    await expect(page.getByRole('spinbutton', { name: `Menge zu ${MATERIAL}` })).toBeVisible();
-    await page
-      .getByRole('button', { name: `Bearbeitung von Menge zu ${MATERIAL} abbrechen` })
-      .click();
+    await page.getByRole('button', { name: `${MATERIAL} ausgeben` }).click();
+    const ausgabe = page.getByRole('dialog', { name: `${MATERIAL} ausgeben` });
+    await expect(ausgabe.getByRole('spinbutton', { name: 'Menge ausgeben' })).toBeVisible();
+    await ausgabe.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(ausgabe).toBeHidden();
     await page.getByRole('button', { name: 'Material disponieren' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();
@@ -364,7 +366,9 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
     await expect(dialog).toBeHidden();
   }
 
-  // Desktop: einzeilig. Alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Personal.
+  // Desktop: einzeilig. Alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Fahrzeugen:
+  // beide Köpfe tragen eine Segmentleiste (Ansicht bzw. Gruppierung, LLH-1225 D4), die mit dem
+  // Zielabstand höher steht als ein Knopf; Personal hat keine.
   await page.setViewportSize({ width: 1440, height: 900 });
   const titelOben = async (modul: string, wortlaut: string) => {
     await page.goto(`/einsaetze/${einsatzId}/${modul}`);
@@ -376,8 +380,9 @@ test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche
     return (await page.getByRole('heading', { level: 1 }).boundingBox())!.y;
   };
   const material = await titelOben('material', MATERIAL);
-  const personal = await titelOben('personal', KRAFT);
-  expect(Math.abs(material - personal)).toBeLessThanOrEqual(1);
+  const fahrzeuge = await titelOben('fahrzeuge', FUNKRUFNAME);
+  expect(Math.abs(material - fahrzeuge)).toBeLessThanOrEqual(1);
+  await titelOben('personal', KRAFT);
 });
 
 for (const { dichte, soll } of STAFFEL) {

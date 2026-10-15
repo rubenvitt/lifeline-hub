@@ -1,5 +1,13 @@
 import { apiGet, apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
-import type { Anhang, BezugTyp, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
+import type {
+  Anhang,
+  BezugTyp,
+  ChatErwaehnung,
+  ChatKanal,
+  ChatNachricht,
+  EtbTyp,
+  NeuerAuftrag,
+} from './types';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
@@ -52,16 +60,20 @@ export function ladeAnhaengeHoch(
   });
 }
 
+/** Sendet eine Nachricht; `erwaehnungen` benachrichtigt die Erwähnten (LLH-1220). */
 export function sendeNachricht(
   einsatzId: number,
   kanalId: number,
   inhalt: string,
   anhangIds: number[] = [],
+  erwaehnungen: ChatErwaehnung[] = [],
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
     `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten`,
     'POST',
-    { inhalt, anhang_ids: anhangIds },
+    erwaehnungen.length > 0
+      ? { inhalt, anhang_ids: anhangIds, erwaehnungen }
+      : { inhalt, anhang_ids: anhangIds },
   );
 }
 

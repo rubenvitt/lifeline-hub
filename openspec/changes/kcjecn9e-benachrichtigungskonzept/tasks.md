@@ -36,10 +36,10 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 4. Gekoppelte Geräte still und Lagemonitor (D12, benötigt 1) · LLH-1210
 
-- [ ] 4.1 Geräte-Layout ohne Ton; Vitest „Gerät mit Modul Meldungen“
-- [ ] 4.2 Verdichtete Lagemonitor-Antwort um offene Sofortmeldungen erweitern (ohne Text); Routentest, dass keine Meldungsfelder enthalten sind
-- [ ] 4.3 Kopfzahl „Sofortmeldungen offen“ und Hervorhebung 60 s bei Anstieg (Sofortmeldungen, SK I), ohne Blinken; Vitest „Neue Sofortmeldung“, „Sofortmeldung bestätigt“
-- [ ] 4.4 Anwenderkapitel `lagemonitor` und `geraet-bedienen` nachziehen
+- [x] 4.1 Geräte-Layout ohne Ton; Vitest „Gerät mit Modul Meldungen“
+- [x] 4.2 Verdichtete Lagemonitor-Antwort um offene Sofortmeldungen erweitern (ohne Text); Routentest, dass keine Meldungsfelder enthalten sind
+- [x] 4.3 Kopfzahl „Sofortmeldungen offen“ und Hervorhebung 60 s bei Anstieg (Sofortmeldungen, SK I), ohne Blinken; Vitest „Neue Sofortmeldung“, „Sofortmeldung bestätigt“
+- [x] 4.4 Anwenderkapitel `lagemonitor` und `geraet-bedienen` nachziehen
 
 ## 5. Native Meldung in der Desktop-App (D7, benötigt 2) · LLH-1211
 
@@ -67,9 +67,9 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 9. Lagebesprechung steht an (D10, benötigt 1, 2) · LLH-1215
 
-- [ ] 9.1 Migration für die Merker am Termin anhängen; Setzen eines Termins leert sie; Test
-- [ ] 9.2 Scheduler meldet 10 min vorher und bei Termin an EL und S1–S7; Rust-Tests „Termin 14:00“, „Termin verschoben“
-- [ ] 9.3 Anwenderkapitel zur Lagebesprechung nachziehen
+- [x] 9.1 Migration für die Merker am Termin anhängen; Setzen eines Termins leert sie; Test
+- [x] 9.2 Scheduler meldet 10 min vorher und bei Termin an EL und S1–S7; Rust-Tests „Termin 14:00“, „Termin verschoben“
+- [x] 9.3 Anwenderkapitel zur Lagebesprechung nachziehen
 
 ## 10. Status einer Nachforderung (benötigt 1, 2) · LLH-1216
 
@@ -83,8 +83,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 12. Neue Person der Sichtungskategorie I (benötigt 1, 2) · LLH-1218
 
-- [ ] 12.1 Neuerfassung mit SK I und Hochstufung auf SK I melden `sichtung_eins` an Leser des Moduls Personen; Rust-Test „Hochstufung“
-- [ ] 12.2 Anwenderkapitel zu Personen und Sichtung nachziehen
+- [x] 12.1 Neuerfassung mit SK I und Hochstufung auf SK I melden `sichtung_eins` an Leser des Moduls Personen; Rust-Test „Hochstufung“
+- [x] 12.2 Anwenderkapitel zu Personen und Sichtung nachziehen
 
 ## 13. Einheit oder Fahrzeug wieder verfügbar (D11, benötigt 1, 2) · LLH-1219
 
@@ -93,16 +93,16 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 14. Chat-Erwähnung (D9, benötigt 1, 2) · LLH-1220
 
-- [ ] 14.1 Migration `chat_erwaehnung` anhängen, Nachricht nimmt die Liste der Erwähnungen an (Grenzen nach `src/AGENTS.md`, Eingabegrenzen); Routentests
-- [ ] 14.2 `@`-Vervollständigung aus Mitgliedern und besetzten Funktionen in der Chat-Eingabe; Vitest
-- [ ] 14.3 Erwähnung meldet `chat_erwaehnung` an Nutzer, die den Kanal sehen dürfen; Rust-Test „Erwähnung einer Funktion“
-- [ ] 14.4 Anwenderkapitel `chat` nachziehen
+- [x] 14.1 Migration `chat_erwaehnung` anhängen, Nachricht nimmt die Liste der Erwähnungen an (Grenzen nach `src/AGENTS.md`, Eingabegrenzen); Routentests
+- [x] 14.2 `@`-Vervollständigung aus Mitgliedern und besetzten Funktionen in der Chat-Eingabe; Vitest
+- [x] 14.3 Erwähnung meldet `chat_erwaehnung` an Nutzer, die den Kanal sehen dürfen; Rust-Test „Erwähnung einer Funktion“
+- [x] 14.4 Anwenderkapitel `chat` nachziehen
 
 ## 15. Org-Ebene: Aufnahme und neuer Einsatz (benötigt 1, 2.5) · LLH-1221
 
-- [ ] 15.1 Aufnahme in einen Einsatz meldet `einsatz_aufnahme` an den Aufgenommenen über den Org-Kanal; Rust-Test „Aufnahme außerhalb eines Einsatzes“
-- [ ] 15.2 Anlegen eines Einsatzes meldet `einsatz_neu` an Führungskräfte mit Leserecht, ohne den Anleger; Rust-Test „Neuer Einsatz“
-- [ ] 15.3 Anwenderkapitel zur Einsatzliste nachziehen
+- [x] 15.1 Aufnahme in einen Einsatz meldet `einsatz_aufnahme` an den Aufgenommenen über den Org-Kanal; Rust-Test „Aufnahme außerhalb eines Einsatzes“
+- [x] 15.2 Anlegen eines Einsatzes meldet `einsatz_neu` an Führungskräfte mit Leserecht, ohne den Anleger; Rust-Test „Neuer Einsatz“
+- [x] 15.3 Anwenderkapitel zur Einsatzliste nachziehen
 
 ## 16. Abschluss · LLH-1222
 
