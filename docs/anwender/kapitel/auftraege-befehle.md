@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/erinnerung/benachrichtigung.rs, src/auftrag/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -224,6 +224,27 @@ bleibt stehen.
 
 Ein aufgehobener Auftrag ist nie offen und nie überfällig: Er fehlt in den Zahlen im Überblick,
 im Lagedashboard, in der Vorbereitung der Lagebesprechung und im Lagebericht.
+
+### Benachrichtigungen zu Aufträgen
+
+Wer einen Auftrag bekommt oder erteilt hat, erhält einen Hinweis, ohne das Modul offen zu haben:
+
+- **„Neuer Auftrag“** geht beim Erteilen an jede Person, die eine Empfänger-Funktion besetzt
+  (laut Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), und an eine Einsatzkraft als
+  Empfänger, wenn ihr Personal mit einem Konto verknüpft ist. Das gilt auch für Aufträge aus
+  einem ETB-Eintrag, einer Meldung oder dem Chat. Einheiten, Abschnitte, Fahrzeuge, externe
+  Stellen und eine frei eingetippte Funktion erreichen niemanden. Kommt durch eine Berichtigung
+  ein Empfänger hinzu, erhält nur er den Hinweis.
+- **„Auftrag quittiert“** geht an die Person, die den Auftrag erteilt hat, sobald ein Empfänger
+  quittiert, etwa „Auftrag #12 an S2“. Bei einer Einsatzkraft als Empfänger steht nur die
+  Nummer da, nie ein Name.
+- **„Auftrag erledigt“** geht an die Person, die den Auftrag erteilt hat, wenn der Vollzug
+  gemeldet wird.
+
+Eigene Aktionen bleiben still: Wer als S4 einen Auftrag an S4 erteilt, den eigenen Auftrag
+quittiert oder den Vollzug selbst meldet, bekommt dazu nichts. Jeder Vorgang meldet sich einmal;
+eine wiederholte Quittung oder eine Berichtigung ohne neuen Empfänger bleibt still. Wer das Modul
+„Aufträge/Befehle“ nicht sehen darf, bekommt keinen Hinweis.
 
 ### Aufträge im Einsatztagebuch
 

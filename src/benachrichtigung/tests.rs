@@ -137,6 +137,34 @@ async fn detail_liest_nur_retain_spalten() {
     }
 }
 
+/// Dasselbe für die Detailzeile der Empfänger-Zeile eines Auftrags (Quittung, LLH-1212), die
+/// mehrere Spalten liest.
+#[tokio::test]
+async fn detail_der_auftrag_empfaenger_zeile_liest_nur_retain_spalten() {
+    let pool = crate::db::test_pool().await;
+    for &(tabelle, spalte) in text::AUFTRAG_EMPFAENGER_SPALTEN {
+        assert!(
+            matches!(
+                klassifikation_von(tabelle, spalte),
+                Some(Klassifikation::Retain(_))
+            ),
+            "{tabelle}.{spalte} ist kein Retain-Wert"
+        );
+        let sql = format!("SELECT {spalte} FROM {tabelle} LIMIT 0");
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_else(|e| panic!("{tabelle}.{spalte}: {e}"));
+    }
+    // Die Abfrage nennt keine Scrub-Spalte der Empfänger-Zeile.
+    for scrub in ["snap_anzeige", "funktion_text", "extern_bezeichnung"] {
+        assert!(
+            !text::AUFTRAG_EMPFAENGER_SQL.contains(scrub),
+            "Detailzeile liest {scrub}"
+        );
+    }
+}
+
 #[test]
 fn jede_tabellenspalte_der_benachrichtigung_ist_retain() {
     for spalte in [
@@ -168,6 +196,8 @@ fn pfade_folgen_den_deeplinks() {
     assert_eq!(p(B::Einsatz, 7), "/einsaetze/7");
     assert_eq!(p(B::Meldung, 3), "/einsaetze/7/meldungen?meldung=3");
     assert_eq!(p(B::Auftrag, 4), "/einsaetze/7/auftraege?auftrag=4");
+    // Ohne gelesene Zeile die Liste; `bilden` setzt den Auftrag ein.
+    assert_eq!(p(B::AuftragEmpfaenger, 4), "/einsaetze/7/auftraege");
     assert_eq!(p(B::Befehl, 5), "/einsaetze/7/auftraege/befehle/5");
     assert_eq!(p(B::Lagebericht, 6), "/einsaetze/7/lageberichte/6");
     assert_eq!(

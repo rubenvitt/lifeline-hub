@@ -36,6 +36,9 @@ import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
 import EinheitVorlageDetailPage from './stammdaten/EinheitVorlageDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
+// Nicht lazy: als eigener Chunk kippt er die Chunk-Aufteilung, und der Haupt-Chunk sprengt das
+// Precache-Limit (vite.config.ts, `maximumFileSizeToCacheInBytes`).
+import BenachrichtigungenPage from './pages/BenachrichtigungenPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
@@ -135,7 +138,6 @@ const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'))
 // Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
 const HilfePage = lazy(() => import('./hilfe/HilfePage'));
 const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
-const BenachrichtigungenPage = lazy(() => import('./pages/BenachrichtigungenPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.

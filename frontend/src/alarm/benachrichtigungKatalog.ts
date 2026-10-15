@@ -205,6 +205,7 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   einsatz: 'einsatz',
   meldung: 'meldungen',
   auftrag: 'auftraege',
+  auftrag_empfaenger: 'auftraege',
   befehl: 'befehle',
   lagebericht: 'lageberichte',
   erinnerung: 'erinnerungen',

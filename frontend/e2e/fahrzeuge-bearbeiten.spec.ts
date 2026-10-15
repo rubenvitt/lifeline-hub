@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleStehend } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -34,7 +35,7 @@ async function waehleEinheit(page: Page, funkrufname: string, pfad: string, leer
     .getByRole('button', { name: `Einheit zu ${funkrufname} ${leer ? 'eintragen' : 'bearbeiten'}` })
     .click();
   await page.getByRole('combobox', { name: `Einheit zu ${funkrufname}` }).click();
-  await page.locator(`.ant-select-item-option[title="${pfad}"]`).click();
+  await waehleStehend(page, pfad);
   await region.getByRole('button', { name: `Einheit zu ${funkrufname} speichern` }).click();
 }
 
