@@ -232,8 +232,11 @@ keines. „Besatzung nicht erfasst“ heißt: keine Person zugeordnet, das Perso
 über die Einheit. Einer Einheit wird ein Fahrzeug beim Disponieren aus dem Stamm, in der Spalte
 „Einheit“ der Liste oder im Modul [Einheiten](einheiten.md) zugeordnet; alle drei Wege sind
 derselbe. Wechselt ein Fahrzeug von einer Einheit in eine andere, sehen beide Einheiten das sofort,
-und das Einsatztagebuch nennt die vorige Einheit. Dieselbe Einheit noch einmal zu wählen ändert
-nichts.
+und das Einsatztagebuch nennt die vorige Einheit. Die Besatzung kommt mit: wer auf dem Fahrzeug
+sitzt und der vorigen oder keiner Einheit angehört, gehört danach der neuen an, und der Eintrag
+nennt diese Personen. Der Einheitsführer der vorigen Einheit bleibt dort, ebenso wer zu einer
+dritten Einheit gehört; beide behalten die Marke „andere Einheit“. Dasselbe gilt, wenn ein Fahrzeug
+ohne Einheit einer Einheit zugeordnet wird. Dieselbe Einheit noch einmal zu wählen ändert nichts.
 
 ### Als eigene Einheit führen
 

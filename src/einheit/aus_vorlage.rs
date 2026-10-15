@@ -564,7 +564,8 @@ pub struct Gebildet {
     pub einheiten: Vec<Bezug>,
     /// Übernommene Fahrzeuge (`einsatz_fahrzeug.id`, Funkrufname) in Vorlagenreihenfolge.
     pub fahrzeuge: Vec<Bezug>,
-    /// Übernommene Personen (`einsatz_personal.id`, Name) in Vorlagenreihenfolge.
+    /// Übernommene Personen (`einsatz_personal.id`, Name) in Vorlagenreihenfolge, danach die
+    /// Besatzung, die mit ihrem Fahrzeug kam (LLH-1238).
     pub personal: Vec<Bezug>,
     pub umgehaengt: Vec<Umgehaengt>,
     /// Einheiten, aus denen umgehängt wurde (Ereignis `einheit` nach dem Commit).
@@ -678,6 +679,8 @@ pub async fn bilde_tx(
 
     // Fahrzeuge je Einheit; Stamm-ID → neue Zeile im Einsatz für die Besatzung.
     let mut ef_von: HashMap<i64, i64> = HashMap::new();
+    // Wer mit einem Fahrzeug im Einsatz in die neue Einheit kam (LLH-1238).
+    let mut mitgekommen: Vec<Bezug> = Vec::new();
     for k in &plan.knoten {
         let eid = einheit_von[&k.id];
         let gewaehlt: Vec<i64> = k
@@ -714,9 +717,11 @@ pub async fn bilde_tx(
                     let ef_id = lage.ef_id.ok_or_else(|| {
                         AppError::Internal("Fahrzeug im Einsatz ohne Zeile".into())
                     })?;
-                    let name = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id)
-                        .await?
-                        .funkrufname;
+                    let z =
+                        mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
+                    mitgekommen
+                        .extend(z.besatzung.into_iter().map(|(id, name)| Bezug { id, name }));
+                    let name = z.funkrufname;
                     if let Some(alt) = &lage.einheit {
                         push_unique(&mut gebildet.alte_einheiten, alt.id);
                         gebildet.umgehaengt.push(Umgehaengt {
@@ -829,6 +834,13 @@ pub async fn bilde_tx(
                     Bezug { id: ep_id, name }
                 }
             };
+            gebildet.personal.push(b);
+        }
+    }
+    // Die Besatzung, die mit ihrem Fahrzeug kam, zählt zu den Kräften, sofern die Vorlage sie
+    // nicht schon selbst eingeteilt hat.
+    for b in mitgekommen {
+        if !gebildet.personal.iter().any(|p| p.id == b.id) {
             gebildet.personal.push(b);
         }
     }

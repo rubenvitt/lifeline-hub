@@ -125,17 +125,22 @@ pub async fn load_betroffene_einheiten_tx(
 }
 
 /// Ergebnis von [`zuordnen_fahrzeug_tx`]: der aufgelöste Funkrufname für den ETB-Text, die
-/// Einheit, der das Fahrzeug vorher angehörte (ID für das Ereignis, Name für den Text), und ob
-/// sich die Zuordnung geändert hat (LLH-1073, design.md D2).
+/// Einheit, der das Fahrzeug vorher angehörte (ID für das Ereignis, Name für den Text), ob sich
+/// die Zuordnung geändert hat (LLH-1073, design.md D2), und die Besatzung, die mitgekommen ist
+/// (`(ep_id, Name)` nach Disposition geordnet, LLH-1238).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FahrzeugZuordnung {
     pub funkrufname: String,
     pub vorher: Option<(i64, String)>,
     pub is_changed: bool,
+    pub besatzung: Vec<(i64, String)>,
 }
 
 /// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. Ein Fahrzeug, das
 /// schon einer anderen Einheit angehört, wechselt; dieselbe Einheit noch einmal schreibt nichts.
+/// Die Besatzung kommt mit (LLH-1238, wie LLH-1073 D10 beim Bilden): wer aktiv auf dem Fahrzeug
+/// sitzt und keiner oder der bisherigen Einheit angehört, wechselt mit; der Führer der bisherigen
+/// Einheit bleibt dort, ebenso wer einer dritten Einheit angehört.
 /// Der Funkrufname ist der aufgelöste (bei einem Stamm-Fahrzeug im aktiven Einsatz der des
 /// Stamms), nicht der vom Disponieren. `NotFound`, falls Fahrzeug oder Einheit nicht zum Einsatz
 /// gehören, `Conflict` bei aufgelöster Einheit oder beendetem Fahrzeug.
@@ -162,6 +167,7 @@ pub async fn zuordnen_fahrzeug_tx(
         None => None,
     };
     let is_changed = anzeige.einheit_id != Some(einheit_id);
+    let mut besatzung = Vec::new();
     if is_changed {
         sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
             .bind(einheit_id)
@@ -169,12 +175,44 @@ pub async fn zuordnen_fahrzeug_tx(
             .bind(einsatz_id)
             .execute(&mut *conn)
             .await?;
+        besatzung =
+            mitnehmen_besatzung_eines_tx(conn, einsatz_id, einheit_id, ef_id, anzeige.einheit_id)
+                .await?;
     }
     Ok(FahrzeugZuordnung {
         funkrufname: anzeige.funkrufname,
         vorher,
         is_changed,
+        besatzung,
     })
+}
+
+/// Die Besatzung eines umgehängten Fahrzeugs wechselt mit (LLH-1238), in **einer** Anweisung:
+/// aktive Personen auf `ef_id` ohne Einheit oder in `vorher`, außer dem Führer von `vorher`
+/// (die bisherige Einheit verliert ihn nicht still). Wer einer dritten Einheit angehört, bleibt
+/// dort (wie [`mitnehmen_besatzung_tx`]). Liefert `(ep_id, Name)` nach Disposition geordnet.
+async fn mitnehmen_besatzung_eines_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+    vorher: Option<i64>,
+) -> Result<Vec<(i64, String)>, AppError> {
+    let mut personen: Vec<(i64, String)> = sqlx::query_as(
+        "UPDATE einsatz_personal SET einheit_id = ?1 \
+         WHERE einsatz_id = ?2 AND beendet_at IS NULL AND fahrzeug_id = ?3 \
+           AND (einheit_id IS NULL OR einheit_id = ?4) \
+           AND id IS NOT (SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?4) \
+         RETURNING id, snap_name",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .bind(ef_id)
+    .bind(vorher)
+    .fetch_all(&mut *conn)
+    .await?;
+    personen.sort_by_key(|(id, _)| *id);
+    Ok(personen)
 }
 
 /// Pool-Wrapper.
@@ -876,6 +914,7 @@ mod tests {
                 funkrufname: "Florian 1".into(),
                 vorher: None,
                 is_changed: true,
+                besatzung: Vec::new(),
             }
         );
         assert_eq!(fahrzeug_mitglieder(&pool, a).await.unwrap().len(), 1);
@@ -919,6 +958,81 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(einheit, None);
+    }
+
+    /// LLH-1238: Umhängen nimmt die Besatzung aus der alten oder ohne Einheit mit; der Führer der
+    /// alten Einheit, eine Kraft einer dritten Einheit und eine entlassene Kraft bleiben, wo sie
+    /// sind. Dieselbe Einheit noch einmal nimmt niemanden mit.
+    #[tokio::test]
+    async fn umhaengen_nimmt_die_besatzung_mit() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, a, b) = setup(&pool).await;
+        let dritte: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'C') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ef: i64 = sqlx::query_scalar("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id")
+            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap();
+        let anna = person(&pool, einsatz, "Anna", Some("mannschaft")).await;
+        let chef = person(&pool, einsatz, "Chef", Some("fuehrer")).await;
+        let carl = person(&pool, einsatz, "Carl", Some("mannschaft")).await;
+        let dora = person(&pool, einsatz, "Dora", Some("mannschaft")).await;
+        let emil = person(&pool, einsatz, "Emil", Some("mannschaft")).await;
+        let weg = person(&pool, einsatz, "Weg", Some("mannschaft")).await;
+        for ep in [anna, chef, weg] {
+            zuordnen_personal(&pool, einsatz, a, ep).await.unwrap();
+        }
+        zuordnen_personal(&pool, einsatz, dritte, carl)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+            .bind(chef)
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id IN (?, ?, ?, ?, ?)")
+            .bind(ef)
+            .bind(anna)
+            .bind(chef)
+            .bind(carl)
+            .bind(emil)
+            .bind(weg)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_personal SET beendet_at = '2026-10-15 10:00:00', \
+             beendet_als = 'entlassen' WHERE id = ?",
+        )
+        .bind(weg)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let z = zuordnen_fahrzeug(&pool, einsatz, b, ef).await.unwrap();
+        assert_eq!(
+            z.besatzung,
+            [(anna, "Anna".to_string()), (emil, "Emil".to_string())]
+        );
+        assert_eq!(einheit_von(&pool, anna).await, Some(b));
+        assert_eq!(einheit_von(&pool, emil).await, Some(b));
+        assert_eq!(einheit_von(&pool, chef).await, Some(a), "Führer bleibt");
+        assert_eq!(einheit_von(&pool, carl).await, Some(dritte));
+        assert_eq!(
+            einheit_von(&pool, dora).await,
+            None,
+            "nicht auf dem Fahrzeug"
+        );
+        assert_eq!(einheit_von(&pool, weg).await, Some(a), "entlassen");
+
+        let z = zuordnen_fahrzeug(&pool, einsatz, b, ef).await.unwrap();
+        assert!(!z.is_changed);
+        assert!(z.besatzung.is_empty());
     }
 
     /// LFH-225/F23: Die Sammelabfragen müssen je Einheit exakt das liefern, was die

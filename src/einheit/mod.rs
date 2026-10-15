@@ -243,6 +243,17 @@ pub fn etb_text_fahrzeug_umgehaengt(einheit: &str, funkrufname: &str, vorher: &s
     )
 }
 
+/// Hängt an den ETB-Text des Zuordnens oder Umhängens eines Fahrzeugs die Besatzung, die
+/// mitgekommen ist (LLH-1238): „…, vorher «Zug 1»; Besatzung kommt mit: A, B“. Ohne Besatzung
+/// bleibt der Text, wie er ist.
+pub fn etb_text_mit_besatzung(text: String, besatzung: &[String]) -> String {
+    if besatzung.is_empty() {
+        text
+    } else {
+        format!("{text}; Besatzung kommt mit: {}", besatzung.join(", "))
+    }
+}
+
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
 /// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::zuordnen_personal_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {

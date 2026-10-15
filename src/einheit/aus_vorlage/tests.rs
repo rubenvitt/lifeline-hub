@@ -1017,6 +1017,49 @@ async fn fahrzeuge_neu_disponiert_frei_zugeordnet_gebunden_umgehaengt() {
     );
 }
 
+/// LLH-1238: Ein umgehängtes Fahrzeug nimmt seine Besatzung aus der alten Einheit mit, auch wer
+/// nicht in der Vorlage steht; eine Person der Vorlage auf demselben Fahrzeug zählt nur einmal.
+#[tokio::test]
+async fn umgehaengtes_fahrzeug_nimmt_die_besatzung_mit() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let zweiter = einheit(&pool, z.k.einsatz_id, "2. Zug").await;
+    let ef2 = im_einsatz_fahrzeug(&pool, z.k, z.rtw2, Some(zweiter)).await;
+    let rita = im_einsatz_person(&pool, z.k, z.rettsan1, None, Some(zweiter), Some(ef2)).await;
+    let gast_stamm = person(&pool, 1, "Gast Gerd").await;
+    let gast = im_einsatz_person(&pool, z.k, gast_stamm, None, Some(zweiter), Some(ef2)).await;
+    let fahrzeuge = [Wahl {
+        id: z.rtw2,
+        umhaengen: true,
+    }];
+    let personal = [Wahl {
+        id: z.rettsan1,
+        umhaengen: true,
+    }];
+    let g = bilde(&pool, &z, &anfrage(&fahrzeuge, &personal))
+        .await
+        .unwrap();
+    let staffel = g.einheiten[1].id;
+    let kraefte: Vec<(i64, &str)> = g.personal.iter().map(|b| (b.id, b.name.as_str())).collect();
+    assert_eq!(kraefte, [(rita, "Rettsan Rita"), (gast, "Gast Gerd")]);
+    assert_eq!(g.alte_einheiten, [zweiter]);
+    let bezug: Vec<(i64, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT id, einheit_id, fahrzeug_id FROM einsatz_personal WHERE einsatz_id = ? \
+         ORDER BY id",
+    )
+    .bind(z.k.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        bezug,
+        [
+            (rita, Some(staffel), Some(ef2)),
+            (gast, Some(staffel), Some(ef2))
+        ]
+    );
+}
+
 #[tokio::test]
 async fn personen_nach_vorlage_mit_position_und_besatzung() {
     let pool = crate::db::test_pool().await;
