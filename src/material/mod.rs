@@ -343,6 +343,13 @@ pub fn etb_text_disponiert(bezeichnung: &str, menge: i64, ort: Option<&str>) -> 
     }
 }
 
+/// Herkunft einer Übernahme aus einer Nachforderung (LLH-1226, design.md D6), angehängt an den
+/// Text aus [`etb_text_disponiert`]: „{basis}, aus Nachforderung «{bezeichnung}»“. Die Bezeichnung
+/// der Nachforderung ist auf [`crate::nachforderung::BEZEICHNUNG_MAX`] begrenzt.
+pub fn etb_text_aus_nachforderung(basis: &str, nachforderung_bezeichnung: &str) -> String {
+    format!("{basis}, aus Nachforderung «{nachforderung_bezeichnung}»")
+}
+
 /// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
 /// und neuer Ort im Wortlaut von [`ort::ort_text_tx`], leer „ohne Ort“.
 pub fn etb_text_ort_gewechselt(
@@ -529,6 +536,26 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_disponiert("Wolldecke", 50, Some("UHS «Turnhalle»")),
             "Material «Wolldecke» (×50) disponiert, Ort UHS «Turnhalle»"
+        );
+    }
+
+    /// LLH-1226, design.md D6: die Herkunft hängt am Disponier-Text, mit und ohne Ort.
+    #[test]
+    fn aus_nachforderung_haengt_die_bezeichnung_an() {
+        assert_eq!(
+            etb_text_aus_nachforderung(
+                &etb_text_disponiert("Tauchpumpe", 1, Some("Einheit «Staffel A»")),
+                "3 Tauchpumpen für Keller Hauptstraße"
+            ),
+            "Material «Tauchpumpe» (×1) disponiert, Ort Einheit «Staffel A», aus Nachforderung \
+             «3 Tauchpumpen für Keller Hauptstraße»"
+        );
+        assert_eq!(
+            etb_text_aus_nachforderung(
+                &etb_text_disponiert("Sandsäcke", 500, None),
+                "Sandsäcke Deich Nord"
+            ),
+            "Material «Sandsäcke» (×500) disponiert, aus Nachforderung «Sandsäcke Deich Nord»"
         );
     }
 
