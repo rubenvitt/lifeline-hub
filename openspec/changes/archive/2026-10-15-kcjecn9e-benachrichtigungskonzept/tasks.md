@@ -106,8 +106,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 16. Abschluss · LLH-1222
 
-- [ ] 16.1 `./scripts/check-all.sh` grün (lokal oder als CI-Lauf des PRs belegt)
-- [ ] 16.2 Mutationsprobe an der Empfängerauflösung (Auslöser-Ausschluss und Ersatz über Mitgliedschaft auskommentieren → Tests rot)
+- [x] 16.1 `./scripts/check-all.sh` grün (lokal oder als CI-Lauf des PRs belegt): als CI-Lauf des Abschluss-PRs
+- [x] 16.2 Mutationsprobe an der Empfängerauflösung (Auslöser-Ausschluss und Ersatz über Mitgliedschaft auskommentieren → Tests rot): Auslöser nicht ausgenommen → 19 Tests rot, ohne Ersatz über die Mitgliedschaft → 16 Tests rot
 
 ## Workflow follow-up
 

@@ -121,7 +121,7 @@ Ob und wie Mitteilungen erscheinen, regelt das Betriebssystem je App:
   Eintrag „Lifeline Hub“ an. „Nicht stören“ bzw. der Fokus-Assistent unterdrückt sie. Mitteilungen
   gibt es nur von der installierten App, nicht von einem Entwicklungsbau aus `target/`.
 
-Herleitung: `openspec/changes/kcjecn9e-benachrichtigungskonzept/design.md`, D7.
+Herleitung: `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonzept/design.md`, D7.
 
 ## Update
 
