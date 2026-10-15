@@ -31,7 +31,7 @@ export function ladeBr(einsatzId: number, brId: number): Promise<BrDetail> {
 }
 
 /** Belegungsreihe eines Raums, ungeblättert, neueste zuerst (LLH-1095). */
-export function ladeBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlaufEintrag[]> {
+export function loadBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlaufEintrag[]> {
   return apiGet<BrVerlaufEintrag[]>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/verlauf`,
   );

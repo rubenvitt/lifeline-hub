@@ -899,7 +899,7 @@ async fn adhoc_fahrzeug(
     ef
 }
 
-async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> serde_json::Value {
+async fn fetch_json(app: &axum::Router, cookie: &str, pfad: &str) -> serde_json::Value {
     let (s, v) = anfrage_json(app, "GET", pfad, cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
     v
@@ -928,7 +928,7 @@ async fn detail_zaehlt_fahrzeuge_der_einheiten() {
     }
     belegen(&app, &cookie, eid, br, "fahrzeug", einzeln, "eintritt").await;
 
-    let v = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+    let v = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
     assert_eq!(v["belegung"]["fahrzeuge"], 3, "{v}");
     assert_eq!(v["belegung"]["einheiten"], 2, "{v}");
     assert!(v["belegung"]["laengste_seit_at"].is_string(), "{v}");
@@ -966,11 +966,11 @@ async fn seit_nach_wechsel_ist_der_wechsel() {
         .unwrap();
     let wechsel = belegen(&app, &cookie, eid, br_b, "einheit", zug, "wechsel").await;
 
-    let v = lesen(&app, &cookie, &br_pfad(eid, br_b)).await;
+    let v = fetch_json(&app, &cookie, &br_pfad(eid, br_b)).await;
     assert_eq!(v["einheiten"][0]["seit_at"], wechsel["zeitpunkt_at"], "{v}");
     assert_ne!(v["einheiten"][0]["seit_at"], "2026-05-28 11:42:00");
     assert_eq!(v["belegung"]["laengste_seit_at"], wechsel["zeitpunkt_at"]);
-    let a = lesen(&app, &cookie, &br_pfad(eid, br_a)).await;
+    let a = fetch_json(&app, &cookie, &br_pfad(eid, br_a)).await;
     assert_eq!(
         a["belegung"],
         json!({"einheiten": 0, "fahrzeuge": 0}),
@@ -1012,7 +1012,7 @@ async fn liste_traegt_dieselben_kennzahlen_wie_detail() {
     .await;
     belegen(&app, &cookie, eid, schule, "einheit", zug3, "eintritt").await;
 
-    let liste = lesen(
+    let liste = fetch_json(
         &app,
         &cookie,
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -1022,7 +1022,7 @@ async fn liste_traegt_dieselben_kennzahlen_wie_detail() {
     assert_eq!(liste.len(), 3, "{liste:?}");
     for br in [sportplatz, schule, leer] {
         let zeile = liste.iter().find(|z| z["id"] == br).unwrap();
-        let detail = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+        let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
         assert_eq!(zeile["belegung"], detail["belegung"], "Raum {br}");
         let mut im_detail: Vec<i64> = detail["einheiten"]
             .as_array()
@@ -1107,7 +1107,7 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
             .collect()
     };
     let n = serde_json::Value::Null;
-    let a = lesen(
+    let a = fetch_json(
         &app,
         &cookie,
         &format!("{}/verlauf", br_pfad(eid, sportplatz)),
@@ -1126,7 +1126,7 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
     assert_eq!(a[0]["objekt_typ"], "einheit");
     assert_eq!(a[0]["objekt_id"], staffel);
     assert!(a[0]["zeitpunkt_at"].is_string());
-    let b = lesen(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, schule))).await;
+    let b = fetch_json(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, schule))).await;
     assert_eq!(
         kurz(&b),
         vec![
@@ -1185,7 +1185,7 @@ async fn verlauf_stornierter_raum_liefert() {
     let (s, _) = anfrage_json(&app, "DELETE", &br_pfad(eid, br), &cookie, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
 
-    let v = lesen(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    let v = fetch_json(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, br))).await;
     assert_eq!(v.as_array().unwrap().len(), 2, "{v}");
 }
 
@@ -1202,7 +1202,7 @@ async fn beobachter_liest_verlauf() {
     rolle_setzen(&app, &admin, eid, beob, "beobachter").await;
     let beob = login_cookie(&app, "berta", "bertapw1").await;
 
-    let v = lesen(&app, &beob, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    let v = fetch_json(&app, &beob, &format!("{}/verlauf", br_pfad(eid, br))).await;
     assert_eq!(v[0]["art"], "eintritt", "{v}");
 }
 
@@ -1217,7 +1217,7 @@ async fn verlauf_modul_ausgeblendet_403() {
     rolle_setzen(&app, &admin, eid, frieda, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
     let pfad = format!("{}/verlauf", br_pfad(eid, br));
-    lesen(&app, &frieda, &pfad).await;
+    fetch_json(&app, &frieda, &pfad).await;
 
     let (s, v) = anfrage_json(
         &app,
@@ -1230,7 +1230,7 @@ async fn verlauf_modul_ausgeblendet_403() {
     assert_eq!(s, StatusCode::OK, "{v}");
     let (s, _) = anfrage_json(&app, "GET", &pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    lesen(&app, &admin, &pfad).await;
+    fetch_json(&app, &admin, &pfad).await;
 }
 
 const BR_EREIGNIS: &[(&str, &str)] = &[("bereitstellungsraum", "br_id")];
@@ -1468,6 +1468,6 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     assert_eq!(br_ereignisse(&mut rx), vec![br]);
-    let d = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
     assert_eq!(d["belegung"]["fahrzeuge"], 0, "{d}");
 }
