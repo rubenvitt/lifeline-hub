@@ -1091,22 +1091,45 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
 
-    let kurz = |v: &serde_json::Value| -> Vec<serde_json::Value> {
+    // Fehlende optionale Felder stehen gar nicht im JSON (`skip_serializing_if`): `get` liefert
+    // dann `None`, ein serialisiertes `null` dagegen `Some(Null)` (src/AGENTS.md, „Optionalität
+    // ehrlich machen“).
+    type Zeile = (
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+        Option<serde_json::Value>,
+        Option<serde_json::Value>,
+    );
+    let kurz = |v: &serde_json::Value| -> Vec<Zeile> {
         v.as_array()
             .unwrap()
             .iter()
             .map(|e| {
-                json!([
-                    e["art"],
-                    e["objekt_name"],
-                    e["herkunft"],
-                    e["ziel"],
-                    e["notiz"]
-                ])
+                (
+                    e["art"].clone(),
+                    e["objekt_name"].clone(),
+                    e.get("herkunft").cloned(),
+                    e.get("ziel").cloned(),
+                    e.get("notiz").cloned(),
+                )
             })
             .collect()
     };
-    let n = serde_json::Value::Null;
+    let z = |art: &str,
+             name: &str,
+             herkunft: Option<&str>,
+             ziel: Option<&str>,
+             notiz: Option<&str>|
+     -> Zeile {
+        (
+            json!(art),
+            json!(name),
+            herkunft.map(|t| json!(t)),
+            ziel.map(|t| json!(t)),
+            notiz.map(|t| json!(t)),
+        )
+    };
     let a = fetch_json(
         &app,
         &cookie,
@@ -1116,10 +1139,10 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
     assert_eq!(
         kurz(&a),
         vec![
-            json!(["austritt", "Staffel", n, n, "Einheit aufgelöst"]),
-            json!(["eintritt", "Staffel", n, n, n]),
-            json!(["wechsel_hinaus", "1. Zug", n, "BR Schule", n]),
-            json!(["eintritt", "1. Zug", n, n, n]),
+            z("austritt", "Staffel", None, None, Some("Einheit aufgelöst")),
+            z("eintritt", "Staffel", None, None, None),
+            z("wechsel_hinaus", "1. Zug", None, Some("BR Schule"), None),
+            z("eintritt", "1. Zug", None, None, None),
         ],
         "{a}"
     );
@@ -1130,8 +1153,14 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
     assert_eq!(
         kurz(&b),
         vec![
-            json!(["austritt", "1. Zug", n, n, "zum Einsatzort"]),
-            json!(["wechsel_herein", "1. Zug", "BR Sportplatz", n, n]),
+            z("austritt", "1. Zug", None, None, Some("zum Einsatzort")),
+            z(
+                "wechsel_herein",
+                "1. Zug",
+                Some("BR Sportplatz"),
+                None,
+                None
+            ),
         ],
         "{b}"
     );
