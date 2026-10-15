@@ -26,6 +26,21 @@ export interface MaterialOrtPatch {
 /** Optionen beim Disponieren: ein Ort (alle Ortsarten) und bei Ad-hoc die Art (LLH-1224). */
 export interface DisponierEingabe {
   ort?: MaterialOrtPatch;
+  /**
+   * Übernahme aus einer eingetroffenen Nachforderung (LLH-1226 D1): der Posten verweist auf sie.
+   * Trägt sie schon einen nicht stornierten Posten, lehnt der Server ohne `ergaenzen` mit 409 ab
+   * (D3); `ergaenzen` geht nur als `true` auf den Draht.
+   */
+  nachforderungId?: number;
+  ergaenzen?: boolean;
+}
+
+/** Die Felder des Bezugs im POST-Körper; ohne Bezug keine. */
+function bezugFelder(o: DisponierEingabe) {
+  return {
+    ...(o.nachforderungId != null ? { nachforderung_id: o.nachforderungId } : {}),
+    ...(o.ergaenzen ? { ergaenzen: true } : {}),
+  };
 }
 
 export function disponiereMaterial(
@@ -38,6 +53,7 @@ export function disponiereMaterial(
     material_id: materialId,
     menge,
     ...optionen.ort,
+    ...bezugFelder(optionen),
   });
 }
 
@@ -54,6 +70,7 @@ export function disponiereAdhoc(
     menge,
     ...(optionen.art ? { art: optionen.art } : {}),
     ...optionen.ort,
+    ...bezugFelder(optionen),
   });
 }
 
