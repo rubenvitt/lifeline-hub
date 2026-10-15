@@ -1809,7 +1809,7 @@ describe('BrDetailPage — Verlauf (LLH-1095 D12)', () => {
 describe('BrDetailPage — Druck mit Wartezeiten (LLH-1095 D14)', () => {
   mitUhr();
 
-  it('druckt einen gehaltenen Zugang mit „seit … · n min“, die längste Wartezeit, ohne Verlauf', async () => {
+  it('druckt einen gehaltenen Zugang mit „seit … · n min“ und die längste Wartezeit zum Druckzeitpunkt, ohne Verlauf', async () => {
     const stand = { br: BELEGT };
     const zaehler = { verlauf: 0 };
     server.use(
@@ -1834,11 +1834,14 @@ describe('BrDetailPage — Druck mit Wartezeiten (LLH-1095 D14)', () => {
     await screen.findByRole('button', { name: '1 neu anzeigen' });
     expect(screen.queryByText('Aachen')).not.toBeInTheDocument();
 
+    // Der Druck rechnet zum Druckzeitpunkt, nicht mit dem Stand der Minutenuhr: die Systemzeit
+    // rückt 1 min 50 s vor, ohne dass das Intervall der Uhr läuft.
+    vi.setSystemTime(new Date(JETZT.getTime() + 110_000));
     act(() => {
       window.dispatchEvent(new Event('beforeprint'));
     });
-    expect(belegungsZeile('Aachen')).toHaveTextContent('seit 1420 · 10 min');
-    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('48 min');
+    expect(belegungsZeile('Aachen')).toHaveTextContent('seit 1420 · 11 min');
+    expect(kennzahl('Längste Wartezeit')).toHaveTextContent('49 min');
     expect(
       screen.getByRole('button', { name: 'Verlauf des Bereitstellungsraums BR Alpha' }),
     ).toHaveAttribute('aria-expanded', 'false');
