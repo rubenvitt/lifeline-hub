@@ -43,9 +43,9 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 5. Native Meldung in der Desktop-App (D7, benötigt 2) · LLH-1211
 
-- [ ] 5.1 `tauri-plugin-notification` und Befehl `benachrichtigung_zeigen` in der Hülle, Eintrag in `SERVER_RECHTE` und AppManifest; `cargo test` der Hülle grün
-- [ ] 5.2 Frontend nutzt den Befehl in der Hülle bei verdecktem Fenster; Fokus bei Aktivierung; Vitest mit gestubbter Hülle
-- [ ] 5.3 `src-tauri/AGENTS.md` und `docs/betrieb` (Berechtigung für Mitteilungen auf macOS/Windows) nachziehen
+- [x] 5.1 `tauri-plugin-notification` und Befehl `benachrichtigung_zeigen` in der Hülle, Eintrag in `SERVER_RECHTE` und AppManifest; `cargo test` der Hülle grün
+- [x] 5.2 Frontend nutzt den Befehl in der Hülle bei verdecktem Fenster; Fokus bei Aktivierung; Vitest mit gestubbter Hülle
+- [x] 5.3 `src-tauri/AGENTS.md` und `docs/betrieb` (Berechtigung für Mitteilungen auf macOS/Windows) nachziehen
 
 ## 6. Auftrag erteilt, quittiert, erledigt (benötigt 1, 2) · LLH-1212
 

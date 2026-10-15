@@ -4,8 +4,9 @@
 //! `openspec/specs/desktop-auslieferung/`; Entscheidungen im Design des Changes LFH-721.
 //!
 //! RECHTE: Die lokale Erststart-Maske darf die Adresse setzen (Capability `lokal`). Die
-//! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken` und
-//! `anmeldung_im_browser` (LFH-818) — sie kann die Hülle nicht auf einen anderen Server umlenken.
+//! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken`,
+//! `anmeldung_im_browser` (LFH-818) und `benachrichtigung_zeigen` (D7 des
+//! Benachrichtigungskonzepts) — sie kann die Hülle nicht auf einen anderen Server umlenken.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adresse;
@@ -29,6 +30,7 @@ use tauri::webview::{DownloadEvent, NewWindowResponse};
 use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_notification::{ActionPerformed, NotificationExt};
 
 use crate::adresse::pruefe_adresse;
 use crate::deeplink::{deute, entscheide, Aktion};
@@ -60,6 +62,10 @@ const MASKE: &str = "tauri://localhost/index.html";
 /// leitet die Hülle den Aufruf auf den nativen Druck um.
 #[cfg(target_os = "macos")]
 const DRUCK_SKRIPT: &str = include_str!("druck.js");
+
+/// Native Meldung über den Command `benachrichtigung_zeigen` (D7 des Benachrichtigungskonzepts):
+/// in jeder Hülle, denn das Notification-Plugin ersetzt die Web-Notification-API jeder Seite.
+const BENACHRICHTIGUNG_SKRIPT: &str = include_str!("benachrichtigung.js");
 
 /// Im WKWebView scheitert jeder Passkey, obwohl die Feature-Erkennung ihn meldet (LFH-783) — die
 /// macOS-Hülle sagt der Seite selbst, dass sie keinen ausführen kann (LFH-817).
@@ -119,8 +125,13 @@ fn freigabe(server: &Url) -> (String, String) {
     (kennung, format!("{origin}/*"))
 }
 
-/// Was die Serverseite aufrufen darf: den Druck und „Im Browser anmelden“ (LFH-818).
-const SERVER_RECHTE: [&str; 2] = ["allow-drucken", "allow-anmeldung-im-browser"];
+/// Was die Serverseite aufrufen darf: den Druck, „Im Browser anmelden“ (LFH-818) und die native
+/// Meldung (D7 des Benachrichtigungskonzepts). Die Commands des Notification-Plugins nicht.
+const SERVER_RECHTE: [&str; 3] = [
+    "allow-drucken",
+    "allow-anmeldung-im-browser",
+    "allow-benachrichtigung-zeigen",
+];
 
 /// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur [`SERVER_RECHTE`].
 fn server_freigeben(app: &AppHandle, server: &Url) {
@@ -141,7 +152,7 @@ fn server_freigeben(app: &AppHandle, server: &Url) {
         |capability, recht| capability.permission(*recht),
     );
     if let Err(fehler) = app.add_capability(capability) {
-        // Ohne Freigabe fehlt nur der native Druck; die Anwendung selbst läuft.
+        // Ohne Freigabe fehlen nur Druck und Meldung der Hülle; die Anwendung selbst läuft.
         log::warn!("Freigabe für {muster} nicht gesetzt: {fehler}");
     }
 }
@@ -226,7 +237,9 @@ fn baue_fenster(app: &AppHandle, label: &str, start: WebviewUrl) -> tauri::Resul
             neues_fenster(&fuer_fenster, &label_fenster, ziel);
             NewWindowResponse::Deny
         })
-        .on_navigation(move |ziel| navigation(&fuer_navigation, &label_navigation, ziel));
+        .on_navigation(move |ziel| navigation(&fuer_navigation, &label_navigation, ziel))
+        // Vor `faehigkeiten.js`: beide ergänzen dieselbe Kennung `__LIFELINE_HUELLE__`.
+        .initialization_script(BENACHRICHTIGUNG_SKRIPT);
     #[cfg(target_os = "macos")]
     let builder = builder
         // WKWebView suspendiert ein verdecktes Fenster nach ~3 s, Live-Ereignisse
@@ -350,6 +363,52 @@ fn abbrechen(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn drucken(fenster: WebviewWindow) -> Result<(), String> {
     fenster.print().map_err(|e| e.to_string())
+}
+
+/// Serverseite (D7 des Benachrichtigungskonzepts): native Meldung mit Titel und Text der Seite.
+/// Entscheidet nichts — ob und wann eine Meldung erscheint, bestimmt das Frontend
+/// (`frontend/src/alarm/desktopAlarm.ts`). Die Meldung merkt sich nur ihr Fenster, damit ein
+/// Klick es nach vorn holt ([`klick_fenster`]).
+#[tauri::command]
+fn benachrichtigung_zeigen(
+    app: AppHandle,
+    fenster: WebviewWindow,
+    titel: String,
+    text: Option<String>,
+) -> Result<(), String> {
+    let meldung = app
+        .notification()
+        .builder()
+        .title(titel)
+        .extra(MELDUNG_FENSTER, fenster.label());
+    let meldung = match text {
+        Some(text) => meldung.body(text),
+        None => meldung,
+    };
+    meldung.show().map_err(|e| e.to_string())
+}
+
+/// Schlüssel in den Zusatzdaten einer Meldung: das Fenster, das sie gezeigt hat.
+const MELDUNG_FENSTER: &str = "fenster";
+
+/// Welches Fenster ein Klick auf eine Meldung nach vorn holt: das, aus dem sie kam, sonst das
+/// Hauptfenster. Andere Aktionen als der Klick selbst (`tap`) holen nichts.
+fn klick_fenster(aktion: &ActionPerformed) -> Option<String> {
+    if aktion.action_id() != "tap" {
+        return None;
+    }
+    let label = aktion
+        .notification()
+        .and_then(|meldung| meldung.extra().get(MELDUNG_FENSTER))
+        .and_then(|wert| wert.as_str());
+    Some(label.unwrap_or(FENSTER).to_string())
+}
+
+/// Holt ein Fenster nach vorn, auch aus dem Dock bzw. der Taskleiste.
+fn nach_vorn(fenster: &WebviewWindow) {
+    let _ = fenster.unminimize();
+    let _ = fenster.show();
+    let _ = fenster.set_focus();
 }
 
 /// Serverseite (LFH-818): „Im Browser anmelden“. Öffnet die Bestätigungsseite des verbundenen
@@ -524,8 +583,7 @@ fn main() {
         // selbst reicht das Plugin über `on_open_url` weiter (Feature `deep-link`).
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(fenster) = fenster(app) {
-                let _ = fenster.unminimize();
-                let _ = fenster.set_focus();
+                nach_vorn(&fenster);
             }
         }))
         .plugin(
@@ -536,13 +594,15 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(Zustand::default())
         .invoke_handler(tauri::generate_handler![
             vorbelegung,
             verbinden,
             abbrechen,
             drucken,
-            anmeldung_im_browser
+            anmeldung_im_browser,
+            benachrichtigung_zeigen
         ])
         .menu(menue::bauen)
         .on_menu_event(menue::behandeln)
@@ -577,6 +637,22 @@ fn main() {
             };
 
             baue_fenster(&handle, FENSTER, start)?;
+
+            // Ein Klick auf eine native Meldung holt ihr Fenster nach vorn, auch aus dem Dock
+            // (D7): macOS aktiviert die App, holt ein minimiertes Fenster aber nicht zurück. Den
+            // Sprung zum Bezug trägt der Toast, der dort schon steht.
+            let fuer_klick = handle.clone();
+            app.notification().on_action(move |aktion| {
+                let Some(label) = klick_fenster(aktion) else {
+                    return;
+                };
+                if let Some(fenster) = fuer_klick
+                    .get_webview_window(&label)
+                    .or_else(|| fenster(&fuer_klick))
+                {
+                    nach_vorn(&fenster);
+                }
+            })?;
 
             let fuer_links = handle.clone();
             app.deep_link()
@@ -647,18 +723,73 @@ mod tests {
         );
     }
 
-    /// Die Serverseite bekommt genau Druck und „Im Browser anmelden“; die Maske (`lokal`) nicht
-    /// die Anmeldung. Die Permission entsteht aus dem Manifest in `build.rs`.
+    /// Die Serverseite bekommt genau Druck, „Im Browser anmelden“ und die native Meldung; die
+    /// Maske (`lokal`) weder die Anmeldung noch die Meldung, und niemand die Commands des
+    /// Notification-Plugins. Die Permissions entstehen aus dem Manifest in `build.rs`.
     #[test]
-    fn serverseite_darf_anmelden_die_maske_nicht() {
+    fn serverseite_darf_anmelden_und_melden_die_maske_nicht() {
         assert_eq!(
             SERVER_RECHTE,
-            ["allow-drucken", "allow-anmeldung-im-browser"]
+            [
+                "allow-drucken",
+                "allow-anmeldung-im-browser",
+                "allow-benachrichtigung-zeigen"
+            ]
         );
+        // Ein Plugin-Recht trüge ein Präfix (`notification:…`).
+        assert!(SERVER_RECHTE.iter().all(|recht| !recht.contains(':')));
         let erzeugt = include_str!("../permissions/autogenerated/anmeldung_im_browser.toml");
         assert!(erzeugt.contains(r#"identifier = "allow-anmeldung-im-browser""#));
+        let erzeugt = include_str!("../permissions/autogenerated/benachrichtigung_zeigen.toml");
+        assert!(erzeugt.contains(r#"identifier = "allow-benachrichtigung-zeigen""#));
+        assert!(erzeugt.contains(r#"commands.allow = ["benachrichtigung_zeigen"]"#));
         let lokal = include_str!("../capabilities/lokal.json");
         assert!(!lokal.contains("anmeldung"), "{lokal}");
+        assert!(!lokal.contains("benachrichtigung"), "{lokal}");
+        assert!(!lokal.contains("notification"), "{lokal}");
+    }
+
+    fn aktion(json: serde_json::Value) -> ActionPerformed {
+        serde_json::from_value(json).expect("ActionPerformed aus JSON")
+    }
+
+    /// Ein Klick holt das Fenster, aus dem die Meldung kam; fehlt es in den Zusatzdaten, das
+    /// Hauptfenster. Eine andere Aktion holt nichts.
+    #[test]
+    fn klick_auf_eine_meldung_holt_ihr_fenster() {
+        let mit_fenster = serde_json::json!({
+            "actionId": "tap",
+            "notification": { "id": 7, "extra": { MELDUNG_FENSTER: "neben-3" } },
+        });
+        assert_eq!(
+            klick_fenster(&aktion(mit_fenster)).as_deref(),
+            Some("neben-3")
+        );
+        let ohne_fenster = serde_json::json!({ "actionId": "tap", "notification": { "id": 7 } });
+        assert_eq!(
+            klick_fenster(&aktion(ohne_fenster)).as_deref(),
+            Some(FENSTER)
+        );
+        let ohne_meldung = serde_json::json!({ "actionId": "tap", "notification": null });
+        assert_eq!(
+            klick_fenster(&aktion(ohne_meldung)).as_deref(),
+            Some(FENSTER)
+        );
+        let andere = serde_json::json!({ "actionId": "dismiss", "notification": { "id": 7 } });
+        assert_eq!(klick_fenster(&aktion(andere)), None);
+    }
+
+    /// Das Skript der Meldung läuft in jeder Hülle und ergänzt die Kennung, die
+    /// `faehigkeiten.js` auf macOS ebenfalls ergänzt — keines darf das andere überschreiben.
+    #[test]
+    fn init_skripte_ergaenzen_dieselbe_kennung() {
+        for skript in [BENACHRICHTIGUNG_SKRIPT, include_str!("faehigkeiten.js")] {
+            assert!(
+                skript.contains("...window.__LIFELINE_HUELLE__,"),
+                "{skript}"
+            );
+        }
+        assert!(BENACHRICHTIGUNG_SKRIPT.contains("ipc.invoke('benachrichtigung_zeigen'"));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
 import {
   desktopPermission,
   fordereDesktopPermission,
@@ -49,6 +50,7 @@ afterEach(() => {
   schliesseAlleDesktopAlarme();
   vi.unstubAllGlobals();
   setzeHidden(false);
+  beendeHuelle();
 });
 
 describe('zeigeDesktopAlarm', () => {
@@ -507,5 +509,85 @@ describe('Desktop-Meldung über den Service Worker (LFH-1062)', () => {
     zeigeDesktopAlarm('A', { tag: 'sofort-1' });
     await abwarten();
     expect(offeneDesktopAlarme()).toBe(0);
+  });
+});
+
+// ── Desktop-App: native Meldung über die Hülle (Benachrichtigungskonzept D7) ──────────────
+
+describe('Desktop-App: native Meldung über die Hülle (tasks.md 5.2)', () => {
+  /** Die Hülle samt der Web-API, die das Notification-Plugin dort in jede Seite hängt. */
+  function inDerHuelle(start = starteMacHuelle) {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    start({ invoke });
+    const web = stubNotification('granted');
+    return { invoke, ...web };
+  }
+
+  it('verdecktes Fenster: die Meldung geht über den Command, nicht über die Web-API', () => {
+    const { invoke, Ctor } = inDerHuelle();
+    setzeHidden(true);
+    const meldung = zeigeDesktopAlarm('Auftrag überfällig', {
+      koerper: 'Auftrag #7',
+      tag: '1-auftrag-7',
+    });
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: 'Auftrag überfällig',
+      text: 'Auftrag #7',
+    });
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(meldung?.tag).toBe('1-auftrag-7');
+    expect(offeneDesktopAlarme()).toBe(1);
+  });
+
+  it('in der Windows-Hülle ebenso', () => {
+    const { invoke, Ctor } = inDerHuelle(starteWindowsHuelle);
+    setzeHidden(true);
+    zeigeDesktopAlarm('Neuer Auftrag');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: 'Neuer Auftrag',
+      text: null,
+    });
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('sichtbares Fenster: keine native Meldung, auch keine über die Web-API', () => {
+    const { invoke, Ctor } = inDerHuelle();
+    setzeHidden(false);
+    expect(zeigeDesktopAlarm('Auftrag überfällig', { koerper: 'Auftrag #7' })).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('gilt in der Hülle als erlaubt, auch ohne Web-API, und fragt nichts an', () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    vi.stubGlobal('Notification', undefined);
+    Reflect.deleteProperty(window, 'Notification');
+    expect(desktopPermission()).toBe('granted');
+    setzeHidden(true);
+    expect(zeigeDesktopAlarm('Titel')).not.toBeNull();
+    expect(invoke).toHaveBeenCalledOnce();
+  });
+
+  it('fordert in der Hülle keine Permission der Web-API an', () => {
+    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+    const { Ctor } = stubNotification('default');
+    fordereDesktopPermission();
+    expect(Ctor.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('lehnt die Hülle ab, gilt die Meldung nicht als offen', async () => {
+    starteMacHuelle({ invoke: vi.fn().mockRejectedValue('nicht erlaubt') });
+    setzeHidden(true);
+    expect(zeigeDesktopAlarm('Titel', { tag: 't' })).not.toBeNull();
+    await vi.waitFor(() => expect(offeneDesktopAlarme()).toBe(0));
+  });
+
+  it('außerhalb der Hülle bleibt es bei der Web-API', () => {
+    const { Ctor } = stubNotification('granted');
+    setzeHidden(true);
+    zeigeDesktopAlarm('Titel', { koerper: 'Text' });
+    expect(window.__LIFELINE_HUELLE__).toBeUndefined();
+    expect(Ctor).toHaveBeenCalledExactlyOnceWith('Titel', { body: 'Text' });
   });
 });

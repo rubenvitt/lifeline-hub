@@ -16,5 +16,10 @@
     ipc && typeof ipc.invoke === 'function'
       ? () => ipc.invoke('anmeldung_im_browser')
       : undefined;
-  window.__LIFELINE_HUELLE__ = Object.freeze({ passkey: false, anmeldungImBrowser });
+  // Ergänzt, was `benachrichtigung.js` schon eingetragen hat.
+  window.__LIFELINE_HUELLE__ = Object.freeze({
+    ...window.__LIFELINE_HUELLE__,
+    passkey: false,
+    anmeldungImBrowser,
+  });
 })();

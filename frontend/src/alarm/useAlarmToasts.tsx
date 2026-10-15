@@ -39,8 +39,8 @@ export type AlarmToastEintrag = {
   /** Server-Benachrichtigung hinter dem Toast: Schließen und Öffnen quittieren sie. */
   benachrichtigungId?: number;
   /**
-   * OS-Meldung bei verdecktem Tab (`desktopAlarm.ts`, dort auch der spätere Weg der
-   * Desktop-App). `tag` nur mit fachlichem Schlüssel; `koerper` fällt auf die Beschreibung zurück.
+   * OS-Meldung bei verdecktem Tab (`desktopAlarm.ts`, dort auch der Weg der Desktop-App). `tag`
+   * nur mit fachlichem Schlüssel; `koerper` fällt auf die Beschreibung zurück.
    */
   desktop?: { tag?: string; koerper?: string };
 };

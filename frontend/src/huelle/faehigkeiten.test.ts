@@ -1,13 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { beendeHuelle, starteMacHuelle } from '../test/huelle';
-import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from './faehigkeiten';
+import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
+import {
+  huelleAnmeldungImBrowser,
+  huelleBenachrichtigung,
+  huelleSperrtPasskey,
+} from './faehigkeiten';
 
 describe('huelleSperrtPasskey (LFH-817)', () => {
   afterEach(beendeHuelle);
 
-  it('sperrt nichts ohne Kennung (Browser, Windows-Hülle)', () => {
+  it('sperrt nichts ohne Kennung (Browser)', () => {
     expect(window.__LIFELINE_HUELLE__).toBeUndefined();
     expect(huelleSperrtPasskey()).toBe(false);
+  });
+
+  it('sperrt nichts in der Windows-Hülle, die nur die native Meldung einträgt', () => {
+    starteWindowsHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+    expect(window.__LIFELINE_HUELLE__).toBeDefined();
+    expect(huelleSperrtPasskey()).toBe(false);
+    expect(huelleAnmeldungImBrowser()).toBeNull();
   });
 
   it('sperrt den Passkey in der macOS-Hülle (ausgeliefertes Init-Skript)', () => {
@@ -57,5 +68,46 @@ describe('huelleAnmeldungImBrowser (LFH-818)', () => {
     expect(huelleAnmeldungImBrowser()).toBeNull();
     window.__LIFELINE_HUELLE__ = { passkey: false };
     expect(huelleAnmeldungImBrowser()).toBeNull();
+  });
+});
+
+describe('huelleBenachrichtigung (Benachrichtigungskonzept D7)', () => {
+  afterEach(beendeHuelle);
+
+  it('liefert im Browser nichts', () => {
+    expect(huelleBenachrichtigung()).toBeNull();
+  });
+
+  it('ruft in der macOS-Hülle den Command mit Titel und Text (ausgelieferte Init-Skripte)', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    await huelleBenachrichtigung()!('Auftrag überfällig', 'Auftrag #7');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: 'Auftrag überfällig',
+      text: 'Auftrag #7',
+    });
+    // Beide Skripte ergänzen dieselbe Kennung, keines verdrängt das andere.
+    expect(huelleSperrtPasskey()).toBe(true);
+    expect(huelleAnmeldungImBrowser()).not.toBeNull();
+  });
+
+  it('ruft den Command auch in der Windows-Hülle, ohne Text mit `null`', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteWindowsHuelle({ invoke });
+    await huelleBenachrichtigung()!('Neuer Auftrag');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', {
+      titel: 'Neuer Auftrag',
+      text: null,
+    });
+  });
+
+  it('reicht eine Ablehnung der Hülle weiter', async () => {
+    starteMacHuelle({ invoke: vi.fn().mockRejectedValue('nicht erlaubt') });
+    await expect(huelleBenachrichtigung()!('Titel')).rejects.toBe('nicht erlaubt');
+  });
+
+  it('liefert nichts ohne IPC-Brücke', () => {
+    starteMacHuelle();
+    expect(huelleBenachrichtigung()).toBeNull();
   });
 });
