@@ -230,6 +230,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.betreuung,
     // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
     EINSATZ_KEYS.lagemonitor,
+    // Die BR-Liste trägt den Abschnittsnamen per Join (LLH-1095).
+    EINSATZ_KEYS.br,
   ],
   // Betroffene Personen (Modul `personen`); `personal` ist ein eigenes Ereignis. Die
   // Betreuungsübersicht trägt „davon namentlich n“ je Stelle, das sich mit jedem Verbleib ändert.
