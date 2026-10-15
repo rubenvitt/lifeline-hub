@@ -87,7 +87,7 @@ describe('isErgaenzen (D3)', () => {
 describe('uebernahmeKoerper (D1, D3)', () => {
   it('Ad-hoc mit Bezug, Ort als Feld des POST, ohne ergaenzen bei der ersten Übernahme', () => {
     expect(
-      uebernahmeKoerper(nf(), { art: 'verbrauchsgut', menge: 1200, ort: 'einheit:3' }),
+      uebernahmeKoerper(nf(), { art: 'verbrauchsgut', menge: 1200, ort: 'einheit:3' }, false),
     ).toEqual({
       adhoc: { bezeichnung: 'Sandsäcke' },
       menge: 1200,
@@ -102,16 +102,18 @@ describe('uebernahmeKoerper (D1, D3)', () => {
 
   it('ein Gerät geht mit Menge 1, auch wenn im Feld mehr stand', () => {
     expect(
-      uebernahmeKoerper(nf({ art: 'Tauchpumpe' }), { art: 'geraet', menge: 3, ort: OHNE_ORT_WERT }),
+      uebernahmeKoerper(
+        nf({ art: 'Tauchpumpe' }),
+        { art: 'geraet', menge: 3, ort: OHNE_ORT_WERT },
+        false,
+      ),
     ).toMatchObject({ menge: 1, optionen: { art: 'geraet', ort: undefined } });
   });
 
-  it('mit verknüpftem Posten bewusst ergänzen', () => {
-    const k = uebernahmeKoerper(nf({ material_ids: [7] }), {
-      art: 'verbrauchsgut',
-      menge: 800,
-      ort: OHNE_ORT_WERT,
-    });
-    expect(k.optionen.ergaenzen).toBe(true);
+  it('ergänzt nur mit der Absicht des Dialogs, nicht aus dem Stand der Nachforderung', () => {
+    const w = { art: 'verbrauchsgut', menge: 800, ort: OHNE_ORT_WERT } as const;
+    expect(uebernahmeKoerper(nf({ material_ids: [7] }), w, true).optionen.ergaenzen).toBe(true);
+    // Ein Live-Abgleich brachte den Posten eines anderen Platzes: ohne Absicht kein Ergänzen.
+    expect(uebernahmeKoerper(nf({ material_ids: [7] }), w, false).optionen.ergaenzen).toBe(false);
   });
 });

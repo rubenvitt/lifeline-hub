@@ -79,11 +79,15 @@ export function uebernahmeVorbelegung(
 
 /**
  * Der Aufruf von `disponiereAdhoc` (D1): ein Ad-hoc-Posten mit Bezug, ein Gerät mit Menge 1, der
- * Ort als Feld des POST, `ergaenzen`, sobald schon ein Posten verknüpft ist (D3).
+ * Ort als Feld des POST. `ergaenzen` ist die Absicht, die der Dialog zeigt („Weiteren Posten
+ * übernehmen“), festgehalten beim Öffnen bzw. nach einer 409 — nicht der Stand, den ein
+ * Live-Abgleich währenddessen bringt: sonst ergänzte ein Klick still, was ein anderer Platz gerade
+ * übernommen hat (D3).
  */
 export function uebernahmeKoerper(
   n: NachforderungBezug,
   w: UebernahmeWerte,
+  ergaenzen: boolean,
 ): {
   adhoc: MaterialAdhocEingabe;
   menge: number;
@@ -96,7 +100,7 @@ export function uebernahmeKoerper(
       art: w.art,
       ort: ortPostFeld(w.ort),
       nachforderungId: n.id,
-      ergaenzen: isErgaenzen(n),
+      ergaenzen,
     },
   };
 }
