@@ -101,6 +101,15 @@ async fn check_listen_entsprechen_dem_katalog() {
 #[tokio::test]
 async fn detail_liest_nur_retain_spalten() {
     let pool = crate::db::test_pool().await;
+    for (tabelle, spalte) in text::DETAIL_ABLOESUNG_SPALTEN {
+        assert!(
+            matches!(
+                klassifikation_von(tabelle, spalte),
+                Some(Klassifikation::Retain(_))
+            ),
+            "abloesung: {tabelle}.{spalte} ist kein Retain-Wert"
+        );
+    }
     for typ in BenachrichtigungBezugTyp::ALLE {
         let Some((tabelle, spalte)) = text::detail_quelle(typ) else {
             continue;
@@ -432,6 +441,59 @@ async fn unwetter_wird_nicht_gemeldet() {
     .await;
     assert!(empfaenger.is_empty());
     assert!(ids(&pool).await.is_empty());
+}
+
+/// Die Detailzeile einer Ablösung nennt Einheit und Fälligkeit in der Anzeigezone des Einsatzes
+/// (LLH-1209; vorher bildete sie der Client, LFH-692): 13:30 UTC ist in Berlin 15:30, eine
+/// eigene Zone des Einsatzes geht der Organisation vor.
+#[tokio::test]
+async fn detail_der_abloesung_nennt_einheit_und_uhrzeit_in_der_anzeigezone() {
+    let pool = crate::db::test_pool().await;
+    let (b, e) = setup(&pool).await;
+    let einheit: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let schicht: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+             rhythmus_quelle, faellig_at, angelegt_von_id) \
+         VALUES (?, ?, '2026-09-22 09:30:00', 240, 'einheit', '2026-09-22 13:30:00', ?) \
+         RETURNING id",
+    )
+    .bind(e)
+    .bind(einheit)
+    .bind(b)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let bezug = Bezug::neu(BenachrichtigungBezugTyp::Abloesung, schicht);
+    let detail = |art| {
+        let pool = pool.clone();
+        async move {
+            text::bilden(&pool, e, art, bezug)
+                .await
+                .unwrap()
+                .detail
+                .unwrap()
+        }
+    };
+    // Ohne Einstellung gilt die Vorgabe Europe/Berlin; die Vorwarnung nennt die Fälligkeit.
+    assert_eq!(
+        detail(BenachrichtigungArt::AbloesungVorwarnung).await,
+        "Florian 1, 15:30"
+    );
+    sqlx::query("INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'UTC')")
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        detail(BenachrichtigungArt::AbloesungFaellig).await,
+        "Florian 1, 13:30"
+    );
 }
 
 /// Dasselbe für die Detailzeile eines Nachforderungs-Status (LLH-1216), die zwei Spalten liest:

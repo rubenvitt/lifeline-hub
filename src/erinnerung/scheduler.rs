@@ -19,7 +19,8 @@ const TICK_SEKUNDEN: u64 = 30;
 
 /// Ein Scheduler-Durchlauf für den Zeitpunkt `jetzt`. Publiziert je fälliger
 /// Erinnerung ein SSE-Event `erinnerung` (Payload `{einsatz_id, erinnerung_id,
-/// bezug_typ, bezug_id}`) und schreibt wiederkehrende per skip-forward fort.
+/// bezug_typ, bezug_id}`), meldet ihre Benachrichtigung (`super::benachrichtigung`) und
+/// schreibt wiederkehrende per skip-forward fort.
 /// Async + injiziertes `jetzt` = deterministisch testbar.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
     // Benachrichtigungen abräumen (LLH-1207, design.md D1): quittierte nach 24 h, unquittierte
@@ -115,11 +116,10 @@ async fn loese_aus(
         })
         .to_string(),
     );
-    // Ablösungsfrist (LFH-635): zusätzlich das Modul-Event `abloesung` mit `art`. Das
-    // Gate von `erinnerung` erreicht nur Leser des Moduls `erinnerungen`; der Hinweis muss
-    // aber bei denen ankommen, die die Ablösung führen (design.md D3). Das Frontend
-    // alarmiert nur über DIESES Event und überspringt den `erinnerung`-Zweig für
-    // `abloesung*` (kein Doppelalarm).
+    // Ablösungsfrist (LFH-635): zusätzlich das Modul-Event `abloesung` mit `art` (Spec
+    // `kraefte-abloesung`, „Kopplung an den Erinnerungs-Scheduler“). Das Gate von `erinnerung`
+    // erreicht nur Leser des Moduls `erinnerungen`; die Ablösungsliste frischen so auch die auf,
+    // die nur die Ablösung führen. Ton und Toast trägt seit LLH-1209 die Benachrichtigung unten.
     let art = match f.bezug_typ.as_deref() {
         Some(crate::kommunikation::OBJEKT_ABLOESUNG) => Some("faellig"),
         Some(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG) => Some("vorwarnung"),
@@ -152,10 +152,14 @@ async fn loese_aus(
             .to_string(),
         );
     }
-    // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
+    // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks). Das
+    // Ereignis frischt die Meldungslisten auf (der Merker `eskaliert` ändert sich); alarmiert
+    // wird über die Benachrichtigung.
     if let Some(mid) = eskaliert_mid {
         live.publiziere_objekt(f.einsatz_id, LiveEvent::Sofortmeldung, "meldung_id", mid);
     }
+    // Benachrichtigung nach dem Merker (LLH-1209): ein erneuter Tick löst nicht noch einmal aus.
+    super::benachrichtigung::melden(pool, live, f, eskaliert_mid).await;
     true
 }
 

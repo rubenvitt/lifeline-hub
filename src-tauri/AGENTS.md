@@ -9,8 +9,16 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   Command), nicht ins Frontend.
 - **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
   bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
-  `anmeldung_im_browser`; `server_freigeben`). Jeder neue Command steht im `AppManifest` von
-  `build.rs`, sonst wäre er für jede Seite offen.
+  `anmeldung_im_browser`, `benachrichtigung_zeigen`; `server_freigeben`). Jeder neue Command steht
+  im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen. Commands eines Plugins
+  (`notification:…`) gibt keine Capability frei.
+- **Native Meldung** (Benachrichtigungskonzept D7): `benachrichtigung_zeigen` reicht Titel und
+  Text an `tauri-plugin-notification` durch; ob und wann, entscheidet das Frontend
+  (`frontend/src/alarm/desktopAlarm.ts`, Kennung über `benachrichtigung.js` in jeder Hülle, vor
+  `faehigkeiten.js`; beide ergänzen `__LIFELINE_HUELLE__`). Das Plugin ersetzt in jeder Seite
+  `window.Notification` durch einen Weg ohne Freigabe; die Seite darf ihn nicht nehmen. Ein Klick
+  (`on_action`, `tap`) holt das Fenster der Meldung nach vorn (`klick_fenster`, `nach_vorn`), den
+  Sprung trägt der Toast. Schließen kann die Hülle eine Meldung auf macOS und Windows nicht.
 - **Im Browser anmelden** (LFH-818, `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`):
   `ASWebAuthenticationSession` (`aswas.rs`), PKCE-`verifier` bleibt in der Hülle, Rücksprung nur
   aus der Sitzung (`anmeldung::folge`); eingelöst per `eval` im startenden Fenster mit doppelter

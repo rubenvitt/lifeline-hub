@@ -176,6 +176,43 @@ describe('useUnwetterHinweis', () => {
     expect(abrufe.anzahl).toBe(0);
   });
 
+  it('„Unwetterwarnung“ in den Benachrichtigungen abgeschaltet: kein Hinweis, kein Ton', async () => {
+    const abrufe = liefere();
+    let einstellungen = 0;
+    server.use(
+      http.get('/api/benutzer-einstellungen', () => {
+        einstellungen += 1;
+        return HttpResponse.json({
+          eintraege: { benachrichtigungen_aus: JSON.stringify(['unwetter']) },
+        });
+      }),
+    );
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(abrufe.anzahl).toBe(1));
+    await waitFor(() => expect(einstellungen).toBe(1));
+    await warteTakt();
+    expect(ereignisse).toHaveLength(0);
+    expect(ton).not.toHaveBeenCalled();
+  });
+
+  it('eine andere abgeschaltete Art hält den Unwetterhinweis nicht auf', async () => {
+    liefere();
+    server.use(
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({ eintraege: { benachrichtigungen_aus: JSON.stringify(['gefahr']) } }),
+      ),
+    );
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(ereignisse).toHaveLength(1));
+    expect(ton).toHaveBeenCalledWith('dezent');
+  });
+
   it('fragt auch im Hintergrund-Tab nach — sonst griffe die Desktop-Meldung nie', async () => {
     liefere();
     renderHook(

@@ -4,7 +4,8 @@ Die Desktop-App „Lifeline Hub“ ist eine **Hülle** um die Webanwendung (LFH-
 aus LFH-720). Sie lädt die https-Adresse des Einsatzservers, genau wie ein Browser. Die
 Anwendung selbst, die Daten und die Anmeldung liegen weiter auf dem Server. Die Hülle bringt
 ein eigenes Fenster, die Serveradresse beim ersten Start, den Deeplink aus „Geräte verbinden“,
-den Druck auf dem Mac, die Behandlung neuer Fenster und fremder Links sowie das Update mit.
+den Druck auf dem Mac, die Behandlung neuer Fenster und fremder Links, die Mitteilungen des
+Betriebssystems sowie das Update mit.
 
 Anforderungen: `openspec/specs/desktop-huelle/` und `openspec/specs/desktop-auslieferung/`.
 Quellcode: `src-tauri/`.
@@ -102,6 +103,25 @@ selbst, wohin ein Link geht:
 Führt ein Link **im Fenster** auf eine fremde Seite, bleibt die App dort. Das ist nötig, weil
 die Anmeldung über einen Identitätsanbieter so abläuft. Einen Zurück-Knopf gibt es nicht. Der
 Weg zurück ist „Server wechseln“ → „Abbrechen“.
+
+## Mitteilungen
+
+Ist das Fenster minimiert oder verdeckt, erscheint eine Benachrichtigung (etwa „Auftrag
+überfällig“) zusätzlich als **Mitteilung des Betriebssystems**, mit Titel und Kurztext. Ein Klick
+darauf holt das Fenster nach vorn. Dort steht die Benachrichtigung mit „Öffnen“, wie sie ohne
+Mitteilung stünde. Bei sichtbarem Fenster gibt es keine Mitteilung, nur Hinweis und Ton in der
+App. Im Kopf des Einsatzes steht in der App immer „Benachrichtigung erlaubt“; ob das System die
+Mitteilung zeigt, erfährt die App nicht.
+
+Ob und wie Mitteilungen erscheinen, regelt das Betriebssystem je App:
+- **macOS:** Systemeinstellungen → Mitteilungen → „Lifeline Hub“: „Mitteilungen erlauben“ an.
+  Als Stil empfiehlt sich „Hinweise“: sie bleiben stehen, bis jemand sie wegklickt, ein Banner
+  verschwindet nach wenigen Sekunden. Ein Fokus („Nicht stören“) unterdrückt sie.
+- **Windows:** Einstellungen → System → Benachrichtigungen: „Benachrichtigungen“ und der
+  Eintrag „Lifeline Hub“ an. „Nicht stören“ bzw. der Fokus-Assistent unterdrückt sie. Mitteilungen
+  gibt es nur von der installierten App, nicht von einem Entwicklungsbau aus `target/`.
+
+Herleitung: `openspec/changes/kcjecn9e-benachrichtigungskonzept/design.md`, D7.
 
 ## Update
 
@@ -307,4 +327,9 @@ Vorgaben für alle Endgeräte (Bildschirmsperre, Gemeinschaftsgeräte, Verlust) 
   (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`),
   mit der signierten und notarisierten App erneut Vivaldi als Standardbrowser (LFH-722,
   `openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`).
+- **Mitteilungen bleiben stehen:** Eine Mitteilung, die niemand anklickt, bleibt in der
+  Mitteilungszentrale (macOS) bzw. im Info-Center (Windows), auch wenn die Benachrichtigung in der
+  App längst erledigt ist. Die App kann sie dort nicht entfernen.
+- **Mitteilungen, nicht gemessen:** auf echten Geräten unter macOS und Windows, besonders der
+  Klick auf eine ältere Mitteilung aus der Mitteilungszentrale bzw. dem Info-Center.
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.

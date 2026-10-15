@@ -29,9 +29,8 @@ import {
  *
  * - `name`: kurzer Name für die Einstellungsseite und die Zählzeilen des Sammeltoasts.
  * - `org`: Org-Art (Org-Kanal), gezeigt auch außerhalb eines Einsatzes.
- * - `einstellbar`: steht auf der Einstellungsseite. `unwetter` erkennt der Browser selbst; er
- *   prüft die Einstellung erst mit der Teilaufgabe „bestehende Alarme“ (tasks.md 3.5), bis dahin
- *   stünde dort ein Schalter ohne Wirkung.
+ * - `einstellbar`: steht auf der Einstellungsseite. `unwetter` erkennt der Browser selbst und
+ *   prüft den Schalter dort (`wetter/useUnwetterHinweis.ts`).
  *
  * Titel, Detailzeile und Sprungziel einer einzelnen Benachrichtigung bildet der Server
  * (`src/benachrichtigung/text.rs`); hier steht nur, was der Client ohne Text braucht.
@@ -111,7 +110,7 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     einstellbar: true,
   },
   einsatz_neu: { name: 'Neuer Einsatz', stufe: 'hinweis', org: true, einstellbar: true },
-  unwetter: { name: 'Unwetterwarnung', stufe: 'hinweis', org: false, einstellbar: false },
+  unwetter: { name: 'Unwetterwarnung', stufe: 'hinweis', org: false, einstellbar: true },
 };
 
 /** Alle Arten in Katalogreihenfolge. */
@@ -231,33 +230,16 @@ export function zielVon(e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ'>):
 }
 
 /**
- * Toast-Schlüssel einer Benachrichtigung. Die vier Arten, die heute noch zusätzlich über die
- * Sonderwege in `useEinsatzLiveStream` kommen, bekommen den Schlüssel ihres Sonderwegs: so teilen
- * beide Wege einen Toast, und dieselbe Benachrichtigung erscheint nie zweimal. Mit dem Ende der
- * Sonderwege (tasks.md 3.5) kann das entfallen; `b-<id>` reicht dann für alle.
+ * Toast-Schlüssel einer Benachrichtigung: ihre Kennung. Dieselbe Benachrichtigung erscheint so
+ * nie zweimal (Replay, Nachreichen); zwei Benachrichtigungen zum selben Bezug sind zwei Toasts.
  */
-export function toastSchluessel(
-  e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_id' | 'benachrichtigung_id'>,
-): string {
-  switch (e.art) {
-    case 'sofortmeldung':
-      return `sofort-${e.bezug_id}`;
-    case 'auftrag_ueberfaellig':
-      return `auftrag-${e.bezug_id}`;
-    case 'erinnerung_faellig':
-      return `erinnerung-${e.bezug_id}`;
-    case 'abloesung_faellig':
-      return `abloesung-${e.bezug_id}-faellig`;
-    case 'abloesung_vorwarnung':
-      return `abloesung-${e.bezug_id}-vorwarnung`;
-    default:
-      return `b-${e.benachrichtigung_id}`;
-  }
+export function toastSchluessel(e: Pick<BenachrichtigungEreignis, 'benachrichtigung_id'>): string {
+  return `b-${e.benachrichtigung_id}`;
 }
 
 /**
- * Gruppe für den Titel des Sammeltoasts. Die Gruppen der Sonderwege tragen ihren eigenen Titel
- * („3 weitere Sofortmeldungen“); eine Benachrichtigung derselben Art fällt in dieselbe Gruppe.
+ * Gruppe für den Titel des Sammeltoasts. Die Gruppen der bestehenden Alarme tragen ihren eigenen
+ * Titel („3 weitere Sofortmeldungen“); beide Ablösungsarten fallen in eine Gruppe.
  */
 export type SammelGruppe =
   'sofort' | 'auftrag-ueberfaellig' | 'erinnerung' | 'abloesung' | 'unwetter' | BenachrichtigungArt;

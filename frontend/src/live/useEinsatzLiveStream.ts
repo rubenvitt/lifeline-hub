@@ -1,6 +1,5 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { spieleAlarmTon as spieleTon } from '../alarm/alarmTon';
 import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
@@ -28,11 +27,12 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * tab-übergreifendes Teilen ist offen (LFH-264).
  *
  * Listener, Invalidierung und lagged-Vollabgleich werden aus `EINSATZ_STREAM_EVENTS`
- * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Nur Ereignisse
- * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung), die Benachrichtigungen (an die
- * Zentrale, `benachrichtigungListener.ts`) und `lagged` stehen explizit hier.
+ * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Explizit hier
+ * stehen nur `sofortmeldung`, die Quittierfrist eines Auftrags (`erinnerung`), die
+ * Benachrichtigungen (an die Zentrale, `benachrichtigungListener.ts`) und `lagged`. Ton und
+ * Toast entstehen nur in der Zentrale (design.md D5), nie hier.
  * Invalidiert wird gebündelt über den Sammler der Verbindung (LFH-922, `liveInvalidierung.ts`),
- * die Modulzähler über einen zweiten mit längerem Fenster (LFH-935); Ton und Toast laufen sofort.
+ * die Modulzähler über einen zweiten mit längerem Fenster (LFH-935).
  * Trägt die Payload eine Objekt-Kennung, ordnet `EINSATZ_STREAM_ZIELE` gezielt zu (nur Detail,
  * nur Anhangliste, eine Zeile über `zeilenAbgleich.ts`, LFH-931); fehlt sie, gelten die Prefixe.
  *
@@ -40,17 +40,10 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * bleibt es bei dieser einen Verbindung, der Org-Strom `/api/live` ruht so lange
  * (`einsatzStromStore.ts`). `lagged` und jeder Wiederaufbau frischen auch die Org-Keys auf.
  * Verbindungsbau, Backoff und Status: `liveVerbindung.ts`.
- *
- * `stumm`: kein Ton (gekoppelte Geräte, Spec `benachrichtigungen`, „Gekoppelte Geräte bleiben
- * still“); Abgleich und Endzustand laufen wie sonst.
  */
-export function useEinsatzLiveStream(
-  einsatzId: number,
-  { stumm = false }: { stumm?: boolean } = {},
-): void {
+export function useEinsatzLiveStream(einsatzId: number): void {
   const qc = useQueryClient();
   useEffect(() => {
-    const spieleAlarmTon: typeof spieleTon = stumm ? () => undefined : spieleTon;
     const sammler = erzeugeLiveSammler(qc);
     // Die Modulzähler bekommen ein eigenes, längeres Fenster (LFH-935): ein Burst kostet je Tab
     // einen Zählerabruf, die Listen bleiben beim kurzen Fenster.
@@ -100,66 +93,28 @@ export function useEinsatzLiveStream(
     // Benachrichtigungen (Einsatz- und Org-Arten) gehen an die Zentrale im Layout.
     listeners.push(...benachrichtigungListener());
 
-    // Sofortmeldung: Listen aktualisieren UND alarmieren (Ton + Toast). Der Toast läuft über ein
-    // window-CustomEvent (AlarmZentrale im Layout). NICHT im lagged-Fan-out.
-    const onSofort = (ev: MessageEvent) => {
-      invalAlle(EINSATZ_STREAM_EVENTS.meldung);
-      spieleAlarmTon('alarm');
-      let detail: unknown = {};
-      try {
-        detail = JSON.parse(ev.data);
-      } catch {
-        /* Payload optional */
-      }
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail }));
-    };
+    // Sofortmeldung: frischt nur die Meldungslisten auf, auch nach einer Eskalation (Merker
+    // `eskaliert`). Ton und Toast kommen seit LLH-1209 als Benachrichtigung über die Zentrale
+    // (design.md D5); deshalb spielt hier und auf gekoppelten Geräten kein Ton. NICHT im
+    // lagged-Fan-out.
+    const onSofort = () => invalAlle(EINSATZ_STREAM_EVENTS.meldung);
     listeners.push(['sofortmeldung', onSofort as EventListener]);
 
-    // Erinnerung: zusätzlich zur Registry-Invalidierung abgestuft alarmieren. `bezug_typ`
-    // 'meldung' wird übersprungen (der sofortmeldung-Pfad alarmiert schon), 'auftrag' → Alarmton +
-    // auftraege-Invalidierung, sonst dezent. Toast über window-CustomEvent (AlarmZentrale).
+    // Die fällige Quittierfrist eines Auftrags macht ihn überfällig: die Auftragsliste frischt mit
+    // auf. Nur der Scheduler setzt `erinnerung_id`; die CRUD-Route sendet dasselbe Ereignis ohne.
+    // Erinnerung und Ablösung alarmieren seit LLH-1209 als Benachrichtigung.
     const onErinnerung = (ev: MessageEvent) => {
-      let detail: {
-        einsatz_id?: number;
-        erinnerung_id?: number;
-        bezug_typ?: 'auftrag' | 'meldung' | 'etb' | 'abloesung' | 'abloesung_vorwarnung' | null;
-        bezug_id?: number | null;
-      } = {};
+      let detail: { erinnerung_id?: number; bezug_typ?: string | null } = {};
       try {
         detail = JSON.parse(ev.data);
       } catch {
         /* Payload optional */
       }
-      // Nur scheduler-gefeuerte Fälligkeit alarmiert; die CRUD-Route sendet dasselbe Event ohne
-      // `erinnerung_id` als reinen Listen-Refresh.
-      if (detail.erinnerung_id == null) return;
-      if (detail.bezug_typ === 'meldung') return; // Doppel-Alarm-Guard
-      // Ablösungsfristen alarmieren über das eigene `abloesung`-Ereignis, hier nicht ein zweites Mal.
-      if (detail.bezug_typ === 'abloesung' || detail.bezug_typ === 'abloesung_vorwarnung') return;
-      if (detail.bezug_typ === 'auftrag') {
-        spieleAlarmTon('alarm');
+      if (detail.erinnerung_id != null && detail.bezug_typ === 'auftrag') {
         inval(EINSATZ_KEYS.auftraege);
-      } else {
-        spieleAlarmTon('dezent');
       }
-      window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', { detail }));
     };
     listeners.push(['erinnerung', onErinnerung as EventListener]);
-
-    // Ablösung: alarmiert nur, wenn `art` gesetzt ist — das setzt ausschließlich der Scheduler;
-    // die CRUD-Routen senden dasselbe Ereignis nur als Refresh.
-    const onAbloesung = (ev: MessageEvent) => {
-      let detail: { art?: 'vorwarnung' | 'faellig' } = {};
-      try {
-        detail = JSON.parse(ev.data);
-      } catch {
-        /* Payload optional */
-      }
-      if (detail.art !== 'vorwarnung' && detail.art !== 'faellig') return;
-      spieleAlarmTon(detail.art === 'faellig' ? 'alarm' : 'dezent');
-      window.dispatchEvent(new CustomEvent('lfh:abloesung-alarm', { detail }));
-    };
-    listeners.push(['abloesung', onAbloesung as EventListener]);
 
     // Endzustand (LFH-732, LFH-910): bei gültiger Sitzung fragt eine zweite Probe den Einsatz
     // selbst ab. Die Detailroute steht hinter demselben Lese-Gate wie `/live`
@@ -241,5 +196,5 @@ export function useEinsatzLiveStream(
       zaehlerSammler.raeumen();
       abmelden();
     };
-  }, [einsatzId, qc, stumm]);
+  }, [einsatzId, qc]);
 }

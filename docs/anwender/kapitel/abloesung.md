@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -88,10 +88,16 @@ Für Einsatzleitung und Führungspersonal:
 ### Fälligkeit und Hinweise
 
 Fällig ist eine Schicht bei Beginn plus Rhythmus. Der Rhythmus liegt zwischen einer halben Stunde
-und 168 Stunden. 30 Minuten vor der Fälligkeit erscheint der Hinweis „Ablösung in 30 min“, bei
-Fälligkeit „Ablösung fällig“, jeweils mit der Einheit und einem Sprung zur Seite Ablösung. Die Zahl
-am Modul in der Seitenleiste zählt die Schichten, die bald fällig oder überfällig sind; der
-Überblick führt die Fälligkeiten als Marken.
+und 168 Stunden. 30 Minuten vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, bei
+Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit der Fälligkeit, etwa
+„Florian 1, 15:30“, und „Öffnen“ zur Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
+die Schichten, die bald fällig oder überfällig sind; der Überblick führt die Fälligkeiten als
+Marken.
+
+Beides bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. Den Hinweis „Ablösung
+steht an“ kann jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“
+nicht (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen
+steht die Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
 
 ### Eine Schicht je Einheit
 

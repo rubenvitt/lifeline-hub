@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-benachrichtigung-zeigen"
+description = "Enables the benachrichtigung_zeigen command without any pre-configured scope."
+commands.allow = ["benachrichtigung_zeigen"]
+
+[[permission]]
+identifier = "deny-benachrichtigung-zeigen"
+description = "Denies the benachrichtigung_zeigen command without any pre-configured scope."
+commands.deny = ["benachrichtigung_zeigen"]

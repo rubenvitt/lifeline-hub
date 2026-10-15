@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs]
+quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -65,8 +65,8 @@ Abschnitt“, Absender, Meldeweg, Empfängerfunktion und Empfänger stehen.
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Beim Eingang einer Sofortmeldung erscheint der Hinweis „Sofortmeldung eingegangen“ mit
-   „Bestätigung ausstehend“; „Öffnen“ führt zu den Meldungen.
+1. Beim Eingang einer Sofortmeldung erscheint der Alarm „Sofortmeldung eingegangen“ mit
+   „Meldung #…“; „Öffnen“ führt zur Meldung.
 2. Die Karte der Sofortmeldung trägt „Bestätigung offen bis …“. An ihr „Bestätigen“ wählen und
    die Rückfrage „Sofortmeldung bestätigen?“ mit „Bestätigen“ beantworten.
 
@@ -113,9 +113,17 @@ Minuten.
 
 Mit der Sofortmeldung legt die App eine automatische Erinnerung „Sofortmeldung #… unbestätigt“
 an. Läuft die Frist ab, ohne dass jemand bestätigt, wird die Meldung eskaliert: Sie rückt
-innerhalb ihrer Priorität nach oben und zählt unter „Bestätigung überfällig“, und die Erinnerung
-meldet sich mit dem Hinweis „Erinnerung fällig“ (Kapitel [Erinnerungen](erinnerungen.md)). Mit
-der Bestätigung schließt die Erinnerung.
+innerhalb ihrer Priorität nach oben und zählt unter „Bestätigung überfällig“, und es erscheint der
+Alarm „Bestätigung ausstehend“ mit „Meldung #…“. Mit der Bestätigung schließt die Erinnerung
+(Kapitel [Erinnerungen](erinnerungen.md)).
+
+### Wer den Alarm bekommt
+
+Den Alarm „Sofortmeldung eingegangen“ bekommen alle, die das Modul Meldungen sehen, außer der
+Person, die die Sofortmeldung erfasst hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
+auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benachrichtigungen“ nicht
+abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche
+Meldung löst keinen Alarm aus.
 
 ### Benachrichtigung an die Empfängerfunktion
 

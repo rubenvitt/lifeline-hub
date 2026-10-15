@@ -65,7 +65,9 @@ async function hinweisBei(jetzt: string): Promise<string> {
       </EinsatzAnzeigeProvider>
     </QueryClientProvider>,
   );
-  await waitFor(() => expect(ereignisse).toHaveLength(1));
+  // Drei Abfragen (Wetter, Einsatz- und Benutzereinstellungen) gehen vor dem Hinweis; unter Last
+  // reicht die Standardfrist von 1 s nicht.
+  await waitFor(() => expect(ereignisse).toHaveLength(1), { timeout: 5000 });
   return ereignisse[0].detail.beschreibung as string;
 }
 

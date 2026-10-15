@@ -12,6 +12,7 @@ import type {
 } from '../api/types';
 import AlarmZentrale from '../einsatz/AlarmZentrale';
 import { BENACHRICHTIGUNG_WINDOW_EVENT, meldeNachreichen } from '../live/benachrichtigungListener';
+import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
 import { server } from '../test/server';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import { spieleAlarmTon } from './alarmTon';
@@ -232,7 +233,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(Ctor).not.toHaveBeenCalled();
   });
 
-  it('Alarm, Tab verdeckt: OS-Meldung unter dem tag des bisherigen Alarms', async () => {
+  it('Alarm, Tab verdeckt: OS-Meldung unter dem tag der Benachrichtigung', async () => {
     const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
     serverMit([ueberfaellig]);
     const { Ctor } = stubMeldungen();
@@ -243,7 +244,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(Ctor).toHaveBeenCalledExactlyOnceWith('Auftrag überfällig', {
       body: 'Auftrag #7',
-      tag: '1-auftrag-7',
+      tag: '1-b-41',
     });
     expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
   });
@@ -302,46 +303,87 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
   });
+});
 
-  describe('neben dem Sonderweg bis tasks.md 3.5: dieselbe Benachrichtigung nur einmal', () => {
-    it('erst der Sonderweg, dann die Benachrichtigung: ein Toast mit dem Text des Servers', async () => {
-      const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
-      serverMit([ueberfaellig]);
-      renderZentrale();
-      act(() => {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: 3, bezug_typ: 'auftrag', bezug_id: 7 },
-          }),
-        );
-      });
-      expect(await screen.findByText('Quittierfrist überschritten')).toBeInTheDocument();
-      live(ueberfaellig);
+describe('Desktop-App: native Meldung (tasks.md 5.2)', () => {
+  afterEach(beendeHuelle);
 
-      expect(await screen.findByText('Auftrag #7')).toBeInTheDocument();
-      expect(screen.getAllByText('Auftrag überfällig')).toHaveLength(1);
-      // Den Ton spielt der Sonderweg in `useEinsatzLiveStream`, hier kein zweiter.
-      expect(ton).not.toHaveBeenCalled();
+  /** Die Hülle samt der Web-API, die das Notification-Plugin dort in jede Seite hängt. */
+  function inDerHuelle(start = starteMacHuelle) {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    start({ invoke });
+    return { invoke, ...stubMeldungen() };
+  }
+
+  const NATIVE_MELDUNG = {
+    titel: 'Auftrag überfällig',
+    text: 'Auftrag #7',
+  };
+
+  it('Fenster minimiert: der Alarm kommt als native Meldung, beim Aktivieren steht der Toast mit „Öffnen“ bereit', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    const s = serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle();
+    setzeHidden(true);
+    renderZentrale();
+    live(ueberfaellig);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', NATIVE_MELDUNG),
+    );
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
+
+    // Der Klick auf die Meldung holt das Fenster nach vorn (Hülle); die Seite wird sichtbar.
+    setzeHidden(false);
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
     });
 
-    it('erst die Benachrichtigung, dann der Sonderweg: der Toast bleibt, wie er ist', async () => {
-      const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
-      serverMit([ueberfaellig]);
-      renderZentrale();
-      live(ueberfaellig);
-      expect(await screen.findByText('Auftrag #7')).toBeInTheDocument();
-      act(() => {
-        window.dispatchEvent(
-          new CustomEvent('lfh:erinnerung-alarm', {
-            detail: { erinnerung_id: 3, bezug_typ: 'auftrag', bezug_id: 7 },
-          }),
-        );
-      });
+    const oeffnen = within(notice('Auftrag überfällig')).getByRole('button', { name: 'Öffnen' });
+    expect(s.quittiert).toEqual([]);
+    await userEvent.click(oeffnen);
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=7');
+    await waitFor(() => expect(s.quittiert).toEqual([41]));
+    expect(invoke).toHaveBeenCalledOnce();
+  });
 
-      expect(screen.getAllByText('Auftrag überfällig')).toHaveLength(1);
-      expect(screen.getByText('Auftrag #7')).toBeInTheDocument();
-      expect(screen.queryByText('Quittierfrist überschritten')).not.toBeInTheDocument();
-    });
+  it('Fenster sichtbar: keine native Meldung, nur Toast und Ton', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle();
+    renderZentrale();
+    live(ueberfaellig);
+
+    expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('in der Windows-Hülle ebenso über den Command', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([ueberfaellig]);
+    const { invoke, Ctor } = inDerHuelle(starteWindowsHuelle);
+    setzeHidden(true);
+    renderZentrale();
+    live(ueberfaellig);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('benachrichtigung_zeigen', NATIVE_MELDUNG),
+    );
+    expect(Ctor).not.toHaveBeenCalled();
+  });
+
+  it('die Kopfleiste nennt die Benachrichtigung in der Hülle erlaubt, wie auch die Web-API steht', async () => {
+    // Auf macOS bleibt die Web-API, die das Plugin einhängt, unentschieden.
+    const { Ctor } = inDerHuelle();
+    Ctor.permission = 'default';
+    renderZentrale();
+    expect(
+      await screen.findByRole('button', { name: 'Benachrichtigung erlaubt' }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -501,14 +543,17 @@ describe('Sammeltoast (tasks.md 2.4)', () => {
     await waitFor(() => expect([...s.quittiert].sort()).toEqual([61, 62, 63, 64, 65]));
   });
 
-  it('teilt das Budget mit den Sonderwegen: Sofortmeldungen und Hinweise bündeln gemeinsam', async () => {
+  it('alle Arten teilen ein Budget: Sofortmeldungen und Hinweise bündeln gemeinsam', async () => {
+    const sofort = [1, 2].map((n) =>
+      benachrichtigung(80 + n, 'sofortmeldung', 'meldung', n, {
+        titel: 'Sofortmeldung eingegangen',
+      }),
+    );
     const liste = [1, 2].map((n) => benachrichtigung(70 + n, 'auftrag_erteilt', 'auftrag', n));
-    serverMit(liste);
+    serverMit([...sofort, ...liste]);
     renderZentrale();
-    act(() => {
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 1 } }));
-      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 2 } }));
-    });
+    for (const b of sofort) live(b);
+    await waitFor(() => expect(screen.getAllByText('Sofortmeldung eingegangen')).toHaveLength(2));
     for (const b of liste) {
       live(b);
       await screen.findByText(`Auftrag #${b.bezug_id}`);

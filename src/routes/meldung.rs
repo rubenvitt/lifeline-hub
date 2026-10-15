@@ -1,4 +1,7 @@
 use crate::app::AppState;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
@@ -293,8 +296,12 @@ async fn auto_frist_erinnerung_sicherstellen(
 /// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
 /// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
 ///
-/// Wer das Bündel zustellt, meldet danach auch die Benachrichtigung an die Empfängerfunktion
-/// (LLH-1214, `meldung::benachrichtigung`): so genau einmal je Meldung, auch bei einem Replay.
+/// Eine Sofortmeldung alarmiert danach über die Benachrichtigungen (LLH-1209, Spec
+/// `benachrichtigungen`, „Sofortmeldung alarmiert“): alle mit dem Modul Meldungen außer dem
+/// Erfasser. Wer das Bündel zustellt, meldet außerdem die Benachrichtigung an die
+/// Empfängerfunktion (`meldung::benachrichtigung`). `melden` schreibt selbst, also erst nach dem
+/// Commit des Markers und nur, wenn dieser Aufruf ihn gesetzt hat: so genau einmal je Meldung,
+/// auch bei einem Replay.
 async fn live_publikation_sicherstellen(
     state: &AppState,
     meldung: &MeldungAnzeige,
@@ -316,6 +323,20 @@ async fn live_publikation_sicherstellen(
         })
         .await?;
     if zugestellt {
+        if ist_sofort {
+            benachrichtigung::melden(
+                &state.pool,
+                &state.live,
+                Anlass::neu(
+                    einsatz_id,
+                    BenachrichtigungArt::Sofortmeldung,
+                    Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung_id),
+                )
+                .von(meldung.erfasst_von_id)
+                .an(Adressat::ModulLeser("meldungen")),
+            )
+            .await;
+        }
         crate::meldung::benachrichtigung::erfasst(&state.pool, &state.live, meldung).await;
     }
     Ok(())
