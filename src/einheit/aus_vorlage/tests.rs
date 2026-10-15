@@ -440,12 +440,27 @@ fn fahrzeug_zustand_je_fall() {
     use VorschauZustand::*;
     assert_eq!(fahrzeug_zustand(true, None), Neu);
     assert_eq!(fahrzeug_zustand(false, None), AusserDienst);
-    assert_eq!(fahrzeug_zustand(true, Some((false, false))), Frei);
-    assert_eq!(fahrzeug_zustand(true, Some((false, true))), Gebunden);
+    assert_eq!(fahrzeug_zustand(true, Some((None, false))), Frei);
+    assert_eq!(fahrzeug_zustand(true, Some((None, true))), Gebunden);
     // Schon im Einsatz zählt vor dem Stamm: ein inzwischen außer Dienst gestelltes bleibt.
-    assert_eq!(fahrzeug_zustand(false, Some((false, false))), Frei);
-    assert_eq!(fahrzeug_zustand(true, Some((true, false))), Entlassen);
-    assert_eq!(fahrzeug_zustand(false, Some((true, false))), AusserDienst);
+    assert_eq!(fahrzeug_zustand(false, Some((None, false))), Frei);
+    assert_eq!(
+        fahrzeug_zustand(true, Some((Some("entlassen"), false))),
+        Entlassen
+    );
+    assert_eq!(
+        fahrzeug_zustand(false, Some((Some("entlassen"), false))),
+        AusserDienst
+    );
+    // Storniert: war nie im Einsatz (LLH-1236).
+    assert_eq!(
+        fahrzeug_zustand(true, Some((Some("storniert"), false))),
+        Neu
+    );
+    assert_eq!(
+        fahrzeug_zustand(false, Some((Some("storniert"), false))),
+        AusserDienst
+    );
 }
 
 #[tokio::test]
@@ -742,7 +757,6 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
         vec![
             (f, 2, "in «2. Zug»".to_string()),
             (f, 3, "außer Dienst".to_string()),
-            (f, 4, "entlassen".to_string()),
             (f, 77, "nicht in der Vorlage".to_string()),
             (p, 6, "in «2. Zug»".to_string()),
             (p, 2, "auf «83-4»".to_string()),
@@ -783,6 +797,70 @@ async fn gruende_vor_dem_ersten_schreiben() {
     )
     .await;
     assert_eq!(einheiten, 1, "nur der 2. Zug");
+}
+
+/// Ein entlassenes Fahrzeug der Vorlage wird beim Bilden in derselben Zeile wieder aufgenommen
+/// (D4, LLH-1236); ein storniertes gilt als neu. Kein zweiter Datensatz.
+#[tokio::test]
+async fn entlassenes_fahrzeug_wird_wieder_aufgenommen_storniertes_ist_neu() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let alter_zug = einheit(&pool, z.k.einsatz_id, "Alter Zug").await;
+    let ef_entlassen = im_einsatz_fahrzeug(&pool, z.k, z.rtw1, Some(alter_zug)).await;
+    let ef_storniert = im_einsatz_fahrzeug(&pool, z.k, z.rtw2, None).await;
+    {
+        let mut conn = pool.acquire().await.unwrap();
+        crate::fahrzeug::disposition_repo::entlassen_tx(
+            &mut conn,
+            z.k.einsatz_id,
+            ef_entlassen,
+            z.k.benutzer_id,
+            &crate::zeit::jetzt(),
+        )
+        .await
+        .unwrap();
+        crate::fahrzeug::disposition_repo::stornieren_tx(
+            &mut conn,
+            z.k.einsatz_id,
+            ef_storniert,
+            z.k.benutzer_id,
+            &crate::zeit::jetzt(),
+        )
+        .await
+        .unwrap();
+    }
+
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    let rtw1 = &plan.fahrzeuge[&z.rtw1];
+    assert_eq!(
+        (rtw1.zustand, rtw1.ef_id, rtw1.einheit.as_ref()),
+        (VorschauZustand::Entlassen, None, None)
+    );
+    assert_eq!(plan.fahrzeuge[&z.rtw2].zustand, VorschauZustand::Neu);
+    assert!(check_against_plan(&plan, &wahl(&[z.rtw1, z.rtw2]), &[]).is_empty());
+
+    let g = bilde(&pool, &z, &anfrage(&wahl(&[z.rtw1, z.rtw2]), &[]))
+        .await
+        .unwrap();
+    let staffel = g.einheiten[1].id;
+    let ids: Vec<i64> = g.fahrzeuge.iter().map(|b| b.id).collect();
+    assert_eq!(ids, [ef_entlassen, ef_storniert], "dieselben Zeilen");
+    assert!(g.umgehaengt.is_empty(), "entlassen ist nicht umgehängt");
+    let zeilen: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT id, einheit_id, beendet_at FROM einsatz_fahrzeug WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(z.k.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeilen,
+        [
+            (ef_entlassen, Some(staffel), None),
+            (ef_storniert, Some(staffel), None),
+        ],
+        "kein zweiter Datensatz"
+    );
 }
 
 // ── 3. Bilden ────────────────────────────────────────────────────────────────────────────────

@@ -231,9 +231,14 @@ pub async fn sammel_disponieren(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (ergebnis, etb_id, anzeigen) = crate::write_retry!(&state.pool, |conn| {
-        let ergebnis =
-            kraefte_disposition::disponiere_fahrzeuge_tx(conn, kontext, &ids, body.einheit_id)
-                .await?;
+        let ergebnis = kraefte_disposition::disponiere_fahrzeuge_tx(
+            conn,
+            kontext,
+            &ids,
+            body.einheit_id,
+            kraefte_disposition::Regeln::SAMMEL,
+        )
+        .await?;
         let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,

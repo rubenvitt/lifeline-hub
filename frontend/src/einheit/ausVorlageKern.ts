@@ -41,17 +41,19 @@ export const LEERE_WAHL: Wahl = { fahrzeuge: new Map(), personal: new Map() };
 type Zeile = VorschauFahrzeug | VorschauPersonal;
 
 /**
- * Gesperrt: außer Dienst. Ein entlassenes Fahrzeug ebenso, solange der Server es nicht erneut
- * disponiert (LLH-1079 Teil II); er lehnt es mit „entlassen“ ab. Personen kommen erneut.
+ * Gesperrt: außer Dienst. Eine entlassene Kraft nimmt der Server beim Bilden wieder auf, auch ein
+ * Fahrzeug (LLH-1236).
  */
-export function isGesperrt(art: ZeilenArt, zustand: VorschauZustand): boolean {
-  if (zustand === 'ausser_dienst') return true;
-  return art === 'fahrzeug' && zustand === 'entlassen';
+export function isGesperrt(_art: ZeilenArt, zustand: VorschauZustand): boolean {
+  return zustand === 'ausser_dienst';
 }
 
-/** Vorgabe des Häkchens (D4): Fahrzeuge „neu“ und „im Einsatz“ an, Personen nie (Vorschlag). */
+/**
+ * Vorgabe des Häkchens (D4): Fahrzeuge „neu“, „im Einsatz“ und „entlassen“ an, Personen nie
+ * (Vorschlag).
+ */
 export function vorgabeAn(art: ZeilenArt, zustand: VorschauZustand): boolean {
-  return art === 'fahrzeug' && (zustand === 'neu' || zustand === 'frei');
+  return art === 'fahrzeug' && (zustand === 'neu' || zustand === 'frei' || zustand === 'entlassen');
 }
 
 export function alleFahrzeuge(v: VorlageVorschau): VorschauFahrzeug[] {
@@ -125,7 +127,7 @@ export function zustandWort(_art: ZeilenArt, zeile: Zeile): string {
     case 'ausser_dienst':
       return 'außer Dienst';
     case 'entlassen':
-      return 'entlassen';
+      return 'entlassen, wird wieder aufgenommen';
     case 'gebunden': {
       if (zeile.einheit_name) return `in «${zeile.einheit_name}»`;
       const fahrzeug = (zeile as VorschauPersonal).fahrzeug_name;

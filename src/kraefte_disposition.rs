@@ -59,7 +59,8 @@ impl Regeln {
     pub const SAMMEL: Regeln = Regeln {
         entlassene: EntlasseneRegel::Ablehnen,
     };
-    /// Einzelweg einer Stamm-Person: eine entlassene wird wieder aufgenommen (LLH-1079 D7).
+    /// Einzelweg einer Stamm-Person und Bilden aus einer Vorlage (LLH-1049 D4, LLH-1236): eine
+    /// entlassene Kraft wird wieder aufgenommen (LLH-1079 D7).
     pub const EINZEL: Regeln = Regeln {
         entlassene: EntlasseneRegel::Reaktivieren,
     };
@@ -209,14 +210,15 @@ pub async fn check_personal_tx(
 }
 
 /// Mengen-Vorprüfung der Fahrzeug-IDs (D2) in **einer** Anweisung: unbekannt oder fremd, schon
-/// disponiert, entlassen, außer Dienst. Wie beim Personal nimmt der Sammelweg ein entlassenes
-/// Fahrzeug nicht still wieder auf (Rückweg „Erneut disponieren“, LLH-1079 Teil II), ein
-/// storniertes dagegen schon: es war nie im Einsatz.
+/// disponiert, entlassen (nach [`Regeln`]), außer Dienst. Wie beim Personal nimmt der Sammelweg
+/// ein entlassenes Fahrzeug nicht still wieder auf (Rückweg „Erneut disponieren“, LLH-1079 Teil
+/// II), ein storniertes dagegen schon: es war nie im Einsatz.
 pub async fn check_fahrzeuge_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     fahrzeug_ids: &[i64],
+    regeln: Regeln,
 ) -> Result<Vec<ZeilenGrund>, AppError> {
     // Liest absichtlich auch beendete Zeilen: nur so trennt die Vorprüfung „schon disponiert“
     // (aktive Zeile) von „entlassen“ (beendete Zeile). Ausnahme mit Grund in der ALLOWLIST des
@@ -226,7 +228,7 @@ pub async fn check_fahrzeuge_tx(
                 CASE \
                     WHEN f.id IS NULL THEN ?4 \
                     WHEN ef.id IS NOT NULL AND coalesce(ef.beendet_at, '') = '' THEN ?5 \
-                    WHEN coalesce(ef.beendet_als, '') = 'entlassen' THEN ?6 \
+                    WHEN ?9 AND coalesce(ef.beendet_als, '') = 'entlassen' THEN ?6 \
                     WHEN f.dienststatus <> ?7 THEN ?8 \
                 END \
          FROM json_each(?1) j \
@@ -242,6 +244,7 @@ pub async fn check_fahrzeuge_tx(
     .bind(GRUND_ENTLASSEN)
     .bind(DIENSTSTATUS_IN_DIENST)
     .bind(GRUND_AUSSER_DIENST)
+    .bind(regeln.entlassene == EntlasseneRegel::Ablehnen)
     .fetch_all(&mut *conn)
     .await?;
     Ok(zeilen
@@ -408,20 +411,24 @@ pub async fn disponiere_personal_tx(
 }
 
 /// Disponiert mehrere Stamm-Fahrzeuge auf einer offenen Transaktion und ordnet sie optional einer
-/// Einheit zu (D3). Ohne Zeitachse (D6: Fahrzeuge wirken nur über ihre Einheit). Fehler wie
-/// [`disponiere_personal_tx`].
+/// Einheit zu (D3). Ohne Zeitachse (D6: Fahrzeuge wirken nur über ihre Einheit). Ein entlassenes
+/// nimmt `disponiere_stamm_tx` in derselben Zeile wieder auf, wenn [`Regeln`] es zulässt. Fehler
+/// wie [`disponiere_personal_tx`].
 pub async fn disponiere_fahrzeuge_tx(
     conn: &mut SqliteConnection,
     kontext: Kontext,
     fahrzeug_ids: &[i64],
     einheit_id: Option<i64>,
+    regeln: Regeln,
 ) -> Result<FahrzeugErgebnis, AppError> {
     let einsatz_id = kontext.einsatz_id;
     let einheit = match einheit_id {
         Some(eid) => Some(load_ziel_einheit_tx(conn, einsatz_id, eid).await?),
         None => None,
     };
-    ablehnen_wenn(check_fahrzeuge_tx(conn, einsatz_id, kontext.org_id, fahrzeug_ids).await?)?;
+    ablehnen_wenn(
+        check_fahrzeuge_tx(conn, einsatz_id, kontext.org_id, fahrzeug_ids, regeln).await?,
+    )?;
 
     let mut fahrzeuge = Vec::with_capacity(fahrzeug_ids.len());
     for &fid in fahrzeug_ids {
