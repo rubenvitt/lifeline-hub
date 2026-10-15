@@ -523,7 +523,9 @@ pub async fn gehoert_zu_einsatz(
     Ok(treffer.is_some())
 }
 
-/// Setzt die Quittung einer Empfänger-Zeile (idempotent: hält den ersten Zeitstempel). Ein
+/// Setzt die Quittung einer Empfänger-Zeile (idempotent: hält den ersten Zeitstempel) und
+/// liefert, ob diese Anfrage sie gesetzt hat; eine schon quittierte Zeile bleibt unverändert und
+/// liefert `false` (nur die erste Quittung benachrichtigt den Auftraggeber, LLH-1212). Ein
 /// aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): die Bedingung steht im `UPDATE`
 /// selbst, damit eine gleichzeitige Aufhebung nicht übergangen wird; dann 422.
 pub async fn quittiere_empfaenger(
@@ -531,11 +533,10 @@ pub async fn quittiere_empfaenger(
     empfaenger_id: i64,
     von_id: i64,
     jetzt: &str,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let getroffen = sqlx::query(
-        "UPDATE auftrag_empfaenger \
-         SET quittiert_at = COALESCE(quittiert_at, ?), quittiert_von_id = COALESCE(quittiert_von_id, ?) \
-         WHERE id = ? AND NOT EXISTS (SELECT 1 FROM auftrag a \
+        "UPDATE auftrag_empfaenger SET quittiert_at = ?, quittiert_von_id = ? \
+         WHERE id = ? AND quittiert_at IS NULL AND NOT EXISTS (SELECT 1 FROM auftrag a \
            WHERE a.id = auftrag_empfaenger.auftrag_id AND a.aufgehoben_at IS NOT NULL)",
     )
     .bind(jetzt)
@@ -544,23 +545,25 @@ pub async fn quittiere_empfaenger(
     .execute(pool)
     .await?
     .rows_affected();
-    if getroffen == 0 {
-        // Aufgehoben (422) oder die Zeile ist weg, etwa durch eine Berichtigung (404).
-        let aufgehoben: Option<bool> = sqlx::query_scalar(
-            "SELECT a.aufgehoben_at IS NOT NULL FROM auftrag_empfaenger ae \
-             JOIN auftrag a ON a.id = ae.auftrag_id WHERE ae.id = ?",
-        )
-        .bind(empfaenger_id)
-        .fetch_optional(pool)
-        .await?;
-        return Err(match aufgehoben {
-            Some(true) => AppError::UnprocessableEntity(
-                "Der Auftrag ist aufgehoben und erwartet keine Quittung mehr".into(),
-            ),
-            _ => AppError::NotFound,
-        });
+    if getroffen == 1 {
+        return Ok(true);
     }
-    Ok(())
+    // Schon quittiert (idempotent), aufgehoben (422) oder die Zeile ist weg, etwa durch eine
+    // Berichtigung (404).
+    let stand: Option<(bool, bool)> = sqlx::query_as(
+        "SELECT a.aufgehoben_at IS NOT NULL, ae.quittiert_at IS NOT NULL \
+         FROM auftrag_empfaenger ae JOIN auftrag a ON a.id = ae.auftrag_id WHERE ae.id = ?",
+    )
+    .bind(empfaenger_id)
+    .fetch_optional(pool)
+    .await?;
+    match stand {
+        Some((true, _)) => Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist aufgehoben und erwartet keine Quittung mehr".into(),
+        )),
+        Some((false, true)) => Ok(false),
+        _ => Err(AppError::NotFound),
+    }
 }
 
 /// Prüft, ob eine Empfänger-Zeile zum Auftrag gehört (Cross-Objekt-Schutz).
@@ -1288,11 +1291,20 @@ fn frist_text(frist: &Option<String>, tz: chrono_tz::Tz) -> Option<String> {
     })
 }
 
+/// Ergebnis einer Berichtigung: die ETB-Anordnung (`None` ohne fachliche Änderung, dann wurde
+/// nichts geschrieben) und die hinzugekommenen Empfänger, die erst jetzt vom Auftrag erfahren
+/// (Benachrichtigung „Neuer Auftrag“, LLH-1212).
+#[derive(Debug, Default)]
+pub struct Berichtigt {
+    pub etb_id: Option<i64>,
+    pub hinzu: Vec<EmpfaengerEingabe>,
+}
+
 /// Berichtigt einen Auftrag (LLH-1098, Spec `auftrag-aufheben-berichtigen`, design.md D6/D7) und
-/// liefert die id der ETB-Anordnung, ohne fachliche Änderung `None` (dann wurde nichts
-/// geschrieben). In EINER Transaktion: Prüfung „offen und unquittiert“ (sonst 422), Felder,
-/// gegebenenfalls neue Empfänger-Zeilen, Erinnerung „Quittierfrist“ und die Anordnung
-/// „Auftrag #N geändert: …“. `b` ist vom Handler geprüft.
+/// liefert die ETB-Anordnung samt den hinzugekommenen Empfängern ([`Berichtigt`]). In EINER
+/// Transaktion: Prüfung „offen und unquittiert“ (sonst 422), Felder, gegebenenfalls neue
+/// Empfänger-Zeilen, Erinnerung „Quittierfrist“ und die Anordnung „Auftrag #N geändert: …“. `b`
+/// ist vom Handler geprüft.
 #[allow(clippy::too_many_arguments)]
 pub async fn berichtigen_tx(
     conn: &mut sqlx::SqliteConnection,
@@ -1303,7 +1315,7 @@ pub async fn berichtigen_tx(
     tz: chrono_tz::Tz,
     b: &super::ValidierteBerichtigung,
     jetzt: &str,
-) -> Result<Option<i64>, AppError> {
+) -> Result<Berichtigt, AppError> {
     use super::etb_text::Aenderung;
     use super::AuftragBearbeitungsstatus as S;
     let (status, lfd_nr, berichtigbar) = stand_in_tx(&mut *conn, einsatz_id, auftrag_id).await?;
@@ -1408,7 +1420,7 @@ pub async fn berichtigen_tx(
         }
     }
     if aenderungen.is_empty() && neue_empfaenger.is_none() {
-        return Ok(None);
+        return Ok(Berichtigt::default());
     }
 
     let frist_wert = frist.clone().unwrap_or(alt.frist_at.clone());
@@ -1431,6 +1443,7 @@ pub async fn berichtigen_tx(
     .execute(&mut *conn)
     .await?;
 
+    let mut hinzugekommen = Vec::new();
     let namen = match neue_empfaenger {
         Some(neu) => {
             // Sicher, weil niemand quittiert hat (Prüfung oben, in derselben Transaktion). Ein
@@ -1459,6 +1472,7 @@ pub async fn berichtigen_tx(
                 empfaenger_einfuegen_tx(&mut *conn, einsatz_id, auftrag_id, &hinzu)
                     .await?
                     .into_iter();
+            hinzugekommen = hinzu;
             let namen: Vec<String> = neue_ziele
                 .iter()
                 .flat_map(|z| {
@@ -1539,7 +1553,10 @@ pub async fn berichtigen_tx(
             }
         }
     }
-    Ok(Some(etb_id))
+    Ok(Berichtigt {
+        etb_id: Some(etb_id),
+        hinzu: hinzugekommen,
+    })
 }
 
 #[cfg(test)]
@@ -1972,9 +1989,18 @@ mod tests {
         .unwrap();
         let empf1 = d.empfaenger[0].id;
 
-        quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:00")
-            .await
-            .unwrap();
+        assert!(
+            quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:00")
+                .await
+                .unwrap(),
+            "die erste Quittung setzt"
+        );
+        assert!(
+            !quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:30")
+                .await
+                .unwrap(),
+            "eine wiederholte Quittung ändert nichts"
+        );
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
             .await
             .unwrap();

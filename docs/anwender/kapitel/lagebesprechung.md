@@ -2,7 +2,7 @@
 titel: Lagebesprechung
 gruppen: [fuehrung]
 reihenfolge: 470
-quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs]
+quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -98,6 +98,22 @@ Stand gibt es nur über „In Lagebericht übernehmen“.
 Erreicht die Uhr den Termin, zeigt das Paneel „Termin“ „jetzt fällig“, danach „seit … min
 überfällig“, als Hinweis, nicht als Alarm. Dasselbe Wort steht in der Zeile der Stab-Seite und an
 der Marke im Führungsüberblick.
+
+### Hinweise vor dem Termin
+
+Steht ein Termin, bekommt der Stab zwei Hinweise mit Sprung zur Seite „Lagebesprechung“:
+10 Minuten vorher „Lagebesprechung in 10 Minuten“ und zum Termin „Lagebesprechung jetzt fällig“.
+Zum Stab zählen die Personen, die EL oder ein Sachgebiet S1 bis S7 besetzen, laut Stab-Besetzung,
+sonst laut Funktion in der Mitgliedschaft. Wer die Lagebesprechung nicht sehen darf, bekommt
+nichts.
+
+- Jeder Hinweis kommt je Termin einmal. Derselbe Termin noch einmal gesetzt löst nichts neu aus.
+- Wird der Termin verschoben, über „Termin“ oder beim Abschluss, gelten die Hinweise dem neuen
+  Termin, der alte meldet sich nicht mehr.
+- Ohne Termin, im abgeschlossenen Einsatz und zu einem Termin, der schon vorbei ist, kommt nichts.
+  Wird ein Termin weniger als acht Minuten vorher gesetzt, entfällt der erste Hinweis.
+- Die Hinweise kommen von der Uhr, nicht aus einer Aktion: auch die Person, die den Termin gesetzt
+  hat, bekommt sie, sofern sie zum Stab gehört.
 
 ### Ohne Netz
 

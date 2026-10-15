@@ -258,6 +258,14 @@ pub async fn anlegen(
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
+    crate::auftrag::benachrichtigung::erteilt(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        d.auftrag.id,
+        ctx.benutzer.id,
+    )
+    .await;
     let mut d = d;
     anreichern_alle(
         &state.pool,
@@ -324,8 +332,21 @@ pub async fn quittieren(
         .filter(|e| e.id == empfaenger_id)
         .collect();
     fordere_im_bereich(&state, &ctx, &zeile).await?;
-    repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
+    let erste_quittung =
+        repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
+    // Nur die erste Quittung der Zeile meldet dem Auftraggeber; eine wiederholte bleibt still.
+    if erste_quittung {
+        crate::auftrag::benachrichtigung::quittiert(
+            &state.pool,
+            &state.live,
+            einsatz_id,
+            empfaenger_id,
+            d.auftrag.erstellt_von_id,
+            ctx.benutzer.id,
+        )
+        .await;
+    }
 
     // LFH-118: sobald ALLE Empfänger quittiert haben, ist der Auftrag nicht mehr überfällig →
     // die Auto-Frist-Erinnerung schließen (verstummt den Nachfass). Solange ein Empfänger offen
@@ -463,8 +484,19 @@ pub async fn vollzug(
         }
         _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
     }
-    let d = repo::laden(&state.pool, auftrag_id, &now).await?;
-    let mut d = d;
+    let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    // Erledigt gemeldet: einmal je Auftrag, ein zweiter Vollzug ist oben schon 422.
+    if req.status == "vollzogen" {
+        crate::auftrag::benachrichtigung::erledigt(
+            &state.pool,
+            &state.live,
+            einsatz_id,
+            auftrag_id,
+            d.auftrag.erstellt_von_id,
+            ctx.benutzer.id,
+        )
+        .await;
+    }
     anreichern_alle(
         &state.pool,
         einsatz_id,
@@ -596,7 +628,7 @@ pub async fn berichtigen(
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
     let now = jetzt();
     let von_id = ctx.benutzer.id;
-    let etb_id = crate::write_retry!(&state.pool, |conn| {
+    let berichtigt = crate::write_retry!(&state.pool, |conn| {
         repo::berichtigen_tx(
             conn,
             einsatz_id,
@@ -609,6 +641,15 @@ pub async fn berichtigen(
         )
         .await
     })?;
+    crate::auftrag::benachrichtigung::empfaenger_hinzugekommen(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        auftrag_id,
+        ctx.benutzer.id,
+        &berichtigt.hinzu,
+    )
+    .await;
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(
         &state.pool,
@@ -620,7 +661,7 @@ pub async fn berichtigen(
         std::slice::from_mut(&mut d),
     )
     .await?;
-    if let Some(etb_id) = etb_id {
+    if let Some(etb_id) = berichtigt.etb_id {
         state.live.publiziere(einsatz_id, etb_id);
         sse(&state, einsatz_id);
     }

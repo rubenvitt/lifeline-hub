@@ -1,4 +1,7 @@
 use crate::app::AppState;
+use crate::benachrichtigung::{
+    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
     EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
@@ -50,6 +53,32 @@ pub(crate) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", person_id);
+}
+
+/// Ob eine Sichtung die Person neu in SK I bringt (Spec `benachrichtigungen`, „Neue Person der
+/// Sichtungskategorie I“): Erfassung oder Hochstufung auf SK I ja; war sie schon SK I, oder geht
+/// es in eine andere Kategorie (auch herab), nein. `vorher` ist der Stand vor dieser Sichtung,
+/// `None` ohne bisherige Sichtung.
+fn wird_sk1(vorher: Option<Sichtungskategorie>, neu: Sichtungskategorie) -> bool {
+    neu == Sichtungskategorie::Sk1 && vorher != Some(Sichtungskategorie::Sk1)
+}
+
+/// Meldet nach dem Commit den Hinweis `sichtung_eins` an die Leser des Moduls Personen, ohne den
+/// Auslöser (`src/AGENTS.md`, Benachrichtigungen). Bezug ist die Person; der Text nennt nur ihre
+/// Registriernummer, nie Name oder Befund.
+async fn melde_sichtung_eins(state: &AppState, einsatz_id: i64, person_id: i64, von: i64) {
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            einsatz_id,
+            BenachrichtigungArt::SichtungEins,
+            Bezug::neu(BenachrichtigungBezugTyp::Person, person_id),
+        )
+        .von(von)
+        .an(Adressat::ModulLeser("personen")),
+    )
+    .await;
 }
 
 /// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
@@ -503,6 +532,10 @@ pub async fn anlegen(
         for etb_id in uhs_etb_id.into_iter().chain(verbleib_etb_id) {
             state.live.publiziere(einsatz_id, etb_id);
         }
+        // Nur bei einer wirklich neuen Person: ein `client_id`-Replay meldet nicht noch einmal.
+        if kategorie.is_some_and(|k| wird_sk1(None, k)) {
+            melde_sichtung_eins(&state, einsatz_id, person.id, ctx.benutzer.id).await;
+        }
     }
     Ok((StatusCode::CREATED, Json(person)))
 }
@@ -832,7 +865,10 @@ pub async fn sichten(
         bestaetigung.as_ref(),
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let sichtung = crate::write_retry!(&state.pool, |conn| {
+    let (sichtung, vorher) = crate::write_retry!(&state.pool, |conn| {
+        // Vorzustand in DERSELBEN Transaktion: eine parallele Sichtung kann den vor der Tx
+        // geladenen `person.aktuelle_sichtung` schon überholt haben.
+        let vorher = sichtung_repo::aktuelle_kategorie_tx(conn, einsatz_id, person_id).await?;
         let sichtung = sichtung_repo::erfassen_tx(
             conn,
             einsatz_id,
@@ -845,9 +881,12 @@ pub async fn sichten(
         )
         .await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(sichtung)
+        Ok((sichtung, vorher))
     })?;
     sse_person(&state, einsatz_id, person_id);
+    if wird_sk1(vorher, kategorie) {
+        melde_sichtung_eins(&state, einsatz_id, person_id, ctx.benutzer.id).await;
+    }
     Ok((StatusCode::CREATED, Json(sichtung)))
 }
 

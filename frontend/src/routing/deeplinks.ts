@@ -700,6 +700,14 @@ export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}
 }
 
 /**
+ * Chat; `?kanal=` wählt den Kanal (Sprung einer Erwähnung, LLH-1220). Gebaut wie der Pfad in
+ * `src/benachrichtigung/text.rs` (Bezug `chat_nachricht`).
+ */
+export function chatPfad(einsatzId: number, opts: { kanal?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'chat'), { kanal: opts.kanal });
+}
+
+/**
  * Vorbelegung der Nachforderungs-Erfassung (z. B. „Nachfordern" aus der Verpflegung). Keine
  * Personenangaben: nur Bezeichnungen und Zahlen.
  */

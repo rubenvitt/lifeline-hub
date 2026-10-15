@@ -815,7 +815,7 @@ export interface components {
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "auftrag" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "lagebesprechung" | "nachforderung" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "lagebesprechung" | "nachforderung" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
@@ -3245,6 +3245,11 @@ export interface components {
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
+            /**
+             * Format: int64
+             * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
+             */
+            sofortmeldungen_offen: number;
             /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
             stand_at: string;
             uhs: components["schemas"]["LagemonitorUhs"][];

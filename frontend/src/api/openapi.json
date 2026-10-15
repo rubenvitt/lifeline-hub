@@ -2250,6 +2250,7 @@
           "einsatz",
           "meldung",
           "auftrag",
+          "auftrag_empfaenger",
           "befehl",
           "lagebericht",
           "erinnerung",
@@ -8458,7 +8459,8 @@
           "kraefte",
           "uhs",
           "zonen",
-          "abschnitte"
+          "abschnitte",
+          "sofortmeldungen_offen"
         ],
         "properties": {
           "abschnitte": {
@@ -8473,6 +8475,11 @@
           },
           "kraefte": {
             "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "sofortmeldungen_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl."
           },
           "stand_at": {
             "type": "string",

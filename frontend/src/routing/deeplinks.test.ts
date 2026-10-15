@@ -58,6 +58,7 @@ import {
   parseAbschnitteAnsicht,
   parseFunkplanAnsicht,
   meldungenPfad,
+  chatPfad,
   nachforderungenPfad,
   parseNachforderungVorbelegung,
   auftraegePfad,
@@ -508,6 +509,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parseAbschnitteAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
     expect(parseAbschnitteAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
+  it('chatPfad mit ?kanal= (Sprung einer Erwähnung)', () => {
+    expect(chatPfad(E)).toBe('/einsaetze/5/chat');
+    expect(chatPfad(E, { kanal: 3 })).toBe('/einsaetze/5/chat?kanal=3');
+  });
+
   it('meldungenPfad mit ?meldung=', () => {
     expect(meldungenPfad(E, { meldung: 11 })).toBe('/einsaetze/5/meldungen?meldung=11');
   });

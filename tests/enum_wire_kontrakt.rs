@@ -1182,6 +1182,7 @@ fn benachrichtigung_wire() {
         Einsatz => "einsatz",
         Meldung => "meldung",
         Auftrag => "auftrag",
+        AuftragEmpfaenger => "auftrag_empfaenger",
         Befehl => "befehl",
         Lagebericht => "lagebericht",
         Erinnerung => "erinnerung",
