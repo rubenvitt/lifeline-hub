@@ -55,8 +55,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 7. Befehl und Lagebericht im Verteiler (benötigt 1, 2) · LLH-1213
 
-- [ ] 7.1 Freigabe meldet `befehl` bzw. `lagebericht` an Funktionen im Verteiler, Modulrecht geprüft; Rust-Tests „Befehl an S3 und S4“, „Empfänger ohne Modulrecht“
-- [ ] 7.2 Anwenderkapitel zu Befehlen und Lagebericht nachziehen
+- [x] 7.1 Freigabe meldet `befehl` bzw. `lagebericht` an Funktionen im Verteiler, Modulrecht geprüft; Rust-Tests „Befehl an S3 und S4“, „Empfänger ohne Modulrecht“
+- [x] 7.2 Anwenderkapitel zu Befehlen und Lagebericht nachziehen
 
 ## 8. Meldung an meine Funktion (D8, benötigt 1, 2) · LLH-1214
 
@@ -78,8 +78,8 @@ untereinander unabhängig, außer wo vermerkt. Der Plan kam auf Rubens Wunsch al
 
 ## 11. Neue Gefahr (benötigt 1, 2) · LLH-1217
 
-- [ ] 11.1 Neu eingetragene Gefahr meldet `gefahr` an Leser der Lagekarte, Änderung bleibt still; Rust-Test „Gefahr eingetragen“ und Test für die Änderung
-- [ ] 11.2 Anwenderkapitel zur Lagekarte (Gefahren) nachziehen
+- [x] 11.1 Neu eingetragene Gefahr meldet `gefahr` an Leser der Lagekarte, Änderung bleibt still; Rust-Test „Gefahr eingetragen“ und Test für die Änderung
+- [x] 11.2 Anwenderkapitel zur Lagekarte (Gefahren) nachziehen
 
 ## 12. Neue Person der Sichtungskategorie I (benötigt 1, 2) · LLH-1218
 
