@@ -160,6 +160,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 
 1. In der Liste beim Fahrzeug „Besatzung“ aufklappen. Unter der Besatzung steht „Beladung“ mit der
    Zahl der Posten und, falls vorhanden, dem Ausfall, je Posten Menge und Status.
+
+   ![Block „Beladung 2 Posten · 1 Ausfall“ unter der Besatzung: Rettungsdecken mit „6 von 10 übrig“, „Ausgeben“ und „Vom Fahrzeug lösen“, eine defekte Absaugpumpe und die Auswahl „Material zuordnen …“](../bilder/fahrzeuge/beladung.png)
+
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Der
    Posten steht danach in der Beladung.
