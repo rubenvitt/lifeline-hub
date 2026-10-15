@@ -25,7 +25,7 @@ interface BrVerlaufProps {
  * Verlauf eines Bereitstellungsraums (LLH-1095, design.md D12, Spec `bereitstellungsraum-belegung`,
  * „Verlauf auf der Detailseite“): ein Aufklappbereich als letzter Abschnitt der Detailseite.
  *
- * - Lädt erst beim Aufklappen (`enabled: offen`) und ungeblättert (`src/AGENTS.md`, Ausnahme für
+ * - Lädt erst beim Aufklappen (`enabled: isOpen`) und ungeblättert (`src/AGENTS.md`, Ausnahme für
  *   Verlaufsreihen je Stelle). Der Schlüssel hängt am Live-Ereignis `bereitstellungsraum`: bei
  *   offenem Verlauf erscheint ein neues Ereignis ohne Neuladen, zugeklappt wird nur markiert.
  * - Der Druck öffnet ihn nicht (Muster Betreuung); ein vorher geöffneter Verlauf druckt mit.
@@ -36,49 +36,49 @@ interface BrVerlaufProps {
  *   Klappkopf mit Boden über den Kontext (LFH-653), Zustand über `aria-expanded`.
  */
 export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufProps) {
-  const [offen, setOffen] = useState(false);
+  const [isOpen, setOpen] = useState(false);
   const { token, rollen } = useRollen();
-  const abfrage = useQuery({
+  const query = useQuery({
     queryKey: einsatzKeys.brVerlauf(einsatzId, brId),
     queryFn: () => loadBrVerlauf(einsatzId, brId),
-    enabled: offen,
+    enabled: isOpen,
   });
 
-  const polster = { padding: token.paddingSM } as const;
-  let koerper;
-  if (abfrage.isError) {
-    koerper = (
+  const paddingStyle = { padding: token.paddingSM } as const;
+  let body;
+  if (query.isError) {
+    body = (
       <div
         role="alert"
         data-lfh="br-verlauf-fehler"
-        style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
+        style={{ ...paddingStyle, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
         <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
         <span style={{ color: rollen.gedaempft, fontSize: 12 }}>
           Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
         </span>
         <span>
-          <Button onClick={() => void abfrage.refetch()}>{PANEEL_NEULADEN}</Button>
+          <Button onClick={() => void query.refetch()}>{PANEEL_NEULADEN}</Button>
         </span>
       </div>
     );
-  } else if (abfrage.isPending) {
-    koerper = (
-      <div aria-busy="true" style={polster}>
+  } else if (query.isPending) {
+    body = (
+      <div aria-busy="true" style={paddingStyle}>
         <Typography.Text type="secondary">Verlauf wird geladen …</Typography.Text>
         <Skeleton active title={false} paragraph={{ rows: 2 }} />
       </div>
     );
-  } else if (abfrage.data.length === 0) {
-    koerper = (
-      <Typography.Text type="secondary" style={{ ...polster, display: 'block' }}>
+  } else if (query.data.length === 0) {
+    body = (
+      <Typography.Text type="secondary" style={{ ...paddingStyle, display: 'block' }}>
         Noch keine Belegung
       </Typography.Text>
     );
   } else {
-    koerper = (
+    body = (
       <ol aria-label="Verlauf" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {abfrage.data.map((e) => (
+        {query.data.map((e) => (
           <VerlaufZeile key={e.id} eintrag={e} />
         ))}
       </ol>
@@ -89,8 +89,8 @@ export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufPro
     <Collapse
       data-lfh="br-verlauf"
       style={{ marginTop: abstand.lg }}
-      activeKey={offen ? ['verlauf'] : []}
-      onChange={(keys) => setOffen((Array.isArray(keys) ? keys : [keys]).includes('verlauf'))}
+      activeKey={isOpen ? ['verlauf'] : []}
+      onChange={(keys) => setOpen((Array.isArray(keys) ? keys : [keys]).includes('verlauf'))}
       items={[
         {
           key: 'verlauf',
@@ -100,7 +100,7 @@ export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufPro
               <span style={NUR_VORLESER}>des Bereitstellungsraums {bezeichnung}</span>
             </>
           ),
-          children: koerper,
+          children: body,
         },
       ]}
     />
