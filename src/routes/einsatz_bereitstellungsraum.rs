@@ -1,7 +1,9 @@
 use crate::app::AppState;
 use crate::bereitstellungsraum::belegung_repo;
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
-use crate::bereitstellungsraum::{BrAnzeige, BrBelegungAnzeige, BrStatus};
+use crate::bereitstellungsraum::{
+    BrAnzeige, BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
+};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Bereitstellungsraeume;
@@ -19,27 +21,60 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge.
+/// Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +
+/// einheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BrDetail {
     #[serde(flatten)]
     pub br: BrAnzeige,
     pub einheiten: Vec<BrEinheitKurz>,
+    /// Einheitenlose Fahrzeuge im Raum (`aktueller_br_id`); die Fahrzeuge der Einheiten stehen an
+    /// der Einheit.
     pub fahrzeuge: Vec<BrFahrzeugKurz>,
+    pub belegung: BrBelegungKennzahlen,
 }
 
 /// Schlanke Einheiten-Info für den Detail-Response.
-#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct BrEinheitKurz {
     pub id: i64,
     pub name: String,
+    /// Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne
+    /// Zone); fehlt ohne passendes Ereignis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seit_at: Option<String>,
+    /// Aktive Fahrzeuge der Einheit.
+    pub fahrzeuge: Vec<BrEinheitFahrzeug>,
+}
+
+/// Aktives Fahrzeug einer Einheit im Raum.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BrEinheitFahrzeug {
+    pub id: i64,
+    pub funkrufname: String,
 }
 
 /// Schlanke Fahrzeug-Info für den Detail-Response.
-#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct BrFahrzeugKurz {
     pub id: i64,
     pub funkrufname: String,
+    /// Wie [`BrEinheitKurz::seit_at`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seit_at: Option<String>,
+}
+
+/// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
+/// Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
+/// `summiereStaerke`).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BrListenEintrag {
+    #[serde(flatten)]
+    pub br: BrAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_name: Option<String>,
+    pub belegung: BrBelegungKennzahlen,
+    pub einheit_ids: Vec<i64>,
 }
 
 // ---------- ETB-/SSE-Helfer ----------
@@ -54,7 +89,14 @@ pub(super) fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
 
 async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<BrDetail, AppError> {
     let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
-    let einheiten = sqlx::query_as::<_, BrEinheitKurz>(
+    let letzte = belegung_repo::letztes_je_objekt(&state.pool, einsatz_id, Some(br_id)).await?;
+    let seit = |typ: ObjektTyp, id: i64| {
+        letzte
+            .iter()
+            .find(|l| l.objekt_typ == typ && l.objekt_id == id)
+            .and_then(|l| l.seit_at().map(str::to_string))
+    };
+    let einheiten: Vec<(i64, String)> = sqlx::query_as(
         "SELECT id, name FROM einsatz_einheit \
          WHERE aktueller_br_id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
     )
@@ -62,19 +104,57 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
     .bind(einsatz_id)
     .fetch_all(&state.pool)
     .await?;
-    let fahrzeuge = sqlx::query_as::<_, BrFahrzeugKurz>(
-        "SELECT id, snap_funkrufname AS funkrufname \
-         FROM einsatz_fahrzeug \
+    // Fahrzeuge aller Einheiten im Raum in EINER Abfrage, im Speicher verteilt (D4).
+    let einheit_fahrzeuge: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT f.einheit_id, f.id, f.snap_funkrufname FROM einsatz_fahrzeug f \
+         WHERE f.einsatz_id = ?2 AND f.beendet_at IS NULL AND f.einheit_id IN ( \
+             SELECT e.id FROM einsatz_einheit e \
+             WHERE e.aktueller_br_id = ?1 AND e.einsatz_id = ?2 AND e.aufgeloest_at IS NULL) \
+         ORDER BY f.snap_funkrufname, f.id",
+    )
+    .bind(br_id)
+    .bind(einsatz_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let einheiten = einheiten
+        .into_iter()
+        .map(|(id, name)| BrEinheitKurz {
+            id,
+            name,
+            seit_at: seit(ObjektTyp::Einheit, id),
+            fahrzeuge: einheit_fahrzeuge
+                .iter()
+                .filter(|(einheit, _, _)| *einheit == id)
+                .map(|(_, id, funkrufname)| BrEinheitFahrzeug {
+                    id: *id,
+                    funkrufname: funkrufname.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+    let fahrzeuge: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, snap_funkrufname FROM einsatz_fahrzeug \
          WHERE aktueller_br_id = ? AND einsatz_id = ? AND beendet_at IS NULL",
     )
     .bind(br_id)
     .bind(einsatz_id)
     .fetch_all(&state.pool)
     .await?;
+    let fahrzeuge = fahrzeuge
+        .into_iter()
+        .map(|(id, funkrufname)| BrFahrzeugKurz {
+            id,
+            funkrufname,
+            seit_at: seit(ObjektTyp::Fahrzeug, id),
+        })
+        .collect();
+    let belegung =
+        belegung_repo::kennzahlen_aus(&state.pool, einsatz_id, Some(br_id), &letzte).await?;
     Ok(BrDetail {
         br,
         einheiten,
         fahrzeuge,
+        belegung: belegung.get(&br_id).cloned().unwrap_or_default(),
     })
 }
 
@@ -86,12 +166,13 @@ pub struct ListeParams {
     pub abschnitt_id: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/bereitstellungsraeume
+/// GET /api/einsaetze/{id}/bereitstellungsraeume — Räume mit Abschnittsname, Kennzahlen der
+/// Belegung und den Einheiten im Raum (LLH-1095). Eine feste Zahl Abfragen für alle Räume.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
     Query(params): Query<ListeParams>,
-) -> Result<Json<Vec<BrAnzeige>>, AppError> {
+) -> Result<Json<Vec<BrListenEintrag>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     parse_enum_opt(
         BrStatus::parse,
@@ -108,8 +189,31 @@ pub async fn liste(
     // Stellenbindung (LFH-1042): ein BR-Gerät kennt nur seinen eigenen Raum, jedes andere Gerät
     // keinen.
     let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum);
-    liste.retain(|b| sicht.sieht(b.id));
-    Ok(Json(liste))
+    liste.retain(|z| sicht.sieht(z.br.id));
+    let mut kennzahlen = belegung_repo::kennzahlen_je_raum(&state.pool, einsatz_id, None).await?;
+    let einheiten: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT aktueller_br_id, id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aktueller_br_id IS NOT NULL AND aufgeloest_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(
+        liste
+            .into_iter()
+            .map(|z| BrListenEintrag {
+                belegung: kennzahlen.remove(&z.br.id).unwrap_or_default(),
+                einheit_ids: einheiten
+                    .iter()
+                    .filter(|(raum, _)| *raum == z.br.id)
+                    .map(|(_, id)| *id)
+                    .collect(),
+                abschnitt_name: z.abschnitt_name,
+                br: z.br,
+            })
+            .collect(),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -157,6 +261,24 @@ pub async fn detail(
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
     let einsatz_id = ctx.einsatz.id;
     Ok(Json(lade_detail(&state, einsatz_id, br_id).await?))
+}
+
+/// GET /api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf — Belegungsreihe des Raums,
+/// ungeblättert, neueste zuerst (LLH-1095, design.md D5; Ausnahme von der Phasenregel in
+/// `src/AGENTS.md`, „Antwortkompression und Phasenlisten“). Rechte wie das Detail; das BR-Gerät
+/// liest nur den eigenen Raum (fremd 404). Auch ein stornierter oder aufgelöster Raum liefert
+/// seine Reihe.
+pub async fn verlauf(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<BrVerlaufEintrag>>, AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let einsatz_id = ctx.einsatz.id;
+    br_repo::laden(&state.pool, einsatz_id, br_id).await?;
+    Ok(Json(
+        belegung_repo::verlauf(&state.pool, einsatz_id, br_id).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]

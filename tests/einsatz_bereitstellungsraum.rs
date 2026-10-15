@@ -7,7 +7,8 @@ use serde_json::json;
 
 mod common;
 use common::{
-    anfrage_json, einsatz_anlegen, login_cookie, setup_mit_pool, setup_mit_pool_und_live,
+    anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen,
+    setup_mit_pool, setup_mit_pool_und_live,
 };
 
 // ---------- Harness ----------
@@ -839,4 +840,395 @@ async fn abschnitt_eines_fremden_einsatzes_ist_404() {
     assert_eq!(s, StatusCode::NOT_FOUND, "PATCH mit fremdem Abschnitt: {v}");
     let (_, v) = anfrage_json(&app, "GET", &format!("{pfad}/{br}"), &cookie, None).await;
     assert_eq!(v["abschnitt_id"], eigener, "Abschnitt unverändert: {v}");
+}
+
+// ============================== LLH-1095 ==============================
+// Wartezeiten, Fahrzeuge der Einheiten, Kennzahlen, Verlauf und Live-Wege (Spec
+// `bereitstellungsraum-belegung`).
+
+async fn belegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    typ: &str,
+    objekt: i64,
+    art: &str,
+) -> serde_json::Value {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung"),
+        cookie,
+        Some(&json!({"objekt_typ": typ, "objekt_id": objekt, "art": art})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{typ} {objekt} {art}: {v}");
+    v
+}
+
+/// Disponiert ein Ad-hoc-Fahrzeug und ordnet es optional einer Einheit zu.
+async fn adhoc_fahrzeug(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    funkrufname: &str,
+    einheit: Option<i64>,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&json!({"adhoc": {"funkrufname": funkrufname}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ef = v["id"].as_i64().unwrap();
+    if let Some(e) = einheit {
+        let (s, v) = anfrage_json(
+            app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+    ef
+}
+
+async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> serde_json::Value {
+    let (s, v) = anfrage_json(app, "GET", pfad, cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+    v
+}
+
+fn br_pfad(einsatz: i64, br: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}")
+}
+
+/// Akzeptanzkriterium LLH-1095: zwei Einheiten mit je einem Fahrzeug und ein Fahrzeug ohne
+/// Einheit ergeben „Fahrzeuge 3“; die Funkrufnamen stehen an ihrer Einheit, das einheitenlose
+/// Fahrzeug unter `fahrzeuge`, jede Kraft mit „seit“.
+#[tokio::test]
+async fn detail_zaehlt_fahrzeuge_der_einheiten() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let zug1 = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let zug2 = einheit_bilden(&app, &cookie, eid, "2. Zug").await;
+    adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/44-1", Some(zug1)).await;
+    adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/44-2", Some(zug2)).await;
+    let einzeln = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/83-1", None).await;
+    for zug in [zug1, zug2] {
+        belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+    }
+    belegen(&app, &cookie, eid, br, "fahrzeug", einzeln, "eintritt").await;
+
+    let v = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(v["belegung"]["fahrzeuge"], 3, "{v}");
+    assert_eq!(v["belegung"]["einheiten"], 2, "{v}");
+    assert!(v["belegung"]["laengste_seit_at"].is_string(), "{v}");
+    let einheiten = v["einheiten"].as_array().unwrap();
+    for (zug, funkrufname) in [(zug1, "Florian 1/44-1"), (zug2, "Florian 1/44-2")] {
+        let e = einheiten.iter().find(|e| e["id"] == zug).unwrap();
+        assert_eq!(
+            e["fahrzeuge"],
+            json!([{"id": e["fahrzeuge"][0]["id"], "funkrufname": funkrufname}])
+        );
+        assert!(e["seit_at"].is_string(), "{e}");
+    }
+    let fahrzeuge = v["fahrzeuge"].as_array().unwrap();
+    assert_eq!(fahrzeuge.len(), 1, "{v}");
+    assert_eq!(fahrzeuge[0]["id"], einzeln);
+    assert_eq!(fahrzeuge[0]["funkrufname"], "Florian 1/83-1");
+    assert!(fahrzeuge[0]["seit_at"].is_string(), "{v}");
+}
+
+/// „Seit“ in B nach einem Wechsel A → B ist der Zeitpunkt des Wechsels, nicht des Eintritts.
+#[tokio::test]
+async fn seit_nach_wechsel_ist_der_wechsel() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let br_b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR B").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let eintritt = belegen(&app, &cookie, eid, br_a, "einheit", zug, "eintritt").await;
+    // Der Eintritt liegt sichtbar früher (die Tabelle löst nur Sekunden auf).
+    sqlx::query("UPDATE br_belegung SET zeitpunkt_at = '2026-05-28 11:42:00' WHERE id = ?")
+        .bind(eintritt["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let wechsel = belegen(&app, &cookie, eid, br_b, "einheit", zug, "wechsel").await;
+
+    let v = lesen(&app, &cookie, &br_pfad(eid, br_b)).await;
+    assert_eq!(v["einheiten"][0]["seit_at"], wechsel["zeitpunkt_at"], "{v}");
+    assert_ne!(v["einheiten"][0]["seit_at"], "2026-05-28 11:42:00");
+    assert_eq!(v["belegung"]["laengste_seit_at"], wechsel["zeitpunkt_at"]);
+    let a = lesen(&app, &cookie, &br_pfad(eid, br_a)).await;
+    assert_eq!(
+        a["belegung"],
+        json!({"einheiten": 0, "fahrzeuge": 0}),
+        "{a}"
+    );
+}
+
+/// Liste und Detail tragen je Raum dieselben Kennzahlen; `einheit_ids` sind die Einheiten des
+/// Details, `abschnitt_name` der Name des Abschnitts.
+#[tokio::test]
+async fn liste_traegt_dieselben_kennzahlen_wie_detail() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let sportplatz = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &br_pfad(eid, sportplatz),
+        &cookie,
+        Some(&json!({"abschnitt_id": nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let schule = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Schule").await;
+    let leer = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Leer").await;
+    let zug1 = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let zug2 = einheit_bilden(&app, &cookie, eid, "2. Zug").await;
+    let zug3 = einheit_bilden(&app, &cookie, eid, "3. Zug").await;
+    adhoc_fahrzeug(&app, &cookie, eid, "Florian 1", Some(zug1)).await;
+    adhoc_fahrzeug(&app, &cookie, eid, "Florian 2", Some(zug2)).await;
+    let einzeln = adhoc_fahrzeug(&app, &cookie, eid, "Florian 3", None).await;
+    belegen(&app, &cookie, eid, sportplatz, "einheit", zug1, "eintritt").await;
+    belegen(&app, &cookie, eid, sportplatz, "einheit", zug2, "eintritt").await;
+    belegen(
+        &app, &cookie, eid, sportplatz, "fahrzeug", einzeln, "eintritt",
+    )
+    .await;
+    belegen(&app, &cookie, eid, schule, "einheit", zug3, "eintritt").await;
+
+    let liste = lesen(
+        &app,
+        &cookie,
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+    )
+    .await;
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 3, "{liste:?}");
+    for br in [sportplatz, schule, leer] {
+        let zeile = liste.iter().find(|z| z["id"] == br).unwrap();
+        let detail = lesen(&app, &cookie, &br_pfad(eid, br)).await;
+        assert_eq!(zeile["belegung"], detail["belegung"], "Raum {br}");
+        let mut im_detail: Vec<i64> = detail["einheiten"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_i64().unwrap())
+            .collect();
+        im_detail.sort_unstable();
+        let mut in_liste: Vec<i64> = zeile["einheit_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_i64().unwrap())
+            .collect();
+        in_liste.sort_unstable();
+        assert_eq!(in_liste, im_detail, "Raum {br}");
+        // Die Raumdaten bleiben an derselben Stelle (flatten).
+        assert_eq!(zeile["bezeichnung"], detail["bezeichnung"]);
+    }
+    let zeile = liste.iter().find(|z| z["id"] == sportplatz).unwrap();
+    assert_eq!(zeile["abschnitt_name"], "Nord");
+    assert_eq!(zeile["belegung"]["fahrzeuge"], 3);
+    assert_eq!(zeile["belegung"]["einheiten"], 2);
+    let zeile = liste.iter().find(|z| z["id"] == leer).unwrap();
+    assert!(zeile.get("abschnitt_name").is_none(), "{zeile}");
+    assert_eq!(zeile["belegung"], json!({"einheiten": 0, "fahrzeuge": 0}));
+    assert_eq!(zeile["einheit_ids"], json!([]));
+}
+
+/// Verlauf: Eintritt, Wechsel (hinaus mit Ziel, herein mit Herkunft), Austritt mit Notiz und das
+/// Auflösen einer Einheit im Raum, neueste zuerst.
+#[tokio::test]
+async fn verlauf_zeigt_austritte_und_wechsel() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let sportplatz = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let schule = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Schule").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let staffel = einheit_bilden(&app, &cookie, eid, "Staffel").await;
+    belegen(&app, &cookie, eid, sportplatz, "einheit", zug, "eintritt").await;
+    belegen(&app, &cookie, eid, schule, "einheit", zug, "wechsel").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/belegung", br_pfad(eid, schule)),
+        &cookie,
+        Some(
+            &json!({"objekt_typ": "einheit", "objekt_id": zug, "art": "austritt",
+                     "notiz": "zum Einsatzort"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    belegen(
+        &app, &cookie, eid, sportplatz, "einheit", staffel, "eintritt",
+    )
+    .await;
+    let (s, _) = anfrage_json(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{eid}/einheiten/{staffel}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let kurz = |v: &serde_json::Value| -> Vec<serde_json::Value> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                json!([
+                    e["art"],
+                    e["objekt_name"],
+                    e["herkunft"],
+                    e["ziel"],
+                    e["notiz"]
+                ])
+            })
+            .collect()
+    };
+    let n = serde_json::Value::Null;
+    let a = lesen(
+        &app,
+        &cookie,
+        &format!("{}/verlauf", br_pfad(eid, sportplatz)),
+    )
+    .await;
+    assert_eq!(
+        kurz(&a),
+        vec![
+            json!(["austritt", "Staffel", n, n, "Einheit aufgelöst"]),
+            json!(["eintritt", "Staffel", n, n, n]),
+            json!(["wechsel_hinaus", "1. Zug", n, "BR Schule", n]),
+            json!(["eintritt", "1. Zug", n, n, n]),
+        ],
+        "{a}"
+    );
+    assert_eq!(a[0]["objekt_typ"], "einheit");
+    assert_eq!(a[0]["objekt_id"], staffel);
+    assert!(a[0]["zeitpunkt_at"].is_string());
+    let b = lesen(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, schule))).await;
+    assert_eq!(
+        kurz(&b),
+        vec![
+            json!(["austritt", "1. Zug", n, n, "zum Einsatzort"]),
+            json!(["wechsel_herein", "1. Zug", "BR Sportplatz", n, n]),
+        ],
+        "{b}"
+    );
+}
+
+/// Der Raum eines anderen Einsatzes und ein unbekannter Raum antworten 404.
+#[tokio::test]
+async fn verlauf_fremder_einsatz_404() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let anderer = einsatz_anlegen(&app, &cookie).await;
+    let fremd = br_anlegen_und_aktivieren(&app, &cookie, anderer, "BR Fremd").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("{}/verlauf", br_pfad(eid, fremd)),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn verlauf_unbekannter_raum_404() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("{}/verlauf", br_pfad(eid, 99_999)),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Lesen ist kein Lebenszyklus-Vorgang: auch ein stornierter Raum liefert seine Reihe.
+#[tokio::test]
+async fn verlauf_stornierter_raum_liefert() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Storno").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "austritt").await;
+    let (s, _) = anfrage_json(&app, "DELETE", &br_pfad(eid, br), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let v = lesen(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    assert_eq!(v.as_array().unwrap().len(), 2, "{v}");
+}
+
+/// Ein Beobachter (ohne Schreibrecht) liest den Verlauf.
+#[tokio::test]
+async fn beobachter_liest_verlauf() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let br = br_anlegen_und_aktivieren(&app, &admin, eid, "BR Lesen").await;
+    let zug = einheit_bilden(&app, &admin, eid, "1. Zug").await;
+    belegen(&app, &admin, eid, br, "einheit", zug, "eintritt").await;
+    let beob = benutzer_anlegen(&app, &admin, "berta", "keine").await;
+    rolle_setzen(&app, &admin, eid, beob, "beobachter").await;
+    let beob = login_cookie(&app, "berta", "bertapw1").await;
+
+    let v = lesen(&app, &beob, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    assert_eq!(v[0]["art"], "eintritt", "{v}");
+}
+
+/// Ist das Modul ausgeblendet, bekommt ein Nicht-Admin 403, der Admin liest weiter.
+#[tokio::test]
+async fn verlauf_modul_ausgeblendet_403() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let br = br_anlegen_und_aktivieren(&app, &admin, eid, "BR Versteckt").await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, frieda, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad = format!("{}/verlauf", br_pfad(eid, br));
+    lesen(&app, &frieda, &pfad).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/modul-overrides/bereitstellungsraeume"),
+        &admin,
+        Some(&json!({"sichtbar": false, "benoetigte_rolle": null})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage_json(&app, "GET", &pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    lesen(&app, &admin, &pfad).await;
 }

@@ -3244,6 +3244,42 @@ async fn br_geraet_kennt_nur_den_eigenen_raum() {
     assert_eq!(v["bezeichnung"], "BR Sportplatz");
     let (s, _) = anfrage(&app, "GET", &format!("{liste}/{schule}"), &geraet, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+
+    // Verlauf (LLH-1095, Spec `funktionsansichten`): der eigene 200 mit dem eigenen Eintritt,
+    // ein Wechsel aus dem fremden Raum herein nennt dessen Bezeichnung, der fremde Verlauf 404.
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &admin, einsatz, schule, rtw, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, rtw, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{liste}/{sportplatz}/verlauf"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let eintraege = v.as_array().unwrap();
+    assert_eq!(eintraege.len(), 2, "{v}");
+    assert_eq!(eintraege[0]["art"], "wechsel_herein");
+    assert_eq!(eintraege[0]["objekt_name"], "RTW 1");
+    assert_eq!(eintraege[0]["herkunft"], "BR Schule");
+    assert_eq!(eintraege[1]["art"], "eintritt");
+    assert_eq!(eintraege[1]["objekt_name"], "LF Nord");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{liste}/{schule}/verlauf"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Verlauf");
 }
 
 /// Anmelden (Eintritt, Wechsel herein) und Abmelden (Austritt) im eigenen Raum; in einen

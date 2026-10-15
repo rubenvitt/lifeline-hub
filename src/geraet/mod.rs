@@ -329,8 +329,9 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/zonen"),
 ];
 
-/// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum lesen, Kräfte
-/// in ihm an- und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene) und
+/// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum samt Verlauf
+/// lesen (LLH-1095; ein Wechsel nennt dort die Bezeichnung des anderen Raums), Kräfte in ihm an-
+/// und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene) und
 /// ihn in Betrieb nehmen; die Einheiten- und Fahrzeugliste des Einsatzes lesen; Meldungen an die
 /// Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die Stelle über
 /// [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten, Auflösen,
@@ -338,6 +339,10 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
     ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
+    ),
     (
         "POST",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
@@ -584,6 +589,10 @@ mod tests {
         assert!(b.rolle().darf_schreiben());
         for (m, p) in [
             ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            (
+                "GET",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
+            ),
             (
                 "POST",
                 "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",

@@ -1328,6 +1328,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_bereitstellungsraum::detail),
         )
         .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
+            get(routes::einsatz_bereitstellungsraum::verlauf),
+        )
+        .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
             patch(routes::einsatz_bereitstellungsraum::aktualisieren),
         )
