@@ -8,6 +8,8 @@
 use super::{BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug};
 use crate::error::AppError;
 use crate::fuehrung::Fuehrungsfunktion;
+use crate::kommunikation::AdressatKategorie;
+use crate::nachforderung::NachforderungStatus;
 use sqlx::SqlitePool;
 
 /// Der Text, den der Toast zeigt.
@@ -65,6 +67,11 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
         // Mehr als eine Spalte: eigener Weg über `AUFTRAG_EMPFAENGER_SPALTEN`.
         BenachrichtigungBezugTyp::AuftragEmpfaenger => None,
+        // Mehr als eine Spalte: eigener Weg über `NACHFORDERUNG_SPALTEN`.
+        BenachrichtigungBezugTyp::NachforderungZugesagt
+        | BenachrichtigungBezugTyp::NachforderungUnterwegs
+        | BenachrichtigungBezugTyp::NachforderungEingetroffen
+        | BenachrichtigungBezugTyp::NachforderungAbgelehnt => None,
         // Titel und Freitexte dieser Objekte sind Scrub-Werte; ihr Titel genügt.
         BenachrichtigungBezugTyp::Erinnerung
         | BenachrichtigungBezugTyp::Lagebesprechung
@@ -146,7 +153,11 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         BenachrichtigungBezugTyp::Erinnerung => format!("{basis}/erinnerungen"),
         BenachrichtigungBezugTyp::Abloesung => format!("{basis}/abloesung"),
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),
-        BenachrichtigungBezugTyp::Nachforderung => format!("{basis}/nachforderungen"),
+        BenachrichtigungBezugTyp::Nachforderung
+        | BenachrichtigungBezugTyp::NachforderungZugesagt
+        | BenachrichtigungBezugTyp::NachforderungUnterwegs
+        | BenachrichtigungBezugTyp::NachforderungEingetroffen
+        | BenachrichtigungBezugTyp::NachforderungAbgelehnt => format!("{basis}/nachforderungen"),
         BenachrichtigungBezugTyp::Gefahrengebiet => {
             format!("{basis}/lagekarte?gefahrengebiet={id}")
         }
@@ -291,6 +302,76 @@ async fn auftrag_empfaenger_text(
     })
 }
 
+/// Der Status, den ein Nachforderungs-Bezug trägt (LLH-1216); `None` für jeden anderen Bezug.
+/// Gegenstück: `nachforderung::benachrichtigung::bezug_typ`.
+pub const fn nachforderung_status(typ: BenachrichtigungBezugTyp) -> Option<NachforderungStatus> {
+    match typ {
+        BenachrichtigungBezugTyp::NachforderungZugesagt => Some(NachforderungStatus::Zugesagt),
+        BenachrichtigungBezugTyp::NachforderungUnterwegs => Some(NachforderungStatus::Unterwegs),
+        BenachrichtigungBezugTyp::NachforderungEingetroffen => {
+            Some(NachforderungStatus::Eingetroffen)
+        }
+        BenachrichtigungBezugTyp::NachforderungAbgelehnt => Some(NachforderungStatus::Abgelehnt),
+        _ => None,
+    }
+}
+
+/// Was die Detailzeile eines Nachforderungs-Status liest, als `(Tabelle, Spalte)`: Anzahl und
+/// Adressat-Kategorie. Nie `art`, `bezeichnung`, `adressat_bezeichnung`, `begruendung` oder
+/// `abgelehnt_grund`: das sind Scrub-Werte (Führungs-Freitexte). Deshalb steht „2 RTW“ aus der
+/// Spec hier als „2× an Leitstelle“. Der Guard
+/// `detail_der_nachforderung_liest_nur_retain_spalten` prüft jede Spalte dieser Liste; die
+/// Abfrage [`NACHFORDERUNG_SQL`] liest keine andere.
+pub const NACHFORDERUNG_SPALTEN: &[(&str, &str)] = &[
+    ("nachforderung", "anzahl"),
+    ("nachforderung", "adressat_kategorie"),
+];
+
+/// Die Abfrage der Detailzeile eines Nachforderungs-Status; liest nur [`NACHFORDERUNG_SPALTEN`].
+pub const NACHFORDERUNG_SQL: &str =
+    "SELECT anzahl, adressat_kategorie FROM nachforderung WHERE id = ? AND einsatz_id = ?";
+
+/// Anzeigelabel der Adressat-Kategorie, wie die Karte der Nachforderung es zeigt
+/// (`ADRESSAT_LABEL` in `frontend/src/nachforderungen/NachforderungKarte.tsx`).
+const fn adressat_label(k: AdressatKategorie) -> &'static str {
+    match k {
+        AdressatKategorie::Leitstelle => "Leitstelle",
+        AdressatKategorie::NachbarEa => "Nachbar-EA",
+        AdressatKategorie::Uebergeordnet => "Übergeordnete Führung",
+        AdressatKategorie::AndereBos => "Andere BOS",
+    }
+}
+
+/// Text zu einem Nachforderungs-Status: Titel „Nachforderung eingetroffen“ mit dem Status aus
+/// dem Bezug, Detail „2× an Leitstelle“. Eine gelöschte Nachforderung lässt das Detail weg.
+async fn nachforderung_text(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    status: NachforderungStatus,
+    bezug: Bezug,
+) -> Result<Text, AppError> {
+    let zeile: Option<(Option<i64>, String)> = sqlx::query_as(NACHFORDERUNG_SQL)
+        .bind(bezug.id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let detail = zeile.map(|(anzahl, kategorie)| {
+        let an = match AdressatKategorie::parse(&kategorie) {
+            Some(k) => adressat_label(k).to_string(),
+            None => kategorie,
+        };
+        match anzahl {
+            Some(n) => format!("{n}× an {an}"),
+            None => format!("an {an}"),
+        }
+    });
+    Ok(Text {
+        titel: format!("Nachforderung {}", status.as_str()),
+        detail,
+        pfad: pfad(einsatz_id, bezug),
+    })
+}
+
 /// Bildet den Text einer Benachrichtigung. Ein gelöschter Bezug lässt nur die Detailzeile weg.
 pub async fn bilden(
     pool: &SqlitePool,
@@ -300,6 +381,9 @@ pub async fn bilden(
 ) -> Result<Text, AppError> {
     if bezug.typ == BenachrichtigungBezugTyp::AuftragEmpfaenger {
         return auftrag_empfaenger_text(pool, einsatz_id, art, bezug).await;
+    }
+    if let Some(status) = nachforderung_status(bezug.typ) {
+        return nachforderung_text(pool, einsatz_id, status, bezug).await;
     }
     if bezug.typ == BenachrichtigungBezugTyp::ChatNachricht {
         return chat_nachricht_text(pool, einsatz_id, art, bezug).await;

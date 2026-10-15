@@ -495,3 +495,100 @@ async fn detail_der_abloesung_nennt_einheit_und_uhrzeit_in_der_anzeigezone() {
         "Florian 1, 13:30"
     );
 }
+
+/// Dasselbe für die Detailzeile eines Nachforderungs-Status (LLH-1216), die zwei Spalten liest:
+/// nur Retain-Werte, und die Abfrage nennt keinen Führungs-Freitext der Nachforderung.
+#[tokio::test]
+async fn detail_der_nachforderung_liest_nur_retain_spalten() {
+    let pool = crate::db::test_pool().await;
+    for &(tabelle, spalte) in text::NACHFORDERUNG_SPALTEN {
+        assert!(
+            matches!(
+                klassifikation_von(tabelle, spalte),
+                Some(Klassifikation::Retain(_))
+            ),
+            "{tabelle}.{spalte} ist kein Retain-Wert"
+        );
+    }
+    sqlx::query(text::NACHFORDERUNG_SQL)
+        .bind(1)
+        .bind(1)
+        .fetch_all(&pool)
+        .await
+        .expect("Abfrage passt zum Schema");
+    for scrub in [
+        "art",
+        "bezeichnung",
+        "begruendung",
+        "abgelehnt_grund",
+        "adressat_bezeichnung",
+    ] {
+        assert!(
+            matches!(
+                klassifikation_von("nachforderung", scrub),
+                Some(Klassifikation::Scrub(..))
+            ),
+            "nachforderung.{scrub} ist kein Scrub-Wert mehr"
+        );
+        let gelesen = text::NACHFORDERUNG_SQL
+            .split(" FROM ")
+            .next()
+            .unwrap()
+            .split([' ', ','])
+            .any(|w| w == scrub);
+        assert!(!gelesen, "Detailzeile liest {scrub}");
+    }
+}
+
+/// Der Titel nennt den Status aus dem Bezug, auch wenn die Nachforderung inzwischen weiter ist.
+#[tokio::test]
+async fn nachforderung_titel_nennt_den_status_des_wechsels() {
+    let pool = crate::db::test_pool().await;
+    let (b, e) = setup(&pool).await;
+    let nf: i64 = sqlx::query_scalar(
+        "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, \
+         prioritaet, status, angefordert_at, erstellt_von_id) \
+         VALUES (?, 'RTW', 'Verstärkung', 2, 'nachbar_ea', 'normal', 'eingetroffen', \
+         '2026-10-14 09:00:00', ?) RETURNING id",
+    )
+    .bind(e)
+    .bind(b)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let t = text::bilden(
+        &pool,
+        e,
+        BenachrichtigungArt::NachforderungStatus,
+        Bezug::neu(BenachrichtigungBezugTyp::NachforderungZugesagt, nf),
+    )
+    .await
+    .unwrap();
+    assert_eq!(t.titel, "Nachforderung zugesagt");
+    assert_eq!(t.detail.as_deref(), Some("2× an Nachbar-EA"));
+    assert_eq!(t.pfad, format!("/einsaetze/{e}/nachforderungen"));
+    sqlx::query("UPDATE nachforderung SET anzahl = NULL WHERE id = ?")
+        .bind(nf)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let ohne_anzahl = text::bilden(
+        &pool,
+        e,
+        BenachrichtigungArt::NachforderungStatus,
+        Bezug::neu(BenachrichtigungBezugTyp::NachforderungAbgelehnt, nf),
+    )
+    .await
+    .unwrap();
+    assert_eq!(ohne_anzahl.titel, "Nachforderung abgelehnt");
+    assert_eq!(ohne_anzahl.detail.as_deref(), Some("an Nachbar-EA"));
+    let fremd = text::bilden(
+        &pool,
+        e + 1,
+        BenachrichtigungArt::NachforderungStatus,
+        Bezug::neu(BenachrichtigungBezugTyp::NachforderungAbgelehnt, nf),
+    )
+    .await
+    .unwrap();
+    assert_eq!(fremd.detail, None, "Bezug aus einem fremden Einsatz");
+}

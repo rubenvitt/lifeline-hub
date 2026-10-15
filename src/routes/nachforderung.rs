@@ -6,7 +6,8 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::nachforderung::{
-    repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT, STATUS_EINGETROFFEN,
+    repo, NachforderungAnzeige, NachforderungStatus, PRIO_NORMAL, STATUS_ABGELEHNT,
+    STATUS_EINGETROFFEN,
 };
 use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
@@ -205,6 +206,20 @@ pub async fn status(
     }
     let n = repo::load(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
+    // Das UPDATE hat den Status geändert (sonst 422 oben): Ersteller und S4 erfahren den Status,
+    // den DIESE Anfrage gesetzt hat, nicht den inzwischen gelesenen.
+    if let Some(gesetzt) = NachforderungStatus::parse(neu) {
+        crate::nachforderung::benachrichtigung::status_gewechselt(
+            &state.pool,
+            &state.live,
+            einsatz_id,
+            nachforderung_id,
+            gesetzt,
+            n.erstellt_von_id,
+            ctx.benutzer.id,
+        )
+        .await;
+    }
     Ok(Json(n))
 }
 
@@ -243,5 +258,15 @@ pub async fn ablehnen(
     }
     let n = repo::load(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
+    crate::nachforderung::benachrichtigung::status_gewechselt(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        nachforderung_id,
+        NachforderungStatus::Abgelehnt,
+        n.erstellt_von_id,
+        ctx.benutzer.id,
+    )
+    .await;
     Ok(Json(n))
 }
