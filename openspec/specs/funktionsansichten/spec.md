@@ -206,6 +206,7 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
 | `bereitstellungsraeume`: eigener BR mit Belegung | L |
+| `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
 | `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt) | S |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
 | `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
@@ -223,6 +224,23 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 
 - **WHEN** das Gerät des BR Sportplatz die BR-Liste abruft
 - **THEN** enthält sie nur den BR Sportplatz
+
+#### Scenario: Verlauf des eigenen BR
+
+- **WHEN** das Gerät des BR Sportplatz den Verlauf des BR Sportplatz abruft
+- **THEN** liefert der Server die Reihe der Belegungsereignisse des BR Sportplatz
+
+#### Scenario: Verlauf eines fremden BR
+
+- **WHEN** das Gerät des BR Sportplatz den Verlauf des BR Schule abruft
+- **THEN** antwortet der Server mit 404
+
+#### Scenario: Wechsel im Verlauf des eigenen BR
+
+- **WHEN** eine Einheit aus dem BR Schule in den BR Sportplatz wechselt
+- **AND** das Gerät des BR Sportplatz den Verlauf des BR Sportplatz abruft
+- **THEN** nennt der Eintrag des Wechsels die Bezeichnung „BR Schule“ als Herkunft
+- **AND** bleiben Detail und Verlauf des BR Schule für das Gerät 404
 
 #### Scenario: Einheit anmelden
 

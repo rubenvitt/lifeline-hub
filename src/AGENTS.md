@@ -219,6 +219,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   oder keiner, sonst 422), Ordnung Abschlusszeit absteigend und `id` als Gleichstand, `limit`
   geklemmt auf `[1, SEITE_MAX]`. Zahlen über den ganzen Bestand kommen aus einem eigenen
   `…/kennzahlen`-Abruf über dieselben SQL-Fragmente, nie aus der geladenen Seite.
+  Ausnahme: Verlaufsreihen je Stelle (Belegungsreihe der Betreuungsstelle, Verlauf des
+  Bereitstellungsraums) sind ungeblättert und laden beim Aufklappen; die Reihe einer Stelle
+  bleibt klein (Specs `betreuung-meldeverlauf`, „Meldereihe einer Betreuungsstelle lesen“, und
+  `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
 - **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
