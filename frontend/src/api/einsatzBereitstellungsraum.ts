@@ -43,6 +43,9 @@ export interface BrEingabe {
   abschnitt_id?: number | null;
   standort?: string | null;
   notiz?: string | null;
+  /** Koordinate (LLH-1107): beide oder keine, sonst 422. */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 export function legeBrAn(einsatzId: number, daten: BrEingabe): Promise<Bereitstellungsraum> {
@@ -59,6 +62,9 @@ export interface BrPatch {
   abschnitt_id?: number | null;
   standort?: string | null;
   notiz?: string | null;
+  /** Koordinate (LLH-1107): beide `null` entfernen die Verortung; ein halbes Paar ist 422. */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 export function aktualisiereBr(

@@ -1023,6 +1023,84 @@ mod tests {
         );
     }
 
+    /// LLH-1107: Die Schwärzung leert Standort und Notiz eines Bereitstellungsraums, die
+    /// Koordinate bleibt als Geo-Skelett (`G_GEO`) wie an der Betreuungsstelle, die Bezeichnung als
+    /// operatives Etikett.
+    #[tokio::test]
+    async fn schwaerzung_br_haelt_koordinate_und_leert_standort() {
+        use crate::bereitstellungsraum::repo as br;
+
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        br::create(
+            &pool,
+            e,
+            nutzer,
+            br::NeueDaten {
+                bezeichnung: "BR Sportplatz",
+                abschnitt_id: None,
+                standort: Some("Sportplatz bei Familie Müller"),
+                notiz: Some("Schlüssel bei Herrn Meier 0170"),
+                lat: Some(51.93),
+                lon: Some(8.87),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap(),
+            "Einsatz wurde geschwärzt"
+        );
+
+        let zeile: (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+        ) = sqlx::query_as(
+            "SELECT bezeichnung, standort, notiz, lat, lon FROM bereitstellungsraum \
+                 WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                "BR Sportplatz".to_string(),
+                None,
+                None,
+                Some(51.93),
+                Some(8.87)
+            )
+        );
+    }
+
     /// LFH-639, Spec-Szenario „Einsatz schwärzen“ — bewusst mit ZWEI aktiven Bezirken und
     /// ZWEI aktiven Stellen: die Bezeichnung steht unter einem partiellen UNIQUE-Index
     /// `(einsatz_id, bezeichnung) WHERE storniert_at IS NULL`. Ein für alle Zeilen gleicher

@@ -1085,6 +1085,14 @@ export interface components {
             geaendert_von: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: double
+             * @description Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`): beide gesetzt = verortet,
+             *     beide leer = nicht verortet; ohne Koordinate fehlen beide Felder.
+             */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
             notiz?: string | null;
             standort?: string | null;
             status: components["schemas"]["BrStatus"];
@@ -1204,7 +1212,8 @@ export interface components {
         /**
          * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
          *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-         *     `summiereStaerke`).
+         *     `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+         *     design.md D10).
          */
         BrListenEintrag: components["schemas"]["BrAnzeige"] & {
             abschnitt_name?: string | null;

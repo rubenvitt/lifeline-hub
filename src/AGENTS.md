@@ -350,10 +350,11 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
 
-## Backend — Bereitstellungsraum (LLH-1085)
+## Backend — Bereitstellungsraum (LLH-1085, LLH-1107)
 
-Spec `bereitstellungsraum-belegung`; `src/bereitstellungsraum/abruf.rs`,
-`src/bereitstellungsraum/belegung_repo.rs`, `src/routes/einsatz_bereitstellungsraum.rs`.
+Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
+`src/bereitstellungsraum/abruf.rs`, `src/bereitstellungsraum/belegung_repo.rs`,
+`src/bereitstellungsraum/repo.rs`, `src/routes/einsatz_bereitstellungsraum.rs`.
 - **`abruf_tx` schreibt kein ETB.** Der Aufrufer schreibt genau einen Satz
   (`AbrufErgebnis::etb_text`) per `etb::system_audit_tx` in derselben Transaktion; der Auftrag
   entsteht über `auftrag::repo::anlegen_tx` darin, die Folgen nach dem Commit über
@@ -364,6 +365,15 @@ Spec `bereitstellungsraum-belegung`; `src/bereitstellungsraum/abruf.rs`,
   abgerufenen Kraft ist 422. So gilt das für jeden Weg, der `belege_tx` ruft (Route, Gerät).
 - „Abgerufen“ ist abgeleitet aus dem jüngsten Ereignis je Kraft, nie gespeichert; `seit` und
   `aktueller_br_id` sehen nur `eintritt`, `wechsel` und `austritt`.
+- **Die Koordinate des Raums prüft `repo::update_tx`, nicht der Handler** (LLH-1107): das
+  wirksame Paar aus Eingabe und Rohstand derselben Schreibtransaktion (`write_retry!`), dann
+  `support::pruefe_koordinate`; ein vorab gelesener Stand könnte das Paar zerreißen. Der PATCH
+  schreibt nie ETB, auch nicht für die Koordinate, und meldet immer `sse_br`; einen
+  Leerlauf-Riegel oder `still_geaendert` wie die Betreuung braucht er nicht. Ein Neubau der
+  Tabelle nimmt `lat`/`lon` mit (`db::tests::migration_*_bereitstellungsraum_lage`).
+- **Listeneinträge entstehen nur in `repo::list_eintraege`**: die Liste der Route und der
+  Lage-Snapshot lesen dieselbe Zusammensetzung; die Stellenbindung eines Geräts filtert danach
+  die Route. Ein neues Feld am Listeneintrag kommt dorthin, nicht in die Route.
 
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 

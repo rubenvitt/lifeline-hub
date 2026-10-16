@@ -6022,6 +6022,84 @@ mod tests {
         assert_eq!(alt, 0, "die alte Tabelle ist weg");
     }
 
+    /// LLH-1107: `lat`/`lon` am Bereitstellungsraum. Eine Bestandszeile von vorher behält jeden
+    /// Wert, die Koordinate ist leer; beide Spalten existieren.
+    #[tokio::test]
+    async fn migration_0209_bereitstellungsraum_lage() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 208).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO bereitstellungsraum \
+                (id, einsatz_id, abschnitt_id, bezeichnung, standort, notiz, status, \
+                 erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at) \
+             VALUES (7, ?, ?, 'BR Sportplatz', 'Sportplatz Nord', 'Zufahrt Süd', 'aktiv', \
+                     '2026-10-01 08:00:00', ?, '2026-10-01 09:00:00', ?, NULL)",
+        )
+        .bind(e)
+        .bind(a)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            i64,
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+            i64,
+            String,
+            i64,
+            Option<String>,
+        );
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, einsatz_id, abschnitt_id, bezeichnung, standort, notiz, status, \
+                        erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at \
+                 FROM bereitstellungsraum ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 209).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
+        let koordinate: (Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT lat, lon FROM bereitstellungsraum WHERE id = 7")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(koordinate, (None, None));
+        let spalten: Vec<(String, String)> = sqlx::query_as(
+            "SELECT name, type FROM pragma_table_info('bereitstellungsraum') \
+             WHERE name IN ('lat', 'lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("lat".to_string(), "REAL".to_string()),
+                ("lon".to_string(), "REAL".to_string())
+            ]
+        );
+    }
+
     /// Die Quelle `bereitstellungsraum` ist erlaubt, eine unbekannte scheitert weiter am CHECK.
     #[tokio::test]
     async fn migration_0207_quelle_bereitstellungsraum() {

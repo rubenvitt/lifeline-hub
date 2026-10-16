@@ -988,7 +988,7 @@ mod tests {
 
     /// Legt einen aktiven BR an.
     async fn aktiven_br(pool: &SqlitePool, einsatz_id: i64, benutzer_id: i64, bez: &str) -> i64 {
-        let br = br_repo::anlegen(
+        let br = br_repo::create(
             pool,
             einsatz_id,
             benutzer_id,
@@ -997,6 +997,8 @@ mod tests {
                 abschnitt_id: None,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await
@@ -1744,7 +1746,7 @@ mod tests {
     async fn geplanter_br_akzeptiert_keine_belegung() {
         let pool = test_pool().await;
         let (b, e) = basis_setup(&pool).await;
-        let br = br_repo::anlegen(
+        let br = br_repo::create(
             &pool,
             e,
             b,
@@ -1753,6 +1755,8 @@ mod tests {
                 abschnitt_id: None,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await

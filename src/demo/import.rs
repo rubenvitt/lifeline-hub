@@ -870,7 +870,7 @@ impl Ablauf<'_> {
             }
             Vorgang::Bereitstellungsraum(v) => {
                 let abschnitt = frueher(&self.abschnitte, "Abschnitt", v.abschnitt)?;
-                let br = crate::bereitstellungsraum::repo::anlegen_tx(
+                let br = crate::bereitstellungsraum::repo::create_tx(
                     conn,
                     self.einsatz_id,
                     self.admin_id,
@@ -879,6 +879,8 @@ impl Ablauf<'_> {
                         abschnitt_id: Some(abschnitt),
                         standort: Some(v.standort),
                         notiz: None,
+                        lat: None,
+                        lon: None,
                     },
                 )
                 .await?;

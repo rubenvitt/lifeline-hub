@@ -2812,6 +2812,21 @@
             "type": "integer",
             "format": "int64"
           },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`): beide gesetzt = verortet,\nbeide leer = nicht verortet; ohne Koordinate fehlen beide Felder."
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "notiz": {
             "type": [
               "string",
@@ -3127,7 +3142,7 @@
             }
           }
         ],
-        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`summiereStaerke`)."
+        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,\ndesign.md D10)."
       },
       "BrStatus": {
         "type": "string",

@@ -3,7 +3,6 @@ import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry'
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo } from 'react';
 import { renderSvg } from '@einsatzzeichen/core';
-import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
@@ -12,7 +11,7 @@ import { GesperrterSprung } from '../../components/Sprung';
 import { etbPfad } from '../../routing/deeplinks';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
-import { KACHEL_SVG_OPTIONEN } from './markerIcons';
+import { KACHEL_SVG_OPTIONEN, markerZeichen } from './markerIcons';
 import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
@@ -32,7 +31,7 @@ import {
   type AuswahlRoh,
   type RasterFeld,
 } from './leistenDaten';
-import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS, type TzProps } from './taktischesZeichen';
+import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from './taktischesZeichen';
 
 interface InspectorProps {
   einsatzId: number;
@@ -89,14 +88,14 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 }
 
 /**
- * Das taktische Zeichen eines Fachobjekts als Bild-URL für die Symbol-Kachel — aus derselben Quelle
- * wie die Karten-Icons (`markerIconKey`, LFH-835). Freie Zeichen zeigt dieser Inspector nicht, sie
- * haben den `FreiesZeichenInspector` (LFH-836). `null`, wenn es sich nicht bauen lässt; dann trägt
- * die Kachel das Kürzel.
+ * Das Zeichen eines Markers als Bild-URL für die Symbol-Kachel — aus derselben Quelle wie die
+ * Karten-Icons (`markerZeichen`, LFH-835). Freie Zeichen zeigt dieser Inspector nicht, sie haben den
+ * `FreiesZeichenInspector` (LFH-836). `null`, wenn es sich nicht bauen lässt; dann trägt die Kachel
+ * das Kürzel.
  */
-function markerBildUrl(tz: TzProps | undefined): string | null {
-  if (!tz) return null;
-  const zeichen = fachobjektZeichen(tz);
+function markerBildUrl(mk: KarteMarker): string | null {
+  if (mk.typ === 'freies_zeichen') return null;
+  const zeichen = markerZeichen(mk);
   if (!zeichen) return null;
   const svg = renderSvg(zeichen.drawing, KACHEL_SVG_OPTIONEN);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -156,7 +155,7 @@ export default function Inspector({
   const fachmodulText = marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen';
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
-  const bild = useMemo(() => markerBildUrl(marker.tz), [marker.tz]);
+  const bild = useMemo(() => markerBildUrl(marker), [marker]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
   const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 

@@ -1653,6 +1653,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("storniert_at", G_ZEIT),
+            // Koordinate auf der Lagekarte (LLH-1107) — Geo-Skelett wie `betreuungsstelle.lat/lon`.
+            retain("lat", G_GEO),
+            retain("lon", G_GEO),
         ],
     },
     TabellenRegel {
