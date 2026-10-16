@@ -81,6 +81,10 @@ die Koordinate der Räume als operatives Geo-Skelett erhalten.
 - **WHEN** eine Person ohne Lesezugriff auf das Modul Bereitstellungsräume einen Snapshot abruft
 - **THEN** enthält die Antwort keine Bereitstellungsräume
 
+#### Scenario: Stand sichern ohne Modulrecht
+- **WHEN** eine Person mit Schreibrecht auf die Lagekarte, aber ohne Lesezugriff auf das Modul Bereitstellungsräume einen Stand sichert oder Bezeichnung und Notiz eines Standes ändert
+- **THEN** enthält auch diese Antwort keine Bereitstellungsräume, eingefroren werden sie trotzdem
+
 #### Scenario: Schwärzung
 - **WHEN** ein Einsatz geschwärzt wird
 - **THEN** bleibt die Koordinate der Räume erhalten, während Standort und Notiz wie bisher geleert werden

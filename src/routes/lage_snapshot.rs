@@ -4,7 +4,7 @@
 //! Vernichtung) die Einsatzleitung. `daten`/`stand_at`/`erstellt_*` sind unveränderlich.
 
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -35,6 +35,7 @@ pub async fn liste(
 }
 
 /// POST /api/einsaetze/{id}/lage-snapshots — „Stand sichern": friert das volle Lagebild ein.
+/// Die Antwort trägt `daten` und wird wie das GET redigiert (s. [`redigiere_nach_modulrechten`]).
 pub async fn erzeugen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -42,7 +43,7 @@ pub async fn erzeugen(
     JsonBody(req): JsonBody<repo::NeuerLageSnapshot>,
 ) -> Result<(StatusCode, Json<LageSnapshotDokument>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let dok = repo::erzeuge(
+    let mut dok = repo::erzeuge(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -51,6 +52,7 @@ pub async fn erzeugen(
     )
     .await?;
     sse_snapshot(&state, einsatz_id, dok.id);
+    redigiere_nach_modulrechten(&state, &ctx, &mut dok).await?;
     Ok((StatusCode::CREATED, Json(dok)))
 }
 
@@ -76,10 +78,11 @@ const REDIGIERBARE_MODUL_FELDER: &[(&str, &str)] = &[
 
 /// Redigiert das eingefrorene `daten`-Dokument auf die Per-Layer-Autorisierung des Lesers —
 /// spiegelbildlich zur stillen Layer-Degradierung der Live-Karte. Nur bei `Forbidden` wird das
-/// Feld geleert; echte Fehler (DB) werden propagiert.
+/// Feld geleert; echte Fehler (DB) werden propagiert. Gilt für jede Antwort, die `daten` trägt
+/// (GET, POST, PATCH), daher am gemeinsamen Kontext statt am Lese-Extraktor.
 async fn redigiere_nach_modulrechten(
     state: &AppState,
-    ctx: &EinsatzLesezugriff<Lagekarte>,
+    ctx: &EinsatzKontext,
     dok: &mut LageSnapshotDokument,
 ) -> Result<(), AppError> {
     let Some(obj) = dok.daten.as_object_mut() else {
@@ -113,7 +116,8 @@ pub async fn einzeln(
 }
 
 /// PATCH /api/einsaetze/{id}/lage-snapshots/{sid} — NUR `bezeichnung`/`notiz` (unveränderliches
-/// Dokument; `daten`/`stand_at`/`erstellt_*` sind im DTO strukturell nicht enthalten).
+/// Dokument; `daten`/`stand_at`/`erstellt_*` sind im DTO strukturell nicht enthalten). Die
+/// Antwort trägt `daten` und wird wie das GET redigiert.
 pub async fn patch(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -129,10 +133,11 @@ pub async fn patch(
         req.notiz.as_ref().map(|o| o.as_deref()),
     )
     .await?;
-    let dok = repo::lade_dokument(&state.pool, einsatz_id, sid)
+    let mut dok = repo::lade_dokument(&state.pool, einsatz_id, sid)
         .await?
         .ok_or(AppError::NotFound)?;
     sse_snapshot(&state, einsatz_id, sid);
+    redigiere_nach_modulrechten(&state, &ctx, &mut dok).await?;
     Ok(Json(dok))
 }
 

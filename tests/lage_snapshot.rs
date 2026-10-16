@@ -670,6 +670,62 @@ async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
     );
 }
 
+/// Auch die Antworten von „Stand sichern“ (POST) und PATCH tragen `daten`; sie werden wie das GET
+/// auf die Modulrechte geschwärzt. Führungspersonal mit Schreibrecht auf die Lagekarte, für das
+/// das Modul Bereitstellungsräume ausgeblendet ist, bekommt in beiden `[]`.
+#[tokio::test]
+async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
+    let (app, e, admin) = setup_http().await;
+    let (s, raum) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Sportplatz","lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{raum:?}");
+    let fuehr_id = benutzer_anlegen(&app, &admin, "fuehrer7", "keine").await;
+    rolle_setzen(&app, &admin, e, fuehr_id, "fuehrungspersonal").await;
+    let fuehr = login_cookie(&app, "fuehrer7", "fuehrer7pw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, dok) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &fuehr,
+        Some(r#"{"bezeichnung":"vom Fuehrer"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{dok:?}");
+    assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
+    let sid = dok["id"].as_i64().unwrap();
+
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{sid}");
+    let (s, dok) = anfrage(&app, "PATCH", &pfad, &fuehr, Some(r#"{"notiz":"n"}"#)).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert_eq!(dok["notiz"], "n");
+    assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
+
+    // Eingefroren ist der Raum trotzdem: die Einsatzleitung liest ihn im selben Stand.
+    let (_, dok) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"notiz":"m"}"#)).await;
+    assert_eq!(
+        dok["daten"]["bereitstellungsraeume"][0]["bezeichnung"], "BR Sportplatz",
+        "{dok}"
+    );
+}
+
 // ---------- LFH-836: Zeichenbeschreibung freier Zeichen im Stand ----------
 
 /// Ein neuer Stand friert `zeichen_spec` ein (eine Altzeile mit ihrer Hülle aus Migration 0192,
