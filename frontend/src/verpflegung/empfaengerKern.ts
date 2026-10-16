@@ -301,21 +301,21 @@ export function verpflegungsstand(
     }));
   };
 
-  const bekannt = new Set(e.einheiten.map((x) => x.id));
+  const nachId = new Map(e.einheiten.map((x) => [x.id, x]));
   const verpflegt: VerpflegtZeile[] = [
-    ...e.einheiten.filter((x) => anEinheit.has(x.id)),
-    ...[...anEinheit.keys()].filter((id) => !bekannt.has(id)).map((id) => ({ id })),
-  ].map((x) => {
-    const einheit = 'name' in x ? x : null;
+    ...e.einheiten.filter((x) => anEinheit.has(x.id)).map((x) => x.id),
+    ...[...anEinheit.keys()].filter((id) => !nachId.has(id)),
+  ].map((id) => {
+    const einheit = nachId.get(id);
     return {
-      id: x.id,
-      name: einheit?.name ?? `Einheit #${x.id}`,
+      id,
+      name: einheit?.name ?? `Einheit #${id}`,
       funkrufname: einheit?.funkrufname ?? null,
-      abschnitt: abschnittJe.get(x.id)?.name ?? null,
+      abschnitt: abschnittJe.get(id)?.name ?? null,
       aufgeloest: !!einheit?.aufgeloest_at,
-      ausgaben: anEinheit.get(x.id) ?? [],
+      ausgaben: anEinheit.get(id) ?? [],
       untereinheiten: e.einheiten.filter(
-        (u) => !u.aufgeloest_at && vorfahren(u.id, eltern).includes(x.id),
+        (u) => !u.aufgeloest_at && vorfahren(u.id, eltern).includes(id),
       ).length,
     };
   });
