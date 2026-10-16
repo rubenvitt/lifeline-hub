@@ -35,7 +35,8 @@ use super::stelle::{
 };
 use super::{
     deckung, dedupe_stelle_ids, draht_lesen, etb_text, zeitraum_text, AusgabeAnzeige, Bedarf,
-    Sonderkost, SonderkostEingabe, VerpflegungAnzeige, Verpflegungsart, ZeitfensterAnzeige,
+    EmpfaengerAbschnitt, EmpfaengerEinheit, Sonderkost, SonderkostEingabe, VerpflegungAnzeige,
+    VerpflegungEmpfaenger, Verpflegungsart, ZeitfensterAnzeige,
 };
 use crate::error::AppError;
 use crate::routes::support::{
@@ -89,6 +90,10 @@ pub struct AusgabeEingabe {
     pub nachforderung_id: Option<i64>,
     /// Verpflegungsstelle desselben Einsatzes (LLH-1040 D3); geprüft in der Transaktion.
     pub verpflegungsstelle_id: Option<i64>,
+    /// Empfänger-Einheit desselben Einsatzes (LLH-1055 D2); geprüft in der Transaktion.
+    pub einheit_id: Option<i64>,
+    /// Empfänger-Abschnitt desselben Einsatzes (LLH-1055 D2); höchstens einer der beiden.
+    pub abschnitt_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688), von der Route normalisiert.
     pub client_id: Option<String>,
 }
@@ -159,7 +164,8 @@ macro_rules! ausgabe_select {
     () => {
         "SELECT id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
                 sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
-                nachforderung_id, zurueckgenommen_at, erfasst_at, verpflegungsstelle_id \
+                nachforderung_id, zurueckgenommen_at, erfasst_at, verpflegungsstelle_id, \
+                einheit_id, abschnitt_id \
          FROM verpflegung_ausgabe "
     };
 }
@@ -302,6 +308,8 @@ struct AusgabeZeile {
     zurueckgenommen_at: Option<String>,
     erfasst_at: String,
     verpflegungsstelle_id: Option<i64>,
+    einheit_id: Option<i64>,
+    abschnitt_id: Option<i64>,
 }
 
 impl From<AusgabeZeile> for AusgabeAnzeige {
@@ -322,6 +330,8 @@ impl From<AusgabeZeile> for AusgabeAnzeige {
             },
             nachforderung_id: z.nachforderung_id,
             verpflegungsstelle_id: z.verpflegungsstelle_id,
+            einheit_id: z.einheit_id,
+            abschnitt_id: z.abschnitt_id,
             zurueckgenommen_at: z.zurueckgenommen_at,
             erfasst_at: z.erfasst_at,
         }
@@ -385,6 +395,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<VerpflegungAnze
     .into_iter()
     .map(StelleZeile::anzeige)
     .collect();
+    let empfaenger = load_empfaenger(pool, einsatz_id).await?;
     Ok(VerpflegungAnzeige {
         zeitfenster: zeilen
             .into_iter()
@@ -395,6 +406,93 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<VerpflegungAnze
             })
             .collect(),
         stellen,
+        empfaenger,
+    })
+}
+
+/// Eine Einheit der Empfängerliste, wie gelesen.
+#[derive(sqlx::FromRow)]
+struct EmpfaengerEinheitZeile {
+    id: i64,
+    name: String,
+    funkrufname: Option<String>,
+    ueber_einheit_id: Option<i64>,
+    abschnitt_id: Option<i64>,
+    abschnitt_name: Option<String>,
+    aufgeloest_at: Option<String>,
+}
+
+/// Die Empfängerliste (LLH-1055, design.md D3) in konstant vielen Abfragen: die nicht
+/// aufgelösten Einheiten und die aufgelösten, auf die eine Ausgabe verweist, in der Folge des
+/// Kräftebaums (`sortier`, `id`); alle Abschnitte. Stärken aus
+/// [`crate::einheit::repo::load_staerken_je_einheit`] (dieselbe Rechnung wie `GET …/einheiten`),
+/// Eintreffen aus der juengsten Einsatzperiode der Zeitachse. Liest bewusst keine Spalte mit
+/// Personenbezug (Führer, Erreichbarkeit, Kommunikationsmittel, Bemerkung, Mitglieder).
+pub async fn load_empfaenger(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<VerpflegungEmpfaenger, AppError> {
+    let zeilen = sqlx::query_as::<_, EmpfaengerEinheitZeile>(
+        "SELECT e.id, e.name, e.funkrufname, e.ueber_einheit_id, e.abschnitt_id, \
+                ab.name AS abschnitt_name, e.aufgeloest_at \
+         FROM einsatz_einheit e \
+         LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
+         WHERE e.einsatz_id = ? \
+           AND (e.aufgeloest_at IS NULL \
+                OR EXISTS (SELECT 1 FROM verpflegung_ausgabe a WHERE a.einheit_id = e.id)) \
+         ORDER BY e.sortier, e.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let abschnitte = sqlx::query_as::<_, (i64, String, Option<i64>)>(
+        "SELECT id, name, ueber_abschnitt_id FROM einsatzabschnitt \
+         WHERE einsatz_id = ? ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|(id, name, ueber_abschnitt_id)| EmpfaengerAbschnitt {
+        id,
+        name,
+        ueber_abschnitt_id,
+    })
+    .collect();
+    if zeilen.is_empty() {
+        return Ok(VerpflegungEmpfaenger {
+            einheiten: Vec::new(),
+            abschnitte,
+        });
+    }
+    let staerken = crate::einheit::repo::load_staerken_je_einheit(pool, einsatz_id).await?;
+    let eintreffen: HashMap<i64, String> =
+        crate::zeitachse::repo::perioden_einheiten(pool, einsatz_id)
+            .await?
+            .into_iter()
+            .filter_map(|p| {
+                let juengste = p.perioden.into_iter().last()?;
+                Some((p.einheit_id, juengste.eintreffen_at?))
+            })
+            .collect();
+    let einheiten = zeilen
+        .into_iter()
+        .map(|z| EmpfaengerEinheit {
+            ist: staerken.eigene(z.id),
+            ist_kumuliert: staerken.kumuliert(z.id),
+            eintreffen_at: eintreffen.get(&z.id).cloned(),
+            id: z.id,
+            name: z.name,
+            funkrufname: z.funkrufname,
+            ueber_einheit_id: z.ueber_einheit_id,
+            abschnitt_id: z.abschnitt_id,
+            abschnitt_name: z.abschnitt_name,
+            aufgeloest_at: z.aufgeloest_at,
+        })
+        .collect();
+    Ok(VerpflegungEmpfaenger {
+        einheiten,
+        abschnitte,
     })
 }
 
@@ -937,18 +1035,30 @@ pub async fn ausgabe_erfassen_tx(
     sonderkost.pruefen()?;
     // 422 — der Zusammenhang
     teilmenge(&sonderkost, eingabe.menge, "die Menge")?;
-    // Die Stelle zuletzt (D3), nach Replay, Zeitfenster, den 400ern und der Teilmenge; LLH-1055
-    // hängt seine Empfängerprüfung dahinter.
+    if eingabe.einheit_id.is_some() && eingabe.abschnitt_id.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Ausgabe hat höchstens einen Empfänger".into(),
+        ));
+    }
+    // Die Stelle (D3), nach Replay, Zeitfenster, den 400ern und den 422ern; dahinter der
+    // Empfänger (LLH-1055 D2).
     if let Some(sid) = eingabe.verpflegungsstelle_id {
         check_stelle_fuer_ausgabe_tx(conn, einsatz_id, sid, &eingabe.zeitpunkt_at).await?;
+    }
+    if let Some(eid) = eingabe.einheit_id {
+        check_einheit_fuer_ausgabe_tx(conn, einsatz_id, eid, &eingabe.zeitpunkt_at).await?;
+    }
+    if let Some(aid) = eingabe.abschnitt_id {
+        crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, aid).await?;
     }
 
     let ausgabe_id: i64 = sqlx::query_scalar(
         "INSERT INTO verpflegung_ausgabe \
             (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
              sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
-             nachforderung_id, erfasst_von_id, client_id, verpflegungsstelle_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             nachforderung_id, erfasst_von_id, client_id, verpflegungsstelle_id, einheit_id, \
+             abschnitt_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(zeitfenster_id)
@@ -965,6 +1075,8 @@ pub async fn ausgabe_erfassen_tx(
     .bind(benutzer_id)
     .bind(eingabe.client_id.as_deref())
     .bind(eingabe.verpflegungsstelle_id)
+    .bind(eingabe.einheit_id)
+    .bind(eingabe.abschnitt_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(AusgabeGeschrieben {
@@ -1007,6 +1119,38 @@ async fn check_stelle_fuer_ausgabe_tx(
             return Err(AppError::Conflict(format!(
                 "Verpflegungsstelle ‚{}‘ ist aufgelöst",
                 stelle.bezeichnung
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Prüft die Empfänger-Einheit einer neuen Ausgabe (LLH-1055, design.md D2) — in der
+/// Transaktion, gegen ein gleichzeitiges Auflösen. Fremd oder unbekannt (auch gelöscht): 404, wie
+/// die fremde Nachforderung im selben Handler; beide Fälle sind ununterscheidbar. Aufgelöst: 409
+/// (Lebenszyklus), außer der Zeitpunkt der Ausgabe liegt vor der Auflösung — eine offline gezählte
+/// oder nachgetragene Abholung scheitert so nicht am späteren Auflösen. Verglichen werden die
+/// GEPARSTEN Zeitpunkte. Deshalb nicht `einheit::repo::require_aktiv_tx`, das jede aufgelöste
+/// Einheit ablehnt. Stärke 0 und fehlendes Eintreffen nehmen an.
+async fn check_einheit_fuer_ausgabe_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    zeitpunkt_at: &str,
+) -> Result<(), AppError> {
+    let (name, aufgeloest_at): (String, Option<String>) = sqlx::query_as(
+        "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if let Some(aufgeloest_at) = aufgeloest_at.as_deref() {
+        let aufgeloest = draht_lesen("aufgeloest_at", aufgeloest_at)?;
+        if draht_lesen("zeitpunkt_at", zeitpunkt_at)? >= aufgeloest {
+            return Err(AppError::Conflict(format!(
+                "Die Einheit ‚{name}‘ ist aufgelöst"
             )));
         }
     }

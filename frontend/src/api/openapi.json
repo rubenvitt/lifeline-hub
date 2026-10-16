@@ -1540,11 +1540,27 @@
           "erfasst_at"
         ],
         "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Empfänger-Abschnitt (LLH-1055, Zuführung) — nur die Kennung. Fehlt auch, wenn der\nAbschnitt inzwischen gelöscht ist."
+          },
           "bemerkung": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in\n`VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`."
           },
           "erfasst_at": {
             "type": "string"
@@ -5962,6 +5978,98 @@
           "ausgelassen",
           "keine"
         ]
+      },
+      "EmpfaengerAbschnitt": {
+        "type": "object",
+        "description": "Ein Abschnitt der Empfängerliste (Ziel einer Zuführung).",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ueber_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "EmpfaengerEinheit": {
+        "type": "object",
+        "description": "Eine Einheit der Empfängerliste.",
+        "required": [
+          "id",
+          "name",
+          "ist",
+          "ist_kumuliert"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aufgeloest_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nur bei einer aufgelösten Einheit, auf die eine Ausgabe verweist (für ihren Namen)."
+          },
+          "eintreffen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Das nicht gestrichene Eintreffen der jüngsten Einsatzperiode (offen oder durch Ablösung\nbeendet); fehlt ohne ein solches."
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist": {
+            "$ref": "#/components/schemas/Staerke",
+            "description": "Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`."
+          },
+          "ist_kumuliert": {
+            "$ref": "#/components/schemas/Staerke",
+            "description": "Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "ueber_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die übergeordnete Einheit (Gliederung); eine Ausgabe an sie verpflegt den Teilbaum."
+          }
+        }
       },
       "EmpfaengerTyp": {
         "type": "string",
@@ -14301,9 +14409,14 @@
         "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
         "required": [
           "zeitfenster",
-          "stellen"
+          "stellen",
+          "empfaenger"
         ],
         "properties": {
+          "empfaenger": {
+            "$ref": "#/components/schemas/VerpflegungEmpfaenger",
+            "description": "Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne\nPersonenangaben. Keine eigene Leseroute."
+          },
           "stellen": {
             "type": "array",
             "items": {
@@ -14317,6 +14430,28 @@
               "$ref": "#/components/schemas/ZeitfensterAnzeige"
             },
             "description": "Nach Beginn geordnet."
+          }
+        }
+      },
+      "VerpflegungEmpfaenger": {
+        "type": "object",
+        "description": "Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu\naufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.",
+        "required": [
+          "einheiten",
+          "abschnitte"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmpfaengerAbschnitt"
+            }
+          },
+          "einheiten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmpfaengerEinheit"
+            }
           }
         }
       },

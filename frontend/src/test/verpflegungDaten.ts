@@ -1,6 +1,9 @@
 import type {
+  EmpfaengerAbschnitt,
+  EmpfaengerEinheit,
   Sonderkost,
   Verpflegung,
+  VerpflegungEmpfaenger,
   VerpflegungAusgabe,
   Verpflegungsstelle,
   VerpflegungZeitfenster,
@@ -70,6 +73,74 @@ export function stelle(over: Partial<Verpflegungsstelle> & { id: number }): Verp
   };
 }
 
+/** Eine Einheit als Empfänger (LLH-1055), Vorgabe: ohne Gliederung, Abschnitt und Stärke. */
+export function empfaengerEinheit(
+  over: Partial<EmpfaengerEinheit> & { id: number },
+): EmpfaengerEinheit {
+  const keine = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
+  return { name: `Einheit ${over.id}`, ist: keine, ist_kumuliert: keine, ...over };
+}
+
+export const ZUG = 31;
+export const GRUPPE_1 = 32;
+export const GRUPPE_2 = 33;
+export const WASSERRETTUNG = 34;
+export const ABSCHNITT_DEICH = 41;
+
+export const ABSCHNITT_DEICH_EMPFAENGER: EmpfaengerAbschnitt = {
+  id: ABSCHNITT_DEICH,
+  name: 'Deich',
+};
+
+/**
+ * Empfängerliste nach dem Server (LLH-1055 D3), in der Folge des Kräftebaums: ein Zug (1/0/1)
+ * mit zwei Gruppen (je 0/1/8, kumuliert 1/2/17) im Abschnitt Deich, eingetroffen; dazu die
+ * Wasserrettung ohne Abschnitt, Stärke und Eintreffen. Ein Abschnitt („Deich“). Das Kumulierte
+ * rechnet der Server; die Testdaten tragen es fertig.
+ */
+export function empfaenger(): VerpflegungEmpfaenger {
+  const gruppe = { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 };
+  const imDeich = { abschnitt_id: ABSCHNITT_DEICH, abschnitt_name: 'Deich' };
+  return {
+    einheiten: [
+      empfaengerEinheit({
+        id: ZUG,
+        name: '1. Zug',
+        funkrufname: 'Florian 1',
+        ...imDeich,
+        ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 1 },
+        ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 17 },
+        eintreffen_at: '2026-09-24 07:15:00',
+      }),
+      empfaengerEinheit({
+        id: GRUPPE_1,
+        name: '1. Gruppe',
+        funkrufname: 'Florian 1-1',
+        ueber_einheit_id: ZUG,
+        ...imDeich,
+        ist: gruppe,
+        ist_kumuliert: gruppe,
+        eintreffen_at: '2026-09-24 07:15:00',
+      }),
+      empfaengerEinheit({
+        id: GRUPPE_2,
+        name: '2. Gruppe',
+        funkrufname: 'Florian 1-2',
+        ueber_einheit_id: ZUG,
+        ...imDeich,
+        ist: gruppe,
+        ist_kumuliert: gruppe,
+        eintreffen_at: '2026-09-24 07:40:00',
+      }),
+      empfaengerEinheit({ id: WASSERRETTUNG, name: 'Wasserrettung' }),
+    ],
+    abschnitte: [ABSCHNITT_DEICH_EMPFAENGER],
+  };
+}
+
+/** Keine Empfänger: Einsatz ohne Einheiten und Abschnitte. */
+export const KEINE_EMPFAENGER: VerpflegungEmpfaenger = { einheiten: [], abschnitte: [] };
+
 export const FELDKUECHE = 21;
 export const TURNHALLE = 22;
 export const DEICH = 23;
@@ -85,6 +156,7 @@ export const DEICH = 23;
 export function verpflegungMitStellen(): Verpflegung {
   const nichts = { gesamt: 0, sonderkost: KEINE_SONDERKOST };
   return {
+    empfaenger: empfaenger(),
     stellen: [
       stelle({ id: TURNHALLE, bezeichnung: 'Ausgabe Turnhalle Nord', art: 'ausgabestelle' }),
       stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz', art: 'feldkueche' }),

@@ -217,32 +217,63 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
-/// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, eigene Stärke, Sprechgruppen
-/// und Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
-struct Anreicherung {
+/// Eigene Ist-Stärke je Einheit und die Unterstellungskanten EINES Einsatzes — die eine Quelle
+/// der Stärken für `GET …/einheiten` und die Empfängerliste der Verpflegung (LLH-1055,
+/// design.md D3: eine Heimat je Zahl). Aufgelöste Einheiten tragen keine Kräfte und keine Kanten.
+pub struct StaerkenJeEinheit {
     /// Eigene Ist-Stärke je Einheit; fehlender Eintrag = keine wertbaren Kräfte.
-    staerken: HashMap<i64, Staerke>,
+    eigene: HashMap<i64, Staerke>,
     /// Unmittelbar unterstellte Einheiten je Einheit (Kanten des ganzen Einsatzes).
     kinder: HashMap<i64, Vec<i64>>,
-    personal: HashMap<i64, Vec<super::EinheitMitgliedPerson>>,
-    fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
-    material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
-    sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
 }
 
-impl Anreicherung {
+impl StaerkenJeEinheit {
     /// Kumulierte Ist-Stärke (eigene + alle unterstellten Einheiten), über [`kumuliere`].
-    fn ist_kumuliert(&self, wurzel_id: i64) -> Staerke {
-        kumuliere(&self.staerken, &self.kinder, wurzel_id)
+    pub fn kumuliert(&self, wurzel_id: i64) -> Staerke {
+        kumuliere(&self.eigene, &self.kinder, wurzel_id)
     }
 
     /// Eigene Ist-Stärke einer Einheit; ohne Kräfte `0/0/0`.
-    fn eigene(&self, einheit_id: i64) -> Staerke {
-        self.staerken
+    pub fn eigene(&self, einheit_id: i64) -> Staerke {
+        self.eigene
             .get(&einheit_id)
             .copied()
             .unwrap_or(Staerke::neu(0, 0, 0))
     }
+}
+
+/// Lädt [`StaerkenJeEinheit`] eines Einsatzes in zwei Abfragen, gleich wie viele Einheiten.
+pub async fn load_staerken_je_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<StaerkenJeEinheit, AppError> {
+    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
+    for (id, vater) in &kanten {
+        if let Some(v) = vater {
+            kinder.entry(*v).or_default().push(*id);
+        }
+    }
+    Ok(StaerkenJeEinheit {
+        eigene: mitglied_repo::ist_staerke_map(pool, einsatz_id).await?,
+        kinder,
+    })
+}
+
+/// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, Stärken, Sprechgruppen und
+/// Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
+struct Anreicherung {
+    staerken: StaerkenJeEinheit,
+    personal: HashMap<i64, Vec<super::EinheitMitgliedPerson>>,
+    fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
+    material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
+    sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
 }
 
 /// Kumulierte Ist-Stärke einer Einheit: eigene plus alle unterstellten, rein im Speicher.
@@ -280,22 +311,8 @@ pub fn kumuliere(
 
 /// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
 async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreicherung, AppError> {
-    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
-        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
-         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
-    let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
-    for (id, vater) in &kanten {
-        if let Some(v) = vater {
-            kinder.entry(*v).or_default().push(*id);
-        }
-    }
     Ok(Anreicherung {
-        staerken: mitglied_repo::ist_staerke_map(pool, einsatz_id).await?,
-        kinder,
+        staerken: load_staerken_je_einheit(pool, einsatz_id).await?,
         personal: mitglied_repo::personal_mitglieder_map(pool, einsatz_id).await?,
         fahrzeuge: mitglied_repo::fahrzeug_mitglieder_map(pool, einsatz_id).await?,
         material: mitglied_repo::material_mitglieder_map(pool, einsatz_id).await?,
@@ -331,8 +348,8 @@ async fn zu_anzeige_batch(
         .unwrap_or(None);
         let soll = override_soll.or(typ_soll);
 
-        let ist = anreicherung.eigene(row.id);
-        let ist_kumuliert = anreicherung.ist_kumuliert(row.id);
+        let ist = anreicherung.staerken.eigene(row.id);
+        let ist_kumuliert = anreicherung.staerken.kumuliert(row.id);
         // Jede Einheit kommt im Satz genau einmal vor → entnehmen statt klonen.
         let personal_mitglieder = anreicherung.personal.remove(&row.id).unwrap_or_default();
         let fahrzeug_mitglieder = anreicherung.fahrzeuge.remove(&row.id).unwrap_or_default();
@@ -1178,6 +1195,10 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "Ein Verteiler nennt die Einheit",
     ),
     (
+        "SELECT EXISTS(SELECT 1 FROM verpflegung_ausgabe WHERE einheit_id = ?)",
+        "Eine Verpflegungsausgabe nennt die Einheit",
+    ),
+    (
         "SELECT EXISTS(SELECT 1 FROM einsatz_personal WHERE einheit_id = ?)",
         "Der Einheit gehört Personal an",
     ),
@@ -1193,7 +1214,8 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
 
 /// Der erste Grund, warum eine Einheit nicht spurlos gelöscht werden darf (design.md D3): eine
 /// Zeitachse, eine Schicht der Ablösung, eine ETB-Verknüpfung, eine Belegung eines
-/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler oder eine (auch
+/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler, eine (auch
+/// zurückgenommene) Verpflegungsausgabe an sie (LLH-1055, design.md D9) oder eine (auch
 /// beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
 pub async fn find_spur_tx(
     conn: &mut SqliteConnection,
@@ -2724,5 +2746,103 @@ mod tests {
             Some(einheit),
             "der Empfänger nennt die aufgelöste Einheit weiter"
         );
+    }
+
+    /// Eine zurückgenommene Verpflegungsausgabe an die Einheit `einheit`; liefert die Ausgabe.
+    async fn verpflegungsausgabe_an(pool: &SqlitePool, einsatz: i64, b: i64, einheit: i64) -> i64 {
+        let zf: i64 = sqlx::query_scalar(
+            "INSERT INTO verpflegung_zeitfenster \
+                (einsatz_id, bezeichnung, von_at, bis_at, bedarf_kraefte, bedarf_betreute, \
+                 angelegt_von_id) \
+             VALUES (?, 'Mittag', '2026-10-13 10:00:00', '2026-10-13 11:30:00', 9, 0, ?) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query_scalar(
+            "INSERT INTO verpflegung_ausgabe \
+                (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, erfasst_von_id, einheit_id, \
+                 zurueckgenommen_at, zurueckgenommen_von_id) \
+             VALUES (?, ?, '2026-10-13 10:10:00', 9, ?, ?, '2026-10-13 10:12:00', ?) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(zf)
+        .bind(b)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1055, Spec `kraefte-entlassung` „Verpflegte Einheit bleibt“: eine Einheit ohne andere
+    /// Spur, an die eine (auch zurückgenommene) Verpflegungsausgabe ging, wird aufgelöst statt
+    /// gelöscht, und die Ausgabe nennt sie weiter.
+    #[tokio::test]
+    async fn aufloesen_behaelt_den_verpflegungsempfaenger() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("2. Gruppe", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let ausgabe = verpflegungsausgabe_an(&pool, einsatz, b, e.id).await;
+
+        let r = aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        assert!(!r.geloescht, "{r:?}");
+        assert!(exists(&pool, e.id).await);
+        let empfaenger: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM verpflegung_ausgabe WHERE id = ?")
+                .bind(ausgabe)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            empfaenger,
+            Some(e.id),
+            "die Ausgabe nennt die Einheit weiter"
+        );
+    }
+
+    /// LLH-1055, Spec „Verpflegte Einheit stornieren“: 422 mit dem Grund, dass eine
+    /// Verpflegungsausgabe die Einheit nennt; die Einheit bleibt unverändert.
+    #[tokio::test]
+    async fn stornieren_mit_verpflegungsausgabe_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("2. Gruppe", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        verpflegungsausgabe_an(&pool, einsatz, b, e.id).await;
+
+        match aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Stornieren).await {
+            Err(AppError::UnprocessableEntity(m)) => assert_eq!(
+                m,
+                "Eine Verpflegungsausgabe nennt die Einheit; die Einheit lässt sich nur auflösen"
+            ),
+            r => panic!("{r:?}"),
+        }
+        assert!(laden(&pool, einsatz, e.id)
+            .await
+            .unwrap()
+            .aufgeloest_at
+            .is_none());
     }
 }

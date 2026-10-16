@@ -346,7 +346,11 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/verpflegung', () =>
-        HttpResponse.json({ zeitfenster: [], stellen: [] }),
+        HttpResponse.json({
+          zeitfenster: [],
+          stellen: [],
+          empfaenger: { einheiten: [], abschnitte: [] },
+        }),
       ),
     );
     renderApp('/einsaetze/7/verpflegung');

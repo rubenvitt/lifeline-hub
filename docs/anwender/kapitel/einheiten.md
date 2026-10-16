@@ -274,7 +274,10 @@ ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztage
 Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
 Einsatzzeiten“ des Einsatzberichts. Eine Einheit ohne jede Spur (keine Mitglieder, keine
 Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
-Meldung, kein Dokument, kein Verteiler) wird beim Auflösen ganz gelöscht. An einer aufgelösten Einheit lässt sich nichts mehr ändern.
+Meldung, kein Dokument, kein Verteiler, keine Verpflegungsausgabe) wird beim Auflösen ganz
+gelöscht. Eine Einheit, an die Verpflegung ausgegeben wurde, bleibt als aufgelöst stehen, auch wenn
+die Ausgabe zurückgenommen ist; die Ausgabe nennt sie weiter. An einer aufgelösten Einheit lässt
+sich nichts mehr ändern.
 
 ### Einsatztagebuch
 
