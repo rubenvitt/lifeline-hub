@@ -679,7 +679,15 @@ pub async fn aendern(
 
         // Beginn
         let beginn_at = eingabe.beginn_at.clone().unwrap_or(roh.beginn_at.clone());
-        let (faellig_at, rhythmus) = compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?;
+        // Ohne neuen Beginn und ohne Rhythmusangabe bleibt die gespeicherte Fälligkeit: nach einer
+        // entfernten Wechselzeiten-Vorgabe ergäbe Beginn + aufgerundeter Rhythmus sonst eine um
+        // Sekunden verschobene Fälligkeit samt neu gesetzter Fristen (Review PR #833).
+        let (faellig_at, rhythmus) =
+            if eingabe.rhythmus_minuten.is_none() && beginn_at == roh.beginn_at {
+                (roh.faellig_at.clone(), roh.rhythmus_minuten)
+            } else {
+                compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?
+            };
         // Bei der Einsatzvorgabe folgt der Rhythmus der Regel; ändert ihn nur der Beginn
         // (Wechselzeiten), ist das keine Rhythmusänderung.
         let rhythmus_geaendert = quelle != roh.rhythmus_quelle
@@ -959,12 +967,17 @@ pub async fn set_einsatz_vorgabe(
         .fetch_all(&mut *conn)
         .await?;
         for s in laufende {
-            let (faellig_at, rhythmus) = compute_faellig(
-                &s.beginn_at,
-                s.rhythmus_minuten,
-                s.rhythmus_quelle,
-                &vorgabe,
-            )?;
+            // Neu gerechnet wird nur, wer der neuen Vorgabe folgt. Eine entfernte Vorgabe lässt
+            // die gespeicherte Fälligkeit sekundengenau stehen (Review PR #833).
+            let (faellig_at, rhythmus) = match (s.rhythmus_quelle, &vorgabe.werte) {
+                (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+                    &s.beginn_at,
+                    s.rhythmus_minuten,
+                    s.rhythmus_quelle,
+                    &vorgabe,
+                )?,
+                _ => (s.faellig_at.clone(), s.rhythmus_minuten),
+            };
             let faellig_geaendert = faellig_at != s.faellig_at;
             if faellig_geaendert || rhythmus != s.rhythmus_minuten {
                 sqlx::query(

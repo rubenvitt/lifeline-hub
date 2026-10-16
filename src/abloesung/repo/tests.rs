@@ -1159,3 +1159,67 @@ async fn reine_vorwarnungsaenderung_loest_die_faelligkeit_nicht_erneut_aus() {
         "keine zweite Auslösung nach dem Entfernen"
     );
 }
+
+/// Wird eine Einsatzvorgabe mit Wechselzeiten entfernt, bleibt die Fälligkeit sekundengenau
+/// stehen — beim Entfernen und bei einer späteren Änderung ohne neuen Beginn oder Rhythmus.
+#[tokio::test]
+async fn entfernte_wechselzeiten_vorgabe_laesst_die_faelligkeit_stehen() {
+    let w = welt().await;
+    let werte = crate::schichtmodell::Werte {
+        bezeichnung: "12-h-Schicht".into(),
+        regel: crate::schichtmodell::Regel::Wechselzeiten {
+            zeiten: vec![
+                crate::uhrzeit::Uhrzeit::parse("t", "06:00").unwrap(),
+                crate::uhrzeit::Uhrzeit::parse("t", "18:00").unwrap(),
+            ],
+            mindestdauer_minuten: 240,
+        },
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+    };
+    set_einsatz_vorgabe(&w.pool, w.e, w.b, &EinsatzVorgabeInput::Werte(werte), T0)
+        .await
+        .unwrap();
+    let (a, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            beginn_at: Some("2026-09-22 11:42:17".into()),
+            rhythmus_minuten: None,
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(a.faellig_at, "2026-09-22 16:00:00");
+    set_einsatz_vorgabe(&w.pool, w.e, w.b, &EinsatzVorgabeInput::Remove, T0)
+        .await
+        .unwrap();
+    assert_eq!(
+        laden(&w.pool, w.e, a.id, T0).await.unwrap().faellig_at,
+        "2026-09-22 16:00:00"
+    );
+    let (geaendert, _) = aendern(
+        &w.pool,
+        w.e,
+        a.id,
+        w.b,
+        &AenderungEingabe {
+            abloesende_einheit_id: Some(Some(w.f1)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(geaendert.faellig_at, "2026-09-22 16:00:00");
+    assert_eq!(
+        offene_fristen(&w.pool, a.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 16:00:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 15:30:00".into()),
+        ]
+    );
+}
