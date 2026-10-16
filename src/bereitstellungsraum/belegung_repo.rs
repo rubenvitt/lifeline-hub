@@ -199,7 +199,7 @@ pub async fn belege_tx(
         }
     };
 
-    pruefe_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
+    check_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
     let vorher_abruf = match aktueller_br_id {
         Some(raum) => offener_abruf_tx(&mut *conn, einsatz_id, typ, objekt_id, raum).await?,
         None => None,
@@ -854,7 +854,7 @@ pub async fn verlauf(
 /// - austritt zusätzlich: der übergebene `br_id` muss dem `aktueller_br_id` des
 ///   Objekts entsprechen — sonst trägt das Event eine falsche br_id (ETB-Text
 ///   „verlässt BR X" wäre falsch). Bei Mismatch `Conflict`.
-fn pruefe_art_vorbedingung(
+fn check_art_vorbedingung(
     art: &BrBelegungsArt,
     aktueller_br_id: Option<i64>,
     br_id: i64,
