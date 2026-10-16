@@ -29,7 +29,12 @@ export interface EinsatzPfade {
   uhsDetail: (einsatzId: number, uhsId: number) => string;
   aufnahme: (einsatzId: number, opts?: { uhs?: number }) => string;
   verpflegung: (einsatzId: number) => string;
-  verpflegungAusgabe: (einsatzId: number, zeitfensterId: number) => string;
+  /** `stelle`: die vorgewählte Verpflegungsstelle (LLH-1040). */
+  verpflegungAusgabe: (
+    einsatzId: number,
+    zeitfensterId: number,
+    opts?: { stelle?: number },
+  ) => string;
 }
 
 export const STAB_PFADE: EinsatzPfade = {

@@ -74,7 +74,9 @@ Bearbeitung, eine falsche Ausgabe wird zurückgenommen. Das System MUST einen Ze
 des Zeitfensters annehmen (Anlieferung vor Beginn). Die Oberfläche SHALL Ausgaben auf zwei Wegen
 erfassen: durch Zählen in der Ausgabeansicht (Requirement „Ausgabe zählen“) und über das
 Formular „Ausgabe nachtragen“ mit Menge, Zeitpunkt, Ort, Sonderkost, Nachforderung und
-Bemerkung. Nach einer gesendeten Erfassung MUST die Oberfläche einen Hinweis mit „Rückgängig“
+Bemerkung. Gibt es im Einsatz Verpflegungsstellen, MUST die Oberfläche die Stelle zur Wahl anbieten
+und das Feld Ort nur ohne gewählte Stelle zeigen, dann als „Zuführungsziel“. Nach einer gesendeten
+Erfassung MUST die Oberfläche einen Hinweis mit „Rückgängig“
 zeigen. Ein neuer Hinweis MUST den vorigen ersetzen.
 
 #### Scenario: Ausgabe erfassen
@@ -100,6 +102,14 @@ zeigen. Ein neuer Hinweis MUST den vorigen ersetzen.
 #### Scenario: Nachtragen in der Vergangenheit
 - **WHEN** eine Person über „Ausgabe nachtragen“ zum vergangenen Zeitfenster „Frühstück“ 40 EP mit Zeitpunkt 07:30 erfasst
 - **THEN** ist die Ausgabe mit dem Zeitpunkt 07:30 gespeichert und zählt in die ausgegebene Menge von „Frühstück“
+
+#### Scenario: Stelle statt Ort
+- **WHEN** im Einsatz Verpflegungsstellen bestehen und eine Person im Dialog eine Stelle wählt
+- **THEN** zeigt der Dialog kein Feld für den Ort, und die Ausgabe wird mit der Stelle und ohne Ort gesendet
+
+#### Scenario: Zuführungsziel ohne Stelle
+- **WHEN** im Einsatz Verpflegungsstellen bestehen und eine Person im Dialog keine Stelle wählt
+- **THEN** bietet der Dialog das Feld „Zuführungsziel“ an, das als Ort der Ausgabe gespeichert wird
 
 ### Requirement: Ausgabe zurücknehmen
 
@@ -298,14 +308,20 @@ deswegen erreichen.
 - **WHEN** die Position einer disponierten Person geändert wird und ein verbundener Benutzer nur das Modul Verpflegung lesen darf
 - **THEN** erhält er das Ereignis `personal` nicht
 
+#### Scenario: Zweiter Client sieht die neue Stelle
+- **WHEN** Client A eine Verpflegungsstelle anlegt oder auflöst, während Client B die Ansicht „Stellen“ desselben Einsatzes geöffnet hat
+- **THEN** zeigt Client B die Stelle bzw. ihren neuen Status ohne Neuladen
+
 ### Requirement: Anzeige im Modul
 
 Die Seite des Moduls SHALL die Zeitfenster nach Beginn geordnet zeigen, getrennt in
 „laufend und anstehend“ und „vergangen“ (Ende vor dem aktuellen Zeitpunkt). Jedes
-Zeitfenster zeigt Bezeichnung, Zeitraum, Gesamtbedarf mit Aufteilung, ausgegebene Menge,
-Fehlmenge, Einstufung, die Sonderkost mit Bedarf, Ausgabe und Fehlmenge je belegter Kostform
-sowie seine Ausgaben mit Zeitpunkt, Ort und Menge. Zahlen und Zeiten MUST in Monospace mit
-tabellarischen Ziffern stehen. Mit Schreibrecht MUST ein laufendes oder anstehendes Zeitfenster
+Zeitfenster zeigt Bezeichnung, Verpflegungsart (wenn gesetzt), Zeitraum, Gesamtbedarf mit
+Aufteilung, ausgegebene Menge, Fehlmenge, Einstufung, die Sonderkost mit Bedarf, Ausgabe und
+Fehlmenge je belegter Kostform sowie seine Ausgaben mit Zeitpunkt, Stelle oder Ort und Menge. Ist
+die Aufstellung je Stelle nicht leer, MUST das Zeitfenster die ausgegebene Menge je Stelle zeigen,
+mit „aufgelöst“ bzw. „nicht zugeordnet“ an den betroffenen Stellen und „ohne Stelle“ zuletzt.
+Zahlen und Zeiten MUST in Monospace mit tabellarischen Ziffern stehen. Mit Schreibrecht MUST ein laufendes oder anstehendes Zeitfenster
 den Sprung „Ausgabe öffnen“ in seine Ausgabeansicht tragen. Jedes Zeitfenster MUST mit
 Schreibrecht die Aktion „Ausgabe nachtragen“ tragen, auch ein vergangenes. Ein vergangenes
 Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
@@ -329,6 +345,14 @@ Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
 #### Scenario: Ohne Schreibrecht kein Sprung
 - **WHEN** eine Person ohne Schreibrecht die Seite des Moduls öffnet
 - **THEN** trägt kein Zeitfenster „Ausgabe öffnen“ oder „Ausgabe nachtragen“
+
+#### Scenario: Ausgegeben je Stelle
+- **WHEN** das Zeitfenster „Mittag“ an der Feldküche 100 EP und an der Turnhalle 80 EP ausgegeben hat
+- **THEN** zeigt seine Karte beide Stellen mit ihrer Menge und darüber wie bisher die Fehlmenge des Zeitfensters
+
+#### Scenario: Bestand ohne Stelle
+- **WHEN** ein Zeitfenster keiner Stelle zugeordnet ist und keine Ausgabe an einer Stelle hat
+- **THEN** zeigt seine Karte keine Aufstellung je Stelle und die Ausgaben mit ihrem Ort wie bisher
 
 ### Requirement: Schwärzung
 
@@ -740,6 +764,38 @@ Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
 - **WHEN** die Einheit „2. Gruppe“ eine Ausgabe bekommen hat und danach aufgelöst wurde
 - **THEN** steht sie in der Empfängerliste mit ihrem Namen und dem Zeitpunkt der Auflösung
 
+### Requirement: Stellen im Modul
+
+Die Seite des Moduls SHALL neben den Ansichten „laufend und anstehend“ und „vergangen“ eine
+Ansicht „Stellen“ in derselben Umschaltleiste führen. Sie MUST je Stelle Bezeichnung, Art,
+Standort, Status als Wort mit Rollenfarbe und das laufende Zeitfenster der Stelle mit der dort
+ausgegebenen Menge zeigen; aufgelöste Stellen stehen zuletzt. Mit Schreibrecht und dem Recht zu
+planen MUST sie „Stelle anlegen“, „In Betrieb nehmen“, „Auflösen“ mit Rückfrage, „Bearbeiten“ und,
+wo zulässig, „Stornieren“ mit Rückfrage anbieten. Ohne Schreibrecht MUST „Stelle anlegen“ gesperrt
+mit Grund stehen und die Zeilenaktionen MUST fehlen (wie unter „Rechte und Modulsichtbarkeit“).
+Der Dialog zum Anlegen MUST mit Bezeichnung, Art und Standort auskommen. Das Verpflegungsgerät
+MUST die Stellen sehen, aber keine dieser Aktionen erhalten, auch kein gesperrtes „Stelle anlegen“.
+
+#### Scenario: Stellen ansehen
+- **WHEN** eine Person die Ansicht „Stellen“ wählt, während die Feldküche aktiv ist und im laufenden Zeitfenster „Mittag“ 100 EP ausgegeben hat
+- **THEN** zeigt die Zeile der Feldküche Art, Standort, „aktiv“ und „Mittag“ mit 100 EP
+
+#### Scenario: Stelle in Betrieb nehmen
+- **WHEN** eine Person mit Schreibrecht bei der geplanten Stelle „Zuführung Deich“ „In Betrieb nehmen“ wählt
+- **THEN** zeigt die Zeile „aktiv“ ohne Neuladen
+
+#### Scenario: Leere Ansicht
+- **WHEN** ein Einsatz keine Verpflegungsstelle hat und eine Person mit Schreibrecht die Ansicht „Stellen“ wählt
+- **THEN** zeigt die Seite einen Leerzustand mit der Aktion „Stelle anlegen“
+
+#### Scenario: Beobachter sieht die Stellen
+- **WHEN** eine Person ohne Schreibrecht die Ansicht „Stellen“ wählt
+- **THEN** zeigt die Seite die Stellen ohne Zeilenaktionen und „Stelle anlegen“ gesperrt mit Grund
+
+#### Scenario: Gerät sieht die Stellen
+- **WHEN** das Verpflegungsgerät die Ansicht „Stellen“ öffnet
+- **THEN** zeigt sie die Stellen ohne „Stelle anlegen“, „In Betrieb nehmen“, „Auflösen“, „Bearbeiten“ und „Stornieren“
+
 ### Requirement: Ausgabeansicht eines Zeitfensters
 
 Die Oberfläche SHALL je Zeitfenster eine Ausgabeansicht als eigene Adresse führen, an der
@@ -757,6 +813,18 @@ NOT eine Zähltaste verschieben. Ohne Schreibrecht MUST die Ansicht den Hinweis 
 zeigen, die Zähltasten gesperrt stehen lassen und „Zurücknehmen“ weglassen (Requirement „Rechte
 und Modulsichtbarkeit“). Die Startseite des Verpflegungsgeräts MUST die Liste der Zeitfenster
 bleiben.
+
+Gibt es im Einsatz Verpflegungsstellen, MUST die Ansicht im Kopf eine Stellenwahl führen:
+„ohne Stelle“, die dem Zeitfenster zugeordneten Stellen zuerst, dann die übrigen, ohne
+aufgelöste. Daneben MUST sie die an der gewählten Stelle im Zeitfenster ausgegebene Menge zeigen.
+Beim Öffnen MUST die Ansicht vorwählen, in dieser Reihenfolge: die Stelle aus der Adresse
+(`?stelle=`, der Sprung „Ausgabe öffnen“ aus der Zeile einer Stelle an der Karte), die in diesem
+Browser für den Einsatz gemerkte Wahl, die einzige zugeordnete Stelle, sonst „ohne Stelle“; eine
+nicht wählbare Stelle wird dabei übersprungen. Die Vorwahl gilt beim Öffnen: Eine Änderung der
+Zuordnung bei offener Ansicht MUST NOT die Wahl ändern. Die Wahl ändert sich nur durch die Person
+oder, wenn die gewählte Stelle aufgelöst wird, auf „ohne Stelle“. Die Stabsoberfläche MUST die
+Wahl je Einsatz im Browser merken (bei jedem Ende der Anmeldung geräumt); das
+Verpflegungsgerät MUST nichts merken. Ohne Stellen im Einsatz MUST die Stellenwahl fehlen.
 
 #### Scenario: Ansicht öffnen
 - **WHEN** eine Person mit Schreibrecht am laufenden Zeitfenster „Mittag“ (Bedarf 150, ausgegeben 80) „Ausgabe öffnen“ wählt
@@ -788,6 +856,26 @@ bleiben.
 - **WHEN** das Verpflegungsgerät nach dem Koppeln oder Neuladen seine Startseite öffnet
 - **THEN** zeigt es die Liste der Zeitfenster, nicht die Ausgabeansicht eines Zeitfensters
 
+#### Scenario: Ausgabe an einer Stelle öffnen
+- **WHEN** „Mittag“ der Feldküche (100 EP ausgegeben) und der Turnhalle zugeordnet ist und eine Person an der Karte in der Zeile der Feldküche „Ausgabe öffnen“ wählt
+- **THEN** öffnet die Ausgabeansicht mit der Feldküche gewählt und zeigt an ihr 100 EP
+
+#### Scenario: Einzige zugeordnete Stelle
+- **WHEN** „Mittag“ nur der Feldküche zugeordnet ist und eine Person die Ausgabeansicht ohne Stelle in der Adresse und ohne gemerkte Wahl öffnet
+- **THEN** ist die Feldküche gewählt
+
+#### Scenario: Zuordnung ändert sich beim Zählen
+- **WHEN** die Ausgabeansicht von „Mittag“ mit der Feldküche als einziger zugeordneter Stelle geöffnet ist und ein anderer Client „Mittag“ zusätzlich der Turnhalle zuordnet
+- **THEN** bleibt die Feldküche gewählt, und die offene Sammlung zählt weiter an ihr
+
+#### Scenario: Gerät merkt nichts
+- **WHEN** das Verpflegungsgerät in der Ausgabeansicht von „Mittag“ (zwei zugeordnete Stellen) die Turnhalle wählt und die Ansicht später erneut öffnet
+- **THEN** ist „ohne Stelle“ gewählt
+
+#### Scenario: Aufgelöste Stelle nicht wählbar
+- **WHEN** die Feldküche aufgelöst ist und eine Person die Ausgabeansicht von „Mittag“ öffnet, auch mit der Feldküche in der Adresse
+- **THEN** bietet die Stellenwahl die Feldküche nicht an, und sie ist nicht gewählt
+
 ### Requirement: Ausgabe zählen
 
 Die Ausgabeansicht SHALL Portionen durch Tippen zählen: „+1“, „+5“ und „+10“ zählen so viele
@@ -803,6 +891,7 @@ eintritt:
 - 15 s nach dem ersten Tipp der Sammlung,
 - 50 oder mehr Portionen in der Sammlung,
 - „Buchen“,
+- Wechsel der Stelle (Requirement „Ausgabeansicht eines Zeitfensters“),
 - das Zeitfenster wird vergangen,
 - Wechsel des Zeitfensters oder Verlassen der Ansicht,
 - die Seite wird verborgen oder beendet.
@@ -815,7 +904,8 @@ gilt die Serveruhr), eine vorgemerkte MUST den Zeitpunkt ihres Abschlusses trage
 Sammlung MUST keine Anfrage erzeugen. „Menge …“ MUST NOT mehr zulassen, als die Sammlung bis
 zur Höchstmenge des Servers je Ausgabe noch aufnehmen kann. In einem vergangenen Zeitfenster
 MUST die Ansicht nicht zählen. Die Zähltasten stehen dort gesperrt mit Grund, und das Nachtragen
-bleibt möglich.
+bleibt möglich. Eine Sammlung MUST die Stelle tragen, die bei ihrem ersten Tipp gewählt war;
+ohne gewählte Stelle geht sie ohne Stelle.
 
 #### Scenario: Zählen und nach Ruhe buchen
 - **WHEN** eine Person mit Verbindung im laufenden Zeitfenster „Mittag“ zwanzigmal „+1“ tippt und dann 3 s nichts tippt
@@ -868,6 +958,11 @@ bleibt möglich.
 - **WHEN** eine Person ohne Netzverbindung zehnmal „+1“ tippt und 3 s wartet
 - **THEN** steht eine Ausgabe über 10 EP als „ausstehend“ an der Ansicht, und Fehlmenge und Einstufung bleiben unverändert
 - **AND** nach wiederhergestellter Verbindung ist sie genau einmal gespeichert, und die ausgegebene Menge ist um 10 gestiegen
+
+#### Scenario: Wechsel der Stelle
+- **WHEN** eine Person mit Verbindung an der Feldküche fünfmal „+1“ tippt und vor Ablauf der Ruhe die Turnhalle wählt
+- **THEN** ist sofort eine Ausgabe über 5 EP an der Feldküche gespeichert
+- **AND** der nächste Tipp beginnt eine neue Sammlung, die an der Turnhalle gebucht wird
 
 #### Scenario: Vergangenes Zeitfenster
 - **WHEN** die Ausgabeansicht eines Zeitfensters gezeigt wird, dessen Ende vorbei ist

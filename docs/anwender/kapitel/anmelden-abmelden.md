@@ -131,6 +131,7 @@ gehört:
 
 - das vorgehaltene Lagebild für die Arbeit ohne Netz,
 - zwischengespeicherte Orte und Erfassungshilfen,
+- die beim Zählen der Ausgabe zuletzt gewählte Verpflegungsstelle je Einsatz,
 - ungesendete Entwürfe im Einsatztagebuch.
 
 **Es bleiben** die vorgemerkten Einträge, die noch nicht beim Server angekommen sind (siehe

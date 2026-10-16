@@ -10,7 +10,19 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
-import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
+import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
+import {
+  DEICH,
+  FELDKUECHE,
+  KEINE_SONDERKOST,
+  TURNHALLE,
+  ausgabe,
+  stelle,
+  verpflegungMitStellen,
+  zeitfenster,
+} from '../test/verpflegungDaten';
+import type { Verpflegungsstelle } from '../api/types';
+import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
 
 dayjs.extend(utc);
 
@@ -63,8 +75,8 @@ const mittag = (over: Partial<VerpflegungZeitfenster> = {}) =>
     ...over,
   });
 
-function liefert(zf: VerpflegungZeitfenster[]) {
-  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf }));
+function liefert(zf: VerpflegungZeitfenster[], stellen: Verpflegungsstelle[] = []) {
+  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf, stellen }));
 }
 
 const ansicht = (
@@ -74,9 +86,11 @@ const ansicht = (
   </Routes>
 );
 
-function zeige(zfId = 1) {
+function zeige(zfId = 1, suche = '') {
   server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
-  return renderMitProviders(ansicht, { route: `/einsaetze/1/verpflegung/${zfId}/ausgabe` });
+  return renderMitProviders(ansicht, {
+    route: `/einsaetze/1/verpflegung/${zfId}/ausgabe${suche}`,
+  });
 }
 
 const taste = (name: string | RegExp) => screen.getByRole('button', { name });
@@ -119,6 +133,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   setzeOnline(true);
   await queueLeerenFuerTests();
 });
@@ -192,6 +207,9 @@ describe('AusgabeAnsicht — Tasten und Sonderkost (D2, D4, D9)', () => {
   });
 
   it('„Menge …“ nimmt bei Sammlung 10 keine 99 995 an; es geht keine Anfrage hinaus', async () => {
+    // Die Uhr steht: Unter Last dauert das Tippen sonst länger als die Ruhe (RUHE_MS), und die
+    // Sammlung bucht, bevor der Dialog prüft.
+    vi.useFakeTimers({ toFake: ['Date'] });
     zeige();
     await geladen();
     await userEvent.click(taste('+10'));
@@ -373,8 +391,9 @@ describe('AusgabeAnsicht — ohne Netz (LLH-1032, AK 2)', () => {
     setzeOnline(false);
     await waitFor(() => expect(band).toHaveTextContent('Offline vorgemerkt'));
     for (let i = 0; i < 3; i++) await userEvent.click(taste('+1'));
+    // Die Sammlung schließt erst nach der Ruhe (RUHE_MS = 3 s); unter Last braucht der Rest länger.
     expect(
-      await screen.findByText(/Offline vorgemerkt: 3 EP zu ‚Mittag‘/, {}, { timeout: 5000 }),
+      await screen.findByText(/Offline vorgemerkt: 3 EP zu ‚Mittag‘/, {}, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(erfasseAusgabe).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
@@ -474,5 +493,204 @@ describe('AusgabeAnsicht — Zustände (D1, D7)', () => {
     expect(await screen.findByText('Zeitfenster nicht geladen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
     await geladen();
+  });
+});
+
+describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
+  /** „Mittag“ an Turnhalle (80) und Feldküche (100); die Zuführung Deich ist frei, eine Schule aufgelöst. */
+  const stellen = () => [
+    ...verpflegungMitStellen().stellen,
+    stelle({ id: 30, bezeichnung: 'Ausgabe Schule', status: 'aufgeloest' }),
+  ];
+  const mittagAnStellen = (stelle_ids = [TURNHALLE, FELDKUECHE]) =>
+    mittag({
+      stelle_ids,
+      je_stelle: [
+        { stelle_id: TURNHALLE, ausgegeben: { gesamt: 80, sonderkost: KEINE_SONDERKOST } },
+        { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
+      ],
+    });
+  const platz = () => document.querySelector<HTMLElement>('[data-lfh="ausgabe-stelle"]')!;
+  const gewaehlt = () => platz().querySelector('.ant-select-content')?.textContent ?? '';
+  const ist = () => platz().querySelector('[data-lfh="ausgabe-stelle-ist"]')?.textContent ?? '';
+
+  beforeEach(() => {
+    localStorage.clear();
+    liefert([mittagAnStellen()], stellen());
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('zugeordnete zuerst, ohne aufgelöste; bei zwei zugeordneten keine Vorwahl', async () => {
+    zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('ohne Stelle');
+    await oeffne('Stelle');
+    expect(optionenVon('Stelle')).toEqual([
+      'ohne Stelle',
+      'Ausgabe Turnhalle Nord',
+      'Feldküche BR Sportplatz',
+      'Zuführung Deich',
+    ]);
+  });
+
+  it('die gewählte Stelle zeigt ihr Ist, das Bündel trägt sie, der Desktop merkt sie', async () => {
+    zeige();
+    await geladen();
+    await waehle('Stelle', 'Feldküche BR Sportplatz');
+    expect(ist()).toBe('an der Stelle 100 EP');
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toEqual({
+        menge: 1,
+        verpflegungsstelle_id: FELDKUECHE,
+        client_id: expect.any(String),
+      }),
+    );
+    expect(loadGemerkteStelle(1)).toBe(FELDKUECHE);
+  });
+
+  it('ein Wechsel der Stelle bucht das offene Bündel an der alten Stelle', async () => {
+    zeige();
+    await geladen();
+    await waehle('Stelle', 'Feldküche BR Sportplatz');
+    await userEvent.click(taste('+5'));
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
+    await waehle('Stelle', 'Ausgabe Turnhalle Nord');
+    await waitFor(() => expect(erfasseAusgabe).toHaveBeenCalledTimes(1));
+    expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+      menge: 5,
+      verpflegungsstelle_id: FELDKUECHE,
+    });
+    expect(gewaehlt()).toBe('Ausgabe Turnhalle Nord');
+  });
+
+  it('die gemerkte Wahl gilt beim Öffnen', async () => {
+    saveGemerkteStelle(1, DEICH);
+    zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Zuführung Deich');
+  });
+
+  it('`?stelle=` aus der Karte geht vor der gemerkten Wahl', async () => {
+    saveGemerkteStelle(1, DEICH);
+    zeige(1, `?stelle=${TURNHALLE}`);
+    await geladen();
+    expect(gewaehlt()).toBe('Ausgabe Turnhalle Nord');
+    expect(ist()).toBe('an der Stelle 80 EP');
+  });
+
+  it('eine aufgelöste Stelle ist nicht wählbar, auch nicht über `?stelle=`', async () => {
+    zeige(1, '?stelle=30');
+    await geladen();
+    expect(gewaehlt()).toBe('ohne Stelle');
+    await oeffne('Stelle');
+    expect(optionenVon('Stelle')).not.toContain('Ausgabe Schule');
+  });
+
+  it('genau eine zugeordnete Stelle ist vorgewählt', async () => {
+    liefert([mittagAnStellen([FELDKUECHE])], stellen());
+    zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+  });
+
+  it('die Vorwahl gilt beim Öffnen: eine neue Zuordnung bei offener Ansicht ändert die Wahl nicht', async () => {
+    liefert([mittagAnStellen([FELDKUECHE])], stellen());
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    await userEvent.click(taste('+5'));
+    liefert([mittagAnStellen([TURNHALLE, FELDKUECHE])], stellen());
+    await client.invalidateQueries();
+    await waitFor(() => expect(ladeVerpflegung).toHaveBeenCalledTimes(2));
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 5,
+        verpflegungsstelle_id: FELDKUECHE,
+      }),
+    );
+  });
+
+  it('die Vorwahl gilt beim Öffnen: fällt eine von zwei zugeordneten weg, bleibt „ohne Stelle“', async () => {
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('ohne Stelle');
+    liefert(
+      [mittagAnStellen()],
+      stellen().map((s) => (s.id === TURNHALLE ? { ...s, status: 'aufgeloest' as const } : s)),
+    );
+    await client.invalidateQueries();
+    await waitFor(() => expect(ladeVerpflegung).toHaveBeenCalledTimes(2));
+    await oeffne('Stelle');
+    await waitFor(() => expect(optionenVon('Stelle')).not.toContain('Ausgabe Turnhalle Nord'));
+    expect(gewaehlt()).toBe('ohne Stelle');
+  });
+
+  it('wird die gewählte Stelle bei offener Ansicht aufgelöst, fällt sie aus der Wahl', async () => {
+    liefert([mittagAnStellen([FELDKUECHE])], stellen());
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    liefert(
+      [mittagAnStellen([FELDKUECHE])],
+      stellen().map((s) => (s.id === FELDKUECHE ? { ...s, status: 'aufgeloest' as const } : s)),
+    );
+    await client.invalidateQueries();
+    await waitFor(() => expect(gewaehlt()).toBe('ohne Stelle'));
+  });
+
+  it('Speicher wirft: die Wahl wirkt trotzdem bis zum Verlassen', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('gesperrt', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('gesperrt', 'SecurityError');
+    });
+    zeige();
+    await geladen();
+    await waehle('Stelle', 'Zuführung Deich');
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 1,
+        verpflegungsstelle_id: DEICH,
+      }),
+    );
+  });
+
+  it('am Gerät wird nichts gemerkt und nichts Gemerktes gelesen', async () => {
+    saveGemerkteStelle(1, DEICH);
+    server.use(
+      meHandler({
+        ...benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Gerät' }),
+        geraet: {
+          kopplung_id: 3,
+          einsatz_id: 1,
+          ansicht: 'verpflegung',
+          uhs_id: null,
+          stelle_id: null,
+          stelle: null,
+          bezeichnung: 'Ausgabe Deich',
+          laeuft_ab_at: '2026-10-04 18:00:00',
+        },
+      }),
+    );
+    renderMitProviders(ansicht, { route: '/einsaetze/1/verpflegung/1/ausgabe' });
+    await geladen();
+    await waitFor(() => expect(gewaehlt()).toBe('ohne Stelle'));
+    await waehle('Stelle', 'Feldküche BR Sportplatz');
+    expect(loadGemerkteStelle(1)).toBe(DEICH);
+  });
+
+  it('ohne Stellen im Einsatz bleibt der Platz leer', async () => {
+    liefert([mittag()], []);
+    zeige();
+    await geladen();
+    expect(platz().childNodes).toHaveLength(0);
   });
 });

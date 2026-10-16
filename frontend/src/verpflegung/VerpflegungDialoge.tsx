@@ -10,6 +10,8 @@ import type {
   ModulFreigaben,
   SonderkostEingabe,
   VerpflegungAusgabe,
+  Verpflegungsart,
+  Verpflegungsstelle,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
   ZeitfensterPatch,
@@ -17,6 +19,7 @@ import type {
 import {
   VERPFLEGUNG_BEMERKUNG_MAX,
   VERPFLEGUNG_ORT_MAX,
+  VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX,
   VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX,
 } from '../api/eingabegrenzen';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -26,8 +29,16 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { stellenWahl } from './stellenKern';
 import { useBedarfsvorschlag, type Vorschlag } from './useBedarfsvorschlag';
-import { KOSTFORM_LABEL, KOSTFORMEN, sonderkostText, uhrzeit, zitat } from './verpflegungText';
+import {
+  KOSTFORM_LABEL,
+  KOSTFORMEN,
+  VERPFLEGUNGSART_LABEL,
+  sonderkostText,
+  uhrzeit,
+  zitat,
+} from './verpflegungText';
 
 dayjs.extend(utc);
 
@@ -45,7 +56,15 @@ dayjs.extend(utc);
  * setzt der Server.
  *
  * PATCH: Schlüssel fehlt = unverändert, kein `null`. Gesendet werden nur geänderte Schlüssel;
- * ein geleertes optionales Zahlfeld heißt 0. Ein leerer PATCH wird nicht gesendet.
+ * ein geleertes optionales Zahlfeld heißt 0. Ein leerer PATCH wird nicht gesendet. Ausnahme
+ * `verpflegungsart`: Leeren schickt `null`; `stelle_ids` ersetzt die Zuordnung (`[]` leert sie),
+ * gleiche Stellen in anderer Reihenfolge sind keine Änderung.
+ *
+ * STELLEN (LLH-1040, design.md D13 Punkte 5–6): Art und Stellen des Zeitfensters liegen im
+ * eigenen Klappteil, dessen Kopf die Wahl nennt; die Stellen nur, wenn es welche gibt. Der
+ * Nachtrag zeigt „Stelle“ sichtbar; „Ort“ heißt mit Stellen im Einsatz „Zuführungsziel“ und
+ * entfällt, sobald eine Stelle gewählt ist (Stelle und Zuführungsziel sind Alternativen, deshalb
+ * höchstens vier sichtbare Felder).
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -77,6 +96,8 @@ interface ZeitfensterWerte {
   bedarf_betreute: number;
   bedarf_weitere?: number | null;
   sonderkost?: SonderkostWerte;
+  verpflegungsart?: Verpflegungsart | null;
+  stelle_ids?: number[];
 }
 
 export function zeitfensterAnlegenBody(w: ZeitfensterWerte): ZeitfensterEingabe {
@@ -89,7 +110,15 @@ export function zeitfensterAnlegenBody(w: ZeitfensterWerte): ZeitfensterEingabe 
     bedarf_betreute: w.bedarf_betreute,
     ...(w.bedarf_weitere != null ? { bedarf_weitere: w.bedarf_weitere } : {}),
     ...(sonderkost ? { sonderkost } : {}),
+    ...(w.verpflegungsart != null ? { verpflegungsart: w.verpflegungsart } : {}),
+    ...(w.stelle_ids && w.stelle_ids.length > 0 ? { stelle_ids: [...w.stelle_ids] } : {}),
   };
+}
+
+/** Gleiche Stellen, gleich in welcher Reihenfolge. */
+function isSameStellen(a: readonly number[], b: readonly number[]): boolean {
+  const menge = new Set(a);
+  return menge.size === new Set(b).size && b.every((id) => menge.has(id));
 }
 
 /** Wire-Zeit normalisiert — ein Vergleich roher Strings sähe „…:00" und „…:00.000" verschieden. */
@@ -118,6 +147,12 @@ export function zeitfensterPatch(
     if (neu !== vorher.bedarf.sonderkost[k]) sk[k] = neu;
   }
   if (Object.keys(sk).length > 0) patch.sonderkost = sk;
+  const art = w.verpflegungsart ?? null;
+  if (art !== (vorher.verpflegungsart ?? null)) patch.verpflegungsart = art;
+  // Ohne Feld (keine Stellen im Einsatz) bleibt die Zuordnung, wie sie ist.
+  if (w.stelle_ids !== undefined && !isSameStellen(w.stelle_ids, vorher.stelle_ids)) {
+    patch.stelle_ids = [...w.stelle_ids];
+  }
   return patch;
 }
 
@@ -130,16 +165,20 @@ interface AusgabeWerte {
   sonderkost?: SonderkostWerte;
   nachforderung_id?: number | null;
   bemerkung?: string | null;
+  verpflegungsstelle_id?: number | null;
 }
 
 export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
-  const ort = text(w.ort);
+  const stelle = w.verpflegungsstelle_id ?? null;
+  // Stelle und Zuführungsziel sind Alternativen: an einer Stelle zählt kein Ort.
+  const ort = stelle != null ? null : text(w.ort);
   const bemerkung = text(w.bemerkung);
   const sonderkost = sonderkostAnlegen(w.sonderkost);
   return {
     menge: w.menge,
     ...(w.zeitpunkt ? { zeitpunkt_at: alsBackendZeit(w.zeitpunkt) } : {}),
     ...(ort != null ? { ort } : {}),
+    ...(stelle != null ? { verpflegungsstelle_id: stelle } : {}),
     ...(sonderkost ? { sonderkost } : {}),
     ...(w.nachforderung_id != null ? { nachforderung_id: w.nachforderung_id } : {}),
     ...(bemerkung != null ? { bemerkung } : {}),
@@ -200,6 +239,30 @@ interface DialogBasis {
 
 // ── Zeitfenster anlegen / bearbeiten ────────────────────────────────────────────────────
 
+const VERPFLEGUNGSART_OPTIONEN = (Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[]).map(
+  (a) => ({ value: a, label: VERPFLEGUNGSART_LABEL[a] }),
+);
+
+/**
+ * Wählbare Stellen eines Zeitfensters: die nicht aufgelösten in der Folge des Servers, dazu die
+ * schon zugeordneten aufgelösten (sie dürfen bleiben, D4; eine neu hinzukommende aufgelöste lehnt
+ * der Server ab und wird deshalb nicht angeboten).
+ */
+function zeitfensterStellenOptionen(
+  stellen: readonly Verpflegungsstelle[],
+  vorher: Pick<VerpflegungZeitfenster, 'stelle_ids'> | null,
+): { value: number; label: string }[] {
+  const zugeordnet = new Set(vorher?.stelle_ids ?? []);
+  return [
+    ...stellen
+      .filter((s) => s.status !== 'aufgeloest')
+      .map((s) => ({ value: s.id, label: s.bezeichnung })),
+    ...stellen
+      .filter((s) => s.status === 'aufgeloest' && zugeordnet.has(s.id))
+      .map((s) => ({ value: s.id, label: `${s.bezeichnung} (aufgelöst)` })),
+  ];
+}
+
 /**
  * Feldhilfe eines Bedarfsfelds. Beim ANLEGEN steht der Vorschlag im Feld, die Hilfe nennt nur
  * die Herkunft; beim BEARBEITEN überschreibt der Vorschlag nichts, die Hilfe nennt die Zahl mit.
@@ -224,6 +287,8 @@ interface ZeitfensterDialogProps extends DialogBasis {
   /** `freigabenQuery.data` unverändert — `undefined` heißt „noch unbekannt" (Hook-Vertrag). */
   freigaben: ModulFreigaben | undefined;
   jetzt: Dayjs;
+  /** Die Verpflegungsstellen des Einsatzes (LLH-1040); ohne gibt es kein Feld „Stellen“. */
+  stellen?: readonly Verpflegungsstelle[];
 }
 
 type Bedarfsfeld = 'bedarf_kraefte' | 'bedarf_betreute';
@@ -233,6 +298,7 @@ export function ZeitfensterDialog({
   einsatzId,
   freigaben,
   jetzt,
+  stellen = [],
   laeuft,
   fehler,
   onSchliessen,
@@ -240,6 +306,21 @@ export function ZeitfensterDialog({
   const [form] = Form.useForm<ZeitfensterWerte>();
   const anlegen = modus.art === 'anlegen';
   const vorher = modus.art === 'bearbeiten' ? modus.zeitfenster : null;
+  // Die Grenze der Stellen kann scheitern: der Klappteil geht dann selbst auf.
+  const [stellenOffen, setStellenOffen] = useState(false);
+  const hasStellen = stellen.length > 0;
+  const art = Form.useWatch('verpflegungsart', form) as Verpflegungsart | null | undefined;
+  const gewaehlteStellen = (Form.useWatch('stelle_ids', form) as number[] | undefined) ?? [];
+  const stellenOptionen = zeitfensterStellenOptionen(stellen, vorher);
+  const stellenKopf = [
+    hasStellen ? 'Art und Stellen' : 'Art',
+    art ? VERPFLEGUNGSART_LABEL[art] : undefined,
+    gewaehlteStellen.length > 0
+      ? `${gewaehlteStellen.length} ${gewaehlteStellen.length === 1 ? 'Stelle' : 'Stellen'}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   // Der Beginn geht als Wire-String in den Query-Key der Kopfzahl — nie ein je Render neu
   // gerechnetes „jetzt".
@@ -286,6 +367,8 @@ export function ZeitfensterDialog({
         bedarf_betreute: vorher.bedarf.betreute,
         bedarf_weitere: vorher.bedarf.weitere,
         sonderkost: { ...vorher.bedarf.sonderkost },
+        verpflegungsart: vorher.verpflegungsart ?? undefined,
+        ...(hasStellen ? { stelle_ids: [...vorher.stelle_ids] } : {}),
       }
     : undefined;
 
@@ -301,6 +384,9 @@ export function ZeitfensterDialog({
         if (modus.art === 'anlegen') return modus.onErfassen(zeitfensterAnlegenBody(w));
         const patch = zeitfensterPatch(modus.zeitfenster, w);
         return Object.keys(patch).length === 0 ? Promise.resolve() : modus.onErfassen(patch);
+      }}
+      onPruefungGescheitert={(felder) => {
+        if (felder.includes('stelle_ids')) setStellenOffen(true);
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -370,6 +456,35 @@ export function ZeitfensterDialog({
           {sonderkostFelder()}
         </>,
       )}
+      {eingeklappt(
+        stellenKopf,
+        <>
+          <Form.Item<ZeitfensterWerte>
+            name="verpflegungsart"
+            label="Art"
+            style={hasStellen ? undefined : { marginBottom: 0 }}
+          >
+            <Select allowClear placeholder="ohne Angabe" options={VERPFLEGUNGSART_OPTIONEN} />
+          </Form.Item>
+          {hasStellen && (
+            <Form.Item<ZeitfensterWerte>
+              name="stelle_ids"
+              label="Stellen"
+              rules={[
+                {
+                  type: 'array',
+                  max: VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX,
+                  message: `Höchstens ${VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX} Stellen`,
+                },
+              ]}
+              style={{ marginBottom: 0 }}
+            >
+              <Select mode="multiple" placeholder="einsatzweit" options={stellenOptionen} />
+            </Form.Item>
+          )}
+        </>,
+        { offen: stellenOffen, setOffen: setStellenOffen },
+      )}
       <SpeicherFehler
         fehler={fehler}
         titel={anlegen ? 'Zeitfenster konnte nicht angelegt werden' : 'Bedarf nicht gespeichert'}
@@ -392,7 +507,29 @@ interface AusgabeDialogProps extends DialogBasis {
    * Feld nicht.
    */
   nachforderungen: readonly NachforderungOption[] | null;
+  /** Die Verpflegungsstellen des Einsatzes (LLH-1040); ohne gibt es keine Stellenwahl. */
+  stellen?: readonly Verpflegungsstelle[];
   onErfassen: (body: AusgabeEingabe) => Promise<unknown>;
+}
+
+/**
+ * Gruppen der Stellenwahl im Nachtrag: die zugeordneten zuerst, die aufgelösten für Nachträge vor
+ * der Auflösung als eigene Gruppe (der Server prüft den Zeitpunkt, 409).
+ */
+function nachtragStellenOptionen(
+  stellen: readonly Verpflegungsstelle[],
+  zf: VerpflegungZeitfenster,
+): { label: string; options: { value: number; label: string }[] }[] {
+  const wahl = stellenWahl(stellen, zf);
+  const toOption = (s: Verpflegungsstelle) => ({ value: s.id, label: s.bezeichnung });
+  return [
+    { label: 'zugeordnet', options: wahl.zugeordnet.map(toOption) },
+    {
+      label: wahl.zugeordnet.length > 0 ? 'weitere' : 'Stellen',
+      options: wahl.weitere.map(toOption),
+    },
+    { label: 'aufgelöst', options: wahl.aufgeloest.map(toOption) },
+  ].filter((g) => g.options.length > 0);
 }
 
 /**
@@ -403,6 +540,7 @@ interface AusgabeDialogProps extends DialogBasis {
 export function AusgabeDialog({
   zeitfenster: zf,
   nachforderungen,
+  stellen = [],
   laeuft,
   fehler,
   onErfassen,
@@ -416,6 +554,9 @@ export function AusgabeDialog({
   const sonderkost = Form.useWatch('sonderkost', form) as SonderkostWerte | undefined;
   const nachforderungId = Form.useWatch('nachforderung_id', form) as number | null | undefined;
   const bemerkung = Form.useWatch('bemerkung', form) as string | null | undefined;
+  const stelleId = Form.useWatch('verpflegungsstelle_id', form) as number | null | undefined;
+  const hasStellen = stellen.length > 0;
+  const ortLabel = hasStellen ? 'Zuführungsziel' : 'Ort';
   const abweichungen = [
     ...KOSTFORMEN.filter((k) => (sonderkost?.[k] ?? 0) > 0).map(
       (k) => `${sonderkost?.[k]} ${KOSTFORM_LABEL[k]}`,
@@ -457,13 +598,24 @@ export function AusgabeDialog({
       >
         {anzahlFeld(1)}
       </Form.Item>
-      <Form.Item<AusgabeWerte>
-        name="ort"
-        label="Ort"
-        rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, 'Ort')]}
-      >
-        <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
-      </Form.Item>
+      {hasStellen && (
+        <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
+          <Select
+            allowClear
+            placeholder="ohne Stelle"
+            options={nachtragStellenOptionen(stellen, zf)}
+          />
+        </Form.Item>
+      )}
+      {stelleId == null && (
+        <Form.Item<AusgabeWerte>
+          name="ort"
+          label={ortLabel}
+          rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, ortLabel)]}
+        >
+          <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
+        </Form.Item>
+      )}
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
@@ -507,7 +659,7 @@ export function AusgabeDialog({
  * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Karten. Während `laeuft` ist sie
  * nicht schließbar, damit ein Server-Grund (422/409) im Dialog ankommt.
  */
-function Rueckfrage({
+export function Rueckfrage({
   titel,
   okText,
   children,

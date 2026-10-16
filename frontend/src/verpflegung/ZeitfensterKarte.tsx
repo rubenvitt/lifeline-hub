@@ -1,7 +1,7 @@
-import { Button, Flex, Typography } from 'antd';
+import { Button, Flex, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import type { VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
+import type { VerpflegungAusgabe, Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
@@ -13,10 +13,12 @@ import {
   monoStil,
   useRollen,
 } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
+import { stellenName, zeilenJeStelle } from './stellenKern';
 import {
   KOSTFORM_LABEL,
   belegteKostformen,
@@ -24,6 +26,7 @@ import {
   sonderkostText,
   sonderkostVoll,
   uhrzeit,
+  VERPFLEGUNGSART_LABEL,
   zeitfensterKennung,
   zeitraumText,
 } from './verpflegungText';
@@ -59,6 +62,11 @@ export interface ZeitfensterKarteProps {
    * Einstufung — die kommen allein vom Server (design.md D8).
    */
   ausstehend?: readonly VorgemerkteAusgabe[];
+  /**
+   * Die Verpflegungsstellen des Einsatzes (LLH-1040), für Namen und Kennzeichen der Aufstellung
+   * je Stelle und der Ausgaben. Gerechnet wird nichts: das Ist je Stelle steht in `je_stelle`.
+   */
+  stellen?: readonly Verpflegungsstelle[];
 }
 
 type Aktionsschluessel = 'nachtragen' | 'bearbeiten' | 'nachfordern' | 'loeschen';
@@ -86,6 +94,13 @@ interface Aktion {
  * sind gleichrangige Aktionen: ab drei nach der Rechteprüfung liegen ALLE im Dreipunkt-Menü,
  * „Löschen" rot hinter dem Trenner, daneben steht nur der Sprung. Ohne Schreibrecht fällt die
  * Aktionszeile weg. Jeder zugängliche Name trägt die Zeilenkennung (Bezeichnung + Zeitraum).
+ *
+ * Stellen (LLH-1040, design.md D13 Punkt 4): die Verpflegungsart als neutrale Marke neben der
+ * Bezeichnung. Unter dem Kennzahlenband das Ist je Stelle aus `je_stelle`, NUR wenn es nicht leer
+ * ist — der Bestand ohne Stelle sieht aus wie vorher. Kein Soll je Stelle: die einzige Fehlmenge
+ * bleibt das Gesamt-„fehlt“. Je wählbarer Stelle (nicht aufgelöst) führt außerhalb des schmalen
+ * Schirms ein Sprung „Ausgabe öffnen“ mit `?stelle=` in die Ausgabeansicht, unter denselben
+ * Bedingungen wie der Sprung der Karte. Ausgaben an einer Stelle nennen die Stelle statt des Orts.
  */
 export default function ZeitfensterKarte({
   zeitfenster: zf,
@@ -100,8 +115,10 @@ export default function ZeitfensterKarte({
   onLoeschen,
   onZuruecknehmen,
   ausstehend = [],
+  stellen = [],
 }: ZeitfensterKarteProps) {
   const { token, rollen } = useRollen();
+  const { istSchmal } = useViewport();
   const { konventionen } = useAnzeigeKonventionen();
   const pfade = useEinsatzPfade();
   const stufe = deckungEinstufung(zf, jetzt);
@@ -126,6 +143,11 @@ export default function ZeitfensterKarte({
       ].filter(Boolean) as Aktion[])
     : [];
   const sprung = darfSchreiben && !istVergangen(zf, jetzt);
+  const jeStelle = zeilenJeStelle(zf, stellen);
+  const sprungJeStelle = sprung && !istSchmal;
+  /** Stelle statt Ort: eine Ausgabe an einer Stelle nennt die Stelle, ohne den Ort. */
+  const woText = (stelleId: number | null | undefined, ort: string | null | undefined) =>
+    stelleId != null ? ` · ${stellenName(stelleId, stellen)}` : ort ? ` · ${ort}` : '';
   const gebuendelt = aktionen.length >= 3;
   const fuehreAus = (key: Aktionsschluessel) => {
     if (key === 'nachtragen') onAusgabeNachtragen?.(zf);
@@ -163,6 +185,12 @@ export default function ZeitfensterKarte({
           <span data-lfh="verpflegung-zeitraum" style={{ ...monoStil(12), color: rollen.text2 }}>
             {zeitraumText(zf, konventionen)}
           </span>
+          {zf.verpflegungsart && (
+            // Neutrale Marke ohne `color`: kein Status, der Text trägt die Bedeutung.
+            <Tag data-lfh="verpflegungsart" style={{ marginInlineEnd: 0 }}>
+              {VERPFLEGUNGSART_LABEL[zf.verpflegungsart]}
+            </Tag>
+          )}
         </Flex>
         <StatusTag darstellung={darstellung} />
       </Flex>
@@ -191,6 +219,60 @@ export default function ZeitfensterKarte({
           ton={FEHLT_TON[stufe]}
         />
       </Kennzahlenband>
+
+      {jeStelle.length > 0 && (
+        <ul
+          aria-label={`Ausgegeben je Stelle zu ${kennung}`}
+          data-lfh="verpflegung-je-stelle"
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            paddingBlock: token.paddingXS,
+            paddingInline: token.padding,
+          }}
+        >
+          {jeStelle.map((z) => {
+            const waehlbar =
+              z.stelleId != null &&
+              stellen.some((s) => s.id === z.stelleId && s.status !== 'aufgeloest');
+            return (
+              <li
+                key={z.stelleId ?? 'ohne'}
+                data-stelle={z.stelleId ?? undefined}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  columnGap: token.marginSM,
+                  rowGap: token.marginXXS,
+                  paddingBlock: 2,
+                }}
+              >
+                <span data-lfh="je-stelle-text" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                  {z.bezeichnung}
+                  {z.kennzeichen.map((k) => (
+                    <span key={k} style={{ color: rollen.text2 }}>
+                      {' · '}
+                      {k}
+                    </span>
+                  ))}
+                  {' · '}
+                  <span style={monoStil(13, 500)}>{z.ausgegeben} EP</span>
+                </span>
+                {sprungJeStelle && waehlbar && (
+                  <SprungKnopf
+                    to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id, { stelle: z.stelleId! })}
+                    zugaenglicherName={`Ausgabe öffnen an ${z.bezeichnung} zu ${kennung}`}
+                  >
+                    Ausgabe öffnen
+                  </SprungKnopf>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {kostformen.length > 0 && (
         <div
@@ -276,7 +358,7 @@ export default function ZeitfensterKarte({
               >
                 <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
                   <span style={monoStil(13, 500)}>{a.menge} EP</span>
-                  {a.ort ? ` · ${a.ort}` : ''}
+                  {woText(a.verpflegungsstelle_id, a.ort)}
                   {sk ? ` · ${sk}` : ''}
                   {verweis != null && (
                     <>
@@ -302,7 +384,7 @@ export default function ZeitfensterKarte({
               >
                 <span style={{ color: rollen.text2 }}>
                   <span style={monoStil(13, 500)}>{d.menge} EP</span>
-                  {d.ort ? ` · ${d.ort}` : ''}
+                  {woText(d.verpflegungsstelle_id, d.ort)}
                   {sk ? ` · ${sk}` : ''}
                 </span>
               </Zeitachseneintrag>

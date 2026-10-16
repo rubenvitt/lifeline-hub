@@ -39,6 +39,7 @@ import {
   abloesungPfad,
   betreuungPfad,
   verpflegungAusgabePfad,
+  parseVerpflegungStelle,
   geraetVerpflegungAusgabePfad,
   verpflegungPfad,
   wetterPegelPfad,
@@ -390,6 +391,21 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('Ausgabeansicht eines Zeitfensters an Stab und Gerät (LLH-1032, design.md D1)', () => {
     expect(verpflegungAusgabePfad(E, 12)).toBe('/einsaetze/5/verpflegung/12/ausgabe');
     expect(geraetVerpflegungAusgabePfad(E, 12)).toBe('/geraet/5/verpflegung/12/ausgabe');
+  });
+
+  it('Ausgabeansicht mit gewählter Stelle per `?stelle=` (LLH-1040, D13 Punkt 7)', () => {
+    expect(verpflegungAusgabePfad(E, 12, { stelle: 21 })).toBe(
+      '/einsaetze/5/verpflegung/12/ausgabe?stelle=21',
+    );
+    expect(geraetVerpflegungAusgabePfad(E, 12, { stelle: 21 })).toBe(
+      '/geraet/5/verpflegung/12/ausgabe?stelle=21',
+    );
+    expect(verpflegungAusgabePfad(E, 12, {})).toBe('/einsaetze/5/verpflegung/12/ausgabe');
+    expect(parseVerpflegungStelle(new URLSearchParams('?stelle=21'))).toBe(21);
+    expect(parseVerpflegungStelle(new URLSearchParams(''))).toBeNull();
+    expect(parseVerpflegungStelle(new URLSearchParams('?stelle=abc'))).toBeNull();
+    expect(parseVerpflegungStelle(new URLSearchParams('?stelle=0'))).toBeNull();
+    expect(parseVerpflegungStelle(new URLSearchParams('?stelle=-3'))).toBeNull();
   });
 
   it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {
