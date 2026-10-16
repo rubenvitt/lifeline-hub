@@ -525,6 +525,7 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
       zeitfenster: [vorher],
       stellen: [],
+      empfaenger: { einheiten: [], abschnitte: [] },
     });
     const nachher = zeitfenster({
       id: 9,

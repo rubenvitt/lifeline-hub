@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Verpflegung, VerpflegungAusgabeErgebnis } from '../api/types';
-import { KEINE_SONDERKOST, zeitfenster } from '../test/verpflegungDaten';
+import { KEINE_EMPFAENGER, KEINE_SONDERKOST, zeitfenster } from '../test/verpflegungDaten';
 import { useAusgabeSammlung, type AusgabeSammlungOptionen } from './useAusgabeSammlung';
 
 const erfasse = vi.fn();
@@ -34,6 +34,7 @@ function aufbau(start: Partial<AusgabeSammlungOptionen> = {}) {
   client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(1), {
     zeitfenster: [zeitfenster()],
     stellen: [],
+    empfaenger: KEINE_EMPFAENGER,
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
