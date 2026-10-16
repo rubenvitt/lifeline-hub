@@ -97,7 +97,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
   ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
   Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Die Suche kennt nur
-  Kräfte des Einsatzes, keine Stammdaten. Meldungen an
+  Kräfte des Einsatzes, keine Stammdaten. Abrufen ist eine Führungsentscheidung (LLH-1085):
+  `br-abrufen` ist an keinem Gerät wahr, „Abrufen“, „Abrufen und austragen“ und „Abruf
+  zurücknehmen“ fehlen dort. Das Gerät sieht abgerufene Kräfte live unter „Abgerufen“ (ohne Ton,
+  Entscheidung 15.10.2026) und bucht „Ausrücken buchen“ als Austritt über `…/belegung`; „Austragen“
+  steht an Desktop und Gerät im Aktionsmenü der Zeile. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
 - **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte
