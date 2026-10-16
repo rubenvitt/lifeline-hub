@@ -3244,6 +3244,42 @@ async fn br_geraet_kennt_nur_den_eigenen_raum() {
     assert_eq!(v["bezeichnung"], "BR Sportplatz");
     let (s, _) = anfrage(&app, "GET", &format!("{liste}/{schule}"), &geraet, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+
+    // Verlauf (LLH-1095, Spec `funktionsansichten`): der eigene 200 mit dem eigenen Eintritt,
+    // ein Wechsel aus dem fremden Raum herein nennt dessen Bezeichnung, der fremde Verlauf 404.
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &admin, einsatz, schule, rtw, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, rtw, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{liste}/{sportplatz}/verlauf"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let eintraege = v.as_array().unwrap();
+    assert_eq!(eintraege.len(), 2, "{v}");
+    assert_eq!(eintraege[0]["art"], "wechsel_herein");
+    assert_eq!(eintraege[0]["objekt_name"], "RTW 1");
+    assert_eq!(eintraege[0]["herkunft"], "BR Schule");
+    assert_eq!(eintraege[1]["art"], "eintritt");
+    assert_eq!(eintraege[1]["objekt_name"], "LF Nord");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{liste}/{schule}/verlauf"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Verlauf");
 }
 
 /// Anmelden (Eintritt, Wechsel herein) und Abmelden (Austritt) im eigenen Raum; in einen
@@ -3521,6 +3557,169 @@ async fn live_kanal_des_br_geraets_traegt_den_raum_ohne_etb() {
         "{beim_br:?}"
     );
     assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
+}
+
+/// Abruf aus dem Bereitstellungsraum (LLH-1085, Spec `funktionsansichten`, „Abruf sehen“,
+/// „Ausrücken bestätigen“, „Abrufen am Gerät“): die Einsatzleitung ruft mit Ziel und Auftrag ab,
+/// das Gerät erhält `bereitstellungsraum`, aber weder `etb` noch `auftrag`, sieht den Abruf im
+/// Detail und bucht das Ausrücken als Austritt; Abrufen und Zurücknehmen sind 403, nichts
+/// geschrieben, keine Benachrichtigung an das Gerät.
+#[tokio::test]
+async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(&json!({"name": "EA Deich"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let deich = v["id"].as_i64().unwrap();
+    let hlf = einheit_bilden(&app, &admin, einsatz, "HLF 20").await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    for e in [hlf, lf] {
+        let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, e, "eintritt").await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let anzahl = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM br_belegung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+
+    // Das Gerät ruft nicht ab und nimmt nicht zurück.
+    let vorher = anzahl().await;
+    for pfad in [format!("{raum}/abruf"), format!("{raum}/abruf/aufheben")] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &pfad,
+            &geraet,
+            Some(&json!({"objekt_typ": "einheit", "objekt_id": lf})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}: {v}");
+    }
+    assert_eq!(anzahl().await, vorher, "nichts geschrieben");
+
+    let mut br_strom = live_geraet(&app, &geraet, einsatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/abruf"),
+        &admin,
+        Some(
+            &json!({"objekt_typ": "einheit", "objekt_id": hlf, "abschnitt_id": deich,
+                     "auftrag_text": "Sandsackverbau"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mut beim_br = Vec::new();
+    strom_lesen(&mut br_strom, &mut beim_br, Duration::from_millis(500)).await;
+    assert!(
+        beim_br.iter().any(|e| e == "bereitstellungsraum"),
+        "{beim_br:?}"
+    );
+    assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
+    assert!(!beim_br.iter().any(|e| e == "auftrag"), "{beim_br:?}");
+
+    let (s, d) = anfrage(&app, "GET", &raum, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    let zeile = d["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == hlf)
+        .unwrap()
+        .clone();
+    assert_eq!(zeile["abruf"]["ziel_anzeige"], "EA Deich", "{zeile}");
+
+    // Ausrücken bestätigen ist der Austritt.
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, hlf, "austritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "HLF 20 rückt aus Bereitstellungsraum BR Sportplatz aus nach EA Deich"),
+        "{etb:?}"
+    );
+    let geraet_benutzer: i64 =
+        sqlx::query_scalar("SELECT erfasst_von FROM br_belegung WHERE id = ?")
+            .bind(v["id"].as_i64().unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let an_geraet: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE benutzer_id = ?")
+            .bind(geraet_benutzer)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(an_geraet, 0, "keine Benachrichtigung an das Gerät");
+}
+
+/// Spec-Szenario „Abgerufene Kraft verlegen“ am Gerät (LLH-1085, tasks.md 3.5): Das Gerät eines
+/// anderen Raums holt eine abgerufene Kraft nicht per Wechsel herein (422, nichts geschrieben,
+/// sie bleibt abgerufen im alten Raum); eine nicht abgerufene Kraft holt es herein.
+#[tokio::test]
+async fn br_geraet_holt_abgerufene_kraft_nicht_per_wechsel_herein() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, schule).await;
+    let hlf = einheit_bilden(&app, &admin, einsatz, "HLF 20").await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    for e in [hlf, lf] {
+        let (s, v) = belegen(&app, &admin, einsatz, sportplatz, e, "eintritt").await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let alt = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{alt}/abruf"),
+        &admin,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": hlf})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let anzahl = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM br_belegung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+
+    let vorher = anzahl().await;
+    let (s, v) = belegen(&app, &geraet, einsatz, schule, hlf, "wechsel").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(anzahl().await, vorher, "nichts geschrieben");
+    let (_, d) = anfrage(&app, "GET", &alt, &admin, None).await;
+    let zeile = d["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == hlf)
+        .cloned()
+        .unwrap_or_else(|| panic!("HLF 20 bleibt im alten Raum: {d}"));
+    assert!(zeile["abruf"].is_object(), "bleibt abgerufen: {zeile}");
+
+    // Gegenprobe: dieselbe Buchung mit einer nicht abgerufenen Kraft gelingt.
+    let (s, v) = belegen(&app, &geraet, einsatz, schule, lf, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
 }
 
 // ---------- Kräfte der UHS (LFH-1045) ----------
@@ -4856,4 +5055,162 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_verpflegung_ohne_etb() {
         "{beim_geraet:?}"
     );
     assert!(!beim_geraet.iter().any(|e| e == "etb"), "{beim_geraet:?}");
+}
+
+/// LLH-1075 (Spec `funktionsansichten`, design.md D7): das BR-Gerät bucht das Eintreffen einer
+/// erwarteten und einer unangemeldeten Kraft am eigenen Raum und sieht seine Meldung; am fremden
+/// Raum 404 ohne Anlage; es liest die Perioden der Einheiten; Übernehmen und Abweisen bleiben der
+/// Führung (403); die Wiederholung einer fremden Erfassung ist 409; das Abschnittsgerät bucht
+/// kein Eintreffen.
+#[tokio::test]
+async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/eintreffen");
+    let einheiten = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "bekannt: {v}");
+    assert_eq!(v["zeitachse"], "geschrieben");
+
+    let vorher = einheiten().await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(schule),
+        &geraet,
+        Some(&json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "FL 9"}]}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+    assert_eq!(einheiten().await, vorher, "nichts angelegt");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({
+            "unangemeldet": {"fahrzeuge": [{"funkrufname": "FL-MUS 1-44-1"}]},
+            "client_id": "g1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "unangemeldet: {v}");
+    let neu = v["einheit_id"].as_i64().unwrap();
+    let meldung = v["meldung_id"].as_i64().unwrap();
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste}");
+    assert!(
+        liste.as_array().unwrap().iter().any(|m| m["id"] == meldung),
+        "die eigene Meldung steht in der Liste des Geräts: {liste}"
+    );
+    let geraet_benutzer: i64 =
+        sqlx::query_scalar("SELECT erfasst_von_id FROM meldung WHERE id = ?")
+            .bind(meldung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let an_geraet: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE benutzer_id = ?")
+            .bind(geraet_benutzer)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(an_geraet, 0, "keine Benachrichtigung an das Gerät");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten/zeitachse"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    for aktion in ["uebernehmen", "abweisen"] {
+        let (s, _) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{neu}/{aktion}"),
+            &geraet,
+            Some(&json!({})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{aktion}");
+    }
+
+    // Die Erfassung einer Person mit derselben client_id gibt das Gerät nicht heraus (409).
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &admin,
+        Some(&json!({
+            "kraft": {"objekt_typ": "einheit", "objekt_id": einheit_bilden(&app, &admin, einsatz, "RTW 1").await},
+            "client_id": "p1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &geraet,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}, "client_id": "p1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "fremde Wiederholung am Gerät");
+
+    // Abschnittsgerät: kein Eintreffen (403).
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(&json!({"name": "Nord"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, ea) = abschnittsgeraet(&app, &admin, einsatz, v["id"].as_i64().unwrap()).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &pfad(sportplatz),
+        &ea,
+        Some(&json!({"kraft": {"objekt_typ": "einheit", "objekt_id": lf}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Abschnittsgerät");
 }

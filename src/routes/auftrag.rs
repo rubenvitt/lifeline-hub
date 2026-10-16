@@ -235,37 +235,7 @@ pub async fn anlegen(
     )
     .await?;
 
-    // Nachfass/Eskalation (LFH-118): bei gesetzter Quittierfrist eine Auto-Frist-Erinnerung
-    // anlegen (idempotent, quelle='auto_frist', bezug_typ='auftrag'). Der Scheduler-Tick feuert
-    // bei Fristablauf `erinnerung` mit Diskriminator → In-App-Alarm; Quittieren aller Empfänger
-    // schließt sie wieder (siehe quittieren). Reuse des Meldungs-Pfads (routes/meldung.rs).
-    if let Some(frist) = d.auftrag.frist_at.as_deref() {
-        let titel = crate::auftrag::quittierfrist_titel(d.auftrag.lfd_nr);
-        crate::erinnerung::repo::anlegen_aus_frist(
-            &state.pool,
-            einsatz_id,
-            ctx.benutzer.id,
-            crate::kommunikation::OBJEKT_AUFTRAG,
-            d.auftrag.id,
-            &titel,
-            frist,
-            &now,
-        )
-        .await?;
-    }
-
-    // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.
-    if let Some(etb_id) = d.auftrag.etb_anordnung_id {
-        state.live.publiziere(einsatz_id, etb_id);
-    }
-    crate::auftrag::benachrichtigung::erteilt(
-        &state.pool,
-        &state.live,
-        einsatz_id,
-        d.auftrag.id,
-        ctx.benutzer.id,
-    )
-    .await;
+    crate::auftrag::nach_erteilung(&state, einsatz_id, d.auftrag.id, ctx.benutzer.id, &now).await?;
     let mut d = d;
     anreichern_alle(
         &state.pool,
@@ -277,7 +247,6 @@ pub async fn anlegen(
         std::slice::from_mut(&mut d),
     )
     .await?;
-    sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(d)))
 }
 

@@ -2677,6 +2677,95 @@
           "einsatzabschnitt"
         ]
       },
+      "BrAbrufErgebnis": {
+        "type": "object",
+        "description": "Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).",
+        "required": [
+          "abruf",
+          "mitgenommen"
+        ],
+        "properties": {
+          "abruf": {
+            "$ref": "#/components/schemas/BrBelegungAnzeige",
+            "description": "Das Abruf-Ereignis der abgerufenen Kraft."
+          },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des erteilten Auftrags."
+          },
+          "mitgenommen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Einheiten, die als Untereinheiten mit abgerufen wurden."
+          }
+        }
+      },
+      "BrAbrufKurz": {
+        "type": "object",
+        "description": "Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec\n`bereitstellungsraum-belegung`, „Detail nennt den Abruf“): abgeleitet aus dem jüngsten\nBelegungsereignis, nicht gespeichert.",
+        "required": [
+          "seit_at"
+        ],
+        "properties": {
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Auftrag des Abrufs; nur an der abgerufenen Einheit, nicht an mitgenommenen."
+          },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer dieses Auftrags."
+          },
+          "mit_objekt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Einheit, mit der diese Untereinheit abgerufen wurde (D10)."
+          },
+          "seit_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Abrufs (UTC ohne Zone)."
+          },
+          "ziel_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Abschnitt; bei einer mitgenommenen Untereinheit der ihrer Einheit."
+          },
+          "ziel_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Ziels zum Zeitpunkt des Abrufs; bei einer mitgenommenen Untereinheit der ihrer\nEinheit."
+          }
+        }
+      },
       "BrAnzeige": {
         "type": "object",
         "description": "Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).",
@@ -2763,6 +2852,14 @@
           "art": {
             "$ref": "#/components/schemas/BrBelegungsArt"
           },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Auftrag, der mit dem Abruf erteilt wurde."
+          },
           "br_id": {
             "type": "integer",
             "format": "int64"
@@ -2779,6 +2876,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "mit_abruf_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10)."
+          },
           "notiz": {
             "type": [
               "string",
@@ -2794,16 +2899,60 @@
           },
           "zeitpunkt_at": {
             "type": "string"
+          },
+          "ziel_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Abschnitt eines Abrufs (LLH-1085, design.md D5); fällt weg, wenn der Abschnitt\ngelöscht wird."
+          },
+          "ziel_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Ziel-Abschnitts zum Zeitpunkt des Abrufs; bleibt nach dem Löschen."
+          }
+        }
+      },
+      "BrBelegungKennzahlen": {
+        "type": "object",
+        "description": "Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec\n`bereitstellungsraum-belegung`, „Kennzahlen der Belegung“). Liste und Detail lesen sie aus\ndemselben Baustein [`belegung_repo::kennzahlen_je_raum`].",
+        "required": [
+          "einheiten",
+          "fahrzeuge"
+        ],
+        "properties": {
+          "einheiten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einheiten im Raum; eine Untereinheit, die selbst im Raum steht, zählt einzeln."
+          },
+          "fahrzeuge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Verschiedene aktive Fahrzeuge im Raum: einheitenlose und die der Einheiten im Raum."
+          },
+          "laengste_seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Frühestes „seit“ über Einheiten und einheitenlose Fahrzeuge (UTC ohne Zone); fehlt, wenn\nkeine Kraft ein „seit“ hat."
           }
         }
       },
       "BrBelegungsArt": {
         "type": "string",
-        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0061_br_belegung.sql`. Append-only.",
+        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0208_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein\n`austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,\ndesign.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.",
         "enum": [
           "eintritt",
           "wechsel",
-          "austritt"
+          "austritt",
+          "abruf",
+          "abruf_aufgehoben"
         ]
       },
       "BrDetail": {
@@ -2815,9 +2964,13 @@
             "type": "object",
             "required": [
               "einheiten",
-              "fahrzeuge"
+              "fahrzeuge",
+              "belegung"
             ],
             "properties": {
+              "belegung": {
+                "$ref": "#/components/schemas/BrBelegungKennzahlen"
+              },
               "einheiten": {
                 "type": "array",
                 "items": {
@@ -2828,33 +2981,17 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/BrFahrzeugKurz"
-                }
+                },
+                "description": "Einheitenlose Fahrzeuge im Raum (`aktueller_br_id`); die Fahrzeuge der Einheiten stehen an\nder Einheit."
               }
             }
           }
         ],
-        "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge."
+        "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +\neinheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4)."
       },
-      "BrEinheitKurz": {
+      "BrEinheitFahrzeug": {
         "type": "object",
-        "description": "Schlanke Einheiten-Info für den Detail-Response.",
-        "required": [
-          "id",
-          "name"
-        ],
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          }
-        }
-      },
-      "BrFahrzeugKurz": {
-        "type": "object",
-        "description": "Schlanke Fahrzeug-Info für den Detail-Response.",
+        "description": "Aktives Fahrzeug einer Einheit im Raum.",
         "required": [
           "id",
           "funkrufname"
@@ -2869,6 +3006,129 @@
           }
         }
       },
+      "BrEinheitKurz": {
+        "type": "object",
+        "description": "Schlanke Einheiten-Info für den Detail-Response.",
+        "required": [
+          "id",
+          "name",
+          "fahrzeuge",
+          "unangemeldet"
+        ],
+        "properties": {
+          "abruf": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BrAbrufKurz",
+                "description": "Abruf, falls die Einheit abgerufen im Raum steht (LLH-1085, design.md D3)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BrEinheitFahrzeug"
+            },
+            "description": "Aktive Fahrzeuge der Einheit."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nicht_uebernommen_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3)."
+          },
+          "seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne\nZone); fehlt ohne passendes Ereignis."
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Herkunft „unangemeldet“, dauerhaft (D3)."
+          }
+        }
+      },
+      "BrFahrzeugKurz": {
+        "type": "object",
+        "description": "Schlanke Fahrzeug-Info für den Detail-Response.",
+        "required": [
+          "id",
+          "funkrufname"
+        ],
+        "properties": {
+          "abruf": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BrAbrufKurz",
+                "description": "Wie [`BrEinheitKurz::abruf`]."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wie [`BrEinheitKurz::seit_at`]."
+          }
+        }
+      },
+      "BrListenEintrag": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BrAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "belegung",
+              "einheit_ids"
+            ],
+            "properties": {
+              "abschnitt_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "belegung": {
+                "$ref": "#/components/schemas/BrBelegungKennzahlen"
+              },
+              "einheit_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`summiereStaerke`)."
+      },
       "BrStatus": {
         "type": "string",
         "description": "Status eines Bereitstellungsraums. String = CHECK-Constraint in\n`migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.",
@@ -2877,6 +3137,90 @@
           "aktiv",
           "aufgeloest"
         ]
+      },
+      "BrVerlaufArt": {
+        "type": "string",
+        "description": "Art eines Eintrags im Verlauf eines Raums (LLH-1095, design.md D5). Anders als\n[`BrBelegungsArt`] aus Sicht des gelesenen Raums: ein `wechsel` ist für den Zielraum\n`wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.",
+        "enum": [
+          "eintritt",
+          "wechsel_herein",
+          "wechsel_hinaus",
+          "austritt",
+          "abruf",
+          "abruf_aufgehoben"
+        ]
+      },
+      "BrVerlaufEintrag": {
+        "type": "object",
+        "description": "Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec\n`bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).",
+        "required": [
+          "id",
+          "zeitpunkt_at",
+          "art",
+          "objekt_typ",
+          "objekt_id",
+          "objekt_name"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BrVerlaufArt"
+          },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Auftrags eines `abruf`."
+          },
+          "herkunft": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Raums, aus dem ein `wechsel_herein` kam."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung des Belegungsereignisses (`br_belegung.id`)."
+          },
+          "mit_einheit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Einheit, mit der eine Untereinheit abgerufen wurde (D10)."
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "objekt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objekt_name": {
+            "type": "string",
+            "description": "Aktueller Name der Einheit bzw. Funkrufname des Fahrzeugs, auch aufgelöst oder entlassen."
+          },
+          "objekt_typ": {
+            "$ref": "#/components/schemas/ObjektTyp"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "ziel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Raums, in den ein `wechsel_hinaus` ging; bei einem `abruf` und einem\n`austritt` direkt nach einem Abruf der Name des Ziel-Abschnitts (LLH-1085, D5)."
+          }
+        }
       },
       "BuildJob": {
         "type": "object",
@@ -3664,7 +4008,8 @@
           "fahrzeug_mitglieder",
           "material_mitglieder",
           "sprechgruppen",
-          "status"
+          "status",
+          "unangemeldet"
         ],
         "properties": {
           "abschnitt_id": {
@@ -3785,6 +4130,13 @@
           "name": {
             "type": "string"
           },
+          "nicht_uebernommen_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,\nnur solange die Übernahme offen ist (UTC ohne Zone)."
+          },
           "personal_mitglieder": {
             "type": "array",
             "items": {
@@ -3846,6 +4198,10 @@
               "null"
             ],
             "format": "int64"
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3)."
           }
         }
       },
@@ -5494,6 +5850,104 @@
           "ueberfaellig"
         ]
       },
+      "EintreffenEingabe": {
+        "type": "object",
+        "description": "Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von\n`kraft` und `unangemeldet`.",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen)."
+          },
+          "kraft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KraftAngabe",
+                "description": "Eine Einheit oder ein einheitenloses Fahrzeug des Einsatzes."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unangemeldet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnangemeldetEingabe",
+                "description": "Eine Kraft, die im Einsatz noch nicht geführt wird."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeitpunkt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in\nder Zukunft. Ohne Angabe gilt „jetzt“."
+          }
+        }
+      },
+      "EintreffenErgebnis": {
+        "type": "object",
+        "description": "Antwort 201 des Eintreffens (design.md D1), beim Replay aus dem Bestand rekonstruiert (D8).",
+        "required": [
+          "belegung",
+          "fahrzeug_ids",
+          "zeitachse",
+          "unangemeldet"
+        ],
+        "properties": {
+          "belegung": {
+            "$ref": "#/components/schemas/BrBelegungAnzeige",
+            "description": "Die Belegungszeile des Eintritts."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die eingebuchte oder neu angelegte Einheit; fehlt bei einem Fahrzeug."
+          },
+          "fahrzeug_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Aktive Fahrzeuge der Einheit bzw. das Fahrzeug selbst."
+          },
+          "meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Meldung an die Einsatzleitung (nur unangemeldet)."
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Die Buchung hat die Kraft neu angelegt."
+          },
+          "zeitachse": {
+            "$ref": "#/components/schemas/EintreffenZeitachse"
+          }
+        }
+      },
+      "EintreffenZeitachse": {
+        "type": "string",
+        "description": "Was das Eintreffen in der Kräfte-Zeitachse bewirkt hat (design.md D1).",
+        "enum": [
+          "geschrieben",
+          "ausgelassen",
+          "keine"
+        ]
+      },
       "EmpfaengerTyp": {
         "type": "string",
         "description": "Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `empfaenger_typ`.",
@@ -6336,6 +6790,28 @@
               "null"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "FahrzeugEingabe": {
+        "type": "object",
+        "description": "Ein Fahrzeug der unangemeldeten Kraft (Ad-hoc-Fahrzeug).",
+        "properties": {
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug."
           }
         }
       },
@@ -7826,6 +8302,23 @@
             "type": "string"
           },
           "laeuft_ab_at": {
+            "type": "string"
+          }
+        }
+      },
+      "KraftAngabe": {
+        "type": "object",
+        "description": "Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`.",
+        "required": [
+          "objekt_typ",
+          "objekt_id"
+        ],
+        "properties": {
+          "objekt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objekt_typ": {
             "type": "string"
           }
         }
@@ -12701,6 +13194,33 @@
           }
         }
       },
+      "StaerkeEingabe": {
+        "type": "object",
+        "description": "Stärke F/UF/M: alle drei oder keine.",
+        "properties": {
+          "fuehrer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "mannschaft": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "unterfuehrer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "StaerkePosition": {
         "type": "string",
         "description": "Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).\nWird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).",
@@ -13199,6 +13719,26 @@
           }
         }
       },
+      "UebernahmeBody": {
+        "type": "object",
+        "description": "Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.",
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ueber_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "UhsAnhangAnzeige": {
         "type": "object",
         "description": "Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die\nDatei ist nur über die UHS-Route ladbar.",
@@ -13544,6 +14084,41 @@
           "verletztensammelstelle",
           "sonstige"
         ]
+      },
+      "UnangemeldetEingabe": {
+        "type": "object",
+        "description": "Unangemeldete Kraft (design.md D1/D2).",
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Freitext an der Einheit; nie in Meldung oder ETB."
+          },
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FahrzeugEingabe"
+            },
+            "description": "1 bis `SAMMEL_MAX` Fahrzeuge; das erste gibt der Einheit ihren Namen."
+          },
+          "staerke": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StaerkeEingabe",
+                "description": "Gemeldete Stärke; steht nur im Text von Meldung und ETB (D6)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trotzdem_anlegen": {
+            "type": "boolean",
+            "description": "Neuanlage trotz gleichnamiger Kraft im Einsatz (D9)."
+          }
+        }
       },
       "Verbindungsart": {
         "type": "string",
@@ -14914,7 +15489,8 @@
           "einheit",
           "abloesung",
           "nachtrag",
-          "disposition"
+          "disposition",
+          "bereitstellungsraum"
         ]
       },
       "ZeitfensterAnzeige": {

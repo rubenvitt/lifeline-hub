@@ -969,6 +969,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Auflösung (LLH-1079): Zeitpunkt und Benutzer-FK.
             retain("aufgeloest_at", G_ZEIT),
             retain("aufgeloest_von", G_FK),
+            // Kennzeichen „nicht übernommen“ und Herkunft „unangemeldet“ (LLH-1075, design.md D3):
+            // Zeitpunkte, Benutzer-FK und die Meldung des Eintreffens.
+            retain("uebernahme_offen_seit", G_ZEIT),
+            retain("uebernommen_at", G_ZEIT),
+            retain("uebernommen_von", G_FK),
+            retain("uebernahme_meldung_id", G_FK),
             retain("soll_fuehrer", G_ZAEHLER),
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
@@ -1664,6 +1670,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
+            // Idempotenzschlüssel des Eintreffens (LLH-1075, design.md D8).
+            retain("client_id", G_IDEMPOTENZ),
+            // Abruf (LLH-1085, design.md D4/D5): Ziel, Auftrag und Verband sind Bezüge, der
+            // Name des Ziel-Abschnitts ein Schnappschuss der Lagestruktur.
+            retain("ziel_abschnitt_id", G_FK),
+            retain("ziel_anzeige", G_OP_LABEL),
+            retain("auftrag_id", G_FK),
+            retain("mit_abruf_id", G_FK),
         ],
     },
     TabellenRegel {

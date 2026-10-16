@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
@@ -62,9 +62,9 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 2. Bei Bedarf in „Kräfte suchen“ einen Namen eingeben.
 3. Bei einer Einheit oder einem Fahrzeug „zuweisen“ wählen. Sie erscheint unter „Bereitgestellte
    Einheiten“ oder „Bereitgestellte Fahrzeuge“; „Bereitgestellt“ zählt die Stärke, „Fahrzeuge“ die
-   einzeln bereitgestellten Fahrzeuge.
+   Fahrzeuge im Raum, auch die der bereitgestellten Einheiten.
 
-   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, Stärke 0/1/5//6 und der Seitenleiste „Kräfte ohne BR“ mit drei Einheiten](../bilder/bereitstellungsraeume/raum.png)
+   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, Stärke 0/1/5//6, „Fahrzeuge“ 3 und der Seitenleiste „Kräfte ohne BR“ mit drei Einheiten](../bilder/bereitstellungsraeume/raum.png)
 
 4. Rückt eine Kraft aus, bei ihr „entfernen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
 
@@ -109,6 +109,16 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Eine Kraft steht
 höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten entfernt. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
+
+### Was die Zahlen zählen
+
+„Fahrzeuge“ zählt jedes aktive Fahrzeug im Raum genau einmal: die einzeln bereitgestellten und
+die Fahrzeuge der bereitgestellten Einheiten. Die Fahrzeuge einer unterstellten Einheit zählen
+nur, wenn diese Einheit selbst im Raum steht. Entlassene oder stornierte Fahrzeuge zählen nicht.
+Am gekoppelten Tablet des Raums steht dieselbe Zahl.
+„noch … belegt“ vor dem Auflösen zählt dagegen nur, was einzeln im Raum steht: die Einheiten und
+die Fahrzeuge ohne Einheit. Die Fahrzeuge einer Einheit gehen mit ihrer Einheit und halten das
+Auflösen nicht auf.
 
 ### Material im Raum
 

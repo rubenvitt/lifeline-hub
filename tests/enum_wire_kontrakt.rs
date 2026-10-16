@@ -285,7 +285,24 @@ fn serde_wire_gleich_as_str() {
         Eintritt,
         Wechsel,
         Austritt,
+        Abruf,
+        AbrufAufgehoben,
     });
+    enum_wire_as_str!(lifeline_hub::bereitstellungsraum::BrVerlaufArt {
+        Eintritt,
+        WechselHerein,
+        WechselHinaus,
+        Austritt,
+        Abruf,
+        AbrufAufgehoben,
+    });
+    enum_wire_as_str!(
+        lifeline_hub::bereitstellungsraum::eintreffen::EintreffenZeitachse {
+            Geschrieben,
+            Ausgelassen,
+            Keine,
+        }
+    );
 
     // chat
     enum_wire_as_str!(lifeline_hub::chat::BezugTyp {
@@ -947,6 +964,7 @@ fn zeitachse_quelle_wire() {
         Abloesung => "abloesung",
         Nachtrag => "nachtrag",
         Disposition => "disposition",
+        Bereitstellungsraum => "bereitstellungsraum",
     } in lifeline_hub::zeitachse::ZeitachseQuelle::ALLE);
 }
 

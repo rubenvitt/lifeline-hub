@@ -143,6 +143,7 @@ const EINHEIT_E10 = {
   aktueller_br_id: null,
   sprechgruppen: [],
   status: { quelle: 'ohne' as const, verteilung: [] },
+  unangemeldet: false,
 };
 
 const FAHRZEUG_F1 = {

@@ -1343,6 +1343,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_bereitstellungsraum::detail),
         )
         .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
+            get(routes::einsatz_bereitstellungsraum::verlauf),
+        )
+        .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
             patch(routes::einsatz_bereitstellungsraum::aktualisieren),
         )
@@ -1357,6 +1361,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
             post(routes::einsatz_bereitstellungsraum::belegung),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+            post(routes::einsatz_bereitstellungsraum::eintreffen),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf",
+            post(routes::einsatz_bereitstellungsraum::abruf),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf/aufheben",
+            post(routes::einsatz_bereitstellungsraum::abruf_aufheben),
         )
         .route(
             "/api/einsaetze/{id}/abschnitte",
@@ -1836,6 +1852,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
+            post(routes::einsatz_einheit::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/abweisen",
+            post(routes::einsatz_einheit::abweisen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",

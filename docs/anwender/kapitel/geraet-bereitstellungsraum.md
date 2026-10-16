@@ -36,7 +36,7 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an; die Knöpfe zum Z
    Einheiten“ oder „Bereitgestellte Fahrzeuge“; die Kennzahl „Bereitgestellt“ zählt die Stärke
    mit.
 
-   ![Aktiver Bereitstellungsraum mit zwei bereitgestellten Einheiten, Stärke 0/2/2//4 und drei Kräften ohne BR](../bilder/geraet-bereitstellungsraum/raum.png)
+   ![Aktiver Bereitstellungsraum mit zwei bereitgestellten Einheiten, Stärke 0/2/2//4, „Fahrzeuge“ 4 und drei Kräften ohne BR](../bilder/geraet-bereitstellungsraum/raum.png)
 
 ### Kräfte abmelden
 

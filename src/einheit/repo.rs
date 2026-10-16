@@ -68,6 +68,8 @@ struct Row {
     hand_status_sortier: Option<i64>,
     aufgeloest_at: Option<String>,
     aufgeloest_von: Option<i64>,
+    nicht_uebernommen_seit: Option<String>,
+    unangemeldet: bool,
 }
 
 impl Row {
@@ -187,6 +189,10 @@ pub fn leite_status_ab(
     }
 }
 
+// Ein einziges Literal statt `concat!`: Der Zustandswächter (`entlassung::tests`) prüft die
+// Konstante erst im zusammengesetzten `{SELECT_AUFGELOEST} WHERE …`. Die beiden Kennzeichen sind
+// deshalb ausgeschrieben; `kennzeichen_gleichen_den_makros` hält sie gleich mit
+// `nicht_uebernommen_seit_sql!` und `unangemeldet_sql!`.
 const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
@@ -200,7 +206,11 @@ const SELECT_AUFGELOEST: &str = "\
            e.status_seit, hs.id AS hand_status_id, hs.label AS hand_status_label, \
            hs.kategorie AS hand_status_kategorie, hs.farbe AS hand_status_farbe, \
            hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier, \
-           e.aufgeloest_at, e.aufgeloest_von \
+           e.aufgeloest_at, e.aufgeloest_von, \
+           CASE WHEN e.uebernahme_offen_seit IS NOT NULL AND e.uebernommen_at IS NULL \
+              AND e.aufgeloest_at IS NULL THEN e.uebernahme_offen_seit END \
+             AS nicht_uebernommen_seit, \
+           (e.uebernahme_offen_seit IS NOT NULL) AS unangemeldet \
     FROM einsatz_einheit e \
     LEFT JOIN einheit_typ t ON t.id = e.typ_id \
     LEFT JOIN fahrzeug_status hs ON hs.id = e.status_id \
@@ -368,6 +378,8 @@ async fn zu_anzeige_batch(
             status,
             aufgeloest_at: row.aufgeloest_at,
             aufgeloest_von: row.aufgeloest_von,
+            nicht_uebernommen_seit: row.nicht_uebernommen_seit,
+            unangemeldet: row.unangemeldet,
         });
     }
     Ok(out)
@@ -899,6 +911,236 @@ pub async fn require_aktiv_tx(
     }
 }
 
+// ─── Übernehmen und Abweisen (LLH-1075, design.md D10/D11) ───────────────────────────────
+
+/// Gewählte Unterstellung beim Übernehmen; beide optional, beide erlaubt wie im PATCH.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Uebernahme {
+    pub abschnitt_id: Option<i64>,
+    pub ueber_einheit_id: Option<i64>,
+}
+
+/// Was das Übernehmen geschrieben hat (ETB-Text und Live).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Uebernommen {
+    pub name: String,
+    pub abschnitt: Option<String>,
+    pub ueber: Option<String>,
+    /// Raum, in dem die Einheit steht (das Übernehmen verlässt ihn nicht).
+    pub br_id: Option<i64>,
+    /// Die Meldung des Eintreffens, falls noch vorhanden.
+    pub meldung_id: Option<i64>,
+}
+
+/// Bezüge der Übernahme vor der Transaktion prüfen wie der PATCH (`validiere_patch`): fremder
+/// Abschnitt oder fremde/aufgelöste Über-Einheit 404/409, Zyklus 400.
+pub async fn check_uebernahme(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    id: i64,
+    u: &Uebernahme,
+) -> Result<(), AppError> {
+    check_gehoert_zum_einsatz_oder_aufgeloest(pool, einsatz_id, id).await?;
+    validiere_patch(
+        pool,
+        einsatz_id,
+        org_id,
+        id,
+        &EinheitPatch {
+            abschnitt_id: u.abschnitt_id.map(Some),
+            ueber_einheit_id: u.ueber_einheit_id.map(Some),
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+/// Existiert die Einheit im Einsatz (404)? Aufgelöst ist hier kein Fehler: den 409 meldet die
+/// Transaktion, vor der Offen-Prüfung (design.md D10).
+async fn check_gehoert_zum_einsatz_oder_aufgeloest(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(), AppError> {
+    let da: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    da.map(|_| ()).ok_or(AppError::NotFound)
+}
+
+/// Offene Übernahme: `(name, aktueller_br_id, uebernahme_meldung_id)`; aufgelöst 409, sonst
+/// ohne offene Übernahme 422.
+async fn require_offen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(String, Option<i64>, Option<i64>), AppError> {
+    require_aktiv_tx(&mut *conn, einsatz_id, id).await?;
+    let (name, offen_seit, uebernommen_at, br_id, meldung_id): (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+    ) = sqlx::query_as(
+        "SELECT name, uebernahme_offen_seit, uebernommen_at, aktueller_br_id, \
+                uebernahme_meldung_id \
+         FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if offen_seit.is_none() || uebernommen_at.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Einheit wartet nicht auf Übernahme".into(),
+        ));
+    }
+    Ok((name, br_id, meldung_id))
+}
+
+/// Übernimmt eine unangemeldete Einheit (D10) in der Transaktion des Aufrufers: aufgelöst 409,
+/// ohne offene Übernahme 422; setzt `uebernommen_at/_von` und die gewählte Unterstellung und
+/// bestätigt die Meldung des Eintreffens (schon bestätigt: ohne Fehler). Kein Austritt aus dem
+/// Raum. Die Bezüge prüft [`check_uebernahme`] vorher.
+#[allow(clippy::too_many_arguments)]
+pub async fn uebernehmen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    id: i64,
+    u: &Uebernahme,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Uebernommen, AppError> {
+    let (name, br_id, meldung_id) = require_offen_tx(&mut *conn, einsatz_id, id).await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET uebernommen_at = ?1, uebernommen_von = ?2, \
+            abschnitt_id = COALESCE(?3, abschnitt_id), \
+            ueber_einheit_id = COALESCE(?4, ueber_einheit_id) \
+         WHERE id = ?5 AND einsatz_id = ?6",
+    )
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(u.abschnitt_id)
+    .bind(u.ueber_einheit_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    if let Some(m) = meldung_id {
+        crate::meldung::repo::bestaetige_tx(&mut *conn, org_id, einsatz_id, m, benutzer_id, jetzt)
+            .await?;
+    }
+    let abschnitt: Option<String> = match u.abschnitt_id {
+        Some(a) => Some(
+            sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+                .bind(a)
+                .bind(einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?,
+        ),
+        None => None,
+    };
+    let ueber: Option<String> = match u.ueber_einheit_id {
+        Some(p) => Some(
+            sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+                .bind(p)
+                .bind(einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?,
+        ),
+        None => None,
+    };
+    Ok(Uebernommen {
+        name,
+        abschnitt,
+        ueber,
+        br_id,
+        meldung_id,
+    })
+}
+
+/// Was das Abweisen geschrieben hat (ETB-Text und Live).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Abgewiesen {
+    pub name: String,
+    /// Bezeichnung des verlassenen Raums.
+    pub br_bezeichnung: Option<String>,
+    pub aufgeloest: Aufgeloest,
+    /// Je entlassenem Fahrzeug: (`einsatz_fahrzeug.id`, Funkrufname, Ergebnis).
+    pub entlassen: Vec<(i64, String, crate::fahrzeug::disposition_repo::Entlassen)>,
+    pub meldung_id: Option<i64>,
+}
+
+/// Weist eine unangemeldete Einheit ab (D11) in der Transaktion des Aufrufers: aufgelöst 409,
+/// ohne offene Übernahme 422; dann auflösen (Austritt mit Notiz „Einheit aufgelöst“,
+/// Zeitachsen-Entlassung, Mitglieder frei), jedes gelöste Fahrzeug entlassen und die Meldung des
+/// Eintreffens bestätigen. Endgültig.
+pub async fn abweisen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Abgewiesen, AppError> {
+    let (name, br_id, meldung_id) = require_offen_tx(&mut *conn, einsatz_id, id).await?;
+    let br_bezeichnung: Option<String> = match br_id {
+        Some(b) => {
+            sqlx::query_scalar("SELECT bezeichnung FROM bereitstellungsraum WHERE id = ?")
+                .bind(b)
+                .fetch_optional(&mut *conn)
+                .await?
+        }
+        None => None,
+    };
+    let aufgeloest = aufloesen_tx(
+        &mut *conn,
+        einsatz_id,
+        id,
+        benutzer_id,
+        jetzt,
+        Aufloesung::Aufloesen,
+    )
+    .await?;
+    let mut entlassen = Vec::with_capacity(aufgeloest.fahrzeuge.len());
+    for ef_id in &aufgeloest.fahrzeuge {
+        let funkrufname: String = sqlx::query_scalar(
+            "SELECT coalesce(f.funkrufname, ef.snap_funkrufname, '') FROM einsatz_fahrzeug ef \
+             LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id WHERE ef.id = ? AND ef.einsatz_id = ?",
+        )
+        .bind(ef_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        let e = crate::fahrzeug::disposition_repo::entlassen_tx(
+            &mut *conn,
+            einsatz_id,
+            *ef_id,
+            benutzer_id,
+            jetzt,
+        )
+        .await?;
+        entlassen.push((*ef_id, funkrufname, e));
+    }
+    if let Some(m) = meldung_id {
+        crate::meldung::repo::bestaetige_tx(&mut *conn, org_id, einsatz_id, m, benutzer_id, jetzt)
+            .await?;
+    }
+    Ok(Abgewiesen {
+        name,
+        br_bezeichnung,
+        aufgeloest,
+        entlassen,
+        meldung_id,
+    })
+}
+
 /// Spurprüfungen vor dem echten Löschen einer Einheit, je SQL und Grund ([`find_spur_tx`]).
 const SPUREN_EINHEIT: &[(&str, &str)] = &[
     (
@@ -1132,6 +1374,27 @@ pub async fn aufloesen(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Die ausgeschriebenen Kennzeichen in `SELECT_AUFGELOEST` gleichen den Makros, die auch
+    /// die Belegung des Bereitstellungsraums nutzt.
+    #[test]
+    fn kennzeichen_gleichen_den_makros() {
+        let flach = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        let select = flach(SELECT_AUFGELOEST);
+        for (makro, alias) in [
+            (
+                super::super::nicht_uebernommen_seit_sql!(),
+                "nicht_uebernommen_seit",
+            ),
+            (super::super::unangemeldet_sql!(), "unangemeldet"),
+        ] {
+            let erwartet = format!("{} AS {alias}", flach(makro));
+            assert!(
+                select.contains(&erwartet),
+                "fehlt in SELECT_AUFGELOEST: {erwartet}"
+            );
+        }
+    }
 
     // ── Ableitung des Einheitenstatus ──────────────────────────────────────────────
 

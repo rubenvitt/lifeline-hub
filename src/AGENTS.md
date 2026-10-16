@@ -219,6 +219,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   oder keiner, sonst 422), Ordnung Abschlusszeit absteigend und `id` als Gleichstand, `limit`
   geklemmt auf `[1, SEITE_MAX]`. Zahlen über den ganzen Bestand kommen aus einem eigenen
   `…/kennzahlen`-Abruf über dieselben SQL-Fragmente, nie aus der geladenen Seite.
+  Ausnahme: Verlaufsreihen je Stelle (Belegungsreihe der Betreuungsstelle, Verlauf des
+  Bereitstellungsraums) sind ungeblättert und laden beim Aufklappen; die Reihe einer Stelle
+  bleibt klein (Specs `betreuung-meldeverlauf`, „Meldereihe einer Betreuungsstelle lesen“, und
+  `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
 - **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
@@ -345,6 +349,21 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   nie Text. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
+
+## Backend — Bereitstellungsraum (LLH-1085)
+
+Spec `bereitstellungsraum-belegung`; `src/bereitstellungsraum/abruf.rs`,
+`src/bereitstellungsraum/belegung_repo.rs`, `src/routes/einsatz_bereitstellungsraum.rs`.
+- **`abruf_tx` schreibt kein ETB.** Der Aufrufer schreibt genau einen Satz
+  (`AbrufErgebnis::etb_text`) per `etb::system_audit_tx` in derselben Transaktion; der Auftrag
+  entsteht über `auftrag::repo::anlegen_tx` darin, die Folgen nach dem Commit über
+  `auftrag::nach_erteilung`. Ein weiterer Abrufweg (LLH-1132) ruft denselben Baustein und hält
+  sich an dieselbe Regel; nie ein zweiter Satz für Mitgenommene oder Auftrag.
+- **Verband-Austritt und Wechsel-Sperre stehen in `belege_tx`, nicht in der Route.** Der Austritt
+  einer abgerufenen Einheit bucht ihre mitgenommenen Untereinheiten mit aus; ein Wechsel einer
+  abgerufenen Kraft ist 422. So gilt das für jeden Weg, der `belege_tx` ruft (Route, Gerät).
+- „Abgerufen“ ist abgeleitet aus dem jüngsten Ereignis je Kraft, nie gespeichert; `seit` und
+  `aktueller_br_id` sehen nur `eintritt`, `wechsel` und `austritt`.
 
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 

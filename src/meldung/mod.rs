@@ -241,6 +241,113 @@ pub struct LageMeldungAnzeige {
     pub gesehen_von_name: Option<String>,
 }
 
+// ── Nach dem Commit: Live-Bündel, Benachrichtigung, Auto-Frist (aus `routes/meldung.rs`
+// gehoben, LLH-1075 design.md D12) ─────────────────────────────────────────────────────
+// Jeder Schreibweg, der eine Meldung anlegt (Meldungsroute, Eintreffen am Bereitstellungsraum),
+// stellt ihr Bündel über dieselben Funktionen zu: so erreicht die Benachrichtigung ihre
+// Empfänger genau einmal, auch bei einem Replay.
+
+/// SSE-Notify: Meldungen des Einsatzes haben sich geändert (Tag `meldung`).
+pub(crate) fn sse(state: &crate::app::AppState, einsatz_id: i64) {
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Meldung);
+}
+
+/// SSE-Notify: unübersehbares Sofort-Highlight (Tag `sofortmeldung`, LFH-97). Läuft über
+/// dieselbe eine EventSource pro Einsatz; der Client löst Alarm (visuell + Ton) aus.
+fn sse_sofort(state: &crate::app::AppState, einsatz_id: i64, meldung_id: i64) {
+    state.live.publiziere_objekt(
+        einsatz_id,
+        crate::live::LiveEvent::Sofortmeldung,
+        "meldung_id",
+        meldung_id,
+    );
+}
+
+/// Leitet die Bestätigungs-Frist in Minuten ab.
+/// Fallback-Kette: Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
+pub(crate) fn meldung_bestaetigung_frist_min_ableiten(
+    e: &crate::einsatz::einstellungen::EinsatzEinstellungen,
+    o: &crate::org::einstellungen::OrgEinstellungen,
+    req_override: Option<i64>,
+    konstante: i64,
+) -> i64 {
+    req_override
+        .or_else(|| crate::einsatz::effektiv::effektive_meldung_frist_min(e, o))
+        .unwrap_or(konstante)
+}
+
+/// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
+/// Meldungsstand sicher. Dadurch repariert auch ein Replay nach verlorener/fehlgeschlagener
+/// Reminder-Anlage den abgeleiteten Datensatz, ohne geänderte Request-Felder zu übernehmen.
+/// `titel` nennt der Schreibweg (Meldungsroute „Sofortmeldung #n unbestätigt“, Eintreffen
+/// „Unangemeldete Kraft #n unbestätigt“).
+pub(crate) async fn auto_frist_erinnerung_sicherstellen(
+    state: &crate::app::AppState,
+    meldung: &MeldungAnzeige,
+    titel: &str,
+) -> Result<(), crate::error::AppError> {
+    if meldung.bestaetigung_pflicht && meldung.bestaetigung_frist_at.is_some() {
+        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(&state.pool, meldung.id, titel)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Liefert das Live-Buendel einer persistierten Meldung at-least-once aus. Der DB-Marker wird
+/// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
+/// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
+///
+/// Eine Sofortmeldung alarmiert danach über die Benachrichtigungen (LLH-1209, Spec
+/// `benachrichtigungen`, „Sofortmeldung alarmiert“): alle mit dem Modul Meldungen außer dem
+/// Erfasser. Wer das Bündel zustellt, meldet außerdem die Benachrichtigung an die
+/// Empfängerfunktion ([`benachrichtigung`]). `melden` schreibt selbst, also erst nach dem
+/// Commit des Markers und nur, wenn dieser Aufruf ihn gesetzt hat: so genau einmal je Meldung,
+/// auch bei einem Replay.
+pub(crate) async fn live_publikation_sicherstellen(
+    state: &crate::app::AppState,
+    meldung: &MeldungAnzeige,
+) -> Result<(), crate::error::AppError> {
+    use crate::benachrichtigung::{
+        self as hinweis, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+    };
+    let einsatz_id = meldung.einsatz_id;
+    let meldung_id = meldung.id;
+    let etb_id = meldung.etb_meldung_id;
+    let ist_sofort = meldung.ist_sofort();
+    let publiziert_at = crate::zeit::jetzt();
+    let zugestellt =
+        repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
+            if let Some(etb_id) = etb_id {
+                state.live.publiziere(einsatz_id, etb_id);
+            }
+            sse(state, einsatz_id);
+            if ist_sofort {
+                sse_sofort(state, einsatz_id, meldung_id);
+            }
+        })
+        .await?;
+    if zugestellt {
+        if ist_sofort {
+            hinweis::melden(
+                &state.pool,
+                &state.live,
+                Anlass::neu(
+                    einsatz_id,
+                    BenachrichtigungArt::Sofortmeldung,
+                    Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung_id),
+                )
+                .von(meldung.erfasst_von_id)
+                .an(Adressat::ModulLeser("meldungen")),
+            )
+            .await;
+        }
+        benachrichtigung::erfasst(&state.pool, &state.live, meldung).await;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
