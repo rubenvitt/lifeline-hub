@@ -41,7 +41,7 @@ pub fn darf_uebergehen(von: &str, nach: &str) -> bool {
 wire_enum! {
     /// Typ des belegenden Objekts. String = CHECK-Constraint in
     /// `migrations/0061_br_belegung.sql`.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum ObjektTyp {
         Einheit => "einheit",
         Fahrzeug => "fahrzeug",
@@ -274,7 +274,13 @@ mod tests {
             assert_eq!(ObjektTyp::parse(t).unwrap().as_str(), t);
         }
         assert!(ObjektTyp::parse("person").is_none());
-        for a in ["eintritt", "wechsel", "austritt", "abruf", "abruf_aufgehoben"] {
+        for a in [
+            "eintritt",
+            "wechsel",
+            "austritt",
+            "abruf",
+            "abruf_aufgehoben",
+        ] {
             assert_eq!(BrBelegungsArt::parse(a).unwrap().as_str(), a);
         }
         assert!(BrBelegungsArt::parse("umzug").is_none());
@@ -308,6 +314,105 @@ pub fn etb_text_eintritt(name: &str, bezeichnung: &str) -> String {
 /// hat (LLH-1075, design.md D5).
 pub fn etb_text_eingetroffen(name: &str, bezeichnung: &str) -> String {
     format!("{name} im BR {bezeichnung} eingetroffen")
+}
+
+/// Kraft und Ziel eines Abrufs für den ETB-Wortlaut (LLH-1085, design.md D8).
+#[derive(Debug, Clone, Copy)]
+pub struct AbrufText<'a> {
+    /// Name der abgerufenen Einheit bzw. Funkrufname des Fahrzeugs.
+    pub name: &'a str,
+    /// Namen der mitgenommenen Untereinheiten (D10).
+    pub mitgenommen: &'a [String],
+    pub br_bezeichnung: &'a str,
+    /// Name des Ziel-Abschnitts.
+    pub ziel: Option<&'a str>,
+    pub auftrag_nr: Option<i64>,
+    /// Abruf und Austritt in einem Schritt.
+    pub ausgerueckt: bool,
+}
+
+/// „HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich (Auftrag Nr. 7)“, mit
+/// Verband „1. Zug mit Gruppe 1, Gruppe 2 aus …“, mit `ausgerueckt` „… und ausgerückt“. Ohne Ziel
+/// fehlt „nach …“, ohne Auftrag die Klammer. Den Auftragstext nennt der Eintrag nie (D8).
+pub fn etb_text_abruf(t: &AbrufText<'_>) -> String {
+    let mut rest = format!(" aus Bereitstellungsraum {} abgerufen", t.br_bezeichnung);
+    if let Some(ziel) = t.ziel {
+        rest.push_str(&format!(" nach {ziel}"));
+    }
+    if let Some(nr) = t.auftrag_nr {
+        rest.push_str(&format!(" (Auftrag Nr. {nr})"));
+    }
+    if t.ausgerueckt {
+        rest.push_str(" und ausgerückt");
+    }
+    format!(
+        "{}{rest}",
+        kraefte_gekappt(
+            t.name,
+            t.mitgenommen,
+            rest.chars().count(),
+            crate::etb::INHALT_MAX
+        )
+    )
+}
+
+/// „Abruf von HLF 20 aus Bereitstellungsraum Sportplatz zurückgenommen“ (D8, D13); mit Verband
+/// „Abruf von 1. Zug mit Gruppe 1 aus …“.
+pub fn etb_text_abruf_aufgehoben(name: &str, mitgenommen: &[String], bezeichnung: &str) -> String {
+    let vorne = "Abruf von ";
+    let rest = format!(" aus Bereitstellungsraum {bezeichnung} zurückgenommen");
+    let laenge = vorne.chars().count() + rest.chars().count();
+    format!(
+        "{vorne}{}{rest}",
+        kraefte_gekappt(name, mitgenommen, laenge, crate::etb::INHALT_MAX)
+    )
+}
+
+/// Austritt einer abgerufenen Kraft (D8, D12): „HLF 20 rückt aus Bereitstellungsraum Sportplatz
+/// aus nach EA Deich“, ohne Ziel ohne „nach …“; mit Verband „1. Zug mit Gruppe 1 rückt aus …“.
+pub fn etb_text_ausgerueckt(
+    name: &str,
+    mitgenommen: &[String],
+    bezeichnung: &str,
+    ziel: Option<&str>,
+) -> String {
+    let mut rest = format!(" rückt aus Bereitstellungsraum {bezeichnung} aus");
+    if let Some(ziel) = ziel {
+        rest.push_str(&format!(" nach {ziel}"));
+    }
+    format!(
+        "{}{rest}",
+        kraefte_gekappt(
+            name,
+            mitgenommen,
+            rest.chars().count(),
+            crate::etb::INHALT_MAX
+        )
+    )
+}
+
+/// „<Name> mit <A>, <B>“, so gekappt, dass es zusammen mit `rest` Zeichen höchstens `max`
+/// Zeichen lang ist: hinten fallen Namen weg, „und n weitere“ zählt sie (D8). Passt nicht einmal
+/// der Name allein, bleibt er stehen: ein Systemtext darf nicht scheitern (`src/AGENTS.md`,
+/// „Eingabegrenzen“).
+fn kraefte_gekappt(name: &str, mitgenommen: &[String], rest: usize, max: usize) -> String {
+    let text = |k: usize| {
+        let weitere = mitgenommen.len() - k;
+        let mut t = name.to_string();
+        if k > 0 {
+            t.push_str(" mit ");
+            t.push_str(&mitgenommen[..k].join(", "));
+        }
+        if weitere > 0 {
+            t.push_str(&format!(" und {weitere} weitere"));
+        }
+        t
+    };
+    (0..=mitgenommen.len())
+        .rev()
+        .map(text)
+        .find(|t| t.chars().count() + rest <= max)
+        .unwrap_or_else(|| text(0))
 }
 
 /// Ein Fahrzeug einer unangemeldeten Kraft, so weit es in Meldung und ETB steht.
@@ -397,6 +502,131 @@ mod etb_text_tests {
             Some("Bereitstellungsraum BR Sportplatz aufgelöst")
         );
         assert_eq!(etb_text_status("BR Sportplatz", "geplant"), None);
+    }
+
+    fn abruf<'a>(mitgenommen: &'a [String]) -> AbrufText<'a> {
+        AbrufText {
+            name: "HLF 20",
+            mitgenommen,
+            br_bezeichnung: "Sportplatz",
+            ziel: None,
+            auftrag_nr: None,
+            ausgerueckt: false,
+        }
+    }
+
+    /// Wortlaute des Abrufs je Variante (LLH-1085, design.md D8).
+    #[test]
+    fn abruf_ohne_ziel_mit_ziel_mit_auftrag_ausgerueckt() {
+        assert_eq!(
+            etb_text_abruf(&abruf(&[])),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen"
+        );
+        let mit_ziel = AbrufText {
+            ziel: Some("EA Deich"),
+            ..abruf(&[])
+        };
+        assert_eq!(
+            etb_text_abruf(&mit_ziel),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich"
+        );
+        let mit_auftrag = AbrufText {
+            auftrag_nr: Some(7),
+            ..mit_ziel
+        };
+        assert_eq!(
+            etb_text_abruf(&mit_auftrag),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich (Auftrag Nr. 7)"
+        );
+        assert_eq!(
+            etb_text_abruf(&AbrufText {
+                ausgerueckt: true,
+                ..mit_ziel
+            }),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich und ausgerückt"
+        );
+        assert_eq!(
+            etb_text_abruf(&AbrufText {
+                ausgerueckt: true,
+                ..mit_auftrag
+            }),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich (Auftrag Nr. 7) \
+             und ausgerückt"
+        );
+        assert_eq!(
+            etb_text_abruf(&AbrufText {
+                auftrag_nr: Some(3),
+                ..abruf(&[])
+            }),
+            "HLF 20 aus Bereitstellungsraum Sportplatz abgerufen (Auftrag Nr. 3)"
+        );
+    }
+
+    #[test]
+    fn abruf_mit_verband_aufgehoben_ausgerueckt() {
+        let gruppen = ["Gruppe 1".to_string(), "Gruppe 2".to_string()];
+        assert_eq!(
+            etb_text_abruf(&AbrufText {
+                name: "1. Zug",
+                ziel: Some("EA Deich"),
+                ..abruf(&gruppen)
+            }),
+            "1. Zug mit Gruppe 1, Gruppe 2 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich"
+        );
+        assert_eq!(
+            etb_text_abruf_aufgehoben("HLF 20", &[], "Sportplatz"),
+            "Abruf von HLF 20 aus Bereitstellungsraum Sportplatz zurückgenommen"
+        );
+        assert_eq!(
+            etb_text_abruf_aufgehoben("1. Zug", &gruppen[..1], "Sportplatz"),
+            "Abruf von 1. Zug mit Gruppe 1 aus Bereitstellungsraum Sportplatz zurückgenommen"
+        );
+        assert_eq!(
+            etb_text_ausgerueckt("HLF 20", &[], "Sportplatz", Some("EA Deich")),
+            "HLF 20 rückt aus Bereitstellungsraum Sportplatz aus nach EA Deich"
+        );
+        assert_eq!(
+            etb_text_ausgerueckt("HLF 20", &[], "Sportplatz", None),
+            "HLF 20 rückt aus Bereitstellungsraum Sportplatz aus"
+        );
+        assert_eq!(
+            etb_text_ausgerueckt("1. Zug", &gruppen, "Sportplatz", Some("EA Deich")),
+            "1. Zug mit Gruppe 1, Gruppe 2 rückt aus Bereitstellungsraum Sportplatz aus nach EA Deich"
+        );
+    }
+
+    /// Zu viele Namen: hinten fallen Namen weg, „und n weitere“ zählt sie; der Text bleibt unter
+    /// der Grenze. Passt nicht einmal ein Name, bleibt nur die Zahl.
+    #[test]
+    fn verband_wird_auf_die_grenze_gekappt() {
+        let gruppen: Vec<String> = (1..=4).map(|i| format!("Gruppe {i}")).collect();
+        assert_eq!(
+            kraefte_gekappt("1. Zug", &gruppen, 0, 100),
+            "1. Zug mit Gruppe 1, Gruppe 2, Gruppe 3, Gruppe 4"
+        );
+        assert_eq!(
+            kraefte_gekappt("1. Zug", &gruppen, 10, 55),
+            "1. Zug mit Gruppe 1, Gruppe 2 und 2 weitere"
+        );
+        assert_eq!(
+            kraefte_gekappt("1. Zug", &gruppen, 10, 30),
+            "1. Zug und 4 weitere"
+        );
+        assert_eq!(
+            kraefte_gekappt("1. Zug", &gruppen, 10, 5),
+            "1. Zug und 4 weitere"
+        );
+        let viele: Vec<String> = (0..5000).map(|i| format!("Gruppe {i}")).collect();
+        let text = etb_text_abruf(&AbrufText {
+            name: "1. Zug",
+            ..abruf(&viele)
+        });
+        assert!(
+            text.chars().count() <= crate::etb::INHALT_MAX,
+            "{}",
+            text.len()
+        );
+        assert!(text.contains(" weitere aus Bereitstellungsraum Sportplatz abgerufen"));
     }
 
     fn fz<'a>(fr: &'a str, typ: Option<&'a str>, org: Option<&'a str>) -> FahrzeugAngabe<'a> {

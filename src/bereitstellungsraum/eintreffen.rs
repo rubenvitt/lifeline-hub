@@ -366,7 +366,8 @@ async fn bekannt_tx(
         &buchung(r),
         r.benutzer_id,
     )
-    .await?;
+    .await?
+    .ereignis;
     let (einheit_id, fahrzeug_ids, zeitachse, personen, name) = match typ {
         ObjektTyp::Einheit => {
             // 4. Zeitachse; `Ausgelassen` ist kein Fehler.
@@ -535,7 +536,8 @@ async fn unangemeldet_tx(
         &buchung(r),
         r.benutzer_id,
     )
-    .await?;
+    .await?
+    .ereignis;
     let (zeitachse, personen) = eintreffen_zeitachse_tx(conn, r, einheit_id).await?;
 
     // 5. Meldung an die Einsatzleitung (D5).
