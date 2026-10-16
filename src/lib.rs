@@ -73,6 +73,7 @@ pub mod tier;
 pub mod tls;
 pub mod transfer;
 pub mod tx;
+pub mod uhrzeit;
 pub mod uhs;
 pub mod verbindung;
 pub mod verpflegung;
