@@ -1845,6 +1845,70 @@ async fn eintreffen_replay_nach_aufloesen_und_abschluss() {
     assert_eq!(bestand(&pool, eid).await, nach_erst);
 }
 
+/// D8 Punkt 2, Rennen zweier Tabs: beide Anfragen verpassen den Vorab-Lookup, die zweite scheitert
+/// in der Transaktion und liefert danach das Ergebnis der ersten (201), nicht ihren Fehler.
+///
+/// Hergestellt auf dem Datei-Pool (WAL): eine zweite Verbindung hält die Schreibsperre und hat
+/// die Belegung des Gewinners schon eingefügt, aber nicht festgeschrieben. Die Anfrage liest
+/// davon nichts (Vorab-Lookup leer) und wartet am `BEGIN IMMEDIATE`; erst dann wird der Gewinner
+/// festgeschrieben, und ihre Transaktion trifft auf ihn (409 „schon im Raum“).
+#[tokio::test]
+async fn eintreffen_rennen_zweier_tabs_liefert_den_gewinner() {
+    let (_dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    let (app, pool, _live) =
+        common::setup_mit_optionen_auf(pool, lifeline_hub::app::RouterOptionen::default()).await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+    let admin = admin_id(&pool).await;
+
+    let mut gewinner_tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    let gewinner: i64 = sqlx::query_scalar(
+        "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von, \
+                                  client_id) \
+         VALUES (?, ?, 'einheit', ?, 'eintritt', ?, 'rennen') RETURNING id",
+    )
+    .bind(eid)
+    .bind(br)
+    .bind(einheit)
+    .bind(admin)
+    .fetch_one(&mut *gewinner_tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ?")
+        .bind(br)
+        .bind(einheit)
+        .execute(&mut *gewinner_tx)
+        .await
+        .unwrap();
+
+    let body = json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit},
+                      "client_id": "rennen"});
+    let anfrage = eintreffen(&app, &cookie, eid, br, body);
+    tokio::pin!(anfrage);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut anfrage)
+            .await
+            .is_err(),
+        "die Anfrage wartet an der Schreibsperre"
+    );
+    gewinner_tx.commit().await.unwrap();
+
+    let (s, v) = anfrage.await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["belegung"]["id"], gewinner, "{v}");
+    assert_eq!(v["einheit_id"], einheit);
+    let zeilen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM br_belegung WHERE einsatz_id = ? AND client_id = 'rennen'",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(zeilen, 1);
+}
+
 /// D8: Grenzen der Offline-Felder und die Kopfzeile der Warteschlange.
 #[tokio::test]
 async fn eintreffen_offline_felder() {
