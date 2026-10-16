@@ -1,7 +1,12 @@
-import { Button, Flex, Tag, Typography } from 'antd';
+import { Button, Collapse, Flex, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import type { VerpflegungAusgabe, Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
+import type {
+  VerpflegungAusgabe,
+  VerpflegungEmpfaenger,
+  Verpflegungsstelle,
+  VerpflegungZeitfenster,
+} from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
@@ -17,7 +22,9 @@ import { useViewport } from '../components/useViewport';
 import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
+import EmpfaengerStand from './EmpfaengerStand';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
+import { LEERE_EMPFAENGER, empfaengerText, verpflegungsstand } from './empfaengerKern';
 import { stellenName, zeilenJeStelle } from './stellenKern';
 import {
   KOSTFORM_LABEL,
@@ -67,6 +74,11 @@ export interface ZeitfensterKarteProps {
    * je Stelle und der Ausgaben. Gerechnet wird nichts: das Ist je Stelle steht in `je_stelle`.
    */
   stellen?: readonly Verpflegungsstelle[];
+  /**
+   * Die Empfängerliste (LLH-1055) für den Empfänger an jeder Ausgabe und die Klappe „Einheiten“
+   * mit „Noch nicht verpflegt“. Ohne Einheiten im Einsatz gibt es die Klappe nicht.
+   */
+  empfaenger?: VerpflegungEmpfaenger;
 }
 
 type Aktionsschluessel = 'nachtragen' | 'bearbeiten' | 'nachfordern' | 'loeschen';
@@ -101,6 +113,11 @@ interface Aktion {
  * bleibt das Gesamt-„fehlt“. Je wählbarer Stelle (nicht aufgelöst) führt außerhalb des schmalen
  * Schirms ein Sprung „Ausgabe öffnen“ mit `?stelle=` in die Ausgabeansicht, unter denselben
  * Bedingungen wie der Sprung der Karte. Ausgaben an einer Stelle nennen die Stelle statt des Orts.
+ *
+ * Empfänger (LLH-1055 Teil II): jede Ausgabe nennt ihren Empfänger („an 2. Gruppe“, „Zuführung
+ * Deich“). Die Klappe „Einheiten“ nennt im Kopf, wie viele noch nicht verpflegt, ohne Eintreffen
+ * und verpflegt sind, und zeigt aufgeklappt `EmpfaengerStand` ohne Wahlknöpfe (gewählt wird in
+ * der Ausgabeansicht). Eingeklappt, weil die Karte sonst je Einheit eine Zeile länger würde.
  */
 export default function ZeitfensterKarte({
   zeitfenster: zf,
@@ -116,6 +133,7 @@ export default function ZeitfensterKarte({
   onZuruecknehmen,
   ausstehend = [],
   stellen = [],
+  empfaenger = LEERE_EMPFAENGER,
 }: ZeitfensterKarteProps) {
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
@@ -148,6 +166,22 @@ export default function ZeitfensterKarte({
   /** Stelle statt Ort: eine Ausgabe an einer Stelle nennt die Stelle, ohne den Ort. */
   const woText = (stelleId: number | null | undefined, ort: string | null | undefined) =>
     stelleId != null ? ` · ${stellenName(stelleId, stellen)}` : ort ? ` · ${ort}` : '';
+  /** „ · an 2. Gruppe“; leer ohne Empfänger. */
+  const anText = (a: Pick<VerpflegungAusgabe, 'einheit_id' | 'abschnitt_id'>) => {
+    const t = empfaengerText(a, empfaenger);
+    return t ? ` · ${t}` : '';
+  };
+  const vorgemerkt = ausstehend.map((v) => v.aktion.daten);
+  const stand = verpflegungsstand(zf, empfaenger, vorgemerkt);
+  const hatEinheiten = empfaenger.einheiten.length > 0;
+  const einheitenKopf = [
+    'Einheiten',
+    `${stand.offen.length} noch nicht verpflegt`,
+    stand.ohneEintreffen.length > 0 ? `${stand.ohneEintreffen.length} ohne Eintreffen` : null,
+    `${stand.verpflegt.length} verpflegt`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const gebuendelt = aktionen.length >= 3;
   const fuehreAus = (key: Aktionsschluessel) => {
     if (key === 'nachtragen') onAusgabeNachtragen?.(zf);
@@ -358,6 +392,7 @@ export default function ZeitfensterKarte({
               >
                 <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
                   <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                  {anText(a)}
                   {woText(a.verpflegungsstelle_id, a.ort)}
                   {sk ? ` · ${sk}` : ''}
                   {verweis != null && (
@@ -384,6 +419,7 @@ export default function ZeitfensterKarte({
               >
                 <span style={{ color: rollen.text2 }}>
                   <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                  {anText(d)}
                   {woText(d.verpflegungsstelle_id, d.ort)}
                   {sk ? ` · ${sk}` : ''}
                 </span>
@@ -391,6 +427,28 @@ export default function ZeitfensterKarte({
             );
           })}
         </ul>
+      )}
+
+      {hatEinheiten && (
+        <Collapse
+          ghost
+          data-lfh="verpflegung-einheiten"
+          style={{ borderBlockStart: `1px solid ${rollen.flaeche2}` }}
+          items={[
+            {
+              key: 'einheiten',
+              label: einheitenKopf,
+              children: (
+                <EmpfaengerStand
+                  zeitfenster={zf}
+                  empfaenger={empfaenger}
+                  ausstehend={vorgemerkt}
+                  ueberschrift="h2"
+                />
+              ),
+            },
+          ]}
+        />
       )}
 
       {(sprung || aktionen.length > 0) && (

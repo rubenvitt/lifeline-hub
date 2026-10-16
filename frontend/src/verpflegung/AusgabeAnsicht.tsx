@@ -864,6 +864,7 @@ export default function AusgabeAnsicht() {
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
           stellen={stellen}
+          empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(zf as VerpflegungZeitfenster, body)}
