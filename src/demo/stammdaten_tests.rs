@@ -77,12 +77,13 @@ fn zeile(ergebnis: &StammdatenErgebnis, art: DemoStammdatenArt) -> DemoBerichtZe
         .unwrap_or_else(|| panic!("keine Berichtszeile für {art:?}"))
 }
 
-fn erwarte_bericht(ergebnis: &StammdatenErgebnis, erwartet: [(i64, i64); 4]) {
+fn erwarte_bericht(ergebnis: &StammdatenErgebnis, erwartet: [(i64, i64); 5]) {
     let arten = [
         DemoStammdatenArt::Fahrzeug,
         DemoStammdatenArt::Personal,
         DemoStammdatenArt::Material,
         DemoStammdatenArt::EinheitVorlage,
+        DemoStammdatenArt::Schichtmodell,
     ];
     assert_eq!(
         ergebnis.je_art.iter().map(|z| z.art).collect::<Vec<_>>(),
@@ -194,6 +195,7 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
     assert_eq!(erg.fahrzeuge.len(), szenario::FAHRZEUGE.len());
@@ -289,10 +291,17 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
         );
     }
 
+    assert_eq!(
+        marke(&pool, "schichtmodell", erg.schichtmodell).await,
+        Some(a.kopf),
+        "Schichtmodell"
+    );
+
     let angelegt = (szenario::FAHRZEUGE.len()
         + szenario::PERSONAL.len()
         + szenario::MATERIAL.len()
-        + szenario::EINHEITEN_VORLAGEN.len()) as i64;
+        + szenario::EINHEITEN_VORLAGEN.len()
+        + 1) as i64;
     assert_eq!(
         anzahl(
             &pool,
@@ -376,6 +385,7 @@ async fn vorhandenes_fahrzeug_in_dienst_wird_mitbenutzt_unveraendert_und_unmarki
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -449,6 +459,7 @@ async fn ausser_dienst_gestellter_namensvetter_bleibt_und_ein_neues_entsteht() {
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -488,6 +499,7 @@ async fn personal_gleichen_namens_mit_anderer_nummer_wird_neu_angelegt() {
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -571,6 +583,7 @@ async fn personal_gleicher_nummer_mitbenutzt_benutzer_und_link_unberuehrt() {
             (szenario::PERSONAL.len() as i64 - 1, 1),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -596,6 +609,7 @@ async fn material_gleicher_bestandsnummer_wird_mitbenutzt() {
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64 - 1, 1),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -627,6 +641,7 @@ async fn gleiche_kennungen_einer_fremden_org_werden_nicht_mitbenutzt() {
             (szenario::PERSONAL.len() as i64, 0),
             (szenario::MATERIAL.len() as i64, 0),
             (szenario::EINHEITEN_VORLAGEN.len() as i64, 0),
+            (1, 0),
         ],
     );
 }
@@ -975,6 +990,7 @@ async fn rundlauf_angelegtes_verschwindet_mitbenutztes_bleibt() {
                 szenario::EINHEITEN_VORLAGEN.len() as i64,
                 0
             ),
+            (DemoStammdatenArt::Schichtmodell, 1, 0),
         ]
     );
     assert_eq!(
@@ -1286,4 +1302,62 @@ async fn demo_vorlage_unter_eigener_obereinheit_bleibt() {
     let ids: Vec<i64> = vorlagen(&pool, a.org).await.iter().map(|v| v.id).collect();
     assert!(ids.contains(&staffel) && !ids.contains(&zug), "{ids:?}");
     assert_eq!(marke(&pool, "einheit_vorlage", staffel).await, None);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Schichtmodell (LLH-1122)
+// ---------------------------------------------------------------------------------------------
+
+/// Spec `kraefte-abloesung`, „Schichtmodelle der Organisation“, und `demo-daten`: der Import legt
+/// das Szenario-Modell an und markiert es (`ist_demo`), ohne es zur Vorgabe zu machen; ein
+/// gleichnamiges Modell der Org (andere Schreibweise) wird mitbenutzt und bleibt unmarkiert.
+#[tokio::test]
+async fn schichtmodell_wird_angelegt_und_markiert_oder_mitbenutzt() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let modelle = crate::schichtmodell::repo::list(&pool, a.org)
+        .await
+        .unwrap();
+    assert_eq!(modelle.len(), 1);
+    assert_eq!(modelle[0].id, erg.schichtmodell);
+    assert_eq!(modelle[0].bezeichnung, szenario::SCHICHTMODELL_BEZEICHNUNG);
+    assert!(modelle[0].ist_demo, "angelegt → Demo-Marke");
+    assert!(
+        !modelle[0].ist_vorgabe,
+        "das Demo-Modell prägt keinen echten Einsatz"
+    );
+
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let eigen: i64 = sqlx::query_scalar(
+        "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten) \
+         VALUES (?, ?, 'rhythmus', 720) RETURNING id",
+    )
+    .bind(a.org)
+    .bind(szenario::SCHICHTMODELL_BEZEICHNUNG.to_uppercase())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    assert_eq!(erg.schichtmodell, eigen);
+    assert_eq!(
+        zeile(&erg, DemoStammdatenArt::Schichtmodell),
+        DemoBerichtZeile {
+            art: DemoStammdatenArt::Schichtmodell,
+            angelegt: 0,
+            mitbenutzt: 1,
+            entfernt: 0,
+            behalten: 0,
+        }
+    );
+    let modelle = crate::schichtmodell::repo::list(&pool, a.org)
+        .await
+        .unwrap();
+    assert_eq!(modelle.len(), 1);
+    assert!(!modelle[0].ist_demo, "mitbenutzt → keine Marke");
 }
