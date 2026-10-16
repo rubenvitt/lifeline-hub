@@ -93,7 +93,7 @@ async function zweiteSitzung(browser: Browser): Promise<Page> {
   return page;
 }
 
-async function etbAnzahl(page: Page, basis: string): Promise<number> {
+async function countEtb(page: Page, basis: string): Promise<number> {
   return ((await (await page.request.get(`${basis}/etb`)).json()) as unknown[]).length;
 }
 
@@ -146,7 +146,7 @@ test('Bereitstellungsraum: aus der Detailseite verorten, Marker mit Belegung liv
 
   // Einstieg an den Raumdaten der Detailseite.
   await page.goto(`/einsaetze/${e}/bereitstellungsraeume/${br}`);
-  const etbVorher = await etbAnzahl(page, basis);
+  const etbVorher = await countEtb(page, basis);
   await page.getByRole('button', { name: 'Auf Karte verorten' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/lagekarte`));
   await karteBereit(page);
@@ -165,7 +165,7 @@ test('Bereitstellungsraum: aus der Detailseite verorten, Marker mit Belegung liv
   // Die andere Karte bekommt den Marker über das Live-Ereignis, ohne Neuladen.
   await expect.poll(() => raumFeature(andere, br), { timeout: 30_000 }).toBeDefined();
   // Kein ETB-Eintrag für die Verortung.
-  expect(await etbAnzahl(page, basis)).toBe(etbVorher);
+  expect(await countEtb(page, basis)).toBe(etbVorher);
 
   // Der geplante Raum: Ring und Wort.
   await springe(page, NORD_ORT, 15);

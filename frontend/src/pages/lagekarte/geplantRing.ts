@@ -39,7 +39,7 @@ function bandFarbe(d: number): Rgba | null {
 }
 
 /** Liegt der Winkel (Grad, 0° rechts, im Uhrzeigersinn) auf einem Strich? */
-function aufStrich(grad: number): boolean {
+function isAufStrich(grad: number): boolean {
   const phase = (((grad % 360) + 360) % 360) / (360 / STRICHE);
   return phase - Math.floor(phase) < STRICH_ANTEIL;
 }
@@ -62,7 +62,7 @@ export function geplantRingBild(): {
       const dx = (x + 0.5 - mitte) / DICHTE;
       const dy = (y + 0.5 - mitte) / DICHTE;
       const farbe = bandFarbe(Math.hypot(dx, dy));
-      if (!farbe || !aufStrich((Math.atan2(dy, dx) * 180) / Math.PI)) continue;
+      if (!farbe || !isAufStrich((Math.atan2(dy, dx) * 180) / Math.PI)) continue;
       data.set(farbe, (y * kante + x) * 4);
     }
   }
