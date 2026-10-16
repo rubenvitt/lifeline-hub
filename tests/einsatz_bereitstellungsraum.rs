@@ -3027,16 +3027,27 @@ async fn abruf_mit_abschnitt_ohne_freigabe_einheiten_403() {
     rolle_setzen(&l.app, &l.admin, l.eid, frieda, "fuehrungspersonal").await;
     let frieda = login_cookie(&l.app, "frieda", "friedapw1").await;
     modul_sperren(&l.app, &l.admin, l.eid, "einheiten", true).await;
+    let anderer = einsatz_anlegen(&l.app, &l.admin).await;
+    let fremder = abschnitt_anlegen(&l.app, &l.admin, anderer, "Fremd").await;
     let vorher = abruf_bestand(&l.pool, l.eid).await;
-    let (s, v) = rufe_ab(
-        &l.app,
-        &frieda,
-        l.eid,
-        l.br,
-        json!({"objekt_typ": "einheit", "objekt_id": l.hlf, "abschnitt_id": l.deich}),
-    )
-    .await;
-    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    // Auch mit unbekannter Kraft und fremdem oder unbekanntem Abschnitt: 403 kommt vor dem
+    // Lesen von Kraft und Abschnitt (sonst 404).
+    for (objekt, abschnitt) in [
+        (l.hlf, l.deich),
+        (99_999, l.deich),
+        (l.hlf, fremder),
+        (l.hlf, 99_999),
+    ] {
+        let (s, v) = rufe_ab(
+            &l.app,
+            &frieda,
+            l.eid,
+            l.br,
+            json!({"objekt_typ": "einheit", "objekt_id": objekt, "abschnitt_id": abschnitt}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{objekt}/{abschnitt}: {v}");
+    }
     assert_eq!(abruf_bestand(&l.pool, l.eid).await, vorher);
     assert_eq!(unterstellung(&l.pool, l.hlf).await, None);
 }
