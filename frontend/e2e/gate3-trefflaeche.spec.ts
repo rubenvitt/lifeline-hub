@@ -2757,12 +2757,13 @@ test('Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser fo
 // ── Verpflegung ──────────────────────────────────────────────────────────────────────
 //
 // Nur antd-`Button`, gemessen wird wegen der eigenen Flex-Hüllen (Aktionszeile der Karte,
-// Aktionsspalte des `Zeitachseneintrag`). ZWEI Karten, damit BEIDE Aktionsformen stehen:
-//  - „Frühstück Deich": Fehlmenge, KEINE Ausgabe → drei oder mehr Aktionen, also Menü. Ohne
-//    Ausgabe, sonst hinge die dritte Aktion allein an „Nachfordern" und damit an einer
-//    Abfrage, die erst nach dem ersten Bild eintrifft.
-//  - „Mittag Deich": gedeckt durch zwei Ausgaben → „Bedarf bearbeiten" als zweiter Knopf,
-//    dazu zwei „Zurücknehmen".
+// Aktionsspalte des `Zeitachseneintrag`). Der Sprung „Ausgabe öffnen“ ist ein `<a>` (LLH-1032):
+// er erbt keine Steuerhöhe und trägt den Boden über `SprungKnopf`. ZWEI Karten, damit BEIDE
+// Aktionsformen stehen:
+//  - „Frühstück Deich": Fehlmenge, KEINE Ausgabe → vier Aktionen (Nachtragen, Bedarf,
+//    Nachfordern, Löschen), also Menü; daneben nur der Sprung.
+//  - „Mittag Deich": gedeckt durch zwei Ausgaben → Sprung, „Ausgabe nachtragen" und „Bedarf
+//    bearbeiten" als Knöpfe, dazu zwei „Zurücknehmen".
 // Namen ohne den Modulnamen; jeder Namens-Regex endet mit dem Leerzeichen vor dem Zeitraum.
 
 test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({ page }) => {
@@ -2824,9 +2825,12 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
     await expect(fruehstueck).toHaveAttribute('data-einstufung', 'unterdeckung');
     await expect(mittagKarte).toHaveAttribute('data-einstufung', 'gedeckt');
 
-    const erfassen = page.getByRole('button', { name: /^Ausgabe erfassen zu \S.* / });
+    const oeffnen = page.getByRole('link', { name: /^Ausgabe öffnen zu \S.* / });
     const menue = fruehstueck.getByRole('button', {
       name: /^Aktionen zu Zeitfenster Frühstück Deich /,
+    });
+    const nachtragen = mittagKarte.getByRole('button', {
+      name: /^Ausgabe nachtragen zu Mittag Deich /,
     });
     const bearbeiten = mittagKarte.getByRole('button', {
       name: /^Bedarf bearbeiten zu Mittag Deich /,
@@ -2835,17 +2839,23 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
       name: /^Zurücknehmen: Ausgabe 20 EP um \d\d:\d\d zu Mittag Deich /,
     });
     // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze.
-    await expect(erfassen).toHaveCount(2);
+    await expect(oeffnen).toHaveCount(2);
     await expect(menue).toHaveCount(1);
     await expect(fruehstueck.getByRole('button', { name: /^Bedarf bearbeiten zu / })).toHaveCount(
       0,
     );
+    await expect(
+      fruehstueck.getByRole('button', { name: /^Ausgabe nachtragen zu / }),
+      'Frühstück: ab drei Aktionen liegt auch „Ausgabe nachtragen" im Menü',
+    ).toHaveCount(0);
+    await expect(nachtragen).toHaveCount(1);
     await expect(bearbeiten).toHaveCount(1);
     await expect(mittagKarte.getByRole('button', { name: /^Aktionen zu / })).toHaveCount(0);
     await expect(zuruecknehmen).toHaveCount(2);
 
-    const primaer = await alleHaltenStufe(erfassen, soll, `Ausgabe erfassen (${dichte})`, 2);
+    const sprung = await alleHaltenStufe(oeffnen, soll, `Ausgabe öffnen (${dichte})`, 2);
     const dreipunkt = await haeltStufe(menue, soll, `Dreipunkt (${dichte})`);
+    const nachtrag = await haeltStufe(nachtragen, soll, `Ausgabe nachtragen (${dichte})`);
     const zweiter = await haeltStufe(bearbeiten, soll, `Bedarf bearbeiten (${dichte})`);
     const zurueck = await alleHaltenStufe(zuruecknehmen, soll, `Zurücknehmen (${dichte})`, 2);
     const kopf = await haeltStufe(
@@ -2864,22 +2874,27 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
       return Math.round(r.x - (l.x + l.width));
     };
     const lueckeMenue = await luecke(
-      fruehstueck.getByRole('button', { name: /^Ausgabe erfassen zu / }),
+      fruehstueck.getByRole('link', { name: /^Ausgabe öffnen zu / }),
       menue,
     );
     const lueckeKnopf = await luecke(
-      mittagKarte.getByRole('button', { name: /^Ausgabe erfassen zu / }),
-      bearbeiten,
+      mittagKarte.getByRole('link', { name: /^Ausgabe öffnen zu / }),
+      nachtragen,
     );
+    const lueckeZweiter = await luecke(nachtragen, bearbeiten);
     const lueckeZurueck = Math.round(await abstandZuNachbarn(mittagKarte, zuruecknehmen.first()));
     if (dichte === 'handschuh') {
       expect(
         lueckeMenue,
-        `Abstand „Ausgabe erfassen" ↔ Dreipunkt (handschuh, gemessen ${lueckeMenue}px)`,
+        `Abstand „Ausgabe öffnen" ↔ Dreipunkt (handschuh, gemessen ${lueckeMenue}px)`,
       ).toBeGreaterThanOrEqual(16);
       expect(
         lueckeKnopf,
-        `Abstand „Ausgabe erfassen" ↔ „Bedarf bearbeiten" (handschuh, gemessen ${lueckeKnopf}px)`,
+        `Abstand „Ausgabe öffnen" ↔ „Ausgabe nachtragen" (handschuh, gemessen ${lueckeKnopf}px)`,
+      ).toBeGreaterThanOrEqual(16);
+      expect(
+        lueckeZweiter,
+        `Abstand „Ausgabe nachtragen" ↔ „Bedarf bearbeiten" (handschuh, gemessen ${lueckeZweiter}px)`,
       ).toBeGreaterThanOrEqual(16);
       expect(
         lueckeZurueck,
@@ -2887,9 +2902,109 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
       ).toBeGreaterThanOrEqual(16);
     }
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Ausgabe erfassen ${primaer}, Dreipunkt ${dreipunkt}, ` +
-        `Bedarf bearbeiten ${zweiter}, Zurücknehmen ${zurueck}, Kopf ${kopf}, ` +
-        `Abstand Menü ${lueckeMenue}, Abstand Knopf ${lueckeKnopf}, Abstand Zurücknehmen ${lueckeZurueck}`,
+      `${dichte} (Soll ≥ ${soll}): Ausgabe öffnen ${sprung}, Dreipunkt ${dreipunkt}, ` +
+        `Ausgabe nachtragen ${nachtrag}, Bedarf bearbeiten ${zweiter}, Zurücknehmen ${zurueck}, ` +
+        `Kopf ${kopf}, Abstand Menü ${lueckeMenue}, Abstand Knopf ${lueckeKnopf}, ` +
+        `Abstand Nachtragen ${lueckeZweiter}, Abstand Zurücknehmen ${lueckeZurueck}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Ausgabeansicht (LLH-1032, design.md D9) ─────────────────────────────────────────
+//
+// „+1“ ist eine Ausnahme NACH OBEN: in jeder Stufe ≥ 72 px hoch und breit, am unteren Rand (im
+// unteren Drittel des Fensters). Alle übrigen Zähltasten folgen der Staffel; in `handschuh`
+// stehen sie ≥ 16 px auseinander. „−1“ und „Buchen“ sind ohne Sammlung gesperrt und werden als
+// gesperrte Ziele gemessen. Der Boden 72 steht als Literal, wie die Staffel.
+
+test('Ausgabeansicht: „+1“ ≥ 72 px in jeder Stufe und unten, übrige Zähltasten nach Staffel, Abstand ≥ 16 px im Handschuh', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Zaehlen`);
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/zeitfenster`, {
+    data: {
+      bezeichnung: 'Mittag Deich',
+      von_at: zeit(-10),
+      bis_at: zeit(110),
+      bedarf_kraefte: 30,
+      bedarf_betreute: 10,
+      sonderkost: { vegetarisch: 4 },
+    },
+  });
+  expect(antwort.ok(), `Seeding: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  const zf = (await antwort.json()) as { id: number };
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
+    await stelleDichte(page, dichte);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    const feld = page.locator('[data-lfh="zaehltasten"]');
+    const plus1 = feld.getByRole('button', { name: '+1', exact: true });
+    const uebrige = [
+      feld.getByRole('button', { name: 'Menge …', exact: true }),
+      feld.getByRole('button', { name: '+5', exact: true }),
+      feld.getByRole('button', { name: '+10', exact: true }),
+      page.getByRole('button', { name: /^vegetarisch 0\/4/ }),
+    ];
+    const minus = feld.getByRole('button', { name: '−1', exact: true });
+    const buchen = page.getByRole('button', { name: 'Buchen', exact: true });
+
+    // „+1“: Höhe UND Breite ≥ 72, in jeder Stufe.
+    await expect(plus1).toHaveCount(1);
+    const k = (await plus1.boundingBox())!;
+    expect(
+      k.height + SUBPIXEL,
+      `„+1“ hoch (${dichte}, gemessen ${k.height}px)`,
+    ).toBeGreaterThanOrEqual(72);
+    expect(
+      k.width + SUBPIXEL,
+      `„+1“ breit (${dichte}, gemessen ${k.width}px)`,
+    ).toBeGreaterThanOrEqual(72);
+    const fenster = page.viewportSize()!;
+    expect(
+      k.y + k.height / 2,
+      `„+1“ im unteren Drittel (${dichte}, Mitte bei ${k.y + k.height / 2}px von ${fenster.height}px)`,
+    ).toBeGreaterThanOrEqual((fenster.height * 2) / 3);
+
+    const werte: number[] = [];
+    for (const [i, t] of uebrige.entries())
+      werte.push(await haeltStufe(t, soll, `Zähltaste ${i} (${dichte})`));
+    const gesperrt = [
+      await gesperrtHaeltStufe(minus, soll, `„−1“ gesperrt (${dichte})`),
+      await gesperrtHaeltStufe(buchen, soll, `„Buchen“ gesperrt (${dichte})`),
+    ];
+
+    // Abstand je Nachbarpaar im Tastenfeld: −1 · Menge … · +5 · +10 · +1.
+    const reihe = [minus, ...uebrige.slice(0, 3), plus1];
+    const luecken: number[] = [];
+    for (let i = 0; i + 1 < reihe.length; i++) {
+      const l = (await reihe[i].boundingBox())!;
+      const r = (await reihe[i + 1].boundingBox())!;
+      // Gleiche Zeile: waagerechter Abstand; sonst (Umbruch) senkrechter.
+      luecken.push(
+        Math.round(
+          Math.abs(l.y - r.y) < 1 ? r.x - (l.x + l.width) : Math.abs(r.y - (l.y + l.height)),
+        ),
+      );
+    }
+    if (dichte === 'handschuh') {
+      for (const [i, l] of luecken.entries()) {
+        expect(
+          l,
+          `Abstand Zähltaste ${i} ↔ ${i + 1} (handschuh, gemessen ${l}px)`,
+        ).toBeGreaterThanOrEqual(16);
+      }
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): +1 ${k.width}×${k.height}, übrige ${werte.join('/')}, ` +
+        `gesperrt ${gesperrt.join('/')}, Abstände ${luecken.join('/')}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

@@ -163,6 +163,14 @@ draußen gelassen werden.
   vormerkt. TanStacks Vorgabe `'online'` hielte die Mutation ohne Netz an: Dann erschiene
   nie „Offline vorgemerkt“, und nach der Rückkehr des Netzes ginge die Erfassung online
   hinaus. Bis LFH-705 galt das für alle fünf solchen Mutationen.
+- **Ein gesammelter Schreibvorgang setzt die `client_id` beim Abschluss, nicht beim ersten
+  Tipp** (LLH-1032, Sammelbuchung der Verpflegung, `verpflegung/useAusgabeSammlung.ts`). Ein
+  Abschluss ohne Ort für Erfolg oder Ablehnung (Unmount, Routenwechsel, `pagehide`,
+  `visibilitychange=hidden`) schreibt ohne Sendeversuch in die Queue
+  (`merkeVerpflegungsausgabeVor`), kein `sendBeacon` und kein `fetch(keepalive)`: die umgingen
+  `apiSend` samt CSRF, Serveruhr-Versatz und Antwort. Der Sync sendet und legt Ablehnungen in den
+  Wiederherstellungsbereich. Ein Bündel, das an Ort und Stelle gesendet wird, ist keine Mutation
+  (nichts zu pausieren); `networkMode` stellt sich dort nicht.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
   `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
   nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt

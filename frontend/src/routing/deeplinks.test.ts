@@ -38,6 +38,8 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  verpflegungAusgabePfad,
+  geraetVerpflegungAusgabePfad,
   verpflegungPfad,
   wetterPegelPfad,
   pegelZielPfad,
@@ -383,6 +385,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
 
   it('verpflegungPfad trifft die Registry-Route (LFH-634)', () => {
     expect(verpflegungPfad(E)).toBe('/einsaetze/5/verpflegung');
+  });
+
+  it('Ausgabeansicht eines Zeitfensters an Stab und Gerät (LLH-1032, design.md D1)', () => {
+    expect(verpflegungAusgabePfad(E, 12)).toBe('/einsaetze/5/verpflegung/12/ausgabe');
+    expect(geraetVerpflegungAusgabePfad(E, 12)).toBe('/geraet/5/verpflegung/12/ausgabe');
   });
 
   it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {

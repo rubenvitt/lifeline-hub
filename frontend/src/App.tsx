@@ -18,6 +18,7 @@ import GeraeteLayout, {
   GeraetEinsatzRahmen,
   GeraetMeldungen,
   GeraetVerpflegung,
+  GeraetVerpflegungAusgabe,
   GeraetStart,
   GeraetMonitor,
   GeraetStelle,
@@ -86,6 +87,7 @@ import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
+import AusgabeAnsicht from './verpflegung/AusgabeAnsicht';
 import WetterPegelPage from './pages/WetterPegelPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
@@ -284,6 +286,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="br/:brId" element={<GeraetBr />} />
           <Route path="meldungen" element={<GeraetMeldungen />} />
           <Route path="verpflegung" element={<GeraetVerpflegung />} />
+          {/* Ausgabeansicht je Zeitfenster (LLH-1032); die Startseite bleibt die Liste. */}
+          <Route path="verpflegung/:zeitfensterId/ausgabe" element={<GeraetVerpflegungAusgabe />} />
           {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
           <Route element={<GeraetUhsRahmen />}>
             <Route path="patienten" element={<GeraetPatientenPage />} />
@@ -402,6 +406,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
           {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
           <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
+          {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,
+              `modulAusPfad` gatet sie über das Segment `verpflegung`. */}
+          <Route path="verpflegung/:zeitfensterId/ausgabe" element={<AusgabeAnsicht />} />
           {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
               (LLH-1180, design.md D7). `modulAusPfad` gatet sie nach dem Fernmeldewesen. */}
           <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />

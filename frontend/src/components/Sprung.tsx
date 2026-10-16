@@ -15,6 +15,7 @@ import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 export function SprungKnopf({
   to,
   gesperrt = false,
+  zugaenglicherName,
   children,
 }: {
   to: To;
@@ -22,12 +23,14 @@ export function SprungKnopf({
   gesperrt?: boolean;
   /** Das Ziel als Wortlaut („Zum ETB-Eintrag“); „↗“ setzt der Baustein. */
   children: string;
+  /** Zugänglicher Name mit Zeilenkennung, wenn mehrere gleiche Sprünge auf einer Seite stehen. */
+  zugaenglicherName?: string;
 }) {
   const href = useHref(to);
   const klick = useLinkClickHandler<HTMLElement>(to);
   if (gesperrt) return <GesperrterSprung>{children}</GesperrterSprung>;
   return (
-    <Button href={href} onClick={klick}>
+    <Button href={href} onClick={klick} aria-label={zugaenglicherName}>
       {children} <span aria-hidden="true">↗</span>
     </Button>
   );

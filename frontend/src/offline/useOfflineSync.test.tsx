@@ -26,6 +26,9 @@ import {
   schreibaktionEinreihen,
 } from './queue';
 import { useOfflineSync } from './useOfflineSync';
+import { merkeVerpflegungsausgabeVor } from './schreiben';
+import { useVorgemerkteAusgaben } from './useVorgemerkteAusgaben';
+import { KEINE_SONDERKOST, ausgabe as serverAusgabe, zeitfenster } from '../test/verpflegungDaten';
 
 vi.mock('../api/etb', () => ({ erfasseEtb: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ legePersonAn: vi.fn() }));
@@ -509,6 +512,97 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     ).toEqual([8, 9]);
     expect(client.getQueryState(einsatzKeys.verpflegung(7))?.isInvalidated).toBe(true);
     expect(legeMeldungAn).not.toHaveBeenCalled();
+  });
+
+  it('ein gesammeltes Bündel (10 EP, 2 vegetarisch) steht ausstehend, wird gesendet und steht danach genau einmal da (LLH-1032)', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const vorher = zeitfenster({
+      id: 9,
+      einsatz_id: 7,
+      ausgaben: [serverAusgabe({ id: 4, zeitfenster_id: 9 })],
+    });
+    client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
+      zeitfenster: [vorher],
+      stellen: [],
+    });
+    const nachher = zeitfenster({
+      id: 9,
+      einsatz_id: 7,
+      ausgegeben: {
+        gesamt: vorher.ausgegeben.gesamt + 10,
+        sonderkost: { ...vorher.ausgegeben.sonderkost, vegetarisch: 2 },
+      },
+      ausgaben: [
+        ...vorher.ausgaben,
+        serverAusgabe({
+          id: 5,
+          zeitfenster_id: 9,
+          menge: 10,
+          sonderkost: { ...KEINE_SONDERKOST, vegetarisch: 2 },
+        }),
+      ],
+    });
+    vi.mocked(erfasseAusgabe).mockResolvedValue({ ausgabe_id: 5, zeitfenster: nachher });
+
+    // Verlassen der Ansicht ohne Netz: das Bündel geht direkt in die Warteschlange (D5).
+    online(false);
+    await merkeVerpflegungsausgabeVor(
+      BENUTZER_A,
+      7,
+      { id: 9, bezeichnung: 'Mittag' },
+      {
+        menge: 10,
+        sonderkost: { vegetarisch: 2 },
+      },
+    );
+    const vorgemerkt = renderHook(() => useVorgemerkteAusgaben(BENUTZER_A, 7), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(vorgemerkt.result.current).toHaveLength(1));
+    expect(vorgemerkt.result.current[0].aktion).toMatchObject({
+      zeitfenster_id: 9,
+      daten: { menge: 10, sonderkost: { vegetarisch: 2 } },
+    });
+
+    const beimEntfernen: (number | undefined)[] = [];
+    const merke = () =>
+      beimEntfernen.push(
+        client.getQueryData<Verpflegung>(einsatzKeys.verpflegung(7))?.zeitfenster[0].ausgegeben
+          .gesamt,
+      );
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      online(true);
+      renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+          ausstehend: 0,
+          abgelehnt: 0,
+        }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(erfasseAusgabe).toHaveBeenCalledExactlyOnceWith(
+      7,
+      9,
+      {
+        menge: 10,
+        sonderkost: { vegetarisch: 2 },
+        zeitpunkt_at: expect.any(String),
+        client_id: expect.any(String),
+      },
+      { offlineQueueBenutzerId: BENUTZER_A },
+    );
+    // Beim Entfernen der Zeile steht die bestätigte Menge schon im Cache: kein Takt ohne sie.
+    expect(beimEntfernen[0]).toBe(vorher.ausgegeben.gesamt + 10);
+    const zf = client.getQueryData<Verpflegung>(einsatzKeys.verpflegung(7))!.zeitfenster[0];
+    expect(zf.ausgegeben).toMatchObject({
+      gesamt: vorher.ausgegeben.gesamt + 10,
+      sonderkost: { vegetarisch: 2 },
+    });
+    expect(zf.ausgaben.filter((a) => a.id === 5)).toHaveLength(1);
+    await waitFor(() => expect(vorgemerkt.result.current).toHaveLength(0));
   });
 
   it('legt ohne vorhandenen Cache keinen an', async () => {

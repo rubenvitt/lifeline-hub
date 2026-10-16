@@ -1,3 +1,30 @@
+## [1.0.0-alpha.130](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.129...v1.0.0-alpha.130) (2026-10-16)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Neue Tabellen für Verpflegungsstellen und für ihre Zuordnung zu Verpflegungszeitfenstern. Zeitfenster bekommen das Feld Verpflegungsart, Ausgaben einen Verweis auf eine Verpflegungsstelle. Die Migration läuft beim Start automatisch.
+- **Schnittstelle Verpflegung erweitert:** Neue Schreibwege legen Verpflegungsstellen an, ändern, stornieren und setzen ihren Status. Die Verpflegungsübersicht liefert zusätzlich die Liste der Stellen und das Ist je Stelle.
+- **Neue Längengrenzen für Freitexte:** Für die Bezeichnung eines Zeitfensters (200 Zeichen) sowie Ort (500) und Bemerkung (2 000) einer Ausgabe gibt es jetzt Höchstlängen. Längere Eingaben lehnt der Server ab. Ausgaben, die vor Einführung der Grenze gespeichert und nur erneut gesendet werden, kommen weiterhin an.
+
+### Betreuung und Verpflegung
+
+- **Verpflegungsstellen (Serverseite):** Für jeden Einsatz lassen sich Verpflegungsstellen führen, jeweils mit Art, Standort, Koordinate und Abschnitt. Eine Stelle durchläuft die Status *geplant → aktiv → aufgelöst*, wie ein Bereitstellungsraum. Stornieren lässt sie sich nur, solange sie geplant ist und noch nichts ausgegeben hat. Die Bedienoberfläche für die Stellen folgt in einem späteren Release.
+- **Einsatztagebuch:** Inbetriebnahme und Auflösung einer Verpflegungsstelle werden automatisch im ETB vermerkt.
+- **Zeitfenster:** Ein Zeitfenster kann bis zu 20 Verpflegungsstellen zugeordnet bekommen und trägt eine Verpflegungsart (warm, kalt oder Getränke).
+- **Ausgaben an einer Stelle:** Eine Ausgabe lässt sich einer Verpflegungsstelle zuordnen. An einer aufgelösten Stelle wird sie nur angenommen, wenn ihr Zeitpunkt vor der Auflösung liegt.
+- **Ist je Stelle:** Die Deckung zeigt zusätzlich, wie viel an jeder Stelle tatsächlich ausgegeben wurde. Das Soll bleibt am Zeitfenster.
+- **Eingabemasken mit Zeichenzähler:** Die Felder Bezeichnung, Ort und Bemerkung zeigen einen Zeichenzähler. Ist ein Text zu lang, sendet die Maske nicht und kürzt auch nichts.
+- **„Weitere Angaben“ verständlicher:** Ist die Bemerkung zu lang, öffnet sich der Klappbereich von selbst. Sein Kopf nennt die Abweichungen von der Vorgabe, etwa „Weitere Angaben · 3 vegan · Bemerkung“: Sonderkost je Kostform, Nachforderung und Bemerkung.
+- **Datenschutz:** Wird ein Einsatz geschwärzt, wird der Standort einer Verpflegungsstelle geleert. Bezeichnung, Art, Status, Koordinate und Zuordnungen bleiben erhalten.
+
+### Gekoppelte Geräte
+
+- Das Verpflegungsgerät sieht die Verpflegungsstellen und kann Ausgaben an einer Stelle buchen. Stellen anlegen oder ändern und Stellen einem Zeitfenster zuordnen kann es nicht.
+
+### Dokumentation
+
+- Die Anwenderkapitel zur Verpflegung am Desktop und am Gerät beschreiben jetzt die Längengrenzen der Angaben und den neuen Kopf von „Weitere Angaben“.
+
 ## [1.0.0-alpha.129](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.128...v1.0.0-alpha.129) (2026-10-15)
 
 ### Wichtige Änderungen

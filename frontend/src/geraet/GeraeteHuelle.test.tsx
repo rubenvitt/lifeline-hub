@@ -762,7 +762,8 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
         .getAllByRole('link')
         .map((l) => l.textContent),
     ).toEqual(['Verpflegung', 'Melden']);
-    expect(screen.getByRole('button', { name: /^Ausgabe erfassen zu Mittag/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: /^Ausgabe öffnen zu Mittag/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Ausgabe nachtragen zu Mittag/ })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Zeitfenster anlegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bedarf bearbeiten/ })).toBeNull();
     // Kein Dreipunkt-Menü, in dem Planen stecken könnte.
@@ -802,6 +803,35 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     expect((gesendet[0] as { inhalt: string }).inhalt).toMatch(/^Fehlmenge Verpflegung ‚Mittag‘/);
     // Nach dem Senden steht die Maske leer da, nicht wieder vorbelegt.
     await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
+  });
+
+  it('„Ausgabe öffnen“ führt auf die Unterseite; Navigation bleibt „Verpflegung“ und „Melden“, „Verpflegung“ aktiv (LLH-1032)', async () => {
+    vi.useRealTimers();
+    verpflegungBereit();
+    const router = renderApp('/geraet/7/verpflegung');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('link', { name: /^Ausgabe öffnen zu Mittag/ }));
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/verpflegung/1/ausgabe'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mittag' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '+1' })).toBeEnabled();
+    const nav = screen.getByRole('navigation', { name: 'Gerätenavigation' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Verpflegung', 'Melden']);
+    expect(within(nav).getByRole('link', { name: 'Verpflegung' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    // Kein Ortspfad am Gerät; zurück führt das Navigationsziel.
+    expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
+  });
+
+  it('eine andere Ansicht landet von der Ausgabeansicht auf ihrer Startseite', async () => {
+    stelleBereit();
+    const router = renderApp('/geraet/7/verpflegung/1/ausgabe');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/patienten'));
   });
 
   it('eine fremde Seite führt auf die Verpflegung', async () => {

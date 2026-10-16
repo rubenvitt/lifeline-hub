@@ -1137,6 +1137,97 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
 });
 
 /**
+ * Ausgabeansicht der Verpflegung (LLH-1032, design.md D10): das klebende Tastenfeld am unteren
+ * Rand verdeckt keinen fokussierten Eintrag der Liste „Letzte Buchungen“. Fokusziele sind die
+ * „Zurücknehmen“-Knöpfe der zehn gezeigten Ausgaben. Den Abstand trägt
+ * `--lfh-zaehltasten-fokusabstand` (`index.css`, `scroll-padding` am Scrollport).
+ *
+ * Mutationsprobe: die Regel `:root:has([data-lfh='zaehltasten'])` in `index.css` entfernt →
+ * der Streifen wird ≤ 0, bei 390 px liegt ein Ziel ganz unter dem Feld.
+ */
+test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabben hinter dem Tastenfeld', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 1032 ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+  const zfAntwort = await page.request.post(`${basis}/zeitfenster`, {
+    data: {
+      bezeichnung: 'Mittag Fokus',
+      von_at: zeit(-60),
+      bis_at: zeit(60),
+      bedarf_kraefte: 200,
+      bedarf_betreute: 0,
+      sonderkost: { vegetarisch: 10, vegan: 5, ohne_schwein: 5 },
+    },
+  });
+  expect(zfAntwort.ok(), await zfAntwort.text()).toBeTruthy();
+  const { id: zfId } = (await zfAntwort.json()) as { id: number };
+  const ANZAHL = 10;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const a = await page.request.post(`${basis}/zeitfenster/${zfId}/ausgaben`, {
+      data: { menge: n, zeitpunkt_at: zeit(-55 + n) },
+    });
+    expect(a.ok(), await a.text()).toBeTruthy();
+  }
+
+  const LEISTE = '[data-lfh="zaehltasten"]';
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 390, height: 700 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/verpflegung/${zfId}/ausgabe`);
+      await stelleDichte(page, dichte);
+      const zuruecknehmen = page.getByRole('button', { name: /^Zurücknehmen: Ausgabe \d+ EP/ });
+      await expect(zuruecknehmen).toHaveCount(ANZAHL);
+      await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
+      await zuruecknehmen.evaluateAll((els) =>
+        els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
+      );
+      const SCHRITTE = ANZAHL + 4;
+      const leiste = await page
+        .locator(LEISTE)
+        .evaluate((l) => Math.round(l.getBoundingClientRect().height));
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await zuruecknehmen.first().focus();
+      const kern = await pruefeFokusVerdeckung(page, SCHRITTE);
+      expect(
+        kern.besuchteZiele.length,
+        `${lauf}: Vorbedingung — der Durchlauf muss die Liste ablaufen`,
+      ).toBeGreaterThanOrEqual(ANZAHL - 1);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await zuruecknehmen.first().focus();
+      const streifen = await kleinsterStreifen(page, SCHRITTE, LEISTE);
+      expect(kern.verdeckt, `${lauf}: vollständig verdeckt:\n${kern.verdeckt.join('\n')}`).toEqual(
+        [],
+      );
+      expect(
+        streifen,
+        `${lauf}: kleinster freier Streifen Ziel ↔ Tastenfeld ${streifen}px, Soll > 0`,
+      ).toBeGreaterThan(0);
+      gemessen.push(
+        `${lauf}: Tastenfeld ${leiste}px, ${kern.besuchteZiele.length} Ziele, Streifen ≥ ${Math.round(streifen)}px`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
  * Informationstelefon (LFH-554): dieselbe angepinnte Erfassung wie im ETB
  * (`.etb-erfassung-sticky`), dieselbe Regel. Fokusziele der Zeitachse sind die Statusauslöser
  * offener Rückrufe; ohne den gemessenen Abstand rollte Tab sie hinter die Leiste.
