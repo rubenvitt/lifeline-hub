@@ -79,14 +79,15 @@ export const DEICH = 23;
  * Feldküche und der Turnhalle, ausgegeben 100 und 80 → Ist je Stelle 100/80, Fehlmenge gesamt
  * 20. „Abend“ hat keine Zuordnung und keine Ausgabe an einer Stelle (`je_stelle` leer, Bestand).
  * Die Zuführung Deich ist geplant und keinem Zeitfenster zugeordnet. Das Ist je Stelle rechnet
- * der Server; die Testdaten tragen es fertig.
+ * der Server; die Testdaten tragen es fertig, in seiner Reihenfolge: `stellen`, `stelle_ids` und
+ * `je_stelle` nach Bezeichnung (die Turnhalle vor der Feldküche).
  */
 export function verpflegungMitStellen(): Verpflegung {
   const nichts = { gesamt: 0, sonderkost: KEINE_SONDERKOST };
   return {
     stellen: [
-      stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz', art: 'feldkueche' }),
       stelle({ id: TURNHALLE, bezeichnung: 'Ausgabe Turnhalle Nord', art: 'ausgabestelle' }),
+      stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz', art: 'feldkueche' }),
       stelle({ id: DEICH, bezeichnung: 'Zuführung Deich', art: 'zufuehrung', status: 'geplant' }),
     ],
     zeitfenster: [
@@ -102,10 +103,10 @@ export function verpflegungMitStellen(): Verpflegung {
         },
         ausgegeben: { gesamt: 180, sonderkost: KEINE_SONDERKOST },
         fehlmenge: { gesamt: 20, sonderkost: KEINE_SONDERKOST },
-        stelle_ids: [FELDKUECHE, TURNHALLE],
+        stelle_ids: [TURNHALLE, FELDKUECHE],
         je_stelle: [
-          { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
           { stelle_id: TURNHALLE, ausgegeben: { gesamt: 80, sonderkost: KEINE_SONDERKOST } },
+          { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
         ],
         ausgaben: [
           ausgabe({ id: 11, menge: 100, ort: null, verpflegungsstelle_id: FELDKUECHE }),

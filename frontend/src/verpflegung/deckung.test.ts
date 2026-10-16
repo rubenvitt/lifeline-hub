@@ -122,11 +122,21 @@ describe('Fixture Ist je Stelle (LLH-1040)', () => {
   it('Bedarf 200, 100/80 an zwei Stellen → Fehlmenge 20; ohne Zuordnung leer', () => {
     const [mittag, abend] = verpflegungMitStellen().zeitfenster;
     const summe = mittag.je_stelle.reduce((s, i) => s + i.ausgegeben.gesamt, 0);
-    expect(mittag.je_stelle.map((i) => i.ausgegeben.gesamt)).toEqual([100, 80]);
+    expect(mittag.je_stelle.map((i) => i.ausgegeben.gesamt)).toEqual([80, 100]);
     expect(summe).toBe(mittag.ausgegeben.gesamt);
     expect(mittag.bedarf.gesamt - summe).toBe(mittag.fehlmenge.gesamt);
     expect(mittag.fehlmenge.gesamt).toBe(20);
     expect(abend.stelle_ids).toEqual([]);
     expect(abend.je_stelle).toEqual([]);
+  });
+
+  it('Reihenfolge wie vom Server: Stellen nach Bezeichnung, je_stelle folgt stelle_ids', () => {
+    const { stellen, zeitfenster } = verpflegungMitStellen();
+    const namen = stellen.map((s) => s.bezeichnung);
+    expect(namen).toEqual([...namen].sort((a, b) => a.localeCompare(b, 'de')));
+    const [mittag] = zeitfenster;
+    const zugeordnet = stellen.filter((s) => mittag.stelle_ids.includes(s.id)).map((s) => s.id);
+    expect(mittag.stelle_ids).toEqual(zugeordnet);
+    expect(mittag.je_stelle.map((i) => i.stelle_id)).toEqual(mittag.stelle_ids);
   });
 });
