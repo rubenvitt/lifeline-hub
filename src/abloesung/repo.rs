@@ -405,6 +405,34 @@ async fn set_fristen_tx(
         faellig_at,
     )
     .await?;
+    set_vorwarn_frist_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        id,
+        einheit_name,
+        faellig_at,
+        vorwarnung_minuten,
+        jetzt,
+    )
+    .await
+}
+
+/// Setzt nur die Vorwarn-Frist einer laufenden Schicht (Regeln wie [`set_fristen_tx`]). Für eine
+/// reine Änderung der Vorwarnzeit: die Fälligkeitsfrist bleibt unberührt, sonst leerte
+/// `setze_auto_frist_tx` ihr `zuletzt_ausgeloest_at`, und eine überfällige Schicht meldete
+/// „fällig“ ein zweites Mal (Spec „Einmaliges Auslösen“, Review PR #833).
+#[allow(clippy::too_many_arguments)]
+async fn set_vorwarn_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    einheit_name: &str,
+    faellig_at: &str,
+    vorwarnung_minuten: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     match vorwarnzeit(faellig_at, vorwarnung_minuten) {
         Some(v) if v.as_str() > jetzt => {
             erinnerung_repo::setze_auto_frist_tx(
@@ -949,9 +977,22 @@ pub async fn set_einsatz_vorgabe(
                 .execute(&mut *conn)
                 .await?;
             }
-            if faellig_geaendert || vorwarnung_geaendert {
+            if faellig_geaendert {
                 let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
                 set_fristen_tx(
+                    conn,
+                    einsatz_id,
+                    benutzer_id,
+                    s.id,
+                    &name,
+                    &faellig_at,
+                    vorgabe.vorwarnung(),
+                    jetzt,
+                )
+                .await?;
+            } else if vorwarnung_geaendert {
+                let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
+                set_vorwarn_frist_tx(
                     conn,
                     einsatz_id,
                     benutzer_id,

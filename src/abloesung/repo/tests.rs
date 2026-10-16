@@ -1089,3 +1089,73 @@ async fn beginnen_folgt_der_einsatzvorgabe_mit_wechselzeiten() {
         Einstufung::Vorwarnung
     );
 }
+
+// ── Review PR #833 (LLH-1122): Regressionstests ─────────────────────────────────────────────
+
+fn rhythmus_werte(minuten: i64, vorwarnung: i64) -> crate::schichtmodell::Werte {
+    crate::schichtmodell::Werte {
+        bezeichnung: "Sanitätsdienst".into(),
+        regel: crate::schichtmodell::Regel::Rhythmus { minuten },
+        vorwarnung_minuten: vorwarnung,
+        planungsvorlauf_minuten: 120,
+    }
+}
+
+/// Fristen der Schicht `id`, die der Scheduler zu `jetzt` auslösen würde.
+async fn ausloesbar(pool: &SqlitePool, id: i64, jetzt: &str) -> Vec<String> {
+    erepo::faellige_zum_ausloesen(pool, jetzt)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|f| f.bezug_id == Some(id))
+        .filter_map(|f| f.bezug_typ)
+        .collect()
+}
+
+/// Eine reine Änderung der Vorwarnung setzt die schon ausgelöste Fälligkeit einer überfälligen
+/// Schicht nicht zurück: „fällig“ kommt genau einmal (Spec „Einmaliges Auslösen“). Ebenso beim
+/// Entfernen einer Vorgabe mit Vorwarnung ≠ 30.
+#[tokio::test]
+async fn reine_vorwarnungsaenderung_loest_die_faelligkeit_nicht_erneut_aus() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, Some(60)), T0)
+        .await
+        .unwrap();
+    assert_eq!(a.faellig_at, "2026-09-22 10:30:00");
+    let tick = "2026-09-22 10:31:00";
+    for f in erepo::faellige_zum_ausloesen(&w.pool, tick).await.unwrap() {
+        erepo::markiere_ausgeloest(&w.pool, f.id, None, tick)
+            .await
+            .unwrap();
+    }
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(360, 45)),
+        "2026-09-22 10:33:00",
+    )
+    .await
+    .unwrap();
+    assert!(
+        ausloesbar(&w.pool, a.id, "2026-09-22 10:34:00")
+            .await
+            .is_empty(),
+        "keine zweite Auslösung nach der Vorwarnungsänderung"
+    );
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Remove,
+        "2026-09-22 10:35:00",
+    )
+    .await
+    .unwrap();
+    assert!(
+        ausloesbar(&w.pool, a.id, "2026-09-22 10:36:00")
+            .await
+            .is_empty(),
+        "keine zweite Auslösung nach dem Entfernen"
+    );
+}
