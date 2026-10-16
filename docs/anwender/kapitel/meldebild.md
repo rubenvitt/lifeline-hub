@@ -161,7 +161,8 @@ Organisation; sie gilt für jeden Einsatz ohne eigene Frist.
   Einheit. Dieses Ereignis lässt sich nicht streichen, nur mit der Rücknahme des Vollzugs aufheben
   (Kapitel [Ablösung](abloesung.md)).
 - **Am Bereitstellungsraum:** „Eintreffen buchen“ trägt bei einer Einheit das Eintreffen ein,
-  wenn sie in ihrem laufenden Einsatzabschnitt noch nicht eingetroffen ist (Kapitel
+  wenn sie in ihrem laufenden Einsatzabschnitt noch nicht eingetroffen ist, auch bei einer dort
+  unangemeldet erfassten Einheit (Kapitel
   [Bereitstellungsräume](bereitstellungsraeume.md)). „zuweisen“ trägt nichts ein.
 - **Nachgetragen:** von Hand, mit Eintrag im Einsatztagebuch. Ein Nachtrag an einer Einheit gilt
   ebenfalls für ihre jetzt zugeordneten Personen.
