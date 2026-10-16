@@ -401,7 +401,18 @@ export default function EintreffenDialog({
                         <Flex key={z.key} gap={token.marginSM} align="start" wrap>
                           <Form.Item
                             name={[z.name, 'funkrufname']}
-                            rules={[zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname')]}
+                            dependencies={[['weitere', z.name, 'fahrzeugtyp']]}
+                            rules={[
+                              // Eine Zeile mit Typ, aber ohne Namen ginge beim Senden still verloren.
+                              ({ getFieldValue }) => ({
+                                validator: (_, wert?: string) =>
+                                  wert?.trim() ||
+                                  !getFieldValue(['weitere', z.name, 'fahrzeugtyp'])?.trim()
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Funkrufname angeben')),
+                              }),
+                              zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname'),
+                            ]}
                             style={{ flex: '2 1 180px', marginBottom: 0 }}
                           >
                             <Input

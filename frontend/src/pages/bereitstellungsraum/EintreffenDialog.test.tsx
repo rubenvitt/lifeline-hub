@@ -290,6 +290,20 @@ describe('EintreffenDialog — Schritt 2: unangemeldet', () => {
     ]);
   });
 
+  it('ein weiteres Fahrzeug mit Typ ohne Funkrufname sendet nichts', async () => {
+    zeige();
+    await zuSchrittZwei('Florian Nachbar 3');
+    await userEvent.click(screen.getByRole('button', { name: /^Weiteres Fahrzeug/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Fahrzeug hinzufügen' }));
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Fahrzeugtyp weiteres Fahrzeug 1' }),
+      'MTW',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Unangemeldet buchen' }));
+    expect(await within(dialog()).findByText('Funkrufname angeben')).toBeInTheDocument();
+    expect(koerper).toEqual([]);
+  });
+
   it('Bemerkung über der Grenze sperrt das Senden ohne Kürzen', async () => {
     zeige();
     await zuSchrittZwei('Florian Nachbar 3');
