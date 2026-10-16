@@ -4523,7 +4523,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten den Zielabstand, der Klappkopf „Verlauf“ die Stufe (LLH-1095), lesend fehlen die Knöpfe', async ({
+test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten den Zielabstand, der Klappkopf „Verlauf“ die Stufe (LLH-1095), „Eintreffen buchen“ und seine Trefferknöpfe die Stufe (LLH-1075), lesend fehlen die Knöpfe', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -4563,6 +4563,21 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
         soll,
         `Klappkopf „Verlauf“ (${dichte})`,
       );
+      // „Eintreffen buchen“ im Kopf und die Trefferknöpfe im Dialog (LLH-1075, design.md D14):
+      // die drei einheitenlosen Fahrzeuge stehen unter „Erwartet“.
+      const eintreffen = page.getByRole('button', { name: 'Eintreffen buchen' });
+      const eintreffenHoehe = await haeltStufe(eintreffen, soll, `„Eintreffen buchen“ (${dichte})`);
+      await eintreffen.click();
+      const dialog = page.getByRole('dialog', { name: 'Eintreffen buchen' });
+      await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+      const trefferHoehe = await alleHaltenStufe(
+        dialog.getByRole('button', { name: /^Eintreffen Florian BR \d$/ }),
+        soll,
+        `Trefferknopf „Eintreffen“ (${dichte})`,
+        3,
+      );
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
       let abstand = Number.POSITIVE_INFINITY;
       for (let i = 0; i < anzahl; i += 1) {
         abstand = Math.min(abstand, await abstandZuNachbarn(leiste, zuweisen.nth(i)));
@@ -4575,7 +4590,7 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
         ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
       }
       gemessen.push(
-        `${lage.width} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}, Verlauf ${verlaufHoehe}`,
+        `${lage.width} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}, Verlauf ${verlaufHoehe}, Eintreffen ${eintreffenHoehe}, Treffer ${trefferHoehe}`,
       );
     }
   }
@@ -4586,6 +4601,7 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
   await page.goto(pfad);
   await expect(leiste.getByText('Florian BR 1')).toBeVisible();
   await expect(leiste.getByRole('button', { name: /zuweisen$/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Eintreffen buchen' })).toHaveCount(0);
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
