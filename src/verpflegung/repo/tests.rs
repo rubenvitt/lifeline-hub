@@ -4,7 +4,8 @@
 use super::*;
 use crate::einsatz::nummer::ZEITZONE_VORGABE;
 use crate::error::AppError;
-use crate::verpflegung::SonderkostEingabe;
+use crate::verpflegung::stelle::{VerpflegungsstelleArt, VerpflegungsstelleStatus};
+use crate::verpflegung::{SonderkostEingabe, Verpflegungsart};
 use crate::write_retry;
 use axum::http::StatusCode;
 
@@ -80,6 +81,8 @@ fn mittag() -> ZeitfensterEingabe {
         bedarf_betreute: 70,
         bedarf_weitere: 0,
         sonderkost: SonderkostEingabe::default(),
+        verpflegungsart: None,
+        stelle_ids: Vec::new(),
     }
 }
 
@@ -91,6 +94,7 @@ fn ausgabe_eingabe(menge: i64) -> AusgabeEingabe {
         bemerkung: None,
         sonderkost: SonderkostEingabe::default(),
         nachforderung_id: None,
+        verpflegungsstelle_id: None,
         client_id: None,
     }
 }
@@ -796,4 +800,549 @@ async fn zeitzone_kommt_aus_der_org_sonst_berlin() {
         .await
         .unwrap();
     assert_eq!(zeitzone(&w.pool, w.e).await.unwrap(), ZEITZONE_VORGABE);
+}
+
+// ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
+
+fn stelle_eingabe(bez: &str) -> StelleEingabe {
+    StelleEingabe {
+        bezeichnung: bez.into(),
+        art: VerpflegungsstelleArt::Feldkueche,
+        standort: Some("Am Sportplatz 2".into()),
+        lat: None,
+        lon: None,
+        abschnitt_id: None,
+    }
+}
+
+async fn stelle_anlegen_in(w: &Welt, e: i64, eingabe: StelleEingabe) -> Result<i64, AppError> {
+    write_retry!(&w.pool, |conn| {
+        create_stelle_tx(conn, e, w.b, &eingabe).await
+    })
+    .map(|g| g.id)
+}
+
+async fn stelle(w: &Welt, bez: &str) -> i64 {
+    stelle_anlegen_in(w, w.e, stelle_eingabe(bez))
+        .await
+        .unwrap()
+}
+
+async fn stelle_status(
+    w: &Welt,
+    id: i64,
+    nach: VerpflegungsstelleStatus,
+) -> Result<StelleGeschrieben, AppError> {
+    write_retry!(&w.pool, |conn| {
+        update_stelle_status_tx(conn, w.e, id, w.b, STARTWERT, nach).await
+    })
+}
+
+async fn stelle_aendern(
+    w: &Welt,
+    id: i64,
+    a: StelleAenderung,
+) -> Result<StelleGeschrieben, AppError> {
+    write_retry!(&w.pool, |conn| {
+        update_stelle_tx(conn, w.e, id, &a).await
+    })
+}
+
+async fn stornieren(w: &Welt, id: i64) -> Result<StelleGeschrieben, AppError> {
+    write_retry!(&w.pool, |conn| {
+        stelle_stornieren_tx(conn, w.e, id, w.b).await
+    })
+}
+
+/// Spec „Bezeichnung schon vergeben“ und „Bezeichnung nach Storno wieder frei“; die Bezeichnung
+/// wird getrimmt verglichen, auch beim Umbenennen, und ein anderer Einsatz stört nicht.
+#[tokio::test]
+async fn stelle_bezeichnung_doppelt_409_nach_storno_frei() {
+    let w = welt().await;
+    let deich = stelle(&w, "Zuführung Deich").await;
+    assert_eq!(
+        status(stelle_anlegen_in(&w, w.e, stelle_eingabe("  Zuführung Deich ")).await),
+        StatusCode::CONFLICT
+    );
+    stelle_anlegen_in(&w, w.e2, stelle_eingabe("Zuführung Deich"))
+        .await
+        .expect("anderer Einsatz");
+    let turnhalle = stelle(&w, "Ausgabe Turnhalle Nord").await;
+    assert_eq!(
+        status(
+            stelle_aendern(
+                &w,
+                turnhalle,
+                StelleAenderung {
+                    bezeichnung: Some("Zuführung Deich".into()),
+                    ..Default::default()
+                }
+            )
+            .await
+        ),
+        StatusCode::CONFLICT,
+        "Umbenennen auf einen vergebenen Namen"
+    );
+    stornieren(&w, deich).await.unwrap();
+    stelle(&w, "Zuführung Deich").await;
+    assert_eq!(
+        etb(&w.pool, w.e).await,
+        vec![],
+        "Anlegen und Storno ohne ETB"
+    );
+}
+
+/// Spec „Halbe Koordinate“ (422, auch im Effektivzustand beim Ändern) und „Abschnitt eines
+/// anderen Einsatzes“ (404).
+#[tokio::test]
+async fn stelle_halbe_koordinate_422_fremder_abschnitt_404() {
+    let w = welt().await;
+    let halb = StelleEingabe {
+        lat: Some(52.0),
+        ..stelle_eingabe("Feldküche")
+    };
+    assert_eq!(
+        status(stelle_anlegen_in(&w, w.e, halb).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let id = stelle_anlegen_in(
+        &w,
+        w.e,
+        StelleEingabe {
+            lat: Some(52.0),
+            lon: Some(9.0),
+            ..stelle_eingabe("Feldküche")
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        status(
+            stelle_aendern(
+                &w,
+                id,
+                StelleAenderung {
+                    lon: Some(None),
+                    ..Default::default()
+                }
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let fremd: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+    )
+    .bind(w.e2)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        status(
+            stelle_anlegen_in(
+                &w,
+                w.e,
+                StelleEingabe {
+                    abschnitt_id: Some(fremd),
+                    ..stelle_eingabe("Ausgabe")
+                }
+            )
+            .await
+        ),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status(
+            stelle_aendern(
+                &w,
+                id,
+                StelleAenderung {
+                    abschnitt_id: Some(Some(fremd)),
+                    ..Default::default()
+                }
+            )
+            .await
+        ),
+        StatusCode::NOT_FOUND
+    );
+}
+
+/// Spec „Aktive Stelle stornieren“ und „Stornieren mit Ausgabe“, auch mit einer
+/// zurückgenommenen; „Stornierte Stelle ändern“ (409).
+#[tokio::test]
+async fn stelle_storno_nur_geplant_ohne_ausgabe() {
+    let w = welt().await;
+    let aktiv = stelle(&w, "Feldküche").await;
+    stelle_status(&w, aktiv, VerpflegungsstelleStatus::Aktiv)
+        .await
+        .unwrap();
+    assert_eq!(
+        status(stornieren(&w, aktiv).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+
+    let mit_ausgabe = stelle(&w, "Turnhalle").await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let a = ausgabe(
+        &w,
+        zid,
+        AusgabeEingabe {
+            verpflegungsstelle_id: Some(mit_ausgabe),
+            ..ausgabe_eingabe(10)
+        },
+    )
+    .await
+    .unwrap();
+    zuruecknehmen_in(&w, w.e, a.ausgabe_id).await.unwrap();
+    assert_eq!(
+        status(stornieren(&w, mit_ausgabe).await),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "auch eine zurückgenommene Ausgabe hält die Stelle"
+    );
+
+    let leer = stelle(&w, "Deich").await;
+    stornieren(&w, leer).await.unwrap();
+    assert_eq!(status(stornieren(&w, leer).await), StatusCode::CONFLICT);
+    assert_eq!(
+        status(
+            stelle_aendern(
+                &w,
+                leer,
+                StelleAenderung {
+                    standort: Some(None),
+                    ..Default::default()
+                }
+            )
+            .await
+        ),
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        status(stelle_status(&w, leer, VerpflegungsstelleStatus::Aktiv).await),
+        StatusCode::CONFLICT
+    );
+    let liste = liste(&w.pool, w.e).await.unwrap();
+    assert!(
+        liste.stellen.iter().all(|s| s.id != leer),
+        "stornierte Stelle fehlt in stellen[]"
+    );
+}
+
+/// Storno entfernt die Zuordnungen in derselben Transaktion.
+#[tokio::test]
+async fn stelle_storno_entfernt_zuordnung() {
+    let w = welt().await;
+    let a = stelle(&w, "A").await;
+    let b = stelle(&w, "B").await;
+    let zid = anlegen(
+        &w,
+        ZeitfensterEingabe {
+            stelle_ids: vec![b, a],
+            ..mittag()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    assert_eq!(
+        laden(&w, zid).await.stelle_ids,
+        vec![a, b],
+        "nach Bezeichnung"
+    );
+    stornieren(&w, a).await.unwrap();
+    assert_eq!(laden(&w, zid).await.stelle_ids, vec![b]);
+}
+
+/// Statuswechsel: geplant → aktiv → aufgelöst mit Zeitpunkt und je einem ETB-Eintrag; ein
+/// aufgelöste Stelle ist endgültig (422) und bleibt änderbar (D2, Entscheider-Agent 15.10.).
+#[tokio::test]
+async fn stelle_status_und_aufgeloeste_aendern() {
+    let w = welt().await;
+    let id = stelle(&w, "Feldküche BR Sportplatz").await;
+    assert_eq!(
+        status(stelle_status(&w, id, VerpflegungsstelleStatus::Geplant).await),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "geplant → geplant"
+    );
+    let g = stelle_status(&w, id, VerpflegungsstelleStatus::Aktiv)
+        .await
+        .unwrap();
+    assert_eq!(g.etb_ids.len(), 1);
+    let g = stelle_status(&w, id, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    assert_eq!(g.etb_ids.len(), 1);
+    let s = load_stelle(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(s.status, VerpflegungsstelleStatus::Aufgeloest);
+    assert!(s.aufgeloest_at.is_some());
+    assert_eq!(
+        status(stelle_status(&w, id, VerpflegungsstelleStatus::Aktiv).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let g = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            bezeichnung: Some("Feldküche Sportplatz".into()),
+            standort: Some(Some("Am Sportplatz 4".into())),
+            lat: Some(Some(52.1)),
+            lon: Some(Some(9.2)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert!(g.geaendert);
+    let s = load_stelle(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(
+        (s.bezeichnung.as_str(), s.standort.as_deref()),
+        ("Feldküche Sportplatz", Some("Am Sportplatz 4"))
+    );
+    assert_eq!(
+        s.status,
+        VerpflegungsstelleStatus::Aufgeloest,
+        "Status bleibt"
+    );
+    let leer = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            bezeichnung: Some("Feldküche Sportplatz".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!leer.geaendert, "ohne neuen Wert nichts geschrieben");
+    let texte: Vec<String> = etb(&w.pool, w.e)
+        .await
+        .into_iter()
+        .map(|(_, t)| t)
+        .collect();
+    assert_eq!(
+        texte,
+        vec![
+            "Verpflegungsstelle ‚Feldküche BR Sportplatz‘ (Feldküche) in Betrieb genommen.",
+            "Verpflegungsstelle ‚Feldküche BR Sportplatz‘ (Feldküche) aufgelöst.",
+        ],
+        "Ändern schreibt kein ETB, alte Einträge behalten den alten Namen"
+    );
+}
+
+/// Spec „Stelle eines anderen Einsatzes“ im Pfad: 404 für Ändern, Status und Storno.
+#[tokio::test]
+async fn stelle_eines_anderen_einsatzes_ist_404() {
+    let w = welt().await;
+    let fremd = stelle_anlegen_in(&w, w.e2, stelle_eingabe("Fremd"))
+        .await
+        .unwrap();
+    assert_eq!(
+        status(stelle_aendern(&w, fremd, StelleAenderung::default()).await),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status(stelle_status(&w, fremd, VerpflegungsstelleStatus::Aktiv).await),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(status(stornieren(&w, fremd).await), StatusCode::NOT_FOUND);
+}
+
+/// Spec „Getränke“: die Verpflegungsart ist nur Anzeige, die Deckung gleich gerechnet.
+#[tokio::test]
+async fn getraenke_fenster_wird_gleich_gedeckt() {
+    let w = welt().await;
+    let zid = anlegen(
+        &w,
+        ZeitfensterEingabe {
+            bezeichnung: "Getränke".into(),
+            bedarf_kraefte: 120,
+            bedarf_betreute: 0,
+            verpflegungsart: Some(Verpflegungsart::Getraenke),
+            ..mittag()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    ausgabe(&w, zid, ausgabe_eingabe(100)).await.unwrap();
+    let zf = laden(&w, zid).await;
+    assert_eq!(zf.verpflegungsart, Some(Verpflegungsart::Getraenke));
+    assert_eq!((zf.ausgegeben.gesamt, zf.fehlmenge.gesamt), (100, 20));
+}
+
+/// Spec `eingabegrenzen` „Doppelte Stellen“: `[3, 3, 4]` ordnet genau 3 und 4 zu.
+#[tokio::test]
+async fn doppelte_stellen_werden_entdoppelt() {
+    let w = welt().await;
+    let a = stelle(&w, "A").await;
+    let b = stelle(&w, "B").await;
+    let zid = anlegen(
+        &w,
+        ZeitfensterEingabe {
+            stelle_ids: vec![a, a, b],
+            ..mittag()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    assert_eq!(laden(&w, zid).await.stelle_ids, vec![a, b]);
+    aendern(
+        &w,
+        zid,
+        ZeitfensterAenderung {
+            stelle_ids: Some(vec![b, b, a, b]),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(laden(&w, zid).await.stelle_ids, vec![a, b]);
+}
+
+/// Roher Zeitpunkt der Auflösung, wie gespeichert.
+async fn aufgeloest_at(w: &Welt, id: i64) -> String {
+    sqlx::query_scalar("SELECT aufgeloest_at FROM verpflegungsstelle WHERE id = ?")
+        .bind(id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Spec „Replay vor der Zustandsprüfung“ IN der Transaktion (D3): der Fall zweier gleichzeitiger
+/// Flushes, deren zweiter am Vorab-Lookup der Route vorbeikam. Die Ausgabe ist gebucht, die Stelle
+/// danach aufgelöst; derselbe Schlüssel liefert die Ausgabe, auch mit einem Zeitpunkt, den die
+/// Stellenprüfung ablehnte (Gegenprobe mit neuem Schlüssel: 409).
+#[tokio::test]
+async fn replay_in_der_transaktion_vor_der_stellenpruefung() {
+    let w = welt().await;
+    let sid = stelle(&w, "Ausgabe Turnhalle Nord").await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let an_stelle = |client_id: &str, zeitpunkt_at: &str| AusgabeEingabe {
+        verpflegungsstelle_id: Some(sid),
+        zeitpunkt_at: zeitpunkt_at.into(),
+        ..mit_client_id(40, client_id)
+    };
+    let erst = ausgabe(&w, zid, an_stelle("s1", "2026-09-24 09:40:00"))
+        .await
+        .unwrap();
+    stelle_status(&w, sid, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    let nach = aufgeloest_at(&w, sid).await;
+    assert_eq!(
+        status(ausgabe(&w, zid, an_stelle("s2", &nach)).await),
+        StatusCode::CONFLICT,
+        "Gegenprobe: neuer Schlüssel an der aufgelösten Stelle"
+    );
+    let wieder = ausgabe(&w, zid, an_stelle("s1", &nach)).await.unwrap();
+    assert_eq!(wieder.ausgabe_id, erst.ausgabe_id);
+    assert!(!wieder.neu, "Replay");
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        1
+    );
+}
+
+/// Reihenfolge der Prüfungen (D3, tasks 5.1/5.2): die Stelle zuletzt. Eine stornierte oder
+/// aufgelöste Stelle verdeckt weder das unbekannte Zeitfenster (404) noch einen 400er noch die
+/// Teilmenge (422 statt 409).
+#[tokio::test]
+async fn stellenpruefung_nach_zeitfenster_400ern_und_teilmenge() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let weg = stelle(&w, "Zuführung Deich").await;
+    stornieren(&w, weg).await.unwrap();
+    let aufgeloest = stelle(&w, "Feldküche BR Sportplatz").await;
+    stelle_status(&w, aufgeloest, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    let nach = aufgeloest_at(&w, aufgeloest).await;
+    let an = |sid: i64, menge: i64| AusgabeEingabe {
+        verpflegungsstelle_id: Some(sid),
+        zeitpunkt_at: nach.clone(),
+        ..ausgabe_eingabe(menge)
+    };
+    // Ohne weiteren Fehler sagt die Stelle selbst ab.
+    assert_eq!(
+        status(ausgabe(&w, zid, an(weg, 5)).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        status(ausgabe(&w, zid, an(aufgeloest, 5)).await),
+        StatusCode::CONFLICT
+    );
+    for (sid, was) in [(weg, "storniert"), (aufgeloest, "aufgelöst")] {
+        assert_eq!(
+            status(ausgabe(&w, 999_999, an(sid, 5)).await),
+            StatusCode::NOT_FOUND,
+            "{was}: unbekanntes Zeitfenster"
+        );
+        assert_eq!(
+            status(ausgabe(&w, zid, an(sid, 0)).await),
+            StatusCode::BAD_REQUEST,
+            "{was}: Menge 0"
+        );
+        assert_eq!(
+            status(
+                ausgabe(
+                    &w,
+                    zid,
+                    AusgabeEingabe {
+                        sonderkost: sk(-1, 0),
+                        ..an(sid, 5)
+                    }
+                )
+                .await
+            ),
+            StatusCode::BAD_REQUEST,
+            "{was}: negative Kostform"
+        );
+    }
+    assert_eq!(
+        status(
+            ausgabe(
+                &w,
+                zid,
+                AusgabeEingabe {
+                    sonderkost: sk(4, 3),
+                    ..an(aufgeloest, 5)
+                }
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "aufgelöst: Sonderkost über der Menge ist 422, nicht 409"
+    );
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        0
+    );
+}
+
+/// Eine direkt aufgelöste Stelle (geplant → aufgelöst, ohne Ausgabe) lässt sich nicht stornieren
+/// (422): sie bleibt in `stellen[]`, und das ETB behält genau den Eintrag „… aufgelöst.“ (D2).
+#[tokio::test]
+async fn aufgeloeste_stelle_ohne_ausgabe_storno_422() {
+    let w = welt().await;
+    let id = stelle(&w, "Zuführung Deich").await;
+    stelle_status(&w, id, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    assert_eq!(
+        status(stornieren(&w, id).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let liste = liste(&w.pool, w.e).await.unwrap();
+    let s = liste
+        .stellen
+        .iter()
+        .find(|s| s.id == id)
+        .expect("aufgelöste Stelle bleibt in stellen[]");
+    assert_eq!(s.status, VerpflegungsstelleStatus::Aufgeloest);
+    assert_eq!(
+        etb(&w.pool, w.e).await.len(),
+        1,
+        "nur „… aufgelöst.“, kein Gegenstück"
+    );
 }

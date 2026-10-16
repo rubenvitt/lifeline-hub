@@ -1278,6 +1278,46 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_von_id", G_FK),
             retain("angelegt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
+            // LLH-1040: warm/kalt/Getränke.
+            retain("verpflegungsart", G_ENUM),
+        ],
+    },
+    // LLH-1040, design.md D9: Die Bezeichnung einer Verpflegungsstelle ist ein Einsatzname wie
+    // beim Bereitstellungsraum („Feldküche BR Sportplatz“) und steht im ETB — sie bleibt. Anders
+    // als bei der Betreuungsstelle benennt sie keine Unterkunft von Betroffenen. Der Standort kann
+    // eine Adresse tragen → NULL; die Koordinate bleibt als Geo-Skelett.
+    TabellenRegel {
+        tabelle: "verpflegungsstelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("bezeichnung", G_OP_LABEL),
+            retain("art", G_ENUM),
+            scrub("standort", Strategie::NullSetzen, Z_EINSATZ),
+            retain("lat", G_GEO),
+            retain("lon", G_GEO),
+            retain("abschnitt_id", G_FK),
+            retain("status", G_ENUM),
+            retain("aufgeloest_at", G_ZEIT),
+            retain("storniert_at", G_ZEIT),
+            retain("storniert_von_id", G_FK),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "verpflegung_zeitfenster_stelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("zeitfenster_id", G_FK),
+            retain("stelle_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -1304,6 +1344,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_von_id", G_FK),
             retain("erfasst_at", G_ZEIT),
             retain("client_id", G_IDEMPOTENZ),
+            retain("verpflegungsstelle_id", G_FK),
         ],
     },
     // Abgeschlossene Lagebesprechungen. `entschluss` wird gescrubbt wie

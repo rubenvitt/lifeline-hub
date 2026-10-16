@@ -496,6 +496,7 @@ describe('3.4 Bilanz', () => {
             { bedarf: { gesamt: 50 }, ausgegeben: { gesamt: 45 }, fehlmenge: { gesamt: 5 } },
             { bedarf: { gesamt: 30 }, ausgegeben: { gesamt: 30 }, fehlmenge: { gesamt: 0 } },
           ],
+          stellen: [],
         } as unknown as Verpflegung),
       }),
       konv,

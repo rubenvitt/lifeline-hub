@@ -737,6 +737,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
       http.get('/api/einsaetze/7/verpflegung', () =>
         HttpResponse.json({
           zeitfenster: [zeitfenster({ id: 1, einsatz_id: 7, von_at: wire(-30), bis_at: wire(60) })],
+          stellen: [],
         }),
       ),
       http.get('/api/einsaetze/7/nachforderungen', () => {

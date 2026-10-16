@@ -51,7 +51,7 @@ wire_enum! {
 
 wire_enum! {
     /// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-    /// `migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
+    /// `migrations/0208_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
     /// `austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,
     /// design.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

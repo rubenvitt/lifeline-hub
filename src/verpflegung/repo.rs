@@ -17,18 +17,30 @@
 //! **ETB (design.md D5):** Anlegen, Ändern und Löschen eines Zeitfensters schreiben je einen
 //! System-Eintrag mit Zeitraum in Org-Zeit; Ausgabe und Rücknahme schreiben keinen. Ein
 //! Ändern ohne neuen Wert schreibt nichts (Leerlauf-Riegel, leere `etb_ids`).
+//!
+//! **Verpflegungsstellen (LLH-1040, design.md D2):** Anlegen, Ändern und Stornieren schreiben
+//! kein ETB; Inbetriebnahme und Auflösung je einen System-Eintrag in derselben Transaktion.
+//! 404 für eine fremde Stelle im Pfad, 409 für eine stornierte, 422 für einen unzulässigen
+//! Übergang, für ein Storno einer nicht geplanten Stelle oder einer Stelle mit Ausgabe und für
+//! einen Verweis im Body auf eine fremde, unbekannte oder stornierte Stelle. Eine Ausgabe an
+//! einer aufgelösten Stelle ist 409, außer ihr Zeitpunkt liegt vor der Auflösung (D3).
 
 use std::collections::HashMap;
 
 use chrono_tz::Tz;
 use sqlx::{SqliteConnection, SqlitePool};
 
+use super::stelle::{
+    darf_uebergehen, VerpflegungsstelleAnzeige, VerpflegungsstelleArt, VerpflegungsstelleStatus,
+};
 use super::{
-    deckung, draht_lesen, etb_text, zeitraum_text, AusgabeAnzeige, Bedarf, Sonderkost,
-    SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
+    deckung, dedupe_stelle_ids, draht_lesen, etb_text, zeitraum_text, AusgabeAnzeige, Bedarf,
+    Sonderkost, SonderkostEingabe, VerpflegungAnzeige, Verpflegungsart, ZeitfensterAnzeige,
 };
 use crate::error::AppError;
-use crate::routes::support::pflicht;
+use crate::routes::support::{
+    optional_max, optional_max_tri, pflicht_max, pflicht_max_tri, pruefe_koordinate,
+};
 
 /// Eingabe „Zeitfenster anlegen“. Die Route hat JSON gelesen und die Zeitpunkte normalisiert
 /// (UTC, `YYYY-MM-DD HH:MM:SS`); Bezeichnung, Bedarf, Sonderkost und Zeitregel prüft das Repo.
@@ -42,6 +54,10 @@ pub struct ZeitfensterEingabe {
     pub bedarf_weitere: i64,
     /// Fehlende Kostformen sind 0.
     pub sonderkost: SonderkostEingabe,
+    /// Fehlt = ohne Angabe (LLH-1040 D8).
+    pub verpflegungsart: Option<Verpflegungsart>,
+    /// Zugeordnete Stellen; leer = einsatzweit (D5). Entdoppelt und begrenzt wird im Repo.
+    pub stelle_ids: Vec<i64>,
 }
 
 /// Eingabe „Zeitfenster ändern“ — jedes Feld fehlt = unverändert, auch je Kostform.
@@ -54,6 +70,10 @@ pub struct ZeitfensterAenderung {
     pub bedarf_betreute: Option<i64>,
     pub bedarf_weitere: Option<i64>,
     pub sonderkost: SonderkostEingabe,
+    /// Tri-State: fehlt = unverändert, `Some(None)` = leeren.
+    pub verpflegungsart: Option<Option<Verpflegungsart>>,
+    /// Fehlt = unverändert; eine Liste ersetzt die Menge, `[]` leert sie (D5).
+    pub stelle_ids: Option<Vec<i64>>,
 }
 
 /// Eingabe „Ausgabe erfassen“. `zeitpunkt_at` hat die Route normalisiert (fehlt = jetzt), die
@@ -67,8 +87,42 @@ pub struct AusgabeEingabe {
     /// Fehlende Kostformen sind 0.
     pub sonderkost: SonderkostEingabe,
     pub nachforderung_id: Option<i64>,
+    /// Verpflegungsstelle desselben Einsatzes (LLH-1040 D3); geprüft in der Transaktion.
+    pub verpflegungsstelle_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688), von der Route normalisiert.
     pub client_id: Option<String>,
+}
+
+/// Eingabe „Verpflegungsstelle anlegen“ (LLH-1040). Die Art hat die Route gelesen (400).
+#[derive(Debug, Clone)]
+pub struct StelleEingabe {
+    pub bezeichnung: String,
+    pub art: VerpflegungsstelleArt,
+    pub standort: Option<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub abschnitt_id: Option<i64>,
+}
+
+/// Eingabe „Verpflegungsstelle ändern“ — jedes Feld fehlt = unverändert; die optionalen Felder
+/// sind Tri-State (`Some(None)` = leeren).
+#[derive(Debug, Clone, Default)]
+pub struct StelleAenderung {
+    pub bezeichnung: Option<String>,
+    pub art: Option<VerpflegungsstelleArt>,
+    pub standort: Option<Option<String>>,
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
+    pub abschnitt_id: Option<Option<i64>>,
+}
+
+/// Ergebnis eines Schreibvorgangs an einer Stelle: ob etwas geschrieben wurde (für Live) und
+/// die ETB-Einträge (nur beim Statuswechsel).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StelleGeschrieben {
+    pub id: i64,
+    pub geaendert: bool,
+    pub etb_ids: Vec<i64>,
 }
 
 /// Ergebnis eines Schreibvorgangs an einem Zeitfenster: seine Kennung und die geschriebenen
@@ -95,7 +149,8 @@ macro_rules! zeitfenster_select {
     () => {
         "SELECT id, einsatz_id, bezeichnung, von_at, bis_at, bedarf_kraefte, bedarf_betreute, \
                 bedarf_weitere, sk_vegetarisch, sk_vegan, sk_ohne_schwein, \
-                sk_diaet_allergenarm, sk_saeugling_kleinkind, angelegt_at, geaendert_at \
+                sk_diaet_allergenarm, sk_saeugling_kleinkind, angelegt_at, geaendert_at, \
+                verpflegungsart \
          FROM verpflegung_zeitfenster "
     };
 }
@@ -104,9 +159,59 @@ macro_rules! ausgabe_select {
     () => {
         "SELECT id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
                 sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
-                nachforderung_id, zurueckgenommen_at, erfasst_at \
+                nachforderung_id, zurueckgenommen_at, erfasst_at, verpflegungsstelle_id \
          FROM verpflegung_ausgabe "
     };
+}
+
+/// Zuordnung Zeitfenster–Stelle als `(zeitfenster_id, stelle_id)`, geordnet über die Stelle.
+macro_rules! zuordnung_select {
+    () => {
+        "SELECT zs.zeitfenster_id, zs.stelle_id FROM verpflegung_zeitfenster_stelle zs \
+         JOIN verpflegungsstelle s ON s.id = zs.stelle_id "
+    };
+}
+
+macro_rules! stelle_select {
+    () => {
+        "SELECT id, bezeichnung, art, standort, lat, lon, abschnitt_id, status, \
+                aufgeloest_at, storniert_at, angelegt_at \
+         FROM verpflegungsstelle "
+    };
+}
+
+#[derive(sqlx::FromRow, Clone)]
+struct StelleZeile {
+    id: i64,
+    bezeichnung: String,
+    #[sqlx(try_from = "String")]
+    art: VerpflegungsstelleArt,
+    standort: Option<String>,
+    lat: Option<f64>,
+    lon: Option<f64>,
+    abschnitt_id: Option<i64>,
+    #[sqlx(try_from = "String")]
+    status: VerpflegungsstelleStatus,
+    aufgeloest_at: Option<String>,
+    storniert_at: Option<String>,
+    angelegt_at: String,
+}
+
+impl StelleZeile {
+    fn anzeige(self) -> VerpflegungsstelleAnzeige {
+        VerpflegungsstelleAnzeige {
+            id: self.id,
+            bezeichnung: self.bezeichnung,
+            art: self.art,
+            standort: self.standort,
+            lat: self.lat,
+            lon: self.lon,
+            abschnitt_id: self.abschnitt_id,
+            status: self.status,
+            aufgeloest_at: self.aufgeloest_at,
+            angelegt_at: self.angelegt_at,
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Clone)]
@@ -126,9 +231,17 @@ struct ZeitfensterZeile {
     sk_saeugling_kleinkind: i64,
     angelegt_at: String,
     geaendert_at: Option<String>,
+    verpflegungsart: Option<String>,
 }
 
 impl ZeitfensterZeile {
+    /// Die gespeicherte Art; der CHECK lässt nur bekannte Wörter zu.
+    fn art(&self) -> Option<Verpflegungsart> {
+        self.verpflegungsart
+            .as_deref()
+            .and_then(Verpflegungsart::parse)
+    }
+
     fn sonderkost(&self) -> Sonderkost {
         Sonderkost {
             vegetarisch: self.sk_vegetarisch,
@@ -148,18 +261,23 @@ impl ZeitfensterZeile {
         )
     }
 
-    fn anzeige(self, ausgaben: Vec<AusgabeAnzeige>) -> ZeitfensterAnzeige {
+    /// `stelle_ids`: die Zuordnung nach Bezeichnung der Stellen.
+    fn anzeige(self, ausgaben: Vec<AusgabeAnzeige>, stelle_ids: Vec<i64>) -> ZeitfensterAnzeige {
         let bedarf = self.bedarf();
-        let d = deckung::rechne(&bedarf, &ausgaben);
+        let verpflegungsart = self.art();
+        let d = deckung::rechne(&bedarf, &ausgaben, &stelle_ids);
         ZeitfensterAnzeige {
             id: self.id,
             einsatz_id: self.einsatz_id,
             bezeichnung: self.bezeichnung,
             von_at: self.von_at,
             bis_at: self.bis_at,
+            verpflegungsart,
             bedarf,
             ausgegeben: d.ausgegeben,
             fehlmenge: d.fehlmenge,
+            stelle_ids,
+            je_stelle: d.je_stelle,
             ausgaben,
             angelegt_at: self.angelegt_at,
             geaendert_at: self.geaendert_at,
@@ -183,6 +301,7 @@ struct AusgabeZeile {
     nachforderung_id: Option<i64>,
     zurueckgenommen_at: Option<String>,
     erfasst_at: String,
+    verpflegungsstelle_id: Option<i64>,
 }
 
 impl From<AusgabeZeile> for AusgabeAnzeige {
@@ -202,6 +321,7 @@ impl From<AusgabeZeile> for AusgabeAnzeige {
                 saeugling_kleinkind: z.sk_saeugling_kleinkind,
             },
             nachforderung_id: z.nachforderung_id,
+            verpflegungsstelle_id: z.verpflegungsstelle_id,
             zurueckgenommen_at: z.zurueckgenommen_at,
             erfasst_at: z.erfasst_at,
         }
@@ -244,14 +364,37 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<VerpflegungAnze
             .or_default()
             .push(a.into());
     }
+    let mut zuordnung: HashMap<i64, Vec<i64>> = HashMap::new();
+    for (zid, sid) in sqlx::query_as::<_, (i64, i64)>(concat!(
+        zuordnung_select!(),
+        "WHERE zs.einsatz_id = ? ORDER BY s.bezeichnung, s.id"
+    ))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    {
+        zuordnung.entry(zid).or_default().push(sid);
+    }
+    let stellen = sqlx::query_as::<_, StelleZeile>(concat!(
+        stelle_select!(),
+        "WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY bezeichnung, id"
+    ))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(StelleZeile::anzeige)
+    .collect();
     Ok(VerpflegungAnzeige {
         zeitfenster: zeilen
             .into_iter()
             .map(|z| {
                 let ausgaben = je_fenster.remove(&z.id).unwrap_or_default();
-                z.anzeige(ausgaben)
+                let stelle_ids = zuordnung.remove(&z.id).unwrap_or_default();
+                z.anzeige(ausgaben, stelle_ids)
             })
             .collect(),
+        stellen,
     })
 }
 
@@ -280,7 +423,17 @@ pub async fn zeitfenster_laden(
     .into_iter()
     .map(AusgabeAnzeige::from)
     .collect();
-    Ok(zeile.anzeige(ausgaben))
+    let stelle_ids = sqlx::query_as::<_, (i64, i64)>(concat!(
+        zuordnung_select!(),
+        "WHERE zs.zeitfenster_id = ? ORDER BY s.bezeichnung, s.id"
+    ))
+    .bind(id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|(_, sid)| sid)
+    .collect();
+    Ok(zeile.anzeige(ausgaben, stelle_ids))
 }
 
 /// Die Zeitzone der Organisation des Einsatzes für die ETB-Texte (design.md D5). Fehlt die
@@ -374,6 +527,130 @@ fn zeitraum(von: &str, bis: &str, tz: Tz) -> Result<String, AppError> {
     ))
 }
 
+// ── Zuordnung Zeitfenster–Stelle (D5) ───────────────────────────────────────────────────────
+
+/// Eine Stelle für Prüfung und ETB-Text einer Zuordnung.
+#[derive(sqlx::FromRow)]
+struct StelleKurz {
+    id: i64,
+    bezeichnung: String,
+    #[sqlx(try_from = "String")]
+    status: VerpflegungsstelleStatus,
+    storniert: bool,
+}
+
+/// IDs als JSON-Array für `json_each(?)`.
+fn ids_json(ids: &[i64]) -> Result<String, AppError> {
+    serde_json::to_string(ids)
+        .map_err(|e| AppError::Internal(format!("Stellen-Kennungen serialisieren: {e}")))
+}
+
+/// Die Stellen des Einsatzes unter `ids`, nach Bezeichnung — EINE Anweisung für die ganze Liste
+/// (`src/AGENTS.md`, „Eingabegrenzen“: ID-Listen mit einer von N unabhängigen Zahl von
+/// Anweisungen). Fremde und unbekannte Kennungen fehlen im Ergebnis.
+async fn stellen_kurz_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ids: &[i64],
+) -> Result<Vec<StelleKurz>, AppError> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(sqlx::query_as::<_, StelleKurz>(
+        "SELECT id, bezeichnung, status, storniert_at IS NOT NULL AS storniert \
+         FROM verpflegungsstelle \
+         WHERE einsatz_id = ? AND id IN (SELECT value FROM json_each(?)) \
+         ORDER BY bezeichnung, id",
+    )
+    .bind(einsatz_id)
+    .bind(ids_json(ids)?)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Die bisherige Zuordnung eines Zeitfensters.
+async fn zuordnung_tx(
+    conn: &mut SqliteConnection,
+    zeitfenster_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT stelle_id FROM verpflegung_zeitfenster_stelle WHERE zeitfenster_id = ?",
+    )
+    .bind(zeitfenster_id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// 422 (D5): jede neue Kennung muss eine nicht stornierte Stelle des Einsatzes sein; eine
+/// aufgelöste Stelle nur, wenn sie schon zugeordnet war (Geschichte). Entfernen geht immer.
+fn check_zuordnung(neu: &[i64], vorher: &[i64], stellen: &[StelleKurz]) -> Result<(), AppError> {
+    for id in neu {
+        match stellen.iter().find(|s| s.id == *id) {
+            None => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Verpflegungsstelle {id} gibt es in diesem Einsatz nicht"
+                )))
+            }
+            Some(s) if s.storniert => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Verpflegungsstelle ‚{}‘ ist storniert",
+                    s.bezeichnung
+                )))
+            }
+            Some(s) if s.status == VerpflegungsstelleStatus::Aufgeloest && !vorher.contains(id) => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Verpflegungsstelle ‚{}‘ ist aufgelöst und lässt sich nicht neu zuordnen",
+                    s.bezeichnung
+                )))
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// Die Bezeichnungen der Stellen unter `ids`, nach Bezeichnung (Reihenfolge von `stellen`).
+fn namen_von(stellen: &[StelleKurz], ids: &[i64]) -> Vec<String> {
+    stellen
+        .iter()
+        .filter(|s| ids.contains(&s.id))
+        .map(|s| s.bezeichnung.clone())
+        .collect()
+}
+
+/// Ersetzt die Zuordnung durch `ids` (geprüft, entdoppelt) — zwei Anweisungen, gleich wie viele
+/// Stellen (Muster `sprechgruppe::repo::ersetzen_tx`). Das INSERT ist bewusst kein
+/// `OR IGNORE`: eine doppelte Kennung, die am Entdoppeln vorbeikäme, scheiterte am Schlüssel.
+async fn replace_zuordnung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    zeitfenster_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    let ids = ids_json(ids)?;
+    sqlx::query(
+        "DELETE FROM verpflegung_zeitfenster_stelle \
+         WHERE zeitfenster_id = ? AND stelle_id NOT IN (SELECT value FROM json_each(?))",
+    )
+    .bind(zeitfenster_id)
+    .bind(&ids)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "INSERT INTO verpflegung_zeitfenster_stelle (einsatz_id, zeitfenster_id, stelle_id) \
+         SELECT ?, ?, value FROM json_each(?) \
+         WHERE value NOT IN \
+             (SELECT stelle_id FROM verpflegung_zeitfenster_stelle WHERE zeitfenster_id = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(zeitfenster_id)
+    .bind(&ids)
+    .bind(zeitfenster_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 // ── Zeitfenster ─────────────────────────────────────────────────────────────────────────────
 
 /// Legt ein Zeitfenster an. ETB: System-Eintrag mit Bezeichnung, Zeitraum und Bedarf.
@@ -385,8 +662,14 @@ pub async fn zeitfenster_anlegen_tx(
     tz: Tz,
     eingabe: &ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
+    // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
+    let stelle_ids = dedupe_stelle_ids(&eingabe.stelle_ids)?;
     // 400 — jedes Feld für sich
-    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
+    let bezeichnung = pflicht_max(
+        &eingabe.bezeichnung,
+        "bezeichnung",
+        super::ZEITFENSTER_BEZEICHNUNG_MAX,
+    )?;
     draht_lesen("von_at", &eingabe.von_at)?;
     draht_lesen("bis_at", &eingabe.bis_at)?;
     anzahl_pruefen("bedarf_kraefte", eingabe.bedarf_kraefte)?;
@@ -403,13 +686,15 @@ pub async fn zeitfenster_anlegen_tx(
     // 422 — der Zusammenhang
     zeitregel(&eingabe.von_at, &eingabe.bis_at)?;
     teilmenge(&sonderkost, b.gesamt, "den Gesamtbedarf")?;
+    let stellen = stellen_kurz_tx(conn, einsatz_id, &stelle_ids).await?;
+    check_zuordnung(&stelle_ids, &[], &stellen)?;
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO verpflegung_zeitfenster \
             (einsatz_id, bezeichnung, von_at, bis_at, bedarf_kraefte, bedarf_betreute, \
              bedarf_weitere, sk_vegetarisch, sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, \
-             sk_saeugling_kleinkind, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             sk_saeugling_kleinkind, angelegt_von_id, verpflegungsart) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(&bezeichnung)
@@ -424,12 +709,18 @@ pub async fn zeitfenster_anlegen_tx(
     .bind(sonderkost.diaet_allergenarm)
     .bind(sonderkost.saeugling_kleinkind)
     .bind(benutzer_id)
+    .bind(eingabe.verpflegungsart.map(|a| a.as_str()))
     .fetch_one(&mut *conn)
     .await?;
+    if !stelle_ids.is_empty() {
+        replace_zuordnung_tx(conn, einsatz_id, id, &stelle_ids).await?;
+    }
     let inhalt = etb_text::angelegt(
         &bezeichnung,
         &zeitraum(&eingabe.von_at, &eingabe.bis_at, tz)?,
         &b,
+        eingabe.verpflegungsart,
+        &namen_von(&stellen, &stelle_ids),
     );
     let etb_id =
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
@@ -452,11 +743,13 @@ pub async fn zeitfenster_aendern_tx(
     tz: Tz,
     a: &ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
+    // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
+    let stelle_ids = a.stelle_ids.as_deref().map(dedupe_stelle_ids).transpose()?;
     let roh = zeitfenster_roh_tx(conn, einsatz_id, id).await?;
 
     // 400 — jedes übergebene Feld für sich
     let bezeichnung = match &a.bezeichnung {
-        Some(b) => pflicht(b, "bezeichnung")?,
+        Some(b) => pflicht_max(b, "bezeichnung", super::ZEITFENSTER_BEZEICHNUNG_MAX)?,
         None => roh.bezeichnung.clone(),
     };
     let von_at = a.von_at.clone().unwrap_or_else(|| roh.von_at.clone());
@@ -477,6 +770,21 @@ pub async fn zeitfenster_aendern_tx(
     // 422 — der Zusammenhang im Effektivzustand
     zeitregel(&von_at, &bis_at)?;
     teilmenge(&sonderkost, neu.gesamt, "den Gesamtbedarf")?;
+    // Stellen (D5): feste Zahl von Anweisungen, gleich wie viele — die bisherige Zuordnung, die
+    // Stellen von jetzt und vorher in EINER Abfrage, später Löschen und Einfügen.
+    let zuordnung = match &stelle_ids {
+        Some(neu_ids) => {
+            let vorher_ids = zuordnung_tx(conn, id).await?;
+            let mut alle = neu_ids.clone();
+            alle.extend(vorher_ids.iter().filter(|v| !neu_ids.contains(v)));
+            let stellen = stellen_kurz_tx(conn, einsatz_id, &alle).await?;
+            check_zuordnung(neu_ids, &vorher_ids, &stellen)?;
+            Some((neu_ids, vorher_ids, stellen))
+        }
+        None => None,
+    };
+    let art_alt = roh.art();
+    let art_neu = a.verpflegungsart.unwrap_or(art_alt);
 
     let zeitraum_neu = zeitraum(&von_at, &bis_at, tz)?;
     let zeitraum_alt = zeitraum(&roh.von_at, &roh.bis_at, tz)?;
@@ -491,6 +799,24 @@ pub async fn zeitfenster_aendern_tx(
                 != (vorher.kraefte, vorher.betreute, vorher.weitere),
         sonderkost_vorher: (neu.sonderkost != vorher.sonderkost)
             .then_some(vorher.sonderkost.summe()),
+        art: (art_neu != art_alt).then_some((art_neu, art_alt)),
+        stellen: None,
+    };
+    // Gleiche Menge in anderer Reihenfolge ist keine Änderung (Leerlauf-Riegel).
+    let stellen_namen = zuordnung
+        .as_ref()
+        .and_then(|(neu_ids, vorher_ids, stellen)| {
+            let mut n = neu_ids.to_vec();
+            let mut v = vorher_ids.clone();
+            n.sort_unstable();
+            v.sort_unstable();
+            (n != v).then(|| (namen_von(stellen, neu_ids), namen_von(stellen, vorher_ids)))
+        });
+    let aenderungen = etb_text::Aenderungen {
+        stellen: stellen_namen
+            .as_ref()
+            .map(|(jetzt, vorher)| (jetzt.as_slice(), vorher.as_slice())),
+        ..aenderungen
     };
     if aenderungen.leer() {
         return Ok(Geschrieben {
@@ -503,7 +829,7 @@ pub async fn zeitfenster_aendern_tx(
         "UPDATE verpflegung_zeitfenster SET bezeichnung = ?, von_at = ?, bis_at = ?, \
             bedarf_kraefte = ?, bedarf_betreute = ?, bedarf_weitere = ?, sk_vegetarisch = ?, \
             sk_vegan = ?, sk_ohne_schwein = ?, sk_diaet_allergenarm = ?, \
-            sk_saeugling_kleinkind = ?, geaendert_at = datetime('now') \
+            sk_saeugling_kleinkind = ?, verpflegungsart = ?, geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(&bezeichnung)
@@ -517,10 +843,16 @@ pub async fn zeitfenster_aendern_tx(
     .bind(sonderkost.ohne_schwein)
     .bind(sonderkost.diaet_allergenarm)
     .bind(sonderkost.saeugling_kleinkind)
+    .bind(art_neu.map(|a| a.as_str()))
     .bind(id)
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
+    if aenderungen.stellen.is_some() {
+        if let Some((neu_ids, _, _)) = &zuordnung {
+            replace_zuordnung_tx(conn, einsatz_id, id, neu_ids).await?;
+        }
+    }
     let inhalt = etb_text::geaendert(&bezeichnung, &zeitraum_neu, &neu, &aenderungen);
     let etb_id =
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
@@ -605,13 +937,18 @@ pub async fn ausgabe_erfassen_tx(
     sonderkost.pruefen()?;
     // 422 — der Zusammenhang
     teilmenge(&sonderkost, eingabe.menge, "die Menge")?;
+    // Die Stelle zuletzt (D3), nach Replay, Zeitfenster, den 400ern und der Teilmenge; LLH-1055
+    // hängt seine Empfängerprüfung dahinter.
+    if let Some(sid) = eingabe.verpflegungsstelle_id {
+        check_stelle_fuer_ausgabe_tx(conn, einsatz_id, sid, &eingabe.zeitpunkt_at).await?;
+    }
 
     let ausgabe_id: i64 = sqlx::query_scalar(
         "INSERT INTO verpflegung_ausgabe \
             (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
              sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
-             nachforderung_id, erfasst_von_id, client_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             nachforderung_id, erfasst_von_id, client_id, verpflegungsstelle_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(zeitfenster_id)
@@ -627,6 +964,7 @@ pub async fn ausgabe_erfassen_tx(
     .bind(eingabe.nachforderung_id)
     .bind(benutzer_id)
     .bind(eingabe.client_id.as_deref())
+    .bind(eingabe.verpflegungsstelle_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(AusgabeGeschrieben {
@@ -634,6 +972,45 @@ pub async fn ausgabe_erfassen_tx(
         zeitfenster_id,
         neu: true,
     })
+}
+
+/// Prüft die Stelle einer neuen Ausgabe (D3) — in der Transaktion, gegen ein gleichzeitiges
+/// Auflösen. Fremd, unbekannt oder storniert: 422 (ein nicht zuordenbarer Verweis im Body; die
+/// stornierte Stelle zählt als nicht vorhanden). Aufgelöst: 409, außer der Zeitpunkt der Ausgabe
+/// liegt vor der Auflösung — eine offline vorgemerkte oder nachgetragene Zählung vom Tresen kommt
+/// so noch an. Verglichen werden die GEPARSTEN Zeitpunkte, nicht die Texte. `geplant` nimmt an
+/// (ein vergessener Klick blockiert den Tresen nicht), ebenso eine dem Zeitfenster nicht
+/// zugeordnete Stelle (die Zuordnung ist Planung, die Ausgabe eine Tatsache).
+async fn check_stelle_fuer_ausgabe_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    zeitpunkt_at: &str,
+) -> Result<(), AppError> {
+    let stelle = sqlx::query_as::<_, StelleZeile>(concat!(
+        stelle_select!(),
+        "WHERE einsatz_id = ? AND id = ?"
+    ))
+    .bind(einsatz_id)
+    .bind(stelle_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .filter(|s| s.storniert_at.is_none())
+    .ok_or_else(|| {
+        AppError::UnprocessableEntity(format!(
+            "Verpflegungsstelle {stelle_id} gibt es in diesem Einsatz nicht"
+        ))
+    })?;
+    if let Some(aufgeloest_at) = stelle.aufgeloest_at.as_deref() {
+        let aufgeloest = draht_lesen("aufgeloest_at", aufgeloest_at)?;
+        if draht_lesen("zeitpunkt_at", zeitpunkt_at)? >= aufgeloest {
+            return Err(AppError::Conflict(format!(
+                "Verpflegungsstelle ‚{}‘ ist aufgelöst",
+                stelle.bezeichnung
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Die gespeicherte Ausgabe mit dieser `client_id` im Einsatz, als Replay (`neu: false`).
@@ -712,6 +1089,286 @@ pub async fn ausgabe_zuruecknehmen_tx(
         ausgabe_id,
         zeitfenster_id,
         neu: true,
+    })
+}
+
+// ── Verpflegungsstellen (LLH-1040, design.md D1, D2) ────────────────────────────────────────
+
+/// Lädt eine Stelle des Einsatzes, auch eine stornierte. Fremd oder unbekannt → 404.
+async fn stelle_roh_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<StelleZeile, AppError> {
+    sqlx::query_as::<_, StelleZeile>(concat!(stelle_select!(), "WHERE einsatz_id = ? AND id = ?"))
+        .bind(einsatz_id)
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Eine stornierte Stelle ist für Ändern, Statuswechsel und Storno 409 (Lebenszyklus, wie der
+/// BR in `routes/einsatz_bereitstellungsraum.rs`). Eine aufgelöste bleibt änderbar (D2).
+fn check_stelle_nicht_storniert(roh: &StelleZeile) -> Result<(), AppError> {
+    match roh.storniert_at {
+        Some(_) => Err(AppError::Conflict(format!(
+            "Verpflegungsstelle ‚{}‘ ist storniert",
+            roh.bezeichnung
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// Die getrimmte Bezeichnung ist unter den nicht stornierten Stellen des Einsatzes eindeutig
+/// (409 vor dem Netz des partiellen UNIQUE-Index, Muster `betreuung::repo`). `ausser_id` ist die
+/// Stelle selbst beim Umbenennen.
+async fn check_stelle_bezeichnung_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bezeichnung: &str,
+    ausser_id: Option<i64>,
+) -> Result<(), AppError> {
+    let belegt: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM verpflegungsstelle WHERE einsatz_id = ? AND bezeichnung = ? \
+         AND storniert_at IS NULL AND id IS NOT ?",
+    )
+    .bind(einsatz_id)
+    .bind(bezeichnung)
+    .bind(ausser_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match belegt {
+        None => Ok(()),
+        Some(_) => Err(AppError::Conflict(format!(
+            "Eine Verpflegungsstelle ‚{bezeichnung}‘ gibt es in diesem Einsatz bereits"
+        ))),
+    }
+}
+
+/// Die Stelle als Anzeige (Antwort der Schreibrouten). Fremd oder unbekannt → 404.
+pub async fn load_stelle(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<VerpflegungsstelleAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    Ok(stelle_roh_tx(&mut conn, einsatz_id, id).await?.anzeige())
+}
+
+/// Legt eine Stelle im Status `geplant` an. Kein ETB-Eintrag (D2: erst die Inbetriebnahme ist
+/// lagerelevant). Reihenfolge: 400 (Felder) → 422 (Koordinate) → 404 (Abschnitt) → 409
+/// (Bezeichnung vergeben).
+pub async fn create_stelle_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    eingabe: &StelleEingabe,
+) -> Result<StelleGeschrieben, AppError> {
+    let bezeichnung = pflicht_max(
+        &eingabe.bezeichnung,
+        "bezeichnung",
+        super::STELLE_BEZEICHNUNG_MAX,
+    )?;
+    let standort = optional_max(eingabe.standort.clone(), "standort", super::STANDORT_MAX)?;
+    pruefe_koordinate(eingabe.lat, eingabe.lon, "lat", "lon")?;
+    if let Some(abschnitt_id) = eingabe.abschnitt_id {
+        crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, abschnitt_id)
+            .await?;
+    }
+    check_stelle_bezeichnung_frei_tx(conn, einsatz_id, &bezeichnung, None).await?;
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO verpflegungsstelle \
+            (einsatz_id, bezeichnung, art, standort, lat, lon, abschnitt_id, angelegt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(&bezeichnung)
+    .bind(eingabe.art.as_str())
+    .bind(&standort)
+    .bind(eingabe.lat)
+    .bind(eingabe.lon)
+    .bind(eingabe.abschnitt_id)
+    .bind(benutzer_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(StelleGeschrieben {
+        id,
+        geaendert: true,
+        etb_ids: Vec::new(),
+    })
+}
+
+/// Ändert eine Stelle, auch eine aufgelöste (Bezeichnung und Standort korrigieren,
+/// `entscheidungen.md`, Entscheider-Agent 15.10.). Kein ETB-Eintrag. Die Koordinate wird im
+/// Effektivzustand dieser Transaktion geprüft (Paar, 422). Ohne neuen Wert läuft kein UPDATE
+/// (`geaendert: false`, kein Live-Ereignis).
+pub async fn update_stelle_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    a: &StelleAenderung,
+) -> Result<StelleGeschrieben, AppError> {
+    let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
+    check_stelle_nicht_storniert(&roh)?;
+    // 400 — jedes übergebene Feld für sich
+    let bezeichnung = pflicht_max_tri(
+        a.bezeichnung.as_deref(),
+        "bezeichnung",
+        super::STELLE_BEZEICHNUNG_MAX,
+    )?
+    .unwrap_or_else(|| roh.bezeichnung.clone());
+    let standort = optional_max_tri(a.standort.clone(), "standort", super::STANDORT_MAX)?
+        .unwrap_or_else(|| roh.standort.clone());
+    let art = a.art.unwrap_or(roh.art);
+    let lat = a.lat.unwrap_or(roh.lat);
+    let lon = a.lon.unwrap_or(roh.lon);
+    let abschnitt_id = a.abschnitt_id.unwrap_or(roh.abschnitt_id);
+    // 422 — die Koordinate als Paar im Effektivzustand
+    pruefe_koordinate(lat, lon, "lat", "lon")?;
+    let bezeichnung_neu = bezeichnung != roh.bezeichnung;
+    let abschnitt_neu = abschnitt_id != roh.abschnitt_id;
+    if !bezeichnung_neu
+        && !abschnitt_neu
+        && art == roh.art
+        && standort == roh.standort
+        && lat == roh.lat
+        && lon == roh.lon
+    {
+        return Ok(StelleGeschrieben {
+            id,
+            geaendert: false,
+            etb_ids: Vec::new(),
+        });
+    }
+    if let (true, Some(abschnitt)) = (abschnitt_neu, abschnitt_id) {
+        crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
+    }
+    if bezeichnung_neu {
+        check_stelle_bezeichnung_frei_tx(conn, einsatz_id, &bezeichnung, Some(id)).await?;
+    }
+    sqlx::query(
+        "UPDATE verpflegungsstelle SET bezeichnung = ?, art = ?, standort = ?, lat = ?, \
+            lon = ?, abschnitt_id = ?, geaendert_at = datetime('now') \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(&bezeichnung)
+    .bind(art.as_str())
+    .bind(&standort)
+    .bind(lat)
+    .bind(lon)
+    .bind(abschnitt_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(StelleGeschrieben {
+        id,
+        geaendert: true,
+        etb_ids: Vec::new(),
+    })
+}
+
+/// Statuswechsel einer Stelle (D2): stornierte Stelle 409, unzulässiger Übergang 422.
+/// `→ aufgeloest` setzt `aufgeloest_at` auf die Serveruhr. `→ aktiv` und `→ aufgeloest` schreiben
+/// je einen System-Eintrag im ETB in derselben Transaktion.
+pub async fn update_stelle_status_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    nach: VerpflegungsstelleStatus,
+) -> Result<StelleGeschrieben, AppError> {
+    let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
+    check_stelle_nicht_storniert(&roh)?;
+    if !darf_uebergehen(roh.status, nach) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Verpflegungsstelle ‚{}‘: Übergang {} → {} ist nicht zulässig",
+            roh.bezeichnung,
+            roh.status.as_str(),
+            nach.as_str()
+        )));
+    }
+    sqlx::query(
+        "UPDATE verpflegungsstelle SET status = ?, \
+            aufgeloest_at = CASE WHEN ? = 'aufgeloest' THEN datetime('now') ELSE aufgeloest_at END, \
+            geaendert_at = datetime('now') \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(nach.as_str())
+    .bind(nach.as_str())
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    let mut etb_ids = Vec::new();
+    if let Some(inhalt) = etb_text::stelle_status(&roh.bezeichnung, roh.art, nach) {
+        etb_ids.push(
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?,
+        );
+    }
+    Ok(StelleGeschrieben {
+        id,
+        geaendert: true,
+        etb_ids,
+    })
+}
+
+/// Storniert eine Stelle (Fehlanlage, D2): nur `geplant` und nur, solange keine Ausgabe — auch
+/// keine zurückgenommene — auf sie verweist, sonst 422. Entfernt die Zuordnungen in derselben
+/// Transaktion und schreibt kein ETB. So zeigt nie eine Ausgabe auf eine stornierte Stelle, und
+/// kein „in Betrieb genommen“ bleibt ohne Gegenstück.
+pub async fn stelle_stornieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+) -> Result<StelleGeschrieben, AppError> {
+    let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
+    check_stelle_nicht_storniert(&roh)?;
+    match roh.status {
+        VerpflegungsstelleStatus::Geplant => {}
+        VerpflegungsstelleStatus::Aktiv => {
+            return Err(AppError::UnprocessableEntity(
+                "In Betrieb genommene Stelle auflösen statt stornieren".into(),
+            ))
+        }
+        VerpflegungsstelleStatus::Aufgeloest => {
+            return Err(AppError::UnprocessableEntity(
+                "Eine aufgelöste Stelle lässt sich nicht stornieren".into(),
+            ))
+        }
+    }
+    let ausgaben: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM verpflegung_ausgabe WHERE verpflegungsstelle_id = ?",
+    )
+    .bind(id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if ausgaben > 0 {
+        return Err(AppError::UnprocessableEntity(format!(
+            "An der Stelle hängen Ausgaben ({ausgaben}) — auflösen statt stornieren"
+        )));
+    }
+    sqlx::query("DELETE FROM verpflegung_zeitfenster_stelle WHERE stelle_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "UPDATE verpflegungsstelle SET storniert_at = datetime('now'), storniert_von_id = ?, \
+            geaendert_at = datetime('now') \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(benutzer_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(StelleGeschrieben {
+        id,
+        geaendert: true,
+        etb_ids: Vec::new(),
     })
 }
 

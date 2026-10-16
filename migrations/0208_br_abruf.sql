@@ -12,15 +12,15 @@
 --                      und jeden späteren Neubau zum Nicht-Blatt; die Reihe ist append-only.
 --
 -- SQLite ändert einen CHECK nur per Neubau. br_belegung ist ein Blatt (keine Tabelle verweist
--- darauf; `grep -l br_belegung migrations/*.sql`: 0061, 0130 nur im Kommentar, 0204) → kein
+-- darauf; `grep -l br_belegung migrations/*.sql`: 0061, 0130 nur im Kommentar, 0207) → kein
 -- PRAGMA-foreign_keys-Umschalter, das DROP löst keine Kaskade aus. Anders als 0169 ohne
--- `-- no-transaction`: der Neubau läuft wie 0204 in der Transaktion der Migration und fällt bei
+-- `-- no-transaction`: der Neubau läuft wie 0207 in der Transaktion der Migration und fällt bei
 -- einem Fehler ganz zurück. Die Tabelle trägt AUTOINCREMENT → der sqlite_sequence-Eintrag wird
 -- VOR dem DROP umgehängt (Muster 0112/0169), sonst vergäbe SQLite nach dem Löschen der höchsten
 -- Zeile (Einsatz gelöscht) deren id erneut.
--- Schema = 0061 + client_id aus 0204; client_id und ihr Unique-Teilindex bleiben unverändert
--- (Guard db::tests::migration_0204_br_belegung_client_id).
--- Abgesichert von db::tests::migration_0205_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema.
+-- Schema = 0061 + client_id aus 0207; client_id und ihr Unique-Teilindex bleiben unverändert
+-- (Guard db::tests::migration_0207_br_belegung_client_id).
+-- Abgesichert von db::tests::migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema.
 
 CREATE TABLE br_belegung_neu (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,7 +66,7 @@ ALTER TABLE br_belegung_neu RENAME TO br_belegung;
 -- No-op, falls SQLite den Eintrag beim RENAME bereits mitzieht (wie in 0082).
 UPDATE sqlite_sequence SET name = 'br_belegung' WHERE name = 'br_belegung_neu';
 
--- Die Indizes aus 0061 und 0204 fallen mit dem DROP; wortgleich neu.
+-- Die Indizes aus 0061 und 0207 fallen mit dem DROP; wortgleich neu.
 CREATE INDEX idx_br_belegung_br     ON br_belegung (br_id, zeitpunkt_at);
 CREATE INDEX idx_br_belegung_objekt ON br_belegung (objekt_typ, objekt_id, zeitpunkt_at);
 CREATE UNIQUE INDEX idx_br_belegung_client_id

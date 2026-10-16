@@ -638,6 +638,21 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
             post(routes::verpflegung::ausgabe_zuruecknehmen),
         )
+        // Verpflegungsstellen (LLH-1040): keine eigene Leseroute, `stellen[]` kommt mit
+        // `GET …/verpflegung`.
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen",
+            post(routes::verpflegung::create_stelle),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen/{sid}",
+            patch(routes::verpflegung::update_stelle)
+                .delete(routes::verpflegung::stelle_stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen/{sid}/status",
+            post(routes::verpflegung::update_stelle_status),
+        )
         // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
         .route(
             "/api/einsaetze/{id}/lagebesprechung",

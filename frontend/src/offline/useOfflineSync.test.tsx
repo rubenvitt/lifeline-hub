@@ -475,6 +475,7 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     const { client, Wrapper } = wrapperFuer();
     client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
       zeitfenster: [fenster(8, 0), fenster(9, 100)],
+      stellen: [],
     });
     vi.mocked(erfasseAusgabe).mockResolvedValue({ ausgabe_id: 5, zeitfenster: fenster(9, 220) });
     await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);

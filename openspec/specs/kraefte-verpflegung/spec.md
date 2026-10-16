@@ -68,10 +68,10 @@ zurückgenommene Ausgabe hat; zurückgenommene Ausgaben werden mit ihm entfernt.
 ### Requirement: Ausgabe erfassen
 
 Das System SHALL je Zeitfenster Ausgaben führen. Eine Ausgabe trägt Zeitpunkt, Menge in EP,
-optional Ort, Sonderkost je Kostform, optional den Verweis auf eine Nachforderung und
-optional eine Bemerkung. Ausgaben MUST append-only sein: Es gibt keine Bearbeitung, eine
-falsche Ausgabe wird zurückgenommen. Das System MUST einen Zeitpunkt außerhalb des
-Zeitfensters annehmen (Anlieferung vor Beginn).
+optional eine Verpflegungsstelle, optional Ort, Sonderkost je Kostform, optional den Verweis auf
+eine Nachforderung und optional eine Bemerkung. Ausgaben MUST append-only sein: Es gibt keine
+Bearbeitung, eine falsche Ausgabe wird zurückgenommen. Das System MUST einen Zeitpunkt außerhalb
+des Zeitfensters annehmen (Anlieferung vor Beginn).
 
 #### Scenario: Ausgabe erfassen
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 120 EP am Ort „Verpflegungsstelle Deich“ um 11:40 erfasst wird
@@ -199,9 +199,12 @@ Nachforderungen der Person zugänglich ist.
 
 Anlegen, Ändern und Löschen eines Zeitfensters MUST in derselben Transaktion einen
 System-Eintrag im ETB schreiben, der Bezeichnung, Zeitraum und Gesamtbedarf nennt (bei
-Änderung auch den vorherigen Gesamtbedarf). Der Zeitraum MUST in der Zeitzone der
-Organisation stehen, nicht in UTC. Das Erfassen und Zurücknehmen einer Ausgabe
-MUST keinen ETB-Eintrag schreiben.
+Änderung auch den vorherigen Gesamtbedarf). Trägt das Zeitfenster eine Verpflegungsart oder
+Stellen, MUST der Eintrag beim Anlegen sie nennen und bei einer Änderung den neuen und den
+vorherigen Wert. Der Zeitraum MUST in der Zeitzone der Organisation stehen, nicht in UTC.
+Inbetriebnahme und Auflösung einer Verpflegungsstelle MUST einen System-Eintrag schreiben, der
+Bezeichnung und Art der Stelle nennt. Anlegen, Ändern und Stornieren einer Stelle sowie das
+Erfassen und Zurücknehmen einer Ausgabe MUST keinen ETB-Eintrag schreiben.
 
 #### Scenario: Bedarf geändert
 - **WHEN** der Gesamtbedarf des Zeitfensters „Mittag“ von 250 auf 270 geändert wird
@@ -213,6 +216,18 @@ MUST keinen ETB-Eintrag schreiben.
 
 #### Scenario: Ausgabe ohne ETB
 - **WHEN** eine Ausgabe erfasst oder zurückgenommen wird
+- **THEN** entsteht kein neuer ETB-Eintrag
+
+#### Scenario: Zeitfenster an Stellen angelegt
+- **WHEN** das Zeitfenster „Mittag“ mit der Art warm an den Stellen „Feldküche BR Sportplatz“ und „Ausgabe Turnhalle Nord“ angelegt wird
+- **THEN** nennt der ETB-Eintrag „warm“ und beide Stellen
+
+#### Scenario: Stellen eines Zeitfensters geändert
+- **WHEN** einem Zeitfenster, das nur der Feldküche zugeordnet ist, zusätzlich die Turnhalle zugeordnet wird
+- **THEN** nennt der ETB-Eintrag die Stellen jetzt und vorher
+
+#### Scenario: Stelle anlegen ohne ETB
+- **WHEN** eine Verpflegungsstelle angelegt, geändert oder storniert wird
 - **THEN** entsteht kein neuer ETB-Eintrag
 
 ### Requirement: Rechte und Modulsichtbarkeit
@@ -241,9 +256,9 @@ Zeilenaktionen weglassen.
 
 ### Requirement: Live-Verteilung
 
-Jede Änderung an Zeitfenstern und Ausgaben MUST nach dem Commit ein Live-Ereignis
-`verpflegung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul Verpflegung
-lesen dürfen. Die Nutzlast MUST nur Kennungen tragen. Ein zugehöriger ETB-Eintrag MUST
+Jede Änderung an Zeitfenstern, Ausgaben und Verpflegungsstellen MUST nach dem Commit ein
+Live-Ereignis `verpflegung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul
+Verpflegung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen. Ein zugehöriger ETB-Eintrag MUST
 zusätzlich als ETB-Ereignis verteilt werden. Neue Zeitfenster anderer Personen MUST die
 Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen.
 
@@ -254,6 +269,10 @@ Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen.
 #### Scenario: Leser ohne Modulrecht
 - **WHEN** einem verbundenen Benutzer das Modul Verpflegung ausgeblendet ist
 - **THEN** erhält er das Ereignis `verpflegung` nicht
+
+#### Scenario: Ereignis bei einer Stelle
+- **WHEN** eine Verpflegungsstelle angelegt, geändert, im Status gewechselt oder storniert wird
+- **THEN** löst das System nach dem Commit ein Ereignis `verpflegung` aus, dessen Nutzlast nur Kennungen trägt
 
 ### Requirement: Anzeige im Modul
 
@@ -274,14 +293,20 @@ tabellarischen Ziffern stehen.
 
 ### Requirement: Schwärzung
 
-Beim Schwärzen eines Einsatzes MUST das System Ort und Bemerkung von Ausgaben leeren.
-Bezeichnungen der Zeitfenster, Zeitpunkte, Bedarfe, Mengen, Sonderkost-Anzahlen und
-Nachforderungsverweise MUST erhalten bleiben.
+Beim Schwärzen eines Einsatzes MUST das System Ort und Bemerkung von Ausgaben und den Standort
+von Verpflegungsstellen leeren. Bezeichnungen der Zeitfenster und der Verpflegungsstellen, Art,
+Status und Koordinate der Stellen, die Zuordnungen, Zeitpunkte, Bedarfe, Mengen,
+Sonderkost-Anzahlen, Stellen- und Nachforderungsverweise MUST erhalten bleiben.
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit einer Ausgabe am Ort „Hof Familie Meyer, Deichstraße 4“ und der Bemerkung „für Frau Meyer glutenfrei“ geschwärzt wird
 - **THEN** sind Ort und Bemerkung der Ausgabe leer
 - **AND** Menge, Sonderkost und Zeitpunkt der Ausgabe sowie das Zeitfenster sind unverändert
+
+#### Scenario: Stelle schwärzen
+- **WHEN** ein Einsatz mit der Stelle „Feldküche BR Sportplatz“ am Standort „Am Sportplatz 2“ und einer Ausgabe an ihr geschwärzt wird
+- **THEN** ist der Standort leer
+- **AND** Bezeichnung, Art, Status und Koordinate der Stelle, ihre Zuordnungen und der Verweis der Ausgabe auf sie sind unverändert
 
 ### Requirement: Stab-Werkzeug S4
 
@@ -326,9 +351,10 @@ zurückliefern (201), ohne zweite Ausgabe und ohne weiteres Live-Ereignis. Ausga
 ### Requirement: Replay vor der Zustandsprüfung
 
 Die Suche nach einer gespeicherten Ausgabe zur `client_id` MUST nach den Prüfungen auf
-Schreibrecht und Modulzugang laufen, aber vor der Prüfung auf einen aktiven Einsatz. Ein Replay
-MUST die gespeicherte Ausgabe auch dann liefern, wenn sie inzwischen zurückgenommen ist. Eine
-neue Ausgabe an einem abgeschlossenen Einsatz MUST weiter mit 409 abgelehnt werden.
+Schreibrecht und Modulzugang laufen, aber vor der Prüfung auf einen aktiven Einsatz und vor der
+Prüfung der Verpflegungsstelle. Ein Replay MUST die gespeicherte Ausgabe auch dann liefern, wenn
+sie inzwischen zurückgenommen oder ihre Stelle inzwischen aufgelöst ist. Eine neue Ausgabe an
+einem abgeschlossenen Einsatz MUST weiter mit 409 abgelehnt werden.
 
 #### Scenario: Replay nach Einsatzende
 - **WHEN** eine Ausgabe mit `client_id` „v4“ gespeichert ist, der Einsatz danach abgeschlossen wird und dieselbe Ausgabe erneut eintrifft
@@ -346,6 +372,10 @@ neue Ausgabe an einem abgeschlossenen Einsatz MUST weiter mit 409 abgelehnt werd
 #### Scenario: Beobachter ohne Schreibrecht
 - **WHEN** ein Beobachter eine Ausgabe mit einer schon gespeicherten `client_id` sendet
 - **THEN** antwortet das System mit 403 und gibt die Ausgabe nicht heraus
+
+#### Scenario: Replay nach dem Auflösen der Stelle
+- **WHEN** eine Ausgabe mit `client_id` „v6“ an der Stelle „Ausgabe Turnhalle Nord“ gespeichert ist, die Stelle danach aufgelöst wird und dieselbe Ausgabe mit einem Zeitpunkt nach der Auflösung erneut eintrifft
+- **THEN** antwortet das System mit 201 und der bestehenden Ausgabe, nicht mit 409
 
 ### Requirement: Ausgabe ohne Verbindung vormerken
 
@@ -383,3 +413,177 @@ in die ausgegebene Menge noch in Fehlmenge oder Einstufung zählen, und sie MUST
 #### Scenario: Nach der Bestätigung gezählt
 - **WHEN** die vorgemerkte Ausgabe von 120 EP gesendet und vom Server gespeichert ist
 - **THEN** steht sie als gewöhnliche Ausgabe in der Liste, die Kennzeichnung „ausstehend“ entfällt, und die Karte zeigt ausgegeben 220 und Fehlmenge 30
+
+### Requirement: Verpflegungsstelle
+
+Das System SHALL je Einsatz Verpflegungsstellen führen. Eine Stelle trägt eine Bezeichnung, eine
+Art (Feldküche, Ausgabestelle oder Zuführung), optional einen Standort als Freitext mit einer
+Koordinate und optional einen Abschnitt desselben Einsatzes. Die getrimmte Bezeichnung MUST unter
+den nicht stornierten Stellen eines Einsatzes eindeutig sein. Eine Koordinate MUST aus Breite und
+Länge zusammen bestehen. Anlegen und Ändern einer Stelle MUST keinen ETB-Eintrag schreiben. Eine
+Verpflegungsstelle MUST keinen Bestand und kein Material führen; sie ist kein Versorgungsposten.
+
+#### Scenario: Stelle anlegen
+- **WHEN** eine Person mit Schreibrecht die Stelle „Feldküche BR Sportplatz“ der Art Feldküche mit Standort „Am Sportplatz 2“ anlegt
+- **THEN** entsteht die Stelle mit Status „geplant“, und das ETB erhält keinen neuen Eintrag
+
+#### Scenario: Bezeichnung schon vergeben
+- **WHEN** im selben Einsatz eine zweite nicht stornierte Stelle „Feldküche BR Sportplatz“ angelegt oder eine Stelle so umbenannt wird
+- **THEN** antwortet das System mit 409 und ändert nichts
+
+#### Scenario: Bezeichnung nach Storno wieder frei
+- **WHEN** die Stelle „Zuführung Deich“ storniert ist und eine neue Stelle „Zuführung Deich“ angelegt wird
+- **THEN** entsteht die neue Stelle
+
+#### Scenario: Leere Bezeichnung oder unbekannte Art
+- **WHEN** eine Stelle mit leerer Bezeichnung oder einer unbekannten Art angelegt wird
+- **THEN** antwortet das System mit 400 und legt nichts an
+
+#### Scenario: Halbe Koordinate
+- **WHEN** eine Stelle mit Breite, aber ohne Länge gespeichert wird
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Abschnitt eines anderen Einsatzes
+- **WHEN** eine Stelle mit einem Abschnitt eines anderen Einsatzes gespeichert wird
+- **THEN** antwortet das System mit 404 und ändert nichts
+
+### Requirement: Lebenszyklus einer Verpflegungsstelle
+
+Eine Stelle SHALL die Status `geplant`, `aktiv` und `aufgeloest` durchlaufen: von `geplant` nach
+`aktiv` oder direkt nach `aufgeloest`, von `aktiv` nach `aufgeloest`. `aufgeloest` MUST endgültig
+sein, und das System MUST den Zeitpunkt der Auflösung speichern. Ein anderer Übergang MUST mit 422
+abgelehnt werden. Inbetriebnahme und Auflösung MUST in derselben Transaktion einen System-Eintrag
+im ETB schreiben. Eine Stelle MUST sich nur stornieren lassen, solange sie `geplant` ist und keine
+Ausgabe, auch keine zurückgenommene, auf sie verweist; das Stornieren entfernt ihre Zuordnungen und
+schreibt keinen ETB-Eintrag. Ändern, Statuswechsel und Storno einer stornierten Stelle MUST mit 409
+abgelehnt werden. Eine aufgelöste Stelle MUST änderbar bleiben.
+
+#### Scenario: In Betrieb nehmen
+- **WHEN** die geplante Stelle „Feldküche BR Sportplatz“ in Betrieb genommen wird
+- **THEN** hat sie den Status „aktiv“, und das ETB enthält einen System-Eintrag, der sie als in Betrieb genommen nennt
+
+#### Scenario: Auflösen
+- **WHEN** die aktive Stelle „Ausgabe Turnhalle Nord“ aufgelöst wird
+- **THEN** hat sie den Status „aufgelöst“ mit dem Zeitpunkt der Auflösung, und das ETB enthält einen System-Eintrag, der sie als aufgelöst nennt
+
+#### Scenario: Aufgelöste Stelle wieder in Betrieb nehmen
+- **WHEN** eine aufgelöste Stelle in Betrieb genommen werden soll
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Stornieren mit Ausgabe
+- **WHEN** eine geplante Stelle storniert werden soll, an der eine Ausgabe gebucht ist
+- **THEN** antwortet das System mit 422 und storniert nichts
+
+#### Scenario: Aktive Stelle stornieren
+- **WHEN** eine aktive Stelle storniert werden soll
+- **THEN** antwortet das System mit 422 und storniert nichts
+
+#### Scenario: Stornierte Stelle ändern
+- **WHEN** eine stornierte Stelle geändert oder in Betrieb genommen werden soll
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Stelle eines anderen Einsatzes
+- **WHEN** eine Stelle über einen fremden Einsatz geändert, im Status gewechselt oder storniert werden soll
+- **THEN** antwortet das System mit 404
+
+### Requirement: Zuordnung von Zeitfenstern zu Stellen
+
+Ein Zeitfenster SHALL einer oder mehreren Stellen desselben Einsatzes zugeordnet werden können,
+beim Anlegen und beim Ändern. Ohne Zuordnung MUST das Zeitfenster einsatzweit gelten wie bisher.
+Der Bedarf MUST am Zeitfenster bleiben; ein Bedarf je Stelle MUST es nicht geben. Beim Ändern
+MUST eine übergebene Liste die Zuordnung ersetzen, eine leere Liste sie leeren und eine fehlende
+Liste sie unverändert lassen. Eine Stelle eines anderen Einsatzes, eine stornierte Stelle oder
+eine neu hinzukommende aufgelöste Stelle MUST mit 422 abgelehnt werden; eine schon zugeordnete
+aufgelöste Stelle MUST zugeordnet bleiben dürfen. Das Löschen eines Zeitfensters MUST seine
+Zuordnungen entfernen.
+
+#### Scenario: Zeitfenster an zwei Stellen
+- **WHEN** das Zeitfenster „Mittag“ mit Bedarf 200 den Stellen „Feldküche BR Sportplatz“ und „Ausgabe Turnhalle Nord“ zugeordnet wird
+- **THEN** gilt es an beiden Stellen, und sein Gesamtbedarf bleibt 200
+
+#### Scenario: Zuordnung leeren
+- **WHEN** ein Zeitfenster mit einer leeren Stellenliste geändert wird
+- **THEN** ist es keiner Stelle mehr zugeordnet und gilt einsatzweit
+
+#### Scenario: Aufgelöste Stelle neu zuordnen
+- **WHEN** ein Zeitfenster einer aufgelösten Stelle neu zugeordnet werden soll
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Unveränderte Zuordnung
+- **WHEN** ein Zeitfenster mit derselben Menge von Stellen in anderer Reihenfolge geändert wird
+- **THEN** ändert sich nichts, und es entsteht weder ein ETB-Eintrag noch ein Live-Ereignis
+
+### Requirement: Ausgabe an einer Verpflegungsstelle
+
+Eine Ausgabe SHALL optional auf eine Verpflegungsstelle desselben Einsatzes verweisen. Eine Stelle
+eines anderen Einsatzes, eine unbekannte oder eine stornierte Stelle MUST mit 422 abgelehnt
+werden. An einer aufgelösten Stelle MUST eine Ausgabe mit 409 abgelehnt werden, wenn ihr Zeitpunkt
+nicht vor der Auflösung liegt; eine Ausgabe mit früherem Zeitpunkt MUST angenommen werden. Beide
+Zeitpunkte MUST als Zeitpunkte verglichen werden, nicht als Text. Eine
+geplante Stelle MUST Ausgaben annehmen. Eine Stelle, der das Zeitfenster nicht zugeordnet ist, MUST
+die Ausgabe ebenfalls annehmen. Die Prüfung der Stelle MUST nach dem Replay über `client_id` und
+nach der Prüfung auf einen aktiven Einsatz laufen.
+
+#### Scenario: Ausgabe an der Feldküche
+- **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 100 EP an der Stelle „Feldküche BR Sportplatz“ erfasst wird
+- **THEN** trägt die Ausgabe die Stelle und zählt in die ausgegebene Menge des Zeitfensters
+
+#### Scenario: Aufgelöste Stelle
+- **WHEN** eine Ausgabe mit dem Zeitpunkt der Erfassung an einer aufgelösten Stelle erfasst wird
+- **THEN** antwortet das System mit 409 und legt nichts an
+
+#### Scenario: Offline vor der Auflösung gebucht
+- **WHEN** eine Ausgabe offline um 12:10 an der Stelle „Ausgabe Turnhalle Nord“ vorgemerkt wurde, die Stelle um 12:20 aufgelöst wird und die Ausgabe um 12:30 eintrifft
+- **THEN** speichert das System die Ausgabe an dieser Stelle mit dem Zeitpunkt 12:10
+
+#### Scenario: Stelle eines anderen Einsatzes
+- **WHEN** eine Ausgabe auf eine Stelle eines anderen Einsatzes verweist
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Stornierte Stelle
+- **WHEN** eine Ausgabe auf eine stornierte Stelle verweist
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Geplante Stelle
+- **WHEN** an einer Stelle, die noch nicht in Betrieb genommen ist, eine Ausgabe erfasst wird
+- **THEN** speichert das System die Ausgabe
+
+#### Scenario: Stelle ohne Zuordnung zum Zeitfenster
+- **WHEN** das Zeitfenster „Mittag“ nur der Feldküche zugeordnet ist und eine Ausgabe an der Stelle „Zuführung Deich“ erfasst wird
+- **THEN** speichert das System die Ausgabe an der Stelle „Zuführung Deich“
+
+### Requirement: Ausgegebene Menge je Stelle
+
+Das System SHALL je Zeitfenster die ausgegebene Menge je Stelle liefern, gesamt und je Kostform,
+aus derselben Rechnung wie die Deckung. Die Aufstellung MUST jede zugeordnete Stelle enthalten,
+auch mit 0, jede weitere Stelle mit Ausgaben und einen Eintrag „ohne Stelle“, wenn es Ausgaben
+ohne Stelle gibt. Ihre Summe MUST die ausgegebene Menge des Zeitfensters sein. Hat ein Zeitfenster
+keine Zuordnung und keine Ausgabe an einer Stelle, MUST die Aufstellung leer sein. Eine Fehlmenge
+oder Einstufung je Stelle MUST es nicht geben; Fehlmenge und Einstufung bleiben am Zeitfenster.
+Zurückgenommene Ausgaben MUST nicht zählen.
+
+#### Scenario: Zwei Stellen
+- **WHEN** das Zeitfenster „Mittag“ mit Bedarf 200 der Feldküche und der Turnhalle zugeordnet ist und dort 100 und 80 EP ausgegeben sind
+- **THEN** liefert es je Stelle 100 und 80 EP, gesamt ausgegeben 180 und die Fehlmenge 20
+
+#### Scenario: Ausgaben ohne Stelle
+- **WHEN** zu einem Zeitfenster, das der Feldküche zugeordnet ist, 100 EP an der Feldküche und 30 EP ohne Stelle ausgegeben sind
+- **THEN** enthält die Aufstellung die Feldküche mit 100 und „ohne Stelle“ mit 30
+
+#### Scenario: Zeitfenster ohne Zuordnung
+- **WHEN** ein Zeitfenster keiner Stelle zugeordnet ist und alle Ausgaben ohne Stelle erfasst sind
+- **THEN** ist die Aufstellung je Stelle leer, und das Zeitfenster zeigt wie bisher nur Gesamtwerte
+
+### Requirement: Verpflegungsart eines Zeitfensters
+
+Ein Zeitfenster SHALL optional eine Verpflegungsart tragen: warm, kalt oder Getränke. Sie MUST nur
+der Anzeige dienen; Bedarf, Deckung und Einstufung MUST für alle Arten gleich gerechnet werden.
+Ein Zeitfenster ohne Art MUST sich wie bisher verhalten.
+
+#### Scenario: Getränke
+- **WHEN** das Zeitfenster „Getränke“ mit der Art Getränke und Bedarf 120 angelegt wird und 100 EP ausgegeben sind
+- **THEN** zeigt es die Art „Getränke“ und wie jedes Zeitfenster die Fehlmenge 20 mit Einstufung
+
+#### Scenario: Unbekannte Art
+- **WHEN** ein Zeitfenster mit einer unbekannten Verpflegungsart angelegt wird
+- **THEN** antwortet das System mit 400 und legt nichts an

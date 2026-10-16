@@ -65,6 +65,13 @@ Zeitfenster anlegen, den Bedarf ändern und Zeitfenster löschen bleiben der Ein
 Tablet fehlen diese Knöpfe. Eine Ausgabe auf eine Nachforderung zu buchen, lehnt der Server für
 ein Gerät ab. Statt nachzufordern meldet das Tablet die Fehlmenge an die Einsatzleitung.
 
+### Länge der Angaben
+
+Der Ort einer Ausgabe darf höchstens 500 Zeichen lang sein, ihre Bemerkung 2 000. Darüber sendet
+der Dialog nicht, und der Zähler unter dem Feld nennt die Überlänge; gekürzt wird nichts. Eine zu
+lange Bemerkung klappt „Weitere Angaben“ beim Erfassen auf. Zugeklappt nennt der Kopf, was darin
+eingetragen ist, etwa „Weitere Angaben · 3 vegan · Bemerkung“.
+
 ### Ohne Netz
 
 Ausgaben merkt das Gerät ohne Netz vor und sendet sie nach (siehe

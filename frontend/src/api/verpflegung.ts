@@ -3,6 +3,10 @@ import type {
   AusgabeEingabe,
   Verpflegung,
   VerpflegungAusgabeErgebnis,
+  Verpflegungsstelle,
+  VerpflegungsstelleEingabe,
+  VerpflegungsstellePatch,
+  VerpflegungsstelleStatus,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
   ZeitfensterPatch,
@@ -15,7 +19,8 @@ import type {
  */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/verpflegung`;
 
-/** Alle Zeitfenster des Einsatzes, nach Beginn geordnet (Ordnung vom Server). */
+/** Alle Zeitfenster des Einsatzes, nach Beginn geordnet (Ordnung vom Server), und die
+ *  Verpflegungsstellen nach Bezeichnung (LLH-1040, keine eigene Leseroute). */
 export function ladeVerpflegung(einsatzId: number): Promise<Verpflegung> {
   return apiGet<Verpflegung>(basis(einsatzId));
 }
@@ -73,4 +78,39 @@ export function nimmAusgabeZurueck(
     'POST',
     {},
   );
+}
+
+// ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
+
+/** Legt eine Stelle `geplant` an; 409, wenn die Bezeichnung schon vergeben ist. */
+export function createStelle(
+  einsatzId: number,
+  body: VerpflegungsstelleEingabe,
+): Promise<Verpflegungsstelle> {
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen`, 'POST', body);
+}
+
+/** Teiländerung, auch einer aufgelösten Stelle; 409 bei einer stornierten. */
+export function updateStelle(
+  einsatzId: number,
+  stelleId: number,
+  body: VerpflegungsstellePatch,
+): Promise<Verpflegungsstelle> {
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', body);
+}
+
+/** In Betrieb nehmen (`aktiv`) oder auflösen (`aufgeloest`); 422 bei unzulässigem Übergang. */
+export function setStelleStatus(
+  einsatzId: number,
+  stelleId: number,
+  status: VerpflegungsstelleStatus,
+): Promise<Verpflegungsstelle> {
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}/status`, 'POST', {
+    status,
+  });
+}
+
+/** Storno einer geplanten Stelle ohne Ausgabe; sonst 422. */
+export function storniereStelle(einsatzId: number, stelleId: number): Promise<void> {
+  return apiSend<void>(`${basis(einsatzId)}/stellen/${stelleId}`, 'DELETE');
 }

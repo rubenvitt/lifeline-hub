@@ -375,3 +375,118 @@ async fn einsatzliste_laedt_labelkarten_nur_fuer_sichtbare_orgs() {
         "die Sperren gelten auch für den System-Admin"
     );
 }
+
+/// LLH-1040 D5 (Spec `eingabegrenzen`): Die Zuordnung eines Zeitfensters zu Stellen prüft und
+/// schreibt mit einer festen Zahl von Anweisungen über `json_each(?)` — 1 und 20 Stellen setzen
+/// gleich viele Statements ab, beim Anlegen wie beim Ersetzen der Menge.
+#[tokio::test]
+async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
+    use lifeline_hub::einsatz::nummer::ZEITZONE_VORGABE;
+    use lifeline_hub::verpflegung::repo::{
+        self as v, StelleEingabe, ZeitfensterAenderung, ZeitfensterEingabe,
+    };
+    use lifeline_hub::verpflegung::stelle::VerpflegungsstelleArt;
+    use lifeline_hub::verpflegung::SonderkostEingabe;
+
+    let _sperre = SPERRE.lock().await;
+    let pool = lifeline_hub::db::test_pool().await;
+    let b = org_und_benutzer(&pool, 1, "s4").await;
+    let e = einsatz(&pool, 1).await;
+    let mut conn = pool.acquire().await.unwrap();
+    let mut stellen = Vec::new();
+    for i in 0..20 {
+        let g = v::create_stelle_tx(
+            &mut conn,
+            e,
+            b,
+            &StelleEingabe {
+                bezeichnung: format!("Ausgabe {i:02}"),
+                art: VerpflegungsstelleArt::Ausgabestelle,
+                standort: None,
+                lat: None,
+                lon: None,
+                abschnitt_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        stellen.push(g.id);
+    }
+    let fenster = |stelle_ids: Vec<i64>| ZeitfensterEingabe {
+        bezeichnung: "Mittag".into(),
+        von_at: "2026-09-24 10:00:00".into(),
+        bis_at: "2026-09-24 11:30:00".into(),
+        bedarf_kraefte: 180,
+        bedarf_betreute: 70,
+        bedarf_weitere: 0,
+        sonderkost: SonderkostEingabe::default(),
+        verpflegungsart: None,
+        stelle_ids,
+    };
+
+    let (eins, sql_eins) = mitschneiden(v::zeitfenster_anlegen_tx(
+        &mut conn,
+        e,
+        b,
+        1,
+        ZEITZONE_VORGABE,
+        &fenster(vec![stellen[0]]),
+    ))
+    .await;
+    let (zwanzig, sql_zwanzig) = mitschneiden(v::zeitfenster_anlegen_tx(
+        &mut conn,
+        e,
+        b,
+        1,
+        ZEITZONE_VORGABE,
+        &fenster(stellen.clone()),
+    ))
+    .await;
+    let (eins, zwanzig) = (eins.unwrap().id, zwanzig.unwrap().id);
+    assert_eq!(
+        sql_zwanzig.len(),
+        sql_eins.len(),
+        "Anlegen: Statements wachsen mit der Zahl der Stellen: {sql_zwanzig:#?}"
+    );
+
+    // Ersetzen: beim einen Fenster 1 → 20, beim anderen 20 → 1 andere.
+    let aendern = |stelle_ids: Vec<i64>| ZeitfensterAenderung {
+        stelle_ids: Some(stelle_ids),
+        ..ZeitfensterAenderung::default()
+    };
+    let (r1, sql_1) = mitschneiden(v::zeitfenster_aendern_tx(
+        &mut conn,
+        e,
+        eins,
+        b,
+        1,
+        ZEITZONE_VORGABE,
+        &aendern(stellen.clone()),
+    ))
+    .await;
+    let (r20, sql_20) = mitschneiden(v::zeitfenster_aendern_tx(
+        &mut conn,
+        e,
+        zwanzig,
+        b,
+        1,
+        ZEITZONE_VORGABE,
+        &aendern(vec![stellen[19]]),
+    ))
+    .await;
+    assert_eq!(r1.unwrap().etb_ids.len(), 1);
+    assert_eq!(r20.unwrap().etb_ids.len(), 1);
+    assert_eq!(
+        sql_20.len(),
+        sql_1.len(),
+        "Ersetzen: Statements hängen an der Zahl der Stellen: {sql_20:#?} / {sql_1:#?}"
+    );
+    drop(conn);
+    let liste = v::liste(&pool, e).await.unwrap();
+    let je_fenster: Vec<usize> = liste
+        .zeitfenster
+        .iter()
+        .map(|z| z.stelle_ids.len())
+        .collect();
+    assert_eq!(je_fenster, vec![20, 1]);
+}

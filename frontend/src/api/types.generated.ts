@@ -551,6 +551,12 @@ export interface components {
             nachforderung_id?: number | null;
             ort?: string | null;
             sonderkost: components["schemas"]["Sonderkost"];
+            /**
+             * Format: int64
+             * @description Verpflegungsstelle, an der ausgegeben wurde (LLH-1040) — nur die Kennung; die Stelle
+             *     steht in `VerpflegungAnzeige.stellen`.
+             */
+            verpflegungsstelle_id?: number | null;
             /** Format: int64 */
             zeitfenster_id: number;
             /**
@@ -1151,7 +1157,7 @@ export interface components {
         };
         /**
          * @description Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-         *     `migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
+         *     `migrations/0208_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
          *     `austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,
          *     design.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.
          * @enum {string}
@@ -5196,6 +5202,19 @@ export interface components {
             status_id: number;
         };
         /**
+         * @description Ausgegebene Menge an einer Stelle (LLH-1040, design.md D6) — nur das Ist, kein Soll und keine
+         *     Fehlmenge je Stelle.
+         */
+        StelleIst: {
+            /** @description Summe der nicht zurückgenommenen Ausgaben an dieser Stelle, gesamt und je Kostform. */
+            ausgegeben: components["schemas"]["Portionen"];
+            /**
+             * Format: int64
+             * @description Die Stelle; fehlt beim Eintrag „ohne Stelle“ (Ausgaben ohne Stelle), der zuletzt steht.
+             */
+            stelle_id?: number | null;
+        };
+        /**
          * @description Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie
          *     [`BezirkMeldungAnzeige`].
          */
@@ -5550,9 +5569,54 @@ export interface components {
         Verkehrsart: "wechsel" | "gegen";
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
+            /**
+             * @description Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
+             *     braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
+             */
+            stellen: components["schemas"]["VerpflegungsstelleAnzeige"][];
             /** @description Nach Beginn geordnet. */
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"][];
         };
+        /**
+         * @description Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung
+         *     gilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;
+         *     keine Art (`NULL`) heißt „ohne Angabe“.
+         * @enum {string}
+         */
+        Verpflegungsart: "warm" | "kalt" | "getraenke";
+        /**
+         * @description Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne
+         *     Benutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und
+         *     keine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.
+         */
+        VerpflegungsstelleAnzeige: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            angelegt_at: string;
+            art: components["schemas"]["VerpflegungsstelleArt"];
+            /** @description Zeitpunkt der Auflösung (UTC ohne Zonenkennung), nur bei `aufgeloest`. */
+            aufgeloest_at?: string | null;
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
+            standort?: string | null;
+            status: components["schemas"]["VerpflegungsstelleStatus"];
+        };
+        /**
+         * @description Art einer Verpflegungsstelle. String = CHECK in `migrations/0206_verpflegungsstelle.sql`.
+         * @enum {string}
+         */
+        VerpflegungsstelleArt: "feldkueche" | "ausgabestelle" | "zufuehrung";
+        /**
+         * @description Status einer Verpflegungsstelle. String = CHECK in
+         *     `migrations/0206_verpflegungsstelle.sql`. `aufgeloest` ist endgültig.
+         * @enum {string}
+         */
+        VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
         /** @description Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
@@ -6024,6 +6088,15 @@ export interface components {
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Ausgegeben je Stelle (D6): jede zugeordnete Stelle (auch mit 0), danach jede weitere mit
+             *     Ausgaben, zuletzt „ohne Stelle“. Leer, wenn es weder Zuordnung noch eine Ausgabe an einer
+             *     Stelle gibt — dann zeigt das Zeitfenster nur Gesamtwerte wie bisher.
+             */
+            je_stelle: components["schemas"]["StelleIst"][];
+            /** @description Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5). */
+            stelle_ids: number[];
+            verpflegungsart?: components["schemas"]["Verpflegungsart"] | null;
             /** @description Beginn, UTC ohne Zonenkennung. */
             von_at: string;
         };
