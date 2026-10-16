@@ -98,7 +98,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `?inhalt=` auf der Meldungsseite), nie als Nachforderung; eine Ausgabe mit `nachforderung_id`
   lehnt der Server für jedes Gerät mit 403 ab. Ohne Stelle steht die Ansicht als Absender.
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
-  Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Den Einsatzleiter am
-  Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
+  Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
+  (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**
+  `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
+  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Den
+  Einsatzleiter am Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
   Einsatzweite Zähler für Meldungen und Personen bekommt kein Gerät, auch ohne Stelle
   (`modul_zaehler.rs`).
