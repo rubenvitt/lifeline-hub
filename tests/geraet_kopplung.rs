@@ -3668,6 +3668,60 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
     assert_eq!(an_geraet, 0, "keine Benachrichtigung an das Gerät");
 }
 
+/// Spec-Szenario „Abgerufene Kraft verlegen“ am Gerät (LLH-1085, tasks.md 3.5): Das Gerät eines
+/// anderen Raums holt eine abgerufene Kraft nicht per Wechsel herein (422, nichts geschrieben,
+/// sie bleibt abgerufen im alten Raum); eine nicht abgerufene Kraft holt es herein.
+#[tokio::test]
+async fn br_geraet_holt_abgerufene_kraft_nicht_per_wechsel_herein() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, schule).await;
+    let hlf = einheit_bilden(&app, &admin, einsatz, "HLF 20").await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    for e in [hlf, lf] {
+        let (s, v) = belegen(&app, &admin, einsatz, sportplatz, e, "eintritt").await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let alt = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{alt}/abruf"),
+        &admin,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": hlf})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let anzahl = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM br_belegung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+
+    let vorher = anzahl().await;
+    let (s, v) = belegen(&app, &geraet, einsatz, schule, hlf, "wechsel").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(anzahl().await, vorher, "nichts geschrieben");
+    let (_, d) = anfrage(&app, "GET", &alt, &admin, None).await;
+    let zeile = d["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == hlf)
+        .cloned()
+        .unwrap_or_else(|| panic!("HLF 20 bleibt im alten Raum: {d}"));
+    assert!(zeile["abruf"].is_object(), "bleibt abgerufen: {zeile}");
+
+    // Gegenprobe: dieselbe Buchung mit einer nicht abgerufenen Kraft gelingt.
+    let (s, v) = belegen(&app, &geraet, einsatz, schule, lf, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
 // ---------- Kräfte der UHS (LFH-1045) ----------
 
 /// Ad-hoc-Kraft im Einsatz (ohne UHS), disponiert von der Leitung; liefert die `ep_id`.
