@@ -1,7 +1,7 @@
 import { Alert, Breadcrumb, Button, Flex, Form, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
@@ -35,11 +35,15 @@ import { useGeraetDarf } from '../geraet/geraetSicht';
 import { useOnline } from '../offline/useOnline';
 import { useVorgemerkteAusgaben } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
+import { parseVerpflegungStelle } from '../routing/deeplinks';
+import { Select } from '../components/Select';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { useAusgabeNachtragen } from './useAusgabeNachtragen';
+import { liesGemerkteStelle, merkeStelle } from './stellenGedaechtnis';
+import { stellenName, stellenWahl } from './stellenKern';
 import { useAusgabeSammlung } from './useAusgabeSammlung';
 import { useNachforderungWahl } from './useNachforderungWahl';
 import {
@@ -96,12 +100,20 @@ function davon(b: Buendel): string {
  * im Seitenhinweis.
  *
  * Stab und Gerät teilen die Seite; Pfade über `useEinsatzPfade` (D1).
+ *
+ * Stelle (LLH-1040, design.md D13 Punkt 7): Am Platz `ausgabe-stelle` im Kopf steht die Wahl der
+ * Verpflegungsstelle, die zugeordneten zuerst, ohne aufgelöste, daneben das Ist der gewählten
+ * Stelle aus `je_stelle`. Vorgewählt wird in dieser Folge: `?stelle=` aus der Karte, am Desktop die
+ * gemerkte Wahl des Einsatzes (`stellenGedaechtnis`), sonst die einzige zugeordnete Stelle. Eine
+ * Hand-Wahl gilt bis zum Verlassen und wird am Desktop gemerkt, am Gerät nicht (LLH-1048). Ein
+ * Wechsel bucht das offene Bündel an der alten Stelle (`useAusgabeSammlung`).
  */
 export default function AusgabeAnsicht() {
   const { id, zeitfensterId } = useParams();
   const einsatzId = Number(id);
   const zfId = Number(zeitfensterId);
-  const { benutzer } = useAuth();
+  const { benutzer, geraet } = useAuth();
+  const [suchParameter] = useSearchParams();
   const darf = useGeraetDarf();
   const pfade = useEinsatzPfade();
   const jetzt = useUhr();
@@ -137,6 +149,35 @@ export default function AusgabeAnsicht() {
   const nachtrag = useAusgabeNachtragen(einsatzId);
 
   const zf = verpflegungQuery.data?.zeitfenster.find((z) => z.id === zfId) ?? null;
+
+  // ── Stellenwahl (LLH-1040) ─────────────────────────────────────────────────────────────
+  const stellen = verpflegungQuery.data?.stellen ?? [];
+  const amDesktop = geraet == null;
+  const wahl = stellenWahl(stellen, zf);
+  const waehlbar = [...wahl.zugeordnet, ...wahl.weitere];
+  const istWaehlbar = (sid: number | null): sid is number =>
+    sid != null && waehlbar.some((s) => s.id === sid);
+  const gemerkt = useMemo(
+    () => (amDesktop ? liesGemerkteStelle(einsatzId) : null),
+    [amDesktop, einsatzId],
+  );
+  // `undefined`: noch nicht von Hand gewählt, dann gilt die Vorwahl.
+  const [handwahl, setHandwahl] = useState<number | null | undefined>(undefined);
+  const ausKarte = parseVerpflegungStelle(suchParameter);
+  const vorwahl = istWaehlbar(ausKarte)
+    ? ausKarte
+    : istWaehlbar(gemerkt)
+      ? gemerkt
+      : wahl.zugeordnet.length === 1
+        ? wahl.zugeordnet[0].id
+        : null;
+  // Eine inzwischen aufgelöste Stelle fällt aus der Wahl.
+  const gewaehlteStelle =
+    handwahl === undefined ? vorwahl : istWaehlbar(handwahl) ? handwahl : null;
+  const waehleStelle = (sid: number | null) => {
+    setHandwahl(sid);
+    if (amDesktop) merkeStelle(einsatzId, sid);
+  };
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const vergangen = zf != null && istVergangen(zf, jetzt);
 
@@ -157,6 +198,7 @@ export default function AusgabeAnsicht() {
     einsatzId,
     zeitfenster: zf ? { id: zf.id, bezeichnung: zf.bezeichnung } : null,
     vergangen,
+    stelleId: gewaehlteStelle,
     onGebucht: (ausgabeId, b) =>
       nachtrag.zeigeGebucht(
         `Gebucht: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}${davon(b)}`,
@@ -418,8 +460,46 @@ export default function AusgabeAnsicht() {
               Buchen
             </Button>
           </Flex>
-          {/* Platz für die Stellenwahl (LLH-1040); rendert heute nichts. */}
-          <div data-lfh="ausgabe-stelle" />
+          {/* Stellenwahl (LLH-1040); ohne wählbare Stelle bleibt der Platz leer. Die Zeile bricht
+              nicht um: die Wahl nimmt den Rest, das Ist steht fest daneben. */}
+          <div data-lfh="ausgabe-stelle">
+            {waehlbar.length > 0 && (
+              <Flex
+                align="center"
+                gap={token.marginSM}
+                style={{
+                  paddingBlock: token.paddingSM,
+                  paddingInline: token.padding,
+                  borderBlockStart: `1px solid ${rollen.flaeche2}`,
+                }}
+              >
+                <Select<number | 'ohne'>
+                  aria-label="Stelle"
+                  value={gewaehlteStelle ?? 'ohne'}
+                  disabled={tastenGesperrt}
+                  onChange={(v) => waehleStelle(v === 'ohne' ? null : v)}
+                  options={[
+                    { value: 'ohne', label: 'ohne Stelle' },
+                    ...waehlbar.map((st) => ({ value: st.id, label: st.bezeichnung })),
+                  ]}
+                  style={{ flex: '1 1 0', minWidth: 0 }}
+                />
+                {gewaehlteStelle != null && (
+                  <span
+                    data-lfh="ausgabe-stelle-ist"
+                    style={{ ...einzeilig, flex: 'none', color: rollen.text2 }}
+                  >
+                    an der Stelle{' '}
+                    <span style={{ ...monoStil(13, 500), color: rollen.text }}>
+                      {zf.je_stelle.find((e) => e.stelle_id === gewaehlteStelle)?.ausgegeben
+                        .gesamt ?? 0}{' '}
+                      EP
+                    </span>
+                  </span>
+                )}
+              </Flex>
+            )}
+          </div>
         </section>
 
         {/* ── Sonderkost ───────────────────────────────────────────────────────────── */}
@@ -506,6 +586,9 @@ export default function AusgabeAnsicht() {
                 >
                   <span style={{ color: rollen.text2 }}>
                     <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                    {d.verpflegungsstelle_id != null
+                      ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
+                      : ''}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -539,6 +622,9 @@ export default function AusgabeAnsicht() {
                 >
                   <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
                     <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                    {a.verpflegungsstelle_id != null
+                      ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
+                      : ''}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -664,6 +750,7 @@ export default function AusgabeAnsicht() {
         <AusgabeDialog
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
+          stellen={stellen}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(zf as VerpflegungZeitfenster, body)}
