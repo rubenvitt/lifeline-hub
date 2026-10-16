@@ -317,8 +317,11 @@ function TagAusVorlageInhalt({
         )
       }
     >
-      {tagFeld}
-      {inhalt}
+      {/* Ein Griff für Bildlauf und e2e: Tag und Vorschau zusammen. */}
+      <div data-lfh="tag-aus-vorlage">
+        {tagFeld}
+        {inhalt}
+      </div>
     </EinsatzSeite>
   );
 }
@@ -328,8 +331,8 @@ type Bedarfsfeld = 'bedarf_kraefte' | 'bedarf_betreute';
 const ANZAHL_PFLICHT = 'Bitte eine Anzahl angeben — 0, wenn niemand';
 
 /**
- * Ein Fenster der Vorschau: Kopf mit Bezeichnung, Zeitraum und Art, rechts die Wahl; darunter
- * Einsatzkräfte und Betreute mit Vorschlag und Herkunft. Vorhanden oder in der Zeitumstellung
+ * Ein Fenster der Vorschau: Kopf mit Bezeichnung, rechts die Wahl; im Körper Zeitraum und Art,
+ * darunter Einsatzkräfte und Betreute mit Vorschlag und Herkunft. Vorhanden oder in der Zeitumstellung
  * steht statt der Wahl der Zustand, und es gibt keine Felder.
  */
 function FensterPaneel({
@@ -366,12 +369,6 @@ function FensterPaneel({
     <Paneel
       titel={name}
       ueberschrift="h2"
-      meta={
-        <span>
-          <span style={monoStil(12)}>{zeitraum}</span>
-          {art && <span> · {art}</span>}
-        </span>
-      }
       aktion={
         zustand != null ? (
           <Typography.Text type="secondary" data-lfh="tag-fenster-zustand">
@@ -388,8 +385,14 @@ function FensterPaneel({
           </Checkbox>
         )
       }
-      koerperPolster={anlegbar}
+      koerperPolster
     >
+      {/* Der Zeitraum im Körper, nicht im Meta des Kopfs: dort kürzte er bei 390 px neben der
+          Wahl mit Auslassung, und er ist die Angabe, um die es geht. */}
+      <div style={{ marginBottom: anlegbar ? token.marginSM : 0 }}>
+        <span style={monoStil(13)}>{zeitraum}</span>
+        {art && <Typography.Text type="secondary"> · {art}</Typography.Text>}
+      </div>
       {anlegbar && (
         <BedarfsFelder
           form={form}
