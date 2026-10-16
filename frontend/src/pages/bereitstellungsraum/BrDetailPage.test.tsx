@@ -1202,9 +1202,12 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     const knopf = await screen.findByRole('button', { name: 'Bearbeiten' });
     const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     expect(kopf).not.toContainElement(knopf);
+    // Zwei Datensatz-Aktionen am Raum; „Eintreffen buchen“ (LLH-1075) erfasst an der Belegung und
+    // steht hier gesperrt, es zählt nicht zum Bündeln (`frontend/AGENTS.md`, „Aktionen“).
     expect(
       within(kopf)
         .getAllByRole('button')
+        .filter((b) => !b.hasAttribute('disabled'))
         .map((b) => b.textContent),
     ).toEqual(['In Betrieb nehmen', 'Stornieren']);
   });
@@ -1855,5 +1858,74 @@ describe('BrDetailPage — Druck mit Wartezeiten (LLH-1095 D14)', () => {
     act(() => {
       window.dispatchEvent(new Event('afterprint'));
     });
+  });
+});
+
+describe('BrDetailPage — „Eintreffen buchen“ im Kopf (LLH-1075, design.md D14)', () => {
+  const GERAET_ME = {
+    id: 9,
+    anzeigename: 'BR Alpha · Tablet',
+    benutzername: 'geraet-4',
+    system_rolle: 'keiner',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-10-04',
+    totp_aktiviert: false,
+    passwort_gesetzt: false,
+    geraet: {
+      kopplung_id: 4,
+      einsatz_id: 1,
+      ansicht: 'bereitstellungsraum',
+      stelle_id: 1,
+      stelle: 'BR Alpha',
+      bezeichnung: 'Tablet',
+      laeuft_ab_at: '2026-10-05 12:00:00',
+    },
+  };
+
+  function seite(br: BrDetail, rolle: EinsatzAnzeige['meine_rolle'] = 'fuehrungspersonal') {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([einheit({ id: 30, name: 'Zug Nord' })]),
+      ),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/einheiten/zeitachse', () => HttpResponse.json([])),
+    );
+    renderBrDetail();
+  }
+
+  it('aktiv: Primärknopf öffnet den Dialog', async () => {
+    seite(brDetail({ status: 'aktiv' }));
+    const knopf = await screen.findByRole('button', { name: 'Eintreffen buchen' });
+    expect(knopf).toHaveClass('ant-btn-primary');
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Eintreffen Zug Nord' })).toBeInTheDocument();
+  });
+
+  it.each(['geplant', 'aufgeloest'] as const)(
+    '%s: gesperrt mit Kurzgrund „BR nicht in Betrieb“',
+    async (status) => {
+      seite(brDetail({ status }));
+      const knopf = await screen.findByRole('button', { name: 'Eintreffen buchen' });
+      expect(knopf).toBeDisabled();
+      expect(knopf).toHaveAccessibleDescription('BR nicht in Betrieb');
+      expect(knopf).not.toHaveClass('ant-btn-primary');
+    },
+  );
+
+  it('Beobachter: kein Knopf', async () => {
+    seite(brDetail({ status: 'aktiv' }), 'beobachter');
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Eintreffen buchen' })).toBeNull();
+  });
+
+  it('am BR-Gerät: Knopf da (Fähigkeit `br-eintreffen`)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)));
+    seite(brDetail({ status: 'aktiv' }));
+    expect(await screen.findByRole('button', { name: 'Eintreffen buchen' })).toBeEnabled();
   });
 });

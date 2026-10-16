@@ -19,8 +19,16 @@ const PLATZHALTER: Partial<Record<AdhocFeld, string>> = {
 
 const WEITERE_ANGABEN = 'weitere';
 
+const ALLE_FELDER = Object.keys(ETIKETT) as AdhocFeld[];
+
 export interface AdhocFahrzeugFelderProps {
-  /** Felder unter „Weitere Angaben“, in dieser Folge; die übrigen stehen sichtbar davor. */
+  /**
+   * Die Felder dieser Maske, in dieser Folge; Vorgabe alle fünf. „Eintreffen buchen“ (LLH-1075)
+   * nimmt nur Funkrufname, Trägerorganisation und Fahrzeugtyp.
+   */
+  felder?: readonly AdhocFeld[];
+  /** Felder unter „Weitere Angaben“, in dieser Folge; die übrigen stehen sichtbar davor. Leer:
+   *  kein Klappteil. */
   weitere: readonly AdhocFeld[];
   /** Klappteil offen? Kontrolliert, damit ein Prüffehler darin ihn öffnen kann. */
   weitereOffen: boolean;
@@ -39,13 +47,14 @@ export interface AdhocFahrzeugFelderProps {
  * geschlossenen Kopf wäre sonst unsichtbar.
  */
 export default function AdhocFahrzeugFelder({
+  felder = ALLE_FELDER,
   weitere,
   weitereOffen,
   onWeitereOffen,
 }: AdhocFahrzeugFelderProps) {
   const form = Form.useFormInstance<AdhocEingabe>();
   const werte = Form.useWatch([], form) as Partial<AdhocEingabe> | undefined;
-  const sichtbar = (Object.keys(ETIKETT) as AdhocFeld[]).filter((f) => !weitere.includes(f));
+  const sichtbar = felder.filter((f) => !weitere.includes(f));
   const feld = (f: AdhocFeld) => (
     <Form.Item
       key={f}
@@ -66,28 +75,30 @@ export default function AdhocFahrzeugFelder({
   return (
     <>
       {sichtbar.map(feld)}
-      <Collapse
-        ghost
-        activeKey={weitereOffen ? [WEITERE_ANGABEN] : []}
-        onChange={(keys) => onWeitereOffen((Array.isArray(keys) ? keys : [keys]).length > 0)}
-        items={[
-          {
-            key: WEITERE_ANGABEN,
-            label: (
-              <Space size={4} wrap>
-                <span>Weitere Angaben</span>
-                {gesetzt.length > 0 && (
-                  <Typography.Text type="secondary" data-lfh="weitere-angaben-werte">
-                    · {gesetzt.join(', ')}
-                  </Typography.Text>
-                )}
-              </Space>
-            ),
-            forceRender: true,
-            children: weitere.map(feld),
-          },
-        ]}
-      />
+      {weitere.length > 0 && (
+        <Collapse
+          ghost
+          activeKey={weitereOffen ? [WEITERE_ANGABEN] : []}
+          onChange={(keys) => onWeitereOffen((Array.isArray(keys) ? keys : [keys]).length > 0)}
+          items={[
+            {
+              key: WEITERE_ANGABEN,
+              label: (
+                <Space size={4} wrap>
+                  <span>Weitere Angaben</span>
+                  {gesetzt.length > 0 && (
+                    <Typography.Text type="secondary" data-lfh="weitere-angaben-werte">
+                      · {gesetzt.join(', ')}
+                    </Typography.Text>
+                  )}
+                </Space>
+              ),
+              forceRender: true,
+              children: weitere.map(feld),
+            },
+          ]}
+        />
+      )}
     </>
   );
 }

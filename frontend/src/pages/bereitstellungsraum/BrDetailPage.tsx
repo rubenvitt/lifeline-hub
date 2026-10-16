@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -80,6 +80,7 @@ import {
 } from './belegungZufluss';
 import { ordnungsschluessel, seitText, wartezeitMinuten } from './brBelegungKern';
 import BrVerlauf from './BrVerlauf';
+import EintreffenDialog from './EintreffenDialog';
 import dayjs from 'dayjs';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
@@ -239,6 +240,9 @@ export default function BrDetailPage() {
   });
 
   const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
+  // „Eintreffen buchen“ (LLH-1075, design.md D14): am Gerät nur mit `br-eintreffen`.
+  const [eintreffenOffen, setEintreffenOffen] = useState(false);
+  const nichtInBetriebId = useId();
 
   const zeilen = useZeilenFehler<string>();
   // Die zuletzt begonnene Belegung je Zeile: nennt eine Ablehnung, deren Zeile nicht mehr steht.
@@ -295,6 +299,7 @@ export default function BrDetailPage() {
     stornoReset();
     leereZeilen();
     setBearbeitenOffen(false);
+    setEintreffenOffen(false);
   }, [brId, statusReset, stornoReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
@@ -323,6 +328,8 @@ export default function BrDetailPage() {
   // führt seinen Raum, verwaltet ihn aber nicht.
   const bearbeitbar = verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest';
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
+  const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
+  const inBetrieb = br.status === 'aktiv';
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({
@@ -494,6 +501,24 @@ export default function BrDetailPage() {
             >
               In Betrieb nehmen
             </Button>
+          )}
+          {/* Primär nur in Betrieb: im Zustand „geplant“ ist „In Betrieb nehmen“ die Primäraktion. */}
+          {eintreffen && (
+            <>
+              <Button
+                type={inBetrieb ? 'primary' : 'default'}
+                disabled={!inBetrieb}
+                aria-describedby={inBetrieb ? undefined : nichtInBetriebId}
+                onClick={() => setEintreffenOffen(true)}
+              >
+                Eintreffen buchen
+              </Button>
+              {!inBetrieb && (
+                <Typography.Text type="secondary" id={nichtInBetriebId}>
+                  BR nicht in Betrieb
+                </Typography.Text>
+              )}
+            </>
           )}
           {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
               Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
@@ -724,6 +749,21 @@ export default function BrDetailPage() {
       {/* `offen` statt `{offen && …}`: der Dialog bleibt für die Schließanimation im Baum. Er
           hängt an `verwalten`, nicht an `bearbeitbar`: löst ein anderer Arbeitsplatz den Raum
           auf, während hier geschrieben wird, verschwände sonst die Eingabe ohne Grund. */}
+      {eintreffen && (
+        <EintreffenDialog
+          einsatzId={einsatzId}
+          br={br}
+          einheiten={einheitenQuery.data ?? []}
+          fahrzeuge={fahrzeugeQuery.data ?? []}
+          offen={eintreffenOffen}
+          onClose={() => setEintreffenOffen(false)}
+          onGebucht={(ergebnis) => {
+            // Die eigene Buchung steht sofort, auch wenn die Schleuse hält (wie `belegungMut`).
+            if (ergebnis.einheit_id != null) einheitenZufluss.merkeEigene(ergebnis.einheit_id);
+            else ergebnis.fahrzeug_ids.forEach((f) => fahrzeugeZufluss.merkeEigene(f));
+          }}
+        />
+      )}
       {verwalten && (
         <BrBearbeitenModal
           einsatzId={einsatzId}
