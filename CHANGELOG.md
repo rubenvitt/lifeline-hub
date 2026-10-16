@@ -1,3 +1,49 @@
+## [1.0.0-alpha.134](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.133...v1.0.0-alpha.134) (2026-10-16)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration bei der Ablösung:** Beim Update wird die Tabelle für Ablösungen neu aufgebaut. Sie bekommt Felder für einen beendeten Status samt Zeitpunkt, beendender Person und Grund, für die Art der Ablösung (Einheit oder Besatzung) und für die Übergabe eines Abschnitts. Neu sind außerdem Tabellen für Schichtmodelle, für das Schichtmodell eines Einsatzes und für eine Liste mehrerer Ablöser. Vor dem Update eine Sicherung anlegen.
+- **Neue Schnittstelle für Schichtmodelle:** Schichtmodelle sind Stammdaten der Organisation. Alle in der Organisation können sie lesen, nur Admins dürfen sie anlegen oder ändern. Jeder Einsatz kann eine eigene Schichtmodell-Vorgabe lesen und setzen. Die Antworten zu Ablösungen enthalten jetzt die Vorwarnzeit in Minuten und als Herkunft des Rhythmus den neuen Wert „Einsatz“.
+
+### Lagekarte
+
+- **Bereitstellungsräume als eigene Ebene:** Räume mit Standort erscheinen mit dem taktischen Zeichen „Bereitstellungsraum“. Die Beschriftung nennt Name, Stärke im Raum und Zahl der Fahrzeuge, z. B. „BR Sportplatz · 0/2/9//11 · 3 Fz“. Ein geplanter Raum hat einen gestrichelten Ring und den Zusatz „geplant“. Aufgelöste und stornierte Räume werden nicht angezeigt.
+- Räume ohne Standort stehen unter „Nicht verortet“ und lassen sich dort platzieren, so wie Betreuungsstellen.
+- Änderungen erscheinen sofort auf allen offenen Karten. Auch der gesicherte Stand der Karte zeigt die Bereitstellungsräume. Ein Klick auf einen Raum führt zu seiner Detailseite.
+- Ist das Modul „Bereitstellungsräume“ nicht freigegeben, fehlt die Ebene oder sie ist mit Begründung gesperrt.
+- Einen Raum zu verorten erzeugt keinen Eintrag im Einsatztagebuch.
+
+### Kräfte und Mittel
+
+- **Bereitstellungsräume:** Auf der Detailseite eines Raums gibt es den Knopf „Auf Karte verorten“. Hat der Raum schon einen Standort, heißt er „Auf Karte versetzen“. Der Knopf öffnet die Lagekarte direkt im Platziermodus. Er erscheint nur für Personen, die den Raum bearbeiten dürfen. Ist die Lagekarte nicht freigegeben, ist er mit Begründung gesperrt.
+- **Ablösung nach Schichtmodell:** Der Schichtrhythmus richtet sich zuerst nach dem eigenen Wert der Einheit, dann nach der Vorgabe des Abschnitts und zuletzt nach der Vorgabe des Einsatzes. Ein Schichtmodell gibt entweder einen festen Rhythmus vor oder feste Wechselzeiten (z. B. 06:00 und 18:00). Bei Wechselzeiten wird die Ablösung zum ersten Wechsel nach Schichtbeginn plus Mindestdauer fällig. Dabei zählt die Zeitzone des Einsatzes, ersatzweise die der Organisation, und die Zeitumstellung wird berücksichtigt.
+- Die Vorwarnzeit kommt jetzt aus dem Schichtmodell und ist nicht mehr fest auf 30 Minuten gesetzt. Ändert sich die Vorgabe des Einsatzes, werden laufende Schichten nach dieser Vorgabe und alle Vorwarnfristen angepasst.
+- Folgt eine Schicht der Vorgabe des Einsatzes, steht auf der Karte „Vorgabe“ statt „eigen“. In diesem Fall trägt der Rhythmus-Dialog keinen Wert vor. So wird beim Speichern ohne Änderung kein eigener Rhythmus angelegt.
+- Eine Einheit, die als Ablöser eingeplant ist, wird bei Bedarf aufgelöst, aber nicht gelöscht.
+
+### Betreuung und Verpflegung
+
+- **Empfänger bei der Ausgabe:** In der Ausgabeansicht lässt sich neben der Stelle ein Empfänger wählen. Möglich sind „ohne Empfänger“ (Standard), eine Einheit mit Funkrufname und Stärke oder ein Abschnitt als Zuführung.
+- Ist eine Einheit gewählt, zählt die Taste „+n“ ihre Ist-Stärke einschließlich aller untergeordneten Einheiten. Mit „−1“ und „Menge …“ lässt sich der Wert ändern.
+- Ein Wechsel von Empfänger oder Stelle bucht die bisher gesammelten Ausgaben auf den bisherigen Empfänger.
+- Die Wahl wird nirgends gespeichert. Der Stab und das gekoppelte Verpflegungsgerät zeigen dieselbe Ansicht.
+- **„Noch nicht verpflegt“ und „Verpflegt“:** Für jedes Zeitfenster gibt es zwei Listen:
+  - Die noch nicht verpflegten Einheiten stehen in der Reihenfolge des Kräftebaums, jeweils mit Funkrufname, Stärke und Abschnitt. Einheiten ohne Eintreffen stehen getrennt.
+  - Die verpflegten Einheiten stehen mit Menge und Uhrzeit, dazu die Zuführungen.
+
+  Eine Einheit gilt als verpflegt, wenn die Ausgabe an sie selbst oder an eine übergeordnete Einheit ging. Zurückgenommene Ausgaben zählen nicht, und eine Zuführung an einen Abschnitt verpflegt keine Einheit. Vorgemerkte Ausgaben stehen als „ausstehend“ bei ihrer Einheit. Mit „Wählen“ an einer Zeile wird die Einheit direkt zum Empfänger.
+- **„Ausgabe nachtragen“** hat ein Feld „Empfänger“. Neben Einheiten und Abschnitten lassen sich dort auch aufgelöste Einheiten wählen, für Nachträge aus der Zeit vor ihrer Auflösung. Die Menge wird mit der Stärke der Einheit vorbelegt. Eine selbst eingetippte Zahl bleibt dabei stehen. „Ort“ bzw. „Zuführungsziel“ steht jetzt unter „Weitere Angaben“.
+- Die Zeitfensterkarte und „Letzte Buchungen“ nennen bei jeder Ausgabe den Empfänger, z. B. „an 2. Gruppe“ oder „Zuführung Deich“. Der Bereich „Einheiten“ zeigt in der Überschrift, wie viele Einheiten noch nicht verpflegt, ohne Eintreffen oder verpflegt sind.
+
+### Verwaltung
+
+- **Schichtmodelle in den Stammdaten:** Ein Schichtmodell gibt einen festen Rhythmus oder feste Wechselzeiten vor. Die Vorwarnung ist standardmäßig 30 Minuten, der Planungsvorlauf 120 Minuten. Jede Organisation hat höchstens eine Vorgabe, und jede Bezeichnung darf nur einmal vorkommen. Ein neuer Einsatz übernimmt die Vorgabe der Organisation als Kopie. Diese Kopie kann der Einsatz übernehmen, mit eigenen Werten anpassen oder entfernen.
+- **Demo-Daten:** Der Import legt das Schichtmodell „12-h-Schicht Hochwasser“ an: Wechsel um 06:00 und 18:00, Mindestdauer 4 Stunden. Es wird nie zur Vorgabe der Organisation. Hat die Organisation keine eigene Vorgabe, bekommt der Demo-Einsatz dieses Modell als Vorgabe. Beim Entfernen der Demo-Daten wird es mitgelöscht.
+
+### Dokumentation
+
+- Das Handbuch hat neue Abschnitte zu Bereitstellungsräumen auf der Lagekarte, zu Empfängern und zu „Noch nicht verpflegt“ in der Verpflegung (auch am gekoppelten Gerät) und zur Schichtmodell-Vorgabe bei der Ablösung. Die Bilder dazu sind neu erstellt.
+
 ## [1.0.0-alpha.133](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.132...v1.0.0-alpha.133) (2026-10-16)
 
 ### Verpflegung
