@@ -92,7 +92,12 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Den Verlauf
   des eigenen Raums liest das Gerät mit (`…/bereitstellungsraeume/{bid}/verlauf`, Spec
   `funktionsansichten`, LLH-1095), erst beim Aufklappen (`pages/bereitstellungsraum/BrVerlauf.tsx`);
-  ein Wechsel nennt den anderen Raum mit Bezeichnung, dessen Detail und Verlauf bleiben 404. Meldungen an
+  ein Wechsel nennt den anderen Raum mit Bezeichnung, dessen Detail und Verlauf bleiben 404.
+  `br-eintreffen` (LLH-1075, design.md D14, nur Ansicht `bereitstellungsraum`) öffnet
+  „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
+  ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
+  Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Die Suche kennt nur
+  Kräfte des Einsatzes, keine Stammdaten. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
 - **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte
