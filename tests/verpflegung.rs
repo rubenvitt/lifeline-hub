@@ -2370,7 +2370,8 @@ fn stammdaten_ereignisse(
 }
 
 /// Spec `org-live`, „Ereignis für die Stammdaten“: Anlegen und Deaktivieren melden
-/// `stammdaten` an die eigene Organisation, Lesen und abgelehnte Anfragen nicht.
+/// `stammdaten` an die eigene Organisation, Lesen und abgelehnte Anfragen nicht; das Schreiben
+/// einer zweiten Organisation meldet an diese.
 #[tokio::test]
 async fn verpflegungsplan_meldet_stammdaten_nur_nach_erfolg() {
     let (app, pool, live) = setup_mit_pool_und_live().await;
@@ -2398,13 +2399,15 @@ async fn verpflegungsplan_meldet_stammdaten_nur_nach_erfolg() {
 
     let (s, _) = anfrage(&app, "GET", PLAN, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
-    mahlzeit(
+    assert_eq!(stammdaten_ereignisse(&mut rx, org), 0, "GET");
+    let (s, _) = mahlzeit(
         &app,
         &admin,
         r#"{"bezeichnung":"Abendessen","beginn":"18:00","ende":"19:30"}"#,
     )
     .await;
-    stammdaten_ereignisse(&mut rx, org);
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(stammdaten_ereignisse(&mut rx, org), 1, "POST Abendessen");
     for (s, fall) in [
         (
             mahlzeit(
@@ -2446,6 +2449,23 @@ async fn verpflegungsplan_meldet_stammdaten_nur_nach_erfolg() {
         assert!(s.is_client_error(), "{fall}: {s}");
         assert_eq!(stammdaten_ereignisse(&mut rx, org), 0, "{fall}");
     }
+
+    // Eine zweite Organisation: ihr Schreiben meldet an sie, nicht an die erste.
+    let (org_b, _) = fremde_org_anlegen(&pool, "Org B", "bert", "bertpw123", "keine").await;
+    assert_ne!(org_b, org);
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE benutzername = 'bert'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let bert = login_cookie(&app, "bert", "bertpw123").await;
+    let (s, _) = mahlzeit(
+        &app,
+        &bert,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(stammdaten_ereignisse(&mut rx, org_b), 1, "Org B");
 }
 
 // ── Tag aus der Vorlage (LLH-1058) ──────────────────────────────────────────────────────────
