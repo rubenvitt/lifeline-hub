@@ -189,8 +189,11 @@ pub fn leite_status_ab(
     }
 }
 
-const SELECT_AUFGELOEST: &str = concat!(
-    "\
+// Ein einziges Literal statt `concat!`: Der Zustandswächter (`entlassung::tests`) prüft die
+// Konstante erst im zusammengesetzten `{SELECT_AUFGELOEST} WHERE …`. Die beiden Kennzeichen sind
+// deshalb ausgeschrieben; `kennzeichen_gleichen_den_makros` hält sie gleich mit
+// `nicht_uebernommen_seit_sql!` und `unangemeldet_sql!`.
+const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
            e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.funkrufname, \
@@ -203,17 +206,16 @@ const SELECT_AUFGELOEST: &str = concat!(
            e.status_seit, hs.id AS hand_status_id, hs.label AS hand_status_label, \
            hs.kategorie AS hand_status_kategorie, hs.farbe AS hand_status_farbe, \
            hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier, \
-           e.aufgeloest_at, e.aufgeloest_von, ",
-    super::nicht_uebernommen_seit_sql!(),
-    " AS nicht_uebernommen_seit, ",
-    super::unangemeldet_sql!(),
-    " AS unangemeldet \
+           e.aufgeloest_at, e.aufgeloest_von, \
+           CASE WHEN e.uebernahme_offen_seit IS NOT NULL AND e.uebernommen_at IS NULL \
+              AND e.aufgeloest_at IS NULL THEN e.uebernahme_offen_seit END \
+             AS nicht_uebernommen_seit, \
+           (e.uebernahme_offen_seit IS NOT NULL) AS unangemeldet \
     FROM einsatz_einheit e \
     LEFT JOIN einheit_typ t ON t.id = e.typ_id \
     LEFT JOIN fahrzeug_status hs ON hs.id = e.status_id \
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
-    LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id"
-);
+    LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
 /// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, eigene Stärke, Sprechgruppen
 /// und Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
@@ -1372,6 +1374,27 @@ pub async fn aufloesen(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Die ausgeschriebenen Kennzeichen in `SELECT_AUFGELOEST` gleichen den Makros, die auch
+    /// die Belegung des Bereitstellungsraums nutzt.
+    #[test]
+    fn kennzeichen_gleichen_den_makros() {
+        let flach = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        let select = flach(SELECT_AUFGELOEST);
+        for (makro, alias) in [
+            (
+                super::super::nicht_uebernommen_seit_sql!(),
+                "nicht_uebernommen_seit",
+            ),
+            (super::super::unangemeldet_sql!(), "unangemeldet"),
+        ] {
+            let erwartet = format!("{} AS {alias}", flach(makro));
+            assert!(
+                select.contains(&erwartet),
+                "fehlt in SELECT_AUFGELOEST: {erwartet}"
+            );
+        }
+    }
 
     // ── Ableitung des Einheitenstatus ──────────────────────────────────────────────
 
