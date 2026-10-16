@@ -322,21 +322,34 @@ impl EinsatzVorgabe {
     }
 }
 
-/// Die wirksame Zone eines Einsatzes: seine Einstellung, sonst die der Organisation, sonst
-/// Europe/Berlin (`einsatz::nummer::zone_oder_vorgabe`, auch für einen unbekannten Namen).
+/// Die wirksame Zone eines Einsatzes: die erste gültige aus seiner Einstellung und der der
+/// Organisation, sonst Europe/Berlin (`einsatz::nummer::ZEITZONE_VORGABE`). Jeder Name wird
+/// für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige der
+/// Organisation (Review PR #833).
 async fn zone_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Tz, AppError> {
-    let name: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(NULLIF(TRIM(ee.zeitzone), ''), NULLIF(TRIM(oe.zeitzone), '')) \
-         FROM einsatz e \
+    let namen: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT ee.zeitzone, oe.zeitzone FROM einsatz e \
          LEFT JOIN einsatz_einstellungen ee ON ee.einsatz_id = e.id \
          LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
     )
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
-        name.flatten().as_deref(),
-    ))
+    let (einsatz, org) = namen.unwrap_or_default();
+    Ok([einsatz, org]
+        .into_iter()
+        .flatten()
+        .find_map(|name| {
+            let zone = name.trim().parse::<Tz>().ok();
+            if zone.is_none() && !name.trim().is_empty() {
+                tracing::warn!(
+                    zeitzone = name,
+                    "Unbekannte Zeitzone für die Ablösung übergangen"
+                );
+            }
+            zone
+        })
+        .unwrap_or(crate::einsatz::nummer::ZEITZONE_VORGABE))
 }
 
 pub(crate) async fn load_einsatz_vorgabe_tx(

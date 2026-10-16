@@ -1223,3 +1223,40 @@ async fn entfernte_wechselzeiten_vorgabe_laesst_die_faelligkeit_stehen() {
         ]
     );
 }
+
+/// Eine ungültige Zone des Einsatzes verdrängt keine gültige der Organisation; die erste
+/// gültige gilt, sonst Europe/Berlin.
+#[tokio::test]
+async fn ungueltige_einsatzzone_verdraengt_die_org_zone_nicht() {
+    let w = welt().await;
+    let zone = |pool: SqlitePool, e: i64| async move {
+        let mut conn = pool.acquire().await.unwrap();
+        zone_tx(&mut conn, e).await.unwrap()
+    };
+    let setze = |pool: SqlitePool, sql: &'static str, wert: Option<&'static str>, id: i64| async move {
+        sqlx::query(sql)
+            .bind(id)
+            .bind(wert)
+            .execute(&pool)
+            .await
+            .unwrap();
+    };
+    const EINSATZ: &str = "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone";
+    const ORG: &str = "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone";
+
+    setze(w.pool.clone(), EINSATZ, Some("MEZ"), w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Berlin);
+    setze(w.pool.clone(), ORG, Some("UTC"), 1).await;
+    assert_eq!(
+        zone(w.pool.clone(), w.e).await,
+        chrono_tz::UTC,
+        "ungültige Einsatzzone → gültige Org-Zone"
+    );
+    setze(w.pool.clone(), EINSATZ, Some("Europe/Vienna"), w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Vienna);
+    setze(w.pool.clone(), ORG, Some("Mond/Basis"), 1).await;
+    setze(w.pool.clone(), EINSATZ, None, w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Berlin);
+}
