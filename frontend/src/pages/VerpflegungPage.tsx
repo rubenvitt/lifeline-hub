@@ -418,9 +418,12 @@ export default function VerpflegungPage() {
       }
     >
       {/* Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen. Das
-          Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. */}
+          Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. Schmal steht nur `marginXS`
+          zwischen Leiste und Banner: drei Segmente à 72 px und „1 neu“ ließen im Handschuh-Betrieb
+          sonst 2 px Luft, zu wenig für abweichende Schriftmetrik (LLH-1040,
+          `e2e/gate1-ueberlauf.spec.ts`). Das Banner trägt eigenen Grund und eigene Kante. */}
       <Flex
-        gap={token.marginSM}
+        gap={istSchmal ? token.marginXS : token.marginSM}
         align="center"
         data-lfh="verpflegung-werkzeugzeile"
         style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
