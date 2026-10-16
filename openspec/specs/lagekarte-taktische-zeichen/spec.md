@@ -35,6 +35,10 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
   (sonstige) oder Betreuung (Betreuungsstelle). Die Stelle trägt die Organisation des Betreibers,
   also die Organisations-Vorgabe des Hubs. Ist keine hinterlegt, MUST sie ohne Organisation
   stehen und MUST NOT fest als Hilfsorganisation erscheinen.
+- **Bereitstellungsraum**: das Führungszeichen D.2.1 „Bereitstellungsraum“ (gelbe Ortsfläche mit
+  Bereitstellungsrahmen), freistehend und ohne Organisation, für jeden Raum dasselbe. Ein
+  geplanter Raum MUST zusätzlich einen gestrichelten Ring um das Zeichen tragen; die Bibliothek
+  kennt keine gestrichelte Fassung des Zeichens.
 
 #### Scenario: Rettungswagen
 - **WHEN** ein Fahrzeug des Typs „RTW“ einer Hilfsorganisation auf der Karte steht
@@ -59,6 +63,10 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 #### Scenario: Betreuungsstelle ohne Organisations-Vorgabe
 - **WHEN** der Hub keine Organisations-Vorgabe hat und eine Betreuungsstelle auf der Karte steht
 - **THEN** zeigt ihr Zeichen die Stelle ohne Organisation mit dem Betreuungszeichen
+
+#### Scenario: Bereitstellungsraum
+- **WHEN** ein verorteter Bereitstellungsraum auf der Karte steht
+- **THEN** zeigt sein Zeichen das Führungszeichen „Bereitstellungsraum“, im Status „geplant“ mit gestricheltem Ring
 
 #### Scenario: Schaden mit großem Ausmaß
 - **WHEN** ein Schaden mit Ausmaß „groß“ verortet ist
