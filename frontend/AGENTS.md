@@ -330,7 +330,9 @@ Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/
 `src/fuehrung/`): `frontend/src/fuehrung/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
 **Kräfte-Zeitachse** (Einsatzdauer im Meldebild, Personal und Einheit-Detail; auch
-`src/zeitachse/`, Status-Kataloge mit `zeitachse_marke`): `frontend/src/kraefte/AGENTS.md`.
+`src/zeitachse/`, Status-Kataloge mit `zeitachse_marke`) und **Ablösung** (Rangfolge,
+Vorwarnung aus dem DTO, Schichtmodelle; auch `abloesung/`, `src/schichtmodell/`):
+`frontend/src/kraefte/AGENTS.md`.
 
 ## Frontend — Bedien-Leitlinie (Einsatzkontexte)
 

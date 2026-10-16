@@ -334,9 +334,11 @@ nachlesbar sein.
 
 Die Karte einer Schicht SHALL die Fälligkeit in einer Zeitspalte zeigen, die das breiteste
 Zeitformat (Tag und Uhrzeit) fasst, sodass Tageszeit und Tageswechsel weder Spaltenbreite noch
-Umbruch ändern. Der Rhythmus MUST in einer eigenen Zeile stehen, die Quelle als „Vorgabe“ oder
-„eigen“. Ändert eine andere Person den Rhythmus einer gezeigten Schicht, MUST die Karte ihre
-Höhe behalten, solange die Zeile mindestens 226 px Platz für Text hat.
+Umbruch ändern. Der Rhythmus MUST in einer eigenen, einzeiligen Zeile stehen, als Dauer mit der
+Quelle „eigen“, „Vorgabe“ (des Abschnitts) oder „Vorgabe Einsatz“; reicht der Platz nicht, kürzt
+sie nur das Quellenwort mit „…“. Ändert eine andere Person den Rhythmus einer gezeigten
+Schicht, MUST die Karte ihre Höhe behalten, solange die Zeile mindestens 226 px Platz für Text
+hat.
 
 #### Scenario: Fremde Rhythmusänderung kurz vor Mitternacht, mobil
 - **WHEN** um 23:40 (Anzeigezone Europe/Berlin) auf 390 px Breite in der Dichte `komfortabel` drei Schichten mit 6 h gezeigt werden und eine andere Person den Rhythmus der mittleren auf 30 min setzt
@@ -347,8 +349,74 @@ Höhe behalten, solange die Zeile mindestens 226 px Platz für Text hat.
 - **THEN** ist die Zeitspalte der Karten in beiden Fällen gleich breit
 
 #### Scenario: Längster zulässiger Rhythmus bleibt einzeilig
-- **WHEN** eine Schicht einen Rhythmus von 167 h 59 min als Vorgabe des Abschnitts trägt und die Karte auf 390 px Breite in der Dichte `komfortabel` oder `handschuh` steht
-- **THEN** steht „Rhythmus 167 h 59 min (Vorgabe)“ in einer Zeile
+- **WHEN** eine Schicht einen Rhythmus von 167 h 59 min als Vorgabe des Einsatzes trägt und die Karte auf 390 px Breite in der Dichte `komfortabel` oder `handschuh` steht
+- **THEN** steht die Zeile „Rhythmus 167:59 h (Vorgabe Einsatz)“ einzeilig, der Wert „Rhythmus 167:59 h“ ganz sichtbar und der ganze Text im Titel
+
+### Requirement: Schichtmodelle in der Verwaltung
+
+Die Verwaltung SHALL unter „Stammdaten“ einen Bereich „Schichtmodelle“ führen: eine Tabelle mit
+Bezeichnung, Regel, Vorwarnung und Planungsvorlauf, Vorgabe- und Demo-Marke. Ein Admin MUST Modelle anlegen, ändern, nach Rückfrage löschen und mit
+einem Handgriff zur Vorgabe der Organisation machen oder deren Vorgabe aufheben können. Ohne
+Admin-Recht MUST der Bereich den Grund nennen und das Anlegen gesperrt zeigen. Er MUST über das
+Org-Ereignis `stammdaten` live bleiben.
+
+#### Scenario: Vorgabe der Organisation wechseln
+- **WHEN** „Sanitätsdienst“ die Vorgabe der Organisation ist und ein Admin bei „Hochwasser“ „Als Vorgabe setzen“ wählt
+- **THEN** sendet die Oberfläche zuerst „Sanitätsdienst“ ohne Vorgabe und dann „Hochwasser“ als Vorgabe, jeweils mit dem ganzen Satz
+
+#### Scenario: Zweiter Schritt scheitert
+- **WHEN** beim Wechsel das Setzen der neuen Vorgabe abgelehnt wird
+- **THEN** stellt die Oberfläche die bisherige Vorgabe wieder her und nennt den Grund
+
+### Requirement: Schichtmodell in der Einsatzanlage
+
+Der Dialog „Neuen Einsatz anlegen“ SHALL die Vorgabe der Organisation als Zeile
+„Schichtmodell: <Bezeichnung> (Vorgabe)“ nennen, ohne eigenes Feld. Ohne Vorgabe der
+Organisation MUST die Zeile fehlen.
+
+#### Scenario: Zeile in der Einsatzanlage
+- **WHEN** die Organisation „12-h-Schicht“ als Vorgabe führt und jemand „Neuen Einsatz anlegen“ öffnet
+- **THEN** steht im Dialog „Schichtmodell: 12-h-Schicht (Vorgabe)“, und der Dialog hat weiter fünf Felder
+
+### Requirement: Vorgabe des Einsatzes in den Einstellungen
+
+Die Einsatz-Einstellungen SHALL einen Reiter „Ablösung“ führen, der die Vorgabe des Einsatzes
+zeigt (Bezeichnung, Regel, Vorwarnung, Planungsvorlauf, laufende Schichten). Mit den Rechten der
+Abschnittsvorgabe MUST er ein Modell der Organisation übernehmen, eigene Werte setzen und die
+Vorgabe entfernen lassen; Entfernen MUST über „Rückgängig“ mit den alten Werten umkehrbar sein.
+Ohne Freigabe des Moduls Ablösung MUST der Reiter das sagen, statt die Vorgabe abzufragen.
+
+#### Scenario: Modell übernehmen
+- **WHEN** die Einsatzleitung im Reiter „Ablösung“ „Sanitätsdienst“ wählt und „Übernehmen“ wählt
+- **THEN** sendet die Oberfläche `schichtmodell_id` und zeigt danach „Rhythmus 6 h“
+
+#### Scenario: Entfernen und zurücknehmen
+- **WHEN** die Einsatzleitung „Vorgabe entfernen“ wählt und danach im Hinweis „Rückgängig“
+- **THEN** ist die alte Vorgabe mit denselben Werten wieder gesetzt
+
+### Requirement: Dauern und Einsatzvorgabe auf der Seite Ablösung
+
+Dauern SHALL als „8 h“, „7:30 h“ oder „45 min“ erscheinen und so vorbelegt werden, nie mit
+Dezimalpunkt; Wechselzeiten taktisch („0600/1800“). Die Seite Ablösung MUST die Vorgabe des
+Einsatzes zeigen und sie in „Schicht beginnen“ und „Rhythmus ändern“ als letzte Stufe der
+Rangfolge nennen: ohne Vorgabe des Abschnitts als Platzhalter, und das Rhythmusfeld darf leer
+bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rechnen.
+
+#### Scenario: Einsatzvorgabe als Platzhalter
+- **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit 12 h hat und eine Schicht für eine Einheit ohne Abschnittsvorgabe beginnen soll
+- **THEN** zeigt das Rhythmusfeld „12 h (Vorgabe Einsatz)“, ist kein Pflichtfeld und sendet leer keinen Rhythmus
+
+#### Scenario: Dauer statt Dezimalzahl
+- **WHEN** eine Schicht einen eigenen Rhythmus von 450 min hat und jemand „Rhythmus ändern“ öffnet
+- **THEN** steht im Feld „7:30 h“
+
+#### Scenario: Eingabe einer Dauer
+- **WHEN** jemand „8“, „7:30“, „7,5“ oder „90 min“ einträgt
+- **THEN** gelten 480, 450, 450 bzw. 90 Minuten, und Unlesbares lehnt das Feld ab, ohne zu senden
+
+#### Scenario: Vorwarnung aus der Schicht
+- **WHEN** eine laufende Schicht in 50 min fällig ist und `vorwarnung_minuten: 60` meldet
+- **THEN** zählt der Modulzähler sie als fällig, ohne neuen Abruf
 
 ### Requirement: Hinweis in der AlarmZentrale
 
