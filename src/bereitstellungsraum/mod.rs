@@ -194,6 +194,20 @@ pub struct BrBelegungKennzahlen {
     pub laengste_seit_at: Option<String>,
 }
 
+/// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
+/// Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
+/// `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus [`repo::list_eintraege`] (LLH-1107,
+/// design.md D10).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BrListenEintrag {
+    #[serde(flatten)]
+    pub br: BrAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_name: Option<String>,
+    pub belegung: BrBelegungKennzahlen,
+    pub einheit_ids: Vec<i64>,
+}
+
 wire_enum! {
     /// Art eines Eintrags im Verlauf eines Raums (LLH-1095, design.md D5). Anders als
     /// [`BrBelegungsArt`] aus Sicht des gelesenen Raums: ein `wechsel` ist für den Zielraum

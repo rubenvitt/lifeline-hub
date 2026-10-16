@@ -1,4 +1,4 @@
-use super::{darf_uebergehen, BrAnzeige};
+use super::{belegung_repo, darf_uebergehen, BrAnzeige, BrListenEintrag};
 use crate::error::AppError;
 use crate::routes::support::pruefe_koordinate;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -65,6 +65,47 @@ pub async fn liste(
     .bind(abschnitt_id)
     .fetch_all(pool)
     .await?)
+}
+
+/// Filter der Liste: Status und Abschnitt, beide optional.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ListenFilter<'a> {
+    pub status: Option<&'a str>,
+    pub abschnitt_id: Option<i64>,
+}
+
+/// Die Räume eines Einsatzes (ohne stornierte) als Listeneinträge: Raum, Abschnittsname,
+/// Kennzahlen der Belegung und die Einheiten im Raum (LLH-1095). Eine feste Zahl Abfragen für alle
+/// Räume. Die Liste der Route und der Lage-Snapshot lesen sie hier (LLH-1107, design.md D10); die
+/// Stellenbindung eines Geräts filtert die Route danach.
+pub async fn list_eintraege(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: ListenFilter<'_>,
+) -> Result<Vec<BrListenEintrag>, AppError> {
+    let zeilen = liste(pool, einsatz_id, filter.status, filter.abschnitt_id).await?;
+    let mut kennzahlen = belegung_repo::kennzahlen_je_raum(pool, einsatz_id, None).await?;
+    let einheiten: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT aktueller_br_id, id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aktueller_br_id IS NOT NULL AND aufgeloest_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|z| BrListenEintrag {
+            belegung: kennzahlen.remove(&z.br.id).unwrap_or_default(),
+            einheit_ids: einheiten
+                .iter()
+                .filter(|(raum, _)| *raum == z.br.id)
+                .map(|(_, id)| *id)
+                .collect(),
+            abschnitt_name: z.abschnitt_name,
+            br: z.br,
+        })
+        .collect())
 }
 
 /// Lädt einen BR (auch stornierte) eines Einsatzes; `NotFound`, falls er nicht

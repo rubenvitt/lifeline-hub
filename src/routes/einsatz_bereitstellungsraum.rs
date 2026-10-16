@@ -7,7 +7,8 @@ use crate::bereitstellungsraum::eintreffen::{
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{
     BrAbrufAufhebenEingabe, BrAbrufEingabe, BrAbrufErgebnis, BrAbrufKurz, BrAnzeige,
-    BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
+    BrBelegungAnzeige, BrBelegungKennzahlen, BrListenEintrag, BrStatus, BrVerlaufEintrag,
+    ObjektTyp,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
@@ -81,19 +82,6 @@ pub struct BrFahrzeugKurz {
     /// Wie [`BrEinheitKurz::abruf`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abruf: Option<BrAbrufKurz>,
-}
-
-/// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
-/// Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-/// `summiereStaerke`).
-#[derive(Debug, Serialize, ToSchema)]
-pub struct BrListenEintrag {
-    #[serde(flatten)]
-    pub br: BrAnzeige,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub abschnitt_name: Option<String>,
-    pub belegung: BrBelegungKennzahlen,
-    pub einheit_ids: Vec<i64>,
 }
 
 // ---------- ETB-/SSE-Helfer ----------
@@ -254,41 +242,20 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter BR-Status im Filter",
     )?;
-    let mut liste = br_repo::liste(
+    let mut liste = br_repo::list_eintraege(
         &state.pool,
         einsatz_id,
-        params.status.as_deref(),
-        params.abschnitt_id,
+        br_repo::ListenFilter {
+            status: params.status.as_deref(),
+            abschnitt_id: params.abschnitt_id,
+        },
     )
     .await?;
     // Stellenbindung (LFH-1042): ein BR-Gerät kennt nur seinen eigenen Raum, jedes andere Gerät
     // keinen.
     let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum);
     liste.retain(|z| sicht.sieht(z.br.id));
-    let mut kennzahlen = belegung_repo::kennzahlen_je_raum(&state.pool, einsatz_id, None).await?;
-    let einheiten: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT aktueller_br_id, id FROM einsatz_einheit \
-         WHERE einsatz_id = ? AND aktueller_br_id IS NOT NULL AND aufgeloest_at IS NULL \
-         ORDER BY id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(
-        liste
-            .into_iter()
-            .map(|z| BrListenEintrag {
-                belegung: kennzahlen.remove(&z.br.id).unwrap_or_default(),
-                einheit_ids: einheiten
-                    .iter()
-                    .filter(|(raum, _)| *raum == z.br.id)
-                    .map(|(_, id)| *id)
-                    .collect(),
-                abschnitt_name: z.abschnitt_name,
-                br: z.br,
-            })
-            .collect(),
-    ))
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
