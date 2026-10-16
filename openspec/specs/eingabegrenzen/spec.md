@@ -293,3 +293,7 @@ Gespeicherte Werte über der Grenze MUST lesbar bleiben.
 #### Scenario: Replay einer alten Ausgabe mit langem Ort
 - **WHEN** eine Ausgabe mit einem Ort von 600 Zeichen vor Einführung der Grenze gespeichert wurde und dieselbe Ausgabe mit ihrer `client_id` erneut eintrifft
 - **THEN** antwortet der Server mit 201 und der gespeicherten Ausgabe, nicht mit 400
+
+#### Scenario: Maske der Stelle
+- **WHEN** eine Person im Dialog einer Verpflegungsstelle mehr als 200 Zeichen als Bezeichnung eingibt
+- **THEN** sendet die Maske den Wert nicht und kürzt ihn nicht still

@@ -74,7 +74,9 @@ Bearbeitung, eine falsche Ausgabe wird zurückgenommen. Das System MUST einen Ze
 des Zeitfensters annehmen (Anlieferung vor Beginn). Die Oberfläche SHALL Ausgaben auf zwei Wegen
 erfassen: durch Zählen in der Ausgabeansicht (Requirement „Ausgabe zählen“) und über das
 Formular „Ausgabe nachtragen“ mit Menge, Zeitpunkt, Ort, Sonderkost, Nachforderung und
-Bemerkung. Nach einer gesendeten Erfassung MUST die Oberfläche einen Hinweis mit „Rückgängig“
+Bemerkung. Gibt es im Einsatz Verpflegungsstellen, MUST die Oberfläche die Stelle zur Wahl anbieten
+und das Feld Ort nur ohne gewählte Stelle zeigen, dann als „Zuführungsziel“. Nach einer gesendeten
+Erfassung MUST die Oberfläche einen Hinweis mit „Rückgängig“
 zeigen. Ein neuer Hinweis MUST den vorigen ersetzen.
 
 #### Scenario: Ausgabe erfassen
@@ -100,6 +102,14 @@ zeigen. Ein neuer Hinweis MUST den vorigen ersetzen.
 #### Scenario: Nachtragen in der Vergangenheit
 - **WHEN** eine Person über „Ausgabe nachtragen“ zum vergangenen Zeitfenster „Frühstück“ 40 EP mit Zeitpunkt 07:30 erfasst
 - **THEN** ist die Ausgabe mit dem Zeitpunkt 07:30 gespeichert und zählt in die ausgegebene Menge von „Frühstück“
+
+#### Scenario: Stelle statt Ort
+- **WHEN** im Einsatz Verpflegungsstellen bestehen und eine Person im Dialog eine Stelle wählt
+- **THEN** zeigt der Dialog kein Feld für den Ort, und die Ausgabe wird mit der Stelle und ohne Ort gesendet
+
+#### Scenario: Zuführungsziel ohne Stelle
+- **WHEN** im Einsatz Verpflegungsstellen bestehen und eine Person im Dialog keine Stelle wählt
+- **THEN** bietet der Dialog das Feld „Zuführungsziel“ an, das als Ort der Ausgabe gespeichert wird
 
 ### Requirement: Ausgabe zurücknehmen
 
@@ -286,14 +296,20 @@ Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen.
 - **WHEN** eine Verpflegungsstelle angelegt, geändert, im Status gewechselt oder storniert wird
 - **THEN** löst das System nach dem Commit ein Ereignis `verpflegung` aus, dessen Nutzlast nur Kennungen trägt
 
+#### Scenario: Zweiter Client sieht die neue Stelle
+- **WHEN** Client A eine Verpflegungsstelle anlegt oder auflöst, während Client B die Ansicht „Stellen“ desselben Einsatzes geöffnet hat
+- **THEN** zeigt Client B die Stelle bzw. ihren neuen Status ohne Neuladen
+
 ### Requirement: Anzeige im Modul
 
 Die Seite des Moduls SHALL die Zeitfenster nach Beginn geordnet zeigen, getrennt in
 „laufend und anstehend“ und „vergangen“ (Ende vor dem aktuellen Zeitpunkt). Jedes
-Zeitfenster zeigt Bezeichnung, Zeitraum, Gesamtbedarf mit Aufteilung, ausgegebene Menge,
-Fehlmenge, Einstufung, die Sonderkost mit Bedarf, Ausgabe und Fehlmenge je belegter Kostform
-sowie seine Ausgaben mit Zeitpunkt, Ort und Menge. Zahlen und Zeiten MUST in Monospace mit
-tabellarischen Ziffern stehen. Mit Schreibrecht MUST ein laufendes oder anstehendes Zeitfenster
+Zeitfenster zeigt Bezeichnung, Verpflegungsart (wenn gesetzt), Zeitraum, Gesamtbedarf mit
+Aufteilung, ausgegebene Menge, Fehlmenge, Einstufung, die Sonderkost mit Bedarf, Ausgabe und
+Fehlmenge je belegter Kostform sowie seine Ausgaben mit Zeitpunkt, Stelle oder Ort und Menge. Ist
+die Aufstellung je Stelle nicht leer, MUST das Zeitfenster die ausgegebene Menge je Stelle zeigen,
+mit „aufgelöst“ bzw. „nicht zugeordnet“ an den betroffenen Stellen und „ohne Stelle“ zuletzt.
+Zahlen und Zeiten MUST in Monospace mit tabellarischen Ziffern stehen. Mit Schreibrecht MUST ein laufendes oder anstehendes Zeitfenster
 den Sprung „Ausgabe öffnen“ in seine Ausgabeansicht tragen. Jedes Zeitfenster MUST mit
 Schreibrecht die Aktion „Ausgabe nachtragen“ tragen, auch ein vergangenes. Ein vergangenes
 Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
@@ -317,6 +333,14 @@ Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
 #### Scenario: Ohne Schreibrecht kein Sprung
 - **WHEN** eine Person ohne Schreibrecht die Seite des Moduls öffnet
 - **THEN** trägt kein Zeitfenster „Ausgabe öffnen“ oder „Ausgabe nachtragen“
+
+#### Scenario: Ausgegeben je Stelle
+- **WHEN** das Zeitfenster „Mittag“ an der Feldküche 100 EP und an der Turnhalle 80 EP ausgegeben hat
+- **THEN** zeigt seine Karte beide Stellen mit ihrer Menge und darüber wie bisher die Fehlmenge des Zeitfensters
+
+#### Scenario: Bestand ohne Stelle
+- **WHEN** ein Zeitfenster keiner Stelle zugeordnet ist und keine Ausgabe an einer Stelle hat
+- **THEN** zeigt seine Karte keine Aufstellung je Stelle und die Ausgaben mit ihrem Ort wie bisher
 
 ### Requirement: Schwärzung
 
@@ -622,6 +646,38 @@ Ein Zeitfenster ohne Art MUST sich wie bisher verhalten.
 #### Scenario: Unbekannte Art
 - **WHEN** ein Zeitfenster mit einer unbekannten Verpflegungsart angelegt wird
 - **THEN** antwortet das System mit 400 und legt nichts an
+
+### Requirement: Stellen im Modul
+
+Die Seite des Moduls SHALL neben den Ansichten „laufend und anstehend“ und „vergangen“ eine
+Ansicht „Stellen“ in derselben Umschaltleiste führen. Sie MUST je Stelle Bezeichnung, Art,
+Standort, Status als Wort mit Rollenfarbe und das laufende Zeitfenster der Stelle mit der dort
+ausgegebenen Menge zeigen; aufgelöste Stellen stehen zuletzt. Mit Schreibrecht und dem Recht zu
+planen MUST sie „Stelle anlegen“, „In Betrieb nehmen“, „Auflösen“ mit Rückfrage, „Bearbeiten“ und,
+wo zulässig, „Stornieren“ mit Rückfrage anbieten. Ohne Schreibrecht MUST „Stelle anlegen“ gesperrt
+mit Grund stehen und die Zeilenaktionen MUST fehlen (wie unter „Rechte und Modulsichtbarkeit“).
+Der Dialog zum Anlegen MUST mit Bezeichnung, Art und Standort auskommen. Das Verpflegungsgerät
+MUST die Stellen sehen, aber keine dieser Aktionen erhalten, auch kein gesperrtes „Stelle anlegen“.
+
+#### Scenario: Stellen ansehen
+- **WHEN** eine Person die Ansicht „Stellen“ wählt, während die Feldküche aktiv ist und im laufenden Zeitfenster „Mittag“ 100 EP ausgegeben hat
+- **THEN** zeigt die Zeile der Feldküche Art, Standort, „aktiv“ und „Mittag“ mit 100 EP
+
+#### Scenario: Stelle in Betrieb nehmen
+- **WHEN** eine Person mit Schreibrecht bei der geplanten Stelle „Zuführung Deich“ „In Betrieb nehmen“ wählt
+- **THEN** zeigt die Zeile „aktiv“ ohne Neuladen
+
+#### Scenario: Leere Ansicht
+- **WHEN** ein Einsatz keine Verpflegungsstelle hat und eine Person mit Schreibrecht die Ansicht „Stellen“ wählt
+- **THEN** zeigt die Seite einen Leerzustand mit der Aktion „Stelle anlegen“
+
+#### Scenario: Beobachter sieht die Stellen
+- **WHEN** eine Person ohne Schreibrecht die Ansicht „Stellen“ wählt
+- **THEN** zeigt die Seite die Stellen ohne Zeilenaktionen und „Stelle anlegen“ gesperrt mit Grund
+
+#### Scenario: Gerät sieht die Stellen
+- **WHEN** das Verpflegungsgerät die Ansicht „Stellen“ öffnet
+- **THEN** zeigt sie die Stellen ohne „Stelle anlegen“, „In Betrieb nehmen“, „Auflösen“, „Bearbeiten“ und „Stornieren“
 
 ### Requirement: Ausgabeansicht eines Zeitfensters
 
