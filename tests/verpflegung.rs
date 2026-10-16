@@ -19,6 +19,9 @@ fn pfad(einsatz: i64) -> String {
 /// „Mittag“ am 24.09., 10:00–11:30 UTC (12:00–13:30 in Berlin), 180 Kräfte, 70 Betreute.
 const MITTAG: &str = r#"{"bezeichnung":"Mittag","von_at":"2026-09-24T10:00:00Z","bis_at":"2026-09-24T11:30:00Z","bedarf_kraefte":180,"bedarf_betreute":70}"#;
 
+/// Eine Feldküche ohne Standort.
+const FELDKUECHE: &str = r#"{"bezeichnung":"Feldküche BR Sportplatz","art":"feldkueche"}"#;
+
 async fn zeitfenster(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {
     let (s, json) = anfrage(
         app,
@@ -57,7 +60,7 @@ async fn etb_eintraege(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     json.as_array().cloned().unwrap_or_default()
 }
 
-/// ETB-Einträge des Einsatzes, die von Verpflegung stammen — chronologisch (die Liste der
+/// ETB-Einträge des Einsatzes, die von Verpflegung stammen (Zeitfenster und Stellen) — chronologisch (die Liste der
 /// Route kommt neueste zuerst).
 async fn verpflegungs_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
     etb_eintraege(app, cookie, einsatz)
@@ -65,9 +68,9 @@ async fn verpflegungs_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec
         .into_iter()
         .rev()
         .filter(|e| {
-            e["inhalt"]
-                .as_str()
-                .is_some_and(|i| i.starts_with("Verpflegung "))
+            e["inhalt"].as_str().is_some_and(|i| {
+                i.starts_with("Verpflegung ") || i.starts_with("Verpflegungsstelle ")
+            })
         })
         .map(|e| {
             assert_eq!(e["typ"], "system", "{e:?}");
@@ -608,6 +611,15 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &frieda,
+        Some(FELDKUECHE),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Stelle anlegen");
 }
 
 /// Spec „Abgeschlossener Einsatz“: 409 aus dem Extractor, nichts angelegt; Lesen bleibt.
@@ -634,9 +646,19 @@ async fn abgeschlossener_einsatz_ist_409() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &admin,
+        Some(FELDKUECHE),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "Stelle anlegen");
     let (s, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(u["zeitfenster"].as_array().unwrap().len(), 0);
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 0);
 }
 
 // ── Live-Verteilung ─────────────────────────────────────────────────────────────────────────
@@ -1105,4 +1127,928 @@ async fn replay_vor_der_grenzpruefung() {
         600,
         "Bestand über der Grenze bleibt lesbar"
     );
+}
+
+// ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
+
+/// Legt eine Stelle an (201) und liefert die Antwort.
+async fn stelle_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> Value {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("{}/stellen", pfad(einsatz)),
+        cookie,
+        Some(body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Stelle: {json:?}");
+    json
+}
+
+/// Eine Ausgabestelle mit dieser Bezeichnung; liefert die Kennung.
+async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
+    let body = serde_json::json!({ "bezeichnung": bezeichnung, "art": "ausgabestelle" });
+    stelle_anlegen(app, cookie, einsatz, &body.to_string()).await["id"]
+        .as_i64()
+        .unwrap()
+}
+
+async fn stelle_status(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    sid: i64,
+    status: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("{}/stellen/{sid}/status", pfad(einsatz)),
+        cookie,
+        Some(&format!(r#"{{"status":"{status}"}}"#)),
+    )
+    .await
+}
+
+async fn stelle_patch(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    sid: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(einsatz)),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+async fn stelle_storno(app: &axum::Router, cookie: &str, einsatz: i64, sid: i64) -> StatusCode {
+    anfrage(
+        app,
+        "DELETE",
+        &format!("{}/stellen/{sid}", pfad(einsatz)),
+        cookie,
+        None,
+    )
+    .await
+    .0
+}
+
+/// „Mittag“ mit diesen Stellen.
+fn mittag_an(stelle_ids: &[i64]) -> String {
+    let mut body: Value = serde_json::from_str(MITTAG).unwrap();
+    body["stelle_ids"] = serde_json::json!(stelle_ids);
+    body.to_string()
+}
+
+async fn zf_patch(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    zid: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("{}/zeitfenster/{zid}", pfad(einsatz)),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+async fn uebersicht(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
+    let (s, u) = anfrage(app, "GET", &pfad(einsatz), cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{u:?}");
+    u
+}
+
+fn ids(v: &Value) -> Vec<i64> {
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_i64().unwrap())
+        .collect()
+}
+
+/// Die Felder einer Stelle in der Antwort: keine Benutzerkennung (Spec `funktionsansichten`).
+const STELLEN_FELDER: [&str; 10] = [
+    "id",
+    "bezeichnung",
+    "art",
+    "standort",
+    "lat",
+    "lon",
+    "abschnitt_id",
+    "status",
+    "aufgeloest_at",
+    "angelegt_at",
+];
+
+fn nur_erlaubte_felder(stelle: &Value) {
+    for k in stelle.as_object().unwrap().keys() {
+        assert!(
+            STELLEN_FELDER.contains(&k.as_str()),
+            "Feld {k:?} gehört nicht in die Stelle: {stelle:?}"
+        );
+    }
+}
+
+/// Spec „Stelle anlegen“, „Stelle in Betrieb nehmen“, „Stelle auflösen“, „Aufgelöste Stelle
+/// bearbeiten“, „Geplante Stelle stornieren“: ETB nur bei Inbetriebnahme und Auflösung.
+#[tokio::test]
+async fn stelle_anlegen_in_betrieb_nehmen_aufloesen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    let s = stelle_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"bezeichnung":"  Feldküche BR Sportplatz ","art":"feldkueche","standort":"Am Sportplatz 2","lat":52.37,"lon":9.73}"#,
+    )
+    .await;
+    nur_erlaubte_felder(&s);
+    assert_eq!(s["bezeichnung"], "Feldküche BR Sportplatz", "getrimmt");
+    assert_eq!(s["art"], "feldkueche");
+    assert_eq!(s["status"], "geplant");
+    assert_eq!(s["standort"], "Am Sportplatz 2");
+    assert_eq!(s["lat"], 52.37);
+    assert!(s.get("aufgeloest_at").is_none(), "{s:?}");
+    let sid = s["id"].as_i64().unwrap();
+    assert!(
+        verpflegungs_etb(&app, &admin, e).await.is_empty(),
+        "Anlegen schreibt kein ETB"
+    );
+
+    let (st, g) = stelle_patch(&app, &admin, e, sid, r#"{"art":"ausgabestelle"}"#).await;
+    assert_eq!(st, StatusCode::OK, "{g:?}");
+    assert_eq!(g["art"], "ausgabestelle");
+    let (st, g) = stelle_patch(&app, &admin, e, sid, r#"{"art":"feldkueche"}"#).await;
+    assert_eq!(st, StatusCode::OK, "{g:?}");
+    assert!(
+        verpflegungs_etb(&app, &admin, e).await.is_empty(),
+        "Ändern schreibt kein ETB"
+    );
+
+    let (st, a) = stelle_status(&app, &admin, e, sid, "aktiv").await;
+    assert_eq!(st, StatusCode::OK, "{a:?}");
+    assert_eq!(a["status"], "aktiv");
+    assert!(a.get("aufgeloest_at").is_none());
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await,
+        vec!["Verpflegungsstelle ‚Feldküche BR Sportplatz‘ (Feldküche) in Betrieb genommen."]
+    );
+
+    let (st, a) = stelle_status(&app, &admin, e, sid, "aufgeloest").await;
+    assert_eq!(st, StatusCode::OK, "{a:?}");
+    assert_eq!(a["status"], "aufgeloest");
+    assert!(a["aufgeloest_at"].is_string(), "{a:?}");
+    let etb = verpflegungs_etb(&app, &admin, e).await;
+    assert_eq!(etb.len(), 2, "{etb:?}");
+    assert_eq!(
+        etb[1],
+        "Verpflegungsstelle ‚Feldküche BR Sportplatz‘ (Feldküche) aufgelöst."
+    );
+
+    // Entscheid: eine aufgelöste Stelle bleibt bearbeitbar (Bezeichnung, Standort samt
+    // Koordinate), ohne ETB; der Status bleibt endgültig.
+    let (st, g) = stelle_patch(
+        &app,
+        &admin,
+        e,
+        sid,
+        r#"{"bezeichnung":"Feldküche Sportplatz","standort":"Am Sportplatz 4","lat":52.38,"lon":9.74}"#,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{g:?}");
+    assert_eq!(g["bezeichnung"], "Feldküche Sportplatz");
+    assert_eq!(g["standort"], "Am Sportplatz 4");
+    assert_eq!(g["lon"], 9.74);
+    assert_eq!(g["status"], "aufgeloest");
+    let (st, g) = stelle_patch(
+        &app,
+        &admin,
+        e,
+        sid,
+        r#"{"standort":null,"lat":null,"lon":null}"#,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{g:?}");
+    assert!(
+        g.get("standort").is_none() && g.get("lat").is_none(),
+        "{g:?}"
+    );
+    let (st, _) = stelle_status(&app, &admin, e, sid, "aktiv").await;
+    assert_eq!(
+        st,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "aufgelöst ist endgültig"
+    );
+    assert_eq!(verpflegungs_etb(&app, &admin, e).await.len(), 2);
+
+    // Storno einer geplanten Stelle: 204, ohne ETB, aus der Übersicht verschwunden.
+    let zweite = stelle(&app, &admin, e, "Zuführung Deich").await;
+    assert_eq!(
+        stelle_storno(&app, &admin, e, zweite).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(verpflegungs_etb(&app, &admin, e).await.len(), 2);
+    let u = uebersicht(&app, &admin, e).await;
+    let stellen = u["stellen"].as_array().unwrap();
+    assert_eq!(stellen.len(), 1, "{u:?}");
+    assert_eq!(stellen[0]["id"], sid);
+    nur_erlaubte_felder(&stellen[0]);
+}
+
+/// Spec „Stelle eines anderen Einsatzes“: 404 auf jedem Schreibweg.
+#[tokio::test]
+async fn stelle_fremder_einsatz_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e1 = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen_mit(&app, &admin, "Zweiter Einsatz").await;
+    let fremd = stelle(&app, &admin, e1, "Ausgabe Turnhalle Nord").await;
+
+    for sid in [fremd, 999_999] {
+        let (s, _) = stelle_patch(&app, &admin, e2, sid, r#"{"bezeichnung":"Neu"}"#).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "PATCH {sid}");
+        let (s, _) = stelle_status(&app, &admin, e2, sid, "aktiv").await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "Status {sid}");
+        assert_eq!(
+            stelle_storno(&app, &admin, e2, sid).await,
+            StatusCode::NOT_FOUND,
+            "DELETE {sid}"
+        );
+    }
+    let u = uebersicht(&app, &admin, e1).await;
+    assert_eq!(u["stellen"][0]["status"], "geplant", "unberührt");
+    assert_eq!(u["stellen"][0]["bezeichnung"], "Ausgabe Turnhalle Nord");
+    let u = uebersicht(&app, &admin, e2).await;
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 0);
+}
+
+/// Statuscodes der Stellenrouten: 400 je Feld, 201 an der Grenze, 422 Übergang und Kontext,
+/// 409 doppelte Bezeichnung und stornierte Stelle.
+#[tokio::test]
+async fn stelle_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let url = format!("{}/stellen", pfad(e));
+
+    let b200 = "B".repeat(200);
+    let s500 = "S".repeat(500);
+    for (body, erwartet) in [
+        (r#"{"bezeichnung":"X","art":"kantine"}"#.to_string(), 400),
+        (r#"{"bezeichnung":"   ","art":"feldkueche"}"#.to_string(), 400),
+        (
+            serde_json::json!({ "bezeichnung": "B".repeat(201), "art": "feldkueche" }).to_string(),
+            400,
+        ),
+        (
+            serde_json::json!({ "bezeichnung": "X", "art": "feldkueche", "standort": "S".repeat(501) })
+                .to_string(),
+            400,
+        ),
+        (
+            r#"{"bezeichnung":"X","art":"feldkueche","lat":52.3}"#.to_string(),
+            422,
+        ),
+        (
+            r#"{"bezeichnung":"X","art":"feldkueche","abschnitt_id":999999}"#.to_string(),
+            404,
+        ),
+        (
+            serde_json::json!({ "bezeichnung": b200, "art": "zufuehrung", "standort": s500 })
+                .to_string(),
+            201,
+        ),
+        (
+            serde_json::json!({ "bezeichnung": format!(" {b200} "), "art": "feldkueche" })
+                .to_string(),
+            409,
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&body)).await;
+        assert_eq!(s.as_u16(), erwartet, "{body}: {j:?}");
+    }
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(
+        u["stellen"].as_array().unwrap().len(),
+        1,
+        "nur die an der Grenze"
+    );
+    let sid = u["stellen"][0]["id"].as_i64().unwrap();
+
+    // PATCH: dieselben Grenzen, 400 vor jedem 422.
+    for (body, erwartet) in [
+        (
+            serde_json::json!({ "bezeichnung": "B".repeat(201) }).to_string(),
+            400,
+        ),
+        (
+            serde_json::json!({ "standort": "S".repeat(501) }).to_string(),
+            400,
+        ),
+        (r#"{"bezeichnung":""}"#.to_string(), 400),
+        (r#"{"art":"kantine"}"#.to_string(), 400),
+        (r#"{"lon":9.7}"#.to_string(), 422),
+        (r#"{"abschnitt_id":999999}"#.to_string(), 404),
+    ] {
+        let (s, j) = stelle_patch(&app, &admin, e, sid, &body).await;
+        assert_eq!(s.as_u16(), erwartet, "PATCH {body}: {j:?}");
+    }
+
+    // Status: unbekannt 400, unzulässiger Übergang 422.
+    let (s, _) = stelle_status(&app, &admin, e, sid, "in_betrieb").await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = stelle_status(&app, &admin, e, sid, "geplant").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "geplant → geplant");
+    let (s, _) = stelle_status(&app, &admin, e, sid, "aktiv").await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = stelle_status(&app, &admin, e, sid, "geplant").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "aktiv → geplant");
+    assert_eq!(
+        stelle_storno(&app, &admin, e, sid).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "aktive Stelle wird aufgelöst, nicht storniert"
+    );
+
+    // Stornierte Stelle: 409 auf jedem Schreibweg.
+    let weg = stelle(&app, &admin, e, "Zuführung Deich").await;
+    assert_eq!(
+        stelle_storno(&app, &admin, e, weg).await,
+        StatusCode::NO_CONTENT
+    );
+    let (s, _) = stelle_patch(&app, &admin, e, weg, r#"{"bezeichnung":"Neu"}"#).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = stelle_status(&app, &admin, e, weg, "aktiv").await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(
+        stelle_storno(&app, &admin, e, weg).await,
+        StatusCode::CONFLICT
+    );
+}
+
+/// Spec „Beobachter plant keine Stelle“: liest die Stellen, schreibt keine.
+#[tokio::test]
+async fn beobachter_plant_keine_stelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+
+    let u = uebersicht(&app, &beob_cookie, e).await;
+    assert_eq!(u["stellen"][0]["id"], sid);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &beob_cookie,
+        Some(FELDKUECHE),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "anlegen");
+    let (s, _) = stelle_patch(&app, &beob_cookie, e, sid, r#"{"bezeichnung":"Neu"}"#).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "ändern");
+    let (s, _) = stelle_status(&app, &beob_cookie, e, sid, "aktiv").await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Status");
+    assert_eq!(
+        stelle_storno(&app, &beob_cookie, e, sid).await,
+        StatusCode::FORBIDDEN,
+        "stornieren"
+    );
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(u["stellen"][0]["status"], "geplant");
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 1);
+}
+
+/// Zählt die anstehenden `verpflegung`-Ereignisse am Abo und leert es.
+fn verpflegung_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+) -> usize {
+    let mut n = 0;
+    while let Ok(m) = rx.try_recv() {
+        if m.event == lifeline_hub::live::LiveEvent::Verpflegung {
+            n += 1;
+        }
+    }
+    n
+}
+
+/// Spec „Live-Verteilung“: jeder Schreibweg einer Stelle verteilt genau ein `verpflegung`, ein
+/// Leerlauf keines; nur Leser mit Modulrecht bekommen es, die Nutzlast trägt keine Inhalte.
+#[tokio::test]
+async fn live_ereignis_bei_stellen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(e);
+
+    let sid = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    assert_eq!(verpflegung_ereignisse(&mut rx), 1, "anlegen");
+    let (s, _) = stelle_patch(&app, &admin, e, sid, r#"{"art":"feldkueche"}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(verpflegung_ereignisse(&mut rx), 1, "ändern");
+    let (s, _) = stelle_patch(&app, &admin, e, sid, r#"{"art":"feldkueche"}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(verpflegung_ereignisse(&mut rx), 0, "Leerlauf");
+    let (s, _) = stelle_status(&app, &admin, e, sid, "aktiv").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(verpflegung_ereignisse(&mut rx), 1, "Status");
+    let weg = stelle(&app, &admin, e, "Zuführung Deich").await;
+    verpflegung_ereignisse(&mut rx);
+    assert_eq!(
+        stelle_storno(&app, &admin, e, weg).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(verpflegung_ereignisse(&mut rx), 1, "stornieren");
+
+    // Nur Leser mit Modulrecht (Muster `live_ereignis_nur_an_leser_mit_modulrecht`).
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
+    rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
+    let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
+    override_setzen(&app, &admin, e, true, Some("fuehrungskraft")).await;
+    let feed_gustav = live_oeffnen(&app, &gustav, e).await;
+    let feed_frieda = live_oeffnen(&app, &frieda, e).await;
+
+    stelle_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"bezeichnung":"Kanarienhof","art":"zufuehrung","standort":"Kanarienweg 4711"}"#,
+    )
+    .await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"name":"Muster","vorname":"Max"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let bei_gustav = sse_anfang_lesen(feed_gustav.into_body(), 400).await;
+    let bei_frieda = sse_anfang_lesen(feed_frieda.into_body(), 400).await;
+    assert!(bei_gustav.contains("event: verpflegung"), "{bei_gustav:?}");
+    assert!(bei_frieda.contains("event: person"), "{bei_frieda:?}");
+    assert!(!bei_frieda.contains("event: verpflegung"), "{bei_frieda:?}");
+    for kanarienvogel in ["Kanarien", "4711", "zufuehrung"] {
+        assert!(
+            bei_gustav
+                .lines()
+                .filter(|z| z.starts_with("data:"))
+                .all(|z| !z.contains(kanarienvogel)),
+            "{kanarienvogel:?} gehört nicht in den Broadcast: {bei_gustav:?}"
+        );
+    }
+}
+
+/// Spec „Verpflegungsart eines Zeitfensters“: anlegen, ändern, mit `null` leeren; unbekannt 400.
+#[tokio::test]
+async fn verpflegungsart_anlegen_aendern_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut body: Value = serde_json::from_str(MITTAG).unwrap();
+    body["verpflegungsart"] = "warm".into();
+    let zid = zeitfenster(&app, &admin, e, &body.to_string()).await;
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(u["zeitfenster"][0]["verpflegungsart"], "warm");
+
+    let (s, z) = zf_patch(&app, &admin, e, zid, r#"{"verpflegungsart":"getraenke"}"#).await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert_eq!(z["verpflegungsart"], "getraenke");
+    let (s, z) = zf_patch(&app, &admin, e, zid, r#"{"bedarf_betreute":71}"#).await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert_eq!(z["verpflegungsart"], "getraenke", "fehlt = bleibt");
+    let (s, z) = zf_patch(&app, &admin, e, zid, r#"{"verpflegungsart":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert!(z.get("verpflegungsart").is_none(), "geleert: {z:?}");
+
+    let (s, _) = zf_patch(&app, &admin, e, zid, r#"{"verpflegungsart":"lauwarm"}"#).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    body["verpflegungsart"] = "lauwarm".into();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster", pfad(e)),
+        &admin,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let etb = verpflegungs_etb(&app, &admin, e).await;
+    assert!(
+        etb[0].ends_with("davon 0 Sonderkost; warm.") || etb[0].ends_with("; warm."),
+        "{etb:?}"
+    );
+    assert!(
+        etb.iter().any(|t| t.contains("Art Getränke (vorher warm)")),
+        "{etb:?}"
+    );
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Art ohne Angabe (vorher Getränke)")),
+        "{etb:?}"
+    );
+}
+
+/// Spec „Zeitfenster mehreren Stellen zuordnen“, „Zuordnung ersetzen“, „Zuordnung leeren“.
+#[tokio::test]
+async fn zuordnung_setzen_ersetzen_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let sport = stelle(&app, &admin, e, "Feldküche BR Sportplatz").await;
+    let deich = stelle(&app, &admin, e, "Zuführung Deich").await;
+
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[sport, nord, sport])).await;
+    let u = uebersicht(&app, &admin, e).await;
+    let mut gesetzt = ids(&u["zeitfenster"][0]["stelle_ids"]);
+    gesetzt.sort_unstable();
+    let mut erwartet = vec![nord, sport];
+    erwartet.sort_unstable();
+    assert_eq!(gesetzt, erwartet, "entdoppelt");
+    let je: Vec<Option<i64>> = u["zeitfenster"][0]["je_stelle"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["stelle_id"].as_i64())
+        .collect();
+    assert_eq!(je.len(), 2, "zugeordnete Stellen auch mit 0: {u:?}");
+
+    let (s, z) = zf_patch(
+        &app,
+        &admin,
+        e,
+        zid,
+        &format!(r#"{{"stelle_ids":[{deich}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert_eq!(ids(&z["stelle_ids"]), vec![deich]);
+
+    let (s, z) = zf_patch(&app, &admin, e, zid, r#"{"stelle_ids":[]}"#).await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert!(ids(&z["stelle_ids"]).is_empty());
+    assert!(z["je_stelle"].as_array().unwrap().is_empty());
+
+    let (s, z) = zf_patch(&app, &admin, e, zid, r#"{"bedarf_betreute":71}"#).await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert!(ids(&z["stelle_ids"]).is_empty(), "fehlt = bleibt");
+}
+
+/// Statuscodes der Zuordnung: 400 vor jeder Abfrage, 422 für fremde, unbekannte, stornierte und
+/// neu hinzukommende aufgelöste Stellen; eine schon zugeordnete aufgelöste bleibt.
+#[tokio::test]
+async fn zuordnung_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Zweiter Einsatz").await;
+    let fremd = stelle(&app, &admin, anderer, "Fremde Stelle").await;
+    let nord = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let alt = stelle(&app, &admin, e, "Alte Ausgabe").await;
+    let weg = stelle(&app, &admin, e, "Zuführung Deich").await;
+    assert_eq!(
+        stelle_storno(&app, &admin, e, weg).await,
+        StatusCode::NO_CONTENT
+    );
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[alt])).await;
+    assert_eq!(
+        stelle_status(&app, &admin, e, alt, "aufgeloest").await.0,
+        StatusCode::OK
+    );
+    let spaet = stelle(&app, &admin, e, "Späte Ausgabe").await;
+    assert_eq!(
+        stelle_status(&app, &admin, e, spaet, "aufgeloest").await.0,
+        StatusCode::OK
+    );
+
+    // 21 Einträge: 400, auch wenn es die Kennungen nicht gibt, das Zeitfenster nicht gibt oder
+    // sie doppelt sind (die Grenze zählt vor dem Entdoppeln).
+    let einundzwanzig: Vec<i64> = (1_000_000..1_000_021).collect();
+    let doppelt: Vec<i64> = std::iter::repeat_n(nord, 21).collect();
+    for liste in [&einundzwanzig, &doppelt] {
+        let (s, _) = anfrage(
+            &app,
+            "POST",
+            &format!("{}/zeitfenster", pfad(e)),
+            &admin,
+            Some(&mittag_an(liste)),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "anlegen");
+        let body = serde_json::json!({ "stelle_ids": liste }).to_string();
+        let (s, _) = zf_patch(&app, &admin, e, zid, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "ändern");
+        let (s, _) = zf_patch(&app, &admin, e, 999_999, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "vor dem 404 des Zeitfensters");
+    }
+    // Genau 20 verschiedene, alle unbekannt: über die Grenze hinaus, also 422.
+    let zwanzig: Vec<i64> = (1_000_000..1_000_020).collect();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster", pfad(e)),
+        &admin,
+        Some(&mittag_an(&zwanzig)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "20 an der Grenze");
+
+    for (sid, was) in [
+        (fremd, "fremd"),
+        (999_999, "unbekannt"),
+        (weg, "storniert"),
+        (spaet, "neu aufgelöst"),
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("{}/zeitfenster", pfad(e)),
+            &admin,
+            Some(&mittag_an(&[nord, sid])),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "anlegen {was}: {j:?}");
+        let (s, j) = zf_patch(
+            &app,
+            &admin,
+            e,
+            zid,
+            &format!(r#"{{"stelle_ids":[{alt},{sid}]}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "ändern {was}: {j:?}");
+    }
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(
+        u["zeitfenster"].as_array().unwrap().len(),
+        1,
+        "nichts angelegt"
+    );
+    assert_eq!(
+        ids(&u["zeitfenster"][0]["stelle_ids"]),
+        vec![alt],
+        "unverändert"
+    );
+
+    // Die schon zugeordnete aufgelöste Stelle bleibt, wenn eine weitere dazukommt.
+    let (s, z) = zf_patch(
+        &app,
+        &admin,
+        e,
+        zid,
+        &format!(r#"{{"stelle_ids":[{alt},{nord}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    let mut jetzt = ids(&z["stelle_ids"]);
+    jetzt.sort_unstable();
+    let mut erwartet = vec![alt, nord];
+    erwartet.sort_unstable();
+    assert_eq!(jetzt, erwartet);
+}
+
+/// Spec „Gleiche Zuordnung“: dieselbe Menge in anderer Reihenfolge ist ein Leerlauf — kein ETB,
+/// kein Live-Ereignis.
+#[tokio::test]
+async fn zuordnung_leerlauf_ohne_etb_und_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let a = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let b = stelle(&app, &admin, e, "Feldküche BR Sportplatz").await;
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[a, b])).await;
+    let etb_vorher = verpflegungs_etb(&app, &admin, e).await.len();
+    let mut rx = live.abonniere(e);
+
+    let (s, z) = zf_patch(
+        &app,
+        &admin,
+        e,
+        zid,
+        &format!(r#"{{"stelle_ids":[{b},{a},{b}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert_eq!(verpflegung_ereignisse(&mut rx), 0);
+    assert_eq!(verpflegungs_etb(&app, &admin, e).await.len(), etb_vorher);
+
+    // Gegenprobe: eine echte Änderung verteilt.
+    let (s, _) = zf_patch(&app, &admin, e, zid, &format!(r#"{{"stelle_ids":[{a}]}}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(verpflegung_ereignisse(&mut rx), 1);
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await.len(),
+        etb_vorher + 1
+    );
+}
+
+/// Spec „Bestand ohne Stelle“: ein Zeitfenster ohne Zuordnung und eine Ausgabe ohne Stelle
+/// sehen aus wie vor der Änderung, nur mit zwei leeren Listen.
+#[tokio::test]
+async fn bestand_ohne_stelle_unveraendert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let a = ausgabe(&app, &admin, e, zid, r#"{"menge":120,"ort":"Deich"}"#).await;
+    let z = &a["zeitfenster"];
+    let mut felder: Vec<&str> = z.as_object().unwrap().keys().map(String::as_str).collect();
+    felder.sort_unstable();
+    assert_eq!(
+        felder,
+        vec![
+            "angelegt_at",
+            "ausgaben",
+            "ausgegeben",
+            "bedarf",
+            "bezeichnung",
+            "bis_at",
+            "einsatz_id",
+            "fehlmenge",
+            "id",
+            "je_stelle",
+            "stelle_ids",
+            "von_at",
+        ]
+    );
+    assert!(z["je_stelle"].as_array().unwrap().is_empty());
+    assert!(z["stelle_ids"].as_array().unwrap().is_empty());
+    assert_eq!(z["ausgegeben"]["gesamt"], 120);
+    assert_eq!(z["fehlmenge"]["gesamt"], 130);
+    assert!(z["ausgaben"][0].get("verpflegungsstelle_id").is_none());
+    assert_eq!(z["ausgaben"][0]["ort"], "Deich");
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(&u["zeitfenster"][0], z);
+    assert!(u["stellen"].as_array().unwrap().is_empty());
+}
+
+/// Spec „Einsatztagebuch“: Art und Stellen beim Anlegen und als „jetzt (vorher …)“.
+#[tokio::test]
+async fn zeitfenster_etb_nennt_stellen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let sport = stelle(&app, &admin, e, "Feldküche BR Sportplatz").await;
+    let mut body: Value = serde_json::from_str(&mittag_an(&[sport, nord])).unwrap();
+    body["verpflegungsart"] = "warm".into();
+    let zid = zeitfenster(&app, &admin, e, &body.to_string()).await;
+    let (s, _) = zf_patch(&app, &admin, e, zid, r#"{"stelle_ids":[]}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await,
+        vec![
+            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute); warm; an ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘.",
+            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Stellen keine (vorher ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘).",
+        ]
+    );
+}
+
+/// Spec „Ausgabe an einer Verpflegungsstelle“: fremd, unbekannt und storniert 422; aufgelöst mit
+/// Zeitpunkt danach 409, davor 201; geplant 201; nicht zugeordnet 201. Das Ist je Stelle folgt.
+#[tokio::test]
+async fn ausgabe_an_stelle_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Zweiter Einsatz").await;
+    let fremd = stelle(&app, &admin, anderer, "Fremde Stelle").await;
+    let nord = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let sport = stelle(&app, &admin, e, "Feldküche BR Sportplatz").await;
+    let weg = stelle(&app, &admin, e, "Zuführung Deich").await;
+    let frei = stelle(&app, &admin, e, "Nicht zugeordnet").await;
+    assert_eq!(
+        stelle_storno(&app, &admin, e, weg).await,
+        StatusCode::NO_CONTENT
+    );
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[nord, sport])).await;
+    assert_eq!(
+        stelle_status(&app, &admin, e, sport, "aktiv").await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        stelle_status(&app, &admin, e, sport, "aufgeloest").await.0,
+        StatusCode::OK
+    );
+    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let an = |sid: i64, menge: i64, zeitpunkt: Option<&str>| {
+        let mut b = serde_json::json!({ "menge": menge, "verpflegungsstelle_id": sid });
+        if let Some(z) = zeitpunkt {
+            b["zeitpunkt_at"] = z.into();
+        }
+        b.to_string()
+    };
+
+    for (sid, was) in [(fremd, "fremd"), (999_999, "unbekannt"), (weg, "storniert")] {
+        let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&an(sid, 5, None))).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{was}: {j:?}");
+    }
+    let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&an(sport, 5, None))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "aufgelöst, Zeitpunkt jetzt: {j:?}");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &url,
+        &admin,
+        Some(&an(sport, 80, Some("2020-01-01T10:00:00Z"))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "aufgelöst, Zeitpunkt davor: {j:?}");
+    // geplant (nie in Betrieb genommen) nimmt an, ebenso eine nicht zugeordnete Stelle.
+    ausgabe(&app, &admin, e, zid, &an(nord, 100, None)).await;
+    ausgabe(&app, &admin, e, zid, &an(frei, 7, None)).await;
+    let a = ausgabe(&app, &admin, e, zid, r#"{"menge":3}"#).await;
+    let z = &a["zeitfenster"];
+    assert_eq!(z["ausgegeben"]["gesamt"], 190);
+    let je: Vec<(Option<i64>, i64)> = z["je_stelle"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| {
+            (
+                x["stelle_id"].as_i64(),
+                x["ausgegeben"]["gesamt"].as_i64().unwrap(),
+            )
+        })
+        .collect();
+    // Zugeordnete nach Bezeichnung, dann nicht zugeordnete mit Ausgabe, „ohne Stelle“ zuletzt.
+    assert_eq!(
+        je,
+        vec![
+            (Some(nord), 100),
+            (Some(sport), 80),
+            (Some(frei), 7),
+            (None, 3)
+        ]
+    );
+    let mit_stelle = z["ausgaben"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["verpflegungsstelle_id"].as_i64() == Some(nord))
+        .count();
+    assert_eq!(mit_stelle, 1);
+}
+
+/// Spec „Replay vor der Zustandsprüfung“: Eine Ausgabe, die vor der Auflösung gebucht wurde,
+/// kommt beim erneuten Senden mit derselben `client_id` als 201 zurück, ohne Live-Ereignis.
+#[tokio::test]
+async fn replay_nach_aufloesen_der_stelle() {
+    use lifeline_hub::live::LiveEvent;
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Ausgabe Turnhalle Nord").await;
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[sid])).await;
+    let body = serde_json::json!({ "menge": 40, "verpflegungsstelle_id": sid, "client_id": "r1" })
+        .to_string();
+    let erst = ausgabe(&app, &admin, e, zid, &body).await;
+    assert_eq!(
+        stelle_status(&app, &admin, e, sid, "aufgeloest").await.0,
+        StatusCode::OK
+    );
+
+    let mut rx = live.abonniere(e);
+    let wieder = ausgabe(&app, &admin, e, zid, &body).await;
+    assert_eq!(wieder["ausgabe_id"], erst["ausgabe_id"]);
+    assert_eq!(wieder["zeitfenster"]["ausgegeben"]["gesamt"], 40);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), rx.recv())
+            .await
+            .map(|n| n.unwrap().event != LiveEvent::Verpflegung)
+            .unwrap_or(true),
+        "ein Replay verteilt nichts"
+    );
+    // Gegenprobe: eine neue Ausgabe an der aufgelösten Stelle ist 409.
+    let neu = serde_json::json!({ "menge": 40, "verpflegungsstelle_id": sid, "client_id": "r2" })
+        .to_string();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &admin,
+        Some(&neu),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
 }

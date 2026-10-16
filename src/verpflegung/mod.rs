@@ -20,7 +20,15 @@
 //! (`nachforderung_id`), nichts Hineingejointes — sonst läse jemand mit Zugriff auf
 //! Verpflegung, aber ohne Zugriff auf Nachforderungen, deren Angaben (design.md D4).
 //!
-//! Spec: `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`
+//! **Verpflegungsstellen** (LLH-1040, [`stelle`]): wo ausgegeben wird, mit Status wie beim
+//! Bereitstellungsraum. Ein Zeitfenster gilt an einer oder mehreren Stellen (Zuordnung n:m),
+//! ohne Zuordnung einsatzweit wie bisher. **Das Soll bleibt am Zeitfenster**; je Stelle gibt es
+//! nur das Ist (`je_stelle`), gerechnet in derselben [`deckung::rechne`]. Eine Ausgabe verweist
+//! optional per `verpflegungsstelle_id` auf eine Stelle. Dazu die Verpflegungsart (warm, kalt,
+//! Getränke) am Zeitfenster, nur Anzeige.
+//!
+//! Spec: `openspec/specs/kraefte-verpflegung/spec.md` (Herleitung
+//! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040).
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -31,6 +39,34 @@ use crate::error::AppError;
 
 pub mod deckung;
 pub mod repo;
+pub mod stelle;
+
+use crate::wire_enum::wire_enum;
+use stelle::VerpflegungsstelleAnzeige;
+
+wire_enum! {
+    /// Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung
+    /// gilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;
+    /// keine Art (`NULL`) heißt „ohne Angabe“.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Verpflegungsart {
+        Warm => "warm",
+        Kalt => "kalt",
+        Getraenke => "getraenke",
+    }
+    try_from = |s| format!("Ungültige Verpflegungsart: {s}");
+}
+
+impl Verpflegungsart {
+    /// Das Wort für den ETB-Text („Getränke“).
+    pub const fn wort(self) -> &'static str {
+        match self {
+            Verpflegungsart::Warm => "warm",
+            Verpflegungsart::Kalt => "kalt",
+            Verpflegungsart::Getraenke => "Getränke",
+        }
+    }
+}
 
 // ── Sonderkost ──────────────────────────────────────────────────────────────────────────────
 
@@ -176,10 +212,25 @@ pub struct AusgabeAnzeige {
     /// der Nachforderung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
+    /// Verpflegungsstelle, an der ausgegeben wurde (LLH-1040) — nur die Kennung; die Stelle
+    /// steht in `VerpflegungAnzeige.stellen`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verpflegungsstelle_id: Option<i64>,
     /// Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zurueckgenommen_at: Option<String>,
     pub erfasst_at: String,
+}
+
+/// Ausgegebene Menge an einer Stelle (LLH-1040, design.md D6) — nur das Ist, kein Soll und keine
+/// Fehlmenge je Stelle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StelleIst {
+    /// Die Stelle; fehlt beim Eintrag „ohne Stelle“ (Ausgaben ohne Stelle), der zuletzt steht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stelle_id: Option<i64>,
+    /// Summe der nicht zurückgenommenen Ausgaben an dieser Stelle, gesamt und je Kostform.
+    pub ausgegeben: Portionen,
 }
 
 /// Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen).
@@ -192,11 +243,20 @@ pub struct ZeitfensterAnzeige {
     pub von_at: String,
     /// Ende, UTC ohne Zonenkennung; liegt immer nach `von_at`.
     pub bis_at: String,
+    /// Warm, kalt oder Getränke; fehlt = ohne Angabe (LLH-1040 D8).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verpflegungsart: Option<Verpflegungsart>,
     pub bedarf: Bedarf,
     /// Summe der nicht zurückgenommenen Ausgaben.
     pub ausgegeben: Portionen,
     /// Je `max(0, bedarf − ausgegeben)`, gesamt und je Kostform.
     pub fehlmenge: Portionen,
+    /// Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5).
+    pub stelle_ids: Vec<i64>,
+    /// Ausgegeben je Stelle (D6): jede zugeordnete Stelle (auch mit 0), danach jede weitere mit
+    /// Ausgaben, zuletzt „ohne Stelle“. Leer, wenn es weder Zuordnung noch eine Ausgabe an einer
+    /// Stelle gibt — dann zeigt das Zeitfenster nur Gesamtwerte wie bisher.
+    pub je_stelle: Vec<StelleIst>,
     /// Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`.
     pub ausgaben: Vec<AusgabeAnzeige>,
     pub angelegt_at: String,
@@ -205,10 +265,13 @@ pub struct ZeitfensterAnzeige {
 }
 
 /// Die eine Lesequelle der Modulseite (`GET …/verpflegung`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct VerpflegungAnzeige {
     /// Nach Beginn geordnet.
     pub zeitfenster: Vec<ZeitfensterAnzeige>,
+    /// Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
+    /// braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
+    pub stellen: Vec<VerpflegungsstelleAnzeige>,
 }
 
 /// Antwort auf „Ausgabe erfassen“ und „Ausgabe zurücknehmen“: die Kennung der Ausgabe (für
@@ -247,6 +310,25 @@ pub const BEMERKUNG_MAX: usize = 2_000;
 /// Stellen je Zeitfenster im Request, gezählt vor dem Entdoppeln.
 pub const STELLEN_JE_ZEITFENSTER_MAX: usize = 20;
 
+/// Stellenliste eines Zeitfensters von außen (LLH-1040 D5): mehr als
+/// [`STELLEN_JE_ZEITFENSTER_MAX`] Einträge, gezählt VOR dem Entdoppeln, sind 400 — vor jeder
+/// Abfrage. Danach entdoppelt, in der Reihenfolge des ersten Auftretens.
+pub fn stelle_ids_entdoppeln(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    if ids.len() > STELLEN_JE_ZEITFENSTER_MAX {
+        return Err(AppError::Validation(format!(
+            "stelle_ids darf höchstens {STELLEN_JE_ZEITFENSTER_MAX} Einträge haben, waren {}",
+            ids.len()
+        )));
+    }
+    let mut eindeutig: Vec<i64> = Vec::with_capacity(ids.len());
+    for id in ids {
+        if !eindeutig.contains(id) {
+            eindeutig.push(*id);
+        }
+    }
+    Ok(eindeutig)
+}
+
 /// Liest einen Zeitpunkt im Drahtformat. Als Rundreise: chrono nimmt beim Parsen auch
 /// ungepolsterte Felder an, die als Text falsch sortierten. Unlesbar → 400.
 pub fn draht_lesen(feld: &str, s: &str) -> Result<DateTime<Utc>, AppError> {
@@ -278,7 +360,8 @@ pub fn zeitraum_text(von: DateTime<Utc>, bis: DateTime<Utc>, tz: Tz) -> String {
 /// einer Ausgabe entgegen — Ausgaben schreiben ohnehin keinen Eintrag, und die Freitexte werden
 /// beim Schwärzen geleert, `etb_eintrag.inhalt` aber nicht.
 pub mod etb_text {
-    use super::Bedarf;
+    use super::stelle::{VerpflegungsstelleArt, VerpflegungsstelleStatus};
+    use super::{Bedarf, Verpflegungsart};
 
     /// Bezeichnung in deutschen einfachen Anführungszeichen.
     fn q(bezeichnung: &str) -> String {
@@ -311,16 +394,63 @@ pub mod etb_text {
         }
     }
 
+    /// „‚A‘, ‚B‘“ bzw. „keine“ — die Stellen eines Zeitfensters (LLH-1040 D7).
+    fn stellen_text(stellen: &[String]) -> String {
+        if stellen.is_empty() {
+            "keine".into()
+        } else {
+            stellen.iter().map(|s| q(s)).collect::<Vec<_>>().join(", ")
+        }
+    }
+
+    fn art_text(art: Option<Verpflegungsart>) -> &'static str {
+        art.map_or("ohne Angabe", Verpflegungsart::wort)
+    }
+
     /// „Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte,
-    /// 70 Betreute), davon 15 Sonderkost.“
-    pub fn angelegt(bezeichnung: &str, zeitraum: &str, b: &Bedarf) -> String {
+    /// 70 Betreute), davon 15 Sonderkost.“ Art und Stellen (LLH-1040 D7) nur, wenn gesetzt:
+    /// „…, davon 15 Sonderkost; warm; an ‚Feldküche BR Sportplatz‘, ‚Ausgabe Turnhalle Nord‘.“
+    pub fn angelegt(
+        bezeichnung: &str,
+        zeitraum: &str,
+        b: &Bedarf,
+        art: Option<Verpflegungsart>,
+        stellen: &[String],
+    ) -> String {
+        let mut zusatz = String::new();
+        if let Some(art) = art {
+            zusatz.push_str(&format!("; {}", art.wort()));
+        }
+        if !stellen.is_empty() {
+            zusatz.push_str(&format!("; an {}", stellen_text(stellen)));
+        }
         format!(
-            "Verpflegung {} {zeitraum} angelegt: Bedarf {} EP{}{}.",
+            "Verpflegung {} {zeitraum} angelegt: Bedarf {} EP{}{}{zusatz}.",
             q(bezeichnung),
             b.gesamt,
             aufteilung(b),
             davon_sonderkost(b)
         )
+    }
+
+    /// System-ETB beim Statuswechsel einer Verpflegungsstelle (LLH-1040 D7, Muster
+    /// `bereitstellungsraum::etb_text_status`): „Verpflegungsstelle ‚Feldküche BR Sportplatz‘
+    /// (Feldküche) in Betrieb genommen.“ bzw. „… aufgelöst.“; `geplant` schreibt keinen Eintrag.
+    pub fn stelle_status(
+        bezeichnung: &str,
+        art: VerpflegungsstelleArt,
+        status: VerpflegungsstelleStatus,
+    ) -> Option<String> {
+        let was = match status {
+            VerpflegungsstelleStatus::Geplant => return None,
+            VerpflegungsstelleStatus::Aktiv => "in Betrieb genommen",
+            VerpflegungsstelleStatus::Aufgeloest => "aufgelöst",
+        };
+        Some(format!(
+            "Verpflegungsstelle {} ({}) {was}.",
+            q(bezeichnung),
+            art.wort()
+        ))
     }
 
     /// Was sich an einem Zeitfenster geändert hat. `None` = unverändert.
@@ -334,6 +464,10 @@ pub mod etb_text {
         pub aufteilung: bool,
         /// Sonderkost-Summe vorher, wenn sich die Sonderkost geändert hat.
         pub sonderkost_vorher: Option<i64>,
+        /// `(jetzt, vorher)`, wenn sich die Verpflegungsart geändert hat (LLH-1040).
+        pub art: Option<(Option<Verpflegungsart>, Option<Verpflegungsart>)>,
+        /// `(jetzt, vorher)` als Bezeichnungen, wenn sich die Menge der Stellen geändert hat.
+        pub stellen: Option<(&'a [String], &'a [String])>,
     }
 
     impl Aenderungen<'_> {
@@ -343,6 +477,8 @@ pub mod etb_text {
                 && self.gesamt_vorher.is_none()
                 && !self.aufteilung
                 && self.sonderkost_vorher.is_none()
+                && self.art.is_none()
+                && self.stellen.is_none()
         }
     }
 
@@ -372,6 +508,20 @@ pub mod etb_text {
             } else {
                 teile.push(format!("Sonderkost {n} (vorher {v})"));
             }
+        }
+        if let Some((jetzt, vorher)) = a.art {
+            teile.push(format!(
+                "Art {} (vorher {})",
+                art_text(jetzt),
+                art_text(vorher)
+            ));
+        }
+        if let Some((jetzt, vorher)) = a.stellen {
+            teile.push(format!(
+                "Stellen {} (vorher {})",
+                stellen_text(jetzt),
+                stellen_text(vorher)
+            ));
         }
         let kopf = match a.gesamt_vorher {
             Some(_) => format!("Verpflegung {} {zeitraum}", q(bezeichnung)),

@@ -178,7 +178,7 @@ fn etb_angelegt_nennt_zeitraum_bedarf_aufteilung_und_sonderkost() {
         },
     );
     assert_eq!(
-        etb_text::angelegt("Mittag", "24.09. 12:00–13:30", &b),
+        etb_text::angelegt("Mittag", "24.09. 12:00–13:30", &b, None, &[]),
         "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
          70 Betreute), davon 15 Sonderkost."
     );
@@ -186,7 +186,9 @@ fn etb_angelegt_nennt_zeitraum_bedarf_aufteilung_und_sonderkost() {
         etb_text::angelegt(
             "Nacht",
             "24.09. 23:00–25.09. 01:00",
-            &bedarf(0, 0, 0, Sonderkost::default())
+            &bedarf(0, 0, 0, Sonderkost::default()),
+            None,
+            &[]
         ),
         "Verpflegung ‚Nacht‘ 24.09. 23:00–25.09. 01:00 angelegt: Bedarf 0 EP."
     );
@@ -251,5 +253,131 @@ fn etb_geloescht_nennt_zeitraum_und_bedarf() {
             &bedarf(180, 70, 0, Sonderkost::default())
         ),
         "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 gelöscht (Bedarf 250 EP)."
+    );
+}
+
+// ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
+
+fn namen(n: &[&str]) -> Vec<String> {
+    n.iter().map(|s| s.to_string()).collect()
+}
+
+/// design.md D7: Art und Stellen hängen nur an, wenn gesetzt.
+#[test]
+fn etb_angelegt_nennt_art_und_stellen_nur_wenn_gesetzt() {
+    let b = bedarf(
+        180,
+        70,
+        0,
+        Sonderkost {
+            vegan: 15,
+            ..Sonderkost::default()
+        },
+    );
+    let stellen = namen(&["Feldküche BR Sportplatz", "Ausgabe Turnhalle Nord"]);
+    assert_eq!(
+        etb_text::angelegt(
+            "Mittag",
+            "24.09. 12:00–13:30",
+            &b,
+            Some(Verpflegungsart::Warm),
+            &stellen
+        ),
+        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
+         70 Betreute), davon 15 Sonderkost; warm; an ‚Feldküche BR Sportplatz‘, \
+         ‚Ausgabe Turnhalle Nord‘."
+    );
+    assert_eq!(
+        etb_text::angelegt(
+            "Getränke",
+            "24.09. 12:00–13:30",
+            &bedarf(120, 0, 0, Sonderkost::default()),
+            Some(Verpflegungsart::Getraenke),
+            &[]
+        ),
+        "Verpflegung ‚Getränke‘ 24.09. 12:00–13:30 angelegt: Bedarf 120 EP (120 Kräfte); \
+         Getränke."
+    );
+    assert_eq!(
+        etb_text::angelegt(
+            "Mittag",
+            "24.09. 12:00–13:30",
+            &bedarf(10, 0, 0, Sonderkost::default()),
+            None,
+            &namen(&["Zuführung Deich"])
+        ),
+        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 10 EP (10 Kräfte); an \
+         ‚Zuführung Deich‘."
+    );
+}
+
+#[test]
+fn etb_geaendert_nennt_art_und_stellen_jetzt_und_vorher() {
+    let b = bedarf(180, 70, 0, Sonderkost::default());
+    let jetzt = namen(&["A", "B"]);
+    let vorher = namen(&["A"]);
+    let a = etb_text::Aenderungen {
+        art: Some((Some(Verpflegungsart::Kalt), Some(Verpflegungsart::Warm))),
+        stellen: Some((&jetzt, &vorher)),
+        ..Default::default()
+    };
+    assert!(!a.leer());
+    assert_eq!(
+        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
+        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art kalt \
+         (vorher warm), Stellen ‚A‘, ‚B‘ (vorher ‚A‘)."
+    );
+    let a = etb_text::Aenderungen {
+        art: Some((None, Some(Verpflegungsart::Getraenke))),
+        stellen: Some((&[], &vorher)),
+        ..Default::default()
+    };
+    assert_eq!(
+        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
+        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art ohne Angabe \
+         (vorher Getränke), Stellen keine (vorher ‚A‘)."
+    );
+    let a = etb_text::Aenderungen {
+        art: Some((Some(Verpflegungsart::Warm), None)),
+        stellen: Some((&vorher, &[])),
+        ..Default::default()
+    };
+    assert_eq!(
+        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
+        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art warm \
+         (vorher ohne Angabe), Stellen ‚A‘ (vorher keine)."
+    );
+}
+
+/// design.md D7, Muster `bereitstellungsraum::etb_text_status`.
+#[test]
+fn etb_stelle_status_in_betrieb_aufgeloest_und_geplant_ohne_text() {
+    use stelle::{VerpflegungsstelleArt as Art, VerpflegungsstelleStatus as St};
+    assert_eq!(
+        etb_text::stelle_status("Feldküche BR Sportplatz", Art::Feldkueche, St::Aktiv).as_deref(),
+        Some("Verpflegungsstelle ‚Feldküche BR Sportplatz‘ (Feldküche) in Betrieb genommen.")
+    );
+    assert_eq!(
+        etb_text::stelle_status("Ausgabe Turnhalle Nord", Art::Ausgabestelle, St::Aufgeloest)
+            .as_deref(),
+        Some("Verpflegungsstelle ‚Ausgabe Turnhalle Nord‘ (Ausgabestelle) aufgelöst.")
+    );
+    assert_eq!(
+        etb_text::stelle_status("Zuführung Deich", Art::Zufuehrung, St::Geplant),
+        None
+    );
+}
+
+/// design.md D5: 21 Einträge sind 400, auch wenn sie entdoppelt weniger wären; danach
+/// entdoppelt in der Reihenfolge des ersten Auftretens.
+#[test]
+fn stelle_ids_grenze_vor_dem_entdoppeln() {
+    assert_eq!(stelle_ids_entdoppeln(&[3, 3, 4]).unwrap(), vec![3, 4]);
+    assert_eq!(stelle_ids_entdoppeln(&[]).unwrap(), Vec::<i64>::new());
+    let zwanzig: Vec<i64> = (1..=20).collect();
+    assert_eq!(stelle_ids_entdoppeln(&zwanzig).unwrap(), zwanzig);
+    assert_eq!(
+        stelle_ids_entdoppeln(&[7; 21]).unwrap_err().status(),
+        StatusCode::BAD_REQUEST
     );
 }

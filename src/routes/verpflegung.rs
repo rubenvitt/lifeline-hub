@@ -9,10 +9,19 @@
 //!
 //! **Statuscodes** (design.md D4, src/AGENTS.md „Statuscode-Konvention“):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, leere Bezeichnung, negativer
-//!   Bedarfsteil oder Kostform, Menge ≤ 0, unlesbarer Zeitpunkt.
-//! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung.
+//!   Bedarfsteil oder Kostform, Menge ≤ 0, unlesbarer Zeitpunkt, Freitext über seiner Grenze
+//!   (`*_MAX`, LLH-1040 D10), unbekannte Art, Verpflegungsart oder Status, mehr als
+//!   `STELLEN_JE_ZEITFENSTER_MAX` Stellen.
+//! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung, fremde
+//!   Verpflegungsstelle im Pfad, fremder Abschnitt.
+//! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Bezeichnung einer
+//!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle mit einem Zeitpunkt nicht vor der
+//!   Auflösung (LLH-1040 D3).
 //! - **422** — der Zusammenhang: Ende nicht nach Beginn, Sonderkost über Gesamtbedarf bzw.
-//!   Menge, Löschen mit gültiger Ausgabe, zweite Rücknahme.
+//!   Menge, Löschen mit gültiger Ausgabe, zweite Rücknahme, unzulässiger Statusübergang einer
+//!   Stelle, Storno einer nicht geplanten Stelle oder einer Stelle mit Ausgabe, halbe Koordinate,
+//!   Verweis im Body (Ausgabe, Zuordnung) auf eine fremde, unbekannte oder stornierte Stelle,
+//!   neue Zuordnung einer aufgelösten Stelle.
 //!
 //! Die fachlichen Prüfungen liegen im Repo; die Route liest JSON, normalisiert die Zeitpunkte
 //! (`etb::normalisiere_zeit`), lädt ETB-Startwert und Org-Zeitzone und öffnet die Transaktion —
@@ -21,7 +30,8 @@
 //! **Live** nach dem Commit (design.md D5/D6): zuerst der ETB-Kurzruf je Eintrag, dann
 //! `LiveEvent::Verpflegung` mit `{einsatz_id}` — keine Mengen, Bezeichnungen oder Freitexte.
 //! Ein Ändern ohne wirksame Änderung (leere `etb_ids`) publiziert nichts. Ausgabe und Rücknahme
-//! schreiben keinen ETB-Eintrag und publizieren nur das Modul-Ereignis.
+//! schreiben keinen ETB-Eintrag und publizieren nur das Modul-Ereignis. Die Stellen (LLH-1040)
+//! publizieren dasselbe Ereignis; nur ihr Statuswechsel schreibt ETB.
 
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -36,11 +46,18 @@ use crate::einsatz::modul::Verpflegung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::routes::support::optional_max;
-use crate::verpflegung::repo::{self, AusgabeEingabe, ZeitfensterAenderung, ZeitfensterEingabe};
+use crate::routes::support::{
+    deserialize_optional_field, optional_max, parse_enum, parse_enum_opt,
+};
+use crate::verpflegung::repo::{
+    self, AusgabeEingabe, StelleAenderung, StelleEingabe, ZeitfensterAenderung, ZeitfensterEingabe,
+};
+use crate::verpflegung::stelle::{
+    VerpflegungsstelleAnzeige, VerpflegungsstelleArt, VerpflegungsstelleStatus,
+};
 use crate::verpflegung::{
-    self,
-    AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
+    self, stelle_ids_entdoppeln, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
+    Verpflegungsart, ZeitfensterAnzeige,
 };
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
@@ -60,6 +77,15 @@ fn zeit(s: &str) -> Result<String, AppError> {
 
 fn zeit_opt(s: Option<String>) -> Result<Option<String>, AppError> {
     s.as_deref().map(zeit).transpose()
+}
+
+/// Verpflegungsart von außen; unbekannt → 400.
+fn art_lesen(s: Option<&str>) -> Result<Option<Verpflegungsart>, AppError> {
+    parse_enum_opt(
+        Verpflegungsart::parse,
+        s,
+        "Unbekannte Verpflegungsart (erlaubt: warm, kalt, getraenke)",
+    )
 }
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
@@ -90,6 +116,12 @@ pub struct ZeitfensterAnlegen {
     /// Fehlt, oder fehlende Kostform = 0.
     #[serde(default)]
     sonderkost: Option<SonderkostEingabe>,
+    /// `warm`, `kalt`, `getraenke`; fehlt = ohne Angabe (LLH-1040 D8).
+    #[serde(default)]
+    verpflegungsart: Option<String>,
+    /// Zugeordnete Stellen; fehlt oder leer = einsatzweit (LLH-1040 D5).
+    #[serde(default)]
+    stelle_ids: Option<Vec<i64>>,
 }
 
 /// POST /api/einsaetze/{id}/verpflegung/zeitfenster
@@ -99,6 +131,8 @@ pub async fn zeitfenster_anlegen(
     JsonBody(req): JsonBody<ZeitfensterAnlegen>,
 ) -> Result<(StatusCode, Json<ZeitfensterAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // 400 vor jeder Abfrage (D5): Grenze der Stellenliste, gezählt vor dem Entdoppeln.
+    let stelle_ids = stelle_ids_entdoppeln(req.stelle_ids.as_deref().unwrap_or_default())?;
     let eingabe = ZeitfensterEingabe {
         bezeichnung: req.bezeichnung,
         von_at: zeit(&req.von_at)?,
@@ -107,6 +141,8 @@ pub async fn zeitfenster_anlegen(
         bedarf_betreute: req.bedarf_betreute,
         bedarf_weitere: req.bedarf_weitere.unwrap_or(0),
         sonderkost: req.sonderkost.unwrap_or_default(),
+        verpflegungsart: art_lesen(req.verpflegungsart.as_deref())?,
+        stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
@@ -138,6 +174,12 @@ pub struct ZeitfensterAendern {
     bedarf_weitere: Option<i64>,
     #[serde(default)]
     sonderkost: Option<SonderkostEingabe>,
+    /// Tri-State: fehlt = unverändert, `null` = leeren.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    verpflegungsart: Option<Option<String>>,
+    /// Fehlt = unverändert; eine Liste ersetzt die Zuordnung, `[]` leert sie.
+    #[serde(default)]
+    stelle_ids: Option<Vec<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}
@@ -148,6 +190,16 @@ pub async fn zeitfenster_aendern(
     JsonBody(req): JsonBody<ZeitfensterAendern>,
 ) -> Result<Json<ZeitfensterAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // 400 vor jeder Abfrage (D5).
+    let stelle_ids = req
+        .stelle_ids
+        .as_deref()
+        .map(stelle_ids_entdoppeln)
+        .transpose()?;
+    let verpflegungsart = req
+        .verpflegungsart
+        .map(|a| art_lesen(a.as_deref()))
+        .transpose()?;
     let aenderung = ZeitfensterAenderung {
         bezeichnung: req.bezeichnung,
         von_at: zeit_opt(req.von_at)?,
@@ -156,6 +208,8 @@ pub async fn zeitfenster_aendern(
         bedarf_betreute: req.bedarf_betreute,
         bedarf_weitere: req.bedarf_weitere,
         sonderkost: req.sonderkost.unwrap_or_default(),
+        verpflegungsart,
+        stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
@@ -218,6 +272,10 @@ pub struct AusgabeErfassen {
     nachforderung_id: Option<i64>,
     #[serde(default)]
     bemerkung: Option<String>,
+    /// Verpflegungsstelle desselben Einsatzes (LLH-1040 D3); fremd, unbekannt oder storniert 422,
+    /// aufgelöst 409 (außer mit einem Zeitpunkt vor der Auflösung).
+    #[serde(default)]
+    verpflegungsstelle_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688): leer = fehlend, > 64 Zeichen = 400.
     #[serde(default)]
     client_id: Option<String>,
@@ -285,6 +343,7 @@ pub async fn ausgabe_erfassen(
         bemerkung,
         sonderkost: req.sonderkost.unwrap_or_default(),
         nachforderung_id: req.nachforderung_id,
+        verpflegungsstelle_id: req.verpflegungsstelle_id,
         client_id,
     };
     let benutzer_id = ctx.benutzer.id;
@@ -330,4 +389,147 @@ pub async fn ausgabe_zuruecknehmen(
         ausgabe_id: a.ausgabe_id,
         zeitfenster: repo::zeitfenster_laden(&state.pool, einsatz_id, a.zeitfenster_id).await?,
     }))
+}
+
+// ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct StelleAnlegen {
+    bezeichnung: String,
+    /// `feldkueche`, `ausgabestelle`, `zufuehrung`; unbekannt → 400.
+    art: String,
+    #[serde(default)]
+    standort: Option<String>,
+    #[serde(default)]
+    lat: Option<f64>,
+    #[serde(default)]
+    lon: Option<f64>,
+    #[serde(default)]
+    abschnitt_id: Option<i64>,
+}
+
+fn stelle_art_lesen(s: &str) -> Result<VerpflegungsstelleArt, AppError> {
+    parse_enum(
+        VerpflegungsstelleArt::parse,
+        s,
+        "Unbekannte Art der Verpflegungsstelle (erlaubt: feldkueche, ausgabestelle, zufuehrung)",
+    )
+}
+
+/// POST /api/einsaetze/{id}/verpflegung/stellen — legt eine Stelle `geplant` an, ohne ETB.
+pub async fn create_stelle(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    JsonBody(req): JsonBody<StelleAnlegen>,
+) -> Result<(StatusCode, Json<VerpflegungsstelleAnzeige>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let eingabe = StelleEingabe {
+        bezeichnung: req.bezeichnung,
+        art: stelle_art_lesen(&req.art)?,
+        standort: req.standort,
+        lat: req.lat,
+        lon: req.lon,
+        abschnitt_id: req.abschnitt_id,
+    };
+    let benutzer_id = ctx.benutzer.id;
+    let g = crate::write_retry!(&state.pool, |conn| {
+        repo::create_stelle_tx(conn, einsatz_id, benutzer_id, &eingabe).await
+    })?;
+    publiziere(&state, einsatz_id, &g.etb_ids);
+    Ok((
+        StatusCode::CREATED,
+        Json(repo::stelle_laden(&state.pool, einsatz_id, g.id).await?),
+    ))
+}
+
+/// Teiländerung: jedes fehlende Feld bleibt; `standort`, `lat`, `lon`, `abschnitt_id` leert
+/// `null`.
+#[derive(Debug, Deserialize)]
+pub struct StelleAendern {
+    #[serde(default)]
+    bezeichnung: Option<String>,
+    #[serde(default)]
+    art: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    standort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    abschnitt_id: Option<Option<i64>>,
+}
+
+/// PATCH /api/einsaetze/{id}/verpflegung/stellen/{sid} — ohne ETB; auch eine aufgelöste Stelle.
+pub async fn update_stelle(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<StelleAendern>,
+) -> Result<Json<VerpflegungsstelleAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let aenderung = StelleAenderung {
+        bezeichnung: req.bezeichnung,
+        art: req.art.as_deref().map(stelle_art_lesen).transpose()?,
+        standort: req.standort,
+        lat: req.lat,
+        lon: req.lon,
+        abschnitt_id: req.abschnitt_id,
+    };
+    let g = crate::write_retry!(&state.pool, |conn| {
+        repo::update_stelle_tx(conn, einsatz_id, sid, &aenderung).await
+    })?;
+    if g.geaendert {
+        publiziere(&state, einsatz_id, &g.etb_ids);
+    }
+    Ok(Json(
+        repo::stelle_laden(&state.pool, einsatz_id, sid).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StelleStatus {
+    /// `aktiv` oder `aufgeloest`; unbekannt → 400, unzulässiger Übergang → 422.
+    status: String,
+}
+
+/// POST /api/einsaetze/{id}/verpflegung/stellen/{sid}/status — ETB bei `aktiv` und
+/// `aufgeloest` in derselben Transaktion.
+pub async fn update_stelle_status(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<StelleStatus>,
+) -> Result<Json<VerpflegungsstelleAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let nach = parse_enum(
+        VerpflegungsstelleStatus::parse,
+        &req.status,
+        "Unbekannter Status der Verpflegungsstelle (erlaubt: geplant, aktiv, aufgeloest)",
+    )?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let g = crate::write_retry!(&state.pool, |conn| {
+        repo::update_stelle_status_tx(conn, einsatz_id, sid, benutzer_id, startwert, nach).await
+    })?;
+    publiziere(&state, einsatz_id, &g.etb_ids);
+    Ok(Json(
+        repo::stelle_laden(&state.pool, einsatz_id, sid).await?,
+    ))
+}
+
+/// DELETE /api/einsaetze/{id}/verpflegung/stellen/{sid} — Storno einer geplanten Stelle ohne
+/// Ausgabe, ohne ETB.
+pub async fn stelle_stornieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let benutzer_id = ctx.benutzer.id;
+    let g = crate::write_retry!(&state.pool, |conn| {
+        repo::stelle_stornieren_tx(conn, einsatz_id, sid, benutzer_id).await
+    })?;
+    publiziere(&state, einsatz_id, &g.etb_ids);
+    Ok(StatusCode::NO_CONTENT)
 }
