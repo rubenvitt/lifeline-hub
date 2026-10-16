@@ -300,6 +300,9 @@ pub const MAX_EP: i64 = 100_000;
 
 /// Bezeichnung eines Zeitfensters („Mittag“).
 pub const ZEITFENSTER_BEZEICHNUNG_MAX: usize = 200;
+/// Zeitfenster je Anfrage „Tag aus der Vorlage anlegen“ (LLH-1058, design.md D13): eine Mahlzeit
+/// je Stunde; ein echter Plan hat drei bis sechs. Darüber 400 vor jedem Schreiben.
+pub const AUS_VORLAGE_MAX: usize = 24;
 /// Bezeichnung einer Verpflegungsstelle („Feldküche BR Sportplatz“). Gelangt ins ETB (D7).
 pub const STELLE_BEZEICHNUNG_MAX: usize = 200;
 /// Standort einer Verpflegungsstelle (Freitext, Adresse möglich).
