@@ -2549,6 +2549,25 @@ async fn abweisen_loest_auf_und_entlaesst() {
             .await
             .unwrap();
     assert!(aufgeloest.is_some());
+    // Abgewiesen ist nicht mehr offen: kein Kennzeichen, die Herkunft bleibt (Spec „Kennzeichen“).
+    let aufgeloeste = fetch_json(
+        &app,
+        &cookie,
+        &format!("/api/einsaetze/{eid}/einheiten?aufgeloeste=1"),
+    )
+    .await;
+    let abgewiesen = aufgeloeste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .cloned()
+        .unwrap_or_else(|| panic!("abgewiesene Einheit fehlt: {aufgeloeste}"));
+    assert!(
+        abgewiesen.get("nicht_uebernommen_seit").is_none(),
+        "{abgewiesen}"
+    );
+    assert_eq!(abgewiesen["unangemeldet"], true);
     assert!(meldung_bestaetigt(&pool, meldung).await);
     assert!(etb_inhalte(&app, &cookie, eid).await.contains(
         &"Einheit «FL-MUS 1-44-1» abgewiesen: verlässt BR Sportplatz, aufgelöst, \
