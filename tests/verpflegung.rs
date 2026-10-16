@@ -941,3 +941,168 @@ async fn replay_verteilt_kein_live_ereignis() {
         "ein Replay verteilt nichts"
     );
 }
+
+// ── Eingabegrenzen (LLH-1040, design.md D10) ────────────────────────────────────────────────
+
+/// Spec `eingabegrenzen` „Freitexte und Stellenlisten der Verpflegung sind begrenzt“: je Feld
+/// 201 an der Grenze, 400 darüber, nichts geschrieben; die Grenze läuft vor dem 422 „Ende nicht
+/// nach Beginn“.
+#[tokio::test]
+async fn grenzen_der_freitexte_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zf_body = |bez: &str| {
+        serde_json::json!({
+            "bezeichnung": bez,
+            "von_at": "2026-09-24T10:00:00Z",
+            "bis_at": "2026-09-24T11:30:00Z",
+            "bedarf_kraefte": 10,
+            "bedarf_betreute": 0,
+        })
+        .to_string()
+    };
+    let zf_url = format!("{}/zeitfenster", pfad(e));
+
+    // Zeitfenster-Bezeichnung beim Anlegen: 200 geht, 201 nicht (Leerraum zählt nicht).
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &zf_url,
+        &admin,
+        Some(&zf_body(&"m".repeat(201))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, zf) = anfrage(
+        &app,
+        "POST",
+        &zf_url,
+        &admin,
+        Some(&zf_body(&format!("  {}  ", "m".repeat(200)))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{zf:?}");
+    let zid = zf["id"].as_i64().unwrap();
+
+    // 400 vor dem 422: zu lange Bezeichnung UND Ende vor Beginn.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &zf_url,
+        &admin,
+        Some(
+            &serde_json::json!({
+                "bezeichnung": "m".repeat(201),
+                "von_at": "2026-09-24T11:00:00Z",
+                "bis_at": "2026-09-24T10:00:00Z",
+                "bedarf_kraefte": 10,
+                "bedarf_betreute": 0,
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Grenze vor dem Zusammenhang");
+
+    // Zeitfenster-Bezeichnung beim Ändern, auch vor dem 422.
+    let zid_url = format!("{}/zeitfenster/{zid}", pfad(e));
+    for body in [
+        serde_json::json!({ "bezeichnung": "m".repeat(201) }),
+        serde_json::json!({ "bezeichnung": "m".repeat(201), "bis_at": "2026-09-24T09:00:00Z" }),
+    ] {
+        let (s, _) = anfrage(&app, "PATCH", &zid_url, &admin, Some(&body.to_string())).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &zid_url,
+        &admin,
+        Some(&serde_json::json!({ "bezeichnung": "n".repeat(200) }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Ort (500) und Bemerkung (2 000) einer Ausgabe.
+    let aus_url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    for (feld, max) in [("ort", 500), ("bemerkung", 2_000)] {
+        let (s, _) = anfrage(
+            &app,
+            "POST",
+            &aus_url,
+            &admin,
+            Some(&serde_json::json!({ "menge": 1, feld: "x".repeat(max + 1) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld} über der Grenze");
+        let (s, _) = anfrage(
+            &app,
+            "POST",
+            &aus_url,
+            &admin,
+            Some(&serde_json::json!({ "menge": 1, feld: "x".repeat(max) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{feld} an der Grenze");
+    }
+    // Vor dem 422 der Teilmenge.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &aus_url,
+        &admin,
+        Some(
+            &serde_json::json!({ "menge": 1, "ort": "x".repeat(501), "sonderkost": { "vegan": 5 } })
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Grenze vor der Teilmenge");
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["zeitfenster"].as_array().unwrap().len(), 1);
+    assert_eq!(u["zeitfenster"][0]["ausgaben"].as_array().unwrap().len(), 2);
+}
+
+/// Spec `eingabegrenzen` „Replay einer alten Ausgabe mit langem Ort“: eine vor der Grenze
+/// gespeicherte Ausgabe kommt beim erneuten Senden mit 201 zurück, nicht mit 400.
+#[tokio::test]
+async fn replay_vor_der_grenzpruefung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let lang = "o".repeat(600);
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO verpflegung_ausgabe \
+            (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, erfasst_von_id, client_id) \
+         VALUES (?, ?, '2026-09-24 10:10:00', 40, ?, 1, 'alt-1') RETURNING id",
+    )
+    .bind(e)
+    .bind(zid)
+    .bind(&lang)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let wieder = ausgabe(
+        &app,
+        &admin,
+        e,
+        zid,
+        &serde_json::json!({ "menge": 40, "ort": lang, "client_id": "alt-1" }).to_string(),
+    )
+    .await;
+    assert_eq!(wieder["ausgabe_id"], aid);
+    assert_eq!(
+        wieder["zeitfenster"]["ausgaben"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        wieder["zeitfenster"]["ausgaben"][0]["ort"]
+            .as_str()
+            .unwrap()
+            .len(),
+        600,
+        "Bestand über der Grenze bleibt lesbar"
+    );
+}

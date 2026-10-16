@@ -8,7 +8,7 @@ use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     auftrag, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fahrzeug, fuehrung,
     infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material, nachforderung,
-    personal, presse, schaden, sprechgruppe, vorlagendokument,
+    personal, presse, schaden, sprechgruppe, verpflegung, vorlagendokument,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -96,6 +96,21 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("SAMMEL_MAX", kraefte_disposition::SAMMEL_MAX),
         ("EINHEIT_NAME_MAX", einheit::NAME_MAX),
         ("ERWAEHNUNGEN_MAX", chat::erwaehnung::ERWAEHNUNGEN_MAX),
+        (
+            "VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX",
+            verpflegung::ZEITFENSTER_BEZEICHNUNG_MAX,
+        ),
+        (
+            "VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX",
+            verpflegung::STELLE_BEZEICHNUNG_MAX,
+        ),
+        ("VERPFLEGUNG_STANDORT_MAX", verpflegung::STANDORT_MAX),
+        ("VERPFLEGUNG_ORT_MAX", verpflegung::ORT_MAX),
+        ("VERPFLEGUNG_BEMERKUNG_MAX", verpflegung::BEMERKUNG_MAX),
+        (
+            "VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX",
+            verpflegung::STELLEN_JE_ZEITFENSTER_MAX,
+        ),
     ])
 }
 

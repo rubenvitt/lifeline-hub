@@ -36,8 +36,10 @@ use crate::einsatz::modul::Verpflegung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
+use crate::routes::support::optional_max;
 use crate::verpflegung::repo::{self, AusgabeEingabe, ZeitfensterAenderung, ZeitfensterEingabe};
 use crate::verpflegung::{
+    self,
     AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
 };
 
@@ -254,6 +256,11 @@ pub async fn ausgabe_erfassen(
         }
     }
     ctx.fordere_aktiv()?;
+    // Grenzen erst NACH dem Replay-Lookup (design.md D10): eine vor der Grenze gespeicherte
+    // Ausgabe käme sonst beim erneuten Senden mit 400 zurück und fiele in den
+    // Wiederherstellungsbereich, obwohl sie längst gebucht ist.
+    let ort = optional_max(req.ort, "ort", verpflegung::ORT_MAX)?;
+    let bemerkung = optional_max(req.bemerkung, "bemerkung", verpflegung::BEMERKUNG_MAX)?;
     let zeitpunkt_at = match req.zeitpunkt_at.as_deref().map(str::trim) {
         Some(s) if !s.is_empty() => zeit(s)?,
         _ => crate::zeit::jetzt(),
@@ -274,8 +281,8 @@ pub async fn ausgabe_erfassen(
     let eingabe = AusgabeEingabe {
         zeitpunkt_at,
         menge: req.menge,
-        ort: req.ort,
-        bemerkung: req.bemerkung,
+        ort,
+        bemerkung,
         sonderkost: req.sonderkost.unwrap_or_default(),
         nachforderung_id: req.nachforderung_id,
         client_id,

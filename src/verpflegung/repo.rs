@@ -28,7 +28,7 @@ use super::{
     SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
 };
 use crate::error::AppError;
-use crate::routes::support::pflicht;
+use crate::routes::support::pflicht_max;
 
 /// Eingabe „Zeitfenster anlegen“. Die Route hat JSON gelesen und die Zeitpunkte normalisiert
 /// (UTC, `YYYY-MM-DD HH:MM:SS`); Bezeichnung, Bedarf, Sonderkost und Zeitregel prüft das Repo.
@@ -386,7 +386,11 @@ pub async fn zeitfenster_anlegen_tx(
     eingabe: &ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     // 400 — jedes Feld für sich
-    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
+    let bezeichnung = pflicht_max(
+        &eingabe.bezeichnung,
+        "bezeichnung",
+        super::ZEITFENSTER_BEZEICHNUNG_MAX,
+    )?;
     draht_lesen("von_at", &eingabe.von_at)?;
     draht_lesen("bis_at", &eingabe.bis_at)?;
     anzahl_pruefen("bedarf_kraefte", eingabe.bedarf_kraefte)?;
@@ -456,7 +460,7 @@ pub async fn zeitfenster_aendern_tx(
 
     // 400 — jedes übergebene Feld für sich
     let bezeichnung = match &a.bezeichnung {
-        Some(b) => pflicht(b, "bezeichnung")?,
+        Some(b) => pflicht_max(b, "bezeichnung", super::ZEITFENSTER_BEZEICHNUNG_MAX)?,
         None => roh.bezeichnung.clone(),
     };
     let von_at = a.von_at.clone().unwrap_or_else(|| roh.von_at.clone());

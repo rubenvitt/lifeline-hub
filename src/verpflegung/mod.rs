@@ -228,6 +228,25 @@ pub struct AusgabeErgebnis {
 /// sich, also 400.
 pub const MAX_EP: i64 = 100_000;
 
+// ── Eingabegrenzen (LLH-1040, design.md D10) ────────────────────────────────────────────────
+//
+// Zeichen nach dem Trimmen, 400 vor jedem 422 (`src/AGENTS.md`, „Eingabegrenzen“), gespiegelt in
+// `frontend/src/api/eingabegrenzen.ts` (`VERPFLEGUNG_*`). Bestand über der Grenze bleibt lesbar;
+// geprüft werden nur neue Schreibvorgänge.
+
+/// Bezeichnung eines Zeitfensters („Mittag“).
+pub const ZEITFENSTER_BEZEICHNUNG_MAX: usize = 200;
+/// Bezeichnung einer Verpflegungsstelle („Feldküche BR Sportplatz“). Gelangt ins ETB (D7).
+pub const STELLE_BEZEICHNUNG_MAX: usize = 200;
+/// Standort einer Verpflegungsstelle (Freitext, Adresse möglich).
+pub const STANDORT_MAX: usize = 500;
+/// Ort einer Ausgabe („Zuführungsziel“).
+pub const ORT_MAX: usize = 500;
+/// Bemerkung einer Ausgabe.
+pub const BEMERKUNG_MAX: usize = 2_000;
+/// Stellen je Zeitfenster im Request, gezählt vor dem Entdoppeln.
+pub const STELLEN_JE_ZEITFENSTER_MAX: usize = 20;
+
 /// Liest einen Zeitpunkt im Drahtformat. Als Rundreise: chrono nimmt beim Parsen auch
 /// ungepolsterte Felder an, die als Text falsch sortierten. Unlesbar → 400.
 pub fn draht_lesen(feld: &str, s: &str) -> Result<DateTime<Utc>, AppError> {
