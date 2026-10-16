@@ -96,7 +96,7 @@ pub struct NeuesFahrzeug {
 /// Geprüfte unangemeldete Kraft.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unangemeldet {
-    /// Entdoppelt (gleicher Funkrufname nach [`normalisiere`] nur einmal), mindestens eins.
+    /// Entdoppelt (gleicher Funkrufname nach [`normalize`] nur einmal), mindestens eins.
     pub fahrzeuge: Vec<NeuesFahrzeug>,
     pub staerke: Option<Staerke>,
     pub bemerkung: Option<String>,
@@ -111,14 +111,14 @@ pub enum Erfassung {
 }
 
 impl Erfassung {
-    pub fn ist_unangemeldet(&self) -> bool {
+    pub fn is_unangemeldet(&self) -> bool {
         matches!(self, Erfassung::Unangemeldet(_))
     }
 }
 
 /// Feldprüfung vor jedem Schreiben (design.md D2): 400 für jedes Feld für sich, danach 422,
 /// wenn `kraft` und `unangemeldet` zugleich kommen. Weder noch → 400.
-pub fn pruefe(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
+pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
     if eingabe.kraft.is_none() && eingabe.unangemeldet.is_none() {
         return Err(AppError::Validation(
             "Kraft oder unangemeldete Kraft fehlt".into(),
@@ -141,7 +141,7 @@ pub fn pruefe(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
     let unangemeldet = eingabe
         .unangemeldet
         .as_ref()
-        .map(pruefe_unangemeldet)
+        .map(check_unangemeldet)
         .transpose()?;
     match (bekannt, unangemeldet) {
         (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
@@ -153,7 +153,7 @@ pub fn pruefe(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
     }
 }
 
-fn pruefe_unangemeldet(u: &UnangemeldetEingabe) -> Result<Unangemeldet, AppError> {
+fn check_unangemeldet(u: &UnangemeldetEingabe) -> Result<Unangemeldet, AppError> {
     use crate::fahrzeug::ADHOC_TEXT_MAX;
     if u.fahrzeuge.is_empty() {
         return Err(AppError::Validation(
@@ -178,10 +178,10 @@ fn pruefe_unangemeldet(u: &UnangemeldetEingabe) -> Result<Unangemeldet, AppError
                 ADHOC_TEXT_MAX,
             )?,
         };
-        let schluessel = normalisiere(&neu.funkrufname);
+        let schluessel = normalize(&neu.funkrufname);
         if !fahrzeuge
             .iter()
-            .any(|g| normalisiere(&g.funkrufname) == schluessel)
+            .any(|g| normalize(&g.funkrufname) == schluessel)
         {
             fahrzeuge.push(neu);
         }
@@ -206,7 +206,7 @@ fn pruefe_unangemeldet(u: &UnangemeldetEingabe) -> Result<Unangemeldet, AppError
 
 /// Vergleichsform eines Funkrufnamens (D9): ohne Rand-Leerzeichen, Leerzeichenfolgen zu einem,
 /// ohne Groß/Klein (Unicode, `to_lowercase`; SQL-`lower()` faltet nur ASCII).
-pub fn normalisiere(s: &str) -> String {
+pub fn normalize(s: &str) -> String {
     s.split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -290,7 +290,7 @@ pub async fn eintreffen_tx(
     erfassung: &Erfassung,
 ) -> Result<Gebucht, AppError> {
     // 1. Raum in der Transaktion (gegen das Rennen mit „Auflösen“): sonst 404/422.
-    let br = belegung_repo::fordere_belegbar_tx(&mut *conn, r.einsatz_id, r.br_id).await?;
+    let br = belegung_repo::require_belegbar_tx(&mut *conn, r.einsatz_id, r.br_id).await?;
     match erfassung {
         Erfassung::Bekannt { typ, objekt_id } => {
             bekannt_tx(conn, r, &br.bezeichnung, *typ, *objekt_id).await
@@ -426,7 +426,7 @@ async fn bekannt_tx(
 
 /// Doppelbuchung (D9): eine aktive Einheit (Name, Funkrufname) oder ein aktives Fahrzeug des
 /// Einsatzes mit demselben Funkrufnamen wie eines der neuen Fahrzeuge → 422 mit Namen.
-async fn pruefe_doppelbuchung_tx(
+async fn check_doppelbuchung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     fahrzeuge: &[NeuesFahrzeug],
@@ -443,12 +443,12 @@ async fn pruefe_doppelbuchung_tx(
     .fetch_all(&mut *conn)
     .await?;
     for neu in fahrzeuge {
-        let schluessel = normalisiere(&neu.funkrufname);
+        let schluessel = normalize(&neu.funkrufname);
         for (art, name, funkrufname) in &bestand {
-            let trifft = normalisiere(name) == schluessel
+            let trifft = normalize(name) == schluessel
                 || funkrufname
                     .as_deref()
-                    .is_some_and(|f| normalisiere(f) == schluessel);
+                    .is_some_and(|f| normalize(f) == schluessel);
             if trifft {
                 return Err(AppError::UnprocessableEntity(format!(
                     "{} ist schon im Einsatz ({art} «{name}»)",
@@ -472,7 +472,7 @@ async fn unangemeldet_tx(
         .ok_or_else(|| AppError::Validation("Funkrufname darf nicht leer sein".into()))?;
     // 2. Doppelbuchung, dann Einheit mit Ad-hoc-Fahrzeugen.
     if !u.trotzdem_anlegen {
-        pruefe_doppelbuchung_tx(&mut *conn, r.einsatz_id, &u.fahrzeuge).await?;
+        check_doppelbuchung_tx(&mut *conn, r.einsatz_id, &u.fahrzeuge).await?;
     }
     let einheit_id = crate::einheit::repo::anlegen_tx(
         &mut *conn,
@@ -666,7 +666,7 @@ impl Gebucht {
 /// wenn die Zeile der erste Eintritt einer unangemeldet erfassten Einheit ist; `zeitachse`
 /// `geschrieben`, wenn die Einheit ein nicht gestrichenes Eintreffen mit Quelle
 /// `bereitstellungsraum` zum Zeitpunkt der Zeile trägt; `fahrzeug_ids` ist der heutige Stand.
-pub async fn rekonstruiere(
+pub async fn reconstruct(
     pool: &SqlitePool,
     belegung: BrBelegungAnzeige,
 ) -> Result<EintreffenErgebnis, AppError> {
@@ -869,8 +869,8 @@ mod tests {
         }
     }
 
-    fn geprueft(u: UnangemeldetEingabe) -> Erfassung {
-        pruefe(&EintreffenEingabe {
+    fn checked(u: UnangemeldetEingabe) -> Erfassung {
+        check(&EintreffenEingabe {
             unangemeldet: Some(u),
             ..Default::default()
         })
@@ -878,7 +878,7 @@ mod tests {
     }
 
     /// (Belegungen, Zeitachsen-Ereignisse, ETB-Einträge, Einheiten, Fahrzeuge, Meldungen)
-    async fn zaehle(pool: &SqlitePool, e: i64) -> [i64; 6] {
+    async fn count_rows(pool: &SqlitePool, e: i64) -> [i64; 6] {
         let mut z = [0; 6];
         for (i, t) in [
             "br_belegung",
@@ -924,10 +924,10 @@ mod tests {
     // ─── Prüfung (400/422), schreibt nichts ─────────────────────────────────
 
     #[test]
-    fn pruefe_weder_noch_400_beides_422() {
-        let r = pruefe(&EintreffenEingabe::default());
+    fn check_weder_noch_400_beides_422() {
+        let r = check(&EintreffenEingabe::default());
         assert!(matches!(r, Err(AppError::Validation(_))), "{r:?}");
-        let r = pruefe(&EintreffenEingabe {
+        let r = check(&EintreffenEingabe {
             kraft: Some(KraftAngabe {
                 objekt_typ: "einheit".into(),
                 objekt_id: 1,
@@ -936,7 +936,7 @@ mod tests {
             ..Default::default()
         });
         assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
-        let r = pruefe(&EintreffenEingabe {
+        let r = check(&EintreffenEingabe {
             kraft: Some(KraftAngabe {
                 objekt_typ: "person".into(),
                 objekt_id: 1,
@@ -947,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn pruefe_grenzen_400() {
+    fn check_grenzen_400() {
         let lang = "x".repeat(201);
         let faelle: Vec<UnangemeldetEingabe> = vec![
             unangemeldet(vec![]),
@@ -989,14 +989,14 @@ mod tests {
             ),
         ];
         for (i, u) in faelle.into_iter().enumerate() {
-            let r = pruefe(&EintreffenEingabe {
+            let r = check(&EintreffenEingabe {
                 unangemeldet: Some(u),
                 ..Default::default()
             });
             assert!(matches!(r, Err(AppError::Validation(_))), "Fall {i}: {r:?}");
         }
         // Genau an der Grenze gelingt es, und gleiche Funkrufnamen werden eins.
-        let Erfassung::Unangemeldet(u) = geprueft(UnangemeldetEingabe {
+        let Erfassung::Unangemeldet(u) = checked(UnangemeldetEingabe {
             bemerkung: Some("x".repeat(crate::einheit::BEMERKUNG_MAX)),
             ..unangemeldet(vec![fz(&"y".repeat(200)), fz("FL 2"), fz(" fl  2 ")])
         }) else {
@@ -1007,8 +1007,8 @@ mod tests {
 
     #[test]
     fn normalisiert_unicode_und_leerzeichen() {
-        assert_eq!(normalisiere("  Müller  1 "), normalisiere("MÜLLER 1"));
-        assert_ne!(normalisiere("Müller 1"), normalisiere("Müller 11"));
+        assert_eq!(normalize("  Müller  1 "), normalize("MÜLLER 1"));
+        assert_ne!(normalize("Müller 1"), normalize("Müller 11"));
     }
 
     // ─── Bekannte Kraft ─────────────────────────────────────────────────────
@@ -1058,7 +1058,7 @@ mod tests {
             etb_texte(&pool, e).await,
             vec!["HLF 20 FF Musterstadt im BR Sportplatz eingetroffen".to_string()]
         );
-        let erg = rekonstruiere(
+        let erg = reconstruct(
             &pool,
             belegung_repo::laden(&pool, e, g.belegung_id).await.unwrap(),
         )
@@ -1091,20 +1091,20 @@ mod tests {
         .await
         .unwrap();
         tx.commit().await.unwrap();
-        let vorher = zaehle(&pool, e).await;
+        let vorher = count_rows(&pool, e).await;
 
         let g = buche(&pool, &rahmen(e, raum, b), &bekannt(ObjektTyp::Einheit, ei))
             .await
             .unwrap();
         assert_eq!(g.zeitachse, EintreffenZeitachse::Ausgelassen);
-        let nachher = zaehle(&pool, e).await;
+        let nachher = count_rows(&pool, e).await;
         assert_eq!(nachher[0], vorher[0] + 1, "Eintritt gebucht");
         assert_eq!(nachher[1], vorher[1], "kein zweites Eintreffen");
         assert_eq!(
             etb_texte(&pool, e).await.last().unwrap(),
             "HLF 20 tritt in Bereitstellungsraum Sportplatz ein"
         );
-        let erg = rekonstruiere(
+        let erg = reconstruct(
             &pool,
             belegung_repo::laden(&pool, e, g.belegung_id).await.unwrap(),
         )
@@ -1125,7 +1125,7 @@ mod tests {
         assert_eq!(g.zeitachse, EintreffenZeitachse::Keine);
         assert_eq!(g.einheit_id, None);
         assert_eq!(g.fahrzeug_ids, vec![f]);
-        let z = zaehle(&pool, e).await;
+        let z = count_rows(&pool, e).await;
         assert_eq!((z[0], z[1], z[2]), (1, 0, 1));
         assert_eq!(
             etb_texte(&pool, e).await,
@@ -1159,7 +1159,7 @@ mod tests {
         .await
         .unwrap();
         let fremde_einheit = einheit(&pool, fremd, "Fremd").await;
-        let vorher = zaehle(&pool, e).await;
+        let vorher = count_rows(&pool, e).await;
 
         let r = rahmen(e, raum, b);
         for (erfassung, conflict) in [
@@ -1178,7 +1178,7 @@ mod tests {
                 assert!(matches!(g, Err(AppError::NotFound)), "{erfassung:?}: {g:?}");
             }
         }
-        assert_eq!(zaehle(&pool, e).await, vorher);
+        assert_eq!(count_rows(&pool, e).await, vorher);
     }
 
     #[tokio::test]
@@ -1201,17 +1201,17 @@ mod tests {
         .id;
         let storniert = br(&pool, e, b, "Storniert", None).await;
         br_repo::storniere(&pool, e, storniert, b).await.unwrap();
-        let vorher = zaehle(&pool, e).await;
+        let vorher = count_rows(&pool, e).await;
         for raum in [geplant, storniert] {
             let g = buche(
                 &pool,
                 &rahmen(e, raum, b),
-                &geprueft(unangemeldet(vec![fz("FL 1")])),
+                &checked(unangemeldet(vec![fz("FL 1")])),
             )
             .await;
             assert!(matches!(g, Err(AppError::UnprocessableEntity(_))), "{g:?}");
         }
-        assert_eq!(zaehle(&pool, e).await, vorher);
+        assert_eq!(count_rows(&pool, e).await, vorher);
     }
 
     // ─── Unangemeldet ───────────────────────────────────────────────────────
@@ -1223,9 +1223,9 @@ mod tests {
         let (b, e) = basis(&pool).await;
         let nord = abschnitt(&pool, e, "Nord").await;
         let raum = br(&pool, e, b, "Sportplatz", Some(nord)).await;
-        let vorher = zaehle(&pool, e).await;
+        let vorher = count_rows(&pool, e).await;
 
-        let erfassung = geprueft(UnangemeldetEingabe {
+        let erfassung = checked(UnangemeldetEingabe {
             staerke: Some(StaerkeEingabe {
                 fuehrer: Some(1),
                 unterfuehrer: Some(1),
@@ -1239,7 +1239,7 @@ mod tests {
             }])
         });
         let g = buche(&pool, &rahmen(e, raum, b), &erfassung).await.unwrap();
-        let nachher = zaehle(&pool, e).await;
+        let nachher = count_rows(&pool, e).await;
         // Belegung, Ereignis, ETB, Einheit, Fahrzeug, Meldung: je genau eins (Auto-ETB an).
         let diff: Vec<i64> = nachher.iter().zip(vorher).map(|(n, v)| n - v).collect();
         assert_eq!(diff, vec![1, 1, 1, 1, 1, 1]);
@@ -1337,7 +1337,7 @@ mod tests {
         }
         assert!(!m.4.contains("Geheime"));
 
-        let erg = rekonstruiere(
+        let erg = reconstruct(
             &pool,
             belegung_repo::laden(&pool, e, g.belegung_id).await.unwrap(),
         )
@@ -1359,7 +1359,7 @@ mod tests {
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("FL 1")])),
+            &checked(unangemeldet(vec![fz("FL 1")])),
         )
         .await
         .unwrap();
@@ -1385,12 +1385,12 @@ mod tests {
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("FL-MUS 1-44-1"), fz("FL-MUS 1-19-1")])),
+            &checked(unangemeldet(vec![fz("FL-MUS 1-44-1"), fz("FL-MUS 1-19-1")])),
         )
         .await
         .unwrap();
         assert_eq!(g.fahrzeug_ids.len(), 2);
-        let z = zaehle(&pool, e).await;
+        let z = count_rows(&pool, e).await;
         assert_eq!((z[0], z[3], z[4]), (1, 1, 2));
         let einheiten: Vec<Option<i64>> =
             sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE einsatz_id = ?")
@@ -1424,12 +1424,12 @@ mod tests {
         let raum = br(&pool, e, b, "Sportplatz", None).await;
         fahrzeug(&pool, e, "FL-MUS 1-44-1", None).await;
         let ei = einheit(&pool, e, "Müller  1").await;
-        let vorher = zaehle(&pool, e).await;
+        let vorher = count_rows(&pool, e).await;
 
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("fl-mus 1-44-1")])),
+            &checked(unangemeldet(vec![fz("fl-mus 1-44-1")])),
         )
         .await;
         match g {
@@ -1442,7 +1442,7 @@ mod tests {
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("MÜLLER 1")])),
+            &checked(unangemeldet(vec![fz("MÜLLER 1")])),
         )
         .await;
         assert!(
@@ -1458,16 +1458,16 @@ mod tests {
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("Neu"), fz("florian hm 12/44")])),
+            &checked(unangemeldet(vec![fz("Neu"), fz("florian hm 12/44")])),
         )
         .await;
         assert!(matches!(g, Err(AppError::UnprocessableEntity(_))), "{g:?}");
-        assert_eq!(zaehle(&pool, e).await, vorher);
+        assert_eq!(count_rows(&pool, e).await, vorher);
 
         let g = buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(UnangemeldetEingabe {
+            &checked(UnangemeldetEingabe {
                 trotzdem_anlegen: true,
                 ..unangemeldet(vec![fz("fl-mus 1-44-1")])
             }),
@@ -1486,7 +1486,7 @@ mod tests {
         buche(
             &pool,
             &rahmen(e, raum, b),
-            &geprueft(unangemeldet(vec![fz("MÜLLER 1")])),
+            &checked(unangemeldet(vec![fz("MÜLLER 1")])),
         )
         .await
         .unwrap();

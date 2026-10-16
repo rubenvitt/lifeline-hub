@@ -91,7 +91,7 @@ pub async fn belege_tx(
     buchung: &Buchung<'_>,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
-    fordere_belegbar_tx(&mut *conn, einsatz_id, br_id).await?;
+    require_belegbar_tx(&mut *conn, einsatz_id, br_id).await?;
     match typ {
         ObjektTyp::Einheit => {
             belege_einheit(
@@ -122,7 +122,7 @@ pub async fn belege_tx(
 /// sonst `UnprocessableEntity` (422). `repo::laden_tx` liefert auch stornierte BRs; ein
 /// stornierter BR behält `status='aktiv'` (storniere setzt nur `storniert_at`), daher zusätzlich
 /// `storniert_at IS NULL` fordern — analog UHS (`pruefe_uhs_aktiv`).
-pub async fn fordere_belegbar_tx(
+pub async fn require_belegbar_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     br_id: i64,

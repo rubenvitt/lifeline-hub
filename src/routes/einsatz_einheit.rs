@@ -680,7 +680,7 @@ pub async fn uebernehmen(
         abschnitt_id: body.abschnitt_id,
         ueber_einheit_id: body.ueber_einheit_id,
     };
-    einheit_repo::pruefe_uebernahme(&state.pool, einsatz_id, org_id, eid, &u).await?;
+    einheit_repo::check_uebernahme(&state.pool, einsatz_id, org_id, eid, &u).await?;
     let jetzt = crate::zeit::jetzt();
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;

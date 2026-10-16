@@ -1601,7 +1601,7 @@ fn differenz(nachher: [i64; 6], vorher: [i64; 6]) -> [i64; 6] {
     d
 }
 
-async fn auto_etb_setzen(pool: &sqlx::SqlitePool, e: i64, an: bool) {
+async fn set_auto_etb(pool: &sqlx::SqlitePool, e: i64, an: bool) {
     sqlx::query(
         "INSERT INTO einsatz_einstellungen (einsatz_id, auto_etb_eintraege) VALUES (?, ?) \
          ON CONFLICT(einsatz_id) DO UPDATE SET auto_etb_eintraege = excluded.auto_etb_eintraege",
@@ -1740,7 +1740,7 @@ async fn eintreffen_unangemeldet_ein_etb_eintrag_in_beiden_einstellungen() {
     let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
 
     for (an, funkrufname) in [(true, "FL-MUS 1-44-1"), (false, "FL-MUS 1-19-1")] {
-        auto_etb_setzen(&pool, eid, an).await;
+        set_auto_etb(&pool, eid, an).await;
         let vorher = bestand(&pool, eid).await;
         let system_vorher = etb_inhalte(&app, &cookie, eid).await.len();
         let (s, v) = eintreffen(
@@ -2187,7 +2187,7 @@ async fn eintreffen_alles_oder_nichts() {
     .await
     .unwrap();
     for an in [true, false] {
-        auto_etb_setzen(&pool, eid, an).await;
+        set_auto_etb(&pool, eid, an).await;
         let (s, v) = eintreffen(&app, &cookie, eid, br, unangemeldet_body("FL 2")).await;
         assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR, "Auto-ETB {an}: {v}");
         assert_eq!(bestand(&pool, eid).await, vorher, "Auto-ETB {an}");

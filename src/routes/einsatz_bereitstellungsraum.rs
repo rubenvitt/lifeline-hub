@@ -530,11 +530,11 @@ pub async fn eintreffen(
     // vor allem anderen (D2).
     let client_id = support::parse_client_id(body.client_id.as_deref())?;
     let zeitpunkt = support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), chrono::Utc::now())?;
-    let erfassung = eintreffen::pruefe(&body)?;
+    let erfassung = eintreffen::check(&body)?;
     // Fremder Raum am Gerät: 404 vor jedem Schreiben (D7).
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
     // Eine unangemeldete Kraft legt Einheit und Fahrzeuge an: deren Rechte, 403 vor dem Schreiben.
-    if erfassung.ist_unangemeldet() {
+    if erfassung.is_unangemeldet() {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
         ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
     }
@@ -572,9 +572,9 @@ pub async fn eintreffen(
             return Err(fehler);
         }
     };
-    melde_eintreffen(&state, einsatz_id, br_id, &gebucht).await?;
+    notify_eintreffen(&state, einsatz_id, br_id, &gebucht).await?;
     let ergebnis = gebucht
-        .ergebnis(&state.pool, einsatz_id, erfassung.ist_unangemeldet())
+        .ergebnis(&state.pool, einsatz_id, erfassung.is_unangemeldet())
         .await?;
     Ok((StatusCode::CREATED, Json(ergebnis)))
 }
@@ -596,16 +596,16 @@ async fn eintreffen_replay(
     if ctx.geraet.is_some() && belegung.erfasst_von != ctx.benutzer.id {
         return Err(AppError::Conflict("client_id bereits vergeben".into()));
     }
-    let ergebnis = eintreffen::rekonstruiere(&state.pool, belegung).await?;
+    let ergebnis = eintreffen::reconstruct(&state.pool, belegung).await?;
     if let Some(meldung_id) = ergebnis.meldung_id {
-        melde_meldung(state, meldung_id).await?;
+        notify_meldung(state, meldung_id).await?;
     }
     Ok((StatusCode::CREATED, Json(ergebnis)))
 }
 
 /// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, bei
 /// unangemeldet das Meldungsbündel samt Benachrichtigung und Auto-Frist-Erinnerung.
-async fn melde_eintreffen(
+async fn notify_eintreffen(
     state: &AppState,
     einsatz_id: i64,
     br_id: i64,
@@ -626,14 +626,14 @@ async fn melde_eintreffen(
         super::einsatz_personal::sse_personal(state, einsatz_id, *ep_id);
     }
     if let Some(meldung_id) = g.meldung_id {
-        melde_meldung(state, meldung_id).await?;
+        notify_meldung(state, meldung_id).await?;
     }
     Ok(())
 }
 
 /// Meldungsbündel genau einmal (Marker `live_published_at`) und die Auto-Frist-Erinnerung mit
 /// eigenem Titel (design.md D5).
-async fn melde_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppError> {
+async fn notify_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppError> {
     let jetzt = crate::zeit::jetzt();
     let meldung = crate::meldung::repo::laden(&state.pool, meldung_id, &jetzt).await?;
     crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;

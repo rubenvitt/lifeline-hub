@@ -932,7 +932,7 @@ pub struct Uebernommen {
 
 /// Bezüge der Übernahme vor der Transaktion prüfen wie der PATCH (`validiere_patch`): fremder
 /// Abschnitt oder fremde/aufgelöste Über-Einheit 404/409, Zyklus 400.
-pub async fn pruefe_uebernahme(
+pub async fn check_uebernahme(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
@@ -972,7 +972,7 @@ async fn check_gehoert_zum_einsatz_oder_aufgeloest(
 
 /// Offene Übernahme: `(name, aktueller_br_id, uebernahme_meldung_id)`; aufgelöst 409, sonst
 /// ohne offene Übernahme 422.
-async fn fordere_offen_tx(
+async fn require_offen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -1004,7 +1004,7 @@ async fn fordere_offen_tx(
 /// Übernimmt eine unangemeldete Einheit (D10) in der Transaktion des Aufrufers: aufgelöst 409,
 /// ohne offene Übernahme 422; setzt `uebernommen_at/_von` und die gewählte Unterstellung und
 /// bestätigt die Meldung des Eintreffens (schon bestätigt: ohne Fehler). Kein Austritt aus dem
-/// Raum. Die Bezüge prüft [`pruefe_uebernahme`] vorher.
+/// Raum. Die Bezüge prüft [`check_uebernahme`] vorher.
 #[allow(clippy::too_many_arguments)]
 pub async fn uebernehmen_tx(
     conn: &mut SqliteConnection,
@@ -1015,7 +1015,7 @@ pub async fn uebernehmen_tx(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<Uebernommen, AppError> {
-    let (name, br_id, meldung_id) = fordere_offen_tx(&mut *conn, einsatz_id, id).await?;
+    let (name, br_id, meldung_id) = require_offen_tx(&mut *conn, einsatz_id, id).await?;
     sqlx::query(
         "UPDATE einsatz_einheit SET uebernommen_at = ?1, uebernommen_von = ?2, \
             abschnitt_id = COALESCE(?3, abschnitt_id), \
@@ -1087,7 +1087,7 @@ pub async fn abweisen_tx(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<Abgewiesen, AppError> {
-    let (name, br_id, meldung_id) = fordere_offen_tx(&mut *conn, einsatz_id, id).await?;
+    let (name, br_id, meldung_id) = require_offen_tx(&mut *conn, einsatz_id, id).await?;
     let br_bezeichnung: Option<String> = match br_id {
         Some(b) => {
             sqlx::query_scalar("SELECT bezeichnung FROM bereitstellungsraum WHERE id = ?")
