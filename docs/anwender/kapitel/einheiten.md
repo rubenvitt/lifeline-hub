@@ -157,8 +157,8 @@ Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kr
 noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
 [Bereitstellungsräume](bereitstellungsraeume.md)). Die Meldung dazu steht unter „Meldungen“.
 
-1. Die Einheit öffnen: in der Gliederung, im Meldebild oder an der Meldung „… unangemeldet im BR
-   … eingetroffen“. Unter dem Kopf steht das Paneel „Übernahme“ mit „eingetroffen …“.
+1. Die Einheit öffnen: in der Gliederung oder im Meldebild. Unter dem Kopf steht das Paneel
+   „Übernahme“ mit „eingetroffen …“.
 2. „Übernehmen“ wählen, bei Bedarf „Abschnitt“ und „Über-Einheit“ wählen und mit „Übernehmen“
    bestätigen. Die Bestätigung lautet „… übernommen“; „nicht übernommen“ und das Paneel
    verschwinden, die Einheit bleibt im Raum.
@@ -166,7 +166,8 @@ noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
    abweisen?“ mit „Abweisen“ bestätigen. Die Einheit verlässt den Raum und wird aufgelöst, ihre
    Fahrzeuge werden entlassen; die App kehrt zur Gliederung zurück.
 
-Dieselben Knöpfe stehen auch an der Meldung selbst.
+Dieselben Knöpfe stehen auch an der Meldung „… unangemeldet im BR … eingetroffen“ (Kapitel
+[Meldungen](meldungen.md)).
 
 ## Hintergrund
 

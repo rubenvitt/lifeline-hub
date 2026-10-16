@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -100,6 +100,20 @@ der Punkt gesperrt als „Auftrag erteilen (keine Berechtigung)“ da.
 Wird der Auftrag später aufgehoben, steht an der Karte „Auftrag aufgehoben“ statt des Verweises,
 und „Auftrag erteilen“ ist wieder da. Ein neu erteilter Auftrag tritt an die Stelle des alten; der
 aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztagebuch nachlesbar.
+
+### Eine unangemeldet eingetroffene Einheit übernehmen
+
+Bucht ein Bereitstellungsraum eine Kraft, die der Einsatz noch nicht kannte, kommt die Meldung
+„… unangemeldet im BR … eingetroffen“. Solange die Einheit nicht übernommen ist, trägt ihre Karte:
+
+- für Einsatzleitung und Führungspersonal „Übernehmen“ und das rote „Abweisen“, wie im Kapitel
+  [Einheiten](einheiten.md) beschrieben; „Abweisen“ fehlt, wenn das Modul Fahrzeuge im Einsatz
+  nicht freigegeben ist,
+- für alle anderen den Verweis „↗ …“ zur Einheit.
+
+Ist das Modul Einheiten im Einsatz nicht freigegeben, fehlen Knöpfe und Verweis.
+
+Nach Übernahme oder Abweisung verschwinden Knöpfe und Verweis.
 
 ## Hintergrund
 
