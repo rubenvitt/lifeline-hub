@@ -32,7 +32,7 @@ Gerät einer Verpflegungsstelle beschreibt
    geordnet. Je Karte stehen Bezeichnung, Zeitraum und rechts die Einstufung, darunter „Bedarf“ mit
    der Aufteilung, „ausgegeben“ und „fehlt“.
 
-   ![Drei Zeitfenster: „Getränke“ gedeckt, „Mittag“ warm in Unterdeckung mit 80 EP an der „Ausgabe Turnhalle Nord“ und 100 EP an der „Feldküche BR Sportplatz“, fehlender vegetarischer Kost und einer zurückgenommenen Ausgabe, „Abendessen“ offen](../bilder/verpflegung/zeitfenster.png)
+   ![Drei Zeitfenster: „Getränke“ gedeckt, „Mittag“ warm in Unterdeckung mit 80 EP an der „Ausgabe Turnhalle Nord“ und 100 EP an der „Feldküche BR Sportplatz“, fehlender vegetarischer Kost und einer zurückgenommenen Ausgabe, „Abendessen“ offen, unter jedem Zeitfenster die Klappe „Einheiten · 5 noch nicht verpflegt · 0 verpflegt“](../bilder/verpflegung/zeitfenster.png)
 
 3. Unter „Sonderkost“ je Kostform Bedarf und Ausgabe lesen. Fehlt etwas, steht dort etwa „fehlt 2
    vegetarisch“.
@@ -130,7 +130,7 @@ Für Einsatzleitung und Führungspersonal:
 5. Für Sonderkost die Taste der Kostform wählen, etwa „vegetarisch“. Sie zählt eine Portion
    dieser Kostform und zugleich eine Portion in die Sammlung.
 
-   ![Ausgabe „Mittag“ mit Soll, ausgegeben und fehlt, einer offenen Sammlung samt vegetarischer Portion, der gewählten Stelle „Feldküche BR Sportplatz“ mit „an der Stelle 100 EP“, der Sonderkost-Taste und den Zähltasten am unteren Rand](../bilder/verpflegung/ausgabe-zaehlen.png)
+   ![Ausgabe „Mittag“ mit Soll, ausgegeben und fehlt, einer offenen Sammlung samt vegetarischer Portion, der gewählten Stelle „Feldküche BR Sportplatz“ mit „an der Stelle 100 EP“, dem gewählten Empfänger „Rettungsstaffel“ mit der Taste „+4“, der Sonderkost-Taste, der Liste „Noch nicht verpflegt“ mit „Wählen“ je Einheit und den Zähltasten am unteren Rand](../bilder/verpflegung/ausgabe-zaehlen.png)
 
 6. Verzählt oder fehlt jemand aus der Einheit: „−1“ nimmt die zuletzt gezählte Portion aus der
    Sammlung. Ohne Sammlung ist „−1“ gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
@@ -152,7 +152,7 @@ einem anderen Ort stattfand:
 4. Unter „Stelle“ die Stelle der Ausgabe wählen; die zugeordneten stehen oben.
 5. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt der Ausgabe wählen.
 
-   ![Dialog „Ausgabe nachtragen: Mittag“ mit „Bedarf 200 · ausgegeben 180 · fehlt 20 EP“, Menge 10 und der Stelle „Ausgabe Turnhalle Nord“](../bilder/verpflegung/ausgabe-nachtragen.png)
+   ![Dialog „Ausgabe nachtragen: Mittag“ mit „Bedarf 200 · ausgegeben 180 · fehlt 20 EP“, Menge 10, dem Empfänger „Rettungsstaffel“ und der Stelle „Ausgabe Turnhalle Nord“](../bilder/verpflegung/ausgabe-nachtragen.png)
 
 6. Für einen Ort, Sonderkost, eine zugehörige Nachforderung oder eine Bemerkung „Weitere Angaben“
    aufklappen. Ohne Stelle steht dort „Ort“, im Einsatz mit Stellen „Zuführungsziel“.

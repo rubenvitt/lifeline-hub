@@ -27,7 +27,7 @@ ausgegeben wird, wählt das Tablet beim Zählen. Die Navigation unten führt zu 
    Betreute, weitere), „Ausgegeben“ und „Fehlt“, darunter je Stelle das dort Ausgegebene, die
    Sonderkost und die einzelnen Ausgaben.
 
-   ![Zwei Zeitfenster am Verpflegungstablet: „Mittagessen“ warm mit Unterdeckung, 80 von 150 EP ausgegeben, alle an der „Ausgabe Gesamtschule“, und „Abendessen“ offen](../bilder/geraet-verpflegung/zeitfenster.png)
+   ![Zwei Zeitfenster am Verpflegungstablet: „Mittagessen“ warm mit Unterdeckung, 80 von 150 EP ausgegeben, alle an der „Ausgabe Gesamtschule“, und „Abendessen“ offen, je mit der Klappe „Einheiten“](../bilder/geraet-verpflegung/zeitfenster.png)
 
 3. Unter „Stellen“ die Verpflegungsstellen des Einsatzes lesen: Art, Standort, Status und das
    laufende Zeitfenster mit den an der Stelle ausgegebenen Portionen.
@@ -51,7 +51,7 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
 4. Je ausgegebene Portion „+1“ tippen, für mehrere „+5“, „+10“ oder „Menge …“. Für Sonderkost die
    Taste der Kostform tippen, etwa „vegetarisch“; sie zählt auch in die Sammlung.
 
-   ![Ausgabe „Mittagessen“ am Tablet mit der gewählten Stelle „Ausgabe Gesamtschule“, offener Sammlung, einem ausstehenden Eintrag unter „Letzte Buchungen“ und den Zähltasten am unteren Rand](../bilder/geraet-verpflegung/ausgabe-zaehlen.png)
+   ![Ausgabe „Mittagessen“ am Tablet mit der gewählten Stelle „Ausgabe Gesamtschule“, dem gewählten Empfänger „Rettungsstaffel“ mit der Taste „+4“, offener Sammlung und „+ 3 ausstehend“, dem Anfang der Liste „Noch nicht verpflegt“ und den Zähltasten am unteren Rand](../bilder/geraet-verpflegung/ausgabe-zaehlen.png)
 
 5. Verzählt: „−1“ nimmt die zuletzt gezählte Portion zurück.
 6. Nichts weiter tun: nach kurzer Ruhe bucht das Tablet die Sammlung als eine Ausgabe und meldet
