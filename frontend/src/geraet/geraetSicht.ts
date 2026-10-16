@@ -31,6 +31,11 @@ export type GeraetFaehigkeit =
    * einzige Änderung an Einheiten und Fahrzeugen am Gerät; Übernehmen und Abweisen nie.
    */
   | 'br-eintreffen'
+  /**
+   * Kräfte aus dem Raum abrufen und einen Abruf zurücknehmen (LLH-1085): eine Entscheidung der
+   * Führung, kein Gerät (Routenliste ohne `…/abruf`). Das Ausrücken bucht das Gerät als Austritt.
+   */
+  | 'br-abrufen'
   /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
   | 'verpflegung-planen'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
@@ -50,6 +55,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
       return geraet.ansicht === 'bereitstellungsraum';
     case 'uhs-verwalten':
     case 'br-verwalten':
+    case 'br-abrufen':
     case 'verpflegung-planen':
     case 'person-status':
     case 'person-zuordnungen':
