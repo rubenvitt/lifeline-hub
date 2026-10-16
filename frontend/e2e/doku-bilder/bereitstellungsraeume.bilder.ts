@@ -22,6 +22,7 @@ import {
  *                  frontend/src/components/AnlegenDrawer.tsx
  *   raum.png       frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
  *                  frontend/src/pages/bereitstellungsraum/brBelegungKern.ts,
+ *                  frontend/src/pages/bereitstellungsraum/abrufKern.ts,
  *                  frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx,
  *                  frontend/src/pages/bereitstellungsraum/freieKraefte.ts,
  *                  frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx
@@ -31,6 +32,12 @@ import {
  *                  frontend/src/components/Erfassung.tsx
  *   eintreffen.png frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx,
  *                  frontend/src/pages/bereitstellungsraum/eintreffenKern.ts
+ *   abrufen.png    frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx,
+ *                  frontend/src/pages/bereitstellungsraum/abrufKern.ts,
+ *                  frontend/src/components/Erfassung.tsx
+ *
+ * Abruf (LLH-1085): die Betreuungsgruppe ist nach „Betreuung“ abgerufen und noch nicht
+ * ausgerückt; raum.png zeigt sie unter „Abgerufen“, verlauf.png den Abruf.
  *
  * Demo-Lücke (D3): der Demo-BR „Parkplatz Stadion Nord“ ist aktiv, aber leer. Die Spec lässt
  * dort den Sanitätszug ein- und wieder austreten (für den Verlauf), stellt zwei Einheiten bereit
@@ -43,6 +50,8 @@ import {
 const KAPITEL = 'bereitstellungsraeume';
 const DEMO_BR = 'Parkplatz Stadion Nord';
 const ZUG = 'Sanitätszug Musterstadt';
+/** Ziel-Abschnitt des Abrufs der Betreuungsgruppe (Demo-Abschnitt „EA 2“). */
+const ZIEL_ABRUF = 'Betreuung';
 /**
  * Angezeigte Wartezeit in den Bildern: die Uhr steht 48 Minuten und 30 Sekunden hinter dem
  * frühesten „seit“ des Raums. Gerechnet vom Server-Stempel und nicht von `Date.now()` im Test,
@@ -111,6 +120,17 @@ test.describe(KAPITEL, () => {
           art: 'eintritt',
         });
       }
+      // Die Betreuungsgruppe ist abgerufen, aber noch nicht ausgerückt (LLH-1085): raum.png zeigt
+      // sie unter „Abgerufen“, verlauf.png den Abruf.
+      const abschnitte = await liste(api, `/api/einsaetze/${demo.id}/abschnitte`);
+      const betreuung = abschnitte.find((a) => a.name === ZIEL_ABRUF);
+      expect(betreuung, `Abschnitt „${ZIEL_ABRUF}“`).toBeDefined();
+      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}/abruf`, {
+        objekt_typ: 'einheit',
+        objekt_id: id('Betreuungsgruppe'),
+        abschnitt_id: betreuung!.id,
+        auftrag_text: 'Notunterkunft Turnhalle Süd einrichten',
+      });
       await fuelle(api, 'post', `/api/einsaetze/${demo.id}/bereitstellungsraeume`, {
         bezeichnung: 'BR Ost',
         standort: 'Sportplatz Ost, Zufahrt Parkstraße',
@@ -156,6 +176,8 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText('Rettungsstaffel').first()).toBeVisible();
     await expect(page.getByTestId('br-summe')).toContainText(/Fahrzeuge\s*3/);
     await expect(page.getByTestId('br-summe')).toContainText(/Längste Wartezeit\s*48 min/);
+    await expect(page.getByTestId('br-abgerufen')).toContainText('Betreuungsgruppe');
+    await expect(page.getByTestId('br-abgerufen')).toContainText(`→ ${ZIEL_ABRUF}`);
     // Der Zug steht im Demo-Einsatz in einem Abschnitt: „Im Einsatz“ (LLH-1075), zugeklappt.
     await page.getByRole('button', { name: /^Im Einsatz/ }).click();
     await expect(page.getByRole('button', { name: `${ZUG} zuweisen` })).toBeVisible();
@@ -178,6 +200,23 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'eintreffen');
   });
 
+  test('Dialog „Abrufen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const br = await demoBr(page.request, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
+    await page.getByRole('button', { name: 'Rettungsstaffel abrufen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Rettungsstaffel abrufen' });
+    // Nur im Dialog, nicht abgerufen: raum.png zeigt die Rettungsstaffel bereitgestellt.
+    await dialog.getByRole('combobox', { name: 'Ziel-Abschnitt' }).click();
+    await page.locator('.ant-select-item-option[title="Sanitätsdienst"]').click();
+    await dialog.getByRole('textbox', { name: 'Auftrag' }).fill('Verletztenablage Nord übernehmen');
+    await dialog.getByRole('textbox', { name: 'Auftrag' }).blur();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'abrufen');
+  });
+
   test('Verlauf eines Bereitstellungsraums', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
@@ -186,8 +225,9 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
     await page.getByRole('button', { name: `Verlauf des Bereitstellungsraums ${DEMO_BR}` }).click();
     const verlauf = page.getByRole('list', { name: 'Verlauf' });
-    await expect(verlauf.getByRole('listitem')).toHaveCount(4);
-    await expect(verlauf.getByRole('listitem').nth(2)).toContainText(`Austritt${ZUG}`);
+    await expect(verlauf.getByRole('listitem')).toHaveCount(5);
+    await expect(verlauf.getByRole('listitem').nth(0)).toContainText(`Abruf nach ${ZIEL_ABRUF}`);
+    await expect(verlauf.getByRole('listitem').nth(3)).toContainText(`Austritt${ZUG}`);
     await page.mouse.move(0, 0);
     await fotografiere(page.locator('[data-lfh="br-verlauf"]'), KAPITEL, 'verlauf');
   });
