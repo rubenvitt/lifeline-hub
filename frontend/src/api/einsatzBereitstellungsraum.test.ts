@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as client from './client';
 import {
   aktualisiereBr,
+  bucheEintreffen,
   hebtBrAbrufAuf,
   legeBrAn,
   ruftAbAusBr,
@@ -82,5 +83,35 @@ describe('Bereitstellungsraum — Koordinate', () => {
       lat: 51.93,
       lon: 8.87,
     });
+  });
+});
+
+/** Eintreffen buchen (LLH-1075, Spec `bereitstellungsraum-belegung`, design.md D1). */
+describe('Bereitstellungsraum — Eintreffen', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('bucht eine bekannte Kraft mit POST an …/eintreffen', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await bucheEintreffen(4, 9, { kraft: { objekt_typ: 'einheit', objekt_id: 12 } });
+    expect(send).toHaveBeenCalledWith(
+      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
+      'POST',
+      { kraft: { objekt_typ: 'einheit', objekt_id: 12 } },
+    );
+  });
+
+  it('bucht eine unangemeldete Kraft mit dem Körper unverändert', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    const unangemeldet = {
+      fahrzeuge: [{ funkrufname: 'FL-MUS 1-44-1', fahrzeugtyp: 'HLF 20' }],
+      staerke: { fuehrer: 1, unterfuehrer: 1, mannschaft: 7 },
+      trotzdem_anlegen: true,
+    };
+    await bucheEintreffen(4, 9, { unangemeldet });
+    expect(send).toHaveBeenCalledWith(
+      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
+      'POST',
+      { unangemeldet },
+    );
   });
 });

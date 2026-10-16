@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { kraftZeileStil } from './KraefteOhneBrSidebar';
+import { describe, expect, it, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { Einheit } from '../../api/types';
+import { renderMitProviders } from '../../test/utils';
+import KraefteOhneBrSidebar, { kraftZeileStil } from './KraefteOhneBrSidebar';
 import { dichten, type Dichte } from '../../theme/tokens';
 
 /**
@@ -31,5 +35,54 @@ describe('kraftZeileStil (LFH-968)', () => {
       gap: 101,
       marginBottom: 202,
     });
+  });
+});
+
+describe('KraefteOhneBrSidebar: „Im Einsatz“ eingeklappt (LLH-1075, design.md D14)', () => {
+  const eh = (id: number, name: string, mehr: Partial<Einheit> = {}) =>
+    ({
+      id,
+      name,
+      typ_label: null,
+      abschnitt_id: null,
+      abschnitt_name: null,
+      ueber_einheit_id: null,
+      aktueller_br_id: null,
+      ...mehr,
+    }) as unknown as Einheit;
+
+  function zeige(onZuweisenEinheit = vi.fn()) {
+    renderMitProviders(
+      <KraefteOhneBrSidebar
+        alleEinheiten={[
+          eh(1, 'Zug Nord', { abschnitt_id: 3, abschnitt_name: 'Nord' }),
+          eh(2, 'Zug Süd', { abschnitt_id: 3, abschnitt_name: 'Nord' }),
+          eh(3, 'GW-L'),
+        ]}
+        alleFahrzeuge={[]}
+        brEinheiten={[]}
+        brFahrzeuge={[]}
+        schreibgeschuetzt={false}
+        onZuweisenEinheit={onZuweisenEinheit}
+        onZuweisenFahrzeug={vi.fn()}
+      />,
+    );
+    return onZuweisenEinheit;
+  }
+
+  it('„Erwartet“ steht offen, „Im Einsatz“ eingeklappt mit Anzahl', () => {
+    zeige();
+    expect(screen.getByRole('button', { name: 'GW-L zuweisen' })).toBeInTheDocument();
+    const kopf = screen.getByRole('button', { name: /Im Einsatz/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(kopf).toHaveTextContent('2');
+    expect(screen.queryByRole('button', { name: 'Zug Nord zuweisen' })).toBeNull();
+  });
+
+  it('aufgeklappt weist „zuweisen“ unverändert zu', async () => {
+    const onZuweisen = zeige();
+    await userEvent.click(screen.getByRole('button', { name: /Im Einsatz/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Zug Nord zuweisen' }));
+    expect(onZuweisen).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 });

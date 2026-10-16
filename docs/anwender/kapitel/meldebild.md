@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts]
 ---
 
 ## Überblick
@@ -32,6 +32,9 @@ setzen Status, tragen nach und streichen.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
    nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
+   „nicht übernommen“ hinter dem Namen kennzeichnet eine Einheit, die ein Bereitstellungsraum
+   unangemeldet gebucht hat und die noch niemand übernommen oder abgewiesen hat (Kapitel
+   [Einheiten](einheiten.md)).
 4. Die Tiefe des Baums in der Werkzeugzeile wählen. Das Meldebild öffnet auf „Einheiten“:
    Untereinheiten stehen unter ihrer Einheit, Fahrzeuge sind zugeklappt. „mit Fahrzeugen“ öffnet
    jede Einheit, „alles“ auch Besatzung und Beladung jedes Fahrzeugs. Mit „+“ vor einer Zeile oder einem
@@ -157,6 +160,10 @@ Organisation; sie gilt für jeden Einsatz ohne eigene Frist.
 - **Aus der Ablösung:** der Vollzug einer Ablösung beendet den Einsatzabschnitt der abgelösten
   Einheit. Dieses Ereignis lässt sich nicht streichen, nur mit der Rücknahme des Vollzugs aufheben
   (Kapitel [Ablösung](abloesung.md)).
+- **Am Bereitstellungsraum:** „Eintreffen buchen“ trägt bei einer Einheit das Eintreffen ein,
+  wenn sie in ihrem laufenden Einsatzabschnitt noch nicht eingetroffen ist, auch bei einer dort
+  unangemeldet erfassten Einheit (Kapitel
+  [Bereitstellungsräume](bereitstellungsraeume.md)). „zuweisen“ trägt nichts ein.
 - **Nachgetragen:** von Hand, mit Eintrag im Einsatztagebuch. Ein Nachtrag an einer Einheit gilt
   ebenfalls für ihre jetzt zugeordneten Personen.
 

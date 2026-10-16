@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Meldung, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
@@ -31,6 +32,8 @@ interface MeldungListeProps {
    * Karte bekommt nur ihren Grund, ein stabiles Objekt: die übrigen bleiben gemerkt (LFH-1077).
    */
   kartenFehler?: (meldungId: number) => ZeilenGrund | null;
+  /** Übernahme der Einheit einer Meldung (LLH-1075); `null` für Karten ohne offene Übernahme. */
+  uebernahme?: (m: Meldung) => ReactNode;
 }
 
 /** Meldungs-Liste: je Meldung eine MeldungKarte. */
@@ -48,6 +51,7 @@ export default function MeldungListe({
   onAuftragErteilen,
   auftragGesperrt,
   kartenFehler,
+  uebernahme,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <SeitenLeer titel="Keine Meldungen" />;
   return (
@@ -68,6 +72,7 @@ export default function MeldungListe({
           onAuftragErteilen={onAuftragErteilen}
           auftragGesperrt={auftragGesperrt}
           fehlerGrund={kartenFehler?.(m.id) ?? null}
+          uebernahme={uebernahme?.(m) ?? null}
         />
       ))}
     </>

@@ -1,10 +1,10 @@
 import { useState, type CSSProperties } from 'react';
-import { Button, Input, Typography } from 'antd';
+import { Button, Collapse, Input, Typography } from 'antd';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../../components/useZeilenFehler';
-import { gruppiereFreieKraefte } from './freieKraefte';
+import { freieKraefteOhneBr, gruppiereFreieKraefte } from './freieKraefte';
 import type { BrEinheitKurz, BrFahrzeugKurz, Einheit, EinsatzFahrzeug } from '../../api/types';
 
 interface Props {
@@ -28,24 +28,7 @@ export function brObjektSchluessel(typ: 'einheit' | 'fahrzeug', id: number): str
   return `${typ}:${id}`;
 }
 
-/**
- * Die freien Kräfte der Seitenleiste, ohne Suche. Exportiert, damit die Seite weiß, welche Zeilen
- * stehen: der Grund einer Kraft, die hier nicht mehr steht, gehört in den Seitenhinweis.
- */
-export function freieKraefteOhneBr(
-  props: Pick<Props, 'alleEinheiten' | 'alleFahrzeuge' | 'brEinheiten' | 'brFahrzeuge'>,
-): { einheiten: Einheit[]; fahrzeuge: EinsatzFahrzeug[] } {
-  const brEinheitIds = new Set(props.brEinheiten.map((e) => e.id));
-  const brFahrzeugIds = new Set(props.brFahrzeuge.map((f) => f.id));
-  return {
-    einheiten: props.alleEinheiten.filter(
-      (e) => e.aktueller_br_id == null && !brEinheitIds.has(e.id),
-    ),
-    fahrzeuge: props.alleFahrzeuge.filter(
-      (f) => f.einheit_id == null && f.aktueller_br_id == null && !brFahrzeugIds.has(f.id),
-    ),
-  };
-}
+export { freieKraefteOhneBr };
 
 /**
  * Eine Zeile der Seitenleiste (Name + „zuweisen“), rein und exportiert (Muster `bedienzielStil`).
@@ -81,12 +64,16 @@ export default function KraefteOhneBrSidebar({
   const breit = abBreite('md');
   const { token, rollen } = useRollen();
   const [suche, setSuche] = useState('');
-  const { einheiten: freieEinheiten, fahrzeuge: freiFahrzeuge } = freieKraefteOhneBr({
+  // „Im Einsatz“ (LLH-1075, D14): eingeklappt, die Anzahl steht am Kopf.
+  const [imEinsatzOffen, setImEinsatzOffen] = useState(false);
+  const { erwartet, imEinsatz } = freieKraefteOhneBr({
     alleEinheiten,
     alleFahrzeuge,
     brEinheiten,
     brFahrzeuge,
   });
+  const freieEinheiten = [...erwartet.einheiten, ...imEinsatz.einheiten];
+  const freiFahrzeuge = [...erwartet.fahrzeuge, ...imEinsatz.fahrzeuge];
   const grund = (schluessel: string) => {
     const g = zeilenFehler?.(schluessel);
     return g ? (
@@ -97,12 +84,17 @@ export default function KraefteOhneBrSidebar({
   };
 
   const leer = freieEinheiten.length === 0 && freiFahrzeuge.length === 0;
-  const gruppen = gruppiereFreieKraefte(freieEinheiten, freiFahrzeuge, suche);
+  const gruppen = gruppiereFreieKraefte(erwartet.einheiten, erwartet.fahrzeuge, suche);
+  const gruppenImEinsatz = gruppiereFreieKraefte(imEinsatz.einheiten, imEinsatz.fahrzeuge, suche);
+  const trefferImEinsatz = gruppenImEinsatz.reduce(
+    (n, g) => n + g.einheiten.length + g.fahrzeuge.length,
+    0,
+  );
 
   // Gründe von Kräften, die die Suche gerade ausblendet: sie stehen mit Namen über der Liste,
   // sonst schwiege die Leiste über eine Ablehnung, bis jemand die Suche leert (LFH-1077).
   const gezeigt = new Set(
-    gruppen.flatMap((g) => [
+    [...gruppen, ...(imEinsatzOffen ? gruppenImEinsatz : [])].flatMap((g) => [
       ...g.einheiten.map((e) => brObjektSchluessel('einheit', e.id)),
       ...g.fahrzeuge.map((f) => brObjektSchluessel('fahrzeug', f.id)),
     ]),
@@ -114,6 +106,42 @@ export default function KraefteOhneBrSidebar({
     const g = gezeigt.has(k) ? null : zeilenFehler?.(k);
     return g ? [{ k, name, g }] : [];
   });
+
+  const renderGruppen = (liste: ReturnType<typeof gruppiereFreieKraefte>) =>
+    liste.map((g) => (
+      <div key={g.titel} style={{ marginBottom: token.marginSM }}>
+        <Augenbraue als="div" style={{ marginBottom: token.marginXXS }}>
+          {g.titel}
+        </Augenbraue>
+        {g.einheiten.map((e) => (
+          <div key={`einheit-${e.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>{e.name}</span>
+            {!schreibgeschuetzt && (
+              <Button aria-label={`${e.name} zuweisen`} onClick={() => onZuweisenEinheit(e)}>
+                zuweisen
+              </Button>
+            )}
+            {grund(brObjektSchluessel('einheit', e.id))}
+          </div>
+        ))}
+        {g.fahrzeuge.map((f) => (
+          <div key={`fahrzeug-${f.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
+            <span style={{ flex: 1, minWidth: 0, ...monoStil(13), color: rollen.text }}>
+              {f.funkrufname}
+            </span>
+            {!schreibgeschuetzt && (
+              <Button
+                aria-label={`${f.funkrufname} zuweisen`}
+                onClick={() => onZuweisenFahrzeug(f)}
+              >
+                zuweisen
+              </Button>
+            )}
+            {grund(brObjektSchluessel('fahrzeug', f.id))}
+          </div>
+        ))}
+      </div>
+    ));
 
   return (
     // Unter `md` volle Breite und gestapelt; die Zuweisung läuft über den Knopf, nicht per Drag.
@@ -154,53 +182,39 @@ export default function KraefteOhneBrSidebar({
             deshalb ein dvh-Maß direkt am Container. */}
         <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
           {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
-          {!leer && gruppen.length === 0 && (
+          {!leer && gruppen.length === 0 && trefferImEinsatz === 0 && (
             <Typography.Text type="secondary">keine Treffer</Typography.Text>
           )}
-          {gruppen.map((g) => (
-            <div key={g.titel} style={{ marginBottom: token.marginSM }}>
-              <Augenbraue als="div" style={{ marginBottom: token.marginXXS }}>
-                {g.titel}
-              </Augenbraue>
-              {g.einheiten.map((e) => (
-                <div
-                  key={`einheit-${e.id}`}
-                  data-lfh="br-kraft-zeile"
-                  style={kraftZeileStil(token)}
-                >
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>
-                    {e.name}
-                  </span>
-                  {!schreibgeschuetzt && (
-                    <Button aria-label={`${e.name} zuweisen`} onClick={() => onZuweisenEinheit(e)}>
-                      zuweisen
-                    </Button>
-                  )}
-                  {grund(brObjektSchluessel('einheit', e.id))}
-                </div>
-              ))}
-              {g.fahrzeuge.map((f) => (
-                <div
-                  key={`fahrzeug-${f.id}`}
-                  data-lfh="br-kraft-zeile"
-                  style={kraftZeileStil(token)}
-                >
-                  <span style={{ flex: 1, minWidth: 0, ...monoStil(13), color: rollen.text }}>
-                    {f.funkrufname}
-                  </span>
-                  {!schreibgeschuetzt && (
-                    <Button
-                      aria-label={`${f.funkrufname} zuweisen`}
-                      onClick={() => onZuweisenFahrzeug(f)}
-                    >
-                      zuweisen
-                    </Button>
-                  )}
-                  {grund(brObjektSchluessel('fahrzeug', f.id))}
-                </div>
-              ))}
-            </div>
-          ))}
+          {gruppen.length > 0 && (
+            <Typography.Text strong style={{ display: 'block', marginBottom: token.marginXS }}>
+              Erwartet
+            </Typography.Text>
+          )}
+          {renderGruppen(gruppen)}
+          {imEinsatz.einheiten.length + imEinsatz.fahrzeuge.length > 0 && (
+            <Collapse
+              ghost
+              destroyOnHidden
+              activeKey={imEinsatzOffen ? ['im-einsatz'] : []}
+              onChange={(keys) =>
+                setImEinsatzOffen((Array.isArray(keys) ? keys : [keys]).length > 0)
+              }
+              items={[
+                {
+                  key: 'im-einsatz',
+                  label: (
+                    <span>
+                      Im Einsatz{' '}
+                      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                        {trefferImEinsatz}
+                      </span>
+                    </span>
+                  ),
+                  children: renderGruppen(gruppenImEinsatz),
+                },
+              ]}
+            />
+          )}
         </div>
       </Paneel>
     </div>

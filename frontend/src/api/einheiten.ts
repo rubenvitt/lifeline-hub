@@ -1,4 +1,10 @@
-import type { AusVorlageEingabe, AusVorlageErgebnis, Einheit, VorlageVorschau } from './types';
+import type {
+  AusVorlageEingabe,
+  AusVorlageErgebnis,
+  Einheit,
+  UebernahmeBody,
+  VorlageVorschau,
+} from './types';
 import { apiGet, apiSend } from './client';
 
 export interface EinheitEingabe {
@@ -133,6 +139,30 @@ export function patcheEinheit(
  */
 export function loeseEinheitAuf(einsatzId: number, eid: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'DELETE');
+}
+
+/**
+ * Eine unangemeldet erfasste Einheit übernehmen (LLH-1075, design.md D10): Kennzeichen weg,
+ * Meldung des Eintreffens bestätigt, optional Abschnitt und Über-Einheit; sie bleibt im Raum.
+ */
+export function uebernehmeEinheit(
+  einsatzId: number,
+  eid: number,
+  daten: UebernahmeBody,
+): Promise<Einheit> {
+  return apiSend<Einheit>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/uebernehmen`,
+    'POST',
+    daten,
+  );
+}
+
+/**
+ * Eine unangemeldet erfasste Einheit abweisen (LLH-1075, design.md D11): sie verlässt den Raum,
+ * wird aufgelöst, ihre Fahrzeuge werden entlassen. Unumkehrbar.
+ */
+export function weiseEinheitAb(einsatzId: number, eid: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/abweisen`, 'POST');
 }
 
 /** Aufgelöste Einheiten des Einsatzes (LLH-1079, Block „Aufgelöst“). */

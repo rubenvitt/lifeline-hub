@@ -437,3 +437,16 @@ describe('EinheitKopf · Lesezeilen (D3)', () => {
     expect(zeileVon('Status')).toHaveTextContent(/kein Status|ohne Status|—/);
   });
 });
+
+describe('EinheitKopf · Kennzeichen „nicht übernommen“ (LLH-1075, design.md D14)', () => {
+  it('steht im Kopf, solange die Übernahme offen ist', () => {
+    renderKopf(einheit({ unangemeldet: true, nicht_uebernommen_seit: '2026-10-16T12:00:00Z' }));
+    const kopf = screen.getByRole('region', { name: 'Kopfdaten' });
+    expect(within(kopf).getByText('nicht übernommen')).toBeInTheDocument();
+  });
+
+  it('eine übernommene Einheit trägt es nicht', () => {
+    renderKopf(einheit({ unangemeldet: true, nicht_uebernommen_seit: null }));
+    expect(screen.queryByText('nicht übernommen')).toBeNull();
+  });
+});
