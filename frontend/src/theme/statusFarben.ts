@@ -39,6 +39,7 @@ import type {
   UhsStatus,
   UhsTyp,
   Verfuegbarkeit,
+  VerpflegungsstelleStatus,
   Warnstufe,
   WetterWarnstufe,
 } from '../api/types';
@@ -484,6 +485,16 @@ export const verpflegungDeckung: Record<VerpflegungDeckung, StatusDarstellung> =
   gedeckt: { rolle: 'normal', label: 'gedeckt' },
   offen: { rolle: 'neutral', label: 'offen' },
   unterdeckung: { rolle: 'alarm', label: 'Unterdeckung' },
+};
+
+/**
+ * Status einer Verpflegungsstelle (LLH-1040, Lebenszyklus wie der Bereitstellungsraum):
+ * „aufgelöst" ist der planmäßige Endzustand, deshalb neutral wie `brStatus`.
+ */
+export const verpflegungsstelleStatus: Record<VerpflegungsstelleStatus, StatusDarstellung> = {
+  geplant: { rolle: 'neutral', label: 'geplant' },
+  aktiv: { rolle: 'normal', label: 'aktiv' },
+  aufgeloest: { rolle: 'neutral', label: 'aufgelöst' },
 };
 
 /**
