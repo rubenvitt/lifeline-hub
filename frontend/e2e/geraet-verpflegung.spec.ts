@@ -147,3 +147,97 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     await kontext.close();
   }
 });
+
+/**
+ * Stellen am Gerät (LLH-1040, design.md D13 Punkt 7): das Gerät sieht die Ansicht „Stellen“ ohne
+ * eine Aktion, in der Ausgabeansicht ist die einzige zugeordnete Stelle vorgewählt; eine Hand-Wahl
+ * bucht an der gewählten Stelle, das Ist der Stelle steht daneben.
+ */
+test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an einer gewählten Stelle', async ({
+  page,
+  browser,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const { id: e } = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E Verpflegung Stellen ${Date.now()}`,
+  });
+  const basis = `/api/einsaetze/${e}/verpflegung`;
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  const stelle = async (bezeichnung: string, art: string) => {
+    const { id } = await anlegen(page, `${basis}/stellen`, { bezeichnung, art });
+    await anlegen(page, `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    return id;
+  };
+  const feldkueche = await stelle('Feldküche BR Sportplatz', 'feldkueche');
+  const turnhalle = await stelle('Ausgabe Turnhalle Nord', 'ausgabestelle');
+  const { id: mittag } = await anlegen(page, `${basis}/zeitfenster`, {
+    bezeichnung: 'Mittag Deich',
+    von_at: zeit(-30),
+    bis_at: zeit(90),
+    bedarf_kraefte: 60,
+    bedarf_betreute: 20,
+  });
+  const zuordnung = await page.request.patch(`${basis}/zeitfenster/${mittag}`, {
+    data: { stelle_ids: [feldkueche] },
+  });
+  expect(zuordnung.ok(), `Zuordnung: ${zuordnung.status()}`).toBeTruthy();
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+    ansicht: 'verpflegung',
+    bezeichnung: 'Ausgabe Turnhalle',
+  });
+
+  const kontext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung$`));
+
+    // Ansicht „Stellen“: beide Stellen, keine Aktion, kein Anlegen.
+    await tablet.getByRole('radio', { name: 'Stellen (2)' }).click();
+    const zeilen = tablet.locator('[data-lfh="verpflegungsstelle"]');
+    await expect(zeilen).toHaveCount(2);
+    await expect(zeilen.first()).toHaveAttribute('data-status', 'aktiv');
+    await expect(tablet.locator('[data-lfh="stelle-aktionen"]')).toHaveCount(0);
+    await expect(tablet.getByRole('button', { name: 'Stelle anlegen' })).toHaveCount(0);
+    await expect(tablet.getByRole('button', { name: /zu Stelle / })).toHaveCount(0);
+
+    // Ausgabeansicht: die einzige zugeordnete Stelle ist vorgewählt, gewählt wird die Turnhalle.
+    await tablet.getByRole('radio', { name: /^laufend/ }).click();
+    const karte = tablet.getByRole('article', { name: /^Zeitfenster Mittag Deich/ });
+    await karte.getByRole('link', { name: /^Ausgabe öffnen zu/ }).click();
+    await expect(tablet.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    const wahl = tablet.locator('[data-lfh="ausgabe-stelle"]');
+    await expect(wahl.locator('.ant-select')).toContainText('Feldküche BR Sportplatz');
+    await wahl.getByRole('combobox', { name: 'Stelle' }).click();
+    await tablet
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .locator('.ant-select-item-option[title="Ausgabe Turnhalle Nord"]')
+      .click();
+    await expect(wahl.locator('.ant-select')).toContainText('Ausgabe Turnhalle Nord');
+    await expect(wahl.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText('an der Stelle 0 EP');
+
+    const plus1 = tablet.getByRole('button', { name: '+1', exact: true });
+    for (let i = 0; i < 5; i++) await plus1.click();
+    await expect(tablet.getByText('Gebucht: 5 EP zu ‚Mittag Deich‘')).toBeVisible();
+    await expect(wahl.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText('an der Stelle 5 EP');
+
+    const antwort = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
+    const stand = (await antwort.json()) as {
+      zeitfenster: {
+        ausgaben: { menge: number; verpflegungsstelle_id: number | null }[];
+        je_stelle: { stelle_id: number | null; ausgegeben: { gesamt: number } }[];
+      }[];
+    };
+    const zf = stand.zeitfenster[0];
+    expect(zf.ausgaben.map((a) => [a.menge, a.verpflegungsstelle_id])).toEqual([[5, turnhalle]]);
+    // Die zugeordnete Stelle steht mit 0 EP in `je_stelle`, die gewählte mit der Buchung.
+    expect(zf.je_stelle.map((z) => [z.stelle_id, z.ausgegeben.gesamt])).toEqual([
+      [feldkueche, 0],
+      [turnhalle, 5],
+    ]);
+  } finally {
+    await kontext.close();
+  }
+});
