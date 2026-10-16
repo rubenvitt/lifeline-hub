@@ -97,7 +97,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
   ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
   Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Die Suche kennt nur
-  Kräfte des Einsatzes, keine Stammdaten. Meldungen an
+  Kräfte des Einsatzes, keine Stammdaten. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
+  `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
 - **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte

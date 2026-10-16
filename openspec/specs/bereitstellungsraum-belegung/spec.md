@@ -723,3 +723,49 @@ die Übernahme offen ist, und danach „unangemeldet“ als neutrale Marke ohne 
 #### Scenario: Nach der Übernahme
 - **WHEN** eine unangemeldet gebuchte Einheit übernommen wurde und weiter im Raum steht
 - **THEN** zeigt ihre Belegungszeile „unangemeldet“ ohne Farbe und nicht „nicht übernommen“
+
+### Requirement: Eintreffen ohne Netz vormerken
+Die Oberfläche SHALL ein Eintreffen (bekannte wie unangemeldete Kraft), das mangels Verbindung
+nicht gesendet werden kann, auf dem Gerät vormerken und bei Verbindung nachsenden. Jede Buchung
+MUST vor dem ersten Sendeversuch eine `client_id` erhalten, die auch die vorgemerkte Kopie
+trägt, damit eine Wiederholung nach abgerissener Antwort höchstens einmal wirkt. Vorgemerkt
+MUST sie den Erfassungszeitpunkt nach der Serveruhr tragen, soweit deren Versatz bekannt ist.
+
+#### Scenario: Ohne Netz gebucht
+- **WHEN** der Einweiser am Tablet ohne Netz „HLF 20 FF Musterstadt“ bucht
+- **THEN** lautet der Hinweis „Offline vorgemerkt: Eintreffen HLF 20 FF Musterstadt“, und nichts geht an den Server
+
+#### Scenario: Abgerissene Antwort
+- **WHEN** die Buchung den Server erreicht, die Antwort aber ausbleibt, und die Queue sie später erneut sendet
+- **THEN** trägt der zweite Versuch dieselbe `client_id`, der Server liefert die erste Buchung, und es gibt genau eine Einheit, einen Belegungseintrag und eine Meldung
+
+### Requirement: Vorgemerkte Eintreffen am Raum
+Die Seite des Raums SHALL die vorgemerkten Buchungen dieses Geräts für diesen Raum unter
+„Vorgemerkt“ zeigen, mit Kraft und Zeitpunkt der Erfassung, getrennt von der Belegung und ohne
+sie in die Kennzahlen zu zählen. Beim Nachsenden MUST der Raum neu geladen sein, bevor die Zeile
+„Vorgemerkt“ verschwindet.
+
+#### Scenario: Vorgemerkt am Raum
+- **WHEN** am Tablet des BR Sportplatz ohne Netz „HLF 20 FF Musterstadt“ gebucht ist
+- **THEN** steht die Kraft unter „Vorgemerkt“ mit „vorgemerkt“ und der Uhrzeit, und „Einheiten“ zählt sie nicht
+
+### Requirement: Ablehnung eines vorgemerkten Eintreffens
+Eine beim Nachsenden fachlich abgelehnte Buchung (etwa 422 für einen inzwischen aufgelösten
+Raum, 409 für eine Kraft, die schon in einem Raum steht, 403) SHALL mit Kraft, Raum, Grund und
+vollständigem Inhalt im Wiederherstellungsbereich stehen, bis sie verworfen oder erneut versucht
+wird.
+
+#### Scenario: Raum beim Nachsenden aufgelöst
+- **WHEN** eine vorgemerkte Buchung nachgesendet wird und der Raum inzwischen aufgelöst ist
+- **THEN** steht sie unter „Offline-Aktionen wiederherstellen“ als „Abgelehntes Eintreffen: … · BR …“ mit dem Grund, und „Vorgemerkt“ am Raum ist leer
+
+### Requirement: Doppelbuchung ohne Netz
+Eine Kraft, deren Buchung vorgemerkt ist, SHALL im Dialog gesperrt mit „vorgemerkt …“ stehen und
+MUST NOT als Treffer für „Diese buchen“ gelten. Trägt eine vorgemerkte unangemeldete Kraft
+denselben Funkrufnamen wie die Eingabe, MUST der Dialog „Schon vorgemerkt: …“ nennen und nur
+„Trotzdem neu anlegen“ anbieten. Fehlen dem Dialog die Kräfte des Einsatzes, MUST er keine
+Doppelbuchung melden; die Prüfung trägt dann der Server beim Senden.
+
+#### Scenario: Schon vorgemerkte Kraft
+- **WHEN** der Einweiser ohne Netz „RTW 2“ gebucht hat und danach unangemeldet „rtw 2“ erfasst
+- **THEN** nennt der Dialog „Schon vorgemerkt: RTW 2“, „Diese buchen“ fehlt, und der Treffer „RTW 2“ in der Suche ist gesperrt
