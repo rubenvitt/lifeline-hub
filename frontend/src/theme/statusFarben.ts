@@ -313,6 +313,14 @@ export const einheitStaerkeUrteil: Record<EinheitStaerkeUrteil, StatusDarstellun
  */
 export const uebernahmeOffen: StatusDarstellung = { rolle: 'achtung', label: 'nicht übernommen' };
 
+/**
+ * Eine abgerufene, noch nicht ausgerückte Kraft im Bereitstellungsraum (LLH-1085 Teil II): sie
+ * wartet auf das Ausrücken, das der Einweiser bucht. Hinweis, keine Gefahr, darum `achtung` wie
+ * {@link uebernahmeOffen}. Eine einzelne Darstellung, keine Karte über einem Enum: „abgerufen“
+ * leitet der Server aus dem jüngsten Belegungsereignis ab.
+ */
+export const brAbgerufen: StatusDarstellung = { rolle: 'achtung', label: 'abgerufen' };
+
 /** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },
