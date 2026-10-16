@@ -4,7 +4,7 @@
 //!
 //! Statuscodes (`src/AGENTS.md`, „Statuscode-Konvention“): 400 für das Feld allein (leere oder
 //! zu lange Bezeichnung, unbekannter Typ, Zahl außerhalb, unlesbare Uhrzeit, fehlender Wert des
-//! Typs; `schichtmodell::WerteBody::pruefen`), 422 für ein Feld des anderen Typs, 409 für eine
+//! Typs; `schichtmodell::WerteBody::check`), 422 für ein Feld des anderen Typs, 409 für eine
 //! gleiche Bezeichnung oder eine zweite Vorgabe, 404 für ein fremdes Modell. `stammdaten`
 //! meldet die Middleware `routes::live::stammdaten_live` (Präfix in `STAMMDATEN_PFADE`).
 

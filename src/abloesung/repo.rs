@@ -869,11 +869,11 @@ pub async fn load_einsatz_vorgabe(
 #[derive(Debug, Clone)]
 pub enum EinsatzVorgabeInput {
     /// Kopie eines Schichtmodells der Organisation des Einsatzes (fremd oder unbekannt: 404).
-    AusStammdaten(i64),
+    FromStammdaten(i64),
     /// Eigene Werte, von der Route geprüft.
     Werte(Werte),
     /// Keine Vorgabe mehr.
-    Entfernen,
+    Remove,
 }
 
 /// Setzt oder entfernt die Vorgabe des Einsatzes und zieht die laufenden Schichten nach: wer der
@@ -892,7 +892,7 @@ pub async fn set_einsatz_vorgabe(
     let startwert = etb_startwert(pool, einsatz_id).await?;
     write_retry!(pool, |conn| {
         let neu = match eingabe {
-            EinsatzVorgabeInput::AusStammdaten(id) => {
+            EinsatzVorgabeInput::FromStammdaten(id) => {
                 let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
                     .fetch_one(&mut *conn)
@@ -900,7 +900,7 @@ pub async fn set_einsatz_vorgabe(
                 Some(schichtmodell_repo::load_werte_tx(conn, org_id, *id).await?)
             }
             EinsatzVorgabeInput::Werte(w) => Some(w.clone()),
-            EinsatzVorgabeInput::Entfernen => None,
+            EinsatzVorgabeInput::Remove => None,
         };
         let vorher = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
         if vorher.werte == neu {
