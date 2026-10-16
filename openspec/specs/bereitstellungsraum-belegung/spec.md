@@ -691,13 +691,17 @@ Ablehnungen MUST im Dialog stehen, ohne Fehler-Toast.
 
 ### Requirement: Doppelbuchung in der Oberfläche
 Erkennt der Client bei der Erfassung einer unangemeldeten Kraft eine Doppelbuchung, SHALL er die
-vorhandene Kraft nennen, „Unangemeldet buchen“ sperren und „Diese buchen“ sowie „Trotzdem neu
-anlegen“ anbieten. Meldet erst der Server die Doppelbuchung, MUST „Trotzdem neu anlegen“
-erscheinen.
+vorhandene Kraft nennen, „Unangemeldet buchen“ sperren und „Trotzdem neu anlegen“ anbieten, dazu
+„Diese buchen“, solange die vorhandene Kraft in keinem Raum steht (dort hilft der Wechsel). Meldet
+erst der Server die Doppelbuchung, MUST „Trotzdem neu anlegen“ erscheinen.
 
 #### Scenario: Doppelbuchung im Client
 - **WHEN** der Einweiser unangemeldet „fl-mus 1-44-1“ eingibt und „FL-MUS 1-44-1“ als Fahrzeug im Einsatz geführt wird
 - **THEN** nennt der Dialog „Schon im Einsatz: FL-MUS 1-44-1“, „Unangemeldet buchen“ ist gesperrt, und „Trotzdem neu anlegen“ sendet die Erfassung mit ausdrücklicher Bestätigung
+
+#### Scenario: Doppelbuchung mit einer Kraft im Raum
+- **WHEN** der Einweiser unangemeldet „Zug Süd“ eingibt und die Einheit „Zug Süd“ in einem Bereitstellungsraum steht
+- **THEN** nennt der Dialog „Schon im Einsatz: Zug Süd“ und bietet nur „Trotzdem neu anlegen“, „Diese buchen“ fehlt
 
 ### Requirement: Seitenleiste trennt Erwartete und Kräfte im Einsatz
 Die Seitenleiste der freien Kräfte SHALL Kräfte ohne Raum in „Erwartet“ (ohne eigenen oder

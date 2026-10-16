@@ -81,7 +81,8 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
    informiert“; die neue Einheit trägt in der Belegung „nicht übernommen“.
 6. Gibt es im Einsatz schon eine Kraft mit diesem Funkrufnamen, steht „Schon im Einsatz: …“ und
    „Unangemeldet buchen“ ist gesperrt. „Diese buchen“ bucht die vorhandene Kraft, „Trotzdem neu
-   anlegen“ legt die neue trotzdem an.
+   anlegen“ legt die neue trotzdem an. Steht die vorhandene Kraft schon in einem Raum, fehlt
+   „Diese buchen“.
 
 ### Kräfte zuweisen und entfernen
 

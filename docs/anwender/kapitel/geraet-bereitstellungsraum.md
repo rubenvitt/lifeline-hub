@@ -53,7 +53,8 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
    informiert“. Die Kraft steht als neue Einheit im Raum und trägt „nicht übernommen“, bis die
    Einsatzleitung sie übernimmt oder abweist.
 5. Steht „Schon im Einsatz: …“, kennt der Einsatz den Funkrufnamen schon. „Diese buchen“ bucht die
-   vorhandene Kraft; „Trotzdem neu anlegen“ nur, wenn es wirklich eine andere Kraft ist.
+   vorhandene Kraft; „Trotzdem neu anlegen“ nur, wenn es wirklich eine andere Kraft ist. Steht die
+   vorhandene Kraft schon in einem Raum, fehlt „Diese buchen“.
 
 ### Kräfte aus der Liste zuweisen
 
