@@ -285,12 +285,16 @@ fn serde_wire_gleich_as_str() {
         Eintritt,
         Wechsel,
         Austritt,
+        Abruf,
+        AbrufAufgehoben,
     });
     enum_wire_as_str!(lifeline_hub::bereitstellungsraum::BrVerlaufArt {
         Eintritt,
         WechselHerein,
         WechselHinaus,
         Austritt,
+        Abruf,
+        AbrufAufgehoben,
     });
     enum_wire_as_str!(
         lifeline_hub::bereitstellungsraum::eintreffen::EintreffenZeitachse {

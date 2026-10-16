@@ -71,6 +71,8 @@ use utoipa::OpenApi;
         crate::betreuung::Raeumungszustand,
         crate::betreuung::StandVerlaufEintrag,
         crate::betreuung::StelleMeldungAnzeige,
+        crate::bereitstellungsraum::BrAbrufErgebnis,
+        crate::bereitstellungsraum::BrAbrufKurz,
         crate::bereitstellungsraum::BrAnzeige,
         crate::bereitstellungsraum::BrBelegungAnzeige,
         crate::bereitstellungsraum::BrBelegungKennzahlen,
