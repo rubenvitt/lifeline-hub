@@ -188,9 +188,9 @@ export function useAusgabeSammlung({
   const tippe = useCallback(
     (n: number, kostform?: Kostform) => {
       if (vergangen || aktuell.current.zeitfenster == null) return;
-      const warLeer = sammlung.istLeer;
+      const wasEmpty = sammlung.istLeer;
       if (!sammlung.tippe(n, Date.now(), kostform)) return;
-      if (warLeer) buendelStelle.current = aktuell.current.stelleId;
+      if (wasEmpty) buendelStelle.current = aktuell.current.stelleId;
       neuZeichnen();
       planeAbschluss();
     },

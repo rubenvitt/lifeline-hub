@@ -22,12 +22,12 @@ function schluessel(einsatzId: number): string {
 }
 
 /** Die gemerkte Stelle des Einsatzes, oder `null` (nichts gemerkt, fremder Wert, kein Speicher). */
-export function liesGemerkteStelle(einsatzId: number): number | null {
+export function loadGemerkteStelle(einsatzId: number): number | null {
   return parseRouteId(sicherLesen(schluessel(einsatzId)) ?? undefined);
 }
 
 /** Merkt die Wahl; „ohne Stelle“ (`null`) entfernt den Eintrag. Wirft nie. */
-export function merkeStelle(einsatzId: number, stelleId: number | null): void {
+export function saveGemerkteStelle(einsatzId: number, stelleId: number | null): void {
   if (stelleId == null) sicherEntfernen(schluessel(einsatzId));
   else sicherSchreiben(schluessel(einsatzId), String(stelleId));
 }

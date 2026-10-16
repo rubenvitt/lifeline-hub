@@ -42,7 +42,7 @@ import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { useAusgabeNachtragen } from './useAusgabeNachtragen';
-import { liesGemerkteStelle, merkeStelle } from './stellenGedaechtnis';
+import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
 import { stellenName, stellenWahl } from './stellenKern';
 import { useAusgabeSammlung } from './useAusgabeSammlung';
 import { useNachforderungWahl } from './useNachforderungWahl';
@@ -155,16 +155,16 @@ export default function AusgabeAnsicht() {
   const amDesktop = geraet == null;
   const wahl = stellenWahl(stellen, zf);
   const waehlbar = [...wahl.zugeordnet, ...wahl.weitere];
-  const istWaehlbar = (sid: number | null): sid is number =>
+  const isWaehlbar = (sid: number | null): sid is number =>
     sid != null && waehlbar.some((s) => s.id === sid);
   const gemerkt = useMemo(
-    () => (amDesktop ? liesGemerkteStelle(einsatzId) : null),
+    () => (amDesktop ? loadGemerkteStelle(einsatzId) : null),
     [amDesktop, einsatzId],
   );
   const ausKarte = parseVerpflegungStelle(suchParameter);
-  const vorwahl = istWaehlbar(ausKarte)
+  const vorwahl = isWaehlbar(ausKarte)
     ? ausKarte
-    : istWaehlbar(gemerkt)
+    : isWaehlbar(gemerkt)
       ? gemerkt
       : wahl.zugeordnet.length === 1
         ? wahl.zugeordnet[0].id
@@ -180,10 +180,10 @@ export default function AusgabeAnsicht() {
   }
   const festgehalten = festeWahl?.schluessel === wahlSchluessel ? festeWahl.stelle : null;
   // Eine inzwischen aufgelöste Stelle fällt aus der Wahl.
-  const gewaehlteStelle = istWaehlbar(festgehalten) ? festgehalten : null;
-  const waehleStelle = (sid: number | null) => {
+  const gewaehlteStelle = isWaehlbar(festgehalten) ? festgehalten : null;
+  const selectStelle = (sid: number | null) => {
     setFesteWahl({ schluessel: wahlSchluessel, stelle: sid });
-    if (amDesktop) merkeStelle(einsatzId, sid);
+    if (amDesktop) saveGemerkteStelle(einsatzId, sid);
   };
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const vergangen = zf != null && istVergangen(zf, jetzt);
@@ -484,7 +484,7 @@ export default function AusgabeAnsicht() {
                   aria-label="Stelle"
                   value={gewaehlteStelle ?? 'ohne'}
                   disabled={tastenGesperrt}
-                  onChange={(v) => waehleStelle(v === 'ohne' ? null : v)}
+                  onChange={(v) => selectStelle(v === 'ohne' ? null : v)}
                   options={[
                     { value: 'ohne', label: 'ohne Stelle' },
                     ...waehlbar.map((st) => ({ value: st.id, label: st.bezeichnung })),

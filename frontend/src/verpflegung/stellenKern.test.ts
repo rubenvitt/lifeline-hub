@@ -12,7 +12,7 @@ import {
 } from '../test/verpflegungDaten';
 import {
   laufendeZeitfensterDerStelle,
-  offeneStellenAnzahl,
+  offeneStellenCount,
   stellenWahl,
   zeilenJeStelle,
 } from './stellenKern';
@@ -169,10 +169,10 @@ describe('stellenWahl (Nachtrag, Ausgabeansicht, Zeitfensterdialog)', () => {
   });
 });
 
-describe('offeneStellenAnzahl (Zählung der Segmentleiste)', () => {
+describe('offeneStellenCount (Zählung der Segmentleiste)', () => {
   it('zählt nicht aufgelöste Stellen', () => {
-    expect(offeneStellenAnzahl(verpflegungMitStellen().stellen)).toBe(3);
-    expect(offeneStellenAnzahl([stelle({ id: 1, status: 'aufgeloest' }), stelle({ id: 2 })])).toBe(
+    expect(offeneStellenCount(verpflegungMitStellen().stellen)).toBe(3);
+    expect(offeneStellenCount([stelle({ id: 1, status: 'aufgeloest' }), stelle({ id: 2 })])).toBe(
       1,
     );
   });

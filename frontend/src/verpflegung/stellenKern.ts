@@ -22,7 +22,7 @@ export interface LaufendesZeitfenster {
 }
 
 /** Hat begonnen (`von ≤ jetzt`) und ist nicht vergangen. */
-function laeuft(zf: VerpflegungZeitfenster, jetzt: Dayjs): boolean {
+function isLaufend(zf: VerpflegungZeitfenster, jetzt: Dayjs): boolean {
   const von = dayjs.utc(zf.von_at);
   return von.isValid() && von.valueOf() <= jetzt.valueOf() && !istVergangen(zf, jetzt);
 }
@@ -38,7 +38,7 @@ export function laufendeZeitfensterDerStelle(
   jetzt: Dayjs,
 ): LaufendesZeitfenster[] {
   return zeitfenster
-    .filter((zf) => laeuft(zf, jetzt))
+    .filter((zf) => isLaufend(zf, jetzt))
     .flatMap((zf) => {
       const eintrag = zf.je_stelle.find((e) => e.stelle_id === stelleId);
       if (!eintrag && !zf.stelle_ids.includes(stelleId)) return [];
@@ -126,6 +126,6 @@ export function stellenWahl(
 }
 
 /** Zahl der Segmentleiste „Stellen (n)“: nicht aufgelöste Stellen. */
-export function offeneStellenAnzahl(stellen: readonly Verpflegungsstelle[]): number {
+export function offeneStellenCount(stellen: readonly Verpflegungsstelle[]): number {
   return stellen.filter((s) => s.status !== 'aufgeloest').length;
 }

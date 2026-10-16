@@ -8,7 +8,7 @@ import {
 import { entwuerfeLeerenFuerTests, entwurfSpeichern } from '../etb/entwuerfe/entwurfStore';
 import type { EtbEntwurf } from '../etb/entwuerfe/entwurfModell';
 import { rohLesen } from '../test/rohIdb';
-import { liesGemerkteStelle, merkeStelle } from '../verpflegung/stellenGedaechtnis';
+import { loadGemerkteStelle, saveGemerkteStelle } from '../verpflegung/stellenGedaechtnis';
 import { geraetFuerBenutzerRaeumen, geraetRaeumen } from './geraetRaeumung';
 import {
   queueEinreihen,
@@ -51,7 +51,7 @@ async function geraetBefuellen(): Promise<void> {
   await quittungAnlegen(A);
   await setzeOrt(ortKeyVon(51.16, 10.45), 'Hauptstr. 5, Musterstadt');
   schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
-  merkeStelle(7, 21);
+  saveGemerkteStelle(7, 21);
   await queueEinreihen(A, 7, { typ: 'meldung', inhalt: 'offline vorgemerkt', client_id: 'etb-a' });
 }
 
@@ -77,7 +77,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
-    expect(liesGemerkteStelle(7)).toBeNull();
+    expect(loadGemerkteStelle(7)).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -90,7 +90,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
-    expect(liesGemerkteStelle(7)).toBeNull();
+    expect(loadGemerkteStelle(7)).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 

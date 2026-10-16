@@ -22,7 +22,7 @@ import {
   zeitfenster,
 } from '../test/verpflegungDaten';
 import type { Verpflegungsstelle } from '../api/types';
-import { liesGemerkteStelle, merkeStelle } from './stellenGedaechtnis';
+import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
 
 dayjs.extend(utc);
 
@@ -542,7 +542,7 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
         client_id: expect.any(String),
       }),
     );
-    expect(liesGemerkteStelle(1)).toBe(FELDKUECHE);
+    expect(loadGemerkteStelle(1)).toBe(FELDKUECHE);
   });
 
   it('ein Wechsel der Stelle bucht das offene Bündel an der alten Stelle', async () => {
@@ -561,14 +561,14 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
   });
 
   it('die gemerkte Wahl gilt beim Öffnen', async () => {
-    merkeStelle(1, DEICH);
+    saveGemerkteStelle(1, DEICH);
     zeige();
     await geladen();
     expect(gewaehlt()).toBe('Zuführung Deich');
   });
 
   it('`?stelle=` aus der Karte geht vor der gemerkten Wahl', async () => {
-    merkeStelle(1, DEICH);
+    saveGemerkteStelle(1, DEICH);
     zeige(1, `?stelle=${TURNHALLE}`);
     await geladen();
     expect(gewaehlt()).toBe('Ausgabe Turnhalle Nord');
@@ -659,7 +659,7 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
   });
 
   it('am Gerät wird nichts gemerkt und nichts Gemerktes gelesen', async () => {
-    merkeStelle(1, DEICH);
+    saveGemerkteStelle(1, DEICH);
     server.use(
       meHandler({
         ...benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Gerät' }),
@@ -679,7 +679,7 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
     await geladen();
     await waitFor(() => expect(gewaehlt()).toBe('ohne Stelle'));
     await waehle('Stelle', 'Feldküche BR Sportplatz');
-    expect(liesGemerkteStelle(1)).toBe(DEICH);
+    expect(loadGemerkteStelle(1)).toBe(DEICH);
   });
 
   it('ohne Stellen im Einsatz bleibt der Platz leer', async () => {

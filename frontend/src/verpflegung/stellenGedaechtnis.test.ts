@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gemerkteStellenRaeumen, liesGemerkteStelle, merkeStelle } from './stellenGedaechtnis';
+import {
+  gemerkteStellenRaeumen,
+  loadGemerkteStelle,
+  saveGemerkteStelle,
+} from './stellenGedaechtnis';
 
 /**
  * Die gemerkte Stellenwahl der Ausgabeansicht (LLH-1040, design.md D13 Punkt 7): nur eine Kennung
@@ -11,23 +15,23 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('stellenGedaechtnis', () => {
   it('merkt die Wahl je Einsatz und liest sie zurück', () => {
-    merkeStelle(7, 21);
-    merkeStelle(8, 22);
-    expect(liesGemerkteStelle(7)).toBe(21);
-    expect(liesGemerkteStelle(8)).toBe(22);
-    expect(liesGemerkteStelle(9)).toBeNull();
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(8, 22);
+    expect(loadGemerkteStelle(7)).toBe(21);
+    expect(loadGemerkteStelle(8)).toBe(22);
+    expect(loadGemerkteStelle(9)).toBeNull();
   });
 
   it('„ohne Stelle“ entfernt den Eintrag', () => {
-    merkeStelle(7, 21);
-    merkeStelle(7, null);
-    expect(liesGemerkteStelle(7)).toBeNull();
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(7, null);
+    expect(loadGemerkteStelle(7)).toBeNull();
     expect(localStorage.length).toBe(0);
   });
 
   it('ein fremder Wert gilt als nichts gemerkt', () => {
     localStorage.setItem('lfh:verpflegung:stelle:7', 'Feldküche');
-    expect(liesGemerkteStelle(7)).toBeNull();
+    expect(loadGemerkteStelle(7)).toBeNull();
   });
 
   it('ein gesperrter Speicher wirft nicht: lesen ergibt nichts, schreiben geht ins Leere', () => {
@@ -37,17 +41,17 @@ describe('stellenGedaechtnis', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('gesperrt', 'SecurityError');
     });
-    expect(() => merkeStelle(7, 21)).not.toThrow();
-    expect(liesGemerkteStelle(7)).toBeNull();
+    expect(() => saveGemerkteStelle(7, 21)).not.toThrow();
+    expect(loadGemerkteStelle(7)).toBeNull();
   });
 
   it('Räumen nimmt alle gemerkten Stellen, fremde Schlüssel bleiben', () => {
-    merkeStelle(7, 21);
-    merkeStelle(8, 22);
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(8, 22);
     localStorage.setItem('lifeline-hub.theme', 'dunkel');
     gemerkteStellenRaeumen();
-    expect(liesGemerkteStelle(7)).toBeNull();
-    expect(liesGemerkteStelle(8)).toBeNull();
+    expect(loadGemerkteStelle(7)).toBeNull();
+    expect(loadGemerkteStelle(8)).toBeNull();
     expect(localStorage.getItem('lifeline-hub.theme')).toBe('dunkel');
   });
 });

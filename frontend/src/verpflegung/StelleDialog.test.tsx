@@ -24,7 +24,7 @@ const ort = vi.hoisted(() => ({
 }));
 vi.mock('../api/ortSuche', () => ({ sucheOrtImEinsatz: ort.suche }));
 
-const { StelleDialog, stelleAnlegenBody, stellePatch } = await import('./StelleDialog');
+const { StelleDialog, createStelleBody, stellePatch } = await import('./StelleDialog');
 
 const TREFFER: OrtSucheAntwort = {
   zustand: 'ok',
@@ -107,17 +107,17 @@ function sichtbareFelder(dialog: HTMLElement): number {
   return felder.size;
 }
 
-describe('stelleAnlegenBody / stellePatch (rein)', () => {
+describe('createStelleBody / stellePatch (rein)', () => {
   it('schickt beim Anlegen nur Gesetztes, Koordinate nur mit Treffer', () => {
     expect(
-      stelleAnlegenBody({
+      createStelleBody({
         bezeichnung: '  Feldküche  ',
         art: 'feldkueche',
         standort: { text: ' ', koordinate: null },
       }),
     ).toEqual({ bezeichnung: 'Feldküche', art: 'feldkueche' });
     expect(
-      stelleAnlegenBody({
+      createStelleBody({
         bezeichnung: 'Feldküche',
         art: 'feldkueche',
         standort: { text: 'Sportplatz', koordinate: { lat: 52.5, lon: 13.4 } },

@@ -52,7 +52,7 @@ interface Rueckfragestand {
 }
 
 /** Hängt an der Stelle eine Ausgabe, auch eine zurückgenommene? Dann kein Storno (Server 422). */
-function hatAusgabe(stelleId: number, zeitfenster: readonly VerpflegungZeitfenster[]): boolean {
+function hasAusgabe(stelleId: number, zeitfenster: readonly VerpflegungZeitfenster[]): boolean {
   return zeitfenster.some((zf) => zf.ausgaben.some((a) => a.verpflegungsstelle_id === stelleId));
 }
 
@@ -121,7 +121,7 @@ export default function StellenListe({
     }
   };
 
-  const bestaetige = () => {
+  const confirmRueckfrage = () => {
     if (!rueckfrage) return;
     const { art, stelle } = rueckfrage;
     setRueckfrage({ ...rueckfrage, laeuft: true, fehler: null });
@@ -142,7 +142,7 @@ export default function StellenListe({
             { key: 'aktiv', label: 'In Betrieb nehmen' },
             { key: 'bearbeiten', label: 'Bearbeiten …' },
             { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
-            ...(hatAusgabe(s.id, zeitfenster)
+            ...(hasAusgabe(s.id, zeitfenster)
               ? []
               : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
           ]
@@ -253,7 +253,7 @@ export default function StellenListe({
           fehlerTitel={rueckfrage.art === 'aufloesen' ? 'Nicht aufgelöst' : 'Nicht storniert'}
           laeuft={rueckfrage.laeuft}
           fehler={rueckfrage.fehler}
-          onBestaetigen={bestaetige}
+          onBestaetigen={confirmRueckfrage}
           onSchliessen={() => setRueckfrage(null)}
         >
           <Typography.Paragraph>

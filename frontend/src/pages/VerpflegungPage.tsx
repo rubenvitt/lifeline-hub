@@ -55,7 +55,7 @@ import {
 } from '../verpflegung/VerpflegungDialoge';
 import { StelleDialog } from '../verpflegung/StelleDialog';
 import StellenListe from '../verpflegung/StellenListe';
-import { offeneStellenAnzahl } from '../verpflegung/stellenKern';
+import { offeneStellenCount } from '../verpflegung/stellenKern';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { useAusgabeNachtragen } from '../verpflegung/useAusgabeNachtragen';
@@ -201,19 +201,20 @@ export default function VerpflegungPage() {
   const stellen = useMemo(() => verpflegungQuery.data?.stellen ?? [], [verpflegungQuery.data]);
   const stellenAnsicht = ansicht === 'stellen';
   // Abschnitte nur für die offene Stellenmaske; ohne Modulzugriff bleibt das Feld weg.
-  const abschnitteLesbar = freigaben?.einsatzabschnitte?.zugriff !== false;
+  const canReadAbschnitte = freigaben?.einsatzabschnitte?.zugriff !== false;
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
     enabled:
-      abschnitteLesbar && (dialog?.art === 'stelle-anlegen' || dialog?.art === 'stelle-bearbeiten'),
+      canReadAbschnitte &&
+      (dialog?.art === 'stelle-anlegen' || dialog?.art === 'stelle-bearbeiten'),
   });
   const abschnittOptionen = useMemo(
     () =>
-      abschnitteLesbar
+      canReadAbschnitte
         ? (abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))
         : null,
-    [abschnitteLesbar, abschnitteQuery.data],
+    [canReadAbschnitte, abschnitteQuery.data],
   );
   // Auf diesem Gerät vorgemerkte Ausgaben je Zeitfenster — „ausstehend“, außerhalb der Deckung
   // (LFH-688, design.md D8).
@@ -446,7 +447,7 @@ export default function VerpflegungPage() {
             },
             {
               wert: 'stellen',
-              label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenAnzahl(stellen)})`,
+              label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenCount(stellen)})`,
             },
           ]}
           style={{ flex: 'none' }}

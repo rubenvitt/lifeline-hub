@@ -116,7 +116,7 @@ export function zeitfensterAnlegenBody(w: ZeitfensterWerte): ZeitfensterEingabe 
 }
 
 /** Gleiche Stellen, gleich in welcher Reihenfolge. */
-function gleicheStellen(a: readonly number[], b: readonly number[]): boolean {
+function isSameStellen(a: readonly number[], b: readonly number[]): boolean {
   const menge = new Set(a);
   return menge.size === new Set(b).size && b.every((id) => menge.has(id));
 }
@@ -150,7 +150,7 @@ export function zeitfensterPatch(
   const art = w.verpflegungsart ?? null;
   if (art !== (vorher.verpflegungsart ?? null)) patch.verpflegungsart = art;
   // Ohne Feld (keine Stellen im Einsatz) bleibt die Zuordnung, wie sie ist.
-  if (w.stelle_ids !== undefined && !gleicheStellen(w.stelle_ids, vorher.stelle_ids)) {
+  if (w.stelle_ids !== undefined && !isSameStellen(w.stelle_ids, vorher.stelle_ids)) {
     patch.stelle_ids = [...w.stelle_ids];
   }
   return patch;
@@ -308,12 +308,12 @@ export function ZeitfensterDialog({
   const vorher = modus.art === 'bearbeiten' ? modus.zeitfenster : null;
   // Die Grenze der Stellen kann scheitern: der Klappteil geht dann selbst auf.
   const [stellenOffen, setStellenOffen] = useState(false);
-  const mitStellen = stellen.length > 0;
+  const hasStellen = stellen.length > 0;
   const art = Form.useWatch('verpflegungsart', form) as Verpflegungsart | null | undefined;
   const gewaehlteStellen = (Form.useWatch('stelle_ids', form) as number[] | undefined) ?? [];
   const stellenOptionen = zeitfensterStellenOptionen(stellen, vorher);
   const stellenKopf = [
-    mitStellen ? 'Art und Stellen' : 'Art',
+    hasStellen ? 'Art und Stellen' : 'Art',
     art ? VERPFLEGUNGSART_LABEL[art] : undefined,
     gewaehlteStellen.length > 0
       ? `${gewaehlteStellen.length} ${gewaehlteStellen.length === 1 ? 'Stelle' : 'Stellen'}`
@@ -368,7 +368,7 @@ export function ZeitfensterDialog({
         bedarf_weitere: vorher.bedarf.weitere,
         sonderkost: { ...vorher.bedarf.sonderkost },
         verpflegungsart: vorher.verpflegungsart ?? undefined,
-        ...(mitStellen ? { stelle_ids: [...vorher.stelle_ids] } : {}),
+        ...(hasStellen ? { stelle_ids: [...vorher.stelle_ids] } : {}),
       }
     : undefined;
 
@@ -462,11 +462,11 @@ export function ZeitfensterDialog({
           <Form.Item<ZeitfensterWerte>
             name="verpflegungsart"
             label="Art"
-            style={mitStellen ? undefined : { marginBottom: 0 }}
+            style={hasStellen ? undefined : { marginBottom: 0 }}
           >
             <Select allowClear placeholder="ohne Angabe" options={VERPFLEGUNGSART_OPTIONEN} />
           </Form.Item>
-          {mitStellen && (
+          {hasStellen && (
             <Form.Item<ZeitfensterWerte>
               name="stelle_ids"
               label="Stellen"
@@ -521,14 +521,14 @@ function nachtragStellenOptionen(
   zf: VerpflegungZeitfenster,
 ): { label: string; options: { value: number; label: string }[] }[] {
   const wahl = stellenWahl(stellen, zf);
-  const alsOption = (s: Verpflegungsstelle) => ({ value: s.id, label: s.bezeichnung });
+  const toOption = (s: Verpflegungsstelle) => ({ value: s.id, label: s.bezeichnung });
   return [
-    { label: 'zugeordnet', options: wahl.zugeordnet.map(alsOption) },
+    { label: 'zugeordnet', options: wahl.zugeordnet.map(toOption) },
     {
       label: wahl.zugeordnet.length > 0 ? 'weitere' : 'Stellen',
-      options: wahl.weitere.map(alsOption),
+      options: wahl.weitere.map(toOption),
     },
-    { label: 'aufgelöst', options: wahl.aufgeloest.map(alsOption) },
+    { label: 'aufgelöst', options: wahl.aufgeloest.map(toOption) },
   ].filter((g) => g.options.length > 0);
 }
 
@@ -555,8 +555,8 @@ export function AusgabeDialog({
   const nachforderungId = Form.useWatch('nachforderung_id', form) as number | null | undefined;
   const bemerkung = Form.useWatch('bemerkung', form) as string | null | undefined;
   const stelleId = Form.useWatch('verpflegungsstelle_id', form) as number | null | undefined;
-  const mitStellen = stellen.length > 0;
-  const ortLabel = mitStellen ? 'Zuführungsziel' : 'Ort';
+  const hasStellen = stellen.length > 0;
+  const ortLabel = hasStellen ? 'Zuführungsziel' : 'Ort';
   const abweichungen = [
     ...KOSTFORMEN.filter((k) => (sonderkost?.[k] ?? 0) > 0).map(
       (k) => `${sonderkost?.[k]} ${KOSTFORM_LABEL[k]}`,
@@ -598,7 +598,7 @@ export function AusgabeDialog({
       >
         {anzahlFeld(1)}
       </Form.Item>
-      {mitStellen && (
+      {hasStellen && (
         <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
           <Select
             allowClear

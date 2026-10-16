@@ -63,7 +63,7 @@ function ortFelder(w: OrtsfeldWert | undefined): {
   return { standort, lat: k?.lat ?? null, lon: k?.lon ?? null };
 }
 
-export function stelleAnlegenBody(w: StelleWerte): VerpflegungsstelleEingabe {
+export function createStelleBody(w: StelleWerte): VerpflegungsstelleEingabe {
   const ort = ortFelder(w.standort);
   return {
     bezeichnung: w.bezeichnung.trim(),
@@ -140,7 +140,7 @@ export function StelleDialog({
   const [form] = Form.useForm<StelleWerte>();
   // Der Stand beim Öffnen: ein Live-Update während der Eingabe verschiebt die Vorlage nicht.
   const [vorher] = useState(modus.art === 'bearbeiten' ? modus.stelle : null);
-  const mitAbschnitt = abschnitte != null && abschnitte.length > 0;
+  const hasAbschnitte = abschnitte != null && abschnitte.length > 0;
   const abschnittId = Form.useWatch('abschnitt_id', form) as number | null | undefined;
   const abschnittName = abschnitte?.find((a) => a.value === abschnittId)?.label;
 
@@ -166,10 +166,10 @@ export function StelleDialog({
       laeuft={laeuft}
       initialValues={initialValues}
       onErfassen={(w) => {
-        if (modus.art === 'anlegen') return modus.onErfassen(stelleAnlegenBody(w));
+        if (modus.art === 'anlegen') return modus.onErfassen(createStelleBody(w));
         const basis = vorher ?? modus.stelle;
         // Ohne Feld bleibt der Abschnitt, wie er ist (sonst hieße „kein Wert“ leeren).
-        const werte = mitAbschnitt ? w : { ...w, abschnitt_id: basis.abschnitt_id };
+        const werte = hasAbschnitte ? w : { ...w, abschnitt_id: basis.abschnitt_id };
         const patch = stellePatch(basis, werte);
         return Object.keys(patch).length === 0 ? Promise.resolve() : modus.onErfassen(patch);
       }}
@@ -203,7 +203,7 @@ export function StelleDialog({
           count={zeichenGrenze(VERPFLEGUNG_STANDORT_MAX)}
         />
       </Form.Item>
-      {mitAbschnitt && (
+      {hasAbschnitte && (
         // `forceRender` ist TRAGEND: sonst fehlt der Abschnitt in `onFinish`.
         <Collapse
           ghost
