@@ -583,6 +583,31 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     expect(onErfassen).not.toHaveBeenCalled();
     expect(bemerkung).toHaveValue('b'.repeat(2_001));
   });
+
+  it('zugeklappt nennt der Kopf jede Abweichung von der Vorgabe (LFH-974)', async () => {
+    renderMitProviders(
+      <AusgabeDialog
+        zeitfenster={zeitfenster()}
+        nachforderungen={[{ value: 4, label: 'Essensportionen ‚Mittag‘' }]}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const klappe = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+    expect(klappe).toHaveTextContent(/^Weitere Angaben$/);
+    fireEvent.change(within(dialog).getByLabelText('vegan'), { target: { value: '3' } });
+    fireEvent.change(within(dialog).getByLabelText('Bemerkung'), {
+      target: { value: 'b'.repeat(2_001) },
+    });
+    await waitFor(() =>
+      expect(klappe).toHaveTextContent(/^Weitere Angaben · 3 vegan · Bemerkung$/),
+    );
+    fireEvent.change(within(dialog).getByLabelText('Bemerkung'), { target: { value: '  ' } });
+    await waitFor(() => expect(klappe).toHaveTextContent(/^Weitere Angaben · 3 vegan$/));
+  });
 });
 
 interface RueckfrageTestProps {

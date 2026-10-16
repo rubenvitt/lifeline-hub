@@ -403,9 +403,20 @@ export function AusgabeDialog({
   onSchliessen,
 }: AusgabeDialogProps) {
   const [form] = Form.useForm<AusgabeWerte>();
-  // Die Bemerkung kann an ihrer Grenze scheitern: der Klappteil geht dann selbst auf
-  // (`frontend/AGENTS.md`, „Ein Pflichtfeld gehört nie hinter den Collapse“, LFH-974).
+  // Die Bemerkung kann an ihrer Grenze scheitern: der Klappteil geht dann selbst auf, und sein
+  // Kopf nennt jede Abweichung von der Vorgabe (`frontend/AGENTS.md`, „Ein Pflichtfeld gehört nie
+  // hinter den Collapse“, LFH-974).
   const [weitereOffen, setWeitereOffen] = useState(false);
+  const sonderkost = Form.useWatch('sonderkost', form) as SonderkostWerte | undefined;
+  const nachforderungId = Form.useWatch('nachforderung_id', form) as number | null | undefined;
+  const bemerkung = Form.useWatch('bemerkung', form) as string | null | undefined;
+  const abweichungen = [
+    ...KOSTFORMEN.filter((k) => (sonderkost?.[k] ?? 0) > 0).map(
+      (k) => `${sonderkost?.[k]} ${KOSTFORM_LABEL[k]}`,
+    ),
+    nachforderungId != null ? 'Nachforderung' : undefined,
+    text(bemerkung) != null ? 'Bemerkung' : undefined,
+  ].filter((t): t is string => !!t);
   return (
     <ErfassungsModal<AusgabeWerte>
       offen
@@ -443,7 +454,7 @@ export function AusgabeDialog({
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
-        'Weitere Angaben',
+        ['Weitere Angaben', ...abweichungen].join(' · '),
         <>
           {sonderkostFelder()}
           {nachforderungen != null && (
