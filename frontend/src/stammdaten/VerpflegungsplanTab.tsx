@@ -84,7 +84,6 @@ export default function VerpflegungsplanTab() {
     {
       title: 'Art',
       key: 'art',
-      abBreite: 'md',
       render: (_, m) => (m.verpflegungsart ? VERPFLEGUNGSART_LABEL[m.verpflegungsart] : '—'),
     },
     {
