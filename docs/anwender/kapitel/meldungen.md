@@ -103,17 +103,17 @@ aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztag
 
 ### Eine unangemeldet eingetroffene Einheit übernehmen
 
-Bucht ein Bereitstellungsraum eine Kraft, die der Einsatz noch nicht kannte, kommt die Meldung
-„… unangemeldet im BR … eingetroffen“. Solange die Einheit nicht übernommen ist, trägt ihre Karte:
+Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kraft, die der Einsatz
+noch nicht kannte, kommt die Meldung „… unangemeldet im BR … eingetroffen“.
 
-- für Einsatzleitung und Führungspersonal „Übernehmen“ und das rote „Abweisen“, wie im Kapitel
-  [Einheiten](einheiten.md) beschrieben; „Abweisen“ fehlt, wenn das Modul Fahrzeuge im Einsatz
-  nicht freigegeben ist,
-- für alle anderen den Verweis „↗ …“ zur Einheit.
+1. An ihrer Karte „Übernehmen“ wählen und wie im Kapitel [Einheiten](einheiten.md) beschrieben
+   bestätigen.
+2. Gehört die Kraft nicht in den Einsatz, stattdessen das rote „Abweisen“ wählen und die Rückfrage
+   „Einheit abweisen?“ mit „Abweisen“ bestätigen.
 
-Ist das Modul Einheiten im Einsatz nicht freigegeben, fehlen Knöpfe und Verweis.
-
-Nach Übernahme oder Abweisung verschwinden Knöpfe und Verweis.
+Nach Übernahme oder Abweisung verschwinden die Knöpfe. „Abweisen“ fehlt, wenn das Modul Fahrzeuge
+im Einsatz nicht freigegeben ist. Ohne Schreibrecht steht an der Karte statt der Knöpfe der
+Verweis „↗ …“ zur Einheit; ist das Modul Einheiten nicht freigegeben, fehlt auch er.
 
 ## Hintergrund
 
