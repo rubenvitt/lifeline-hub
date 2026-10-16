@@ -7807,4 +7807,117 @@ mod tests {
             assert_eq!(rest, 0, "{tabelle}");
         }
     }
+
+    // --- LLH-1058: Verpflegungsplan der Organisation (0211) ---
+
+    /// Eine Mahlzeit im Verpflegungsplan nach 0211 in Org 1.
+    async fn verpflegung_vorlage(
+        pool: &SqlitePool,
+        bezeichnung: &str,
+        beginn: &str,
+        ende: &str,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            "INSERT INTO verpflegung_vorlage (org_id, bezeichnung, beginn, ende) \
+             VALUES (1, ?, ?, ?) RETURNING id",
+        )
+        .bind(bezeichnung)
+        .bind(beginn)
+        .bind(ende)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// design.md „Migration Plan“: die Tabelle ist nach dem Einspielen leer und nimmt eine
+    /// Mahlzeit mit Vorgaben (aktiv, ohne Art) an; Nachtverpflegung über Mitternacht geht.
+    #[tokio::test]
+    async fn migration_0211_verpflegung_vorlage_leer_und_vorgaben() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 211).await;
+        bild_grundlage(&pool).await;
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM verpflegung_vorlage")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
+        let id = verpflegung_vorlage(&pool, "Frühstück", "06:30", "08:00")
+            .await
+            .unwrap();
+        let (aktiv, art): (i64, Option<String>) =
+            sqlx::query_as("SELECT aktiv, verpflegungsart FROM verpflegung_vorlage WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((aktiv, art), (1, None));
+        verpflegung_vorlage(&pool, "Nachtverpflegung", "23:00", "01:00")
+            .await
+            .expect("Ende vor Beginn ist der Folgetag");
+    }
+
+    /// Die CHECKs lehnen „24:00“, „6:30“, „6.30“, gleiches Ende und eine unbekannte Art ab.
+    #[tokio::test]
+    async fn migration_0211_verpflegung_vorlage_checks() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 211).await;
+        bild_grundlage(&pool).await;
+        for (fall, beginn, ende) in [
+            ("24:00", "24:00", "08:00"),
+            ("6:30", "6:30", "08:00"),
+            ("6.30", "06:30", "8.00"),
+            ("Minute 60", "06:60", "08:00"),
+            ("gleiches Ende", "12:00", "12:00"),
+        ] {
+            assert!(
+                verpflegung_vorlage(&pool, fall, beginn, ende)
+                    .await
+                    .is_err(),
+                "{fall} muss abgelehnt werden"
+            );
+        }
+        let id = verpflegung_vorlage(&pool, "Mittag", "12:00", "13:30")
+            .await
+            .unwrap();
+        for (art, ok) in [
+            ("warm", true),
+            ("kalt", true),
+            ("getraenke", true),
+            ("heiss", false),
+        ] {
+            let r = sqlx::query("UPDATE verpflegung_vorlage SET verpflegungsart = ? WHERE id = ?")
+                .bind(art)
+                .bind(id)
+                .execute(&pool)
+                .await;
+            assert_eq!(r.is_ok(), ok, "{art}");
+        }
+        let r = sqlx::query("UPDATE verpflegung_vorlage SET aktiv = 2 WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await;
+        assert!(r.is_err(), "aktiv nur 0 oder 1");
+    }
+
+    /// Der Name ist unter den aktiven Mahlzeiten einer Org eindeutig; ein deaktivierter Name ist
+    /// wieder frei.
+    #[tokio::test]
+    async fn migration_0211_verpflegung_vorlage_name_frei_nach_deaktivieren() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 211).await;
+        bild_grundlage(&pool).await;
+        let erste = verpflegung_vorlage(&pool, "Mittag", "12:00", "13:30")
+            .await
+            .unwrap();
+        assert!(
+            verpflegung_vorlage(&pool, "Mittag", "11:30", "13:00")
+                .await
+                .is_err(),
+            "zweite aktive „Mittag“ scheitert am Index"
+        );
+        sqlx::query("UPDATE verpflegung_vorlage SET aktiv = 0 WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .unwrap();
+        verpflegung_vorlage(&pool, "Mittag", "11:30", "13:00")
+            .await
+            .expect("deaktivierter Name ist wieder frei");
+    }
 }

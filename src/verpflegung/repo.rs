@@ -751,18 +751,26 @@ async fn replace_zuordnung_tx(
 
 // ── Zeitfenster ─────────────────────────────────────────────────────────────────────────────
 
-/// Legt ein Zeitfenster an. ETB: System-Eintrag mit Bezeichnung, Zeitraum und Bedarf.
-pub async fn zeitfenster_anlegen_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    startwert: i64,
-    tz: Tz,
+/// Ein Zeitfenster nach den Feldprüfungen (400) von [`check_zeitfenster_felder`].
+#[derive(Debug, Clone)]
+pub struct ZeitfensterFelder {
+    /// Getrimmt, nicht leer, höchstens `ZEITFENSTER_BEZEICHNUNG_MAX`.
+    pub bezeichnung: String,
+    /// Entdoppelt.
+    pub stelle_ids: Vec<i64>,
+    pub sonderkost: Sonderkost,
+    pub bedarf: Bedarf,
+}
+
+/// Die Feldprüfungen (400) eines neuen Zeitfensters, jedes Feld für sich und ohne Abfrage:
+/// Stellenliste, Bezeichnung, Zeitpunkte, Bedarfsteile, Kostformen. Das Einzelanlegen ruft sie
+/// zuerst; die Sammelanlage (LLH-1058, design.md D3) ruft sie für ALLE Fenster, bevor das erste
+/// 422 geprüft wird.
+pub fn check_zeitfenster_felder(
     eingabe: &ZeitfensterEingabe,
-) -> Result<Geschrieben, AppError> {
-    // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
+) -> Result<ZeitfensterFelder, AppError> {
+    // Die Stellenliste (D5), gezählt vor dem Entdoppeln.
     let stelle_ids = dedupe_stelle_ids(&eingabe.stelle_ids)?;
-    // 400 — jedes Feld für sich
     let bezeichnung = pflicht_max(
         &eingabe.bezeichnung,
         "bezeichnung",
@@ -775,15 +783,49 @@ pub async fn zeitfenster_anlegen_tx(
     anzahl_pruefen("bedarf_weitere", eingabe.bedarf_weitere)?;
     let sonderkost = eingabe.sonderkost.ueber(&Sonderkost::default());
     sonderkost.pruefen()?;
-    let b = bedarf(
+    let bedarf = bedarf(
         eingabe.bedarf_kraefte,
         eingabe.bedarf_betreute,
         eingabe.bedarf_weitere,
         sonderkost,
     );
-    // 422 — der Zusammenhang
+    Ok(ZeitfensterFelder {
+        bezeichnung,
+        stelle_ids,
+        sonderkost,
+        bedarf,
+    })
+}
+
+/// Der Zusammenhang (422) eines neuen Zeitfensters ohne Abfrage: Ende nach Beginn, Sonderkost
+/// als Teilmenge.
+fn check_zeitfenster_zusammenhang(
+    eingabe: &ZeitfensterEingabe,
+    f: &ZeitfensterFelder,
+) -> Result<(), AppError> {
     zeitregel(&eingabe.von_at, &eingabe.bis_at)?;
-    teilmenge(&sonderkost, b.gesamt, "den Gesamtbedarf")?;
+    teilmenge(&f.sonderkost, f.bedarf.gesamt, "den Gesamtbedarf")
+}
+
+/// Legt ein Zeitfenster an. ETB: System-Eintrag mit Bezeichnung, Zeitraum und Bedarf.
+pub async fn create_zeitfenster_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    tz: Tz,
+    eingabe: &ZeitfensterEingabe,
+) -> Result<Geschrieben, AppError> {
+    // 400 — jedes Feld für sich, vor jeder Abfrage
+    let felder = check_zeitfenster_felder(eingabe)?;
+    // 422 — der Zusammenhang
+    check_zeitfenster_zusammenhang(eingabe, &felder)?;
+    let ZeitfensterFelder {
+        bezeichnung,
+        stelle_ids,
+        sonderkost,
+        bedarf: b,
+    } = felder;
     let stellen = stellen_kurz_tx(conn, einsatz_id, &stelle_ids).await?;
     check_zuordnung(&stelle_ids, &[], &stellen)?;
 
@@ -828,11 +870,149 @@ pub async fn zeitfenster_anlegen_tx(
     })
 }
 
+/// Ergebnis „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der
+/// Reihenfolge der Anfrage, die übersprungenen Bezeichnungen (wie übergeben, getrimmt) und die
+/// ETB-Einträge, je angelegtem Zeitfenster genau einer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TagGeschrieben {
+    pub angelegt: Vec<i64>,
+    pub uebersprungen: Vec<String>,
+    pub etb_ids: Vec<i64>,
+}
+
+/// Stellt einer Ablehnung das Zeitfenster voran, um das es geht: „„Abendessen“: …“, ohne
+/// Bezeichnung „Zeitfenster 3: …“ (design.md D3). Der Statuscode bleibt.
+pub fn label_error(nr: usize, bezeichnung: &str, e: AppError) -> AppError {
+    let wer = match bezeichnung.trim() {
+        "" => format!("Zeitfenster {}", nr + 1),
+        b => format!("„{b}“"),
+    };
+    match e {
+        AppError::Validation(m) => AppError::Validation(format!("{wer}: {m}")),
+        AppError::UnprocessableEntity(m) => AppError::UnprocessableEntity(format!("{wer}: {m}")),
+        AppError::Conflict(m) => AppError::Conflict(format!("{wer}: {m}")),
+        andere => andere,
+    }
+}
+
+/// Schlüssel für den Namensvergleich: getrimmt, ohne Groß- und Kleinschreibung. `to_lowercase`
+/// faltet auch Umlaute; SQLites `lower()` nur ASCII (design.md D5).
+fn name_key(bezeichnung: &str) -> String {
+    bezeichnung.trim().to_lowercase()
+}
+
+/// Kürzester und längster Kalendertag in Stunden (Tage der Zeitumstellung).
+const TAG_STUNDEN: std::ops::RangeInclusive<i64> = 23..=25;
+
+/// Legt die Zeitfenster eines Tages aus der Vorlage an (LLH-1058, design.md D3, D5), alles oder
+/// nichts in der offenen Transaktion. Die Zeiten hat der Client in der Anzeigezone gerechnet
+/// (D4); der Server nimmt Zeitpunkte wie beim Einzelanlegen.
+///
+/// Prüfreihenfolge: erst die Feldfehler (400) ALLER Fenster und der Tagesgrenzen, dann der
+/// Zusammenhang (422, vor jedem Schreiben): Tagesgrenzen 23 bis 25 Stunden auseinander, jeder
+/// Beginn im Tag (`tag_von_at` ≤ `von_at` < `tag_bis_at`), jede Bezeichnung höchstens einmal,
+/// je Fenster Zeitregel und Teilmenge. Danach wird ein Fenster übersprungen, dessen Bezeichnung
+/// im Einsatz schon ein Zeitfenster trägt, das an diesem Tag beginnt; die übrigen entstehen über
+/// [`create_zeitfenster_tx`], also mit denselben Prüfungen und demselben ETB-Eintrag wie
+/// einzeln. Eine Ablehnung nennt das Fenster ([`label_error`]).
+#[allow(clippy::too_many_arguments)]
+pub async fn zeitfenster_aus_vorlage_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    tz: Tz,
+    tag_von_at: &str,
+    tag_bis_at: &str,
+    fenster: &[ZeitfensterEingabe],
+) -> Result<TagGeschrieben, AppError> {
+    // 400 — die Anfrage und jedes Feld für sich, für alle Fenster vor dem ersten 422
+    let tag_von = draht_lesen("tag_von_at", tag_von_at)?;
+    let tag_bis = draht_lesen("tag_bis_at", tag_bis_at)?;
+    if fenster.is_empty() {
+        return Err(AppError::Validation(
+            "zeitfenster darf nicht leer sein".into(),
+        ));
+    }
+    if fenster.len() > super::AUS_VORLAGE_MAX {
+        return Err(AppError::Validation(format!(
+            "zeitfenster darf höchstens {} Einträge haben, waren {}",
+            super::AUS_VORLAGE_MAX,
+            fenster.len()
+        )));
+    }
+    let felder = fenster
+        .iter()
+        .enumerate()
+        .map(|(i, e)| check_zeitfenster_felder(e).map_err(|f| label_error(i, &e.bezeichnung, f)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // 422 — der Zusammenhang, vor jedem Schreiben
+    let minuten = (tag_bis - tag_von).num_minutes();
+    if !(TAG_STUNDEN.start() * 60..=TAG_STUNDEN.end() * 60).contains(&minuten) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Ein Tag dauert 23 bis 25 Stunden; von {tag_von_at} bis {tag_bis_at} passt nicht"
+        )));
+    }
+    let mut gesehen = std::collections::HashSet::new();
+    for (i, (e, f)) in fenster.iter().zip(&felder).enumerate() {
+        let beginn = draht_lesen("von_at", &e.von_at)?;
+        let mut check = || {
+            if beginn < tag_von || beginn >= tag_bis {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Der Beginn ({}) liegt nicht im Tag ({tag_von_at} bis {tag_bis_at})",
+                    e.von_at
+                )));
+            }
+            if !gesehen.insert(name_key(&f.bezeichnung)) {
+                return Err(AppError::UnprocessableEntity(
+                    "Die Bezeichnung kommt in der Anfrage mehrfach vor".into(),
+                ));
+            }
+            check_zeitfenster_zusammenhang(e, f)
+        };
+        check().map_err(|m| label_error(i, &e.bezeichnung, m))?;
+    }
+
+    // Überspringen (D5): Bezeichnungen der Zeitfenster, die an diesem Tag beginnen. Die
+    // Zeitpunkte liegen im Drahtformat vor, als Text sortiert das richtig.
+    let vorhanden: std::collections::HashSet<String> = sqlx::query_scalar::<_, String>(
+        "SELECT bezeichnung FROM verpflegung_zeitfenster \
+         WHERE einsatz_id = ? AND von_at >= ? AND von_at < ?",
+    )
+    .bind(einsatz_id)
+    .bind(crate::zeit::formatiere_utc(tag_von))
+    .bind(crate::zeit::formatiere_utc(tag_bis))
+    .fetch_all(&mut *conn)
+    .await?
+    .iter()
+    .map(|b| name_key(b))
+    .collect();
+
+    let mut g = TagGeschrieben {
+        angelegt: Vec::new(),
+        uebersprungen: Vec::new(),
+        etb_ids: Vec::new(),
+    };
+    for (i, (e, f)) in fenster.iter().zip(&felder).enumerate() {
+        if vorhanden.contains(&name_key(&f.bezeichnung)) {
+            g.uebersprungen.push(f.bezeichnung.clone());
+            continue;
+        }
+        let neu = create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, tz, e)
+            .await
+            .map_err(|m| label_error(i, &e.bezeichnung, m))?;
+        g.angelegt.push(neu.id);
+        g.etb_ids.extend(neu.etb_ids);
+    }
+    Ok(g)
+}
+
 /// Ändert ein Zeitfenster. Geprüft wird gegen den **Effektivzustand** aus Bestand und
 /// Änderung — sonst unterliefe eine Teiländerung (nur der Bedarf, nur das Ende) die
 /// Teilmengen- bzw. Zeitregel. Ändert sich kein Wert, läuft weder UPDATE noch ETB
 /// (Leerlauf-Riegel) und `etb_ids` bleibt leer.
-pub async fn zeitfenster_aendern_tx(
+pub async fn update_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -962,7 +1142,7 @@ pub async fn zeitfenster_aendern_tx(
 
 /// Löscht ein Zeitfenster samt zurückgenommener Ausgaben (CASCADE). Solange eine gültige
 /// Ausgabe daran hängt, ist das 422: sie wäre sonst still aus der Bilanz verschwunden.
-pub async fn zeitfenster_loeschen_tx(
+pub async fn delete_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,

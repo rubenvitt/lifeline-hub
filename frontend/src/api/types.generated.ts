@@ -5637,6 +5637,29 @@ export interface components {
             einheiten: components["schemas"]["EmpfaengerEinheit"][];
         };
         /**
+         * @description Antwort auf „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der
+         *     Reihenfolge der Anfrage und die Bezeichnungen der übersprungenen, weil an diesem Tag im
+         *     Einsatz schon ein gleichnamiges beginnt.
+         */
+        VerpflegungTagErgebnis: {
+            angelegt: components["schemas"]["ZeitfensterAnzeige"][];
+            uebersprungen: string[];
+        };
+        /** @description Eine Mahlzeit des Verpflegungsplans. */
+        VerpflegungVorlage: {
+            aktiv: boolean;
+            /** @description Wanduhrzeit `HH:MM` ohne Datum und ohne Zone. */
+            beginn: string;
+            bezeichnung: string;
+            /** @description Wanduhrzeit `HH:MM`; liegt sie vor `beginn`, endet die Mahlzeit am Folgetag. */
+            ende: string;
+            /** @description `ende` liegt vor `beginn`: die Mahlzeit endet am Folgetag („+1 Tag“). */
+            folgetag: boolean;
+            /** Format: int64 */
+            id: number;
+            verpflegungsart?: components["schemas"]["Verpflegungsart"] | null;
+        };
+        /**
          * @description Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung
          *     gilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;
          *     keine Art (`NULL`) heißt „ohne Angabe“.

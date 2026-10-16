@@ -424,7 +424,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         stelle_ids,
     };
 
-    let (eins, sql_eins) = mitschneiden(v::zeitfenster_anlegen_tx(
+    let (eins, sql_eins) = mitschneiden(v::create_zeitfenster_tx(
         &mut conn,
         e,
         b,
@@ -433,7 +433,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         &fenster(vec![stellen[0]]),
     ))
     .await;
-    let (zwanzig, sql_zwanzig) = mitschneiden(v::zeitfenster_anlegen_tx(
+    let (zwanzig, sql_zwanzig) = mitschneiden(v::create_zeitfenster_tx(
         &mut conn,
         e,
         b,
@@ -454,7 +454,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         stelle_ids: Some(stelle_ids),
         ..ZeitfensterAenderung::default()
     };
-    let (r1, sql_1) = mitschneiden(v::zeitfenster_aendern_tx(
+    let (r1, sql_1) = mitschneiden(v::update_zeitfenster_tx(
         &mut conn,
         e,
         eins,
@@ -464,7 +464,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         &aendern(stellen.clone()),
     ))
     .await;
-    let (r20, sql_20) = mitschneiden(v::zeitfenster_aendern_tx(
+    let (r20, sql_20) = mitschneiden(v::update_zeitfenster_tx(
         &mut conn,
         e,
         zwanzig,

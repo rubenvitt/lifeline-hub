@@ -872,3 +872,107 @@ bleibt möglich.
 #### Scenario: Vergangenes Zeitfenster
 - **WHEN** die Ausgabeansicht eines Zeitfensters gezeigt wird, dessen Ende vorbei ist
 - **THEN** sind alle Zähltasten gesperrt mit dem Grund „Zeitfenster vorbei“, und „Ausgabe nachtragen“ ist verfügbar
+
+### Requirement: Verpflegungsplan der Organisation
+
+Das System SHALL je Organisation einen Verpflegungsplan führen: eine Liste von Mahlzeiten mit
+Bezeichnung, Beginn und Ende als Uhrzeit ohne Datum und ohne Zeitzone (`HH:MM`, 00:00–23:59) und
+optional einer Verpflegungsart. Liegt das Ende vor dem Beginn, MUST die Mahlzeit als am Folgetag
+endend gelten; ein Ende gleich dem Beginn MUST mit 422 abgelehnt werden. Die Bezeichnung MUST
+unter den aktiven Mahlzeiten einer Organisation eindeutig sein, ohne Unterschied von Groß- und
+Kleinschreibung (409 bei Dublette). Eine Mahlzeit MUST NOT gelöscht werden; sie wird deaktiviert
+und kann wieder aktiviert werden. Die Liste MUST nach Beginn geordnet sein. Lesen SHALL jedem
+angemeldeten Mitglied der Organisation offenstehen; Anlegen und Ändern MUST dem Admin vorbehalten
+sein (403 sonst). Mahlzeiten anderer Organisationen MUST wie nicht vorhanden behandelt werden
+(404). Der Plan trägt keinen Bedarf.
+
+#### Scenario: Mahlzeit anlegen
+- **WHEN** der Admin die Mahlzeit „Frühstück“ mit Beginn `0630` und Ende `08:00` anlegt
+- **THEN** antwortet das System mit 201, und der Plan führt „Frühstück 06:30–08:00“
+
+#### Scenario: Nachtverpflegung über Mitternacht
+- **WHEN** der Admin die Mahlzeit „Nachtverpflegung“ mit Beginn 23:00 und Ende 01:00 anlegt
+- **THEN** wird sie angelegt und gilt als am Folgetag um 01:00 endend
+
+#### Scenario: Ende gleich Beginn
+- **WHEN** eine Mahlzeit mit Beginn und Ende 12:00 angelegt oder auf diese Zeiten geändert wird
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Unlesbare Uhrzeit
+- **WHEN** eine Mahlzeit mit dem Beginn „24:00“ oder „6.30 Uhr“ angelegt wird
+- **THEN** antwortet das System mit 400 und legt nichts an
+
+#### Scenario: Name doppelt
+- **WHEN** der Admin neben der aktiven Mahlzeit „Mittag“ eine Mahlzeit „mittag“ anlegt
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Deaktivierte Mahlzeit
+- **WHEN** der Admin die Mahlzeit „Nachtverpflegung“ deaktiviert
+- **THEN** fehlt sie in der Liste ohne `nur_aktive=false`, erscheint mit ihr als inaktiv, und eine neue aktive Mahlzeit „Nachtverpflegung“ ist wieder möglich
+
+#### Scenario: Einsatzkraft schreibt
+- **WHEN** ein Mitglied ohne Admin-Recht eine Mahlzeit ändert
+- **THEN** antwortet das System mit 403
+
+### Requirement: Tag aus der Vorlage anlegen
+
+Das System SHALL mehrere Zeitfenster eines Einsatztages in einer Anfrage anlegen. Die Anfrage
+nennt die Grenzen des Tages und je Zeitfenster Bezeichnung, Beginn, Ende, Bedarf, Sonderkost und
+optional die Verpflegungsart, wie beim Anlegen eines einzelnen Zeitfensters. Jedes entstehende
+Zeitfenster MUST ein gewöhnliches, von der Vorlage und von anderen Tagen unabhängiges
+Zeitfenster sein; es MUST keine Serie entstehen, die sich fortschreibt, und keine Kopplung an
+Schichten. Das System MUST alle Zeitfenster in einer Transaktion anlegen: scheitert eines, MUST
+nichts angelegt werden, und die Meldung MUST die Bezeichnung nennen. Je angelegtem Zeitfenster
+MUST genau ein ETB-Eintrag mit demselben Inhalt wie beim Einzelanlegen entstehen. Ein
+Zeitfenster, dessen Bezeichnung (getrimmt, ohne Unterschied von Groß- und Kleinschreibung) im
+Einsatz schon ein Zeitfenster trägt, das an diesem Tag beginnt, MUST übersprungen und in der
+Antwort genannt werden. Die Tagesgrenzen MUST 23 bis 25 Stunden auseinanderliegen, jeder Beginn
+MUST innerhalb des Tages liegen, und eine Bezeichnung MUST in der Anfrage höchstens einmal
+vorkommen, sonst 422. Feldfehler (400: unlesbarer Zeitpunkt, leere oder zu lange Bezeichnung,
+negativer Bedarfsteil, unbekannte Verpflegungsart) irgendeines Zeitfensters der Anfrage MUST vor
+jeder Prüfung des Zusammenhangs (422) gemeldet werden. Die angelegten Zeitfenster MUST keiner
+Verpflegungsstelle zugeordnet sein. Die Anfrage verlangt dieselben Rechte wie das Einzelanlegen.
+Nach dem Commit MUST genau ein Live-Ereignis `verpflegung` verteilt werden, dazu je ETB-Eintrag
+das ETB-Ereignis; entsteht kein Zeitfenster, MUST weder ein ETB-Eintrag noch ein Live-Ereignis
+entstehen.
+
+#### Scenario: Drei Zeitfenster für einen Tag
+- **WHEN** für den Tag 2026-10-10 22:00 bis 2026-10-11 22:00 UTC die Zeitfenster „Frühstück“ 04:30–06:00, „Mittag“ 10:00–11:30 und „Abendessen“ 16:00–17:30 UTC mit Bedarf angelegt werden
+- **THEN** antwortet das System mit 201 und nennt drei angelegte Zeitfenster und kein übersprungenes
+- **AND** das ETB enthält genau drei neue System-Einträge, je einen wie beim Einzelanlegen
+
+#### Scenario: Gleichnamiges Zeitfenster am selben Tag
+- **WHEN** im Einsatz schon „Mittag“ am 11.10. beginnt und für den 11.10. „Frühstück“, „mittag“ und „Abendessen“ angelegt werden
+- **THEN** entstehen „Frühstück“ und „Abendessen“, „mittag“ steht als übersprungen in der Antwort, und für „mittag“ entsteht kein ETB-Eintrag
+
+#### Scenario: Alles schon angelegt
+- **WHEN** jedes übergebene Zeitfenster übersprungen wird
+- **THEN** antwortet das System mit 200, nennt alle als übersprungen und verteilt weder ETB-Eintrag noch Live-Ereignis
+
+#### Scenario: Gleicher Name am Vortag
+- **WHEN** „Abendessen“ nur am 10.10. im Einsatz besteht und für den 11.10. „Abendessen“ angelegt wird
+- **THEN** wird „Abendessen“ für den 11.10. angelegt
+
+#### Scenario: Ein Zeitfenster scheitert
+- **WHEN** in einer Anfrage mit drei Zeitfenstern bei „Abendessen“ die Sonderkost den Gesamtbedarf übersteigt
+- **THEN** antwortet das System mit 422 mit einer Meldung, die „Abendessen“ nennt, und legt keines der drei Zeitfenster an
+
+#### Scenario: Beginn außerhalb des Tages
+- **WHEN** ein übergebenes Zeitfenster vor `tag_von_at` oder ab `tag_bis_at` beginnt
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Feldfehler vor dem Zusammenhang
+- **WHEN** in einer Anfrage beim ersten Zeitfenster die Sonderkost den Gesamtbedarf übersteigt und das dritte eine leere Bezeichnung trägt
+- **THEN** antwortet das System mit 400 und legt nichts an
+
+#### Scenario: Unabhängig nach dem Anlegen
+- **WHEN** ein aus der Vorlage angelegtes „Mittag“ geändert oder die Mahlzeit „Mittag“ im Verpflegungsplan geändert oder deaktiviert wird
+- **THEN** ändert sich jeweils nur das eine, und kein anderer Tag erhält ein Zeitfenster
+
+#### Scenario: Beobachter und abgeschlossener Einsatz
+- **WHEN** eine Person ohne Schreibrecht bzw. eine Person in einem abgeschlossenen Einsatz einen Tag aus der Vorlage anlegt
+- **THEN** antwortet das System mit 403 bzw. 409 und legt nichts an
+
+#### Scenario: Verpflegungsgerät
+- **WHEN** ein gekoppeltes Verpflegungsgerät einen Tag aus der Vorlage anlegen oder den Verpflegungsplan lesen will
+- **THEN** antwortet der Server mit 403, und die Geräteansicht bietet keinen Einstieg

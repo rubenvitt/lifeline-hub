@@ -117,7 +117,7 @@ async fn anlegen_in(
     eingabe: ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_anlegen_tx(conn, e, w.b, STARTWERT, TZ, &eingabe).await
+        create_zeitfenster_tx(conn, e, w.b, STARTWERT, TZ, &eingabe).await
     })
 }
 
@@ -132,7 +132,7 @@ async fn aendern_in(
     a: ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_aendern_tx(conn, e, id, w.b, STARTWERT, TZ, &a).await
+        update_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ, &a).await
     })
 }
 
@@ -142,7 +142,7 @@ async fn aendern(w: &Welt, id: i64, a: ZeitfensterAenderung) -> Result<Geschrieb
 
 async fn loeschen_in(w: &Welt, e: i64, id: i64) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_loeschen_tx(conn, e, id, w.b, STARTWERT, TZ).await
+        delete_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ).await
     })
 }
 
@@ -1815,4 +1815,308 @@ async fn aufgeloeste_einheit_nimmt_nur_fruehere_ausgaben() {
         }
     }
     ausgabe(&w, zid, an_einheit(1, leer)).await.unwrap();
+}
+
+// ── Tag aus der Vorlage (LLH-1058, design.md D3, D5) ────────────────────────────────────────
+
+/// Der 11.10.2026 in Berlin: 10.10. 22:00 bis 11.10. 22:00 UTC.
+const TAG_VON: &str = "2026-10-10 22:00:00";
+const TAG_BIS: &str = "2026-10-11 22:00:00";
+
+/// Ein Fenster des 11.10. mit 100 Kräften und 20 Betreuten.
+fn fenster(bezeichnung: &str, von_at: &str, bis_at: &str) -> ZeitfensterEingabe {
+    ZeitfensterEingabe {
+        bezeichnung: bezeichnung.into(),
+        von_at: von_at.into(),
+        bis_at: bis_at.into(),
+        bedarf_kraefte: 100,
+        bedarf_betreute: 20,
+        ..mittag()
+    }
+}
+
+/// Frühstück 06:30–08:00, Mittag 12:00–13:30, Abendessen 18:00–19:30 in Berlin.
+fn drei_fenster() -> Vec<ZeitfensterEingabe> {
+    vec![
+        fenster("Frühstück", "2026-10-11 04:30:00", "2026-10-11 06:00:00"),
+        fenster("Mittag", "2026-10-11 10:00:00", "2026-10-11 11:30:00"),
+        fenster("Abendessen", "2026-10-11 16:00:00", "2026-10-11 17:30:00"),
+    ]
+}
+
+async fn tag_in(
+    w: &Welt,
+    e: i64,
+    von: &str,
+    bis: &str,
+    fenster: Vec<ZeitfensterEingabe>,
+) -> Result<TagGeschrieben, AppError> {
+    write_retry!(&w.pool, |conn| {
+        zeitfenster_aus_vorlage_tx(conn, e, w.b, STARTWERT, TZ, von, bis, &fenster).await
+    })
+}
+
+async fn tag(w: &Welt, fenster: Vec<ZeitfensterEingabe>) -> Result<TagGeschrieben, AppError> {
+    tag_in(w, w.e, TAG_VON, TAG_BIS, fenster).await
+}
+
+async fn anzahl_zeitfenster(w: &Welt) -> i64 {
+    zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_zeitfenster").await
+}
+
+fn meldung(r: Result<TagGeschrieben, AppError>) -> (StatusCode, String) {
+    let e = r.unwrap_err();
+    (e.status(), e.to_string())
+}
+
+/// Spec „Drei Zeitfenster für einen Tag“: drei gewöhnliche Zeitfenster, je ein ETB-Eintrag mit
+/// demselben Text wie beim Einzelanlegen.
+#[tokio::test]
+async fn tag_aus_vorlage_legt_drei_zeitfenster_wie_einzeln_an() {
+    let w = welt().await;
+    let g = tag(&w, drei_fenster()).await.unwrap();
+    assert_eq!(g.angelegt.len(), 3);
+    assert!(g.uebersprungen.is_empty());
+    assert_eq!(g.etb_ids.len(), 3);
+    let namen: Vec<String> = liste(&w.pool, w.e)
+        .await
+        .unwrap()
+        .zeitfenster
+        .into_iter()
+        .map(|z| {
+            assert!(z.stelle_ids.is_empty(), "keine Stelle: {z:?}");
+            z.bezeichnung
+        })
+        .collect();
+    assert_eq!(namen, ["Frühstück", "Mittag", "Abendessen"]);
+
+    // Dieselben Fenster einzeln im anderen Einsatz: dieselben ETB-Texte.
+    for f in drei_fenster() {
+        anlegen_in(&w, w.e2, f).await.unwrap();
+    }
+    let sammel = etb(&w.pool, w.e).await;
+    assert_eq!(sammel, etb(&w.pool, w.e2).await);
+    assert_eq!(
+        sammel[0].1,
+        "Verpflegung ‚Frühstück‘ 11.10. 06:30–08:00 angelegt: Bedarf 120 EP (100 Kräfte, \
+         20 Betreute)."
+    );
+}
+
+/// Spec „Feldfehler vor dem Zusammenhang“ (D3): ein 422 im ersten Fenster und ein 400 im
+/// dritten ergeben 400; nichts ist angelegt.
+#[tokio::test]
+async fn tag_aus_vorlage_feldfehler_irgendeines_fensters_vor_dem_zusammenhang() {
+    let w = welt().await;
+    let mut f = drei_fenster();
+    f[0].sonderkost = sk(500, 0);
+    f[2].bezeichnung = "  ".into();
+    let (s, m) = meldung(tag(&w, f).await);
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{m}");
+    assert!(m.contains("Zeitfenster 3"), "{m}");
+    let mut f = drei_fenster();
+    f[0].von_at = "2026-10-12 04:30:00".into();
+    f[2].bedarf_betreute = -1;
+    let (s, m) = meldung(tag(&w, f).await);
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "Beginn außerhalb im ersten: {m}"
+    );
+    assert!(m.contains("„Abendessen“"), "{m}");
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
+    assert!(etb(&w.pool, w.e).await.is_empty());
+}
+
+/// Spec „Gleichnamiges Zeitfenster am selben Tag“: „mittag“ wird gegen „Mittag“ übersprungen
+/// und genannt, ohne ETB-Eintrag.
+#[tokio::test]
+async fn tag_aus_vorlage_ueberspringt_gleichnamiges_am_selben_tag() {
+    let w = welt().await;
+    anlegen(
+        &w,
+        fenster("Mittag", "2026-10-11 09:30:00", "2026-10-11 11:00:00"),
+    )
+    .await
+    .unwrap();
+    let mut f = drei_fenster();
+    f[1].bezeichnung = " mittag ".into();
+    let g = tag(&w, f).await.unwrap();
+    assert_eq!(g.angelegt.len(), 2);
+    assert_eq!(g.uebersprungen, ["mittag"]);
+    assert_eq!(g.etb_ids.len(), 2);
+    assert_eq!(anzahl_zeitfenster(&w).await, 3);
+    assert_eq!(
+        etb(&w.pool, w.e).await.len(),
+        3,
+        "1 einzeln + 2 aus der Vorlage"
+    );
+}
+
+/// Der Vergleich faltet auch Umlaute (`to_lowercase`, nicht SQLites `lower()`).
+#[tokio::test]
+async fn tag_aus_vorlage_ueberspringt_fruehstueck_gegen_grossbuchstaben() {
+    let w = welt().await;
+    anlegen(
+        &w,
+        fenster("Frühstück", "2026-10-11 04:30:00", "2026-10-11 06:00:00"),
+    )
+    .await
+    .unwrap();
+    let mut f = drei_fenster();
+    f[0].bezeichnung = "FRÜHSTÜCK".into();
+    let g = tag(&w, f).await.unwrap();
+    assert_eq!(g.uebersprungen, ["FRÜHSTÜCK"]);
+    assert_eq!(g.angelegt.len(), 2);
+}
+
+/// Spec „Gleicher Name am Vortag“ (R6): ein „Abendessen“, das am 10.10. beginnt und über
+/// Mitternacht dauert, blockiert das des 11.10. nicht; ebenso wenig eins in einem anderen
+/// Einsatz.
+#[tokio::test]
+async fn tag_aus_vorlage_name_am_vortag_oder_anderswo_blockiert_nicht() {
+    let w = welt().await;
+    anlegen(
+        &w,
+        fenster("Abendessen", "2026-10-10 21:30:00", "2026-10-10 22:30:00"),
+    )
+    .await
+    .unwrap();
+    anlegen_in(
+        &w,
+        w.e2,
+        fenster("Mittag", "2026-10-11 10:00:00", "2026-10-11 11:30:00"),
+    )
+    .await
+    .unwrap();
+    let g = tag(&w, drei_fenster()).await.unwrap();
+    assert_eq!(g.angelegt.len(), 3);
+    assert!(g.uebersprungen.is_empty());
+}
+
+/// Spec „Alles schon angelegt“: nichts entsteht, kein ETB.
+#[tokio::test]
+async fn tag_aus_vorlage_alles_uebersprungen() {
+    let w = welt().await;
+    tag(&w, drei_fenster()).await.unwrap();
+    let vorher = etb(&w.pool, w.e).await.len();
+    let g = tag(&w, drei_fenster()).await.unwrap();
+    assert!(g.angelegt.is_empty());
+    assert!(g.etb_ids.is_empty());
+    assert_eq!(g.uebersprungen, ["Frühstück", "Mittag", "Abendessen"]);
+    assert_eq!(anzahl_zeitfenster(&w).await, 3);
+    assert_eq!(etb(&w.pool, w.e).await.len(), vorher);
+}
+
+/// Spec „Ein Zeitfenster scheitert“: Sonderkost über dem Bedarf beim dritten ist 422 mit seiner
+/// Bezeichnung; keines der drei entsteht.
+#[tokio::test]
+async fn tag_aus_vorlage_scheiterndes_drittes_fenster_legt_nichts_an() {
+    let w = welt().await;
+    let mut f = drei_fenster();
+    f[2].sonderkost = sk(100, 21);
+    let (s, m) = meldung(tag(&w, f).await);
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{m}");
+    assert!(m.contains("„Abendessen“"), "{m}");
+    let mut f = drei_fenster();
+    f[2].bis_at = f[2].von_at.clone();
+    let (s, m) = meldung(tag(&w, f).await);
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{m}");
+    assert!(m.contains("„Abendessen“"), "{m}");
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
+    assert!(etb(&w.pool, w.e).await.is_empty());
+}
+
+/// Spec „Beginn außerhalb des Tages“: vor `tag_von_at` oder ab `tag_bis_at` ist 422; genau
+/// `tag_von_at` gehört zum Tag.
+#[tokio::test]
+async fn tag_aus_vorlage_beginn_muss_im_tag_liegen() {
+    let w = welt().await;
+    for von in ["2026-10-10 21:59:59", TAG_BIS] {
+        let mut f = drei_fenster();
+        f[1].von_at = von.into();
+        f[1].bis_at = "2026-10-11 23:00:00".into();
+        let (s, m) = meldung(tag(&w, f).await);
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{von}: {m}");
+        assert!(m.contains("„Mittag“"), "{m}");
+    }
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
+    let mut f = drei_fenster();
+    f[0].von_at = TAG_VON.into();
+    let g = tag(&w, f).await.unwrap();
+    assert_eq!(g.angelegt.len(), 3, "Beginn genau an der Tagesgrenze");
+}
+
+/// Eine Bezeichnung höchstens einmal je Anfrage (getrimmt, ohne Groß- und Kleinschreibung).
+#[tokio::test]
+async fn tag_aus_vorlage_doppelte_bezeichnung_ist_422() {
+    let w = welt().await;
+    let mut f = drei_fenster();
+    f[2].bezeichnung = " MITTAG".into();
+    let (s, m) = meldung(tag(&w, f).await);
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{m}");
+    assert!(m.contains("MITTAG"), "{m}");
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
+}
+
+/// Die Tagesgrenzen liegen 23 bis 25 Stunden auseinander (Tage der Zeitumstellung), sonst 422.
+#[tokio::test]
+async fn tag_aus_vorlage_tagesgrenzen_23_bis_25_stunden() {
+    let w = welt().await;
+    for bis in ["2026-10-11 20:00:00", "2026-10-12 00:00:00", TAG_VON] {
+        let (s, m) = meldung(tag_in(&w, w.e, TAG_VON, bis, drei_fenster()).await);
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "bis {bis}: {m}");
+    }
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
+    // 25.10.2026 in Berlin (25 h) und 29.03.2026 (23 h).
+    let g = tag_in(
+        &w,
+        w.e,
+        "2026-10-24 22:00:00",
+        "2026-10-25 23:00:00",
+        vec![fenster(
+            "Nachtverpflegung",
+            "2026-10-24 22:00:00",
+            "2026-10-25 03:00:00",
+        )],
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.angelegt.len(), 1);
+    let g = tag_in(
+        &w,
+        w.e,
+        "2026-03-28 23:00:00",
+        "2026-03-29 22:00:00",
+        vec![fenster(
+            "Frühstück",
+            "2026-03-29 04:30:00",
+            "2026-03-29 06:00:00",
+        )],
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.angelegt.len(), 1);
+}
+
+/// Tagesgrenzen unlesbar und eine leere oder zu große Anfrage sind 400.
+#[tokio::test]
+async fn tag_aus_vorlage_grenzen_und_unlesbarer_tag_sind_400() {
+    let w = welt().await;
+    let (s, _) = meldung(tag_in(&w, w.e, "gestern", TAG_BIS, drei_fenster()).await);
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = meldung(tag(&w, Vec::new()).await);
+    assert_eq!(s, StatusCode::BAD_REQUEST, "leere Anfrage");
+    let viele: Vec<ZeitfensterEingabe> = (0..=crate::verpflegung::AUS_VORLAGE_MAX)
+        .map(|i| {
+            fenster(
+                &format!("Mahlzeit {i}"),
+                "2026-10-11 04:30:00",
+                "2026-10-11 06:00:00",
+            )
+        })
+        .collect();
+    let (s, _) = meldung(tag(&w, viele).await);
+    assert_eq!(s, StatusCode::BAD_REQUEST, "25 Fenster");
+    assert_eq!(anzahl_zeitfenster(&w).await, 0);
 }

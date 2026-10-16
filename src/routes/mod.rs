@@ -76,6 +76,7 @@ pub mod tier_anhang;
 pub mod uhs_anhang;
 pub mod uhs_plan;
 pub mod verpflegung;
+pub mod verpflegung_vorlage;
 pub mod versionsstand;
 pub mod vorlagendokument;
 pub mod web_push;

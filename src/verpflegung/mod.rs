@@ -37,9 +37,17 @@
 //! ist, leitet der Client ab, weil nur er die vorgemerkten Ausgaben kennt; der Server liefert
 //! keine solche Liste.
 //!
+//! **Verpflegungsplan und Tag aus der Vorlage** (LLH-1058, [`vorlage`]): je Organisation eine
+//! Liste von Mahlzeiten mit Uhrzeit ohne Datum ([`crate::uhrzeit::Uhrzeit`]). Daraus legt
+//! `repo::zeitfenster_aus_vorlage_tx` die Zeitfenster eines Einsatztages in einer Transaktion
+//! an, je Fenster ein ETB-Eintrag wie beim Einzelanlegen; gleichnamige Fenster, die an diesem
+//! Tag schon beginnen, werden übersprungen. Die Uhrzeiten auf den Tag in der Anzeigezone legt
+//! der Client; ein angelegtes Zeitfenster kennt seine Vorlage nicht, eine Serie gibt es nicht.
+//!
 //! Spec: `openspec/specs/kraefte-verpflegung/spec.md` (Herleitung
 //! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040,
-//! Empfänger LLH-1055 „Empfänger einer Ausgabe“, „Empfängerliste der Verpflegung“).
+//! Empfänger LLH-1055 „Empfänger einer Ausgabe“, „Empfängerliste der Verpflegung“,
+//! Verpflegungsplan LLH-1058).
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -52,6 +60,7 @@ use crate::staerke::Staerke;
 pub mod deckung;
 pub mod repo;
 pub mod stelle;
+pub mod vorlage;
 
 use crate::wire_enum::wire_enum;
 use stelle::VerpflegungsstelleAnzeige;
@@ -358,6 +367,15 @@ pub struct AusgabeErgebnis {
     pub zeitfenster: ZeitfensterAnzeige,
 }
 
+/// Antwort auf „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der
+/// Reihenfolge der Anfrage und die Bezeichnungen der übersprungenen, weil an diesem Tag im
+/// Einsatz schon ein gleichnamiges beginnt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct VerpflegungTagErgebnis {
+    pub angelegt: Vec<ZeitfensterAnzeige>,
+    pub uebersprungen: Vec<String>,
+}
+
 // ── Zeiten ──────────────────────────────────────────────────────────────────────────────────
 
 /// Obergrenze je Zahlfeld in EP (Bedarfsteil, Menge, Kostform). Eine Verpflegungslage mit mehr
@@ -375,6 +393,9 @@ pub const MAX_EP: i64 = 100_000;
 
 /// Bezeichnung eines Zeitfensters („Mittag“).
 pub const ZEITFENSTER_BEZEICHNUNG_MAX: usize = 200;
+/// Zeitfenster je Anfrage „Tag aus der Vorlage anlegen“ (LLH-1058, design.md D13): eine Mahlzeit
+/// je Stunde; ein echter Plan hat drei bis sechs. Darüber 400 vor jedem Schreiben.
+pub const AUS_VORLAGE_MAX: usize = 24;
 /// Bezeichnung einer Verpflegungsstelle („Feldküche BR Sportplatz“). Gelangt ins ETB (D7).
 pub const STELLE_BEZEICHNUNG_MAX: usize = 200;
 /// Standort einer Verpflegungsstelle (Freitext, Adresse möglich).
