@@ -951,3 +951,65 @@ describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {
     expect(zeitachse).toHaveTextContent(/Schreibrecht/);
   });
 });
+
+describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075, D14)', () => {
+  const offen = () =>
+    http.get('/api/einsaetze/1/einheiten', () =>
+      HttpResponse.json([
+        { ...einheiten[0], unangemeldet: true, nicht_uebernommen_seit: '2026-10-16T12:00:00Z' },
+      ]),
+    );
+
+  it('mit Recht: Paneel „Übernahme“ mit „Übernehmen“ und „Abweisen“', async () => {
+    zeige(offen());
+    const paneel = await screen.findByRole('region', { name: 'Übernahme' });
+    expect(within(paneel).getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    expect(within(paneel).getByRole('button', { name: 'Abweisen' })).toBeInTheDocument();
+  });
+
+  it('Beobachter: nur das Kennzeichen, keine Knöpfe', async () => {
+    server.use(offen(), ...handlers('beobachter'));
+    rendere();
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(screen.getByText('nicht übernommen')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Übernahme' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Übernehmen' })).toBeNull();
+  });
+
+  it('ohne Freigabe Fahrzeuge kein „Abweisen“', async () => {
+    zeige(
+      offen(),
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
+      ),
+    );
+    const paneel = await screen.findByRole('region', { name: 'Übernahme' });
+    await waitFor(() =>
+      expect(within(paneel).queryByRole('button', { name: 'Abweisen' })).toBeNull(),
+    );
+    expect(within(paneel).getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+  });
+
+  it('nach dem Abweisen die Gliederung', async () => {
+    let abgewiesen = false;
+    zeige(
+      offen(),
+      http.post('/api/einsaetze/1/einheiten/10/abweisen', () => {
+        abgewiesen = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const paneel = await screen.findByRole('region', { name: 'Übernahme' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Abweisen' }));
+    const blase = await screen.findByRole('tooltip');
+    await userEvent.click(within(blase).getByRole('button', { name: 'Abweisen' }));
+    await waitFor(() => expect(abgewiesen).toBe(true));
+    expect(await screen.findByText('Gliederung')).toBeInTheDocument();
+  });
+
+  it('eine übernommene Einheit trägt kein Paneel', async () => {
+    zeige();
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(screen.queryByRole('region', { name: 'Übernahme' })).toBeNull();
+  });
+});

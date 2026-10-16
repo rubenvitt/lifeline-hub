@@ -34,6 +34,7 @@ import EinheitKopf from './einheit/EinheitKopf';
 import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
+import EinheitUebernahme from './einheit/EinheitUebernahme';
 import EinheitMaterial from './einheit/EinheitMaterial';
 import FahrzeugeBesatzung from './einheit/FahrzeugeBesatzung';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
@@ -295,6 +296,28 @@ function EinheitAnsicht({
           onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
           onSetHandStatus={(statusId) => handStatus.mutateAsync(statusId)}
         />
+
+        {/* Offene Übernahme (LLH-1075, D14): direkt unter dem Kopf, nur mit Recht Einheiten;
+            Abweisen entlässt die Fahrzeuge und braucht deren Freigabe. Ohne Recht bleibt das
+            Kennzeichen im Kopf. */}
+        {aktuell.nicht_uebernommen_seit != null && rechte.canEditEinheit && (
+          <EinheitUebernahme
+            key={aktuell.id}
+            einsatzId={einsatzId}
+            einheit={aktuell}
+            einheiten={einheiten}
+            abschnitte={abschnitteQuery.data}
+            canAbweisen={rechte.hasFahrzeugLink}
+            onAbgewiesen={() => {
+              // Wie nach dem Auflösen: die Einheit ist aufgelöst, zurück zur Gliederung.
+              void navigate(einheitenPfad(einsatzId));
+              qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(einsatzId), (alt) =>
+                alt?.filter((x) => x.id !== einheitId),
+              );
+              invalidate();
+            }}
+          />
+        )}
 
         {/* Jede Handlung hier wirkt mit dem Klick: die Zeile erscheint, wandert oder
             verschwindet, das quittiert ohne Satz (LFH-1078). */}
