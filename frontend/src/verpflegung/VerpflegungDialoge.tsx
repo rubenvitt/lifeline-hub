@@ -11,6 +11,7 @@ import type {
   SonderkostEingabe,
   VerpflegungAusgabe,
   Verpflegungsart,
+  VerpflegungEmpfaenger,
   Verpflegungsstelle,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
@@ -29,6 +30,12 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import {
+  empfaengerFelder,
+  empfaengerOptionen,
+  parseEmpfaengerSchluessel,
+  staerkeVorgabe,
+} from './empfaengerKern';
 import { stellenWahl } from './stellenKern';
 import { useBedarfsvorschlag, type Vorschlag } from './useBedarfsvorschlag';
 import {
@@ -47,8 +54,9 @@ dayjs.extend(utc);
  * Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`).
  *
  * FELDBUDGET: „Zeitfenster" zeigt bewusst VIER Felder, weil die beiden Bedarfsteile je einen
- * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe nachtragen" drei. Der
- * Rest liegt in einem `Collapse` mit `forceRender`, sonst fehlen die Werte in `onFinish`.
+ * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe nachtragen" höchstens
+ * vier (Menge, Empfänger, Stelle, Zeitpunkt). Der Rest liegt in einem `Collapse` mit
+ * `forceRender`, sonst fehlen die Werte in `onFinish`.
  *
  * ZEIT: Wire-Zeiten sind UTC ohne Zone — hinaus über `alsBackendZeit`, herein über
  * `alsZeitpunkt`, nie `dayjs(s)`; die Felder zeigen und lesen die Anzeigezone (`ZeitraumEingabe`,
@@ -63,8 +71,13 @@ dayjs.extend(utc);
  * STELLEN (LLH-1040, design.md D13 Punkte 5–6): Art und Stellen des Zeitfensters liegen im
  * eigenen Klappteil, dessen Kopf die Wahl nennt; die Stellen nur, wenn es welche gibt. Der
  * Nachtrag zeigt „Stelle“ sichtbar; „Ort“ heißt mit Stellen im Einsatz „Zuführungsziel“ und
- * entfällt, sobald eine Stelle gewählt ist (Stelle und Zuführungsziel sind Alternativen, deshalb
- * höchstens vier sichtbare Felder).
+ * entfällt, sobald eine Stelle gewählt ist (Stelle und Zuführungsziel sind Alternativen).
+ *
+ * EMPFÄNGER (LLH-1055 Teil II): der Nachtrag zeigt „Empfänger“ sichtbar (der Server lehnt ab, 404
+ * oder 409), eine Einheit belegt die Menge mit der Ist-Stärke ihres Teilbaums vor, solange die
+ * Menge leer ist oder noch die eigene Vorgabe trägt. Dafür liegt „Ort“/„Zuführungsziel“ seither im
+ * Klappteil (Feldbudget); der Klappkopf nennt es, sobald es gefüllt ist, und geht bei einer zu
+ * langen Angabe selbst auf.
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -166,6 +179,8 @@ interface AusgabeWerte {
   nachforderung_id?: number | null;
   bemerkung?: string | null;
   verpflegungsstelle_id?: number | null;
+  /** Schlüssel des Empfängers (`einheit:31`, `abschnitt:41`), LLH-1055. */
+  empfaenger?: string | null;
 }
 
 export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
@@ -179,6 +194,7 @@ export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
     ...(w.zeitpunkt ? { zeitpunkt_at: alsBackendZeit(w.zeitpunkt) } : {}),
     ...(ort != null ? { ort } : {}),
     ...(stelle != null ? { verpflegungsstelle_id: stelle } : {}),
+    ...empfaengerFelder(parseEmpfaengerSchluessel(w.empfaenger)),
     ...(sonderkost ? { sonderkost } : {}),
     ...(w.nachforderung_id != null ? { nachforderung_id: w.nachforderung_id } : {}),
     ...(bemerkung != null ? { bemerkung } : {}),
@@ -509,6 +525,8 @@ interface AusgabeDialogProps extends DialogBasis {
   nachforderungen: readonly NachforderungOption[] | null;
   /** Die Verpflegungsstellen des Einsatzes (LLH-1040); ohne gibt es keine Stellenwahl. */
   stellen?: readonly Verpflegungsstelle[];
+  /** Die Empfängerliste (LLH-1055); ohne Einheiten und Abschnitte gibt es keine Empfängerwahl. */
+  empfaenger?: VerpflegungEmpfaenger;
   onErfassen: (body: AusgabeEingabe) => Promise<unknown>;
 }
 
@@ -541,6 +559,7 @@ export function AusgabeDialog({
   zeitfenster: zf,
   nachforderungen,
   stellen = [],
+  empfaenger,
   laeuft,
   fehler,
   onErfassen,
@@ -555,9 +574,24 @@ export function AusgabeDialog({
   const nachforderungId = Form.useWatch('nachforderung_id', form) as number | null | undefined;
   const bemerkung = Form.useWatch('bemerkung', form) as string | null | undefined;
   const stelleId = Form.useWatch('verpflegungsstelle_id', form) as number | null | undefined;
+  const ort = Form.useWatch('ort', form) as string | null | undefined;
   const hasStellen = stellen.length > 0;
   const ortLabel = hasStellen ? 'Zuführungsziel' : 'Ort';
+  const empfaengerGruppen = empfaenger ? empfaengerOptionen(empfaenger, { aufgeloeste: true }) : [];
+  // Die eigene Vorgabe der Menge: nur sie wird bei einem Wechsel ersetzt, nie eine eingetippte Zahl.
+  const vorgabe = useRef<number | null>(null);
+  const waehleEmpfaenger = (schluessel: string | undefined) => {
+    const w = parseEmpfaengerSchluessel(schluessel);
+    const einheit =
+      w?.art === 'einheit' ? empfaenger?.einheiten.find((e) => e.id === w.id) : undefined;
+    const neu = einheit ? staerkeVorgabe(einheit) : null;
+    const menge = form.getFieldValue('menge') as number | null | undefined;
+    if (menge != null && menge !== vorgabe.current) return;
+    form.setFieldValue('menge', neu ?? undefined);
+    vorgabe.current = neu;
+  };
   const abweichungen = [
+    stelleId == null && text(ort) != null ? ortLabel : undefined,
     ...KOSTFORMEN.filter((k) => (sonderkost?.[k] ?? 0) > 0).map(
       (k) => `${sonderkost?.[k]} ${KOSTFORM_LABEL[k]}`,
     ),
@@ -573,7 +607,7 @@ export function AusgabeDialog({
       laeuft={laeuft}
       onErfassen={(w) => onErfassen(ausgabeBody(w))}
       onPruefungGescheitert={(felder) => {
-        if (felder.includes('bemerkung')) setWeitereOffen(true);
+        if (felder.includes('bemerkung') || felder.includes('ort')) setWeitereOffen(true);
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -598,6 +632,16 @@ export function AusgabeDialog({
       >
         {anzahlFeld(1)}
       </Form.Item>
+      {empfaengerGruppen.length > 0 && (
+        <Form.Item<AusgabeWerte> name="empfaenger" label="Empfänger">
+          <Select<string>
+            allowClear
+            placeholder="ohne Empfänger"
+            options={empfaengerGruppen}
+            onChange={waehleEmpfaenger}
+          />
+        </Form.Item>
+      )}
       {hasStellen && (
         <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
           <Select
@@ -607,21 +651,21 @@ export function AusgabeDialog({
           />
         </Form.Item>
       )}
-      {stelleId == null && (
-        <Form.Item<AusgabeWerte>
-          name="ort"
-          label={ortLabel}
-          rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, ortLabel)]}
-        >
-          <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
-        </Form.Item>
-      )}
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
         ['Weitere Angaben', ...abweichungen].join(' · '),
         <>
+          {stelleId == null && (
+            <Form.Item<AusgabeWerte>
+              name="ort"
+              label={ortLabel}
+              rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, ortLabel)]}
+            >
+              <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
+            </Form.Item>
+          )}
           {sonderkostFelder()}
           {nachforderungen != null && (
             <Form.Item<AusgabeWerte> name="nachforderung_id" label="Nachforderung">
