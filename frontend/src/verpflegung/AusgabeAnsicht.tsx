@@ -61,6 +61,13 @@ const KEINE_SAMMLUNG = 'keine Sammlung';
 /** Kurzgrund an allen Zähltasten eines vergangenen Zeitfensters (D7). */
 const ZEITFENSTER_VORBEI = 'Zeitfenster vorbei';
 
+/** Eine Zeile, die nie umbricht und sich mit „…“ kürzt: ein Tipp ändert so keine Höhe (D3). */
+const einzeilig = {
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+} as const;
+
 /** „ (davon 2 vegetarisch)“ zu einem Bündel, leer ohne Sonderkost. */
 function davon(b: Buendel): string {
   const sk = sonderkostText(sonderkostVoll(b.sonderkost));
@@ -253,6 +260,8 @@ export default function AusgabeAnsicht() {
   const zeilenServer = serverAusgaben.slice(0, Math.max(0, LETZTE - zeilenAusstehend.length));
   const aeltere = ausstehend.length + serverAusgaben.length - LETZTE;
 
+  const sammelSonderkost = sonderkostText(sammlung.sonderkost);
+
   const uebrige = zaehltasteStil(token, 'uebrige');
   const abstand = zaehltastenAbstand(token);
 
@@ -345,35 +354,63 @@ export default function AusgabeAnsicht() {
                 { label: 'ausstehend', wert: ausstehendMenge, farbe: rollen.linieStark },
                 { label: 'Rest', wert: rest, farbe: rollen.flaeche3 },
               ]}
-              legende={`ausgegeben ${zf.ausgegeben.gesamt} · Sammlung ${sammlung.menge} · ausstehend ${ausstehendMenge} · Rest ${rest}`}
+              legende={
+                // Feste Zeilenzahl: schmal zwei Zeilen, sonst eine; jede bricht nie um. Eine
+                // Stelle mehr bei Sammlung oder Rest ändert so nie die Höhe des Kopfs.
+                <>
+                  <span style={{ ...einzeilig, display: istSchmal ? 'block' : 'inline' }}>
+                    ausgegeben {zf.ausgegeben.gesamt} · Sammlung {sammlung.menge}
+                  </span>
+                  {istSchmal ? null : ' · '}
+                  <span style={{ ...einzeilig, display: istSchmal ? 'block' : 'inline' }}>
+                    ausstehend {ausstehendMenge} · Rest {rest}
+                  </span>
+                </>
+              }
             />
           </div>
-          {/* Die Sammelzeile steht immer, auch leer: „Sammlung 0“, „Buchen“ gesperrt (D3). */}
+          {/* Die Sammelzeile steht immer, auch leer: „Sammlung 0“, „Buchen“ gesperrt (D3). Sie
+              bricht nie um: links zwei feste, einzeilige Zeilen (Menge und ausstehend; Sonderkost
+              der Sammlung, leer mit reservierter Höhe), rechts „Buchen“ an festem Platz. Ein
+              wachsender Text kürzt sich, statt Tasten zu schieben. */}
           <Flex
             data-lfh="ausgabe-sammlung"
             align="center"
             gap={token.marginSM}
-            wrap
             style={{
               paddingBlock: token.paddingSM,
               paddingInline: token.padding,
               borderBlockStart: `1px solid ${rollen.flaeche2}`,
             }}
           >
-            <span>
-              Sammlung{' '}
-              <span data-lfh="sammlung-menge" style={monoStil(15, 500)}>
-                {sammlung.menge}
-              </span>
-            </span>
-            <span style={{ ...monoStil(12), color: rollen.text2 }}>
-              {sonderkostText(sammlung.sonderkost)}
-            </span>
-            <span data-lfh="ausgabe-ausstehend" style={{ ...monoStil(12), color: rollen.text2 }}>
-              + {ausstehendMenge} ausstehend
-            </span>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <div style={einzeilig}>
+                Sammlung{' '}
+                <span data-lfh="sammlung-menge" style={monoStil(15, 500)}>
+                  {sammlung.menge}
+                </span>{' '}
+                <span
+                  data-lfh="ausgabe-ausstehend"
+                  style={{
+                    ...monoStil(12),
+                    color: rollen.text2,
+                    marginInlineStart: token.marginXS,
+                  }}
+                >
+                  + {ausstehendMenge} ausstehend
+                </span>
+              </div>
+              <div
+                data-lfh="sammlung-sonderkost"
+                title={sammelSonderkost || undefined}
+                style={{ ...einzeilig, ...monoStil(12), color: rollen.text2 }}
+              >
+                {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
+                {sammelSonderkost || '\u00a0'}
+              </div>
+            </div>
             <Button
-              style={{ ...uebrige, marginInlineStart: 'auto' }}
+              style={{ ...uebrige, flex: 'none' }}
               disabled={zuruckGesperrt}
               aria-describedby={beschrieben(zuruckGesperrt)}
               onClick={sammlung.buchen}

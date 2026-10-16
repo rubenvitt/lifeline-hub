@@ -29,7 +29,15 @@ async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unkn
 }
 
 /** Ein Einsatz mit einem laufenden Zeitfenster „Mittag Deich“ (40 EP, davon 4 vegetarisch). */
-async function saeen(page: Page, minutenVon = -10, minutenBis = 110) {
+async function saeen(
+  page: Page,
+  minutenVon = -10,
+  minutenBis = 110,
+  {
+    sonderkost = { vegetarisch: 4 },
+    kraefte = 30,
+  }: { sonderkost?: Record<string, number>; kraefte?: number } = {},
+) {
   await anmeldenAlsAdmin(page);
   const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Ausgabe ${Date.now()}` }))
     .id;
@@ -39,9 +47,9 @@ async function saeen(page: Page, minutenVon = -10, minutenBis = 110) {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(minutenVon),
     bis_at: zeit(minutenBis),
-    bedarf_kraefte: 30,
+    bedarf_kraefte: kraefte,
     bedarf_betreute: 10,
-    sonderkost: { vegetarisch: 4 },
+    sonderkost,
   });
   return { e, zf: zf.id };
 }
@@ -161,27 +169,91 @@ test('ohne Netz: gezählt steht „ausstehend“, nach der Rückkehr läuft gena
   await expect(page.locator('[data-lfh="ausgabe-ausstehend"]')).toHaveText('+ 0 ausstehend');
 });
 
-test('Lage: der erste Tipp verschiebt keine Zähltaste', async ({ page }) => {
-  const { e, zf } = await saeen(page);
-  await oeffne(page, e, zf);
-  const tasten: Locator[] = [
-    page.getByRole('button', { name: '−1', exact: true }),
-    page.getByRole('button', { name: 'Menge …', exact: true }),
-    page.getByRole('button', { name: '+5', exact: true }),
-    page.getByRole('button', { name: '+10', exact: true }),
-    plus1(page),
-    page.getByRole('button', { name: /^vegetarisch/ }),
-    page.getByRole('button', { name: 'Buchen', exact: true }),
-  ];
-  const lage = async () => Promise.all(tasten.map(async (t) => (await t.boundingBox())!));
-  const vorher = await lage();
-  await page.getByRole('button', { name: /^vegetarisch/ }).click();
-  await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('1');
-  const nachher = await lage();
-  for (const [i, v] of vorher.entries()) {
-    expect(nachher[i], `Zähltaste ${i} vor/nach dem ersten Tipp`).toEqual(v);
-  }
-});
+/*
+ * Lage der Zähltasten (Spec „Ausgabeansicht eines Zeitfensters“: ein Tipp, eine Ablehnung oder ein
+ * Wechsel der Verbindung verschiebt keine Zähltaste). Am Desktop und bei 390 px in allen drei
+ * Stufen: dort ist der Kopf so schmal, dass ein wachsender Text („davon 1 vegetarisch“, eine
+ * Stelle mehr in der Legende) die Zeile umbrechen und alles darunter schieben könnte.
+ *
+ * Mutationsproben: Sonderkost-Text der Sammlung wieder in die umbrechende Zeile vor „Buchen“
+ * → 390 px rot; Legende wieder als ein umbrechender Text → 390 px `kompakt` rot; Grund einer
+ * abgelehnten Rücknahme wieder im Seitenhinweis → rot.
+ */
+for (const { breite, hoehe, dichte } of [
+  { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+  { breite: 390, hoehe: 844, dichte: 'kompakt' },
+  { breite: 390, hoehe: 844, dichte: 'komfortabel' },
+  { breite: 390, hoehe: 700, dichte: 'handschuh' },
+]) {
+  test(`Lage: Tipps und eine abgelehnte Rücknahme verschieben keine Zähltaste (${breite}×${hoehe}, ${dichte})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: breite, height: hoehe });
+    // Bedarf 150: bei 390 px in `kompakt` passt die Legende mit „Sammlung 0 … Rest 150“ knapp
+    // in eine Zeile, mit „Sammlung 11 … Rest 139“ nicht mehr.
+    const { e, zf } = await saeen(page, -10, 110, {
+      sonderkost: { vegetarisch: 4, vegan: 2 },
+      kraefte: 140,
+    });
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    const vegetarisch = page.getByRole('button', { name: /^vegetarisch/ });
+    const vegan = page.getByRole('button', { name: /^vegan/ });
+    const tasten: [string, Locator][] = [
+      ['−1', page.getByRole('button', { name: '−1', exact: true })],
+      ['Menge …', page.getByRole('button', { name: 'Menge …', exact: true })],
+      ['+5', page.getByRole('button', { name: '+5', exact: true })],
+      ['+10', page.getByRole('button', { name: '+10', exact: true })],
+      ['+1', plus1(page)],
+      ['vegetarisch', vegetarisch],
+      ['vegan', vegan],
+      ['Buchen', page.getByRole('button', { name: 'Buchen', exact: true })],
+    ];
+    // Immer am Seitenanfang gemessen: ein Klick rollt die Taste ins Bild, das klebende Tastenfeld
+    // steht aber relativ zum Fenster; so sind beide Arten vergleichbar.
+    const lage = async () => {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      return Promise.all(
+        tasten.map(async ([name, t]) => {
+          const box = (await t.boundingBox())!;
+          return { name, x: box.x, y: box.y, w: box.width, h: box.height };
+        }),
+      );
+    };
+    const vorher = await lage();
+    const gleich = async (wann: string) => {
+      const nachher = await lage();
+      for (const [i, v] of vorher.entries()) {
+        expect(nachher[i], `${v.name} ${wann}`).toEqual(v);
+      }
+    };
+
+    await vegetarisch.click();
+    await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('1');
+    await gleich('nach dem ersten Tipp (vegetarisch)');
+
+    await vegan.click();
+    for (let i = 0; i < 9; i++) await plus1(page).click();
+    await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('11');
+    await gleich('nach vegan und 9 × „+1“ (zweistellig)');
+
+    await page.getByRole('button', { name: 'Buchen', exact: true }).click();
+    await expect(page.getByText(/^Gebucht: 11 EP/)).toBeVisible();
+    await gleich('nach dem Buchen');
+
+    // Die Ausgabe ist schon anderswo zurückgenommen: „Rückgängig“ wird abgelehnt.
+    const [ausgabe] = (await zeitfenster(page, e)).ausgaben;
+    await anlegen(page, `/api/einsaetze/${e}/verpflegung/ausgaben/${ausgabe.id}/zuruecknehmen`, {});
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+    await expect(page.locator('[data-lfh="ausgabe-ablehnung"]')).toContainText(
+      'Nicht zurückgenommen',
+    );
+    await gleich('nach der abgelehnten Rücknahme');
+  });
+}
 
 test('4 × „+1“, dann sofort zur Modulseite: genau eine Ausgabe über 4 EP, kein Rückgängig-Toast', async ({
   page,
