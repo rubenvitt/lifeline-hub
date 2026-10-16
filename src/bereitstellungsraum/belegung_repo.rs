@@ -7,7 +7,8 @@ use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
 
 const SELECT_ALLE: &str = "\
-    SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von \
+    SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von, \
+           ziel_abschnitt_id, ziel_anzeige, auftrag_id, mit_abruf_id \
     FROM br_belegung";
 
 /// Eine Belegungsbuchung ohne Objekt und Raum: Art, Notiz und – für das Eintreffen (LLH-1075,
@@ -460,6 +461,8 @@ pub async fn verlauf(
             let (art, herkunft, ziel) = match z.art.as_str() {
                 "eintritt" => (BrVerlaufArt::Eintritt, None, None),
                 "austritt" => (BrVerlaufArt::Austritt, None, None),
+                "abruf" => (BrVerlaufArt::Abruf, None, None),
+                "abruf_aufgehoben" => (BrVerlaufArt::AbrufAufgehoben, None, None),
                 _ if z.br_id == br_id => (BrVerlaufArt::WechselHerein, z.vorher_bezeichnung, None),
                 _ => (BrVerlaufArt::WechselHinaus, None, z.ziel_bezeichnung),
             };
@@ -473,6 +476,8 @@ pub async fn verlauf(
                 notiz: z.notiz,
                 herkunft,
                 ziel,
+                auftrag_nr: None,
+                mit_einheit: None,
             })
         })
         .collect()
@@ -597,6 +602,12 @@ fn pruefe_art_vorbedingung(
     br_id: i64,
 ) -> Result<(), AppError> {
     match art {
+        // Abruf und Rücknahme haben eigene Routen (LLH-1085, design.md D2).
+        BrBelegungsArt::Abruf | BrBelegungsArt::AbrufAufgehoben => {
+            Err(AppError::UnprocessableEntity(
+                "Abruf und Rücknahme über …/abruf, nicht über die Belegung".into(),
+            ))
+        }
         BrBelegungsArt::Eintritt if aktueller_br_id.is_some() => Err(AppError::Conflict(
             "Objekt hat bereits einen aktiven Bereitstellungsraum — Wechsel oder Austritt verwenden"
                 .into(),
@@ -619,7 +630,10 @@ fn pruefe_art_vorbedingung(
 /// - austritt → NULL
 fn cache_nach_art(art: &BrBelegungsArt, br_id: i64) -> Option<i64> {
     match art {
-        BrBelegungsArt::Eintritt | BrBelegungsArt::Wechsel => Some(br_id),
+        BrBelegungsArt::Eintritt
+        | BrBelegungsArt::Wechsel
+        | BrBelegungsArt::Abruf
+        | BrBelegungsArt::AbrufAufgehoben => Some(br_id),
         BrBelegungsArt::Austritt => None,
     }
 }

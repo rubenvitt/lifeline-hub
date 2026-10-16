@@ -1,9 +1,10 @@
+pub mod abruf;
 pub mod belegung_repo;
 pub mod eintreffen;
 pub mod repo;
 
 use crate::wire_enum::wire_enum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 wire_enum! {
@@ -50,12 +51,16 @@ wire_enum! {
 
 wire_enum! {
     /// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-    /// `migrations/0061_br_belegung.sql`. Append-only.
+    /// `migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
+    /// `austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,
+    /// design.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum BrBelegungsArt {
         Eintritt => "eintritt",
         Wechsel => "wechsel",
         Austritt => "austritt",
+        Abruf => "abruf",
+        AbrufAufgehoben => "abruf_aufgehoben",
     }
     try_from = |s| format!("Ungültige BrBelegungsArt: {s}");
 }
@@ -92,6 +97,80 @@ pub struct BrBelegungAnzeige {
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,
+    /// Ziel-Abschnitt eines Abrufs (LLH-1085, design.md D5); fällt weg, wenn der Abschnitt
+    /// gelöscht wird.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_abschnitt_id: Option<i64>,
+    /// Name des Ziel-Abschnitts zum Zeitpunkt des Abrufs; bleibt nach dem Löschen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_anzeige: Option<String>,
+    /// Auftrag, der mit dem Abruf erteilt wurde.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_id: Option<i64>,
+    /// Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mit_abruf_id: Option<i64>,
+}
+
+/// Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec
+/// `bereitstellungsraum-belegung`, „Detail nennt den Abruf“): abgeleitet aus dem jüngsten
+/// Belegungsereignis, nicht gespeichert.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BrAbrufKurz {
+    /// Zeitpunkt des Abrufs (UTC ohne Zone).
+    pub seit_at: String,
+    /// Ziel-Abschnitt; bei einer mitgenommenen Untereinheit der ihrer Einheit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_abschnitt_id: Option<i64>,
+    /// Name des Ziels zum Zeitpunkt des Abrufs; bei einer mitgenommenen Untereinheit der ihrer
+    /// Einheit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_anzeige: Option<String>,
+    /// Auftrag des Abrufs; nur an der abgerufenen Einheit, nicht an mitgenommenen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_id: Option<i64>,
+    /// Laufende Nummer dieses Auftrags.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_nr: Option<i64>,
+    /// Die Einheit, mit der diese Untereinheit abgerufen wurde (D10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mit_objekt_id: Option<i64>,
+}
+
+/// Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BrAbrufErgebnis {
+    /// Das Abruf-Ereignis der abgerufenen Kraft.
+    pub abruf: BrBelegungAnzeige,
+    /// Einheiten, die als Untereinheiten mit abgerufen wurden.
+    pub mitgenommen: Vec<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_id: Option<i64>,
+    /// Laufende Nummer des erteilten Auftrags.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_nr: Option<i64>,
+}
+
+/// Body von `POST …/bereitstellungsraeume/{bid}/abruf` (handgepflegt, `src/AGENTS.md`,
+/// Typ-Codegen).
+#[derive(Debug, Deserialize)]
+pub struct BrAbrufEingabe {
+    pub objekt_typ: String,
+    pub objekt_id: i64,
+    /// Ziel-Abschnitt; nur für Einheiten.
+    pub abschnitt_id: Option<i64>,
+    /// Auftrag an die Kraft; leer heißt „kein Auftrag“.
+    pub auftrag_text: Option<String>,
+    /// Abruf und Austritt in einem Schritt („Rückt sofort aus“).
+    #[serde(default)]
+    pub ausgerueckt: bool,
+}
+
+/// Body von `POST …/bereitstellungsraeume/{bid}/abruf/aufheben` (handgepflegt).
+#[derive(Debug, Deserialize)]
+pub struct BrAbrufAufhebenEingabe {
+    pub objekt_typ: String,
+    pub objekt_id: i64,
 }
 
 /// Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec
@@ -119,6 +198,8 @@ wire_enum! {
         WechselHerein => "wechsel_herein",
         WechselHinaus => "wechsel_hinaus",
         Austritt => "austritt",
+        Abruf => "abruf",
+        AbrufAufgehoben => "abruf_aufgehoben",
     }
     try_from = |s| format!("Ungültige BrVerlaufArt: {s}");
 }
@@ -141,9 +222,16 @@ pub struct BrVerlaufEintrag {
     /// Bezeichnung des Raums, aus dem ein `wechsel_herein` kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub herkunft: Option<String>,
-    /// Bezeichnung des Raums, in den ein `wechsel_hinaus` ging.
+    /// Bezeichnung des Raums, in den ein `wechsel_hinaus` ging; bei einem `abruf` und einem
+    /// `austritt` direkt nach einem Abruf der Name des Ziel-Abschnitts (LLH-1085, D5).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ziel: Option<String>,
+    /// Laufende Nummer des Auftrags eines `abruf`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auftrag_nr: Option<i64>,
+    /// Name der Einheit, mit der eine Untereinheit abgerufen wurde (D10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mit_einheit: Option<String>,
 }
 
 #[cfg(test)]
@@ -152,7 +240,14 @@ mod tests {
 
     #[test]
     fn verlauf_art_roundtrip() {
-        for a in ["eintritt", "wechsel_herein", "wechsel_hinaus", "austritt"] {
+        for a in [
+            "eintritt",
+            "wechsel_herein",
+            "wechsel_hinaus",
+            "austritt",
+            "abruf",
+            "abruf_aufgehoben",
+        ] {
             let art = BrVerlaufArt::parse(a).unwrap();
             assert_eq!(art.as_str(), a);
             assert_eq!(serde_json::to_value(art).unwrap(), serde_json::json!(a));
@@ -179,9 +274,10 @@ mod tests {
             assert_eq!(ObjektTyp::parse(t).unwrap().as_str(), t);
         }
         assert!(ObjektTyp::parse("person").is_none());
-        for a in ["eintritt", "wechsel", "austritt"] {
+        for a in ["eintritt", "wechsel", "austritt", "abruf", "abruf_aufgehoben"] {
             assert_eq!(BrBelegungsArt::parse(a).unwrap().as_str(), a);
         }
+        assert!(BrBelegungsArt::parse("umzug").is_none());
     }
 }
 
