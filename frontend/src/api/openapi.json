@@ -14305,6 +14305,75 @@
           }
         }
       },
+      "VerpflegungTagErgebnis": {
+        "type": "object",
+        "description": "Antwort auf „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der\nReihenfolge der Anfrage und die Bezeichnungen der übersprungenen, weil an diesem Tag im\nEinsatz schon ein gleichnamiges beginnt.",
+        "required": [
+          "angelegt",
+          "uebersprungen"
+        ],
+        "properties": {
+          "angelegt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeitfensterAnzeige"
+            }
+          },
+          "uebersprungen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "VerpflegungVorlage": {
+        "type": "object",
+        "description": "Eine Mahlzeit des Verpflegungsplans.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "beginn",
+          "ende",
+          "folgetag",
+          "aktiv"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "beginn": {
+            "type": "string",
+            "description": "Wanduhrzeit `HH:MM` ohne Datum und ohne Zone."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "ende": {
+            "type": "string",
+            "description": "Wanduhrzeit `HH:MM`; liegt sie vor `beginn`, endet die Mahlzeit am Folgetag."
+          },
+          "folgetag": {
+            "type": "boolean",
+            "description": "`ende` liegt vor `beginn`: die Mahlzeit endet am Folgetag („+1 Tag“)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "verpflegungsart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Verpflegungsart",
+                "description": "Warm, kalt oder Getränke; fehlt = ohne Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Verpflegungsart": {
         "type": "string",
         "description": "Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung\ngilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;\nkeine Art (`NULL`) heißt „ohne Angabe“.",
