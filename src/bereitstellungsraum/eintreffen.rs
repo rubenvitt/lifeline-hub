@@ -1217,6 +1217,7 @@ mod tests {
     // ─── Unangemeldet ───────────────────────────────────────────────────────
 
     #[tokio::test]
+    #[allow(clippy::type_complexity)]
     async fn unangemeldet_eine_einheit_ein_fahrzeug_meldung() {
         let pool = test_pool().await;
         let (b, e) = basis(&pool).await;
