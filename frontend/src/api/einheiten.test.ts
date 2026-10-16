@@ -1,12 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import * as client from './client';
 import { gruendeJeKraft } from '../kraefte/sammelDisposition';
 import {
   bildeEinheit,
   createEinheitAusVorlage,
   loadEinheitAusVorlage,
   patchEinheitZeichen,
+  uebernehmeEinheit,
+  weiseEinheitAb,
 } from './einheiten';
 
 describe('api/einheiten — Einheit aus Vorlage (LLH-1049)', () => {
@@ -114,5 +117,29 @@ describe('api/einheiten · patchEinheitZeichen', () => {
     const breit = { tz_fachaufgabe: 'fuehrung', lat: 52.1, lon: 10.2 } as never;
     await patchEinheitZeichen(1, 10, breit);
     expect(JSON.parse(aufruf().init.body as string)).toEqual({ tz_fachaufgabe: 'fuehrung' });
+  });
+});
+
+describe('api/einheiten — Übernehmen und Abweisen (LLH-1075, design.md D10, D11)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('übernimmt mit POST an …/uebernehmen und schickt nur die gewählte Unterstellung', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await uebernehmeEinheit(5, 7, { abschnitt_id: 3 });
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/uebernehmen', 'POST', {
+      abschnitt_id: 3,
+    });
+  });
+
+  it('übernimmt ohne Angabe mit leerem Körper', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await uebernehmeEinheit(5, 7, {});
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/uebernehmen', 'POST', {});
+  });
+
+  it('weist mit POST an …/abweisen ab, ohne Körper', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue(undefined as never);
+    await weiseEinheitAb(5, 7);
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/abweisen', 'POST');
   });
 });
