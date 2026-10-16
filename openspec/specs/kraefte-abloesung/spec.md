@@ -2,8 +2,13 @@
 
 ## Purpose
 Die Führung sieht und steuert, wann welche Einheit im Einsatz abgelöst werden muss. Das
-umfasst den Rhythmus je Abschnitt oder Einheit, Vorwarnung und Überfälligkeit, den Vollzug
-mit Folgeschicht und seine Rücknahme. Jeder Schritt ist im Einsatztagebuch nachgewiesen.
+umfasst den Rhythmus je Einheit, Abschnitt oder Einsatz, die Schichtmodelle der Organisation,
+Vorwarnung und Überfälligkeit, den Vollzug mit Folgeschicht und seine Rücknahme. Jeder Schritt
+ist im Einsatztagebuch nachgewiesen.
+
+LLH-1122 hebt das Non-Goal „Die Vorwarnzeit ist fest auf 30 min gesetzt“ aus LFH-635
+(`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/design.md`, Non-Goals) auf:
+die Vorwarnzeit kommt aus dem Schichtmodell des Einsatzes, 30 min sind nur noch die Vorgabe.
 
 ## Requirements
 
@@ -37,8 +42,111 @@ der Einheit aus der Kräfte-Zeitachse übernehmen und ohne ein solches den Zeitp
 - **THEN** antwortet das System mit 404
 
 #### Scenario: Ungültiger Rhythmus
-- **WHEN** der Rhythmus fehlt und der Abschnitt der Einheit keine Vorgabe hat, oder der Rhythmus ≤ 0 oder > 7 Tage ist
+- **WHEN** der Rhythmus fehlt und weder der Abschnitt der Einheit noch der Einsatz eine Vorgabe hat, oder der Rhythmus ≤ 0 oder > 7 Tage ist
 - **THEN** antwortet das System mit 400
+
+### Requirement: Rangfolge des Rhythmus
+
+Das System SHALL den Rhythmus einer neuen Schicht in dieser Rangfolge bestimmen: ein
+eigener Wert der Schicht (`rhythmus_quelle = einheit`), sonst die Vorgabe des Abschnitts ihrer
+Einheit (`abschnitt`), sonst die Vorgabe des Einsatzes (`einsatz`). Folgt eine Schicht der
+Vorgabe des Einsatzes, MUST das System Fälligkeit und Rhythmus aus deren Schichtmodell rechnen;
+bei Wechselzeiten ist der gespeicherte Rhythmus die Dauer von Beginn bis Fälligkeit. Das
+Einsatztagebuch MUST beim Beginn die Herkunft „Vorgabe Einsatz“ mit der Bezeichnung des Modells
+nennen.
+
+#### Scenario: Einsatzvorgabe greift
+- **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit Rhythmus 360 min hat und eine Schicht ohne eigenen Rhythmus für eine Einheit ohne Abschnittsvorgabe um 08:00 beginnt
+- **THEN** folgt die Schicht der Vorgabe des Einsatzes und ist um 14:00 fällig
+- **AND** das ETB nennt „Rhythmus 6 h (Vorgabe Einsatz «Sanitätsdienst»)“
+
+#### Scenario: Abschnitt vor Einsatz
+- **WHEN** der Abschnitt der Einheit eine Vorgabe von 480 min hat und der Einsatz eine von 360 min
+- **THEN** folgt die Schicht der Vorgabe des Abschnitts
+
+#### Scenario: Zurück zur Vorgabe ohne jede Vorgabe
+- **WHEN** eine Schicht mit eigenem Rhythmus zurück zur Vorgabe soll und weder Abschnitt noch Einsatz eine haben
+- **THEN** antwortet das System mit 422
+
+### Requirement: Fälligkeit nach Wechselzeiten
+
+Das System SHALL bei einem Schichtmodell vom Typ `wechselzeiten` die Fälligkeit als den
+ersten Wechsel bestimmen, der mindestens die Mindestdauer nach dem Beginn und echt nach dem
+Beginn liegt. Die Wechselzeiten MUST als Wanduhrzeit in der wirksamen Zone gelten: die des
+Einsatzes, sonst die der Organisation, sonst Europe/Berlin. Über eine Zeitumstellung MUST die
+echte Dauer zählen; eine Wechselzeit, die es am Umstellungstag nicht gibt, gilt eine Stunde
+später, eine doppelte beim ersten Mal. Die Fälligkeit MUST gespeichert werden.
+
+#### Scenario: Wechsel am selben Tag
+- **WHEN** eine Schicht um 13:42 beginnt und das Modell Wechsel um 06:00 und 18:00 mit 4 h Mindestdauer vorgibt
+- **THEN** ist sie um 18:00 fällig
+
+#### Scenario: Wechsel am Folgetag
+- **WHEN** dieselbe Schicht um 15:00 beginnt
+- **THEN** ist sie um 06:00 am Folgetag fällig
+
+#### Scenario: Zeitumstellung Ende März
+- **WHEN** eine Schicht am 28.03.2026 um 18:00 (Europe/Berlin) beginnt
+- **THEN** ist sie am 29.03.2026 um 06:00 Sommerzeit fällig, nach elf echten Stunden
+
+#### Scenario: Zone des Einsatzes vor der Organisation
+- **WHEN** die Organisation die Zone UTC hat und der Einsatz Europe/Berlin
+- **THEN** gelten die Wechselzeiten in Europe/Berlin
+
+### Requirement: Schichtmodelle der Organisation
+
+Das System SHALL je Organisation Schichtmodelle als Stammdaten führen: Bezeichnung, Typ
+(`rhythmus` mit Rhythmus in Minuten oder `wechselzeiten` mit Uhrzeiten und Mindestdauer),
+Vorwarnung (Vorgabe 30 min) und Planungsvorlauf (Vorgabe 120 min). Höchstens ein Modell MUST die
+Vorgabe der Organisation sein. Lesen darf jedes Mitglied der Organisation, anlegen, ändern und
+löschen nur ein Admin; jede Änderung meldet das Org-Ereignis `stammdaten`. Die Bezeichnung MUST je
+Organisation ohne Unterschied von Groß- und Kleinschreibung eindeutig sein. Ein Modell der
+Demo-Daten MUST `ist_demo` melden.
+
+#### Scenario: Zweite Vorgabe
+- **WHEN** ein Admin ein zweites Modell als Vorgabe der Organisation anlegt oder setzt
+- **THEN** antwortet das System mit 409, und die bisherige Vorgabe bleibt
+
+#### Scenario: Gleiche Bezeichnung
+- **WHEN** ein Admin ein Modell „HOCHWASSER“ anlegt und es „Hochwasser“ schon gibt
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Feld des anderen Typs
+- **WHEN** ein Modell vom Typ `rhythmus` eine Mindestdauer trägt
+- **THEN** antwortet das System mit 422; fehlt der Rhythmus, mit 400
+
+#### Scenario: Kein Admin
+- **WHEN** eine Person ohne Admin-Rolle ein Modell anlegt
+- **THEN** antwortet das System mit 403
+
+### Requirement: Vorgabe des Einsatzes
+
+Das System SHALL beim Anlegen eines Einsatzes die Vorgabe der Organisation als Kopie zur
+Vorgabe des Einsatzes machen. Hat die Organisation keine Vorgabe, MUST der Einsatz ohne Vorgabe
+bleiben. Eine spätere Änderung oder das Löschen des Modells in den Stammdaten MUST die Kopie und
+damit laufende Fälligkeiten unverändert lassen. Die Vorgabe des Einsatzes MUST mit den Rechten der
+Abschnittsvorgabe lesbar und änderbar sein: als Kopie eines Modells der eigenen Organisation, mit
+eigenen Werten oder entfernt. Ändert sie sich, MUST das System Rhythmus, Fälligkeit und Fristen
+aller laufenden Schichten mit Quelle `einsatz` neu setzen und die Vorwarn-Fristen aller laufenden
+Schichten auf die neue Vorwarnzeit legen; eine entfernte Vorgabe lässt den zuletzt gültigen
+Rhythmus stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festgehalten werden.
+
+#### Scenario: Anlage übernimmt die Org-Vorgabe
+- **WHEN** die Organisation die Vorgabe „12-h-Schicht“ führt und ein Einsatz angelegt wird
+- **THEN** hat der Einsatz eine Kopie von „12-h-Schicht“ als Vorgabe
+
+#### Scenario: Gelöschtes Modell
+- **WHEN** das Modell danach in den Stammdaten geändert und gelöscht wird
+- **THEN** ist die Vorgabe des Einsatzes unverändert
+
+#### Scenario: Einsatzvorgabe verkürzt
+- **WHEN** die Vorgabe des Einsatzes von 360 auf 240 min mit 45 min Vorwarnung gesetzt wird und eine laufende Schicht ihr folgt
+- **THEN** ist diese Schicht 120 min früher fällig, ihre Fristen stehen auf der neuen Fälligkeit und 45 min davor
+- **AND** Schichten mit eigenem Rhythmus oder nach der Abschnittsvorgabe behalten ihre Fälligkeit
+
+#### Scenario: Weder Modell noch Werte
+- **WHEN** die Vorgabe ohne `schichtmodell_id` und ohne `schichtmodell` gesetzt werden soll
+- **THEN** antwortet das System mit 400; mit beiden Angaben mit 422; mit einem fremden Modell mit 404
 
 ### Requirement: Rhythmus-Vorgabe am Abschnitt
 
@@ -64,7 +172,8 @@ Jede Änderung der Vorgabe MUST als ETB-Eintrag vom Typ Entscheidung festgehalte
 ### Requirement: Schicht bearbeiten
 
 Das System SHALL an einer laufenden Schicht Beginn, Rhythmus (eigener Wert oder zurück zur
-Abschnittsvorgabe) und geplante ablösende Einheit änderbar machen. Eine Änderung von Beginn
+Vorgabe des Abschnitts, sonst des Einsatzes) und geplante ablösende Einheit änderbar machen.
+Eine Änderung von Beginn
 oder Rhythmus MUST die Fälligkeit und die zugehörigen Fristen neu setzen. Eine abgelöste
 Schicht MUST NOT änderbar sein.
 
@@ -83,10 +192,11 @@ Schicht MUST NOT änderbar sein.
 ### Requirement: Fälligkeit, Vorwarnung und Überfälligkeit
 
 Das System SHALL eine laufende Schicht als `vorwarnung` einstufen, wenn ihre Fälligkeit
-höchstens 30 min entfernt ist, und als `ueberfaellig`, wenn sie erreicht oder überschritten
-ist. Andernfalls ist sie `planmaessig`. Die Einstufung MUST bei jedem Lesen gegen die
-aktuelle Zeit berechnet werden und darf nicht davon abhängen, ob ein Hintergrundlauf
-stattgefunden hat.
+höchstens die Vorwarnzeit entfernt ist, und als `ueberfaellig`, wenn sie erreicht oder
+überschritten ist. Andernfalls ist sie `planmaessig`. Die Vorwarnzeit MUST aus dem
+Schichtmodell des Einsatzes kommen, ohne eines gilt 30 min; jede Schicht MUST sie als
+`vorwarnung_minuten` melden. Die Einstufung MUST bei jedem Lesen gegen die aktuelle Zeit
+berechnet werden und darf nicht davon abhängen, ob ein Hintergrundlauf stattgefunden hat.
 
 #### Scenario: Überfällig
 - **WHEN** eine laufende Schicht um 15:30 fällig ist und um 15:31 gelesen wird
@@ -96,10 +206,15 @@ stattgefunden hat.
 - **WHEN** dieselbe Schicht um 15:05 gelesen wird
 - **THEN** trägt sie die Einstufung `vorwarnung`
 
+#### Scenario: Vorwarnung aus dem Schichtmodell
+- **WHEN** das Schichtmodell des Einsatzes 45 min Vorwarnung vorgibt und die Schicht um 14:45 gelesen wird
+- **THEN** trägt sie die Einstufung `vorwarnung` und meldet `vorwarnung_minuten: 45`
+
 ### Requirement: Kopplung an den Erinnerungs-Scheduler
 
 Das System SHALL für jede laufende Schicht eine offene Auto-Frist zur Fälligkeit führen und,
-solange die Vorwarnzeit noch in der Zukunft liegt, eine zweite 30 min vor Fälligkeit.
+solange die Vorwarnzeit noch in der Zukunft liegt, eine zweite um die Vorwarnzeit vor
+Fälligkeit.
 Beim Anlegen einer Schicht und bei Änderungen von Beginn oder Rhythmus MUST das System diese
 Fristen anlegen oder verschieben. Bei Vollzug MUST es sie schließen. Erreicht der Scheduler
 eine dieser Fristen, MUST er genau einmal ein Live-Ereignis an alle Leser des Moduls
@@ -132,7 +247,9 @@ ablösender Einheit vollziehen. Beim Vollzug MUST die Schicht `abgeloest` werden
 Fristen MUST geschlossen werden, und ein ETB-Eintrag MUST Einheit, ablösende Einheit und
 Zeitpunkt nennen. Ist eine ablösende Einheit angegeben, MUST für sie in derselben
 Transaktion eine laufende Folgeschicht mit Beginn = Vollzugszeitpunkt und dem Rhythmus der
-abgelösten Schicht entstehen, samt eigener Fristen. Hat die ablösende Einheit schon eine
+abgelösten Schicht entstehen, samt eigener Fristen; folgt die abgelöste Schicht der Vorgabe des
+Einsatzes, rechnet deren Schichtmodell die Folgeschicht ab dem Vollzug. Hat die ablösende
+Einheit schon eine
 laufende Schicht, MUST der Vollzug mit 422 scheitern und nichts ändern.
 
 #### Scenario: Vollzug mit ablösender Einheit
