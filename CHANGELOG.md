@@ -1,3 +1,68 @@
+## [1.0.0-alpha.132](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.131...v1.0.0-alpha.132) (2026-10-16)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Eine neue Tabelle speichert den Verpflegungsplan der Organisation. Die Migration läuft beim ersten Start der neuen Version automatisch.
+- **Neue Schnittstellen:** Es gibt neue Endpunkte für den Verpflegungsplan (lesen, anlegen, ändern) und für das Anlegen eines ganzen Verpflegungstags aus der Vorlage. Am Bereitstellungsraum kommen Schnittstellen für das Eintreffen sowie für Übernehmen und Abweisen einer unangemeldeten Einheit hinzu.
+
+### Kräfte und Mittel – Bereitstellungsraum
+
+- **„Eintreffen buchen“:** Neuer Hauptknopf im Kopf der Detailseite des Bereitstellungsraums.
+  - Ist der Raum geplant oder aufgelöst, ist der Knopf gesperrt und zeigt „BR nicht in Betrieb“.
+  - Ohne Schreibrecht wird er nicht angezeigt.
+- **Suche im Dialog:** Der Dialog durchsucht erwartete und bereits eingesetzte Kräfte. Gesucht wird nach Name, Typ und Funkrufname, auch nach den Funkrufnamen der Fahrzeuge einer Einheit. Ein Treffer lässt sich mit einem Tipp buchen.
+- **Unangemeldete Kräfte erfassen:** Über „Nicht in der Liste“ legen Sie eine Kraft an, die ohne Anmeldung eingetroffen ist.
+  - Angaben: Funkrufname, Trägerorganisation, Fahrzeugtyp und Stärke.
+  - Bemerkung und weitere Fahrzeuge lassen sich aufklappen. Hat ein weiteres Fahrzeug einen Typ, ist auch sein Funkrufname Pflicht.
+- **Schutz vor Doppelbuchung:** Steht eine passende Kraft schon im Einsatz, erscheint ein Hinweis mit „Trotzdem neu anlegen“. „Diese buchen“ wird nur angeboten, solange die vorhandene Kraft in keinem Raum steht.
+- **Geteilte Seitenleiste:** Die Seitenleiste zeigt „Erwartet“ und „Im Einsatz“ getrennt. Einheiten mit eigenem oder geerbtem Abschnitt stehen unter „Im Einsatz“. Dieser Bereich ist eingeklappt und zeigt die Anzahl.
+
+### Kräfte und Mittel – Unangemeldete Einheiten
+
+- **Kennzeichen „nicht übernommen“:** Unangemeldet eingetroffene Einheiten sind sichtbar markiert (ohne Blinken):
+  - in der Belegung des Raums,
+  - im Kräftebaum des Meldebilds,
+  - in der Einheitenliste,
+  - im Kopf der Einheit-Ansicht.
+
+  Nach der Übernahme steht in der Belegung nur noch neutral „unangemeldet“.
+- **Übernehmen oder Abweisen:** Mit dem Recht „Einheiten“ erscheint in der Einheit-Ansicht direkt unter dem Kopf ein Bereich „Übernahme“.
+  - „Übernehmen“ ordnet die Einheit einem Abschnitt und optional einer übergeordneten Einheit zu.
+  - „Abweisen“ verlangt eine Bestätigung und zusätzlich das Recht „Fahrzeuge“.
+
+### Kommunikation – Meldungen
+
+- Die Meldung zu einer unangemeldet eingetroffenen Einheit hat jetzt ebenfalls die Knöpfe „Übernehmen“ und „Abweisen“. Nach der Übernahme verschwinden sie.
+- Ohne das Recht „Einheiten“ zeigt die Meldung nur einen Verweis zur Einheit.
+
+### Betreuung und Verpflegung
+
+- **Verpflegungsplan der Organisation:** Administratoren pflegen einen Katalog von Mahlzeiten. Jede Mahlzeit hat eine Bezeichnung, Beginn und Ende sowie optional eine Verpflegungsart. Alle Mitglieder der Organisation können den Plan lesen.
+  - Uhrzeiten werden als „HH:MM“ oder „HHMM“ angenommen.
+  - Liegt das Ende vor dem Beginn, endet die Mahlzeit am Folgetag. Ende und Beginn dürfen nicht gleich sein.
+  - Jede Bezeichnung darf unter den aktiven Mahlzeiten nur einmal vorkommen, ohne Unterschied zwischen Groß- und Kleinschreibung.
+  - Mahlzeiten werden deaktiviert statt gelöscht.
+- **Tag aus der Vorlage:** Die Zeitfenster eines Verpflegungstags lassen sich in einem Schritt anlegen, höchstens 24.
+  - Entweder entstehen alle Zeitfenster oder keines.
+  - Gibt es an diesem Tag schon ein Fenster mit derselben Bezeichnung, wird es übersprungen und in der Antwort genannt.
+  - Jedes angelegte Fenster erzeugt seinen Eintrag im Einsatztagebuch.
+  - Angelegte Zeitfenster bleiben vom Plan unabhängig: Änderungen am Plan wirken nicht auf sie zurück.
+- Diese Version liefert nur den Serverteil. Die Oberfläche dafür folgt.
+
+### Gekoppelte Geräte
+
+- **Tablet am Bereitstellungsraum:** Das Tablet kann am eigenen Raum Eintreffen buchen, auch für unangemeldete Kräfte. Übernehmen und Abweisen bleiben der Führung vorbehalten, und die Suche greift nicht auf die Stammdaten zu.
+- **Verpflegungsgerät:** Es darf weder einen Tag aus der Vorlage anlegen noch den Verpflegungsplan lesen.
+
+### Dokumentation
+
+- Die Anwenderdokumentation ist mit neuen Abläufen und Bildschirmbildern ergänzt:
+  - Bereitstellungsräume: Eintreffen buchen und Doppelbuchung
+  - Gerät am Bereitstellungsraum
+  - Einheiten: unangemeldete Einheit übernehmen oder abweisen
+  - Meldungen
+  - Meldebild: Kennzeichen „nicht übernommen“
+
 ## [1.0.0-alpha.131](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.130...v1.0.0-alpha.131) (2026-10-16)
 
 ### Wichtige Änderungen
