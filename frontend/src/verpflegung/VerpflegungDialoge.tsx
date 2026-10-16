@@ -3,6 +3,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { VERPFLEGUNG_EP_MAX } from '../api/eingabegrenzen';
 import type {
   AusgabeEingabe,
   Kostform,
@@ -35,8 +36,8 @@ dayjs.extend(utc);
  * Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`).
  *
  * FELDBUDGET: „Zeitfenster" zeigt bewusst VIER Felder, weil die beiden Bedarfsteile je einen
- * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe" drei. Der Rest liegt
- * in einem `Collapse` mit `forceRender`, sonst fehlen die Werte in `onFinish`.
+ * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe nachtragen" drei. Der
+ * Rest liegt in einem `Collapse` mit `forceRender`, sonst fehlen die Werte in `onFinish`.
  *
  * ZEIT: Wire-Zeiten sind UTC ohne Zone — hinaus über `alsBackendZeit`, herein über
  * `alsZeitpunkt`, nie `dayjs(s)`; die Felder zeigen und lesen die Anzeigezone (`ZeitraumEingabe`,
@@ -377,7 +378,7 @@ export function ZeitfensterDialog({
   );
 }
 
-// ── Ausgabe erfassen ────────────────────────────────────────────────────────────────────
+// ── Ausgabe nachtragen ──────────────────────────────────────────────────────────────────
 
 export interface NachforderungOption {
   value: number;
@@ -394,6 +395,11 @@ interface AusgabeDialogProps extends DialogBasis {
   onErfassen: (body: AusgabeEingabe) => Promise<unknown>;
 }
 
+/**
+ * „Ausgabe nachtragen“ (LLH-1032, design.md D8): der Nebenweg neben dem Zählen in der
+ * Ausgabeansicht, für Papierlisten, einen Zeitpunkt in der Vergangenheit, Ort, Nachforderung und
+ * Bemerkung. Die Menge lässt nicht mehr zu als der Server (`VERPFLEGUNG_EP_MAX`).
+ */
 export function AusgabeDialog({
   zeitfenster: zf,
   nachforderungen,
@@ -420,9 +426,9 @@ export function AusgabeDialog({
   return (
     <ErfassungsModal<AusgabeWerte>
       offen
-      titel={`Ausgabe erfassen: ${zf.bezeichnung}`}
+      titel={`Ausgabe nachtragen: ${zf.bezeichnung}`}
       form={form}
-      erfassenText="Erfassen"
+      erfassenText="Nachtragen"
       laeuft={laeuft}
       onErfassen={(w) => onErfassen(ausgabeBody(w))}
       onPruefungGescheitert={(felder) => {
@@ -439,7 +445,15 @@ export function AusgabeDialog({
       <Form.Item<AusgabeWerte>
         name="menge"
         label="Menge (EP)"
-        rules={[{ required: true, message: 'Bitte eine Menge angeben' }]}
+        rules={[
+          { required: true, message: 'Bitte eine Menge angeben' },
+          // Regel statt `max` am Feld: das kappte still auf die Grenze und buchte trotzdem.
+          {
+            type: 'number',
+            max: VERPFLEGUNG_EP_MAX,
+            message: `Höchstens ${VERPFLEGUNG_EP_MAX} EP`,
+          },
+        ]}
       >
         {anzahlFeld(1)}
       </Form.Item>
@@ -481,7 +495,7 @@ export function AusgabeDialog({
         </>,
         { offen: weitereOffen, setOffen: setWeitereOffen },
       )}
-      <SpeicherFehler fehler={fehler} titel="Ausgabe konnte nicht erfasst werden" />
+      <SpeicherFehler fehler={fehler} titel="Ausgabe konnte nicht nachgetragen werden" />
     </ErfassungsModal>
   );
 }

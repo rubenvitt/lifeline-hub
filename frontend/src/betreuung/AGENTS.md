@@ -31,6 +31,15 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   n:m (`stelle_ids`), **Soll nur am Zeitfenster**, Ist je Stelle (`je_stelle`) nur vom Server
   (`deckung::rechne`), der Client rechnet nichts nach; keine eigene Leseroute, `stellen[]` kommt
   mit `GET …/verpflegung` (`einsatzKeys.verpflegung`).
+  **Ausgabe zählen** (LLH-1032, Spec `kraefte-verpflegung`, „Ausgabe zählen“): erfasst wird in
+  der Ausgabeansicht je Zeitfenster (`verpflegung/AusgabeAnsicht.tsx`, Route
+  `verpflegung/:zeitfensterId/ausgabe` an Stab und Gerät, Pfade über `EinsatzPfade`). Gezählt
+  wird in eine Sammlung, die als EINE Ausgabe gebucht wird (`verpflegung/ausgabeSammlung.ts`,
+  `useAusgabeSammlung.ts`: 3 s Ruhe, höchstens 15 s, ab 50 Portionen, „Buchen“). Eine
+  Sonderkost-Taste zählt die Menge mit (Stapel von Portionen, „−1“ nimmt die oberste); Tasten nur
+  für Kostformen mit Bedarf, die übrigen im Menü „Weitere Kostform …“. „Ausgabe nachtragen“ (das
+  Formular mit Zeitpunkt, `useAusgabeNachtragen.ts`) ist an der Karte eine gezählte Aktion und
+  in der Ansicht ein Nebenweg; vergangene Zeitfenster werden nur nachgetragen, nicht gezählt.
 - **Ausgaben offline** (LFH-688, `openspec/changes/archive/2026-10-01-lfh-688-verpflegung-ausgaben-offline/design.md`):
   `offline/schreiben.ts` (`ausgabe`) mit `client_id`; Replay-Lookup **vor** `fordere_aktiv`
   (`EinsatzSchreibfreigabe`), fremdes Zeitfenster 422, Replay ohne Live; Erfassungszeit nur an der
@@ -39,6 +48,11 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Zeitfenster vor dem Entfernen der Zeile in den Cache. Stelle (LLH-1040): eine aufgelöste Stelle
   nimmt Ausgaben mit einem Zeitpunkt **vor** der Auflösung an (sonst 409); Stellenprüfung und
   Grenzprüfung (`ort`, `bemerkung`) laufen **nach** dem Replay-Lookup.
+  **Bündel** (LLH-1032): ein Bündel ist eine Ausgabe mit einer `client_id`, gesetzt beim
+  Abschluss; offene Sammlung und „ausstehend“ zählen nie in „fehlt“ und die Einstufung, sie
+  stehen daneben. Beim Wechsel des Zeitfensters, beim Verlassen der Ansicht und beim Verbergen
+  der Seite geht das Bündel direkt in die Warteschlange (`merkeVerpflegungsausgabeVor`), ohne
+  Hinweis.
 - **Versorgung S4** (LFH-553, Entscheidung 30.09.2026,
   `openspec/changes/archive/2026-09-30-lfh-553-versorgung-abgrenzung/design.md`, Spec
   `stab-versorgung`): kein Modul „Versorgung“, keine Tabelle `versorgungsposten`. Träger:

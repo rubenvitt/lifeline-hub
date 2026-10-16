@@ -879,6 +879,24 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
+      // Ausgabeansicht desselben Zeitfensters (LLH-1032): vier belegte Kostformen als Tasten,
+      // bei 390 px das Tastenfeld in zwei Reihen. Die Adresse trägt die Kennung des Zeitfensters,
+      // die erst nach dem Seeding feststeht; deshalb führt `vorbereiten` von der Modulseite hin.
+      pfad: `/einsaetze/${einsatzId}/verpflegung`,
+      vorbereiten: async (p: Page) => {
+        const r = await p.request.get(`/api/einsaetze/${einsatzId}/verpflegung`);
+        const [zf] = ((await r.json()) as { zeitfenster: { id: number }[] }).zeitfenster;
+        await p.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
+        await expect(p.locator('[data-lfh="zaehltasten"]')).toBeVisible();
+      },
+      anker: (p: Page) =>
+        p.getByRole('heading', {
+          level: 1,
+          name: 'Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2',
+        }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+    {
       // Gemessen mit OFFENER Leiste (unter `lg` unter der Karte, auf dem Handschirm per
       // Vorgabe zu), weil das der breitere Rahmen ist. Die Zeile misst den RAHMEN: die Leiste
       // trägt `overflowY: 'auto'` (damit auch `overflow-x: auto`), ein zu breiter Eintrag

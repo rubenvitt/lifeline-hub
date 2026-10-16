@@ -187,6 +187,15 @@ mark.lfh-fundstelle {
   scroll-padding-block-end: var(--lfh-speicherleiste-fokusabstand, 0px);
 }
 
+/* Ausgabeansicht der Verpflegung: Fokusabstand zum klebenden Tastenfeld (LLH-1032, WCAG 2.4.11),
+   aus demselben Grund wie die Speicherleiste `scroll-padding` am SCROLLPORT. Am Stab rollt das
+   Dokument, in der Gerätehülle das `main` (`geraet/GeraeteLayout.tsx`, `overflow: auto`). Die
+   Höhe setzt `components/fokusabstandUnten.ts` und nimmt sie beim Aushängen wieder weg. */
+:root:has([data-lfh='zaehltasten']),
+main:has([data-lfh='zaehltasten']) {
+  scroll-padding-block-end: var(--lfh-zaehltasten-fokusabstand, 0px);
+}
+
 /* Modulpanel: Fokusabstand zum klebenden Fuß „Einsatzdauer“ (LLH-1241, WCAG 2.4.11), aus demselben
    gemessenen Grund `scroll-padding` am SCROLLPORT statt `scroll-margin` an den Zeilen: bei
    1366 × 520 in `handschuh` blieben „Material“ und „Bereitstellungsräume“ getabbt ganz unter dem

@@ -279,6 +279,14 @@ export function verpflegungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'verpflegung');
 }
 
+/**
+ * Ausgabeansicht eines Zeitfensters (LLH-1032, design.md D1): Portionen zählen mit Soll/Ist.
+ * Unterroute des Moduls, `modulAusPfad` gatet sie über das Segment `verpflegung`.
+ */
+export function verpflegungAusgabePfad(einsatzId: number, zeitfensterId: number): string {
+  return `${verpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`;
+}
+
 /** Fachmodul „Wetter & Pegel": Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
 export function wetterPegelPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'wetter-pegel');
@@ -1134,6 +1142,11 @@ export function parseMeldungInhalt(params: URLSearchParams): string | null {
 /** Verpflegung des Verpflegungsgeräts (LFH-1044), Startseite der Ansicht. */
 export function geraetVerpflegungPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/verpflegung`;
+}
+
+/** Ausgabeansicht eines Zeitfensters am Verpflegungsgerät (LLH-1032); die Startseite bleibt die Liste. */
+export function geraetVerpflegungAusgabePfad(einsatzId: number, zeitfensterId: number): string {
+  return `${geraetVerpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`;
 }
 
 /** Startseite des Abschnittsgeräts (LFH-1043): der eigene Abschnitt mit seinen Einheiten. */

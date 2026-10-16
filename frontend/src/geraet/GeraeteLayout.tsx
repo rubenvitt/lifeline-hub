@@ -51,6 +51,7 @@ import AufnahmePage from '../pages/personen/AufnahmePage';
 import BrDetailPage from '../pages/bereitstellungsraum/BrDetailPage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
 import VerpflegungPage from '../pages/VerpflegungPage';
+import AusgabeAnsicht from '../verpflegung/AusgabeAnsicht';
 import GeraetMeldungenPage from './GeraetMeldungenPage';
 import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
@@ -198,6 +199,17 @@ export function GeraetVerpflegung() {
   const { geraet } = useAuth();
   if (!geraet || geraet.ansicht !== 'verpflegung') return <GeraetStart />;
   return <VerpflegungPage />;
+}
+
+/**
+ * Ausgabeansicht eines Zeitfensters (LLH-1032, design.md D1): Unterseite der Verpflegung, nur in
+ * der Ansicht `verpflegung`; jede andere landet auf ihrer Startseite. Das Navigationsziel
+ * „Verpflegung“ bleibt hier aktiv (`NavLink` ohne `end`).
+ */
+export function GeraetVerpflegungAusgabe() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'verpflegung') return <GeraetStart />;
+  return <AusgabeAnsicht />;
 }
 
 /** Bereich „UHS“ nur für die Ansicht, die Material und Dateien ihrer UHS führt (UHS-Laptop). */

@@ -19,7 +19,8 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-verpflegung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitfenster.png        frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx
- *   ausgabe-erfassen.png   frontend/src/verpflegung/VerpflegungDialoge.tsx (Dialog „Ausgabe erfassen“)
+ *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/geraet/GeraeteLayout.tsx
+ *                          (Tablet, offene Sammlung, ein ausstehender Eintrag ohne Netz)
  *   fehlmenge.png          frontend/src/geraet/GeraetMeldungenPage.tsx (vorbefüllt aus der Verpflegung)
  */
 
@@ -98,18 +99,14 @@ test.describe(KAPITEL, () => {
     }
   });
 
-  test('Ausgabe erfassen und zurücknehmen', async ({ page, browser }) => {
+  test('Ausgabe nachtragen und zurücknehmen', async ({ page, browser }) => {
     const { kontext, geraet, mittag } = await verpflegungTablet(page, browser);
     try {
-      await mittag.getByRole('button', { name: /^Ausgabe erfassen zu / }).click();
-      const dialog = geraet.getByRole('dialog', { name: `Ausgabe erfassen: ${MITTAG}` });
+      await mittag.getByRole('button', { name: /^Ausgabe nachtragen zu / }).click();
+      const dialog = geraet.getByRole('dialog', { name: `Ausgabe nachtragen: ${MITTAG}` });
       await dialog.getByLabel('Menge (EP)').fill('40');
       await dialog.getByLabel('Ort').fill('Gesamtschule, Aula');
-      await dialog.getByLabel('Ort').blur();
-      // Erst nach der Einblendung: mitten im Zoom wäre der Dialog im Bild noch verkleinert.
-      await expect(dialog).not.toHaveClass(/ant-zoom-appear/);
-      await fotografiere(dialog, KAPITEL, 'ausgabe-erfassen');
-      await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Nachtragen', exact: true }).click();
       await expect(dialog).toHaveCount(0);
 
       // Nachgeklickt: eine Ausgabe zurücknehmen, mit Rückfrage.
@@ -119,6 +116,36 @@ test.describe(KAPITEL, () => {
       await rueckfrage.getByRole('button', { name: 'Zurücknehmen' }).click();
       await expect(rueckfrage).toHaveCount(0);
       await expect(zurueck).toHaveCount(0);
+    } finally {
+      await kontext.close();
+    }
+  });
+
+  test('Portionen zählen', async ({ page, browser }) => {
+    const { kontext, geraet, mittag } = await verpflegungTablet(page, browser);
+    try {
+      await mittag.getByRole('link', { name: /^Ausgabe öffnen zu / }).click();
+      await expect(geraet).toHaveURL(/\/geraet\/\d+\/verpflegung\/\d+\/ausgabe$/);
+      await expect(geraet.getByRole('heading', { level: 1, name: MITTAG })).toBeVisible();
+      const plus1 = geraet.locator('[data-lfh="zaehltasten"]').getByRole('button', {
+        name: '+1',
+        exact: true,
+      });
+      // Ein ausstehender Eintrag: ohne Netz gezählt und gebucht.
+      await kontext.setOffline(true);
+      await expect(geraet.locator('[data-lfh="ausgabe-offline"]')).toHaveText('Offline vorgemerkt');
+      for (let i = 0; i < 3; i++) await plus1.click();
+      await geraet.getByRole('button', { name: 'Buchen', exact: true }).click();
+      await expect(geraet.locator('[data-lfh="ausgabe-ausstehend"]')).toHaveText('+ 3 ausstehend');
+      // Danach eine offene Sammlung samt Sonderkost.
+      await geraet.getByRole('button', { name: /^vegetarisch/ }).click();
+      await plus1.click();
+      await expect(geraet.locator('[data-lfh="sammlung-menge"]')).toHaveText('2');
+      // Nur der Inhalt: der Vormerk-Hinweis und die Leiste „Offline“ liegen über dem Kopf.
+      const inhalt = geraet.locator('main');
+      await inhalt.evaluate((m) => m.scrollTo(0, 0));
+      await geraet.mouse.move(0, 0);
+      await fotografiere(inhalt, KAPITEL, 'ausgabe-zaehlen');
     } finally {
       await kontext.close();
     }
