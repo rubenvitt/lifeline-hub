@@ -64,6 +64,17 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   für Kostformen mit Bedarf, die übrigen im Menü „Weitere Kostform …“. „Ausgabe nachtragen“ (das
   Formular mit Zeitpunkt, `useAusgabeNachtragen.ts`) ist an der Karte eine gezählte Aktion und
   in der Ansicht ein Nebenweg; vergangene Zeitfenster werden nur nachgetragen, nicht gezählt.
+  **Verpflegungsplan und Tag aus Vorlage** (LLH-1058, Spec `kraefte-verpflegung`,
+  `src/verpflegung/vorlage.rs`): der Plan ist ein Org-Katalog (`/admin/stammdaten/verpflegungsplan`,
+  `stammdaten/VerpflegungsplanTab.tsx`, Prefix `verpflegung-vorlagen`, live über `stammdaten`, nicht
+  im Lagebild), Uhrzeiten `HH:MM` ohne Datum, kein Löschen. Den Tag legt die eigene Seite
+  `verpflegung/TagAusVorlage.tsx` (`verpflegung/aus-vorlage?tag=`, Nebenweg der Verpflegungsseite, nur
+  am Stab) an; die Uhrzeiten legt **der Client** in der Anzeigezone auf den Tag, nur über
+  `anzeige/uhrzeit.ts` und den reinen Kern `verpflegung/tagAusVorlageKern.ts`, der Server kennt keine
+  Zone dafür. Bedarf je Fenster aus `useBedarfsvorschlag` zu seinem Beginn wie beim Einzelanlegen;
+  „schon angelegt“ und Fenster in der ausfallenden Stunde gehen nicht hinaus, der Rest übersprungen
+  vom Server und in der Quittung genannt. Die Vorschau steht, sobald sie Fenster hat (kein Sprung bei
+  Live). Es entsteht keine Serie: ein Zeitfenster kennt seine Vorlage nicht.
 - **Ausgaben offline** (LFH-688, `openspec/changes/archive/2026-10-01-lfh-688-verpflegung-ausgaben-offline/design.md`):
   `offline/schreiben.ts` (`ausgabe`) mit `client_id`; Replay-Lookup **vor** `fordere_aktiv`
   (`EinsatzSchreibfreigabe`), fremdes Zeitfenster 422, Replay ohne Live; Erfassungszeit nur an der
