@@ -215,6 +215,10 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.lagemonitor,
     // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
     EINSATZ_KEYS.einheitAusVorlage,
+    // Die Empfängerliste der Verpflegung ist eine Projektion der Einheiten in
+    // `GET …/verpflegung` (LLH-1055 D4); der Server verteilt `einheit` dafür auch an Leser der
+    // Verpflegung.
+    EINSATZ_KEYS.verpflegung,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
   // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
@@ -227,6 +231,9 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.betreuung,
     // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
     EINSATZ_KEYS.lagemonitor,
+    // Abschnitte als Empfänger und Abschnittsnamen der Einheiten in der Empfängerliste der
+    // Verpflegung (LLH-1055 D4).
+    EINSATZ_KEYS.verpflegung,
   ],
   // Betroffene Personen (Modul `personen`); `personal` ist ein eigenes Ereignis. Die
   // Betreuungsübersicht trägt „davon namentlich n“ je Stelle, das sich mit jedem Verbleib ändert.

@@ -110,6 +110,26 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
+  // LLH-1055 D4: die Empfängerliste ist eine Projektion in `GET …/verpflegung`; der Server
+  // verteilt Einheiten- und Abschnittsänderungen deshalb auch an Leser der Verpflegung.
+  it.each(['einheit', 'abschnitt'])(
+    'Ereignis `%s` lädt die Verpflegung neu (LLH-1055)',
+    async (ereignis) => {
+      vi.stubGlobal('EventSource', FakeEventSource);
+      const client = neuerQueryClient();
+      const spy = vi.spyOn(client, 'invalidateQueries');
+      render(
+        <QueryClientProvider client={client}>
+          <Probe id={1} />
+        </QueryClientProvider>,
+      );
+      FakeEventSource.letzte?.emit(ereignis);
+      await waitFor(() => {
+        expect(keysVon(spy)).toContainEqual(['einsatz-verpflegung', 1]);
+      });
+    },
+  );
+
   it('invalidiert einsatz-material bei material-Event', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
