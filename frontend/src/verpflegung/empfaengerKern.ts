@@ -94,10 +94,17 @@ export function empfaengerText(a: MitEmpfaenger, e: VerpflegungEmpfaenger): stri
   return w.art === 'einheit' ? `an ${einheitName(w.id, e)}` : `Zuführung ${abschnittName(w.id, e)}`;
 }
 
-/** „2. Gruppe · Florian 1-2 · 0/1/8//9“ — ohne Stärke ohne die Zahl (nicht „0“). */
+/**
+ * Stärke des Teilbaums als Text („0/1/8//9“), `null` ohne Stärke: eine Einheit ohne disponierte
+ * Kräfte zeigt keine Zahl statt „0/0/0//0“.
+ */
+export function staerkeAnzeige(e: EmpfaengerEinheit): string | null {
+  return staerkeVorgabe(e) != null ? staerkeText(summiereStaerke([e])) : null;
+}
+
+/** „2. Gruppe · Florian 1-2 · 0/1/8//9“. */
 export function einheitLabel(e: EmpfaengerEinheit): string {
-  const staerke = staerkeVorgabe(e) != null ? staerkeText(summiereStaerke([e])) : null;
-  return [e.name, e.funkrufname, staerke].filter(Boolean).join(' · ');
+  return [e.name, e.funkrufname, staerkeAnzeige(e)].filter(Boolean).join(' · ');
 }
 
 /**
