@@ -2580,6 +2580,28 @@ async fn tag_aus_vorlage_etb_wie_einzeln_und_ein_live_ereignis() {
     );
 }
 
+/// `VerpflegungTagErgebnis`: die angelegten Zeitfenster stehen in der Reihenfolge der Anfrage,
+/// nicht nach Beginn wie in der Liste des Moduls.
+#[tokio::test]
+async fn tag_aus_vorlage_antwort_in_der_reihenfolge_der_anfrage() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    // Weder nach Beginn noch umgekehrt: Abendessen, Frühstück, Mittag.
+    let mut fenster = drei_tag_fenster();
+    fenster.rotate_left(2);
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&fenster)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let namen: Vec<&str> = v["angelegt"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| z["bezeichnung"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, ["Abendessen", "Frühstück", "Mittag"]);
+}
+
 /// Spec „Gleichnamiges Zeitfenster am selben Tag“ und „Alles schon angelegt“: das Übersprungene
 /// steht in der Antwort und bekommt keinen ETB-Eintrag; ohne angelegtes Fenster 200 ohne ETB und
 /// ohne Live-Ereignis.
