@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError, fehlerText } from '../api/client';
+import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
@@ -9,6 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Verpflegung } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { eintreffenQueryKeys } from '../bereitstellungsraum/eintreffenQueryKeys';
 import { meldeOfflineSchreibaktionGesendet } from './ereignisse';
 import { istOfflineTransient } from './fehler';
 import {
@@ -176,6 +178,22 @@ export function useOfflineSync(benutzerId?: number): void {
             );
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             void qc.invalidateQueries({ queryKey: key });
+          } else if (aktion.art === 'eintreffen') {
+            // LLH-1075 Teil III: dieselbe `client_id` wie beim ersten Versuch; hat der Server die
+            // Buchung schon (abgerissene Antwort), liefert er sie erneut, statt doppelt anzulegen.
+            // Ablehnungen (Raum aufgelöst 422, Kraft schon in einem Raum 409, Rechte 403) gehen
+            // unten in den Wiederherstellungsbereich.
+            await bucheEintreffen(element.wert.einsatz_id, aktion.br_id, aktion.daten, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Die gebuchte Kraft steht im Raum, BEVOR „vorgemerkt“ verschwindet: sonst fehlte sie
+            // einen Takt lang (wie die Ausgabe oben). Ohne Antwort bleibt nur der Takt; der Abruf
+            // wirft nicht.
+            const [detail, ...weitere] = eintreffenQueryKeys(element.wert.einsatz_id, aktion.br_id);
+            await qc.invalidateQueries({ queryKey: detail });
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            for (const queryKey of weitere) void qc.invalidateQueries({ queryKey });
           } else {
             const nie: never = aktion;
             throw new Error(`Unbekannte Offline-Schreibaktion ${JSON.stringify(nie)}`);

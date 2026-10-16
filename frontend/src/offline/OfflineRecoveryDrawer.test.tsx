@@ -207,6 +207,42 @@ describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () 
   });
 });
 
+describe('OfflineRecoveryDrawer: abgelehntes Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)', () => {
+  it('nennt Kraft und Raum, zeigt den Grund und reiht mit derselben client_id erneut ein', async () => {
+    const aktion = {
+      art: 'eintreffen' as const,
+      br_id: 4,
+      bezeichnung: 'BR Sportplatz',
+      name: 'FL-MUS 1-44-1',
+      daten: {
+        unangemeldet: { fahrzeuge: [{ funkrufname: 'FL-MUS 1-44-1' }] },
+        client_id: 'eintreffen-abgelehnt',
+        zeitpunkt_at: '2026-10-16 12:12:00',
+      },
+    };
+    await schreibaktionEinreihen(11, 7, aktion);
+    const [eintreffen] = await schreibaktionenLaden(11, 7);
+    await schreibaktionAblehnen(11, eintreffen, 'Bereitstellungsraum ist nicht aktiv');
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(
+      await screen.findByText('Abgelehntes Eintreffen: FL-MUS 1-44-1 · BR Sportplatz'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Bereitstellungsraum ist nicht aktiv')).toBeInTheDocument();
+    expect(screen.getByText(/"client_id": "eintreffen-abgelehnt"/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Erneut versuchen/ }));
+    await waitFor(async () =>
+      expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([aktion]),
+    );
+  });
+});
+
 function zurueckgehalten<T>() {
   let erfuellen!: (wert: T) => void;
   let ablehnen!: (grund: unknown) => void;

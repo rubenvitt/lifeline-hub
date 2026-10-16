@@ -3,7 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { meldeBelegung, meldeStand } from '../api/betreuung';
-import { ApiError, NetzFehler } from '../api/client';
+import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
+import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
@@ -24,6 +25,7 @@ import {
   queueLeerenFuerTests,
   queueZaehlerLaden,
   schreibaktionEinreihen,
+  schreibaktionenAbgelehntLaden,
 } from './queue';
 import { useOfflineSync } from './useOfflineSync';
 import { merkeVerpflegungsausgabeVor } from './schreiben';
@@ -35,6 +37,7 @@ vi.mock('../api/einsatzPerson', () => ({ legePersonAn: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
+vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -636,6 +639,98 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     await waitFor(() => expect(erfasseAusgabe).toHaveBeenCalled());
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
     unmount();
+  });
+});
+
+describe('Eintreffen am Bereitstellungsraum in der Offline-Queue (LLH-1075 Teil III)', () => {
+  const eintreffen = {
+    art: 'eintreffen' as const,
+    br_id: 4,
+    bezeichnung: 'BR Sportplatz',
+    name: 'FL-MUS 1-44-1',
+    daten: {
+      unangemeldet: { fahrzeuge: [{ funkrufname: 'FL-MUS 1-44-1' }] },
+      client_id: 'eintreffen-1',
+      zeitpunkt_at: '2026-10-16 12:12:00',
+    },
+  };
+  const ergebnis = { einheit_id: 30, fahrzeug_ids: [5] } as Awaited<
+    ReturnType<typeof bucheEintreffen>
+  >;
+
+  it('sendet mit dem Queue-Besitzer, lädt Raum und Kräfte nach, bevor die Zeile verschwindet', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const keys = [
+      einsatzKeys.br(7),
+      einsatzKeys.brDetail(7, 4),
+      einsatzKeys.brVerlauf(7, 4),
+      einsatzKeys.einheiten(7),
+      einsatzKeys.fahrzeuge(7),
+      einsatzKeys.kraefteZeitachse(7),
+      einsatzKeys.meldungen(7),
+      einsatzKeys.etb(7),
+    ];
+    for (const key of keys) client.setQueryData(key, []);
+    vi.mocked(bucheEintreffen).mockResolvedValue(ergebnis);
+    await schreibaktionEinreihen(BENUTZER_A, 7, eintreffen);
+    const beimEntfernen: (boolean | undefined)[] = [];
+    const merke = () =>
+      beimEntfernen.push(client.getQueryState(einsatzKeys.brDetail(7, 4))?.isInvalidated);
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+          ausstehend: 0,
+          abgelehnt: 0,
+        }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(bucheEintreffen).toHaveBeenCalledExactlyOnceWith(7, 4, eintreffen.daten, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
+    expect(beimEntfernen[0]).toBe(true);
+    for (const key of keys)
+      expect(client.getQueryState(key)?.isInvalidated, String(key)).toBe(true);
+  });
+
+  it('abgerissene Antwort: der nächste Versuch sendet dieselbe client_id, die Zeile geht genau einmal', async () => {
+    vi.mocked(bucheEintreffen)
+      .mockRejectedValueOnce(new AusgangUnbekannt())
+      .mockResolvedValueOnce(ergebnis);
+    await schreibaktionEinreihen(BENUTZER_A, 7, eintreffen);
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(bucheEintreffen).toHaveBeenCalledTimes(1));
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    window.dispatchEvent(new Event('online'));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(bucheEintreffen).toHaveBeenCalledTimes(2);
+    const [erster, zweiter] = vi.mocked(bucheEintreffen).mock.calls.map((c) => c[2]);
+    expect(zweiter).toEqual(erster);
+    expect(zweiter.client_id).toBe('eintreffen-1');
+    unmount();
+  });
+
+  it.each([
+    [409, 'HLF 20 steht schon im Bereitstellungsraum BR Schule'],
+    [422, 'Bereitstellungsraum ist nicht aktiv'],
+    [403, 'Keine Berechtigung'],
+  ])('legt eine Ablehnung %i beim Nachsenden unter „abgelehnt“ ab', async (status, grund) => {
+    vi.mocked(bucheEintreffen).mockRejectedValue(new ApiError(status, grund));
+    await schreibaktionEinreihen(BENUTZER_A, 7, eintreffen);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+    expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
+      expect.objectContaining({ aktion: eintreffen, grund }),
+    ]);
   });
 });
 
