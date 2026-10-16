@@ -1,4 +1,4 @@
-import { anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { anmelden, apiAlsAdmin, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
  * Bilder des Kapitels „Stammdaten“ (`docs/anwender/kapitel/stammdaten.md`).
@@ -14,8 +14,10 @@ import { anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
  *                         frontend/src/stammdaten/EinheitVorlageSections.tsx
  *                         (Paneel „Stammbesetzung“), frontend/src/stammdaten/EinheitVorlagenTab.tsx
  *                         (Weg dorthin)
+ *   verpflegungsplan.png  frontend/src/stammdaten/VerpflegungsplanTab.tsx
  *
- * Nichts wird gespeichert: die Demo-Stammdaten bleiben für andere Kapitel unverändert. Die
+ * Gespeichert wird nur der Verpflegungsplan (LLH-1058), den die Demo-Daten nicht mitbringen: vier
+ * aktive Mahlzeiten und eine deaktivierte. Die übrigen Demo-Stammdaten bleiben unverändert. Die
  * Vorlage „Rettungsstaffel“ unter „Sanitätszug Musterstadt“ bringen die Demo-Daten mit
  * (`src/demo/szenario.rs`, `EINHEITEN_VORLAGEN`).
  */
@@ -52,6 +54,39 @@ test.describe(KAPITEL, () => {
     const formular = page.locator('form');
     await expect(formular.getByLabel('Name der Organisation')).toBeVisible();
     await fotografiere(formular, KAPITEL, 'organisation');
+  });
+
+  test('Katalog „Verpflegungsplan“', async ({ page }) => {
+    const api = await apiAlsAdmin();
+    try {
+      for (const [bezeichnung, beginn, ende, verpflegungsart] of [
+        ['Frühstück', '0630', '0800', 'kalt'],
+        ['Mittag', '1200', '1330', 'warm'],
+        ['Kaffee', '1500', '1530', 'getraenke'],
+        ['Abendessen', '1800', '1930', 'warm'],
+        ['Nachtverpflegung', '2300', '0100', 'kalt'],
+      ]) {
+        const m = await fuelle<{ id: number }>(api, 'post', '/api/verpflegung-vorlagen', {
+          bezeichnung,
+          beginn,
+          ende,
+          verpflegungsart,
+        });
+        if (bezeichnung === 'Kaffee') {
+          await fuelle(api, 'patch', `/api/verpflegung-vorlagen/${m.id}`, { aktiv: false });
+        }
+      }
+    } finally {
+      await api.dispose();
+    }
+    await anmelden(page);
+    await uhrAnhalten(page);
+    await page.goto('/admin/stammdaten/verpflegungsplan');
+    const tabelle = page.locator('.ant-table-wrapper');
+    await expect(tabelle.getByText('+1 Tag')).toBeVisible();
+    await expect(tabelle.getByText('Inaktiv')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(tabelle, KAPITEL, 'verpflegungsplan');
   });
 
   test('Stammbesetzung einer Einheiten-Vorlage', async ({ page }) => {

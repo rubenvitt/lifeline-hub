@@ -106,6 +106,9 @@ Für Einsatzleitung und Führungspersonal, wenn die Organisation einen Verpflegu
 3. Je Fenster „Einsatzkräfte (EP)“ und „Betreute (EP)“ prüfen. Die App schlägt die Zahlen vor
    wie beim Anlegen eines einzelnen Zeitfensters und nennt darunter, woher sie stammen; jede Zahl
    lässt sich überschreiben. Ein leeres Feld braucht eine Zahl, „0“, wenn niemand.
+
+   ![Seite „Tag aus Vorlage anlegen“ für einen Tag mit den Fenstern „Frühstück“, „Mittag“, „Abendessen“ und „Nachtverpflegung“ bis zum Folgetag, je mit vorgeschlagenen Einsatzkräften und Betreuten samt Herkunft und der Wahl „anlegen“](../bilder/verpflegung/tag-aus-vorlage.png)
+
 4. Ein Fenster, das an diesem Tag nicht gebraucht wird, mit „anlegen“ abwählen. Steht an einem
    Fenster „schon angelegt“, gibt es am Tag schon ein Zeitfenster dieses Namens; es wird nicht
    noch einmal angelegt.

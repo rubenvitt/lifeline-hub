@@ -106,6 +106,9 @@ Eine weitere Untereinheit entsteht auf der Seite der Vorlage mit „Untereinheit
 3. „Bezeichnung“ eintragen, etwa „Frühstück“, und unter „Beginn“ und „Ende“ die Uhrzeit, etwa
    „0630“ und „0800“. Endet die Mahlzeit nach Mitternacht, steht unter dem Ende „Ende am
    Folgetag“.
+
+   ![Tabelle „Verpflegungsplan“ mit Frühstück, Mittag, der inaktiven Mahlzeit „Kaffee“, Abendessen und der Nachtverpflegung „2300–0100 +1 Tag“, je mit Art, Zustand und Aktionen](../bilder/stammdaten/verpflegungsplan.png)
+
 4. Nach Bedarf unter „Art“ „warm“, „kalt“ oder „Getränke“ wählen.
 5. „Anlegen“ wählen. Zum Ändern in der Zeile „Bearbeiten“ wählen.
 6. Eine Mahlzeit, die nicht mehr gebraucht wird, mit „Deaktivieren“ stilllegen; „Aktivieren“

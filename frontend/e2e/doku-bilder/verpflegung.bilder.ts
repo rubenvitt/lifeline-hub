@@ -21,6 +21,8 @@ import {
  *                          „Stelle“), frontend/src/verpflegung/ZeitfensterKarte.tsx (Menü der Karte)
  *   stellen.png            frontend/src/verpflegung/StellenListe.tsx (Ansicht „Stellen“),
  *                          frontend/src/verpflegung/stellenKern.ts
+ *   tag-aus-vorlage.png    frontend/src/verpflegung/TagAusVorlage.tsx,
+ *                          frontend/src/verpflegung/tagAusVorlageKern.ts (übermorgen, vier Mahlzeiten)
  *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx (Stellenwahl),
  *                          frontend/src/verpflegung/zaehltasteStil.ts (Fükw, offene Sammlung)
  *
@@ -28,8 +30,10 @@ import {
  * (LLH-1040: „Feldküche BR Sportplatz“ und „Ausgabe Turnhalle Nord“ aktiv, „Zuführung Deich“
  * geplant) und drei Zeitfenster — „Getränke“ laufend und gedeckt, einsatzweit; „Mittag“ laufend
  * mit Unterdeckung samt Sonderkost, den beiden aktiven Stellen zugeordnet und an ihnen mit 100 und
- * 80 EP ausgegeben, dazu eine zurückgenommene Ausgabe; „Abendessen“ anstehend und offen. Das
- * Zählbild steht zuletzt: seine Sammlung bucht sich nach der Ruhe womöglich und änderte sonst die
+ * 80 EP ausgegeben, dazu eine zurückgenommene Ausgabe; „Abendessen“ anstehend und offen. Den
+ * Verpflegungsplan (LLH-1058) bringen die Demo-Daten auch nicht mit: die Spec legt vier Mahlzeiten
+ * an; das Bild zeigt übermorgen, damit kein Zeitfenster von heute als „schon angelegt“ hineinragt,
+ * gleich zu welcher Stunde der Lauf fährt. Das Zählbild steht zuletzt: seine Sammlung bucht sich nach der Ruhe womöglich und änderte sonst die
  * Zahlen der übrigen Bilder.
  */
 
@@ -135,6 +139,20 @@ test.describe(KAPITEL, () => {
         bedarf_kraefte: 14,
         bedarf_betreute: 8,
       });
+
+      for (const [bezeichnung, beginn, ende, verpflegungsart] of [
+        ['Frühstück', '0630', '0800', 'kalt'],
+        ['Mittag', '1200', '1330', 'warm'],
+        ['Abendessen', '1800', '1930', 'warm'],
+        ['Nachtverpflegung', '2300', '0100', 'kalt'],
+      ]) {
+        await fuelle(api, 'post', '/api/verpflegung-vorlagen', {
+          bezeichnung,
+          beginn,
+          ende,
+          verpflegungsart,
+        });
+      }
     } finally {
       await api.dispose();
     }
@@ -206,6 +224,27 @@ test.describe(KAPITEL, () => {
     await expect(stellen.getByText('100 EP ausgegeben')).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(stellen, KAPITEL, 'stellen');
+  });
+
+  test('Tag aus Vorlage anlegen', async ({ page }) => {
+    // Höher als der Fükw: vier Fenster mit je zwei Bedarfsfeldern.
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const jetzt = await uhrAnhalten(page);
+    const uebermorgen = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(
+      new Date(jetzt.getTime() + 2 * 86_400_000),
+    );
+    await page.goto(`/einsaetze/${demo.id}/verpflegung/aus-vorlage?tag=${uebermorgen}`);
+    const seite = page.locator('[data-lfh="tag-aus-vorlage"]');
+    await expect(seite.getByRole('region')).toHaveCount(4);
+    await expect(
+      seite.getByText('Vorschlag: Personal im Einsatz', { exact: false }).first(),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    // Die Hülle setzt den Fokus in die erste Wahl; das Bild zeigt die Ruhe.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await fotografiere(seite, KAPITEL, 'tag-aus-vorlage');
   });
 
   test('Portionen an der Ausgabe zählen', async ({ page }) => {
