@@ -103,6 +103,15 @@ export function abschnittDerObersten(einheiten: readonly Einheit[]): Map<number,
   return ergebnis;
 }
 
+/**
+ * Was {@link abschnittDerEinheit} von einer Einheit braucht; auch die Empfängerliste der
+ * Verpflegung (`EmpfaengerEinheit`, LLH-1055) trägt es.
+ */
+export type AbschnittTraeger = Pick<
+  Einheit,
+  'id' | 'ueber_einheit_id' | 'abschnitt_id' | 'abschnitt_name'
+>;
+
 /** Der Abschnitt, den eine Einheit anzeigt: ID und Name aus `abschnitt_name` der tragenden Einheit. */
 export interface EinheitAbschnitt {
   id: number;
@@ -118,12 +127,12 @@ export interface EinheitAbschnitt {
  * {@link abschnittDerObersten} (Spec `lage-verdichtung`).
  */
 export function abschnittDerEinheit(
-  einheiten: readonly Einheit[],
+  einheiten: readonly AbschnittTraeger[],
 ): Map<number, EinheitAbschnitt | null> {
   const nachId = new Map(einheiten.map((e) => [e.id, e]));
   const ergebnis = new Map<number, EinheitAbschnitt | null>();
   for (const e of einheiten) {
-    let cur: Einheit | undefined = e;
+    let cur: AbschnittTraeger | undefined = e;
     let treffer: EinheitAbschnitt | null = null;
     const gesehen = new Set<number>();
     while (cur && !gesehen.has(cur.id)) {
