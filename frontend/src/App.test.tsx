@@ -345,7 +345,9 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/verpflegung', () => HttpResponse.json({ zeitfenster: [] })),
+      http.get('/api/einsaetze/7/verpflegung', () =>
+        HttpResponse.json({ zeitfenster: [], stellen: [] }),
+      ),
     );
     renderApp('/einsaetze/7/verpflegung');
     await waitFor(() =>

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 import type { Sonderkost, VerpflegungZeitfenster } from '../api/types';
+import { verpflegungMitStellen } from '../test/verpflegungDaten';
 import { deckungEinstufung, istVergangen } from './deckung';
 
 /**
@@ -39,6 +40,8 @@ function zeitfenster(
     },
     ausgegeben: { gesamt: 250 - fehlmengeGesamt, sonderkost: KEINE },
     fehlmenge: { gesamt: fehlmengeGesamt, sonderkost: { ...KEINE, ...fehlmengeSonderkost } },
+    stelle_ids: [],
+    je_stelle: [],
     ausgaben: [],
     angelegt_at: '2026-09-24 08:00:00',
   };
@@ -107,5 +110,23 @@ describe('istVergangen — Trennung der Segmentleiste', () => {
   it('liest das Ende als UTC: 13:29 in Berlin ist vor 11:30 UTC', () => {
     expect(istVergangen(zeitfenster(0), abs('2026-09-24T13:29:00+02:00'))).toBe(false);
     expect(istVergangen(zeitfenster(0), abs('2026-09-24T13:31:00+02:00'))).toBe(true);
+  });
+});
+
+/**
+ * Das Beispiel ohne Soll je Stelle (LLH-1040 D11) als Fixture: Der Server rechnet das Ist je
+ * Stelle, der Client nicht. Geprüft wird nur, dass die Fixture der Invariante des Servers folgt
+ * (Summe je Stelle = ausgegeben), damit Tests der Karte (Teil II) auf stimmigen Zahlen bauen.
+ */
+describe('Fixture Ist je Stelle (LLH-1040)', () => {
+  it('Bedarf 200, 100/80 an zwei Stellen → Fehlmenge 20; ohne Zuordnung leer', () => {
+    const [mittag, abend] = verpflegungMitStellen().zeitfenster;
+    const summe = mittag.je_stelle.reduce((s, i) => s + i.ausgegeben.gesamt, 0);
+    expect(mittag.je_stelle.map((i) => i.ausgegeben.gesamt)).toEqual([100, 80]);
+    expect(summe).toBe(mittag.ausgegeben.gesamt);
+    expect(mittag.bedarf.gesamt - summe).toBe(mittag.fehlmenge.gesamt);
+    expect(mittag.fehlmenge.gesamt).toBe(20);
+    expect(abend.stelle_ids).toEqual([]);
+    expect(abend.je_stelle).toEqual([]);
   });
 });
