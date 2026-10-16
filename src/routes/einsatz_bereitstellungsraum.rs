@@ -231,7 +231,7 @@ pub struct ListeParams {
 
 /// GET /api/einsaetze/{id}/bereitstellungsraeume — Räume mit Abschnittsname, Kennzahlen der
 /// Belegung und den Einheiten im Raum (LLH-1095). Eine feste Zahl Abfragen für alle Räume.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
     Query(params): Query<ListeParams>,

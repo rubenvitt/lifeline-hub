@@ -1317,7 +1317,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume",
-            get(routes::einsatz_bereitstellungsraum::liste),
+            get(routes::einsatz_bereitstellungsraum::list),
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume",

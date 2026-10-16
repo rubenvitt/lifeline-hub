@@ -43,7 +43,7 @@ pub struct ListenZeile {
 
 /// BR eines Einsatzes (ohne stornierte), optional gefiltert nach Status und/oder Abschnitt, mit
 /// dem Namen des Abschnitts.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     einsatz_id: i64,
     status: Option<&str>,
@@ -83,7 +83,7 @@ pub async fn list_eintraege(
     einsatz_id: i64,
     filter: ListenFilter<'_>,
 ) -> Result<Vec<BrListenEintrag>, AppError> {
-    let zeilen = liste(pool, einsatz_id, filter.status, filter.abschnitt_id).await?;
+    let zeilen = list(pool, einsatz_id, filter.status, filter.abschnitt_id).await?;
     let mut kennzahlen = belegung_repo::kennzahlen_je_raum(pool, einsatz_id, None).await?;
     let einheiten: Vec<(i64, i64)> = sqlx::query_as(
         "SELECT aktueller_br_id, id FROM einsatz_einheit \
@@ -583,12 +583,12 @@ mod tests {
         create(&pool, e, b, neu("BR B")).await.unwrap();
         // Storno: br1 verschwindet aus der Liste:
         storniere(&pool, e, br1.id, b).await.unwrap();
-        let alle = liste(&pool, e, None, None).await.unwrap();
+        let alle = list(&pool, e, None, None).await.unwrap();
         assert_eq!(alle.len(), 1, "stornierte BR fallen aus der Liste");
         // Status-Filter:
-        let geplante = liste(&pool, e, Some("geplant"), None).await.unwrap();
+        let geplante = list(&pool, e, Some("geplant"), None).await.unwrap();
         assert_eq!(geplante.len(), 1);
-        let aktive = liste(&pool, e, Some("aktiv"), None).await.unwrap();
+        let aktive = list(&pool, e, Some("aktiv"), None).await.unwrap();
         assert!(aktive.is_empty());
     }
 
@@ -679,7 +679,7 @@ mod tests {
             koordinate(&laden(&pool, e, br.id).await.unwrap()),
             (Some(51.93), Some(8.87))
         );
-        let liste = liste(&pool, e, None, None).await.unwrap();
+        let liste = list(&pool, e, None, None).await.unwrap();
         assert_eq!(koordinate(&liste[0].br), (Some(51.93), Some(8.87)));
 
         let ohne = create(&pool, e, b, neu("BR Schule")).await.unwrap();
@@ -717,7 +717,7 @@ mod tests {
                 "{lat:?}/{lon:?}: {err:?}"
             );
         }
-        assert!(liste(&pool, e, None, None).await.unwrap().is_empty());
+        assert!(list(&pool, e, None, None).await.unwrap().is_empty());
     }
 
     #[tokio::test]
