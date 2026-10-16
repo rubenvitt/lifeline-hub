@@ -1,22 +1,27 @@
 use crate::app::AppState;
 use crate::bereitstellungsraum::belegung_repo;
+use crate::bereitstellungsraum::eintreffen::{
+    self, EintreffenEingabe, EintreffenErgebnis, Gebucht, Rahmen,
+};
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{
     BrAnzeige, BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
 };
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Bereitstellungsraeume;
+use crate::einsatz::kontext::{
+    EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
+};
+use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
+    self, deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
 };
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -45,6 +50,11 @@ pub struct BrEinheitKurz {
     pub seit_at: Option<String>,
     /// Aktive Fahrzeuge der Einheit.
     pub fahrzeuge: Vec<BrEinheitFahrzeug>,
+    /// Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nicht_uebernommen_seit: Option<String>,
+    /// Herkunft „unangemeldet“, dauerhaft (D3).
+    pub unangemeldet: bool,
 }
 
 /// Aktives Fahrzeug einer Einheit im Raum.
@@ -141,10 +151,14 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
             .find(|l| l.objekt_typ == typ && l.objekt_id == id)
             .and_then(|l| l.seit_at().map(str::to_string))
     };
-    let einheiten: Vec<(i64, String)> = sqlx::query_as(
-        "SELECT id, name FROM einsatz_einheit \
-         WHERE aktueller_br_id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
-    )
+    let einheiten: Vec<(i64, String, Option<String>, bool)> = sqlx::query_as(concat!(
+        "SELECT e.id, e.name, ",
+        crate::einheit::nicht_uebernommen_seit_sql!(),
+        ", ",
+        crate::einheit::unangemeldet_sql!(),
+        " FROM einsatz_einheit e \
+         WHERE e.aktueller_br_id = ? AND e.einsatz_id = ? AND e.aufgeloest_at IS NULL",
+    ))
     .bind(br_id)
     .bind(einsatz_id)
     .fetch_all(&state.pool)
@@ -163,19 +177,23 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
     .await?;
     let einheiten = einheiten
         .into_iter()
-        .map(|(id, name)| BrEinheitKurz {
-            id,
-            name,
-            seit_at: seit(ObjektTyp::Einheit, id),
-            fahrzeuge: einheit_fahrzeuge
-                .iter()
-                .filter(|(einheit, _, _)| *einheit == id)
-                .map(|(_, id, funkrufname)| BrEinheitFahrzeug {
-                    id: *id,
-                    funkrufname: funkrufname.clone(),
-                })
-                .collect(),
-        })
+        .map(
+            |(id, name, nicht_uebernommen_seit, unangemeldet)| BrEinheitKurz {
+                id,
+                name,
+                nicht_uebernommen_seit,
+                unangemeldet,
+                seit_at: seit(ObjektTyp::Einheit, id),
+                fahrzeuge: einheit_fahrzeuge
+                    .iter()
+                    .filter(|(einheit, _, _)| *einheit == id)
+                    .map(|(_, id, funkrufname)| BrEinheitFahrzeug {
+                        id: *id,
+                        funkrufname: funkrufname.clone(),
+                    })
+                    .collect(),
+            },
+        )
         .collect();
     let fahrzeuge: Vec<(i64, String)> = sqlx::query_as(
         "SELECT id, snap_funkrufname FROM einsatz_fahrzeug \
@@ -496,6 +514,134 @@ pub async fn belegung(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
+/// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen — eine bekannte Kraft oder
+/// eine unangemeldete Kraft einbuchen (LLH-1075, design.md D1–D12, Spec
+/// `bereitstellungsraum-belegung`). `EinsatzSchreibfreigabe`, weil ein Replay auch nach dem
+/// Abschluss des Einsatzes antworten muss (D8); `fordere_aktiv` folgt erst nach dem Replay.
+pub async fn eintreffen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibfreigabe<Bereitstellungsraeume>,
+    headers: HeaderMap,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<EintreffenEingabe>,
+) -> Result<(StatusCode, Json<EintreffenErgebnis>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // Felder für sich (400, auch der Erfassungszeitpunkt), dann der Zusammenhang „beides“ (422),
+    // vor allem anderen (D2).
+    let client_id = support::parse_client_id(body.client_id.as_deref())?;
+    let zeitpunkt = support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), chrono::Utc::now())?;
+    let erfassung = eintreffen::check(&body)?;
+    // Fremder Raum am Gerät: 404 vor jedem Schreiben (D7).
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    // Eine unangemeldete Kraft legt Einheit und Fahrzeuge an: deren Rechte, 403 vor dem Schreiben.
+    if erfassung.is_unangemeldet() {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+        ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
+    }
+    support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    // Replay vor dem Aktiv-Gate und vor jeder Zustandsprüfung (D8).
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(b) = belegung_repo::mit_client_id(&state.pool, einsatz_id, cid).await? {
+            return eintreffen_replay(&state, &ctx, br_id, b).await;
+        }
+    }
+    ctx.fordere_aktiv()?;
+    let eingang = crate::zeit::jetzt();
+    let rahmen = Rahmen {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        br_id,
+        benutzer_id: ctx.benutzer.id,
+        zeitpunkt_at: &zeitpunkt,
+        eingang_at: &eingang,
+        client_id: client_id.as_deref(),
+        etb_startwert: etb_startwert(&state.pool, einsatz_id).await?,
+    };
+    let gebucht = match crate::write_retry!(&state.pool, |conn| {
+        eintreffen::eintreffen_tx(conn, &rahmen, &erfassung).await
+    }) {
+        Ok(g) => g,
+        Err(fehler) => {
+            // Rennen zweier Tabs: der Unique-Fehler rollt die ganze Buchung zurück; danach den
+            // Gewinner lesen (Muster `meldung::repo::anlegen_idempotent`).
+            if let Some(cid) = client_id.as_deref() {
+                if let Some(b) = belegung_repo::mit_client_id(&state.pool, einsatz_id, cid).await? {
+                    return eintreffen_replay(&state, &ctx, br_id, b).await;
+                }
+            }
+            return Err(fehler);
+        }
+    };
+    notify_eintreffen(&state, einsatz_id, br_id, &gebucht).await?;
+    let ergebnis = gebucht
+        .ergebnis(&state.pool, einsatz_id, erfassung.is_unangemeldet())
+        .await?;
+    Ok((StatusCode::CREATED, Json(ergebnis)))
+}
+
+/// Wiederholung einer schon gebuchten Erfassung (D8): gleicher Raum → das gespeicherte Ergebnis,
+/// anderer Raum 422, die Erfassung einer anderen Person am Gerät 409 (LFH-892). Live und
+/// Benachrichtigung der Meldung stellt `live_publikation_sicherstellen` nach, nur falls noch offen.
+async fn eintreffen_replay(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    br_id: i64,
+    belegung: BrBelegungAnzeige,
+) -> Result<(StatusCode, Json<EintreffenErgebnis>), AppError> {
+    if belegung.br_id != br_id {
+        return Err(AppError::UnprocessableEntity(
+            "client_id gehört zu einem Eintreffen in einem anderen Bereitstellungsraum".into(),
+        ));
+    }
+    if ctx.geraet.is_some() && belegung.erfasst_von != ctx.benutzer.id {
+        return Err(AppError::Conflict("client_id bereits vergeben".into()));
+    }
+    let ergebnis = eintreffen::reconstruct(&state.pool, belegung).await?;
+    if let Some(meldung_id) = ergebnis.meldung_id {
+        notify_meldung(state, meldung_id).await?;
+    }
+    Ok((StatusCode::CREATED, Json(ergebnis)))
+}
+
+/// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, bei
+/// unangemeldet das Meldungsbündel samt Benachrichtigung und Auto-Frist-Erinnerung.
+async fn notify_eintreffen(
+    state: &AppState,
+    einsatz_id: i64,
+    br_id: i64,
+    g: &Gebucht,
+) -> Result<(), AppError> {
+    state.live.publiziere(einsatz_id, g.etb_id);
+    sse_br(state, einsatz_id, br_id);
+    if let Some(einheit_id) = g.einheit_id {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+    }
+    // Eine unangemeldete Kraft bringt neue Fahrzeuge; ein bekanntes Fahrzeug steht im Raum.
+    if g.meldung_id.is_some() || g.objekt_typ == ObjektTyp::Fahrzeug {
+        for ef_id in &g.fahrzeug_ids {
+            super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, *ef_id);
+        }
+    }
+    for ep_id in &g.personen {
+        super::einsatz_personal::sse_personal(state, einsatz_id, *ep_id);
+    }
+    if let Some(meldung_id) = g.meldung_id {
+        notify_meldung(state, meldung_id).await?;
+    }
+    Ok(())
+}
+
+/// Meldungsbündel genau einmal (Marker `live_published_at`) und die Auto-Frist-Erinnerung mit
+/// eigenem Titel (design.md D5).
+async fn notify_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let meldung = crate::meldung::repo::laden(&state.pool, meldung_id, &jetzt).await?;
+    crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;
+    let titel = format!("Unangemeldete Kraft #{} unbestätigt", meldung.lfd_nr);
+    crate::meldung::auto_frist_erinnerung_sicherstellen(state, &meldung, &titel).await?;
+    Ok(())
+}
+
 /// Erstellt den ETB-Text für ein Belegungs-Event mit realem Objektnamen.
 async fn belegungs_etb_text(
     pool: &sqlx::SqlitePool,
@@ -526,10 +672,7 @@ async fn belegungs_etb_text(
     };
 
     let text = match event.art.as_str() {
-        "eintritt" => format!(
-            "{} tritt in Bereitstellungsraum {} ein",
-            obj_name, br_bezeichnung
-        ),
+        "eintritt" => crate::bereitstellungsraum::etb_text_eintritt(&obj_name, br_bezeichnung),
         "wechsel" => format!(
             "{} wechselt zu Bereitstellungsraum {}",
             obj_name, br_bezeichnung

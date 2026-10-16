@@ -66,6 +66,7 @@ const eh = (
   aktueller_br_id: null,
   sprechgruppen: [],
   status: { quelle: 'ohne', verteilung: [] },
+  unangemeldet: false,
 });
 const p = (
   id: number,

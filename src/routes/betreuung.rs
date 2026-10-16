@@ -13,7 +13,7 @@
 //! design.md D3):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, unbekannter Enum-Wert, leere
 //!   Bezeichnung, Plangröße/Kapazität < 1, Anzahl < 0, Zeitpunkt unlesbar oder mehr als
-//!   [`ZUKUNFT_TOLERANZ_SEKUNDEN`] in der Zukunft, `client_id` länger als 64 Zeichen.
+//!   [`support::ZUKUNFT_TOLERANZ_SEKUNDEN`] in der Zukunft, `client_id` länger als 64 Zeichen.
 //! - **404** — fremdes oder unbekanntes Objekt, Abschnitt eines anderen Einsatzes.
 //! - **409** — nur der Lebenszyklus (storniert) und die doppelte Bezeichnung. Es gibt KEIN
 //!   CAS und damit keinen Überschreiben-Dialog: die zweite 409-Quelle aus LFH-299/300 kann
@@ -40,7 +40,7 @@
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::Deserialize;
 
 use crate::app::AppState;
@@ -63,35 +63,6 @@ use crate::geraet::stelle::{self, Sicht};
 use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::routes::support;
-
-/// Toleranz für Uhrenversatz zwischen Erfassungsgerät und Server (design.md D2). Ein
-/// Zeitpunkt, der weiter in der Zukunft liegt, ist für sich unbrauchbar → 400.
-pub const ZUKUNFT_TOLERANZ_SEKUNDEN: i64 = 60;
-
-fn draht(t: DateTime<Utc>) -> String {
-    crate::zeit::formatiere(t.naive_utc())
-}
-
-/// Meldezeitpunkt: fehlt/leer → `jetzt`, sonst normalisiert (400 bei Unlesbarem) und höchstens
-/// [`ZUKUNFT_TOLERANZ_SEKUNDEN`] nach `jetzt` (sonst 400). Gespeichert wird `min(zeitpunkt,
-/// jetzt)` (LFH-680, design.md D2): die Toleranz fängt Uhrenversatz ab, übernimmt ihn aber
-/// nicht — sonst wäre eine Meldung sofort „aktuell“ und fehlte bis zu 60 s in der Kopfzahl
-/// „jetzt“. `jetzt` ist injiziert, damit die Grenze ohne Uhr prüfbar ist.
-fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String, AppError> {
-    let zeit = match eingabe.map(str::trim) {
-        Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
-        _ => return Ok(draht(jetzt)),
-    };
-    let t = crate::zeit::parse(&zeit)
-        .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{zeit}'")))?
-        .and_utc();
-    if (t - jetzt).num_seconds() > ZUKUNFT_TOLERANZ_SEKUNDEN {
-        return Err(AppError::Validation(format!(
-            "Zeitpunkt {zeit} liegt in der Zukunft (Toleranz {ZUKUNFT_TOLERANZ_SEKUNDEN} s)"
-        )));
-    }
-    Ok(draht(t.min(jetzt)))
-}
 
 /// Worauf ein Live-Ereignis zeigt. Nur die Kennung geht auf den Draht.
 #[derive(Clone, Copy)]
@@ -195,7 +166,7 @@ pub async fn kopfzahl(
 ) -> Result<Json<BelegungKopfzahl>, AppError> {
     let stichtag = match params.zeitpunkt.as_deref().map(str::trim) {
         Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
-        _ => draht(Utc::now()),
+        _ => crate::zeit::jetzt(),
     };
     Ok(Json(
         repo::kopfzahl(&state.pool, ctx.einsatz.id, &stichtag).await?,
@@ -354,20 +325,6 @@ pub async fn bezirk_stornieren(
     ))
 }
 
-/// Höchstlänge einer `client_id` — wie bei Meldung und Person (`routes/meldung.rs`).
-const CLIENT_ID_MAX: usize = 64;
-
-/// Idempotenzschlüssel der Offline-Queue (LFH-675): getrimmt, leer heißt fehlend, zu lang ist
-/// für sich unbrauchbar → 400.
-fn client_id(roh: Option<&str>) -> Result<Option<String>, AppError> {
-    match roh.map(str::trim).filter(|s| !s.is_empty()) {
-        Some(cid) if cid.len() > CLIENT_ID_MAX => Err(AppError::Validation(format!(
-            "client_id zu lang (max. {CLIENT_ID_MAX} Zeichen)"
-        ))),
-        cid => Ok(cid.map(str::to_owned)),
-    }
-}
-
 #[derive(Debug, Deserialize)]
 pub struct StandMelden {
     evakuiert: i64,
@@ -396,7 +353,7 @@ pub async fn stand_melden(
 ) -> Result<(StatusCode, Json<BezirkMeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
-    let client_id = client_id(req.client_id.as_deref())?;
+    let client_id = support::parse_client_id(req.client_id.as_deref())?;
     // Vorab-Lookup nach den Gates, vor der Aktiv-Prüfung und der Validierung: der Replay
     // bewertet den Body nicht, maßgeblich ist allein der Schlüssel (Muster `routes/meldung.rs`).
     if let Some(cid) = client_id.as_deref() {
@@ -412,7 +369,7 @@ pub async fn stand_melden(
     let eingabe = StandEingabe {
         evakuiert: req.evakuiert,
         erhebung: enum_wert(&req.erhebung)?,
-        zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
+        zeitpunkt_at: support::meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
         client_id,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -618,7 +575,7 @@ pub async fn belegung_melden(
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle, sid)?;
     support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
-    let client_id = client_id(req.client_id.as_deref())?;
+    let client_id = support::parse_client_id(req.client_id.as_deref())?;
     if let Some(cid) = client_id.as_deref() {
         if let Some(replay) = repo::belegung_nach_client_id(&state.pool, einsatz_id, cid).await? {
             let m = repo::replay_am_objekt(replay, sid, "einer anderen Betreuungsstelle")?;
@@ -631,7 +588,7 @@ pub async fn belegung_melden(
     ctx.fordere_aktiv()?;
     let eingabe = BelegungEingabe {
         belegt: req.belegt,
-        zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
+        zeitpunkt_at: support::meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
         client_id,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -672,65 +629,4 @@ pub async fn belegung_zuruecknehmen(
         meldung_id: m.meldung_id,
         stelle: repo::stelle_laden(&state.pool, einsatz_id, m.objekt_id).await?,
     }))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn t(s: &str) -> DateTime<Utc> {
-        crate::zeit::parse_utc(s).unwrap()
-    }
-
-    #[test]
-    fn zukunft_bis_60_s_toleriert_und_auf_jetzt_geklemmt_ab_61_s_400() {
-        let jetzt = t("2026-09-23 12:00:00");
-        // LFH-680: toleriert heißt nicht übernommen. Gespeichert wird `jetzt`, sonst wäre die
-        // Meldung sofort „aktuell“, fehlte aber bis zu 60 s in der Kopfzahl „jetzt“.
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-23 12:01:00"), jetzt).unwrap(),
-            "2026-09-23 12:00:00"
-        );
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-23 12:00:01"), jetzt).unwrap(),
-            "2026-09-23 12:00:00"
-        );
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-23 12:01:01"), jetzt)
-                .unwrap_err()
-                .status(),
-            StatusCode::BAD_REQUEST
-        );
-        // Mit Zone: 14:01:01+02:00 ist 12:01:01 UTC, also 61 s voraus.
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-23T14:01:01+02:00"), jetzt)
-                .unwrap_err()
-                .status(),
-            StatusCode::BAD_REQUEST
-        );
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-23T14:00:00+02:00"), jetzt).unwrap(),
-            "2026-09-23 12:00:00",
-            "normalisiert auf UTC"
-        );
-    }
-
-    #[test]
-    fn fehlender_zeitpunkt_ist_jetzt_unlesbarer_400() {
-        let jetzt = t("2026-09-23 12:00:00");
-        assert_eq!(meldezeitpunkt(None, jetzt).unwrap(), "2026-09-23 12:00:00");
-        assert_eq!(
-            meldezeitpunkt(Some("  "), jetzt).unwrap(),
-            "2026-09-23 12:00:00"
-        );
-        assert_eq!(
-            meldezeitpunkt(Some("gestern"), jetzt).unwrap_err().status(),
-            StatusCode::BAD_REQUEST
-        );
-        // Vergangenheit ist erlaubt (nachgetragene Meldung).
-        assert_eq!(
-            meldezeitpunkt(Some("2026-09-22 09:30:00"), jetzt).unwrap(),
-            "2026-09-22 09:30:00"
-        );
-    }
 }

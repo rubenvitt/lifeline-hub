@@ -331,11 +331,14 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 
 /// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum samt Verlauf
 /// lesen (LLH-1095; ein Wechsel nennt dort die Bezeichnung des anderen Raums), Kräfte in ihm an-
-/// und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene) und
-/// ihn in Betrieb nehmen; die Einheiten- und Fahrzeugliste des Einsatzes lesen; Meldungen an die
-/// Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die Stelle über
-/// [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten, Auflösen,
-/// Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch das Abrufen) fehlen bewusst.
+/// und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene), das
+/// Eintreffen einer erwarteten oder unangemeldeten Kraft buchen (LLH-1075) und ihn in Betrieb
+/// nehmen; die Einheiten- und Fahrzeugliste des Einsatzes samt Perioden der Einheiten lesen;
+/// Meldungen an die Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die
+/// Stelle über [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten,
+/// Auflösen, Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch das Abrufen,
+/// Übernehmen und Abweisen) fehlen bewusst, außer dem Anlegen einer unangemeldeten Kraft beim
+/// Eintreffen.
 const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
     ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
@@ -349,9 +352,14 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ),
     (
         "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+    ),
+    (
+        "POST",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
     ),
     ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("GET", "/api/einsaetze/{id}/einheiten/zeitachse"),
     ("GET", "/api/einsaetze/{id}/fahrzeuge"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
@@ -601,7 +609,12 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
             ),
+            (
+                "POST",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+            ),
             ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("GET", "/api/einsaetze/{id}/einheiten/zeitachse"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
         ] {
             assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
@@ -612,6 +625,10 @@ mod tests {
             ("DELETE", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),
+            ("POST", "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen"),
+            ("POST", "/api/einsaetze/{id}/einheiten/{eid}/abweisen"),
+            ("GET", "/api/einsaetze/{id}/einheiten/{eid}/zeitachse"),
+            ("POST", "/api/einsaetze/{id}/einheiten"),
             ("GET", "/api/einsaetze/{id}/personen"),
             ("GET", "/api/einsaetze/{id}/uhs"),
         ] {

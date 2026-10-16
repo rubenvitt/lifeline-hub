@@ -77,6 +77,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             fuehrungsstelle::EINSATZLEITER_NAME_MAX,
         ),
         ("EINHEIT_VORLAGE_NAME_MAX", einheit_vorlage::NAME_MAX),
+        ("EINHEIT_BEMERKUNG_MAX", einheit::BEMERKUNG_MAX),
         (
             "EINHEIT_VORLAGE_FUNKRUFNAME_MAX",
             einheit_vorlage::FUNKRUFNAME_MAX,

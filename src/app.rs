@@ -1348,6 +1348,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_bereitstellungsraum::belegung),
         )
         .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+            post(routes::einsatz_bereitstellungsraum::eintreffen),
+        )
+        .route(
             "/api/einsaetze/{id}/abschnitte",
             get(routes::einsatzabschnitt::list),
         )
@@ -1825,6 +1829,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
+            post(routes::einsatz_einheit::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/abweisen",
+            post(routes::einsatz_einheit::abweisen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",

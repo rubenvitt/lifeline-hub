@@ -2882,7 +2882,8 @@
         "required": [
           "id",
           "name",
-          "fahrzeuge"
+          "fahrzeuge",
+          "unangemeldet"
         ],
         "properties": {
           "fahrzeuge": {
@@ -2899,12 +2900,23 @@
           "name": {
             "type": "string"
           },
+          "nicht_uebernommen_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3)."
+          },
           "seit_at": {
             "type": [
               "string",
               "null"
             ],
             "description": "Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne\nZone); fehlt ohne passendes Ereignis."
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Herkunft „unangemeldet“, dauerhaft (D3)."
           }
         }
       },
@@ -3827,7 +3839,8 @@
           "fahrzeug_mitglieder",
           "material_mitglieder",
           "sprechgruppen",
-          "status"
+          "status",
+          "unangemeldet"
         ],
         "properties": {
           "abschnitt_id": {
@@ -3948,6 +3961,13 @@
           "name": {
             "type": "string"
           },
+          "nicht_uebernommen_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,\nnur solange die Übernahme offen ist (UTC ohne Zone)."
+          },
           "personal_mitglieder": {
             "type": "array",
             "items": {
@@ -4009,6 +4029,10 @@
               "null"
             ],
             "format": "int64"
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3)."
           }
         }
       },
@@ -5657,6 +5681,104 @@
           "ueberfaellig"
         ]
       },
+      "EintreffenEingabe": {
+        "type": "object",
+        "description": "Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von\n`kraft` und `unangemeldet`.",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen)."
+          },
+          "kraft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KraftAngabe",
+                "description": "Eine Einheit oder ein einheitenloses Fahrzeug des Einsatzes."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unangemeldet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnangemeldetEingabe",
+                "description": "Eine Kraft, die im Einsatz noch nicht geführt wird."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeitpunkt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in\nder Zukunft. Ohne Angabe gilt „jetzt“."
+          }
+        }
+      },
+      "EintreffenErgebnis": {
+        "type": "object",
+        "description": "Antwort 201 des Eintreffens (design.md D1), beim Replay aus dem Bestand rekonstruiert (D8).",
+        "required": [
+          "belegung",
+          "fahrzeug_ids",
+          "zeitachse",
+          "unangemeldet"
+        ],
+        "properties": {
+          "belegung": {
+            "$ref": "#/components/schemas/BrBelegungAnzeige",
+            "description": "Die Belegungszeile des Eintritts."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die eingebuchte oder neu angelegte Einheit; fehlt bei einem Fahrzeug."
+          },
+          "fahrzeug_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Aktive Fahrzeuge der Einheit bzw. das Fahrzeug selbst."
+          },
+          "meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Meldung an die Einsatzleitung (nur unangemeldet)."
+          },
+          "unangemeldet": {
+            "type": "boolean",
+            "description": "Die Buchung hat die Kraft neu angelegt."
+          },
+          "zeitachse": {
+            "$ref": "#/components/schemas/EintreffenZeitachse"
+          }
+        }
+      },
+      "EintreffenZeitachse": {
+        "type": "string",
+        "description": "Was das Eintreffen in der Kräfte-Zeitachse bewirkt hat (design.md D1).",
+        "enum": [
+          "geschrieben",
+          "ausgelassen",
+          "keine"
+        ]
+      },
       "EmpfaengerTyp": {
         "type": "string",
         "description": "Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `empfaenger_typ`.",
@@ -6499,6 +6621,28 @@
               "null"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "FahrzeugEingabe": {
+        "type": "object",
+        "description": "Ein Fahrzeug der unangemeldeten Kraft (Ad-hoc-Fahrzeug).",
+        "properties": {
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug."
           }
         }
       },
@@ -7989,6 +8133,23 @@
             "type": "string"
           },
           "laeuft_ab_at": {
+            "type": "string"
+          }
+        }
+      },
+      "KraftAngabe": {
+        "type": "object",
+        "description": "Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`.",
+        "required": [
+          "objekt_typ",
+          "objekt_id"
+        ],
+        "properties": {
+          "objekt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objekt_typ": {
             "type": "string"
           }
         }
@@ -12864,6 +13025,33 @@
           }
         }
       },
+      "StaerkeEingabe": {
+        "type": "object",
+        "description": "Stärke F/UF/M: alle drei oder keine.",
+        "properties": {
+          "fuehrer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "mannschaft": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "unterfuehrer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "StaerkePosition": {
         "type": "string",
         "description": "Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).\nWird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).",
@@ -13341,6 +13529,26 @@
           }
         }
       },
+      "UebernahmeBody": {
+        "type": "object",
+        "description": "Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.",
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ueber_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "UhsAnhangAnzeige": {
         "type": "object",
         "description": "Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die\nDatei ist nur über die UHS-Route ladbar.",
@@ -13686,6 +13894,41 @@
           "verletztensammelstelle",
           "sonstige"
         ]
+      },
+      "UnangemeldetEingabe": {
+        "type": "object",
+        "description": "Unangemeldete Kraft (design.md D1/D2).",
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Freitext an der Einheit; nie in Meldung oder ETB."
+          },
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FahrzeugEingabe"
+            },
+            "description": "1 bis `SAMMEL_MAX` Fahrzeuge; das erste gibt der Einheit ihren Namen."
+          },
+          "staerke": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StaerkeEingabe",
+                "description": "Gemeldete Stärke; steht nur im Text von Meldung und ETB (D6)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trotzdem_anlegen": {
+            "type": "boolean",
+            "description": "Neuanlage trotz gleichnamiger Kraft im Einsatz (D9)."
+          }
+        }
       },
       "Verbindungsart": {
         "type": "string",
@@ -14958,7 +15201,8 @@
           "einheit",
           "abloesung",
           "nachtrag",
-          "disposition"
+          "disposition",
+          "bereitstellungsraum"
         ]
       },
       "ZeitfensterAnzeige": {

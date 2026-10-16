@@ -539,7 +539,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     geaendert_at: '2026-10-04 08:00:00',
     geaendert_von: 1,
     storniert_at: null,
-    einheiten: [{ id: 31, name: 'RTW 1', fahrzeuge: [] }],
+    einheiten: [{ id: 31, name: 'RTW 1', fahrzeuge: [], unangemeldet: false }],
     fahrzeuge: [],
     belegung: { einheiten: 1, fahrzeuge: 0 },
   };
