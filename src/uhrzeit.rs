@@ -110,7 +110,7 @@ mod tests {
         assert!(u("06:30") < u("12:00"));
         assert!(u("12:00") < u("23:00"));
         assert!(u("09:59") < u("10:00"));
-        let mut liste = vec![u("23:00"), u("06:30"), u("12:00")];
+        let mut liste = [u("23:00"), u("06:30"), u("12:00")];
         liste.sort();
         assert_eq!(
             liste.iter().map(ToString::to_string).collect::<Vec<_>>(),
