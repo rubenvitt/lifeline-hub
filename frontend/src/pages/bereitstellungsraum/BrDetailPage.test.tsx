@@ -178,7 +178,7 @@ function kennzahl(titel: string): HTMLElement {
  * Das zuletzt geöffnete antd-Menü (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“):
  * jedes Portal kommt beim ersten Öffnen ans Ende von `body`.
  */
-async function oeffneMenue(name: string, bereich: HTMLElement = document.body) {
+async function openMenue(name: string, bereich: HTMLElement = document.body) {
   await userEvent.click(
     within(bereich).getByRole('button', { name: new RegExp(`^Weitere Aktionen zu ${name}`) }),
   );
@@ -193,7 +193,7 @@ async function oeffneMenue(name: string, bereich: HTMLElement = document.body) {
 
 /** „Austragen“ steht im Aktionsmenü der Zeile, nicht als roter Knopf (LLH-1085). */
 async function austragen(name: string, bereich: HTMLElement = document.body) {
-  const menue = await oeffneMenue(name, bereich);
+  const menue = await openMenue(name, bereich);
   await userEvent.click(within(menue).getByRole('menuitem', { name: 'Austragen' }));
 }
 
@@ -878,7 +878,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     await austragen('Einheit Alpha');
     await within(zeile('Einheit Alpha')).findByRole('alert');
 
-    // `oeffneMenue` sucht per Regex: das Ladesymbol des ersten Laufs klingt in jsdom nicht ab.
+    // `openMenue` sucht per Regex: das Ladesymbol des ersten Laufs klingt in jsdom nicht ab.
     await austragen('Einheit Alpha');
     await waitFor(() => expect(within(zeile('Einheit Alpha')).queryByRole('alert')).toBeNull());
   });
@@ -2139,7 +2139,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
     expect(screen.getByTestId('br-belegung').querySelectorAll('.ant-btn-dangerous')).toHaveLength(
       0,
     );
-    const menue = await oeffneMenue('HLF 20');
+    const menue = await openMenue('HLF 20');
     expect(
       within(menue)
         .getAllByRole('menuitem')
@@ -2203,7 +2203,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
   it('„Abrufen und austragen“: ein Schritt mit `ausgerueckt`', async () => {
     const aufrufe = seite({ br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) });
     await screen.findByText('HLF 20');
-    const menue = await oeffneMenue('HLF 20');
+    const menue = await openMenue('HLF 20');
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abrufen und austragen' }));
     expect(await within(dialog()).findByText('HLF 20 abrufen und austragen')).toBeInTheDocument();
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen und austragen/ }));
@@ -2246,6 +2246,8 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
     );
     await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
     expect(await within(dialog()).findByText('Modul Einheiten gesperrt')).toBeInTheDocument();
+    // Das gesperrte Feld zeigt keinen vorbelegten Abschnitt, der doch nicht hinausginge.
+    expect(within(dialog()).queryByTitle('EA Deich')).toBeNull();
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen/ }));
     await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
     expect(aufrufe.abruf[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 10 });
@@ -2299,7 +2301,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Abruf zurücknehmen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /abrufen$/ })).toBeNull();
-    const menue = await oeffneMenue('Zug Nord');
+    const menue = await openMenue('Zug Nord');
     expect(
       within(menue)
         .getAllByRole('menuitem')

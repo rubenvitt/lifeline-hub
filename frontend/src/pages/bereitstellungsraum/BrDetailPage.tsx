@@ -91,7 +91,7 @@ import {
   abrufAngabe,
   abrufFolge,
   abrufZeilenId,
-  teileNachAbruf,
+  splitNachAbruf,
   type AbrufZeile,
 } from './abrufKern';
 import AbrufDialog, { type AbrufZiel } from './AbrufDialog';
@@ -254,7 +254,7 @@ export default function BrDetailPage() {
   // eine Zeile zielt, dem schiebt auch ein fremder Abruf nichts darunter.
   const teilung = useMemo(
     () =>
-      teileNachAbruf(
+      splitNachAbruf(
         detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
         detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
       ),
@@ -327,7 +327,14 @@ export default function BrDetailPage() {
     onMutate: (z) => zeilen.beginne(brObjektSchluessel(z.objekt_typ, z.objekt_id)),
     onSuccess: (_antwort, z) => {
       message.success({ content: `Abruf von ${z.name} zurückgenommen`, key: 'br-belegung' });
+      // Die Kraft und die mit ihr abgerufenen Untereinheiten stehen sofort wieder bereit, auch
+      // wenn die Schleuse hält.
       (z.objekt_typ === 'einheit' ? einheitenZufluss : fahrzeugeZufluss).merkeEigene(z.objekt_id);
+      if (z.objekt_typ === 'einheit') {
+        teilung.abgerufen
+          .filter((a) => a.objekt_typ === 'einheit' && a.abruf.mit_objekt_id === z.objekt_id)
+          .forEach((a) => einheitenZufluss.merkeEigene(a.objekt_id));
+      }
       invalidate();
     },
     onError: (e, z) =>
@@ -500,7 +507,7 @@ export default function BrDetailPage() {
     const g = zeilen.grund(brObjektSchluessel(typ, objektId));
     return g && <ZeilenFehler fehler={g.fehler} fallback={g.fallback} />;
   };
-  const laeuftRuecknahme = (typ: 'einheit' | 'fahrzeug', objektId: number) =>
+  const isRuecknahmePending = (typ: 'einheit' | 'fahrzeug', objektId: number) =>
     ruecknahmeMut.isPending &&
     ruecknahmeMut.variables?.objekt_typ === typ &&
     ruecknahmeMut.variables.objekt_id === objektId;
@@ -563,7 +570,7 @@ export default function BrDetailPage() {
             <Button
               key="zuruecknehmen"
               aria-label={`Abruf zurücknehmen für ${z.name}`}
-              loading={laeuftRuecknahme(z.objekt_typ, z.objekt_id)}
+              loading={isRuecknahmePending(z.objekt_typ, z.objekt_id)}
               onClick={() => ruecknahmeMut.mutate(z)}
             >
               Abruf zurücknehmen
@@ -608,7 +615,7 @@ export default function BrDetailPage() {
   };
   // „Abgerufen“ steht, solange der Raum in Betrieb ist oder noch Abgerufene trägt: so hat das
   // Banner einer gehaltenen Zeile seinen Platz, und ein erster Abruf schiebt keinen Kopf ein.
-  const zeigeAbgerufen =
+  const isAbgerufenSichtbar =
     inBetrieb ||
     abgerufenZufluss.sichtbar.length > 0 ||
     abgerufenZufluss.zurueckgehalten.length > 0;
@@ -806,7 +813,7 @@ export default function BrDetailPage() {
           <div data-testid="br-belegung" {...flaeche}>
             {/* Abgerufen (LLH-1085): oben und mit Achtungsrand abgesetzt, damit der Einweiser
                 sieht, wer ausrücken soll. Die Zeilen zählen weiter in Stärke und Kennzahlen. */}
-            {zeigeAbgerufen && (
+            {isAbgerufenSichtbar && (
               <div data-testid="br-abgerufen">
                 <SektionHeader
                   titel="Abgerufen"

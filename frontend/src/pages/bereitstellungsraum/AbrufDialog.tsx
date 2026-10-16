@@ -1,5 +1,6 @@
 import { App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ruftAbAusBr, type BrAbrufEingabe } from '../../api/einsatzBereitstellungsraum';
 import { AUFTRAG_TEXT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -73,8 +74,20 @@ export default function AbrufDialog({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const sperre = abrufFelderRechte(freigaben);
-  const istEinheit = ziel?.objekt_typ === 'einheit';
-  const mitAbschnitt = istEinheit && sperre.abschnitt == null;
+  const isEinheit = ziel?.objekt_typ === 'einheit';
+  const canSetAbschnitt = isEinheit && sperre.abschnitt == null;
+  const raumAbschnitt = br.abschnitt_id ?? null;
+
+  /*
+   * VORBELEGUNG des Ziel-Abschnitts mit dem Abschnitt des Raums, sobald das Feld frei ist. Nicht
+   * über `initialValues`: kommen die Freigaben erst nach dem Öffnen, stünde das Feld sonst leer.
+   * Eine Eingabe überschreibt sie nicht; das Leeren beim Schließen macht die Hülle.
+   */
+  useEffect(() => {
+    if (ziel == null || !canSetAbschnitt || raumAbschnitt == null) return;
+    if (form.isFieldTouched('abschnitt_id')) return;
+    form.setFieldsValue({ abschnitt_id: raumAbschnitt });
+  }, [ziel, canSetAbschnitt, raumAbschnitt, form]);
 
   const mutation = useMutation({
     mutationFn: ({ daten }: { daten: BrAbrufEingabe; ziel: AbrufZiel }) =>
@@ -103,8 +116,8 @@ export default function AbrufDialog({
     },
   });
 
-  const einheit = istEinheit ? einheiten.find((e) => e.id === ziel.objekt_id) : undefined;
-  const verband = istEinheit ? verbandImRaum(ziel.objekt_id, br.einheiten, einheiten) : [];
+  const einheit = isEinheit ? einheiten.find((e) => e.id === ziel.objekt_id) : undefined;
+  const verband = isEinheit ? verbandImRaum(ziel.objekt_id, br.einheiten, einheiten) : [];
   const handlung = ziel?.austragen ? 'Abrufen und austragen' : 'Abrufen';
 
   return (
@@ -113,7 +126,6 @@ export default function AbrufDialog({
       titel={ziel ? `${ziel.name} ${ziel.austragen ? 'abrufen und austragen' : 'abrufen'}` : ''}
       form={form}
       erfassenText={handlung}
-      initialValues={{ abschnitt_id: br.abschnitt_id ?? undefined }}
       speicherung={mutation}
       speicherFehlerTitel="Nicht abgerufen"
       speicherFehlerFallback="Abrufen fehlgeschlagen"
@@ -126,7 +138,7 @@ export default function AbrufDialog({
           daten: {
             objekt_typ: ziel.objekt_typ,
             objekt_id: ziel.objekt_id,
-            ...(mitAbschnitt && w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
+            ...(canSetAbschnitt && w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
             ...(text ? { auftrag_text: text } : {}),
             ...(ziel.austragen ? { ausgerueckt: true } : {}),
           },
@@ -135,11 +147,11 @@ export default function AbrufDialog({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      {istEinheit && (
+      {isEinheit && (
         <Form.Item label="Ziel-Abschnitt" name="abschnitt_id" extra={sperre.abschnitt || undefined}>
           <Select<number>
             allowClear
-            disabled={!mitAbschnitt}
+            disabled={!canSetAbschnitt}
             placeholder={
               einheit?.abschnitt_name ? `bleibt ${einheit.abschnitt_name}` : 'ohne Abschnitt'
             }

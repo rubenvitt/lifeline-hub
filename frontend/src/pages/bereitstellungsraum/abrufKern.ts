@@ -53,7 +53,7 @@ export function abrufZeilenId(typ: ObjektTyp, objektId: number): number {
   return typ === 'einheit' ? objektId * 2 : objektId * 2 + 1;
 }
 
-export function teileNachAbruf(
+export function splitNachAbruf(
   einheiten: readonly BrEinheitKurz[],
   fahrzeuge: readonly BrFahrzeugKurz[],
 ): BelegungNachAbruf {

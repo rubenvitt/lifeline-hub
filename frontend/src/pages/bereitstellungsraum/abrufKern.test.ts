@@ -5,7 +5,7 @@ import {
   abrufFelderRechte,
   abrufFolge,
   abrufQuittung,
-  teileNachAbruf,
+  splitNachAbruf,
   verbandImRaum,
 } from './abrufKern';
 
@@ -23,7 +23,7 @@ function brFahrzeug(id: number, funkrufname: string, over: Partial<BrFahrzeugKur
 
 describe('Belegung nach Abruf teilen (LLH-1085, Spec „Detail nennt den Abruf“)', () => {
   it('abgerufene Kräfte stehen getrennt, die übrigen bleiben bereitgestellt', () => {
-    const t = teileNachAbruf(
+    const t = splitNachAbruf(
       [brEinheit(1, '1. Zug', { abruf: abruf() }), brEinheit(2, '2. Zug')],
       [brFahrzeug(1, 'Florian 1'), brFahrzeug(3, 'Florian 3', { abruf: abruf() })],
     );
@@ -36,7 +36,7 @@ describe('Belegung nach Abruf teilen (LLH-1085, Spec „Detail nennt den Abruf�
   });
 
   it('Einheit und Fahrzeug mit gleicher Kennung kollidieren in der Schleuse nicht', () => {
-    const t = teileNachAbruf(
+    const t = splitNachAbruf(
       [brEinheit(7, 'HLF 20', { abruf: abruf() })],
       [brFahrzeug(7, 'Florian 7', { abruf: abruf() })],
     );
@@ -45,7 +45,7 @@ describe('Belegung nach Abruf teilen (LLH-1085, Spec „Detail nennt den Abruf�
   });
 
   it('ohne Abruf ist nichts abgerufen', () => {
-    const t = teileNachAbruf([brEinheit(1, 'A', { abruf: null })], [brFahrzeug(1, 'F')]);
+    const t = splitNachAbruf([brEinheit(1, 'A', { abruf: null })], [brFahrzeug(1, 'F')]);
     expect(t.abgerufen).toEqual([]);
     expect(t.einheiten).toHaveLength(1);
   });
@@ -53,7 +53,7 @@ describe('Belegung nach Abruf teilen (LLH-1085, Spec „Detail nennt den Abruf�
 
 describe('Folge der Abgerufenen', () => {
   it('am längsten abgerufen zuerst, bei Gleichstand nach Name', () => {
-    const t = teileNachAbruf(
+    const t = splitNachAbruf(
       [
         brEinheit(1, 'Zug B', { abruf: abruf({ seit_at: '2026-10-15 12:40:00' }) }),
         brEinheit(2, 'Zug A', { abruf: abruf({ seit_at: '2026-10-15 12:40:00' }) }),
