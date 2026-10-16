@@ -879,6 +879,8 @@ impl Ablauf<'_> {
                         abschnitt_id: Some(abschnitt),
                         standort: Some(v.standort),
                         notiz: None,
+                        lat: None,
+                        lon: None,
                     },
                 )
                 .await?;

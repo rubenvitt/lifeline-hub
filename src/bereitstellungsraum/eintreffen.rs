@@ -788,6 +788,8 @@ mod tests {
                 abschnitt_id,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await
@@ -1196,6 +1198,8 @@ mod tests {
                 abschnitt_id: None,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await

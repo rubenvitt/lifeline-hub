@@ -81,6 +81,12 @@ pub struct BrAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`): beide gesetzt = verortet,
+    /// beide leer = nicht verortet; ohne Koordinate fehlen beide Felder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
 }
 
 /// Belegungs-Verlaufseintrag (1:1 zu `br_belegung`).

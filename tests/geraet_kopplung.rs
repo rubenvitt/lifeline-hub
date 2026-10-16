@@ -3383,6 +3383,12 @@ async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
     for (m, pfad, body) in [
         ("DELETE", raum.clone(), None),
         ("PATCH", raum.clone(), Some(json!({"notiz": "x"}))),
+        // LLH-1107: auch die Koordinate setzt nur die Leitung.
+        (
+            "PATCH",
+            raum.clone(),
+            Some(json!({"lat": 51.9, "lon": 8.8})),
+        ),
         (
             "POST",
             format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
@@ -3394,6 +3400,7 @@ async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
     }
     let (_, v) = anfrage(&app, "GET", &raum, &admin, None).await;
     assert_eq!(v["status"], "aktiv", "nichts aufgelöst");
+    assert!(v.get("lat").is_none(), "nicht verortet: {v}");
 }
 
 /// Die Kräfte des Einsatzes liest das Gerät als Liste, ändern und abrufen kann es sie nicht; den

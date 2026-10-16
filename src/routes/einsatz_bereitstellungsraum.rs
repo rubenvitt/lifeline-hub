@@ -297,6 +297,9 @@ pub struct AnlegenBody {
     pub abschnitt_id: Option<i64>,
     pub standort: Option<String>,
     pub notiz: Option<String>,
+    /// Koordinate (LLH-1107): beide oder keine, sonst 422.
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 /// POST /api/einsaetze/{id}/bereitstellungsraeume
@@ -320,6 +323,8 @@ pub async fn create(
             abschnitt_id: body.abschnitt_id,
             standort: standort.as_deref(),
             notiz: notiz.as_deref(),
+            lat: body.lat,
+            lon: body.lon,
         },
     )
     .await?;
@@ -365,10 +370,16 @@ pub struct PatchBody {
     pub standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
+    /// Koordinate (LLH-1107): fehlt = unverändert, `null` = entfernen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}
-/// KEIN ETB-Eintrag. SSE.
+/// KEIN ETB-Eintrag, auch nicht für die Koordinate (LLH-1107, design.md D2): die Verortung geht
+/// live über das Ereignis `bereitstellungsraum`. SSE.
 pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
@@ -376,13 +387,6 @@ pub async fn update(
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
-    if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict(
-            "Stornierter BR kann nicht geändert werden".into(),
-        ));
-    }
-
     let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let standort = body
         .standort
@@ -391,19 +395,19 @@ pub async fn update(
         .notiz
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
-    let nachher = br_repo::update(
-        &state.pool,
-        einsatz_id,
-        br_id,
-        ctx.benutzer.id,
-        PatchDaten {
-            bezeichnung: bezeichnung.as_deref(),
-            abschnitt_id: body.abschnitt_id,
-            standort: standort.as_ref().map(|o| o.as_deref()),
-            notiz: notiz.as_ref().map(|o| o.as_deref()),
-        },
-    )
-    .await?;
+    let daten = PatchDaten {
+        bezeichnung: bezeichnung.as_deref(),
+        abschnitt_id: body.abschnitt_id,
+        standort: standort.as_ref().map(|o| o.as_deref()),
+        notiz: notiz.as_ref().map(|o| o.as_deref()),
+        lat: body.lat,
+        lon: body.lon,
+    };
+    // Storniert (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
+    // Stand dieser Transaktion.
+    let nachher = crate::write_retry!(&state.pool, |conn| {
+        br_repo::update_tx(conn, einsatz_id, br_id, ctx.benutzer.id, &daten).await
+    })?;
     sse_br(&state, einsatz_id, br_id);
     Ok(Json(nachher))
 }
