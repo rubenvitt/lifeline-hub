@@ -409,7 +409,7 @@ mod tests {
     }
 
     async fn raum(pool: &SqlitePool, e: i64, b: i64, bez: &str) -> i64 {
-        let br = br_repo::anlegen(
+        let br = br_repo::create(
             pool,
             e,
             b,

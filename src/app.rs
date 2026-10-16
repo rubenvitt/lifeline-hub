@@ -1321,7 +1321,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume",
-            post(routes::einsatz_bereitstellungsraum::anlegen),
+            post(routes::einsatz_bereitstellungsraum::create),
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
@@ -1333,7 +1333,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
-            patch(routes::einsatz_bereitstellungsraum::aktualisieren),
+            patch(routes::einsatz_bereitstellungsraum::update),
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",

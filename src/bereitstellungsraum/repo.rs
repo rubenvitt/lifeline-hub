@@ -94,23 +94,23 @@ pub async fn laden_tx(
 /// Legt einen BR im Status `geplant` an. UNIQUE(einsatz_id, bezeichnung) →
 /// `Conflict` (409) bei Duplikat.
 ///
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// Pool-Hülle um [`create_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
 /// laufen im Autocommit einer geliehenen Verbindung.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: NeueDaten<'_>,
 ) -> Result<BrAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
-    anlegen_tx(&mut conn, einsatz_id, erfasser_id, &daten).await
+    create_tx(&mut conn, einsatz_id, erfasser_id, &daten).await
 }
 
 /// Legt einen BR auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
 /// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
 /// UNIQUE(einsatz_id, bezeichnung) → `Conflict` (409) wie in der Pool-Hülle.
 /// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
-pub async fn anlegen_tx(
+pub async fn create_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
@@ -150,7 +150,7 @@ pub async fn anlegen_tx(
 /// Aktualisiert BR-Stammfelder (NICHT Status). `Some(None)` setzt ein Feld
 /// explizit auf NULL (z. B. Standort löschen); `None` lässt unverändert.
 /// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
-pub async fn aktualisiere(
+pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
@@ -379,7 +379,7 @@ mod tests {
     async fn anlegen_liefert_geplant() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(
+        let br = create(
             &pool,
             e,
             b,
@@ -399,7 +399,7 @@ mod tests {
     async fn status_geplant_aktiv_aufgeloest() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(
+        let br = create(
             &pool,
             e,
             b,
@@ -422,7 +422,7 @@ mod tests {
     async fn anlegen_setzt_zeitstempel_und_benutzer() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Süd")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Süd")).await.unwrap();
         assert_eq!(br.einsatz_id, e);
         assert_eq!(br.bezeichnung, "BR Süd");
         assert_eq!(br.erfasst_von, b);
@@ -441,7 +441,7 @@ mod tests {
                 require_verortbar_tx(&mut conn, einsatz, br).await
             }
         };
-        let br = anlegen(&pool, e, b, neu("BR Nord")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Nord")).await.unwrap();
         check(e, br.id).await.unwrap();
         // Ein geplanter BR eines anderen Einsatzes ist für diesen Einsatz unbekannt.
         assert!(matches!(
@@ -457,7 +457,7 @@ mod tests {
             check(e, br.id).await.unwrap_err(),
             AppError::UnprocessableEntity(m) if m == "Bereitstellungsraum ist aufgelöst"
         ));
-        let s = anlegen(&pool, e, b, neu("Storno")).await.unwrap();
+        let s = create(&pool, e, b, neu("Storno")).await.unwrap();
         storniere(&pool, e, s.id, b).await.unwrap();
         assert!(matches!(
             check(e, s.id).await.unwrap_err(),
@@ -473,8 +473,8 @@ mod tests {
     async fn anlegen_doppelte_bezeichnung_ist_konflikt() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen(&pool, e, b, neu("BR Ost")).await.unwrap();
-        let err = anlegen(&pool, e, b, neu("BR Ost")).await.unwrap_err();
+        create(&pool, e, b, neu("BR Ost")).await.unwrap();
+        let err = create(&pool, e, b, neu("BR Ost")).await.unwrap_err();
         assert!(
             matches!(err, AppError::Conflict(_)),
             "UNIQUE(einsatz_id, bezeichnung)"
@@ -485,7 +485,7 @@ mod tests {
     async fn laden_fremd_liefert_not_found() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR X")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR X")).await.unwrap();
         // Falscher einsatz_id → NotFound (Org-Isolation)
         let err = laden(&pool, e + 999, br.id).await.unwrap_err();
         assert!(matches!(err, AppError::NotFound));
@@ -495,7 +495,7 @@ mod tests {
     async fn laden_liefert_auch_stornierte() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Storno")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Storno")).await.unwrap();
         storniere(&pool, e, br.id, b).await.unwrap();
         let geladen = laden(&pool, e, br.id).await.unwrap();
         assert!(geladen.storniert_at.is_some());
@@ -505,8 +505,8 @@ mod tests {
     async fn liste_filtert_stornierte_und_status() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br1 = anlegen(&pool, e, b, neu("BR A")).await.unwrap();
-        anlegen(&pool, e, b, neu("BR B")).await.unwrap();
+        let br1 = create(&pool, e, b, neu("BR A")).await.unwrap();
+        create(&pool, e, b, neu("BR B")).await.unwrap();
         // Storno: br1 verschwindet aus der Liste:
         storniere(&pool, e, br1.id, b).await.unwrap();
         let alle = liste(&pool, e, None, None).await.unwrap();
@@ -522,8 +522,8 @@ mod tests {
     async fn aktualisiere_felder() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Alt")).await.unwrap();
-        let nach = aktualisiere(
+        let br = create(&pool, e, b, neu("BR Alt")).await.unwrap();
+        let nach = update(
             &pool,
             e,
             br.id,
@@ -545,8 +545,8 @@ mod tests {
     async fn aktualisiere_not_found_bei_falscher_einsatz_id() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Y")).await.unwrap();
-        let err = aktualisiere(&pool, e + 999, br.id, b, PatchDaten::default())
+        let br = create(&pool, e, b, neu("BR Y")).await.unwrap();
+        let err = update(&pool, e + 999, br.id, b, PatchDaten::default())
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::NotFound));
@@ -556,7 +556,7 @@ mod tests {
     async fn ungueltige_status_transition_ist_422() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Z")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Z")).await.unwrap();
         // geplant → aufgeloest ist erlaubt, aber aktiv → geplant ist verboten
         setze_status(&pool, e, br.id, "aktiv", b).await.unwrap();
         let err = setze_status(&pool, e, br.id, "geplant", b)
@@ -572,7 +572,7 @@ mod tests {
     async fn setze_status_not_found_bei_falschem_einsatz() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR NotFound")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR NotFound")).await.unwrap();
         let err = setze_status(&pool, e + 999, br.id, "aktiv", b)
             .await
             .unwrap_err();
@@ -583,7 +583,7 @@ mod tests {
     async fn aufloesen_blockiert_bei_aktiver_einheit_belegung() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Block")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Block")).await.unwrap();
         setze_status(&pool, e, br.id, "aktiv", b).await.unwrap();
         // Einheit anlegen und BR-Cache setzen (belegung_repo kommt erst in Task 4):
         sqlx::query(
@@ -611,7 +611,7 @@ mod tests {
     async fn aufloesen_blockiert_bei_aktiver_fahrzeug_belegung() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Block Fz")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Block Fz")).await.unwrap();
         setze_status(&pool, e, br.id, "aktiv", b).await.unwrap();
         // Fahrzeug anlegen mit BR-Cache:
         sqlx::query(
@@ -633,7 +633,7 @@ mod tests {
     async fn storniere_doppelt_ist_konflikt() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Doppel")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Doppel")).await.unwrap();
         storniere(&pool, e, br.id, b).await.unwrap();
         let err = storniere(&pool, e, br.id, b).await.unwrap_err();
         assert!(
@@ -646,7 +646,7 @@ mod tests {
     async fn aktive_belegungen_zaehlt_einheit_und_fahrzeug() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let br = anlegen(&pool, e, b, neu("BR Zaehlen")).await.unwrap();
+        let br = create(&pool, e, b, neu("BR Zaehlen")).await.unwrap();
         assert_eq!(
             aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br.id)
                 .await

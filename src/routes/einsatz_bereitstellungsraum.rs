@@ -301,7 +301,7 @@ pub struct AnlegenBody {
 
 /// POST /api/einsaetze/{id}/bereitstellungsraeume
 /// KEIN ETB-Eintrag (erst Inbetriebnahme ist lagerelevant). SSE.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
     JsonBody(body): JsonBody<AnlegenBody>,
@@ -311,7 +311,7 @@ pub async fn anlegen(
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
 
-    let br = br_repo::anlegen(
+    let br = br_repo::create(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -369,7 +369,7 @@ pub struct PatchBody {
 
 /// PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}
 /// KEIN ETB-Eintrag. SSE.
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
     PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
@@ -391,7 +391,7 @@ pub async fn aktualisieren(
         .notiz
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
-    let nachher = br_repo::aktualisiere(
+    let nachher = br_repo::update(
         &state.pool,
         einsatz_id,
         br_id,
