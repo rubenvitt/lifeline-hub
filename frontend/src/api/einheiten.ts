@@ -150,7 +150,11 @@ export function uebernehmeEinheit(
   eid: number,
   daten: UebernahmeBody,
 ): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/uebernehmen`, 'POST', daten);
+  return apiSend<Einheit>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/uebernehmen`,
+    'POST',
+    daten,
+  );
 }
 
 /**
