@@ -2,7 +2,7 @@
 //! design.md D8, Spec `benachrichtigungen`, „Meldung an mich“).
 //!
 //! Der Schreibweg ruft [`erfasst`] nach dem Commit, genau einmal je Meldung: dann, wenn er das
-//! Live-Bündel der Meldung zustellt (`routes::meldung::live_publikation_sicherstellen`, Marker
+//! Live-Bündel der Meldung zustellt (`meldung::live_publikation_sicherstellen`, Marker
 //! `live_published_at`). Eine Wiederholung derselben `client_id` meldet deshalb nicht noch einmal.
 //! Wer etwas bekommt, entscheidet [`crate::benachrichtigung::melden`] (`src/AGENTS.md`,
 //! Benachrichtigungen); hier steht nur, wer als Adressat gemeint ist.

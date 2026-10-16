@@ -25,6 +25,7 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.gefahrenmatrix).toBe('gefahrenmatrix');
     expect(EINSATZ_KEYS.br).toBe('einsatz-br');
     expect(EINSATZ_KEYS.brDetail).toBe('einsatz-br-detail');
+    expect(EINSATZ_KEYS.brVerlauf).toBe('einsatz-br-verlauf');
     // Als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.stab`, sonst prüfte der Pin die
     // Konstante gegen sich selbst. Ein geänderter Query-Key trifft still ein anderes Cache-Fach.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
@@ -114,9 +115,10 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Lagemonitor und Verpflegung ab (LFH-612/635/639, LLH-1055)', () => {
-    // Bezirke und Stellen tragen den Abschnittsnamen per Join; fehlt die Betreuung hier, zeigt die
-    // Seite still den alten Namen. Der Lagemonitor zeigt die Abschnittsflächen (LLH-1153).
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055)', () => {
+    // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
+    // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die
+    // Abschnittsflächen (LLH-1153).
     expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
@@ -124,6 +126,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.abloesungen,
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.lagemonitor,
+      EINSATZ_KEYS.br,
       // Die Empfängerliste der Verpflegung trägt die Abschnitte (LLH-1055 D4).
       EINSATZ_KEYS.verpflegung,
     ]);
@@ -189,6 +192,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.bereitstellungsraum).toEqual([
       EINSATZ_KEYS.br,
       EINSATZ_KEYS.brDetail,
+      EINSATZ_KEYS.brVerlauf,
     ]);
   });
 
@@ -326,6 +330,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(NICHT_LIVE_KEYS).toContain('einsatz-uhs-plan-bild');
     expect(einsatzKeys.tier(1, 2)).toEqual(['einsatz-tier', 1, 2]);
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
+    expect(einsatzKeys.brVerlauf(1, 2)).toEqual(['einsatz-br-verlauf', 1, 2]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);
     expect(einsatzKeys.lagebericht(1, 2)).toEqual(['einsatz-lagebericht', 1, 2]);
   });

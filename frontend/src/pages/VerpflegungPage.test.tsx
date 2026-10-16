@@ -16,6 +16,7 @@ import { parseNachforderungVorbelegung } from '../routing/deeplinks';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
+import { setzeOnline } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
@@ -144,6 +145,13 @@ async function oeffneMenue(zf: VerpflegungZeitfenster) {
   });
 }
 
+/** „Ausgabe nachtragen“ an Mittag: am Stab mit drei Aktionen im Menü (LLH-1032, D8). */
+async function nachtragenDialog() {
+  const menue = await oeffneMenue(mittag());
+  await userEvent.click(within(menue).getByText('Ausgabe nachtragen'));
+  return screen.findByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
+}
+
 describe('VerpflegungPage (LFH-634)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -210,7 +218,9 @@ describe('VerpflegungPage (LFH-634)', () => {
     await screen.findAllByRole('article');
     expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /^Ausgabe erfassen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Ausgabe nachtragen/ })).toBeNull();
+    // Kein Sprung zur Ausgabeansicht: dem Leser zeigt die Karte schon alles (LLH-1032, D1).
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Zurücknehmen/ })).toBeNull();
   });
@@ -249,18 +259,15 @@ describe('VerpflegungPage (LFH-634)', () => {
     });
   });
 
-  it('Ausgabe erfassen: POST, dann ruft „Rückgängig" die Rücknahme — ohne ETB-Invalidierung', async () => {
+  it('Ausgabe nachtragen: POST, dann ruft „Rückgängig" die Rücknahme — ohne ETB-Invalidierung', async () => {
     erfasseAusgabe.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
     nimmAusgabeZurueck.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
     const { client } = renderPage();
     await screen.findAllByRole('article');
     const spion = vi.spyOn(client, 'invalidateQueries');
-    await userEvent.click(
-      screen.getByRole('button', { name: `Ausgabe erfassen zu ${zeitfensterKennung(mittag())}` }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+    const dialog = await nachtragenDialog();
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
       expect(erfasseAusgabe).toHaveBeenCalledWith(
         1,
@@ -284,12 +291,9 @@ describe('VerpflegungPage (LFH-634)', () => {
   describe('Rückgängig abgelehnt (LFH-1077)', () => {
     async function erfasseUndNimmZurueck() {
       await screen.findAllByRole('article');
-      await userEvent.click(
-        screen.getByRole('button', { name: `Ausgabe erfassen zu ${zeitfensterKennung(mittag())}` }),
-      );
-      const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+      const dialog = await nachtragenDialog();
       await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
       const rueckgaengig = await screen.findAllByRole('button', { name: /Rückgängig/ });
       await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
     }
@@ -332,21 +336,19 @@ describe('VerpflegungPage (LFH-634)', () => {
 
   describe('Ausgabe ohne Verbindung (LFH-688)', () => {
     afterEach(async () => {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      setzeOnline(true);
       await queueLeerenFuerTests();
     });
 
     it('offline: vorgemerkt — Hinweis ohne Rückgängig, Dialog schließt, „ausstehend“ an der Karte', async () => {
       await queueLeerenFuerTests();
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       renderPage();
       await screen.findAllByRole('article');
-      await userEvent.click(
-        screen.getByRole('button', { name: `Ausgabe erfassen zu ${zeitfensterKennung(mittag())}` }),
-      );
-      const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+      // Geladen wird online, dann fällt das Netz weg — auch für TanStacks `onlineManager`.
+      setzeOnline(false);
+      const dialog = await nachtragenDialog();
       await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '40');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
 
       expect(await screen.findByText(/Offline vorgemerkt: 40 EP/)).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -378,6 +380,22 @@ describe('VerpflegungPage (LFH-634)', () => {
       const andere = await karte(abend());
       expect(andere.querySelector('[data-lfh="verpflegung-ausgabe-ausstehend"]')).toBeNull();
     });
+  });
+
+  it('„Ausgabe öffnen“ führt laufend und anstehend in die Ausgabeansicht, vergangen nicht (LLH-1032)', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    expect(
+      screen.getByRole('link', { name: `Ausgabe öffnen zu ${zeitfensterKennung(mittag())}` }),
+    ).toHaveAttribute('href', '/einsaetze/1/verpflegung/1/ausgabe');
+    expect(
+      screen.getByRole('link', { name: `Ausgabe öffnen zu ${zeitfensterKennung(abend())}` }),
+    ).toHaveAttribute('href', '/einsaetze/1/verpflegung/2/ausgabe');
+    await userEvent.click(screen.getByRole('radio', { name: /^vergangen/ }));
+    await screen.findByRole('article', {
+      name: `Zeitfenster ${zeitfensterKennung(fruehstueck())}`,
+    });
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen/ })).toBeNull();
   });
 
   it('Zurücknehmen aus der Liste fragt rot zurück; Abbrechen sendet nichts', async () => {

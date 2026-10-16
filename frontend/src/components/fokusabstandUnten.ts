@@ -25,6 +25,8 @@ export const FOKUSABSTAND_BEFEHL = '--lfh-befehl-fokusabstand';
 export const FOKUSABSTAND_ETB = '--lfh-etb-fokusabstand';
 /** Speicherleiste der Formularseiten (LFH-475): `scroll-margin` an den Feldern (`index.css`). */
 export const FOKUSABSTAND_SPEICHERLEISTE = '--lfh-speicherleiste-fokusabstand';
+/** Tastenfeld der Ausgabeansicht (LLH-1032): `scroll-padding` am Scrollport (`index.css`). */
+export const FOKUSABSTAND_ZAEHLTASTEN = '--lfh-zaehltasten-fokusabstand';
 
 /**
  * Callback-Ref-Körper: misst die Leiste, schreibt Höhe + `abstand` als `variable` an `<html>`

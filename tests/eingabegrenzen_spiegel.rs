@@ -77,6 +77,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             fuehrungsstelle::EINSATZLEITER_NAME_MAX,
         ),
         ("EINHEIT_VORLAGE_NAME_MAX", einheit_vorlage::NAME_MAX),
+        ("EINHEIT_BEMERKUNG_MAX", einheit::BEMERKUNG_MAX),
         (
             "EINHEIT_VORLAGE_FUNKRUFNAME_MAX",
             einheit_vorlage::FUNKRUFNAME_MAX,
@@ -110,6 +111,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX",
             verpflegung::STELLEN_JE_ZEITFENSTER_MAX,
+        ),
+        (
+            "VERPFLEGUNG_EP_MAX",
+            usize::try_from(verpflegung::MAX_EP).unwrap(),
         ),
     ])
 }

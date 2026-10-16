@@ -97,6 +97,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Bearbeiten, Löschen. Eine Fehlmenge geht als Meldung an die Einsatzleitung (`meldungVorbelegung`,
   `?inhalt=` auf der Meldungsseite), nie als Nachforderung; eine Ausgabe mit `nachforderung_id`
   lehnt der Server für jedes Gerät mit 403 ab. Ohne Stelle steht die Ansicht als Absender.
+  Gezählt wird auf der Unterseite `/geraet/:id/verpflegung/:zeitfensterId/ausgabe`
+  (`GeraetVerpflegungAusgabe`, LLH-1032); die Startseite bleibt die Liste, das Navigationsziel
+  „Verpflegung“ bleibt dort aktiv (`NavLink` ohne `end`). Karte und Ansicht wählen den Pfad über
+  `EinsatzPfade` (`verpflegung`, `verpflegungAusgabe`), nie über `useAuth().geraet`; eine neue
+  Serverroute gibt es dafür nicht.
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**

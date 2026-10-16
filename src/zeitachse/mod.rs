@@ -63,6 +63,8 @@ wire_enum! {
         Nachtrag => "nachtrag",
         /// Aus dem Entlassen der Kraft (LLH-1079).
         Disposition => "disposition",
+        /// Eintreffen, das der Bereitstellungsraum gebucht hat (LLH-1075, design.md D4).
+        Bereitstellungsraum => "bereitstellungsraum",
     }
     try_from = |s| format!("Ungültige Zeitachsen-Quelle: {s}");
 }

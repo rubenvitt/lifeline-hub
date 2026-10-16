@@ -26,7 +26,9 @@ import {
  *                  frontend/src/components/Erfassung.tsx
  *
  * Demo-Lücke (D3): der Demo-BR „Parkplatz Stadion Nord“ ist aktiv, aber leer. Die Spec stellt
- * dort zwei Einheiten bereit und legt einen zweiten, geplanten BR an.
+ * dort zwei Einheiten bereit und legt einen zweiten, geplanten BR an. Beide Einheiten tragen im
+ * Demo-Einsatz Fahrzeuge (Rettungsstaffel RTW 1 und RTW 2, Betreuungsgruppe MTW), „Fahrzeuge“ in
+ * raum.png zählt sie mit (LLH-1095).
  */
 
 const KAPITEL = 'bereitstellungsraeume';
@@ -109,6 +111,7 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
     await expect(page.getByText('Rettungsstaffel').first()).toBeVisible();
+    await expect(page.getByTestId('br-summe')).toContainText(/Fahrzeuge\s*3/);
     await expect(
       page.getByRole('button', { name: 'Sanitätszug Musterstadt zuweisen' }),
     ).toBeVisible();

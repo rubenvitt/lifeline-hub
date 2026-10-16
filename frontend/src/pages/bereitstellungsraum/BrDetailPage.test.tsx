@@ -9,7 +9,13 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
-import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
+import type {
+  BrDetail,
+  BrEinheitKurz,
+  EinsatzAnzeige,
+  Einheit,
+  EinsatzFahrzeug,
+} from '../../api/types';
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 
@@ -31,7 +37,24 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Test-Einsatz', meine_rolle: 'fuehrungspersonal', ...over });
 }
 
-function brDetail(over: Partial<BrDetail> = {}): BrDetail {
+type EinheitEingabe = Omit<BrEinheitKurz, 'fahrzeuge' | 'unangemeldet'> &
+  Partial<Pick<BrEinheitKurz, 'fahrzeuge' | 'unangemeldet'>>;
+
+/** Ohne Angabe folgt `belegung` den Listen, wie der Server zählt (LLH-1095): Einheiten, dazu
+ *  die einheitenlosen Fahrzeuge und die der Einheiten. */
+function brDetail(
+  over: Omit<Partial<BrDetail>, 'einheiten'> & { einheiten?: EinheitEingabe[] } = {},
+): BrDetail {
+  const einheiten = (over.einheiten ?? []).map((e) => ({
+    fahrzeuge: [],
+    unangemeldet: false,
+    ...e,
+  }));
+  const fahrzeuge = over.fahrzeuge ?? [];
+  const belegung = over.belegung ?? {
+    einheiten: einheiten.length,
+    fahrzeuge: einheiten.reduce((n, e) => n + e.fahrzeuge.length, fahrzeuge.length),
+  };
   return {
     id: 1,
     einsatz_id: 1,
@@ -45,9 +68,10 @@ function brDetail(over: Partial<BrDetail> = {}): BrDetail {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
-    einheiten: [],
-    fahrzeuge: [],
     ...over,
+    einheiten,
+    fahrzeuge,
+    belegung,
   };
 }
 
@@ -108,6 +132,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
     aktueller_br_id: null,
     sprechgruppen: [],
     status: { quelle: 'ohne', verteilung: [] },
+    unangemeldet: false,
     ...over,
   };
 }
@@ -477,6 +502,41 @@ describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
     const spalte = await screen.findByTestId('kraefte-ohne-br');
     expect(spalte.style.width).toBe('240px');
     expect(screen.getByTestId('br-detail-rahmen').style.flexDirection).toBe('row');
+  });
+});
+
+describe('BrDetailPage — Fahrzeuge der Einheiten zählen mit (LLH-1095)', () => {
+  // Zwei Einheiten mit je einem Fahrzeug und ein Fahrzeug ohne Einheit: die Kennzahl liest den
+  // Serverwert (3), „noch n belegt“ zählt wie die Sperre des Servers nur Einheiten und
+  // einheitenlose Fahrzeuge (3, nicht 5).
+  const br = brDetail({
+    status: 'aktiv',
+    einheiten: [
+      { id: 10, name: '1. Zug', fahrzeuge: [{ id: 21, funkrufname: 'Florian 1/44-1' }] },
+      { id: 11, name: '2. Zug', fahrzeuge: [{ id: 22, funkrufname: 'Florian 1/44-2' }] },
+    ],
+    fahrzeuge: [{ id: 23, funkrufname: 'Florian 1/83-1' }],
+    belegung: { einheiten: 2, fahrzeuge: 3 },
+  });
+
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+  });
+
+  it('Fahrzeuge 3', async () => {
+    renderBrDetail();
+    const summe = await screen.findByTestId('br-summe');
+    expect(summe).toHaveTextContent(/Fahrzeuge\s*3$/);
+  });
+
+  it('noch 3 belegt, nicht 5', async () => {
+    renderBrDetail();
+    expect(await screen.findByText('noch 3 belegt')).toBeInTheDocument();
   });
 });
 

@@ -7,15 +7,19 @@ import {
   geraetPatientenPfad,
   geraetPersonPfad,
   geraetUhsPfad,
+  geraetVerpflegungAusgabePfad,
+  geraetVerpflegungPfad,
   personDetailPfad,
   personenAufnahmePfad,
   personenPfad,
   uhsDetailPfad,
+  verpflegungAusgabePfad,
+  verpflegungPfad,
 } from './deeplinks';
 
 /**
  * Wohin die Seiten führen, die Stabsoberfläche und Gerätehülle teilen (LFH-892, design.md D9):
- * Aufnahme, UHS mit Grundriss, Person. Unter `/einsaetze` die Modulpfade, in der Gerätehülle
+ * Aufnahme, UHS mit Grundriss, Person, Verpflegung samt Ausgabeansicht (LLH-1032). Unter `/einsaetze` die Modulpfade, in der Gerätehülle
  * deren Gegenstücke unter `/geraet`. Die Pfade selbst stehen in `deeplinks.ts`; hier wird nur
  * gewählt. Ohne Provider gilt die Stabsoberfläche.
  */
@@ -24,6 +28,8 @@ export interface EinsatzPfade {
   personenListe: (einsatzId: number) => string;
   uhsDetail: (einsatzId: number, uhsId: number) => string;
   aufnahme: (einsatzId: number, opts?: { uhs?: number }) => string;
+  verpflegung: (einsatzId: number) => string;
+  verpflegungAusgabe: (einsatzId: number, zeitfensterId: number) => string;
 }
 
 export const STAB_PFADE: EinsatzPfade = {
@@ -31,6 +37,8 @@ export const STAB_PFADE: EinsatzPfade = {
   personenListe: (einsatzId) => personenPfad(einsatzId),
   uhsDetail: uhsDetailPfad,
   aufnahme: personenAufnahmePfad,
+  verpflegung: verpflegungPfad,
+  verpflegungAusgabe: verpflegungAusgabePfad,
 };
 
 export const GERAET_PFADE: EinsatzPfade = {
@@ -38,17 +46,22 @@ export const GERAET_PFADE: EinsatzPfade = {
   personenListe: geraetPatientenPfad,
   uhsDetail: geraetUhsPfad,
   aufnahme: geraetAufnahmePfad,
+  verpflegung: geraetVerpflegungPfad,
+  verpflegungAusgabe: geraetVerpflegungAusgabePfad,
 };
 
 /**
  * Gerät einer Betreuungsstelle (LFH-1041): Personen heißen Betroffene und stehen unter eigenem
- * Pfad; eine UHS gibt es dort nicht, der Weg dorthin führt auf die Betroffenen.
+ * Pfad; eine UHS gibt es dort nicht, der Weg dorthin führt auf die Betroffenen. Die Verpflegung
+ * ist dort nicht erreichbar; ihre Pfade stehen wie beim übrigen Gerät nur der Vollständigkeit halber.
  */
 export const GERAET_BETREUUNG_PFADE: EinsatzPfade = {
   personDetail: geraetBetroffenerPfad,
   personenListe: geraetBetroffenePfad,
   uhsDetail: (einsatzId) => geraetBetroffenePfad(einsatzId),
   aufnahme: (einsatzId) => geraetBetroffenAufnahmePfad(einsatzId),
+  verpflegung: geraetVerpflegungPfad,
+  verpflegungAusgabe: geraetVerpflegungAusgabePfad,
 };
 
 const PfadeKontext = createContext<EinsatzPfade>(STAB_PFADE);

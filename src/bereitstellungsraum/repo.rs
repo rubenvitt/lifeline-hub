@@ -26,25 +26,38 @@ pub struct PatchDaten<'a> {
     pub notiz: Option<Option<&'a str>>,
 }
 
-/// BR eines Einsatzes (ohne stornierte), optional gefiltert nach Status und/oder Abschnitt.
+/// Zeile der Liste: Raum und Name seines Abschnitts (LLH-1095, design.md D4).
+#[derive(Debug, sqlx::FromRow)]
+pub struct ListenZeile {
+    #[sqlx(flatten)]
+    pub br: BrAnzeige,
+    pub abschnitt_name: Option<String>,
+}
+
+/// BR eines Einsatzes (ohne stornierte), optional gefiltert nach Status und/oder Abschnitt, mit
+/// dem Namen des Abschnitts.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     status: Option<&str>,
     abschnitt_id: Option<i64>,
-) -> Result<Vec<BrAnzeige>, AppError> {
-    let sql = format!(
-        "{SELECT_ALLE} WHERE einsatz_id = ?1 AND storniert_at IS NULL \
-         AND (?2 IS NULL OR status = ?2) \
-         AND (?3 IS NULL OR abschnitt_id = ?3) \
-         ORDER BY bezeichnung"
-    );
-    Ok(sqlx::query_as::<_, BrAnzeige>(sqlx::AssertSqlSafe(&*sql))
-        .bind(einsatz_id)
-        .bind(status)
-        .bind(abschnitt_id)
-        .fetch_all(pool)
-        .await?)
+) -> Result<Vec<ListenZeile>, AppError> {
+    Ok(sqlx::query_as::<_, ListenZeile>(
+        "SELECT b.id, b.einsatz_id, b.abschnitt_id, b.bezeichnung, b.standort, b.notiz, \
+                b.status, b.erfasst_at, b.erfasst_von, b.geaendert_at, b.geaendert_von, \
+                b.storniert_at, a.name AS abschnitt_name \
+         FROM bereitstellungsraum b \
+         LEFT JOIN einsatzabschnitt a ON a.id = b.abschnitt_id \
+         WHERE b.einsatz_id = ?1 AND b.storniert_at IS NULL \
+           AND (?2 IS NULL OR b.status = ?2) \
+           AND (?3 IS NULL OR b.abschnitt_id = ?3) \
+         ORDER BY b.bezeichnung",
+    )
+    .bind(einsatz_id)
+    .bind(status)
+    .bind(abschnitt_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 /// Lädt einen BR (auch stornierte) eines Einsatzes; `NotFound`, falls er nicht

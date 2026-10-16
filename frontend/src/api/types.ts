@@ -412,6 +412,20 @@ export type BrDetail = S['BrDetail'];
 export type BrEinheitKurz = S['BrEinheitKurz'];
 export type BrFahrzeugKurz = S['BrFahrzeugKurz'];
 export type BrBelegung = S['BrBelegungAnzeige'];
+// LLH-1095: Kennzahlen, Fahrzeuge der Einheiten, Liste mit Belegung, Verlauf.
+export type BrBelegungKennzahlen = S['BrBelegungKennzahlen'];
+export type BrEinheitFahrzeug = S['BrEinheitFahrzeug'];
+export type BrListenEintrag = S['BrListenEintrag'];
+export type BrVerlaufArt = S['BrVerlaufArt'];
+export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
+// LLH-1075: Eintreffen buchen (bekannt oder unangemeldet), Übernehmen einer unangemeldeten Einheit.
+export type EintreffenEingabe = S['EintreffenEingabe'];
+export type EintreffenErgebnis = S['EintreffenErgebnis'];
+export type EintreffenZeitachse = S['EintreffenZeitachse'];
+export type UebernahmeBody = S['UebernahmeBody'];
+// LLH-1085: Abruf einer Kraft aus dem Raum (abgeleitet im Detail, Antwort der Route).
+export type BrAbrufKurz = S['BrAbrufKurz'];
+export type BrAbrufErgebnis = S['BrAbrufErgebnis'];
 
 // ============================== Chat / Anhänge ==============================
 export type ChatKanal = S['ChatKanalAnzeige'];

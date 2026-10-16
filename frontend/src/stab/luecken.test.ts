@@ -67,6 +67,7 @@ function einheit(
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     status: { quelle: 'ohne', verteilung: [] },
+    unangemeldet: false,
   } as Einheit;
 }
 

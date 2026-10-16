@@ -60,6 +60,9 @@ export const EINSATZ_KEYS = {
   lagemeldungen: 'einsatz-lagemeldungen',
   br: 'einsatz-br',
   brDetail: 'einsatz-br-detail',
+  // Verlauf eines Raums (LLH-1095): eigener Prefix, lädt erst beim Aufklappen; live über
+  // `bereitstellungsraum`, nicht auf der Platte.
+  brVerlauf: 'einsatz-br-verlauf',
   kartenbilder: 'einsatz-kartenbilder',
   etb: 'etb',
   befehle: 'einsatz-befehle',
@@ -231,6 +234,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.betreuung,
     // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
     EINSATZ_KEYS.lagemonitor,
+    // Die BR-Liste trägt den Abschnittsnamen per Join (LLH-1095).
+    EINSATZ_KEYS.br,
     // Abschnitte als Empfänger und Abschnittsnamen der Einheiten in der Empfängerliste der
     // Verpflegung (LLH-1055 D4).
     EINSATZ_KEYS.verpflegung,
@@ -277,8 +282,8 @@ export const EINSATZ_STREAM_EVENTS = {
   auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
   nachforderung: [EINSATZ_KEYS.nachforderungen],
   meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
-  // Liste + Detail (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
-  bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail],
+  // Liste + Detail + Verlauf (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
+  bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail, EINSATZ_KEYS.brVerlauf],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
@@ -789,6 +794,8 @@ export const einsatzKeys = {
   // Bereitstellungsraum
   br: (einsatzId: number) => [EINSATZ_KEYS.br, einsatzId] as const,
   brDetail: (einsatzId: number, brId: number) => [EINSATZ_KEYS.brDetail, einsatzId, brId] as const,
+  brVerlauf: (einsatzId: number, brId: number) =>
+    [EINSATZ_KEYS.brVerlauf, einsatzId, brId] as const,
 
   // Befehle
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,

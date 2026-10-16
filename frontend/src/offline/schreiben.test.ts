@@ -4,7 +4,7 @@ import { ApiError, NetzFehler } from '../api/client';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
-import { queueLeerenFuerTests, schreibaktionenLaden } from './queue';
+import { OFFLINE_QUEUE_EVENT, queueLeerenFuerTests, schreibaktionenLaden } from './queue';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from './serveruhr';
 import {
   erfasseBelegungOfflineFaehig,
@@ -12,6 +12,7 @@ import {
   erfassePersonOfflineFaehig,
   erfasseStandOfflineFaehig,
   erfasseVerpflegungsausgabeOfflineFaehig,
+  merkeVerpflegungsausgabeVor,
 } from './schreiben';
 
 vi.mock('../api/einsatzPerson', async (importOriginal) => {
@@ -358,5 +359,60 @@ describe('Erfassungszeitpunkt nach der Serveruhr (LFH-705)', () => {
     );
     const [zeile] = await schreibaktionenLaden(11, 7);
     expect(zeile.aktion.daten).toHaveProperty('zeitpunkt_at', '2026-10-01 10:00:00');
+  });
+});
+
+describe('Sammlung direkt vormerken (LLH-1032, design.md D5)', () => {
+  const mittag = { id: 9, bezeichnung: 'Mittag' };
+  const SERVER = Date.parse('2026-10-01T10:00:00Z');
+
+  // Die Geräteuhr geht 5 min vor; der Server hat einmal geantwortet.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + 5 * 60_000);
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('schreibt online ohne Sendeversuch in die Queue, mit client_id und Zeit nach der Serveruhr', async () => {
+    const ereignisse: Event[] = [];
+    const hoerer = (e: Event) => ereignisse.push(e);
+    window.addEventListener(OFFLINE_QUEUE_EVENT, hoerer);
+    try {
+      const ergebnis = await merkeVerpflegungsausgabeVor(11, 7, mittag, {
+        menge: 7,
+        sonderkost: { vegetarisch: 2 },
+      });
+      expect(erfasseAusgabe).not.toHaveBeenCalled();
+      const [zeile] = await schreibaktionenLaden(11, 7);
+      expect(zeile.aktion).toEqual({
+        art: 'ausgabe',
+        zeitfenster_id: 9,
+        bezeichnung: 'Mittag',
+        daten: {
+          menge: 7,
+          sonderkost: { vegetarisch: 2 },
+          client_id: expect.any(String),
+          zeitpunkt_at: '2026-10-01 10:00:00',
+        },
+      });
+      expect(ergebnis).toEqual({
+        zustand: 'vorgemerkt',
+        client_id: (zeile.aktion.daten as { client_id: string }).client_id,
+      });
+      expect(ereignisse.length).toBeGreaterThan(0);
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, hoerer);
+    }
+  });
+
+  it('zwei Sammlungen tragen zwei verschiedene client_id', async () => {
+    await merkeVerpflegungsausgabeVor(11, 7, mittag, { menge: 1 });
+    await merkeVerpflegungsausgabeVor(11, 7, mittag, { menge: 2 });
+    const zeilen = await schreibaktionenLaden(11, 7);
+    const ids = zeilen.map((z) => (z.aktion.daten as { client_id: string }).client_id);
+    expect(new Set(ids).size).toBe(2);
   });
 });

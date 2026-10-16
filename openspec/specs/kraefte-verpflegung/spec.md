@@ -71,7 +71,11 @@ Das System SHALL je Zeitfenster Ausgaben führen. Eine Ausgabe trägt Zeitpunkt,
 optional eine Verpflegungsstelle, optional Ort, Sonderkost je Kostform, optional den Verweis auf
 eine Nachforderung und optional eine Bemerkung. Ausgaben MUST append-only sein: Es gibt keine
 Bearbeitung, eine falsche Ausgabe wird zurückgenommen. Das System MUST einen Zeitpunkt außerhalb
-des Zeitfensters annehmen (Anlieferung vor Beginn).
+des Zeitfensters annehmen (Anlieferung vor Beginn). Die Oberfläche SHALL Ausgaben auf zwei Wegen
+erfassen: durch Zählen in der Ausgabeansicht (Requirement „Ausgabe zählen“) und über das
+Formular „Ausgabe nachtragen“ mit Menge, Zeitpunkt, Ort, Sonderkost, Nachforderung und
+Bemerkung. Nach einer gesendeten Erfassung MUST die Oberfläche einen Hinweis mit „Rückgängig“
+zeigen. Ein neuer Hinweis MUST den vorigen ersetzen.
 
 #### Scenario: Ausgabe erfassen
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 120 EP am Ort „Verpflegungsstelle Deich“ um 11:40 erfasst wird
@@ -86,8 +90,16 @@ des Zeitfensters annehmen (Anlieferung vor Beginn).
 - **THEN** antwortet das System mit 400
 
 #### Scenario: Rückgängig nach dem Erfassen
-- **WHEN** eine Person eine Ausgabe über den Dialog erfasst hat
-- **THEN** zeigt die Seite einen Hinweis mit der Aktion „Rückgängig“, die die Ausgabe zurücknimmt
+- **WHEN** eine Person mit Verbindung eine Ausgabe über „Ausgabe nachtragen“ erfasst hat oder eine gezählte Sammlung in der geöffneten Ausgabeansicht gebucht wurde
+- **THEN** zeigt die Seite einen Hinweis mit der Aktion „Rückgängig“, die genau diese Ausgabe zurücknimmt
+
+#### Scenario: Nur der letzte Rückweg
+- **WHEN** zwei Sammlungen nacheinander gebucht werden
+- **THEN** steht nur ein Hinweis mit „Rückgängig“, und er gilt der zweiten Sammlung
+
+#### Scenario: Nachtragen in der Vergangenheit
+- **WHEN** eine Person über „Ausgabe nachtragen“ zum vergangenen Zeitfenster „Frühstück“ 40 EP mit Zeitpunkt 07:30 erfasst
+- **THEN** ist die Ausgabe mit dem Zeitpunkt 07:30 gespeichert und zählt in die ausgegebene Menge von „Frühstück“
 
 ### Requirement: Ausgabe zurücknehmen
 
@@ -293,7 +305,10 @@ Die Seite des Moduls SHALL die Zeitfenster nach Beginn geordnet zeigen, getrennt
 Zeitfenster zeigt Bezeichnung, Zeitraum, Gesamtbedarf mit Aufteilung, ausgegebene Menge,
 Fehlmenge, Einstufung, die Sonderkost mit Bedarf, Ausgabe und Fehlmenge je belegter Kostform
 sowie seine Ausgaben mit Zeitpunkt, Ort und Menge. Zahlen und Zeiten MUST in Monospace mit
-tabellarischen Ziffern stehen.
+tabellarischen Ziffern stehen. Mit Schreibrecht MUST ein laufendes oder anstehendes Zeitfenster
+den Sprung „Ausgabe öffnen“ in seine Ausgabeansicht tragen. Jedes Zeitfenster MUST mit
+Schreibrecht die Aktion „Ausgabe nachtragen“ tragen, auch ein vergangenes. Ein vergangenes
+Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
 
 #### Scenario: Leeres Modul
 - **WHEN** ein Einsatz noch kein Zeitfenster hat
@@ -302,6 +317,18 @@ tabellarischen Ziffern stehen.
 #### Scenario: Vergangenes Zeitfenster mit Unterdeckung
 - **WHEN** ein Zeitfenster mit Fehlmenge 20 vorbei ist
 - **THEN** steht es in der Ansicht „vergangen“ weiterhin mit „Unterdeckung“ und Fehlmenge 20
+
+#### Scenario: Sprung in die Ausgabe
+- **WHEN** eine Person mit Schreibrecht am laufenden Zeitfenster „Mittag“ „Ausgabe öffnen“ wählt
+- **THEN** zeigt die Oberfläche die Ausgabeansicht von „Mittag“, am Verpflegungsgerät unter dessen eigener Adresse
+
+#### Scenario: Vergangenes Zeitfenster nur nachtragen
+- **WHEN** eine Person mit Schreibrecht die Ansicht „vergangen“ öffnet
+- **THEN** trägt jedes Zeitfenster dort „Ausgabe nachtragen“ und keinen Sprung „Ausgabe öffnen“
+
+#### Scenario: Ohne Schreibrecht kein Sprung
+- **WHEN** eine Person ohne Schreibrecht die Seite des Moduls öffnet
+- **THEN** trägt kein Zeitfenster „Ausgabe öffnen“ oder „Ausgabe nachtragen“
 
 ### Requirement: Schwärzung
 
@@ -397,15 +424,23 @@ einem abgeschlossenen Einsatz MUST weiter mit 409 abgelehnt werden.
 ### Requirement: Ausgabe ohne Verbindung vormerken
 
 Die Oberfläche MUST eine Ausgabe, die mangels Verbindung nicht gesendet werden kann, auf dem
-Gerät vormerken und bei wiederhergestellter Verbindung senden. Die vorgemerkte Ausgabe MUST den
-Zeitpunkt der Erfassung tragen, wenn keiner eingetragen ist. Der Hinweis nach dem Vormerken MUST
-ohne „Rückgängig“ erscheinen. Eine fachlich abgelehnte Ausgabe MUST mit Grund und Inhalt sichtbar
-bleiben, bis sie verworfen oder erneut versucht wird.
+Gerät vormerken und bei wiederhergestellter Verbindung senden. Das gilt für eine nachgetragene
+Ausgabe wie für eine gezählte Sammlung. Die vorgemerkte Ausgabe MUST den Zeitpunkt der
+Erfassung tragen, wenn keiner eingetragen ist. Der Hinweis nach dem Vormerken MUST ohne
+„Rückgängig“ erscheinen. Ein neuer Hinweis MUST den vorigen ersetzen. Eine Sammlung, die beim
+Wechsel des Zeitfensters, beim Verlassen der Ansicht oder beim Verbergen der Seite vorgemerkt
+wird, MUST ohne Hinweis vorgemerkt werden. Eine fachlich abgelehnte Ausgabe MUST mit Grund und
+Inhalt sichtbar bleiben, bis sie verworfen oder erneut versucht wird.
 
 #### Scenario: Ausgabe ohne Verbindung
-- **WHEN** eine Person ohne Netzverbindung im Dialog „Ausgabe erfassen“ 120 EP zu „Mittag“ erfasst
+- **WHEN** eine Person ohne Netzverbindung über „Ausgabe nachtragen“ 120 EP zu „Mittag“ erfasst
 - **THEN** zeigt die Seite einen Hinweis, dass die Ausgabe vorgemerkt ist, und bietet kein „Rückgängig“ an
 - **AND** nach wiederhergestellter Verbindung ist die Ausgabe genau einmal gespeichert, mit dem Zeitpunkt der Erfassung
+
+#### Scenario: Sammlung ohne Verbindung
+- **WHEN** eine Sammlung von 8 Portionen ohne Netzverbindung abgeschlossen wird
+- **THEN** zeigt die Seite einen Hinweis, dass 8 EP vorgemerkt sind, ohne „Rückgängig“
+- **AND** nach wiederhergestellter Verbindung ist genau eine Ausgabe über 8 EP gespeichert, mit dem Zeitpunkt des Abschlusses
 
 #### Scenario: Online bleibt Rückgängig
 - **WHEN** eine Person mit Verbindung eine Ausgabe erfasst
@@ -616,7 +651,10 @@ MUST das System die Ausgabe mit 409 ablehnen, wenn ihr Zeitpunkt nicht vor der A
 eine Ausgabe mit früherem Zeitpunkt MUST angenommen werden. Die Prüfung des Empfängers MUST nach
 dem Replay über `client_id` und nach der Prüfung auf einen aktiven Einsatz laufen; ein Replay
 MUST die gespeicherte Ausgabe ohne diese Prüfung liefern. Eine Ausgabe mit Empfänger MUST wie
-jede Ausgabe keinen ETB-Eintrag schreiben.
+jede Ausgabe keinen ETB-Eintrag schreiben. Eine Ausgabe ohne Empfänger MUST weiter angenommen
+werden; so bucht die Ausgabeansicht eine gezählte Sammlung (Requirement „Ausgabe zählen“) und
+das Formular „Ausgabe nachtragen“ eine Ausgabe, solange sie keinen Empfänger nennen. Eine als
+eine Ausgabe gebuchte Sammlung trägt damit höchstens einen Empfänger für alle ihre Portionen.
 
 #### Scenario: Abholung durch eine Einheit
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 9 EP an die Einheit „2. Gruppe“ erfasst wird
@@ -659,6 +697,10 @@ jede Ausgabe keinen ETB-Eintrag schreiben.
 - **WHEN** der Abschnitt „Deich“ gelöscht wird, an den eine Ausgabe ging
 - **THEN** bleibt die Ausgabe mit Menge und Zeitpunkt bestehen und zählt weiter in die ausgegebene Menge, nur ohne Empfänger
 
+#### Scenario: Gezählte Sammlung ohne Empfänger
+- **WHEN** in der Ausgabeansicht von „Mittag“ eine Sammlung von 20 Portionen ohne Empfänger gebucht wird
+- **THEN** ist genau eine Ausgabe über 20 EP ohne Empfänger gespeichert und zählt in die ausgegebene Menge des Zeitfensters
+
 ### Requirement: Empfängerliste der Verpflegung
 
 Die Antwort des Verpflegungsmoduls SHALL eine Empfängerliste enthalten: alle nicht aufgelösten
@@ -697,3 +739,136 @@ Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
 #### Scenario: Aufgelöste Einheit mit Ausgabe
 - **WHEN** die Einheit „2. Gruppe“ eine Ausgabe bekommen hat und danach aufgelöst wurde
 - **THEN** steht sie in der Empfängerliste mit ihrem Namen und dem Zeitpunkt der Auflösung
+
+### Requirement: Ausgabeansicht eines Zeitfensters
+
+Die Oberfläche SHALL je Zeitfenster eine Ausgabeansicht als eigene Adresse führen, an der
+Stabsoberfläche unter `/einsaetze/{id}/verpflegung/{zeitfensterId}/ausgabe` und am
+Verpflegungsgerät unter `/geraet/{id}/verpflegung/{zeitfensterId}/ausgabe`. Die Ansicht MUST
+Bedarf, ausgegebene Menge und Fehlmenge des Zeitfensters groß als Zahl und als Balken zeigen,
+dazu die Einstufung aus Wort und Rollenfarbe. Die Menge der offenen Sammlung und die auf dem
+Gerät vorgemerkten Ausgaben MUST sie getrennt davon zeigen, als „Sammlung“ bzw. „ausstehend“.
+Beide MUST NOT in Fehlmenge oder Einstufung zählen. Die Ansicht MUST die zehn jüngsten Ausgaben
+des Zeitfensters mit Zeitpunkt, Menge und Sonderkost zeigen. Gültige Ausgaben tragen dort
+„Zurücknehmen“, ausstehende nicht. Die Taste „+1“ MUST in jeder Dichtestufe mindestens 72 px
+hoch sein und am unteren Rand der Ansicht stehen. Alle übrigen Zähltasten MUST mindestens die
+Steuerhöhe der Stufe erreichen. Ein Tipp, eine Ablehnung oder ein Wechsel der Verbindung MUST
+NOT eine Zähltaste verschieben. Ohne Schreibrecht MUST die Ansicht den Hinweis auf den Grund
+zeigen, die Zähltasten gesperrt stehen lassen und „Zurücknehmen“ weglassen (Requirement „Rechte
+und Modulsichtbarkeit“). Die Startseite des Verpflegungsgeräts MUST die Liste der Zeitfenster
+bleiben.
+
+#### Scenario: Ansicht öffnen
+- **WHEN** eine Person mit Schreibrecht am laufenden Zeitfenster „Mittag“ (Bedarf 150, ausgegeben 80) „Ausgabe öffnen“ wählt
+- **THEN** öffnet die Ausgabeansicht unter der Adresse des Zeitfensters und zeigt Bedarf 150, ausgegeben 80 und fehlt 70
+
+#### Scenario: Ausstehend getrennt
+- **WHEN** zum Zeitfenster „Mittag“ (Bedarf 150, ausgegeben 80) auf diesem Gerät 12 EP vorgemerkt sind
+- **THEN** zeigt die Ausgabeansicht „+ 12 ausstehend“ getrennt von der ausgegebenen Menge
+- **AND** sie zeigt weiter ausgegeben 80 und fehlt 70
+
+#### Scenario: Unbekanntes Zeitfenster
+- **WHEN** die Adresse ein Zeitfenster nennt, das es im Einsatz nicht oder nicht mehr gibt
+- **THEN** zeigt die Ansicht, dass es dieses Zeitfenster nicht gibt, mit einem Weg zur Verpflegung, und keine Zähltasten
+
+#### Scenario: Beobachter öffnet die Adresse
+- **WHEN** eine Person ohne Schreibrecht die Ausgabeansicht eines Zeitfensters öffnet
+- **THEN** sieht sie Bedarf, Ausgaben und Fehlmenge und den Hinweis auf das fehlende Schreibrecht
+- **AND** die Zähltasten stehen gesperrt, und keine Ausgabe trägt „Zurücknehmen“
+
+#### Scenario: Große Taste in jeder Stufe
+- **WHEN** die Ausgabeansicht in der Dichtestufe `kompakt` gezeigt wird
+- **THEN** ist die Taste „+1“ mindestens 72 px hoch und steht am unteren Rand der Ansicht
+
+#### Scenario: Erster Tipp verschiebt nichts
+- **WHEN** in der Ausgabeansicht eines Zeitfensters mit belegter Sonderkost der erste Tipp eine Sammlung beginnt
+- **THEN** stehen alle Zähltasten danach an derselben Stelle wie davor
+
+#### Scenario: Gerät behält seine Startseite
+- **WHEN** das Verpflegungsgerät nach dem Koppeln oder Neuladen seine Startseite öffnet
+- **THEN** zeigt es die Liste der Zeitfenster, nicht die Ausgabeansicht eines Zeitfensters
+
+### Requirement: Ausgabe zählen
+
+Die Ausgabeansicht SHALL Portionen durch Tippen zählen: „+1“, „+5“ und „+10“ zählen so viele
+Portionen Normalkost, „Menge …“ eine eingegebene Zahl, und je Kostform mit Bedarf größer 0 im
+Zeitfenster zählt eine eigene Taste eine Portion dieser Kostform. Die übrigen Kostformen MUST
+über ein Menü zählbar sein. Eine Portion einer Kostform MUST zugleich in die Menge zählen. Ein
+Tipp MUST die angezeigte Sammlung ohne Netzanfrage sofort erhöhen. Die gezählten Portionen
+bilden eine Sammlung. Die Oberfläche MUST eine Sammlung als genau eine Ausgabe mit genau einem
+Idempotenzschlüssel `client_id` senden oder vormerken, und zwar sobald eine dieser Bedingungen
+eintritt:
+
+- 3 s ohne Tipp,
+- 15 s nach dem ersten Tipp der Sammlung,
+- 50 oder mehr Portionen in der Sammlung,
+- „Buchen“,
+- das Zeitfenster wird vergangen,
+- Wechsel des Zeitfensters oder Verlassen der Ansicht,
+- die Seite wird verborgen oder beendet.
+
+In den beiden letzten Fällen MUST die Oberfläche die Sammlung sofort ohne eigenen Sendeversuch
+vormerken, die Warteschlange sendet sie. „−1“ MUST nur die zuletzt gezählte Portion der offenen
+Sammlung zurücknehmen, auch eine Portion einer Kostform. Ohne offene Sammlung MUST „−1“
+gesperrt stehen, mit dem Grund am Element. Eine gesendete Sammlung MUST ohne Zeitpunkt gehen (es
+gilt die Serveruhr), eine vorgemerkte MUST den Zeitpunkt ihres Abschlusses tragen. Eine leere
+Sammlung MUST keine Anfrage erzeugen. „Menge …“ MUST NOT mehr zulassen, als die Sammlung bis
+zur Höchstmenge des Servers je Ausgabe noch aufnehmen kann. In einem vergangenen Zeitfenster
+MUST die Ansicht nicht zählen. Die Zähltasten stehen dort gesperrt mit Grund, und das Nachtragen
+bleibt möglich.
+
+#### Scenario: Zählen und nach Ruhe buchen
+- **WHEN** eine Person mit Verbindung im laufenden Zeitfenster „Mittag“ zwanzigmal „+1“ tippt und dann 3 s nichts tippt
+- **THEN** zeigt die Ansicht während des Tippens die Sammlung 1 bis 20, ohne dass eine Anfrage gesendet wird
+- **AND** danach ist genau eine Ausgabe über 20 EP mit einer `client_id` gespeichert
+
+#### Scenario: Höchstdauer bei Dauerbetrieb
+- **WHEN** eine Person alle 2 s „+1“ tippt
+- **THEN** wird die Sammlung spätestens 15 s nach ihrem ersten Tipp als eine Ausgabe gebucht, und der nächste Tipp beginnt eine neue Sammlung
+
+#### Scenario: Gruppe über Menge
+- **WHEN** eine Person in einer leeren Sammlung über „Menge …“ 60 Portionen zählt
+- **THEN** wird sofort eine Ausgabe über 60 EP gebucht
+
+#### Scenario: Sonderkost zählt in die Menge
+- **WHEN** in einer Sammlung dreimal „+1“ und zweimal „vegetarisch“ getippt wird und die Sammlung gebucht wird
+- **THEN** ist genau eine Ausgabe über 5 EP mit 2 vegetarisch gespeichert, und der Server lehnt sie nicht ab
+
+#### Scenario: Minus nimmt die letzte Portion
+- **WHEN** in einer Sammlung „+1“ und danach „vegan“ getippt wird und dann „−1“
+- **THEN** enthält die Sammlung eine Portion Normalkost und keine vegane Portion
+
+#### Scenario: Menge an der Höchstgrenze
+- **WHEN** eine Sammlung 10 Portionen enthält und eine Person über „Menge …“ 99 995 eingibt
+- **THEN** lässt das Feld das nicht zu, und es entsteht keine Anfrage über der Grenze von 100 000 EP
+
+#### Scenario: Minus ohne Sammlung
+- **WHEN** keine Sammlung offen ist
+- **THEN** ist „−1“ gesperrt, und der Grund steht am Element
+
+#### Scenario: Sammlung auf null
+- **WHEN** eine Sammlung mit einer Portion durch „−1“ leer wird
+- **THEN** entsteht keine Anfrage und keine Ausgabe
+
+#### Scenario: Tablet wird gesperrt
+- **WHEN** während einer offenen Sammlung von 7 Portionen die Seite verborgen wird
+- **THEN** steht die Sammlung als vorgemerkte Ausgabe über 7 EP in der Warteschlange mit dem Zeitpunkt ihres Abschlusses
+- **AND** nach der Rückkehr ist sie genau einmal gespeichert
+
+#### Scenario: Ansicht verlassen
+- **WHEN** eine Person während einer offenen Sammlung von 4 Portionen zur Liste der Zeitfenster wechselt
+- **THEN** steht die Sammlung ohne Rückfrage als eine Ausgabe über 4 EP in der Warteschlange
+- **AND** mit Verbindung ist sie danach genau einmal gespeichert
+
+#### Scenario: Abgelehnt nach dem Verlassen
+- **WHEN** eine beim Verlassen der Ansicht vorgemerkte Sammlung beim Senden abgelehnt wird, weil ihr Zeitfenster inzwischen gelöscht ist
+- **THEN** steht sie im Wiederherstellungsbereich mit dem Grund und dem vollständigen Inhalt
+
+#### Scenario: Ohne Verbindung zählen
+- **WHEN** eine Person ohne Netzverbindung zehnmal „+1“ tippt und 3 s wartet
+- **THEN** steht eine Ausgabe über 10 EP als „ausstehend“ an der Ansicht, und Fehlmenge und Einstufung bleiben unverändert
+- **AND** nach wiederhergestellter Verbindung ist sie genau einmal gespeichert, und die ausgegebene Menge ist um 10 gestiegen
+
+#### Scenario: Vergangenes Zeitfenster
+- **WHEN** die Ausgabeansicht eines Zeitfensters gezeigt wird, dessen Ende vorbei ist
+- **THEN** sind alle Zähltasten gesperrt mit dem Grund „Zeitfenster vorbei“, und „Ausgabe nachtragen“ ist verfügbar

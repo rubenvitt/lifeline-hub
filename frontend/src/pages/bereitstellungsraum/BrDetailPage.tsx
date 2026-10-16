@@ -342,7 +342,9 @@ export default function BrDetailPage() {
   const summe = unvollstaendig
     ? null
     : summiereStaerke(bereitgestellt, einheitenQuery.data ?? bereitgestellt);
-  const fahrzeugZahl = br.fahrzeuge.length;
+  // Fahrzeuge im Raum, auch die der bereitgestellten Einheiten: Serverwert (LLH-1095, Spec
+  // `bereitstellungsraum-belegung`, „Kennzahlen der Belegung“), nicht die Länge einer Liste.
+  const fahrzeugZahl = br.belegung.fahrzeuge;
 
   /**
    * Der Banner steht im Kopf seiner Liste, in einem Platz fester Höhe: erschiene er über der
@@ -367,8 +369,9 @@ export default function BrDetailPage() {
       </div>
     );
   }
-  // Wie `aktive_belegungen_tx` im Server: belegte Einheiten und Fahrzeuge.
-  const belegt = br.einheiten.length + fahrzeugZahl;
+  // Wie `aktive_belegungen_tx` im Server: belegte Einheiten und einheitenlose Fahrzeuge. Die
+  // Fahrzeuge der Einheiten gehen mit ihrer Einheit und sperren das Auflösen nicht (LLH-1095 D8).
+  const belegt = br.einheiten.length + br.fahrzeuge.length;
 
   // Zeilen, die gerade stehen (Raum und Seitenleiste; was deren Suche ausblendet, zeigt die Leiste
   // selbst über der Liste). Ein Grund ohne Zeile, etwa weil die Kraft inzwischen in einem anderen

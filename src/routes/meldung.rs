@@ -1,7 +1,4 @@
 use crate::app::AppState;
-use crate::benachrichtigung::{
-    self, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
-};
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
@@ -13,8 +10,8 @@ use crate::extract::PfadParam;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveEvent;
 use crate::meldung::{
-    repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
-    PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
+    meldung_bestaetigung_frist_min_ableiten, repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE,
+    BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
 use crate::routes::support::{hoechstens, parse_enum, pflicht_max};
 use crate::zeit::jetzt;
@@ -25,39 +22,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// SSE-Notify: Meldungen des Einsatzes haben sich geändert (Tag `meldung`).
-fn sse(state: &AppState, einsatz_id: i64) {
-    state
-        .live
-        .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
-}
-
-/// SSE-Notify: unübersehbares Sofort-Highlight (Tag `sofortmeldung`, LFH-97). Läuft über
-/// dieselbe eine EventSource pro Einsatz; der Client löst Alarm (visuell + Ton) aus.
-fn sse_sofort(state: &AppState, einsatz_id: i64, meldung_id: i64) {
-    state.live.publiziere_objekt(
-        einsatz_id,
-        LiveEvent::Sofortmeldung,
-        "meldung_id",
-        meldung_id,
-    );
-}
-
 fn trimme(o: &Option<String>) -> Option<&str> {
     o.as_deref().map(str::trim).filter(|s| !s.is_empty())
-}
-
-/// Leitet die Bestätigungs-Frist in Minuten ab.
-/// Fallback-Kette: Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
-fn meldung_bestaetigung_frist_min_ableiten(
-    e: &crate::einsatz::einstellungen::EinsatzEinstellungen,
-    o: &crate::org::einstellungen::OrgEinstellungen,
-    req_override: Option<i64>,
-    konstante: i64,
-) -> i64 {
-    req_override
-        .or_else(|| crate::einsatz::effektiv::effektive_meldung_frist_min(e, o))
-        .unwrap_or(konstante)
 }
 
 #[derive(Debug, Deserialize)]
@@ -277,69 +243,10 @@ async fn empfaenger_funktion_pruefen(
     Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
 }
 
-/// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
-/// Meldungsstand sicher. Dadurch repariert auch ein Replay nach verlorener/fehlgeschlagener
-/// Reminder-Anlage den abgeleiteten Datensatz, ohne geänderte Request-Felder zu übernehmen.
-async fn auto_frist_erinnerung_sicherstellen(
-    state: &AppState,
-    meldung: &MeldungAnzeige,
-) -> Result<(), AppError> {
-    if meldung.bestaetigung_pflicht && meldung.bestaetigung_frist_at.is_some() {
-        let titel = format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr);
-        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(&state.pool, meldung.id, &titel)
-            .await?;
-    }
-    Ok(())
-}
-
-/// Liefert das Live-Buendel einer persistierten Meldung at-least-once aus. Der DB-Marker wird
-/// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
-/// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
-///
-/// Eine Sofortmeldung alarmiert danach über die Benachrichtigungen (LLH-1209, Spec
-/// `benachrichtigungen`, „Sofortmeldung alarmiert“): alle mit dem Modul Meldungen außer dem
-/// Erfasser. Wer das Bündel zustellt, meldet außerdem die Benachrichtigung an die
-/// Empfängerfunktion (`meldung::benachrichtigung`). `melden` schreibt selbst, also erst nach dem
-/// Commit des Markers und nur, wenn dieser Aufruf ihn gesetzt hat: so genau einmal je Meldung,
-/// auch bei einem Replay.
-async fn live_publikation_sicherstellen(
-    state: &AppState,
-    meldung: &MeldungAnzeige,
-) -> Result<(), AppError> {
-    let einsatz_id = meldung.einsatz_id;
-    let meldung_id = meldung.id;
-    let etb_id = meldung.etb_meldung_id;
-    let ist_sofort = meldung.ist_sofort();
-    let publiziert_at = jetzt();
-    let zugestellt =
-        repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
-            if let Some(etb_id) = etb_id {
-                state.live.publiziere(einsatz_id, etb_id);
-            }
-            sse(state, einsatz_id);
-            if ist_sofort {
-                sse_sofort(state, einsatz_id, meldung_id);
-            }
-        })
-        .await?;
-    if zugestellt {
-        if ist_sofort {
-            benachrichtigung::melden(
-                &state.pool,
-                &state.live,
-                Anlass::neu(
-                    einsatz_id,
-                    BenachrichtigungArt::Sofortmeldung,
-                    Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung_id),
-                )
-                .von(meldung.erfasst_von_id)
-                .an(Adressat::ModulLeser("meldungen")),
-            )
-            .await;
-        }
-        crate::meldung::benachrichtigung::erfasst(&state.pool, &state.live, meldung).await;
-    }
-    Ok(())
+/// Titel der Auto-Frist-Erinnerung einer über die Meldungsroute erfassten Meldung (Wortlaut seit
+/// LFH-97; für jede pflichtige Meldung „Sofortmeldung“, Folgeaufgabe aus LLH-1075).
+fn titel_sofort(meldung: &MeldungAnzeige) -> String {
+    format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr)
 }
 
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
@@ -373,8 +280,13 @@ pub async fn anlegen(
             if ctx.geraet.is_some() && meldung.erfasst_von_id != ctx.benutzer.id {
                 return Err(AppError::Conflict("client_id bereits vergeben".into()));
             }
-            live_publikation_sicherstellen(&state, &meldung).await?;
-            auto_frist_erinnerung_sicherstellen(&state, &meldung).await?;
+            crate::meldung::live_publikation_sicherstellen(&state, &meldung).await?;
+            crate::meldung::auto_frist_erinnerung_sicherstellen(
+                &state,
+                &meldung,
+                &titel_sofort(&meldung),
+            )
+            .await?;
             let mut meldung = meldung;
             ohne_namen_fuer_geraet(ctx.geraet.as_ref(), &mut meldung);
             return Ok((StatusCode::CREATED, Json(meldung)));
@@ -504,8 +416,8 @@ pub async fn anlegen(
     // Erst das persistente At-least-once-Live-Buendel, dann den reparierbaren Reminder.
     // Schlaegt die nachgelagerte Reminder-Anlage fehl, hat der Sofortalarm den Client bereits
     // erreicht; der idempotente Queue-Replay stellt nur den Reminder nach, ohne Doppelalarm.
-    live_publikation_sicherstellen(&state, &m).await?;
-    auto_frist_erinnerung_sicherstellen(&state, &m).await?;
+    crate::meldung::live_publikation_sicherstellen(&state, &m).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(&state, &m, &titel_sofort(&m)).await?;
     Ok((StatusCode::CREATED, Json(m)))
 }
 
@@ -545,7 +457,7 @@ pub async fn status(
     let jetzt = jetzt();
     repo::setze_status(&state.pool, meldung_id, status, &jetzt).await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt).await?;
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
     Ok(Json(m))
 }
 
@@ -575,7 +487,7 @@ pub async fn bestaetigen(
         ));
     }
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
     Ok(Json(m))
 }
 
@@ -606,7 +518,7 @@ pub async fn zuweisen(
     }
     repo::weise_bearbeiter(&state.pool, meldung_id, req.bearbeiter_id).await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
     Ok(Json(m))
 }
 
@@ -649,7 +561,7 @@ pub async fn lagerelevant(
     )
     .await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
     Ok(Json(m))
 }
 
@@ -700,7 +612,7 @@ pub async fn auftrag_erteilen(
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
 
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
     Ok((StatusCode::CREATED, Json(m)))
@@ -760,7 +672,7 @@ pub async fn lage_gesehen(
     let l = repo::mark_lage_gesehen(&state.pool, einsatz_id, lage_id, ctx.benutzer.id, &jetzt())
         .await?
         .ok_or(AppError::NotFound)?;
-    sse(&state, einsatz_id);
+    crate::meldung::sse(&state, einsatz_id);
     Ok(Json(l))
 }
 
@@ -793,7 +705,7 @@ pub async fn lage_alle_gesehen(
     )
     .await?;
     if gesehen > 0 {
-        sse(&state, einsatz_id);
+        crate::meldung::sse(&state, einsatz_id);
     }
     Ok(Json(LageGesehenAnzeige { gesehen }))
 }

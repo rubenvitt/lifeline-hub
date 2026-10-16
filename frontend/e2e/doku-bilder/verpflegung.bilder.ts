@@ -17,11 +17,15 @@ import {
  *   zeitfenster.png        frontend/src/pages/VerpflegungPage.tsx,
  *                          frontend/src/verpflegung/ZeitfensterKarte.tsx
  *   zeitfenster-anlegen.png frontend/src/verpflegung/VerpflegungDialoge.tsx (`ZeitfensterDialog`)
- *   ausgabe-erfassen.png   frontend/src/verpflegung/VerpflegungDialoge.tsx (`AusgabeDialog`)
+ *   ausgabe-nachtragen.png frontend/src/verpflegung/VerpflegungDialoge.tsx (`AusgabeDialog`),
+ *                          frontend/src/verpflegung/ZeitfensterKarte.tsx (Menü der Karte)
+ *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx,
+ *                          frontend/src/verpflegung/zaehltasteStil.ts (Fükw, offene Sammlung)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Verpflegung. Die Spec legt drei Zeitfenster an —
  * „Getränke“ laufend und gedeckt, „Mittag“ laufend mit Unterdeckung samt Sonderkost und einer
- * zurückgenommenen Ausgabe, „Abendessen“ anstehend und offen.
+ * zurückgenommenen Ausgabe, „Abendessen“ anstehend und offen. Das Zählbild steht zuletzt: seine
+ * Sammlung bucht sich nach der Ruhe womöglich und änderte sonst die Zahlen der übrigen Bilder.
  */
 
 const KAPITEL = 'verpflegung';
@@ -126,18 +130,41 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'zeitfenster-anlegen');
   });
 
-  test('Dialog „Ausgabe erfassen“', async ({ page }) => {
+  test('Dialog „Ausgabe nachtragen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/verpflegung`);
-    await page.getByRole('button', { name: /^Ausgabe erfassen zu Mittag/ }).click();
-    const dialog = page.getByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+    await page.getByRole('button', { name: /^Aktionen zu Zeitfenster Mittag/ }).click();
+    await page.getByRole('menuitem', { name: 'Ausgabe nachtragen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
     await dialog.getByLabel('Menge (EP)').fill('10');
     await dialog.getByLabel('Ort').fill('Turnhalle Nord');
     await dialog.getByLabel('Ort').blur();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
-    await fotografiere(dialog, KAPITEL, 'ausgabe-erfassen');
+    await fotografiere(dialog, KAPITEL, 'ausgabe-nachtragen');
+  });
+
+  test('Portionen an der Ausgabe zählen', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/verpflegung`);
+    await page.getByRole('link', { name: /^Ausgabe öffnen zu Mittag/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag' })).toBeVisible();
+    await page.getByRole('button', { name: /^vegetarisch/ }).click();
+    const plus1 = page.locator('[data-lfh="zaehltasten"]').getByRole('button', {
+      name: '+1',
+      exact: true,
+    });
+    await plus1.click();
+    await plus1.click();
+    await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('3');
+    // Die ganze Seite: Kopf oben, Zähltasten am unteren Rand; das Element allein ist ein Fenster
+    // hoch und läge zum Teil unter der Kopfleiste.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.mouse.move(0, 0);
+    await fotografiere(page, KAPITEL, 'ausgabe-zaehlen');
   });
 });

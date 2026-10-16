@@ -7,7 +7,7 @@
  * Anführungszeichen ‚…‘ wie in den ETB-Sätzen (`src/verpflegung/mod.rs`).
  */
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
-import type { Kostform, Sonderkost, VerpflegungZeitfenster } from '../api/types';
+import type { Kostform, Sonderkost, SonderkostEingabe, VerpflegungZeitfenster } from '../api/types';
 import type { NachforderungVorbelegung } from '../routing/deeplinks';
 
 /** Wortlaut je Kostform — exhaustiv über `Record`: eine sechste Kostform bricht den Typcheck. */
@@ -76,6 +76,17 @@ export function belegteKostformen(...mengen: readonly Sonderkost[]): Kostform[] 
 }
 
 /** „davon 3 vegan, 2 vegetarisch" — leer ohne Sonderkost. */
+/** Eine Eingabe trägt nur die belegten Kostformen; fehlende sind 0. */
+export function sonderkostVoll(sk: SonderkostEingabe | undefined): Sonderkost {
+  return {
+    vegetarisch: sk?.vegetarisch ?? 0,
+    vegan: sk?.vegan ?? 0,
+    ohne_schwein: sk?.ohne_schwein ?? 0,
+    diaet_allergenarm: sk?.diaet_allergenarm ?? 0,
+    saeugling_kleinkind: sk?.saeugling_kleinkind ?? 0,
+  };
+}
+
 export function sonderkostText(sk: Sonderkost): string {
   const teile = KOSTFORMEN.filter((k) => sk[k] > 0).map((k) => `${sk[k]} ${KOSTFORM_LABEL[k]}`);
   return teile.length > 0 ? `davon ${teile.join(', ')}` : '';
