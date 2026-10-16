@@ -2096,3 +2096,647 @@ async fn replay_nach_aufloesen_der_stelle() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
 }
+
+// ── Verpflegungsplan der Organisation (LLH-1058) ────────────────────────────────────────────
+
+const PLAN: &str = "/api/verpflegung-vorlagen";
+
+async fn mahlzeit(app: &axum::Router, cookie: &str, body: &str) -> (StatusCode, Value) {
+    anfrage(app, "POST", PLAN, cookie, Some(body)).await
+}
+
+async fn mahlzeit_patch(
+    app: &axum::Router,
+    cookie: &str,
+    id: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(app, "PATCH", &format!("{PLAN}/{id}"), cookie, Some(body)).await
+}
+
+fn plan_namen(json: &Value) -> Vec<String> {
+    json.as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v["bezeichnung"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Spec „Mahlzeit anlegen“, „Nachtverpflegung über Mitternacht“, „Einsatzkraft schreibt“:
+/// Admin legt an (201, `0630` wird `06:30`), jedes Mitglied liest, ohne Admin 403.
+#[tokio::test]
+async fn verpflegungsplan_anlegen_lesen_und_rechte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (s, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":" Frühstück ","beginn":"0630","ende":"08:00","verpflegungsart":"warm"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bezeichnung"], "Frühstück");
+    assert_eq!(v["beginn"], "06:30");
+    assert_eq!(v["ende"], "08:00");
+    assert_eq!(v["folgetag"], false);
+    assert_eq!(v["verpflegungsart"], "warm");
+    assert_eq!(v["aktiv"], true);
+    let fruehstueck = v["id"].as_i64().unwrap();
+    let (s, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Nachtverpflegung","beginn":"23:00","ende":"01:00"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["folgetag"], true);
+    assert!(
+        !v.as_object().unwrap().contains_key("verpflegungsart"),
+        "ohne Art kein Feld: {v}"
+    );
+
+    let (s, liste) = anfrage(&app, "GET", PLAN, &erika, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(plan_namen(&liste), ["Frühstück", "Nachtverpflegung"]);
+
+    let (s, _) = mahlzeit(
+        &app,
+        &erika,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = mahlzeit_patch(&app, &erika, fruehstueck, r#"{"aktiv":false}"#).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{PLAN}/{fruehstueck}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::METHOD_NOT_ALLOWED, "kein Löschen");
+}
+
+/// Spec „Unlesbare Uhrzeit“, „Ende gleich Beginn“, „Name doppelt“ und die Grenze aus
+/// `eingabegrenzen`: 400, 422, 409; nichts angelegt.
+#[tokio::test]
+async fn verpflegungsplan_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (s, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mittag = v["id"].as_i64().unwrap();
+    let lang = "x".repeat(201);
+
+    for (body, erwartet) in [
+        (
+            r#"{"bezeichnung":"   ","beginn":"06:30","ende":"08:00"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            format!(r#"{{"bezeichnung":"{lang}","beginn":"06:30","ende":"08:00"}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"bezeichnung":"Frühstück","beginn":"24:00","ende":"08:00"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"bezeichnung":"Frühstück","beginn":"6.30 Uhr","ende":"08:00"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"bezeichnung":"Frühstück","beginn":"06:30"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"bezeichnung":"Frühstück","beginn":"06:30","ende":"08:00","verpflegungsart":"heiss"}"#
+                .to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        // Ein 400 geht dem 422 vor.
+        (
+            format!(r#"{{"bezeichnung":"{lang}","beginn":"12:00","ende":"12:00"}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"bezeichnung":"Frühstück","beginn":"12:00","ende":"1200"}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            r#"{"bezeichnung":"mittag","beginn":"11:30","ende":"13:00"}"#.to_string(),
+            StatusCode::CONFLICT,
+        ),
+    ] {
+        let (s, v) = mahlzeit(&app, &admin, &body).await;
+        assert_eq!(s, erwartet, "{body}: {v}");
+    }
+    for (body, erwartet) in [
+        (r#"{"ende":"12:60"}"#, StatusCode::BAD_REQUEST),
+        (r#"{"bezeichnung":""}"#, StatusCode::BAD_REQUEST),
+        (r#"{"verpflegungsart":"heiss"}"#, StatusCode::BAD_REQUEST),
+        (r#"{"ende":"12:00"}"#, StatusCode::UNPROCESSABLE_ENTITY),
+    ] {
+        let (s, v) = mahlzeit_patch(&app, &admin, mittag, body).await;
+        assert_eq!(s, erwartet, "PATCH {body}: {v}");
+    }
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("{PLAN}?nur_aktive=false"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(plan_namen(&liste), ["Mittag"], "nichts angelegt: {liste}");
+    assert_eq!(liste[0]["ende"], "13:30", "nichts geändert");
+}
+
+/// Spec „Deaktivierte Mahlzeit“: fehlt ohne `nur_aktive=false`, erscheint mit als inaktiv, der
+/// Name ist wieder frei; Art leeren mit `null`.
+#[tokio::test]
+async fn verpflegungsplan_deaktivieren_und_aktivieren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Nachtverpflegung","beginn":"23:00","ende":"01:00","verpflegungsart":"kalt"}"#,
+    )
+    .await;
+    let id = v["id"].as_i64().unwrap();
+    let (s, v) = mahlzeit_patch(
+        &app,
+        &admin,
+        id,
+        r#"{"aktiv":false,"verpflegungsart":null}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["aktiv"], false);
+    assert!(v.get("verpflegungsart").is_none(), "{v}");
+    let (_, liste) = anfrage(&app, "GET", PLAN, &admin, None).await;
+    assert_eq!(liste, serde_json::json!([]));
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("{PLAN}?nur_aktive=false"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(plan_namen(&liste), ["Nachtverpflegung"]);
+    assert_eq!(liste[0]["aktiv"], false);
+
+    let (s, _) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Nachtverpflegung","beginn":"22:30","ende":"00:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Name wieder frei");
+    let (s, _) = mahlzeit_patch(&app, &admin, id, r#"{"aktiv":true}"#).await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "Reaktivieren gegen gleichnamige aktive"
+    );
+}
+
+/// Mahlzeiten einer anderen Organisation gibt es nicht (404), die Liste zeigt sie nicht.
+#[tokio::test]
+async fn verpflegungsplan_fremde_org_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    let id = v["id"].as_i64().unwrap();
+    fremde_org_anlegen(&pool, "Org B", "bert", "bertpw123", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE benutzername = 'bert'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let bert = login_cookie(&app, "bert", "bertpw123").await;
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("{PLAN}?nur_aktive=false"),
+        &bert,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(liste, serde_json::json!([]));
+    let (s, _) = mahlzeit_patch(&app, &bert, id, r#"{"aktiv":false}"#).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = mahlzeit_patch(&app, &admin, id + 1000, r#"{"aktiv":false}"#).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // Derselbe Name ist in der anderen Org frei.
+    let (s, _) = mahlzeit(
+        &app,
+        &bert,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+}
+
+fn stammdaten_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::org::OrgNachricht>,
+    org_id: i64,
+) -> usize {
+    let mut n = 0;
+    while let Ok(m) = rx.try_recv() {
+        if m.event == lifeline_hub::live::org::OrgLiveEvent::Stammdaten {
+            assert_eq!(m.org_id, org_id, "nur an die eigene Organisation");
+            n += 1;
+        }
+    }
+    n
+}
+
+/// Spec `org-live`, „Ereignis für die Stammdaten“: Anlegen und Deaktivieren melden
+/// `stammdaten` an die eigene Organisation, Lesen und abgelehnte Anfragen nicht.
+#[tokio::test]
+async fn verpflegungsplan_meldet_stammdaten_nur_nach_erfolg() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let mut rx = live.abonniere_org();
+
+    let (s, v) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(stammdaten_ereignisse(&mut rx, org), 1, "POST");
+    let id = v["id"].as_i64().unwrap();
+    let (s, _) = mahlzeit_patch(&app, &admin, id, r#"{"aktiv":false}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(stammdaten_ereignisse(&mut rx, org), 1, "Deaktivieren");
+
+    let (s, _) = anfrage(&app, "GET", PLAN, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Abendessen","beginn":"18:00","ende":"19:30"}"#,
+    )
+    .await;
+    stammdaten_ereignisse(&mut rx, org);
+    for (s, fall) in [
+        (
+            mahlzeit(
+                &app,
+                &admin,
+                r#"{"bezeichnung":"abendessen","beginn":"18:00","ende":"19:30"}"#,
+            )
+            .await
+            .0,
+            "409",
+        ),
+        (
+            mahlzeit(
+                &app,
+                &admin,
+                r#"{"bezeichnung":"Frühstück","beginn":"0630","ende":"0630"}"#,
+            )
+            .await
+            .0,
+            "422",
+        ),
+        (
+            mahlzeit(
+                &app,
+                &admin,
+                r#"{"bezeichnung":"","beginn":"06:30","ende":"08:00"}"#,
+            )
+            .await
+            .0,
+            "400",
+        ),
+        (
+            mahlzeit_patch(&app, &erika, id, r#"{"aktiv":true}"#)
+                .await
+                .0,
+            "403",
+        ),
+    ] {
+        assert!(s.is_client_error(), "{fall}: {s}");
+        assert_eq!(stammdaten_ereignisse(&mut rx, org), 0, "{fall}");
+    }
+}
+
+// ── Tag aus der Vorlage (LLH-1058) ──────────────────────────────────────────────────────────
+
+/// Der 11.10.2026 in Berlin, drei Fenster mit Bedarf (ISO-Zeitpunkte wie vom Client).
+fn tag_body(fenster: &[Value]) -> String {
+    serde_json::json!({
+        "tag_von_at": "2026-10-10T22:00:00Z",
+        "tag_bis_at": "2026-10-11T22:00:00Z",
+        "zeitfenster": fenster,
+    })
+    .to_string()
+}
+
+fn tag_fenster(bezeichnung: &str, von: &str, bis: &str) -> Value {
+    serde_json::json!({
+        "bezeichnung": bezeichnung,
+        "von_at": von,
+        "bis_at": bis,
+        "bedarf_kraefte": 186,
+        "bedarf_betreute": 70,
+        "bedarf_weitere": 4,
+        "sonderkost": {"vegetarisch": 12},
+    })
+}
+
+fn drei_tag_fenster() -> Vec<Value> {
+    vec![
+        tag_fenster("Frühstück", "2026-10-11T04:30:00Z", "2026-10-11T06:00:00Z"),
+        tag_fenster("Mittag", "2026-10-11T10:00:00Z", "2026-10-11T11:30:00Z"),
+        tag_fenster(
+            "Abendessen",
+            "2026-10-11T18:00:00+02:00",
+            "2026-10-11T19:30:00+02:00",
+        ),
+    ]
+}
+
+async fn create_tag(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("{}/zeitfenster/aus-vorlage", pfad(einsatz)),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+fn ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+) -> (usize, usize) {
+    let (mut verpflegung, mut etb) = (0, 0);
+    while let Ok(m) = rx.try_recv() {
+        match m.event {
+            lifeline_hub::live::LiveEvent::Verpflegung => verpflegung += 1,
+            lifeline_hub::live::LiveEvent::Etb => etb += 1,
+            _ => {}
+        }
+    }
+    (verpflegung, etb)
+}
+
+/// AK „Je angelegtem Zeitfenster genau ein ETB-Eintrag wie beim Einzelanlegen“ und Spec „Drei
+/// Zeitfenster für einen Tag“: 201, drei gewöhnliche Zeitfenster ohne Stelle; das ETB ist
+/// dasselbe wie nach drei Einzelanlagen mit denselben Werten. Live: genau ein `verpflegung` und
+/// je ETB-Eintrag ein ETB-Ereignis.
+#[tokio::test]
+async fn tag_aus_vorlage_etb_wie_einzeln_und_ein_live_ereignis() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(e);
+
+    let mut fenster = drei_tag_fenster();
+    fenster[1]["verpflegungsart"] = "warm".into();
+    // Der Body kennt keine Stellen: ein mitgeschicktes Feld wirkt nicht.
+    fenster[1]["stelle_ids"] = serde_json::json!([1]);
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&fenster)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let angelegt = v["angelegt"].as_array().unwrap();
+    assert_eq!(angelegt.len(), 3, "{v}");
+    assert_eq!(v["uebersprungen"], serde_json::json!([]));
+    assert_eq!(angelegt[2]["bezeichnung"], "Abendessen");
+    assert_eq!(angelegt[2]["von_at"], "2026-10-11 16:00:00");
+    assert_eq!(angelegt[1]["verpflegungsart"], "warm");
+    assert_eq!(angelegt[0]["bedarf"]["gesamt"], 260);
+    for z in angelegt {
+        assert_eq!(z["stelle_ids"], serde_json::json!([]), "{z}");
+    }
+    assert_eq!(ereignisse(&mut rx), (1, 3));
+
+    for mut f in drei_tag_fenster() {
+        if f["bezeichnung"] == "Mittag" {
+            f["verpflegungsart"] = "warm".into();
+        }
+        zeitfenster(&app, &admin, e2, &f.to_string()).await;
+    }
+    let sammel = verpflegungs_etb(&app, &admin, e).await;
+    assert_eq!(sammel.len(), 3);
+    assert_eq!(sammel, verpflegungs_etb(&app, &admin, e2).await);
+    assert_eq!(
+        sammel[0],
+        "Verpflegung ‚Frühstück‘ 11.10. 06:30–08:00 angelegt: Bedarf 260 EP (186 Kräfte, \
+         70 Betreute, 4 weitere), davon 12 Sonderkost."
+    );
+}
+
+/// Spec „Gleichnamiges Zeitfenster am selben Tag“ und „Alles schon angelegt“: das Übersprungene
+/// steht in der Antwort und bekommt keinen ETB-Eintrag; ohne angelegtes Fenster 200 ohne ETB und
+/// ohne Live-Ereignis.
+#[tokio::test]
+async fn tag_aus_vorlage_ueberspringt_und_200_ohne_etb_und_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    zeitfenster(
+        &app,
+        &admin,
+        e,
+        &tag_fenster("Mittag", "2026-10-11T09:30:00Z", "2026-10-11T11:00:00Z").to_string(),
+    )
+    .await;
+    let mut rx = live.abonniere(e);
+
+    let mut fenster = drei_tag_fenster();
+    fenster[1]["bezeichnung"] = "mittag".into();
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&fenster)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["angelegt"].as_array().unwrap().len(), 2);
+    assert_eq!(v["uebersprungen"], serde_json::json!(["mittag"]));
+    assert_eq!(verpflegungs_etb(&app, &admin, e).await.len(), 3);
+    assert_eq!(ereignisse(&mut rx), (1, 2));
+
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&drei_tag_fenster())).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["angelegt"], serde_json::json!([]));
+    assert_eq!(
+        v["uebersprungen"],
+        serde_json::json!(["Frühstück", "Mittag", "Abendessen"])
+    );
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await.len(),
+        3,
+        "kein neuer ETB-Eintrag"
+    );
+    assert_eq!(ereignisse(&mut rx), (0, 0), "kein Live-Ereignis");
+}
+
+/// Feldfehler sind 400 und gehen jedem 422 vor, auch eines anderen Fensters (Spec
+/// `eingabegrenzen`, „Grenze vor dem Zusammenhang“, und „Feldfehler vor dem Zusammenhang“);
+/// nichts angelegt, kein ETB.
+#[tokio::test]
+async fn tag_aus_vorlage_feldfehler_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let lang = "x".repeat(201);
+
+    let mut faelle: Vec<(&str, String)> = Vec::new();
+    let mut b: Value = serde_json::from_str(&tag_body(&drei_tag_fenster())).unwrap();
+    b["tag_von_at"] = "gestern".into();
+    faelle.push(("tag_von_at unlesbar", b.to_string()));
+    let mut f = drei_tag_fenster();
+    f[1]["von_at"] = "mittags".into();
+    faelle.push(("von_at unlesbar", tag_body(&f)));
+    let mut f = drei_tag_fenster();
+    f[2]["bezeichnung"] = "  ".into();
+    faelle.push(("leere Bezeichnung", tag_body(&f)));
+    let mut f = drei_tag_fenster();
+    f[0]["verpflegungsart"] = "heiss".into();
+    faelle.push(("unbekannte Art", tag_body(&f)));
+    let mut f = drei_tag_fenster();
+    f[1]["bedarf_betreute"] = (-1).into();
+    faelle.push(("negativer Bedarf", tag_body(&f)));
+    let mut f = drei_tag_fenster();
+    f[0]["von_at"] = "2026-10-12T04:30:00Z".into();
+    f[0]["bis_at"] = "2026-10-12T06:00:00Z".into();
+    f[2]["bezeichnung"] = lang.clone().into();
+    faelle.push((
+        "201 Zeichen im dritten, Beginn außerhalb im ersten",
+        tag_body(&f),
+    ));
+    let mut f = drei_tag_fenster();
+    f[0]["sonderkost"] = serde_json::json!({"vegetarisch": 999});
+    f[2]["bezeichnung"] = "".into();
+    faelle.push(("422 im ersten, leer im dritten", tag_body(&f)));
+    let viele: Vec<Value> = (0..25)
+        .map(|i| {
+            tag_fenster(
+                &format!("Mahlzeit {i}"),
+                "2026-10-11T04:30:00Z",
+                "2026-10-11T05:00:00Z",
+            )
+        })
+        .collect();
+    faelle.push(("25 Fenster", tag_body(&viele)));
+    faelle.push(("leere Liste", tag_body(&[])));
+    faelle.push((
+        "ohne zeitfenster",
+        r#"{"tag_von_at":"2026-10-10T22:00:00Z","tag_bis_at":"2026-10-11T22:00:00Z"}"#.into(),
+    ));
+    for (fall, body) in faelle {
+        let (s, v) = create_tag(&app, &admin, e, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{fall}: {v}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["zeitfenster"], serde_json::json!([]));
+    assert!(verpflegungs_etb(&app, &admin, e).await.is_empty());
+}
+
+/// Der Zusammenhang ist 422 mit der Bezeichnung in der Meldung (Spec „Ein Zeitfenster
+/// scheitert“, „Beginn außerhalb des Tages“).
+#[tokio::test]
+async fn tag_aus_vorlage_zusammenhang_ist_422_mit_bezeichnung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut f = drei_tag_fenster();
+    f[2]["sonderkost"] = serde_json::json!({"vegetarisch": 300});
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&f)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Abendessen"), "{v}");
+    let mut f = drei_tag_fenster();
+    f[1]["von_at"] = "2026-10-11T22:00:00Z".into();
+    f[1]["bis_at"] = "2026-10-11T23:00:00Z".into();
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&f)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Mittag"), "{v}");
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["zeitfenster"], serde_json::json!([]));
+    assert!(verpflegungs_etb(&app, &admin, e).await.is_empty());
+}
+
+/// Spec „Beobachter und abgeschlossener Einsatz“, dazu ausgeblendetes Modul und fremder Einsatz:
+/// dieselben Rechte wie beim Einzelanlegen.
+#[tokio::test]
+async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = tag_body(&drei_tag_fenster());
+
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, _) = create_tag(&app, &beob_cookie, e, &body).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Beobachter");
+
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    override_setzen(&app, &admin, e, false, None).await;
+    let (s, _) = create_tag(&app, &frieda, e, &body).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Modul ausgeblendet");
+    override_setzen(&app, &admin, e, true, None).await;
+
+    fremde_org_anlegen(&pool, "Org B", "bert", "bertpw123", "keine").await;
+    let bert = login_cookie(&app, "bert", "bertpw123").await;
+    // Eine Person einer anderen Org: dieselbe Antwort wie beim Einzelanlegen.
+    let (s, _) = create_tag(&app, &bert, e, &body).await;
+    let (einzeln, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster", pfad(e)),
+        &bert,
+        Some(MITTAG),
+    )
+    .await;
+    assert!(s.is_client_error(), "fremde Org: {s}");
+    assert_eq!(s, einzeln, "fremde Org wie beim Einzelanlegen");
+    let (s, _) = create_tag(&app, &admin, 999_999, &body).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "unbekannter Einsatz");
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "Einsatz abschließen: {s}");
+    let (s, _) = create_tag(&app, &admin, e, &body).await;
+    assert_eq!(s, StatusCode::CONFLICT, "abgeschlossener Einsatz");
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["zeitfenster"], serde_json::json!([]));
+}

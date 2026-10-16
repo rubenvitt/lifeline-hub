@@ -283,6 +283,15 @@ pub struct AusgabeErgebnis {
     pub zeitfenster: ZeitfensterAnzeige,
 }
 
+/// Antwort auf „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der
+/// Reihenfolge der Anfrage und die Bezeichnungen der übersprungenen, weil an diesem Tag im
+/// Einsatz schon ein gleichnamiges beginnt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct VerpflegungTagErgebnis {
+    pub angelegt: Vec<ZeitfensterAnzeige>,
+    pub uebersprungen: Vec<String>,
+}
+
 // ── Zeiten ──────────────────────────────────────────────────────────────────────────────────
 
 /// Obergrenze je Zahlfeld in EP (Bedarfsteil, Menge, Kostform). Eine Verpflegungslage mit mehr
