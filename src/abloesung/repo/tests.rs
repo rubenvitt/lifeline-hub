@@ -1260,3 +1260,81 @@ async fn ungueltige_einsatzzone_verdraengt_die_org_zone_nicht() {
     setze(w.pool.clone(), EINSATZ, None, w.e).await;
     assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Berlin);
 }
+
+/// Die Rücknahme setzt die Fristen nach der aktuellen Einsatzvorgabe: eine geänderte Vorwarnung
+/// gilt für die wieder laufende Schicht, und folgt sie der Vorgabe, rechnet deren Regel neu.
+#[tokio::test]
+async fn ruecknahme_setzt_die_fristen_nach_der_aktuellen_vorgabe() {
+    let w = welt().await;
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(360, 30)),
+        T0,
+    )
+    .await
+    .unwrap();
+    // f2 folgt der Einsatzvorgabe, f1 (Abschnitt ohne Vorgabe) hat einen eigenen Rhythmus.
+    let (einsatz, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, None), T0)
+        .await
+        .unwrap();
+    assert_eq!(einsatz.rhythmus_quelle, RhythmusQuelle::Einsatz);
+    let (eigen, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    for s in [einsatz.id, eigen.id] {
+        vollziehen(
+            &w.pool,
+            w.e,
+            s,
+            w.b,
+            "2026-09-22 10:00:00",
+            None,
+            "2026-09-22 10:00:00",
+        )
+        .await
+        .unwrap();
+    }
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(240, 45)),
+        "2026-09-22 10:05:00",
+    )
+    .await
+    .unwrap();
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, eigen.id, w.b, "2026-09-22 10:10:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        r.faellig_at, "2026-09-22 15:30:00",
+        "eigener Rhythmus bleibt"
+    );
+    assert_eq!(
+        offene_fristen(&w.pool, eigen.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 15:30:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 14:45:00".into()),
+        ],
+        "Vorwarnung nach der aktuellen Vorgabe"
+    );
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, einsatz.id, w.b, "2026-09-22 10:10:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        r.faellig_at, "2026-09-22 13:30:00",
+        "Regel der Vorgabe neu gerechnet"
+    );
+    assert_eq!(r.rhythmus_minuten, 240);
+    assert_eq!(
+        offene_fristen(&w.pool, einsatz.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 13:30:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 12:45:00".into()),
+        ]
+    );
+}

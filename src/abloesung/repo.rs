@@ -470,6 +470,22 @@ async fn set_vorwarn_frist_tx(
     Ok(())
 }
 
+/// Zeitpunkt der offenen Auto-Frist eines Bezugs, `None` ohne eine.
+async fn open_frist_at_tx(
+    conn: &mut SqliteConnection,
+    bezug_typ: &str,
+    id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT faellig_at FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(bezug_typ)
+    .bind(id)
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
 async fn close_fristen_tx(
     conn: &mut SqliteConnection,
     id: i64,
@@ -1270,13 +1286,61 @@ pub async fn zuruecknehmen(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-        erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
-        // Die Vorwarnung nur wieder öffnen, solange sie noch vor uns liegt.
-        let vorwarnung = load_einsatz_vorgabe_tx(conn, einsatz_id)
-            .await?
-            .vorwarnung();
-        if vorwarnzeit(&roh.faellig_at, vorwarnung).is_some_and(|v| v.as_str() > jetzt) {
-            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await?;
+        // Fristen nach der aktuellen Vorgabe (Review PR #833). Folgt die Schicht der Vorgabe des
+        // Einsatzes und rechnet deren Regel inzwischen anders, gilt die neue Fälligkeit samt
+        // neuer Fristen. Sonst öffnet die Rücknahme die alte Fälligkeitsfrist, ohne eine schon
+        // erfolgte Auslösung zu wiederholen, und legt die Vorwarnung auf die aktuelle
+        // Vorwarnzeit — nur, solange sie noch vor uns liegt.
+        let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+        let vorwarnung = vorgabe.vorwarnung();
+        let (faellig_at, rhythmus) = match (roh.rhythmus_quelle, &vorgabe.werte) {
+            (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+                &roh.beginn_at,
+                roh.rhythmus_minuten,
+                roh.rhythmus_quelle,
+                &vorgabe,
+            )?,
+            _ => (roh.faellig_at.clone(), roh.rhythmus_minuten),
+        };
+        if faellig_at != roh.faellig_at {
+            sqlx::query(
+                "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? WHERE id = ?",
+            )
+            .bind(rhythmus)
+            .bind(&faellig_at)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+            set_fristen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorwarnung,
+                jetzt,
+            )
+            .await?;
+        } else {
+            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
+            if let Some(v) = vorwarnzeit(&faellig_at, vorwarnung).filter(|v| v.as_str() > jetzt) {
+                erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id)
+                    .await?;
+                if open_frist_at_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await? != Some(v) {
+                    set_vorwarn_frist_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        id,
+                        &name,
+                        &faellig_at,
+                        vorwarnung,
+                        jetzt,
+                    )
+                    .await?;
+                }
+            }
         }
 
         let etb_id = crate::etb::repo::anlegen_tx(
