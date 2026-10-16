@@ -103,8 +103,14 @@ impl LiveEvent {
             // Position und den aus `einsatz_einheit.fuehrer_id` / `einsatzabschnitt.leiter_id`
             // abgeleiteten Führungsflags liefert. Ein `lagekarte`-Leser sieht diese Daten per
             // GET vollständig; ohne den Key fröre sein Führungskräfte-Layer ein.
-            LiveEvent::Einheit => &["einheiten", "lagekarte"],
-            LiveEvent::Abschnitt => &["einsatzabschnitte", "lagekarte"],
+            //
+            // Dazu `verpflegung` (LLH-1055, design.md D4): `GET …/verpflegung` legt in der
+            // Empfängerliste Name, Gliederung, Abschnitt und Stärke derselben Einheiten und
+            // Abschnitte selbst offen, auch ohne Modul `einheiten`. Ohne den Key fröre die Liste
+            // am Tresen ein. NICHT bei `Personal`: die Verpflegung zeigt keine disponierten
+            // Personen.
+            LiveEvent::Einheit => &["einheiten", "lagekarte", "verpflegung"],
+            LiveEvent::Abschnitt => &["einsatzabschnitte", "lagekarte", "verpflegung"],
             // NICHT `lagekarte`: die Karte zeigt disponiertes Personal, keine betroffenen
             // Personen. Ein Widen hier wäre der Metadaten-Leak, den F01 gerade schließt.
             LiveEvent::Person => &["personen"],
@@ -968,8 +974,15 @@ mod tests {
             (LiveEvent::LageZone, &["lagekarte", "gefahrenzonen"]),
             (LiveEvent::FreiesZeichen, &["lagekarte"]),
             (LiveEvent::Gefahr, &["gefahrenzonen"]),
-            (LiveEvent::Einheit, &["einheiten", "lagekarte"]),
-            (LiveEvent::Abschnitt, &["einsatzabschnitte", "lagekarte"]),
+            // Empfängerliste der Verpflegung (LLH-1055, design.md D4).
+            (
+                LiveEvent::Einheit,
+                &["einheiten", "lagekarte", "verpflegung"],
+            ),
+            (
+                LiveEvent::Abschnitt,
+                &["einsatzabschnitte", "lagekarte", "verpflegung"],
+            ),
             (LiveEvent::Person, &["personen"]),
             (LiveEvent::Personal, &["personal", "lagekarte"]),
             (LiveEvent::Lagebericht, &["lageberichte"]),

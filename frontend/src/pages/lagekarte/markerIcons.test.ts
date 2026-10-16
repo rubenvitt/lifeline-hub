@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { serializeAnySpec } from '@einsatzzeichen/core';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
-import { baueZeichenRegistry, kartenPixelRatio, markerIconKey } from './markerIcons';
+import { baueZeichenRegistry, kartenPixelRatio, markerIconKey, markerZeichen } from './markerIcons';
 
 // LFH-835/LFH-836 (design.md D8): Fachobjekte und freie Zeichen zeichnet @einsatzzeichen (`ez|`).
 // Der Schlüssel entsteht aus der WIRKSAMEN Spec; gleiche Spec heißt gleicher Schlüssel, auch über
@@ -76,6 +76,15 @@ describe('markerIconKey', () => {
     expect(
       markerIconKey({ typ: 'freies_zeichen', freiesZeichen: { symbol: 'gibt-es-nicht' } }),
     ).toBe('ez|{"v":1,"spec":{"kind":"point"}}');
+  });
+});
+
+describe('markerZeichen', () => {
+  it('liefert Schlüssel und Zeichnung aus derselben Quelle wie markerIconKey', () => {
+    const mk = { typ: 'einheit', tz: { grundzeichen: 'taktische-formation' } } as const;
+    expect(markerZeichen(mk)?.schluessel).toBe(markerIconKey(mk));
+    expect(markerZeichen(mk)?.drawing).toBeDefined();
+    expect(markerZeichen({ typ: 'einheit' })).toBeNull();
   });
 });
 

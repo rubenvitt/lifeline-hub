@@ -5,8 +5,11 @@ import type { KarteMarker } from './marker';
 
 type MitZeichen = Pick<KarteMarker, 'typ' | 'tz' | 'freiesZeichen'>;
 
-/** Das Zeichen eines Markers aus seiner einen Quelle: Leseadapter oder Fachobjekt-Übersetzung. */
-function zeichenVon(mk: MitZeichen): { schluessel: string; drawing: Drawing } | null {
+/**
+ * Das Zeichen eines Markers aus seiner einen Quelle: Leseadapter oder Fachobjekt-Übersetzung. Karte
+ * (`markerIconKey`, `baueZeichenRegistry`) und Inspector-Kachel lesen es nur hier.
+ */
+export function markerZeichen(mk: MitZeichen): { schluessel: string; drawing: Drawing } | null {
   if (mk.typ === 'freies_zeichen') return mk.freiesZeichen ? freiesZeichen(mk.freiesZeichen) : null;
   return mk.tz ? fachobjektZeichen(mk.tz) : null;
 }
@@ -21,14 +24,14 @@ function zeichenVon(mk: MitZeichen): { schluessel: string; drawing: Drawing } | 
  * immer einen (zur Not den Platzhalter).
  */
 export function markerIconKey(mk: MitZeichen): string | undefined {
-  return zeichenVon(mk)?.schluessel;
+  return markerZeichen(mk)?.schluessel;
 }
 
 /** Bildschlüssel → Zeichnung, für alle Marker mit Zeichen; gleiche Zeichen einmal. */
 export function baueZeichenRegistry(markers: ReadonlyArray<MitZeichen>): Map<string, Drawing> {
   const registry = new Map<string, Drawing>();
   for (const mk of markers) {
-    const zeichen = zeichenVon(mk);
+    const zeichen = markerZeichen(mk);
     if (zeichen && !registry.has(zeichen.schluessel)) {
       registry.set(zeichen.schluessel, zeichen.drawing);
     }

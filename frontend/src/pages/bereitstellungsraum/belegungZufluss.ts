@@ -6,8 +6,11 @@
  * unter einen Finger, der gerade auf „entfernen“ zielte. Am BR-Tablet ist die Liste der
  * Hauptarbeitsplatz.
  *
- * - FESTE FOLGE: der Server liefert die Belegung ohne Ordnung; die Liste ordnet nach Name bzw.
- *   Funkrufname ({@link ordnungsschluessel}), bei Gleichstand nach Id.
+ * - FESTE FOLGE NACH WARTEZEIT (LLH-1095 D11): der Server liefert die Belegung ohne Ordnung; die
+ *   Liste ordnet am längsten wartend zuerst ({@link einheitFolge}, {@link fahrzeugFolge} über
+ *   `folgeSchluessel` aus `brBelegungKern.ts`), ohne „seit“ ans Ende, bei Gleichstand nach Name
+ *   bzw. Funkrufname, dann nach Id. Eine neu eingetretene Kraft hat das jüngste „seit“ und kommt
+ *   ans Ende; ein Umschalter „nach Name“ ist verworfen.
  * - DIE SCHLEUSE HÄLT wie die `Datensicht` (`frontend/AGENTS.md`, „Zufluss der `Datensicht`“):
  *   solange der Fokus in den Listen liegt oder ein Maus- bzw. Stiftzeiger über ihnen steht (nicht
  *   Touch: ein Tipp betritt und verlässt die Fläche, danach hält der Fokus). Fremde Neuzugänge
@@ -16,7 +19,7 @@
  *   abgemeldete Zeilen.
  *
  * Die reine Logik ist die der Ablösung (`abloesung/zufluss.ts`, `…Nach`-Varianten), hier mit dem
- * Ordnungsschlüssel als eingefrorenem Sortierschlüssel. Ohne Halt zeigt die Liste alles.
+ * Folgeschlüssel als eingefrorenem Sortierschlüssel. Ohne Halt zeigt die Liste alles.
  */
 import { useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react';
 import {
@@ -27,25 +30,22 @@ import {
   type Sortierschluessel,
   type Zuflussstand,
 } from '../../abloesung/zufluss';
+import type { BrEinheitKurz, BrFahrzeugKurz } from '../../api/types';
+import { folgeSchluessel } from './brBelegungKern';
+
+export { ordnungsschluessel } from './brBelegungKern';
 
 interface MitId {
   id: number;
 }
 
-/**
- * Schlüssel der festen Folge, mit `<` vergleichbar wie in `teileZuflussNach`: ohne Groß/Klein und
- * Akzente, Zahlen nach Wert („Florian 2“ vor „Florian 10“). Der Name selbst hängt dahinter, damit
- * „Ärzte“ und „Arzte“ nicht gleich zählen.
- */
-export function ordnungsschluessel(name: string): string {
-  const grob = name
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLocaleLowerCase('de')
-    .replace(/ß/g, 'ss')
-    .replace(/\d+/g, (zahl) => zahl.padStart(12, '0'));
-  return `${grob}\u0000${name}`;
-}
+/** Folge der bereitgestellten Einheiten: am längsten wartend zuerst, dann nach Name. */
+export const einheitFolge: Sortierschluessel<BrEinheitKurz> = (e) =>
+  folgeSchluessel(e.seit_at, e.name);
+
+/** Folge der einheitenlosen Fahrzeuge: am längsten wartend zuerst, dann nach Funkrufname. */
+export const fahrzeugFolge: Sortierschluessel<BrFahrzeugKurz> = (f) =>
+  folgeSchluessel(f.seit_at, f.funkrufname);
 
 /** Die Liste in fester Folge: Schlüssel, dann Id — dieselbe Ordnung wie `teileZuflussNach`. */
 export function geordnet<T extends MitId>(

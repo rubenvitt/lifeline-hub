@@ -206,6 +206,8 @@ impl Funktionsansicht {
             ],
             Funktionsansicht::Betreuungsstelle => &["betreuung", "personen", "meldungen"],
             // LFH-1044: Zeitfenster mit Deckung und die eigenen Meldungen; keine Nachforderungen.
+            // Kein `einheiten` (LLH-1055 D4): die Empfängerliste steckt in `verpflegung`, und
+            // `einheit`/`abschnitt` tragen `verpflegung` in ihrer Gate-Menge.
             Funktionsansicht::Verpflegung => &["verpflegung", "meldungen"],
         }
     }
@@ -402,6 +404,10 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
 /// die Einsatzleitung anlegen und die eigenen lesen (so meldet das Gerät eine Fehlmenge).
 /// Zeitfenster anlegen, ändern und löschen, Nachforderungen (ihre Liste trägt Namen), Personal,
 /// Betreuung und ETB fehlen bewusst; eine Ausgabe auf eine Nachforderung lehnt der Handler ab.
+/// Empfänger (LLH-1055, design.md D3/D4): Einheiten und Abschnitte liest das Gerät nur als
+/// Empfängerliste in `GET …/verpflegung` (ohne Führer, Erreichbarkeit und Mitglieder) und bucht an
+/// sie. `GET …/einheiten` fehlt bewusst: sie trägt Personalnamen. Live erreichen es `einheit` und
+/// `abschnitt` über deren Gate-Menge, nicht über ein Lese-Modul `einheiten`.
 const VERPFLEGUNG: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/verpflegung"),
     (
@@ -700,6 +706,10 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/betreuung"),
             ("GET", "/api/einsaetze/{id}/personen"),
             ("GET", "/api/einsaetze/{id}/etb"),
+            // Empfänger nur über die Projektion in `GET …/verpflegung` (LLH-1055 D3): die
+            // Einheitenliste trägt Führer, Erreichbarkeit und Personalnamen.
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("GET", "/api/einsaetze/{id}/abschnitte"),
         ] {
             assert!(!darf_route(v, m, p), "Verpflegungsgerät darf {m} {p} nicht");
         }

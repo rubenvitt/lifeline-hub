@@ -28,6 +28,7 @@ import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
+  BrEinheitFahrzeug,
   BrEinheitKurz,
   BrFahrzeugKurz,
   BrStatus,
@@ -58,7 +59,10 @@ import BrSwitcher from './BrSwitcher';
 import BrBearbeitenModal from './BrBearbeitenModal';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
-import { summiereStaerke } from '../../anzeige/staerke';
+import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { useUhr } from '../../abloesung/useUhr';
+import { dauerText } from '../../kraefte/zeitachse';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
@@ -68,16 +72,30 @@ import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { useDruckModus } from '../../components/druck/useDruckModus';
 import {
-  ordnungsschluessel,
+  einheitFolge,
+  fahrzeugFolge,
   useBelegungZufluss,
   useHalteFlaeche,
   zuflussText,
 } from './belegungZufluss';
+import { ordnungsschluessel, seitText, wartezeitMinuten } from './brBelegungKern';
+import BrVerlauf from './BrVerlauf';
+import dayjs from 'dayjs';
 
-const EINHEIT_SCHLUESSEL = (e: BrEinheitKurz) => ordnungsschluessel(e.name);
-const FAHRZEUG_SCHLUESSEL = (f: BrFahrzeugKurz) => ordnungsschluessel(f.funkrufname);
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
+
+/** Funkrufnamen der Fahrzeuge einer Einheit, in fester Folge, durch „ · “ getrennt. */
+function funkrufnamen(fahrzeuge: readonly BrEinheitFahrzeug[]): string {
+  return fahrzeuge
+    .map((f) => f.funkrufname)
+    .sort((a, b) => {
+      const ka = ordnungsschluessel(a);
+      const kb = ordnungsschluessel(b);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    })
+    .join(' · ');
+}
 
 /** Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. */
 type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: string };
@@ -167,6 +185,7 @@ export default function BrDetailPage() {
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, brId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.brVerlauf(einsatzId, brId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -178,15 +197,20 @@ export default function BrDetailPage() {
   const { gehalten, flaeche } = useHalteFlaeche();
   const druckt = useDruckModus();
   const halten = gehalten && !druckt;
+  // Die Wartezeit läuft mit der Uhr, ohne neuen Abruf (D10). Der Druck rechnet zum Druckzeitpunkt:
+  // `beforeprint` rendert synchron (`useDruckModus`), die Uhr könnte bis zu einer Minute alt sein.
+  const uhr = useUhr(60_000);
+  const jetzt = druckt ? dayjs() : uhr;
+  const { formatZeitKurz } = useAnzeigeKonventionen();
   const einheitenZufluss = useBelegungZufluss(
     detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
-    EINHEIT_SCHLUESSEL,
+    einheitFolge,
     halten,
     brId,
   );
   const fahrzeugeZufluss = useBelegungZufluss(
     detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
-    FAHRZEUG_SCHLUESSEL,
+    fahrzeugFolge,
     halten,
     brId,
   );
@@ -328,23 +352,29 @@ export default function BrDetailPage() {
     });
   }
 
-  // Typ und Stärke aus Einheiten-/Fahrzeugliste: `BrEinheitKurz` trägt nur id+name.
+  // Typ und Stärke aus Einheiten-/Fahrzeugliste: `BrEinheitKurz` trägt nur Name, „seit“ und
+  // die Funkrufnamen der Fahrzeuge.
   const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
   const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
-  const bereitgestellt = br.einheiten
-    .map((e) => einheitVon.get(e.id))
-    .filter((e): e is Einheit => e != null);
-  // `bereitgestellt` verwirft jede Einheit, die in `einheitenQuery.data` fehlt. Eine Summe darüber
-  // wäre zu klein, sähe aber vollständig aus — deshalb entscheidet die Menge, nicht `isSuccess`.
-  const unvollstaendig = bereitgestellt.length < br.einheiten.length;
-  // Die ganze Einheitenliste trägt die Unterstellung auch über Einheiten außerhalb des Raums
-  // (LFH-550): eine Enkeleinheit zählt nicht doppelt, wenn nur ihr Großvater hier steht.
-  const summe = unvollstaendig
-    ? null
-    : summiereStaerke(bereitgestellt, einheitenQuery.data ?? bereitgestellt);
-  // Fahrzeuge im Raum, auch die der bereitgestellten Einheiten: Serverwert (LLH-1095, Spec
-  // `bereitstellungsraum-belegung`, „Kennzahlen der Belegung“), nicht die Länge einer Liste.
+  // Stärke nur über `staerkeImRaum` (dieselbe Rechnung wie die Liste, LLH-1095 D1): fehlt eine
+  // Einheit des Raums in der Einheitenliste, „—“ mit Grund statt einer zu kleinen Zahl.
+  const { staerke: summe, unvollstaendig } = staerkeImRaum(
+    br.einheiten.map((e) => e.id),
+    einheitenQuery.data,
+  );
+  // Fahrzeuge, Einheiten und längste Wartezeit: Serverwerte (Spec `bereitstellungsraum-belegung`,
+  // „Kennzahlen auf der Detailseite“), nicht die Länge der Listen.
   const fahrzeugZahl = br.belegung.fahrzeuge;
+  const einheitenZahl = br.belegung.einheiten;
+  const laengsteSeit = br.belegung.laengste_seit_at ?? null;
+
+  /** „seit 1342 · 48 min“ an einer Zeile; ohne „seit“ keine Zeitangabe (keine Schätzung). */
+  const seitAngabe = (seitAt: string | null | undefined) =>
+    seitAt ? (
+      <span data-lfh="br-seit" style={{ ...monoStil(12), color: rollen.gedaempft }}>
+        {seitText(formatZeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
+      </span>
+    ) : null;
 
   /**
    * Der Banner steht im Kopf seiner Liste, in einem Platz fester Höhe: erschiene er über der
@@ -525,10 +555,17 @@ export default function BrDetailPage() {
         }}
       >
         <div style={{ flex: 1 }}>
-          {/* Stärke und Fahrzeugzahl als Kennzahlen. Bei unvollständiger Einheitenliste „—" mit
-              Grund — eine zu kleine Summe sähe sonst vollständig aus. */}
+          {/* Kennzahlen der Belegung (D9). Bei unvollständiger Einheitenliste „—" mit Grund — eine
+              zu kleine Summe sähe sonst vollständig aus. Die Notiz „seit …“ kommt und geht mit der
+              Belegung: das Band hält ihre Höhe fest, sonst schöbe ein Ein- oder Austritt die
+              Belegung unter dem Zeiger (`frontend/AGENTS.md`, „Kennzahlenband“). Ton neutral,
+              kein Grenzwert für lange Wartezeit. */}
           <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
-            <Kennzahlenband beschriftung="Bereitgestellte Kräfte">
+            <Kennzahlenband
+              beschriftung="Bereitgestellte Kräfte"
+              notizZeilen={2}
+              notizZeilenSchmal={2}
+            >
               <Kennzahl
                 titel="Bereitgestellt"
                 groesse="klein"
@@ -545,6 +582,17 @@ export default function BrDetailPage() {
                 titel={fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
                 groesse="klein"
                 wert={fahrzeugZahl}
+              />
+              <Kennzahl
+                titel={einheitenZahl === 1 ? 'Einheit' : 'Einheiten'}
+                groesse="klein"
+                wert={einheitenZahl}
+              />
+              <Kennzahl
+                titel="Längste Wartezeit"
+                groesse="klein"
+                wert={laengsteSeit ? dauerText(wartezeitMinuten(laengsteSeit, jetzt)) : '—'}
+                notiz={laengsteSeit ? `seit ${formatZeitKurz(laengsteSeit)}` : undefined}
               />
             </Kennzahlenband>
           </div>
@@ -584,6 +632,12 @@ export default function BrDetailPage() {
                     <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                       <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
                     </span>
+                    {e.fahrzeuge.length > 0 && (
+                      <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
+                        {funkrufnamen(e.fahrzeuge)}
+                      </span>
+                    )}
+                    {seitAngabe(e.seit_at)}
                   </Space>
                   {zeilenGrund('einheit', e.id)}
                 </ListenEintrag>
@@ -619,6 +673,7 @@ export default function BrDetailPage() {
                     {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
                       <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
                     )}
+                    {seitAngabe(f.seit_at)}
                   </Space>
                   {zeilenGrund('fahrzeug', f.id)}
                 </ListenEintrag>
@@ -649,6 +704,9 @@ export default function BrDetailPage() {
               />
             </div>
           )}
+          {/* Letzter Abschnitt der Hauptspalte (D12): aufgeklappt schiebt er nichts Bedienbares
+              nach unten. `key`: der Umschalter behält die Seite, der Verlauf gehört dem Raum. */}
+          <BrVerlauf key={br.id} einsatzId={einsatzId} brId={br.id} bezeichnung={br.bezeichnung} />
         </div>
 
         <KraefteOhneBrSidebar

@@ -89,7 +89,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
   `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
-  `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Meldungen an
+  `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Den Verlauf
+  des eigenen Raums liest das Gerät mit (`…/bereitstellungsraeume/{bid}/verlauf`, Spec
+  `funktionsansichten`, LLH-1095), erst beim Aufklappen (`pages/bereitstellungsraum/BrVerlauf.tsx`);
+  ein Wechsel nennt den anderen Raum mit Bezeichnung, dessen Detail und Verlauf bleiben 404. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
 - **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte
@@ -108,7 +111,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   die Ortszeile zur Koordinate fehlt (`fremde-module`). Die Wahl wird am Gerät nicht gemerkt. Die
   Kopplung bleibt einsatzweit, eine an die Stelle gebundene Kopplung folgt mit LLH-1048.
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
-  Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Den Einsatzleiter am
-  Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
+  Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
+  (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**
+  `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
+  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Den
+  Einsatzleiter am Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
   Einsatzweite Zähler für Meldungen und Personen bekommt kein Gerät, auch ohne Stelle
   (`modul_zaehler.rs`).

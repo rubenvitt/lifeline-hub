@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, type TableColumnsType } from 'antd';
+import { Breadcrumb, Button } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -6,8 +6,9 @@ import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../..
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
+import { listeEinheiten } from '../../api/einheiten';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Bereitstellungsraum, BrStatus } from '../../api/types';
+import type { BrListenEintrag, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
 import {
@@ -17,9 +18,15 @@ import {
   SeitenStandVeraltet,
 } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
-import KatalogTabelle from '../../components/KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
+import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
+import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
+import { useUhr } from '../../abloesung/useUhr';
+import { dauerText } from '../../kraefte/zeitachse';
+import { wartezeitMinuten } from './brBelegungKern';
 import BrAnlegenDrawer from './BrAnlegenDrawer';
 import { KennungsLink } from '../../components/kennungsLink';
+import { useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
 
 export default function BereitstellungsraeumePage() {
@@ -35,6 +42,14 @@ export default function BereitstellungsraeumePage() {
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
   });
+  // Für die Stärke im Raum (LLH-1095 D13). Ohne Freigabe Einheiten (403) oder bei einem Fehler
+  // bleibt `data` leer, und „Stärke“ zeigt „—“ wie die Detailseite.
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
+  const jetzt = useUhr(60_000);
+  const { rollen } = useRollen();
 
   const [anlegen, setAnlegen] = useState(false);
 
@@ -54,8 +69,13 @@ export default function BereitstellungsraeumePage() {
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
 
-  const spalten: TableColumnsType<Bereitstellungsraum> = [
+  // Spalten der Belegung (LLH-1095 D13, Spec `bereitstellungsraum-belegung`, „Liste zeigt die
+  // Belegung“): dieselben Werte wie die Detailseite — Fahrzeuge, Einheiten und längste Wartezeit
+  // aus `belegung` des Servers, die Stärke nur über `staerkeImRaum`. Abschnitt und Standort sind
+  // abwählbar und fallen unter `md` weg (Zähler im Schalter, Kriterium 14).
+  const spalten: KatalogSpalte<BrListenEintrag>[] = [
     {
+      key: 'bezeichnung',
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       render: (b: string, br) => (
@@ -63,11 +83,72 @@ export default function BereitstellungsraeumePage() {
       ),
     },
     {
+      key: 'status',
       title: 'Status',
       dataIndex: 'status',
+      immerSichtbar: true,
       render: (s: BrStatus) => <StatusTag darstellung={brStatus[s]} />,
     },
-    { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
+    {
+      key: 'abschnitt',
+      title: 'Abschnitt',
+      dataIndex: 'abschnitt_name',
+      abBreite: 'md',
+      render: (a: string | null | undefined) => a ?? '—',
+    },
+    {
+      key: 'standort',
+      title: 'Standort',
+      dataIndex: 'standort',
+      abBreite: 'md',
+      render: (s: string | null | undefined) => s ?? '—',
+    },
+    {
+      key: 'staerke',
+      title: 'Stärke',
+      immerSichtbar: true,
+      zahl: true,
+      align: 'right',
+      render: (_: unknown, br) => {
+        const { staerke, unvollstaendig } = staerkeImRaum(br.einheit_ids, einheitenQuery.data);
+        // Der Grund steht sichtbar an der Zelle wie auf der Detailseite (Ton achtung), nie nur
+        // als Tooltip: sonst sähe „unvollständig“ aus wie ein leerer Raum (D1, Touch).
+        return unvollstaendig ? (
+          <span data-lfh="br-staerke-unvollstaendig" style={{ color: rollen.achtungText }}>
+            — unvollständig
+          </span>
+        ) : (
+          <StaerkeAnzeige wert={staerke} />
+        );
+      },
+    },
+    {
+      key: 'fahrzeuge',
+      title: 'Fahrzeuge',
+      immerSichtbar: true,
+      zahl: true,
+      align: 'right',
+      render: (_: unknown, br) => br.belegung.fahrzeuge,
+    },
+    {
+      key: 'einheiten',
+      title: 'Einheiten',
+      immerSichtbar: true,
+      zahl: true,
+      align: 'right',
+      render: (_: unknown, br) => br.belegung.einheiten,
+    },
+    {
+      key: 'wartezeit',
+      title: 'Längste Wartezeit',
+      immerSichtbar: true,
+      zahl: true,
+      align: 'right',
+      render: (_: unknown, br) => {
+        const seit = br.belegung.laengste_seit_at;
+        return seit ? dauerText(wartezeitMinuten(seit, jetzt)) : '—';
+      },
+    },
   ];
 
   // Zwei Ebenen: der Seitenzustand hängt nur an `einsatzQuery` (Breadcrumb, Schreibrecht) und
@@ -148,11 +229,12 @@ export default function BereitstellungsraeumePage() {
             />
           )}
           {(sichtbar.length > 0 || brQuery.isLoading) && (
-            <KatalogTabelle<Bereitstellungsraum>
+            <KatalogTabelle<BrListenEintrag>
               rowKey="id"
               loading={brQuery.isLoading}
               dataSource={sichtbar}
               columns={spalten}
+              spaltenSchalter={{ bezeichnung: modulName('bereitstellungsraeume') }}
               size="middle"
               pagination={false}
               locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}

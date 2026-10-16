@@ -2,14 +2,15 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs]
 ---
 
 ## Überblick
 
 Ein **Bereitstellungsraum** (BR) ist der Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz
-warten. Das Modul zeigt je Raum, wer dort bereitsteht und mit welcher Stärke, welche Kräfte noch
-keinem Raum zugewiesen sind und welches Material dort liegt.
+warten. Das Modul zeigt je Raum, wer dort bereitsteht, mit welcher Stärke und seit wann, wer am
+längsten wartet, wer wann kam und ging, welche Kräfte noch keinem Raum zugewiesen sind und welches
+Material dort liegt.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder
@@ -24,9 +25,13 @@ auf. Die Bedienung am gekoppelten Tablet eines Bereitstellungsraums beschreibt
    sonst einen aktiven. Gibt es noch keinen, bietet sie „Ersten BR anlegen“ an.
 2. Über den Namen des Raums im Seitenkopf in einen anderen Raum wechseln.
 3. Für die Übersicht aller Räume in der Brotkrumenleiste „Bereitstellungsräume“ wählen. Die Liste
-   zeigt Bezeichnung, Status und Standort.
+   zeigt je Raum Bezeichnung, Status, Abschnitt und Standort, dazu die Belegung: „Stärke“,
+   „Fahrzeuge“, „Einheiten“ und „Längste Wartezeit“, mit denselben Werten wie der Raum selbst.
 
-   ![Liste mit „BR Ost“ im Status „geplant“ und „Parkplatz Stadion Nord“ im Status „aktiv“, je mit Standort](../bilder/bereitstellungsraeume/liste.png)
+   ![Liste mit „BR Ost“ im Status „geplant“ ohne Belegung und „Parkplatz Stadion Nord“ im Status „aktiv“ mit Stärke 0/1/5//6, 3 Fahrzeugen, 2 Einheiten und einer längsten Wartezeit von 48 min](../bilder/bereitstellungsraeume/liste.png)
+
+4. Über „Spalten“ lassen sich „Abschnitt“ und „Standort“ aus- und wieder einblenden; auf dem
+   Handy fehlen sie zunächst, der Knopf nennt dann die Zahl der ausgeblendeten Spalten.
 
 ### Einen Bereitstellungsraum anlegen und in Betrieb nehmen
 
@@ -64,9 +69,30 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
    Einheiten“ oder „Bereitgestellte Fahrzeuge“; „Bereitgestellt“ zählt die Stärke, „Fahrzeuge“ die
    Fahrzeuge im Raum, auch die der bereitgestellten Einheiten.
 
-   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, Stärke 0/1/5//6, „Fahrzeuge“ 3 und der Seitenleiste „Kräfte ohne BR“ mit drei Einheiten](../bilder/bereitstellungsraeume/raum.png)
+   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, je mit ihren Fahrzeugen und „seit … · 48 min“, Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und der Seitenleiste „Kräfte ohne BR“](../bilder/bereitstellungsraeume/raum.png)
 
 4. Rückt eine Kraft aus, bei ihr „entfernen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
+
+### Sehen, wer am längsten wartet
+
+1. Den Raum öffnen. Oben stehen „Bereitgestellt“ (Stärke), „Fahrzeuge“, „Einheiten“ und
+   „Längste Wartezeit“; darunter steht, seit wann die am längsten wartende Kraft im Raum ist.
+2. Unter „Bereitgestellte Einheiten“ steht die Einheit, die am längsten wartet, oben. Jede Zeile
+   nennt Typ, Stärke, die Funkrufnamen ihrer Fahrzeuge und „seit“ mit Uhrzeit und Wartezeit, etwa
+   „seit 1342 · 48 min“. Unter „Bereitgestellte Fahrzeuge“ stehen die Fahrzeuge ohne Einheit in
+   derselben Folge.
+3. Eine neu zugewiesene Kraft kommt ans Ende. Die Wartezeit zählt ohne Neuladen weiter.
+
+### Den Verlauf eines Raums lesen
+
+1. Den Raum öffnen und ganz unten „Verlauf“ aufklappen.
+2. Die Liste nennt, neueste zuerst, je Ereignis die Uhrzeit, was geschah („Eintritt“, „Austritt“,
+   „Wechsel von …“, „Wechsel nach …“), die Einheit oder das Fahrzeug und, falls erfasst, eine Notiz
+   wie „Einheit aufgelöst“ oder „Fahrzeug entlassen“.
+
+   ![Aufgeklappter Verlauf des Raums „Parkplatz Stadion Nord“ mit dem Austritt des Sanitätszugs und drei Eintritten](../bilder/bereitstellungsraeume/verlauf.png)
+
+3. Bei offenem Verlauf erscheinen neue Ereignisse ohne Neuladen.
 
 ### Material im Raum führen
 
@@ -119,6 +145,35 @@ Am gekoppelten Tablet des Raums steht dieselbe Zahl.
 „noch … belegt“ vor dem Auflösen zählt dagegen nur, was einzeln im Raum steht: die Einheiten und
 die Fahrzeuge ohne Einheit. Die Fahrzeuge einer Einheit gehen mit ihrer Einheit und halten das
 Auflösen nicht auf.
+
+### Wartezeit und Folge
+
+„Seit“ ist der Zeitpunkt, an dem eine Kraft zuletzt in diesen Raum kam: ihr Eintritt oder ihr
+Wechsel aus einem anderen Raum. Ein früherer Aufenthalt in einem anderen Raum zählt nicht. Fehlt
+ein solcher Zeitpunkt, etwa bei älteren Daten, steht die Kraft ohne Zeitangabe am Ende der Liste;
+die App schätzt nichts. Die Wartezeit rechnet in ganzen Minuten gegen die Uhr des Geräts; geht
+diese nach, erscheint die Wartezeit kürzer, nie negativ. Die Fahrzeuge einer Einheit tragen kein
+eigenes „seit“, sie stehen mit ihrer Einheit. „Längste Wartezeit“ ist die Wartezeit der Kraft, die
+am längsten im Raum steht. Eine Farbe oder Warnung für lange Wartezeiten gibt es nicht.
+
+Die Listen ordnen fest nach Wartezeit, bei gleicher Zeit nach Namen. Steht der Mauszeiger über
+der Belegung oder liegt der Fokus dort, warten Zugänge anderer Arbeitsplätze hinter dem Hinweis
+„… neu“, damit keine Zeile unter dem Zeiger springt; eigene Zuweisungen erscheinen sofort.
+
+### Verlauf
+
+Der Verlauf führt jedes Ereignis des Raums vollständig und ungeblättert, auch Austritte durch
+Auflösen einer Einheit oder Entlassen eines Fahrzeugs. Ein Wechsel steht in beiden Räumen: im
+verlassenen als „Wechsel nach …“, im neuen als „Wechsel von …“. Aufgelöste Einheiten und
+entlassene Fahrzeuge stehen mit ihrem Namen. Auch ein aufgelöster Raum zeigt seinen Verlauf. Der
+Verlauf lädt erst beim Aufklappen; beim Wechsel in einen anderen Raum klappt er zu. Wer den Raum
+lesen darf, darf auch den Verlauf lesen.
+
+### Druck
+
+Der Druck des Raums zeigt alle Kräfte, auch solche, die gerade hinter dem Hinweis „… neu“ warten,
+jeweils mit „seit“ und der Wartezeit zum Zeitpunkt des Drucks, dazu „Längste Wartezeit“. Der
+Verlauf wird nicht gedruckt, solange er zugeklappt ist; ein aufgeklappter Verlauf druckt mit.
 
 ### Material im Raum
 

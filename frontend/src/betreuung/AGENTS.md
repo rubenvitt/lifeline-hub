@@ -23,9 +23,10 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Zeitpunkt der vorgemerkten Kopie: LFH-705, Regel in `offline/AGENTS.md`, „Schreiben ohne Netz“.
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
-  der EP; Ausgabe verweist nur per `nachforderung_id` und `verpflegungsstelle_id`; Einstufung im
-  Client (`verpflegung/deckung.ts`); ins ETB nur Zeitfenster und Bedarf (Org-Zeitzone), dazu Art
-  und Stellen des Zeitfensters und Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler.
+  der EP; Ausgabe verweist nur per Kennung (`nachforderung_id`, `verpflegungsstelle_id`, Empfänger
+  `einheit_id` oder `abschnitt_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
+  Zeitfenster und Bedarf (Org-Zeitzone), dazu Art und Stellen des Zeitfensters und
+  Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler.
   **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
   (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe), Zuordnung zum Zeitfenster
   n:m (`stelle_ids`), **Soll nur am Zeitfenster**, Ist je Stelle (`je_stelle`) nur vom Server
@@ -42,6 +43,18 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Schlüssel `lfh:verpflegung:stelle:<einsatz>`, in `GERAETESPEICHER` und
   `offline/geraetRaeumung.ts`). Ein Stellenwechsel schließt das offene Bündel an der alten Stelle
   ab („senden“); das Bündel trägt die Stelle seines ersten Tipps.
+  **Empfänger** (LLH-1055 D1–D4, `src/verpflegung/repo.rs`): Einheit (Abholung) oder Abschnitt
+  (Zuführung), **höchstens einer** (beide 422), **nie Personen**; fremd oder unbekannt 404. Die
+  Empfängerliste (`empfaenger`) kommt nur als Projektion mit `GET …/verpflegung` (bewusste
+  Ausnahme von LFH-634 D4): Name, Funkrufname, Gliederung, Abschnitt, Stärke aus
+  `einheit::repo::load_staerken_je_einheit`, Eintreffen; die Feldmenge ist in
+  `tests/verpflegung.rs` gepinnt, kein Führer, keine Erreichbarkeit, keine Mitglieder. Live:
+  `einheit` und `abschnitt` erreichen Leser der Verpflegung über die Gate-Menge
+  (`LiveEvent::modul_keys`), `personal` nicht; der Client lädt dann `einsatzKeys.verpflegung` neu.
+  Eine Ausgabe an eine Einheit ist eine Spur (`SPUREN_EINHEIT`): auflösen behält sie, stornieren 422.
+  Die Sammelbuchung der Ausgabeansicht und „Ausgabe nachtragen“ (LLH-1032) setzen noch keinen
+  Empfänger; `einheit_id`/`abschnitt_id` an `AusgabeEingabe` sind optional, eine Ausgabe ohne
+  Empfänger bleibt gültig. Ein Bündel trägt höchstens einen Empfänger für alle seine Portionen.
   **Ausgabe zählen** (LLH-1032, Spec `kraefte-verpflegung`, „Ausgabe zählen“): erfasst wird in
   der Ausgabeansicht je Zeitfenster (`verpflegung/AusgabeAnsicht.tsx`, Route
   `verpflegung/:zeitfensterId/ausgabe` an Stab und Gerät, Pfade über `EinsatzPfade`). Gezählt
@@ -57,7 +70,8 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   vorgemerkten Kopie; vorgemerkte Ausgaben stehen als „ausstehend“ an der Karte
   (`useVorgemerkteAusgaben`) und zählen **nie** in die Deckung; der Sync schreibt das bestätigte
   Zeitfenster vor dem Entfernen der Zeile in den Cache. Stelle (LLH-1040): eine aufgelöste Stelle
-  nimmt Ausgaben mit einem Zeitpunkt **vor** der Auflösung an (sonst 409); Stellenprüfung und
+  nimmt Ausgaben mit einem Zeitpunkt **vor** der Auflösung an (sonst 409); ebenso eine aufgelöste
+  Einheit als Empfänger (LLH-1055), Empfängerprüfung erst nach dem Replay; Stellenprüfung und
   Grenzprüfung (`ort`, `bemerkung`) laufen **nach** dem Replay-Lookup.
   **Bündel** (LLH-1032): ein Bündel ist eine Ausgabe mit einer `client_id`, gesetzt beim
   Abschluss; offene Sammlung und „ausstehend“ zählen nie in „fehlt“ und die Einstufung, sie

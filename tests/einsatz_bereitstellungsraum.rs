@@ -3761,3 +3761,234 @@ async fn abruf_fahrzeug_sendet_fahrzeug() {
         "{ereignisse:?}"
     );
 }
+
+// ---------- Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`) ----------
+
+async fn patch_br(
+    app: &axum::Router,
+    cookie: &str,
+    eid: i64,
+    br: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage_json(app, "PATCH", &br_pfad(eid, br), cookie, Some(&body)).await
+}
+
+/// Nur `lat`/`lon` per PATCH: 200, kein ETB-Eintrag, Live-Ereignis `bereitstellungsraum` mit
+/// der Kennung des Raums; Liste und Detail tragen die Koordinate. Die spätere Inbetriebnahme
+/// nennt keine Koordinate.
+#[tokio::test]
+async fn verortung_ohne_etb_und_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &cookie,
+        Some(&json!({"bezeichnung": "BR Sportplatz"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let br = v["id"].as_i64().unwrap();
+    let etb_vorher = etb_inhalte(&app, &cookie, eid).await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = patch_br(&app, &cookie, eid, br, json!({"lat": 51.93, "lon": 8.87})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        (v["lat"].as_f64(), v["lon"].as_f64()),
+        (Some(51.93), Some(8.87))
+    );
+    assert_eq!(br_ereignisse(&mut rx), vec![br], "Live-Ereignis zum Raum");
+    assert_eq!(
+        etb_inhalte(&app, &cookie, eid).await,
+        etb_vorher,
+        "kein ETB-Eintrag"
+    );
+
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(detail["lat"].as_f64(), Some(51.93), "{detail}");
+    let liste = fetch_json(
+        &app,
+        &cookie,
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+    )
+    .await;
+    assert_eq!(liste[0]["lon"].as_f64(), Some(8.87), "{liste}");
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/status", br_pfad(eid, br)),
+        &cookie,
+        Some(&json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let etb = etb_inhalte(&app, &cookie, eid).await;
+    let neu: Vec<_> = etb.iter().filter(|t| !etb_vorher.contains(t)).collect();
+    assert_eq!(
+        neu,
+        ["Bereitstellungsraum BR Sportplatz in Betrieb genommen"],
+        "{etb:?}"
+    );
+}
+
+/// Halbes Paar ohne Bestand und Werte außerhalb des Bereichs → 422, nichts geändert.
+#[tokio::test]
+async fn verortung_halbes_paar_oder_bereich_ist_422() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Halb").await;
+    for body in [
+        json!({"lat": 51.9}),
+        json!({"lon": 8.8}),
+        json!({"lat": 91, "lon": 8}),
+        json!({"lat": 51.9, "lon": -181}),
+        json!({"lat": 51.9, "lon": null}),
+        json!({"lat": 51.9, "standort": "Schulhof"}),
+    ] {
+        let (s, v) = patch_br(&app, &cookie, eid, br, body.clone()).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {v}");
+    }
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert!(
+        detail.get("lat").is_none() && detail.get("lon").is_none(),
+        "{detail}"
+    );
+    assert!(detail["standort"].is_null(), "nichts geändert: {detail}");
+}
+
+/// Beide `null` entfernen die Koordinate; die Anzeige lässt beide Felder weg. Fehlt die
+/// Koordinate in einer Änderung, bleibt sie.
+#[tokio::test]
+async fn verortung_entfernen_laesst_feld_weg() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Weg").await;
+    let (s, _) = patch_br(&app, &cookie, eid, br, json!({"lat": 51.9, "lon": 8.8})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = patch_br(&app, &cookie, eid, br, json!({"notiz": "Zufahrt Süd"})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        (v["lat"].as_f64(), v["lon"].as_f64()),
+        (Some(51.9), Some(8.8)),
+        "{v}"
+    );
+
+    let (s, v) = patch_br(&app, &cookie, eid, br, json!({"lat": null, "lon": null})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("lat").is_none() && v.get("lon").is_none(), "{v}");
+    assert_eq!(v["notiz"], "Zufahrt Süd");
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert!(
+        detail.get("lat").is_none() && detail.get("lon").is_none(),
+        "{detail}"
+    );
+}
+
+/// Ein stornierter Raum lässt sich nicht verorten (409).
+#[tokio::test]
+async fn verortung_stornierter_raum_409() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &cookie,
+        Some(&json!({"bezeichnung": "BR Storno"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let br = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage_json(&app, "DELETE", &br_pfad(eid, br), &cookie, None).await;
+    assert!(s.is_success(), "stornieren: {s}");
+    let (s, v) = patch_br(&app, &cookie, eid, br, json!({"lat": 51.9, "lon": 8.8})).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+/// Anlegen mit Standort und Koordinate trägt beide.
+#[tokio::test]
+async fn anlegen_mit_koordinate() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &cookie,
+        Some(&json!({
+            "bezeichnung": "BR Sportplatz",
+            "standort": "Sportplatz Nord",
+            "lat": 51.93,
+            "lon": 8.87
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["standort"], "Sportplatz Nord");
+    assert_eq!(
+        (v["lat"].as_f64(), v["lon"].as_f64()),
+        (Some(51.93), Some(8.87))
+    );
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, v["id"].as_i64().unwrap())).await;
+    assert_eq!(detail["lat"].as_f64(), Some(51.93), "{detail}");
+}
+
+/// Anlegen mit halbem Paar → 422, kein Raum entsteht.
+#[tokio::test]
+async fn anlegen_mit_halbem_paar_ist_422() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let pfad = format!("/api/einsaetze/{eid}/bereitstellungsraeume");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"bezeichnung": "BR Halb", "lat": 51.9})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let liste = fetch_json(&app, &cookie, &pfad).await;
+    assert_eq!(liste, json!([]), "nichts angelegt");
+}
+
+/// Ein Beobachter darf nicht verorten (403), die Koordinate bleibt leer.
+#[tokio::test]
+async fn beobachter_kann_nicht_verorten_403() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let br = br_anlegen_und_aktivieren(&app, &admin, eid, "BR Beob").await;
+    let beob = benutzer_anlegen(&app, &admin, "berta", "keine").await;
+    rolle_setzen(&app, &admin, eid, beob, "beobachter").await;
+    let beob = login_cookie(&app, "berta", "bertapw1").await;
+
+    let (s, _) = patch_br(&app, &beob, eid, br, json!({"lat": 51.9, "lon": 8.8})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let detail = fetch_json(&app, &admin, &br_pfad(eid, br)).await;
+    assert!(detail.get("lat").is_none(), "{detail}");
+}
+
+/// Ein Raum eines anderen Einsatzes ist unter diesem Einsatz unbekannt (404).
+#[tokio::test]
+async fn fremder_einsatz_verorten_404() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let anderer = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Eigen").await;
+    let (s, _) = patch_br(&app, &cookie, anderer, br, json!({"lat": 51.9, "lon": 8.8})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert!(detail.get("lat").is_none(), "{detail}");
+}

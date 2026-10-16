@@ -282,7 +282,11 @@ Jede Änderung an Zeitfenstern, Ausgaben und Verpflegungsstellen MUST nach dem C
 Live-Ereignis `verpflegung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul
 Verpflegung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen. Ein zugehöriger ETB-Eintrag MUST
 zusätzlich als ETB-Ereignis verteilt werden. Neue Zeitfenster anderer Personen MUST die
-Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen.
+Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen. Die Ereignisse
+`einheit` und `abschnitt` MUST zusätzlich alle verbundenen Clients erreichen, die das Modul
+Verpflegung lesen dürfen, weil die Empfängerliste Einheiten und Abschnitte zeigt; der Client
+MUST darauf die Verpflegung neu laden. Das Ereignis `personal` MUST Leser der Verpflegung nicht
+deswegen erreichen.
 
 #### Scenario: Zweiter Client sieht die Ausgabe
 - **WHEN** Client A eine Ausgabe erfasst, während Client B die Verpflegungsseite desselben Einsatzes geöffnet hat
@@ -295,6 +299,14 @@ Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen.
 #### Scenario: Ereignis bei einer Stelle
 - **WHEN** eine Verpflegungsstelle angelegt, geändert, im Status gewechselt oder storniert wird
 - **THEN** löst das System nach dem Commit ein Ereignis `verpflegung` aus, dessen Nutzlast nur Kennungen trägt
+
+#### Scenario: Einheit geändert, Leser nur der Verpflegung
+- **WHEN** eine Einheit gebildet, umgehängt oder aufgelöst wird und ein verbundener Benutzer nur die Module Verpflegung, nicht aber Einheiten oder Lagekarte lesen darf
+- **THEN** erhält er das Ereignis `einheit` und lädt die Verpflegung neu
+
+#### Scenario: Personal geändert, Leser nur der Verpflegung
+- **WHEN** die Position einer disponierten Person geändert wird und ein verbundener Benutzer nur das Modul Verpflegung lesen darf
+- **THEN** erhält er das Ereignis `personal` nicht
 
 #### Scenario: Zweiter Client sieht die neue Stelle
 - **WHEN** Client A eine Verpflegungsstelle anlegt oder auflöst, während Client B die Ansicht „Stellen“ desselben Einsatzes geöffnet hat
@@ -347,7 +359,8 @@ Zeitfenster MUST keinen Sprung „Ausgabe öffnen“ tragen.
 Beim Schwärzen eines Einsatzes MUST das System Ort und Bemerkung von Ausgaben und den Standort
 von Verpflegungsstellen leeren. Bezeichnungen der Zeitfenster und der Verpflegungsstellen, Art,
 Status und Koordinate der Stellen, die Zuordnungen, Zeitpunkte, Bedarfe, Mengen,
-Sonderkost-Anzahlen, Stellen- und Nachforderungsverweise MUST erhalten bleiben.
+Sonderkost-Anzahlen, Stellen- und Nachforderungsverweise sowie die Verweise auf Empfänger
+(Einheit, Abschnitt) MUST erhalten bleiben.
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit einer Ausgabe am Ort „Hof Familie Meyer, Deichstraße 4“ und der Bemerkung „für Frau Meyer glutenfrei“ geschwärzt wird
@@ -358,6 +371,10 @@ Sonderkost-Anzahlen, Stellen- und Nachforderungsverweise MUST erhalten bleiben.
 - **WHEN** ein Einsatz mit der Stelle „Feldküche BR Sportplatz“ am Standort „Am Sportplatz 2“ und einer Ausgabe an ihr geschwärzt wird
 - **THEN** ist der Standort leer
 - **AND** Bezeichnung, Art, Status und Koordinate der Stelle, ihre Zuordnungen und der Verweis der Ausgabe auf sie sind unverändert
+
+#### Scenario: Empfänger bleibt nach dem Schwärzen
+- **WHEN** ein Einsatz mit einer Ausgabe an die Einheit „2. Gruppe“ geschwärzt wird
+- **THEN** verweist die Ausgabe weiter auf die Einheit
 
 ### Requirement: Stab-Werkzeug S4
 
@@ -646,6 +663,106 @@ Ein Zeitfenster ohne Art MUST sich wie bisher verhalten.
 #### Scenario: Unbekannte Art
 - **WHEN** ein Zeitfenster mit einer unbekannten Verpflegungsart angelegt wird
 - **THEN** antwortet das System mit 400 und legt nichts an
+
+### Requirement: Empfänger einer Ausgabe
+
+Eine Ausgabe SHALL optional genau einen Empfänger tragen: eine Einheit desselben Einsatzes
+(Abholung) oder einen Abschnitt desselben Einsatzes (Zuführung). Personen MUST NOT Empfänger sein.
+Eine Ausgabe MUST vom Empfänger nur die Kennung tragen. Nennt eine Ausgabe Einheit und Abschnitt
+zugleich, MUST das System mit 422 antworten. Eine Einheit oder ein Abschnitt eines anderen
+Einsatzes oder eine unbekannte Kennung MUST mit 404 abgelehnt werden. Ist die Einheit aufgelöst,
+MUST das System die Ausgabe mit 409 ablehnen, wenn ihr Zeitpunkt nicht vor der Auflösung liegt;
+eine Ausgabe mit früherem Zeitpunkt MUST angenommen werden. Die Prüfung des Empfängers MUST nach
+dem Replay über `client_id` und nach der Prüfung auf einen aktiven Einsatz laufen; ein Replay
+MUST die gespeicherte Ausgabe ohne diese Prüfung liefern. Eine Ausgabe mit Empfänger MUST wie
+jede Ausgabe keinen ETB-Eintrag schreiben. Eine Ausgabe ohne Empfänger MUST weiter angenommen
+werden; so bucht die Ausgabeansicht eine gezählte Sammlung (Requirement „Ausgabe zählen“) und
+das Formular „Ausgabe nachtragen“ eine Ausgabe, solange sie keinen Empfänger nennen. Eine als
+eine Ausgabe gebuchte Sammlung trägt damit höchstens einen Empfänger für alle ihre Portionen.
+
+#### Scenario: Abholung durch eine Einheit
+- **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 9 EP an die Einheit „2. Gruppe“ erfasst wird
+- **THEN** trägt die Ausgabe die Kennung der Einheit und zählt in die ausgegebene Menge des Zeitfensters
+- **AND** das ETB erhält keinen neuen Eintrag
+
+#### Scenario: Zuführung an einen Abschnitt
+- **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 40 EP an den Abschnitt „Deich“ erfasst wird
+- **THEN** trägt die Ausgabe die Kennung des Abschnitts
+
+#### Scenario: Zwei Empfänger
+- **WHEN** eine Ausgabe die Einheit „2. Gruppe“ und den Abschnitt „Deich“ zugleich nennt
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Menge und zwei Empfänger fehlerhaft
+- **WHEN** eine Ausgabe mit Menge 0 die Einheit „2. Gruppe“ und den Abschnitt „Deich“ zugleich nennt
+- **THEN** antwortet das System mit 400
+
+#### Scenario: Einheit eines anderen Einsatzes
+- **WHEN** eine Ausgabe eine Einheit eines anderen Einsatzes oder eine unbekannte Einheit nennt
+- **THEN** antwortet das System mit 404 und legt nichts an
+
+#### Scenario: Abschnitt eines anderen Einsatzes
+- **WHEN** eine Ausgabe einen Abschnitt eines anderen Einsatzes oder einen unbekannten Abschnitt nennt
+- **THEN** antwortet das System mit 404 und legt nichts an
+
+#### Scenario: Aufgelöste Einheit
+- **WHEN** die Einheit „2. Gruppe“ um 12:20 aufgelöst wurde und eine Ausgabe an sie mit dem Zeitpunkt der Erfassung um 12:30 erfasst wird
+- **THEN** antwortet das System mit 409 und legt nichts an
+
+#### Scenario: Vor der Auflösung offline gebucht
+- **WHEN** eine Ausgabe an die Einheit „2. Gruppe“ um 12:10 offline vorgemerkt wurde, die Einheit um 12:20 aufgelöst wird und die Ausgabe um 12:30 eintrifft
+- **THEN** speichert das System die Ausgabe an die Einheit mit dem Zeitpunkt 12:10
+
+#### Scenario: Replay nach dem Auflösen
+- **WHEN** eine Ausgabe an die Einheit „2. Gruppe“ mit `client_id` „v6“ gespeichert ist, die Einheit danach aufgelöst wird und dieselbe Ausgabe erneut eintrifft
+- **THEN** antwortet das System mit 201 und der gespeicherten Ausgabe
+
+#### Scenario: Abschnitt gelöscht
+- **WHEN** der Abschnitt „Deich“ gelöscht wird, an den eine Ausgabe ging
+- **THEN** bleibt die Ausgabe mit Menge und Zeitpunkt bestehen und zählt weiter in die ausgegebene Menge, nur ohne Empfänger
+
+#### Scenario: Gezählte Sammlung ohne Empfänger
+- **WHEN** in der Ausgabeansicht von „Mittag“ eine Sammlung von 20 Portionen ohne Empfänger gebucht wird
+- **THEN** ist genau eine Ausgabe über 20 EP ohne Empfänger gespeichert und zählt in die ausgegebene Menge des Zeitfensters
+
+### Requirement: Empfängerliste der Verpflegung
+
+Die Antwort des Verpflegungsmoduls SHALL eine Empfängerliste enthalten: alle nicht aufgelösten
+Einheiten des Einsatzes mit Name, Funkrufname, Über-Einheit, Abschnitt, eigener und kumulierter
+Ist-Stärke und dem Zeitpunkt des Eintreffens, dazu die aufgelösten Einheiten, auf die eine Ausgabe
+verweist, und alle Abschnitte mit Name und Über-Abschnitt. Die Stärken MUST aus derselben Rechnung
+stammen wie in der Einheitenliste. Das Eintreffen MUST das nicht gestrichene Eintreffen der
+jüngsten Einsatzperiode sein und fehlen, wenn es keins gibt. Die Liste MUST NOT Einheitsführer,
+Erreichbarkeit, Kommunikationsmittel, Bemerkung, Mitglieder, Fahrzeuge oder Material enthalten.
+Jeder, der die Verpflegung lesen darf, MUST die Liste erhalten, auch ohne Zugriff auf das Modul
+Einheiten; Einheiten- und Abschnittsnamen, Gliederung, Stärke und Eintreffen sind
+Lagebezeichnungen ohne Personenbezug und hier eine bewusste Ausnahme von der Regel, dass das
+Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
+
+#### Scenario: Liste mit Gliederung und Stärke
+- **WHEN** der Einsatz den Zug „Florian 1“ (eigene Stärke 1/0/1) mit den Gruppen „1. Gruppe“ (0/1/8) und „2. Gruppe“ (0/1/8) führt und die Verpflegung abgerufen wird
+- **THEN** enthält die Empfängerliste alle drei Einheiten mit Über-Einheit, „Florian 1“ mit eigener Stärke 1/0/1 und kumulierter Stärke 1/2/17
+
+#### Scenario: Ohne Eintreffen
+- **WHEN** eine Einheit kein nicht gestrichenes Eintreffen in ihrer Zeitachse hat
+- **THEN** trägt sie in der Empfängerliste keinen Zeitpunkt des Eintreffens
+
+#### Scenario: Abgelöste Einheit bleibt
+- **WHEN** die Schicht der Einheit „1. Gruppe“ vollzogen ist und ihre Einsatzperiode damit endete
+- **THEN** steht sie weiter in der Empfängerliste mit dem Eintreffen dieser Periode
+
+#### Scenario: Keine Personenangaben
+- **WHEN** eine Einheit mit Einheitsführer, Erreichbarkeit und Personal in der Empfängerliste steht
+- **THEN** enthält die Antwort weder den Namen des Einheitsführers noch die Erreichbarkeit noch Namen von Mitgliedern
+
+#### Scenario: Leser ohne Modul Einheiten
+- **WHEN** eine Person die Verpflegung lesen darf, das Modul Einheiten für sie aber ausgeblendet ist
+- **THEN** erhält sie die Empfängerliste mit den Namen der Einheiten
+- **AND** die Einheitenliste des Einsatzes beantwortet das System ihr weiter mit 403
+
+#### Scenario: Aufgelöste Einheit mit Ausgabe
+- **WHEN** die Einheit „2. Gruppe“ eine Ausgabe bekommen hat und danach aufgelöst wurde
+- **THEN** steht sie in der Empfängerliste mit ihrem Namen und dem Zeitpunkt der Auflösung
 
 ### Requirement: Stellen im Modul
 

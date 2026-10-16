@@ -2,7 +2,7 @@
 titel: Bereitstellungsraum am Gerät
 gruppen: [geraete]
 reihenfolge: 740
-quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -32,17 +32,23 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an; die Knöpfe zum Z
 1. „Raum“ öffnen. Rechts stehen unter „Kräfte ohne BR“ die Einheiten und die Fahrzeuge ohne
    Einheit, die keinem Bereitstellungsraum zugeordnet sind.
 2. Bei Bedarf unter „Kräfte suchen“ den Namen eingeben.
-3. Bei der eintreffenden Kraft „zuweisen“ wählen. Sie erscheint unter „Bereitgestellte
-   Einheiten“ oder „Bereitgestellte Fahrzeuge“; die Kennzahl „Bereitgestellt“ zählt die Stärke
-   mit.
+3. Bei der eintreffenden Kraft „zuweisen“ wählen. Sie erscheint am Ende von „Bereitgestellte
+   Einheiten“ oder „Bereitgestellte Fahrzeuge“ mit „seit“ und ihrer Wartezeit; die Kennzahl
+   „Bereitgestellt“ zählt die Stärke mit. Oben steht, wer am längsten wartet.
 
-   ![Aktiver Bereitstellungsraum mit zwei bereitgestellten Einheiten, Stärke 0/2/2//4, „Fahrzeuge“ 4 und drei Kräften ohne BR](../bilder/geraet-bereitstellungsraum/raum.png)
+   ![Aktiver Bereitstellungsraum mit zwei bereitgestellten Einheiten, je mit ihren Fahrzeugen und „seit … · 0 min“, Stärke 0/2/2//4, „Fahrzeuge“ 4, „Einheiten“ 2, „Längste Wartezeit“ 0 min und dem Sanitätszug unter „Kräfte ohne BR“](../bilder/geraet-bereitstellungsraum/raum.png)
 
 ### Kräfte abmelden
 
 1. „Raum“ öffnen.
 2. Bei der Kraft, die den Raum verlässt, „entfernen“ wählen. Sie steht danach wieder unter „Kräfte
    ohne BR“.
+
+### Verlauf lesen
+
+1. „Raum“ öffnen und ganz unten „Verlauf“ aufklappen.
+2. Die Liste nennt, neueste zuerst, wann welche Kraft eingetreten, ausgetreten oder aus einem
+   anderen Raum gewechselt ist. Ein Wechsel nennt den anderen Raum mit seiner Bezeichnung.
 
 ### Meldung an die Einsatzleitung
 
@@ -61,6 +67,12 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an; die Knöpfe zum Z
 Das Tablet führt nur seinen eigenen Raum. Es legt keinen Raum an, wechselt nicht in einen anderen,
 ändert weder Stammdaten noch Bezeichnung, Standort und Notiz des Raums, löst den Raum nicht auf und
 storniert ihn nicht; das bleibt der Einsatzleitung. Auch an den Einheiten und Fahrzeugen selbst ändert es nichts.
+
+### Verlauf und Wartezeiten
+
+Das Tablet liest den Verlauf seines eigenen Raums wie die Einsatzleitung; Wartezeit, Folge und
+Verlauf beschreibt das Kapitel [Bereitstellungsräume](bereitstellungsraeume.md). Von einem anderen
+Raum sieht es nur die Bezeichnung in einem Wechsel, nicht dessen Belegung oder Verlauf.
 
 ### Absender der Meldungen
 

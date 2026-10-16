@@ -7,7 +7,8 @@ use crate::bereitstellungsraum::eintreffen::{
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{
     BrAbrufAufhebenEingabe, BrAbrufEingabe, BrAbrufErgebnis, BrAbrufKurz, BrAnzeige,
-    BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
+    BrBelegungAnzeige, BrBelegungKennzahlen, BrListenEintrag, BrStatus, BrVerlaufEintrag,
+    ObjektTyp,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
@@ -81,19 +82,6 @@ pub struct BrFahrzeugKurz {
     /// Wie [`BrEinheitKurz::abruf`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abruf: Option<BrAbrufKurz>,
-}
-
-/// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
-/// Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-/// `summiereStaerke`).
-#[derive(Debug, Serialize, ToSchema)]
-pub struct BrListenEintrag {
-    #[serde(flatten)]
-    pub br: BrAnzeige,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub abschnitt_name: Option<String>,
-    pub belegung: BrBelegungKennzahlen,
-    pub einheit_ids: Vec<i64>,
 }
 
 // ---------- ETB-/SSE-Helfer ----------
@@ -243,7 +231,7 @@ pub struct ListeParams {
 
 /// GET /api/einsaetze/{id}/bereitstellungsraeume — Räume mit Abschnittsname, Kennzahlen der
 /// Belegung und den Einheiten im Raum (LLH-1095). Eine feste Zahl Abfragen für alle Räume.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
     Query(params): Query<ListeParams>,
@@ -254,41 +242,20 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter BR-Status im Filter",
     )?;
-    let mut liste = br_repo::liste(
+    let mut liste = br_repo::list_eintraege(
         &state.pool,
         einsatz_id,
-        params.status.as_deref(),
-        params.abschnitt_id,
+        br_repo::ListenFilter {
+            status: params.status.as_deref(),
+            abschnitt_id: params.abschnitt_id,
+        },
     )
     .await?;
     // Stellenbindung (LFH-1042): ein BR-Gerät kennt nur seinen eigenen Raum, jedes andere Gerät
     // keinen.
     let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum);
     liste.retain(|z| sicht.sieht(z.br.id));
-    let mut kennzahlen = belegung_repo::kennzahlen_je_raum(&state.pool, einsatz_id, None).await?;
-    let einheiten: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT aktueller_br_id, id FROM einsatz_einheit \
-         WHERE einsatz_id = ? AND aktueller_br_id IS NOT NULL AND aufgeloest_at IS NULL \
-         ORDER BY id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(
-        liste
-            .into_iter()
-            .map(|z| BrListenEintrag {
-                belegung: kennzahlen.remove(&z.br.id).unwrap_or_default(),
-                einheit_ids: einheiten
-                    .iter()
-                    .filter(|(raum, _)| *raum == z.br.id)
-                    .map(|(_, id)| *id)
-                    .collect(),
-                abschnitt_name: z.abschnitt_name,
-                br: z.br,
-            })
-            .collect(),
-    ))
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -297,11 +264,14 @@ pub struct AnlegenBody {
     pub abschnitt_id: Option<i64>,
     pub standort: Option<String>,
     pub notiz: Option<String>,
+    /// Koordinate (LLH-1107): beide oder keine, sonst 422.
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 /// POST /api/einsaetze/{id}/bereitstellungsraeume
 /// KEIN ETB-Eintrag (erst Inbetriebnahme ist lagerelevant). SSE.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
     JsonBody(body): JsonBody<AnlegenBody>,
@@ -311,7 +281,7 @@ pub async fn anlegen(
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
 
-    let br = br_repo::anlegen(
+    let br = br_repo::create(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -320,6 +290,8 @@ pub async fn anlegen(
             abschnitt_id: body.abschnitt_id,
             standort: standort.as_deref(),
             notiz: notiz.as_deref(),
+            lat: body.lat,
+            lon: body.lon,
         },
     )
     .await?;
@@ -365,24 +337,23 @@ pub struct PatchBody {
     pub standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
+    /// Koordinate (LLH-1107): fehlt = unverändert, `null` = entfernen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}
-/// KEIN ETB-Eintrag. SSE.
-pub async fn aktualisieren(
+/// KEIN ETB-Eintrag, auch nicht für die Koordinate (LLH-1107, design.md D2): die Verortung geht
+/// live über das Ereignis `bereitstellungsraum`. SSE.
+pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
     PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
-    if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict(
-            "Stornierter BR kann nicht geändert werden".into(),
-        ));
-    }
-
     let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let standort = body
         .standort
@@ -391,19 +362,19 @@ pub async fn aktualisieren(
         .notiz
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
-    let nachher = br_repo::aktualisiere(
-        &state.pool,
-        einsatz_id,
-        br_id,
-        ctx.benutzer.id,
-        PatchDaten {
-            bezeichnung: bezeichnung.as_deref(),
-            abschnitt_id: body.abschnitt_id,
-            standort: standort.as_ref().map(|o| o.as_deref()),
-            notiz: notiz.as_ref().map(|o| o.as_deref()),
-        },
-    )
-    .await?;
+    let daten = PatchDaten {
+        bezeichnung: bezeichnung.as_deref(),
+        abschnitt_id: body.abschnitt_id,
+        standort: standort.as_ref().map(|o| o.as_deref()),
+        notiz: notiz.as_ref().map(|o| o.as_deref()),
+        lat: body.lat,
+        lon: body.lon,
+    };
+    // Storniert (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
+    // Stand dieser Transaktion.
+    let nachher = crate::write_retry!(&state.pool, |conn| {
+        br_repo::update_tx(conn, einsatz_id, br_id, ctx.benutzer.id, &daten).await
+    })?;
     sse_br(&state, einsatz_id, br_id);
     Ok(Json(nachher))
 }
