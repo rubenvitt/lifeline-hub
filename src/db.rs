@@ -7591,7 +7591,7 @@ mod tests {
         }
     }
 
-    // ── LLH-1055: Empfänger einer Verpflegungsausgabe (0207) ────────────────────────────────
+    // ── LLH-1055: Empfänger einer Verpflegungsausgabe (0210) ────────────────────────────────
 
     /// Eine Einheit und ein Abschnitt im Einsatz `e`; liefert (einheit, abschnitt).
     async fn empfaenger_bestand(pool: &SqlitePool, e: i64) -> (i64, i64) {
@@ -7615,12 +7615,12 @@ mod tests {
     /// LLH-1055, design.md „Migration Plan“: Ausgaben vor der Migration bleiben unverändert
     /// lesbar, die neuen Spalten sind `NULL`; beide Indizes sind da.
     #[tokio::test]
-    async fn migration_0207_verpflegung_ausgabe_empfaenger_bestand() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 209).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (_, aus) = verpflegung_bestand(&pool, e, b).await;
 
-        migriere_bis(&pool, 207).await;
+        migriere_bis(&pool, 210).await;
 
         let (menge, ort, einheit, abschnitt): (i64, Option<String>, Option<i64>, Option<i64>) =
             sqlx::query_as(
@@ -7653,8 +7653,8 @@ mod tests {
     /// Ein gelöschter Abschnitt oder eine gelöschte Einheit leert nur den Verweis; die Ausgabe
     /// bleibt mit ihrer Menge stehen (`ON DELETE SET NULL`).
     #[tokio::test]
-    async fn migration_0207_verpflegung_ausgabe_empfaenger_set_null() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_set_null() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 210).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (_, aus) = verpflegung_bestand(&pool, e, b).await;
         let (einheit, abschnitt) = empfaenger_bestand(&pool, e).await;
@@ -7696,8 +7696,8 @@ mod tests {
 
     /// Ein Einsatz mit je einer Ausgabe an eine Einheit und an einen Abschnitt lässt sich löschen.
     #[tokio::test]
-    async fn migration_0207_verpflegung_ausgabe_empfaenger_einsatz_loeschen() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_einsatz_loeschen() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 210).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (_, aus) = verpflegung_bestand(&pool, e, b).await;
         let (_, aus2) = verpflegung_bestand(&pool, e, b).await;
