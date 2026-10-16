@@ -114,7 +114,7 @@ async fn anlegen_in(
     eingabe: ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_anlegen_tx(conn, e, w.b, STARTWERT, TZ, &eingabe).await
+        create_zeitfenster_tx(conn, e, w.b, STARTWERT, TZ, &eingabe).await
     })
 }
 
@@ -129,7 +129,7 @@ async fn aendern_in(
     a: ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_aendern_tx(conn, e, id, w.b, STARTWERT, TZ, &a).await
+        update_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ, &a).await
     })
 }
 
@@ -139,7 +139,7 @@ async fn aendern(w: &Welt, id: i64, a: ZeitfensterAenderung) -> Result<Geschrieb
 
 async fn loeschen_in(w: &Welt, e: i64, id: i64) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_loeschen_tx(conn, e, id, w.b, STARTWERT, TZ).await
+        delete_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ).await
     })
 }
 

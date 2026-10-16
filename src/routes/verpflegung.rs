@@ -148,7 +148,7 @@ pub async fn zeitfenster_anlegen(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, tz, &eingabe).await
+        repo::create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, tz, &eingabe).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok((
@@ -215,7 +215,7 @@ pub async fn zeitfenster_aendern(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_aendern_tx(
+        repo::update_zeitfenster_tx(
             conn,
             einsatz_id,
             zid,
@@ -247,7 +247,7 @@ pub async fn zeitfenster_loeschen(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_loeschen_tx(conn, einsatz_id, zid, benutzer_id, startwert, tz).await
+        repo::delete_zeitfenster_tx(conn, einsatz_id, zid, benutzer_id, startwert, tz).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok(StatusCode::NO_CONTENT)

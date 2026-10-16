@@ -654,7 +654,7 @@ async fn replace_zuordnung_tx(
 // ── Zeitfenster ─────────────────────────────────────────────────────────────────────────────
 
 /// Legt ein Zeitfenster an. ETB: System-Eintrag mit Bezeichnung, Zeitraum und Bedarf.
-pub async fn zeitfenster_anlegen_tx(
+pub async fn create_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -734,7 +734,7 @@ pub async fn zeitfenster_anlegen_tx(
 /// Änderung — sonst unterliefe eine Teiländerung (nur der Bedarf, nur das Ende) die
 /// Teilmengen- bzw. Zeitregel. Ändert sich kein Wert, läuft weder UPDATE noch ETB
 /// (Leerlauf-Riegel) und `etb_ids` bleibt leer.
-pub async fn zeitfenster_aendern_tx(
+pub async fn update_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -864,7 +864,7 @@ pub async fn zeitfenster_aendern_tx(
 
 /// Löscht ein Zeitfenster samt zurückgenommener Ausgaben (CASCADE). Solange eine gültige
 /// Ausgabe daran hängt, ist das 422: sie wäre sonst still aus der Bilanz verschwunden.
-pub async fn zeitfenster_loeschen_tx(
+pub async fn delete_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,

@@ -1329,7 +1329,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let zf = v::zeitfenster_anlegen_tx(
+        let zf = v::create_zeitfenster_tx(
             &mut tx,
             e,
             nutzer,
