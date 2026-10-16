@@ -1,3 +1,71 @@
+## [1.0.0-alpha.131](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.130...v1.0.0-alpha.131) (2026-10-16)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen beim Start:** Dieses Release spielt mehrere Migrationen ein. Die Tabelle der Bereitstellungsraum-Belegung wird neu aufgebaut, damit sie Abruf, Ziel und Auftrag speichern kann. Die Zeitachse der Kräfte wird neu aufgebaut und kennt jetzt den Bereitstellungsraum als Herkunft. Neue Spalten gibt es für:
+  - das Kennzeichen „nicht übernommen“ an Einheiten,
+  - den Wiederholungsschutz bei Belegungen,
+  - die Koordinate eines Bereitstellungsraums,
+  - den Empfänger einer Verpflegungsausgabe.
+- **Schnittstelle Bereitstellungsräume:** Die Liste der Räume liefert jetzt zusätzlich je Raum den Abschnittsnamen, die Kennzahlen der Belegung und die Einheiten im Raum. Raum und Detail tragen die Koordinate. Neu sind diese Aufrufe:
+  - Verlauf eines Raums,
+  - Eintreffen buchen,
+  - unangemeldete Einheit übernehmen oder abweisen,
+  - Kraft abrufen und Abruf zurücknehmen.
+
+  Über die allgemeine Belegungsbuchung lassen sich Abruf und Rücknahme nicht buchen.
+- **Schnittstelle Verpflegung:** Die Verpflegungsdaten enthalten jetzt eine Empfängerliste. Eine Ausgabe kann optional eine Einheit oder einen Abschnitt als Empfänger nennen.
+- **Lage-Snapshots** enthalten jetzt die Bereitstellungsräume. Ältere Stände haben dieses Feld nicht.
+
+### Kräfte und Mittel – Bereitstellungsraum
+
+- **Wartezeiten auf der Detailseite:**
+  - Oben stehen die Kennzahlen „Bereitgestellt“, „Fahrzeuge“, „Einheiten“ und „Längste Wartezeit“.
+  - Zu jeder Einheit sieht man Typ, Stärke, die Funkrufnamen ihrer Fahrzeuge und die Wartezeit, etwa „seit 1342 · 48 min“. Die Wartezeit zählt mit der Uhr weiter.
+  - Wer am längsten wartet, steht oben.
+  - Im Druck gilt die Wartezeit zum Zeitpunkt des Drucks.
+- **„Fahrzeuge“ zählt jetzt auch die Fahrzeuge der Einheiten im Raum.** Ändern sich die Fahrzeuge einer Einheit (zuordnen, umhängen, freigeben, entlassen, Sammel-Disposition), aktualisiert sich die Anzeige des Raums sofort. Das gilt auch für Leser ohne Recht auf Einheiten oder Fahrzeuge.
+- **Verlauf:** Ein aufklappbarer Bereich zeigt Eintritte, Wechsel (mit Herkunft bzw. Ziel), Austritte samt Notiz und Abrufe. Er lädt erst beim Aufklappen und aktualisiert sich live. Das Gerät am Bereitstellungsraum sieht den Verlauf seines eigenen Raums.
+- **Liste der Räume:**
+  - Neue Spalten: Abschnitt, Stärke, Fahrzeuge, Einheiten und längste Wartezeit.
+  - Abschnitt und Standort lassen sich ausblenden. Auf schmalen Bildschirmen entfallen sie automatisch.
+  - Ist eine Stärke unvollständig, steht dort sichtbar „— unvollständig“ statt eines bloßen Strichs.
+  - Wird ein Abschnitt umbenannt, aktualisiert sich die Liste.
+- **Serverseitig vorbereitet (Oberfläche folgt):**
+  - **Eintreffen einbuchen:** Bekannte und unangemeldete Kräfte lassen sich am Raum einbuchen. Das Eintreffen landet in der Kräfte-Zeitachse. Doppelte Buchungen und Wiederholungen werden abgefangen. Kommt eine Kraft unangemeldet an, entsteht eine Meldung an die Einsatzleitung mit Bestätigungsfrist. Die Einheit lässt sich danach übernehmen (mit Wahl der Unterstellung) oder abweisen.
+  - **Kräfte abrufen:** Eine Kraft lässt sich samt ihrem Verband in einen Abschnitt abrufen, auf Wunsch mit Auftrag. Ein Abruf lässt sich zurücknehmen. Abruf und Rücknahme stehen im Einsatztagebuch. Das Ausrücken erscheint dort als „… rückt aus … nach …“. Eine abgerufene Kraft lässt sich nicht in einen anderen Raum wechseln.
+  - **Koordinate am Raum:** Die Koordinate lässt sich setzen, ändern und entfernen, ohne Eintrag im Einsatztagebuch. Andere Ansichten sehen die Änderung sofort.
+
+### Lagekarte
+
+- Ein gesicherter Lagestand hält jetzt auch die Bereitstellungsräume fest: Koordinate, Status, Belegung und Einheiten.
+- **Korrektur:** Beim Sichern und Ändern eines Lagestands werden die Daten jetzt wie beim Abruf nach Modulrechten geschwärzt. Bisher konnten Nutzer mit Schreibrecht auf die Lagekarte dabei Inhalte ausgeblendeter Module sehen.
+
+### Betreuung und Verpflegung
+
+- **Neue Ausgabeansicht mit Portionszähler** statt des bisherigen Dialogs, im Stab wie am Verpflegungsgerät:
+  - Über „Ausgabe öffnen“ an laufenden oder anstehenden Zeitfenstern gelangt man direkt dorthin.
+  - Der Kopf zeigt Soll, ausgegeben und fehlt.
+  - Das Tastenfeld hat eine große Taste „+1“ sowie „−1“, „+5“, „+10“ und „Menge …“.
+  - Für Sonderkost gibt es eigene Tasten, nur wenn Bedarf besteht. Weitere Kostformen stehen im Menü.
+- **Gesammelte Buchung:** Tipps werden gesammelt. Gebucht wird nach 3 Sekunden Ruhe, spätestens nach 15 Sekunden oder 50 Portionen, oder sofort über „Buchen“. Wer die Seite verlässt oder das Zeitfenster wechselt, verliert keine Portionen, sie werden vorgemerkt. Ohne Netz bleiben sie vorgemerkt und werden später genau einmal gebucht.
+- Die letzten Buchungen lassen sich zurücknehmen. Wird eine Rücknahme abgelehnt, steht der Grund an fester Stelle unter den Tasten.
+- Die Bedienung bleibt auch auf schmalen Geräten ruhig: Beim Tippen verrutscht keine Taste mehr.
+- **„Ausgabe nachtragen“** ersetzt „Ausgabe erfassen“. Eine zu große Menge wird jetzt mit dem Hinweis „Höchstens 100000 EP“ abgelehnt, statt still gekappt zu werden.
+- **Korrektur:** Eine noch laufende Buchung zählt nach einem Wechsel des Zeitfensters nicht mehr fälschlich beim neuen Zeitfenster mit.
+- **Serverseitig vorbereitet (Oberfläche folgt):** Eine Ausgabe kann eine Einheit (Abholung) oder einen Abschnitt (Zuführung) als Empfänger nennen.
+  - Die Empfängerliste enthält Einheiten mit Name, Funkrufname, Gliederung, Abschnitt, Stärke und Eintreffen, aber keine Personendaten. Sie aktualisiert sich live, auch für das Verpflegungsgerät.
+  - Eine Einheit, an die ausgegeben wurde, bleibt beim Auflösen erhalten und lässt sich nicht stornieren.
+
+### Gekoppelte Geräte
+
+- Das Gerät am Bereitstellungsraum sieht Wartezeiten und Verlauf des eigenen Raums. Es kann Eintreffen buchen und das Ausrücken einer abgerufenen Kraft bestätigen, aber selbst nicht abrufen und den Raum nicht verorten.
+- Das Verpflegungsgerät zählt Portionen über die neue Ausgabeansicht.
+
+### Dokumentation
+
+- Die Anwenderkapitel zu Bereitstellungsräumen und Verpflegung beschreiben Wartezeiten, Verlauf, Portionszähler und Nachtragen, jeweils mit neuen Bildern. Das Kapitel „Einheiten“ zählt die Verpflegungsausgabe zu den Spuren, die beim Auflösen einer Einheit zu beachten sind.
+
 ## [1.0.0-alpha.130](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.129...v1.0.0-alpha.130) (2026-10-16)
 
 ### Wichtige Änderungen
