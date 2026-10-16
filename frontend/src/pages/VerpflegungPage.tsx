@@ -14,18 +14,27 @@ import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
 import type {
   VerpflegungAusgabe,
+  Verpflegungsstelle,
+  VerpflegungsstelleEingabe,
+  VerpflegungsstellePatch,
+  VerpflegungsstelleStatus,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
   ZeitfensterPatch,
 } from '../api/types';
 import {
   aendereZeitfenster,
+  createStelle,
   ladeVerpflegung,
   legeZeitfensterAn,
   loescheZeitfenster,
   nimmAusgabeZurueck,
+  setStelleStatus,
+  storniereStelle,
+  updateStelle,
 } from '../api/verpflegung';
 import { useAuth } from '../auth/AuthContext';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -44,6 +53,9 @@ import {
   RuecknahmeDialog,
   ZeitfensterDialog,
 } from '../verpflegung/VerpflegungDialoge';
+import { StelleDialog } from '../verpflegung/StelleDialog';
+import StellenListe from '../verpflegung/StellenListe';
+import { offeneStellenAnzahl } from '../verpflegung/stellenKern';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { useAusgabeNachtragen } from '../verpflegung/useAusgabeNachtragen';
@@ -87,14 +99,24 @@ function zuflussText(
   return teile.join(' · ');
 }
 
-type Ansicht = 'laufend' | 'vergangen';
+/** Zwei Zeitfenster-Ansichten und die Stellen (LLH-1040, D13 Punkt 1): EINE Leiste. */
+type Ansicht = 'laufend' | 'vergangen' | 'stellen';
+
+/** Erfolgswort je Zielstatus einer Stelle. */
+const STELLE_STATUS_ERFOLG: Record<VerpflegungsstelleStatus, string> = {
+  geplant: 'geplant',
+  aktiv: 'in Betrieb genommen',
+  aufgeloest: 'aufgelöst',
+};
 
 type Dialog =
   | { art: 'anlegen' }
   | { art: 'bearbeiten'; zf: VerpflegungZeitfenster }
   | { art: 'ausgabe'; zf: VerpflegungZeitfenster }
   | { art: 'ruecknahme'; zf: VerpflegungZeitfenster; ausgabe: VerpflegungAusgabe }
-  | { art: 'loeschen'; zf: VerpflegungZeitfenster };
+  | { art: 'loeschen'; zf: VerpflegungZeitfenster }
+  | { art: 'stelle-anlegen' }
+  | { art: 'stelle-bearbeiten'; stelle: Verpflegungsstelle };
 
 /**
  * Fachmodul Verpflegung (LFH-634): Zeitfenster mit Bedarf, Ausgaben und Deckung.
@@ -120,6 +142,10 @@ type Dialog =
  * Nichts blinkt.
  *
  * Kopfzahlen rechnen mit der vollen Menge, auch solange ein Neuzugang hinter dem Banner wartet.
+ *
+ * Der dritte Wert der Leiste zeigt die Verpflegungsstellen (LLH-1040, `verpflegung/StellenListe`);
+ * dort heißt die Primäraktion „Stelle anlegen“, und das Banner der Zeitfenster schweigt. Die Stellen
+ * kommen mit derselben Übersicht (`GET …/verpflegung`), es gibt keinen eigenen Abruf.
  *
  * Auf dem Verpflegungsgerät (LFH-1044) dieselbe Seite ohne Planen (Zeitfenster anlegen, Bedarf
  * ändern, löschen) und ohne Brotkrumen; eine Fehlmenge geht als Meldung an die Einsatzleitung,
@@ -171,6 +197,23 @@ export default function VerpflegungPage() {
   } = useNachforderungWahl(einsatzId, freigaben);
 
   const alle = useMemo(() => verpflegungQuery.data?.zeitfenster ?? [], [verpflegungQuery.data]);
+  const stellen = useMemo(() => verpflegungQuery.data?.stellen ?? [], [verpflegungQuery.data]);
+  const stellenAnsicht = ansicht === 'stellen';
+  // Abschnitte nur für die offene Stellenmaske; ohne Modulzugriff bleibt das Feld weg.
+  const abschnitteLesbar = freigaben?.einsatzabschnitte?.zugriff !== false;
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled:
+      abschnitteLesbar && (dialog?.art === 'stelle-anlegen' || dialog?.art === 'stelle-bearbeiten'),
+  });
+  const abschnittOptionen = useMemo(
+    () =>
+      abschnitteLesbar
+        ? (abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))
+        : null,
+    [abschnitteLesbar, abschnitteQuery.data],
+  );
   // Auf diesem Gerät vorgemerkte Ausgaben je Zeitfenster — „ausstehend“, außerhalb der Deckung
   // (LFH-688, design.md D8).
   const vorgemerkt = useVorgemerkteAusgaben(benutzer?.id, einsatzId);
@@ -188,11 +231,12 @@ export default function VerpflegungPage() {
   const zufluss: Zuflussstand =
     zuflussZustand.einsatzId === einsatzId ? zuflussZustand : LEERER_ZUFLUSSSTAND;
   const geteilt = teileZuflussNach(alle, zufluss, BEGINN);
-  const umgeordnet = geteilt.umgeordnet;
+  const umgeordnet = !stellenAnsicht && geteilt.umgeordnet;
   const inAnsicht = (zf: VerpflegungZeitfenster) =>
     istVergangen(zf, jetzt) === (ansicht === 'vergangen');
   let sichtbar = geteilt.sichtbar;
-  let zurueckgehalten = geteilt.zurueckgehalten.filter(inAnsicht);
+  // In der Ansicht „Stellen“ hält nichts zurück: dort steht keine Zeitfensterkarte.
+  let zurueckgehalten = stellenAnsicht ? [] : geteilt.zurueckgehalten.filter(inAnsicht);
   // Null gezeigte Karten in dieser Ansicht halten nichts zurück: ein Leerzustand neben „1 neues
   // Zeitfenster" wäre ein Widerspruch.
   if (zurueckgehalten.length > 0 && !sichtbar.some(inAnsicht)) {
@@ -253,6 +297,39 @@ export default function VerpflegungPage() {
       message.success(`Zeitfenster ${zitat(zf.bezeichnung)} gelöscht`);
     },
   });
+  // Stellen (LLH-1040, D2): Anlegen und Ändern schreiben kein ETB, ein Statuswechsel schon (D7);
+  // Storno nicht.
+  const stelleAnlegenMut = useMutation({
+    mutationFn: (body: VerpflegungsstelleEingabe) => createStelle(einsatzId, body),
+    onSuccess: (s) => {
+      invalidiere(false);
+      message.success(`Stelle ${zitat(s.bezeichnung)} angelegt`);
+    },
+  });
+  const stelleAendernMut = useMutation({
+    mutationFn: ({ sid, patch }: { sid: number; patch: VerpflegungsstellePatch }) =>
+      updateStelle(einsatzId, sid, patch),
+    onSuccess: (s) => {
+      invalidiere(false);
+      message.success(`Stelle ${zitat(s.bezeichnung)} gespeichert`);
+    },
+  });
+  // Gründe an der Zeile bzw. in der Rückfrage (`StellenListe`), nie als Toast.
+  const stelleStatusMut = useMutation({
+    mutationFn: ({ s, status }: { s: Verpflegungsstelle; status: VerpflegungsstelleStatus }) =>
+      setStelleStatus(einsatzId, s.id, status),
+    onSuccess: (s) => {
+      invalidiere(true);
+      message.success(`Stelle ${zitat(s.bezeichnung)} ${STELLE_STATUS_ERFOLG[s.status]}`);
+    },
+  });
+  const stelleStornoMut = useMutation({
+    mutationFn: (s: Verpflegungsstelle) => storniereStelle(einsatzId, s.id),
+    onSuccess: (_, s) => {
+      invalidiere(false);
+      message.success(`Stelle ${zitat(s.bezeichnung)} storniert`);
+    },
+  });
   // Nachtragen samt Rückgängig- und Vormerk-Hinweis, geteilt mit der Ausgabeansicht (LLH-1032).
   const nachtrag = useAusgabeNachtragen(einsatzId);
   const ruecknahmeFehler = nachtrag.ruecknahmeFehler;
@@ -281,10 +358,15 @@ export default function VerpflegungPage() {
   const vergangen = alle.filter((zf) => istVergangen(zf, jetzt));
   const unterdeckung = alle.filter((zf) => deckungEinstufung(zf, jetzt) === 'unterdeckung').length;
   const liste = sichtbar.filter(inAnsicht);
-  const oeffneAnlegen = () => {
+  const oeffneZeitfensterAnlegen = () => {
     anlegenMut.reset();
     setDialog({ art: 'anlegen' });
   };
+  const oeffneStelleAnlegen = () => {
+    stelleAnlegenMut.reset();
+    setDialog({ art: 'stelle-anlegen' });
+  };
+  const oeffneAnlegen = stellenAnsicht ? oeffneStelleAnlegen : oeffneZeitfensterAnlegen;
   const nachfordern = (zf: VerpflegungZeitfenster) => {
     if (geraet) {
       const inhalt = meldungVorbelegung(zf, konventionen);
@@ -315,7 +397,7 @@ export default function VerpflegungPage() {
       aktionen={
         planen && (
           <Button type="primary" disabled={!darfSchreiben} onClick={oeffneAnlegen}>
-            Zeitfenster anlegen
+            {stellenAnsicht ? 'Stelle anlegen' : 'Zeitfenster anlegen'}
           </Button>
         )
       }
@@ -355,6 +437,7 @@ export default function VerpflegungPage() {
               label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
             },
             { wert: 'vergangen', label: `vergangen (${vergangen.length})` },
+            { wert: 'stellen', label: `Stellen (${offeneStellenAnzahl(stellen)})` },
           ]}
           style={{ flex: 'none' }}
         />
@@ -384,17 +467,33 @@ export default function VerpflegungPage() {
           type="error"
           showIcon
           style={{ marginBottom: token.marginSM }}
-          title="Zeitfenster konnten nicht geladen werden"
+          title="Verpflegung konnte nicht geladen werden"
         />
       )}
       {verpflegungQuery.isLoading ? (
         <Spin />
+      ) : stellenAnsicht ? (
+        <StellenListe
+          einsatzId={einsatzId}
+          stellen={stellen}
+          zeitfenster={alle}
+          jetzt={jetzt}
+          darfPlanen={darfSchreiben && planen}
+          mitOrt={darf('fremde-module')}
+          onAnlegen={oeffneStelleAnlegen}
+          onBearbeiten={(s) => {
+            stelleAendernMut.reset();
+            setDialog({ art: 'stelle-bearbeiten', stelle: s });
+          }}
+          onStatus={(s, status) => stelleStatusMut.mutateAsync({ s, status })}
+          onStornieren={(s) => stelleStornoMut.mutateAsync(s)}
+        />
       ) : alle.length === 0 ? (
         <SeitenLeer
           titel="Noch kein Zeitfenster"
           aktion={
             darfSchreiben && planen
-              ? { label: 'Zeitfenster anlegen', onClick: oeffneAnlegen }
+              ? { label: 'Zeitfenster anlegen', onClick: oeffneZeitfensterAnlegen }
               : undefined
           }
         />
@@ -499,6 +598,31 @@ export default function VerpflegungPage() {
           laeuft={ruecknahmeMut.isPending}
           fehler={ruecknahmeMut.error}
           onBestaetigen={() => ruecknahmeMut.mutate(dialog.ausgabe.id)}
+          onSchliessen={schliesse}
+        />
+      )}
+      {dialog?.art === 'stelle-anlegen' && (
+        <StelleDialog
+          modus={{ art: 'anlegen', onErfassen: (body) => stelleAnlegenMut.mutateAsync(body) }}
+          einsatzId={einsatzId}
+          abschnitte={abschnittOptionen}
+          laeuft={stelleAnlegenMut.isPending}
+          fehler={stelleAnlegenMut.error}
+          onSchliessen={schliesse}
+        />
+      )}
+      {dialog?.art === 'stelle-bearbeiten' && (
+        <StelleDialog
+          key={`s-${dialog.stelle.id}`}
+          modus={{
+            art: 'bearbeiten',
+            stelle: dialog.stelle,
+            onErfassen: (patch) => stelleAendernMut.mutateAsync({ sid: dialog.stelle.id, patch }),
+          }}
+          einsatzId={einsatzId}
+          abschnitte={abschnittOptionen}
+          laeuft={stelleAendernMut.isPending}
+          fehler={stelleAendernMut.error}
           onSchliessen={schliesse}
         />
       )}

@@ -8,9 +8,17 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
-import type { ModulFreigaben, VerpflegungZeitfenster } from '../api/types';
+import type { ModulFreigaben, Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
-import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
+import {
+  DEICH,
+  FELDKUECHE,
+  KEINE_SONDERKOST,
+  ausgabe,
+  stelle,
+  verpflegungMitStellen,
+  zeitfenster,
+} from '../test/verpflegungDaten';
 import { zeitfensterKennung } from '../verpflegung/verpflegungText';
 import { parseNachforderungVorbelegung } from '../routing/deeplinks';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
@@ -42,13 +50,26 @@ const aendereZeitfenster = vi.fn();
 const loescheZeitfenster = vi.fn();
 const erfasseAusgabe = vi.fn();
 const nimmAusgabeZurueck = vi.fn();
+const createStelle = vi.fn();
+const updateStelle = vi.fn();
+const setStelleStatus = vi.fn();
+const storniereStelle = vi.fn();
 vi.mock('../api/verpflegung', () => ({
+  createStelle: (...a: unknown[]) => createStelle(...a),
+  updateStelle: (...a: unknown[]) => updateStelle(...a),
+  setStelleStatus: (...a: unknown[]) => setStelleStatus(...a),
+  storniereStelle: (...a: unknown[]) => storniereStelle(...a),
   ladeVerpflegung: (...a: unknown[]) => ladeVerpflegung(...a),
   legeZeitfensterAn: (...a: unknown[]) => legeZeitfensterAn(...a),
   aendereZeitfenster: (...a: unknown[]) => aendereZeitfenster(...a),
   loescheZeitfenster: (...a: unknown[]) => loescheZeitfenster(...a),
   erfasseAusgabe: (...a: unknown[]) => erfasseAusgabe(...a),
   nimmAusgabeZurueck: (...a: unknown[]) => nimmAusgabeZurueck(...a),
+}));
+
+const listeAbschnitte = vi.fn();
+vi.mock('../api/einsatzabschnitte', () => ({
+  listeAbschnitte: (...a: unknown[]) => listeAbschnitte(...a),
 }));
 
 // Der Vorschlag fragt Personal und Betreuung an — eigens getestet, hier ohne Quellen.
@@ -86,8 +107,8 @@ const abend = () =>
 const fruehstueck = () =>
   zeitfenster({ id: 3, bezeichnung: 'Frühstück', von_at: um(-240), bis_at: um(-180) });
 
-function liefert(zf: VerpflegungZeitfenster[]) {
-  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf }));
+function liefert(zf: VerpflegungZeitfenster[], stellen: Verpflegungsstelle[] = []) {
+  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf, stellen }));
 }
 
 function Ort() {
@@ -622,6 +643,139 @@ describe('VerpflegungPage (LFH-634)', () => {
       await userEvent.click(screen.getByRole('radio', { name: /laufend/ }));
       expect(kartenNamen()).toEqual(['Imbiss', 'Mittag', 'Abend']);
       expect(sammelbanner()).toBeNull();
+    });
+  });
+
+  describe('Ansicht „Stellen“ (LLH-1040, D13 Punkte 1–3)', () => {
+    /** Drei offene aus dem Ticket und eine aufgelöste, die nicht mitzählt. */
+    const stellen = () => [
+      ...verpflegungMitStellen().stellen,
+      stelle({ id: 30, bezeichnung: 'Ausgabe Schule', status: 'aufgeloest' }),
+    ];
+
+    it('dritter Wert der Segmentleiste zählt ohne aufgelöste; Primäraktion folgt der Ansicht', async () => {
+      liefert([fruehstueck(), mittag(), abend()], stellen());
+      renderPage();
+      await screen.findAllByRole('article');
+      const segment = screen.getByRole('radio', { name: 'Stellen (3)' });
+      expect(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' })).toBeEnabled();
+      expect(within(kopf()).queryByRole('button', { name: 'Stelle anlegen' })).toBeNull();
+
+      await userEvent.click(segment);
+      const liste = await screen.findByRole('region', { name: 'Verpflegungsstellen' });
+      expect(within(liste).getByRole('article', { name: 'Stelle Zuführung Deich' })).toBeVisible();
+      expect(screen.queryByRole('article', { name: /^Zeitfenster/ })).toBeNull();
+      expect(within(kopf()).getByRole('button', { name: 'Stelle anlegen' })).toBeEnabled();
+      expect(within(kopf()).queryByRole('button', { name: 'Zeitfenster anlegen' })).toBeNull();
+
+      await userEvent.click(screen.getByRole('radio', { name: /^laufend/ }));
+      expect(await karte(mittag())).toBeVisible();
+      expect(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' })).toBeEnabled();
+    });
+
+    it('Stelle anlegen: POST, Verpflegung invalidiert, Erfolg als Toast', async () => {
+      liefert([mittag()], []);
+      createStelle.mockResolvedValue(stelle({ id: 40, bezeichnung: 'Feldküche Nord' }));
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: 'Stellen (0)' }));
+      expect(await screen.findByText('Keine Verpflegungsstellen')).toBeInTheDocument();
+      const spion = vi.spyOn(client, 'invalidateQueries');
+      await userEvent.click(within(kopf()).getByRole('button', { name: 'Stelle anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Stelle anlegen' });
+      await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Feldküche Nord');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Art' }));
+      await userEvent.click(
+        await waitFor(() => {
+          const o = document.querySelector<HTMLElement>(
+            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Feldküche"]',
+          );
+          expect(o).not.toBeNull();
+          return o!;
+        }),
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() =>
+        expect(createStelle).toHaveBeenCalledWith(1, {
+          bezeichnung: 'Feldküche Nord',
+          art: 'feldkueche',
+        }),
+      );
+      expect(await screen.findByText('Stelle ‚Feldküche Nord‘ angelegt')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(spion.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey))).toContain(
+          JSON.stringify(['einsatz-verpflegung', 1]),
+        ),
+      );
+    });
+
+    it('In Betrieb nehmen invalidiert Verpflegung UND Einsatztagebuch', async () => {
+      liefert([mittag()], stellen());
+      setStelleStatus.mockResolvedValue(
+        stelle({ id: DEICH, bezeichnung: 'Zuführung Deich', status: 'aktiv' }),
+      );
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: /^Stellen/ }));
+      const spion = vi.spyOn(client, 'invalidateQueries');
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zu Stelle Zuführung Deich' }),
+      );
+      const menue = await waitFor(() => {
+        const m = document.querySelector<HTMLElement>(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        );
+        expect(m).not.toBeNull();
+        return m!;
+      });
+      await userEvent.click(within(menue).getByText('In Betrieb nehmen'));
+      await waitFor(() => expect(setStelleStatus).toHaveBeenCalledWith(1, DEICH, 'aktiv'));
+      await waitFor(() => {
+        const keys = spion.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+        expect(keys).toContain(JSON.stringify(['einsatz-verpflegung', 1]));
+        expect(keys).toContain(JSON.stringify(['etb', 1]));
+      });
+      expect(
+        await screen.findByText('Stelle ‚Zuführung Deich‘ in Betrieb genommen'),
+      ).toBeInTheDocument();
+    });
+
+    it('Bearbeiten öffnet die Maske vorbelegt und schickt nur Geändertes', async () => {
+      liefert([mittag()], stellen());
+      listeAbschnitte.mockResolvedValue([]);
+      updateStelle.mockResolvedValue(stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche' }));
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: /^Stellen/ }));
+      await userEvent.click(
+        await screen.findByRole('button', {
+          name: 'Bearbeiten … zu Stelle Feldküche BR Sportplatz',
+        }),
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Stelle bearbeiten: Feldküche BR Sportplatz',
+      });
+      const bez = within(dialog).getByLabelText('Bezeichnung');
+      await userEvent.clear(bez);
+      await userEvent.type(bez, 'Feldküche');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(updateStelle).toHaveBeenCalledWith(1, FELDKUECHE, { bezeichnung: 'Feldküche' }),
+      );
+      expect(await screen.findByText('Stelle ‚Feldküche‘ gespeichert')).toBeInTheDocument();
+    });
+
+    it('ohne Schreibrecht: „Stelle anlegen“ gesperrt mit Grund, keine Zeilenaktionen', async () => {
+      einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+      liefert([mittag()], stellen());
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: /^Stellen/ }));
+      await screen.findByRole('region', { name: 'Verpflegungsstellen' });
+      expect(within(kopf()).getByRole('button', { name: 'Stelle anlegen' })).toBeDisabled();
+      expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Aktionen zu Stelle/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /zu Stelle/ })).toBeNull();
     });
   });
 });

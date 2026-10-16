@@ -26,7 +26,9 @@ export type GeraetFaehigkeit =
   | 'person-anhaenge'
   /** Bereitstellungsraum wechseln, anlegen, bearbeiten, auflösen, stornieren (LFH-1042, LFH-1147). */
   | 'br-verwalten'
-  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
+  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044); Verpflegungsstellen
+   *  anlegen, bearbeiten, in Betrieb nehmen, auflösen, stornieren und Zeitfenstern zuordnen
+   *  (LLH-1040). Das Gerät liest die Stellen und wählt sie beim Buchen. */
   | 'verpflegung-planen'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
   | 'fremde-module';

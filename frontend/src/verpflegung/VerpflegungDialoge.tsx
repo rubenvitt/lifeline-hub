@@ -507,7 +507,7 @@ export function AusgabeDialog({
  * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Karten. Während `laeuft` ist sie
  * nicht schließbar, damit ein Server-Grund (422/409) im Dialog ankommt.
  */
-function Rueckfrage({
+export function Rueckfrage({
   titel,
   okText,
   children,
