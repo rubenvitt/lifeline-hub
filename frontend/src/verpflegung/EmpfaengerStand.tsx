@@ -104,7 +104,9 @@ export default function EmpfaengerStand({
         style={{
           ...zeileStil,
           paddingInlineStart: z.tiefe * token.padding,
-          background: istGewaehlt ? rollen.auswahlFlaeche : undefined,
+          // Gewählt: die Auswahlfläche über das Token (`colorPrimaryBg`, Rolle `auswahlFlaeche`,
+          // LFH-984), dazu `aria-pressed` am Knopf als zweiter Kanal.
+          background: istGewaehlt ? token.colorPrimaryBg : undefined,
         }}
       >
         <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
