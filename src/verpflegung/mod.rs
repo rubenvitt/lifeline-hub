@@ -40,6 +40,7 @@ use crate::error::AppError;
 pub mod deckung;
 pub mod repo;
 pub mod stelle;
+pub mod vorlage;
 
 use crate::wire_enum::wire_enum;
 use stelle::VerpflegungsstelleAnzeige;
