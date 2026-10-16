@@ -6025,8 +6025,8 @@ mod tests {
     /// LLH-1107: `lat`/`lon` am Bereitstellungsraum. Eine Bestandszeile von vorher behält jeden
     /// Wert, die Koordinate ist leer; beide Spalten existieren.
     #[tokio::test]
-    async fn migration_0208_bereitstellungsraum_lage() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+    async fn migration_0209_bereitstellungsraum_lage() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 208).await;
         let (e, b) = bild_grundlage(&pool).await;
         let a: i64 = sqlx::query_scalar(
             "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
@@ -6075,7 +6075,7 @@ mod tests {
         };
         let vorher = lies(pool.clone()).await;
 
-        migriere_bis(&pool, 208).await;
+        migriere_bis(&pool, 209).await;
 
         assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
         let koordinate: (Option<f64>, Option<f64>) =
