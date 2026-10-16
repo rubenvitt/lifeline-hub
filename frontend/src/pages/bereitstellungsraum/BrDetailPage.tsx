@@ -834,7 +834,9 @@ export default function BrDetailPage() {
                     dataSource={abgerufenZufluss.sichtbar}
                     emptyText="Keine Kraft abgerufen"
                     renderItem={(z) => (
-                      <ListenEintrag actions={abrufAktionen(z)}>
+                      // Unter `md` stehen die zwei Knöpfe unter der Angabe (LFH-978): rechts
+                      // daneben ließen sie dem Ziel auf 390 px nur ein Wort je Zeile.
+                      <ListenEintrag actions={abrufAktionen(z)} gestapelt={!breit}>
                         <Space wrap>
                           {z.einheit
                             ? einheitAngaben(z.einheit)
