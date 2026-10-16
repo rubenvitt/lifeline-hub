@@ -9,6 +9,7 @@ import timezone from 'dayjs/plugin/timezone';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben, VerpflegungVorlage, VerpflegungZeitfenster } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
 import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
@@ -272,6 +273,41 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
     expect(
       await screen.findByText(
         '1 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Abendessen‘',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('ein live hinzukommendes Zeitfenster verschiebt die Vorschau nicht; der Server überspringt es', async () => {
+    createTagAusVorlage.mockResolvedValue({
+      angelegt: [zeitfenster({ id: 101 }), zeitfenster({ id: 102 }), zeitfenster({ id: 103 })],
+      uebersprungen: ['Mittag'],
+    });
+    const user = userEvent.setup();
+    const { client } = renderSeite();
+    const mittag = await fenster('Mittag');
+    // Jemand anderes legt „Mittag“ für diesen Tag an (Live-Ereignis `verpflegung`).
+    client.setQueryData(einsatzKeys.verpflegung(1), {
+      zeitfenster: [
+        zeitfenster({
+          id: 7,
+          bezeichnung: 'Mittag',
+          von_at: '2026-10-11 10:00:00',
+          bis_at: '2026-10-11 11:30:00',
+        }),
+      ],
+      stellen: [],
+    });
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.verpflegung(1))).toBeTruthy());
+    // Die Felder unter dem Cursor bleiben stehen.
+    expect(within(mittag).getByLabelText('Betreute (EP) zu Mittag')).toBeInTheDocument();
+    expect(within(mittag).queryByText('schon angelegt')).toBeNull();
+    for (const name of ['Frühstück', 'Abendessen', 'Nachtverpflegung']) {
+      await user.type(within(await fenster(name)).getByLabelText(`Betreute (EP) zu ${name}`), '0');
+    }
+    await user.click(anlegenKnopf());
+    expect(
+      await screen.findByText(
+        '3 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Mittag‘',
       ),
     ).toBeInTheDocument();
   });

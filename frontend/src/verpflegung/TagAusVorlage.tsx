@@ -130,11 +130,21 @@ function TagAusVorlageInhalt({
     queryFn: () => listVerpflegungVorlagen('aktiv'),
   });
 
-  const fenster = useMemo(
+  const aktuell = useMemo(
     () =>
-      buildTagFenster(planQuery.data ?? [], tag, zone, verpflegungQuery.data?.zeitfenster ?? []),
+      planQuery.data && verpflegungQuery.data
+        ? buildTagFenster(planQuery.data, tag, zone, verpflegungQuery.data.zeitfenster)
+        : null,
     [planQuery.data, tag, zone, verpflegungQuery.data],
   );
+  // Die Vorschau steht, sobald sie Fenster hat (`frontend/AGENTS.md`, „Live-Updates springen
+  // nicht unter dem Cursor“): ein live hinzukommendes gleichnamiges Zeitfenster nimmt keinem
+  // Fenster die Felder unter der Hand, eine neue Mahlzeit schiebt nichts ein. Was inzwischen am
+  // Tag besteht, überspringt der Server, und die Quittung nennt es. Ein anderer Tag ist eine neue
+  // Vorschau (`key`).
+  const [stand, setStand] = useState<TagFenster[] | null>(null);
+  if (stand == null && aktuell != null && aktuell.length > 0) setStand(aktuell);
+  const fenster = stand ?? aktuell ?? [];
   const gewaehlt = fenster.filter((f) => isAnlegbar(f) && !abgewaehlt.has(f.vorlage.id));
 
   const anlegen = useMutation({
