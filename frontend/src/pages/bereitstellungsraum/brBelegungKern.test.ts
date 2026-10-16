@@ -101,6 +101,17 @@ describe('Art eines Verlaufseintrags als Wort', () => {
     );
   });
 
+  it('Abruf nennt Ziel und Auftrag, der Austritt danach das Ziel (LLH-1085)', () => {
+    expect(verlaufText(eintrag({ art: 'abruf', ziel: 'EA Deich', auftrag_nr: 7 }))).toBe(
+      'Abruf nach EA Deich (Auftrag Nr. 7)',
+    );
+    expect(verlaufText(eintrag({ art: 'abruf', ziel: null, auftrag_nr: null }))).toBe('Abruf');
+    expect(verlaufText(eintrag({ art: 'austritt', ziel: 'EA Deich' }))).toBe(
+      'Austritt nach EA Deich',
+    );
+    expect(verlaufText(eintrag({ art: 'abruf_aufgehoben' }))).toBe('Abruf zurückgenommen');
+  });
+
   it('Wechsel ohne Bezeichnung des anderen Raums bleibt ein Wechsel', () => {
     expect(verlaufText(eintrag({ art: 'wechsel_hinaus' }))).toBe('Wechsel hinaus');
     expect(verlaufText(eintrag({ art: 'wechsel_herein', herkunft: null }))).toBe('Wechsel herein');
