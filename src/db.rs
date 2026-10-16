@@ -6172,6 +6172,246 @@ mod tests {
         );
     }
 
+    // --- LLH-1085: Abruf aus dem Bereitstellungsraum (0205) ---
+
+    #[derive(Debug, PartialEq, sqlx::FromRow)]
+    struct BelegungZeile {
+        id: i64,
+        einsatz_id: i64,
+        br_id: i64,
+        objekt_typ: String,
+        objekt_id: i64,
+        art: String,
+        notiz: Option<String>,
+        zeitpunkt_at: String,
+        erfasst_von: i64,
+        client_id: Option<String>,
+    }
+
+    async fn belegung_zeilen(pool: &SqlitePool) -> Vec<BelegungZeile> {
+        sqlx::query_as::<_, BelegungZeile>(
+            "SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, \
+                    erfasst_von, client_id \
+             FROM br_belegung ORDER BY id",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Der Neubau von `br_belegung` (design.md D4) übernimmt den Bestand Zeile für Zeile samt
+    /// `id` und `client_id`, hängt die AUTOINCREMENT-Sequenz um (die gelöschte höchste Zeile
+    /// bleibt verbraucht), behält Unique-Teilindex und Indizes und lässt die neuen Arten nur mit
+    /// den passenden Bezügen zu.
+    #[tokio::test]
+    async fn migration_0205_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 204).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                geaendert_von) VALUES (?, 'BR Sportplatz', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        for (art, notiz, client_id) in [
+            ("eintritt", None, Some("c-1")),
+            ("wechsel", Some("Notiz"), None),
+            ("austritt", None, None),
+            ("eintritt", None, None),
+        ] {
+            sqlx::query(
+                "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, \
+                    zeitpunkt_at, erfasst_von, client_id) \
+                 VALUES (?, ?, 'einheit', 7, ?, ?, '2026-10-16 13:42:00', ?, ?)",
+            )
+            .bind(e)
+            .bind(br)
+            .bind(art)
+            .bind(notiz)
+            .bind(b)
+            .bind(client_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query("DELETE FROM br_belegung WHERE id = 4")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let vorher = belegung_zeilen(&pool).await;
+        assert_eq!(vorher.len(), 3);
+
+        migriere_bis(&pool, 205).await;
+
+        assert_eq!(
+            belegung_zeilen(&pool).await,
+            vorher,
+            "Bestand Zeile für Zeile"
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'br_belegung_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'br_belegung_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+        let seq: i64 =
+            sqlx::query_scalar("SELECT seq FROM sqlite_sequence WHERE name = 'br_belegung'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(seq, 4, "Sequenz bleibt der alte Wert");
+
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_index_list('br_belegung') WHERE origin = 'c' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            [
+                "idx_br_belegung_auftrag",
+                "idx_br_belegung_br",
+                "idx_br_belegung_client_id",
+                "idx_br_belegung_objekt",
+                "idx_br_belegung_ziel_abschnitt"
+            ]
+        );
+        let fks: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"from\", \"table\", on_delete \
+             FROM pragma_foreign_key_list('br_belegung') ORDER BY \"from\"",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fks,
+            [
+                ("auftrag_id".into(), "auftrag".into(), "SET NULL".into()),
+                ("br_id".into(), "bereitstellungsraum".into(), "NO ACTION".into()),
+                ("einsatz_id".into(), "einsatz".into(), "CASCADE".into()),
+                ("erfasst_von".into(), "benutzer".into(), "NO ACTION".into()),
+                (
+                    "ziel_abschnitt_id".into(),
+                    "einsatzabschnitt".into(),
+                    "SET NULL".into()
+                ),
+            ],
+            "mit_abruf_id ohne Fremdschlüssel"
+        );
+
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'EA Deich') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'Sandsackverbau', '2026-10-16 14:30:00', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einfuegen = |art: &'static str,
+                         ziel: Option<i64>,
+                         anzeige: Option<&'static str>,
+                         auftrag_id: Option<i64>,
+                         mit: Option<i64>,
+                         client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, \
+                        erfasst_von, ziel_abschnitt_id, ziel_anzeige, auftrag_id, mit_abruf_id, \
+                        client_id) \
+                     VALUES (?, ?, 'einheit', 8, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(br)
+                .bind(art)
+                .bind(b)
+                .bind(ziel)
+                .bind(anzeige)
+                .bind(auftrag_id)
+                .bind(mit)
+                .bind(client_id)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let abruf = einfuegen(
+            "abruf",
+            Some(abschnitt),
+            Some("EA Deich"),
+            Some(auftrag),
+            None,
+            None,
+        )
+        .await
+        .expect("Abruf mit Ziel und Auftrag");
+        assert_eq!(abruf, 5, "nächster Insert über dem alten Höchstwert");
+        einfuegen("abruf", None, None, None, Some(abruf), None)
+            .await
+            .expect("mitgenommene Untereinheit");
+        einfuegen("abruf_aufgehoben", None, None, None, None, None)
+            .await
+            .expect("Rücknahme");
+        assert!(
+            einfuegen("eintritt", None, Some("EA Deich"), None, None, None)
+                .await
+                .is_err(),
+            "Ziel nur am Abruf"
+        );
+        assert!(
+            einfuegen("austritt", None, None, None, Some(abruf), None)
+                .await
+                .is_err(),
+            "mit_abruf_id nur am Abruf"
+        );
+        assert!(
+            einfuegen("abruf", None, Some("EA Deich"), None, Some(abruf), None)
+                .await
+                .is_err(),
+            "mitgenommen ohne eigenes Ziel"
+        );
+        assert!(
+            einfuegen("umzug", None, None, None, None, None)
+                .await
+                .is_err(),
+            "unbekannte Art"
+        );
+        assert!(
+            einfuegen("eintritt", None, None, None, None, Some("c-1"))
+                .await
+                .is_err(),
+            "client_id bleibt je Einsatz eindeutig"
+        );
+
+        sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ?")
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (ziel, anzeige): (Option<i64>, Option<String>) = sqlx::query_as(
+            "SELECT ziel_abschnitt_id, ziel_anzeige FROM br_belegung WHERE id = ?",
+        )
+        .bind(abruf)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((ziel, anzeige.as_deref()), (None, Some("EA Deich")));
+    }
+
     // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
     /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem
