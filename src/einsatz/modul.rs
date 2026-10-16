@@ -380,6 +380,11 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen"),
             Some(Some("verpflegung"))
         );
+        // Verpflegungsstellen (LLH-1040) hängen unter demselben Präfix.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/verpflegung/stellen/{sid}/status"),
+            Some(Some("verpflegung"))
+        );
         // Lagebesprechung (LLH-1111): eigener Key, nicht `stab`; beide Präfixe.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/lagebesprechung/termin"),

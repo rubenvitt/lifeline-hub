@@ -1,5 +1,6 @@
 import type {
   Bereitstellungsraum,
+  BrAbrufErgebnis,
   BrDetail,
   BrBelegung,
   BrListenEintrag,
@@ -88,10 +89,11 @@ export function storniereBr(einsatzId: number, brId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`, 'DELETE');
 }
 
+/** Eintritt, Wechsel und Austritt; Abruf und Rücknahme haben eigene Routen (LLH-1085). */
 interface BrBelegungEingabe {
   objekt_typ: ObjektTyp;
   objekt_id: number;
-  art: BrBelegungsArt;
+  art: Exclude<BrBelegungsArt, 'abruf' | 'abruf_aufgehoben'>;
   notiz?: string | null;
 }
 
@@ -102,6 +104,50 @@ export function belegeBr(
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/belegung`,
+    'POST',
+    daten,
+  );
+}
+
+/** Body von `POST …/abruf` (handgepflegt, LLH-1085). */
+export interface BrAbrufEingabe {
+  objekt_typ: ObjektTyp;
+  objekt_id: number;
+  /** Ziel-Abschnitt; nur für Einheiten. */
+  abschnitt_id?: number | null;
+  /** Auftrag an die Kraft; leer heißt „kein Auftrag“. */
+  auftrag_text?: string | null;
+  /** Abruf und Austritt in einem Schritt („Rückt sofort aus“). */
+  ausgerueckt?: boolean;
+}
+
+/** Ruft eine Kraft aus dem Raum ab, wahlweise mit Ziel-Abschnitt und Auftrag (LLH-1085). */
+export function ruftAbAusBr(
+  einsatzId: number,
+  brId: number,
+  daten: BrAbrufEingabe,
+): Promise<BrAbrufErgebnis> {
+  return apiSend<BrAbrufErgebnis>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/abruf`,
+    'POST',
+    daten,
+  );
+}
+
+/** Body von `POST …/abruf/aufheben` (handgepflegt, LLH-1085). */
+export interface BrAbrufAufhebenEingabe {
+  objekt_typ: ObjektTyp;
+  objekt_id: number;
+}
+
+/** Nimmt den offenen Abruf einer Kraft zurück; ein erteilter Auftrag bleibt (LLH-1085). */
+export function hebtBrAbrufAuf(
+  einsatzId: number,
+  brId: number,
+  daten: BrAbrufAufhebenEingabe,
+): Promise<BrBelegung> {
+  return apiSend<BrBelegung>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/abruf/aufheben`,
     'POST',
     daten,
   );

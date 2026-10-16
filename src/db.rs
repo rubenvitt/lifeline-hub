@@ -5873,6 +5873,548 @@ mod tests {
         assert_eq!(aufgeloest, None);
     }
 
+    // --- Migration 0207: Eintreffen am Bereitstellungsraum (LLH-1075) ---
+
+    /// Zeitachse mit Einheit, Person, Fan-out und Streichung auf dem Stand vor 0207; liefert
+    /// (einsatz, benutzer, einheit, person).
+    async fn bild_zeitachse_vor_0207(pool: &SqlitePool) -> (i64, i64, i64, i64) {
+        let (e, b) = bild_grundlage(pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'HLF 20') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) \
+             VALUES (?, 'Anna', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let ursprung: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_kraft_zeitachse \
+                (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von, erfasst_at) \
+             VALUES (?, ?, 'eintreffen', '2026-10-15 14:00:00', 'status', ?, \
+                     '2026-10-15 14:00:01') RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_kraft_zeitachse \
+                (einsatz_id, personal_id, art, zeitpunkt_at, quelle, ursprung_id, notiz, \
+                 erfasst_von, erfasst_at, gestrichen_at, gestrichen_von, streichgrund) \
+             VALUES (?, ?, 'eintreffen', '2026-10-15 14:00:00', 'einheit', ?, 'Notiz', ?, \
+                     '2026-10-15 14:00:01', '2026-10-15 14:10:00', ?, 'verwechselt'), \
+                    (?, ?, 'entlassung', '2026-10-15 16:00:00', 'disposition', NULL, NULL, ?, \
+                     '2026-10-15 16:00:01', NULL, NULL, NULL)",
+        )
+        .bind(e)
+        .bind(person)
+        .bind(ursprung)
+        .bind(b)
+        .bind(b)
+        .bind(e)
+        .bind(person)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        (e, b, einheit, person)
+    }
+
+    #[derive(Debug, PartialEq, sqlx::FromRow)]
+    struct ZeitachseZeile {
+        id: i64,
+        einsatz_id: i64,
+        einheit_id: Option<i64>,
+        personal_id: Option<i64>,
+        art: String,
+        zeitpunkt_at: String,
+        quelle: String,
+        ursprung_id: Option<i64>,
+        notiz: Option<String>,
+        erfasst_von: i64,
+        erfasst_at: String,
+        gestrichen_at: Option<String>,
+        gestrichen_von: Option<i64>,
+        streichgrund: Option<String>,
+    }
+
+    async fn zeitachse_zeilen(pool: &SqlitePool) -> Vec<ZeitachseZeile> {
+        sqlx::query_as::<_, ZeitachseZeile>(
+            "SELECT id, einsatz_id, einheit_id, personal_id, art, zeitpunkt_at, quelle, \
+                    ursprung_id, notiz, erfasst_von, erfasst_at, gestrichen_at, \
+                    gestrichen_von, streichgrund \
+             FROM einsatz_kraft_zeitachse ORDER BY id",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Der Neubau übernimmt den Bestand Zeile für Zeile samt `id`, `ursprung_id` und Streichung;
+    /// Fremdschlüssel und Indizes bleiben wie nach 0193.
+    #[tokio::test]
+    async fn migration_0207_zeitachse_bestand_erhalten() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        bild_zeitachse_vor_0207(&pool).await;
+        let vorher = zeitachse_zeilen(&pool).await;
+        assert_eq!(vorher.len(), 3);
+
+        migriere_bis(&pool, 207).await;
+
+        assert_eq!(
+            zeitachse_zeilen(&pool).await,
+            vorher,
+            "Bestand Zeile für Zeile"
+        );
+        let fks: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"from\", \"table\", on_delete \
+             FROM pragma_foreign_key_list('einsatz_kraft_zeitachse') ORDER BY \"from\"",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let fk = |spalte: &str| {
+            fks.iter()
+                .find(|(f, _, _)| f == spalte)
+                .map(|(_, t, d)| (t.as_str(), d.as_str()))
+                .unwrap_or_else(|| panic!("FK {spalte} fehlt: {fks:?}"))
+        };
+        assert_eq!(fk("einheit_id"), ("einsatz_einheit", "NO ACTION"));
+        assert_eq!(fk("personal_id"), ("einsatz_personal", "NO ACTION"));
+        assert_eq!(fk("einsatz_id"), ("einsatz", "CASCADE"));
+        assert_eq!(
+            fk("ursprung_id"),
+            ("einsatz_kraft_zeitachse", "SET NULL"),
+            "Selbstbezug auf die neue Tabelle, nicht auf die alte"
+        );
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_index_list('einsatz_kraft_zeitachse') \
+             WHERE origin = 'c' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            [
+                "idx_zeitachse_einheit",
+                "idx_zeitachse_einsatz",
+                "idx_zeitachse_personal",
+                "idx_zeitachse_ursprung"
+            ]
+        );
+        let alt: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'einsatz_kraft_zeitachse_alt'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(alt, 0, "die alte Tabelle ist weg");
+    }
+
+    /// Die Quelle `bereitstellungsraum` ist erlaubt, eine unbekannte scheitert weiter am CHECK.
+    #[tokio::test]
+    async fn migration_0207_quelle_bereitstellungsraum() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'HLF 20') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einfuegen = |quelle: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_kraft_zeitachse \
+                        (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von) \
+                     VALUES (?, ?, 'eintreffen', '2026-10-15 14:30:00', ?, ?)",
+                )
+                .bind(e)
+                .bind(einheit)
+                .bind(quelle)
+                .bind(b)
+                .execute(&pool)
+                .await
+            }
+        };
+        einfuegen("bereitstellungsraum")
+            .await
+            .expect("Quelle bereitstellungsraum");
+        assert!(einfuegen("tor").await.is_err(), "unbekannte Quelle");
+    }
+
+    /// Eine Einheit oder Person mit Ereignissen lässt sich weiter nicht löschen (FK ohne
+    /// `ON DELETE`), das Löschen des Einsatzes nimmt alles mit.
+    #[tokio::test]
+    async fn migration_0207_kraft_mit_zeitachse_nicht_loeschbar() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, _b, einheit, person) = bild_zeitachse_vor_0207(&pool).await;
+        migriere_bis(&pool, 207).await;
+
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE id = ?")
+            .bind(person)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+                .bind(einheit)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "Einheit mit Zeitachse"
+        );
+        assert!(
+            sqlx::query("DELETE FROM einsatz_personal WHERE id = ?")
+                .bind(person)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "Person mit Zeitachse"
+        );
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("der Einsatz nimmt Kräfte und Zeitachse mit");
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_kraft_zeitachse")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0);
+    }
+
+    /// `br_belegung.client_id` ist je Einsatz eindeutig, in einem anderen Einsatz frei und ohne
+    /// Schlüssel beliebig oft leer; die Einheit trägt die vier Spalten des Kennzeichens. Ein
+    /// späterer Neubau von `br_belegung` (LLH-1085) muss Spalte und Teilindex mitnehmen.
+    #[tokio::test]
+    async fn migration_0207_br_belegung_client_id() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage 2') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut raeume = Vec::new();
+        for einsatz in [e, e2] {
+            raeume.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                        geaendert_von) VALUES (?, 'BR Sportplatz', ?, ?) RETURNING id",
+                )
+                .bind(einsatz)
+                .bind(b)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let belegen = |einsatz: i64, br: i64, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO br_belegung \
+                        (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von, client_id) \
+                     VALUES (?, ?, 'einheit', 1, 'eintritt', ?, ?)",
+                )
+                .bind(einsatz)
+                .bind(br)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        belegen(e, raeume[0], Some("a1")).await.unwrap();
+        assert!(
+            belegen(e, raeume[0], Some("a1")).await.is_err(),
+            "derselbe Schlüssel im selben Einsatz"
+        );
+        belegen(e2, raeume[1], Some("a1"))
+            .await
+            .expect("derselbe Schlüssel in einem anderen Einsatz");
+        belegen(e, raeume[0], None).await.unwrap();
+        belegen(e, raeume[0], None)
+            .await
+            .expect("ohne Schlüssel beliebig oft");
+
+        let spalten: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('einsatz_einheit') \
+             WHERE name LIKE 'uebernahme_%' OR name LIKE 'uebernommen_%' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                "uebernahme_meldung_id",
+                "uebernahme_offen_seit",
+                "uebernommen_at",
+                "uebernommen_von"
+            ]
+        );
+    }
+
+    // --- LLH-1085: Abruf aus dem Bereitstellungsraum (0208) ---
+
+    #[derive(Debug, PartialEq, sqlx::FromRow)]
+    struct BelegungZeile {
+        id: i64,
+        einsatz_id: i64,
+        br_id: i64,
+        objekt_typ: String,
+        objekt_id: i64,
+        art: String,
+        notiz: Option<String>,
+        zeitpunkt_at: String,
+        erfasst_von: i64,
+        client_id: Option<String>,
+    }
+
+    async fn belegung_zeilen(pool: &SqlitePool) -> Vec<BelegungZeile> {
+        sqlx::query_as::<_, BelegungZeile>(
+            "SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, \
+                    erfasst_von, client_id \
+             FROM br_belegung ORDER BY id",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Der Neubau von `br_belegung` (design.md D4) übernimmt den Bestand Zeile für Zeile samt
+    /// `id` und `client_id`, hängt die AUTOINCREMENT-Sequenz um (die gelöschte höchste Zeile
+    /// bleibt verbraucht), behält Unique-Teilindex und Indizes und lässt die neuen Arten nur mit
+    /// den passenden Bezügen zu.
+    #[tokio::test]
+    async fn migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                geaendert_von) VALUES (?, 'BR Sportplatz', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        for (art, notiz, client_id) in [
+            ("eintritt", None, Some("c-1")),
+            ("wechsel", Some("Notiz"), None),
+            ("austritt", None, None),
+            ("eintritt", None, None),
+        ] {
+            sqlx::query(
+                "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, \
+                    zeitpunkt_at, erfasst_von, client_id) \
+                 VALUES (?, ?, 'einheit', 7, ?, ?, '2026-10-16 13:42:00', ?, ?)",
+            )
+            .bind(e)
+            .bind(br)
+            .bind(art)
+            .bind(notiz)
+            .bind(b)
+            .bind(client_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query("DELETE FROM br_belegung WHERE id = 4")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let vorher = belegung_zeilen(&pool).await;
+        assert_eq!(vorher.len(), 3);
+
+        migriere_bis(&pool, 208).await;
+
+        assert_eq!(
+            belegung_zeilen(&pool).await,
+            vorher,
+            "Bestand Zeile für Zeile"
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'br_belegung_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'br_belegung_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+        let seq: i64 =
+            sqlx::query_scalar("SELECT seq FROM sqlite_sequence WHERE name = 'br_belegung'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(seq, 4, "Sequenz bleibt der alte Wert");
+
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_index_list('br_belegung') WHERE origin = 'c' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            [
+                "idx_br_belegung_auftrag",
+                "idx_br_belegung_br",
+                "idx_br_belegung_client_id",
+                "idx_br_belegung_objekt",
+                "idx_br_belegung_ziel_abschnitt"
+            ]
+        );
+        let fks: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"from\", \"table\", on_delete \
+             FROM pragma_foreign_key_list('br_belegung') ORDER BY \"from\"",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fks,
+            [
+                ("auftrag_id".into(), "auftrag".into(), "SET NULL".into()),
+                (
+                    "br_id".into(),
+                    "bereitstellungsraum".into(),
+                    "NO ACTION".into()
+                ),
+                ("einsatz_id".into(), "einsatz".into(), "CASCADE".into()),
+                ("erfasst_von".into(), "benutzer".into(), "NO ACTION".into()),
+                (
+                    "ziel_abschnitt_id".into(),
+                    "einsatzabschnitt".into(),
+                    "SET NULL".into()
+                ),
+            ],
+            "mit_abruf_id ohne Fremdschlüssel"
+        );
+
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'EA Deich') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'Sandsackverbau', '2026-10-16 14:30:00', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einfuegen = |art: &'static str,
+                         ziel: Option<i64>,
+                         anzeige: Option<&'static str>,
+                         auftrag_id: Option<i64>,
+                         mit: Option<i64>,
+                         client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, \
+                        erfasst_von, ziel_abschnitt_id, ziel_anzeige, auftrag_id, mit_abruf_id, \
+                        client_id) \
+                     VALUES (?, ?, 'einheit', 8, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(br)
+                .bind(art)
+                .bind(b)
+                .bind(ziel)
+                .bind(anzeige)
+                .bind(auftrag_id)
+                .bind(mit)
+                .bind(client_id)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let abruf = einfuegen(
+            "abruf",
+            Some(abschnitt),
+            Some("EA Deich"),
+            Some(auftrag),
+            None,
+            None,
+        )
+        .await
+        .expect("Abruf mit Ziel und Auftrag");
+        assert_eq!(abruf, 5, "nächster Insert über dem alten Höchstwert");
+        einfuegen("abruf", None, None, None, Some(abruf), None)
+            .await
+            .expect("mitgenommene Untereinheit");
+        einfuegen("abruf_aufgehoben", None, None, None, None, None)
+            .await
+            .expect("Rücknahme");
+        assert!(
+            einfuegen("eintritt", None, Some("EA Deich"), None, None, None)
+                .await
+                .is_err(),
+            "Ziel nur am Abruf"
+        );
+        assert!(
+            einfuegen("austritt", None, None, None, Some(abruf), None)
+                .await
+                .is_err(),
+            "mit_abruf_id nur am Abruf"
+        );
+        assert!(
+            einfuegen("abruf", None, Some("EA Deich"), None, Some(abruf), None)
+                .await
+                .is_err(),
+            "mitgenommen ohne eigenes Ziel"
+        );
+        assert!(
+            einfuegen("umzug", None, None, None, None, None)
+                .await
+                .is_err(),
+            "unbekannte Art"
+        );
+        assert!(
+            einfuegen("eintritt", None, None, None, None, Some("c-1"))
+                .await
+                .is_err(),
+            "client_id bleibt je Einsatz eindeutig"
+        );
+
+        sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ?")
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (ziel, anzeige): (Option<i64>, Option<String>) =
+            sqlx::query_as("SELECT ziel_abschnitt_id, ziel_anzeige FROM br_belegung WHERE id = ?")
+                .bind(abruf)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((ziel, anzeige.as_deref()), (None, Some("EA Deich")));
+    }
+
     // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
     /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem
@@ -6829,5 +7371,223 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rest, 0);
+    }
+
+    // ── LLH-1040: Verpflegungsstelle (0206) ─────────────────────────────────────────────────
+
+    /// Ein Zeitfenster mit einer Ausgabe auf einer Alt-DB vor 0206; liefert (zeitfenster, ausgabe).
+    async fn verpflegung_bestand(pool: &SqlitePool, e: i64, b: i64) -> (i64, i64) {
+        let zf: i64 = sqlx::query_scalar(
+            "INSERT INTO verpflegung_zeitfenster \
+                (einsatz_id, bezeichnung, von_at, bis_at, bedarf_kraefte, bedarf_betreute, \
+                 angelegt_von_id) \
+             VALUES (?, 'Mittag', '2026-09-24 10:00:00', '2026-09-24 11:30:00', 180, 70, ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let aus: i64 = sqlx::query_scalar(
+            "INSERT INTO verpflegung_ausgabe \
+                (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, erfasst_von_id) \
+             VALUES (?, ?, '2026-09-24 10:10:00', 120, 'Deich', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(zf)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (zf, aus)
+    }
+
+    /// Eine Stelle nach 0206 (`geplant`).
+    async fn verpflegungsstelle(pool: &SqlitePool, e: i64, b: i64, bez: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO verpflegungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, ?, 'feldkueche', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(bez)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1040, design.md „Migration Plan“: Zeitfenster und Ausgaben vor der Migration bleiben
+    /// unverändert lesbar, die neuen Spalten sind `NULL`, es gibt keine Zuordnung.
+    #[tokio::test]
+    async fn migration_0206_verpflegungsstelle_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (zf, aus) = verpflegung_bestand(&pool, e, b).await;
+
+        migriere_bis(&pool, 206).await;
+
+        let (bez, kraefte, art): (String, i64, Option<String>) = sqlx::query_as(
+            "SELECT bezeichnung, bedarf_kraefte, verpflegungsart FROM verpflegung_zeitfenster \
+             WHERE id = ?",
+        )
+        .bind(zf)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((bez.as_str(), kraefte, art), ("Mittag", 180, None));
+        let (menge, ort, stelle): (i64, Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT menge, ort, verpflegungsstelle_id FROM verpflegung_ausgabe WHERE id = ?",
+        )
+        .bind(aus)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((menge, ort.as_deref(), stelle), (120, Some("Deich"), None));
+        let zuordnungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM verpflegung_zeitfenster_stelle")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(zuordnungen, 0);
+    }
+
+    /// Unbekannte Art, unbekannter Status, `aufgeloest` ohne Zeitpunkt (und ein Zeitpunkt ohne
+    /// `aufgeloest`) sowie eine unbekannte Verpflegungsart scheitern am CHECK.
+    #[tokio::test]
+    async fn migration_0206_verpflegungsstelle_checks() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einfuegen =
+            |art: &'static str, status: &'static str, aufgeloest: Option<&'static str>| {
+                let pool = pool.clone();
+                async move {
+                    sqlx::query(
+                        "INSERT INTO verpflegungsstelle \
+                        (einsatz_id, bezeichnung, art, status, aufgeloest_at, angelegt_von_id) \
+                     VALUES (?, ?, ?, ?, ?, ?)",
+                    )
+                    .bind(e)
+                    .bind(format!("{art}-{status}-{aufgeloest:?}"))
+                    .bind(art)
+                    .bind(status)
+                    .bind(aufgeloest)
+                    .bind(b)
+                    .execute(&pool)
+                    .await
+                }
+            };
+        for (fall, ergebnis) in [
+            ("Art", einfuegen("kantine", "geplant", None).await),
+            ("Status", einfuegen("feldkueche", "geschlossen", None).await),
+            (
+                "aufgelöst ohne Zeitpunkt",
+                einfuegen("feldkueche", "aufgeloest", None).await,
+            ),
+            (
+                "Zeitpunkt ohne aufgelöst",
+                einfuegen("feldkueche", "aktiv", Some("2026-09-24 12:00:00")).await,
+            ),
+        ] {
+            assert!(ergebnis.is_err(), "{fall} muss abgelehnt werden");
+        }
+        for (art, status, aufgeloest) in [
+            ("feldkueche", "geplant", None),
+            ("ausgabestelle", "aktiv", None),
+            ("zufuehrung", "aufgeloest", Some("2026-09-24 12:00:00")),
+        ] {
+            einfuegen(art, status, aufgeloest)
+                .await
+                .unwrap_or_else(|f| panic!("{art}/{status}: {f}"));
+        }
+        let (zf, _) = verpflegung_bestand(&pool, e, b).await;
+        for (art, ok) in [
+            ("warm", true),
+            ("kalt", true),
+            ("getraenke", true),
+            ("heiss", false),
+        ] {
+            let r =
+                sqlx::query("UPDATE verpflegung_zeitfenster SET verpflegungsart = ? WHERE id = ?")
+                    .bind(art)
+                    .bind(zf)
+                    .execute(&pool)
+                    .await;
+            assert_eq!(r.is_ok(), ok, "{art}");
+        }
+    }
+
+    /// Die Bezeichnung ist unter den nicht stornierten Stellen eines Einsatzes eindeutig; nach
+    /// dem Storno ist sie wieder frei, in einem anderen Einsatz ohnehin.
+    #[tokio::test]
+    async fn migration_0206_verpflegungsstelle_bezeichnung_eindeutig() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let erste = verpflegungsstelle(&pool, e, b, "Zuführung Deich").await;
+        let zweite = sqlx::query(
+            "INSERT INTO verpflegungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Zuführung Deich', 'zufuehrung', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await;
+        assert!(zweite.is_err(), "zweite gleiche Bezeichnung scheitert");
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Andere Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        verpflegungsstelle(&pool, e2, b, "Zuführung Deich").await;
+        sqlx::query("UPDATE verpflegungsstelle SET storniert_at = datetime('now') WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .unwrap();
+        verpflegungsstelle(&pool, e, b, "Zuführung Deich").await;
+    }
+
+    /// Ein Einsatz mit Stelle, Zuordnung und Ausgabe an der Stelle lässt sich löschen.
+    #[tokio::test]
+    async fn migration_0206_verpflegungsstelle_einsatz_loeschen() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (zf, aus) = verpflegung_bestand(&pool, e, b).await;
+        let st = verpflegungsstelle(&pool, e, b, "Feldküche BR Sportplatz").await;
+        sqlx::query(
+            "INSERT INTO verpflegung_zeitfenster_stelle (einsatz_id, zeitfenster_id, stelle_id) \
+             VALUES (?, ?, ?)",
+        )
+        .bind(e)
+        .bind(zf)
+        .bind(st)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE verpflegung_ausgabe SET verpflegungsstelle_id = ? WHERE id = ?")
+            .bind(st)
+            .bind(aus)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Stelle, Zuordnung und Ausgabe mit");
+        for tabelle in [
+            "verpflegungsstelle",
+            "verpflegung_zeitfenster_stelle",
+            "verpflegung_ausgabe",
+        ] {
+            let rest: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM {tabelle}"
+            )))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rest, 0, "{tabelle}");
+        }
     }
 }

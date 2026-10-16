@@ -1,4 +1,10 @@
-import type { Sonderkost, VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
+import type {
+  Sonderkost,
+  Verpflegung,
+  VerpflegungAusgabe,
+  Verpflegungsstelle,
+  VerpflegungZeitfenster,
+} from '../api/types';
 
 /** Testdaten des Fachmoduls Verpflegung (LFH-634) — nur für Tests. */
 
@@ -45,8 +51,77 @@ export function zeitfenster(
     },
     ausgegeben: { gesamt: 230, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
     fehlmenge: { gesamt: 20, sonderkost: KEINE_SONDERKOST },
+    stelle_ids: [],
+    je_stelle: [],
     ausgaben: [ausgabe({ id: 11, menge: 230, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } })],
     angelegt_at: '2026-09-24 06:00:00',
     ...over,
+  };
+}
+
+/** Eine Verpflegungsstelle (LLH-1040), Vorgabe: Feldküche, aktiv. */
+export function stelle(over: Partial<Verpflegungsstelle> & { id: number }): Verpflegungsstelle {
+  return {
+    bezeichnung: `Stelle ${over.id}`,
+    art: 'feldkueche',
+    status: 'aktiv',
+    angelegt_at: '2026-09-24 06:00:00',
+    ...over,
+  };
+}
+
+export const FELDKUECHE = 21;
+export const TURNHALLE = 22;
+export const DEICH = 23;
+
+/**
+ * Beispiel des Tickets ohne Soll je Stelle (LLH-1040 D11): „Mittag“ mit Bedarf 200 an der
+ * Feldküche und der Turnhalle, ausgegeben 100 und 80 → Ist je Stelle 100/80, Fehlmenge gesamt
+ * 20. „Abend“ hat keine Zuordnung und keine Ausgabe an einer Stelle (`je_stelle` leer, Bestand).
+ * Die Zuführung Deich ist geplant und keinem Zeitfenster zugeordnet. Das Ist je Stelle rechnet
+ * der Server; die Testdaten tragen es fertig, in seiner Reihenfolge: `stellen`, `stelle_ids` und
+ * `je_stelle` nach Bezeichnung (die Turnhalle vor der Feldküche).
+ */
+export function verpflegungMitStellen(): Verpflegung {
+  const nichts = { gesamt: 0, sonderkost: KEINE_SONDERKOST };
+  return {
+    stellen: [
+      stelle({ id: TURNHALLE, bezeichnung: 'Ausgabe Turnhalle Nord', art: 'ausgabestelle' }),
+      stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz', art: 'feldkueche' }),
+      stelle({ id: DEICH, bezeichnung: 'Zuführung Deich', art: 'zufuehrung', status: 'geplant' }),
+    ],
+    zeitfenster: [
+      zeitfenster({
+        id: 1,
+        verpflegungsart: 'warm',
+        bedarf: {
+          kraefte: 200,
+          betreute: 0,
+          weitere: 0,
+          gesamt: 200,
+          sonderkost: KEINE_SONDERKOST,
+        },
+        ausgegeben: { gesamt: 180, sonderkost: KEINE_SONDERKOST },
+        fehlmenge: { gesamt: 20, sonderkost: KEINE_SONDERKOST },
+        stelle_ids: [TURNHALLE, FELDKUECHE],
+        je_stelle: [
+          { stelle_id: TURNHALLE, ausgegeben: { gesamt: 80, sonderkost: KEINE_SONDERKOST } },
+          { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
+        ],
+        ausgaben: [
+          ausgabe({ id: 11, menge: 100, ort: null, verpflegungsstelle_id: FELDKUECHE }),
+          ausgabe({ id: 12, menge: 80, ort: null, verpflegungsstelle_id: TURNHALLE }),
+        ],
+      }),
+      zeitfenster({
+        id: 2,
+        bezeichnung: 'Abend',
+        von_at: '2026-09-24 16:00:00',
+        bis_at: '2026-09-24 17:30:00',
+        ausgegeben: nichts,
+        fehlmenge: { gesamt: 250, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+        ausgaben: [],
+      }),
+    ],
   };
 }

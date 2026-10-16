@@ -200,18 +200,25 @@ darf.
 
 Die Funktionsansicht `bereitstellungsraum` SHALL an genau einen Bereitstellungsraum des Einsatzes
 gebunden sein und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben;
-was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung.
+was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung. Das
+Anlegen einer unangemeldeten Kraft beim Eintreffen ist die einzige Änderung an Einheiten und
+Fahrzeugen, die das Gerät darf; sie verlangt wie am Desktop die Freigabe der Module Einheiten und
+Fahrzeuge. Abrufen ist eine Entscheidung der Führung: Das Gerät sieht einen Abruf und bestätigt
+das Ausrücken als Austritt, ruft aber selbst nicht ab.
 
 | Modul / Bereich | Bereitstellungsraum |
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
-| `bereitstellungsraeume`: eigener BR mit Belegung | L |
+| `bereitstellungsraeume`: eigener BR mit Belegung, abgerufene Kräfte mit Ziel | L |
 | `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
-| `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt) | S |
+| `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt), Ausrücken einer abgerufenen Kraft bestätigen (Austritt) | S |
+| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung) | S |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
+| `bereitstellungsraeume`: Kräfte abrufen, Abruf zurücknehmen, in einen anderen BR verlegen | — |
 | `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
 | `einheiten`, `fahrzeuge`: Liste des Einsatzes | L |
-| `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen | — |
+| `einheiten`: Zeitachsen-Übersicht der Einheiten (Perioden je Einheit) | L |
+| `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen, Übernehmen, Abweisen | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
 
@@ -257,6 +264,39 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 - **WHEN** das Gerät des BR Sportplatz eine Einheit mit Austritt aus dem BR Sportplatz bucht
 - **THEN** steht die Einheit in keinem BR mehr
 
+#### Scenario: Abruf sehen
+
+- **WHEN** die Einsatzleitung eine Einheit aus dem BR Sportplatz nach „EA Deich“ abruft
+- **AND** das Gerät des BR Sportplatz danach seinen BR abruft
+- **THEN** trägt die Einheit im Detail den Abruf mit dem Ziel „EA Deich“
+
+#### Scenario: Ausrücken bestätigen
+
+- **WHEN** das Gerät des BR Sportplatz für eine abgerufene Einheit den Austritt aus dem BR
+  Sportplatz bucht
+- **THEN** steht die Einheit in keinem BR mehr
+
+#### Scenario: Abrufen am Gerät
+
+- **WHEN** das Gerät des BR Sportplatz eine Einheit im BR Sportplatz abrufen oder einen Abruf
+  zurücknehmen will
+- **THEN** antwortet der Server mit 403, und nichts ist geschrieben
+
+#### Scenario: Unangemeldete Kraft am Gerät
+
+- **WHEN** das Gerät des BR Sportplatz am BR Sportplatz eine unangemeldete Kraft bucht
+- **THEN** gibt es eine neue Einheit mit ihrem Fahrzeug im BR Sportplatz und eine Meldung an die Einsatzleitung
+
+#### Scenario: Eintreffen am fremden BR
+
+- **WHEN** das Gerät des BR Sportplatz ein Eintreffen am BR Schule bucht
+- **THEN** antwortet der Server mit 404, und nichts ist angelegt
+
+#### Scenario: Zeitachsen-Übersicht lesen
+
+- **WHEN** das Gerät die Zeitachsen-Übersicht der Einheiten abruft
+- **THEN** erhält es die Perioden je Einheit
+
 #### Scenario: In Betrieb nehmen
 
 - **WHEN** das Gerät seinen geplanten BR auf `aktiv` setzt
@@ -270,6 +310,11 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 #### Scenario: Einheit ändern
 
 - **WHEN** das Gerät eine Einheit des Einsatzes ändert
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Übernehmen am Gerät
+
+- **WHEN** das Gerät eine nicht übernommene Einheit übernehmen oder abweisen will
 - **THEN** antwortet der Server mit 403
 
 #### Scenario: Nur eigene Meldungen
@@ -289,14 +334,18 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 Die Funktionsansicht `verpflegung` SHALL einsatzweit gelten, an keine Stelle gebunden sein und
 die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; was die Tabelle
 nicht nennt, MUST verboten sein. Sie MUST keine Namen von Einsatzkräften oder Benutzern
-erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung.
+erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung. Die
+Verpflegungsstellen des Einsatzes MUST sie alle lesen; beim Buchen einer Ausgabe MUST sie eine
+Verpflegungsstelle wählen können. Stellen planen MUST sie nicht.
 
 | Modul / Bereich | Verpflegung |
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
 | `verpflegung`: Zeitfenster mit Bedarf, Ausgaben und Deckung | L |
-| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung), Ausgabe zurücknehmen | S |
-| `verpflegung`: Zeitfenster anlegen, ändern, löschen | — |
+| `verpflegung`: Verpflegungsstellen mit Art, Standort und Status | L |
+| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung, optional an einer Verpflegungsstelle), Ausgabe zurücknehmen | S |
+| `verpflegung`: Zeitfenster anlegen, ändern, löschen, Stellen zuordnen | — |
+| `verpflegung`: Verpflegungsstelle anlegen, ändern, in Betrieb nehmen, auflösen, stornieren | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
 | `nachforderungen`, `personal`, `betreuung`, `personen`, `etb` | — |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
@@ -352,6 +401,21 @@ Lagemonitor).
 - **WHEN** die Einsatzleitung die Kopplung widerruft
 - **AND** das Gerät danach eine Ausgabe bucht
 - **THEN** antwortet der Server mit 401
+
+#### Scenario: Stellen lesen
+
+- **WHEN** das Verpflegungsgerät die Verpflegung seines Einsatzes abruft
+- **THEN** erhält es alle nicht stornierten Verpflegungsstellen mit Bezeichnung, Art, Standort und Status, aber keine Namen und keine Benutzerkennungen
+
+#### Scenario: Buchen an einer Stelle
+
+- **WHEN** das Verpflegungsgerät eine Ausgabe von 40 EP an der Stelle „Ausgabe Turnhalle Nord“ bucht
+- **THEN** trägt die Ausgabe diese Stelle, und die ausgegebene Menge der Stelle steigt um 40
+
+#### Scenario: Stellen planen am Gerät
+
+- **WHEN** das Verpflegungsgerät eine Verpflegungsstelle anlegt, ändert, in Betrieb nimmt, auflöst oder storniert oder einem Zeitfenster Stellen zuordnet
+- **THEN** antwortet der Server mit 403
 
 ### Requirement: Ansicht Betreuungsstelle
 

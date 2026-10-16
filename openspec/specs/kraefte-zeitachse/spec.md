@@ -12,10 +12,11 @@ werden.
 
 Das System SHALL je Einheit und je Person eines Einsatzes ein Ereignisprotokoll führen. Ein
 Ereignis trägt Art (`alarmierung`, `eintreffen`, `abloesung` oder `entlassung`), Zeitpunkt,
-Quelle (`status`, `einheit`, `abloesung`, `nachtrag` oder `disposition`), optional eine Notiz, die
-erfassende Person und den Erfassungszeitpunkt. Das Protokoll MUST append-only sein: Ein Ereignis
-wird nie geändert oder gelöscht, nur gestrichen (siehe Streichung). Die Reihenfolge der
-Ereignisse MUST sich nach ihrem Zeitpunkt richten, nicht nach dem Erfassungszeitpunkt.
+Quelle (`status`, `einheit`, `abloesung`, `nachtrag`, `disposition` oder `bereitstellungsraum`),
+optional eine Notiz, die erfassende Person und den Erfassungszeitpunkt. Das Protokoll MUST
+append-only sein: Ein Ereignis wird nie geändert oder gelöscht, nur gestrichen (siehe
+Streichung). Die Reihenfolge der Ereignisse MUST sich nach ihrem Zeitpunkt richten, nicht nach dem
+Erfassungszeitpunkt.
 
 #### Scenario: Ereignis bleibt nach Streichung lesbar
 - **WHEN** ein Ereignis „eintreffen 06:40“ gestrichen wird
@@ -28,6 +29,10 @@ Ereignisse MUST sich nach ihrem Zeitpunkt richten, nicht nach dem Erfassungszeit
 #### Scenario: Entlassen aus der Disposition
 - **WHEN** eine Person über „Entlassen“ aus dem Einsatz genommen wird
 - **THEN** trägt ihre Entlassung die Quelle `disposition`
+
+#### Scenario: Eintreffen am Bereitstellungsraum
+- **WHEN** eine Einheit am Bereitstellungsraum als eingetroffen gebucht wird
+- **THEN** trägt ihr Eintreffen die Quelle `bereitstellungsraum`
 
 ### Requirement: Einsatzperioden
 
@@ -285,3 +290,26 @@ eines ganzen Einsatzes (Aufbewahrung, Demo-Daten) MUST seine Zeitachse weiter mi
 #### Scenario: Einsatz-Purge
 - **WHEN** die Aufbewahrung einen Einsatz endgültig löscht
 - **THEN** sind auch seine Zeitachsen-Ereignisse entfernt
+
+### Requirement: Eintreffen am Bereitstellungsraum
+
+Bucht der Bereitstellungsraum das Eintreffen einer Einheit, SHALL das System in derselben
+Transaktion das Ereignis `eintreffen` mit Quelle `bereitstellungsraum` und dem
+Erfassungszeitpunkt der Buchung schreiben; der Fan-out auf die Personen der Einheit MUST wie bei
+jedem Einheit-Ereignis folgen. Verletzt das Ereignis die Perioden-Regeln, MUST es ausgelassen
+werden, und die Buchung MUST trotzdem gelingen. Das gilt auch für eine Einheit, die bei der
+Buchung erst entsteht (unangemeldete Kraft): ihre Einsatzdauer beginnt mit dem Eintreffen am
+Bereitstellungsraum. Die Buchung MUST NOT den Wortlaut „(nachgetragen)“ ins ETB schreiben. Die
+Herkunft MUST in der Zeitachse als „am Bereitstellungsraum“ erkennbar sein.
+
+#### Scenario: Unangemeldete Einheit
+- **WHEN** eine unangemeldete Kraft um 14:30 am BR Sportplatz gebucht wird
+- **THEN** beginnt die Periode der neuen Einheit um 14:30 mit einem Eintreffen, Quelle `bereitstellungsraum`
+
+#### Scenario: Fan-out
+- **WHEN** eine Einheit mit zwei zugeordneten Personen am BR als eingetroffen gebucht wird
+- **THEN** tragen beide Personen ein Eintreffen zum selben Zeitpunkt mit Quelle `einheit`
+
+#### Scenario: Herkunft in der Anzeige
+- **WHEN** die Zeitachse einer am BR eingetroffenen Einheit angezeigt wird
+- **THEN** nennt der Eintrag „am Bereitstellungsraum“ und nicht „nachgetragen“

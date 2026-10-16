@@ -638,6 +638,21 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
             post(routes::verpflegung::ausgabe_zuruecknehmen),
         )
+        // Verpflegungsstellen (LLH-1040): keine eigene Leseroute, `stellen[]` kommt mit
+        // `GET …/verpflegung`.
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen",
+            post(routes::verpflegung::create_stelle),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen/{sid}",
+            patch(routes::verpflegung::update_stelle)
+                .delete(routes::verpflegung::stelle_stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/stellen/{sid}/status",
+            post(routes::verpflegung::update_stelle_status),
+        )
         // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
         .route(
             "/api/einsaetze/{id}/lagebesprechung",
@@ -1348,6 +1363,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_bereitstellungsraum::belegung),
         )
         .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+            post(routes::einsatz_bereitstellungsraum::eintreffen),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf",
+            post(routes::einsatz_bereitstellungsraum::abruf),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf/aufheben",
+            post(routes::einsatz_bereitstellungsraum::abruf_aufheben),
+        )
+        .route(
             "/api/einsaetze/{id}/abschnitte",
             get(routes::einsatzabschnitt::list),
         )
@@ -1825,6 +1852,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
+            post(routes::einsatz_einheit::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/abweisen",
+            post(routes::einsatz_einheit::abweisen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",

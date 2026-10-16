@@ -418,6 +418,14 @@ export type BrEinheitFahrzeug = S['BrEinheitFahrzeug'];
 export type BrListenEintrag = S['BrListenEintrag'];
 export type BrVerlaufArt = S['BrVerlaufArt'];
 export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
+// LLH-1075: Eintreffen buchen (bekannt oder unangemeldet), Übernehmen einer unangemeldeten Einheit.
+export type EintreffenEingabe = S['EintreffenEingabe'];
+export type EintreffenErgebnis = S['EintreffenErgebnis'];
+export type EintreffenZeitachse = S['EintreffenZeitachse'];
+export type UebernahmeBody = S['UebernahmeBody'];
+// LLH-1085: Abruf einer Kraft aus dem Raum (abgeleitet im Detail, Antwort der Route).
+export type BrAbrufKurz = S['BrAbrufKurz'];
+export type BrAbrufErgebnis = S['BrAbrufErgebnis'];
 
 // ============================== Chat / Anhänge ==============================
 export type ChatKanal = S['ChatKanalAnzeige'];
@@ -843,7 +851,8 @@ export interface BelegungsmeldungEingabe {
 }
 
 // ============================== LFH-634 Verpflegung ==============================
-/** Übersicht `GET …/verpflegung`: alle Zeitfenster nach Beginn. */
+/** Übersicht `GET …/verpflegung`: alle Zeitfenster nach Beginn, dazu die Verpflegungsstellen
+ *  (LLH-1040, keine eigene Leseroute). */
 export type Verpflegung = S['VerpflegungAnzeige'];
 /** Zeitfenster samt Bedarf, ausgegebener Menge, Fehlmenge und Ausgaben. */
 export type VerpflegungZeitfenster = S['ZeitfensterAnzeige'];
@@ -855,6 +864,43 @@ export type VerpflegungAusgabeErgebnis = S['AusgabeErgebnis'];
 /** Die fünf festen Kostformen als Teilmenge. */
 export type Sonderkost = S['Sonderkost'];
 export type Kostform = keyof Sonderkost;
+/** Verpflegungsart eines Zeitfensters (warm, kalt, Getränke), nur Anzeige (LLH-1040). */
+export type Verpflegungsart = S['Verpflegungsart'];
+/** Verpflegungsstelle (LLH-1040): Feldküche, Ausgabestelle oder Zuführung, Status wie beim BR.
+ *  Stornierte kommen nicht vor, aufgelöste schon (die Karte braucht ihre Namen). */
+export type Verpflegungsstelle = S['VerpflegungsstelleAnzeige'];
+export type VerpflegungsstelleArt = S['VerpflegungsstelleArt'];
+export type VerpflegungsstelleStatus = S['VerpflegungsstelleStatus'];
+/** Ausgegebene Menge an einer Stelle (`je_stelle` am Zeitfenster), nur das Ist; ohne
+ *  `stelle_id` der Eintrag „ohne Stelle“. Der Client rechnet je Stelle nichts nach. */
+export type VerpflegungStelleIst = S['StelleIst'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/stellen` (`StelleAnlegen`).
+ * Bezeichnung eindeutig unter den nicht stornierten Stellen (sonst 409); `lat` und `lon` nur
+ * als Paar (sonst 422).
+ */
+export interface VerpflegungsstelleEingabe {
+  bezeichnung: string;
+  art: VerpflegungsstelleArt;
+  standort?: string;
+  lat?: number;
+  lon?: number;
+  abschnitt_id?: number;
+}
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/verpflegung/stellen/{sid}` (`StelleAendern`).
+ * Schlüssel fehlt = unverändert; `null` leert Standort, Koordinate und Abschnitt.
+ */
+export interface VerpflegungsstellePatch {
+  bezeichnung?: string;
+  art?: VerpflegungsstelleArt;
+  standort?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  abschnitt_id?: number | null;
+}
 
 /**
  * Kein Backend-Schema: `sonderkost` in den Eingabe-Bodies (`SonderkostEingabe`). Jedes Feld
@@ -875,14 +921,21 @@ export interface ZeitfensterEingabe {
   bedarf_betreute: number;
   bedarf_weitere?: number;
   sonderkost?: SonderkostEingabe;
+  /** Fehlt = ohne Angabe (LLH-1040). */
+  verpflegungsart?: Verpflegungsart;
+  /** Zugeordnete Stellen, höchstens 20; fehlt oder leer = einsatzweit. */
+  stelle_ids?: number[];
 }
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PATCH …/verpflegung/zeitfenster/{id}`
- * (`ZeitfensterAendern`). Zweiwertig: Schlüssel fehlt = unverändert, es gibt kein `null`.
- * Wertgleichheit schreibt weder ETB-Eintrag noch Ereignis.
+ * (`ZeitfensterAendern`). Schlüssel fehlt = unverändert; nur `verpflegungsart` kennt `null`
+ * (leeren). `stelle_ids` ersetzt die Zuordnung, `[]` leert sie. Wertgleichheit (bei den Stellen
+ * auch in anderer Reihenfolge) schreibt weder ETB-Eintrag noch Ereignis.
  */
-export type ZeitfensterPatch = Partial<ZeitfensterEingabe>;
+export type ZeitfensterPatch = Omit<Partial<ZeitfensterEingabe>, 'verpflegungsart'> & {
+  verpflegungsart?: Verpflegungsart | null;
+};
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
@@ -896,6 +949,9 @@ export interface AusgabeEingabe {
   sonderkost?: SonderkostEingabe;
   nachforderung_id?: number;
   bemerkung?: string;
+  /** Verpflegungsstelle (LLH-1040): fremd, unbekannt oder storniert 422, aufgelöst 409 — außer
+   *  `zeitpunkt_at` liegt vor der Auflösung. */
+  verpflegungsstelle_id?: number;
   /** Idempotenzschlüssel der Offline-Queue (LFH-688); ein Replay liefert die gespeicherte Ausgabe. */
   client_id?: string;
 }

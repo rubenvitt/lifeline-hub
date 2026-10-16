@@ -94,5 +94,19 @@ export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;
 export const SAMMEL_MAX = 50;
 /** Name der obersten Einheit beim Bilden aus einer Vorlage (LLH-1049). */
 export const EINHEIT_NAME_MAX = 200;
+/** Bemerkung einer unangemeldet am Bereitstellungsraum erfassten Einheit (LLH-1075). */
+export const EINHEIT_BEMERKUNG_MAX = 2_000;
 /** Erwähnungen je Chat-Nachricht im Request (LLH-1220, vor dem Entdoppeln). */
 export const ERWAEHNUNGEN_MAX = 20;
+/** Bezeichnung eines Verpflegungszeitfensters (LLH-1040). */
+export const VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX = 200;
+/** Bezeichnung einer Verpflegungsstelle. */
+export const VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX = 200;
+/** Standort einer Verpflegungsstelle. */
+export const VERPFLEGUNG_STANDORT_MAX = 500;
+/** Ort (Zuführungsziel) einer Verpflegungsausgabe. */
+export const VERPFLEGUNG_ORT_MAX = 500;
+/** Bemerkung einer Verpflegungsausgabe. */
+export const VERPFLEGUNG_BEMERKUNG_MAX = 2_000;
+/** Stellen je Verpflegungszeitfenster im Request (vor dem Entdoppeln). */
+export const VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX = 20;

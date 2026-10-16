@@ -1255,10 +1255,13 @@ mod tests {
 
     /// LFH-634, Spec-Szenario „Einsatz schwärzen“: Ort und Bemerkung der Ausgabe leer; Menge,
     /// Sonderkost, Zeitpunkt, Nachforderungsverweis und das Zeitfenster samt Bezeichnung und
-    /// Bedarf unverändert.
+    /// Bedarf unverändert. LLH-1040, Spec-Szenario „Stelle schwärzen“: der Standort der Stelle
+    /// ist leer; Bezeichnung, Art, Status und Koordinate der Stelle, die Zuordnung und der
+    /// Verweis der Ausgabe auf sie bleiben.
     #[tokio::test]
     async fn schwaerzung_verpflegung_leert_ort_und_bemerkung_und_haelt_mengen() {
         use crate::verpflegung::repo as v;
+        use crate::verpflegung::stelle::{VerpflegungsstelleArt, VerpflegungsstelleStatus};
         use crate::verpflegung::SonderkostEingabe;
 
         let pool = crate::db::test_pool().await;
@@ -1300,6 +1303,32 @@ mod tests {
         };
 
         let mut tx = pool.begin().await.unwrap();
+        let stelle = v::create_stelle_tx(
+            &mut tx,
+            e,
+            nutzer,
+            &v::StelleEingabe {
+                bezeichnung: "Feldküche BR Sportplatz".into(),
+                art: VerpflegungsstelleArt::Feldkueche,
+                standort: Some("Am Sportplatz 2".into()),
+                lat: Some(52.37),
+                lon: Some(9.73),
+                abschnitt_id: None,
+            },
+        )
+        .await
+        .unwrap()
+        .id;
+        v::update_stelle_status_tx(
+            &mut tx,
+            e,
+            stelle,
+            nutzer,
+            1,
+            VerpflegungsstelleStatus::Aktiv,
+        )
+        .await
+        .unwrap();
         let zf = v::zeitfenster_anlegen_tx(
             &mut tx,
             e,
@@ -1314,6 +1343,8 @@ mod tests {
                 bedarf_betreute: 70,
                 bedarf_weitere: 0,
                 sonderkost,
+                verpflegungsart: None,
+                stelle_ids: vec![stelle],
             },
         )
         .await
@@ -1330,6 +1361,7 @@ mod tests {
                 bemerkung: Some("für Frau Meyer glutenfrei".into()),
                 sonderkost,
                 nachforderung_id: Some(nachforderung),
+                verpflegungsstelle_id: Some(stelle),
                 client_id: None,
             },
         )
@@ -1337,6 +1369,8 @@ mod tests {
         .unwrap();
         tx.commit().await.unwrap();
         let vorher = v::zeitfenster_laden(&pool, e, zf.id).await.unwrap();
+        let stelle_vorher = v::load_stelle(&pool, e, stelle).await.unwrap();
+        assert_eq!(stelle_vorher.standort.as_deref(), Some("Am Sportplatz 2"));
 
         assert!(
             super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
@@ -1358,6 +1392,23 @@ mod tests {
         assert_eq!(nachher, erwartet);
         assert_eq!(nachher.bezeichnung, "Mittag");
         assert_eq!(nachher.bedarf.gesamt, 250);
+        assert_eq!(
+            a.verpflegungsstelle_id,
+            Some(stelle),
+            "Stellenverweis bleibt"
+        );
+        assert_eq!(nachher.stelle_ids, vec![stelle], "Zuordnung bleibt");
+        // Die Stelle: nur der Standort ist leer.
+        let stelle_nachher = v::load_stelle(&pool, e, stelle).await.unwrap();
+        let mut erwartet = stelle_vorher.clone();
+        erwartet.standort = None;
+        assert_eq!(stelle_nachher, erwartet);
+        assert_eq!(stelle_nachher.bezeichnung, "Feldküche BR Sportplatz");
+        assert_eq!(stelle_nachher.status, VerpflegungsstelleStatus::Aktiv);
+        assert_eq!(
+            (stelle_nachher.lat, stelle_nachher.lon),
+            (Some(52.37), Some(9.73))
+        );
     }
 
     /// LFH-554/LFH-901, Spec-Szenarien „Schwärzung“ von Presse-Log und Informationstelefon:

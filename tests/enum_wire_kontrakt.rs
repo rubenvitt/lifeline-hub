@@ -285,13 +285,24 @@ fn serde_wire_gleich_as_str() {
         Eintritt,
         Wechsel,
         Austritt,
+        Abruf,
+        AbrufAufgehoben,
     });
     enum_wire_as_str!(lifeline_hub::bereitstellungsraum::BrVerlaufArt {
         Eintritt,
         WechselHerein,
         WechselHinaus,
         Austritt,
+        Abruf,
+        AbrufAufgehoben,
     });
+    enum_wire_as_str!(
+        lifeline_hub::bereitstellungsraum::eintreffen::EintreffenZeitachse {
+            Geschrieben,
+            Ausgelassen,
+            Keine,
+        }
+    );
 
     // chat
     enum_wire_as_str!(lifeline_hub::chat::BezugTyp {
@@ -953,6 +964,7 @@ fn zeitachse_quelle_wire() {
         Abloesung => "abloesung",
         Nachtrag => "nachtrag",
         Disposition => "disposition",
+        Bereitstellungsraum => "bereitstellungsraum",
     } in lifeline_hub::zeitachse::ZeitachseQuelle::ALLE);
 }
 
@@ -1490,6 +1502,27 @@ fn geraet_kopplung_wire() {
         Abgelaufen => "abgelaufen",
         Widerrufen => "widerrufen",
     });
+}
+
+/// LLH-1040: Verpflegungsstelle (Art, Status wie beim Bereitstellungsraum) und Verpflegungsart
+/// des Zeitfensters. Die Wörter stehen als CHECK in `migrations/0206_verpflegungsstelle.sql`.
+#[test]
+fn verpflegungsstelle_wire() {
+    enum_wire!(lifeline_hub::verpflegung::stelle::VerpflegungsstelleArt {
+        Feldkueche => "feldkueche",
+        Ausgabestelle => "ausgabestelle",
+        Zufuehrung => "zufuehrung",
+    } in lifeline_hub::verpflegung::stelle::VerpflegungsstelleArt::ALLE);
+    enum_wire!(lifeline_hub::verpflegung::stelle::VerpflegungsstelleStatus {
+        Geplant => "geplant",
+        Aktiv => "aktiv",
+        Aufgeloest => "aufgeloest",
+    } in lifeline_hub::verpflegung::stelle::VerpflegungsstelleStatus::ALLE);
+    enum_wire!(lifeline_hub::verpflegung::Verpflegungsart {
+        Warm => "warm",
+        Kalt => "kalt",
+        Getraenke => "getraenke",
+    } in lifeline_hub::verpflegung::Verpflegungsart::ALLE);
 }
 
 #[test]

@@ -74,6 +74,7 @@ describe('Wörter', () => {
     expect(HERKUNFT_WORT.einheit).toBe('über Einheit');
     expect(HERKUNFT_WORT.nachtrag).toBe('nachgetragen');
     expect(HERKUNFT_WORT.disposition).toBe('aus dem Einsatz entlassen');
+    expect(HERKUNFT_WORT.bereitstellungsraum).toBe('am Bereitstellungsraum');
   });
 
   it('Ablösung lässt sich nicht nachtragen', () => {

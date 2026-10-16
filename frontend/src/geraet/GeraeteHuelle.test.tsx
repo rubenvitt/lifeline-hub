@@ -539,7 +539,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     geaendert_at: '2026-10-04 08:00:00',
     geaendert_von: 1,
     storniert_at: null,
-    einheiten: [{ id: 31, name: 'RTW 1', fahrzeuge: [] }],
+    einheiten: [{ id: 31, name: 'RTW 1', fahrzeuge: [], unangemeldet: false }],
     fahrzeuge: [],
     belegung: { einheiten: 1, fahrzeuge: 0 },
   };
@@ -737,6 +737,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
       http.get('/api/einsaetze/7/verpflegung', () =>
         HttpResponse.json({
           zeitfenster: [zeitfenster({ id: 1, einsatz_id: 7, von_at: wire(-30), bis_at: wire(60) })],
+          stellen: [],
         }),
       ),
       http.get('/api/einsaetze/7/nachforderungen', () => {

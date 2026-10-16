@@ -551,6 +551,12 @@ export interface components {
             nachforderung_id?: number | null;
             ort?: string | null;
             sonderkost: components["schemas"]["Sonderkost"];
+            /**
+             * Format: int64
+             * @description Verpflegungsstelle, an der ausgegeben wurde (LLH-1040) — nur die Kennung; die Stelle
+             *     steht in `VerpflegungAnzeige.stellen`.
+             */
+            verpflegungsstelle_id?: number | null;
             /** Format: int64 */
             zeitfenster_id: number;
             /**
@@ -1016,6 +1022,54 @@ export interface components {
          * @enum {string}
          */
         Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt";
+        /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
+        BrAbrufErgebnis: {
+            /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
+            abruf: components["schemas"]["BrBelegungAnzeige"];
+            /** Format: int64 */
+            auftrag_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des erteilten Auftrags.
+             */
+            auftrag_nr?: number | null;
+            /** @description Einheiten, die als Untereinheiten mit abgerufen wurden. */
+            mitgenommen: number[];
+        };
+        /**
+         * @description Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec
+         *     `bereitstellungsraum-belegung`, „Detail nennt den Abruf“): abgeleitet aus dem jüngsten
+         *     Belegungsereignis, nicht gespeichert.
+         */
+        BrAbrufKurz: {
+            /**
+             * Format: int64
+             * @description Auftrag des Abrufs; nur an der abgerufenen Einheit, nicht an mitgenommenen.
+             */
+            auftrag_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer dieses Auftrags.
+             */
+            auftrag_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Die Einheit, mit der diese Untereinheit abgerufen wurde (D10).
+             */
+            mit_objekt_id?: number | null;
+            /** @description Zeitpunkt des Abrufs (UTC ohne Zone). */
+            seit_at: string;
+            /**
+             * Format: int64
+             * @description Ziel-Abschnitt; bei einer mitgenommenen Untereinheit der ihrer Einheit.
+             */
+            ziel_abschnitt_id?: number | null;
+            /**
+             * @description Name des Ziels zum Zeitpunkt des Abrufs; bei einer mitgenommenen Untereinheit der ihrer
+             *     Einheit.
+             */
+            ziel_anzeige?: string | null;
+        };
         /** @description Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`). */
         BrAnzeige: {
             /** Format: int64 */
@@ -1039,6 +1093,11 @@ export interface components {
         /** @description Belegungs-Verlaufseintrag (1:1 zu `br_belegung`). */
         BrBelegungAnzeige: {
             art: components["schemas"]["BrBelegungsArt"];
+            /**
+             * Format: int64
+             * @description Auftrag, der mit dem Abruf erteilt wurde.
+             */
+            auftrag_id?: number | null;
             /** Format: int64 */
             br_id: number;
             /** Format: int64 */
@@ -1047,11 +1106,24 @@ export interface components {
             erfasst_von: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10).
+             */
+            mit_abruf_id?: number | null;
             notiz?: string | null;
             /** Format: int64 */
             objekt_id: number;
             objekt_typ: components["schemas"]["ObjektTyp"];
             zeitpunkt_at: string;
+            /**
+             * Format: int64
+             * @description Ziel-Abschnitt eines Abrufs (LLH-1085, design.md D5); fällt weg, wenn der Abschnitt
+             *     gelöscht wird.
+             */
+            ziel_abschnitt_id?: number | null;
+            /** @description Name des Ziel-Abschnitts zum Zeitpunkt des Abrufs; bleibt nach dem Löschen. */
+            ziel_anzeige?: string | null;
         };
         /**
          * @description Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec
@@ -1077,10 +1149,12 @@ export interface components {
         };
         /**
          * @description Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-         *     `migrations/0061_br_belegung.sql`. Append-only.
+         *     `migrations/0208_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
+         *     `austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,
+         *     design.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.
          * @enum {string}
          */
-        BrBelegungsArt: "eintritt" | "wechsel" | "austritt";
+        BrBelegungsArt: "eintritt" | "wechsel" | "austritt" | "abruf" | "abruf_aufgehoben";
         /**
          * @description Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +
          *     einheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4).
@@ -1102,19 +1176,25 @@ export interface components {
         };
         /** @description Schlanke Einheiten-Info für den Detail-Response. */
         BrEinheitKurz: {
+            abruf?: components["schemas"]["BrAbrufKurz"] | null;
             /** @description Aktive Fahrzeuge der Einheit. */
             fahrzeuge: components["schemas"]["BrEinheitFahrzeug"][];
             /** Format: int64 */
             id: number;
             name: string;
+            /** @description Kennzeichen „nicht übernommen“ wie an `EinheitAnzeige` (LLH-1075, D3). */
+            nicht_uebernommen_seit?: string | null;
             /**
              * @description Seit wann die Einheit im Raum steht (jüngster Eintritt oder Wechsel herein, UTC ohne
              *     Zone); fehlt ohne passendes Ereignis.
              */
             seit_at?: string | null;
+            /** @description Herkunft „unangemeldet“, dauerhaft (D3). */
+            unangemeldet: boolean;
         };
         /** @description Schlanke Fahrzeug-Info für den Detail-Response. */
         BrFahrzeugKurz: {
+            abruf?: components["schemas"]["BrAbrufKurz"] | null;
             funkrufname: string;
             /** Format: int64 */
             id: number;
@@ -1143,13 +1223,18 @@ export interface components {
          *     `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
          * @enum {string}
          */
-        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt";
+        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben";
         /**
          * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
          *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
          */
         BrVerlaufEintrag: {
             art: components["schemas"]["BrVerlaufArt"];
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Auftrags eines `abruf`.
+             */
+            auftrag_nr?: number | null;
             /** @description Bezeichnung des Raums, aus dem ein `wechsel_herein` kam. */
             herkunft?: string | null;
             /**
@@ -1157,6 +1242,8 @@ export interface components {
              * @description Kennung des Belegungsereignisses (`br_belegung.id`).
              */
             id: number;
+            /** @description Name der Einheit, mit der eine Untereinheit abgerufen wurde (D10). */
+            mit_einheit?: string | null;
             notiz?: string | null;
             /** Format: int64 */
             objekt_id: number;
@@ -1165,7 +1252,10 @@ export interface components {
             objekt_typ: components["schemas"]["ObjektTyp"];
             /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
-            /** @description Bezeichnung des Raums, in den ein `wechsel_hinaus` ging. */
+            /**
+             * @description Bezeichnung des Raums, in den ein `wechsel_hinaus` ging; bei einem `abruf` und einem
+             *     `austritt` direkt nach einem Abruf der Name des Ziel-Abschnitts (LLH-1085, D5).
+             */
             ziel?: string | null;
         };
         /**
@@ -1510,6 +1600,11 @@ export interface components {
             lon?: number | null;
             material_mitglieder: components["schemas"]["EinheitMitgliedMaterial"][];
             name: string;
+            /**
+             * @description Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,
+             *     nur solange die Übernahme offen ist (UTC ohne Zone).
+             */
+            nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
             soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
@@ -1524,6 +1619,8 @@ export interface components {
             tz_organisation?: string | null;
             /** Format: int64 */
             ueber_einheit_id?: number | null;
+            /** @description Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3). */
+            unangemeldet: boolean;
         };
         /** @description Fahrzeug-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedFahrzeug: {
@@ -2151,6 +2248,46 @@ export interface components {
          */
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
+         * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
+         *     `kraft` und `unangemeldet`.
+         */
+        EintreffenEingabe: {
+            /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
+            client_id?: string | null;
+            kraft?: components["schemas"]["KraftAngabe"] | null;
+            unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
+            /**
+             * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
+             *     der Zukunft. Ohne Angabe gilt „jetzt“.
+             */
+            zeitpunkt_at?: string | null;
+        };
+        /** @description Antwort 201 des Eintreffens (design.md D1), beim Replay aus dem Bestand rekonstruiert (D8). */
+        EintreffenErgebnis: {
+            /** @description Die Belegungszeile des Eintritts. */
+            belegung: components["schemas"]["BrBelegungAnzeige"];
+            /**
+             * Format: int64
+             * @description Die eingebuchte oder neu angelegte Einheit; fehlt bei einem Fahrzeug.
+             */
+            einheit_id?: number | null;
+            /** @description Aktive Fahrzeuge der Einheit bzw. das Fahrzeug selbst. */
+            fahrzeug_ids: number[];
+            /**
+             * Format: int64
+             * @description Meldung an die Einsatzleitung (nur unangemeldet).
+             */
+            meldung_id?: number | null;
+            /** @description Die Buchung hat die Kraft neu angelegt. */
+            unangemeldet: boolean;
+            zeitachse: components["schemas"]["EintreffenZeitachse"];
+        };
+        /**
+         * @description Was das Eintreffen in der Kräfte-Zeitachse bewirkt hat (design.md D1).
+         * @enum {string}
+         */
+        EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
          * @enum {string}
@@ -2500,6 +2637,13 @@ export interface components {
             traegerorganisation?: string | null;
             /** Format: int64 */
             tragenkapazitaet?: number | null;
+        };
+        /** @description Ein Fahrzeug der unangemeldeten Kraft (Ad-hoc-Fahrzeug). */
+        FahrzeugEingabe: {
+            fahrzeugtyp?: string | null;
+            funkrufname?: string;
+            /** @description Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug. */
+            traegerorganisation?: string | null;
         };
         /**
          * @description Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
@@ -3084,6 +3228,12 @@ export interface components {
         KopplungsCode: {
             code: string;
             laeuft_ab_at: string;
+        };
+        /** @description Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`. */
+        KraftAngabe: {
+            /** Format: int64 */
+            objekt_id: number;
+            objekt_typ: string;
         };
         /** @description Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden. */
         LageGesehenAnzeige: {
@@ -4971,6 +5121,15 @@ export interface components {
             /** Format: int32 */
             unterfuehrer: number;
         };
+        /** @description Stärke F/UF/M: alle drei oder keine. */
+        StaerkeEingabe: {
+            /** Format: int64 */
+            fuehrer?: number | null;
+            /** Format: int64 */
+            mannschaft?: number | null;
+            /** Format: int64 */
+            unterfuehrer?: number | null;
+        };
         /**
          * @description Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
          *     Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
@@ -5032,6 +5191,19 @@ export interface components {
             sortier: number;
             /** Format: int64 */
             status_id: number;
+        };
+        /**
+         * @description Ausgegebene Menge an einer Stelle (LLH-1040, design.md D6) — nur das Ist, kein Soll und keine
+         *     Fehlmenge je Stelle.
+         */
+        StelleIst: {
+            /** @description Summe der nicht zurückgenommenen Ausgaben an dieser Stelle, gesamt und je Kostform. */
+            ausgegeben: components["schemas"]["Portionen"];
+            /**
+             * Format: int64
+             * @description Die Stelle; fehlt beim Eintrag „ohne Stelle“ (Ausgaben ohne Stelle), der zuletzt steht.
+             */
+            stelle_id?: number | null;
         };
         /**
          * @description Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie
@@ -5163,6 +5335,13 @@ export interface components {
             otpauth_url: string;
             secret_base32: string;
         };
+        /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
+        UebernahmeBody: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            /** Format: int64 */
+            ueber_einheit_id?: number | null;
+        };
         /**
          * @description Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die
          *     Datei ist nur über die UHS-Route ladbar.
@@ -5293,6 +5472,16 @@ export interface components {
          * @enum {string}
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
+        /** @description Unangemeldete Kraft (design.md D1/D2). */
+        UnangemeldetEingabe: {
+            /** @description Freitext an der Einheit; nie in Meldung oder ETB. */
+            bemerkung?: string | null;
+            /** @description 1 bis `SAMMEL_MAX` Fahrzeuge; das erste gibt der Einheit ihren Namen. */
+            fahrzeuge?: components["schemas"]["FahrzeugEingabe"][];
+            staerke?: components["schemas"]["StaerkeEingabe"] | null;
+            /** @description Neuanlage trotz gleichnamiger Kraft im Einsatz (D9). */
+            trotzdem_anlegen?: boolean;
+        };
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.
@@ -5371,9 +5560,54 @@ export interface components {
         Verkehrsart: "wechsel" | "gegen";
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
+            /**
+             * @description Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
+             *     braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
+             */
+            stellen: components["schemas"]["VerpflegungsstelleAnzeige"][];
             /** @description Nach Beginn geordnet. */
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"][];
         };
+        /**
+         * @description Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung
+         *     gilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;
+         *     keine Art (`NULL`) heißt „ohne Angabe“.
+         * @enum {string}
+         */
+        Verpflegungsart: "warm" | "kalt" | "getraenke";
+        /**
+         * @description Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne
+         *     Benutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und
+         *     keine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.
+         */
+        VerpflegungsstelleAnzeige: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            angelegt_at: string;
+            art: components["schemas"]["VerpflegungsstelleArt"];
+            /** @description Zeitpunkt der Auflösung (UTC ohne Zonenkennung), nur bei `aufgeloest`. */
+            aufgeloest_at?: string | null;
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
+            standort?: string | null;
+            status: components["schemas"]["VerpflegungsstelleStatus"];
+        };
+        /**
+         * @description Art einer Verpflegungsstelle. String = CHECK in `migrations/0206_verpflegungsstelle.sql`.
+         * @enum {string}
+         */
+        VerpflegungsstelleArt: "feldkueche" | "ausgabestelle" | "zufuehrung";
+        /**
+         * @description Status einer Verpflegungsstelle. String = CHECK in
+         *     `migrations/0206_verpflegungsstelle.sql`. `aufgeloest` ist endgültig.
+         * @enum {string}
+         */
+        VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
         /** @description Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
@@ -5826,7 +6060,7 @@ export interface components {
          * @description Herkunft eines Ereignisses. Wire == `as_str()`.
          * @enum {string}
          */
-        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition";
+        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition" | "bereitstellungsraum";
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;
@@ -5845,6 +6079,15 @@ export interface components {
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Ausgegeben je Stelle (D6): jede zugeordnete Stelle (auch mit 0), danach jede weitere mit
+             *     Ausgaben, zuletzt „ohne Stelle“. Leer, wenn es weder Zuordnung noch eine Ausgabe an einer
+             *     Stelle gibt — dann zeigt das Zeitfenster nur Gesamtwerte wie bisher.
+             */
+            je_stelle: components["schemas"]["StelleIst"][];
+            /** @description Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5). */
+            stelle_ids: number[];
+            verpflegungsart?: components["schemas"]["Verpflegungsart"] | null;
             /** @description Beginn, UTC ohne Zonenkennung. */
             von_at: string;
         };
