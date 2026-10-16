@@ -24,7 +24,10 @@ import {
 } from '../api/meldungen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
+import type { Einheit, Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
+import EinheitUebernahme from './einheit/EinheitUebernahme';
+import { KennungsLink } from '../components/kennungsLink';
+import { einheitDetailPfad } from '../routing/deeplinks';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -467,7 +470,60 @@ export default function MeldungenPage() {
   );
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
-  const auftragGesperrt = useSprungSperre(einsatzId)('auftraege');
+  const sprungGesperrt = useSprungSperre(einsatzId);
+  const auftragGesperrt = sprungGesperrt('auftraege');
+
+  /*
+   * Offene Übernahme an der Meldung (LLH-1075, design.md D14): die Meldung einer unangemeldeten
+   * Einheit trägt dieselben Knöpfe wie die Einheit-Ansicht, nur mit Recht Einheiten (Abweisen
+   * zusätzlich Fahrzeuge). Ohne Recht bleibt der Sprung zur Einheit, sofern ihr Modul offen ist.
+   * Nach der Übernahme fehlt `nicht_uebernommen_seit`, die Knöpfe verschwinden mit dem Bestand.
+   */
+  const offeneUebernahmen = useMemo(
+    () =>
+      new Map(
+        (einheitenQuery.data ?? [])
+          .filter((e) => e.nicht_uebernommen_seit != null)
+          .map((e) => [e.id, e] as [number, Einheit]),
+      ),
+    [einheitenQuery.data],
+  );
+  const einheitenSchreiben =
+    einsatzQuery.data != null &&
+    darfImEinsatzSchreiben(einsatzQuery.data) &&
+    !sprungGesperrt('einheiten');
+  const einheitenSprung = !sprungGesperrt('einheiten');
+  const fahrzeugeOffen = !sprungGesperrt('fahrzeuge');
+  const uebernahme = useCallback(
+    (m: Meldung) => {
+      const e = m.einheit_id != null ? offeneUebernahmen.get(m.einheit_id) : undefined;
+      if (!e) return null;
+      if (!einheitenSchreiben) {
+        return einheitenSprung ? (
+          <KennungsLink to={einheitDetailPfad(einsatzId, e.id)}>↗ {e.name}</KennungsLink>
+        ) : null;
+      }
+      return (
+        <EinheitUebernahme
+          kompakt
+          einsatzId={einsatzId}
+          einheit={e}
+          einheiten={einheitenQuery.data ?? []}
+          abschnitte={abschnitteQuery.data}
+          canAbweisen={fahrzeugeOffen}
+        />
+      );
+    },
+    [
+      offeneUebernahmen,
+      einheitenSchreiben,
+      einheitenSprung,
+      fahrzeugeOffen,
+      einsatzId,
+      einheitenQuery.data,
+      abschnitteQuery.data,
+    ],
+  );
 
   if (einsatzQuery.isLoading) {
     return (
@@ -497,6 +553,7 @@ export default function MeldungenPage() {
     onAuftragErteilen,
     auftragGesperrt,
     kartenFehler: kartenFehler.grund,
+    uebernahme,
   };
 
   const auftragsZiele = {

@@ -154,3 +154,18 @@ Vorgabestufe ohne Markierung lassen.
 #### Scenario: Unbekannte Einheit
 - **WHEN** das Meldebild mit `?einheit=` einer nicht vorhandenen Einheit öffnet
 - **THEN** zeigt es die Vorgabestufe „Einheiten“ ohne Markierung
+
+### Requirement: Nicht übernommene Einheit im Kräftebaum
+Eine unangemeldet erfasste Einheit, die die Führung noch nicht übernommen hat, SHALL in ihrer
+Zeile des Kräftebaums hinter dem Namen das Wort „nicht übernommen“ tragen, in der Rolle Achtung
+und ohne Blinken. Das Wort MUST auch im Druck und in Graustufen lesbar sein. Nach der Übernahme
+oder dem Abweisen MUST das Wort entfallen. Dieselbe Marke MUST in der Gliederung der Einheiten
+stehen.
+
+#### Scenario: Unangemeldete Einheit im Meldebild
+- **WHEN** am BR Sportplatz „FL-MUS 1-44-1“ unangemeldet gebucht wurde und die Führung das Meldebild öffnet
+- **THEN** trägt die Zeile der Einheit „FL-MUS 1-44-1“ das Wort „nicht übernommen“
+
+#### Scenario: Nach der Übernahme
+- **WHEN** die Einsatzleitung die Einheit übernommen hat
+- **THEN** trägt ihre Zeile im Kräftebaum das Wort nicht mehr

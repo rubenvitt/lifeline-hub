@@ -6,6 +6,7 @@ import { Augenbraue, monoStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
+import NichtUebernommenMarke from './NichtUebernommenMarke';
 import type { PersonAnzeige, RasterZeile } from './meldebildRaster';
 
 /**
@@ -90,7 +91,10 @@ export type SprungGesperrt = (modul: 'einheiten' | 'fahrzeuge' | 'personal') => 
  */
 export type KraeftebaumZelleZeile =
   | RasterZeile
-  | ({ art: 'einheit' } & Pick<RasterZeile, 'einheitId' | 'bezeichnung' | 'zusatz' | 'tz'>);
+  | ({ art: 'einheit' } & Pick<
+      RasterZeile,
+      'einheitId' | 'bezeichnung' | 'zusatz' | 'tz' | 'isNichtUebernommen'
+    >);
 
 interface KraeftebaumZelleProps {
   zeile: KraeftebaumZelleZeile;
@@ -138,6 +142,12 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
         <EinheitZeichen tz={z.tz} />,
         <>
           <span style={{ fontWeight: 500 }}>{name(z.bezeichnung, ziel)}</span>
+          {z.isNichtUebernommen && (
+            <>
+              {' '}
+              <NichtUebernommenMarke />
+            </>
+          )}
           {nebentext([z.zusatz])}
         </>,
       );

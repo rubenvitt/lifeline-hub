@@ -122,3 +122,117 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await kontext.close();
   }
 });
+
+/**
+ * LLH-1075 Teil II (Spec `bereitstellungsraum-belegung`, „Eintreffen buchen in der Oberfläche“):
+ * der Einweiser am Tablet (`handschuh`) bucht eine erwartete Einheit mit einem Tipp und ein
+ * unangemeldetes Fahrzeug; die Führung am Desktop (`kompakt`) sieht die Meldung, das Kennzeichen
+ * „nicht übernommen“ im Meldebild und in der Einheitenliste und übernimmt mit Abschnitt, danach ist
+ * das Kennzeichen weg. Der Teil „ohne Netz vorgemerkt“ folgt mit der Schreib-Warteschlange
+ * (Teil III).
+ *
+ * Mutationsprobe: in `geraetSicht.ts` `br-eintreffen` nur für `uhs-tablet` → der Knopf fehlt am
+ * Tablet, der Schritt „Eintreffen buchen“ wird rot.
+ */
+test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  await anmeldenAlsAdmin(page);
+  const einsatz = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E BR Tor ${Date.now()}`,
+  });
+  const e = einsatz.id;
+  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+    bezeichnung: 'BR Sportplatz',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+    status: 'aktiv',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
+  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Musterstadt' });
+  const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
+    page,
+    `/api/einsaetze/${e}/geraete`,
+    { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
+  );
+
+  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/br/${raum.id}$`));
+    await stelleDichte(tablet, 'handschuh');
+
+    // Erwartet, ein Tipp.
+    await tablet.getByRole('button', { name: 'Eintreffen buchen' }).click();
+    const dialog = tablet.getByRole('dialog', { name: 'Eintreffen buchen' });
+    await expect(dialog.getByRole('searchbox', { name: 'Suche' })).toBeFocused();
+    // Gemessen erst, wenn die Einblendung steht (sonst skaliert `ant-zoom` den Kasten).
+    await expect(tablet.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const treffer = dialog.getByRole('button', { name: 'Eintreffen HLF Musterstadt' });
+    await haeltStufe(treffer, 72, 'Trefferknopf „Eintreffen“ (handschuh)');
+    await treffer.click();
+    await expect(tablet.getByText('HLF Musterstadt gebucht')).toBeVisible();
+    const belegung = tablet.getByTestId('br-belegung');
+    await expect(belegung.getByText('HLF Musterstadt')).toBeVisible();
+
+    // Unangemeldet: der Suchtext wird der Funkrufname.
+    await tablet.getByRole('button', { name: 'Eintreffen buchen' }).click();
+    await dialog.getByRole('searchbox', { name: 'Suche' }).fill('Florian Nachbar 3');
+    await dialog.getByRole('button', { name: 'Nicht in der Liste' }).click();
+    await expect(dialog.getByRole('textbox', { name: 'Funkrufname' })).toHaveValue(
+      'Florian Nachbar 3',
+    );
+    await dialog.getByRole('textbox', { name: 'Trägerorganisation' }).fill('FF Nachbarstadt');
+    await dialog.getByRole('button', { name: 'Unangemeldet buchen' }).click();
+    await expect(
+      tablet.getByText('Florian Nachbar 3 unangemeldet gebucht, Einsatzleitung informiert'),
+    ).toBeVisible();
+    // Die Einheit heißt wie ihr Fahrzeug: Zeile der Einheit und Fahrzeugzeile darunter.
+    await expect(belegung.getByText('Florian Nachbar 3', { exact: true })).toHaveCount(2);
+    await expect(belegung.getByText('nicht übernommen')).toBeVisible();
+  } finally {
+    await kontext.close();
+  }
+
+  // Die Führung am Desktop.
+  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as {
+    id: number;
+    name: string;
+  }[];
+  const neu = einheiten.find((x) => x.name === 'Florian Nachbar 3');
+  expect(neu, 'die unangemeldete Einheit ist angelegt').toBeDefined();
+
+  await page.goto(`/einsaetze/${e}/meldungen`);
+  await stelleDichte(page, 'kompakt');
+  const karte = page.locator('[data-meldung-id]').filter({ hasText: 'Florian Nachbar 3' });
+  await expect(karte.getByRole('button', { name: 'Übernehmen' })).toBeVisible();
+  await expect(karte.getByRole('button', { name: 'Abweisen' })).toBeVisible();
+
+  await page.goto(`/einsaetze/${e}/kraefteuebersicht`);
+  const zelle = page
+    .locator('[data-lfh="kraeftebaum-zelle"]')
+    .filter({ hasText: 'Florian Nachbar 3' });
+  await expect(zelle.getByText('nicht übernommen')).toBeVisible();
+
+  await page.goto(`/einsaetze/${e}/einheiten`);
+  const zeile = page.getByRole('row').filter({ hasText: 'Florian Nachbar 3' });
+  await expect(zeile.getByText('nicht übernommen')).toBeVisible();
+
+  await page.goto(`/einsaetze/${e}/einheiten/${neu!.id}`);
+  const paneel = page.getByRole('region', { name: 'Übernahme' });
+  await paneel.getByRole('button', { name: 'Übernehmen' }).click();
+  const uebernahme = page.getByRole('dialog', { name: 'Florian Nachbar 3 übernehmen' });
+  await uebernahme.getByRole('combobox', { name: 'Abschnitt' }).click();
+  await page.locator('.ant-select-item-option[title="EA Nord"]').click();
+  await uebernahme.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.getByText('Florian Nachbar 3 übernommen')).toBeVisible();
+  await expect(paneel).toHaveCount(0);
+  await expect(page.getByText('nicht übernommen')).toHaveCount(0);
+
+  await page.goto(`/einsaetze/${e}/einheiten`);
+  await expect(page.getByRole('row').filter({ hasText: 'Florian Nachbar 3' })).toContainText(
+    'EA Nord',
+  );
+  await expect(page.getByText('nicht übernommen')).toHaveCount(0);
+});

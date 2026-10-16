@@ -229,3 +229,48 @@ die Gliederung der Einheiten erscheinen. Eine Ablehnung MUST im Abschnitt stehen
 #### Scenario: Auflösen abgelehnt
 - **WHEN** der Server das Auflösen ablehnt
 - **THEN** bleibt die Ansicht stehen, und der Grund steht im Abschnitt „Einheit auflösen“
+
+### Requirement: Nicht übernommene Einheit übernehmen
+Die Ansicht einer nicht übernommenen Einheit SHALL im Paneel „Kopfdaten“ „nicht übernommen“
+zeigen und, mit Schreibrecht und Freigabe Einheiten, unter dem Kopf das Paneel „Übernahme“ mit
+„Übernehmen“ und „Abweisen“. „Übernehmen“ MUST Abschnitt und Über-Einheit optional abfragen
+(keine eigene Untereinheit, keine aufgelöste) und genau eine Übernahme senden. Ablehnungen MUST
+am Ort stehen, ohne Toast.
+
+#### Scenario: Übernehmen mit Abschnitt
+- **WHEN** eine Person mit Schreibrecht an einer nicht übernommenen Einheit „Übernehmen“ wählt, Abschnitt Nord setzt und bestätigt
+- **THEN** sendet die Ansicht genau eine Übernahme mit Abschnitt Nord, und danach zeigt die Ansicht weder das Wort noch die beiden Knöpfe
+
+#### Scenario: Über-Einheit ohne eigene Untereinheiten
+- **WHEN** jemand eine nicht übernommene Einheit mit einer Untereinheit übernimmt
+- **THEN** bietet „Über-Einheit“ weder die Einheit selbst noch ihre Untereinheit an
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** eine Person ohne Schreibrecht eine nicht übernommene Einheit öffnet
+- **THEN** zeigt die Ansicht „nicht übernommen“ ohne „Übernehmen“ und „Abweisen“
+
+### Requirement: Nicht übernommene Einheit abweisen
+„Abweisen“ an einer nicht übernommenen Einheit SHALL rot stehen, nur mit Freigabe Fahrzeuge, und
+MUST vor dem Senden mit „Einheit abweisen?“, einem Satz zur Folge und „Abweisen“ fragen; danach
+MUST die Gliederung erscheinen wie nach dem Auflösen.
+
+#### Scenario: Abweisen abgebrochen
+- **WHEN** jemand „Abweisen“ wählt und die Rückfrage abbricht
+- **THEN** wird nichts gesendet
+
+#### Scenario: Abgewiesen
+- **WHEN** jemand „Abweisen“ wählt und die Rückfrage mit „Abweisen“ bestätigt
+- **THEN** sendet die Ansicht genau eine Abweisung, und danach erscheint die Gliederung
+
+### Requirement: Übernahme an der Meldung
+Die Meldung des Eintreffens einer nicht übernommenen Einheit SHALL in der Meldungsliste
+„Übernehmen“ und „Abweisen“ tragen wie die Ansicht der Einheit; ohne Recht an Einheiten MUST dort
+nur ein Verweis auf die Einheit stehen.
+
+#### Scenario: Meldung mit Knöpfen
+- **WHEN** die Einsatzleitung die Meldung „FL-MUS 1-44-1 unangemeldet im BR Sportplatz eingetroffen …“ sieht
+- **THEN** trägt die Meldung „Übernehmen“ und „Abweisen“
+
+#### Scenario: Ohne Recht an Einheiten
+- **WHEN** eine Person ohne Recht an Einheiten dieselbe Meldung sieht
+- **THEN** trägt die Meldung nur den Verweis „↗ FL-MUS 1-44-1“

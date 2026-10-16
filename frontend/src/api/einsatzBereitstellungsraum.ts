@@ -6,6 +6,8 @@ import type {
   BrListenEintrag,
   BrStatus,
   BrVerlaufEintrag,
+  EintreffenEingabe,
+  EintreffenErgebnis,
   ObjektTyp,
   BrBelegungsArt,
 } from './types';
@@ -110,6 +112,23 @@ export function belegeBr(
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/belegung`,
+    'POST',
+    daten,
+  );
+}
+
+/**
+ * Eintreffen buchen (LLH-1075, design.md D1): eine bekannte Kraft (`kraft`) oder eine
+ * unangemeldete (`unangemeldet`), genau eines von beiden. Eintritt, Zeitachse, ETB und bei einer
+ * unangemeldeten Kraft die Meldung an die Einsatzleitung entstehen beim Server in einem Schritt.
+ */
+export function bucheEintreffen(
+  einsatzId: number,
+  brId: number,
+  daten: EintreffenEingabe,
+): Promise<EintreffenErgebnis> {
+  return apiSend<EintreffenErgebnis>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/eintreffen`,
     'POST',
     daten,
   );

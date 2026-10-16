@@ -40,6 +40,8 @@ export interface GliederungZeile {
   abschnitt: string | null;
   /** Funkrufnamen der Fahrzeuge der Einheit, natürlich sortiert. */
   fahrzeuge: string[];
+  /** Unangemeldet eingetroffen, noch nicht übernommen (LLH-1075). */
+  isNichtUebernommen: boolean;
   children?: GliederungZeile[];
 }
 
@@ -77,6 +79,7 @@ export function buildEinheitenGliederung(
       fahrzeuge: (x.fahrzeug_mitglieder ?? [])
         .map((f) => f.funkrufname)
         .sort((a, b) => COLLATOR.compare(a, b)),
+      isNichtUebernommen: x.nicht_uebernommen_seit != null,
       ...(kinder.length > 0 ? { children: kinder } : {}),
     };
   };

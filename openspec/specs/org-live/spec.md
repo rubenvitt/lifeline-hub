@@ -76,9 +76,9 @@ angemeldeten Abonnenten der Organisation erreichen und keinen anderer Organisati
 
 Stammdaten-Kataloge im Sinne dieser Anforderung sind Fahrzeuge, Fahrzeug-Status, Personal,
 Personal-Status, Material, Material-Kategorien, Qualifikationen, Einheit-Typen, Einheiten-Vorlagen,
-Sprechgruppen der Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen, externe
-Stellen und die Organisation selbst (Name, Logo). Import, Neu-Import und Entfernen der Demo-Daten
-MUST `stammdaten` ebenfalls auslösen.
+der Verpflegungsplan, Sprechgruppen der Organisation, ETB-Bausteine, Stichwort-Vorschläge,
+Führungsfunktionen, externe Stellen und die Organisation selbst (Name, Logo). Import, Neu-Import
+und Entfernen der Demo-Daten MUST `stammdaten` ebenfalls auslösen.
 
 #### Scenario: Fahrzeug außer Dienst
 - **WHEN** der System-Admin auf Schirm A ein Fahrzeug außer Dienst stellt und Schirm B derselben Organisation eine Fahrzeugauswahl offen hat

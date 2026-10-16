@@ -113,6 +113,11 @@ fn backend() -> BTreeMap<&'static str, usize> {
             verpflegung::STELLEN_JE_ZEITFENSTER_MAX,
         ),
         (
+            "VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX",
+            verpflegung::vorlage::BEZEICHNUNG_MAX,
+        ),
+        ("VERPFLEGUNG_AUS_VORLAGE_MAX", verpflegung::AUS_VORLAGE_MAX),
+        (
             "VERPFLEGUNG_EP_MAX",
             usize::try_from(verpflegung::MAX_EP).unwrap(),
         ),
