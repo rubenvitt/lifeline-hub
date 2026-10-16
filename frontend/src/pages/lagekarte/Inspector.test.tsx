@@ -710,4 +710,25 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
     expect(kachel.querySelector('img')).toBeNull();
     expect(kachel).toHaveTextContent('TZ');
   });
+
+  it('lässt die Kachel eines freien Zeichens ohne Bild, die zeigt der FreiesZeichenInspector', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={{
+          ...marker,
+          schluessel: 'freies_zeichen-7',
+          typ: 'freies_zeichen',
+          id: 7,
+          tz: undefined,
+          freiesZeichen: { grundzeichen: 'stelle', symbol: 'sammeln' },
+        }}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    const kachel = document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"]')!;
+    expect(kachel.querySelector('img')).toBeNull();
+  });
 });
