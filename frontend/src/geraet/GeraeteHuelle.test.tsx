@@ -765,6 +765,9 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     expect(screen.getByRole('link', { name: /^Ausgabe öffnen zu Mittag/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Ausgabe nachtragen zu Mittag/ })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Zeitfenster anlegen' })).toBeNull();
+    // Kein Tag aus der Vorlage am Gerät (LLH-1058), auch nicht gesperrt.
+    expect(screen.queryByRole('link', { name: /Tag aus Vorlage/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tag aus Vorlage|^Weitere/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bedarf bearbeiten/ })).toBeNull();
     // Kein Dreipunkt-Menü, in dem Planen stecken könnte.
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();

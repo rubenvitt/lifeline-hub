@@ -46,7 +46,11 @@ import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useVorgemerkteAusgaben, type VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
-import { geraetMeldungenPfad, nachforderungenPfad } from '../routing/deeplinks';
+import {
+  geraetMeldungenPfad,
+  nachforderungenPfad,
+  verpflegungAusVorlagePfad,
+} from '../routing/deeplinks';
 import {
   AusgabeDialog,
   LoeschenDialog,
@@ -404,6 +408,28 @@ export default function VerpflegungPage() {
         )
       }
       neueZeile={darfSchreiben && planen ? oeffneAnlegen : undefined}
+      // Nebenweg „Tag aus Vorlage anlegen“ (LLH-1058): öffnet die Seite des Tages; ohne
+      // Schreibrecht gesperrt mit Grund, am Gerät (kein Planen) gar nicht.
+      weitere={{
+        name: 'Weitere Aktionen zur Verpflegung',
+        eintraege: planen
+          ? [
+              darfSchreiben
+                ? {
+                    key: 'aus-vorlage',
+                    label: 'Tag aus Vorlage anlegen',
+                    ziel: verpflegungAusVorlagePfad(einsatzId),
+                    onWahl: () => void navigate(verpflegungAusVorlagePfad(einsatzId)),
+                  }
+                : {
+                    key: 'aus-vorlage',
+                    label: `Tag aus Vorlage anlegen (${verpflegungRechteText(einsatz.status)})`,
+                    onWahl: () => {},
+                    gesperrt: true,
+                  },
+            ]
+          : [],
+      }}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (!darfSchreiben || ruecknahmeFehler != null) && (

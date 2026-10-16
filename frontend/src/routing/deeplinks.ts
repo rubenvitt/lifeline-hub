@@ -302,6 +302,27 @@ export function parseVerpflegungStelle(params: URLSearchParams): number | null {
   return parseRouteId(params.get('stelle') ?? undefined);
 }
 
+/**
+ * „Tag aus Vorlage anlegen“ (LLH-1058): Unterroute des Moduls, `modulAusPfad` gatet sie über das
+ * Segment `verpflegung`. `?tag=YYYY-MM-DD` ist der Kalendertag der Anzeigezone; ohne gilt heute.
+ */
+export function verpflegungAusVorlagePfad(einsatzId: number, opts: { tag?: string } = {}): string {
+  return mitQuery(`${verpflegungPfad(einsatzId)}/aus-vorlage`, { tag: opts.tag });
+}
+
+/** Der Kalendertag aus `?tag=`; alles, was kein gültiges Datum `YYYY-MM-DD` ist, wird verworfen. */
+export function parseVerpflegungTag(params: URLSearchParams): string | null {
+  const roh = params.get('tag');
+  const m = roh == null ? null : /^(\d{4})-(\d{2})-(\d{2})$/.exec(roh);
+  if (!m) return null;
+  const [jahr, monat, tag] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  // Über `Date.UTC` zurückgerechnet: der 30.02. wäre sonst der 02.03.
+  const d = new Date(Date.UTC(jahr, monat - 1, tag));
+  return d.getUTCFullYear() === jahr && d.getUTCMonth() === monat - 1 && d.getUTCDate() === tag
+    ? roh
+    : null;
+}
+
 /** Fachmodul „Wetter & Pegel": Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
 export function wetterPegelPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'wetter-pegel');
