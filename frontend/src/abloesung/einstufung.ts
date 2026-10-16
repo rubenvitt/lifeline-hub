@@ -28,7 +28,7 @@ export function abloesungZeit(wire: string | null | undefined): Dayjs | null {
  * Einstufung gegen `jetzt`. Eine unlesbare Fälligkeit gilt wie im Backend als überfällig:
  * sie soll auffallen, nicht verschwinden.
  */
-export function einstufungVon(faelligAt: string, jetzt: Dayjs): AbloesungEinstufung {
+export function computeEinstufung(faelligAt: string, jetzt: Dayjs): AbloesungEinstufung {
   const f = abloesungZeit(faelligAt);
   if (!f) return 'ueberfaellig';
   const abstand = f.valueOf() - jetzt.valueOf();
@@ -38,9 +38,9 @@ export function einstufungVon(faelligAt: string, jetzt: Dayjs): AbloesungEinstuf
 }
 
 /** Modulzähler: laufende Schichten in der Vorwarnzeit oder überfällig. */
-export function zaehleFaellige(abloesungen: readonly Abloesung[], jetzt: Dayjs): number {
+export function countFaellige(abloesungen: readonly Abloesung[], jetzt: Dayjs): number {
   return abloesungen.filter(
-    (a) => a.status === 'laufend' && einstufungVon(a.faellig_at, jetzt) !== 'planmaessig',
+    (a) => a.status === 'laufend' && computeEinstufung(a.faellig_at, jetzt) !== 'planmaessig',
   ).length;
 }
 

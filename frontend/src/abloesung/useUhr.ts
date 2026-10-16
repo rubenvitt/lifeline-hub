@@ -17,7 +17,7 @@ export function useUhr(intervallMs = 30_000): Dayjs {
 }
 
 /** Der nächste Zeitpunkt, an dem sich die Einstufung einer laufenden Schicht ändert. */
-export function naechsterWechsel(liste: readonly Abloesung[], jetzt: Dayjs): Dayjs | null {
+export function findNextChange(liste: readonly Abloesung[], jetzt: Dayjs): Dayjs | null {
   let naechster: Dayjs | null = null;
   for (const a of liste) {
     if (a.status !== 'laufend') continue;
@@ -48,7 +48,7 @@ export function useEinstufungsUhr(liste: readonly Abloesung[] | undefined): Dayj
   const jetzt = useMemo(() => dayjs(), [liste, takt]);
   useEffect(() => {
     if (!liste) return;
-    const wechsel = naechsterWechsel(liste, jetzt);
+    const wechsel = findNextChange(liste, jetzt);
     if (!wechsel) return;
     // +50 ms: der Wechsel soll sicher HINTER der Grenze gerechnet werden (≤ ist überfällig).
     const t = window.setTimeout(

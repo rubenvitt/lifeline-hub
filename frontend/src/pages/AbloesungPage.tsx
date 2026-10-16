@@ -25,7 +25,7 @@ import {
   VollzugDialog,
   type EinheitOption,
 } from '../abloesung/AbloesungDialoge';
-import { rhythmusText, zaehleFaellige } from '../abloesung/einstufung';
+import { rhythmusText, countFaellige } from '../abloesung/einstufung';
 import { useUhr } from '../abloesung/useUhr';
 import {
   eingeordnet,
@@ -333,7 +333,7 @@ export default function AbloesungPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const faellig = zaehleFaellige(laufende, jetzt);
+  const faellig = countFaellige(laufende, jetzt);
   const liste = ansicht === 'laufend' ? sichtbar : (abgeloestQuery.data ?? []);
   const bannerText = zuflussText(zurueckgehalten, jetzt, umgeordnet ? sichtbar : null);
   const listenQuery = ansicht === 'laufend' ? laufendQuery : abgeloestQuery;

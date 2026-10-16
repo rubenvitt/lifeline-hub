@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Abloesung } from '../api/types';
-import { naechsterWechsel, useEinstufungsUhr } from './useUhr';
+import { findNextChange, useEinstufungsUhr } from './useUhr';
 
 dayjs.extend(utc);
 
@@ -26,10 +26,10 @@ const schicht = (
   angelegt_at: '2026-09-22 09:00:00',
 });
 
-describe('naechsterWechsel (LFH-635)', () => {
+describe('findNextChange (LFH-635)', () => {
   it('nimmt die früheste künftige Grenze: Vorwarnbeginn oder Fälligkeit', () => {
     const jetzt = dayjs.utc('2026-09-22 15:10:00');
-    const w = naechsterWechsel(
+    const w = findNextChange(
       [schicht(1, '2026-09-22 15:30:00'), schicht(2, '2026-09-22 16:00:00')],
       jetzt,
     );
@@ -38,8 +38,8 @@ describe('naechsterWechsel (LFH-635)', () => {
   });
   it('steht ohne laufende Schicht oder künftige Grenze still', () => {
     const jetzt = dayjs.utc('2026-09-22 20:00:00');
-    expect(naechsterWechsel([schicht(1, '2026-09-22 15:30:00')], jetzt)).toBeNull();
-    expect(naechsterWechsel([schicht(1, '2026-09-22 21:30:00', 'abgeloest')], jetzt)).toBeNull();
+    expect(findNextChange([schicht(1, '2026-09-22 15:30:00')], jetzt)).toBeNull();
+    expect(findNextChange([schicht(1, '2026-09-22 21:30:00', 'abgeloest')], jetzt)).toBeNull();
   });
 });
 

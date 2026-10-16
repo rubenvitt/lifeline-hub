@@ -29,7 +29,7 @@
  */
 import type { Dayjs } from 'dayjs';
 import type { Abloesung, AbloesungEinstufung } from '../api/types';
-import { einstufungVon, zaehleFaellige } from './einstufung';
+import { computeEinstufung, countFaellige } from './einstufung';
 
 export interface Zuflussstand {
   /**
@@ -176,7 +176,7 @@ function faelligUntenGehalten(folge: readonly Abloesung[], jetzt: Dayjs): number
   let mildesteDarueber = Infinity;
   let n = 0;
   for (const s of folge) {
-    const stufe = DRINGLICHKEIT[einstufungVon(s.faellig_at, jetzt)];
+    const stufe = DRINGLICHKEIT[computeEinstufung(s.faellig_at, jetzt)];
     if (stufe > 0 && mildesteDarueber < stufe) n += 1;
     mildesteDarueber = Math.min(mildesteDarueber, stufe);
   }
@@ -197,7 +197,7 @@ export function zuflussText(
   const n = zurueckgehalten.length;
   if (n > 0) {
     const basis = n === 1 ? '1 neue Schicht' : `${n} neue Schichten`;
-    const faellig = zaehleFaellige(zurueckgehalten, jetzt);
+    const faellig = countFaellige(zurueckgehalten, jetzt);
     teile.push(faellig > 0 ? `${basis}, davon ${faellig} fällig` : basis);
   }
   if (umgeordnet) {
