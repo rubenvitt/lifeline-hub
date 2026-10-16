@@ -895,7 +895,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
  * `pages/LagekartePage.tsx` mit.
  */
-type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
+type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -905,6 +905,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   person: true,
   // Betreuungsstelle („Auf Karte verorten" der Betreuungsseite).
   betreuungsstelle: true,
+  // Bereitstellungsraum („Auf Karte verorten" der BR-Detailseite, LLH-1107).
+  bereitstellungsraum: true,
 };
 
 /**

@@ -1,5 +1,5 @@
 import type { Drawing } from '@einsatzzeichen/schema';
-import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
+import { bereitstellungsraumZeichen, fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import type { KarteMarker } from './marker';
 
@@ -11,6 +11,9 @@ type MitZeichen = Pick<KarteMarker, 'typ' | 'tz' | 'freiesZeichen'>;
  */
 export function markerZeichen(mk: MitZeichen): { schluessel: string; drawing: Drawing } | null {
   if (mk.typ === 'freies_zeichen') return mk.freiesZeichen ? freiesZeichen(mk.freiesZeichen) : null;
+  // Das Raumzeichen ist ein freistehendes Führungszeichen, kein Grundzeichen mit Merkmalen: es
+  // hängt am Typ (LLH-1107).
+  if (mk.typ === 'bereitstellungsraum') return bereitstellungsraumZeichen();
   return mk.tz ? fachobjektZeichen(mk.tz) : null;
 }
 
