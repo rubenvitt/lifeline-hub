@@ -590,6 +590,54 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
     expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
   });
 
+  it('die Vorwahl gilt beim Öffnen: eine neue Zuordnung bei offener Ansicht ändert die Wahl nicht', async () => {
+    liefert([mittagAnStellen([FELDKUECHE])], stellen());
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    await userEvent.click(taste('+5'));
+    liefert([mittagAnStellen([TURNHALLE, FELDKUECHE])], stellen());
+    await client.invalidateQueries();
+    await waitFor(() => expect(ladeVerpflegung).toHaveBeenCalledTimes(2));
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 5,
+        verpflegungsstelle_id: FELDKUECHE,
+      }),
+    );
+  });
+
+  it('die Vorwahl gilt beim Öffnen: fällt eine von zwei zugeordneten weg, bleibt „ohne Stelle“', async () => {
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('ohne Stelle');
+    liefert(
+      [mittagAnStellen()],
+      stellen().map((s) => (s.id === TURNHALLE ? { ...s, status: 'aufgeloest' as const } : s)),
+    );
+    await client.invalidateQueries();
+    await waitFor(() => expect(ladeVerpflegung).toHaveBeenCalledTimes(2));
+    await oeffne('Stelle');
+    await waitFor(() => expect(optionenVon('Stelle')).not.toContain('Ausgabe Turnhalle Nord'));
+    expect(gewaehlt()).toBe('ohne Stelle');
+  });
+
+  it('wird die gewählte Stelle bei offener Ansicht aufgelöst, fällt sie aus der Wahl', async () => {
+    liefert([mittagAnStellen([FELDKUECHE])], stellen());
+    const { client } = zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('Feldküche BR Sportplatz');
+    liefert(
+      [mittagAnStellen([FELDKUECHE])],
+      stellen().map((s) => (s.id === FELDKUECHE ? { ...s, status: 'aufgeloest' as const } : s)),
+    );
+    await client.invalidateQueries();
+    await waitFor(() => expect(gewaehlt()).toBe('ohne Stelle'));
+  });
+
   it('Speicher wirft: die Wahl wirkt trotzdem bis zum Verlassen', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new DOMException('gesperrt', 'SecurityError');

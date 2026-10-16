@@ -161,8 +161,6 @@ export default function AusgabeAnsicht() {
     () => (amDesktop ? liesGemerkteStelle(einsatzId) : null),
     [amDesktop, einsatzId],
   );
-  // `undefined`: noch nicht von Hand gewählt, dann gilt die Vorwahl.
-  const [handwahl, setHandwahl] = useState<number | null | undefined>(undefined);
   const ausKarte = parseVerpflegungStelle(suchParameter);
   const vorwahl = istWaehlbar(ausKarte)
     ? ausKarte
@@ -171,11 +169,20 @@ export default function AusgabeAnsicht() {
       : wahl.zugeordnet.length === 1
         ? wahl.zugeordnet[0].id
         : null;
+  // Die Vorwahl gilt beim Öffnen (D13 Punkt 7): einmal festgehalten, sobald Zeitfenster und
+  // Anmeldung (Gerät oder Desktop) geladen sind. Danach ändert nur eine Handlung die Wahl, keine
+  // Live-Änderung der Zuordnung; sonst wechselte die Stelle mitten im Zählen und
+  // `useAusgabeSammlung` buchte das Bündel ungefragt.
+  const wahlSchluessel = `${zfId}:${ausKarte ?? ''}`;
+  const [festeWahl, setFesteWahl] = useState<{ schluessel: string; stelle: number | null }>();
+  if (zf != null && benutzer != null && festeWahl?.schluessel !== wahlSchluessel) {
+    setFesteWahl({ schluessel: wahlSchluessel, stelle: vorwahl });
+  }
+  const festgehalten = festeWahl?.schluessel === wahlSchluessel ? festeWahl.stelle : null;
   // Eine inzwischen aufgelöste Stelle fällt aus der Wahl.
-  const gewaehlteStelle =
-    handwahl === undefined ? vorwahl : istWaehlbar(handwahl) ? handwahl : null;
+  const gewaehlteStelle = istWaehlbar(festgehalten) ? festgehalten : null;
   const waehleStelle = (sid: number | null) => {
-    setHandwahl(sid);
+    setFesteWahl({ schluessel: wahlSchluessel, stelle: sid });
     if (amDesktop) merkeStelle(einsatzId, sid);
   };
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
