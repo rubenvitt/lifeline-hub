@@ -1,14 +1,15 @@
 //! Uhrzeit ohne Datum und ohne Zone (LLH-1058, design.md D2): eine Wanduhrzeit `HH:MM` wie der
 //! Beginn einer Mahlzeit im Verpflegungsplan („Frühstück 06:30“). Erst das Anwenden auf einen
-//! Kalendertag macht daraus einen Zeitpunkt, und das geschieht in der Anzeigezone im Client
-//! (Spec `zeiteingabe`, „Uhrzeit ohne Datum“), nicht hier.
+//! Kalendertag macht daraus einen Zeitpunkt, und das geschieht in der Anzeigezone im Client, nicht
+//! hier. Das Format legt `openspec/specs/kraefte-verpflegung/spec.md`, „Verpflegungsplan der
+//! Organisation“, fest; die Regel für den Client (Spec `zeiteingabe`) kommt mit LLH-1058 Teil II.
 //!
 //! Bewusst getrennt von [`crate::zeit`]: dort gilt das eine Zeitformat für Zeitpunkte (UTC,
 //! sekundengenau). Eine Uhrzeit ist kein Zeitpunkt. Gespeichert und gesendet wird `HH:MM`; als
 //! Text sortiert das richtig, die Ordnung des Typs ist dieselbe.
 //!
 //! Gelesen werden „HH:MM“ und die Stab-Schreibweise „HHMM“, getrimmt, von 00:00 bis 23:59. Die
-//! kurzen Formen „HMM“ und „H:MM“ ergänzt erst die Maske (`frontend/src/anzeige/uhrzeit.ts`) zu
+//! kurzen Formen „HMM“ und „H:MM“ ergänzt erst die Maske des Clients (LLH-1058 Teil II) zu
 //! „HH:MM“; der Server nimmt nur, was die Maske sendet.
 
 use std::fmt;
