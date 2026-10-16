@@ -258,3 +258,38 @@ ETB-Einträge MAY je Fahrzeug geschrieben werden.
 #### Scenario: Dubletten
 - **WHEN** beim Übernehmen dieselbe Person zweimal genannt wird
 - **THEN** sitzt sie einmal auf dem Fahrzeug, und der ETB-Eintrag nennt sie einmal
+
+### Requirement: Freitexte und Stellenlisten der Verpflegung sind begrenzt
+Die Bezeichnung eines Verpflegungszeitfensters und einer Verpflegungsstelle MUST höchstens 200
+Zeichen lang sein, der Standort einer Stelle und der Ort einer Ausgabe höchstens 500, die
+Bemerkung einer Ausgabe höchstens 2 000, jeweils nach dem Trimmen, sonst 400. Die Liste der
+Stellen eines Zeitfensters MUST entdoppelt werden und darf höchstens 20 Einträge haben, gezählt
+vor dem Entdoppeln; eine längere Liste MUST mit 400 abgelehnt werden, bevor etwas geschrieben
+wird. Prüfen und Schreiben der Stellenliste MUST eine von ihrer Länge unabhängige Zahl von
+Datenbankanweisungen brauchen. Diese Prüfungen MUST vor jeder Prüfung des Zusammenhangs (422)
+laufen; beim Erfassen einer Ausgabe MUST das Replay über `client_id` vor der Grenzprüfung laufen.
+Gespeicherte Werte über der Grenze MUST lesbar bleiben.
+
+#### Scenario: Zu langer Standort
+- **WHEN** eine Verpflegungsstelle mit einem Standort von 501 Zeichen angelegt wird
+- **THEN** antwortet der Server mit 400 und legt nichts an
+
+#### Scenario: Zu langer Ort einer Ausgabe
+- **WHEN** eine Ausgabe mit einem Ort von 501 Zeichen erfasst wird
+- **THEN** antwortet der Server mit 400 und legt nichts an
+
+#### Scenario: Doppelte Stellen
+- **WHEN** ein Zeitfenster mit der Stellenliste `[3, 3, 4]` angelegt wird
+- **THEN** ist das Zeitfenster genau den Stellen 3 und 4 zugeordnet
+
+#### Scenario: Zu lange Stellenliste
+- **WHEN** ein Zeitfenster mit 21 Einträgen in der Stellenliste geändert wird
+- **THEN** antwortet der Server mit 400, und weder Zeitfenster noch Zuordnung ändern sich
+
+#### Scenario: Volle Stellenliste
+- **WHEN** einem Zeitfenster 20 Stellen zugeordnet werden
+- **THEN** braucht die Zuordnung nicht mehr Anweisungen als bei einer Stelle
+
+#### Scenario: Replay einer alten Ausgabe mit langem Ort
+- **WHEN** eine Ausgabe mit einem Ort von 600 Zeichen vor Einführung der Grenze gespeichert wurde und dieselbe Ausgabe mit ihrer `client_id` erneut eintrifft
+- **THEN** antwortet der Server mit 201 und der gespeicherten Ausgabe, nicht mit 400

@@ -23,14 +23,22 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Zeitpunkt der vorgemerkten Kopie: LFH-705, Regel in `offline/AGENTS.md`, „Schreiben ohne Netz“.
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
-  der EP; Ausgabe verweist nur per `nachforderung_id`; Einstufung im Client
-  (`verpflegung/deckung.ts`); ins ETB nur Zeitfenster und Bedarf (Org-Zeitzone); kein Modulzähler.
+  der EP; Ausgabe verweist nur per `nachforderung_id` und `verpflegungsstelle_id`; Einstufung im
+  Client (`verpflegung/deckung.ts`); ins ETB nur Zeitfenster und Bedarf (Org-Zeitzone), dazu Art
+  und Stellen des Zeitfensters und Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler.
+  **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
+  (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe), Zuordnung zum Zeitfenster
+  n:m (`stelle_ids`), **Soll nur am Zeitfenster**, Ist je Stelle (`je_stelle`) nur vom Server
+  (`deckung::rechne`), der Client rechnet nichts nach; keine eigene Leseroute, `stellen[]` kommt
+  mit `GET …/verpflegung` (`einsatzKeys.verpflegung`).
 - **Ausgaben offline** (LFH-688, `openspec/changes/archive/2026-10-01-lfh-688-verpflegung-ausgaben-offline/design.md`):
   `offline/schreiben.ts` (`ausgabe`) mit `client_id`; Replay-Lookup **vor** `fordere_aktiv`
   (`EinsatzSchreibfreigabe`), fremdes Zeitfenster 422, Replay ohne Live; Erfassungszeit nur an der
   vorgemerkten Kopie; vorgemerkte Ausgaben stehen als „ausstehend“ an der Karte
   (`useVorgemerkteAusgaben`) und zählen **nie** in die Deckung; der Sync schreibt das bestätigte
-  Zeitfenster vor dem Entfernen der Zeile in den Cache.
+  Zeitfenster vor dem Entfernen der Zeile in den Cache. Stelle (LLH-1040): eine aufgelöste Stelle
+  nimmt Ausgaben mit einem Zeitpunkt **vor** der Auflösung an (sonst 409); Stellenprüfung und
+  Grenzprüfung (`ort`, `bemerkung`) laufen **nach** dem Replay-Lookup.
 - **Versorgung S4** (LFH-553, Entscheidung 30.09.2026,
   `openspec/changes/archive/2026-09-30-lfh-553-versorgung-abgrenzung/design.md`, Spec
   `stab-versorgung`): kein Modul „Versorgung“, keine Tabelle `versorgungsposten`. Träger:
