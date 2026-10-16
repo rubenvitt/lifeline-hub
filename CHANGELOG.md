@@ -1,3 +1,26 @@
+## [1.0.0-alpha.133](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.132...v1.0.0-alpha.133) (2026-10-16)
+
+### Verpflegung
+
+- **Neue Ansicht „Stellen“:** Das Verpflegungsmodul hat neben „aktuell“ und „vergangen“ eine dritte Ansicht für Verpflegungsstellen, zum Beispiel Feldküche, Ausgabestelle oder Zuführung. Dort legen Sie Stellen mit Bezeichnung, Art, Standort und optional einem Abschnitt an und bearbeiten sie. Die Zahl an der Ansicht zählt aufgelöste Stellen nicht mit.
+- **Status als Klartext:** Jede Stelle ist „geplant“, „aktiv“ oder „aufgelöst“. Welche Aktionen eine Stelle anbietet, hängt von ihrem Status ab, zum Beispiel „in Betrieb nehmen“, „auflösen“ oder „stornieren“. Vor dem Auflösen und Stornieren kommt eine deutlich rot markierte Rückfrage. Die Liste zeigt zu jeder Stelle das laufende Zeitfenster und die dort bereits ausgegebene Menge.
+- **Zeitfenster mit Art und Stellen:** Im Zeitfensterdialog gibt es einen aufklappbaren Bereich „Art und Stellen“. Dort legen Sie die Verpflegungsart fest und ordnen dem Zeitfenster Stellen zu. Die Zeitfensterkarte zeigt die Verpflegungsart. Sobald an Stellen ausgegeben wurde, zeigt sie auch, wie viel an welcher Stelle ausgegeben wurde, einschließlich aufgelöster, nicht zugeordneter und Ausgaben ohne Stelle.
+- **Direkt zur Ausgabe einer Stelle:** Auf breiteren Bildschirmen öffnet „Ausgabe öffnen“ an der Zeile einer Stelle die Ausgabeansicht mit dieser Stelle bereits ausgewählt. Das gilt auch am Tablet.
+- **Stelle beim Zählen auswählen:** In der Ausgabeansicht wählen Sie die Verpflegungsstelle aus. Zugeordnete Stellen stehen oben, aufgelöste werden nicht angeboten. Angezeigt wird, wie viel an der gewählten Stelle bereits ausgegeben wurde. Die Vorauswahl kommt aus dem Sprung von der Karte. Gibt es dort keine, nimmt der Desktop die zuletzt gewählte Stelle des Einsatzes, sonst wird die einzige zugeordnete Stelle gewählt. Die Vorauswahl wird beim Öffnen festgelegt und ändert sich danach nicht mehr von selbst, auch nicht, wenn ein anderer Client das Zeitfenster umplant.
+- **Stellenwechsel beim Zählen:** Wechseln Sie mitten im Zählen die Stelle, werden die bis dahin gezählten Ausgaben noch an der bisherigen Stelle gebucht. Ausgaben, die ohne Netz vorgemerkt oder vom Server abgelehnt wurden, behalten ihre Stelle bis in den Wiederherstellungsbereich.
+- **Nachtragen mit Stelle:** Beim Nachtragen einer Ausgabe lässt sich die Stelle angeben. Das Feld „Ort“ heißt bei Zeitfenstern mit Stellen „Zuführungsziel“ und fällt weg, sobald eine Stelle gewählt ist. Ausgabelisten nennen statt des Orts die Stelle.
+- **Schmale Bildschirme:** Bei 390 px Breite und großen Bedienflächen (Handschuh-Betrieb) passte die Leiste mit den drei Ansichten und dem Hinweis „1 neu“ nicht mehr in eine Zeile, und der Hinweis wurde abgeschnitten. Auf schmalen Bildschirmen tragen deshalb „vergangen“ und „Stellen“ keine Zahl mehr, und der Abstand ist knapper. Jetzt passt alles vollständig in die Zeile.
+
+### Gekoppelte Geräte
+
+- Gekoppelte Geräte zeigen die Verpflegungsstellen nur an und bieten dort keine Aktionen. Beim Zählen lässt sich am Gerät eine Stelle wählen. Das Gerät merkt sich diese Wahl nicht.
+- Beim Abmelden wird die am Desktop gemerkte Stellenwahl mit gelöscht.
+
+### Dokumentation
+
+- Die Kapitel „Verpflegung“ und „Verpflegung am Gerät“ beschreiben die neuen Abläufe: Stellen anlegen und in Betrieb nehmen, Zeitfenstern zuordnen, Ausgaben je Stelle einsehen, Stellen auflösen oder stornieren sowie Zählen und Nachtragen mit Stelle. Hintergrundabschnitte erklären Status, Zuführungsziel, Verpflegungsart, Stellenwahl, Einträge im Einsatztagebuch, Rechte und die Arbeit ohne Netz.
+- „Was das Abmelden löscht“ nennt jetzt auch die gemerkte Verpflegungsstelle. Die Bilder zeigen jetzt Beispiele mit Verpflegungsstellen.
+
 ## [1.0.0-alpha.132](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.131...v1.0.0-alpha.132) (2026-10-16)
 
 ### Wichtige Änderungen
