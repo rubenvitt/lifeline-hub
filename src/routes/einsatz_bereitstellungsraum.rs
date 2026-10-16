@@ -1,24 +1,27 @@
 use crate::app::AppState;
+use crate::bereitstellungsraum::abruf::{self, AbrufDaten, Startwerte};
 use crate::bereitstellungsraum::belegung_repo;
 use crate::bereitstellungsraum::eintreffen::{
     self, EintreffenEingabe, EintreffenErgebnis, Gebucht, Rahmen,
 };
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{
-    BrAnzeige, BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
+    BrAbrufAufhebenEingabe, BrAbrufEingabe, BrAbrufErgebnis, BrAbrufKurz, BrAnzeige,
+    BrBelegungAnzeige, BrBelegungKennzahlen, BrStatus, BrVerlaufEintrag, ObjektTyp,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
-use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge};
+use crate::einsatz::modul::{Auftraege, Bereitstellungsraeume, Einheiten, Fahrzeuge};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    self, deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
+    self, deserialize_optional_field, hoechstens, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
+    trimme,
 };
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -55,6 +58,9 @@ pub struct BrEinheitKurz {
     pub nicht_uebernommen_seit: Option<String>,
     /// Herkunft „unangemeldet“, dauerhaft (D3).
     pub unangemeldet: bool,
+    /// Abruf, falls die Einheit abgerufen im Raum steht (LLH-1085, design.md D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abruf: Option<BrAbrufKurz>,
 }
 
 /// Aktives Fahrzeug einer Einheit im Raum.
@@ -72,6 +78,9 @@ pub struct BrFahrzeugKurz {
     /// Wie [`BrEinheitKurz::seit_at`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seit_at: Option<String>,
+    /// Wie [`BrEinheitKurz::abruf`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abruf: Option<BrAbrufKurz>,
 }
 
 /// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
@@ -145,6 +154,7 @@ pub(super) async fn sse_br_der_einheit(state: &AppState, einsatz_id: i64, einhei
 async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<BrDetail, AppError> {
     let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     let letzte = belegung_repo::letztes_je_objekt(&state.pool, einsatz_id, Some(br_id)).await?;
+    let mut abrufe = belegung_repo::abruf_je_objekt(&state.pool, einsatz_id, Some(br_id)).await?;
     let seit = |typ: ObjektTyp, id: i64| {
         letzte
             .iter()
@@ -184,6 +194,7 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
                 nicht_uebernommen_seit,
                 unangemeldet,
                 seit_at: seit(ObjektTyp::Einheit, id),
+                abruf: abrufe.remove(&(ObjektTyp::Einheit, id)),
                 fahrzeuge: einheit_fahrzeuge
                     .iter()
                     .filter(|(einheit, _, _)| *einheit == id)
@@ -209,6 +220,7 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
             id,
             funkrufname,
             seit_at: seit(ObjektTyp::Fahrzeug, id),
+            abruf: abrufe.remove(&(ObjektTyp::Fahrzeug, id)),
         })
         .collect();
     let belegung =
@@ -478,7 +490,7 @@ pub async fn belegung(
     let einsatz_id = ctx.einsatz.id;
     let notiz = trimme(body.notiz);
 
-    let event = belegung_repo::belege(
+    let belegt = belegung_repo::belege_mit_folgen(
         &state.pool,
         einsatz_id,
         br_id,
@@ -489,11 +501,24 @@ pub async fn belegung(
         ctx.benutzer.id,
     )
     .await?;
+    let event = belegt.ereignis;
 
-    // ETB-Spur (nicht pseudonym): Objektname laden und ETB schreiben.
+    // ETB-Spur (nicht pseudonym): Objektname laden und ETB schreiben. Ein Austritt nach einem
+    // Abruf ist das Ausrücken und nennt dessen Ziel und den mit ausgetretenen Verband (LLH-1085,
+    // design.md D8/D12).
     let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
-    if let Some(etb_text) =
-        belegungs_etb_text(&state.pool, einsatz_id, &br.bezeichnung, &event).await?
+    let mitgenommen: Vec<String> = belegt.mitgenommen.iter().map(|(_, n)| n.clone()).collect();
+    if let Some(etb_text) = belegungs_etb_text(
+        &state.pool,
+        einsatz_id,
+        &br.bezeichnung,
+        &event,
+        belegt
+            .vorher_abruf
+            .as_ref()
+            .map(|a| (a.ziel_anzeige.as_deref(), &mitgenommen[..])),
+    )
+    .await?
     {
         super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &etb_text).await;
     }
@@ -511,7 +536,246 @@ pub async fn belegung(
             .to_string();
         state.live.publiziere_event(einsatz_id, ev, data);
     }
+    for (einheit_id, _) in &belegt.mitgenommen {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, *einheit_id);
+    }
     Ok((StatusCode::CREATED, Json(event)))
+}
+
+/// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf — eine Kraft aus dem Raum abrufen,
+/// optional mit Ziel-Abschnitt (Unterstellung) und Auftrag, auf Wunsch gleich ausgerückt (LLH-1085,
+/// design.md D2, D6–D11, D15). Belegung, Unterstellung, Auftrag samt Anordnung und genau ein
+/// ETB-Eintrag entstehen in EINER Transaktion. Das BR-Gerät erreicht die Route nicht (fehlt in
+/// seiner Routenliste, D2).
+pub async fn abruf(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<BrAbrufEingabe>,
+) -> Result<(StatusCode, Json<BrAbrufErgebnis>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let auftrag_text = trimme(body.auftrag_text);
+    // Rechte der Zielmodule vor jedem Lesen (D7, Muster `meldung::auftrag_erteilen`).
+    if body.abschnitt_id.is_some() {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    if auftrag_text.is_some() {
+        ctx.fordere_zielmodul::<Auftraege>(&state.pool).await?;
+    }
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    // Felder für sich (400).
+    let typ = parse_enum(ObjektTyp::parse, &body.objekt_typ, "Unbekannter objekt_typ")?;
+    if let Some(text) = auftrag_text.as_deref() {
+        hoechstens(text, "Auftragstext", crate::auftrag::AUFTRAG_TEXT_MAX)?;
+    }
+    // Kraft und Abschnitt im Einsatz (404) vor dem Validator: dessen Empfängerprüfung meldete eine
+    // fremde Kraft als 400 (D6).
+    check_kraft_im_einsatz(&state.pool, einsatz_id, typ, body.objekt_id).await?;
+    let abschnitt = match body.abschnitt_id {
+        Some(abschnitt_id) => {
+            let name: String = sqlx::query_scalar(
+                "SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(abschnitt_id)
+            .bind(einsatz_id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+            Some((abschnitt_id, name))
+        }
+        None => None,
+    };
+    if typ == ObjektTyp::Fahrzeug && abschnitt.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Ein Fahrzeug ohne Einheit hat keine Unterstellung; Abruf ohne Abschnitt".into(),
+        ));
+    }
+
+    // Auftrag über die gemeinsame Validierung mit der Vorgabefrist der direkten Erfassung (D9).
+    let now = crate::zeit::jetzt();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+    let validiert = match auftrag_text {
+        Some(text) => {
+            let (einheit_id, fahrzeug_id) = match typ {
+                ObjektTyp::Einheit => (Some(body.objekt_id), None),
+                ObjektTyp::Fahrzeug => (None, Some(body.objekt_id)),
+            };
+            let neu = crate::auftrag::NeuerAuftrag {
+                auftrag_text: text,
+                absicht: None,
+                lage: None,
+                ort: abschnitt.as_ref().map(|(_, name)| name.clone()),
+                zeit: None,
+                mittel: None,
+                verbindung: None,
+                sicherheit: None,
+                weg: None,
+                prioritaet: None,
+                richtung: None,
+                frist_at: None,
+                erteilt_at: None,
+                empfaenger: vec![crate::auftrag::EmpfaengerEingabeReq {
+                    empfaenger_typ: typ.as_str().into(),
+                    abschnitt_id: None,
+                    einheit_id,
+                    person_id: None,
+                    fahrzeug_id,
+                    funktion_text: None,
+                    funktion: None,
+                    extern_kategorie: None,
+                    extern_bezeichnung: None,
+                }],
+            };
+            let frist = crate::einsatz::effektiv::effektive_auftrag_quittierung_frist_min(
+                &einst, &org_einst,
+            );
+            Some(
+                crate::auftrag::validate_neuer_auftrag(&state.pool, einsatz_id, &neu, &now, frist)
+                    .await?,
+            )
+        }
+        None => None,
+    };
+    let auftrag_daten = validiert.as_ref().map(|v| v.daten());
+    let daten = AbrufDaten {
+        objekt_typ: typ,
+        objekt_id: body.objekt_id,
+        abschnitt: abschnitt.as_ref().map(|(id, name)| (*id, name.as_str())),
+        auftrag: auftrag_daten.as_ref(),
+        ausgerueckt: body.ausgerueckt,
+    };
+    let startwerte = Startwerte {
+        auftrag: einst.auftrag_startwert(),
+        etb: einst.etb_startwert(),
+        auto_etb: crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
+    };
+    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis =
+            abruf::abruf_tx(conn, einsatz_id, br_id, &daten, startwerte, ctx.benutzer.id).await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwerte.etb,
+            &ergebnis.etb_text(),
+        )
+        .await?;
+        Ok((ergebnis, etb_id))
+    })?;
+
+    // Live nach dem Commit (D15).
+    state.live.publiziere(einsatz_id, etb_id);
+    sse_br(&state, einsatz_id, br_id);
+    sse_kraefte(
+        &state,
+        einsatz_id,
+        typ,
+        body.objekt_id,
+        &ergebnis.mitgenommen,
+    );
+    if let Some(auftrag_id) = ergebnis.auftrag_id {
+        crate::auftrag::nach_erteilung(&state, einsatz_id, auftrag_id, ctx.benutzer.id, &now)
+            .await?;
+    }
+    let abruf = belegung_repo::laden(&state.pool, einsatz_id, ergebnis.abruf_id).await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(BrAbrufErgebnis {
+            abruf,
+            mitgenommen: ergebnis.mitgenommen.iter().map(|(id, _)| *id).collect(),
+            auftrag_id: ergebnis.auftrag_id,
+            auftrag_nr: ergebnis.auftrag_nr,
+        }),
+    ))
+}
+
+/// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf/aufheben — einen Abruf
+/// zurücknehmen, samt der mit abgerufenen Untereinheiten (LLH-1085, design.md D13). Unterstellung
+/// und Auftrag bleiben, darum nur das BR-Schreibrecht (D7). Ereignisse und ETB in EINER
+/// Transaktion.
+pub async fn abruf_aufheben(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<BrAbrufAufhebenEingabe>,
+) -> Result<Json<BrBelegungAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let typ = parse_enum(ObjektTyp::parse, &body.objekt_typ, "Unbekannter objekt_typ")?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = abruf::aufheben_tx(
+            conn,
+            einsatz_id,
+            br_id,
+            typ,
+            body.objekt_id,
+            ctx.benutzer.id,
+        )
+        .await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &ergebnis.etb_text(),
+        )
+        .await?;
+        Ok((ergebnis, etb_id))
+    })?;
+    state.live.publiziere(einsatz_id, etb_id);
+    sse_br(&state, einsatz_id, br_id);
+    sse_kraefte(
+        &state,
+        einsatz_id,
+        typ,
+        body.objekt_id,
+        &ergebnis.mitgenommen,
+    );
+    Ok(Json(
+        belegung_repo::laden(&state.pool, einsatz_id, ergebnis.ereignis_id).await?,
+    ))
+}
+
+/// Live `einheit` je betroffener Einheit bzw. `fahrzeug` für ein einheitenloses Fahrzeug
+/// (LLH-1085, design.md D15).
+fn sse_kraefte(
+    state: &AppState,
+    einsatz_id: i64,
+    typ: ObjektTyp,
+    objekt_id: i64,
+    mitgenommen: &[(i64, String)],
+) {
+    match typ {
+        ObjektTyp::Einheit => super::einsatz_einheit::sse_einheit(state, einsatz_id, objekt_id),
+        ObjektTyp::Fahrzeug => super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, objekt_id),
+    }
+    for (einheit_id, _) in mitgenommen {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, *einheit_id);
+    }
+}
+
+/// Kraft gehört zum Einsatz, sonst 404 (D6); aufgelöst, entlassen und „im Raum“ prüft die
+/// Transaktion.
+async fn check_kraft_im_einsatz(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    typ: ObjektTyp,
+    objekt_id: i64,
+) -> Result<(), AppError> {
+    let sql = match typ {
+        ObjektTyp::Einheit => "SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        ObjektTyp::Fahrzeug => "SELECT 1 FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    };
+    sqlx::query_scalar::<_, i64>(sql)
+        .bind(objekt_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(())
 }
 
 /// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen — eine bekannte Kraft oder
@@ -643,11 +907,14 @@ async fn notify_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppErro
 }
 
 /// Erstellt den ETB-Text für ein Belegungs-Event mit realem Objektnamen.
+/// `ausgerueckt`: bei einem Austritt nach einem Abruf dessen Ziel und die mit ausgetretenen
+/// Untereinheiten (LLH-1085, design.md D8).
 async fn belegungs_etb_text(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     br_bezeichnung: &str,
     event: &BrBelegungAnzeige,
+    ausgerueckt: Option<(Option<&str>, &[String])>,
 ) -> Result<Option<String>, AppError> {
     // `belege()` hat die Objekt-Existenz bereits geprüft; ein fehlender Name
     // wäre ein inkonsistenter Zustand → NotFound statt leerer ETB-Text.
@@ -677,10 +944,18 @@ async fn belegungs_etb_text(
             "{} wechselt zu Bereitstellungsraum {}",
             obj_name, br_bezeichnung
         ),
-        "austritt" => format!(
-            "{} verlässt Bereitstellungsraum {}",
-            obj_name, br_bezeichnung
-        ),
+        "austritt" => match ausgerueckt {
+            Some((ziel, mitgenommen)) => crate::bereitstellungsraum::etb_text_ausgerueckt(
+                &obj_name,
+                mitgenommen,
+                br_bezeichnung,
+                ziel,
+            ),
+            None => format!(
+                "{} verlässt Bereitstellungsraum {}",
+                obj_name, br_bezeichnung
+            ),
+        },
         _ => return Ok(None),
     };
     Ok(Some(text))
