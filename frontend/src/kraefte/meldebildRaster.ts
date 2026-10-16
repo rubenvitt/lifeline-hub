@@ -170,6 +170,11 @@ export interface RasterZeile {
    * (D6, LLH-1225 D14; tönt die Zeile).
    */
   materialAusfall: number;
+  /**
+   * Nur Einheitenzeilen: unangemeldet eingetroffen, von der Führung noch nicht übernommen
+   * (LLH-1075, `NichtUebernommenMarke`).
+   */
+  nichtUebernommen: boolean;
   children?: RasterZeile[];
 }
 
@@ -371,6 +376,7 @@ const LEER: Omit<RasterZeile, 'key' | 'art' | 'bezeichnung' | 'zusatz' | 'status
   person: null,
   gruppe: null,
   materialAusfall: 0,
+  nichtUebernommen: false,
 };
 
 function personZeile(x: PersonImBaum): RasterZeile {
@@ -547,6 +553,7 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
         organisation: x.tz_organisation ?? null,
       },
       materialAusfall: k.mittel.materialAusfall,
+      nichtUebernommen: x.nicht_uebernommen_seit != null,
       children: kinder.length > 0 ? kinder : undefined,
     };
   };

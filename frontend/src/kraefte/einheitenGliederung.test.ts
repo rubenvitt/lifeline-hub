@@ -207,6 +207,20 @@ describe('buildEinheitenGliederung (LLH-1029)', () => {
  * das Meldebild. Mit Mitteln, damit das Meldebild seine Fahrzeug- und Personenzeilen dazwischen
  * schiebt und nur der Vergleich über die Einheitenzeilen trägt.
  */
+describe('Kennzeichen „nicht übernommen“ in der Einheitenliste (LLH-1075)', () => {
+  it('trägt die offene Übernahme, eine übernommene Einheit nicht', () => {
+    const [offen, uebernommen] = buildEinheitenGliederung(
+      [
+        eh(1, null, null, { nicht_uebernommen_seit: '2026-10-16T12:00:00Z' }),
+        eh(2, null, null, { unangemeldet: true }),
+      ],
+      [],
+    );
+    expect(offen.nichtUebernommen).toBe(true);
+    expect(uebernommen.nichtUebernommen).toBe(false);
+  });
+});
+
 describe('Einheiten-Gliederung und Meldebild: gleiche Knotenfolge', () => {
   /** Einheit-Knoten mit Tiefe in Baumfolge, nur echte Einheiten (ohne „Ohne Einheit“). */
   const meldebildEinheiten = (zeilen: readonly RasterZeile[], tiefe = 0): [string, number][] =>

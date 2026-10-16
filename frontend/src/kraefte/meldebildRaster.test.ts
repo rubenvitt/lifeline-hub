@@ -331,6 +331,22 @@ describe('baueMeldebildRaster', () => {
 
 // ── Kräftebaum (LLH-1025) ───────────────────────────────────────────────────
 
+describe('Kennzeichen „nicht übernommen“ (LLH-1075, design.md D14)', () => {
+  it('eine Einheit mit offener Übernahme trägt es, eine übernommene nicht', () => {
+    const raster = baueMeldebildRaster(
+      eingabe({
+        einheiten: [
+          eh(1, null, null, { nicht_uebernommen_seit: '2026-10-16T12:00:00Z', unangemeldet: true }),
+          eh(2, null, null, { unangemeldet: true }),
+        ],
+      }),
+    );
+    const je = new Map(alleZeilen(raster).map((z) => [z.key, z.nichtUebernommen]));
+    expect(je.get('eh-1')).toBe(true);
+    expect(je.get('eh-2')).toBe(false);
+  });
+});
+
 describe('Raster als Kräftebaum', () => {
   /** Zug 1/1/2 mit zwei Gruppen je 0/1/8. */
   const zugMitGruppen = () => {

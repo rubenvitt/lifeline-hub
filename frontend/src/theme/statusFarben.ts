@@ -306,6 +306,13 @@ export const einheitStaerkeUrteil: Record<EinheitStaerkeUrteil, StatusDarstellun
   unterbesetzt: { rolle: 'achtung', label: 'unterbesetzt' },
 };
 
+/**
+ * Offene Übernahme einer unangemeldet eingetroffenen Einheit (LLH-1075, design.md D14):
+ * Führungshinweis, keine Gefahr, darum `achtung`. Eine einzelne Darstellung, keine Karte über
+ * einem Enum; `kraefte/NichtUebernommenMarke.tsx` zeichnet sie.
+ */
+export const uebernahmeOffen: StatusDarstellung = { rolle: 'achtung', label: 'nicht übernommen' };
+
 /** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },

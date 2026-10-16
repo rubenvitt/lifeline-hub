@@ -81,6 +81,7 @@ import {
 import { ordnungsschluessel, seitText, wartezeitMinuten } from './brBelegungKern';
 import BrVerlauf from './BrVerlauf';
 import EintreffenDialog from './EintreffenDialog';
+import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUebernommenMarke';
 import dayjs from 'dayjs';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
@@ -651,6 +652,12 @@ export default function BrDetailPage() {
                 >
                   <Space wrap>
                     <span>{e.name}</span>
+                    {/* Herkunft (LLH-1075): offen „nicht übernommen“, danach neutral. */}
+                    {e.nicht_uebernommen_seit != null ? (
+                      <NichtUebernommenMarke />
+                    ) : (
+                      e.unangemeldet && <UnangemeldetMarke />
+                    )}
                     {einheitVon.get(e.id)?.typ_label && (
                       <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>
                     )}

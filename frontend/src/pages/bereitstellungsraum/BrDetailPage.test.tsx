@@ -1929,3 +1929,45 @@ describe('BrDetailPage — „Eintreffen buchen“ im Kopf (LLH-1075, design.md 
     expect(await screen.findByRole('button', { name: 'Eintreffen buchen' })).toBeEnabled();
   });
 });
+
+describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D14)', () => {
+  it('offen „nicht übernommen“, nach der Übernahme neutral „unangemeldet“, angemeldet nichts', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+        HttpResponse.json(
+          brDetail({
+            einheiten: [
+              {
+                id: 10,
+                name: 'Florian Nachbar 3',
+                unangemeldet: true,
+                nicht_uebernommen_seit: '2026-10-16T12:00:00Z',
+              },
+              { id: 11, name: 'Florian Nachbar 4', unangemeldet: true },
+              { id: 12, name: 'Zug Nord' },
+            ],
+          }),
+        ),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+    renderBrDetail();
+    const zeile = async (name: string) =>
+      (await screen.findByText(name)).closest(
+        '[data-lfh="liste-eintrag"], li, .ant-space',
+      ) as HTMLElement;
+    const offen = await zeile('Florian Nachbar 3');
+    expect(within(offen).getByText('nicht übernommen')).toBeInTheDocument();
+    expect(within(offen).queryByText('unangemeldet')).toBeNull();
+    const uebernommen = await zeile('Florian Nachbar 4');
+    expect(within(uebernommen).getByText('unangemeldet').closest('.ant-tag')).not.toHaveAttribute(
+      'data-rolle',
+    );
+    expect(within(uebernommen).queryByText('nicht übernommen')).toBeNull();
+    const angemeldet = await zeile('Zug Nord');
+    expect(within(angemeldet).queryByText('unangemeldet')).toBeNull();
+    expect(within(angemeldet).queryByText('nicht übernommen')).toBeNull();
+  });
+});
