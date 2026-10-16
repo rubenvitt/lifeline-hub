@@ -11,10 +11,12 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::abloesung::repo::{self, AenderungEingabe, BeginnEingabe, Zeitachsenwirkung};
+use crate::abloesung::repo::{
+    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, Zeitachsenwirkung,
+};
 use crate::abloesung::{
-    AbloesungAnzeige, AbloesungStatus, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    RHYTHMUS_MAX_MINUTEN,
+    AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus, AbloesungVollzugAnzeige,
+    AbloesungVorgabeAnzeige, RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -23,6 +25,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support;
+use crate::schichtmodell::WerteBody;
 use crate::zeit::jetzt;
 
 /// Listen-Refresh für Ablösungs-Leser. Ohne `art` — nur der Scheduler setzt `art` und löst
@@ -274,6 +277,75 @@ pub async fn vorgabe_setzen(
         publiziere(&state, einsatz_id, etb_id);
     }
     Ok(Json(repo::vorgaben(&state.pool, einsatz_id).await?))
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/schichtmodell — Vorgabe des Einsatzes (LLH-1122).
+pub async fn read_einsatz_vorgabe(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+) -> Result<Json<AbloesungEinsatzVorgabeAnzeige>, AppError> {
+    Ok(Json(
+        repo::load_einsatz_vorgabe(&state.pool, ctx.einsatz.id).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetEinsatzVorgabe {
+    /// Kopie dieses Schichtmodells der Organisation.
+    #[serde(default)]
+    schichtmodell_id: Option<i64>,
+    /// Eigene Werte; `null` = Vorgabe entfernen. Tri-State, damit ein leerer Body nicht still
+    /// als „entfernen“ gelesen wird.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    schichtmodell: Option<Option<WerteBody>>,
+}
+
+impl SetEinsatzVorgabe {
+    /// Genau eine der beiden Angaben: keine → 400 (fehlender Pflichtwert), beide → 422
+    /// (Feld-Kombination). Die Werte prüft `WerteBody::pruefen` (400/422).
+    fn into_input(self) -> Result<EinsatzVorgabeInput, AppError> {
+        // Erst die Werte für sich (400), dann der Zusammenhang (422).
+        let werte = match self.schichtmodell {
+            Some(Some(w)) => Some(Some(w.check()?)),
+            Some(None) => Some(None),
+            None => None,
+        };
+        match (self.schichtmodell_id, werte) {
+            (None, None) => Err(AppError::Validation(
+                "schichtmodell_id oder schichtmodell fehlt (schichtmodell: null = entfernen)"
+                    .into(),
+            )),
+            (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
+                "Entweder ein Schichtmodell der Organisation (schichtmodell_id) oder eigene Werte \
+                 (schichtmodell), nicht beides"
+                    .into(),
+            )),
+            (Some(id), None) => Ok(EinsatzVorgabeInput::AusStammdaten(id)),
+            (None, Some(None)) => Ok(EinsatzVorgabeInput::Entfernen),
+            (None, Some(Some(w))) => Ok(EinsatzVorgabeInput::Werte(w)),
+        }
+    }
+}
+
+/// PUT /api/einsaetze/{id}/abloesungen/schichtmodell — Vorgabe des Einsatzes setzen, aus den
+/// Stammdaten kopieren oder entfernen; Rechte wie die Abschnittsvorgabe. Laufende Schichten mit
+/// Quelle `einsatz` wandern mit (Repo).
+pub async fn set_einsatz_vorgabe(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Abloesung>,
+    JsonBody(req): JsonBody<SetEinsatzVorgabe>,
+) -> Result<Json<AbloesungEinsatzVorgabeAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let eingabe = req.into_input()?;
+    let etb_id =
+        repo::set_einsatz_vorgabe(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe, &jetzt())
+            .await?;
+    if etb_id.is_some() {
+        publiziere(&state, einsatz_id, etb_id);
+    }
+    Ok(Json(
+        repo::load_einsatz_vorgabe(&state.pool, einsatz_id).await?,
+    ))
 }
 
 #[cfg(test)]

@@ -43,7 +43,7 @@ struct Loeschweg {
 /// Demo-Vorlage die Demo-Fahrzeuge und -Personen fest, LLH-1042), dann Personal (samt
 /// Qualifikationen), Fahrzeug, Material. Die Reihenfolge der Berichtszeilen ist davon unabhängig
 /// (s. [`bericht_zeilen`]).
-const LOESCHWEGE: [Loeschweg; 4] = [
+const LOESCHWEGE: [Loeschweg; 5] = [
     Loeschweg {
         art: DemoStammdatenArt::EinheitVorlage,
         // Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen entfernen“: steht die Vorlage
@@ -86,6 +86,15 @@ const LOESCHWEGE: [Loeschweg; 4] = [
         behalten_wenn: None,
         vorlauf: None,
         loeschen: "DELETE FROM material WHERE id = ? AND org_id = ?",
+        mehrere_runden: false,
+    },
+    // LLH-1122: Kein Fremdschlüssel zeigt auf ein Schichtmodell (Einsätze halten eine Kopie),
+    // das Löschen gelingt also immer; der Demo-Einsatz behält seine Kopie, bis er selbst fällt.
+    Loeschweg {
+        art: DemoStammdatenArt::Schichtmodell,
+        behalten_wenn: None,
+        vorlauf: None,
+        loeschen: "DELETE FROM schichtmodell WHERE id = ? AND org_id = ?",
         mehrere_runden: false,
     },
 ];

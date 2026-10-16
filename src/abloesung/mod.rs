@@ -1,15 +1,19 @@
 //! Ablösung von Einheiten im Einsatz (LFH-635).
 //!
 //! **Eine Zeile = eine Schicht einer Einheit**: Einsatzbeginn + Rhythmus → Fälligkeit,
-//! geplante ablösende Einheit, Vollzug. Je Einheit läuft höchstens eine Schicht. Der
-//! Rhythmus kommt als Vorgabe vom Einsatzabschnitt (`rhythmus_quelle = abschnitt`) oder als
-//! eigener Wert der Einheit (`einheit`).
+//! geplante ablösende Einheit, Vollzug. Je Einheit läuft höchstens eine Schicht. Rangfolge des
+//! Rhythmus (LLH-1122): eigener Wert der Einheit (`rhythmus_quelle = einheit`) → Vorgabe des
+//! Abschnitts (`abschnitt`) → Vorgabe des Einsatzes (`einsatz`, ein Schichtmodell mit Rhythmus
+//! oder Wechselzeiten, [`crate::schichtmodell`]).
 //!
 //! **Die Einstufung wird beim Lesen berechnet**, nicht gespeichert: sie hängt an der Uhr, und
 //! ein verpasster Scheduler-Tick darf sie nicht verfälschen. Der Erinnerungs-Scheduler liefert
-//! nur den einmaligen Hinweis (Vorwarnung 30 min vorher, Fälligkeit).
+//! nur den einmaligen Hinweis (Vorwarnung und Fälligkeit). Die Vorwarnzeit kommt aus dem
+//! Schichtmodell des Einsatzes, ohne eines gilt [`VORWARNUNG_VORGABE_MINUTEN`] (LLH-1122 hebt
+//! das Non-Goal „Vorwarnzeit fest 30 min“ aus LFH-635 auf).
 //!
-//! Spec: `openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/`
+//! Spec: `openspec/specs/kraefte-abloesung/spec.md`; Herleitung
+//! `openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/`
 
 use crate::wire_enum::wire_enum;
 use crate::zeit;
@@ -18,9 +22,7 @@ use utoipa::ToSchema;
 
 pub mod repo;
 
-/// Vorwarnzeit vor der Fälligkeit (Minuten). Entspricht `KNAPP_MINUTEN` im Überblick; in v1
-/// bewusst nicht einstellbar (design.md, Non-Goals).
-pub const VORWARNUNG_MINUTEN: i64 = 30;
+pub use crate::schichtmodell::VORWARNUNG_VORGABE_MINUTEN;
 
 /// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0114_abloesung.sql`).
 pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
@@ -45,6 +47,9 @@ wire_enum! {
         Abschnitt => "abschnitt",
         /// Eigener Wert der Schicht; eine Änderung der Abschnittsvorgabe lässt ihn stehen.
         Einheit => "einheit",
+        /// Folgt der Vorgabe des Einsatzes (Schichtmodell) und wandert mit, wenn sie sich
+        /// ändert (LLH-1122).
+        Einsatz => "einsatz",
     }
     try_from = |s| format!("Ungültige Rhythmusquelle: {s}");
 }
@@ -55,7 +60,7 @@ wire_enum! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum Einstufung {
         Planmaessig => "planmaessig",
-        /// Fälligkeit höchstens [`VORWARNUNG_MINUTEN`] entfernt.
+        /// Fälligkeit höchstens die Vorwarnzeit entfernt.
         Vorwarnung => "vorwarnung",
         /// Fälligkeit erreicht oder überschritten.
         Ueberfaellig => "ueberfaellig",
@@ -67,19 +72,19 @@ pub fn faelligkeit(beginn_at: &str, rhythmus_minuten: i64) -> Option<String> {
     zeit::plus_minuten(beginn_at, rhythmus_minuten)
 }
 
-/// Zeitpunkt der Vorwarnung = Fälligkeit − [`VORWARNUNG_MINUTEN`].
-pub fn vorwarnzeit(faellig_at: &str) -> Option<String> {
-    zeit::plus_minuten(faellig_at, -VORWARNUNG_MINUTEN)
+/// Zeitpunkt der Vorwarnung = Fälligkeit − `vorwarnung_minuten`.
+pub fn vorwarnzeit(faellig_at: &str, vorwarnung_minuten: i64) -> Option<String> {
+    zeit::plus_minuten(faellig_at, -vorwarnung_minuten)
 }
 
 /// Einstufung einer laufenden Schicht (rein, deterministisch testbar). Eine unparsbare
 /// Fälligkeit gilt defensiv als überfällig: sie soll auffallen, nicht verschwinden.
-pub fn einstufung(faellig_at: &str, jetzt: &str) -> Einstufung {
+pub fn einstufung(faellig_at: &str, jetzt: &str, vorwarnung_minuten: i64) -> Einstufung {
     match (zeit::parse(faellig_at), zeit::parse(jetzt)) {
         (Some(f), Some(j)) => {
             if f <= j {
                 Einstufung::Ueberfaellig
-            } else if f - j <= chrono::Duration::minutes(VORWARNUNG_MINUTEN) {
+            } else if f - j <= chrono::Duration::minutes(vorwarnung_minuten) {
                 Einstufung::Vorwarnung
             } else {
                 Einstufung::Planmaessig
@@ -114,6 +119,9 @@ pub struct AbloesungAnzeige {
     pub rhythmus_minuten: i64,
     pub rhythmus_quelle: RhythmusQuelle,
     pub faellig_at: String,
+    /// Vorwarnzeit vor der Fälligkeit in Minuten: aus dem Schichtmodell des Einsatzes, ohne
+    /// eines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit.
+    pub vorwarnung_minuten: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abloesende_einheit_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,6 +157,19 @@ pub struct AbloesungVorgabeAnzeige {
     pub laufende_schichten: i64,
 }
 
+/// Vorgabe des Einsatzes (LLH-1122): die Kopie eines Schichtmodells, die beim Anlegen aus der
+/// Vorgabe der Organisation kam oder in den Einsatz-Einstellungen gesetzt wurde.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AbloesungEinsatzVorgabeAnzeige {
+    /// Fehlt = der Einsatz hat keine Vorgabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schichtmodell: Option<crate::schichtmodell::EinsatzSchichtmodell>,
+    /// Wirksame Vorwarnzeit aller Schichten des Einsatzes.
+    pub vorwarnung_minuten: i64,
+    /// Laufende Schichten, die der Vorgabe des Einsatzes folgen.
+    pub laufende_schichten: i64,
+}
+
 /// Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
 /// Folgeschicht.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -177,10 +198,32 @@ mod tests {
     }
 
     #[test]
-    fn vorwarnzeit_liegt_30_min_davor() {
+    fn vorwarnzeit_liegt_die_vorwarnung_davor() {
         assert_eq!(
-            vorwarnzeit("2026-09-22 15:30:00").as_deref(),
+            vorwarnzeit("2026-09-22 15:30:00", 30).as_deref(),
             Some("2026-09-22 15:00:00")
+        );
+        assert_eq!(
+            vorwarnzeit("2026-09-22 15:30:00", 45).as_deref(),
+            Some("2026-09-22 14:45:00")
+        );
+    }
+
+    /// Die Vorwarnung aus dem Schichtmodell verschiebt die Grenze der Stufe (LLH-1122).
+    #[test]
+    fn einstufung_mit_eigener_vorwarnung() {
+        let f = "2026-09-22 15:30:00";
+        assert_eq!(
+            einstufung(f, "2026-09-22 14:45:00", 45),
+            Einstufung::Vorwarnung
+        );
+        assert_eq!(
+            einstufung(f, "2026-09-22 14:44:59", 45),
+            Einstufung::Planmaessig
+        );
+        assert_eq!(
+            einstufung(f, "2026-09-22 14:45:00", 30),
+            Einstufung::Planmaessig
         );
     }
 
@@ -189,26 +232,29 @@ mod tests {
     fn einstufung_grenzfaelle() {
         let f = "2026-09-22 15:30:00";
         assert_eq!(
-            einstufung(f, "2026-09-22 15:30:00"),
+            einstufung(f, "2026-09-22 15:30:00", 30),
             Einstufung::Ueberfaellig,
             "genau fällig"
         );
         assert_eq!(
-            einstufung(f, "2026-09-22 15:31:00"),
+            einstufung(f, "2026-09-22 15:31:00", 30),
             Einstufung::Ueberfaellig
         );
-        assert_eq!(einstufung(f, "2026-09-22 15:29:59"), Einstufung::Vorwarnung);
         assert_eq!(
-            einstufung(f, "2026-09-22 15:00:00"),
+            einstufung(f, "2026-09-22 15:29:59", 30),
+            Einstufung::Vorwarnung
+        );
+        assert_eq!(
+            einstufung(f, "2026-09-22 15:00:00", 30),
             Einstufung::Vorwarnung,
             "genau 30 min"
         );
         assert_eq!(
-            einstufung(f, "2026-09-22 14:59:59"),
+            einstufung(f, "2026-09-22 14:59:59", 30),
             Einstufung::Planmaessig,
             "30 min + 1 s"
         );
-        assert_eq!(einstufung("kaputt", f), Einstufung::Ueberfaellig);
+        assert_eq!(einstufung("kaputt", f, 30), Einstufung::Ueberfaellig);
     }
 
     #[test]
@@ -223,7 +269,7 @@ mod tests {
         for s in [AbloesungStatus::Laufend, AbloesungStatus::Abgeloest] {
             assert_eq!(AbloesungStatus::parse(s.as_str()), Some(s));
         }
-        for q in [RhythmusQuelle::Abschnitt, RhythmusQuelle::Einheit] {
+        for q in RhythmusQuelle::ALLE {
             assert_eq!(RhythmusQuelle::parse(q.as_str()), Some(q));
         }
         assert_eq!(AbloesungStatus::parse("offen"), None);

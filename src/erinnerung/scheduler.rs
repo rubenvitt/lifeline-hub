@@ -127,16 +127,18 @@ async fn loese_aus(
     };
     if let (Some(art), Some(abloesung_id)) = (art, f.bezug_id) {
         // Die Fälligkeit der Schicht, nicht die der Vorwarn-Frist: der Hinweis nennt die
-        // Uhrzeit, zu der abgelöst werden muss.
+        // Uhrzeit, zu der abgelöst werden muss. Seit LLH-1122 liegt die Vorwarnung je
+        // Schichtmodell verschieden weit davor; gelesen wird deshalb die Schicht selbst. Fehlt
+        // sie (inzwischen gelöscht), gilt die Vorgabe von 30 min.
         let faellig_at = match art {
-            "vorwarnung" => crate::zeit::parse_utc(&f.faellig_at)
-                .and_then(|v| {
-                    v.checked_add_signed(chrono::Duration::minutes(
-                        crate::abloesung::VORWARNUNG_MINUTEN,
-                    ))
-                })
-                .map(crate::zeit::formatiere_utc)
+            "vorwarnung" => match schicht_faellig_at(pool, abloesung_id).await {
+                Some(faellig_at) => faellig_at,
+                None => crate::zeit::plus_minuten(
+                    &f.faellig_at,
+                    crate::abloesung::VORWARNUNG_VORGABE_MINUTEN,
+                )
                 .unwrap_or_else(|| f.faellig_at.clone()),
+            },
             _ => f.faellig_at.clone(),
         };
         live.publiziere_event(
@@ -161,6 +163,19 @@ async fn loese_aus(
     // Benachrichtigung nach dem Merker (LLH-1209): ein erneuter Tick löst nicht noch einmal aus.
     super::benachrichtigung::melden(pool, live, f, eskaliert_mid).await;
     true
+}
+
+/// Gespeicherte Fälligkeit einer Schicht der Ablösung; `None`, wenn es sie nicht mehr gibt oder
+/// das Lesen scheitert (geloggt, der Hinweis geht trotzdem hinaus).
+async fn schicht_faellig_at(pool: &SqlitePool, abloesung_id: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT faellig_at FROM einsatz_abloesung WHERE id = ?")
+        .bind(abloesung_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("Fälligkeit der Schicht {abloesung_id} nicht lesbar: {e}");
+            None
+        })
 }
 
 /// Führt `fut` aus und fängt eine Panic darin ab (LFH-924): sie erscheint als
@@ -419,6 +434,61 @@ mod tests {
 
         tick_einmal(&pool, &live, t("2026-09-22 15:31:00")).await;
         assert!(abloesung_events(&mut rx).is_empty(), "keine Wiederholung");
+    }
+
+    /// LLH-1122: die Vorwarnung liegt je Schichtmodell verschieden weit vor der Fälligkeit
+    /// (hier 45 min). Das Ereignis nennt die gespeicherte Fälligkeit der Schicht, nicht die
+    /// Vorwarnzeit + 30 min.
+    #[tokio::test]
+    async fn vorwarnung_nennt_die_faelligkeit_der_schicht() {
+        use crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schicht: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+                rhythmus_quelle, faellig_at, angelegt_von_id) \
+             VALUES (?, ?, '2026-09-22 09:30:00', 360, 'einsatz', '2026-09-22 15:30:00', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+        let mut conn = pool.acquire().await.unwrap();
+        repo::setze_auto_frist_tx(
+            &mut conn,
+            e,
+            b,
+            OBJEKT_ABLOESUNG_VORWARNUNG,
+            schicht,
+            "Ablösung in 45 min: Florian 1",
+            "2026-09-22 14:45:00",
+        )
+        .await
+        .unwrap();
+        drop(conn);
+
+        tick_einmal(&pool, &live, t("2026-09-22 14:45:30")).await;
+        let mut gesehen = Vec::new();
+        while let Ok(n) = rx.try_recv() {
+            if n.event.as_str() == "abloesung" {
+                gesehen.push(serde_json::from_str::<serde_json::Value>(&n.data).unwrap());
+            }
+        }
+        assert_eq!(gesehen.len(), 1);
+        assert_eq!(gesehen[0]["art"], "vorwarnung");
+        assert_eq!(gesehen[0]["faellig_at"], "2026-09-22 15:30:00");
     }
 
     /// LFH-97: die Auto-Frist-Erinnerung einer bestätigungspflichtigen Sofortmeldung
