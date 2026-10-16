@@ -55,10 +55,11 @@ und jeder freigegebene Posten MUST live aktualisiert werden.
 
 Das System SHALL eine Einheit auflösen können, ohne ihre Zeile zu löschen. Auflösen MUST zuerst
 alle Kräfte von der Einheit lösen und danach das Ereignis `entlassung` an der Einheit schreiben,
-das keine Person erreicht. Zeitachse, abgelöste Schichten und ETB-Verknüpfungen der Einheit MUST
-erhalten bleiben. Eine Einheit ohne Zeitachse, Schicht, ETB-Verknüpfung, Belegung eines
-Bereitstellungsraums, ohne Auftrag, Meldung, Dokument und Verteiler mit Verweis auf sie und ohne
-jede (auch beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
+das keine Person erreicht. Zeitachse, abgelöste Schichten, ETB-Verknüpfungen und
+Verpflegungsausgaben an die Einheit MUST erhalten bleiben. Eine Einheit ohne Zeitachse, Schicht,
+ETB-Verknüpfung, Belegung eines Bereitstellungsraums, ohne Auftrag, Meldung, Dokument, Verteiler
+und Verpflegungsausgabe (auch eine zurückgenommene) mit Verweis auf sie und ohne jede (auch
+beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
 
 #### Scenario: Aufgelöste Einheit bleibt im Nachweis
 - **WHEN** die Einheit „Florian 1“ mit Eintreffen 06:40 um 15:00 aufgelöst wird
@@ -67,6 +68,14 @@ jede (auch beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
 #### Scenario: Leere Einheit gelöscht
 - **WHEN** eine eben angelegte Einheit ohne Kräfte und ohne Spur aufgelöst wird
 - **THEN** ist sie gelöscht
+
+#### Scenario: Verpflegte Einheit bleibt
+- **WHEN** eine Einheit ohne Kräfte und ohne andere Spur, an die eine Verpflegungsausgabe ging, aufgelöst wird
+- **THEN** bleibt sie als aufgelöst stehen, und die Ausgabe nennt sie weiter als Empfänger
+
+#### Scenario: Verpflegte Einheit stornieren
+- **WHEN** eine Einheit ohne andere Spur, an die eine Verpflegungsausgabe ging, als Fehldisposition storniert werden soll
+- **THEN** antwortet das System mit 422 und dem Grund, dass eine Verpflegungsausgabe die Einheit nennt
 
 ### Requirement: Fehldisposition stornieren
 

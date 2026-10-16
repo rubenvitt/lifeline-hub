@@ -94,7 +94,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet einheit auf den ×6-Fan-out in exakter Reihenfolge ab', () => {
+  it('bildet einheit auf den Fan-out in exakter Reihenfolge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.einheit).toEqual([
       EINSATZ_KEYS.einheiten,
       EINSATZ_KEYS.fuehrungskraefte,
@@ -110,10 +110,12 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.lagemonitor,
       // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
       EINSATZ_KEYS.einheitAusVorlage,
+      // Die Empfängerliste der Verpflegung ist eine Projektion der Einheiten (LLH-1055 D4).
+      EINSATZ_KEYS.verpflegung,
     ]);
   });
 
-  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Lagemonitor und BR-Liste ab (LFH-612/635/639, LLH-1095)', () => {
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055)', () => {
     // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
     // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die
     // Abschnittsflächen (LLH-1153).
@@ -125,6 +127,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.lagemonitor,
       EINSATZ_KEYS.br,
+      // Die Empfängerliste der Verpflegung trägt die Abschnitte (LLH-1055 D4).
+      EINSATZ_KEYS.verpflegung,
     ]);
   });
 

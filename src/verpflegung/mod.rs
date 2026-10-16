@@ -27,8 +27,19 @@
 //! optional per `verpflegungsstelle_id` auf eine Stelle. Dazu die Verpflegungsart (warm, kalt,
 //! Getränke) am Zeitfenster, nur Anzeige.
 //!
+//! **Empfänger statt Personen** (LLH-1055, LLH-1024 F3): Eine Ausgabe nennt optional höchstens
+//! einen Empfänger, eine Einheit (Abholung, steht für ihren Teilbaum) oder einen Abschnitt
+//! (Zuführung), nie eine Person, und trägt von ihm nur die Kennung. Namen, Gliederung, Stärke und
+//! Eintreffen kommen als Projektion [`VerpflegungEmpfaenger`] mit `GET …/verpflegung`, für jeden
+//! Leser der Verpflegung, auch ohne Modul `einheiten`: eine **bewusste Ausnahme** von der Regel
+//! „nichts Hineingejointes aus anderen Modulen“ (LFH-634 D4). Die Feldmenge ist gepinnt; Führer,
+//! Erreichbarkeit, Mitglieder, Fahrzeuge und Material bleiben draußen. Wer noch nicht verpflegt
+//! ist, leitet der Client ab, weil nur er die vorgemerkten Ausgaben kennt; der Server liefert
+//! keine solche Liste.
+//!
 //! Spec: `openspec/specs/kraefte-verpflegung/spec.md` (Herleitung
-//! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040).
+//! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040,
+//! Empfänger LLH-1055 „Empfänger einer Ausgabe“, „Empfängerliste der Verpflegung“).
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -36,6 +47,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::error::AppError;
+use crate::staerke::Staerke;
 
 pub mod deckung;
 pub mod repo;
@@ -216,6 +228,14 @@ pub struct AusgabeAnzeige {
     /// steht in `VerpflegungAnzeige.stellen`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verpflegungsstelle_id: Option<i64>,
+    /// Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in
+    /// `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einheit_id: Option<i64>,
+    /// Empfänger-Abschnitt (LLH-1055, Zuführung) — nur die Kennung. Fehlt auch, wenn der
+    /// Abschnitt inzwischen gelöscht ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_id: Option<i64>,
     /// Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zurueckgenommen_at: Option<String>,
@@ -272,6 +292,62 @@ pub struct VerpflegungAnzeige {
     /// Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
     /// braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
     pub stellen: Vec<VerpflegungsstelleAnzeige>,
+    /// Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne
+    /// Personenangaben. Keine eigene Leseroute.
+    pub empfaenger: VerpflegungEmpfaenger,
+}
+
+// ── Empfängerliste (LLH-1055, design.md D3) ─────────────────────────────────────────────────
+//
+// Eine Projektion des Kräftebaums für jeden Leser der Verpflegung, auch ohne Modul `einheiten`:
+// bewusste Ausnahme von LFH-634 D4. Name, Funkrufname, Gliederung, Abschnitt, Stärke und
+// Eintreffen sind Lagebezeichnungen ohne Personenbezug. Die Feldmenge ist gepinnt
+// (`tests/verpflegung.rs`, `empfaengerliste_ohne_personenangaben`): kein Einheitsführer, keine
+// Erreichbarkeit, kein Kommunikationsmittel, keine Bemerkung, keine Mitglieder, Fahrzeuge oder
+// Material, kein Status, keine Koordinate.
+
+/// Eine Einheit der Empfängerliste.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EmpfaengerEinheit {
+    pub id: i64,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funkrufname: Option<String>,
+    /// Die übergeordnete Einheit (Gliederung); eine Ausgabe an sie verpflegt den Teilbaum.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ueber_einheit_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_name: Option<String>,
+    /// Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`.
+    pub ist: Staerke,
+    /// Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`).
+    pub ist_kumuliert: Staerke,
+    /// Das nicht gestrichene Eintreffen der jüngsten Einsatzperiode (offen oder durch Ablösung
+    /// beendet); fehlt ohne ein solches.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eintreffen_at: Option<String>,
+    /// Nur bei einer aufgelösten Einheit, auf die eine Ausgabe verweist (für ihren Namen).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aufgeloest_at: Option<String>,
+}
+
+/// Ein Abschnitt der Empfängerliste (Ziel einer Zuführung).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EmpfaengerAbschnitt {
+    pub id: i64,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ueber_abschnitt_id: Option<i64>,
+}
+
+/// Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu
+/// aufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct VerpflegungEmpfaenger {
+    pub einheiten: Vec<EmpfaengerEinheit>,
+    pub abschnitte: Vec<EmpfaengerAbschnitt>,
 }
 
 /// Antwort auf „Ausgabe erfassen“ und „Ausgabe zurücknehmen“: die Kennung der Ausgabe (für

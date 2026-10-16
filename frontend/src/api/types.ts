@@ -874,6 +874,14 @@ export type VerpflegungsstelleStatus = S['VerpflegungsstelleStatus'];
 /** Ausgegebene Menge an einer Stelle (`je_stelle` am Zeitfenster), nur das Ist; ohne
  *  `stelle_id` der Eintrag „ohne Stelle“. Der Client rechnet je Stelle nichts nach. */
 export type VerpflegungStelleIst = S['StelleIst'];
+/** Empfängerliste der Verpflegung (LLH-1055): Projektion in `GET …/verpflegung`, keine eigene
+ *  Leseroute und ohne Personenangaben — nie `GET …/einheiten` für die Verpflegung lesen. */
+export type VerpflegungEmpfaenger = S['VerpflegungEmpfaenger'];
+/** Eine Einheit als Empfänger: Gliederung, Abschnitt, Ist-Stärke (eigene und kumuliert) und
+ *  Eintreffen. Aufgelöste stehen nur drin, wenn eine Ausgabe sie nennt. */
+export type EmpfaengerEinheit = S['EmpfaengerEinheit'];
+/** Ein Einsatzabschnitt als Empfänger (Zuführung an den Abschnitt). */
+export type EmpfaengerAbschnitt = S['EmpfaengerAbschnitt'];
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/stellen` (`StelleAnlegen`).
@@ -952,6 +960,11 @@ export interface AusgabeEingabe {
   /** Verpflegungsstelle (LLH-1040): fremd, unbekannt oder storniert 422, aufgelöst 409 — außer
    *  `zeitpunkt_at` liegt vor der Auflösung. */
   verpflegungsstelle_id?: number;
+  /** Empfänger (LLH-1055), höchstens einer von `einheit_id` und `abschnitt_id` (beide 422).
+   *  Unbekannte oder fremde Einheit bzw. Abschnitt 404; aufgelöste Einheit 409 — außer
+   *  `zeitpunkt_at` liegt vor der Auflösung. */
+  einheit_id?: number;
+  abschnitt_id?: number;
   /** Idempotenzschlüssel der Offline-Queue (LFH-688); ein Replay liefert die gespeicherte Ausgabe. */
   client_id?: string;
 }

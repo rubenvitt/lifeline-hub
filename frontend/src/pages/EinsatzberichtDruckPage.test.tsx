@@ -307,7 +307,11 @@ describe('EinsatzberichtDruckPage', () => {
     server.use(
       http.get(`/api/einsaetze/${E}/verpflegung`, async () => {
         await delay(200);
-        return HttpResponse.json({ zeitfenster: [], stellen: [] });
+        return HttpResponse.json({
+          zeitfenster: [],
+          stellen: [],
+          empfaenger: { einheiten: [], abschnitte: [] },
+        });
       }),
     );
     rendere();

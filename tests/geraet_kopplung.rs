@@ -5064,6 +5064,193 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_verpflegung_ohne_etb() {
     assert!(!beim_geraet.iter().any(|e| e == "etb"), "{beim_geraet:?}");
 }
 
+/// Bildet „2. Gruppe“ mit dem Einheitsführer „Adalbert Zugführer“, dem Mitglied „Mechthild
+/// Mitglied“ und einer Erreichbarkeit; liefert die Kennung der Einheit.
+async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i64 {
+    let gruppe = einheit_bilden(app, admin, einsatz, "2. Gruppe").await;
+    let fuehrer =
+        common::stammpersonal_disponieren(app, admin, einsatz, "Adalbert Zugführer").await;
+    let mitglied =
+        common::stammpersonal_disponieren(app, admin, einsatz, "Mechthild Mitglied").await;
+    for ep in [fuehrer, mitglied] {
+        let (s, v) = anfrage(
+            app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{gruppe}/personal/{ep}"),
+            admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+    let (s, v) = anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{gruppe}"),
+        admin,
+        Some(&json!({"fuehrer_id": fuehrer, "erreichbarkeit": "0171 4711815"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrer_name"], "Adalbert Zugführer", "Vorbedingung");
+    gruppe
+}
+
+/// LLH-1055 D3, Spec `funktionsansichten` „Empfängerliste ohne Führernamen“ und „Keine
+/// Einheitenliste“: Das Verpflegungsgerät liest die Empfängerliste mit Einheitenname und Stärke,
+/// aber ohne Führer-, Mitgliedernamen und Erreichbarkeit; `GET …/einheiten` bleibt 403.
+#[tokio::test]
+async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gruppe = gruppe_mit_personal(&app, &admin, einsatz).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/verpflegung"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let e = &v["empfaenger"]["einheiten"][0];
+    assert_eq!(e["id"], gruppe);
+    assert_eq!(e["name"], "2. Gruppe");
+    assert_eq!(
+        e["ist"],
+        json!({"fuehrer": 0, "unterfuehrer": 0, "mannschaft": 2})
+    );
+    let text = v.to_string();
+    for verboten in ["Adalbert", "Mechthild", "4711815"] {
+        assert!(!text.contains(verboten), "{verboten:?} in {text}");
+    }
+    let mut alle = Vec::new();
+    schluessel(&v, &mut alle);
+    for verboten in [
+        "fuehrer_id",
+        "fuehrer_name",
+        "erreichbarkeit",
+        "personal_mitglieder",
+    ] {
+        assert!(!alle.iter().any(|k| k == verboten), "{verboten}: {alle:?}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "keine Einheitenliste am Gerät");
+}
+
+/// LLH-1055 D2, Spec `funktionsansichten` „Buchen an eine Einheit“: Das Verpflegungsgerät bucht
+/// 9 EP an die „2. Gruppe“; die Ausgabe trägt die Einheit, die Antwort keinen Personennamen.
+#[tokio::test]
+async fn verpflegungsgeraet_bucht_an_einheit() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zf = mittag(&app, &admin, einsatz).await;
+    let gruppe = gruppe_mit_personal(&app, &admin, einsatz).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster/{zf}/ausgaben"),
+        &geraet,
+        Some(&json!({"menge": 9, "einheit_id": gruppe})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zeitfenster"]["ausgaben"][0]["einheit_id"], gruppe, "{v}");
+    assert_eq!(v["zeitfenster"]["ausgegeben"]["gesamt"], 9);
+    let text = v.to_string();
+    for verboten in ["Adalbert", "Mechthild"] {
+        assert!(!text.contains(verboten), "{verboten:?} in {text}");
+    }
+}
+
+/// LLH-1055 D4, Spec „Einheit kommt live dazu“: Eine neue Einheit erreicht das Gerät als
+/// `einheit`, ein umbenannter Abschnitt als `abschnitt`; `personal` nicht. Das Modul `einheiten`
+/// bleibt ihm verschlossen.
+#[tokio::test]
+async fn live_kanal_des_verpflegungsgeraets_traegt_einheit() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(&json!({"name": "Deich"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let deich = v["id"].as_i64().unwrap();
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+
+    let mut geraet_strom = live_geraet(&app, &geraet, einsatz).await;
+    let mut admin_strom = live_geraet(&app, &admin, einsatz).await;
+    einheit_bilden(&app, &admin, einsatz, "4. Gruppe").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{deich}"),
+        &admin,
+        Some(&json!({"name": "Deich Nord"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    common::stammpersonal_disponieren(&app, &admin, einsatz, "Anna Kraft").await;
+
+    let mut beim_admin = Vec::new();
+    strom_lesen(
+        &mut admin_strom,
+        &mut beim_admin,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_admin.iter().any(|e| e == "personal"),
+        "Gegenprobe: {beim_admin:?}"
+    );
+    let mut beim_geraet = Vec::new();
+    strom_lesen(
+        &mut geraet_strom,
+        &mut beim_geraet,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_geraet.iter().any(|e| e == "einheit"),
+        "{beim_geraet:?}"
+    );
+    assert!(
+        beim_geraet.iter().any(|e| e == "abschnitt"),
+        "{beim_geraet:?}"
+    );
+    assert!(
+        !beim_geraet.iter().any(|e| e == "personal"),
+        "{beim_geraet:?}"
+    );
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
 /// LLH-1075 (Spec `funktionsansichten`, design.md D7): das BR-Gerät bucht das Eintreffen einer
 /// erwarteten und einer unangemeldeten Kraft am eigenen Raum und sieht seine Meldung; am fremden
 /// Raum 404 ohne Anlage; es liest die Perioden der Einheiten; Übernehmen und Abweisen bleiben der
