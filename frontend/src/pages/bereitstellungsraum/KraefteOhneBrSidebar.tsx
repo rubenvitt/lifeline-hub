@@ -194,7 +194,6 @@ export default function KraefteOhneBrSidebar({
           {imEinsatz.einheiten.length + imEinsatz.fahrzeuge.length > 0 && (
             <Collapse
               ghost
-              size="small"
               destroyOnHidden
               activeKey={imEinsatzOffen ? ['im-einsatz'] : []}
               onChange={(keys) =>
