@@ -2669,6 +2669,95 @@
           "einsatzabschnitt"
         ]
       },
+      "BrAbrufErgebnis": {
+        "type": "object",
+        "description": "Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).",
+        "required": [
+          "abruf",
+          "mitgenommen"
+        ],
+        "properties": {
+          "abruf": {
+            "$ref": "#/components/schemas/BrBelegungAnzeige",
+            "description": "Das Abruf-Ereignis der abgerufenen Kraft."
+          },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des erteilten Auftrags."
+          },
+          "mitgenommen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Einheiten, die als Untereinheiten mit abgerufen wurden."
+          }
+        }
+      },
+      "BrAbrufKurz": {
+        "type": "object",
+        "description": "Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec\n`bereitstellungsraum-belegung`, „Detail nennt den Abruf“): abgeleitet aus dem jüngsten\nBelegungsereignis, nicht gespeichert.",
+        "required": [
+          "seit_at"
+        ],
+        "properties": {
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Auftrag des Abrufs; nur an der abgerufenen Einheit, nicht an mitgenommenen."
+          },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer dieses Auftrags."
+          },
+          "mit_objekt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Einheit, mit der diese Untereinheit abgerufen wurde (D10)."
+          },
+          "seit_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Abrufs (UTC ohne Zone)."
+          },
+          "ziel_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Abschnitt; bei einer mitgenommenen Untereinheit der ihrer Einheit."
+          },
+          "ziel_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Ziels zum Zeitpunkt des Abrufs; bei einer mitgenommenen Untereinheit der ihrer\nEinheit."
+          }
+        }
+      },
       "BrAnzeige": {
         "type": "object",
         "description": "Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).",
@@ -2755,6 +2844,14 @@
           "art": {
             "$ref": "#/components/schemas/BrBelegungsArt"
           },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Auftrag, der mit dem Abruf erteilt wurde."
+          },
           "br_id": {
             "type": "integer",
             "format": "int64"
@@ -2771,6 +2868,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "mit_abruf_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10)."
+          },
           "notiz": {
             "type": [
               "string",
@@ -2786,6 +2891,21 @@
           },
           "zeitpunkt_at": {
             "type": "string"
+          },
+          "ziel_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Abschnitt eines Abrufs (LLH-1085, design.md D5); fällt weg, wenn der Abschnitt\ngelöscht wird."
+          },
+          "ziel_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Ziel-Abschnitts zum Zeitpunkt des Abrufs; bleibt nach dem Löschen."
           }
         }
       },
@@ -2818,11 +2938,13 @@
       },
       "BrBelegungsArt": {
         "type": "string",
-        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0061_br_belegung.sql`. Append-only.",
+        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein\n`austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,\ndesign.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.",
         "enum": [
           "eintritt",
           "wechsel",
-          "austritt"
+          "austritt",
+          "abruf",
+          "abruf_aufgehoben"
         ]
       },
       "BrDetail": {
@@ -2886,6 +3008,17 @@
           "unangemeldet"
         ],
         "properties": {
+          "abruf": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BrAbrufKurz",
+                "description": "Abruf, falls die Einheit abgerufen im Raum steht (LLH-1085, design.md D3)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fahrzeuge": {
             "type": "array",
             "items": {
@@ -2928,6 +3061,17 @@
           "funkrufname"
         ],
         "properties": {
+          "abruf": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BrAbrufKurz",
+                "description": "Wie [`BrEinheitKurz::abruf`]."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "funkrufname": {
             "type": "string"
           },
@@ -2993,7 +3137,9 @@
           "eintritt",
           "wechsel_herein",
           "wechsel_hinaus",
-          "austritt"
+          "austritt",
+          "abruf",
+          "abruf_aufgehoben"
         ]
       },
       "BrVerlaufEintrag": {
@@ -3011,6 +3157,14 @@
           "art": {
             "$ref": "#/components/schemas/BrVerlaufArt"
           },
+          "auftrag_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Auftrags eines `abruf`."
+          },
           "herkunft": {
             "type": [
               "string",
@@ -3022,6 +3176,13 @@
             "type": "integer",
             "format": "int64",
             "description": "Kennung des Belegungsereignisses (`br_belegung.id`)."
+          },
+          "mit_einheit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Einheit, mit der eine Untereinheit abgerufen wurde (D10)."
           },
           "notiz": {
             "type": [
@@ -3049,7 +3210,7 @@
               "string",
               "null"
             ],
-            "description": "Bezeichnung des Raums, in den ein `wechsel_hinaus` ging."
+            "description": "Bezeichnung des Raums, in den ein `wechsel_hinaus` ging; bei einem `abruf` und einem\n`austritt` direkt nach einem Abruf der Name des Ziel-Abschnitts (LLH-1085, D5)."
           }
         }
       },
