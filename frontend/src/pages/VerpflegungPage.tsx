@@ -546,6 +546,7 @@ export default function VerpflegungPage() {
                 setDialog({ art: 'ruecknahme', zf: x, ausgabe: a });
               }}
               ausstehend={ausstehendJe.get(zf.id)}
+              stellen={stellen}
             />
           ))}
         </section>
@@ -559,6 +560,7 @@ export default function VerpflegungPage() {
           einsatzId={einsatzId}
           freigaben={freigaben}
           jetzt={jetzt}
+          stellen={stellen}
           laeuft={anlegenMut.isPending}
           fehler={anlegenMut.error}
           onSchliessen={schliesse}
@@ -575,6 +577,7 @@ export default function VerpflegungPage() {
           einsatzId={einsatzId}
           freigaben={freigaben}
           jetzt={jetzt}
+          stellen={stellen}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
           onSchliessen={schliesse}
@@ -585,6 +588,7 @@ export default function VerpflegungPage() {
           key={`a-${dialog.zf.id}`}
           zeitfenster={alle.find((zf) => zf.id === dialog.zf.id) ?? dialog.zf}
           nachforderungen={nachforderungOptionen}
+          stellen={stellen}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(dialog.zf, body)}
