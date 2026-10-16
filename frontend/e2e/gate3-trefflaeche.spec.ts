@@ -4523,7 +4523,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten den Zielabstand, lesend fehlen sie', async ({
+test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten den Zielabstand, der Klappkopf „Verlauf“ die Stufe (LLH-1095), lesend fehlen die Knöpfe', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -4557,6 +4557,12 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
       await stelleDichte(page, dichte);
       const anzahl = await mindestensKnoten(zuweisen, 3, `zuweisen (${dichte})`);
       const hoehe = await alleHaltenStufe(zuweisen, soll, `zuweisen (${dichte})`, 3);
+      // Klappkopf „Verlauf“ (LLH-1095 D12): Boden über den Kontext wie jedes `Collapse` (LFH-653).
+      const verlaufHoehe = await haeltStufe(
+        page.getByRole('button', { name: 'Verlauf des Bereitstellungsraums BR Festplatz' }),
+        soll,
+        `Klappkopf „Verlauf“ (${dichte})`,
+      );
       let abstand = Number.POSITIVE_INFINITY;
       for (let i = 0; i < anzahl; i += 1) {
         abstand = Math.min(abstand, await abstandZuNachbarn(leiste, zuweisen.nth(i)));
@@ -4568,7 +4574,9 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
           `kleinster Abstand zwischen „zuweisen“ (${lage.width}, ${dichte})`,
         ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
       }
-      gemessen.push(`${lage.width} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
+      gemessen.push(
+        `${lage.width} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}, Verlauf ${verlaufHoehe}`,
+      );
     }
   }
 

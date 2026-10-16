@@ -1,10 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
+import { haeltStufe, stelleDichte } from './trefflaeche-kern';
 
 /**
  * Bereitstellungsraum (LFH-1042; Spec `funktionsansichten`): ein Tablet bei 1024 × 768 nimmt
  * seinen geplanten Raum in Betrieb, meldet eine Einheit an und wieder ab und schickt eine Meldung
- * an die Einsatzleitung. Auflösen, Stornieren und andere Räume gibt es auf dem Gerät nicht.
+ * an die Einsatzleitung. Auflösen, Stornieren und andere Räume gibt es auf dem Gerät nicht. Die
+ * Belegung nennt „seit …“, und der Verlauf des eigenen Raums steht am Gerät mit Eintritt und
+ * Austritt (LLH-1095, Spec `bereitstellungsraum-belegung`, „Verlauf auf der Detailseite“), in
+ * `kompakt` und `handschuh`.
  *
  * Seeding als Admin über die API, die Gerätesitzung in einem eigenen Kontext. Kein `networkidle`
  * (LFH-385).
@@ -55,12 +59,35 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await expect(tablet.getByRole('button', { name: 'In Betrieb nehmen' })).toHaveCount(0);
     await expect(tablet.getByRole('button', { name: 'Auflösen' })).toHaveCount(0);
 
-    // Anmelden aus „Kräfte ohne BR“, abmelden aus der Belegung.
+    // Anmelden aus „Kräfte ohne BR“, abmelden aus der Belegung. Angemeldet nennt die Zeile, seit
+    // wann die Einheit wartet (LLH-1095).
     await tablet.getByRole('button', { name: 'LF Nord zuweisen' }).click();
     const belegung = tablet.getByRole('button', { name: 'entfernen' });
     await expect(belegung).toHaveCount(1);
+    await expect(tablet.getByTestId('br-belegung')).toContainText(/seit \d{4,6} · \d+ min/);
     await belegung.click();
     await expect(tablet.getByText('Keine Einheiten bereitgestellt')).toBeVisible();
+
+    // Verlauf des eigenen Raums: zugeklappt geladen erst beim Aufklappen, neueste zuerst.
+    const verlauf = tablet.getByRole('button', {
+      name: 'Verlauf des Bereitstellungsraums BR Sportplatz',
+    });
+    for (const { dichte, soll } of [
+      { dichte: 'kompakt', soll: 30 },
+      { dichte: 'handschuh', soll: 72 },
+    ]) {
+      await stelleDichte(tablet, dichte);
+      await expect(verlauf).toHaveAttribute('aria-expanded', 'false');
+      await haeltStufe(verlauf, soll, `Klappkopf „Verlauf“ (${dichte})`);
+      await verlauf.click();
+      await expect(verlauf).toHaveAttribute('aria-expanded', 'true');
+      const eintraege = tablet.getByRole('list', { name: 'Verlauf' }).getByRole('listitem');
+      await expect(eintraege).toHaveCount(2);
+      await expect(eintraege.nth(0)).toContainText('Austritt');
+      await expect(eintraege.nth(0)).toContainText('LF Nord');
+      await expect(eintraege.nth(1)).toContainText('Eintritt');
+      await expect(eintraege.nth(1)).toContainText('LF Nord');
+    }
 
     await nav.getByRole('link', { name: 'Melden' }).click();
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/meldungen$`));

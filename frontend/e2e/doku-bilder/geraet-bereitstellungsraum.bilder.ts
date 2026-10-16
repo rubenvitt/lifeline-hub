@@ -14,13 +14,17 @@ import {
  * Bilder des Kapitels „Bereitstellungsraum“ (`docs/anwender/kapitel/geraet-bereitstellungsraum.md`):
  * ein Tablet am Bereitstellungsraum, Kontext Tablet, eigener Browserkontext wie in
  * `e2e/geraet-kopplung.spec.ts`. Der Demo-Raum ist schon in Betrieb; damit „In Betrieb nehmen“
- * nachgeklickt werden kann, legt die Spec als Einsatzleitung einen geplanten Raum an (D3).
+ * nachgeklickt werden kann, legt die Spec als Einsatzleitung einen geplanten Raum an (D3). Die Uhr
+ * steht vor dem Anmelden der Kräfte, raum.png zeigt deshalb „· 0 min“ (LLH-1095).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-bereitstellungsraum`, Mitänderungsregel in
  * `docs/anwender/AGENTS.md`):
- *   geplant.png   frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx (Gerätezweig)
+ *   geplant.png   frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx (Gerätezweig),
+ *                 frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx (zugeklappt)
  *   raum.png      frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
+ *                 frontend/src/pages/bereitstellungsraum/brBelegungKern.ts,
+ *                 frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx (zugeklappt),
  *                 frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx
  *   melden.png    frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx
  */
