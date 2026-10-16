@@ -1631,6 +1631,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_von", G_FK),
             // Idempotenzschlüssel des Eintreffens (LLH-1075, design.md D8).
             retain("client_id", G_IDEMPOTENZ),
+            // Abruf (LLH-1085, design.md D4/D5): Ziel, Auftrag und Verband sind Bezüge, der
+            // Name des Ziel-Abschnitts ein Schnappschuss der Lagestruktur.
+            retain("ziel_abschnitt_id", G_FK),
+            retain("ziel_anzeige", G_OP_LABEL),
+            retain("auftrag_id", G_FK),
+            retain("mit_abruf_id", G_FK),
         ],
     },
     TabellenRegel {

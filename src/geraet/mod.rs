@@ -335,9 +335,11 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 /// Eintreffen einer erwarteten oder unangemeldeten Kraft buchen (LLH-1075) und ihn in Betrieb
 /// nehmen; die Einheiten- und Fahrzeugliste des Einsatzes samt Perioden der Einheiten lesen;
 /// Meldungen an die Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die
-/// Stelle über [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten,
-/// Auflösen, Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch das Abrufen,
-/// Übernehmen und Abweisen) fehlen bewusst, außer dem Anlegen einer unangemeldeten Kraft beim
+/// Stelle über [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Ausrücken bestätigen
+/// ist der Austritt über `…/belegung` (LLH-1085); Abrufen, Zurücknehmen eines Abrufs und Verlegen
+/// hinaus fehlen bewusst (Führungshandlungen, ein Wechsel hinaus trägt den fremden Raum). Anlegen,
+/// Stammdaten, Auflösen, Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch
+/// Übernehmen und Abweisen) fehlen ebenso, außer dem Anlegen einer unangemeldeten Kraft beim
 /// Eintreffen.
 const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
@@ -634,6 +636,26 @@ mod tests {
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }
+    }
+
+    /// Abrufen und Zurücknehmen eines Abrufs sind Führungshandlungen (LLH-1085, design.md D2):
+    /// keine Ansicht darf sie, auch nicht der Bereitstellungsraum, der das Ausrücken als Austritt
+    /// bucht.
+    #[test]
+    fn kein_geraet_ruft_ab_oder_nimmt_zurueck() {
+        for a in Funktionsansicht::ALLE {
+            for p in [
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf/aufheben",
+            ] {
+                assert!(!darf_route(a, "POST", p), "{a:?} darf POST {p} nicht");
+            }
+        }
+        assert!(darf_route(
+            Funktionsansicht::Bereitstellungsraum,
+            "POST",
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung"
+        ));
     }
 
     #[test]

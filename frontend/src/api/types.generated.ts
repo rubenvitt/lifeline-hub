@@ -1016,6 +1016,54 @@ export interface components {
          * @enum {string}
          */
         Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt";
+        /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
+        BrAbrufErgebnis: {
+            /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
+            abruf: components["schemas"]["BrBelegungAnzeige"];
+            /** Format: int64 */
+            auftrag_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des erteilten Auftrags.
+             */
+            auftrag_nr?: number | null;
+            /** @description Einheiten, die als Untereinheiten mit abgerufen wurden. */
+            mitgenommen: number[];
+        };
+        /**
+         * @description Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec
+         *     `bereitstellungsraum-belegung`, „Detail nennt den Abruf“): abgeleitet aus dem jüngsten
+         *     Belegungsereignis, nicht gespeichert.
+         */
+        BrAbrufKurz: {
+            /**
+             * Format: int64
+             * @description Auftrag des Abrufs; nur an der abgerufenen Einheit, nicht an mitgenommenen.
+             */
+            auftrag_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer dieses Auftrags.
+             */
+            auftrag_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Die Einheit, mit der diese Untereinheit abgerufen wurde (D10).
+             */
+            mit_objekt_id?: number | null;
+            /** @description Zeitpunkt des Abrufs (UTC ohne Zone). */
+            seit_at: string;
+            /**
+             * Format: int64
+             * @description Ziel-Abschnitt; bei einer mitgenommenen Untereinheit der ihrer Einheit.
+             */
+            ziel_abschnitt_id?: number | null;
+            /**
+             * @description Name des Ziels zum Zeitpunkt des Abrufs; bei einer mitgenommenen Untereinheit der ihrer
+             *     Einheit.
+             */
+            ziel_anzeige?: string | null;
+        };
         /** @description Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`). */
         BrAnzeige: {
             /** Format: int64 */
@@ -1039,6 +1087,11 @@ export interface components {
         /** @description Belegungs-Verlaufseintrag (1:1 zu `br_belegung`). */
         BrBelegungAnzeige: {
             art: components["schemas"]["BrBelegungsArt"];
+            /**
+             * Format: int64
+             * @description Auftrag, der mit dem Abruf erteilt wurde.
+             */
+            auftrag_id?: number | null;
             /** Format: int64 */
             br_id: number;
             /** Format: int64 */
@@ -1047,11 +1100,24 @@ export interface components {
             erfasst_von: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10).
+             */
+            mit_abruf_id?: number | null;
             notiz?: string | null;
             /** Format: int64 */
             objekt_id: number;
             objekt_typ: components["schemas"]["ObjektTyp"];
             zeitpunkt_at: string;
+            /**
+             * Format: int64
+             * @description Ziel-Abschnitt eines Abrufs (LLH-1085, design.md D5); fällt weg, wenn der Abschnitt
+             *     gelöscht wird.
+             */
+            ziel_abschnitt_id?: number | null;
+            /** @description Name des Ziel-Abschnitts zum Zeitpunkt des Abrufs; bleibt nach dem Löschen. */
+            ziel_anzeige?: string | null;
         };
         /**
          * @description Kennzahlen der Belegung eines Raums (LLH-1095, design.md D1–D3, Spec
@@ -1077,10 +1143,12 @@ export interface components {
         };
         /**
          * @description Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-         *     `migrations/0061_br_belegung.sql`. Append-only.
+         *     `migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein
+         *     `austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,
+         *     design.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.
          * @enum {string}
          */
-        BrBelegungsArt: "eintritt" | "wechsel" | "austritt";
+        BrBelegungsArt: "eintritt" | "wechsel" | "austritt" | "abruf" | "abruf_aufgehoben";
         /**
          * @description Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +
          *     einheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4).
@@ -1102,6 +1170,7 @@ export interface components {
         };
         /** @description Schlanke Einheiten-Info für den Detail-Response. */
         BrEinheitKurz: {
+            abruf?: components["schemas"]["BrAbrufKurz"] | null;
             /** @description Aktive Fahrzeuge der Einheit. */
             fahrzeuge: components["schemas"]["BrEinheitFahrzeug"][];
             /** Format: int64 */
@@ -1119,6 +1188,7 @@ export interface components {
         };
         /** @description Schlanke Fahrzeug-Info für den Detail-Response. */
         BrFahrzeugKurz: {
+            abruf?: components["schemas"]["BrAbrufKurz"] | null;
             funkrufname: string;
             /** Format: int64 */
             id: number;
@@ -1147,13 +1217,18 @@ export interface components {
          *     `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
          * @enum {string}
          */
-        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt";
+        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben";
         /**
          * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
          *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
          */
         BrVerlaufEintrag: {
             art: components["schemas"]["BrVerlaufArt"];
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Auftrags eines `abruf`.
+             */
+            auftrag_nr?: number | null;
             /** @description Bezeichnung des Raums, aus dem ein `wechsel_herein` kam. */
             herkunft?: string | null;
             /**
@@ -1161,6 +1236,8 @@ export interface components {
              * @description Kennung des Belegungsereignisses (`br_belegung.id`).
              */
             id: number;
+            /** @description Name der Einheit, mit der eine Untereinheit abgerufen wurde (D10). */
+            mit_einheit?: string | null;
             notiz?: string | null;
             /** Format: int64 */
             objekt_id: number;
@@ -1169,7 +1246,10 @@ export interface components {
             objekt_typ: components["schemas"]["ObjektTyp"];
             /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
-            /** @description Bezeichnung des Raums, in den ein `wechsel_hinaus` ging. */
+            /**
+             * @description Bezeichnung des Raums, in den ein `wechsel_hinaus` ging; bei einem `abruf` und einem
+             *     `austritt` direkt nach einem Abruf der Name des Ziel-Abschnitts (LLH-1085, D5).
+             */
             ziel?: string | null;
         };
         /**

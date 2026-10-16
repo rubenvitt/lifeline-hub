@@ -423,6 +423,9 @@ export type EintreffenEingabe = S['EintreffenEingabe'];
 export type EintreffenErgebnis = S['EintreffenErgebnis'];
 export type EintreffenZeitachse = S['EintreffenZeitachse'];
 export type UebernahmeBody = S['UebernahmeBody'];
+// LLH-1085: Abruf einer Kraft aus dem Raum (abgeleitet im Detail, Antwort der Route).
+export type BrAbrufKurz = S['BrAbrufKurz'];
+export type BrAbrufErgebnis = S['BrAbrufErgebnis'];
 
 // ============================== Chat / Anhänge ==============================
 export type ChatKanal = S['ChatKanalAnzeige'];

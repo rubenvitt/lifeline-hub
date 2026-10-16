@@ -7,18 +7,21 @@ Fahrzeuge einschließlich der Fahrzeuge der Einheiten, längste Wartezeit) und d
 Reihe seiner Belegungsereignisse. Liste und Detail lesen dieselben Kennzahlen, das gekoppelte
 Gerät des Raums liest den Verlauf des eigenen Raums mit. Am Raum bucht die Führung oder das Gerät
 des Raums das Eintreffen einer Kraft, auch einer unangemeldeten, die das System als Einheit mit
-Meldung an die Einsatzleitung anlegt; die Führung übernimmt oder weist sie ab.
+Meldung an die Einsatzleitung anlegt; die Führung übernimmt oder weist sie ab. Die Führung ruft
+eine Kraft aus dem Raum ab, wahlweise mit Ziel-Abschnitt und Auftrag in einer Transaktion mit
+genau einem ETB-Eintrag; eine Einheit nimmt ihre Untereinheiten mit. Die abgerufene Kraft bleibt
+im Raum, bis ihr Ausrücken als Austritt gebucht ist; ein Abruf lässt sich zurücknehmen.
 
 ## Requirements
 
 ### Requirement: Wartezeit je Kraft im Raum
 Das Detail eines Bereitstellungsraums SHALL für jede Einheit und jedes einheitenlose Fahrzeug,
 das im Raum steht, den Zeitpunkt nennen, seit dem es dort steht („seit“). „Seit“ MUST der
-Zeitpunkt des jüngsten Belegungsereignisses des Objekts sein, gemessen an der
-Erfassungsreihenfolge, und MUST nur dann gesetzt sein, wenn dieses Ereignis ein Eintritt oder
-ein Wechsel in genau diesen Raum ist; sonst MUST „seit“ fehlen. Ein früherer Eintritt in einen
-anderen Raum MUST „seit“ nicht bestimmen. Zeitpunkte MUST als UTC ohne Zonenkennung
-(`YYYY-MM-DD HH:MM:SS`) übertragen werden.
+Zeitpunkt des jüngsten Eintritts, Wechsels oder Austritts des Objekts sein, gemessen an der
+Erfassungsreihenfolge; Abrufe und ihre Rücknahmen MUST dabei übergangen werden. „Seit“ MUST nur
+dann gesetzt sein, wenn dieses Ereignis ein Eintritt oder ein Wechsel in genau diesen Raum ist;
+sonst MUST „seit“ fehlen. Ein früherer Eintritt in einen anderen Raum MUST „seit“ nicht
+bestimmen. Zeitpunkte MUST als UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`) übertragen werden.
 
 #### Scenario: Eintritt
 - **WHEN** die Einheit „1. Zug“ um 13:42 in den BR Sportplatz eintritt
@@ -33,6 +36,11 @@ anderen Raum MUST „seit“ nicht bestimmen. Zeitpunkte MUST als UTC ohne Zonen
 - **WHEN** eine Einheit im Raum steht, für die kein Eintritt oder Wechsel in diesen Raum als
   jüngstes Ereignis vorliegt
 - **THEN** führt das Detail die Einheit ohne „seit“
+
+#### Scenario: Abruf ändert die Wartezeit nicht
+- **WHEN** „1. Zug“ um 13:42 in den BR Sportplatz eintritt, um 14:30 abgerufen wird und der
+  Abruf um 14:35 zurückgenommen wird
+- **THEN** nennt das Detail für „1. Zug“ „seit“ 13:42
 
 ### Requirement: Fahrzeuge der Einheiten im Raum
 Das Detail eines Bereitstellungsraums SHALL zu jeder Einheit im Raum ihre aktiven Fahrzeuge mit
@@ -91,13 +99,16 @@ Ein gekoppeltes Gerät eines Bereitstellungsraums MUST weiter nur seinen eigenen
 ### Requirement: Verlauf eines Raums lesen
 Das System SHALL je Bereitstellungsraum die vollständige Reihe seiner Belegungsereignisse liefern,
 ungeblättert, neueste zuerst nach Erfassungsreihenfolge. Die Reihe MUST Eintritte, Wechsel in den
-Raum, Wechsel aus dem Raum in einen anderen Raum und Austritte enthalten, auch Austritte durch
-Auflösen einer Einheit oder Entlassen eines Fahrzeugs. Jeder Eintrag MUST Zeitpunkt, Art,
-Objekttyp, Objektkennung, Objektname und, falls erfasst, die Notiz tragen; ein Wechsel in den Raum
-MUST den Herkunftsraum, ein Wechsel aus dem Raum den Zielraum nennen. Ein Objekt, das inzwischen
-aufgelöst oder entlassen ist, MUST mit seinem Namen erscheinen. Auch ein stornierter oder
-aufgelöster Raum MUST seine Reihe liefern. Ein Raum eines anderen Einsatzes oder ein unbekannter
-Raum MUST mit 404 antworten.
+Raum, Wechsel aus dem Raum in einen anderen Raum, Abrufe, Rücknahmen von Abrufen und Austritte
+enthalten, auch Austritte durch Auflösen einer Einheit oder Entlassen eines Fahrzeugs. Jeder
+Eintrag MUST Zeitpunkt, Art, Objekttyp, Objektkennung, Objektname und, falls erfasst, die Notiz
+tragen; ein Wechsel in den Raum MUST den Herkunftsraum, ein Wechsel aus dem Raum den Zielraum
+nennen. Ein Abruf MUST sein Ziel und, falls vorhanden, die Auftragsnummer nennen, der Abruf
+einer mitgenommenen Untereinheit die Einheit, mit der sie abgerufen wurde; ein Austritt, dem ein
+Abruf vorausging, MUST dessen Ziel nennen. Ein Objekt, das inzwischen aufgelöst oder
+entlassen ist, MUST mit seinem Namen erscheinen. Auch ein stornierter oder aufgelöster Raum MUST
+seine Reihe liefern. Ein Raum eines anderen Einsatzes oder ein unbekannter Raum MUST mit 404
+antworten.
 
 #### Scenario: Reihe mit Wechsel und Austritt
 - **WHEN** „1. Zug“ in den BR Sportplatz eintritt, danach in den BR Schule wechselt und dort
@@ -109,6 +120,12 @@ Raum MUST mit 404 antworten.
 - **WHEN** eine Einheit, die im BR Sportplatz steht, aufgelöst wird
 - **THEN** zeigt die Reihe des BR Sportplatz einen Austritt dieser Einheit mit der Notiz
   „Einheit aufgelöst“
+
+#### Scenario: Abruf und Ausrücken
+- **WHEN** „HLF 20“ aus dem BR Sportplatz nach „EA Deich“ mit Auftrag Nr. 7 abgerufen wird und
+  danach ausrückt
+- **THEN** zeigt die Reihe des BR Sportplatz „Austritt“ mit Ziel „EA Deich“ vor „Abruf“ mit Ziel
+  „EA Deich“ und Auftrag Nr. 7
 
 #### Scenario: Raum ohne Belegung
 - **WHEN** die Reihe eines Raums ohne Belegungsereignis abgerufen wird
@@ -326,3 +343,232 @@ aufgelöste Einheit MUST mit 409, eine Einheit ohne offene Übernahme mit 422 ab
 #### Scenario: Abweisen
 - **WHEN** die Einsatzleitung „FL-MUS 1-44-1“ abweist
 - **THEN** verzeichnet der BR ihren Austritt, die Einheit ist aufgelöst, ihre Zeitachse trägt die Entlassung, ihr Fahrzeug ist entlassen, die Meldung ist bestätigt, und das ETB trägt genau einen Eintrag „Einheit «FL-MUS 1-44-1» abgewiesen …“
+
+### Requirement: Kraft aus dem Raum abrufen
+Das System SHALL über `POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf` eine Einheit
+oder ein einheitenloses Fahrzeug, das im Raum `{bid}` steht, abrufen. Der Abruf MUST ein
+Belegungsereignis der Art `abruf` mit dem Zeitpunkt der Serveruhr schreiben und die Kraft im
+Raum lassen. Ziel-Abschnitt und Auftragstext MUST optional sein.
+
+#### Scenario: Abruf ohne Ziel
+- **WHEN** die Führung das „HLF 20“ aus dem BR Sportplatz ohne Abschnitt und ohne Auftrag abruft
+- **THEN** steht das „HLF 20“ weiter im BR Sportplatz und gilt dort als abgerufen
+- **AND** seine Unterstellung ist unverändert
+
+### Requirement: Vorbedingungen des Abrufs
+Der Raum MUST aktiv und nicht storniert sein, sonst 422. Die Kraft MUST im Raum `{bid}` stehen
+und MUST NOT schon abgerufen sein, sonst 422. Ein Fahrzeug, das einer Einheit angehört, MUST mit
+422 abgelehnt werden; es geht mit seiner Einheit. Ein unbekannter Objekttyp MUST mit 400, eine
+aufgelöste Einheit oder ein entlassenes Fahrzeug mit 409, eine Kraft eines anderen Einsatzes oder
+eine unbekannte Kraft mit 404 abgelehnt werden. Bei jeder Ablehnung MUST nichts geschrieben sein.
+
+#### Scenario: Kraft in einem anderen Raum
+- **WHEN** die Führung über den BR Sportplatz eine Einheit abruft, die im BR Schule steht
+- **THEN** antwortet das System mit 422, und nichts ist geschrieben
+
+#### Scenario: Zweiter Abruf
+- **WHEN** eine schon abgerufene Einheit noch einmal abgerufen wird
+- **THEN** antwortet das System mit 422, und es entsteht kein zweites Abruf-Ereignis
+
+#### Scenario: Fahrzeug einer Einheit
+- **WHEN** die Führung das Fahrzeug „Florian 1/44-1“ abruft, das zur Einheit „1. Zug“ im BR
+  Sportplatz gehört
+- **THEN** antwortet das System mit 422, und nichts ist geschrieben
+
+### Requirement: Abruf setzt die Unterstellung
+Ist ein Ziel-Abschnitt gewählt, SHALL der Abruf die abgerufene Einheit diesem Abschnitt
+unterstellen. Ohne Abschnitt MUST die Unterstellung unverändert bleiben. Ein Abschnitt eines
+anderen Einsatzes oder ein unbekannter Abschnitt MUST mit 404 abgelehnt werden, wie beim Anlegen
+eines Raums. Ein einheitenloses Fahrzeug hat keine Unterstellung; ein Abruf mit Abschnitt MUST
+dafür mit 422 abgelehnt werden.
+
+#### Scenario: Abruf mit Abschnitt
+- **WHEN** die Führung „HLF 20“ aus dem BR Sportplatz mit dem Abschnitt „EA Deich“ abruft
+- **THEN** ist „HLF 20“ dem Abschnitt „EA Deich“ unterstellt
+
+#### Scenario: Fahrzeug ohne Einheit mit Abschnitt
+- **WHEN** die Führung ein einheitenloses Fahrzeug mit Abschnitt abruft
+- **THEN** antwortet das System mit 422, und nichts ist geschrieben
+
+#### Scenario: Abschnitt eines anderen Einsatzes
+- **WHEN** die Führung „HLF 20“ mit einem Abschnitt eines anderen Einsatzes abruft
+- **THEN** antwortet das System mit 404, und nichts ist geschrieben
+
+### Requirement: Ziel bleibt im Nachweis
+Das Abruf-Ereignis MUST den Ziel-Abschnitt und dessen Namen zum Zeitpunkt des Abrufs tragen.
+Wird der Abschnitt später gelöscht, MUST der Bezug entfallen und der Name im Ereignis erhalten
+bleiben.
+
+#### Scenario: Abschnitt später gelöscht
+- **WHEN** „HLF 20“ nach „EA Deich“ abgerufen wurde und der Abschnitt „EA Deich“ danach aufgelöst
+  wird
+- **THEN** nennt der Abruf im Verlauf weiter „EA Deich“ als Ziel
+
+### Requirement: Abruf mit Auftrag
+Ist ein Auftragstext angegeben, SHALL der Abruf einen Auftrag mit diesem Text an die abgerufene
+Einheit bzw. das abgerufene Fahrzeug erteilen. Der Auftrag MUST dieselbe Prüfung und dieselben
+Vorgaben durchlaufen wie ein direkt erfasster Auftrag, als Ziel den Namen des Ziel-Abschnitts
+tragen, falls einer gewählt ist, und seine Anordnung nach der Auto-ETB-Regel des Einsatzes
+selbst schreiben. Das Abruf-Ereignis MUST auf den Auftrag verweisen. Ein leerer Text MUST als
+„kein Auftrag“ gelten. Ein Auftragstext über der Grenze des Auftragstexts MUST mit 400 abgelehnt
+werden, ohne dass etwas geschrieben ist.
+
+#### Scenario: Abruf mit Auftrag
+- **WHEN** die Führung „HLF 20“ nach „EA Deich“ mit dem Auftrag „Sandsackverbau“ abruft
+- **THEN** gibt es einen Auftrag „Sandsackverbau“ an „HLF 20“ mit dem Ziel „EA Deich“
+- **AND** der Abruf nennt die Nummer dieses Auftrags
+
+#### Scenario: Auftragstext zu lang
+- **WHEN** die Führung „HLF 20“ mit einem Auftragstext über der Grenze abruft
+- **THEN** antwortet das System mit 400, und es gibt weder Abruf noch Auftrag
+
+### Requirement: Genau ein ETB-Eintrag zum Abruf
+Der Abruf MUST genau einen System-Eintrag schreiben, der Kraft, Raum, gegebenenfalls Ziel und
+Auftragsnummer nennt, etwa „HLF 20 aus Bereitstellungsraum Sportplatz abgerufen nach EA Deich
+(Auftrag Nr. 7)“. Den Eintrag „Abschnitt zugeordnet“ des Einheitenwegs MUST der Abruf nicht
+schreiben; den Auftragstext MUST der Abruf-Eintrag nicht wiederholen.
+
+#### Scenario: Abruf mit Abschnitt im ETB
+- **WHEN** „HLF 20“ aus dem BR Sportplatz nach „EA Deich“ ohne Auftrag abgerufen wird
+- **THEN** steht im ETB genau ein neuer Eintrag „HLF 20 aus Bereitstellungsraum Sportplatz
+  abgerufen nach EA Deich“
+
+### Requirement: Abruf in einer Transaktion
+Belegungsereignis, Unterstellung, Auftrag samt Anordnung und der ETB-Eintrag zum Abruf SHALL in
+einer Transaktion entstehen; scheitert ein Teil, MUST nichts davon geschrieben sein.
+
+#### Scenario: ETB scheitert
+- **WHEN** beim Abruf mit Abschnitt das Schreiben des ETB-Eintrags scheitert
+- **THEN** gibt es kein Abruf-Ereignis, die Unterstellung ist unverändert, und kein Auftrag ist
+  angelegt
+
+### Requirement: Rechte des Abrufs
+Der Abruf und seine Rücknahme MUST das Schreibrecht auf das Modul Bereitstellungsräume im
+Einsatz verlangen. Mit Ziel-Abschnitt MUST der Abruf zusätzlich das Recht am Modul Einheiten,
+mit Auftragstext das Recht am Modul Aufträge verlangen und sonst mit 403 ablehnen, bevor etwas
+gelesen oder geschrieben wird. Ein gekoppeltes Gerät MUST weder abrufen noch einen Abruf
+zurücknehmen.
+
+#### Scenario: Aufträge gesperrt
+- **WHEN** eine Person ohne Recht am Modul Aufträge eine Kraft mit Auftragstext abruft
+- **THEN** antwortet das System mit 403, und nichts ist geschrieben
+
+#### Scenario: Einheiten gesperrt, ohne Abschnitt
+- **WHEN** eine Person ohne Recht am Modul Einheiten eine Kraft ohne Abschnitt abruft
+- **THEN** ist die Kraft abgerufen
+
+#### Scenario: Beobachter
+- **WHEN** ein Beobachter eine Kraft abruft
+- **THEN** antwortet das System mit 403
+
+### Requirement: Verband geht mit
+Ruft die Führung eine Einheit ab, SHALL der Abruf ihre Untereinheiten über alle Ebenen
+mitnehmen, die im selben Raum stehen und nicht schon abgerufen sind, je mit eigenem
+Abruf-Ereignis, das auf den Abruf der Einheit verweist. Unterstellung und Auftrag MUST nur an der
+abgerufenen Einheit gesetzt werden. Untereinheiten außerhalb des Raums und schon eigens
+abgerufene Untereinheiten MUST unberührt bleiben. Der ETB-Eintrag MUST die mitgenommenen
+Untereinheiten nennen.
+
+#### Scenario: Zug mit Gruppen
+- **WHEN** im BR Sportplatz der „1. Zug“ und seine Gruppen „Gruppe 1“ und „Gruppe 2“ stehen und
+  die Führung den „1. Zug“ nach „EA Deich“ abruft
+- **THEN** sind alle drei abgerufen, nur der „1. Zug“ ist „EA Deich“ unterstellt
+- **AND** das ETB nennt „1. Zug mit Gruppe 1, Gruppe 2“
+
+#### Scenario: Gruppe in anderem Raum
+- **WHEN** „Gruppe 2“ im BR Schule steht und der „1. Zug“ aus dem BR Sportplatz abgerufen wird
+- **THEN** bleibt „Gruppe 2“ im BR Schule unverändert
+
+#### Scenario: Gruppe eigens abgerufen
+- **WHEN** „Gruppe 1“ nach „EA Nord“ abgerufen ist und danach der „1. Zug“ nach „EA Deich“
+  abgerufen wird
+- **THEN** behält „Gruppe 1“ ihren Abruf nach „EA Nord“ und geht nicht mit dem „1. Zug“
+
+### Requirement: Abgerufene Kraft bleibt im Raum, bis sie ausrückt
+Eine Kraft SHALL als abgerufen gelten, solange ihr jüngstes Belegungsereignis ein Abruf in diesem
+Raum ist; der Zustand MUST aus der Belegungsreihe abgeleitet werden. Eine abgerufene Kraft MUST
+weiter im Raum stehen: in Belegung, Stärke und Kennzahlen des Raums, und ein Raum mit ihr MUST
+sich nicht auflösen lassen.
+
+#### Scenario: Stärke bleibt
+- **WHEN** im BR Sportplatz zwei Einheiten stehen und eine davon abgerufen wird
+- **THEN** zählt der BR Sportplatz weiter zwei Einheiten
+
+### Requirement: Detail nennt den Abruf
+Das Detail eines Raums MUST je abgerufener Einheit und je abgerufenem einheitenlosem Fahrzeug den
+Zeitpunkt des Abrufs („abgerufen seit“), den Namen des Ziels und die Nummer des Auftrags tragen,
+soweit vorhanden, bei einer mitgenommenen Untereinheit die Einheit, mit der sie abgerufen wurde.
+Eine nicht abgerufene Kraft MUST keinen Abruf tragen.
+
+#### Scenario: Abgerufen seit
+- **WHEN** „HLF 20“ um 14:30 nach „EA Deich“ mit Auftrag Nr. 7 abgerufen wird
+- **THEN** nennt das Detail bei „HLF 20“ „abgerufen seit“ 14:30, „EA Deich“ und Auftrag Nr. 7
+
+### Requirement: Ausrücken nach dem Abruf
+Ein Austritt über die Belegungsroute SHALL das Ausrücken einer abgerufenen Kraft buchen. War das
+jüngste Ereignis ein Abruf, MUST der ETB-Eintrag das Ziel aus dem Abruf nennen, etwa „HLF 20
+rückt aus Bereitstellungsraum Sportplatz aus nach EA Deich“; sonst MUST er wie bisher „verlässt
+Bereitstellungsraum“ lauten. Der Austritt einer abgerufenen Einheit MUST in derselben
+Transaktion die Untereinheiten austragen, die mit ihr abgerufen wurden und es noch sind; eigens
+abgerufene oder zurückgenommene Untereinheiten MUST im Raum bleiben.
+
+#### Scenario: Ausrücken bestätigt
+- **WHEN** „HLF 20“ nach „EA Deich“ abgerufen ist und danach der Austritt gebucht wird
+- **THEN** steht „HLF 20“ in keinem Raum mehr, und das ETB nennt „rückt aus Bereitstellungsraum
+  Sportplatz aus nach EA Deich“
+
+#### Scenario: Verband rückt aus
+- **WHEN** der „1. Zug“ mit „Gruppe 1“ abgerufen ist und der Austritt für den „1. Zug“ gebucht
+  wird
+- **THEN** stehen „1. Zug“ und „Gruppe 1“ in keinem Raum mehr
+
+### Requirement: Abrufen und sofort austragen
+Mit `ausgerueckt: true` SHALL der Abruf in derselben Transaktion den Austritt jeder abgerufenen
+Kraft schreiben. Der ETB-Eintrag MUST dann einer bleiben und das Ausrücken nennen.
+
+#### Scenario: Lage ohne Einweiser
+- **WHEN** die Führung „HLF 20“ nach „EA Deich“ mit `ausgerueckt: true` abruft
+- **THEN** steht „HLF 20“ in keinem Raum mehr und ist „EA Deich“ unterstellt
+- **AND** im ETB steht genau ein Eintrag „HLF 20 aus Bereitstellungsraum Sportplatz abgerufen
+  nach EA Deich und ausgerückt“
+
+### Requirement: Abruf zurücknehmen
+Das System SHALL über `POST …/bereitstellungsraeume/{bid}/abruf/aufheben` einen Abruf
+zurücknehmen, wenn das jüngste Ereignis der Kraft ein Abruf in diesem Raum ist, sonst 422. Die
+Rücknahme MUST ein Ereignis der Art `abruf_aufgehoben` schreiben, die mit abgerufenen
+Untereinheiten einschließen, einen ETB-Eintrag schreiben und Unterstellung und Auftrag unverändert
+lassen. Danach MUST die Kraft wieder als bereitgestellt gelten.
+
+#### Scenario: Fehlabruf
+- **WHEN** „HLF 20“ irrtümlich abgerufen wurde und die Führung den Abruf zurücknimmt
+- **THEN** gilt „HLF 20“ im BR Sportplatz wieder als bereitgestellt
+- **AND** im ETB steht „Abruf von HLF 20 aus Bereitstellungsraum Sportplatz zurückgenommen“
+
+#### Scenario: Nichts abgerufen
+- **WHEN** die Führung den Abruf einer Kraft zurücknimmt, die nicht abgerufen ist
+- **THEN** antwortet das System mit 422
+
+### Requirement: Belegungsroute nimmt keinen Abruf an
+`POST …/bereitstellungsraeume/{bid}/belegung` MUST die Arten `abruf` und `abruf_aufgehoben` mit
+422 ablehnen und nichts schreiben. Einen Wechsel einer abgerufenen Kraft in einen anderen Raum
+MUST die Route mit 422 ablehnen; erst die Rücknahme des Abrufs macht ihn möglich.
+
+#### Scenario: Abruf über die Belegung
+- **WHEN** jemand über die Belegungsroute eine Belegung mit der Art `abruf` schickt
+- **THEN** antwortet das System mit 422
+
+#### Scenario: Abgerufene Kraft verlegen
+- **WHEN** „HLF 20“ im BR Sportplatz abgerufen ist und ein Wechsel in den BR Schule gebucht wird
+- **THEN** antwortet das System mit 422, und „HLF 20“ steht weiter abgerufen im BR Sportplatz
+
+### Requirement: Abruf live
+Nach dem Commit eines Abrufs, einer Rücknahme oder eines Ausrückens SHALL das System für den
+Raum das Live-Ereignis `bereitstellungsraum` senden, für jede betroffene Einheit `einheit`, für
+ein einheitenloses Fahrzeug `fahrzeug`, mit Auftrag `auftrag` und für den ETB-Eintrag das
+ETB-Ereignis. Einen Ton oder eine Benachrichtigung MUST der Abruf nicht auslösen.
+
+#### Scenario: Gerät erfährt den Abruf
+- **WHEN** die Führung eine Kraft aus dem BR Sportplatz mit Auftrag abruft und ein Gerät des BR
+  Sportplatz verbunden ist
+- **THEN** erhält das Gerät das Ereignis `bereitstellungsraum`, aber weder `etb` noch `auftrag`,
+  und spielt keinen Ton

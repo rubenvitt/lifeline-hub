@@ -313,6 +313,62 @@ pub struct AuftragDetail {
     pub empfaenger: Vec<AuftragEmpfaengerAnzeige>,
 }
 
+/// Nach dem Commit eines neu erteilten Auftrags (LLH-1085, design.md D9): Auto-Frist-Erinnerung
+/// bei gesetzter Quittierfrist (LFH-118), ETB-Live der Anordnung, Benachrichtigung `erteilt` und
+/// Live `auftrag`. Gemeinsam für `POST …/auftraege` und den Abruf aus dem Bereitstellungsraum.
+pub async fn nach_erteilung(
+    state: &crate::app::AppState,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    benutzer_id: i64,
+    now: &str,
+) -> Result<(), crate::error::AppError> {
+    let (lfd_nr, frist_at, etb_anordnung_id): (Option<i64>, Option<String>, Option<i64>) =
+        sqlx::query_as(
+            "SELECT lfd_nr, frist_at, etb_anordnung_id FROM auftrag \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(auftrag_id)
+        .bind(einsatz_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or(crate::error::AppError::NotFound)?;
+    // Nachfass/Eskalation (LFH-118): bei gesetzter Quittierfrist eine Auto-Frist-Erinnerung
+    // anlegen (idempotent, quelle='auto_frist', bezug_typ='auftrag'). Der Scheduler-Tick feuert
+    // bei Fristablauf `erinnerung` mit Diskriminator → In-App-Alarm; Quittieren aller Empfänger
+    // schließt sie wieder.
+    if let Some(frist) = frist_at.as_deref() {
+        let titel = quittierfrist_titel(lfd_nr);
+        crate::erinnerung::repo::anlegen_aus_frist(
+            &state.pool,
+            einsatz_id,
+            benutzer_id,
+            crate::kommunikation::OBJEKT_AUFTRAG,
+            auftrag_id,
+            &titel,
+            frist,
+            now,
+        )
+        .await?;
+    }
+    // ETB-Anordnung entstand im selben Commit → ETB-Live-Event mitschicken.
+    if let Some(etb_id) = etb_anordnung_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+    benachrichtigung::erteilt(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        auftrag_id,
+        benutzer_id,
+    )
+    .await;
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Auftrag);
+    Ok(())
+}
+
 /// Setzt `aktuelle_besetzung` an Funktionsempfängern mit Sachgebietscode (LFH-549). Die
 /// Besetzung wird einmal je Anfrage geladen, nur mit Stab-Recht (`fuehrung::aufloesung`).
 pub async fn anreichern_alle(
