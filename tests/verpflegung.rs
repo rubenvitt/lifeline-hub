@@ -2509,3 +2509,64 @@ async fn empfaengerliste_ohne_modul_einheiten() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(u["empfaenger"]["einheiten"][0]["name"], "2. Gruppe");
 }
+
+/// Spec „Einheit geändert, Leser nur der Verpflegung“ und „Personal geändert, Leser nur der
+/// Verpflegung“ (design.md D4): Ein Leser, der von den Kräften nur die Verpflegung sieht, bekommt
+/// `einheit` und `abschnitt`, aber nicht `personal`.
+#[tokio::test]
+async fn live_einheit_erreicht_verpflegungsleser() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    for modul in ["einheiten", "lagekarte", "einsatzabschnitte", "personal"] {
+        modul_override(&app, &admin, e, modul, true, Some("fuehrungskraft")).await;
+    }
+    let deich = abschnitt(&app, &admin, e, "Deich").await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/abschnitte"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Vorbedingung: keine Abschnitte");
+    let (s, _) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: Verpflegung lesbar");
+
+    let feed_frieda = live_oeffnen(&app, &frieda, e).await;
+    let feed_admin = live_oeffnen(&app, &admin, e).await;
+    einheit_bilden(&app, &admin, e, "4. Gruppe").await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/abschnitte/{deich}"),
+        &admin,
+        Some(r#"{"name":"Deich Nord"}"#),
+    )
+    .await;
+    assert!(s.is_success(), "Abschnitt umbenennen: {s}");
+    stammpersonal_disponieren(&app, &admin, e, "Anna Kraft").await;
+
+    let bei_frieda = sse_anfang_lesen(feed_frieda.into_body(), 400).await;
+    let bei_admin = sse_anfang_lesen(feed_admin.into_body(), 400).await;
+    assert!(
+        bei_admin.contains("event: personal"),
+        "Gegenprobe: das Personal-Ereignis wurde verteilt: {bei_admin:?}"
+    );
+    assert!(
+        bei_frieda.contains("event: einheit"),
+        "Verpflegungsleser bekommt `einheit`: {bei_frieda:?}"
+    );
+    assert!(
+        bei_frieda.contains("event: abschnitt"),
+        "Verpflegungsleser bekommt `abschnitt`: {bei_frieda:?}"
+    );
+    assert!(
+        !bei_frieda.contains("event: personal"),
+        "aber nicht `personal`: {bei_frieda:?}"
+    );
+}
