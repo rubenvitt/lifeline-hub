@@ -142,11 +142,27 @@ export default function AbloesungKarte({
             </span>
           </Text>
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
-              Zeile darf sie berühren. Die kurzen Quellenwörter halten auch 167:59 h als Vorgabe
-              des Einsatzes auf 390 px einzeilig (LFH-708, LLH-1122); den Abschnitt nennt die
-              Zeile darüber, deshalb heißt seine Vorgabe nur „Vorgabe“. */}
-          <Text type="secondary" data-lfh="abloesung-rhythmus">
-            Rhythmus {formatDauer(s.rhythmus_minuten)} ({QUELLE_WORT[s.rhythmus_quelle]})
+              Zeile darf sie berühren; sie bleibt deshalb immer einzeilig (LFH-708). Den Abschnitt
+              nennt die Zeile darüber, seine Vorgabe heißt nur „Vorgabe“. „Vorgabe Einsatz“
+              (LLH-1122) passt auf 390 px in `komfortabel` für jeden Wert (167:59 h: 252 von
+              256 px); nur im Handschuh-Betrieb auf 390 px kürzt die Zeile bei Werten mit Minuten
+              oder ab 100 h das Quellenwort mit „…“, nie den Wert, und der ganze Text steht im
+              `title` (gemessen in `e2e/abloesung-zufluss.spec.ts`). */}
+          <Text
+            type="secondary"
+            data-lfh="abloesung-rhythmus"
+            title={`Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`}
+            style={{
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <span data-lfh="abloesung-rhythmus-wert">
+              Rhythmus {formatDauer(s.rhythmus_minuten)}
+            </span>{' '}
+            ({QUELLE_WORT[s.rhythmus_quelle]})
           </Text>
           {s.abloesende_einheit_name && (
             <Text type="secondary">
