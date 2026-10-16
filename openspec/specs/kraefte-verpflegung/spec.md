@@ -697,6 +697,18 @@ zeigen, die Zähltasten gesperrt stehen lassen und „Zurücknehmen“ weglassen
 und Modulsichtbarkeit“). Die Startseite des Verpflegungsgeräts MUST die Liste der Zeitfenster
 bleiben.
 
+Gibt es im Einsatz Verpflegungsstellen, MUST die Ansicht im Kopf eine Stellenwahl führen:
+„ohne Stelle“, die dem Zeitfenster zugeordneten Stellen zuerst, dann die übrigen, ohne
+aufgelöste. Daneben MUST sie die an der gewählten Stelle im Zeitfenster ausgegebene Menge zeigen.
+Beim Öffnen MUST die Ansicht vorwählen, in dieser Reihenfolge: die Stelle aus der Adresse
+(`?stelle=`, der Sprung „Ausgabe öffnen“ aus der Zeile einer Stelle an der Karte), die in diesem
+Browser für den Einsatz gemerkte Wahl, die einzige zugeordnete Stelle, sonst „ohne Stelle“; eine
+nicht wählbare Stelle wird dabei übersprungen. Die Vorwahl gilt beim Öffnen: Eine Änderung der
+Zuordnung bei offener Ansicht MUST NOT die Wahl ändern. Die Wahl ändert sich nur durch die Person
+oder, wenn die gewählte Stelle aufgelöst wird, auf „ohne Stelle“. Die Stabsoberfläche MUST die
+Wahl je Einsatz im Browser merken (bei jedem Ende der Anmeldung geräumt); das
+Verpflegungsgerät MUST nichts merken. Ohne Stellen im Einsatz MUST die Stellenwahl fehlen.
+
 #### Scenario: Ansicht öffnen
 - **WHEN** eine Person mit Schreibrecht am laufenden Zeitfenster „Mittag“ (Bedarf 150, ausgegeben 80) „Ausgabe öffnen“ wählt
 - **THEN** öffnet die Ausgabeansicht unter der Adresse des Zeitfensters und zeigt Bedarf 150, ausgegeben 80 und fehlt 70
@@ -727,6 +739,26 @@ bleiben.
 - **WHEN** das Verpflegungsgerät nach dem Koppeln oder Neuladen seine Startseite öffnet
 - **THEN** zeigt es die Liste der Zeitfenster, nicht die Ausgabeansicht eines Zeitfensters
 
+#### Scenario: Ausgabe an einer Stelle öffnen
+- **WHEN** „Mittag“ der Feldküche (100 EP ausgegeben) und der Turnhalle zugeordnet ist und eine Person an der Karte in der Zeile der Feldküche „Ausgabe öffnen“ wählt
+- **THEN** öffnet die Ausgabeansicht mit der Feldküche gewählt und zeigt an ihr 100 EP
+
+#### Scenario: Einzige zugeordnete Stelle
+- **WHEN** „Mittag“ nur der Feldküche zugeordnet ist und eine Person die Ausgabeansicht ohne Stelle in der Adresse und ohne gemerkte Wahl öffnet
+- **THEN** ist die Feldküche gewählt
+
+#### Scenario: Zuordnung ändert sich beim Zählen
+- **WHEN** die Ausgabeansicht von „Mittag“ mit der Feldküche als einziger zugeordneter Stelle geöffnet ist und ein anderer Client „Mittag“ zusätzlich der Turnhalle zuordnet
+- **THEN** bleibt die Feldküche gewählt, und die offene Sammlung zählt weiter an ihr
+
+#### Scenario: Gerät merkt nichts
+- **WHEN** das Verpflegungsgerät in der Ausgabeansicht von „Mittag“ (zwei zugeordnete Stellen) die Turnhalle wählt und die Ansicht später erneut öffnet
+- **THEN** ist „ohne Stelle“ gewählt
+
+#### Scenario: Aufgelöste Stelle nicht wählbar
+- **WHEN** die Feldküche aufgelöst ist und eine Person die Ausgabeansicht von „Mittag“ öffnet, auch mit der Feldküche in der Adresse
+- **THEN** bietet die Stellenwahl die Feldküche nicht an, und sie ist nicht gewählt
+
 ### Requirement: Ausgabe zählen
 
 Die Ausgabeansicht SHALL Portionen durch Tippen zählen: „+1“, „+5“ und „+10“ zählen so viele
@@ -742,6 +774,7 @@ eintritt:
 - 15 s nach dem ersten Tipp der Sammlung,
 - 50 oder mehr Portionen in der Sammlung,
 - „Buchen“,
+- Wechsel der Stelle (Requirement „Ausgabeansicht eines Zeitfensters“),
 - das Zeitfenster wird vergangen,
 - Wechsel des Zeitfensters oder Verlassen der Ansicht,
 - die Seite wird verborgen oder beendet.
@@ -754,7 +787,8 @@ gilt die Serveruhr), eine vorgemerkte MUST den Zeitpunkt ihres Abschlusses trage
 Sammlung MUST keine Anfrage erzeugen. „Menge …“ MUST NOT mehr zulassen, als die Sammlung bis
 zur Höchstmenge des Servers je Ausgabe noch aufnehmen kann. In einem vergangenen Zeitfenster
 MUST die Ansicht nicht zählen. Die Zähltasten stehen dort gesperrt mit Grund, und das Nachtragen
-bleibt möglich.
+bleibt möglich. Eine Sammlung MUST die Stelle tragen, die bei ihrem ersten Tipp gewählt war;
+ohne gewählte Stelle geht sie ohne Stelle.
 
 #### Scenario: Zählen und nach Ruhe buchen
 - **WHEN** eine Person mit Verbindung im laufenden Zeitfenster „Mittag“ zwanzigmal „+1“ tippt und dann 3 s nichts tippt
@@ -807,6 +841,11 @@ bleibt möglich.
 - **WHEN** eine Person ohne Netzverbindung zehnmal „+1“ tippt und 3 s wartet
 - **THEN** steht eine Ausgabe über 10 EP als „ausstehend“ an der Ansicht, und Fehlmenge und Einstufung bleiben unverändert
 - **AND** nach wiederhergestellter Verbindung ist sie genau einmal gespeichert, und die ausgegebene Menge ist um 10 gestiegen
+
+#### Scenario: Wechsel der Stelle
+- **WHEN** eine Person mit Verbindung an der Feldküche fünfmal „+1“ tippt und vor Ablauf der Ruhe die Turnhalle wählt
+- **THEN** ist sofort eine Ausgabe über 5 EP an der Feldküche gespeichert
+- **AND** der nächste Tipp beginnt eine neue Sammlung, die an der Turnhalle gebucht wird
 
 #### Scenario: Vergangenes Zeitfenster
 - **WHEN** die Ausgabeansicht eines Zeitfensters gezeigt wird, dessen Ende vorbei ist
