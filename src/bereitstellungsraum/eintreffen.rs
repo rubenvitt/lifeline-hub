@@ -779,7 +779,7 @@ mod tests {
     }
 
     async fn br(pool: &SqlitePool, e: i64, b: i64, bez: &str, abschnitt_id: Option<i64>) -> i64 {
-        let br = br_repo::anlegen(
+        let br = br_repo::create(
             pool,
             e,
             b,
@@ -788,6 +788,8 @@ mod tests {
                 abschnitt_id,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await
@@ -1187,7 +1189,7 @@ mod tests {
     async fn raum_geplant_oder_storniert_422() {
         let pool = test_pool().await;
         let (b, e) = basis(&pool).await;
-        let geplant = br_repo::anlegen(
+        let geplant = br_repo::create(
             &pool,
             e,
             b,
@@ -1196,6 +1198,8 @@ mod tests {
                 abschnitt_id: None,
                 standort: None,
                 notiz: None,
+                lat: None,
+                lon: None,
             },
         )
         .await

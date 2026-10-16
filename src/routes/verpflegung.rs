@@ -14,15 +14,17 @@
 //!   `STELLEN_JE_ZEITFENSTER_MAX` Stellen, keine oder mehr als `AUS_VORLAGE_MAX` Zeitfenster
 //!   eines Tages.
 //! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung, fremde
-//!   Verpflegungsstelle im Pfad, fremder Abschnitt.
+//!   Verpflegungsstelle im Pfad, fremder Abschnitt, fremde oder unbekannte Empfänger-Einheit bzw.
+//!   Empfänger-Abschnitt einer Ausgabe (LLH-1055 D2).
 //! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Bezeichnung einer
-//!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle mit einem Zeitpunkt nicht vor der
-//!   Auflösung (LLH-1040 D3).
+//!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle (LLH-1040 D3) oder an eine
+//!   aufgelöste Einheit (LLH-1055 D2) mit einem Zeitpunkt nicht vor der Auflösung.
 //! - **422** — der Zusammenhang: Ende nicht nach Beginn, Sonderkost über Gesamtbedarf bzw.
 //!   Menge, Löschen mit gültiger Ausgabe, zweite Rücknahme, unzulässiger Statusübergang einer
 //!   Stelle, Storno einer nicht geplanten Stelle oder einer Stelle mit Ausgabe, halbe Koordinate,
 //!   Verweis im Body (Ausgabe, Zuordnung) auf eine fremde, unbekannte oder stornierte Stelle,
-//!   neue Zuordnung einer aufgelösten Stelle; beim Tag aus der Vorlage Tagesgrenzen nicht 23
+//!   neue Zuordnung einer aufgelösten Stelle, Ausgabe mit Einheit und Abschnitt zugleich
+//!   (höchstens ein Empfänger, LLH-1055); beim Tag aus der Vorlage Tagesgrenzen nicht 23
 //!   bis 25 Stunden auseinander, Beginn außerhalb des Tages, Bezeichnung doppelt in der Anfrage.
 //!
 //! **Tag aus der Vorlage** (LLH-1058, design.md D3): `POST …/zeitfenster/aus-vorlage` legt die
@@ -101,7 +103,7 @@ fn parse_verpflegungsart(s: Option<&str>) -> Result<Option<Verpflegungsart>, App
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
 /// GET /api/einsaetze/{id}/verpflegung — alle Zeitfenster nach Beginn, je mit Deckung und
-/// Ausgaben.
+/// Ausgaben, dazu die Stellen und die Empfängerliste (LLH-1055 D3, auch ohne Modul `einheiten`).
 pub async fn uebersicht(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Verpflegung>,
@@ -407,6 +409,13 @@ pub struct AusgabeErfassen {
     /// aufgelöst 409 (außer mit einem Zeitpunkt vor der Auflösung).
     #[serde(default)]
     verpflegungsstelle_id: Option<i64>,
+    /// Empfänger-Einheit desselben Einsatzes (LLH-1055 D2); fremd oder unbekannt 404, aufgelöst
+    /// 409 (außer mit einem Zeitpunkt vor der Auflösung). Mit `abschnitt_id` zusammen 422.
+    #[serde(default)]
+    einheit_id: Option<i64>,
+    /// Empfänger-Abschnitt desselben Einsatzes (Zuführung, LLH-1055 D2); fremd oder unbekannt 404.
+    #[serde(default)]
+    abschnitt_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688): leer = fehlend, > 64 Zeichen = 400.
     #[serde(default)]
     client_id: Option<String>,
@@ -475,6 +484,8 @@ pub async fn ausgabe_erfassen(
         sonderkost: req.sonderkost.unwrap_or_default(),
         nachforderung_id: req.nachforderung_id,
         verpflegungsstelle_id: req.verpflegungsstelle_id,
+        einheit_id: req.einheit_id,
+        abschnitt_id: req.abschnitt_id,
         client_id,
     };
     let benutzer_id = ctx.benutzer.id;

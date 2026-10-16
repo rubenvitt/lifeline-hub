@@ -118,7 +118,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
-  nur `anzeige/staerke.ts:staerkeText`. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
+  nur `anzeige/staerke.ts:staerkeText`. Belegung eines Bereitstellungsraums (LLH-1095, Spec
+  `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
+  des Servers (Liste und Detail), Stärke im Raum nur über `staerkeImRaum`
+  (`bereitstellungsraum/brZahlen.ts`); „noch n belegt“ vor dem Auflösen zählt wie
+  `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
 - **Eine Baumlogik der Kräfte: `kraefte/kraeftebaumKern.ts`** (LLH-1025, Spec `kraeftebaum`).

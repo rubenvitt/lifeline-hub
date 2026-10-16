@@ -229,6 +229,7 @@ async fn snapshot_hat_alle_quellen_und_friert_org_default_ein() {
         "bilder",
         "betreuungsstellen",
         "evakuierungsbezirke",
+        "bereitstellungsraeume",
     ] {
         assert!(
             snap.daten[key].is_array(),
@@ -583,6 +584,145 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     assert_eq!(
         dok["daten"]["betreuungsstellen"].as_array().unwrap().len(),
         1
+    );
+}
+
+// ---------- LLH-1107: Bereitstellungsräume im Stand ----------
+
+/// Ein verorteter aktiver Raum mit einer Einheit friert Koordinate, Status und Kennzahlen der
+/// Belegung ein; ein Leser, für den das Modul ausgeblendet ist, bekommt `[]`.
+#[tokio::test]
+async fn snapshot_friert_br_ein_und_redigiert_ihn_ohne_modulrecht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (s, raum) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Sportplatz","lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{raum:?}");
+    let br = raum["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{br}/status"),
+        &admin,
+        Some(r#"{"status":"aktiv"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let zug = common::einheit_bilden(&app, &admin, e, "1. Zug").await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{br}/belegung"),
+        &admin,
+        Some(&format!(
+            r#"{{"objekt_typ":"einheit","objekt_id":{zug},"art":"eintritt"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+
+    let snap = repo::erzeuge(&pool, e, benutzer_id, Some("S"), None)
+        .await
+        .unwrap();
+    let eingefroren = &snap.daten["bereitstellungsraeume"][0];
+    assert_eq!(eingefroren["bezeichnung"], "BR Sportplatz", "{eingefroren}");
+    assert_eq!(eingefroren["lat"], 51.93);
+    assert_eq!(eingefroren["lon"], 8.87);
+    assert_eq!(eingefroren["status"], "aktiv");
+    assert_eq!(eingefroren["belegung"]["einheiten"], 1);
+    assert_eq!(eingefroren["einheit_ids"], json!([zug]));
+
+    // Für einen Beobachter ist das Modul ausgeblendet: das Feld kommt leer.
+    let leser_id = benutzer_anlegen(&app, &admin, "leser3", "keine").await;
+    rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
+    let leser = login_cookie(&app, "leser3", "leser3pw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
+    // Der Admin liest ihn weiter.
+    let (_, dok) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(
+        dok["daten"]["bereitstellungsraeume"][0]["lat"], 51.93,
+        "{dok}"
+    );
+}
+
+/// Auch die Antworten von „Stand sichern“ (POST) und PATCH tragen `daten`; sie werden wie das GET
+/// auf die Modulrechte geschwärzt. Führungspersonal mit Schreibrecht auf die Lagekarte, für das
+/// das Modul Bereitstellungsräume ausgeblendet ist, bekommt in beiden `[]`.
+#[tokio::test]
+async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
+    let (app, e, admin) = setup_http().await;
+    let (s, raum) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"bezeichnung":"BR Sportplatz","lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{raum:?}");
+    let fuehr_id = benutzer_anlegen(&app, &admin, "fuehrer7", "keine").await;
+    rolle_setzen(&app, &admin, e, fuehr_id, "fuehrungspersonal").await;
+    let fuehr = login_cookie(&app, "fuehrer7", "fuehrer7pw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, dok) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &fuehr,
+        Some(r#"{"bezeichnung":"vom Fuehrer"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{dok:?}");
+    assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
+    let sid = dok["id"].as_i64().unwrap();
+
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{sid}");
+    let (s, dok) = anfrage(&app, "PATCH", &pfad, &fuehr, Some(r#"{"notiz":"n"}"#)).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert_eq!(dok["notiz"], "n");
+    assert_eq!(dok["daten"]["bereitstellungsraeume"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Sportplatz"), "{dok}");
+
+    // Eingefroren ist der Raum trotzdem: die Einsatzleitung liest ihn im selben Stand.
+    let (_, dok) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"notiz":"m"}"#)).await;
+    assert_eq!(
+        dok["daten"]["bereitstellungsraeume"][0]["bezeichnung"], "BR Sportplatz",
+        "{dok}"
     );
 }
 

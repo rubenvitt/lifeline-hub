@@ -4,8 +4,9 @@
 use super::*;
 use crate::einsatz::nummer::ZEITZONE_VORGABE;
 use crate::error::AppError;
+use crate::staerke::Staerke;
 use crate::verpflegung::stelle::{VerpflegungsstelleArt, VerpflegungsstelleStatus};
-use crate::verpflegung::{SonderkostEingabe, Verpflegungsart};
+use crate::verpflegung::{SonderkostEingabe, VerpflegungEmpfaenger, Verpflegungsart};
 use crate::write_retry;
 use axum::http::StatusCode;
 
@@ -95,6 +96,8 @@ fn ausgabe_eingabe(menge: i64) -> AusgabeEingabe {
         sonderkost: SonderkostEingabe::default(),
         nachforderung_id: None,
         verpflegungsstelle_id: None,
+        einheit_id: None,
+        abschnitt_id: None,
         client_id: None,
     }
 }
@@ -1345,6 +1348,473 @@ async fn aufgeloeste_stelle_ohne_ausgabe_storno_422() {
         1,
         "nur „… aufgelöst.“, kein Gegenstück"
     );
+}
+
+// ── Empfänger (LLH-1055, design.md D1–D3) ───────────────────────────────────────────────────
+
+/// Eine Einheit im Einsatz `e`.
+async fn einheit_in(
+    w: &Welt,
+    e: i64,
+    name: &str,
+    ueber: Option<i64>,
+    abschnitt: Option<i64>,
+) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name, ueber_einheit_id, abschnitt_id) \
+         VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(e)
+    .bind(name)
+    .bind(ueber)
+    .bind(abschnitt)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+async fn einheit(w: &Welt, name: &str, ueber: Option<i64>) -> i64 {
+    einheit_in(w, w.e, name, ueber, None).await
+}
+
+/// Ein Abschnitt im Einsatz `e`.
+async fn abschnitt_in(w: &Welt, e: i64, name: &str, ueber: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatzabschnitt (einsatz_id, name, ueber_abschnitt_id) \
+         VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(e)
+    .bind(name)
+    .bind(ueber)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// `f` Führer, `uf` Unterführer und `m` Mannschaft als disponiertes Personal der Einheit.
+async fn kraefte(w: &Welt, einheit: i64, f: usize, uf: usize, m: usize) {
+    for (n, position) in [(f, "fuehrer"), (uf, "unterfuehrer"), (m, "mannschaft")] {
+        for i in 0..n {
+            sqlx::query(
+                "INSERT INTO einsatz_personal (einsatz_id, snap_name, staerke_position, einheit_id) \
+                 VALUES (?, ?, ?, ?)",
+            )
+            .bind(w.e)
+            .bind(format!("Kraft {einheit}-{position}-{i}"))
+            .bind(position)
+            .bind(einheit)
+            .execute(&w.pool)
+            .await
+            .unwrap();
+        }
+    }
+}
+
+/// Ein Ereignis der Zeitachse an der Einheit; `gestrichen` streicht es gleich.
+async fn zeitachse(w: &Welt, einheit: i64, art: &str, zeitpunkt_at: &str, gestrichen: bool) {
+    sqlx::query(
+        "INSERT INTO einsatz_kraft_zeitachse \
+            (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von, gestrichen_at, \
+             gestrichen_von, streichgrund) \
+         VALUES (?, ?, ?, ?, 'nachtrag', ?, ?, ?, ?)",
+    )
+    .bind(w.e)
+    .bind(einheit)
+    .bind(art)
+    .bind(zeitpunkt_at)
+    .bind(w.b)
+    .bind(gestrichen.then_some("2026-09-24 08:00:00"))
+    .bind(gestrichen.then_some(w.b))
+    .bind(gestrichen.then_some("vertippt"))
+    .execute(&w.pool)
+    .await
+    .unwrap();
+}
+
+fn an_einheit(menge: i64, einheit: i64) -> AusgabeEingabe {
+    AusgabeEingabe {
+        einheit_id: Some(einheit),
+        ..ausgabe_eingabe(menge)
+    }
+}
+
+fn an_abschnitt(menge: i64, abschnitt: i64) -> AusgabeEingabe {
+    AusgabeEingabe {
+        abschnitt_id: Some(abschnitt),
+        ..ausgabe_eingabe(menge)
+    }
+}
+
+async fn empfaenger_von(w: &Welt) -> VerpflegungEmpfaenger {
+    liste(&w.pool, w.e).await.unwrap().empfaenger
+}
+
+/// Spec „Abholung durch eine Einheit“ und „Zuführung an einen Abschnitt“: die Ausgabe trägt
+/// genau die Kennung ihres Empfängers, gespeichert und geladen.
+#[tokio::test]
+async fn ausgabe_traegt_empfaenger() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let gruppe = einheit(&w, "2. Gruppe", None).await;
+    let deich = abschnitt_in(&w, w.e, "Deich", None).await;
+    let a = ausgabe(&w, zid, an_einheit(9, gruppe)).await.unwrap();
+    let z = ausgabe(&w, zid, an_abschnitt(40, deich)).await.unwrap();
+
+    let zf = laden(&w, zid).await;
+    let geladen = |id: i64| zf.ausgaben.iter().find(|x| x.id == id).unwrap();
+    assert_eq!(
+        (
+            geladen(a.ausgabe_id).einheit_id,
+            geladen(a.ausgabe_id).abschnitt_id
+        ),
+        (Some(gruppe), None)
+    );
+    assert_eq!(
+        (
+            geladen(z.ausgabe_id).einheit_id,
+            geladen(z.ausgabe_id).abschnitt_id
+        ),
+        (None, Some(deich))
+    );
+    assert_eq!(zf.ausgegeben.gesamt, 49, "beide zählen in die Deckung");
+    let gespeichert: Vec<(Option<i64>, Option<i64>)> =
+        sqlx::query_as("SELECT einheit_id, abschnitt_id FROM verpflegung_ausgabe ORDER BY id")
+            .fetch_all(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(gespeichert, [(Some(gruppe), None), (None, Some(deich))]);
+    assert!(
+        etb(&w.pool, w.e).await.len() == 1,
+        "nur das Anlegen des Zeitfensters"
+    );
+}
+
+/// Bestand: eine Ausgabe ohne Empfänger serialisiert ohne die beiden Felder (Optionalität
+/// ehrlich, `src/AGENTS.md`); mit Empfänger steht nur die Kennung da.
+#[tokio::test]
+async fn ausgabe_ohne_empfaenger_serialisiert_ohne_die_felder() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let gruppe = einheit(&w, "2. Gruppe", None).await;
+    ausgabe(&w, zid, ausgabe_eingabe(5)).await.unwrap();
+    ausgabe(&w, zid, an_einheit(9, gruppe)).await.unwrap();
+    let json = serde_json::to_value(laden(&w, zid).await).unwrap();
+    let ohne = json["ausgaben"][0].as_object().unwrap();
+    assert!(!ohne.contains_key("einheit_id"), "{ohne:?}");
+    assert!(!ohne.contains_key("abschnitt_id"), "{ohne:?}");
+    let mit = json["ausgaben"][1].as_object().unwrap();
+    assert_eq!(mit["einheit_id"], gruppe);
+    assert!(!mit.contains_key("abschnitt_id"), "{mit:?}");
+    assert!(!mit.contains_key("empfaenger"), "nur die Kennung: {mit:?}");
+}
+
+/// Spec „Liste mit Gliederung und Stärke“: Zug „Florian 1“ (1/0/1) mit zwei Gruppen (je 0/1/8)
+/// ergibt kumuliert 1/2/17. Die Stärken sind dieselben wie in `GET …/einheiten` (eine Heimat je
+/// Zahl); Abschnitte mit Über-Abschnitt; nichts aus einem anderen Einsatz.
+#[tokio::test]
+async fn empfaenger_mit_gliederung_und_staerke() {
+    let w = welt().await;
+    let deich = abschnitt_in(&w, w.e, "Deich", None).await;
+    let nord = abschnitt_in(&w, w.e, "Deich Nord", Some(deich)).await;
+    abschnitt_in(&w, w.e2, "Fremder Abschnitt", None).await;
+    let zug = einheit_in(&w, w.e, "Florian 1", None, Some(deich)).await;
+    sqlx::query("UPDATE einsatz_einheit SET funkrufname = 'Florian Hannover 1' WHERE id = ?")
+        .bind(zug)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let g1 = einheit_in(&w, w.e, "1. Gruppe", Some(zug), Some(nord)).await;
+    let g2 = einheit(&w, "2. Gruppe", Some(zug)).await;
+    einheit_in(&w, w.e2, "Fremde Gruppe", None, None).await;
+    kraefte(&w, zug, 1, 0, 1).await;
+    kraefte(&w, g1, 0, 1, 8).await;
+    kraefte(&w, g2, 0, 1, 8).await;
+
+    let r = empfaenger_von(&w).await;
+    let ids: Vec<i64> = r.einheiten.iter().map(|e| e.id).collect();
+    assert_eq!(ids, [zug, g1, g2]);
+    let z = &r.einheiten[0];
+    assert_eq!(z.name, "Florian 1");
+    assert_eq!(z.funkrufname.as_deref(), Some("Florian Hannover 1"));
+    assert_eq!(z.ueber_einheit_id, None);
+    assert_eq!(
+        (z.abschnitt_id, z.abschnitt_name.as_deref()),
+        (Some(deich), Some("Deich"))
+    );
+    assert_eq!(z.ist, Staerke::neu(1, 0, 1));
+    assert_eq!(z.ist_kumuliert, Staerke::neu(1, 2, 17));
+    assert_eq!(r.einheiten[1].ueber_einheit_id, Some(zug));
+    assert_eq!(r.einheiten[1].abschnitt_name.as_deref(), Some("Deich Nord"));
+    assert_eq!(r.einheiten[2].ist_kumuliert, Staerke::neu(0, 1, 8));
+    assert_eq!(z.aufgeloest_at, None);
+
+    // Dieselben Stärken wie die Einheitenliste.
+    let kraeftebaum = crate::einheit::repo::liste(&w.pool, w.e).await.unwrap();
+    for e in &r.einheiten {
+        let k = kraeftebaum.iter().find(|k| k.id == e.id).unwrap();
+        assert_eq!(
+            (e.ist, e.ist_kumuliert),
+            (k.ist, k.ist_kumuliert),
+            "{}",
+            e.name
+        );
+    }
+
+    let abschnitte: Vec<(i64, &str, Option<i64>)> = r
+        .abschnitte
+        .iter()
+        .map(|a| (a.id, a.name.as_str(), a.ueber_abschnitt_id))
+        .collect();
+    assert_eq!(
+        abschnitte,
+        [(deich, "Deich", None), (nord, "Deich Nord", Some(deich))]
+    );
+}
+
+/// Spec „Ohne Eintreffen“: ohne Zeitachse, mit nur einer Alarmierung oder mit gestrichenem
+/// Eintreffen fehlt der Zeitpunkt; ein Eintreffen steht da.
+#[tokio::test]
+async fn empfaenger_ohne_eintreffen() {
+    let w = welt().await;
+    let ohne = einheit(&w, "1. Gruppe", None).await;
+    let alarmiert = einheit(&w, "2. Gruppe", None).await;
+    zeitachse(&w, alarmiert, "alarmierung", "2026-09-24 04:10:00", false).await;
+    let gestrichen = einheit(&w, "3. Gruppe", None).await;
+    zeitachse(&w, gestrichen, "eintreffen", "2026-09-24 04:40:00", true).await;
+    let da = einheit(&w, "4. Gruppe", None).await;
+    zeitachse(&w, da, "alarmierung", "2026-09-24 04:10:00", false).await;
+    zeitachse(&w, da, "eintreffen", "2026-09-24 04:40:00", false).await;
+
+    let r = empfaenger_von(&w).await;
+    let eintreffen = |id: i64| {
+        r.einheiten
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .eintreffen_at
+            .clone()
+    };
+    assert_eq!(eintreffen(ohne), None);
+    assert_eq!(eintreffen(alarmiert), None);
+    assert_eq!(eintreffen(gestrichen), None, "gestrichen zählt nicht");
+    assert_eq!(eintreffen(da).as_deref(), Some("2026-09-24 04:40:00"));
+}
+
+/// Spec „Abgelöste Einheit bleibt“: Die Ablösung beendet die Periode, die Einheit steht weiter in
+/// der Liste mit dem Eintreffen dieser Periode. Bei einer zweiten Periode gilt deren Eintreffen.
+#[tokio::test]
+async fn empfaenger_abgeloest_behaelt_eintreffen() {
+    let w = welt().await;
+    let abgeloest = einheit(&w, "1. Gruppe", None).await;
+    zeitachse(&w, abgeloest, "eintreffen", "2026-09-24 04:40:00", false).await;
+    zeitachse(&w, abgeloest, "abloesung", "2026-09-24 10:00:00", false).await;
+    let zweimal = einheit(&w, "2. Gruppe", None).await;
+    zeitachse(&w, zweimal, "eintreffen", "2026-09-24 04:40:00", false).await;
+    zeitachse(&w, zweimal, "entlassung", "2026-09-24 08:00:00", false).await;
+    zeitachse(&w, zweimal, "eintreffen", "2026-09-24 11:05:00", false).await;
+
+    let r = empfaenger_von(&w).await;
+    let eintreffen = |id: i64| {
+        r.einheiten
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .eintreffen_at
+            .clone()
+    };
+    assert_eq!(
+        eintreffen(abgeloest).as_deref(),
+        Some("2026-09-24 04:40:00")
+    );
+    assert_eq!(eintreffen(zweimal).as_deref(), Some("2026-09-24 11:05:00"));
+}
+
+/// Spec „Aufgelöste Einheit mit Ausgabe“: eine aufgelöste Einheit steht nur in der Liste, wenn
+/// eine Ausgabe (auch eine zurückgenommene) auf sie verweist, dann mit ihrem Zeitpunkt der
+/// Auflösung; ohne Ausgabe fehlt sie.
+#[tokio::test]
+async fn aufgeloeste_nur_mit_ausgabe() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let verpflegt = einheit(&w, "2. Gruppe", None).await;
+    let zurueck = einheit(&w, "3. Gruppe", None).await;
+    let ohne = einheit(&w, "4. Gruppe", None).await;
+    let aktiv = einheit(&w, "5. Gruppe", None).await;
+    ausgabe(&w, zid, an_einheit(9, verpflegt)).await.unwrap();
+    let aid = ausgabe(&w, zid, an_einheit(9, zurueck))
+        .await
+        .unwrap()
+        .ausgabe_id;
+    zuruecknehmen_in(&w, w.e, aid).await.unwrap();
+    sqlx::query(
+        "UPDATE einsatz_einheit SET aufgeloest_at = '2026-09-24 10:20:00' WHERE id IN (?, ?, ?)",
+    )
+    .bind(verpflegt)
+    .bind(zurueck)
+    .bind(ohne)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+
+    let r = empfaenger_von(&w).await;
+    let ids: Vec<i64> = r.einheiten.iter().map(|e| e.id).collect();
+    assert_eq!(ids, [verpflegt, zurueck, aktiv]);
+    let v = &r.einheiten[0];
+    assert_eq!(v.aufgeloest_at.as_deref(), Some("2026-09-24 10:20:00"));
+    assert_eq!(v.ist_kumuliert, Staerke::neu(0, 0, 0));
+    assert_eq!(r.einheiten[2].aufgeloest_at, None);
+}
+
+/// Ein Empfänger in einem anderen Einsatz stört die eigene Liste nicht, und eine Ausgabe dort
+/// holt keine aufgelöste Einheit dieses Einsatzes herein (einsatzgebunden).
+#[tokio::test]
+async fn empfaenger_liste_ist_einsatzgebunden() {
+    let w = welt().await;
+    let fremd = einheit_in(&w, w.e2, "Fremde Gruppe", None, None).await;
+    let zid2 = anlegen_in(&w, w.e2, mittag()).await.unwrap().id;
+    ausgabe_in(&w, w.e2, zid2, an_einheit(3, fremd))
+        .await
+        .unwrap();
+    let r = empfaenger_von(&w).await;
+    assert!(r.einheiten.is_empty() && r.abschnitte.is_empty(), "{r:?}");
+}
+
+/// Spec „Replay nach dem Auflösen“ IN der Transaktion (D2, wie die Stelle): der zweite von zwei
+/// gleichzeitigen Flushes kam am Vorab-Lookup der Route vorbei. Die Ausgabe ist gebucht, die
+/// Einheit danach aufgelöst; derselbe Schlüssel liefert die Ausgabe ohne Empfängerprüfung
+/// (Gegenprobe mit neuem Schlüssel: 409).
+#[tokio::test]
+async fn replay_in_der_transaktion_vor_der_empfaengerpruefung() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let gruppe = einheit(&w, "2. Gruppe", None).await;
+    let an = |client_id: &str| AusgabeEingabe {
+        einheit_id: Some(gruppe),
+        zeitpunkt_at: "2026-09-24 10:30:00".into(),
+        ..mit_client_id(9, client_id)
+    };
+    let erst = ausgabe(&w, zid, an("v6")).await.unwrap();
+    sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = '2026-09-24 10:20:00' WHERE id = ?")
+        .bind(gruppe)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        status(ausgabe(&w, zid, an("v7")).await),
+        StatusCode::CONFLICT,
+        "Gegenprobe: neuer Schlüssel an die aufgelöste Einheit"
+    );
+    let wieder = ausgabe(&w, zid, an("v6")).await.unwrap();
+    assert_eq!(wieder.ausgabe_id, erst.ausgabe_id);
+    assert!(!wieder.neu, "Replay");
+}
+
+/// Reihenfolge der Prüfungen (D2): 404 Zeitfenster → 400er → 422er (Teilmenge, zwei
+/// Empfänger) → Stelle → Empfänger. Ein fehlerhafter Empfänger verdeckt keinen früheren Fehler.
+#[tokio::test]
+async fn empfaengerpruefung_nach_zeitfenster_400ern_422ern_und_stelle() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let deich = abschnitt_in(&w, w.e, "Deich", None).await;
+    let gruppe = einheit(&w, "2. Gruppe", None).await;
+    let fremd = einheit_in(&w, w.e2, "Fremde Gruppe", None, None).await;
+    let weg = stelle(&w, "Zuführung Deich").await;
+    stornieren(&w, weg).await.unwrap();
+    let an_fremd = |menge: i64| an_einheit(menge, fremd);
+    assert_eq!(
+        status(ausgabe(&w, zid, an_fremd(5)).await),
+        StatusCode::NOT_FOUND,
+        "für sich: fremde Einheit"
+    );
+    assert_eq!(
+        status(ausgabe(&w, 999_999, an_fremd(5)).await),
+        StatusCode::NOT_FOUND,
+        "unbekanntes Zeitfenster"
+    );
+    assert_eq!(
+        status(ausgabe(&w, zid, an_fremd(0)).await),
+        StatusCode::BAD_REQUEST,
+        "Menge 0 vor dem Empfänger"
+    );
+    assert_eq!(
+        status(
+            ausgabe(
+                &w,
+                zid,
+                AusgabeEingabe {
+                    sonderkost: sk(4, 3),
+                    ..an_fremd(5)
+                }
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Teilmenge vor dem Empfänger"
+    );
+    assert_eq!(
+        status(
+            ausgabe(
+                &w,
+                zid,
+                AusgabeEingabe {
+                    verpflegungsstelle_id: Some(weg),
+                    ..an_fremd(5)
+                }
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Stelle vor dem Empfänger"
+    );
+    let beide = AusgabeEingabe {
+        abschnitt_id: Some(deich),
+        ..an_einheit(5, gruppe)
+    };
+    assert_eq!(
+        status(ausgabe(&w, zid, beide.clone()).await),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "zwei Empfänger"
+    );
+    assert_eq!(
+        status(ausgabe(&w, zid, AusgabeEingabe { menge: 0, ..beide }).await),
+        StatusCode::BAD_REQUEST,
+        "Menge 0 vor zwei Empfängern"
+    );
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        0
+    );
+}
+
+/// D2: Die Grenze der Auflösung wird geparst verglichen. Genau zur Auflösung und danach 409,
+/// eine Sekunde davor 201; eine Einheit ohne Kräfte und ohne Eintreffen nimmt an.
+#[tokio::test]
+async fn aufgeloeste_einheit_nimmt_nur_fruehere_ausgaben() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let gruppe = einheit(&w, "2. Gruppe", None).await;
+    let leer = einheit(&w, "Leere Gruppe", None).await;
+    sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = '2026-09-24 10:20:00' WHERE id = ?")
+        .bind(gruppe)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let um = |t: &str| AusgabeEingabe {
+        zeitpunkt_at: t.into(),
+        ..an_einheit(9, gruppe)
+    };
+    for (t, erwartet) in [
+        ("2026-09-24 10:20:00", Err(StatusCode::CONFLICT)),
+        ("2026-09-24 10:30:00", Err(StatusCode::CONFLICT)),
+        ("2026-09-24 10:19:59", Ok(())),
+    ] {
+        let r = ausgabe(&w, zid, um(t)).await;
+        match erwartet {
+            Ok(()) => assert!(r.is_ok(), "{t}: {r:?}"),
+            Err(s) => assert_eq!(status(r), s, "{t}"),
+        }
+    }
+    ausgabe(&w, zid, an_einheit(1, leer)).await.unwrap();
 }
 
 // ── Tag aus der Vorlage (LLH-1058, design.md D3, D5) ────────────────────────────────────────

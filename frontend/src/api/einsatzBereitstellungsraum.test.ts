@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as client from './client';
-import { hebtBrAbrufAuf, ruftAbAusBr } from './einsatzBereitstellungsraum';
+import {
+  aktualisiereBr,
+  hebtBrAbrufAuf,
+  legeBrAn,
+  ruftAbAusBr,
+} from './einsatzBereitstellungsraum';
 
 /** Abruf und Rücknahme gehen an eigene Routen (LLH-1085, Spec `bereitstellungsraum-belegung`). */
 describe('Bereitstellungsraum — Abruf und Rücknahme', () => {
@@ -36,5 +41,46 @@ describe('Bereitstellungsraum — Abruf und Rücknahme', () => {
       'POST',
       { objekt_typ: 'fahrzeug', objekt_id: 5 },
     );
+  });
+});
+
+/** Koordinate des Raums (LLH-1107, Spec `bereitstellungsraum-lagekarte`). */
+describe('Bereitstellungsraum — Koordinate', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('PATCH nur Koordinate sendet genau lat und lon', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await aktualisiereBr(4, 9, { lat: 51.93, lon: 8.87 });
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume/9', 'PATCH', {
+      lat: 51.93,
+      lon: 8.87,
+    });
+    const body = send.mock.calls[0][2] as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['lat', 'lon']);
+  });
+
+  it('Verortung entfernen sendet beide als null', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await aktualisiereBr(4, 9, { lat: null, lon: null });
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume/9', 'PATCH', {
+      lat: null,
+      lon: null,
+    });
+  });
+
+  it('Anlegen nimmt Standort und Koordinate mit', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    await legeBrAn(4, {
+      bezeichnung: 'BR Sportplatz',
+      standort: 'Sportplatz Nord',
+      lat: 51.93,
+      lon: 8.87,
+    });
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume', 'POST', {
+      bezeichnung: 'BR Sportplatz',
+      standort: 'Sportplatz Nord',
+      lat: 51.93,
+      lon: 8.87,
+    });
   });
 });

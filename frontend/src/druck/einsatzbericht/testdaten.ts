@@ -193,7 +193,11 @@ export function rohBericht(
       } as unknown as Schaden,
     ]),
     betreuung: daten({ bezirke: [], stellen: [] } as unknown as BetreuungUebersicht),
-    verpflegung: daten({ zeitfenster: [], stellen: [] } as unknown as Verpflegung),
+    verpflegung: daten({
+      zeitfenster: [],
+      stellen: [],
+      empfaenger: { einheiten: [], abschnitte: [] },
+    } as unknown as Verpflegung),
     etbZaehler: daten({
       gesamt: 3,
       je_typ: { meldung: 2, anordnung: 0, entscheidung: 1, lage: 0, berichtigung: 0, system: 0 },

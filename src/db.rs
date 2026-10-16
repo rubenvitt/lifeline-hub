@@ -6022,6 +6022,84 @@ mod tests {
         assert_eq!(alt, 0, "die alte Tabelle ist weg");
     }
 
+    /// LLH-1107: `lat`/`lon` am Bereitstellungsraum. Eine Bestandszeile von vorher behält jeden
+    /// Wert, die Koordinate ist leer; beide Spalten existieren.
+    #[tokio::test]
+    async fn migration_0209_bereitstellungsraum_lage() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 208).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO bereitstellungsraum \
+                (id, einsatz_id, abschnitt_id, bezeichnung, standort, notiz, status, \
+                 erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at) \
+             VALUES (7, ?, ?, 'BR Sportplatz', 'Sportplatz Nord', 'Zufahrt Süd', 'aktiv', \
+                     '2026-10-01 08:00:00', ?, '2026-10-01 09:00:00', ?, NULL)",
+        )
+        .bind(e)
+        .bind(a)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            i64,
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+            i64,
+            String,
+            i64,
+            Option<String>,
+        );
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, einsatz_id, abschnitt_id, bezeichnung, standort, notiz, status, \
+                        erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at \
+                 FROM bereitstellungsraum ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 209).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
+        let koordinate: (Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT lat, lon FROM bereitstellungsraum WHERE id = 7")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(koordinate, (None, None));
+        let spalten: Vec<(String, String)> = sqlx::query_as(
+            "SELECT name, type FROM pragma_table_info('bereitstellungsraum') \
+             WHERE name IN ('lat', 'lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("lat".to_string(), "REAL".to_string()),
+                ("lon".to_string(), "REAL".to_string())
+            ]
+        );
+    }
+
     /// Die Quelle `bereitstellungsraum` ist erlaubt, eine unbekannte scheitert weiter am CHECK.
     #[tokio::test]
     async fn migration_0207_quelle_bereitstellungsraum() {
@@ -7581,6 +7659,145 @@ mod tests {
             "verpflegung_zeitfenster_stelle",
             "verpflegung_ausgabe",
         ] {
+            let rest: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM {tabelle}"
+            )))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rest, 0, "{tabelle}");
+        }
+    }
+
+    // ── LLH-1055: Empfänger einer Verpflegungsausgabe (0210) ────────────────────────────────
+
+    /// Eine Einheit und ein Abschnitt im Einsatz `e`; liefert (einheit, abschnitt).
+    async fn empfaenger_bestand(pool: &SqlitePool, e: i64) -> (i64, i64) {
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '2. Gruppe') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Deich') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (einheit, abschnitt)
+    }
+
+    /// LLH-1055, design.md „Migration Plan“: Ausgaben vor der Migration bleiben unverändert
+    /// lesbar, die neuen Spalten sind `NULL`; beide Indizes sind da.
+    #[tokio::test]
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 209).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (_, aus) = verpflegung_bestand(&pool, e, b).await;
+
+        migriere_bis(&pool, 210).await;
+
+        let (menge, ort, einheit, abschnitt): (i64, Option<String>, Option<i64>, Option<i64>) =
+            sqlx::query_as(
+                "SELECT menge, ort, einheit_id, abschnitt_id FROM verpflegung_ausgabe WHERE id = ?",
+            )
+            .bind(aus)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            (menge, ort.as_deref(), einheit, abschnitt),
+            (120, Some("Deich"), None, None)
+        );
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'index' \
+             AND tbl_name = 'verpflegung_ausgabe' AND name LIKE 'idx_verpflegung_ausgabe_%' \
+             ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        for name in [
+            "idx_verpflegung_ausgabe_abschnitt",
+            "idx_verpflegung_ausgabe_einheit",
+        ] {
+            assert!(indizes.iter().any(|i| i == name), "{name}: {indizes:?}");
+        }
+    }
+
+    /// Ein gelöschter Abschnitt oder eine gelöschte Einheit leert nur den Verweis; die Ausgabe
+    /// bleibt mit ihrer Menge stehen (`ON DELETE SET NULL`).
+    #[tokio::test]
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_set_null() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 210).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (_, aus) = verpflegung_bestand(&pool, e, b).await;
+        let (einheit, abschnitt) = empfaenger_bestand(&pool, e).await;
+        let (_, aus2) = verpflegung_bestand(&pool, e, b).await;
+        sqlx::query("UPDATE verpflegung_ausgabe SET abschnitt_id = ? WHERE id = ?")
+            .bind(abschnitt)
+            .bind(aus)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE verpflegung_ausgabe SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(aus2)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ?")
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .expect("der Empfänger hält das Löschen des Abschnitts nicht auf");
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .expect("der Empfänger hält das Löschen der Einheit nicht auf");
+        for id in [aus, aus2] {
+            let (menge, einheit_id, abschnitt_id): (i64, Option<i64>, Option<i64>) =
+                sqlx::query_as(
+                    "SELECT menge, einheit_id, abschnitt_id FROM verpflegung_ausgabe WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!((menge, einheit_id, abschnitt_id), (120, None, None), "{id}");
+        }
+    }
+
+    /// Ein Einsatz mit je einer Ausgabe an eine Einheit und an einen Abschnitt lässt sich löschen.
+    #[tokio::test]
+    async fn migration_0210_verpflegung_ausgabe_empfaenger_einsatz_loeschen() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 210).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (_, aus) = verpflegung_bestand(&pool, e, b).await;
+        let (_, aus2) = verpflegung_bestand(&pool, e, b).await;
+        let (einheit, abschnitt) = empfaenger_bestand(&pool, e).await;
+        sqlx::query("UPDATE verpflegung_ausgabe SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(aus)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE verpflegung_ausgabe SET abschnitt_id = ? WHERE id = ?")
+            .bind(abschnitt)
+            .bind(aus2)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Ausgaben, Einheit und Abschnitt mit");
+        for tabelle in ["verpflegung_ausgabe", "einsatz_einheit", "einsatzabschnitt"] {
             let rest: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT COUNT(*) FROM {tabelle}"
             )))

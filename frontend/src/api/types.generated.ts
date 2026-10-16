@@ -537,7 +537,19 @@ export interface components {
         };
         /** @description Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung. */
         AusgabeAnzeige: {
+            /**
+             * Format: int64
+             * @description Empfänger-Abschnitt (LLH-1055, Zuführung) — nur die Kennung. Fehlt auch, wenn der
+             *     Abschnitt inzwischen gelöscht ist.
+             */
+            abschnitt_id?: number | null;
             bemerkung?: string | null;
+            /**
+             * Format: int64
+             * @description Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in
+             *     `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`.
+             */
+            einheit_id?: number | null;
             erfasst_at: string;
             /** Format: int64 */
             id: number;
@@ -1085,6 +1097,14 @@ export interface components {
             geaendert_von: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: double
+             * @description Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`): beide gesetzt = verortet,
+             *     beide leer = nicht verortet; ohne Koordinate fehlen beide Felder.
+             */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
             notiz?: string | null;
             standort?: string | null;
             status: components["schemas"]["BrStatus"];
@@ -1204,7 +1224,8 @@ export interface components {
         /**
          * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
          *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-         *     `summiereStaerke`).
+         *     `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+         *     design.md D10).
          */
         BrListenEintrag: components["schemas"]["BrAnzeige"] & {
             abschnitt_name?: string | null;
@@ -2287,6 +2308,40 @@ export interface components {
          * @enum {string}
          */
         EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /** @description Ein Abschnitt der Empfängerliste (Ziel einer Zuführung). */
+        EmpfaengerAbschnitt: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** Format: int64 */
+            ueber_abschnitt_id?: number | null;
+        };
+        /** @description Eine Einheit der Empfängerliste. */
+        EmpfaengerEinheit: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            /** @description Nur bei einer aufgelösten Einheit, auf die eine Ausgabe verweist (für ihren Namen). */
+            aufgeloest_at?: string | null;
+            /**
+             * @description Das nicht gestrichene Eintreffen der jüngsten Einsatzperiode (offen oder durch Ablösung
+             *     beendet); fehlt ohne ein solches.
+             */
+            eintreffen_at?: string | null;
+            funkrufname?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`. */
+            ist: components["schemas"]["Staerke"];
+            /** @description Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`). */
+            ist_kumuliert: components["schemas"]["Staerke"];
+            name: string;
+            /**
+             * Format: int64
+             * @description Die übergeordnete Einheit (Gliederung); eine Ausgabe an sie verpflegt den Teilbaum.
+             */
+            ueber_einheit_id?: number | null;
+        };
         /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
@@ -5561,12 +5616,25 @@ export interface components {
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
             /**
+             * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne
+             *     Personenangaben. Keine eigene Leseroute.
+             */
+            empfaenger: components["schemas"]["VerpflegungEmpfaenger"];
+            /**
              * @description Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
              *     braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
              */
             stellen: components["schemas"]["VerpflegungsstelleAnzeige"][];
             /** @description Nach Beginn geordnet. */
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"][];
+        };
+        /**
+         * @description Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu
+         *     aufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.
+         */
+        VerpflegungEmpfaenger: {
+            abschnitte: components["schemas"]["EmpfaengerAbschnitt"][];
+            einheiten: components["schemas"]["EmpfaengerEinheit"][];
         };
         /**
          * @description Antwort auf „Tag aus der Vorlage anlegen“ (LLH-1058): die angelegten Zeitfenster in der

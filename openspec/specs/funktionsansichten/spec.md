@@ -336,18 +336,24 @@ die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; w
 nicht nennt, MUST verboten sein. Sie MUST keine Namen von Einsatzkräften oder Benutzern
 erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung. Die
 Verpflegungsstellen des Einsatzes MUST sie alle lesen; beim Buchen einer Ausgabe MUST sie eine
-Verpflegungsstelle wählen können. Stellen planen MUST sie nicht.
+Verpflegungsstelle wählen können. Stellen planen MUST sie nicht. Die Empfängerliste der
+Verpflegung (Einheiten mit Name, Funkrufname, Gliederung, Abschnitt, Stärke und Eintreffen;
+Abschnitte mit Name) MUST sie lesen und beim Buchen einen Empfänger daraus wählen können.
+Einheiten- und Abschnittsnamen gelten dabei nicht als Namen von Einsatzkräften; Namen von
+Einheitsführern und Mitgliedern MUST sie weiterhin nicht erhalten. Die Einheitenliste des
+Einsatzes MUST ihr verschlossen bleiben.
 
 | Modul / Bereich | Verpflegung |
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
 | `verpflegung`: Zeitfenster mit Bedarf, Ausgaben und Deckung | L |
 | `verpflegung`: Verpflegungsstellen mit Art, Standort und Status | L |
-| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung, optional an einer Verpflegungsstelle), Ausgabe zurücknehmen | S |
+| `verpflegung`: Empfängerliste (Einheiten und Abschnitte ohne Personenangaben) | L |
+| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung, optional an einer Verpflegungsstelle und an eine Einheit oder einen Abschnitt), Ausgabe zurücknehmen | S |
 | `verpflegung`: Zeitfenster anlegen, ändern, löschen, Stellen zuordnen | — |
 | `verpflegung`: Verpflegungsstelle anlegen, ändern, in Betrieb nehmen, auflösen, stornieren | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
-| `nachforderungen`, `personal`, `betreuung`, `personen`, `etb` | — |
+| `einheiten`, `nachforderungen`, `personal`, `betreuung`, `personen`, `etb` | — |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
 
 Die Modulzähler eines Geräts MUST keine einsatzweiten Zähler für `meldungen` und `personen`
@@ -416,6 +422,26 @@ Lagemonitor).
 
 - **WHEN** das Verpflegungsgerät eine Verpflegungsstelle anlegt, ändert, in Betrieb nimmt, auflöst oder storniert oder einem Zeitfenster Stellen zuordnet
 - **THEN** antwortet der Server mit 403
+
+#### Scenario: Empfängerliste ohne Führernamen
+
+- **WHEN** das Verpflegungsgerät die Verpflegung abruft und die Einheit „2. Gruppe“ einen Einheitsführer und Personal hat
+- **THEN** enthält die Antwort den Namen „2. Gruppe“ und ihre Stärke, aber weder den Namen des Einheitsführers noch die Erreichbarkeit noch Namen von Mitgliedern
+
+#### Scenario: Keine Einheitenliste
+
+- **WHEN** das Verpflegungsgerät die Einheitenliste des Einsatzes abruft
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Buchen an eine Einheit
+
+- **WHEN** das Verpflegungsgerät eine Ausgabe von 9 EP an die Einheit „2. Gruppe“ bucht
+- **THEN** trägt die Ausgabe die Einheit, und die Antwort nennt keinen Namen einer Person
+
+#### Scenario: Einheit kommt live dazu
+
+- **WHEN** an einem anderen Arbeitsplatz eine Einheit gebildet wird, während das Verpflegungsgerät verbunden ist
+- **THEN** erhält das Gerät das Ereignis `einheit` und lädt die Verpflegung neu, ohne Zugriff auf das Modul Einheiten zu bekommen
 
 ### Requirement: Ansicht Betreuungsstelle
 

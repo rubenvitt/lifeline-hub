@@ -81,6 +81,12 @@ pub struct BrAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`): beide gesetzt = verortet,
+    /// beide leer = nicht verortet; ohne Koordinate fehlen beide Felder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
 }
 
 /// Belegungs-Verlaufseintrag (1:1 zu `br_belegung`).
@@ -186,6 +192,20 @@ pub struct BrBelegungKennzahlen {
     /// keine Kraft ein „seit“ hat.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub laengste_seit_at: Option<String>,
+}
+
+/// Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
+/// Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
+/// `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+/// design.md D10).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct BrListenEintrag {
+    #[serde(flatten)]
+    pub br: BrAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_name: Option<String>,
+    pub belegung: BrBelegungKennzahlen,
+    pub einheit_ids: Vec<i64>,
 }
 
 wire_enum! {
