@@ -1072,7 +1072,7 @@ async fn stelle_status_und_aufgeloeste_aendern() {
         .await
         .unwrap();
     assert_eq!(g.etb_ids.len(), 1);
-    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    let s = load_stelle(&w.pool, w.e, id).await.unwrap();
     assert_eq!(s.status, VerpflegungsstelleStatus::Aufgeloest);
     assert!(s.aufgeloest_at.is_some());
     assert_eq!(
@@ -1093,7 +1093,7 @@ async fn stelle_status_und_aufgeloeste_aendern() {
     .await
     .unwrap();
     assert!(g.geaendert);
-    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    let s = load_stelle(&w.pool, w.e, id).await.unwrap();
     assert_eq!(
         (s.bezeichnung.as_str(), s.standort.as_deref()),
         ("Feldküche Sportplatz", Some("Am Sportplatz 4"))

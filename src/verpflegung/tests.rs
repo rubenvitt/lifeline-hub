@@ -372,12 +372,12 @@ fn etb_stelle_status_in_betrieb_aufgeloest_und_geplant_ohne_text() {
 /// entdoppelt in der Reihenfolge des ersten Auftretens.
 #[test]
 fn stelle_ids_grenze_vor_dem_entdoppeln() {
-    assert_eq!(stelle_ids_entdoppeln(&[3, 3, 4]).unwrap(), vec![3, 4]);
-    assert_eq!(stelle_ids_entdoppeln(&[]).unwrap(), Vec::<i64>::new());
+    assert_eq!(dedupe_stelle_ids(&[3, 3, 4]).unwrap(), vec![3, 4]);
+    assert_eq!(dedupe_stelle_ids(&[]).unwrap(), Vec::<i64>::new());
     let zwanzig: Vec<i64> = (1..=20).collect();
-    assert_eq!(stelle_ids_entdoppeln(&zwanzig).unwrap(), zwanzig);
+    assert_eq!(dedupe_stelle_ids(&zwanzig).unwrap(), zwanzig);
     assert_eq!(
-        stelle_ids_entdoppeln(&[7; 21]).unwrap_err().status(),
+        dedupe_stelle_ids(&[7; 21]).unwrap_err().status(),
         StatusCode::BAD_REQUEST
     );
 }

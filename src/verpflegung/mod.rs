@@ -313,7 +313,7 @@ pub const STELLEN_JE_ZEITFENSTER_MAX: usize = 20;
 /// Stellenliste eines Zeitfensters von außen (LLH-1040 D5): mehr als
 /// [`STELLEN_JE_ZEITFENSTER_MAX`] Einträge, gezählt VOR dem Entdoppeln, sind 400 — vor jeder
 /// Abfrage. Danach entdoppelt, in der Reihenfolge des ersten Auftretens.
-pub fn stelle_ids_entdoppeln(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+pub fn dedupe_stelle_ids(ids: &[i64]) -> Result<Vec<i64>, AppError> {
     if ids.len() > STELLEN_JE_ZEITFENSTER_MAX {
         return Err(AppError::Validation(format!(
             "stelle_ids darf höchstens {STELLEN_JE_ZEITFENSTER_MAX} Einträge haben, waren {}",

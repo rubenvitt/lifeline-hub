@@ -34,7 +34,7 @@ use super::stelle::{
     darf_uebergehen, VerpflegungsstelleAnzeige, VerpflegungsstelleArt, VerpflegungsstelleStatus,
 };
 use super::{
-    deckung, draht_lesen, etb_text, stelle_ids_entdoppeln, zeitraum_text, AusgabeAnzeige, Bedarf,
+    deckung, dedupe_stelle_ids, draht_lesen, etb_text, zeitraum_text, AusgabeAnzeige, Bedarf,
     Sonderkost, SonderkostEingabe, VerpflegungAnzeige, Verpflegungsart, ZeitfensterAnzeige,
 };
 use crate::error::AppError;
@@ -583,7 +583,7 @@ async fn zuordnung_tx(
 
 /// 422 (D5): jede neue Kennung muss eine nicht stornierte Stelle des Einsatzes sein; eine
 /// aufgelöste Stelle nur, wenn sie schon zugeordnet war (Geschichte). Entfernen geht immer.
-fn zuordnung_pruefen(neu: &[i64], vorher: &[i64], stellen: &[StelleKurz]) -> Result<(), AppError> {
+fn check_zuordnung(neu: &[i64], vorher: &[i64], stellen: &[StelleKurz]) -> Result<(), AppError> {
     for id in neu {
         match stellen.iter().find(|s| s.id == *id) {
             None => {
@@ -621,7 +621,7 @@ fn namen_von(stellen: &[StelleKurz], ids: &[i64]) -> Vec<String> {
 /// Ersetzt die Zuordnung durch `ids` (geprüft, entdoppelt) — zwei Anweisungen, gleich wie viele
 /// Stellen (Muster `sprechgruppe::repo::ersetzen_tx`). Das INSERT ist bewusst kein
 /// `OR IGNORE`: eine doppelte Kennung, die am Entdoppeln vorbeikäme, scheiterte am Schlüssel.
-async fn zuordnung_ersetzen_tx(
+async fn replace_zuordnung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     zeitfenster_id: i64,
@@ -663,7 +663,7 @@ pub async fn zeitfenster_anlegen_tx(
     eingabe: &ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
-    let stelle_ids = stelle_ids_entdoppeln(&eingabe.stelle_ids)?;
+    let stelle_ids = dedupe_stelle_ids(&eingabe.stelle_ids)?;
     // 400 — jedes Feld für sich
     let bezeichnung = pflicht_max(
         &eingabe.bezeichnung,
@@ -687,7 +687,7 @@ pub async fn zeitfenster_anlegen_tx(
     zeitregel(&eingabe.von_at, &eingabe.bis_at)?;
     teilmenge(&sonderkost, b.gesamt, "den Gesamtbedarf")?;
     let stellen = stellen_kurz_tx(conn, einsatz_id, &stelle_ids).await?;
-    zuordnung_pruefen(&stelle_ids, &[], &stellen)?;
+    check_zuordnung(&stelle_ids, &[], &stellen)?;
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO verpflegung_zeitfenster \
@@ -713,7 +713,7 @@ pub async fn zeitfenster_anlegen_tx(
     .fetch_one(&mut *conn)
     .await?;
     if !stelle_ids.is_empty() {
-        zuordnung_ersetzen_tx(conn, einsatz_id, id, &stelle_ids).await?;
+        replace_zuordnung_tx(conn, einsatz_id, id, &stelle_ids).await?;
     }
     let inhalt = etb_text::angelegt(
         &bezeichnung,
@@ -744,11 +744,7 @@ pub async fn zeitfenster_aendern_tx(
     a: &ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
     // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
-    let stelle_ids = a
-        .stelle_ids
-        .as_deref()
-        .map(stelle_ids_entdoppeln)
-        .transpose()?;
+    let stelle_ids = a.stelle_ids.as_deref().map(dedupe_stelle_ids).transpose()?;
     let roh = zeitfenster_roh_tx(conn, einsatz_id, id).await?;
 
     // 400 — jedes übergebene Feld für sich
@@ -782,7 +778,7 @@ pub async fn zeitfenster_aendern_tx(
             let mut alle = neu_ids.clone();
             alle.extend(vorher_ids.iter().filter(|v| !neu_ids.contains(v)));
             let stellen = stellen_kurz_tx(conn, einsatz_id, &alle).await?;
-            zuordnung_pruefen(neu_ids, &vorher_ids, &stellen)?;
+            check_zuordnung(neu_ids, &vorher_ids, &stellen)?;
             Some((neu_ids, vorher_ids, stellen))
         }
         None => None,
@@ -854,7 +850,7 @@ pub async fn zeitfenster_aendern_tx(
     .await?;
     if aenderungen.stellen.is_some() {
         if let Some((neu_ids, _, _)) = &zuordnung {
-            zuordnung_ersetzen_tx(conn, einsatz_id, id, neu_ids).await?;
+            replace_zuordnung_tx(conn, einsatz_id, id, neu_ids).await?;
         }
     }
     let inhalt = etb_text::geaendert(&bezeichnung, &zeitraum_neu, &neu, &aenderungen);
@@ -944,7 +940,7 @@ pub async fn ausgabe_erfassen_tx(
     // Die Stelle zuletzt (D3), nach Replay, Zeitfenster, den 400ern und der Teilmenge; LLH-1055
     // hängt seine Empfängerprüfung dahinter.
     if let Some(sid) = eingabe.verpflegungsstelle_id {
-        stelle_fuer_ausgabe_pruefen_tx(conn, einsatz_id, sid, &eingabe.zeitpunkt_at).await?;
+        check_stelle_fuer_ausgabe_tx(conn, einsatz_id, sid, &eingabe.zeitpunkt_at).await?;
     }
 
     let ausgabe_id: i64 = sqlx::query_scalar(
@@ -985,7 +981,7 @@ pub async fn ausgabe_erfassen_tx(
 /// so noch an. Verglichen werden die GEPARSTEN Zeitpunkte, nicht die Texte. `geplant` nimmt an
 /// (ein vergessener Klick blockiert den Tresen nicht), ebenso eine dem Zeitfenster nicht
 /// zugeordnete Stelle (die Zuordnung ist Planung, die Ausgabe eine Tatsache).
-async fn stelle_fuer_ausgabe_pruefen_tx(
+async fn check_stelle_fuer_ausgabe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     stelle_id: i64,
@@ -1114,7 +1110,7 @@ async fn stelle_roh_tx(
 
 /// Eine stornierte Stelle ist für Ändern, Statuswechsel und Storno 409 (Lebenszyklus, wie der
 /// BR in `routes/einsatz_bereitstellungsraum.rs`). Eine aufgelöste bleibt änderbar (D2).
-fn stelle_nicht_storniert(roh: &StelleZeile) -> Result<(), AppError> {
+fn check_stelle_nicht_storniert(roh: &StelleZeile) -> Result<(), AppError> {
     match roh.storniert_at {
         Some(_) => Err(AppError::Conflict(format!(
             "Verpflegungsstelle ‚{}‘ ist storniert",
@@ -1151,7 +1147,7 @@ async fn check_stelle_bezeichnung_frei_tx(
 }
 
 /// Die Stelle als Anzeige (Antwort der Schreibrouten). Fremd oder unbekannt → 404.
-pub async fn stelle_laden(
+pub async fn load_stelle(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
@@ -1214,7 +1210,7 @@ pub async fn update_stelle_tx(
     a: &StelleAenderung,
 ) -> Result<StelleGeschrieben, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
-    stelle_nicht_storniert(&roh)?;
+    check_stelle_nicht_storniert(&roh)?;
     // 400 — jedes übergebene Feld für sich
     let bezeichnung = pflicht_max_tri(
         a.bezeichnung.as_deref(),
@@ -1285,7 +1281,7 @@ pub async fn update_stelle_status_tx(
     nach: VerpflegungsstelleStatus,
 ) -> Result<StelleGeschrieben, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
-    stelle_nicht_storniert(&roh)?;
+    check_stelle_nicht_storniert(&roh)?;
     if !darf_uebergehen(roh.status, nach) {
         return Err(AppError::UnprocessableEntity(format!(
             "Verpflegungsstelle ‚{}‘: Übergang {} → {} ist nicht zulässig",
@@ -1330,7 +1326,7 @@ pub async fn stelle_stornieren_tx(
     benutzer_id: i64,
 ) -> Result<StelleGeschrieben, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
-    stelle_nicht_storniert(&roh)?;
+    check_stelle_nicht_storniert(&roh)?;
     match roh.status {
         VerpflegungsstelleStatus::Geplant => {}
         VerpflegungsstelleStatus::Aktiv => {

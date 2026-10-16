@@ -1369,7 +1369,7 @@ mod tests {
         .unwrap();
         tx.commit().await.unwrap();
         let vorher = v::zeitfenster_laden(&pool, e, zf.id).await.unwrap();
-        let stelle_vorher = v::stelle_laden(&pool, e, stelle).await.unwrap();
+        let stelle_vorher = v::load_stelle(&pool, e, stelle).await.unwrap();
         assert_eq!(stelle_vorher.standort.as_deref(), Some("Am Sportplatz 2"));
 
         assert!(
@@ -1399,7 +1399,7 @@ mod tests {
         );
         assert_eq!(nachher.stelle_ids, vec![stelle], "Zuordnung bleibt");
         // Die Stelle: nur der Standort ist leer.
-        let stelle_nachher = v::stelle_laden(&pool, e, stelle).await.unwrap();
+        let stelle_nachher = v::load_stelle(&pool, e, stelle).await.unwrap();
         let mut erwartet = stelle_vorher.clone();
         erwartet.standort = None;
         assert_eq!(stelle_nachher, erwartet);

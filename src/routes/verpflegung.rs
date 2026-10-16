@@ -56,7 +56,7 @@ use crate::verpflegung::stelle::{
     VerpflegungsstelleAnzeige, VerpflegungsstelleArt, VerpflegungsstelleStatus,
 };
 use crate::verpflegung::{
-    self, stelle_ids_entdoppeln, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
+    self, dedupe_stelle_ids, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
     Verpflegungsart, ZeitfensterAnzeige,
 };
 
@@ -80,7 +80,7 @@ fn zeit_opt(s: Option<String>) -> Result<Option<String>, AppError> {
 }
 
 /// Verpflegungsart von außen; unbekannt → 400.
-fn art_lesen(s: Option<&str>) -> Result<Option<Verpflegungsart>, AppError> {
+fn parse_verpflegungsart(s: Option<&str>) -> Result<Option<Verpflegungsart>, AppError> {
     parse_enum_opt(
         Verpflegungsart::parse,
         s,
@@ -132,7 +132,7 @@ pub async fn zeitfenster_anlegen(
 ) -> Result<(StatusCode, Json<ZeitfensterAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     // 400 vor jeder Abfrage (D5): Grenze der Stellenliste, gezählt vor dem Entdoppeln.
-    let stelle_ids = stelle_ids_entdoppeln(req.stelle_ids.as_deref().unwrap_or_default())?;
+    let stelle_ids = dedupe_stelle_ids(req.stelle_ids.as_deref().unwrap_or_default())?;
     let eingabe = ZeitfensterEingabe {
         bezeichnung: req.bezeichnung,
         von_at: zeit(&req.von_at)?,
@@ -141,7 +141,7 @@ pub async fn zeitfenster_anlegen(
         bedarf_betreute: req.bedarf_betreute,
         bedarf_weitere: req.bedarf_weitere.unwrap_or(0),
         sonderkost: req.sonderkost.unwrap_or_default(),
-        verpflegungsart: art_lesen(req.verpflegungsart.as_deref())?,
+        verpflegungsart: parse_verpflegungsart(req.verpflegungsart.as_deref())?,
         stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -194,11 +194,11 @@ pub async fn zeitfenster_aendern(
     let stelle_ids = req
         .stelle_ids
         .as_deref()
-        .map(stelle_ids_entdoppeln)
+        .map(dedupe_stelle_ids)
         .transpose()?;
     let verpflegungsart = req
         .verpflegungsart
-        .map(|a| art_lesen(a.as_deref()))
+        .map(|a| parse_verpflegungsart(a.as_deref()))
         .transpose()?;
     let aenderung = ZeitfensterAenderung {
         bezeichnung: req.bezeichnung,
@@ -408,7 +408,7 @@ pub struct StelleAnlegen {
     abschnitt_id: Option<i64>,
 }
 
-fn stelle_art_lesen(s: &str) -> Result<VerpflegungsstelleArt, AppError> {
+fn parse_stelle_art(s: &str) -> Result<VerpflegungsstelleArt, AppError> {
     parse_enum(
         VerpflegungsstelleArt::parse,
         s,
@@ -425,7 +425,7 @@ pub async fn create_stelle(
     let einsatz_id = ctx.einsatz.id;
     let eingabe = StelleEingabe {
         bezeichnung: req.bezeichnung,
-        art: stelle_art_lesen(&req.art)?,
+        art: parse_stelle_art(&req.art)?,
         standort: req.standort,
         lat: req.lat,
         lon: req.lon,
@@ -438,7 +438,7 @@ pub async fn create_stelle(
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok((
         StatusCode::CREATED,
-        Json(repo::stelle_laden(&state.pool, einsatz_id, g.id).await?),
+        Json(repo::load_stelle(&state.pool, einsatz_id, g.id).await?),
     ))
 }
 
@@ -470,7 +470,7 @@ pub async fn update_stelle(
     let einsatz_id = ctx.einsatz.id;
     let aenderung = StelleAenderung {
         bezeichnung: req.bezeichnung,
-        art: req.art.as_deref().map(stelle_art_lesen).transpose()?,
+        art: req.art.as_deref().map(parse_stelle_art).transpose()?,
         standort: req.standort,
         lat: req.lat,
         lon: req.lon,
@@ -482,9 +482,7 @@ pub async fn update_stelle(
     if g.geaendert {
         publiziere(&state, einsatz_id, &g.etb_ids);
     }
-    Ok(Json(
-        repo::stelle_laden(&state.pool, einsatz_id, sid).await?,
-    ))
+    Ok(Json(repo::load_stelle(&state.pool, einsatz_id, sid).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -513,9 +511,7 @@ pub async fn update_stelle_status(
         repo::update_stelle_status_tx(conn, einsatz_id, sid, benutzer_id, startwert, nach).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
-    Ok(Json(
-        repo::stelle_laden(&state.pool, einsatz_id, sid).await?,
-    ))
+    Ok(Json(repo::load_stelle(&state.pool, einsatz_id, sid).await?))
 }
 
 /// DELETE /api/einsaetze/{id}/verpflegung/stellen/{sid} — Storno einer geplanten Stelle ohne
