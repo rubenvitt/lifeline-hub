@@ -8,6 +8,7 @@ import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
+import { listeEinheiten } from '../api/einheiten';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
@@ -85,7 +86,13 @@ vi.mock('../api/meldungen', async () => {
 });
 // Auftrags-Ziele: MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
-vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
+const uebernehmeEinheit = vi.fn();
+const weiseEinheitAb = vi.fn();
+vi.mock('../api/einheiten', () => ({
+  listeEinheiten: vi.fn().mockResolvedValue([]),
+  uebernehmeEinheit: (...a: unknown[]) => uebernehmeEinheit(...a),
+  weiseEinheitAb: (...a: unknown[]) => weiseEinheitAb(...a),
+}));
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1,
@@ -1387,4 +1394,75 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
       });
     },
   );
+});
+
+describe('MeldungenPage · Übernahme an der Meldung (LLH-1075, design.md D14)', () => {
+  const neu = {
+    id: 20,
+    einsatz_id: 1,
+    name: 'Florian Nachbar 3',
+    abschnitt_id: null,
+    abschnitt_name: null,
+    ueber_einheit_id: null,
+    unangemeldet: true,
+    nicht_uebernommen_seit: '2026-10-16 12:00:00',
+    fahrzeug_mitglieder: [],
+  };
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setzeOnline(true);
+    await queueLeerenFuerTests();
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 5, lfd_nr: 5, absender: 'BR Alpha', einheit_id: 20 }),
+      meldung({ id: 6, lfd_nr: 6, absender: 'Florian Süd', einheit_id: null }),
+    ]);
+    vi.mocked(listeEinheiten).mockResolvedValue([neu] as never);
+  });
+
+  it('die Meldung trägt „Übernehmen“ und „Abweisen“, die übrige nicht', async () => {
+    renderPage();
+    const karte = (await screen.findByText('BR Alpha')).closest('[data-meldung-id]') as HTMLElement;
+    expect(await within(karte).findByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    expect(within(karte).getByRole('button', { name: 'Abweisen' })).toBeInTheDocument();
+    const andere = screen.getByText('Florian Süd').closest('[data-meldung-id]') as HTMLElement;
+    expect(within(andere).queryByRole('button', { name: 'Übernehmen' })).toBeNull();
+  });
+
+  it('nach der Übernahme verschwinden die Knöpfe', async () => {
+    uebernehmeEinheit.mockResolvedValue({ ...neu, nicht_uebernommen_seit: null });
+    renderPage();
+    const karte = (await screen.findByText('BR Alpha')).closest('[data-meldung-id]') as HTMLElement;
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      { ...neu, nicht_uebernommen_seit: null },
+    ] as never);
+    await userEvent.click(await within(karte).findByRole('button', { name: 'Übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(uebernehmeEinheit).toHaveBeenCalledWith(1, 20, {}));
+    await waitFor(() =>
+      expect(within(karte).queryByRole('button', { name: 'Abweisen' })).toBeNull(),
+    );
+  });
+
+  it('ohne Einheitenrecht nur der Sprung zur Einheit', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage();
+    const karte = (await screen.findByText('BR Alpha')).closest('[data-meldung-id]') as HTMLElement;
+    expect(await within(karte).findByRole('link', { name: /Florian Nachbar 3/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/20',
+    );
+    expect(within(karte).queryByRole('button', { name: 'Übernehmen' })).toBeNull();
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+  });
 });

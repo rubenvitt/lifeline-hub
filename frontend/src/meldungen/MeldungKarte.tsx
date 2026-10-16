@@ -71,6 +71,11 @@ interface MeldungKarteProps {
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
    */
   fehlerGrund?: ZeilenGrund | null;
+  /**
+   * Offene Übernahme der Einheit dieser Meldung (LLH-1075, design.md D14): „Übernehmen“ und
+   * „Abweisen“ oder, ohne Einheitenrecht, der Sprung zur Einheit. `null` an jeder anderen Karte.
+   */
+  uebernahme?: ReactNode;
 }
 
 /**
@@ -127,6 +132,7 @@ function MeldungKarte({
   onAuftragErteilen,
   auftragGesperrt = false,
   fehlerGrund,
+  uebernahme = null,
 }: MeldungKarteProps) {
   const { rollen, token } = useRollen();
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
@@ -290,6 +296,7 @@ function MeldungKarte({
         )}
       </Flex>
 
+      {uebernahme != null && <div style={{ marginTop: 8 }}>{uebernahme}</div>}
       {/* Grund einer abgelehnten Karten-Aktion über der Aktionszeile, bis zur nächsten Aktion an
          dieser Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). */}
       {fehlerGrund && (
