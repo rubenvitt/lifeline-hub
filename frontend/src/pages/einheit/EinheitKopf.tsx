@@ -26,6 +26,7 @@ import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
+import NichtUebernommenMarke from '../../kraefte/NichtUebernommenMarke';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../../kraefte/fmsTableauKern';
 import { einheitStaerkeUrteilVon } from '../../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
@@ -142,7 +143,11 @@ export default function EinheitKopf({
   const urteil = einheitStaerkeUrteilVon(e.ist_kumuliert, e.soll ?? null);
 
   return (
-    <Paneel titel="Kopfdaten" koerperPolster>
+    <Paneel
+      titel="Kopfdaten"
+      meta={e.nicht_uebernommen_seit != null ? <NichtUebernommenMarke /> : undefined}
+      koerperPolster
+    >
       <div
         style={{
           display: 'flex',

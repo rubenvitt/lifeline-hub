@@ -807,3 +807,39 @@ describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(2);
   });
 });
+
+describe('EinheitenPage · Kennzeichen „nicht übernommen“ (LLH-1075, design.md D14)', () => {
+  it('steht an der unangemeldeten Einheit, nicht an einer übernommenen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('aufgeloeste')
+            ? []
+            : [
+                ...einheiten,
+                {
+                  ...einheiten[0],
+                  id: 11,
+                  name: 'Florian Nachbar 3',
+                  unangemeldet: true,
+                  nicht_uebernommen_seit: '2026-10-16T12:00:00Z',
+                },
+                { ...einheiten[0], id: 12, name: 'Florian Nachbar 4', unangemeldet: true },
+              ],
+        ),
+      ),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    expect(
+      within(await zeileVon('Florian Nachbar 3')).getByText('nicht übernommen'),
+    ).toBeInTheDocument();
+    expect(within(await zeileVon('Florian Nachbar 4')).queryByText('nicht übernommen')).toBeNull();
+    expect(within(await zeileVon('1. Zug')).queryByText('nicht übernommen')).toBeNull();
+  });
+});

@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts]
 ---
 
 ## Überblick
@@ -59,17 +59,45 @@ Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv i
 3. „Speichern“ wählen. Die neue Bezeichnung steht im Seitenkopf, im Umschalter und in der
    Übersicht, Standort und Notiz stehen unter „Raumdaten“; die Übersicht zeigt auch den Standort.
 
+### Eintreffen buchen
+
+Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustand „geplant“ steht
+„Eintreffen buchen“ gesperrt, daneben „BR nicht in Betrieb“.
+
+1. Den Raum öffnen und im Seitenkopf „Eintreffen buchen“ wählen.
+2. In „Name oder Funkrufname“ den Namen, den Typ oder einen Funkrufnamen der Kraft eingeben. Die Treffer stehen
+   unter „Erwartet“ und „Im Einsatz“, je mit Typ, den Funkrufnamen ihrer Fahrzeuge und, falls
+   bekannt, „alarmiert …“, dem Abschnitt oder „eingetroffen …“.
+
+   ![Dialog „Eintreffen buchen“ mit leerer Suche und der Gruppe „Im Einsatz“: drei Einheiten mit Typ, den Funkrufnamen ihrer Fahrzeuge und ihrem Abschnitt, je mit dem Knopf „Eintreffen“, darunter „Nicht in der Liste“](../bilder/bereitstellungsraeume/eintreffen.png)
+
+3. Beim Treffer „Eintreffen“ wählen. Die Bestätigung lautet „… gebucht“; die Kraft steht danach
+   in der Belegung des Raums.
+4. Steht die Kraft nicht in der Liste, „Nicht in der Liste“ wählen. „Funkrufname“ ist mit der Suche
+   vorbelegt; bei Bedarf „Trägerorganisation“, „Fahrzeugtyp“ und „Stärke“ eintragen, unter
+   „Bemerkung“ einen freien Text, unter „Weiteres Fahrzeug“ mit „Fahrzeug hinzufügen“ die übrigen
+   Fahrzeuge der Kraft.
+5. „Unangemeldet buchen“ wählen. Die Bestätigung lautet „… unangemeldet gebucht, Einsatzleitung
+   informiert“; die neue Einheit trägt in der Belegung „nicht übernommen“.
+6. Gibt es im Einsatz schon eine Kraft mit diesem Funkrufnamen, steht „Schon im Einsatz: …“ und
+   „Unangemeldet buchen“ ist gesperrt. „Diese buchen“ bucht die vorhandene Kraft, „Trotzdem neu
+   anlegen“ legt die neue trotzdem an. Steht die vorhandene Kraft schon in einem Raum, fehlt
+   „Diese buchen“.
+
 ### Kräfte zuweisen und entfernen
 
 Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 
-1. Den Raum öffnen. Rechts steht „Kräfte ohne BR“, nach Typ gruppiert.
+1. Den Raum öffnen. Rechts steht „Kräfte ohne BR“: oben unter „Erwartet“ die Kräfte ohne
+   Abschnitt, nach Typ gruppiert, darunter zugeklappt „Im Einsatz“ mit ihrer Zahl. Aufklappen zeigt
+   die Kräfte, die schon in einem Abschnitt stehen.
 2. Bei Bedarf in „Kräfte suchen“ einen Namen eingeben.
 3. Bei einer Einheit oder einem Fahrzeug „zuweisen“ wählen. Sie erscheint unter „Bereitgestellte
    Einheiten“ oder „Bereitgestellte Fahrzeuge“; „Bereitgestellt“ zählt die Stärke, „Fahrzeuge“ die
-   Fahrzeuge im Raum, auch die der bereitgestellten Einheiten.
+   Fahrzeuge im Raum, auch die der bereitgestellten Einheiten. Anders als „Eintreffen buchen“
+   trägt „zuweisen“ kein Eintreffen in die Zeitachse ein.
 
-   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, je mit ihren Fahrzeugen und „seit … · 48 min“, Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und der Seitenleiste „Kräfte ohne BR“](../bilder/bereitstellungsraeume/raum.png)
+   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, je mit ihren Fahrzeugen und „seit … · 48 min“, Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und der Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
 
 4. Rückt eine Kraft aus, bei ihr „entfernen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
 
@@ -136,6 +164,33 @@ Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einh
 höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten entfernt. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 
+„Erwartet“ und „Im Einsatz“ trennen nach dem Abschnitt: eine Einheit ohne eigenen Abschnitt zählt
+mit dem Abschnitt ihrer Über-Einheit. Fahrzeuge ohne Einheit stehen immer unter „Erwartet“. Im
+Dialog „Eintreffen buchen“ steht eine Kraft außerdem unter „Im Einsatz“, sobald sie in ihrem
+laufenden Einsatzabschnitt schon eingetroffen ist.
+
+### Was ein Eintreffen schreibt
+
+„Eintreffen“ bucht in einem Schritt den Eintritt in den Raum und, bei einer Einheit, das
+Eintreffen in ihrer [Zeitachse](meldebild.md); ein Fahrzeug ohne Einheit bekommt nur den Eintritt.
+Ist die Einheit in ihrem laufenden Einsatzabschnitt schon eingetroffen, bleibt die Zeitachse
+unverändert. Das Einsatztagebuch bekommt genau einen Eintrag: „… im BR … eingetroffen“, oder
+„… tritt in Bereitstellungsraum … ein“, wenn die Zeitachse nichts eingetragen hat. Bei einer
+unangemeldeten Kraft trägt der Eintrag den Text der Meldung.
+
+Eine unangemeldete Kraft legt die App als neue Einheit ohne Abschnitt an, benannt nach dem
+Funkrufnamen des ersten Fahrzeugs, mit ihren Fahrzeugen und der Bemerkung. Die Stärke ist keine
+Soll-Stärke; sie steht nur im Text der Meldung und des Einsatztagebuchs. Dazu geht eine Meldung an
+die Einsatzleitung, etwa „Florian Nachbar 3 (FF Nachbarort, HLF) unangemeldet im BR Parkplatz Stadion
+Nord eingetroffen, Stärke 0/1/8//9. Übernahme offen.“; die Bemerkung steht nicht darin.
+Die Einheit trägt „nicht übernommen“, bis die Einsatzleitung sie übernimmt oder abweist (Kapitel
+[Einheiten](einheiten.md)); danach trägt sie in der Belegung dauerhaft das neutrale Kennzeichen
+„unangemeldet“.
+
+Ob ein Funkrufname schon im Einsatz steht, vergleicht die App ohne Groß- und Kleinschreibung und
+ohne doppelte Leerzeichen, mit Namen und Funkrufnamen der Einheiten und den Funkrufnamen der
+Fahrzeuge. Kräfte aus den Stammdaten bietet der Dialog nicht an.
+
 ### Was die Zahlen zählen
 
 „Fahrzeuge“ zählt jedes aktive Fahrzeug im Raum genau einmal: die einzeln bereitgestellten und
@@ -186,14 +241,16 @@ Freigabe fehlt die Sektion „Material“. Am gekoppelten Tablet eines Raums feh
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Raum in Betrieb genommen oder aufgelöst wird und wenn eine
-Kraft in einen Raum eintritt oder ihn verlässt, jeweils mit Namen. Das Anlegen, das Ändern der
+Kraft in einen Raum eintritt, dort eintrifft oder ihn verlässt, jeweils mit Namen. Das Anlegen, das Ändern der
 Raumdaten und das Stornieren eines Raums stehen nicht darin. Wird ein Raum umbenannt, behalten
 frühere Einträge den alten Namen.
 
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, ändern, in Betrieb nehmen,
-zuweisen, entfernen, auflösen und stornieren dürfen Einsatzleitung und Führungspersonal, solange
-der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Bereitstellungsräume
+Eintreffen buchen, zuweisen, entfernen, auflösen und stornieren dürfen Einsatzleitung und
+Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
+Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fahrzeuge; fehlt es,
+steht der Grund im Dialog und nichts wird gebucht. Die Bereitstellungsräume
 gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält (Kapitel
 [Ohne Netz](ohne-netz.md)).

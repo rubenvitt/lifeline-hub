@@ -11,7 +11,8 @@
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, leere Bezeichnung, negativer
 //!   Bedarfsteil oder Kostform, Menge ≤ 0, unlesbarer Zeitpunkt, Freitext über seiner Grenze
 //!   (`*_MAX`, LLH-1040 D10), unbekannte Art, Verpflegungsart oder Status, mehr als
-//!   `STELLEN_JE_ZEITFENSTER_MAX` Stellen.
+//!   `STELLEN_JE_ZEITFENSTER_MAX` Stellen, keine oder mehr als `AUS_VORLAGE_MAX` Zeitfenster
+//!   eines Tages.
 //! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung, fremde
 //!   Verpflegungsstelle im Pfad, fremder Abschnitt, fremde oder unbekannte Empfänger-Einheit bzw.
 //!   Empfänger-Abschnitt einer Ausgabe (LLH-1055 D2).
@@ -23,7 +24,16 @@
 //!   Stelle, Storno einer nicht geplanten Stelle oder einer Stelle mit Ausgabe, halbe Koordinate,
 //!   Verweis im Body (Ausgabe, Zuordnung) auf eine fremde, unbekannte oder stornierte Stelle,
 //!   neue Zuordnung einer aufgelösten Stelle, Ausgabe mit Einheit und Abschnitt zugleich
-//!   (höchstens ein Empfänger, LLH-1055).
+//!   (höchstens ein Empfänger, LLH-1055); beim Tag aus der Vorlage Tagesgrenzen nicht 23
+//!   bis 25 Stunden auseinander, Beginn außerhalb des Tages, Bezeichnung doppelt in der Anfrage.
+//!
+//! **Tag aus der Vorlage** (LLH-1058, design.md D3): `POST …/zeitfenster/aus-vorlage` legt die
+//! übergebenen Zeitfenster eines Tages in EINER Transaktion an, gleiches Gate wie das
+//! Einzelanlegen. Die Route liest alle Zeitpunkte, prüft die Anzahl (`AUS_VORLAGE_MAX`) und je
+//! Fenster Bezeichnung und Art (400, vor jedem 422 auch eines anderen Fensters); den Rest prüft
+//! `repo::zeitfenster_aus_vorlage_tx`. Ein am Tag schon vorhandenes gleichnamiges Fenster wird
+//! übersprungen. 201, wenn mindestens eins entsteht, sonst 200 ohne ETB und ohne Ereignis; die
+//! Zeitfenster sind keiner Stelle zugeordnet, der Body kennt keine.
 //!
 //! Die fachlichen Prüfungen liegen im Repo; die Route liest JSON, normalisiert die Zeitpunkte
 //! (`etb::normalisiere_zeit`), lädt ETB-Startwert und Org-Zeitzone und öffnet die Transaktion —
@@ -49,7 +59,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, optional_max, parse_enum, parse_enum_opt,
+    deserialize_optional_field, optional_max, parse_enum, parse_enum_opt, pflicht_max,
 };
 use crate::verpflegung::repo::{
     self, AusgabeEingabe, StelleAenderung, StelleEingabe, ZeitfensterAenderung, ZeitfensterEingabe,
@@ -59,7 +69,7 @@ use crate::verpflegung::stelle::{
 };
 use crate::verpflegung::{
     self, dedupe_stelle_ids, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
-    Verpflegungsart, ZeitfensterAnzeige,
+    VerpflegungTagErgebnis, Verpflegungsart, ZeitfensterAnzeige,
 };
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
@@ -150,12 +160,133 @@ pub async fn zeitfenster_anlegen(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, tz, &eingabe).await
+        repo::create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, tz, &eingabe).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok((
         StatusCode::CREATED,
         Json(repo::zeitfenster_laden(&state.pool, einsatz_id, g.id).await?),
+    ))
+}
+
+/// Ein Zeitfenster der Anfrage „Tag aus der Vorlage“: die Felder des Einzelanlegens ohne
+/// Stellen (die Zuordnung geschieht danach an der Karte, design.md D3).
+#[derive(Debug, Deserialize)]
+pub struct TagZeitfenster {
+    bezeichnung: String,
+    von_at: String,
+    bis_at: String,
+    bedarf_kraefte: i64,
+    bedarf_betreute: i64,
+    #[serde(default)]
+    bedarf_weitere: Option<i64>,
+    #[serde(default)]
+    sonderkost: Option<SonderkostEingabe>,
+    #[serde(default)]
+    verpflegungsart: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TagAusVorlage {
+    /// Grenzen des Tages in der Anzeigezone (00:00 bis 00:00 des Folgetags), wie `von_at`.
+    tag_von_at: String,
+    tag_bis_at: String,
+    zeitfenster: Vec<TagZeitfenster>,
+}
+
+/// POST /api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage — legt die Zeitfenster eines
+/// Tages an (LLH-1058). 201 mit angelegten und übersprungenen; 200, wenn alles übersprungen ist.
+pub async fn zeitfenster_aus_vorlage(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    JsonBody(req): JsonBody<TagAusVorlage>,
+) -> Result<(StatusCode, Json<VerpflegungTagErgebnis>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // 400 vor jedem 422, auch eines anderen Fensters (design.md D3, Spec `eingabegrenzen`).
+    let tag_von_at = zeit(&req.tag_von_at)?;
+    let tag_bis_at = zeit(&req.tag_bis_at)?;
+    if req.zeitfenster.is_empty() {
+        return Err(AppError::Validation(
+            "zeitfenster darf nicht leer sein".into(),
+        ));
+    }
+    if req.zeitfenster.len() > verpflegung::AUS_VORLAGE_MAX {
+        return Err(AppError::Validation(format!(
+            "zeitfenster darf höchstens {} Einträge haben, waren {}",
+            verpflegung::AUS_VORLAGE_MAX,
+            req.zeitfenster.len()
+        )));
+    }
+    let fenster = req
+        .zeitfenster
+        .into_iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let label = f.bezeichnung.clone();
+            let eingabe = || -> Result<ZeitfensterEingabe, AppError> {
+                Ok(ZeitfensterEingabe {
+                    bezeichnung: pflicht_max(
+                        &f.bezeichnung,
+                        "bezeichnung",
+                        verpflegung::ZEITFENSTER_BEZEICHNUNG_MAX,
+                    )?,
+                    von_at: zeit(&f.von_at)?,
+                    bis_at: zeit(&f.bis_at)?,
+                    bedarf_kraefte: f.bedarf_kraefte,
+                    bedarf_betreute: f.bedarf_betreute,
+                    bedarf_weitere: f.bedarf_weitere.unwrap_or(0),
+                    sonderkost: f.sonderkost.unwrap_or_default(),
+                    verpflegungsart: parse_verpflegungsart(f.verpflegungsart.as_deref())?,
+                    stelle_ids: Vec::new(),
+                })
+            };
+            eingabe().map_err(|e| repo::label_error(i, &label, e))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let g = crate::write_retry!(&state.pool, |conn| {
+        repo::zeitfenster_aus_vorlage_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            startwert,
+            tz,
+            &tag_von_at,
+            &tag_bis_at,
+            &fenster,
+        )
+        .await
+    })?;
+    // Ohne angelegtes Fenster weder ETB noch Ereignis (Spec „Alles schon angelegt“).
+    if g.angelegt.is_empty() {
+        return Ok((
+            StatusCode::OK,
+            Json(VerpflegungTagErgebnis {
+                angelegt: Vec::new(),
+                uebersprungen: g.uebersprungen,
+            }),
+        ));
+    }
+    publiziere(&state, einsatz_id, &g.etb_ids);
+    // Die angelegten in der Reihenfolge der Anfrage, aus EINER Lesung des Moduls.
+    let mut alle = repo::liste(&state.pool, einsatz_id).await?.zeitfenster;
+    let angelegt = g
+        .angelegt
+        .iter()
+        .filter_map(|id| {
+            alle.iter()
+                .position(|z| z.id == *id)
+                .map(|i| alle.swap_remove(i))
+        })
+        .collect();
+    Ok((
+        StatusCode::CREATED,
+        Json(VerpflegungTagErgebnis {
+            angelegt,
+            uebersprungen: g.uebersprungen,
+        }),
     ))
 }
 
@@ -217,7 +348,7 @@ pub async fn zeitfenster_aendern(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_aendern_tx(
+        repo::update_zeitfenster_tx(
             conn,
             einsatz_id,
             zid,
@@ -249,7 +380,7 @@ pub async fn zeitfenster_loeschen(
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::zeitfenster_loeschen_tx(conn, einsatz_id, zid, benutzer_id, startwert, tz).await
+        repo::delete_zeitfenster_tx(conn, einsatz_id, zid, benutzer_id, startwert, tz).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok(StatusCode::NO_CONTENT)

@@ -625,6 +625,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/verpflegung/zeitfenster",
             post(routes::verpflegung::zeitfenster_anlegen),
         )
+        // Tag aus der Vorlage (LLH-1058): mehrere Zeitfenster eines Tages in einer Transaktion.
+        .route(
+            "/api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage",
+            post(routes::verpflegung::zeitfenster_aus_vorlage),
+        )
         .route(
             "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}",
             patch(routes::verpflegung::zeitfenster_aendern)
@@ -1766,6 +1771,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einheit-vorlagen/{id}/personal",
             put(routes::einheit_vorlage::replace_personal),
+        )
+        // Verpflegungsplan (LLH-1058): Lesen für alle der Org, Schreiben Admin.
+        .route(
+            "/api/verpflegung-vorlagen",
+            get(routes::verpflegung_vorlage::list).post(routes::verpflegung_vorlage::create),
+        )
+        .route(
+            "/api/verpflegung-vorlagen/{vid}",
+            patch(routes::verpflegung_vorlage::update),
         )
         .route("/api/einheit-typen", get(routes::einheit_typ::liste))
         .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))

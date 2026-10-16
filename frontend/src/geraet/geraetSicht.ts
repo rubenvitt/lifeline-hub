@@ -26,6 +26,11 @@ export type GeraetFaehigkeit =
   | 'person-anhaenge'
   /** Bereitstellungsraum wechseln, anlegen, bearbeiten, auflösen, stornieren (LFH-1042, LFH-1147). */
   | 'br-verwalten'
+  /**
+   * Eintreffen am eigenen Raum buchen, auch eine unangemeldete Kraft anlegen (LLH-1075). Die
+   * einzige Änderung an Einheiten und Fahrzeugen am Gerät; Übernehmen und Abweisen nie.
+   */
+  | 'br-eintreffen'
   /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044); Verpflegungsstellen
    *  anlegen, bearbeiten, in Betrieb nehmen, auflösen, stornieren und Zeitfenstern zuordnen
    *  (LLH-1040). Das Gerät liest die Stellen und wählt sie beim Buchen. */
@@ -43,6 +48,8 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
       return geraet.ansicht === 'uhs-laptop';
     case 'person-sichtung':
       return geraet.ansicht === 'uhs-tablet' || geraet.ansicht === 'uhs-laptop';
+    case 'br-eintreffen':
+      return geraet.ansicht === 'bereitstellungsraum';
     case 'uhs-verwalten':
     case 'br-verwalten':
     case 'verpflegung-planen':

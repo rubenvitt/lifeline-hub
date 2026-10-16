@@ -110,5 +110,9 @@ export const VERPFLEGUNG_ORT_MAX = 500;
 export const VERPFLEGUNG_BEMERKUNG_MAX = 2_000;
 /** Stellen je Verpflegungszeitfenster im Request (vor dem Entdoppeln). */
 export const VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX = 20;
+/** Bezeichnung einer Mahlzeit im Verpflegungsplan (LLH-1058). */
+export const VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX = 200;
+/** Zeitfenster je Anfrage „Tag aus der Vorlage anlegen“ (LLH-1058). */
+export const VERPFLEGUNG_AUS_VORLAGE_MAX = 24;
 /** Menge einer Verpflegungsausgabe in EP (LLH-1032); ebenso jede Kostform darin. */
 export const VERPFLEGUNG_EP_MAX = 100_000;

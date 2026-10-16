@@ -171,6 +171,30 @@ describe('KraeftebaumZelle', () => {
   });
 });
 
+describe('KraeftebaumZelle — „nicht übernommen“ (LLH-1075)', () => {
+  const zeile = (isNichtUebernommen: boolean) =>
+    ({
+      art: 'einheit',
+      einheitId: 1,
+      bezeichnung: 'Florian Nachbar 3',
+      zusatz: null,
+      tz: { typLabel: null, fachaufgabe: null, organisation: null },
+      isNichtUebernommen,
+    }) as const;
+
+  it('zeigt das Kennzeichen an der Einheit mit offener Übernahme', () => {
+    renderMitProviders(<KraeftebaumZelle zeile={zeile(true)} einsatzId={7} gesperrt={offen} />);
+    expect(screen.getByText('nicht übernommen')).toBeInTheDocument();
+  });
+
+  it('eine übernommene Einheit trägt keins', () => {
+    renderMitProviders(<KraeftebaumZelle zeile={zeile(false)} einsatzId={7} gesperrt={offen} />);
+    expect(screen.queryByText('nicht übernommen')).toBeNull();
+    zeige('eh-1');
+    expect(screen.queryByText('nicht übernommen')).toBeNull();
+  });
+});
+
 describe('Texte des Kräftebaums', () => {
   it('Besatzung Ist/Soll statt Stärke, „nicht erfasst“ ohne Kraft', () => {
     const b = finde('ef-30').besatzung!;
