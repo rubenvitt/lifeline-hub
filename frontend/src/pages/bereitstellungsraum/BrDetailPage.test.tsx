@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +19,12 @@ import type {
 } from '../../api/types';
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
+import { setzeOnline } from '../../test/utils';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
+} from '../../offline/queue';
 
 // `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
 // diese Datei testet die Seiten-Komposition, nicht den Switcher.
@@ -1969,5 +1975,115 @@ describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D
     const angemeldet = await zeile('Zug Nord');
     expect(within(angemeldet).queryByText('unangemeldet')).toBeNull();
     expect(within(angemeldet).queryByText('nicht übernommen')).toBeNull();
+  });
+});
+
+describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
+  const GERAET_ME = {
+    id: 9,
+    anzeigename: 'BR Alpha · Tablet',
+    benutzername: 'geraet-4',
+    system_rolle: 'keiner',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-10-04',
+    totp_aktiviert: false,
+    passwort_gesetzt: false,
+    geraet: {
+      kopplung_id: 4,
+      einsatz_id: 1,
+      ansicht: 'bereitstellungsraum',
+      stelle_id: 1,
+      stelle: 'BR Alpha',
+      bezeichnung: 'Tablet',
+      laeuft_ab_at: '2026-10-05 12:00:00',
+    },
+  };
+  let gesendet: number;
+
+  beforeEach(async () => {
+    gesendet = 0;
+    await queueLeerenFuerTests();
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+        HttpResponse.json(brDetail({ status: 'aktiv' })),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([einheit({ id: 30, name: 'Zug Nord' })]),
+      ),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/einheiten/zeitachse', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/eintreffen', () => {
+        gesendet += 1;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+  });
+  afterEach(() => {
+    setzeOnline(true);
+  });
+
+  it('am Gerät: ein Tipp merkt vor, der Raum zeigt „Vorgemerkt“, der Treffer ist gesperrt', async () => {
+    renderBrDetail();
+    const knopf = await screen.findByRole('button', { name: 'Eintreffen buchen' });
+    act(() => setzeOnline(false));
+    await userEvent.click(knopf);
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen Zug Nord' }));
+
+    expect(await screen.findByText('Offline vorgemerkt: Eintreffen Zug Nord')).toBeInTheDocument();
+    expect(gesendet).toBe(0);
+    const [zeile] = await schreibaktionenLaden(9, 1);
+    expect(zeile.aktion).toMatchObject({
+      art: 'eintreffen',
+      br_id: 1,
+      bezeichnung: 'BR Alpha',
+      name: 'Zug Nord',
+      daten: {
+        kraft: { objekt_typ: 'einheit', objekt_id: 30 },
+        client_id: expect.any(String),
+        zeitpunkt_at: expect.any(String),
+      },
+    });
+
+    const vorgemerkt = await screen.findByTestId('br-vorgemerkt');
+    expect(within(vorgemerkt).getByText('Zug Nord')).toBeInTheDocument();
+    expect(within(vorgemerkt).getByText(/^vorgemerkt \d{4}/)).toBeInTheDocument();
+    // Kennzahlen bleiben die des Servers (Spec `bereitstellungsraum-belegung`).
+    expect(kennzahl('Einheiten')).toHaveTextContent('0');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Eintreffen buchen' }));
+    const treffer = await screen.findByRole('button', { name: 'Eintreffen Zug Nord' });
+    expect(treffer).toBeDisabled();
+    expect(within(screen.getByRole('dialog')).getByText(/vorgemerkt \d{4}/)).toBeInTheDocument();
+  });
+
+  it('zeigt nur die Vormerkungen dieses Raums, eine unangemeldete mit Marke', async () => {
+    const eintreffen = (br_id: number, name: string) => ({
+      art: 'eintreffen' as const,
+      br_id,
+      bezeichnung: br_id === 1 ? 'BR Alpha' : 'BR Beta',
+      name,
+      daten: {
+        unangemeldet: { fahrzeuge: [{ funkrufname: name }] },
+        client_id: `c-${name}`,
+        zeitpunkt_at: '2026-10-16 12:12:00',
+      },
+    });
+    await schreibaktionEinreihen(9, 1, eintreffen(1, 'FL-MUS 1-44-1'));
+    await schreibaktionEinreihen(9, 1, eintreffen(2, 'FL-MUS 2-44-1'));
+    renderBrDetail();
+    const vorgemerkt = await screen.findByTestId('br-vorgemerkt');
+    expect(within(vorgemerkt).getByText('FL-MUS 1-44-1')).toBeInTheDocument();
+    expect(within(vorgemerkt).getByText('unangemeldet')).toBeInTheDocument();
+    expect(within(vorgemerkt).queryByText('FL-MUS 2-44-1')).toBeNull();
+  });
+
+  it('ohne Vormerkung keine Sektion', async () => {
+    renderBrDetail();
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTestId('br-vorgemerkt')).toBeNull();
   });
 });
