@@ -34,6 +34,7 @@ import {
   type EbenenZeile,
   type PersonenEbenenAngabe,
   type BetreuungEbenenAngabe,
+  type BrEbenenAngabe,
 } from './leistenDaten';
 import Sichtungslegende from './Sichtungslegende';
 import Klassenlegende from './Klassenlegende';
@@ -86,6 +87,8 @@ export interface LayerSichtbar {
    * (`betreuungEbene.ts`).
    */
   betreuungsstelle: boolean;
+  /** Ebene „Bereitstellungsräume" (LLH-1107), Grenze an der Datenquelle (`brEbene.ts`). */
+  bereitstellungsraum: boolean;
 }
 
 /**
@@ -94,7 +97,14 @@ export interface LayerSichtbar {
  * Koordinaten-Lücke zeigt die Betroffenen-Seite.
  */
 export type PlatzierenPunktTyp =
-  'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person' | 'betreuungsstelle';
+  | 'uhs'
+  | 'schaden'
+  | 'einheit'
+  | 'fahrzeug'
+  | 'fuehrung'
+  | 'person'
+  | 'betreuungsstelle'
+  | 'bereitstellungsraum';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   uhs: 'UHS',
@@ -104,6 +114,7 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   fuehrung: 'Personal', // beliebiges disponiertes Personal, nicht nur Führung
   abschnitt: 'Abschnitt',
   betreuungsstelle: 'Betreuungsstelle',
+  bereitstellungsraum: 'Bereitstellungsraum',
 };
 
 /**
@@ -161,8 +172,9 @@ export function ortVorschauExclude(
 ): string | undefined {
   if (!ziel) return undefined;
   if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
-  // Sidebar-Typen → Backend-Marker-Tags; 'fuehrung' → 'personal'. Keine Betreuungsstelle: die
-  // Peilung prüft nur den Einsatz-Lesezugriff und darf keine Stellen kennen (wie `person`).
+  // Sidebar-Typen → Backend-Marker-Tags; 'fuehrung' → 'personal'. Keine Betreuungsstelle und kein
+  // Bereitstellungsraum: die Peilung prüft nur den Einsatz-Lesezugriff und darf keine
+  // modulgebundenen Orte kennen (wie `person`).
   const map: Record<string, string> = {
     uhs: 'uhs',
     schaden: 'schaden',
@@ -270,6 +282,8 @@ export interface SidebarProps {
   personen?: PersonenEbenenAngabe;
   /** Ebene „Betreuungsstellen": nur die Zugriffsgrenze — die Marker zählen in `verortet` mit. */
   betreuung?: BetreuungEbenenAngabe;
+  /** Ebene „Bereitstellungsräume" (LLH-1107): ebenso nur die Zugriffsgrenze. */
+  br?: BrEbenenAngabe;
   /**
    * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das Paneel
    * trägt nur, was dort keinen Platz hat.
@@ -654,6 +668,7 @@ export default function Sidebar(props: SidebarProps) {
     sektionFehler.nichtVerortet != null,
     props.personen,
     props.betreuung,
+    props.br,
   );
   const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
   const grundlagePaneelInhalt =

@@ -1,5 +1,6 @@
 import type {
   Betreuungsstelle,
+  BrListenEintrag,
   EinsatzAnzeige,
   Evakuierungsbezirk,
   Uhs,
@@ -56,4 +57,10 @@ export interface SnapshotDaten {
    * `betreuungsstellen`.
    */
   evakuierungsbezirke?: Evakuierungsbezirk[];
+  /**
+   * Bereitstellungsräume mit Status, Koordinate und Belegung (LLH-1107). Optional wie
+   * `betreuungsstellen`: ältere Stände tragen das Feld nicht, und ohne Modul
+   * „Bereitstellungsräume" lässt der Server es weg.
+   */
+  bereitstellungsraeume?: BrListenEintrag[];
 }

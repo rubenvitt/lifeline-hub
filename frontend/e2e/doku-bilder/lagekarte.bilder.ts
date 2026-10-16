@@ -22,7 +22,8 @@ import {
  * (`pnpm doku:bilder --grep lagekarte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   lagekarte.png          frontend/src/pages/LagekartePage.tsx,
  *                          frontend/src/pages/lagekarte/Sidebar.tsx,
- *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx
+ *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx,
+ *                          frontend/src/pages/lagekarte/markerLayer.ts (Raumzeichen, LLH-1107)
  *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
  *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
  *                          frontend/src/pages/lagekarte/zeichenWahl.ts
@@ -31,8 +32,8 @@ import {
  *
  * Kartengrundlage aus `e2e/kartenFixture.ts` (kein Netz): eine Vektorkarte mit grauem Grund und
  * einer Linie je Kachel. Die Lageobjekte darauf sind die des Demo-Einsatzes; die Demo verortet nur
- * Zonen und die Betreuungsstelle, der Lauf setzt den Einsatzort und vier Einheiten dazu
- * (Koordinaten im Gebiet des Szenarios, `src/demo/szenario.rs`).
+ * Zonen und die Betreuungsstelle, der Lauf setzt den Einsatzort, vier Einheiten und den
+ * Bereitstellungsraum dazu (Koordinaten im Gebiet des Szenarios, `src/demo/szenario.rs`).
  */
 
 const KAPITEL = 'lagekarte';
@@ -47,6 +48,10 @@ const EINHEITEN_ORT: Record<string, [number, number]> = {
   Betreuungsgruppe: [10.2593, 50.9592],
   Logistiktrupp: [10.2546, 50.9581],
 };
+
+/** Bereitstellungsraum des Demo-Szenarios und sein Ort (lon, lat) für das Bild. */
+const BR_NAME = 'Parkplatz Stadion Nord';
+const BR_ORT: [number, number] = [10.2445, 50.9585];
 
 /** Verortet Einsatzort und Einheiten über die API, wie es „Platzieren“ täte. */
 async function lageVerorten(page: Page, einsatzId: number) {
@@ -65,6 +70,17 @@ async function lageVerorten(page: Page, einsatzId: number) {
       lon,
     });
   }
+  // Der Demo-Bereitstellungsraum steht mit seinem Raumzeichen auf der Karte (LLH-1107).
+  const raeume = await page.request.get(`/api/einsaetze/${einsatzId}/bereitstellungsraeume`);
+  expect(raeume.ok()).toBe(true);
+  const raum = ((await raeume.json()) as { id: number; bezeichnung: string }[]).find(
+    (r) => r.bezeichnung === BR_NAME,
+  );
+  expect(raum, `Demo-Bereitstellungsraum „${BR_NAME}“ fehlt`).toBeTruthy();
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${raum!.id}`, {
+    lat: BR_ORT[1],
+    lon: BR_ORT[0],
+  });
 }
 
 /** Öffnet die Lagekarte des Demo-Einsatzes auf der Fixture-Grundlage und wartet auf den Stil. */

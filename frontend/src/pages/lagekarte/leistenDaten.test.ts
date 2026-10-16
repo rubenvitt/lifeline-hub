@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   Betreuungsstelle,
+  BrListenEintrag,
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
@@ -42,6 +43,7 @@ const ALLE_AN: LayerSichtbar = {
   freies_zeichen: true,
   person: true,
   betreuungsstelle: true,
+  bereitstellungsraum: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -55,7 +57,7 @@ const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
 });
 
 describe('ebenenZeilen', () => {
-  it('führt dieselben zwölf Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
+  it('führt dieselben Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
     const keys = EBENEN.map((e) => e.key).sort();
     expect(keys).toEqual((Object.keys(ALLE_AN) as (keyof LayerSichtbar)[]).sort());
   });
@@ -188,6 +190,35 @@ describe('ebenenZeilen', () => {
     expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
   });
 
+  // Ebene „Bereitstellungsräume" (LLH-1107): dieselbe Regel.
+  it('„Bereitstellungsräume" ohne Angabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
+    const zeilen = ebenenZeilen([marker('bereitstellungsraum')], 0, ALLE_AN, false);
+    expect(zeilen.map((z) => z.key)).not.toContain('bereitstellungsraum');
+  });
+
+  it('„Bereitstellungsräume" frei: Zeile nach den Betreuungsstellen, gezählt aus den Markern', () => {
+    const zeilen = ebenenZeilen(
+      [marker('bereitstellungsraum', 1), marker('bereitstellungsraum', 2)],
+      0,
+      ALLE_AN,
+      false,
+      undefined,
+      { zugriff: 'frei' },
+      { zugriff: 'frei' },
+    );
+    const i = zeilen.findIndex((z) => z.key === 'bereitstellungsraum');
+    expect(zeilen[i]).toMatchObject({ name: 'Bereitstellungsräume', anzahl: 2, sichtbar: true });
+    expect(zeilen[i - 1].key).toBe('betreuungsstelle');
+  });
+
+  it('„Bereitstellungsräume" gesperrt: Grund, keine Zahl, nie „an"', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, undefined, undefined, {
+      zugriff: 'gesperrt',
+    });
+    const z = zeilen.find((x) => x.key === 'bereitstellungsraum')!;
+    expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
+  });
+
   it('trägt den Schaltzustand je Ebene', () => {
     const zeilen = ebenenZeilen([], 0, { ...ALLE_AN, schaden: false }, false);
     expect(zeilen.find((z) => z.key === 'schaden')!.sichtbar).toBe(false);
@@ -301,6 +332,53 @@ describe('auswahlRaster — Betreuungsstelle (LFH-673)', () => {
     expect(auswahlUnterzeile(marker('betreuungsstelle', 7), roh)).toBe(
       'Betreuungsstelle · Notunterkunft',
     );
+  });
+});
+
+const RAUM = {
+  id: 7,
+  bezeichnung: 'BR Sportplatz',
+  status: 'aktiv',
+  abschnitt_name: 'Nord',
+  belegung: { einheiten: 1, fahrzeuge: 3, laengste_seit_at: '2026-10-16 08:15:00' },
+  einheit_ids: [1],
+} as unknown as BrListenEintrag;
+
+describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
+  const einheit = { ...EINHEIT, ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 } };
+  const roh: AuswahlRoh = { ...ROH, einheiten: [einheit], bereitstellungsraeume: [RAUM] };
+  it('Status, Stärke über die Einheitenliste, Zahlen der Belegung vom Server, Abschnitt', () => {
+    const raster = auswahlRaster(marker('bereitstellungsraum', 7), roh, zeit);
+    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+      ['Status', 'aktiv'],
+      ['Stärke', '0/2/9//11'],
+      ['Fahrzeuge', '3'],
+      ['Einheiten', '1'],
+      ['Wartet seit', 'Z(2026-10-16 08:15:00)'],
+      ['Abschnitt', 'Nord'],
+    ]);
+    expect(raster[0].rolle).toBe('normal');
+  });
+  it('fehlt eine Einheit in der Liste, steht „—" statt einer zu kleinen Stärke', () => {
+    const raster = auswahlRaster(marker('bereitstellungsraum', 7), { ...roh, einheiten: [] }, zeit);
+    expect(raster.find((f) => f.label === 'Stärke')?.wert).toBe('—');
+  });
+  it('leerer Raum: keine Stärke, keine Wartezeit — „—", nichts erfunden', () => {
+    const leer = {
+      ...RAUM,
+      einheit_ids: [],
+      belegung: { einheiten: 0, fahrzeuge: 0 },
+    } as BrListenEintrag;
+    const raster = auswahlRaster(
+      marker('bereitstellungsraum', 7),
+      { ...roh, bereitstellungsraeume: [leer] },
+      zeit,
+    );
+    expect(raster.find((f) => f.label === 'Stärke')?.wert).toBe('—');
+    expect(raster.find((f) => f.label === 'Wartet seit')?.wert).toBe('—');
+  });
+  it('Unterzeile nennt die Objektart', () => {
+    expect(auswahlUnterzeile(marker('bereitstellungsraum', 7), roh)).toBe('Bereitstellungsraum');
   });
 });
 
