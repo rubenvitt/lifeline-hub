@@ -134,9 +134,10 @@ type Dialog =
  *
  * Das Banner nimmt keine eigene Zeile: es steht in der immer gerenderten Werkzeugzeile, deren Höhe
  * es nicht ändert. Auf dem Handschirm (unter `md`) trägt die Zeile Satz und Knopf nicht (LFH-694:
- * 0 px Text, im Handschuh-Betrieb 59 px Überlauf). Dort heißt das erste Segment „aktuell (n)“, und
- * das Banner steht als Kurzform „1 neu" in einem Knopf; der volle Satz bleibt für Hilfstechnik im
- * Status. Gemessen in `e2e/gate1-ueberlauf.spec.ts`.
+ * 0 px Text, im Handschuh-Betrieb 59 px Überlauf). Dort heißt das erste Segment „aktuell (n)“, die
+ * beiden anderen „vergangen“ und „Stellen“ ohne Zahl (LLH-1040), und das Banner steht als
+ * Kurzform „1 neu" in einem Knopf; der volle Satz bleibt für Hilfstechnik im Status. Gemessen in
+ * `e2e/gate1-ueberlauf.spec.ts`.
  *
  * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und Trennung „vergangen" laufen ohne Abruf mit.
  * Nichts blinkt.
@@ -436,8 +437,17 @@ export default function VerpflegungPage() {
               wert: 'laufend',
               label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
             },
-            { wert: 'vergangen', label: `vergangen (${vergangen.length})` },
-            { wert: 'stellen', label: `Stellen (${offeneStellenAnzahl(stellen)})` },
+            // Schmal ohne Zahl: mit drei Werten und dem Banner „1 neu“ trägt die Zeile bei 390 px im
+            // Handschuh-Betrieb die Zahlen nicht (5 px Überlauf; design.md, Risiken;
+            // `e2e/gate1-ueberlauf.spec.ts`). „aktuell (n)“ behält ihre, sie ist die Lage.
+            {
+              wert: 'vergangen',
+              label: istSchmal ? 'vergangen' : `vergangen (${vergangen.length})`,
+            },
+            {
+              wert: 'stellen',
+              label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenAnzahl(stellen)})`,
+            },
           ]}
           style={{ flex: 'none' }}
         />

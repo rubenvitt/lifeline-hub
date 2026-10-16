@@ -528,14 +528,16 @@ describe('VerpflegungPage (LFH-634)', () => {
       expect(sammelbanner()).toBeNull();
     });
 
-    it('auf dem Handschirm: Segment „aktuell (n)“, Banner als Knopf „1 neu“, voller Satz im Status (LFH-694)', async () => {
+    it('auf dem Handschirm: Segmente „aktuell (n)“, „vergangen“ und „Stellen“, Banner als Knopf „1 neu“, voller Satz im Status (LFH-694)', async () => {
       setzeViewportBreite(390);
       const { client } = renderPage();
       await screen.findAllByRole('article');
       // Unter `md` kurz, damit neben der Segmentleiste Platz für das Banner bleibt.
       expect(screen.getByRole('radio', { name: 'aktuell (2)' })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: 'vergangen (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'vergangen' })).toBeInTheDocument();
       expect(screen.queryByRole('radio', { name: /laufend & anstehend/ })).toBeNull();
+      // „vergangen“ und „Stellen“ schmal ohne Zahl (LLH-1040, design.md Risiken).
+      expect(screen.getByRole('radio', { name: 'Stellen' })).toBeInTheDocument();
 
       liefert([fruehstueck(), fremd(), mittag(), abend()]);
       await client.invalidateQueries();
