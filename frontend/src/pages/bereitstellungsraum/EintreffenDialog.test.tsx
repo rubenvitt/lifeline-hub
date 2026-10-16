@@ -96,7 +96,7 @@ function zeige({
   const onClose = vi.fn();
   const onGebucht = vi.fn();
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  render(
+  const baum = (offen: boolean) => (
     <QueryClientProvider client={qc}>
       <AntApp>
         <EintreffenDialog
@@ -104,14 +104,20 @@ function zeige({
           br={{ id: 1, einheiten: [], fahrzeuge: [] }}
           einheiten={einheiten}
           fahrzeuge={fahrzeuge}
-          offen
+          offen={offen}
           onClose={onClose}
           onGebucht={onGebucht}
         />
       </AntApp>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { onClose, onGebucht };
+  const { rerender } = render(baum(true));
+  /** Wie die Seite: nach `onClose` zu, danach wieder auf. */
+  const wiederOeffnen = () => {
+    rerender(baum(false));
+    rerender(baum(true));
+  };
+  return { onClose, onGebucht, wiederOeffnen };
 }
 
 const dialog = () => screen.getByRole('dialog');
@@ -173,6 +179,41 @@ describe('EintreffenDialog — Schritt 2: unangemeldet', () => {
     zeige();
     const funkrufname = await zuSchrittZwei('Florian Nachbar 3');
     expect(funkrufname).toHaveValue('Florian Nachbar 3');
+  });
+
+  it('„Zurück zur Suche“ und neuer Suchtext: Schritt 2 beginnt leer mit dem neuen Text', async () => {
+    zeige();
+    await zuSchrittZwei('Florian 3');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Trägerorganisation' }), 'FF Alt');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Suche' }));
+    const feld = await screen.findByRole('searchbox', { name: 'Suche' });
+    await userEvent.clear(feld);
+    const funkrufname = await zuSchrittZwei('Florian 4');
+    expect(funkrufname).toHaveValue('Florian 4');
+    expect(screen.getByRole('textbox', { name: 'Trägerorganisation' })).toHaveValue('');
+  });
+
+  it('nach Abbrechen und erneutem Öffnen gilt der neue Suchtext', async () => {
+    const { onClose, wiederOeffnen } = zeige();
+    await zuSchrittZwei('Florian 3');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    wiederOeffnen();
+    const funkrufname = await zuSchrittZwei('Florian 4');
+    expect(funkrufname).toHaveValue('Florian 4');
+  });
+
+  it('nach Zurück und Buchung eines Treffers beginnt Schritt 2 beim nächsten Mal leer', async () => {
+    const { onClose, wiederOeffnen } = zeige();
+    await zuSchrittZwei('Florian 3');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Suche' }));
+    const feld = await screen.findByRole('searchbox', { name: 'Suche' });
+    await userEvent.clear(feld);
+    await userEvent.click(screen.getByRole('button', { name: 'Eintreffen Zug Nord' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    wiederOeffnen();
+    const funkrufname = await zuSchrittZwei('Florian 4');
+    expect(funkrufname).toHaveValue('Florian 4');
   });
 
   it('vier Felder sichtbar, Bemerkung erst nach Aufklappen', async () => {

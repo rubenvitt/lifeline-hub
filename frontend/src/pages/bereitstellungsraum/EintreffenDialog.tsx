@@ -198,6 +198,11 @@ export default function EintreffenDialog({
 
   function zuSchrittZwei() {
     buchung.reset();
+    // Der Speicher von `form` überlebt das Aushängen von Schritt 2 (Zurück, Schließen) und gewänne
+    // beim Einhängen gegen `initialValues` (Falle wie an `ErfassungsModal`): Schritt 2 beginnt
+    // deshalb hier leer mit dem aktuellen Suchtext.
+    form.resetFields();
+    form.setFieldsValue({ funkrufname: suche.trim() });
     setSchritt('neu');
   }
 
