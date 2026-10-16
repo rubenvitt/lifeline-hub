@@ -4718,6 +4718,23 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
             Some(json!({"bedarf_kraefte": 1})),
         ),
         ("DELETE", format!("{basis}/zeitfenster/{zf}"), None),
+        // Tag aus der Vorlage und Verpflegungsplan (LLH-1058 D12).
+        (
+            "POST",
+            format!("{basis}/zeitfenster/aus-vorlage"),
+            Some(json!({
+                "tag_von_at": "2026-10-07T22:00:00Z",
+                "tag_bis_at": "2026-10-08T22:00:00Z",
+                "zeitfenster": [{
+                    "bezeichnung": "Abend",
+                    "von_at": "2026-10-08T18:00:00Z",
+                    "bis_at": "2026-10-08T19:00:00Z",
+                    "bedarf_kraefte": 10,
+                    "bedarf_betreute": 0,
+                }],
+            })),
+        ),
+        ("GET", "/api/verpflegung-vorlagen".to_string(), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");

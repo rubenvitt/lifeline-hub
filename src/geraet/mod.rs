@@ -694,6 +694,13 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/verpflegung/stellen/{sid}/status",
             ),
+            // Tag aus der Vorlage (LLH-1058 D12): planen bleibt der Führung, den
+            // Verpflegungsplan liest das Gerät nicht.
+            (
+                "POST",
+                "/api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage",
+            ),
+            ("GET", "/api/verpflegung-vorlagen"),
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen"),
             ("GET", "/api/einsaetze/{id}/personal"),
