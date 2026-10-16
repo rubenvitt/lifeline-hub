@@ -2259,40 +2259,6 @@ export interface components {
          * @enum {string}
          */
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
-        /** @description Ein Abschnitt der Empfängerliste (Ziel einer Zuführung). */
-        EmpfaengerAbschnitt: {
-            /** Format: int64 */
-            id: number;
-            name: string;
-            /** Format: int64 */
-            ueber_abschnitt_id?: number | null;
-        };
-        /** @description Eine Einheit der Empfängerliste. */
-        EmpfaengerEinheit: {
-            /** Format: int64 */
-            abschnitt_id?: number | null;
-            abschnitt_name?: string | null;
-            /** @description Nur bei einer aufgelösten Einheit, auf die eine Ausgabe verweist (für ihren Namen). */
-            aufgeloest_at?: string | null;
-            /**
-             * @description Das nicht gestrichene Eintreffen der jüngsten Einsatzperiode (offen oder durch Ablösung
-             *     beendet); fehlt ohne ein solches.
-             */
-            eintreffen_at?: string | null;
-            funkrufname?: string | null;
-            /** Format: int64 */
-            id: number;
-            /** @description Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`. */
-            ist: components["schemas"]["Staerke"];
-            /** @description Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`). */
-            ist_kumuliert: components["schemas"]["Staerke"];
-            name: string;
-            /**
-             * Format: int64
-             * @description Die übergeordnete Einheit (Gliederung); eine Ausgabe an sie verpflegt den Teilbaum.
-             */
-            ueber_einheit_id?: number | null;
-        };
         /**
          * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
          *     `kraft` und `unangemeldet`.
@@ -2333,6 +2299,40 @@ export interface components {
          * @enum {string}
          */
         EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /** @description Ein Abschnitt der Empfängerliste (Ziel einer Zuführung). */
+        EmpfaengerAbschnitt: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** Format: int64 */
+            ueber_abschnitt_id?: number | null;
+        };
+        /** @description Eine Einheit der Empfängerliste. */
+        EmpfaengerEinheit: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            /** @description Nur bei einer aufgelösten Einheit, auf die eine Ausgabe verweist (für ihren Namen). */
+            aufgeloest_at?: string | null;
+            /**
+             * @description Das nicht gestrichene Eintreffen der jüngsten Einsatzperiode (offen oder durch Ablösung
+             *     beendet); fehlt ohne ein solches.
+             */
+            eintreffen_at?: string | null;
+            funkrufname?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`. */
+            ist: components["schemas"]["Staerke"];
+            /** @description Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`). */
+            ist_kumuliert: components["schemas"]["Staerke"];
+            name: string;
+            /**
+             * Format: int64
+             * @description Die übergeordnete Einheit (Gliederung); eine Ausgabe an sie verpflegt den Teilbaum.
+             */
+            ueber_einheit_id?: number | null;
+        };
         /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
