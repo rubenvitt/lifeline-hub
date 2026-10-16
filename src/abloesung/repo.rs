@@ -248,7 +248,7 @@ async fn abschnitt_tx(
     )
 }
 
-async fn hat_laufende_tx(conn: &mut SqliteConnection, einheit_id: i64) -> Result<bool, AppError> {
+async fn has_laufende_tx(conn: &mut SqliteConnection, einheit_id: i64) -> Result<bool, AppError> {
     let r: Option<i64> = sqlx::query_scalar(
         "SELECT 1 FROM einsatz_abloesung WHERE einheit_id = ? AND status = 'laufend'",
     )
@@ -297,7 +297,7 @@ fn faellig_oder_400(beginn_at: &str, rhythmus: i64) -> Result<String, AppError> 
 /// Vorwarnzeit schon hinter `jetzt`, wird eine offene Vorwarnung geschlossen statt verschoben —
 /// eine Vorwarnung in der Vergangenheit ist keine mehr.
 #[allow(clippy::too_many_arguments)]
-async fn setze_fristen_tx(
+async fn set_fristen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -337,7 +337,7 @@ async fn setze_fristen_tx(
     Ok(())
 }
 
-async fn schliesse_fristen_tx(
+async fn close_fristen_tx(
     conn: &mut SqliteConnection,
     id: i64,
     jetzt: &str,
@@ -346,7 +346,7 @@ async fn schliesse_fristen_tx(
     erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id, jetzt).await
 }
 
-async fn loesche_fristen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+async fn delete_fristen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
     erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await
 }
@@ -366,7 +366,7 @@ pub async fn release_einheit_tx(
     .fetch_all(&mut *conn)
     .await?;
     for id in &laufend {
-        loesche_fristen_tx(conn, *id).await?;
+        delete_fristen_tx(conn, *id).await?;
         sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
             .bind(id)
             .execute(&mut *conn)
@@ -384,7 +384,7 @@ pub async fn release_einheit_tx(
 
 /// Legt eine laufende Schicht an und setzt ihre Fristen. Liefert die neue ID.
 #[allow(clippy::too_many_arguments)]
-async fn schicht_anlegen_tx(
+async fn create_schicht_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -397,7 +397,7 @@ async fn schicht_anlegen_tx(
     vorgaenger_id: Option<i64>,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    if hat_laufende_tx(conn, einheit_id).await? {
+    if has_laufende_tx(conn, einheit_id).await? {
         return Err(AppError::UnprocessableEntity(format!(
             "Einheit «{einheit_name}» hat bereits eine laufende Schicht"
         )));
@@ -420,7 +420,7 @@ async fn schicht_anlegen_tx(
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
     .await?;
-    setze_fristen_tx(
+    set_fristen_tx(
         conn,
         einsatz_id,
         benutzer_id,
@@ -466,7 +466,7 @@ pub async fn beginnen(
                 .await?
                 .unwrap_or_else(|| jetzt.to_string()),
         };
-        let id = schicht_anlegen_tx(
+        let id = create_schicht_tx(
             conn,
             einsatz_id,
             benutzer_id,
@@ -593,7 +593,7 @@ pub async fn aendern(
         .execute(&mut *conn)
         .await?;
         if faellig_at != roh.faellig_at {
-            setze_fristen_tx(conn, einsatz_id, benutzer_id, id, &name, &faellig_at, jetzt).await?;
+            set_fristen_tx(conn, einsatz_id, benutzer_id, id, &name, &faellig_at, jetzt).await?;
         }
         let etb_id = crate::etb::system_audit_tx(
             conn,
@@ -662,7 +662,7 @@ pub async fn vorgabe_setzen(
                 .execute(&mut *conn)
                 .await?;
                 let (name, _) = einheit_tx(conn, einsatz_id, einheit_id).await?;
-                setze_fristen_tx(conn, einsatz_id, benutzer_id, id, &name, &faellig_at, jetzt)
+                set_fristen_tx(conn, einsatz_id, benutzer_id, id, &name, &faellig_at, jetzt)
                     .await?;
             }
         }
@@ -750,7 +750,7 @@ pub async fn vollziehen(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-        schliesse_fristen_tx(conn, id, jetzt).await?;
+        close_fristen_tx(conn, id, jetzt).await?;
         // LFH-552: der Vollzug beendet die Einsatzperiode der abgelösten Einheit (samt Fan-out);
         // ohne offene Periode bleibt die Zeitachse unberührt.
         let zeitachse = crate::zeitachse::repo::abloesung_vollzogen_tx(
@@ -764,7 +764,7 @@ pub async fn vollziehen(
 
         let folge_id = match &abloeser {
             Some((a, a_name)) => Some(
-                schicht_anlegen_tx(
+                create_schicht_tx(
                     conn,
                     einsatz_id,
                     benutzer_id,
@@ -856,14 +856,14 @@ pub async fn zuruecknehmen(
                         .into(),
                 ));
             }
-            loesche_fristen_tx(conn, *folge_id).await?;
+            delete_fristen_tx(conn, *folge_id).await?;
             sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
                 .bind(folge_id)
                 .execute(&mut *conn)
                 .await?;
         }
         let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
-        if hat_laufende_tx(conn, roh.einheit_id).await? {
+        if has_laufende_tx(conn, roh.einheit_id).await? {
             return Err(AppError::UnprocessableEntity(format!(
                 "Einheit «{name}» hat inzwischen eine neue laufende Schicht"
             )));
