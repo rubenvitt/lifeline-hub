@@ -215,6 +215,11 @@ struct SnapshotDaten {
     /// Evakuierungsbezirke — beschriften die Bezirksflächen in `zonen`; ebenfalls am Modul
     /// Betreuung gegatet.
     evakuierungsbezirke: Vec<crate::betreuung::EvakuierungsbezirkAnzeige>,
+    /// Bereitstellungsräume (ohne stornierte) mit Koordinate, Status, Kennzahlen der Belegung und
+    /// Einheiten im Raum, wie die Liste des Moduls ohne Gerätefilter (LLH-1107, design.md D10);
+    /// am Modul Bereitstellungsräume gegatet (`REDIGIERBARE_MODUL_FELDER`). Ältere Stände tragen
+    /// das Feld nicht.
+    bereitstellungsraeume: Vec<crate::bereitstellungsraum::BrListenEintrag>,
 }
 
 /// Friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein.
@@ -289,6 +294,12 @@ pub async fn erzeuge(
         bilder: crate::karte_hintergrundbild::repo::liste(pool, einsatz_id, None).await?,
         betreuungsstellen: betreuung.stellen,
         evakuierungsbezirke: betreuung.bezirke,
+        bereitstellungsraeume: crate::bereitstellungsraum::repo::list_eintraege(
+            pool,
+            einsatz_id,
+            crate::bereitstellungsraum::repo::ListenFilter::default(),
+        )
+        .await?,
     };
 
     let daten_value = serde_json::to_value(&daten)
