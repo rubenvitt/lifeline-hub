@@ -6294,7 +6294,11 @@ mod tests {
             fks,
             [
                 ("auftrag_id".into(), "auftrag".into(), "SET NULL".into()),
-                ("br_id".into(), "bereitstellungsraum".into(), "NO ACTION".into()),
+                (
+                    "br_id".into(),
+                    "bereitstellungsraum".into(),
+                    "NO ACTION".into()
+                ),
                 ("einsatz_id".into(), "einsatz".into(), "CASCADE".into()),
                 ("erfasst_von".into(), "benutzer".into(), "NO ACTION".into()),
                 (
@@ -6402,13 +6406,12 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        let (ziel, anzeige): (Option<i64>, Option<String>) = sqlx::query_as(
-            "SELECT ziel_abschnitt_id, ziel_anzeige FROM br_belegung WHERE id = ?",
-        )
-        .bind(abruf)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let (ziel, anzeige): (Option<i64>, Option<String>) =
+            sqlx::query_as("SELECT ziel_abschnitt_id, ziel_anzeige FROM br_belegung WHERE id = ?")
+                .bind(abruf)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!((ziel, anzeige.as_deref()), (None, Some("EA Deich")));
     }
 
