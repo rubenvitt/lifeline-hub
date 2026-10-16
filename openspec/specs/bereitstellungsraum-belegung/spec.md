@@ -651,3 +651,71 @@ ETB-Ereignis. Einen Ton oder eine Benachrichtigung MUST der Abruf nicht auslöse
   Sportplatz verbunden ist
 - **THEN** erhält das Gerät das Ereignis `bereitstellungsraum`, aber weder `etb` noch `auftrag`,
   und spielt keinen Ton
+
+### Requirement: Eintreffen buchen in der Oberfläche
+Die Detailseite eines Bereitstellungsraums SHALL am Desktop und am Gerät des Raums „Eintreffen
+buchen“ im Kopf anbieten, als Primäraktion, solange der Raum `aktiv` ist. Der Dialog MUST die
+aktiven Kräfte des Einsatzes ohne Raum durchsuchbar zeigen, „Erwartet“ vor „Im Einsatz“; ein
+Tipp auf einen Treffer MUST ihn buchen. Ist der Raum nicht in Betrieb, MUST die Aktion gesperrt
+mit Grund stehen; ohne Schreibrecht MUST sie fehlen.
+
+#### Scenario: Ein Tipp bucht
+- **WHEN** der Einweiser „HLF“ sucht und den Treffer „HLF 20 FF Musterstadt“ tippt
+- **THEN** ist die Einheit gebucht, der Dialog schließt, und ein Hinweis nennt „HLF 20 FF Musterstadt gebucht“
+
+#### Scenario: Schon eingetroffen
+- **WHEN** eine Einheit ohne Abschnitt in ihrer offenen Periode schon eingetroffen ist und in keinem Raum steht
+- **THEN** steht sie im Dialog unter „Im Einsatz“, nicht unter „Erwartet“
+
+#### Scenario: Raum geplant
+- **WHEN** der Raum den Status `geplant` hat
+- **THEN** steht „Eintreffen buchen“ gesperrt mit dem Grund „BR nicht in Betrieb“
+
+#### Scenario: Am Gerät
+- **WHEN** der Einweiser am Tablet des Raums „Eintreffen buchen“ wählt
+- **THEN** füllt der Dialog den Bildschirm
+
+#### Scenario: Anderes Gerät
+- **WHEN** ein Gerät einer anderen Ansicht als `bereitstellungsraum` die Seite eines Raums zeigt
+- **THEN** fehlt „Eintreffen buchen“
+
+### Requirement: Unangemeldete Kraft in der Oberfläche erfassen
+„Nicht in der Liste“ im Dialog „Eintreffen buchen“ SHALL die Erfassung einer unangemeldeten
+Kraft mit vier sichtbaren Feldern öffnen (Funkrufname, Trägerorganisation, Fahrzeugtyp, Stärke),
+Bemerkung und weitere Fahrzeuge aufklappbar, den Suchtext als Funkrufname übernommen.
+Ablehnungen MUST im Dialog stehen, ohne Fehler-Toast.
+
+#### Scenario: Unangemeldet gebucht
+- **WHEN** der Einweiser „Nicht in der Liste“ wählt, den Funkrufnamen ergänzt und „Unangemeldet buchen“ wählt
+- **THEN** zeigt ein Hinweis „FL-MUS 1-44-1 unangemeldet gebucht, Einsatzleitung informiert“
+
+### Requirement: Doppelbuchung in der Oberfläche
+Erkennt der Client bei der Erfassung einer unangemeldeten Kraft eine Doppelbuchung, SHALL er die
+vorhandene Kraft nennen, „Unangemeldet buchen“ sperren und „Diese buchen“ sowie „Trotzdem neu
+anlegen“ anbieten. Meldet erst der Server die Doppelbuchung, MUST „Trotzdem neu anlegen“
+erscheinen.
+
+#### Scenario: Doppelbuchung im Client
+- **WHEN** der Einweiser unangemeldet „fl-mus 1-44-1“ eingibt und „FL-MUS 1-44-1“ als Fahrzeug im Einsatz geführt wird
+- **THEN** nennt der Dialog „Schon im Einsatz: FL-MUS 1-44-1“, „Unangemeldet buchen“ ist gesperrt, und „Trotzdem neu anlegen“ sendet die Erfassung mit ausdrücklicher Bestätigung
+
+### Requirement: Seitenleiste trennt Erwartete und Kräfte im Einsatz
+Die Seitenleiste der freien Kräfte SHALL Kräfte ohne Raum in „Erwartet“ (ohne eigenen oder
+geerbten Abschnitt, dazu Fahrzeuge ohne Einheit) und „Im Einsatz“ (mit Abschnitt) trennen;
+„Im Einsatz“ MUST eingeklappt mit Anzahl stehen und aufklappbar sein.
+
+#### Scenario: Kraft im Abschnitt
+- **WHEN** eine Einheit mit Abschnitt Nord in keinem Raum steht
+- **THEN** steht sie in der Seitenleiste unter „Im Einsatz“, das eingeklappt die Anzahl nennt
+
+#### Scenario: Unterstellte Einheit
+- **WHEN** eine Einheit ohne eigenen Abschnitt einer Einheit im Abschnitt Nord unterstellt ist
+- **THEN** steht sie unter „Im Einsatz“
+
+### Requirement: Herkunft in der Belegung
+Die Belegungszeile einer Einheit SHALL „nicht übernommen“ in der Rolle Achtung zeigen, solange
+die Übernahme offen ist, und danach „unangemeldet“ als neutrale Marke ohne Farbe.
+
+#### Scenario: Nach der Übernahme
+- **WHEN** eine unangemeldet gebuchte Einheit übernommen wurde und weiter im Raum steht
+- **THEN** zeigt ihre Belegungszeile „unangemeldet“ ohne Farbe und nicht „nicht übernommen“
