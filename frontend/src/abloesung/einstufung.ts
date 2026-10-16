@@ -67,15 +67,6 @@ interface AbloesungsMarke {
   einheiten: number;
 }
 
-/** Rhythmus als Text: „6 h", „6 h 30 min", „45 min" — wie `rhythmus_text` im Backend. */
-export function rhythmusText(minuten: number): string {
-  const h = Math.floor(minuten / 60);
-  const m = minuten % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} h`;
-  return `${h} h ${m} min`;
-}
-
 /**
  * Laufende Schichten → Marken „Ablösung <Abschnitt>, <n> Einheiten" bzw. „Ablösung <Einheit>".
  * Schichten ohne Abschnitt bilden je eine eigene Marke.

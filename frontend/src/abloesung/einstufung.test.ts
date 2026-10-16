@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { Abloesung } from '../api/types';
-import { abloesungsMarken, computeEinstufung, rhythmusText, countFaellige } from './einstufung';
+import { abloesungsMarken, computeEinstufung, countFaellige } from './einstufung';
 
 dayjs.extend(utc);
 
@@ -112,13 +112,5 @@ describe('abloesungsMarken', () => {
   });
   it('lässt abgelöste Schichten weg', () => {
     expect(abloesungsMarken([schicht({ id: 1, status: 'abgeloest' })])).toEqual([]);
-  });
-});
-
-describe('rhythmusText', () => {
-  it('liest sich wie im ETB', () => {
-    expect(rhythmusText(360)).toBe('6 h');
-    expect(rhythmusText(390)).toBe('6 h 30 min');
-    expect(rhythmusText(45)).toBe('45 min');
   });
 });

@@ -43,7 +43,9 @@ const vollzieheAbloesung = vi.fn();
 const nimmVollzugZurueck = vi.fn();
 const aendereSchicht = vi.fn();
 const setzeAbloesungVorgabe = vi.fn();
+const fetchEinsatzSchichtmodell = vi.fn();
 vi.mock('../api/abloesungen', () => ({
+  fetchEinsatzSchichtmodell: (...a: unknown[]) => fetchEinsatzSchichtmodell(...a),
   listeAbloesungen: (...a: unknown[]) => listeAbloesungen(...a),
   listeAbloesungVorgaben: (...a: unknown[]) => listeAbloesungVorgaben(...a),
   beginneSchicht: (...a: unknown[]) => beginneSchicht(...a),
@@ -124,6 +126,7 @@ describe('AbloesungPage (LFH-635)', () => {
       ),
     );
     listeEinheitenPerioden.mockResolvedValue([]);
+    fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
     listeAbloesungVorgaben.mockResolvedValue([
       {
         abschnitt_id: 7,
@@ -166,14 +169,138 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(herkunft).not.toContainElement(rhythmus(bald));
   });
 
-  it('eine Schicht nach der Vorgabe des Einsatzes heißt „Vorgabe“, nicht „eigen“ (LLH-1122)', async () => {
+  it('eine Schicht nach der Vorgabe des Einsatzes nennt „Vorgabe Einsatz“ (LLH-1122)', async () => {
     listeAbloesungen.mockImplementation((_e: number, status: string) =>
-      Promise.resolve(status === 'laufend' ? [schicht({ id: 1, rhythmus_quelle: 'einsatz' })] : []),
+      Promise.resolve(
+        status === 'laufend'
+          ? [
+              schicht({ id: 1, rhythmus_quelle: 'einsatz', rhythmus_minuten: 450 }),
+              schicht({ id: 2, faellig_at: inMinuten(90) }),
+            ]
+          : [],
+      ),
     );
     renderPage();
-    const [karte] = await screen.findAllByRole('article');
-    expect(karte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
+    const [einsatzKarte, abschnittKarte] = await screen.findAllByRole('article');
+    // Dauer als „7:30 h“, nie „7.5“ oder „7 h 30 min“ (LLH-1122).
+    expect(einsatzKarte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
+      /^Rhythmus 7:30 h \(Vorgabe Einsatz\)$/,
+    );
+    // Die Abschnittsvorgabe bleibt kurz: den Abschnitt nennt die Zeile darüber (LFH-708).
+    expect(abschnittKarte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
       /^Rhythmus 6 h \(Vorgabe\)$/,
+    );
+  });
+
+  it('das Paneel „Vorgabe des Einsatzes“ nennt Modell, Regel und Vorwarnung (LLH-1122)', async () => {
+    fetchEinsatzSchichtmodell.mockResolvedValue({
+      schichtmodell: {
+        bezeichnung: '12-h-Schicht Hochwasser',
+        typ: 'wechselzeiten',
+        wechselzeiten: ['06:00', '18:00'],
+        mindestdauer_minuten: 240,
+        vorwarnung_minuten: 45,
+        planungsvorlauf_minuten: 120,
+        geaendert_at: inMinuten(-60),
+      },
+      vorwarnung_minuten: 45,
+      laufende_schichten: 2,
+    });
+    renderPage();
+    const paneel = await screen.findByRole('region', { name: 'Vorgabe des Einsatzes' });
+    await waitFor(() =>
+      expect(paneel).toHaveTextContent(
+        '12-h-Schicht Hochwasser Wechsel 0600/1800 · Mindestdauer 4 h · Vorwarnung 45 min · 2 laufend',
+      ),
+    );
+    // Gesetzt wird in den Einsatz-Einstellungen; hier nur der Sprung dorthin.
+    expect(
+      within(paneel).getByRole('link', { name: 'Vorgabe des Einsatzes ändern' }),
+    ).toHaveAttribute('href', '/einsaetze/1/einstellungen/abloesung');
+  });
+
+  it('ohne Vorgabe des Einsatzes: „keine Vorgabe“ (LLH-1122)', async () => {
+    renderPage();
+    const paneel = await screen.findByRole('region', { name: 'Vorgabe des Einsatzes' });
+    await waitFor(() => expect(paneel).toHaveTextContent('keine Vorgabe'));
+  });
+
+  it('Schicht beginnen: die Vorgabe des Einsatzes macht den Rhythmus entbehrlich (LLH-1122)', async () => {
+    fetchEinsatzSchichtmodell.mockResolvedValue({
+      schichtmodell: {
+        bezeichnung: 'Sanitätsdienst',
+        typ: 'rhythmus',
+        rhythmus_minuten: 720,
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+        geaendert_at: inMinuten(-60),
+      },
+      vorwarnung_minuten: 30,
+      laufende_schichten: 0,
+    });
+    listeAbloesungen.mockResolvedValue([]);
+    beginneSchicht.mockResolvedValue(schicht({ id: 2 }));
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    const dialog = await screen.findByRole('dialog');
+    // Florian 2 hat keinen Abschnitt, also gilt die Vorgabe des Einsatzes.
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
+    await waitFor(() => expect(feld).toHaveAttribute('placeholder', '12 h (Vorgabe Einsatz)'));
+    expect(feld).not.toBeRequired();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+    await waitFor(() =>
+      expect(beginneSchicht).toHaveBeenCalledWith(1, {
+        einheit_id: 12,
+        beginn_at: undefined,
+        rhythmus_minuten: undefined,
+      }),
+    );
+  });
+
+  it('Rhythmus einer Schicht: nur die Vorgabe des Einsatzes erlaubt ein leeres Feld (LLH-1122)', async () => {
+    fetchEinsatzSchichtmodell.mockResolvedValue({
+      schichtmodell: {
+        bezeichnung: 'Hochwasser',
+        typ: 'wechselzeiten',
+        wechselzeiten: ['06:00', '18:00'],
+        mindestdauer_minuten: 240,
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+        geaendert_at: inMinuten(-60),
+      },
+      vorwarnung_minuten: 30,
+      laufende_schichten: 1,
+    });
+    laufendLiefert([
+      schicht({
+        id: 4,
+        abschnitt_id: undefined,
+        abschnitt_name: undefined,
+        rhythmus_quelle: 'einheit',
+        rhythmus_minuten: 450,
+      }),
+    ]);
+    aendereSchicht.mockResolvedValue(schicht({ id: 4 }));
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 4' }));
+    const menu = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menu).getByText('Rhythmus ändern'));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
+    // Der eigene Wert steht als Dauer im Feld, nie „7.5“.
+    expect(feld).toHaveValue('7:30 h');
+    expect(feld).toHaveAttribute('placeholder', 'Wechsel 0600/1800 (Vorgabe Einsatz)');
+    expect(feld).not.toBeRequired();
+    await userEvent.clear(feld);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aendereSchicht).toHaveBeenCalledWith(1, 4, { rhythmus_minuten: null }),
     );
   });
 
@@ -242,7 +369,7 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledWith(1, 1));
   });
 
-  it('Schicht beginnen: Enter-Struktur und Rhythmus in Stunden → Minuten', async () => {
+  it('Schicht beginnen: Enter-Struktur und Rhythmus als Dauer → Minuten', async () => {
     listeAbloesungen.mockResolvedValue([]);
     beginneSchicht.mockResolvedValue(schicht({ id: 2 }));
     renderPage();
@@ -255,7 +382,7 @@ describe('AbloesungPage (LFH-635)', () => {
     // Einheit wählen (Florian 2 hat keine Abschnittsvorgabe → Rhythmus ist Pflicht)
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
     await userEvent.click(await screen.findByTitle('Florian 2'));
-    await userEvent.type(within(dialog).getByLabelText('Rhythmus (Stunden)'), '4.5');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), '4:30');
     await userEvent.click(knopf);
     await waitFor(() =>
       expect(beginneSchicht).toHaveBeenCalledWith(1, {
@@ -276,7 +403,9 @@ describe('AbloesungPage (LFH-635)', () => {
       );
     await aendern();
     let dialog = await screen.findByRole('dialog');
-    const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
+    // Vorbelegt als Dauer, nie „6.0“ (LLH-1122).
+    expect(feld).toHaveValue('6 h');
     await userEvent.clear(feld);
     await userEvent.type(feld, '8');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
@@ -285,7 +414,7 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await aendern();
     dialog = await screen.findByRole('dialog');
-    await userEvent.clear(within(dialog).getByLabelText('Rhythmus (Stunden)'));
+    await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Rhythmus' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(setzeAbloesungVorgabe).toHaveBeenLastCalledWith(1, 7, null));
   });
@@ -343,7 +472,7 @@ describe('AbloesungPage (LFH-635)', () => {
     ) as HTMLElement;
     await userEvent.click(within(menu).getByText('Rhythmus ändern'));
     const dialog = await screen.findByRole('dialog');
-    const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)');
     expect(within(dialog).queryByText(/Leer/)).toBeNull();
   });
@@ -355,7 +484,7 @@ describe('AbloesungPage (LFH-635)', () => {
       screen.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern' }),
     );
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Rhythmus (Stunden)')).toHaveAttribute(
+    expect(within(dialog).getByRole('textbox', { name: 'Rhythmus' })).toHaveAttribute(
       'placeholder',
       'keine Vorgabe',
     );
@@ -446,7 +575,7 @@ describe('AbloesungPage (LFH-635)', () => {
       const dialog = await screen.findByRole('dialog');
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
       await userEvent.click(await screen.findByTitle('Florian 2'));
-      await userEvent.type(within(dialog).getByLabelText('Rhythmus (Stunden)'), '4');
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), '4');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
 
       await waitFor(() =>
@@ -475,7 +604,7 @@ describe('AbloesungPage (LFH-635)', () => {
       const dialog = await screen.findByRole('dialog');
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
       await userEvent.click(await screen.findByTitle('Florian 2'));
-      await userEvent.type(within(dialog).getByLabelText('Rhythmus (Stunden)'), '4');
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), '4');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
       await waitFor(() => expect(beginneSchicht).toHaveBeenCalled());
 
@@ -635,7 +764,7 @@ describe('AbloesungPage (LFH-635)', () => {
       ) as HTMLElement;
       await userEvent.click(within(menu).getByText('Rhythmus ändern'));
       const dialog = await screen.findByRole('dialog');
-      const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+      const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
       await userEvent.clear(feld);
       await userEvent.type(feld, '0.5');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
@@ -671,7 +800,7 @@ describe('AbloesungPage (LFH-635)', () => {
         screen.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern' }),
       );
       const dialog = await screen.findByRole('dialog');
-      const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+      const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
       await userEvent.clear(feld);
       await userEvent.type(feld, '0.5');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));

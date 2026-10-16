@@ -2,10 +2,11 @@ import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLinkClickHandler, useParams } from 'react-router';
 import {
   aendereSchicht,
   beginneSchicht,
+  fetchEinsatzSchichtmodell,
   listeAbloesungen,
   listeAbloesungVorgaben,
   nimmVollzugZurueck,
@@ -25,7 +26,9 @@ import {
   VollzugDialog,
   type EinheitOption,
 } from '../abloesung/AbloesungDialoge';
-import { rhythmusText, countFaellige } from '../abloesung/einstufung';
+import { formatDauer } from '../abloesung/dauer';
+import { countFaellige } from '../abloesung/einstufung';
+import { formatRegel, formatRegelKurz } from '../abloesung/schichtmodellText';
 import { useUhr } from '../abloesung/useUhr';
 import {
   eingeordnet,
@@ -53,7 +56,8 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { abschnittVorgabe } from '../components/vorgabeText';
+import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
+import { einsatzEinstellungenPfad } from '../routing/deeplinks';
 
 const { Text } = Typography;
 
@@ -61,7 +65,8 @@ const { Text } = Typography;
 const abloesungRechteText = einsatzRechteGrund;
 
 type Rhythmusziel =
-  | { art: 'schicht'; schicht: Abloesung; vorgabe: number | undefined }
+  /** `vorgabe`: was bei leerem Feld gilt, schon als Platzhalter (Abschnitt vor Einsatz). */
+  | { art: 'schicht'; schicht: Abloesung; vorgabe: string | undefined }
   | { art: 'abschnitt'; vorgabe: AbloesungVorgabe };
 
 /**
@@ -122,6 +127,16 @@ export default function AbloesungPage() {
     queryKey: einsatzKeys.abloesungVorgaben(einsatzId),
     queryFn: () => listeAbloesungVorgaben(einsatzId),
   });
+  // Vorgabe des Einsatzes (LLH-1122): gesetzt wird sie in den Einsatz-Einstellungen, hier gilt sie
+  // als letzte Stufe der Rangfolge (Platzhalter, leeres Rhythmusfeld) und steht im Paneel.
+  const einsatzVorgabeQuery = useQuery({
+    queryKey: einsatzKeys.abloesungEinsatzVorgabe(einsatzId),
+    queryFn: () => fetchEinsatzSchichtmodell(einsatzId),
+  });
+  const einsatzModell = einsatzVorgabeQuery.data?.schichtmodell ?? null;
+  const einsatzVorgabeKurz = einsatzModell ? formatRegelKurz(einsatzModell) : undefined;
+  const einsatzVorgabePfad = einsatzEinstellungenPfad(einsatzId, 'abloesung');
+  const zurEinsatzVorgabe = useLinkClickHandler<HTMLElement>(einsatzVorgabePfad);
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   // Die Einheiten braucht nur, wer Schichten beginnen oder Ablöser wählen darf.
   const einheitenQuery = useQuery({
@@ -455,7 +470,14 @@ export default function AbloesungPage() {
               onRhythmusAendern={(x) => {
                 aendernMut.reset();
                 const v = vorgaben.find((g) => g.abschnitt_id === x.abschnitt_id)?.rhythmus_minuten;
-                setRhythmusZiel({ art: 'schicht', schicht: x, vorgabe: v ?? undefined });
+                // Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122).
+                const vorgabe =
+                  v != null
+                    ? abschnittVorgabe(formatDauer(v))
+                    : einsatzVorgabeKurz != null
+                      ? einsatzVorgabe(einsatzVorgabeKurz)
+                      : undefined;
+                setRhythmusZiel({ art: 'schicht', schicht: x, vorgabe });
               }}
               onZuruecknehmen={(x) => zuruecknehmenMut.mutate(x.id)}
               fehlerGrund={kartenFehler.grund(s.id)}
@@ -483,7 +505,7 @@ export default function AbloesungPage() {
                   <Text strong>{v.abschnitt_name}</Text>{' '}
                   <Text type="secondary">
                     {v.rhythmus_minuten != null
-                      ? `Rhythmus ${rhythmusText(v.rhythmus_minuten)}`
+                      ? `Rhythmus ${formatDauer(v.rhythmus_minuten)}`
                       : 'keine Vorgabe'}
                     {v.laufende_schichten > 0 ? ` · ${v.laufende_schichten} laufend` : ''}
                   </Text>
@@ -505,6 +527,48 @@ export default function AbloesungPage() {
         )}
       </Paneel>
 
+      {/* Unter den Abschnitten, wie in der Rangfolge: sie gilt, wo der Abschnitt keine hat. */}
+      <Paneel titel="Vorgabe des Einsatzes" style={{ marginTop: token.marginLG }}>
+        <PaneelZeile>
+          <Flex
+            justify="space-between"
+            align="center"
+            gap={token.marginXS}
+            wrap
+            style={{ width: '100%' }}
+            data-lfh="abloesung-einsatzvorgabe"
+          >
+            {einsatzModell ? (
+              <span>
+                <Text strong>{einsatzModell.bezeichnung}</Text>{' '}
+                <Text type="secondary">
+                  {formatRegel(einsatzModell)} · Vorwarnung{' '}
+                  {formatDauer(einsatzModell.vorwarnung_minuten)}
+                  {einsatzVorgabeQuery.data && einsatzVorgabeQuery.data.laufende_schichten > 0
+                    ? ` · ${einsatzVorgabeQuery.data.laufende_schichten} laufend`
+                    : ''}
+                </Text>
+              </span>
+            ) : (
+              <Text type="secondary">
+                {einsatzVorgabeQuery.isError ? 'nicht geladen' : 'keine Vorgabe'}
+              </Text>
+            )}
+            {darfSchreiben && (
+              // Ein Sprung, keine Handlung (LFH-616): gesetzt wird in den Einsatz-Einstellungen.
+              // Als Knopf mit `href`, damit das Ziel die Steuerhöhe trägt (LFH-365).
+              <Button
+                type="text"
+                icon={<IconStift />}
+                href={einsatzVorgabePfad}
+                onClick={zurEinsatzVorgabe}
+                aria-label="Vorgabe des Einsatzes ändern"
+              />
+            )}
+          </Flex>
+        </PaneelZeile>
+      </Paneel>
+
       {/* Dialoge werden je Ziel frisch montiert: `initialValues` greift nur beim Einhängen, und
           der Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {beginnenOffen && (
@@ -512,6 +576,7 @@ export default function AbloesungPage() {
           offen
           einheiten={freieEinheiten}
           vorgabeJeEinheit={vorgabeJeEinheit}
+          einsatzVorgabe={einsatzVorgabeKurz}
           eintreffenJeEinheit={eintreffenJeEinheit}
           laeuft={beginnenMut.isPending}
           fehler={beginnenMut.error}
@@ -559,11 +624,7 @@ export default function AbloesungPage() {
               : null
           }
           leerErlaubt={rhythmusZiel.vorgabe != null}
-          platzhalter={
-            rhythmusZiel.vorgabe != null
-              ? abschnittVorgabe(rhythmusText(rhythmusZiel.vorgabe))
-              : undefined
-          }
+          platzhalter={rhythmusZiel.vorgabe}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
           onErfassen={(minuten) =>
