@@ -5873,11 +5873,11 @@ mod tests {
         assert_eq!(aufgeloest, None);
     }
 
-    // --- Migration 0204: Eintreffen am Bereitstellungsraum (LLH-1075) ---
+    // --- Migration 0207: Eintreffen am Bereitstellungsraum (LLH-1075) ---
 
-    /// Zeitachse mit Einheit, Person, Fan-out und Streichung auf dem Stand vor 0204; liefert
+    /// Zeitachse mit Einheit, Person, Fan-out und Streichung auf dem Stand vor 0207; liefert
     /// (einsatz, benutzer, einheit, person).
-    async fn bild_zeitachse_vor_0204(pool: &SqlitePool) -> (i64, i64, i64, i64) {
+    async fn bild_zeitachse_vor_0207(pool: &SqlitePool) -> (i64, i64, i64, i64) {
         let (e, b) = bild_grundlage(pool).await;
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'HLF 20') RETURNING id",
@@ -5963,13 +5963,13 @@ mod tests {
     /// Der Neubau übernimmt den Bestand Zeile für Zeile samt `id`, `ursprung_id` und Streichung;
     /// Fremdschlüssel und Indizes bleiben wie nach 0193.
     #[tokio::test]
-    async fn migration_0204_zeitachse_bestand_erhalten() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 203).await;
-        bild_zeitachse_vor_0204(&pool).await;
+    async fn migration_0207_zeitachse_bestand_erhalten() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        bild_zeitachse_vor_0207(&pool).await;
         let vorher = zeitachse_zeilen(&pool).await;
         assert_eq!(vorher.len(), 3);
 
-        migriere_bis(&pool, 204).await;
+        migriere_bis(&pool, 207).await;
 
         assert_eq!(
             zeitachse_zeilen(&pool).await,
@@ -6024,8 +6024,8 @@ mod tests {
 
     /// Die Quelle `bereitstellungsraum` ist erlaubt, eine unbekannte scheitert weiter am CHECK.
     #[tokio::test]
-    async fn migration_0204_quelle_bereitstellungsraum() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 204).await;
+    async fn migration_0207_quelle_bereitstellungsraum() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
         let (e, b) = bild_grundlage(&pool).await;
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'HLF 20') RETURNING id",
@@ -6059,10 +6059,10 @@ mod tests {
     /// Eine Einheit oder Person mit Ereignissen lässt sich weiter nicht löschen (FK ohne
     /// `ON DELETE`), das Löschen des Einsatzes nimmt alles mit.
     #[tokio::test]
-    async fn migration_0204_kraft_mit_zeitachse_nicht_loeschbar() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 203).await;
-        let (e, _b, einheit, person) = bild_zeitachse_vor_0204(&pool).await;
-        migriere_bis(&pool, 204).await;
+    async fn migration_0207_kraft_mit_zeitachse_nicht_loeschbar() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
+        let (e, _b, einheit, person) = bild_zeitachse_vor_0207(&pool).await;
+        migriere_bis(&pool, 207).await;
 
         sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE id = ?")
             .bind(person)
@@ -6101,8 +6101,8 @@ mod tests {
     /// Schlüssel beliebig oft leer; die Einheit trägt die vier Spalten des Kennzeichens. Ein
     /// späterer Neubau von `br_belegung` (LLH-1085) muss Spalte und Teilindex mitnehmen.
     #[tokio::test]
-    async fn migration_0204_br_belegung_client_id() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 204).await;
+    async fn migration_0207_br_belegung_client_id() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
         let (e, b) = bild_grundlage(&pool).await;
         let e2: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage 2') RETURNING id",
@@ -6172,7 +6172,7 @@ mod tests {
         );
     }
 
-    // --- LLH-1085: Abruf aus dem Bereitstellungsraum (0205) ---
+    // --- LLH-1085: Abruf aus dem Bereitstellungsraum (0208) ---
 
     #[derive(Debug, PartialEq, sqlx::FromRow)]
     struct BelegungZeile {
@@ -6204,8 +6204,8 @@ mod tests {
     /// bleibt verbraucht), behält Unique-Teilindex und Indizes und lässt die neuen Arten nur mit
     /// den passenden Bezügen zu.
     #[tokio::test]
-    async fn migration_0205_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 204).await;
+    async fn migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 207).await;
         let (e, b) = bild_grundlage(&pool).await;
         let br: i64 = sqlx::query_scalar(
             "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
@@ -6245,7 +6245,7 @@ mod tests {
         let vorher = belegung_zeilen(&pool).await;
         assert_eq!(vorher.len(), 3);
 
-        migriere_bis(&pool, 205).await;
+        migriere_bis(&pool, 208).await;
 
         assert_eq!(
             belegung_zeilen(&pool).await,
@@ -7421,7 +7421,7 @@ mod tests {
     /// unverändert lesbar, die neuen Spalten sind `NULL`, es gibt keine Zuordnung.
     #[tokio::test]
     async fn migration_0206_verpflegungsstelle_bestand() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 203).await;
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 206).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (zf, aus) = verpflegung_bestand(&pool, e, b).await;
 

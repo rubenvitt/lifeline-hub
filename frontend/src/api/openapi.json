@@ -2946,7 +2946,7 @@
       },
       "BrBelegungsArt": {
         "type": "string",
-        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0205_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein\n`austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,\ndesign.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.",
+        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0208_br_abruf.sql`. Append-only. `abruf` lässt die Kraft im Raum, bis ein\n`austritt` das Ausrücken bucht; `abruf_aufgehoben` nimmt einen Abruf zurück (LLH-1085,\ndesign.md D1/D13). Beide schreibt nur [`abruf`], nie die Belegungsroute.",
         "enum": [
           "eintritt",
           "wechsel",

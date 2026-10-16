@@ -18,7 +18,7 @@ ALTER TABLE einsatz_einheit ADD COLUMN uebernahme_meldung_id INTEGER
 --    Belegungszeile, die trägt den Schlüssel der Offline-Warteschlange. Eindeutig je Einsatz;
 --    NULL bleibt für Belegungen ohne Schlüssel (Seitenleiste, Abweisen, Altbestand) erlaubt.
 --    LLH-1085 baut `br_belegung` neu und muss Spalte und Index mitnehmen
---    (Guard db::tests::migration_0204_br_belegung_client_id).
+--    (Guard db::tests::migration_0207_br_belegung_client_id).
 ALTER TABLE br_belegung ADD COLUMN client_id TEXT;
 CREATE UNIQUE INDEX idx_br_belegung_client_id
     ON br_belegung(einsatz_id, client_id)
@@ -28,7 +28,7 @@ CREATE UNIQUE INDEX idx_br_belegung_client_id
 --    Eintreffen, das der Bereitstellungsraum bucht. Die Tabelle ist weiter ein Blatt (nur der
 --    Selbstbezug `ursprung_id`; `grep -l einsatz_kraft_zeitachse migrations/*.sql`: 0130, 0193),
 --    ohne AUTOINCREMENT, Trigger und Views. Schema = 0193 1:1, geändert ist nur der CHECK auf
---    `quelle`. Abgesichert von db::tests::migration_0204_* und zeitachse::repo::tests.
+--    `quelle`. Abgesichert von db::tests::migration_0207_* und zeitachse::repo::tests.
 ALTER TABLE einsatz_kraft_zeitachse RENAME TO einsatz_kraft_zeitachse_alt;
 
 CREATE TABLE einsatz_kraft_zeitachse (
