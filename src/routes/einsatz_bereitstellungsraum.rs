@@ -526,8 +526,10 @@ pub async fn eintreffen(
     JsonBody(body): JsonBody<EintreffenEingabe>,
 ) -> Result<(StatusCode, Json<EintreffenErgebnis>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    // Felder für sich (400), dann der Zusammenhang „beides“ (422), vor allem anderen (D2).
+    // Felder für sich (400, auch der Erfassungszeitpunkt), dann der Zusammenhang „beides“ (422),
+    // vor allem anderen (D2).
     let client_id = support::parse_client_id(body.client_id.as_deref())?;
+    let zeitpunkt = support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), chrono::Utc::now())?;
     let erfassung = eintreffen::pruefe(&body)?;
     // Fremder Raum am Gerät: 404 vor jedem Schreiben (D7).
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
@@ -544,7 +546,6 @@ pub async fn eintreffen(
         }
     }
     ctx.fordere_aktiv()?;
-    let zeitpunkt = support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), chrono::Utc::now())?;
     let eingang = crate::zeit::jetzt();
     let rahmen = Rahmen {
         einsatz_id,

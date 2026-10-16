@@ -1834,8 +1834,14 @@ async fn eintreffen_replay_nach_aufloesen_und_abschluss() {
     assert_eq!(viert["einheit_id"], erst["einheit_id"]);
     let mut neu = unangemeldet_body("FL-MUS 1-19-1");
     neu["client_id"] = json!("a2");
-    let (s, _) = eintreffen(&app, &cookie, eid, schule, neu).await;
+    let (s, _) = eintreffen(&app, &cookie, eid, schule, neu.clone()).await;
     assert_eq!(s, StatusCode::CONFLICT);
+    // Der Erfassungszeitpunkt ist eine Eingabegrenze (D2): 400 auch am abgeschlossenen Einsatz.
+    neu["zeitpunkt_at"] = json!((chrono::Utc::now() + chrono::Duration::hours(2))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string());
+    let (s, _) = eintreffen(&app, &cookie, eid, schule, neu).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt vor dem Aktiv-Gate");
     assert_eq!(bestand(&pool, eid).await, nach_erst);
 }
 
@@ -1862,6 +1868,11 @@ async fn eintreffen_offline_felder() {
     let (s, _) = eintreffen(&app, &cookie, eid, br, body.clone()).await;
     // Mehr als 60 s voraus (65 s: die Sekunde des Formats und die Laufzeit liegen dazwischen).
     assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt +65 s");
+    // Eingabegrenze vor dem Zusammenhang (D2): mit Kraft und unangemeldet zugleich 400, nicht 422.
+    let mut beides = body.clone();
+    beides["unangemeldet"] = unangemeldet_body("FL 1")["unangemeldet"].clone();
+    let (s, _) = eintreffen(&app, &cookie, eid, br, beides).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt vor dem 422 „beides“");
 
     let (s, _) = common::anfrage_mit_offline_queue_benutzer(
         &app,
