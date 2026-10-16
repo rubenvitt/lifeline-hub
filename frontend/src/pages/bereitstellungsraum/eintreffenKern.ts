@@ -50,7 +50,11 @@ function offenePeriode(p: EinheitPerioden | undefined) {
   return p?.perioden.find((x) => x.ende_at == null) ?? null;
 }
 
-function passt(treffer: EintreffenTreffer, weitere: readonly (string | null | undefined)[], suche: string) {
+function passt(
+  treffer: EintreffenTreffer,
+  weitere: readonly (string | null | undefined)[],
+  suche: string,
+) {
   if (!suche) return true;
   const felder = [treffer.name, treffer.typ, ...treffer.funkrufnamen, ...weitere];
   return felder.some((f) => f != null && normalizeFunkrufname(f).includes(suche));

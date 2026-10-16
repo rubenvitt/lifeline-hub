@@ -180,9 +180,7 @@ describe('buildEintreffenGruppen (LLH-1075, design.md D13)', () => {
       expect(namen(buildEintreffenGruppen({ ...daten, suche: 'zug' }).erwartet)).toEqual([
         'Zug Nord',
       ]);
-      expect(namen(buildEintreffenGruppen({ ...daten, suche: 'rtw' }).erwartet)).toEqual([
-        'RTW 2',
-      ]);
+      expect(namen(buildEintreffenGruppen({ ...daten, suche: 'rtw' }).erwartet)).toEqual(['RTW 2']);
     });
 
     it('der Funkrufname eines Fahrzeugs findet seine Einheit', () => {
@@ -324,7 +322,9 @@ describe('kraftEingabe', () => {
 
 describe('buildEintreffenEingabe', () => {
   it('lässt leere Felder weg und trimmt', () => {
-    expect(buildEintreffenEingabe({ funkrufname: ' FL-MUS 1-44-1 ', traegerorganisation: ' ' })).toEqual({
+    expect(
+      buildEintreffenEingabe({ funkrufname: ' FL-MUS 1-44-1 ', traegerorganisation: ' ' }),
+    ).toEqual({
       unangemeldet: { fahrzeuge: [{ funkrufname: 'FL-MUS 1-44-1' }] },
     });
   });
