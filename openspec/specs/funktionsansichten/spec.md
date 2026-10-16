@@ -203,16 +203,18 @@ gebunden sein und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau die
 was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung. Das
 Anlegen einer unangemeldeten Kraft beim Eintreffen ist die einzige Änderung an Einheiten und
 Fahrzeugen, die das Gerät darf; sie verlangt wie am Desktop die Freigabe der Module Einheiten und
-Fahrzeuge.
+Fahrzeuge. Abrufen ist eine Entscheidung der Führung: Das Gerät sieht einen Abruf und bestätigt
+das Ausrücken als Austritt, ruft aber selbst nicht ab.
 
 | Modul / Bereich | Bereitstellungsraum |
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
-| `bereitstellungsraeume`: eigener BR mit Belegung | L |
+| `bereitstellungsraeume`: eigener BR mit Belegung, abgerufene Kräfte mit Ziel | L |
 | `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
-| `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt) | S |
+| `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt), Ausrücken einer abgerufenen Kraft bestätigen (Austritt) | S |
 | `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung) | S |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
+| `bereitstellungsraeume`: Kräfte abrufen, Abruf zurücknehmen, in einen anderen BR verlegen | — |
 | `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
 | `einheiten`, `fahrzeuge`: Liste des Einsatzes | L |
 | `einheiten`: Zeitachsen-Übersicht der Einheiten (Perioden je Einheit) | L |
@@ -261,6 +263,24 @@ Fahrzeuge.
 
 - **WHEN** das Gerät des BR Sportplatz eine Einheit mit Austritt aus dem BR Sportplatz bucht
 - **THEN** steht die Einheit in keinem BR mehr
+
+#### Scenario: Abruf sehen
+
+- **WHEN** die Einsatzleitung eine Einheit aus dem BR Sportplatz nach „EA Deich“ abruft
+- **AND** das Gerät des BR Sportplatz danach seinen BR abruft
+- **THEN** trägt die Einheit im Detail den Abruf mit dem Ziel „EA Deich“
+
+#### Scenario: Ausrücken bestätigen
+
+- **WHEN** das Gerät des BR Sportplatz für eine abgerufene Einheit den Austritt aus dem BR
+  Sportplatz bucht
+- **THEN** steht die Einheit in keinem BR mehr
+
+#### Scenario: Abrufen am Gerät
+
+- **WHEN** das Gerät des BR Sportplatz eine Einheit im BR Sportplatz abrufen oder einen Abruf
+  zurücknehmen will
+- **THEN** antwortet der Server mit 403, und nichts ist geschrieben
 
 #### Scenario: Unangemeldete Kraft am Gerät
 
