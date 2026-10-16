@@ -17,6 +17,7 @@ import {
   empfaengerSchluessel,
   empfaengerText,
   empfaengerVon,
+  isEmpfaengerWaehlbar,
   parseEmpfaengerSchluessel,
   staerkeVorgabe,
   verpflegungsstand,
@@ -224,6 +225,19 @@ describe('Empfänger — Wahl, Felder, Texte (LLH-1055)', () => {
       id: 41,
     });
     expect(empfaengerVon({})).toBeNull();
+  });
+
+  it('wählbar beim Zählen: nicht aufgelöste Einheit oder bekannter Abschnitt', () => {
+    const e = empfaenger();
+    e.einheiten.push(
+      empfaengerEinheit({ id: 50, name: 'Alt', aufgeloest_at: '2026-09-24 08:00:00' }),
+    );
+    expect(isEmpfaengerWaehlbar({ art: 'einheit', id: GRUPPE_2 }, e)).toBe(true);
+    expect(isEmpfaengerWaehlbar({ art: 'einheit', id: 50 }, e)).toBe(false);
+    expect(isEmpfaengerWaehlbar({ art: 'einheit', id: 99 }, e)).toBe(false);
+    expect(isEmpfaengerWaehlbar({ art: 'abschnitt', id: ABSCHNITT_DEICH }, e)).toBe(true);
+    expect(isEmpfaengerWaehlbar({ art: 'abschnitt', id: GRUPPE_2 }, e)).toBe(false);
+    expect(isEmpfaengerWaehlbar(null, e)).toBe(false);
   });
 
   it('Text an einer Ausgabe: „an 2. Gruppe“, „Zuführung Deich“', () => {

@@ -46,6 +46,20 @@ export interface EmpfaengerWahl {
   id: number;
 }
 
+/** Ohne Einheiten und Abschnitte; auch, solange die Verpflegung nicht geladen ist. */
+export const LEERE_EMPFAENGER: VerpflegungEmpfaenger = { einheiten: [], abschnitte: [] };
+
+/** Wählbar beim Zählen: eine nicht aufgelöste Einheit oder ein Abschnitt der Liste. */
+export function isEmpfaengerWaehlbar(
+  w: EmpfaengerWahl | null,
+  e: VerpflegungEmpfaenger,
+): w is EmpfaengerWahl {
+  if (!w) return false;
+  return w.art === 'einheit'
+    ? e.einheiten.some((x) => x.id === w.id && !x.aufgeloest_at)
+    : e.abschnitte.some((x) => x.id === w.id);
+}
+
 /** Wert der Option „ohne Empfänger“ in einer Auswahl. */
 export const OHNE_EMPFAENGER = 'ohne';
 
