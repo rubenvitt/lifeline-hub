@@ -334,14 +334,18 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 Die Funktionsansicht `verpflegung` SHALL einsatzweit gelten, an keine Stelle gebunden sein und
 die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; was die Tabelle
 nicht nennt, MUST verboten sein. Sie MUST keine Namen von Einsatzkräften oder Benutzern
-erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung.
+erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung. Die
+Verpflegungsstellen des Einsatzes MUST sie alle lesen; beim Buchen einer Ausgabe MUST sie eine
+Verpflegungsstelle wählen können. Stellen planen MUST sie nicht.
 
 | Modul / Bereich | Verpflegung |
 | --- | --- |
 | Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
 | `verpflegung`: Zeitfenster mit Bedarf, Ausgaben und Deckung | L |
-| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung), Ausgabe zurücknehmen | S |
-| `verpflegung`: Zeitfenster anlegen, ändern, löschen | — |
+| `verpflegung`: Verpflegungsstellen mit Art, Standort und Status | L |
+| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung, optional an einer Verpflegungsstelle), Ausgabe zurücknehmen | S |
+| `verpflegung`: Zeitfenster anlegen, ändern, löschen, Stellen zuordnen | — |
+| `verpflegung`: Verpflegungsstelle anlegen, ändern, in Betrieb nehmen, auflösen, stornieren | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
 | `nachforderungen`, `personal`, `betreuung`, `personen`, `etb` | — |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
@@ -397,6 +401,21 @@ Lagemonitor).
 - **WHEN** die Einsatzleitung die Kopplung widerruft
 - **AND** das Gerät danach eine Ausgabe bucht
 - **THEN** antwortet der Server mit 401
+
+#### Scenario: Stellen lesen
+
+- **WHEN** das Verpflegungsgerät die Verpflegung seines Einsatzes abruft
+- **THEN** erhält es alle nicht stornierten Verpflegungsstellen mit Bezeichnung, Art, Standort und Status, aber keine Namen und keine Benutzerkennungen
+
+#### Scenario: Buchen an einer Stelle
+
+- **WHEN** das Verpflegungsgerät eine Ausgabe von 40 EP an der Stelle „Ausgabe Turnhalle Nord“ bucht
+- **THEN** trägt die Ausgabe diese Stelle, und die ausgegebene Menge der Stelle steigt um 40
+
+#### Scenario: Stellen planen am Gerät
+
+- **WHEN** das Verpflegungsgerät eine Verpflegungsstelle anlegt, ändert, in Betrieb nimmt, auflöst oder storniert oder einem Zeitfenster Stellen zuordnet
+- **THEN** antwortet der Server mit 403
 
 ### Requirement: Ansicht Betreuungsstelle
 

@@ -1574,6 +1574,14 @@
           "sonderkost": {
             "$ref": "#/components/schemas/Sonderkost"
           },
+          "verpflegungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Verpflegungsstelle, an der ausgegeben wurde (LLH-1040) — nur die Kennung; die Stelle\nsteht in `VerpflegungAnzeige.stellen`."
+          },
           "zeitfenster_id": {
             "type": "integer",
             "format": "int64"
@@ -13351,6 +13359,27 @@
           }
         }
       },
+      "StelleIst": {
+        "type": "object",
+        "description": "Ausgegebene Menge an einer Stelle (LLH-1040, design.md D6) — nur das Ist, kein Soll und keine\nFehlmenge je Stelle.",
+        "required": [
+          "ausgegeben"
+        ],
+        "properties": {
+          "ausgegeben": {
+            "$ref": "#/components/schemas/Portionen",
+            "description": "Summe der nicht zurückgenommenen Ausgaben an dieser Stelle, gesamt und je Kostform."
+          },
+          "stelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Stelle; fehlt beim Eintrag „ohne Stelle“ (Ausgaben ohne Stelle), der zuletzt steht."
+          }
+        }
+      },
       "StelleMeldungAnzeige": {
         "type": "object",
         "description": "Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie\n[`BezirkMeldungAnzeige`].",
@@ -14256,9 +14285,17 @@
         "type": "object",
         "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
         "required": [
-          "zeitfenster"
+          "zeitfenster",
+          "stellen"
         ],
         "properties": {
+          "stellen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerpflegungsstelleAnzeige"
+            },
+            "description": "Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte\nbraucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4)."
+          },
           "zeitfenster": {
             "type": "array",
             "items": {
@@ -14267,6 +14304,96 @@
             "description": "Nach Beginn geordnet."
           }
         }
+      },
+      "Verpflegungsart": {
+        "type": "string",
+        "description": "Verpflegungsart eines Zeitfensters (LLH-1024 F5, LLH-1040 D8): nur Anzeige, die Deckung\ngilt für alle Arten gleich. String = CHECK in `migrations/0206_verpflegungsstelle.sql`;\nkeine Art (`NULL`) heißt „ohne Angabe“.",
+        "enum": [
+          "warm",
+          "kalt",
+          "getraenke"
+        ]
+      },
+      "VerpflegungsstelleAnzeige": {
+        "type": "object",
+        "description": "Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne\nBenutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und\nkeine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "art",
+          "status",
+          "angelegt_at"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/VerpflegungsstelleArt"
+          },
+          "aufgeloest_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der Auflösung (UTC ohne Zonenkennung), nur bei `aufgeloest`."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/VerpflegungsstelleStatus"
+          }
+        }
+      },
+      "VerpflegungsstelleArt": {
+        "type": "string",
+        "description": "Art einer Verpflegungsstelle. String = CHECK in `migrations/0206_verpflegungsstelle.sql`.",
+        "enum": [
+          "feldkueche",
+          "ausgabestelle",
+          "zufuehrung"
+        ]
+      },
+      "VerpflegungsstelleStatus": {
+        "type": "string",
+        "description": "Status einer Verpflegungsstelle. String = CHECK in\n`migrations/0206_verpflegungsstelle.sql`. `aufgeloest` ist endgültig.",
+        "enum": [
+          "geplant",
+          "aktiv",
+          "aufgeloest"
+        ]
       },
       "VersionsstandAnzeige": {
         "type": "object",
@@ -15378,6 +15505,8 @@
           "bedarf",
           "ausgegeben",
           "fehlmenge",
+          "stelle_ids",
+          "je_stelle",
           "ausgaben",
           "angelegt_at"
         ],
@@ -15423,6 +15552,32 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "je_stelle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StelleIst"
+            },
+            "description": "Ausgegeben je Stelle (D6): jede zugeordnete Stelle (auch mit 0), danach jede weitere mit\nAusgaben, zuletzt „ohne Stelle“. Leer, wenn es weder Zuordnung noch eine Ausgabe an einer\nStelle gibt — dann zeigt das Zeitfenster nur Gesamtwerte wie bisher."
+          },
+          "stelle_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5)."
+          },
+          "verpflegungsart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Verpflegungsart",
+                "description": "Warm, kalt oder Getränke; fehlt = ohne Angabe (LLH-1040 D8)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "von_at": {
             "type": "string",

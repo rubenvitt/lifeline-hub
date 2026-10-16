@@ -117,6 +117,14 @@ Modul Nachforderungen ([Nachforderung](nachforderung.md)); eine Ausgabe kann auf
 ohne deren Status zu ändern. „Nachfordern“ steht nur bereit, wenn etwas fehlt und das Modul
 Nachforderungen bedient werden kann.
 
+### Länge der Angaben
+
+Die Bezeichnung eines Zeitfensters darf höchstens 200 Zeichen lang sein, der Ort einer Ausgabe
+500 und ihre Bemerkung 2 000. Darüber sendet der Dialog nicht, und der Zähler unter dem Feld nennt
+die Überlänge; gekürzt wird nichts. Eine zu lange Bemerkung klappt „Weitere Angaben“ beim Erfassen
+auf. Zugeklappt nennt der Kopf, was darin eingetragen ist, etwa „Weitere Angaben · 3 vegan ·
+Bemerkung“.
+
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Zeitfenster angelegt, geändert oder gelöscht wird, mit

@@ -4731,6 +4731,105 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     assert_eq!(v["zeitfenster"][0]["bedarf"]["gesamt"], 250);
 }
 
+/// LLH-1040 D12: Das Verpflegungsgerät liest die Stellen mit `GET …/verpflegung` (ohne
+/// Benutzerkennungen) und bucht an einer Stelle; Stellen planen und Zeitfenster zuordnen bleibt
+/// der Führung.
+#[tokio::test]
+async fn verpflegungsgeraet_liest_stellen_und_bucht_an_stelle() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zf = mittag(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/stellen"),
+        &admin,
+        Some(&json!({
+            "bezeichnung": "Feldküche BR Sportplatz",
+            "art": "feldkueche",
+            "standort": "Am Sportplatz 2",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let sid = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/stellen/{sid}/status"),
+        &admin,
+        Some(&json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let stellen = v["stellen"].as_array().unwrap();
+    assert_eq!(stellen.len(), 1, "{v}");
+    assert_eq!(stellen[0]["bezeichnung"], "Feldküche BR Sportplatz");
+    assert_eq!(stellen[0]["status"], "aktiv");
+    let mut alle = Vec::new();
+    schluessel(&v, &mut alle);
+    assert!(
+        !alle
+            .iter()
+            .any(|k| k.contains("name") || k.contains("_von") || k.contains("benutzer")),
+        "{alle:?}"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &geraet,
+        Some(&json!({"menge": 40, "verpflegungsstelle_id": sid})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zeitfenster"]["je_stelle"][0]["stelle_id"], sid, "{v}");
+    assert_eq!(v["zeitfenster"]["je_stelle"][0]["ausgegeben"]["gesamt"], 40);
+
+    for (m, pfad, body) in [
+        (
+            "POST",
+            format!("{basis}/stellen"),
+            Some(json!({"bezeichnung": "Ausgabe Deich", "art": "zufuehrung"})),
+        ),
+        (
+            "PATCH",
+            format!("{basis}/stellen/{sid}"),
+            Some(json!({"bezeichnung": "Küche"})),
+        ),
+        ("DELETE", format!("{basis}/stellen/{sid}"), None),
+        (
+            "POST",
+            format!("{basis}/stellen/{sid}/status"),
+            Some(json!({"status": "aufgeloest"})),
+        ),
+        (
+            "PATCH",
+            format!("{basis}/zeitfenster/{zf}"),
+            Some(json!({"stelle_ids": [sid]})),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (_, v) = anfrage(&app, "GET", &basis, &admin, None).await;
+    assert_eq!(v["stellen"].as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v["stellen"][0]["bezeichnung"], "Feldküche BR Sportplatz");
+    assert_eq!(v["stellen"][0]["status"], "aktiv");
+    assert_eq!(
+        v["zeitfenster"][0]["stelle_ids"].as_array().unwrap().len(),
+        0,
+        "nichts zugeordnet"
+    );
+}
+
 /// Personal, Betreuung, Nachforderungen, Personen und ETB erreicht das Gerät nicht; Modulzähler
 /// und Freigaben folgen der Ansicht, ohne einsatzweiten Meldungs- oder Personenzähler.
 #[tokio::test]
