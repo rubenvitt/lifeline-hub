@@ -421,8 +421,12 @@ export default function BrDetailPage() {
     brFahrzeuge: br.fahrzeuge,
   });
   const stehend = new Set([
-    ...[...br.einheiten, ...frei.einheiten].map((e) => brObjektSchluessel('einheit', e.id)),
-    ...[...br.fahrzeuge, ...frei.fahrzeuge].map((f) => brObjektSchluessel('fahrzeug', f.id)),
+    ...[...br.einheiten, ...frei.erwartet.einheiten, ...frei.imEinsatz.einheiten].map((e) =>
+      brObjektSchluessel('einheit', e.id),
+    ),
+    ...[...br.fahrzeuge, ...frei.erwartet.fahrzeuge, ...frei.imEinsatz.fahrzeuge].map((f) =>
+      brObjektSchluessel('fahrzeug', f.id),
+    ),
   ]);
   const ohneZeile = zeilen.gemeldet().filter((k) => !stehend.has(k));
   const laeuft = (typ: 'einheit' | 'fahrzeug', objektId: number) =>

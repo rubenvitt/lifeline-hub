@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Einheit, EinsatzFahrzeug } from '../../api/types';
-import { gruppiereFreieKraefte } from './freieKraefte';
+import { freieKraefteOhneBr, gruppiereFreieKraefte } from './freieKraefte';
 
 const e = (id: number, name: string, typ_label: string | null): Einheit =>
   ({ id, name, typ_label }) as unknown as Einheit;
@@ -30,5 +30,66 @@ describe('gruppiereFreieKraefte', () => {
     expect(gruppiereFreieKraefte(einheiten, fahrzeuge, 'lf 20').map((g) => g.titel)).toEqual([
       'Fahrzeuge ohne Einheit',
     ]);
+  });
+});
+
+describe('freieKraefteOhneBr: „Erwartet“ und „Im Einsatz“ (LLH-1075, design.md D14)', () => {
+  const eh = (id: number, mehr: Partial<Einheit> = {}) =>
+    ({
+      id,
+      name: `E${id}`,
+      abschnitt_id: null,
+      abschnitt_name: null,
+      ueber_einheit_id: null,
+      aktueller_br_id: null,
+      ...mehr,
+    }) as unknown as Einheit;
+  const fz = (id: number, mehr: Partial<EinsatzFahrzeug> = {}) =>
+    ({
+      id,
+      funkrufname: `F${id}`,
+      einheit_id: null,
+      aktueller_br_id: null,
+      ...mehr,
+    }) as unknown as EinsatzFahrzeug;
+  const ids = (k: { einheiten: Einheit[]; fahrzeuge: EinsatzFahrzeug[] }) => [
+    ...k.einheiten.map((x) => `e${x.id}`),
+    ...k.fahrzeuge.map((x) => `f${x.id}`),
+  ];
+
+  it('Einheit mit Abschnitt steht unter „Im Einsatz“, ohne unter „Erwartet“', () => {
+    const r = freieKraefteOhneBr({
+      alleEinheiten: [eh(1, { abschnitt_id: 3, abschnitt_name: 'Nord' }), eh(2)],
+      alleFahrzeuge: [fz(9)],
+      brEinheiten: [],
+      brFahrzeuge: [],
+    });
+    expect(ids(r.erwartet)).toEqual(['e2', 'f9']);
+    expect(ids(r.imEinsatz)).toEqual(['e1']);
+  });
+
+  it('der geerbte Abschnitt zählt (Lesart des Meldebilds)', () => {
+    const r = freieKraefteOhneBr({
+      alleEinheiten: [
+        eh(1, { abschnitt_id: 3, aktueller_br_id: 7 }),
+        eh(2, { ueber_einheit_id: 1 }),
+      ],
+      alleFahrzeuge: [],
+      brEinheiten: [],
+      brFahrzeuge: [],
+    });
+    expect(ids(r.imEinsatz)).toEqual(['e2']);
+    expect(ids(r.erwartet)).toEqual([]);
+  });
+
+  it('Kräfte in einem Raum und Fahrzeuge einer Einheit fehlen in beiden', () => {
+    const r = freieKraefteOhneBr({
+      alleEinheiten: [eh(1, { aktueller_br_id: 4 }), eh(2)],
+      alleFahrzeuge: [fz(8, { einheit_id: 2 }), fz(9, { aktueller_br_id: 4 }), fz(10)],
+      brEinheiten: [{ id: 2 } as never],
+      brFahrzeuge: [],
+    });
+    expect(ids(r.erwartet)).toEqual(['f10']);
+    expect(ids(r.imEinsatz)).toEqual([]);
   });
 });
