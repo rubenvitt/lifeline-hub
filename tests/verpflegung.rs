@@ -2010,6 +2010,50 @@ async fn ausgabe_an_stelle_statuscodes() {
     assert_eq!(mit_stelle, 1);
 }
 
+/// Grenze der Auflösung (Spec „wenn ihr Zeitpunkt nicht vor der Auflösung liegt“): genau der
+/// Zeitpunkt der Auflösung ist 409, eine Sekunde davor 201, deutlich danach 409 — deterministisch
+/// über `aufgeloest_at` aus der Antwort der Statusroute, nicht über die Serveruhr.
+#[tokio::test]
+async fn ausgabe_an_stelle_grenze_der_aufloesung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Feldküche BR Sportplatz").await;
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[sid])).await;
+    let (s, antwort) = stelle_status(&app, &admin, e, sid, "aufgeloest").await;
+    assert_eq!(s, StatusCode::OK);
+    let auf = chrono::NaiveDateTime::parse_from_str(
+        antwort["aufgeloest_at"].as_str().unwrap(),
+        "%Y-%m-%d %H:%M:%S",
+    )
+    .unwrap();
+    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let an = |t: chrono::NaiveDateTime| {
+        serde_json::json!({
+            "menge": 5,
+            "verpflegungsstelle_id": sid,
+            "zeitpunkt_at": t.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        })
+        .to_string()
+    };
+    for (t, erwartet, was) in [
+        (auf, StatusCode::CONFLICT, "genau die Auflösung"),
+        (
+            auf - chrono::Duration::seconds(1),
+            StatusCode::CREATED,
+            "eine Sekunde davor",
+        ),
+        (
+            auf + chrono::Duration::minutes(5),
+            StatusCode::CONFLICT,
+            "deutlich danach",
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&an(t))).await;
+        assert_eq!(s, erwartet, "{was}: {j:?}");
+    }
+}
+
 /// Spec „Replay vor der Zustandsprüfung“: Eine Ausgabe, die vor der Auflösung gebucht wurde,
 /// kommt beim erneuten Senden mit derselben `client_id` als 201 zurück, ohne Live-Ereignis.
 #[tokio::test]

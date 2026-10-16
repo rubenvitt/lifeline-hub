@@ -1199,3 +1199,150 @@ async fn doppelte_stellen_werden_entdoppelt() {
     .unwrap();
     assert_eq!(laden(&w, zid).await.stelle_ids, vec![a, b]);
 }
+
+/// Roher Zeitpunkt der Auflösung, wie gespeichert.
+async fn aufgeloest_at(w: &Welt, id: i64) -> String {
+    sqlx::query_scalar("SELECT aufgeloest_at FROM verpflegungsstelle WHERE id = ?")
+        .bind(id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Spec „Replay vor der Zustandsprüfung“ IN der Transaktion (D3): der Fall zweier gleichzeitiger
+/// Flushes, deren zweiter am Vorab-Lookup der Route vorbeikam. Die Ausgabe ist gebucht, die Stelle
+/// danach aufgelöst; derselbe Schlüssel liefert die Ausgabe, auch mit einem Zeitpunkt, den die
+/// Stellenprüfung ablehnte (Gegenprobe mit neuem Schlüssel: 409).
+#[tokio::test]
+async fn replay_in_der_transaktion_vor_der_stellenpruefung() {
+    let w = welt().await;
+    let sid = stelle(&w, "Ausgabe Turnhalle Nord").await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let an_stelle = |client_id: &str, zeitpunkt_at: &str| AusgabeEingabe {
+        verpflegungsstelle_id: Some(sid),
+        zeitpunkt_at: zeitpunkt_at.into(),
+        ..mit_client_id(40, client_id)
+    };
+    let erst = ausgabe(&w, zid, an_stelle("s1", "2026-09-24 09:40:00"))
+        .await
+        .unwrap();
+    stelle_status(&w, sid, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    let nach = aufgeloest_at(&w, sid).await;
+    assert_eq!(
+        status(ausgabe(&w, zid, an_stelle("s2", &nach)).await),
+        StatusCode::CONFLICT,
+        "Gegenprobe: neuer Schlüssel an der aufgelösten Stelle"
+    );
+    let wieder = ausgabe(&w, zid, an_stelle("s1", &nach)).await.unwrap();
+    assert_eq!(wieder.ausgabe_id, erst.ausgabe_id);
+    assert!(!wieder.neu, "Replay");
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        1
+    );
+}
+
+/// Reihenfolge der Prüfungen (D3, tasks 5.1/5.2): die Stelle zuletzt. Eine stornierte oder
+/// aufgelöste Stelle verdeckt weder das unbekannte Zeitfenster (404) noch einen 400er noch die
+/// Teilmenge (422 statt 409).
+#[tokio::test]
+async fn stellenpruefung_nach_zeitfenster_400ern_und_teilmenge() {
+    let w = welt().await;
+    let zid = anlegen(&w, mittag()).await.unwrap().id;
+    let weg = stelle(&w, "Zuführung Deich").await;
+    stornieren(&w, weg).await.unwrap();
+    let aufgeloest = stelle(&w, "Feldküche BR Sportplatz").await;
+    stelle_status(&w, aufgeloest, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    let nach = aufgeloest_at(&w, aufgeloest).await;
+    let an = |sid: i64, menge: i64| AusgabeEingabe {
+        verpflegungsstelle_id: Some(sid),
+        zeitpunkt_at: nach.clone(),
+        ..ausgabe_eingabe(menge)
+    };
+    // Ohne weiteren Fehler sagt die Stelle selbst ab.
+    assert_eq!(
+        status(ausgabe(&w, zid, an(weg, 5)).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        status(ausgabe(&w, zid, an(aufgeloest, 5)).await),
+        StatusCode::CONFLICT
+    );
+    for (sid, was) in [(weg, "storniert"), (aufgeloest, "aufgelöst")] {
+        assert_eq!(
+            status(ausgabe(&w, 999_999, an(sid, 5)).await),
+            StatusCode::NOT_FOUND,
+            "{was}: unbekanntes Zeitfenster"
+        );
+        assert_eq!(
+            status(ausgabe(&w, zid, an(sid, 0)).await),
+            StatusCode::BAD_REQUEST,
+            "{was}: Menge 0"
+        );
+        assert_eq!(
+            status(
+                ausgabe(
+                    &w,
+                    zid,
+                    AusgabeEingabe {
+                        sonderkost: sk(-1, 0),
+                        ..an(sid, 5)
+                    }
+                )
+                .await
+            ),
+            StatusCode::BAD_REQUEST,
+            "{was}: negative Kostform"
+        );
+    }
+    assert_eq!(
+        status(
+            ausgabe(
+                &w,
+                zid,
+                AusgabeEingabe {
+                    sonderkost: sk(4, 3),
+                    ..an(aufgeloest, 5)
+                }
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "aufgelöst: Sonderkost über der Menge ist 422, nicht 409"
+    );
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        0
+    );
+}
+
+/// Eine direkt aufgelöste Stelle (geplant → aufgelöst, ohne Ausgabe) lässt sich nicht stornieren
+/// (422): sie bleibt in `stellen[]`, und das ETB behält genau den Eintrag „… aufgelöst.“ (D2).
+#[tokio::test]
+async fn aufgeloeste_stelle_ohne_ausgabe_storno_422() {
+    let w = welt().await;
+    let id = stelle(&w, "Zuführung Deich").await;
+    stelle_status(&w, id, VerpflegungsstelleStatus::Aufgeloest)
+        .await
+        .unwrap();
+    assert_eq!(
+        status(stornieren(&w, id).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let liste = liste(&w.pool, w.e).await.unwrap();
+    let s = liste
+        .stellen
+        .iter()
+        .find(|s| s.id == id)
+        .expect("aufgelöste Stelle bleibt in stellen[]");
+    assert_eq!(s.status, VerpflegungsstelleStatus::Aufgeloest);
+    assert_eq!(
+        etb(&w.pool, w.e).await.len(),
+        1,
+        "nur „… aufgelöst.“, kein Gegenstück"
+    );
+}
