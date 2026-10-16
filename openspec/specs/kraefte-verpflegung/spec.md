@@ -1071,3 +1071,87 @@ entstehen.
 #### Scenario: Verpflegungsgerät
 - **WHEN** ein gekoppeltes Verpflegungsgerät einen Tag aus der Vorlage anlegen oder den Verpflegungsplan lesen will
 - **THEN** antwortet der Server mit 403, und die Geräteansicht bietet keinen Einstieg
+
+### Requirement: Verpflegungsplan in der Verwaltung
+
+Die Verwaltung SHALL unter den Stammdaten einen Bereich „Verpflegungsplan“ führen, der alle
+Mahlzeiten der Organisation zeigt, aktive und deaktivierte, in der Folge des Servers (nach Beginn).
+Jede Mahlzeit MUST Bezeichnung, Beginn und Ende als taktische Uhrzeit („0630–0800“), die Art (wenn
+gesetzt) und ihren Zustand als Wort („Aktiv“, „Inaktiv“) zeigen; endet sie am Folgetag, MUST „+1 Tag“
+dabeistehen. Der Admin MUST Mahlzeiten anlegen und bearbeiten (Bezeichnung, Beginn, Ende, Art)
+sowie deaktivieren und wieder aktivieren können; Deaktivieren und Aktivieren sind umkehrbar und
+MUST ohne Rückfrage wirken. Die Uhrzeiten MUST über die Maske einer Uhrzeit ohne Datum eingegeben
+werden (Spec `zeiteingabe`, „Uhrzeit ohne Datum“); eine unlesbare Uhrzeit und ein Ende gleich dem
+Beginn MUST am Feld stehen, ohne dass die Maske sendet. Ein Ende vor dem Beginn MUST in der Maske
+als Folgetag erkennbar sein. Ändern MUST nur die geänderten Angaben senden. Ohne Admin-Recht MUST
+„Mahlzeit anlegen“ gesperrt mit Grund stehen, und die Zeilenaktionen MUST fehlen. Ändert jemand den
+Plan, MUST jede offene Ansicht des Plans der Organisation ihn ohne Neuladen zeigen (Org-Ereignis
+`stammdaten`).
+
+#### Scenario: Plan ansehen
+- **WHEN** der Plan „Frühstück“ 06:30–08:00 und „Nachtverpflegung“ 23:00–01:00 (kalt) führt
+- **THEN** zeigt die Verwaltung „0630–0800“ und „2300–0100“ mit „+1 Tag“ und „kalt“
+
+#### Scenario: Mahlzeit in Stab-Schreibweise anlegen
+- **WHEN** der Admin „Frühstück“ mit Beginn „630“ und Ende „0800“ anlegt
+- **THEN** sendet die Maske Beginn `06:30` und Ende `08:00`
+
+#### Scenario: Ende gleich Beginn in der Maske
+- **WHEN** der Admin Beginn und Ende 12:00 eingibt
+- **THEN** steht „Ende gleich Beginn“ am Feld, und die Maske sendet nichts
+
+#### Scenario: Deaktivierte Mahlzeit wieder aktivieren
+- **WHEN** der Admin bei der inaktiven Mahlzeit „Kaffee“ „Aktivieren“ wählt und der Server mit 409 ablehnt, weil eine aktive Mahlzeit so heißt
+- **THEN** steht der Grund über der Tabelle, und „Kaffee“ bleibt inaktiv
+
+#### Scenario: Ohne Admin-Recht
+- **WHEN** ein Mitglied ohne Admin-Recht den Verpflegungsplan öffnet
+- **THEN** sieht es den Plan, „Mahlzeit anlegen“ gesperrt mit Grund und keine Zeilenaktionen
+
+### Requirement: Tag aus der Vorlage in der Oberfläche
+
+Die Seite des Moduls SHALL mit Schreibrecht einen Nebenweg „Tag aus Vorlage anlegen“ tragen, der
+eine eigene Seite mit Adresse öffnet (`…/verpflegung/aus-vorlage?tag=JJJJ-MM-TT`). Ohne Schreibrecht
+MUST der Nebenweg gesperrt mit Grund stehen; am Verpflegungsgerät MUST er fehlen. Die Seite MUST
+einen Kalendertag wählen lassen, Vorgabe ist heute im Kalender der Anzeigezone nach der Serveruhr.
+Sie MUST je aktiver Mahlzeit des Verpflegungsplans ein Fenster zeigen: Bezeichnung, Zeitraum in der
+Anzeigezone (über Mitternacht bis zum Folgetag), Art und je einen Bedarf für Einsatzkräfte und
+Betreute, vorbelegt wie beim Anlegen eines einzelnen Zeitfensters (Requirement
+„Bedarfsvorschläge aus Personal und Betreuung“), je Fenster zu dessen Beginn; ohne Quelle MUST das
+Feld leer bleiben und vor dem Absenden gefüllt werden. Jedes Fenster MUST sich abwählen lassen; ein
+abgewähltes MUST nicht gesendet werden und verlangt keinen Bedarf. Beginnt am Tag schon ein
+gleichnamiges Zeitfenster, MUST das Fenster als „schon angelegt“ stehen und nicht gesendet werden.
+Liegt ein Fenster ganz in der ausfallenden Stunde einer Sommerzeit-Umstellung, sodass sein Ende
+nicht nach dem Beginn liegt, MUST es als nicht anlegbar stehen und nicht gesendet werden. Die
+Uhrzeiten MUST in der Anzeigezone auf den Tag gelegt werden (Spec `zeiteingabe`, „Uhrzeit ohne
+Datum“), die Tagesgrenzen ebenso. „Zeitfenster anlegen“ MUST alle gewählten Fenster in einer
+Anfrage senden, ohne weitere Personen, Sonderkost und Stellen; danach MUST die Oberfläche zur Seite
+des Moduls zurückkehren und eine Rückmeldung zeigen, die die Zahl der angelegten Zeitfenster, den
+Tag und jedes übersprungene Fenster nennt. Eine Ablehnung MUST auf der Seite stehen, und die Seite
+MUST bleiben. Hat die Vorschau Fenster, MUST sie bei Live-Änderungen stehen bleiben; was
+inzwischen am Tag besteht, überspringt der Server. Ist der Plan leer, MUST die Seite das sagen und
+dem Admin den Weg in den Verpflegungsplan zeigen.
+
+#### Scenario: Vorschau des 11.10.
+- **WHEN** die Anzeigezone Europe/Berlin ist, der Browser auf UTC steht und die Seite für den 11.10.2026 mit dem Plan „Frühstück“ 06:30–08:00 und „Nachtverpflegung“ 23:00–01:00 geöffnet wird
+- **THEN** zeigt sie „11.10. 06:30–08:00“ und „11.10. 23:00–12.10. 01:00“, und gesendet werden `2026-10-11 04:30:00` bis `06:00:00` bzw. `2026-10-11 21:00:00` bis `23:00:00`
+
+#### Scenario: Vorschlag ohne Quelle
+- **WHEN** für den Beginn von „Frühstück“ keine Betreuungsstelle eine Belegung gemeldet hat
+- **THEN** bleibt das Feld Betreute leer mit „keine Belegung gemeldet“, und „Zeitfenster anlegen“ verlangt eine Zahl
+
+#### Scenario: Schon angelegt
+- **WHEN** im Einsatz schon „Mittag“ am 11.10. beginnt und die Seite für den 11.10. geöffnet wird
+- **THEN** steht „Mittag“ als „schon angelegt“ ohne Bedarfsfelder, und die Anfrage enthält „Mittag“ nicht
+
+#### Scenario: Quittung nennt Übersprungenes
+- **WHEN** der Server ein Fenster anlegt und „Abendessen“ überspringt
+- **THEN** kehrt die Oberfläche zur Verpflegung zurück und meldet „1 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Abendessen‘“
+
+#### Scenario: Umstellung im März
+- **WHEN** der Plan eine Mahlzeit 02:00–03:00 führt und die Seite für den 29.03.2026 in Europe/Berlin geöffnet wird
+- **THEN** steht diese Mahlzeit als nicht anlegbar und wird nicht gesendet
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** eine Person ohne Schreibrecht die Seite des Moduls öffnet
+- **THEN** steht „Tag aus Vorlage anlegen“ gesperrt mit Grund, und auf der Seite des Tages ist „Zeitfenster anlegen“ gesperrt
