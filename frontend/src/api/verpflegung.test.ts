@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import {
   aendereZeitfenster,
+  createStelle,
   erfasseAusgabe,
   ladeVerpflegung,
   legeZeitfensterAn,
   loescheZeitfenster,
   nimmAusgabeZurueck,
+  setStelleStatus,
+  storniereStelle,
+  updateStelle,
 } from './verpflegung';
 
 /**
@@ -97,5 +101,46 @@ describe('api/verpflegung — Pfade und Methoden der sechs Endpunkte', () => {
       nachforderung_id: 12,
       sonderkost: { vegetarisch: 4 },
     });
+  });
+});
+
+describe('api/verpflegung — Verpflegungsstellen (LLH-1040)', () => {
+  it('legt an, ändert, wechselt den Status und storniert an den richtigen Pfaden', async () => {
+    const a = faengeAnfragen();
+    await createStelle(7, {
+      bezeichnung: 'Feldküche BR Sportplatz',
+      art: 'feldkueche',
+      standort: 'Am Sportplatz 2',
+      lat: 52.37,
+      lon: 9.73,
+    });
+    await updateStelle(7, 4, { standort: null, lat: null, lon: null });
+    await setStelleStatus(7, 4, 'aktiv');
+    await storniereStelle(7, 5);
+    expect(a.map((x) => [x.methode, x.pfad])).toEqual([
+      ['POST', `${B}/stellen`],
+      ['PATCH', `${B}/stellen/4`],
+      ['POST', `${B}/stellen/4/status`],
+      ['DELETE', `${B}/stellen/5`],
+    ]);
+    expect(a[0].body).toEqual({
+      bezeichnung: 'Feldküche BR Sportplatz',
+      art: 'feldkueche',
+      standort: 'Am Sportplatz 2',
+      lat: 52.37,
+      lon: 9.73,
+    });
+    // `null` leert und kommt als `null` an; fehlende Schlüssel bleiben weg.
+    expect(a[1].body).toEqual({ standort: null, lat: null, lon: null });
+    expect(a[2].body).toEqual({ status: 'aktiv' });
+    expect(a[3].body).toBeUndefined();
+  });
+
+  it('schickt Art und Stellen des Zeitfensters und die Stelle der Ausgabe', async () => {
+    const a = faengeAnfragen();
+    await aendereZeitfenster(7, 5, { verpflegungsart: null, stelle_ids: [] });
+    await erfasseAusgabe(7, 5, { menge: 40, verpflegungsstelle_id: 4 });
+    expect(a[0].body).toEqual({ verpflegungsart: null, stelle_ids: [] });
+    expect(a[1].body).toEqual({ menge: 40, verpflegungsstelle_id: 4 });
   });
 });

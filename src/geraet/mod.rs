@@ -637,6 +637,15 @@ mod tests {
                 "DELETE",
                 "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}",
             ),
+            // Verpflegungsstellen planen (LLH-1040 D12): liest sie über `GET …/verpflegung`,
+            // legt aber keine an, ändert, storniert und wechselt keinen Status.
+            ("POST", "/api/einsaetze/{id}/verpflegung/stellen"),
+            ("PATCH", "/api/einsaetze/{id}/verpflegung/stellen/{sid}"),
+            ("DELETE", "/api/einsaetze/{id}/verpflegung/stellen/{sid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/verpflegung/stellen/{sid}/status",
+            ),
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen"),
             ("GET", "/api/einsaetze/{id}/personal"),
