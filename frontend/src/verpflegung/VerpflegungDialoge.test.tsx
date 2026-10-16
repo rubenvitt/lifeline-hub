@@ -511,6 +511,80 @@ describe('AusgabeDialog', () => {
   });
 });
 
+describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
+  it('Bezeichnung des Zeitfensters: Zähler ab 80 %, über 200 kein Senden, nichts gekürzt', async () => {
+    const { onErfassen } = zeigeAnlegen();
+    const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+    const feld = within(dialog).getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'm'.repeat(159) } });
+    expect(within(dialog).queryByText(/\/ 200/)).toBeNull();
+    fireEvent.change(feld, { target: { value: 'm'.repeat(160) } });
+    expect(within(dialog).getByText('160 / 200')).toBeInTheDocument();
+    fireEvent.change(feld, { target: { value: 'm'.repeat(201) } });
+    expect(within(dialog).getByText('201 / 200 · zu lang')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(
+      await within(dialog).findByText('Bezeichnung darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('m'.repeat(201));
+  });
+
+  function zeigeAusgabe(onErfassen = vi.fn().mockResolvedValue(undefined)) {
+    renderMitProviders(
+      <AusgabeDialog
+        zeitfenster={zeitfenster()}
+        nachforderungen={null}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    return { onErfassen };
+  }
+
+  it('Ort der Ausgabe: über 500 kein Senden, der Text bleibt ungekürzt stehen', async () => {
+    const { onErfassen } = zeigeAusgabe();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '5');
+    const ort = within(dialog).getByLabelText('Ort');
+    fireEvent.change(ort, { target: { value: 'o'.repeat(501) } });
+    expect(within(dialog).getByText('501 / 500 · zu lang')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(
+      await within(dialog).findByText('Ort darf höchstens 500 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(ort).toHaveValue('o'.repeat(501));
+    fireEvent.change(ort, { target: { value: 'o'.repeat(500) } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ menge: 5, ort: 'o'.repeat(500) }),
+    );
+  });
+
+  it('Bemerkung über 2 000: kein Senden, der zugeklappte Teil geht mit dem Grund auf', async () => {
+    const { onErfassen } = zeigeAusgabe();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '5');
+    const klappe = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+    await userEvent.click(klappe);
+    const bemerkung = within(dialog).getByLabelText('Bemerkung');
+    fireEvent.change(bemerkung, { target: { value: 'b'.repeat(2_001) } });
+    expect(within(dialog).getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(klappe);
+    await waitFor(() => expect(klappe).toHaveAttribute('aria-expanded', 'false'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(klappe).toHaveAttribute('aria-expanded', 'true'));
+    expect(
+      await within(dialog).findByText('Bemerkung darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(bemerkung).toHaveValue('b'.repeat(2_001));
+  });
+});
+
 interface RueckfrageTestProps {
   laeuft: boolean;
   fehler: unknown;

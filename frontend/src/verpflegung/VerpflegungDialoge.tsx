@@ -1,7 +1,7 @@
 import { Collapse, Form, Input, InputNumber, Modal, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type {
   AusgabeEingabe,
@@ -13,10 +13,16 @@ import type {
   ZeitfensterEingabe,
   ZeitfensterPatch,
 } from '../api/types';
+import {
+  VERPFLEGUNG_BEMERKUNG_MAX,
+  VERPFLEGUNG_ORT_MAX,
+  VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX,
+} from '../api/eingabegrenzen';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Augenbraue } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { useBedarfsvorschlag, type Vorschlag } from './useBedarfsvorschlag';
@@ -146,8 +152,23 @@ function anzahlFeld(min = 0) {
 }
 
 /** Eingeklappter Bereich — `forceRender` ist TRAGEND (sonst fehlen die Werte in `onFinish`). */
-function eingeklappt(label: string, children: ReactNode) {
-  return <Collapse ghost items={[{ key: 'weitere', label, forceRender: true, children }]} />;
+function eingeklappt(
+  label: string,
+  children: ReactNode,
+  offen?: { offen: boolean; setOffen: (offen: boolean) => void },
+) {
+  return (
+    <Collapse
+      ghost
+      {...(offen
+        ? {
+            activeKey: offen.offen ? ['weitere'] : [],
+            onChange: (k: string | string[]) => offen.setOffen([k].flat().includes('weitere')),
+          }
+        : {})}
+      items={[{ key: 'weitere', label, forceRender: true, children }]}
+    />
+  );
 }
 
 /**
@@ -286,9 +307,15 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="bezeichnung"
         label="Bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          zeichenRegel(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX, 'Bezeichnung'),
+        ]}
       >
-        <Input placeholder="z. B. Mittag" />
+        <Input
+          placeholder="z. B. Mittag"
+          count={zeichenGrenze(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX)}
+        />
       </Form.Item>
       <Form.Item<ZeitfensterWerte>
         name="zeitraum"
@@ -376,6 +403,9 @@ export function AusgabeDialog({
   onSchliessen,
 }: AusgabeDialogProps) {
   const [form] = Form.useForm<AusgabeWerte>();
+  // Die Bemerkung kann an ihrer Grenze scheitern: der Klappteil geht dann selbst auf
+  // (`frontend/AGENTS.md`, „Ein Pflichtfeld gehört nie hinter den Collapse“, LFH-974).
+  const [weitereOffen, setWeitereOffen] = useState(false);
   return (
     <ErfassungsModal<AusgabeWerte>
       offen
@@ -384,6 +414,9 @@ export function AusgabeDialog({
       erfassenText="Erfassen"
       laeuft={laeuft}
       onErfassen={(w) => onErfassen(ausgabeBody(w))}
+      onPruefungGescheitert={(felder) => {
+        if (felder.includes('bemerkung')) setWeitereOffen(true);
+      }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -399,8 +432,12 @@ export function AusgabeDialog({
       >
         {anzahlFeld(1)}
       </Form.Item>
-      <Form.Item<AusgabeWerte> name="ort" label="Ort">
-        <Input />
+      <Form.Item<AusgabeWerte>
+        name="ort"
+        label="Ort"
+        rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, 'Ort')]}
+      >
+        <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
       </Form.Item>
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
@@ -419,10 +456,19 @@ export function AusgabeDialog({
               />
             </Form.Item>
           )}
-          <Form.Item<AusgabeWerte> name="bemerkung" label="Bemerkung" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
+          <Form.Item<AusgabeWerte>
+            name="bemerkung"
+            label="Bemerkung"
+            rules={[zeichenRegel(VERPFLEGUNG_BEMERKUNG_MAX, 'Bemerkung')]}
+            style={{ marginBottom: 0 }}
+          >
+            <Input.TextArea
+              autoSize={{ minRows: 2 }}
+              count={zeichenGrenze(VERPFLEGUNG_BEMERKUNG_MAX)}
+            />
           </Form.Item>
         </>,
+        { offen: weitereOffen, setOffen: setWeitereOffen },
       )}
       <SpeicherFehler fehler={fehler} titel="Ausgabe konnte nicht erfasst werden" />
     </ErfassungsModal>
