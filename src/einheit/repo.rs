@@ -207,32 +207,63 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
-/// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, eigene Stärke, Sprechgruppen
-/// und Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
-struct Anreicherung {
+/// Eigene Ist-Stärke je Einheit und die Unterstellungskanten EINES Einsatzes — die eine Quelle
+/// der Stärken für `GET …/einheiten` und die Empfängerliste der Verpflegung (LLH-1055,
+/// design.md D3: eine Heimat je Zahl). Aufgelöste Einheiten tragen keine Kräfte und keine Kanten.
+pub struct StaerkenJeEinheit {
     /// Eigene Ist-Stärke je Einheit; fehlender Eintrag = keine wertbaren Kräfte.
-    staerken: HashMap<i64, Staerke>,
+    eigene: HashMap<i64, Staerke>,
     /// Unmittelbar unterstellte Einheiten je Einheit (Kanten des ganzen Einsatzes).
     kinder: HashMap<i64, Vec<i64>>,
-    personal: HashMap<i64, Vec<super::EinheitMitgliedPerson>>,
-    fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
-    material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
-    sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
 }
 
-impl Anreicherung {
+impl StaerkenJeEinheit {
     /// Kumulierte Ist-Stärke (eigene + alle unterstellten Einheiten), über [`kumuliere`].
-    fn ist_kumuliert(&self, wurzel_id: i64) -> Staerke {
-        kumuliere(&self.staerken, &self.kinder, wurzel_id)
+    pub fn kumuliert(&self, wurzel_id: i64) -> Staerke {
+        kumuliere(&self.eigene, &self.kinder, wurzel_id)
     }
 
     /// Eigene Ist-Stärke einer Einheit; ohne Kräfte `0/0/0`.
-    fn eigene(&self, einheit_id: i64) -> Staerke {
-        self.staerken
+    pub fn eigene(&self, einheit_id: i64) -> Staerke {
+        self.eigene
             .get(&einheit_id)
             .copied()
             .unwrap_or(Staerke::neu(0, 0, 0))
     }
+}
+
+/// Lädt [`StaerkenJeEinheit`] eines Einsatzes in zwei Abfragen, gleich wie viele Einheiten.
+pub async fn load_staerken_je_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<StaerkenJeEinheit, AppError> {
+    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
+    for (id, vater) in &kanten {
+        if let Some(v) = vater {
+            kinder.entry(*v).or_default().push(*id);
+        }
+    }
+    Ok(StaerkenJeEinheit {
+        eigene: mitglied_repo::ist_staerke_map(pool, einsatz_id).await?,
+        kinder,
+    })
+}
+
+/// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, Stärken, Sprechgruppen und
+/// Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
+struct Anreicherung {
+    staerken: StaerkenJeEinheit,
+    personal: HashMap<i64, Vec<super::EinheitMitgliedPerson>>,
+    fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
+    material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
+    sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
 }
 
 /// Kumulierte Ist-Stärke einer Einheit: eigene plus alle unterstellten, rein im Speicher.
@@ -270,22 +301,8 @@ pub fn kumuliere(
 
 /// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
 async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreicherung, AppError> {
-    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
-        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
-         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
-    let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
-    for (id, vater) in &kanten {
-        if let Some(v) = vater {
-            kinder.entry(*v).or_default().push(*id);
-        }
-    }
     Ok(Anreicherung {
-        staerken: mitglied_repo::ist_staerke_map(pool, einsatz_id).await?,
-        kinder,
+        staerken: load_staerken_je_einheit(pool, einsatz_id).await?,
         personal: mitglied_repo::personal_mitglieder_map(pool, einsatz_id).await?,
         fahrzeuge: mitglied_repo::fahrzeug_mitglieder_map(pool, einsatz_id).await?,
         material: mitglied_repo::material_mitglieder_map(pool, einsatz_id).await?,
@@ -321,8 +338,8 @@ async fn zu_anzeige_batch(
         .unwrap_or(None);
         let soll = override_soll.or(typ_soll);
 
-        let ist = anreicherung.eigene(row.id);
-        let ist_kumuliert = anreicherung.ist_kumuliert(row.id);
+        let ist = anreicherung.staerken.eigene(row.id);
+        let ist_kumuliert = anreicherung.staerken.kumuliert(row.id);
         // Jede Einheit kommt im Satz genau einmal vor → entnehmen statt klonen.
         let personal_mitglieder = anreicherung.personal.remove(&row.id).unwrap_or_default();
         let fahrzeug_mitglieder = anreicherung.fahrzeuge.remove(&row.id).unwrap_or_default();
