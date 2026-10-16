@@ -419,6 +419,7 @@ function einheit(over: Partial<Einheit> & Pick<Einheit, 'id'>): Einheit {
     aktueller_br_id: null,
     sprechgruppen: [],
     status: { quelle: 'ohne', verteilung: [] },
+    unangemeldet: false,
     ...over,
   };
 }

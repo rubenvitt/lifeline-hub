@@ -33,11 +33,11 @@ describe('feste Reihenfolge der Belegung (LFH-1113)', () => {
 describe('Folge nach Wartezeit (LLH-1095 D11)', () => {
   it('längste Wartezeit zuerst, neue Kraft ans Ende, ohne seit ans Ende', () => {
     const einheiten = [
-      { id: 1, name: 'Alpha', fahrzeuge: [], seit_at: '2026-10-15 12:05:00' },
-      { id: 2, name: 'Bravo', fahrzeuge: [] },
-      { id: 3, name: 'Zulu', fahrzeuge: [], seit_at: '2026-10-15 11:42:00' },
+      { id: 1, name: 'Alpha', fahrzeuge: [], unangemeldet: false, seit_at: '2026-10-15 12:05:00' },
+      { id: 2, name: 'Bravo', fahrzeuge: [], unangemeldet: false },
+      { id: 3, name: 'Zulu', fahrzeuge: [], unangemeldet: false, seit_at: '2026-10-15 11:42:00' },
       // Eben eingetreten: das jüngste „seit“.
-      { id: 4, name: 'Aachen', fahrzeuge: [], seit_at: '2026-10-15 12:29:00' },
+      { id: 4, name: 'Aachen', fahrzeuge: [], unangemeldet: false, seit_at: '2026-10-15 12:29:00' },
     ];
     expect(geordnet(einheiten, einheitFolge).map((e) => e.name)).toEqual([
       'Zulu',
