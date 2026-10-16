@@ -27,6 +27,8 @@ const KATALOG_MODULE: &[&str] = &[
     "einheit_vorlage",
     // Verpflegungsplan (LLH-1058): ohne diesen Eintrag bliebe ein vergessener Präfix grün.
     "verpflegung_vorlage",
+    // Schichtmodelle (LLH-1122).
+    "schichtmodell",
     "sprechgruppe",
     "etb_baustein",
     "stichwort",
