@@ -435,7 +435,8 @@ export default function EintreffenDialog({
             showIcon
             style={{ marginTop: token.marginSM }}
             title={doppel ? `Schon im Einsatz: ${doppel.name}` : 'Schon im Einsatz'}
-            action={
+            // Unter dem Titel statt daneben: bei 390 px drückte die Knopfreihe den Titel auf null.
+            description={
               <Space size="middle" wrap>
                 {doppel?.treffer && (
                   <Button
