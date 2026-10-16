@@ -100,6 +100,17 @@ export default function EinsatzAbloesung() {
   if (daten.laedt || freigabenQ.isLoading || (freigegeben && vorgabeQ.isLoading)) {
     return <SeitenSkeleton />;
   }
+  // Ohne Freigaben wüsste die Sektion nicht, ob das Modul gesperrt ist: kein „nicht freigegeben“
+  // auf Verdacht.
+  if (freigabenQ.isError) {
+    return (
+      <SeitenFehler
+        text="Modulfreigaben nicht ladbar"
+        ursache={freigabenQ.error}
+        onWiederholen={() => void freigabenQ.refetch()}
+      />
+    );
+  }
   if (!freigegeben) {
     return (
       <Formularpaneel titel="Schichtmodell des Einsatzes">
