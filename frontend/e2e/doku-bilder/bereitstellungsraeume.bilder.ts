@@ -23,11 +23,14 @@ import {
  *   raum.png       frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
  *                  frontend/src/pages/bereitstellungsraum/brBelegungKern.ts,
  *                  frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx,
+ *                  frontend/src/pages/bereitstellungsraum/freieKraefte.ts,
  *                  frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx
  *   verlauf.png    frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx,
  *                  frontend/src/pages/bereitstellungsraum/brBelegungKern.ts
  *   bearbeiten.png frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx,
  *                  frontend/src/components/Erfassung.tsx
+ *   eintreffen.png frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx,
+ *                  frontend/src/pages/bereitstellungsraum/eintreffenKern.ts
  *
  * Demo-Lücke (D3): der Demo-BR „Parkplatz Stadion Nord“ ist aktiv, aber leer. Die Spec lässt
  * dort den Sanitätszug ein- und wieder austreten (für den Verlauf), stellt zwei Einheiten bereit
@@ -153,8 +156,26 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText('Rettungsstaffel').first()).toBeVisible();
     await expect(page.getByTestId('br-summe')).toContainText(/Fahrzeuge\s*3/);
     await expect(page.getByTestId('br-summe')).toContainText(/Längste Wartezeit\s*48 min/);
+    // Der Zug steht im Demo-Einsatz in einem Abschnitt: „Im Einsatz“ (LLH-1075), zugeklappt.
+    await page.getByRole('button', { name: /^Im Einsatz/ }).click();
     await expect(page.getByRole('button', { name: `${ZUG} zuweisen` })).toBeVisible();
+    await page.mouse.move(0, 0);
     await fotografiere(page, KAPITEL, 'raum');
+  });
+
+  test('Dialog „Eintreffen buchen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const br = await demoBr(page.request, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
+    await page.getByRole('button', { name: 'Eintreffen buchen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Eintreffen buchen' });
+    // Nur geöffnet, nichts gebucht: raum.png zeigt den Raum wie im Demo-Einsatz.
+    await expect(dialog.getByRole('region', { name: 'Im Einsatz' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: `Eintreffen ${ZUG}` })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'eintreffen');
   });
 
   test('Verlauf eines Bereitstellungsraums', async ({ page }) => {

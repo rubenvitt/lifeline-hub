@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
 ---
 
 ## Überblick
@@ -151,6 +151,23 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Aufgeklappter Block „Aufgelöst (1)“ unter der Gliederung mit einer Einheit und dem Zeitpunkt der Auflösung](../bilder/einheiten/aufgeloest.png)
 
+### Eine unangemeldete Einheit übernehmen oder abweisen
+
+Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kraft, die der Einsatz
+noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
+[Bereitstellungsräume](bereitstellungsraeume.md)). Die Meldung dazu steht unter „Meldungen“.
+
+1. Die Einheit öffnen: in der Gliederung, im Meldebild oder an der Meldung „… unangemeldet im BR
+   … eingetroffen“. Unter dem Kopf steht das Paneel „Übernahme“ mit „eingetroffen …“.
+2. „Übernehmen“ wählen, bei Bedarf „Abschnitt“ und „Über-Einheit“ wählen und mit „Übernehmen“
+   bestätigen. Die Bestätigung lautet „… übernommen“; „nicht übernommen“ und das Paneel
+   verschwinden, die Einheit bleibt im Raum.
+3. Gehört die Kraft nicht in den Einsatz, stattdessen „Abweisen“ wählen und die Rückfrage „Einheit
+   abweisen?“ mit „Abweisen“ bestätigen. Die Einheit verlässt den Raum und wird aufgelöst, ihre
+   Fahrzeuge werden entlassen; die App kehrt zur Gliederung zurück.
+
+Dieselben Knöpfe stehen auch an der Meldung selbst.
+
 ## Hintergrund
 
 ### Wer zu einer Einheit gehört
@@ -231,6 +248,16 @@ inzwischen an einer anderen Angabe derselben Einheit geändert hat, bleibt erhal
 geänderte Angabe wird überschrieben. Ein abgelehnter Wert bleibt in der offenen Zeile stehen,
 der Grund steht darunter.
 
+### Unangemeldete Einheiten
+
+„nicht übernommen“ steht an der Einheit in der Gliederung, im Meldebild, im Kopf ihrer Seite und
+in der Belegung des Bereitstellungsraums, bis sie übernommen oder abgewiesen ist. Bis dahin lässt
+sich die Einheit wie jede andere bearbeiten. Übernehmen bestätigt die Meldung des Eintreffens und
+schreibt einen Eintrag ins Einsatztagebuch, mit Abschnitt und Über-Einheit, falls gewählt. Abweisen ist endgültig: wie beim Auflösen bleibt die Einheit mit Zeitachse
+und Einsatztagebuch im Nachweis, ihre Fahrzeuge stehen als entlassen in der Fahrzeugliste. Im
+Bereitstellungsraum trägt eine übernommene Einheit weiter das neutrale Kennzeichen
+„unangemeldet“.
+
 ### Taktisches Zeichen
 
 Das taktische Zeichen gehört zur Lage: es wird wie auf der Lagekarte gespeichert, ohne Eintrag im
@@ -300,7 +327,9 @@ Fahrzeugen, Kräften und wer woher umgehängt wurde.
 
 Lesen darf, wer das Modul Einheiten sieht. Bilden, ändern, zuordnen und auflösen dürfen
 Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im
-Einsatz](rechte-im-einsatz.md)). Ohne dieses Recht zeigt die Seite einer Einheit nur die Werte,
+Einsatz](rechte-im-einsatz.md)); das gilt auch für Übernehmen. Abweisen verlangt zusätzlich das
+Recht auf Fahrzeuge, weil es die Fahrzeuge entlässt. An der Meldung führt ohne Recht auf Einheiten
+nur ein Verweis zur Einheit. Ohne dieses Recht zeigt die Seite einer Einheit nur die Werte,
 leere als „—“, ohne Statuswahl, ohne Menü an den Personen, ohne Auswahlfelder, ohne Lösen und
 ohne das Paneel „Einheit auflösen“. Material zuordnen, lösen und ausgeben verlangt nicht das Recht
 auf Einheiten, sondern Schreibrecht im Einsatz und die Freigabe des Moduls Material: der Ort gehört

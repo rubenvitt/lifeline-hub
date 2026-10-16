@@ -15,7 +15,8 @@ import {
  * ein Tablet am Bereitstellungsraum, Kontext Tablet, eigener Browserkontext wie in
  * `e2e/geraet-kopplung.spec.ts`. Der Demo-Raum ist schon in Betrieb; damit „In Betrieb nehmen“
  * nachgeklickt werden kann, legt die Spec als Einsatzleitung einen geplanten Raum an (D3). Die Uhr
- * steht vor dem Anmelden der Kräfte, raum.png zeigt deshalb „· 0 min“ (LLH-1095).
+ * steht vor dem Einbuchen der Kräfte, raum.png zeigt deshalb „· 0 min“ (LLH-1095). Zwei Einheiten
+ * des Demo-Einsatzes und eine unangemeldete Kraft kommen über „Eintreffen buchen“ (LLH-1075).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-bereitstellungsraum`, Mitänderungsregel in
@@ -25,12 +26,17 @@ import {
  *   raum.png      frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
  *                 frontend/src/pages/bereitstellungsraum/brBelegungKern.ts,
  *                 frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx (zugeklappt),
- *                 frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx
+ *                 frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx,
+ *                 frontend/src/kraefte/NichtUebernommenMarke.tsx
+ *   unangemeldet.png frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx (Schritt 2,
+ *                 Gerät vollflächig), frontend/src/kraefte/AdhocFahrzeugFelder.tsx,
+ *                 frontend/src/components/Erfassung.tsx
  *   melden.png    frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx
  */
 
 const KAPITEL = 'geraet-bereitstellungsraum';
 const RAUM = 'Sportplatz Süd';
+const UNANGEMELDET = 'Florian Nachbarort 1/46-1';
 
 /** Ein geplanter Bereitstellungsraum, einmal je Lauf. */
 async function geplanterRaum(page: Page, einsatz: number): Promise<number> {
@@ -87,22 +93,39 @@ test.describe(KAPITEL, () => {
       await expect(inBetrieb).toHaveCount(0);
       await expect(geraet.getByRole('button', { name: 'Auflösen' })).toHaveCount(0);
 
-      // Zwei freie Einheiten aus „Kräfte ohne BR“ anmelden.
-      const frei = geraet.getByRole('button', { name: / zuweisen$/ });
-      await expect(frei.first()).toBeVisible();
+      // Zwei Einheiten über „Eintreffen buchen“ einbuchen (LLH-1075), je ein Tipp.
       const belegung = geraet.getByTestId('br-belegung');
+      const eintreffen = geraet.getByRole('button', { name: 'Eintreffen buchen' });
+      const dialog = geraet.getByRole('dialog', { name: 'Eintreffen buchen' });
       for (let i = 0; i < 2; i++) {
-        const name = ((await frei.first().getAttribute('aria-label')) ?? '').replace(
-          / zuweisen$/,
-          '',
-        );
-        await frei.first().click();
-        await expect(belegung.getByText(name, { exact: true })).toBeVisible();
+        await eintreffen.click();
+        const treffer = dialog.getByRole('button', { name: /^Eintreffen / }).first();
+        await expect(treffer).toBeVisible();
+        const name = ((await treffer.getAttribute('aria-label')) ?? '').replace(/^Eintreffen /, '');
+        await treffer.click();
+        await expect(belegung.getByText(name, { exact: true }).first()).toBeVisible();
+        // Die Rückmeldung „… gebucht“ schließt bei angehaltener Uhr nicht und läge über dem Kopf.
+        await geraet.reload();
       }
-      // Die Rückmeldungen („… dem BR zugewiesen“) verdeckten die Kopfzeile; bei angehaltener Uhr
-      // schließen sie nicht von selbst. Neu laden zeigt denselben Stand ohne sie.
+
+      // Eine unangemeldete Kraft: Schritt 2 des Dialogs.
+      await eintreffen.click();
+      await dialog.getByRole('searchbox', { name: 'Suche' }).fill(UNANGEMELDET);
+      await dialog.getByRole('button', { name: 'Nicht in der Liste' }).click();
+      await dialog.getByRole('textbox', { name: 'Trägerorganisation' }).fill('FF Nachbarort');
+      await dialog.getByRole('textbox', { name: 'Fahrzeugtyp' }).fill('HLF 20');
+      await dialog.getByRole('spinbutton', { name: 'Führer', exact: true }).fill('0');
+      await dialog.getByRole('spinbutton', { name: 'Unterführer' }).fill('1');
+      await dialog.getByRole('spinbutton', { name: 'Mannschaft' }).fill('8');
+      await dialog.getByRole('spinbutton', { name: 'Mannschaft' }).blur();
+      await geraet.mouse.move(0, 0);
+      await fotografiere(dialog, KAPITEL, 'unangemeldet');
+      await dialog.getByRole('button', { name: 'Unangemeldet buchen' }).click();
+      await expect(belegung.getByText(UNANGEMELDET, { exact: true }).first()).toBeVisible();
+      await expect(belegung.getByText('nicht übernommen')).toBeVisible();
+
       await geraet.reload();
-      await expect(belegung.getByRole('button', { name: 'entfernen' })).toHaveCount(2);
+      await expect(belegung.getByRole('button', { name: 'entfernen' })).toHaveCount(3);
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'raum');
 
