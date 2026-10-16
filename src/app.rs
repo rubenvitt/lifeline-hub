@@ -557,7 +557,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells.
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtmodell",
-            get(routes::abloesung::einsatz_vorgabe).put(routes::abloesung::einsatz_vorgabe_setzen),
+            get(routes::abloesung::read_einsatz_vorgabe)
+                .put(routes::abloesung::set_einsatz_vorgabe),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/{aid}",

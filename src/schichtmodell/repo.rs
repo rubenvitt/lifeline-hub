@@ -12,7 +12,7 @@
 
 use sqlx::{SqliteConnection, SqlitePool};
 
-use super::{spalten, EinsatzSchichtmodell, Schichtmodell, Werte, WerteZeile};
+use super::{columns, EinsatzSchichtmodell, Schichtmodell, Werte, WerteZeile};
 use crate::error::AppError;
 use crate::write_retry;
 
@@ -41,7 +41,7 @@ impl ModellZeile {
     }
 }
 
-fn modell_select() -> String {
+fn select_sql() -> String {
     format!(
         "SELECT s.id, s.ist_vorgabe, \
                 EXISTS (SELECT 1 FROM demo_herkunft dh \
@@ -55,7 +55,7 @@ fn modell_select() -> String {
 pub async fn list(pool: &SqlitePool, org_id: i64) -> Result<Vec<Schichtmodell>, AppError> {
     sqlx::query_as::<_, ModellZeile>(sqlx::AssertSqlSafe(format!(
         "{} WHERE s.org_id = ? ORDER BY s.ist_vorgabe DESC, s.bezeichnung, s.id",
-        modell_select()
+        select_sql()
     )))
     .bind(org_id)
     .fetch_all(pool)
@@ -72,7 +72,7 @@ pub(crate) async fn load_tx(
 ) -> Result<Schichtmodell, AppError> {
     sqlx::query_as::<_, ModellZeile>(sqlx::AssertSqlSafe(format!(
         "{} WHERE s.org_id = ? AND s.id = ?",
-        modell_select()
+        select_sql()
     )))
     .bind(org_id)
     .bind(id)
@@ -185,7 +185,7 @@ pub(crate) async fn insert_tx(
     werte: &Werte,
     ist_vorgabe: bool,
 ) -> Result<i64, AppError> {
-    let (typ, rhythmus, wechselzeiten, mindestdauer) = spalten(&werte.regel);
+    let (typ, rhythmus, wechselzeiten, mindestdauer) = columns(&werte.regel);
     sqlx::query_scalar(
         "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten, wechselzeiten, \
             mindestdauer_minuten, vorwarnung_minuten, planungsvorlauf_minuten, ist_vorgabe) \
@@ -222,7 +222,7 @@ pub async fn update(
         if ist_vorgabe {
             check_vorgabe_frei_tx(conn, org_id, Some(id)).await?;
         }
-        let (typ, rhythmus, wechselzeiten, mindestdauer) = spalten(&werte.regel);
+        let (typ, rhythmus, wechselzeiten, mindestdauer) = columns(&werte.regel);
         sqlx::query(
             "UPDATE schichtmodell SET bezeichnung = ?, typ = ?, rhythmus_minuten = ?, \
                 wechselzeiten = ?, mindestdauer_minuten = ?, vorwarnung_minuten = ?, \
@@ -296,7 +296,7 @@ pub(crate) async fn load_einsatz_tx(
 }
 
 /// Die Kopie am Einsatz als Antwort.
-pub async fn einsatz(
+pub async fn load_einsatz(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Option<EinsatzSchichtmodell>, AppError> {
@@ -307,7 +307,7 @@ pub async fn einsatz(
 }
 
 /// Setzt (`Some`) oder entfernt (`None`) die Kopie am Einsatz. Nur die Zeile; das Nachziehen
-/// der Schichten macht `abloesung::repo::einsatz_vorgabe_setzen`.
+/// der Schichten macht `abloesung::repo::set_einsatz_vorgabe`.
 pub(crate) async fn set_einsatz_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -321,7 +321,7 @@ pub(crate) async fn set_einsatz_tx(
             .await?;
         return Ok(());
     };
-    let (typ, rhythmus, wechselzeiten, mindestdauer) = spalten(&werte.regel);
+    let (typ, rhythmus, wechselzeiten, mindestdauer) = columns(&werte.regel);
     sqlx::query(
         "INSERT INTO einsatz_schichtmodell (einsatz_id, bezeichnung, typ, rhythmus_minuten, \
             wechselzeiten, mindestdauer_minuten, vorwarnung_minuten, planungsvorlauf_minuten, \

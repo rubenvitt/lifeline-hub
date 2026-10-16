@@ -1047,11 +1047,11 @@ async fn beginnen_folgt_der_einsatzvorgabe_mit_wechselzeiten() {
         vorwarnung_minuten: 45,
         planungsvorlauf_minuten: 120,
     };
-    let etb = einsatz_vorgabe_setzen(
+    let etb = set_einsatz_vorgabe(
         &w.pool,
         w.e,
         w.b,
-        &EinsatzVorgabeEingabe::Werte(werte.clone()),
+        &EinsatzVorgabeInput::Werte(werte.clone()),
         T0,
     )
     .await

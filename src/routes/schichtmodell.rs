@@ -43,7 +43,7 @@ pub async fn create(
     AdminUser(benutzer): AdminUser,
     JsonBody(body): JsonBody<SchichtmodellBody>,
 ) -> Result<(StatusCode, Json<Schichtmodell>), AppError> {
-    let werte = body.werte.pruefen()?;
+    let werte = body.werte.check()?;
     Ok((
         StatusCode::CREATED,
         Json(repo::create(&state.pool, benutzer.org_id, &werte, body.ist_vorgabe).await?),
@@ -58,7 +58,7 @@ pub async fn update(
     PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<SchichtmodellBody>,
 ) -> Result<Json<Schichtmodell>, AppError> {
-    let werte = body.werte.pruefen()?;
+    let werte = body.werte.check()?;
     Ok(Json(
         repo::update(&state.pool, benutzer.org_id, id, &werte, body.ist_vorgabe).await?,
     ))

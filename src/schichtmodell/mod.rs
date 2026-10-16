@@ -202,7 +202,7 @@ pub struct WerteBody {
     pub planungsvorlauf_minuten: Option<i64>,
 }
 
-fn im_bereich(feld: &str, wert: i64, min: i64, max: i64) -> Result<i64, AppError> {
+fn check_range(feld: &str, wert: i64, min: i64, max: i64) -> Result<i64, AppError> {
     if wert < min || wert > max {
         return Err(AppError::Validation(format!(
             "{feld} muss zwischen {min} und {max} liegen, war {wert}"
@@ -216,7 +216,7 @@ impl WerteBody {
     /// leere Bezeichnung, unbekannter Typ, Zahl außerhalb, unlesbare Uhrzeit, zu viele
     /// Wechselzeiten, fehlender Pflichtwert des Typs), dann der Zusammenhang (422: ein Feld des
     /// anderen Typs). Wechselzeiten werden sortiert und entdoppelt.
-    pub fn pruefen(&self) -> Result<Werte, AppError> {
+    pub fn check(&self) -> Result<Werte, AppError> {
         let bezeichnung =
             crate::routes::support::pflicht_max(&self.bezeichnung, "bezeichnung", BEZEICHNUNG_MAX)?;
         let typ = SchichtmodellTyp::parse(self.typ.trim()).ok_or_else(|| {
@@ -228,7 +228,7 @@ impl WerteBody {
         let rhythmus = self
             .rhythmus_minuten
             .map(|r| {
-                im_bereich(
+                check_range(
                     "rhythmus_minuten",
                     r,
                     1,
@@ -256,16 +256,16 @@ impl WerteBody {
         };
         let mindestdauer = self
             .mindestdauer_minuten
-            .map(|m| im_bereich("mindestdauer_minuten", m, 0, MINDESTDAUER_MAX_MINUTEN))
+            .map(|m| check_range("mindestdauer_minuten", m, 0, MINDESTDAUER_MAX_MINUTEN))
             .transpose()?;
-        let vorwarnung = im_bereich(
+        let vorwarnung = check_range(
             "vorwarnung_minuten",
             self.vorwarnung_minuten
                 .unwrap_or(VORWARNUNG_VORGABE_MINUTEN),
             1,
             VORLAUF_MAX_MINUTEN,
         )?;
-        let planungsvorlauf = im_bereich(
+        let planungsvorlauf = check_range(
             "planungsvorlauf_minuten",
             self.planungsvorlauf_minuten
                 .unwrap_or(PLANUNGSVORLAUF_VORGABE_MINUTEN),
@@ -312,7 +312,7 @@ impl WerteBody {
 }
 
 /// Spalten eines Modells in Datenbankform: (typ, rhythmus, wechselzeiten als JSON, mindestdauer).
-pub(crate) fn spalten(regel: &Regel) -> (&'static str, Option<i64>, Option<String>, Option<i64>) {
+pub(crate) fn columns(regel: &Regel) -> (&'static str, Option<i64>, Option<String>, Option<i64>) {
     match regel {
         Regel::Rhythmus { minuten } => (regel.typ().as_str(), Some(*minuten), None, None),
         Regel::Wechselzeiten {
@@ -379,16 +379,16 @@ impl WerteZeile {
 }
 
 /// Felder der Regel für die Antworten.
-struct RegelFelder {
+struct RegelFields {
     typ: SchichtmodellTyp,
     rhythmus_minuten: Option<i64>,
     wechselzeiten: Option<Vec<String>>,
     mindestdauer_minuten: Option<i64>,
 }
 
-fn regel_felder(regel: &Regel) -> RegelFelder {
+fn regel_fields(regel: &Regel) -> RegelFields {
     match regel {
-        Regel::Rhythmus { minuten } => RegelFelder {
+        Regel::Rhythmus { minuten } => RegelFields {
             typ: SchichtmodellTyp::Rhythmus,
             rhythmus_minuten: Some(*minuten),
             wechselzeiten: None,
@@ -397,7 +397,7 @@ fn regel_felder(regel: &Regel) -> RegelFelder {
         Regel::Wechselzeiten {
             zeiten,
             mindestdauer_minuten,
-        } => RegelFelder {
+        } => RegelFields {
             typ: SchichtmodellTyp::Wechselzeiten,
             rhythmus_minuten: None,
             wechselzeiten: Some(zeiten.iter().map(Uhrzeit::to_string).collect()),
@@ -431,7 +431,7 @@ pub struct Schichtmodell {
 
 impl Schichtmodell {
     pub(crate) fn aus(id: i64, werte: Werte, ist_vorgabe: bool, ist_demo: bool) -> Self {
-        let f = regel_felder(&werte.regel);
+        let f = regel_fields(&werte.regel);
         Schichtmodell {
             id,
             bezeichnung: werte.bezeichnung,
@@ -465,7 +465,7 @@ pub struct EinsatzSchichtmodell {
 
 impl EinsatzSchichtmodell {
     pub(crate) fn aus(werte: Werte, geaendert_at: String) -> Self {
-        let f = regel_felder(&werte.regel);
+        let f = regel_fields(&werte.regel);
         EinsatzSchichtmodell {
             bezeichnung: werte.bezeichnung,
             typ: f.typ,

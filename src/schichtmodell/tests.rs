@@ -165,7 +165,7 @@ fn body(typ: &str) -> WerteBody {
 }
 
 fn status(b: &WerteBody) -> StatusCode {
-    b.pruefen().unwrap_err().status()
+    b.check().unwrap_err().status()
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn rhythmus_mit_vorgaben() {
         rhythmus_minuten: Some(360),
         ..body("rhythmus")
     }
-    .pruefen()
+    .check()
     .unwrap();
     assert_eq!(
         w,
@@ -195,7 +195,7 @@ fn wechselzeiten_werden_sortiert_und_entdoppelt() {
         vorwarnung_minuten: Some(45),
         ..body("wechselzeiten")
     }
-    .pruefen()
+    .check()
     .unwrap();
     assert_eq!(w.regel, zwoelf_stunden(240));
     assert_eq!(w.vorwarnung_minuten, 45);
@@ -323,7 +323,7 @@ fn spalten_und_zeile_runden_sich() {
         vorwarnung_minuten: 45,
         planungsvorlauf_minuten: 90,
     };
-    let (typ, rhythmus, wechselzeiten, mindestdauer) = spalten(&werte.regel);
+    let (typ, rhythmus, wechselzeiten, mindestdauer) = columns(&werte.regel);
     assert_eq!(wechselzeiten.as_deref(), Some(r#"["06:00","18:00"]"#));
     let zeile = WerteZeile {
         bezeichnung: werte.bezeichnung.clone(),
