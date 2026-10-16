@@ -337,6 +337,9 @@ async fn load_kraft_tx(
 
 /// Untereinheiten über alle Ebenen (`ueber_einheit_id`), die im Raum stehen, aktiv sind und
 /// nicht schon abgerufen (D10). `UNION` beendet einen Zyklus im Bestand; die Wurzel selbst fehlt.
+/// Aufgelöste Einheiten stehen nie im Baum: Auflösen hängt ihre Kinder an die übergeordnete
+/// Einheit um (`einheit::repo`), der Filter im Baum ändert also nichts und hält den
+/// Zustandswächter (`entlassung::tests`) zufrieden.
 async fn load_verband_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -345,10 +348,11 @@ async fn load_verband_tx(
 ) -> Result<Vec<(i64, String)>, AppError> {
     Ok(sqlx::query_as(
         "WITH RECURSIVE baum(id) AS ( \
-             SELECT id FROM einsatz_einheit WHERE ueber_einheit_id = ?3 AND einsatz_id = ?1 \
+             SELECT id FROM einsatz_einheit \
+             WHERE ueber_einheit_id = ?3 AND einsatz_id = ?1 AND aufgeloest_at IS NULL \
              UNION \
              SELECT e.id FROM einsatz_einheit e JOIN baum ON e.ueber_einheit_id = baum.id \
-             WHERE e.einsatz_id = ?1) \
+             WHERE e.einsatz_id = ?1 AND e.aufgeloest_at IS NULL) \
          SELECT e.id, e.name FROM baum JOIN einsatz_einheit e ON e.id = baum.id \
          WHERE e.id <> ?3 AND e.aktueller_br_id = ?2 AND e.aufgeloest_at IS NULL \
            AND COALESCE((SELECT x.art FROM br_belegung x \
