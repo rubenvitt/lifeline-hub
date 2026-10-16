@@ -93,7 +93,7 @@ export type KraeftebaumZelleZeile =
   | RasterZeile
   | ({ art: 'einheit' } & Pick<
       RasterZeile,
-      'einheitId' | 'bezeichnung' | 'zusatz' | 'tz' | 'nichtUebernommen'
+      'einheitId' | 'bezeichnung' | 'zusatz' | 'tz' | 'isNichtUebernommen'
     >);
 
 interface KraeftebaumZelleProps {
@@ -142,7 +142,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
         <EinheitZeichen tz={z.tz} />,
         <>
           <span style={{ fontWeight: 500 }}>{name(z.bezeichnung, ziel)}</span>
-          {z.nichtUebernommen && (
+          {z.isNichtUebernommen && (
             <>
               {' '}
               <NichtUebernommenMarke />

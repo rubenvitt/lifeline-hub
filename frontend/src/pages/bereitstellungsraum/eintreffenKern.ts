@@ -50,7 +50,7 @@ function offenePeriode(p: EinheitPerioden | undefined) {
   return p?.perioden.find((x) => x.ende_at == null) ?? null;
 }
 
-function passt(
+function matches(
   treffer: EintreffenTreffer,
   weitere: readonly (string | null | undefined)[],
   suche: string,
@@ -91,7 +91,7 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
       alarmiertAt: offen?.anker === 'alarmierung' ? offen.beginn_at : null,
       eingetroffenAt: offen?.eintreffen_at ?? null,
     };
-    if (!passt(t, [x.funkrufname], suche)) continue;
+    if (!matches(t, [x.funkrufname], suche)) continue;
     (abschnitt == null && t.eingetroffenAt == null ? erwartet : imEinsatz).push(t);
   }
 
@@ -108,7 +108,7 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
       alarmiertAt: null,
       eingetroffenAt: null,
     };
-    if (passt(t, [], suche)) erwartet.push(t);
+    if (matches(t, [], suche)) erwartet.push(t);
   }
 
   const nachName = (a: EintreffenTreffer, b: EintreffenTreffer) => COLLATOR.compare(a.name, b.name);

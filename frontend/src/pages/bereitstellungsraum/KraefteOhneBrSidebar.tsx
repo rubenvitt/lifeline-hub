@@ -107,7 +107,7 @@ export default function KraefteOhneBrSidebar({
     return g ? [{ k, name, g }] : [];
   });
 
-  const zeigeGruppen = (liste: ReturnType<typeof gruppiereFreieKraefte>) =>
+  const renderGruppen = (liste: ReturnType<typeof gruppiereFreieKraefte>) =>
     liste.map((g) => (
       <div key={g.titel} style={{ marginBottom: token.marginSM }}>
         <Augenbraue als="div" style={{ marginBottom: token.marginXXS }}>
@@ -190,7 +190,7 @@ export default function KraefteOhneBrSidebar({
               Erwartet
             </Typography.Text>
           )}
-          {zeigeGruppen(gruppen)}
+          {renderGruppen(gruppen)}
           {imEinsatz.einheiten.length + imEinsatz.fahrzeuge.length > 0 && (
             <Collapse
               ghost
@@ -210,7 +210,7 @@ export default function KraefteOhneBrSidebar({
                       </span>
                     </span>
                   ),
-                  children: zeigeGruppen(gruppenImEinsatz),
+                  children: renderGruppen(gruppenImEinsatz),
                 },
               ]}
             />

@@ -341,7 +341,7 @@ describe('Kennzeichen „nicht übernommen“ (LLH-1075, design.md D14)', () => 
         ],
       }),
     );
-    const je = new Map(alleZeilen(raster).map((z) => [z.key, z.nichtUebernommen]));
+    const je = new Map(alleZeilen(raster).map((z) => [z.key, z.isNichtUebernommen]));
     expect(je.get('eh-1')).toBe(true);
     expect(je.get('eh-2')).toBe(false);
   });

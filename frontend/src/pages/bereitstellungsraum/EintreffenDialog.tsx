@@ -62,7 +62,7 @@ const KEINE_WEITEREN = [] as const;
 const KEINE_GRUPPEN: EintreffenGruppen = { erwartet: [], imEinsatz: [] };
 
 /** 422 „… ist schon im Einsatz“ (D9): die Serverprüfung fand eine gleichnamige Kraft. */
-function istDoppelbuchung(fehler: unknown): boolean {
+function isDoppelbuchung(fehler: unknown): boolean {
   return (
     fehler instanceof ApiError &&
     fehler.status === 422 &&
@@ -175,7 +175,7 @@ export default function EintreffenDialog({
     },
   });
 
-  function schliessen() {
+  function close() {
     setSchritt('suche');
     setSuche('');
     setKlappOffen([]);
@@ -190,7 +190,7 @@ export default function EintreffenDialog({
       {
         onSuccess: () => {
           nachher?.();
-          schliessen();
+          close();
         },
       },
     );
@@ -210,7 +210,7 @@ export default function EintreffenDialog({
   const sperrtAbbruch = buchung.isPending;
   function aufAbbruch() {
     if (schritt === 'neu' && steuerung.current) steuerung.current.abbrechen();
-    else if (!sperrtAbbruch) schliessen();
+    else if (!sperrtAbbruch) close();
   }
 
   const funkrufname = Form.useWatch('funkrufname', form) ?? '';
@@ -218,7 +218,7 @@ export default function EintreffenDialog({
     schritt === 'neu'
       ? findDoppelbuchung(funkrufname, { einheiten, fahrzeuge, kandidaten: alle })
       : null;
-  const serverDoppel = schritt === 'neu' && istDoppelbuchung(buchung.error);
+  const serverDoppel = schritt === 'neu' && isDoppelbuchung(buchung.error);
   const bemerkung = Form.useWatch('bemerkung', form) as string | undefined;
   const weitere = (Form.useWatch('weitere', form) ?? []) as UnangemeldetFormular['weitere'];
   const weitereNamen = (weitere ?? []).map((w) => w?.funkrufname?.trim()).filter(Boolean);
@@ -339,8 +339,8 @@ export default function EintreffenDialog({
           setKlappOffen([...auf]);
           trotzdemRef.current = false;
         }}
-        onFertig={schliessen}
-        onAbbrechen={schliessen}
+        onFertig={close}
+        onAbbrechen={close}
       >
         <AdhocFahrzeugFelder
           felder={FAHRZEUG_FELDER}

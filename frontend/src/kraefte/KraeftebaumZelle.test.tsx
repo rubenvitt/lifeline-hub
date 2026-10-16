@@ -172,14 +172,14 @@ describe('KraeftebaumZelle', () => {
 });
 
 describe('KraeftebaumZelle — „nicht übernommen“ (LLH-1075)', () => {
-  const zeile = (nichtUebernommen: boolean) =>
+  const zeile = (isNichtUebernommen: boolean) =>
     ({
       art: 'einheit',
       einheitId: 1,
       bezeichnung: 'Florian Nachbar 3',
       zusatz: null,
       tz: { typLabel: null, fachaufgabe: null, organisation: null },
-      nichtUebernommen,
+      isNichtUebernommen,
     }) as const;
 
   it('zeigt das Kennzeichen an der Einheit mit offener Übernahme', () => {

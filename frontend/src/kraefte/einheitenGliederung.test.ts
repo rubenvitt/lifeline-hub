@@ -216,8 +216,8 @@ describe('Kennzeichen „nicht übernommen“ in der Einheitenliste (LLH-1075)',
       ],
       [],
     );
-    expect(offen.nichtUebernommen).toBe(true);
-    expect(uebernommen.nichtUebernommen).toBe(false);
+    expect(offen.isNichtUebernommen).toBe(true);
+    expect(uebernommen.isNichtUebernommen).toBe(false);
   });
 });
 
