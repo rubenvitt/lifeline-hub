@@ -57,6 +57,7 @@ import { StelleDialog } from '../verpflegung/StelleDialog';
 import StellenListe from '../verpflegung/StellenListe';
 import { offeneStellenCount } from '../verpflegung/stellenKern';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
+import { LEERE_EMPFAENGER } from '../verpflegung/empfaengerKern';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { useAusgabeNachtragen } from '../verpflegung/useAusgabeNachtragen';
 import { useNachforderungWahl } from '../verpflegung/useNachforderungWahl';
@@ -199,6 +200,8 @@ export default function VerpflegungPage() {
 
   const alle = useMemo(() => verpflegungQuery.data?.zeitfenster ?? [], [verpflegungQuery.data]);
   const stellen = useMemo(() => verpflegungQuery.data?.stellen ?? [], [verpflegungQuery.data]);
+  // Empfängerliste (LLH-1055): Projektion in `GET …/verpflegung`, auch am Gerät, nie `…/einheiten`.
+  const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
   const stellenAnsicht = ansicht === 'stellen';
   // Abschnitte nur für die offene Stellenmaske; ohne Modulzugriff bleibt das Feld weg.
   const canReadAbschnitte = freigaben?.einsatzabschnitte?.zugriff !== false;
@@ -561,6 +564,7 @@ export default function VerpflegungPage() {
               }}
               ausstehend={ausstehendJe.get(zf.id)}
               stellen={stellen}
+              empfaenger={empfaengerListe}
             />
           ))}
         </section>
@@ -603,6 +607,7 @@ export default function VerpflegungPage() {
           zeitfenster={alle.find((zf) => zf.id === dialog.zf.id) ?? dialog.zf}
           nachforderungen={nachforderungOptionen}
           stellen={stellen}
+          empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(dialog.zf, body)}

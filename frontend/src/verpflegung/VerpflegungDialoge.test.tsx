@@ -14,10 +14,15 @@ import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import {
+  ABSCHNITT_DEICH,
   FELDKUECHE,
+  GRUPPE_2,
   KEINE_SONDERKOST,
   TURNHALLE,
+  ZUG,
   ausgabe,
+  empfaenger,
+  empfaengerEinheit,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
@@ -462,10 +467,10 @@ describe('AusgabeDialog', () => {
     return { onErfassen, onSchliessen };
   }
 
-  it('„Ausgabe nachtragen“ (LLH-1032 D8): drei Felder sichtbar, der Rest eingeklappt; Knopf im <form>; sendet Menge und Ort', async () => {
+  it('„Ausgabe nachtragen“ (LLH-1032 D8): ohne Stellen und Empfänger zwei Felder sichtbar, der Rest eingeklappt (Ort seit LLH-1055); Knopf im <form>; sendet Menge und Ort', async () => {
     const { onErfassen, onSchliessen } = zeige(NF);
     const dialog = await screen.findByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
-    await budgetUndAufklappen(dialog, 3, /Weitere Angaben/);
+    await budgetUndAufklappen(dialog, 2, /Weitere Angaben/);
     const knopf = pruefeFormStruktur(dialog, 'Nachtragen');
     // Leer heißt jetzt — kein vorbelegter Client-Zeitpunkt.
     expect(within(dialog).getByPlaceholderText('jetzt')).toHaveValue('');
@@ -586,6 +591,11 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     ).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
     expect(ort).toHaveValue('o'.repeat(501));
+    // Der Ort liegt eingeklappt (LLH-1055): der Klappteil geht mit dem Grund auf.
+    expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     fireEvent.change(ort, { target: { value: 'o'.repeat(500) } });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
@@ -997,13 +1007,18 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
   });
 
   describe('Nachtrag', () => {
-    function zeigeNachtrag(stellen = STELLEN, zf = verpflegungMitStellen().zeitfenster[0]) {
+    function zeigeNachtrag(
+      stellen = STELLEN,
+      zf = verpflegungMitStellen().zeitfenster[0],
+      liste = empfaenger(),
+    ) {
       const onErfassen = vi.fn().mockResolvedValue(undefined);
       renderMitProviders(
         <AusgabeDialog
           zeitfenster={zf}
           nachforderungen={null}
           stellen={stellen}
+          empfaenger={liste}
           laeuft={false}
           fehler={null}
           onErfassen={onErfassen}
@@ -1021,15 +1036,16 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
       expect(within(dialog).queryByLabelText('Zuführungsziel')).toBeNull();
     });
 
-    it('mit Stellen: „Stelle“ und „Zuführungsziel“; die gewählte Stelle nimmt das Zuführungsziel weg', async () => {
+    it('mit Stellen: „Stelle“ und „Zuführungsziel“ (eingeklappt); die gewählte Stelle nimmt das Zuführungsziel weg', async () => {
       const { onErfassen } = zeigeNachtrag();
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).queryByLabelText('Ort')).toBeNull();
       expect(within(dialog).getByLabelText('Zuführungsziel')).toBeInTheDocument();
+      // Menge, Empfänger, Stelle, Zeitpunkt (Feldbudget, LLH-1055); das Zuführungsziel liegt eingeklappt.
       expect(sichtbareFelder(dialog)).toBe(4);
       await waehle('Stelle', 'Feldküche BR Sportplatz');
       await waitFor(() => expect(within(dialog).queryByLabelText('Zuführungsziel')).toBeNull());
-      expect(sichtbareFelder(dialog)).toBe(3);
+      expect(sichtbareFelder(dialog)).toBe(4);
       await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '100');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
       await waitFor(() =>
@@ -1037,11 +1053,15 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
       );
     });
 
-    it('Zuführungsziel ohne gewählte Stelle geht als `ort` hinaus', async () => {
+    it('Zuführungsziel ohne gewählte Stelle geht als `ort` hinaus; der Klappkopf nennt es', async () => {
       const { onErfassen } = zeigeNachtrag();
       const dialog = await screen.findByRole('dialog');
       await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
       await userEvent.type(within(dialog).getByLabelText('Zuführungsziel'), 'Deich km 3');
+      expect(
+        within(dialog).getByRole('button', { name: 'Weitere Angaben · Zuführungsziel' }),
+      ).toBeInTheDocument();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
       await waitFor(() =>
         expect(onErfassen).toHaveBeenCalledWith({ menge: 20, ort: 'Deich km 3' }),
@@ -1063,6 +1083,86 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
         (g) => g.textContent,
       );
       expect(gruppen).toEqual(['zugeordnet', 'weitere', 'aufgelöst']);
+    });
+
+    it('Empfänger: Einheiten mit Stärke, Zuführung an Abschnitt, aufgelöste als eigene Gruppe', async () => {
+      const liste = empfaenger();
+      liste.einheiten.push(
+        empfaengerEinheit({ id: 50, name: 'Alt', aufgeloest_at: '2026-09-24 08:00:00' }),
+      );
+      zeigeNachtrag(STELLEN, verpflegungMitStellen().zeitfenster[0], liste);
+      await oeffne('Empfänger');
+      expect(optionenVon('Empfänger')).toEqual([
+        '1. Zug · Florian 1 · 1/2/17//20',
+        '1. Gruppe · Florian 1-1 · 0/1/8//9',
+        '2. Gruppe · Florian 1-2 · 0/1/8//9',
+        'Wasserrettung',
+        'Zuführung Deich',
+        'Alt',
+      ]);
+      const gruppen = [...document.querySelectorAll<HTMLElement>('.ant-select-item-group')].map(
+        (g) => g.textContent,
+      );
+      expect(gruppen).toContain('aufgelöst');
+    });
+
+    it('eine Einheit belegt die leere Menge mit ihrer Stärke vor; überschreibbar; sendet `einheit_id`', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      const menge = within(dialog).getByLabelText('Menge (EP)');
+      await waehle('Empfänger', '1. Zug · Florian 1 · 1/2/17//20');
+      await waitFor(() => expect(menge).toHaveValue('20'));
+      // Ein Wechsel ersetzt nur die eigene Vorgabe.
+      await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+      await waitFor(() => expect(menge).toHaveValue('9'));
+      await userEvent.clear(menge);
+      await userEvent.type(menge, '8');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 8, einheit_id: GRUPPE_2 }),
+      );
+    });
+
+    it('eine eingetippte Menge bleibt beim Wählen der Einheit stehen', async () => {
+      zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      const menge = within(dialog).getByLabelText('Menge (EP)');
+      await userEvent.type(menge, '12');
+      await waehle('Empfänger', '1. Zug · Florian 1 · 1/2/17//20');
+      expect(menge).toHaveValue('12');
+    });
+
+    it('Zuführung an einen Abschnitt: keine Vorgabe, sendet `abschnitt_id`', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      await waehle('Empfänger', 'Zuführung Deich');
+      expect(within(dialog).getByLabelText('Menge (EP)')).toHaveValue('');
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '40');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 40, abschnitt_id: ABSCHNITT_DEICH }),
+      );
+    });
+
+    it('ohne Einheiten und Abschnitte gibt es kein Feld „Empfänger“', async () => {
+      zeigeNachtrag(STELLEN, verpflegungMitStellen().zeitfenster[0], {
+        einheiten: [],
+        abschnitte: [],
+      });
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).queryByRole('combobox', { name: 'Empfänger' })).toBeNull();
+    });
+
+    it('ausgabeBody: höchstens ein Empfänger', () => {
+      expect(ausgabeBody({ menge: 5, empfaenger: `einheit:${ZUG}` })).toEqual({
+        menge: 5,
+        einheit_id: ZUG,
+      });
+      expect(ausgabeBody({ menge: 5, empfaenger: `abschnitt:${ABSCHNITT_DEICH}` })).toEqual({
+        menge: 5,
+        abschnitt_id: ABSCHNITT_DEICH,
+      });
+      expect(ausgabeBody({ menge: 5, empfaenger: null })).toEqual({ menge: 5 });
     });
 
     it('ausgabeBody: mit Stelle kein Ort', () => {

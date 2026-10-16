@@ -2,7 +2,7 @@
 titel: Verpflegung
 gruppen: [fuehrung]
 reihenfolge: 370
-quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
+quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
 ---
 
 ## Überblick
@@ -12,7 +12,9 @@ Zeitfenster steht der Bedarf für Einsatzkräfte, Betreute und weitere Personen,
 und dagegen stehen die Ausgaben. Die Seite zeigt je Zeitfenster, was ausgegeben ist und was fehlt,
 und stuft es als „gedeckt“, „offen“ oder „Unterdeckung“ ein. Ausgegeben wird an
 **Verpflegungsstellen**, etwa einer Feldküche oder einer Ausgabestelle; je Stelle zeigt die Seite,
-was dort ausgegeben wurde.
+was dort ausgegeben wurde. Eine Ausgabe kann an eine **Einheit** gehen, die ihr Essen abholt, oder
+als **Zuführung** an einen Einsatzabschnitt; je Zeitfenster zeigt die Seite dann, welche Einheit
+noch nicht verpflegt ist.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Zeitfenster an, zählen an der Ausgabe die Portionen, tragen Ausgaben nach und fordern nach, wenn
@@ -30,7 +32,7 @@ Gerät einer Verpflegungsstelle beschreibt
    geordnet. Je Karte stehen Bezeichnung, Zeitraum und rechts die Einstufung, darunter „Bedarf“ mit
    der Aufteilung, „ausgegeben“ und „fehlt“.
 
-   ![Drei Zeitfenster: „Getränke“ gedeckt, „Mittag“ warm in Unterdeckung mit 80 EP an der „Ausgabe Turnhalle Nord“ und 100 EP an der „Feldküche BR Sportplatz“, fehlender vegetarischer Kost und einer zurückgenommenen Ausgabe, „Abendessen“ offen](../bilder/verpflegung/zeitfenster.png)
+   ![Drei Zeitfenster: „Getränke“ gedeckt, „Mittag“ warm in Unterdeckung mit 80 EP an der „Ausgabe Turnhalle Nord“ und 100 EP an der „Feldküche BR Sportplatz“, fehlender vegetarischer Kost und einer zurückgenommenen Ausgabe, „Abendessen“ offen, unter jedem Zeitfenster die Klappe „Einheiten · 5 noch nicht verpflegt · 0 verpflegt“](../bilder/verpflegung/zeitfenster.png)
 
 3. Unter „Sonderkost“ je Kostform Bedarf und Ausgabe lesen. Fehlt etwas, steht dort etwa „fehlt 2
    vegetarisch“.
@@ -78,6 +80,20 @@ Für Einsatzleitung und Führungspersonal:
 3. „Ausgabe öffnen“ in der Zeile einer Stelle öffnet die Ausgabeansicht mit dieser Stelle.
 4. In der Liste der Ausgaben nennt jede Ausgabe ihre Stelle, ohne Stelle den Ort.
 
+### Sehen, welche Einheit noch nicht verpflegt ist
+
+1. Auf der Karte eines Zeitfensters die Klappe „Einheiten“ lesen. Ihr Kopf nennt die Zahlen, etwa
+   „Einheiten · 2 noch nicht verpflegt · 1 ohne Eintreffen · 1 verpflegt“.
+2. Die Klappe aufklappen. Unter „Noch nicht verpflegt“ stehen die Einheiten nach der Gliederung,
+   Untereinheiten eingerückt, je mit Funkrufname, Stärke und Abschnitt. Ist an eine Einheit eine
+   Ausgabe ohne Netz vorgemerkt, steht dort „ausstehend … EP“; ging Essen als Zuführung an ihren
+   Abschnitt, steht dort „Zuführung an …“.
+3. Unter „ohne Eintreffen“ stehen Einheiten, für die die Kräfte-Zeitachse kein Eintreffen kennt.
+4. Unter „Verpflegt“ stehen die Einheiten mit Menge und Uhrzeit jeder Ausgabe, etwa „9 EP 11:40“,
+   und wie viele Untereinheiten die Ausgabe mit verpflegt hat; darunter die Zuführungen an
+   Abschnitte.
+5. Dieselben Listen stehen in der Ausgabeansicht unter den Sonderkost-Tasten.
+
 ### Ein Zeitfenster anlegen
 
 Für Einsatzleitung und Führungspersonal:
@@ -104,18 +120,23 @@ Für Einsatzleitung und Führungspersonal:
 2. Hat der Einsatz Stellen, unter den Zahlen die Stelle wählen, an der gezählt wird, oder „ohne
    Stelle“. Daneben steht, wie viel an der gewählten Stelle schon ausgegeben ist, etwa „an der
    Stelle 100 EP“.
-3. Je ausgegebene Portion „+1“ wählen, für mehrere auf einmal „+5“ oder „+10“. „Menge …“ öffnet
-   „Menge zählen“ für eine größere Zahl; „Zählen“ übernimmt sie.
-4. Für Sonderkost die Taste der Kostform wählen, etwa „vegetarisch“. Sie zählt eine Portion
+3. Holt eine Einheit ihr Essen ab, darunter unter „Empfänger“ die Einheit wählen oder in der Liste
+   „Noch nicht verpflegt“ bei ihr „Wählen“. Daneben steht dann eine Taste mit ihrer Stärke, etwa
+   „+9“; sie zählt so viele Portionen auf einmal. Für eine Zuführung „Zuführung …“ mit dem
+   Abschnitt wählen. Ohne Wahl bleibt es bei „ohne Empfänger“.
+4. Je ausgegebene Portion „+1“ wählen, für mehrere auf einmal „+5“ oder „+10“. „Menge …“ öffnet
+   „Menge zählen“ für eine größere Zahl, bei gewählter Einheit schon mit ihrer Stärke; „Zählen“
+   übernimmt sie.
+5. Für Sonderkost die Taste der Kostform wählen, etwa „vegetarisch“. Sie zählt eine Portion
    dieser Kostform und zugleich eine Portion in die Sammlung.
 
-   ![Ausgabe „Mittag“ mit Soll, ausgegeben und fehlt, einer offenen Sammlung samt vegetarischer Portion, der gewählten Stelle „Feldküche BR Sportplatz“ mit „an der Stelle 100 EP“, der Sonderkost-Taste und den Zähltasten am unteren Rand](../bilder/verpflegung/ausgabe-zaehlen.png)
+   ![Ausgabe „Mittag“ mit Soll, ausgegeben und fehlt, einer offenen Sammlung samt vegetarischer Portion, der gewählten Stelle „Feldküche BR Sportplatz“ mit „an der Stelle 100 EP“, dem gewählten Empfänger „Rettungsstaffel“ mit der Taste „+4“, der Sonderkost-Taste, der Liste „Noch nicht verpflegt“ mit „Wählen“ je Einheit und den Zähltasten am unteren Rand](../bilder/verpflegung/ausgabe-zaehlen.png)
 
-5. Verzählt: „−1“ nimmt die zuletzt gezählte Portion aus der Sammlung. Ohne Sammlung ist „−1“
-   gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
-6. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ bucht sofort. Die Meldung „Gebucht:
+6. Verzählt oder fehlt jemand aus der Einheit: „−1“ nimmt die zuletzt gezählte Portion aus der
+   Sammlung. Ohne Sammlung ist „−1“ gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
+7. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ bucht sofort. Die Meldung „Gebucht:
    … EP zu ‚…‘“ bietet „Rückgängig“, falls es das falsche Zeitfenster war. Unter „Letzte Buchungen“
-   stehen die jüngsten Ausgaben.
+   stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“.
 
 ### Eine Ausgabe nachtragen
 
@@ -126,14 +147,16 @@ einem anderen Ort stattfand:
    Zeitfenster …“ (drei Punkte). In der Ausgabeansicht steht „Ausgabe nachtragen“ oben rechts.
    Der Dialog nennt oben Bedarf, Ausgegebenes und Fehlmenge.
 2. Unter „Menge (EP)“ die ausgegebenen Portionen eintragen.
-3. Unter „Stelle“ die Stelle der Ausgabe wählen; die zugeordneten stehen oben. Ohne Stelle bei
-   Bedarf den „Ort“ eintragen, im Einsatz mit Stellen heißt das Feld „Zuführungsziel“.
-4. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt der Ausgabe wählen.
+3. Unter „Empfänger“ bei Bedarf die Einheit oder „Zuführung …“ mit dem Abschnitt wählen. Ist die
+   Menge noch leer, trägt die Auswahl einer Einheit ihre Stärke ein; die Zahl lässt sich ändern.
+4. Unter „Stelle“ die Stelle der Ausgabe wählen; die zugeordneten stehen oben.
+5. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt der Ausgabe wählen.
 
-   ![Dialog „Ausgabe nachtragen: Mittag“ mit „Bedarf 200 · ausgegeben 180 · fehlt 20 EP“, Menge 10 und der Stelle „Ausgabe Turnhalle Nord“](../bilder/verpflegung/ausgabe-nachtragen.png)
+   ![Dialog „Ausgabe nachtragen: Mittag“ mit „Bedarf 200 · ausgegeben 180 · fehlt 20 EP“, Menge 10, dem Empfänger „Rettungsstaffel“ und der Stelle „Ausgabe Turnhalle Nord“](../bilder/verpflegung/ausgabe-nachtragen.png)
 
-5. Für Sonderkost, eine zugehörige Nachforderung oder eine Bemerkung „Weitere Angaben“ aufklappen.
-6. „Nachtragen“ wählen. War es das falsche Zeitfenster, in der Meldung „Rückgängig“ wählen.
+6. Für einen Ort, Sonderkost, eine zugehörige Nachforderung oder eine Bemerkung „Weitere Angaben“
+   aufklappen. Ohne Stelle steht dort „Ort“, im Einsatz mit Stellen „Zuführungsziel“.
+7. „Nachtragen“ wählen. War es das falsche Zeitfenster, in der Meldung „Rückgängig“ wählen.
 
 ### Eine Ausgabe zurücknehmen
 
@@ -200,8 +223,28 @@ wurde. Ein Zeitfenster ohne Stellen gilt einsatzweit, wie vor der Einführung de
 ### Zuführungsziel
 
 Hat der Einsatz Stellen, heißt der Ort einer Ausgabe „Zuführungsziel“: dorthin wurde das Essen
-gebracht, etwa „Deich km 4,2“. Das Feld steht nur ohne gewählte Stelle; mit Stelle nennt die
-Ausgabe ihre Stelle statt eines Orts.
+gebracht, etwa „Deich km 4,2“. Das Feld steht unter „Weitere Angaben“ und nur ohne gewählte
+Stelle; mit Stelle nennt die Ausgabe ihre Stelle statt eines Orts.
+
+### Empfänger
+
+Eine Ausgabe geht an höchstens einen Empfänger: an eine Einheit, die ihr Essen abholt, oder als
+Zuführung an einen Einsatzabschnitt, nie an einzelne Personen. Eine Ausgabe an eine Einheit
+verpflegt auch alle ihre Untereinheiten; die Stärke, die die App vorschlägt, ist deshalb die des
+ganzen Teilbaums. Die Einheiten, ihre Stärke und ihr Eintreffen kommen aus dem Modul Verpflegung
+selbst, ohne Namen von Personen; dafür braucht es das Modul Einheiten nicht.
+
+Als noch nicht verpflegt gilt eine Einheit, die eingetroffen ist und in diesem Zeitfenster weder
+selbst noch über eine übergeordnete Einheit eine Ausgabe bekommen hat. Eine zurückgenommene
+Ausgabe zählt nicht. Wer erst nach dem Ende des Zeitfensters eingetroffen ist, steht für dieses
+Zeitfenster nicht in der Liste. Ohne Eintreffen in der Kräfte-Zeitachse weiß die App nicht, ob die
+Einheit da war; sie steht deshalb gesondert unter „ohne Eintreffen“. Eine Zuführung an einen
+Abschnitt verpflegt keine Einheit, weil sie nicht sagt, wer gegessen hat; die Zeilen der Einheiten
+im Abschnitt nennen sie nur. Eine aufgelöste Einheit steht nicht mehr zur Wahl beim Zählen; im
+Nachtrag lässt sie sich für eine Ausgabe vor der Auflösung wählen.
+
+Die Wahl des Empfängers merkt sich die App nicht; sie gilt, bis ein anderes Zeitfenster geöffnet
+wird.
 
 ### Verpflegungsart
 
@@ -236,7 +279,9 @@ die Zahl steht dann als „Aktuell …“ unter dem Feld.
 
 Gezählte Portionen sammeln sich zuerst auf dem Gerät, in der „Sammlung“, und gehen dann als
 **eine** Ausgabe an den Server: 3 Sekunden nach dem letzten Tipp, spätestens 15 Sekunden nach dem
-ersten, sofort ab 50 Portionen, mit „Buchen“ oder wenn das Zeitfenster endet. „Menge …“ zählt
+ersten, sofort ab 50 Portionen, mit „Buchen“, wenn das Zeitfenster endet oder wenn eine andere Stelle oder ein anderer
+Empfänger gewählt wird. Eine Sammlung gehört immer zu dem Empfänger, für den ihre erste Portion
+gezählt wurde. „Menge …“ zählt
 höchstens so viele Portionen, wie eine Ausgabe fassen darf. Sonderkost ist immer Teil der Menge,
 deshalb lehnt der Server eine gezählte Sammlung nicht wegen Sonderkost ab.
 
@@ -284,15 +329,17 @@ zählen, Ausgaben nachtragen und zurücknehmen, Stellen anlegen, in Betrieb nehm
 stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht sind „Zeitfenster
 anlegen“ und „Stelle anlegen“ gesperrt, die Karten zeigen keine Aktionen und kein „Ausgabe
-öffnen“, die Stellen keine Aktionen, und in der Ausgabeansicht sind die Zähltasten und die
-Stellenwahl mit dem Grund gesperrt.
+öffnen“, die Stellen keine Aktionen, und in der Ausgabeansicht sind die Zähltasten, die
+Stellenwahl, die Empfängerwahl und „Wählen“ mit dem Grund gesperrt.
 
 Die Zeitfenster gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält. Wird die App
 ohne Netz neu gestartet, zeigt die Ausgabeansicht „Zeitfenster nicht geladen“ und es gibt nichts
 zu zählen. Fällt das Netz bei offener Seite aus, lässt sich weiter zählen und nachtragen: Der Kopf
 der Ausgabeansicht zeigt „Offline vorgemerkt“, gebuchte Sammlungen stehen als „+ … ausstehend“
 und unter „Letzte Buchungen“, auf der Karte als „ausstehend“. Sie zählen erst in die Deckung, wenn
-der Server sie bestätigt hat (Kapitel [Ohne Netz](ohne-netz.md)). Wird eine Stelle aufgelöst,
+der Server sie bestätigt hat (Kapitel [Ohne Netz](ohne-netz.md)). Eine vorgemerkte Ausgabe an eine
+Einheit trägt ihren Empfänger; bis zur Bestätigung bleibt die Einheit unter „Noch nicht
+verpflegt“, mit „ausstehend … EP“ in ihrer Zeile. Wird eine Stelle aufgelöst,
 während ohne Netz an ihr gezählt wird, nimmt der Server die Ausgaben an, die vor der Auflösung
 gezählt wurden; eine später gezählte lehnt er ab, sie steht dann mit Grund unter „abgelehnt –
 prüfen“.

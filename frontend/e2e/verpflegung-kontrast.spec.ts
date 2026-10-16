@@ -493,6 +493,16 @@ for (const modus of ['light', 'dark'] as const) {
         sonderkost: { vegan: 6 },
       })
     ).id;
+    // Empfänger (LLH-1055): eine eingetroffene Gruppe und eine Einheit ohne Eintreffen, damit
+    // Empfängerwahl und „Noch nicht verpflegt“ samt „Wählen“ gemessen werden.
+    const { id: gruppe } = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, {
+      name: 'Gruppe Kontrast',
+    });
+    await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name: 'Wasserrettung Kontrast' });
+    await post(page, `/api/einsaetze/${einsatzId}/einheiten/${gruppe}/zeitachse`, {
+      art: 'eintreffen',
+      zeitpunkt_at: zeit(-60),
+    });
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     const messwerte: Record<string, unknown>[] = [];
@@ -526,7 +536,15 @@ for (const modus of ['light', 'dark'] as const) {
         .toBeGreaterThanOrEqual(TEXT[modus]);
 
       // Jeder Text außerhalb gesperrter Knöpfe.
-      for (const bereich of ['ausgabe-kopf', 'ausgabe-sonderkost', 'zaehltasten'] as const) {
+      // Die gewählte Zeile trägt die Auswahlfläche; ihr Text wird darauf gemessen.
+      await page.getByRole('button', { name: 'Empfänger wählen: Gruppe Kontrast' }).click();
+      await page.mouse.move(0, 0);
+      for (const bereich of [
+        'ausgabe-kopf',
+        'ausgabe-sonderkost',
+        'zaehltasten',
+        'verpflegung-stand',
+      ] as const) {
         const knoten = await textknoten(page.locator(`[data-lfh="${bereich}"]`));
         for (const { ziel, text } of knoten) {
           if (await ziel.evaluate((el) => el.closest('button[disabled]') != null)) continue;
@@ -548,7 +566,18 @@ for (const modus of ['light', 'dark'] as const) {
       await pruefe(minus, GESPERRT_BODEN, `${modus}/${k.stufe}/−1 gesperrt`);
       await expect(minus).toHaveCSS('border-top-style', 'dashed');
     }
-    for (const tragend of ['Sammlung', '+1', '+5', '+10', 'Menge …', 'Soll', 'fehlt']) {
+    for (const tragend of [
+      'Sammlung',
+      '+1',
+      '+5',
+      '+10',
+      'Menge …',
+      'Soll',
+      'fehlt',
+      'Gruppe Kontrast',
+      'Wasserrettung Kontrast',
+      'Wählen',
+    ]) {
       expect(
         gemessen.filter((t) => t === tragend).length,
         `Text „${tragend}“ gemessen`,

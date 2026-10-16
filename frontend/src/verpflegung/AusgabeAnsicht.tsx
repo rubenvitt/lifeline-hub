@@ -40,6 +40,18 @@ import { Select } from '../components/Select';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
+import EmpfaengerStand from './EmpfaengerStand';
+import {
+  LEERE_EMPFAENGER,
+  OHNE_EMPFAENGER,
+  empfaengerOptionen,
+  empfaengerSchluessel,
+  empfaengerText,
+  isEmpfaengerWaehlbar,
+  parseEmpfaengerSchluessel,
+  staerkeVorgabe,
+  type EmpfaengerWahl,
+} from './empfaengerKern';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { useAusgabeNachtragen } from './useAusgabeNachtragen';
 import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
@@ -71,6 +83,11 @@ const einzeilig = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 } as const;
+
+/** „ · an 2. Gruppe“; leer ohne Text. */
+function mitPunkt(text: string): string {
+  return text ? ` · ${text}` : '';
+}
 
 /** „ (davon 2 vegetarisch)“ zu einem Bündel, leer ohne Sonderkost. */
 function davon(b: Buendel): string {
@@ -107,6 +124,15 @@ function davon(b: Buendel): string {
  * gemerkte Wahl des Einsatzes (`stellenGedaechtnis`), sonst die einzige zugeordnete Stelle. Eine
  * Hand-Wahl gilt bis zum Verlassen und wird am Desktop gemerkt, am Gerät nicht (LLH-1048). Ein
  * Wechsel bucht das offene Bündel an der alten Stelle (`useAusgabeSammlung`).
+ *
+ * Empfänger (LLH-1055 Teil II, Entscheidung LLH-1024 F3): Am Platz `ausgabe-empfaenger` steht die
+ * Wahl „ohne Empfänger“ (Vorgabe, das Zählen bleibt so schnell wie ohne), eine Einheit (Abholung)
+ * oder ein Abschnitt (Zuführung), alles aus der Projektion `empfaenger` in `GET …/verpflegung`.
+ * Mit einer Einheit steht daneben die Taste „+n“: sie zählt die Ist-Stärke ihres Teilbaums in die
+ * Sammlung, „−1“ und „Menge …“ (vorbelegt mit derselben Zahl) überschreiben. Gemerkt wird die Wahl
+ * nirgends; sie gilt bis zum Wechsel des Zeitfensters. Ein Wechsel bucht das offene Bündel beim
+ * alten Empfänger. Unter den Tasten zeigt `EmpfaengerStand`, wer noch nicht verpflegt ist; „Wählen“
+ * an einer Zeile setzt die Einheit als Empfänger (Handschuh: die Zeile statt der Auswahlliste).
  */
 export default function AusgabeAnsicht() {
   const { id, zeitfensterId } = useParams();
@@ -185,6 +211,26 @@ export default function AusgabeAnsicht() {
     setFesteWahl({ schluessel: wahlSchluessel, stelle: sid });
     if (amDesktop) saveGemerkteStelle(einsatzId, sid);
   };
+  // ── Empfänger (LLH-1055 Teil II) ─────────────────────────────────────────────────────────
+  const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
+  const hatEmpfaenger =
+    empfaengerListe.einheiten.some((e) => !e.aufgeloest_at) ||
+    empfaengerListe.abschnitte.length > 0;
+  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit fällt aus ihr.
+  const [empfaengerWahl, setEmpfaengerWahl] = useState<{
+    zeitfenster: number;
+    wahl: EmpfaengerWahl | null;
+  }>({ zeitfenster: zfId, wahl: null });
+  const roheWahl = empfaengerWahl.zeitfenster === zfId ? empfaengerWahl.wahl : null;
+  const gewaehlterEmpfaenger = isEmpfaengerWaehlbar(roheWahl, empfaengerListe) ? roheWahl : null;
+  const empfaengerEinheit =
+    gewaehlterEmpfaenger?.art === 'einheit'
+      ? empfaengerListe.einheiten.find((e) => e.id === gewaehlterEmpfaenger.id)
+      : undefined;
+  const staerke = empfaengerEinheit ? staerkeVorgabe(empfaengerEinheit) : null;
+  const selectEmpfaenger = (wahl: EmpfaengerWahl | null) =>
+    setEmpfaengerWahl({ zeitfenster: zfId, wahl });
+
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const vergangen = zf != null && istVergangen(zf, jetzt);
 
@@ -206,6 +252,7 @@ export default function AusgabeAnsicht() {
     zeitfenster: zf ? { id: zf.id, bezeichnung: zf.bezeichnung } : null,
     vergangen,
     stelleId: gewaehlteStelle,
+    empfaenger: gewaehlterEmpfaenger,
     onGebucht: (ausgabeId, b) =>
       nachtrag.zeigeGebucht(
         `Gebucht: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}${davon(b)}`,
@@ -507,6 +554,45 @@ export default function AusgabeAnsicht() {
               </Flex>
             )}
           </div>
+          {/* Empfänger (LLH-1055); ohne Einheiten und Abschnitte bleibt der Platz leer. Die Wahl
+              nimmt den Rest der Zeile, „+n“ steht fest daneben. */}
+          <div data-lfh="ausgabe-empfaenger">
+            {hatEmpfaenger && (
+              <Flex
+                align="center"
+                gap={token.marginSM}
+                style={{
+                  paddingBlock: token.paddingSM,
+                  paddingInline: token.padding,
+                  borderBlockStart: `1px solid ${rollen.flaeche2}`,
+                }}
+              >
+                <Select<string>
+                  aria-label="Empfänger"
+                  value={empfaengerSchluessel(gewaehlterEmpfaenger)}
+                  disabled={tastenGesperrt}
+                  onChange={(v) => selectEmpfaenger(parseEmpfaengerSchluessel(v))}
+                  options={[
+                    { value: OHNE_EMPFAENGER, label: 'ohne Empfänger' },
+                    ...empfaengerOptionen(empfaengerListe, { aufgeloeste: false }),
+                  ]}
+                  style={{ flex: '1 1 0', minWidth: 0 }}
+                />
+                {empfaengerEinheit && staerke != null && (
+                  <Button
+                    data-lfh="zaehltaste-staerke"
+                    style={{ ...uebrige, flex: 'none' }}
+                    aria-label={`Stärke zählen: ${staerke} EP an ${empfaengerEinheit.name}`}
+                    disabled={tastenGesperrt}
+                    aria-describedby={beschrieben(tastenGesperrt)}
+                    onClick={() => sammlung.tippe(staerke)}
+                  >
+                    +{staerke}
+                  </Button>
+                )}
+              </Flex>
+            )}
+          </div>
         </section>
 
         {/* ── Sonderkost ───────────────────────────────────────────────────────────── */}
@@ -574,6 +660,18 @@ export default function AusgabeAnsicht() {
           )}
         </div>
 
+        {/* ── Noch nicht verpflegt (LLH-1055) ─────────────────────────────────────────── */}
+        <EmpfaengerStand
+          zeitfenster={zf}
+          empfaenger={empfaengerListe}
+          ausstehend={ausstehend.map((v) => v.aktion.daten)}
+          ueberschrift="h2"
+          onWaehlen={selectEmpfaenger}
+          gewaehlt={gewaehlterEmpfaenger}
+          gesperrt={tastenGesperrt}
+          grundId={grundId}
+        />
+
         {/* ── Letzte Buchungen (D6) ───────────────────────────────────────────────── */}
         <section aria-labelledby={`${grundId}-letzte`} style={{ flex: '1 0 auto' }}>
           <Augenbraue als="h2" id={`${grundId}-letzte`}>
@@ -596,6 +694,7 @@ export default function AusgabeAnsicht() {
                     {d.verpflegungsstelle_id != null
                       ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
                       : ''}
+                    {mitPunkt(empfaengerText(d, empfaengerListe))}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -632,6 +731,7 @@ export default function AusgabeAnsicht() {
                     {a.verpflegungsstelle_id != null
                       ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
                       : ''}
+                    {mitPunkt(empfaengerText(a, empfaengerListe))}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -685,7 +785,13 @@ export default function AusgabeAnsicht() {
                 style={uebrige}
                 disabled={tastenGesperrt}
                 aria-describedby={beschrieben(tastenGesperrt)}
-                onClick={() => setDialog({ art: 'menge' })}
+                onClick={() => {
+                  // Vorbelegt mit der Stärke der gewählten Einheit, überschreibbar (LLH-1055).
+                  mengeForm.setFieldsValue({
+                    menge: staerke != null && staerke <= sammlung.platz ? staerke : undefined,
+                  });
+                  setDialog({ art: 'menge' });
+                }}
               >
                 Menge …
               </Button>
@@ -758,6 +864,7 @@ export default function AusgabeAnsicht() {
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
           stellen={stellen}
+          empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(zf as VerpflegungZeitfenster, body)}
