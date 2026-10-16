@@ -2740,3 +2740,71 @@ async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
     let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     assert_eq!(u["zeitfenster"], serde_json::json!([]));
 }
+
+/// Spec „Unabhängig nach dem Anlegen“: ein aus der Vorlage angelegtes Zeitfenster kennt seine
+/// Mahlzeit nicht. Die Mahlzeit ändern oder deaktivieren lässt das Zeitfenster stehen und legt
+/// nichts an; das Zeitfenster ändern lässt den Plan und die übrigen Zeitfenster stehen.
+#[tokio::test]
+async fn tag_aus_vorlage_unabhaengig_nach_dem_anlegen() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = mahlzeit(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Mittag","beginn":"12:00","ende":"13:30"}"#,
+    )
+    .await;
+    let mid = m["id"].as_i64().unwrap();
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&drei_tag_fenster())).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let vorher = uebersicht(&app, &admin, e).await["zeitfenster"].clone();
+    assert_eq!(vorher.as_array().unwrap().len(), 3);
+
+    let (s, _) = mahlzeit_patch(&app, &admin, mid, r#"{"beginn":"11:30","ende":"13:00"}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = mahlzeit_patch(&app, &admin, mid, r#"{"aktiv":false}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        uebersicht(&app, &admin, e).await["zeitfenster"],
+        vorher,
+        "Plan ändern wirkt nicht auf angelegte Zeitfenster"
+    );
+
+    let mittag = vorher
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["bezeichnung"] == "Mittag")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _) = zf_patch(&app, &admin, e, mittag, r#"{"bedarf_betreute":71}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    let nachher = uebersicht(&app, &admin, e).await["zeitfenster"].clone();
+    for (a, b) in vorher
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(nachher.as_array().unwrap())
+    {
+        if a["id"] == mittag {
+            assert_eq!(b["bedarf"]["betreute"], 71, "{b}");
+        } else {
+            assert_eq!(a, b, "andere Zeitfenster unverändert");
+        }
+    }
+    let (_, plan) = anfrage(
+        &app,
+        "GET",
+        &format!("{PLAN}?nur_aktive=false"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (plan[0]["beginn"].as_str(), plan[0]["ende"].as_str()),
+        (Some("11:30"), Some("13:00")),
+        "Zeitfenster ändern wirkt nicht auf den Plan"
+    );
+}
