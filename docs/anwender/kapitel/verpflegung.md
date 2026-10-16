@@ -212,7 +212,9 @@ Einsatztagebuch; gerechnet wird mit ihr nicht.
 
 Die Ausgabeansicht wählt die Stelle vor: zuerst die Stelle, von deren Zeile auf der Karte sie
 geöffnet wurde, sonst die zuletzt am selben Rechner gewählte Stelle des Einsatzes, sonst die
-einzige zugeordnete Stelle. Eine aufgelöste Stelle steht nicht zur Wahl. Wer die Stelle wechselt,
+einzige zugeordnete Stelle. Diese Wahl bleibt, solange die Ansicht offen ist, auch wenn jemand
+die Stellen des Zeitfensters ändert; nur wenn die gewählte Stelle aufgelöst wird, steht danach
+„ohne Stelle“. Eine aufgelöste Stelle steht nicht zur Wahl. Wer die Stelle wechselt,
 bucht die offene Sammlung an der bisherigen Stelle; die Sammlung gehört immer zu der Stelle, an der
 ihre erste Portion gezählt wurde.
 

@@ -38,6 +38,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
 
 1. Beim laufenden oder anstehenden Zeitfenster „Ausgabe öffnen“ wählen. Oben stehen „Soll“,
    „ausgegeben“ und „fehlt“, unten die Zähltasten; die Navigation zeigt weiter „Verpflegung“.
+   „Ausgabe öffnen“ in der Zeile einer Stelle auf der Karte öffnet die Ausgabe gleich mit dieser
+   Stelle.
 2. Unter den Zahlen die eigene Stelle wählen oder „ohne Stelle“. Ist dem Zeitfenster genau eine
    Stelle zugeordnet, ist sie schon gewählt. Daneben steht, wie viel an ihr ausgegeben ist, etwa
    „an der Stelle 80 EP“.
@@ -94,8 +96,10 @@ Gezählte Portionen sammeln sich erst auf dem Tablet und gehen als eine Ausgabe 
 3 Sekunden nach dem letzten Tipp, spätestens 15 Sekunden nach dem ersten, sofort ab 50 Portionen,
 mit „Buchen“, wenn das Zeitfenster endet oder wenn eine andere Stelle gewählt wird. Die Ausgabe
 trägt die Stelle, an der ihre erste Portion gezählt wurde. Eine aufgelöste Stelle steht nicht zur
-Wahl. Die gewählte Stelle merkt sich das Tablet nicht; geöffnet wird mit der einzigen
-zugeordneten Stelle oder ohne Stelle. Bei einem vergangenen Zeitfenster sind die
+Wahl. Die gewählte Stelle merkt sich das Tablet nicht; geöffnet wird mit der Stelle, aus deren
+Zeile auf der Karte „Ausgabe öffnen“ kam, sonst mit der einzigen zugeordneten Stelle oder ohne
+Stelle. Die Wahl beim Öffnen bleibt, auch wenn die Einsatzleitung währenddessen die Stellen des
+Zeitfensters ändert; nur das Auflösen der gewählten Stelle setzt sie auf „ohne Stelle“. Bei einem vergangenen Zeitfenster sind die
 Zähltasten gesperrt („Zeitfenster vorbei“). „Fehlt“ zählt nur Gebuchtes; die Sammlung steht
 daneben.
 
