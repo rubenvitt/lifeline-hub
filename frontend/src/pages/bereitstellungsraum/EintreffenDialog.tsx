@@ -33,6 +33,7 @@ import {
   findDoppelbuchung,
   kraftEingabe,
   trefferHinweise,
+  type EintreffenGruppen,
   type EintreffenTreffer,
 } from './eintreffenKern';
 
@@ -58,6 +59,7 @@ const KLAPP_WEITERE = 'weitere';
 /** Die Felder des Fahrzeugs, das der Einheit ihren Namen gibt (design.md D14). */
 const FAHRZEUG_FELDER = ['funkrufname', 'traegerorganisation', 'fahrzeugtyp'] as const;
 const KEINE_WEITEREN = [] as const;
+const KEINE_GRUPPEN: EintreffenGruppen = { erwartet: [], imEinsatz: [] };
 
 /** 422 „… ist schon im Einsatz“ (D9): die Serverprüfung fand eine gleichnamige Kraft. */
 function istDoppelbuchung(fehler: unknown): boolean {
@@ -127,20 +129,26 @@ export default function EintreffenDialog({
     }),
     [br.einheiten, br.fahrzeuge],
   );
+  // Geschlossen rechnet der Dialog nichts: er hängt dauerhaft an der Seite des Raums.
   const alle = useMemo(
-    () => buildEintreffenGruppen({ einheiten, fahrzeuge, perioden: periodenQuery.data, imRaum }),
-    [einheiten, fahrzeuge, periodenQuery.data, imRaum],
+    () =>
+      offen
+        ? buildEintreffenGruppen({ einheiten, fahrzeuge, perioden: periodenQuery.data, imRaum })
+        : KEINE_GRUPPEN,
+    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum],
   );
   const gruppen = useMemo(
     () =>
-      buildEintreffenGruppen({
-        einheiten,
-        fahrzeuge,
-        perioden: periodenQuery.data,
-        imRaum,
-        suche,
-      }),
-    [einheiten, fahrzeuge, periodenQuery.data, imRaum, suche],
+      offen
+        ? buildEintreffenGruppen({
+            einheiten,
+            fahrzeuge,
+            perioden: periodenQuery.data,
+            imRaum,
+            suche,
+          })
+        : KEINE_GRUPPEN,
+    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum, suche],
   );
 
   const buchung = useMutation({
