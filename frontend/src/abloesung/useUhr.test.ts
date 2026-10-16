@@ -11,6 +11,7 @@ const schicht = (
   id: number,
   faellig_at: string,
   status: Abloesung['status'] = 'laufend',
+  vorwarnung_minuten = 30,
 ): Abloesung => ({
   id,
   einsatz_id: 1,
@@ -18,7 +19,7 @@ const schicht = (
   einheit_name: `F${id}`,
   beginn_at: '2026-09-22 09:00:00',
   rhythmus_minuten: 360,
-  vorwarnung_minuten: 30,
+  vorwarnung_minuten,
   rhythmus_quelle: 'einheit',
   faellig_at,
   status,
@@ -34,6 +35,11 @@ describe('findNextChange (LFH-635)', () => {
       jetzt,
     );
     // Schicht 2 beginnt ihre Vorwarnung um 15:30 — gleichauf mit der Fälligkeit von Schicht 1.
+    expect(w?.format('YYYY-MM-DD HH:mm:ss')).toBe('2026-09-22 15:30:00');
+  });
+  it('nimmt den Vorwarnbeginn aus der Schicht (LLH-1122)', () => {
+    const jetzt = dayjs.utc('2026-09-22 15:10:00');
+    const w = findNextChange([schicht(1, '2026-09-22 17:00:00', 'laufend', 90)], jetzt);
     expect(w?.format('YYYY-MM-DD HH:mm:ss')).toBe('2026-09-22 15:30:00');
   });
   it('steht ohne laufende Schicht oder künftige Grenze still', () => {

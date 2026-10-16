@@ -10,7 +10,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
-import { abloesungZeit, computeEinstufung, rhythmusText } from './einstufung';
+import { abloesungZeit, einstufungOf, rhythmusText } from './einstufung';
 
 const { Text } = Typography;
 
@@ -57,7 +57,7 @@ export default function AbloesungKarte({
 }: AbloesungKarteProps) {
   const { token, rollen } = useRollen();
   const laufend = s.status === 'laufend';
-  const stufe = laufend ? computeEinstufung(s.faellig_at, jetzt) : null;
+  const stufe = laufend ? einstufungOf(s, jetzt) : null;
   const darstellung = stufe ? abloesungEinstufung[stufe] : null;
   const kante =
     darstellung && darstellung.rolle !== 'neutral'

@@ -28,20 +28,26 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
 describe('computeEinstufung — dieselben Grenzfälle wie im Backend', () => {
   const f = '2026-09-22 15:30:00';
   it('genau fällig ist überfällig', () => {
-    expect(computeEinstufung(f, t('2026-09-22 15:30:00'))).toBe('ueberfaellig');
-    expect(computeEinstufung(f, t('2026-09-22 15:31:00'))).toBe('ueberfaellig');
+    expect(computeEinstufung(f, t('2026-09-22 15:30:00'), 30)).toBe('ueberfaellig');
+    expect(computeEinstufung(f, t('2026-09-22 15:31:00'), 30)).toBe('ueberfaellig');
   });
   it('genau 30 min vorher ist Vorwarnung, 30 min + 1 s planmäßig', () => {
-    expect(computeEinstufung(f, t('2026-09-22 15:29:59'))).toBe('vorwarnung');
-    expect(computeEinstufung(f, t('2026-09-22 15:00:00'))).toBe('vorwarnung');
-    expect(computeEinstufung(f, t('2026-09-22 14:59:59'))).toBe('planmaessig');
+    expect(computeEinstufung(f, t('2026-09-22 15:29:59'), 30)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 15:00:00'), 30)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 14:59:59'), 30)).toBe('planmaessig');
   });
   it('liest die Wire-Zeit als UTC, nicht als Ortszeit', () => {
     // Gegen einen absoluten Zeitpunkt geprüft: ein Ortszeit-Lesen verschöbe sonst beide Seiten gleich.
-    expect(computeEinstufung(f, dayjs('2026-09-22T15:29:00Z'))).toBe('vorwarnung');
+    expect(computeEinstufung(f, dayjs('2026-09-22T15:29:00Z'), 30)).toBe('vorwarnung');
+  });
+  it('die Vorwarnung kommt aus der Schicht, nicht aus einer festen Zahl (LLH-1122)', () => {
+    // Spiegel von `einstufung_mit_eigener_vorwarnung` in `src/abloesung/mod.rs`.
+    expect(computeEinstufung(f, t('2026-09-22 14:45:00'), 45)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 14:44:59'), 45)).toBe('planmaessig');
+    expect(computeEinstufung(f, t('2026-09-22 14:45:00'), 30)).toBe('planmaessig');
   });
   it('unlesbar gilt als überfällig', () => {
-    expect(computeEinstufung('kaputt', t('2026-09-22 10:00:00'))).toBe('ueberfaellig');
+    expect(computeEinstufung('kaputt', t('2026-09-22 10:00:00'), 30)).toBe('ueberfaellig');
   });
 });
 
@@ -55,6 +61,15 @@ describe('countFaellige', () => {
       schicht({ id: 4, faellig_at: '2026-09-22 15:00:00', status: 'abgeloest' }),
     ];
     expect(countFaellige(liste, jetzt)).toBe(2);
+  });
+  it('rechnet je Schicht mit ihrer Vorwarnung (LLH-1122)', () => {
+    const jetzt = t('2026-09-22 15:10:00');
+    const liste = [
+      // In 50 min fällig: mit 60 min Vorwarnung schon fällig, mit 30 min noch nicht.
+      schicht({ id: 1, faellig_at: '2026-09-22 16:00:00', vorwarnung_minuten: 60 }),
+      schicht({ id: 2, faellig_at: '2026-09-22 16:00:00', vorwarnung_minuten: 30 }),
+    ];
+    expect(countFaellige(liste, jetzt)).toBe(1);
   });
 });
 

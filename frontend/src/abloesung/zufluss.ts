@@ -29,7 +29,7 @@
  */
 import type { Dayjs } from 'dayjs';
 import type { Abloesung, AbloesungEinstufung } from '../api/types';
-import { computeEinstufung, countFaellige } from './einstufung';
+import { countFaellige, einstufungOf } from './einstufung';
 
 export interface Zuflussstand {
   /**
@@ -176,7 +176,7 @@ function faelligUntenGehalten(folge: readonly Abloesung[], jetzt: Dayjs): number
   let mildesteDarueber = Infinity;
   let n = 0;
   for (const s of folge) {
-    const stufe = DRINGLICHKEIT[computeEinstufung(s.faellig_at, jetzt)];
+    const stufe = DRINGLICHKEIT[einstufungOf(s, jetzt)];
     if (stufe > 0 && mildesteDarueber < stufe) n += 1;
     mildesteDarueber = Math.min(mildesteDarueber, stufe);
   }
