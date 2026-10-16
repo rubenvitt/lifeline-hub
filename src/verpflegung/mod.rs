@@ -27,8 +27,16 @@
 //! optional per `verpflegungsstelle_id` auf eine Stelle. Dazu die Verpflegungsart (warm, kalt,
 //! Getränke) am Zeitfenster, nur Anzeige.
 //!
+//! **Verpflegungsplan und Tag aus der Vorlage** (LLH-1058, [`vorlage`]): je Organisation eine
+//! Liste von Mahlzeiten mit Uhrzeit ohne Datum ([`crate::uhrzeit::Uhrzeit`]). Daraus legt
+//! `repo::zeitfenster_aus_vorlage_tx` die Zeitfenster eines Einsatztages in einer Transaktion
+//! an, je Fenster ein ETB-Eintrag wie beim Einzelanlegen; gleichnamige Fenster, die an diesem
+//! Tag schon beginnen, werden übersprungen. Die Uhrzeiten auf den Tag in der Anzeigezone legt
+//! der Client; ein angelegtes Zeitfenster kennt seine Vorlage nicht, eine Serie gibt es nicht.
+//!
 //! Spec: `openspec/specs/kraefte-verpflegung/spec.md` (Herleitung
-//! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040).
+//! `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`, Stellen LLH-1040,
+//! Verpflegungsplan LLH-1058).
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;

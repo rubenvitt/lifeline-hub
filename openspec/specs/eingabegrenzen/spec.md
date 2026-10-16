@@ -293,3 +293,27 @@ Gespeicherte Werte über der Grenze MUST lesbar bleiben.
 #### Scenario: Replay einer alten Ausgabe mit langem Ort
 - **WHEN** eine Ausgabe mit einem Ort von 600 Zeichen vor Einführung der Grenze gespeichert wurde und dieselbe Ausgabe mit ihrer `client_id` erneut eintrifft
 - **THEN** antwortet der Server mit 201 und der gespeicherten Ausgabe, nicht mit 400
+
+### Requirement: Verpflegungsplan und Tagesanlage sind begrenzt
+Die Bezeichnung einer Mahlzeit im Verpflegungsplan und die Bezeichnung jedes Zeitfensters beim
+Anlegen eines Tages aus der Vorlage MUST nach dem Trimmen höchstens 200 Zeichen lang sein. Eine
+Anfrage „Tag aus der Vorlage anlegen“ MUST höchstens 24 Zeitfenster enthalten. Eine Verletzung
+MUST mit 400 abgelehnt werden, bevor etwas geschrieben wird und vor jeder Prüfung des
+Zusammenhangs (422), auch eines anderen Zeitfensters derselben Anfrage. Die Masken MUST nicht
+mehr zulassen als der Server.
+
+#### Scenario: Zu lange Bezeichnung einer Mahlzeit
+- **WHEN** der Admin eine Mahlzeit mit einer Bezeichnung aus 201 Zeichen anlegt
+- **THEN** antwortet der Server mit 400 und legt nichts an
+
+#### Scenario: Zu viele Zeitfenster
+- **WHEN** ein Tag aus der Vorlage mit 25 Zeitfenstern angelegt werden soll
+- **THEN** antwortet der Server mit 400, und weder Zeitfenster noch ETB-Einträge entstehen
+
+#### Scenario: Grenze vor dem Zusammenhang
+- **WHEN** in einer Anfrage das erste Zeitfenster außerhalb des Tages beginnt und das dritte eine Bezeichnung aus 201 Zeichen trägt
+- **THEN** antwortet der Server mit 400, nicht mit 422
+
+#### Scenario: Maske der Mahlzeit
+- **WHEN** der Admin im Dialog einer Mahlzeit mehr als 200 Zeichen als Bezeichnung eingibt
+- **THEN** sendet die Maske den Wert nicht und kürzt ihn nicht still
