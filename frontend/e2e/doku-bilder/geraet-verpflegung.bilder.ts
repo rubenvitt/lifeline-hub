@@ -14,19 +14,22 @@ import {
  * Bilder des Kapitels „Verpflegung“ (`docs/anwender/kapitel/geraet-verpflegung.md`): ein Tablet an
  * der Essensausgabe, Kontext Tablet, eigener Browserkontext wie in `e2e/geraet-kopplung.spec.ts`.
  * Der Demo-Einsatz hat keine Zeitfenster; zwei legt die Spec als Einsatzleitung über die API an,
- * dazu eine erste Ausgabe (D3).
+ * dazu zwei aktive Verpflegungsstellen (LLH-1040; „Ausgabe Gesamtschule“ dem Mittagessen
+ * zugeordnet, „Ausgabe Turnhalle Nord“ nicht) und eine erste Ausgabe an der Gesamtschule (D3).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-verpflegung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitfenster.png        frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx
  *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/geraet/GeraeteLayout.tsx
- *                          (Tablet, offene Sammlung, ein ausstehender Eintrag ohne Netz)
+ *                          (Tablet, Stellenwahl mit der zugeordneten Stelle, offene Sammlung, ein
+ *                          ausstehender Eintrag ohne Netz)
  *   fehlmenge.png          frontend/src/geraet/GeraetMeldungenPage.tsx (vorbefüllt aus der Verpflegung)
  */
 
 const KAPITEL = 'geraet-verpflegung';
 const MITTAG = 'Mittagessen';
 const ABEND = 'Abendessen';
+const STELLE = 'Ausgabe Gesamtschule';
 
 /** Zwei Zeitfenster (eines läuft, eines steht an) und eine Ausgabe, einmal je Lauf. */
 async function zeitfensterAnlegen(page: Page, einsatz: number) {
@@ -37,6 +40,17 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
   if (stand.zeitfenster.some((z) => z.bezeichnung === MITTAG)) return;
   const stunde = 3_600_000;
   const jetzt = Date.now();
+  const stelle = async (bezeichnung: string, standort: string) => {
+    const { id } = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
+      bezeichnung,
+      art: 'ausgabestelle',
+      standort,
+    });
+    await fuelle(page, 'post', `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    return id;
+  };
+  const gesamtschule = await stelle(STELLE, 'Gesamtschule, Mensa');
+  await stelle('Ausgabe Turnhalle Nord', 'Turnhalle Nord');
   const mittag = await fuelle<{ id: number }>(page, 'post', `${basis}/zeitfenster`, {
     bezeichnung: MITTAG,
     von_at: new Date(jetzt - stunde).toISOString(),
@@ -45,9 +59,13 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
     bedarf_betreute: 90,
     sonderkost: { vegetarisch: 12 },
   });
+  await fuelle(page, 'patch', `${basis}/zeitfenster/${mittag.id}`, {
+    stelle_ids: [gesamtschule],
+    verpflegungsart: 'warm',
+  });
   await fuelle(page, 'post', `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
     menge: 80,
-    ort: 'Gesamtschule, Mensa',
+    verpflegungsstelle_id: gesamtschule,
     sonderkost: { vegetarisch: 6 },
   });
   await fuelle(page, 'post', `${basis}/zeitfenster`, {
@@ -105,7 +123,13 @@ test.describe(KAPITEL, () => {
       await mittag.getByRole('button', { name: /^Ausgabe nachtragen zu / }).click();
       const dialog = geraet.getByRole('dialog', { name: `Ausgabe nachtragen: ${MITTAG}` });
       await dialog.getByLabel('Menge (EP)').fill('40');
-      await dialog.getByLabel('Ort').fill('Gesamtschule, Aula');
+      // An der Stelle statt an einem Ort („Zuführungsziel“ steht nur ohne Stelle).
+      await dialog.getByRole('combobox', { name: 'Stelle' }).click();
+      await geraet
+        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+        .locator(`.ant-select-item-option[title="${STELLE}"]`)
+        .click();
+      await expect(dialog.getByLabel('Zuführungsziel')).toHaveCount(0);
       await dialog.getByRole('button', { name: 'Nachtragen', exact: true }).click();
       await expect(dialog).toHaveCount(0);
 
@@ -127,6 +151,11 @@ test.describe(KAPITEL, () => {
       await mittag.getByRole('link', { name: /^Ausgabe öffnen zu / }).click();
       await expect(geraet).toHaveURL(/\/geraet\/\d+\/verpflegung\/\d+\/ausgabe$/);
       await expect(geraet.getByRole('heading', { level: 1, name: MITTAG })).toBeVisible();
+      // Die einzige zugeordnete Stelle ist vorgewählt, ihr Ist steht daneben.
+      await expect(geraet.locator('[data-lfh="ausgabe-stelle"] .ant-select')).toContainText(STELLE);
+      await expect(geraet.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText(
+        'an der Stelle 80 EP',
+      );
       const plus1 = geraet.locator('[data-lfh="zaehltasten"]').getByRole('button', {
         name: '+1',
         exact: true,
