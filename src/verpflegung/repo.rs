@@ -879,7 +879,8 @@ pub async fn zeitfenster_aus_vorlage_tx(
     // Überspringen (D5): Bezeichnungen der Zeitfenster, die an diesem Tag beginnen. Die
     // Zeitpunkte liegen im Drahtformat vor, als Text sortiert das richtig.
     let vorhanden: std::collections::HashSet<String> = sqlx::query_scalar::<_, String>(
-        "SELECT bezeichnung FROM verpflegung_zeitfenster          WHERE einsatz_id = ? AND von_at >= ? AND von_at < ?",
+        "SELECT bezeichnung FROM verpflegung_zeitfenster \
+         WHERE einsatz_id = ? AND von_at >= ? AND von_at < ?",
     )
     .bind(einsatz_id)
     .bind(crate::zeit::formatiere_utc(tag_von))
