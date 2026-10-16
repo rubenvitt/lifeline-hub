@@ -133,6 +133,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   setzeOnline(true);
   await queueLeerenFuerTests();
 });
@@ -206,6 +207,9 @@ describe('AusgabeAnsicht — Tasten und Sonderkost (D2, D4, D9)', () => {
   });
 
   it('„Menge …“ nimmt bei Sammlung 10 keine 99 995 an; es geht keine Anfrage hinaus', async () => {
+    // Die Uhr steht: Unter Last dauert das Tippen sonst länger als die Ruhe (RUHE_MS), und die
+    // Sammlung bucht, bevor der Dialog prüft.
+    vi.useFakeTimers({ toFake: ['Date'] });
     zeige();
     await geladen();
     await userEvent.click(taste('+10'));
@@ -387,8 +391,9 @@ describe('AusgabeAnsicht — ohne Netz (LLH-1032, AK 2)', () => {
     setzeOnline(false);
     await waitFor(() => expect(band).toHaveTextContent('Offline vorgemerkt'));
     for (let i = 0; i < 3; i++) await userEvent.click(taste('+1'));
+    // Die Sammlung schließt erst nach der Ruhe (RUHE_MS = 3 s); unter Last braucht der Rest länger.
     expect(
-      await screen.findByText(/Offline vorgemerkt: 3 EP zu ‚Mittag‘/, {}, { timeout: 5000 }),
+      await screen.findByText(/Offline vorgemerkt: 3 EP zu ‚Mittag‘/, {}, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(erfasseAusgabe).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
