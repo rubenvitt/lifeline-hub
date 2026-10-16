@@ -2096,3 +2096,416 @@ async fn replay_nach_aufloesen_der_stelle() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
 }
+
+// ── Empfänger (LLH-1055) ────────────────────────────────────────────────────────────────────
+
+/// Bildet eine Einheit mit beliebigem Body; liefert ihre id.
+async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, body: &Value) -> i64 {
+    let (s, j) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Einheit: {j:?}");
+    j["id"].as_i64().unwrap()
+}
+
+async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Abschnitt: {j:?}");
+    j["id"].as_i64().unwrap()
+}
+
+/// Ordnet eine disponierte Kraft der Einheit zu.
+async fn kraft_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, einheit: i64, ep: i64) {
+    let (s, j) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{ep}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Kraft zuordnen: {j:?}");
+}
+
+/// Löst eine Einheit auf (mit Spur bleibt sie stehen, ohne wird sie gelöscht).
+async fn einheit_aufloesen(app: &axum::Router, cookie: &str, einsatz: i64, einheit: i64) {
+    let (s, j) = anfrage(
+        app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Einheit auflösen: {j:?}");
+}
+
+/// Modul-Override für ein beliebiges Modul des Einsatzes.
+async fn modul_override(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    modul: &str,
+    sichtbar: bool,
+    rolle: Option<&str>,
+) {
+    let rolle = rolle.map_or("null".to_string(), |r| format!(r#""{r}""#));
+    let (s, j) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        cookie,
+        Some(&format!(
+            r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override {modul}: {j:?}");
+}
+
+/// Spec „Abholung durch eine Einheit“, „Zuführung an einen Abschnitt“: 201, die Ausgabe trägt
+/// die Kennung ihres Empfängers und zählt in die ausgegebene Menge; kein ETB-Eintrag.
+#[tokio::test]
+async fn ausgabe_an_einheit_und_abschnitt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    let deich = abschnitt(&app, &admin, e, "Deich").await;
+    let etb_vorher = etb_eintraege(&app, &admin, e).await.len();
+
+    let a = ausgabe(
+        &app,
+        &admin,
+        e,
+        zid,
+        &serde_json::json!({ "menge": 9, "einheit_id": gruppe }).to_string(),
+    )
+    .await;
+    let aid = a["ausgabe_id"].as_i64().unwrap();
+    let z = ausgabe(
+        &app,
+        &admin,
+        e,
+        zid,
+        &serde_json::json!({ "menge": 40, "abschnitt_id": deich }).to_string(),
+    )
+    .await;
+    let zid_ausgabe = z["ausgabe_id"].as_i64().unwrap();
+    assert_eq!(z["zeitfenster"]["ausgegeben"]["gesamt"], 49);
+    let ausgaben = z["zeitfenster"]["ausgaben"].as_array().unwrap();
+    let von = |id: i64| ausgaben.iter().find(|x| x["id"] == id).unwrap().clone();
+    assert_eq!(von(aid)["einheit_id"], gruppe);
+    assert!(!von(aid).as_object().unwrap().contains_key("abschnitt_id"));
+    assert_eq!(von(zid_ausgabe)["abschnitt_id"], deich);
+    assert!(!von(zid_ausgabe)
+        .as_object()
+        .unwrap()
+        .contains_key("einheit_id"));
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        etb_vorher,
+        "eine Ausgabe schreibt auch mit Empfänger kein ETB"
+    );
+}
+
+/// Spec „Zwei Empfänger“, „Menge und zwei Empfänger fehlerhaft“, „Einheit eines anderen
+/// Einsatzes“, „Abschnitt eines anderen Einsatzes“, „Aufgelöste Einheit“, „Vor der Auflösung
+/// offline gebucht“ (design.md D2). Nichts Abgelehntes wird angelegt.
+#[tokio::test]
+async fn ausgabe_empfaenger_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen_mit(&app, &admin, "Andere Lage").await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    let leer = einheit_bilden(&app, &admin, e, "Leere Gruppe").await;
+    let deich = abschnitt(&app, &admin, e, "Deich").await;
+    let fremde_einheit = einheit_bilden(&app, &admin, e2, "Fremde Gruppe").await;
+    let fremder_abschnitt = abschnitt(&app, &admin, e2, "Fremder Abschnitt").await;
+    let geloescht = einheit_bilden(&app, &admin, e, "Fehlanlage").await;
+    einheit_aufloesen(&app, &admin, e, geloescht).await;
+
+    let post = |body: Value| {
+        let app = app.clone();
+        let admin = admin.clone();
+        let url = url.clone();
+        async move { anfrage_json(&app, "POST", &url, &admin, Some(&body)).await }
+    };
+    for (body, erwartet, was) in [
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": gruppe, "abschnitt_id": deich }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "zwei Empfänger",
+        ),
+        (
+            serde_json::json!({ "menge": 0, "einheit_id": gruppe, "abschnitt_id": deich }),
+            StatusCode::BAD_REQUEST,
+            "zwei Empfänger mit Menge 0",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": fremde_einheit }),
+            StatusCode::NOT_FOUND,
+            "fremde Einheit",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": 999_999 }),
+            StatusCode::NOT_FOUND,
+            "unbekannte Einheit",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "abschnitt_id": fremder_abschnitt }),
+            StatusCode::NOT_FOUND,
+            "fremder Abschnitt",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "abschnitt_id": 999_999 }),
+            StatusCode::NOT_FOUND,
+            "unbekannter Abschnitt",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": geloescht }),
+            StatusCode::NOT_FOUND,
+            "gelöschte leere Einheit",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": "zwei" }),
+            StatusCode::BAD_REQUEST,
+            "falscher Typ",
+        ),
+    ] {
+        let (s, j) = post(body).await;
+        assert_eq!(s, erwartet, "{was}: {j:?}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(
+        u["zeitfenster"][0]["ausgaben"].as_array().unwrap().len(),
+        0,
+        "nichts angelegt"
+    );
+
+    // Stärke 0 und ohne Eintreffen: angenommen.
+    let (s, j) = post(serde_json::json!({ "menge": 3, "einheit_id": leer })).await;
+    assert_eq!(s, StatusCode::CREATED, "Einheit mit Stärke 0: {j:?}");
+
+    // Aufgelöst: die erste Ausgabe ist ihre Spur, die Einheit bleibt als aufgelöst stehen.
+    let (s, _) = post(serde_json::json!({
+        "menge": 9, "einheit_id": gruppe, "zeitpunkt_at": "2026-09-24T10:10:00Z"
+    }))
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    einheit_aufloesen(&app, &admin, e, gruppe).await;
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let auf = u["empfaenger"]["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == gruppe)
+        .expect("aufgelöste Einheit mit Ausgabe steht in der Empfängerliste")["aufgeloest_at"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let auf = chrono::NaiveDateTime::parse_from_str(&auf, "%Y-%m-%d %H:%M:%S").unwrap();
+    let um = |t: chrono::NaiveDateTime| {
+        serde_json::json!({
+            "menge": 9,
+            "einheit_id": gruppe,
+            "zeitpunkt_at": t.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        })
+    };
+    for (t, erwartet, was) in [
+        (auf, StatusCode::CONFLICT, "genau die Auflösung"),
+        (
+            auf + chrono::Duration::minutes(10),
+            StatusCode::CONFLICT,
+            "aufgelöst danach",
+        ),
+        (
+            auf - chrono::Duration::minutes(10),
+            StatusCode::CREATED,
+            "aufgelöst davor",
+        ),
+    ] {
+        let (s, j) = post(um(t)).await;
+        assert_eq!(s, erwartet, "{was}: {j:?}");
+    }
+}
+
+/// Spec „Replay nach dem Auflösen“: Eine Ausgabe an eine Einheit, die danach aufgelöst wurde,
+/// kommt mit derselben `client_id` als 201 mit der gespeicherten Ausgabe zurück, ohne
+/// Live-Ereignis.
+#[tokio::test]
+async fn replay_mit_empfaenger_nach_aufloesen() {
+    use lifeline_hub::live::LiveEvent;
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    let body =
+        serde_json::json!({ "menge": 9, "einheit_id": gruppe, "client_id": "v6" }).to_string();
+    let erst = ausgabe(&app, &admin, e, zid, &body).await;
+    einheit_aufloesen(&app, &admin, e, gruppe).await;
+
+    let mut rx = live.abonniere(e);
+    let wieder = ausgabe(&app, &admin, e, zid, &body).await;
+    assert_eq!(wieder["ausgabe_id"], erst["ausgabe_id"]);
+    assert_eq!(wieder["zeitfenster"]["ausgegeben"]["gesamt"], 9);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), rx.recv())
+            .await
+            .map(|n| n.unwrap().event != LiveEvent::Verpflegung)
+            .unwrap_or(true),
+        "ein Replay verteilt nichts"
+    );
+    let neu =
+        serde_json::json!({ "menge": 9, "einheit_id": gruppe, "client_id": "v7" }).to_string();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &admin,
+        Some(&neu),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "Gegenprobe: neue Ausgabe nach der Auflösung"
+    );
+}
+
+/// Spec „Keine Personenangaben“ (design.md D3): Die Empfängerliste trägt je Einheit genau die
+/// Schlüssel der Projektion. Führer, Erreichbarkeit, Kommunikationsmittel, Bemerkung und
+/// Mitglieder fehlen, und kein Personenname steht im Antworttext.
+#[tokio::test]
+async fn empfaengerliste_ohne_personenangaben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let deich = abschnitt(&app, &admin, e, "Deich").await;
+    let fuehrer = stammpersonal_disponieren(&app, &admin, e, "Adalbert Zugführer").await;
+    let mitglied = stammpersonal_disponieren(&app, &admin, e, "Mechthild Mitglied").await;
+    let zug = einheit_bilden(&app, &admin, e, "Florian 1").await;
+    let gruppe = einheit_mit(
+        &app,
+        &admin,
+        e,
+        &serde_json::json!({
+            "name": "2. Gruppe",
+            "funkrufname": "Florian Hannover 2",
+            "ueber_einheit_id": zug,
+            "abschnitt_id": deich,
+            "erreichbarkeit": "0171 4711815",
+            "kommunikationsmittel": "mobil",
+            "bemerkung": "Bemerkung Kanarienvogel",
+        }),
+    )
+    .await;
+    kraft_zuordnen(&app, &admin, e, gruppe, fuehrer).await;
+    kraft_zuordnen(&app, &admin, e, gruppe, mitglied).await;
+    let (s, j) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/einheiten/{gruppe}"),
+        &admin,
+        Some(&serde_json::json!({ "fuehrer_id": fuehrer })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Einheitsführer setzen: {j:?}");
+    assert_eq!(j["fuehrer_name"], "Adalbert Zugführer", "Vorbedingung");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/einheiten/{gruppe}/zeitachse"),
+        &admin,
+        Some(r#"{"art":"eintreffen","zeitpunkt_at":"2026-09-24T04:40:00Z"}"#),
+    )
+    .await;
+    assert!(s.is_success(), "Eintreffen nachtragen: {j:?}");
+
+    let (s, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let einheiten = u["empfaenger"]["einheiten"].as_array().unwrap();
+    let g = einheiten.iter().find(|x| x["id"] == gruppe).unwrap();
+    let mut schluessel: Vec<&str> = g.as_object().unwrap().keys().map(String::as_str).collect();
+    schluessel.sort_unstable();
+    assert_eq!(
+        schluessel,
+        [
+            "abschnitt_id",
+            "abschnitt_name",
+            "eintreffen_at",
+            "funkrufname",
+            "id",
+            "ist",
+            "ist_kumuliert",
+            "name",
+            "ueber_einheit_id",
+        ],
+        "genau die Felder der Projektion (aufgeloest_at nur bei aufgelösten)"
+    );
+    assert_eq!(g["name"], "2. Gruppe");
+    assert_eq!(g["ist"]["mannschaft"], 2);
+    assert_eq!(g["eintreffen_at"], "2026-09-24 04:40:00");
+    let abschnitte = u["empfaenger"]["abschnitte"].as_array().unwrap();
+    assert_eq!(abschnitte.len(), 1);
+    let mut schluessel: Vec<&str> = abschnitte[0]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    schluessel.sort_unstable();
+    assert_eq!(schluessel, ["id", "name"]);
+    let text = u["empfaenger"].to_string();
+    for verboten in ["Adalbert", "Mechthild", "4711815", "mobil", "Kanarienvogel"] {
+        assert!(!text.contains(verboten), "{verboten:?} in {text}");
+    }
+}
+
+/// Spec „Leser ohne Modul Einheiten“: Wer die Verpflegung lesen darf, bekommt die Namen der
+/// Einheiten in der Empfängerliste; die Einheitenliste bleibt ihm 403 (bewusste Ausnahme von D4).
+#[tokio::test]
+async fn empfaengerliste_ohne_modul_einheiten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    modul_override(&app, &admin, e, "einheiten", true, Some("fuehrungskraft")).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Einheitenliste bleibt verschlossen"
+    );
+    let (s, u) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(u["empfaenger"]["einheiten"][0]["name"], "2. Gruppe");
+}

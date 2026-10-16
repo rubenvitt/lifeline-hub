@@ -953,6 +953,10 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "Ein Verteiler nennt die Einheit",
     ),
     (
+        "SELECT EXISTS(SELECT 1 FROM verpflegung_ausgabe WHERE einheit_id = ?)",
+        "Eine Verpflegungsausgabe nennt die Einheit",
+    ),
+    (
         "SELECT EXISTS(SELECT 1 FROM einsatz_personal WHERE einheit_id = ?)",
         "Der Einheit gehört Personal an",
     ),
@@ -968,7 +972,8 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
 
 /// Der erste Grund, warum eine Einheit nicht spurlos gelöscht werden darf (design.md D3): eine
 /// Zeitachse, eine Schicht der Ablösung, eine ETB-Verknüpfung, eine Belegung eines
-/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler oder eine (auch
+/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler, eine (auch
+/// zurückgenommene) Verpflegungsausgabe an sie (LLH-1055, design.md D9) oder eine (auch
 /// beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
 pub async fn find_spur_tx(
     conn: &mut SqliteConnection,
@@ -2478,5 +2483,103 @@ mod tests {
             Some(einheit),
             "der Empfänger nennt die aufgelöste Einheit weiter"
         );
+    }
+
+    /// Eine zurückgenommene Verpflegungsausgabe an die Einheit `einheit`; liefert die Ausgabe.
+    async fn verpflegungsausgabe_an(pool: &SqlitePool, einsatz: i64, b: i64, einheit: i64) -> i64 {
+        let zf: i64 = sqlx::query_scalar(
+            "INSERT INTO verpflegung_zeitfenster \
+                (einsatz_id, bezeichnung, von_at, bis_at, bedarf_kraefte, bedarf_betreute, \
+                 angelegt_von_id) \
+             VALUES (?, 'Mittag', '2026-10-13 10:00:00', '2026-10-13 11:30:00', 9, 0, ?) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query_scalar(
+            "INSERT INTO verpflegung_ausgabe \
+                (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, erfasst_von_id, einheit_id, \
+                 zurueckgenommen_at, zurueckgenommen_von_id) \
+             VALUES (?, ?, '2026-10-13 10:10:00', 9, ?, ?, '2026-10-13 10:12:00', ?) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(zf)
+        .bind(b)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1055, Spec `kraefte-entlassung` „Verpflegte Einheit bleibt“: eine Einheit ohne andere
+    /// Spur, an die eine (auch zurückgenommene) Verpflegungsausgabe ging, wird aufgelöst statt
+    /// gelöscht, und die Ausgabe nennt sie weiter.
+    #[tokio::test]
+    async fn aufloesen_behaelt_den_verpflegungsempfaenger() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("2. Gruppe", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let ausgabe = verpflegungsausgabe_an(&pool, einsatz, b, e.id).await;
+
+        let r = aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        assert!(!r.geloescht, "{r:?}");
+        assert!(exists(&pool, e.id).await);
+        let empfaenger: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM verpflegung_ausgabe WHERE id = ?")
+                .bind(ausgabe)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            empfaenger,
+            Some(e.id),
+            "die Ausgabe nennt die Einheit weiter"
+        );
+    }
+
+    /// LLH-1055, Spec „Verpflegte Einheit stornieren“: 422 mit dem Grund, dass eine
+    /// Verpflegungsausgabe die Einheit nennt; die Einheit bleibt unverändert.
+    #[tokio::test]
+    async fn stornieren_mit_verpflegungsausgabe_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("2. Gruppe", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        verpflegungsausgabe_an(&pool, einsatz, b, e.id).await;
+
+        match aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Stornieren).await {
+            Err(AppError::UnprocessableEntity(m)) => assert_eq!(
+                m,
+                "Eine Verpflegungsausgabe nennt die Einheit; die Einheit lässt sich nur auflösen"
+            ),
+            r => panic!("{r:?}"),
+        }
+        assert!(laden(&pool, einsatz, e.id)
+            .await
+            .unwrap()
+            .aufgeloest_at
+            .is_none());
     }
 }

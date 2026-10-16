@@ -1339,6 +1339,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
             retain("client_id", G_IDEMPOTENZ),
             retain("verpflegungsstelle_id", G_FK),
+            // Empfänger (LLH-1055, design.md D10): nur Kennungen; Einheiten- und
+            // Abschnittsnamen folgen ihren eigenen Regeln.
+            retain("einheit_id", G_FK),
+            retain("abschnitt_id", G_FK),
         ],
     },
     // Abgeschlossene Lagebesprechungen. `entschluss` wird gescrubbt wie
