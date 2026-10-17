@@ -257,13 +257,14 @@ async fn uebersicht_bietet_alle_ansichten() {
     assert_eq!(
         v["ansichten"],
         json!([
-            {"ansicht": "uhs-tablet", "stellenart": "uhs"},
-            {"ansicht": "uhs-laptop", "stellenart": "uhs"},
-            {"ansicht": "lagemonitor", "stellenart": null},
-            {"ansicht": "betreuungsstelle", "stellenart": "betreuungsstelle"},
-            {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
-            {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
-            {"ansicht": "verpflegung", "stellenart": null},
+            {"ansicht": "uhs-tablet", "stellenart": "uhs", "stelle_pflicht": true},
+            {"ansicht": "uhs-laptop", "stellenart": "uhs", "stelle_pflicht": true},
+            {"ansicht": "lagemonitor", "stellenart": null, "stelle_pflicht": false},
+            {"ansicht": "betreuungsstelle", "stellenart": "betreuungsstelle", "stelle_pflicht": true},
+            {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum", "stelle_pflicht": true},
+            {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt", "stelle_pflicht": true},
+            // LLH-1048: die Verpflegung bindet wahlweise an eine Verpflegungsstelle.
+            {"ansicht": "verpflegung", "stellenart": "verpflegungsstelle", "stelle_pflicht": false},
         ])
     );
 }
@@ -4585,29 +4586,460 @@ fn schluessel(v: &Value, alle: &mut Vec<String>) {
     }
 }
 
-/// Das Verpflegungsgerät ist einsatzweit: eine Stelle lehnt die Kopplung ab, ohne Stelle koppelt
-/// es mit der Rolle zum Schreiben.
+/// Legt eine Verpflegungsstelle an und setzt sie auf `status` (`geplant` bleibt so).
+async fn verpflegungsstelle(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    bezeichnung: &str,
+    status: &str,
+) -> i64 {
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung/stellen");
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &basis,
+        cookie,
+        Some(&json!({"bezeichnung": bezeichnung, "art": "feldkueche"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let sid = v["id"].as_i64().unwrap();
+    let schritte: &[&str] = match status {
+        "geplant" => &[],
+        "aktiv" => &["aktiv"],
+        "aufgeloest" => &["aktiv", "aufgeloest"],
+        _ => panic!("Status {status}"),
+    };
+    for st in schritte {
+        let (s, v) = anfrage_json(
+            app,
+            "POST",
+            &format!("{basis}/{sid}/status"),
+            cookie,
+            Some(&json!({"status": st})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    sid
+}
+
+/// Ein Verpflegungsgerät an der Verpflegungsstelle `stelle` (LLH-1048): `(kopplung_id, cookie)`.
+async fn verpflegungsgeraet_an(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    stelle: i64,
+) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": stelle, "bezeichnung": "Tresen"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+/// LLH-1048 (LLH-1024 F7): Die Verpflegung bindet wahlweise. Ohne Stelle koppelt das Gerät
+/// einsatzweit wie bisher; mit Stelle nur an eine geplante oder aktive Verpflegungsstelle des
+/// eigenen Einsatzes, und es trägt deren Namen.
 #[tokio::test]
-async fn verpflegungsgeraet_ist_an_keine_stelle_gebunden() {
+async fn verpflegungsgeraet_bindet_wahlweise_an_eine_verpflegungsstelle() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Anderer").await;
 
-    let (s, v) = anlegen(
-        &app,
-        &admin,
-        einsatz,
-        json!({"ansicht": "verpflegung", "stelle_id": uhs, "bezeichnung": "Ausgabe"}),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
-
+    // Ohne Stelle: einsatzweit wie bisher.
     let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
     let (s, ich) = me(&app, &geraet).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(ich["geraet"]["ansicht"], "verpflegung");
     assert!(ich["geraet"]["stelle_id"].is_null(), "{ich}");
+
+    let fremd = verpflegungsstelle(&app, &admin, anderer, "Küche Anderswo", "aktiv").await;
+    let storniert = verpflegungsstelle(&app, &admin, einsatz, "Fehlanlage", "geplant").await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{storniert}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let aufgeloest = verpflegungsstelle(&app, &admin, einsatz, "Alte Küche", "aufgeloest").await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    for (stelle, erwartet) in [
+        (fremd, StatusCode::NOT_FOUND),
+        (storniert, StatusCode::CONFLICT),
+        (aufgeloest, StatusCode::UNPROCESSABLE_ENTITY),
+        // Eine UHS ist keine Verpflegungsstelle.
+        (uhs + 1000, StatusCode::NOT_FOUND),
+    ] {
+        let (s, v) = anlegen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"ansicht": "verpflegung", "stelle_id": stelle, "bezeichnung": "Tresen"}),
+        )
+        .await;
+        assert_eq!(s, erwartet, "Stelle {stelle}: {v}");
+    }
+
+    // Eine geplante Stelle nimmt die Kopplung (ein vergessenes „In Betrieb nehmen“ blockiert
+    // den Tresen nicht, wie beim Buchen).
+    let kueche =
+        verpflegungsstelle(&app, &admin, einsatz, "Feldküche BR Sportplatz", "geplant").await;
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": kueche, "bezeichnung": "Tresen"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["kopplung"]["stelle_id"], kueche);
+    assert_eq!(v["kopplung"]["stelle"], "Feldküche BR Sportplatz");
+    assert_eq!(
+        v["kopplung"]["anzeigename"],
+        "Feldküche BR Sportplatz · Tresen"
+    );
+    assert!(v["kopplung"]["uhs_id"].is_null(), "{v}");
+    let a = koppeln(&app, v["code"]["code"].as_str().unwrap(), None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    let (s, ich) = me(&app, &a.cookie.unwrap()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["stelle_id"], kueche);
+    assert_eq!(ich["geraet"]["stelle"], "Feldküche BR Sportplatz");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Feldküche BR Sportplatz · Tresen") && t.contains("Verpflegung")),
+        "{etb:?}"
+    );
+}
+
+/// Ein Zeitfenster mit Beginn `stunde` Uhr (UTC) am 08.10., Bedarf 100, an diesen Stellen.
+async fn zeitfenster_an(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    bezeichnung: &str,
+    stunde: u32,
+    stellen: &[i64],
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster"),
+        cookie,
+        Some(&json!({
+            "bezeichnung": bezeichnung,
+            "von_at": format!("2026-10-08T{stunde:02}:00:00Z"),
+            "bis_at": format!("2026-10-08T{stunde:02}:45:00Z"),
+            "bedarf_kraefte": 100,
+            "bedarf_betreute": 0,
+            "stelle_ids": stellen,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+fn kennungen(v: &Value, feld: &str) -> Vec<i64> {
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x[feld].as_i64().unwrap())
+        .collect()
+}
+
+/// LLH-1048: Ein Gerät an der Feldküche sieht die Zeitfenster der Feldküche und die
+/// einsatzweiten, im Einzelnen nur die Ausgaben der Feldküche und den Rest als Summe je Einheit
+/// (`verpflegt_anderswo`, Feldmenge gepinnt). Es bucht jede Ausgabe an der Feldküche (ohne
+/// Angabe setzt der Server sie, eine andere Stelle ist 403), ein Zeitfenster nur fremder Stellen
+/// gibt es für es nicht (404), fremde Ausgaben nimmt es nicht zurück (404). Ein Replay bleibt
+/// stabil.
+#[tokio::test]
+async fn verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "aktiv").await;
+    let turnhalle = verpflegungsstelle(&app, &admin, einsatz, "Turnhalle", "aktiv").await;
+    let z_kueche = zeitfenster_an(&app, &admin, einsatz, "Früh", 6, &[kueche]).await;
+    let z_turnhalle = zeitfenster_an(&app, &admin, einsatz, "Vormittag", 9, &[turnhalle]).await;
+    let z_einsatzweit = zeitfenster_an(&app, &admin, einsatz, "Mittag", 12, &[]).await;
+    let z_beide = zeitfenster_an(&app, &admin, einsatz, "Abend", 18, &[turnhalle, kueche]).await;
+    let gruppe1 = einheit_bilden(&app, &admin, einsatz, "1. Gruppe").await;
+    let gruppe2 = einheit_bilden(&app, &admin, einsatz, "2. Gruppe").await;
+
+    let buche = |cookie: String, zid: i64, body: Value| {
+        let app = app.clone();
+        let pfad = format!("{basis}/zeitfenster/{zid}/ausgaben");
+        async move { anfrage_json(&app, "POST", &pfad, &cookie, Some(&body)).await }
+    };
+    // Die Leitung bucht am Abend an beiden Stellen und ohne Stelle.
+    for body in [
+        json!({"menge": 30, "verpflegungsstelle_id": turnhalle, "einheit_id": gruppe1}),
+        json!({"menge": 10, "einheit_id": gruppe1}),
+        json!({"menge": 5, "verpflegungsstelle_id": turnhalle, "einheit_id": gruppe2}),
+        json!({"menge": 3, "verpflegungsstelle_id": turnhalle}),
+        json!({"menge": 7, "verpflegungsstelle_id": kueche, "einheit_id": gruppe2}),
+    ] {
+        let (s, v) = buche(admin.clone(), z_beide, body).await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let (s, v) = buche(
+        admin.clone(),
+        z_beide,
+        json!({"menge": 99, "verpflegungsstelle_id": turnhalle, "einheit_id": gruppe2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let zurueck = v["ausgabe_id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/ausgaben/{zurueck}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (_, geraet) = verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        kennungen(&v["zeitfenster"], "id"),
+        vec![z_kueche, z_einsatzweit, z_beide],
+        "nur eigene und einsatzweite Zeitfenster"
+    );
+    assert_eq!(
+        kennungen(&v["stellen"], "id"),
+        vec![kueche],
+        "nur die eigene Stelle"
+    );
+    let abend = &v["zeitfenster"][2];
+    assert_eq!(abend["stelle_ids"], json!([kueche]), "{abend}");
+    assert_eq!(kennungen(&abend["je_stelle"], "stelle_id"), vec![kueche]);
+    let ausgaben = abend["ausgaben"].as_array().unwrap();
+    assert_eq!(ausgaben.len(), 1, "nur die Ausgabe an der Küche: {abend}");
+    assert_eq!(ausgaben[0]["menge"], 7);
+    // Soll und Ist bleiben am Zeitfenster.
+    assert_eq!(abend["ausgegeben"]["gesamt"], 55, "{abend}");
+    assert_eq!(abend["fehlmenge"]["gesamt"], 45, "{abend}");
+    assert_eq!(
+        abend["verpflegt_anderswo"],
+        json!([
+            {"einheit_id": gruppe1, "menge": 40},
+            {"einheit_id": gruppe2, "menge": 5},
+        ]),
+        "Summe je Einheit, ohne Zurückgenommenes und ohne Empfänger"
+    );
+    for eintrag in abend["verpflegt_anderswo"].as_array().unwrap() {
+        let mut felder: Vec<&str> = eintrag
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        felder.sort_unstable();
+        assert_eq!(felder, ["einheit_id", "menge"], "Feldmenge gepinnt");
+    }
+    assert_eq!(v["zeitfenster"][0]["verpflegt_anderswo"], json!([]));
+    // Die Empfängerliste bleibt einsatzweit.
+    assert_eq!(
+        v["empfaenger"]["einheiten"].as_array().unwrap().len(),
+        2,
+        "{v}"
+    );
+
+    // Ein Zeitfenster nur der Turnhalle gibt es für das Gerät nicht.
+    let (s, v) = buche(geraet.clone(), z_turnhalle, json!({"menge": 4})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
+    // Eine andere Stelle ist 403, auch an einem gemeinsamen Zeitfenster.
+    let (s, v) = buche(
+        geraet.clone(),
+        z_beide,
+        json!({"menge": 4, "verpflegungsstelle_id": turnhalle}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    // Ohne Angabe setzt der Server die eigene Stelle.
+    let (s, v) = buche(geraet.clone(), z_einsatzweit, json!({"menge": 4})).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eigene = v["ausgabe_id"].as_i64().unwrap();
+    let gebucht = v["zeitfenster"]["ausgaben"].as_array().unwrap();
+    assert_eq!(gebucht.len(), 1, "{v}");
+    assert_eq!(gebucht[0]["id"], eigene);
+    assert_eq!(gebucht[0]["verpflegungsstelle_id"], kueche);
+    let (s, v) = buche(
+        geraet.clone(),
+        z_kueche,
+        json!({"menge": 2, "verpflegungsstelle_id": kueche}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, alles) = anfrage(&app, "GET", &basis, &admin, None).await;
+    assert_eq!(
+        alles["zeitfenster"][1]["ausgaben"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0,
+        "an der Turnhalle nichts gebucht: {alles}"
+    );
+    assert_eq!(
+        alles["zeitfenster"][2]["ausgaben"][0]["verpflegungsstelle_id"],
+        kueche
+    );
+
+    // Replay mit `client_id` bleibt stabil, auch wenn das Zeitfenster inzwischen nur noch an
+    // der Turnhalle gilt.
+    let (s, v) = buche(
+        geraet.clone(),
+        z_einsatzweit,
+        json!({"menge": 6, "client_id": "tresen-1"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let erste = v["ausgabe_id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{basis}/zeitfenster/{z_einsatzweit}"),
+        &admin,
+        Some(&json!({"stelle_ids": [turnhalle]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = buche(
+        geraet.clone(),
+        z_einsatzweit,
+        json!({"menge": 6, "client_id": "tresen-1"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Replay: {v}");
+    assert_eq!(v["ausgabe_id"], erste);
+    let (s, v) = buche(
+        geraet.clone(),
+        z_einsatzweit,
+        json!({"menge": 6, "client_id": "tresen-2"}),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "neu, aber nicht mehr an der Stelle: {v}"
+    );
+
+    // Zurücknehmen: nur Ausgaben der eigenen Stelle.
+    let (_, alles) = anfrage(&app, "GET", &basis, &admin, None).await;
+    let abend = alles["zeitfenster"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["id"] == z_beide)
+        .unwrap();
+    for a in abend["ausgaben"].as_array().unwrap() {
+        if a["verpflegungsstelle_id"] == kueche || a["zurueckgenommen_at"].is_string() {
+            continue;
+        }
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("{basis}/ausgaben/{}/zuruecknehmen", a["id"]),
+            &geraet,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "fremde Ausgabe {a}: {v}");
+    }
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/ausgaben/{eigene}/zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        v["zeitfenster"]["ausgaben"][0]["zurueckgenommen_at"].is_string(),
+        "{v}"
+    );
+
+    // Ein einsatzweites Gerät sieht weiter alles.
+    let (_, offen) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let (s, v) = anfrage(&app, "GET", &basis, &offen, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zeitfenster"].as_array().unwrap().len(), 4);
+    assert_eq!(v["stellen"].as_array().unwrap().len(), 2);
+    let (s, v) = buche(
+        offen.clone(),
+        z_turnhalle,
+        json!({"menge": 1, "verpflegungsstelle_id": turnhalle}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zeitfenster"]["verpflegt_anderswo"], json!([]));
+}
+
+/// LLH-1048: Wird die Stelle aufgelöst, bleibt die Kopplung wie bei den anderen Stellengeräten
+/// bestehen. Das Gerät liest weiter; eine Ausgabe nach der Auflösung ist 409, eine offline davor
+/// gezählte kommt an (Regel der Stelle, LLH-1040 D3).
+#[tokio::test]
+async fn verpflegungsgeraet_an_aufgeloester_stelle() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "aktiv").await;
+    let zf = zeitfenster_an(&app, &admin, einsatz, "Mittag", 12, &[kueche]).await;
+    let (_, geraet) = verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/stellen/{kueche}/status"),
+        &admin,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, ich) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK, "Kopplung bleibt");
+    assert_eq!(ich["geraet"]["stelle_id"], kueche);
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stellen"][0]["status"], "aufgeloest");
+    assert_eq!(kennungen(&v["zeitfenster"], "id"), vec![zf]);
+
+    let pfad = format!("{basis}/zeitfenster/{zf}/ausgaben");
+    let (s, v) = anfrage_json(&app, "POST", &pfad, &geraet, Some(&json!({"menge": 5}))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &geraet,
+        Some(&json!({"menge": 5, "zeitpunkt_at": "2026-01-01T12:00:00Z"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "vor der Auflösung gezählt: {v}");
+    assert_eq!(
+        v["zeitfenster"]["ausgaben"][0]["verpflegungsstelle_id"],
+        kueche
+    );
 }
 
 /// Das Gerät liest Zeitfenster mit Deckung, bucht Portionen und nimmt eine Buchung zurück; das

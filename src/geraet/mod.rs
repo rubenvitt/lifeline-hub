@@ -35,7 +35,7 @@ pub const BEZEICHNUNG_MAX: usize = 60;
 
 wire_enum! {
     /// Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-    /// `migrations/0159_geraet_kopplung_stellenarten.sql`.
+    /// `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Funktionsansicht {
         UhsTablet => "uhs-tablet",
@@ -50,14 +50,16 @@ wire_enum! {
 }
 
 wire_enum! {
-    /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
-    /// `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).
+    /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).
+    /// Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
+    /// (`migrations/0213_…`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Bindungsart {
         Uhs => "uhs",
         Betreuungsstelle => "betreuungsstelle",
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
+        Verpflegungsstelle => "verpflegungsstelle",
     }
 }
 
@@ -117,21 +119,29 @@ impl Funktionsansicht {
         }
     }
 
-    /// Die Art der Stelle, an die die Ansicht gebunden ist; `None` für Ansichten ohne Stelle
-    /// (Lagemonitor, Verpflegung).
+    /// Die Art der Stelle, an die die Ansicht gebunden ist oder sein kann; `None` für den
+    /// Lagemonitor, der keine Stelle kennt. Ob die Stelle Pflicht ist, sagt
+    /// [`Self::ist_stellengebunden`].
     pub fn stellenart(self) -> Option<Bindungsart> {
         match self {
             Funktionsansicht::UhsTablet | Funktionsansicht::UhsLaptop => Some(Bindungsart::Uhs),
             Funktionsansicht::Betreuungsstelle => Some(Bindungsart::Betreuungsstelle),
             Funktionsansicht::Bereitstellungsraum => Some(Bindungsart::Bereitstellungsraum),
             Funktionsansicht::Einsatzabschnitt => Some(Bindungsart::Einsatzabschnitt),
-            Funktionsansicht::Lagemonitor | Funktionsansicht::Verpflegung => None,
+            Funktionsansicht::Verpflegung => Some(Bindungsart::Verpflegungsstelle),
+            Funktionsansicht::Lagemonitor => None,
         }
     }
 
-    /// Ob die Ansicht an genau eine Stelle gebunden ist.
+    /// Ob die Stelle der Ansicht wahlweise ist (LLH-1048, LLH-1024 F7): ohne Stelle arbeitet das
+    /// Gerät einsatzweit, mit Stelle nur an ihr. Nur die Verpflegung.
+    pub fn stelle_wahlweise(self) -> bool {
+        matches!(self, Funktionsansicht::Verpflegung)
+    }
+
+    /// Ob die Ansicht an genau eine Stelle gebunden sein muss (ohne Stelle kein Koppeln).
     pub fn ist_stellengebunden(self) -> bool {
-        self.stellenart().is_some()
+        self.stellenart().is_some() && !self.stelle_wahlweise()
     }
 
     /// Ob die Einsatzleitung ein Gerät mit dieser Ansicht koppeln kann. Eine Ansicht wird erst
@@ -399,9 +409,11 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/meldungen"),
 ];
 
-/// Zusätzliche Einsatzrouten des Verpflegungsgeräts (LFH-1044), einsatzweit ohne Stelle: die
-/// Zeitfenster mit Deckung lesen, Portionen ausgeben und eine Ausgabe zurücknehmen; Meldungen an
-/// die Einsatzleitung anlegen und die eigenen lesen (so meldet das Gerät eine Fehlmenge).
+/// Zusätzliche Einsatzrouten des Verpflegungsgeräts (LFH-1044), einsatzweit oder an einer
+/// Verpflegungsstelle (LLH-1048): die Zeitfenster mit Deckung lesen, Portionen ausgeben und eine
+/// Ausgabe zurücknehmen; Meldungen an die Einsatzleitung anlegen und die eigenen lesen (so meldet
+/// das Gerät eine Fehlmenge). Ein an eine Stelle gebundenes Gerät schneiden die Handler über
+/// [`stelle::sicht_wahlweise`] auf seine Stelle zu.
 /// Zeitfenster anlegen, ändern und löschen, Nachforderungen (ihre Liste trägt Namen), Personal,
 /// Betreuung und ETB fehlen bewusst; eine Ausgabe auf eine Nachforderung lehnt der Handler ab.
 /// Empfänger (LLH-1055, design.md D3/D4): Einheiten und Abschnitte liest das Gerät nur als
@@ -438,7 +450,8 @@ pub struct GeraetKontext {
     pub ansicht: Funktionsansicht,
     /// Stelle der stellengebundenen Ansichten. `None` bei einer gebundenen Ansicht heißt: die
     /// Stelle ist weg (Abschnitt aufgelöst); das Gerät sieht dann keine Stelle mehr
-    /// ([`stelle::eigene`]).
+    /// ([`stelle::eigene`]). Bei wahlweiser Bindung (Verpflegung) heißt `None`: einsatzweit
+    /// ([`stelle::sicht_wahlweise`]).
     pub stelle: Option<Stelle>,
     pub bezeichnung: String,
     pub laeuft_ab_at: String,
@@ -594,8 +607,28 @@ mod tests {
             F::Einsatzabschnitt.stellenart(),
             Some(Bindungsart::Einsatzabschnitt)
         );
-        assert_eq!(F::Verpflegung.stellenart(), None);
+        assert_eq!(
+            F::Verpflegung.stellenart(),
+            Some(Bindungsart::Verpflegungsstelle)
+        );
         assert_eq!(F::Lagemonitor.stellenart(), None);
+    }
+
+    /// LLH-1048 (LLH-1024 F7): nur die Verpflegung bindet wahlweise; jede andere Ansicht mit
+    /// Stellenart braucht ihre Stelle, der Lagemonitor kennt keine.
+    #[test]
+    fn nur_die_verpflegung_bindet_wahlweise() {
+        for a in Funktionsansicht::ALLE {
+            let wahlweise = a == Funktionsansicht::Verpflegung;
+            assert_eq!(a.stelle_wahlweise(), wahlweise, "{a:?}");
+            assert_eq!(
+                a.ist_stellengebunden(),
+                a.stellenart().is_some() && !wahlweise,
+                "{a:?}"
+            );
+        }
+        assert!(!Funktionsansicht::Verpflegung.ist_stellengebunden());
+        assert!(!Funktionsansicht::Lagemonitor.ist_stellengebunden());
     }
 
     #[test]

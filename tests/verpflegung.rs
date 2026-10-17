@@ -3324,3 +3324,43 @@ async fn tag_aus_vorlage_unabhaengig_nach_dem_anlegen() {
         "Zeitfenster ändern wirkt nicht auf den Plan"
     );
 }
+
+/// LLH-1048: `verpflegt_anderswo` gibt es nur für ein an eine Verpflegungsstelle gebundenes Gerät
+/// (Nachweis samt gepinnter Feldmenge: `tests/geraet_kopplung.rs`,
+/// `verpflegungsgeraet_an_einer_stelle_sieht_und_bucht_nur_dort`). Eine Person sieht jede
+/// Ausgabe einzeln, alle Zeitfenster und alle Stellen; das Feld steht immer da und ist für sie
+/// leer, in der Übersicht wie in der Antwort auf eine Ausgabe.
+#[tokio::test]
+async fn person_sieht_alles_und_kein_verpflegt_anderswo() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let kueche = stelle(&app, &admin, e, "Feldküche").await;
+    let turnhalle = stelle(&app, &admin, e, "Turnhalle").await;
+    let zid = zeitfenster(&app, &admin, e, &mittag_an(&[kueche])).await;
+    zeitfenster(&app, &admin, e, &mittag_an(&[turnhalle])).await;
+    let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    for sid in [kueche, turnhalle] {
+        let body =
+            serde_json::json!({"menge": 10, "verpflegungsstelle_id": sid, "einheit_id": gruppe});
+        let a = ausgabe(&app, &admin, e, zid, &body.to_string()).await;
+        assert_eq!(
+            a["zeitfenster"]["verpflegt_anderswo"],
+            serde_json::json!([])
+        );
+    }
+    let u = uebersicht(&app, &admin, e).await;
+    assert_eq!(u["zeitfenster"].as_array().unwrap().len(), 2);
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 2);
+    let z = u["zeitfenster"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["id"] == zid)
+        .unwrap();
+    assert_eq!(z["ausgaben"].as_array().unwrap().len(), 2, "{z}");
+    assert_eq!(z["je_stelle"].as_array().unwrap().len(), 2, "{z}");
+    for z in u["zeitfenster"].as_array().unwrap() {
+        assert_eq!(z["verpflegt_anderswo"], serde_json::json!([]), "{z}");
+    }
+}

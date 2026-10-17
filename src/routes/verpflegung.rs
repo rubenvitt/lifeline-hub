@@ -15,7 +15,11 @@
 //!   eines Tages.
 //! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung, fremde
 //!   Verpflegungsstelle im Pfad, fremder Abschnitt, fremde oder unbekannte Empfänger-Einheit bzw.
-//!   Empfänger-Abschnitt einer Ausgabe (LLH-1055 D2).
+//!   Empfänger-Abschnitt einer Ausgabe (LLH-1055 D2). Für ein an eine Verpflegungsstelle
+//!   gebundenes Gerät (LLH-1048) auch ein Zeitfenster, das nur fremden Stellen zugeordnet ist, und
+//!   eine Ausgabe, die nicht an seiner Stelle gebucht ist.
+//! - **403** — ein Gerät bucht auf eine Nachforderung (LFH-1044); ein an eine Stelle gebundenes
+//!   Gerät nennt eine andere Verpflegungsstelle (LLH-1048, ohne Angabe setzt der Server seine).
 //! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Bezeichnung einer
 //!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle (LLH-1040 D3) oder an eine
 //!   aufgelöste Einheit (LLH-1055 D2) mit einem Zeitpunkt nicht vor der Auflösung.
@@ -57,6 +61,8 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, Einsat
 use crate::einsatz::modul::Verpflegung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
+use crate::geraet::stelle::{self, Sicht};
+use crate::geraet::{Bindungsart, GeraetKontext};
 use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, optional_max, parse_enum, parse_enum_opt, pflicht_max,
@@ -68,7 +74,7 @@ use crate::verpflegung::stelle::{
     VerpflegungsstelleAnzeige, VerpflegungsstelleArt, VerpflegungsstelleStatus,
 };
 use crate::verpflegung::{
-    self, dedupe_stelle_ids, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
+    self, dedupe_stelle_ids, stellensicht, AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige,
     VerpflegungTagErgebnis, Verpflegungsart, ZeitfensterAnzeige,
 };
 
@@ -108,7 +114,37 @@ pub async fn uebersicht(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Verpflegung>,
 ) -> Result<Json<VerpflegungAnzeige>, AppError> {
-    Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
+    let eigene = eigene_stelle(ctx.geraet.as_ref())?;
+    let v = repo::liste(&state.pool, ctx.einsatz.id).await?;
+    Ok(Json(match eigene {
+        Some(sid) => stellensicht::verpflegung(v, sid),
+        None => v,
+    }))
+}
+
+/// Die Verpflegungsstelle eines daran gebundenen Geräts (LLH-1048); `None` für eine Person und
+/// das einsatzweite Gerät. Jedes andere Gerät erreicht diese Routen nicht (Routenliste); sähe es
+/// sie doch, kennte es keine Stelle: 403.
+fn eigene_stelle(geraet: Option<&GeraetKontext>) -> Result<Option<i64>, AppError> {
+    match stelle::sicht_wahlweise(geraet, Bindungsart::Verpflegungsstelle) {
+        Sicht::Alle => Ok(None),
+        Sicht::Nur(id) => Ok(Some(id)),
+        Sicht::Keine => Err(AppError::Forbidden),
+    }
+}
+
+/// Lädt ein Zeitfenster für die Antwort, für ein gebundenes Gerät in seiner Sicht.
+async fn zeitfenster_fuer(
+    state: &AppState,
+    einsatz_id: i64,
+    zeitfenster_id: i64,
+    eigene: Option<i64>,
+) -> Result<ZeitfensterAnzeige, AppError> {
+    let z = repo::zeitfenster_laden(&state.pool, einsatz_id, zeitfenster_id).await?;
+    Ok(match eigene {
+        Some(sid) => stellensicht::zeitfenster(z, sid),
+        None => z,
+    })
 }
 
 // ── Zeitfenster ─────────────────────────────────────────────────────────────────────────────
@@ -436,6 +472,7 @@ pub async fn ausgabe_erfassen(
 ) -> Result<(StatusCode, Json<AusgabeErgebnis>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let eigene = eigene_stelle(ctx.geraet.as_ref())?;
     let client_id = req
         .client_id
         .as_deref()
@@ -450,7 +487,7 @@ pub async fn ausgabe_erfassen(
     if let Some(cid) = client_id.as_deref() {
         if let Some(replay) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
             let a = repo::replay_am_zeitfenster(replay, zid)?;
-            return antwort(&state, einsatz_id, a).await;
+            return antwort(&state, einsatz_id, a, eigene).await;
         }
     }
     ctx.fordere_aktiv()?;
@@ -476,6 +513,13 @@ pub async fn ausgabe_erfassen(
             return Err(AppError::NotFound);
         }
     }
+    // Ein an eine Stelle gebundenes Gerät bucht an ihr (LLH-1048): ohne Angabe setzt der Server
+    // sie, eine andere ist 403 — nach Replay, Grenzen und Nachforderung, vor jeder Abfrage.
+    let verpflegungsstelle_id = stelle::ziel_stelle_wahlweise(
+        ctx.geraet.as_ref(),
+        Bindungsart::Verpflegungsstelle,
+        req.verpflegungsstelle_id,
+    )?;
     let eingabe = AusgabeEingabe {
         zeitpunkt_at,
         menge: req.menge,
@@ -483,24 +527,37 @@ pub async fn ausgabe_erfassen(
         bemerkung,
         sonderkost: req.sonderkost.unwrap_or_default(),
         nachforderung_id: req.nachforderung_id,
-        verpflegungsstelle_id: req.verpflegungsstelle_id,
+        verpflegungsstelle_id,
         einheit_id: req.einheit_id,
         abschnitt_id: req.abschnitt_id,
         client_id,
     };
     let benutzer_id = ctx.benutzer.id;
     let a = crate::write_retry!(&state.pool, |conn| {
+        if let Some(sid) = eigene {
+            // Replay zuerst (wie in `ausgabe_erfassen_tx`): eine schon gebuchte Ausgabe kommt
+            // auch zurück, wenn das Zeitfenster inzwischen nicht mehr an der Stelle gilt.
+            if let Some(cid) = eingabe.client_id.as_deref() {
+                if let Some(r) = repo::laden_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+                    return repo::replay_am_zeitfenster(r, zid);
+                }
+            }
+            // Ein Zeitfenster nur fremder Stellen gibt es für das Gerät nicht (404).
+            repo::check_zeitfenster_an_stelle_tx(conn, einsatz_id, zid, sid).await?;
+        }
         repo::ausgabe_erfassen_tx(conn, einsatz_id, zid, benutzer_id, &eingabe).await
     })?;
-    antwort(&state, einsatz_id, a).await
+    antwort(&state, einsatz_id, a, eigene).await
 }
 
-/// 201 mit Ausgabe und Zeitfenster danach; das Modul-Ereignis nur, wenn wirklich geschrieben
-/// wurde (ein Replay publiziert nichts, design.md D5).
+/// 201 mit Ausgabe und Zeitfenster danach (für ein gebundenes Gerät in seiner Sicht); das
+/// Modul-Ereignis nur, wenn wirklich geschrieben wurde (ein Replay publiziert nichts, design.md
+/// D5).
 async fn antwort(
     state: &AppState,
     einsatz_id: i64,
     a: repo::AusgabeGeschrieben,
+    eigene: Option<i64>,
 ) -> Result<(StatusCode, Json<AusgabeErgebnis>), AppError> {
     if a.neu {
         publiziere(state, einsatz_id, &[]);
@@ -509,7 +566,7 @@ async fn antwort(
         StatusCode::CREATED,
         Json(AusgabeErgebnis {
             ausgabe_id: a.ausgabe_id,
-            zeitfenster: repo::zeitfenster_laden(&state.pool, einsatz_id, a.zeitfenster_id).await?,
+            zeitfenster: zeitfenster_fuer(state, einsatz_id, a.zeitfenster_id, eigene).await?,
         }),
     ))
 }
@@ -523,13 +580,19 @@ pub async fn ausgabe_zuruecknehmen(
 ) -> Result<Json<AusgabeErgebnis>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let benutzer_id = ctx.benutzer.id;
+    let eigene = eigene_stelle(ctx.geraet.as_ref())?;
     let a = crate::write_retry!(&state.pool, |conn| {
+        // Ein gebundenes Gerät nimmt nur Ausgaben seiner Stelle zurück; andere sieht es nicht
+        // (404, LLH-1048).
+        if let Some(sid) = eigene {
+            repo::check_ausgabe_an_stelle_tx(conn, einsatz_id, aid, sid).await?;
+        }
         repo::ausgabe_zuruecknehmen_tx(conn, einsatz_id, aid, benutzer_id).await
     })?;
     publiziere(&state, einsatz_id, &[]);
     Ok(Json(AusgabeErgebnis {
         ausgabe_id: a.ausgabe_id,
-        zeitfenster: repo::zeitfenster_laden(&state.pool, einsatz_id, a.zeitfenster_id).await?,
+        zeitfenster: zeitfenster_fuer(&state, einsatz_id, a.zeitfenster_id, eigene).await?,
     }))
 }
 
