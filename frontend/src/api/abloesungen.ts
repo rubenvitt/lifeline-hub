@@ -18,10 +18,7 @@ const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/abloesungen`;
  * Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend, beendete (LLH-1128) nach ihrem
  * Ende absteigend (Ordnung vom Server).
  */
-export function listeAbloesungen(
-  einsatzId: number,
-  status: AbloesungStatus,
-): Promise<Abloesung[]> {
+export function listeAbloesungen(einsatzId: number, status: AbloesungStatus): Promise<Abloesung[]> {
   return apiGet<Abloesung[]>(`${basis(einsatzId)}?status=${status}`);
 }
 
