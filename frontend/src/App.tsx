@@ -89,6 +89,7 @@ import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
 import AusgabeAnsicht from './verpflegung/AusgabeAnsicht';
+import TagAusVorlage from './verpflegung/TagAusVorlage';
 import WetterPegelPage from './pages/WetterPegelPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
@@ -411,6 +412,9 @@ export const appRouten = createRoutesFromElements(
           {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,
               `modulAusPfad` gatet sie über das Segment `verpflegung`. */}
           <Route path="verpflegung/:zeitfensterId/ausgabe" element={<AusgabeAnsicht />} />
+          {/* Tag aus Vorlage anlegen (LLH-1058): Unterroute des Moduls, nur am Stab; `modulAusPfad`
+              gatet sie über das Segment `verpflegung`. */}
+          <Route path="verpflegung/aus-vorlage" element={<TagAusVorlage />} />
           {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
               (LLH-1180, design.md D7). `modulAusPfad` gatet sie nach dem Fernmeldewesen. */}
           <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />

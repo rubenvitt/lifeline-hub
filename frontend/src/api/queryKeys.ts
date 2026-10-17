@@ -940,6 +940,9 @@ export const GLOBAL_KEYS = {
   // Katalog „Einheiten-Vorlagen“ (LLH-1042). Nicht im Lagebild: im Einsatz gebildet wird nur
   // mit Netz (LLH-1049), und die Verwaltung arbeitet ohnehin online.
   einheitVorlagen: 'einheit-vorlagen',
+  // Verpflegungsplan der Organisation (LLH-1058). Nicht im Lagebild: einen Tag aus der Vorlage
+  // legt nur an, wer Netz hat; Zeitfenster entstehen ohne Netz nicht.
+  verpflegungVorlagen: 'verpflegung-vorlagen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
   // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
@@ -1075,6 +1078,11 @@ export const globalKeys = {
    */
   einheitVorlagen: () => [GLOBAL_KEYS.einheitVorlagen] as const,
   einheitVorlagenListe: (scope: 'aktiv' | 'alle') => [GLOBAL_KEYS.einheitVorlagen, scope] as const,
+  // Verpflegungsplan (LLH-1058): die Verwaltung liest `'alle'`, der Tag aus der Vorlage `'aktiv'`;
+  // `stammdaten` invalidiert den baren Prefix und damit beide Fächer.
+  verpflegungVorlagen: () => [GLOBAL_KEYS.verpflegungVorlagen] as const,
+  verpflegungVorlagenListe: (scope: 'aktiv' | 'alle') =>
+    [GLOBAL_KEYS.verpflegungVorlagen, scope] as const,
 
   /**
    * Präferenzen EINES Benutzers. Der Server-Slot ist pro Benutzer, sein Cache-Fach muss es auch
@@ -1135,6 +1143,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.qualifikationen,
     GLOBAL_KEYS.einheitTypen,
     GLOBAL_KEYS.einheitVorlagen,
+    GLOBAL_KEYS.verpflegungVorlagen,
     GLOBAL_KEYS.etbBausteine,
     GLOBAL_KEYS.stichwortVorschlaege,
     GLOBAL_KEYS.externeStellen,

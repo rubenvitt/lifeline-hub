@@ -986,6 +986,48 @@ export type ZeitfensterPatch = Omit<Partial<ZeitfensterEingabe>, 'verpflegungsar
   verpflegungsart?: Verpflegungsart | null;
 };
 
+/** Eine Mahlzeit des Verpflegungsplans der Organisation (LLH-1058): Uhrzeiten `HH:MM` ohne
+ *  Datum, `folgetag` heißt „Ende am nächsten Tag“. */
+export type VerpflegungVorlage = S['VerpflegungVorlage'];
+/** Antwort auf „Tag aus der Vorlage anlegen“: angelegt in Anfragereihenfolge, übersprungen mit
+ *  Bezeichnung (am Tag schon gleichnamig vorhanden). */
+export type VerpflegungTagErgebnis = S['VerpflegungTagErgebnis'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST /api/verpflegung-vorlagen` (`VorlageBody`).
+ * Uhrzeiten als `HH:MM` oder `HHMM`; Ende gleich Beginn 422, gleicher aktiver Name 409.
+ */
+export interface VerpflegungVorlageEingabe {
+  bezeichnung: string;
+  beginn: string;
+  ende: string;
+  verpflegungsart?: Verpflegungsart;
+}
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PATCH /api/verpflegung-vorlagen/{vid}`
+ * (`PatchVorlage`). Schlüssel fehlt = unverändert; `verpflegungsart: null` leert die Art,
+ * `aktiv` schaltet in beide Richtungen (es gibt kein Löschen).
+ */
+export type VerpflegungVorlagePatch = Partial<
+  Omit<VerpflegungVorlageEingabe, 'verpflegungsart'>
+> & {
+  verpflegungsart?: Verpflegungsart | null;
+  aktiv?: boolean;
+};
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/aus-vorlage`
+ * (`TagAusVorlage`). Die Tagesgrenzen und jede Uhrzeit hat der Client in der Anzeigezone auf den
+ * Tag gelegt (`anzeige/uhrzeit.ts`); ein Zeitfenster trägt die Felder des Einzelanlegens ohne
+ * Stellen. Höchstens `VERPFLEGUNG_AUS_VORLAGE_MAX` Zeitfenster.
+ */
+export interface TagAusVorlageEingabe {
+  tag_von_at: string;
+  tag_bis_at: string;
+  zeitfenster: Omit<ZeitfensterEingabe, 'stelle_ids'>[];
+}
+
 /**
  * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
  * (`AusgabeErfassen`). Ohne `zeitpunkt_at` gilt „jetzt“; `menge` > 0; die Sonderkost ist

@@ -143,6 +143,7 @@ function baum(client: QueryClient) {
             <Routes>
               <Route path="/einsaetze/:id/verpflegung" element={<VerpflegungPage />} />
               <Route path="/einsaetze/:id/nachforderungen" element={<Ort />} />
+              <Route path="/einsaetze/:id/verpflegung/aus-vorlage" element={<Ort />} />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
@@ -262,6 +263,28 @@ describe('VerpflegungPage (LFH-634)', () => {
     expect(screen.queryByRole('link', { name: /^Ausgabe öffnen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Zurücknehmen/ })).toBeNull();
+  });
+
+  it('Nebenweg „Tag aus Vorlage anlegen“ öffnet die Seite des Tages (LLH-1058)', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    const weg = within(kopf()).getByRole('link', { name: 'Tag aus Vorlage anlegen' });
+    expect(weg).toHaveAttribute('href', '/einsaetze/1/verpflegung/aus-vorlage');
+    await userEvent.click(weg);
+    expect(await screen.findByTestId('ort')).toHaveTextContent(
+      '/einsaetze/1/verpflegung/aus-vorlage',
+    );
+  });
+
+  it('ohne Schreibrecht steht „Tag aus Vorlage anlegen“ gesperrt mit Grund (LLH-1058)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    renderPage();
+    await screen.findAllByRole('article');
+    expect(
+      within(kopf()).getByRole('button', {
+        name: 'Tag aus Vorlage anlegen (nur Einsatzleitung und Führungspersonal)',
+      }),
+    ).toBeDisabled();
   });
 
   it('ohne Schreibrecht im leeren Modul: Leerzustand ohne Aktion', async () => {

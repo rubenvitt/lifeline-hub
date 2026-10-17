@@ -2,7 +2,7 @@
 titel: Verpflegung
 gruppen: [fuehrung]
 reihenfolge: 370
-quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
+quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/verpflegung/TagAusVorlage.tsx, frontend/src/verpflegung/tagAusVorlageKern.ts, frontend/src/anzeige/uhrzeit.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, src/verpflegung/vorlage.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
 ---
 
 ## Überblick
@@ -109,6 +109,28 @@ Für Einsatzleitung und Führungspersonal:
    „davon Sonderkost (EP)“ die Portionen je Kostform eintragen.
 5. Für Art und Stellen „Art und Stellen“ aufklappen (Ablauf „Ein Zeitfenster Stellen zuordnen“).
 6. „Anlegen“ wählen.
+
+### Einen Tag aus der Vorlage anlegen
+
+Für Einsatzleitung und Führungspersonal, wenn die Organisation einen Verpflegungsplan führt
+(Kapitel [Stammdaten](stammdaten.md)):
+
+1. Im Seitenkopf „Tag aus Vorlage anlegen“ wählen; auf schmalen Bildschirmen liegt es unter
+   „Weitere“.
+2. Unter „Tag“ den Tag wählen; vorgegeben ist heute. Je Mahlzeit des Plans steht ein Fenster mit
+   Bezeichnung, Zeitraum und Art.
+3. Je Fenster „Einsatzkräfte (EP)“ und „Betreute (EP)“ prüfen. Die App schlägt die Zahlen vor
+   wie beim Anlegen eines einzelnen Zeitfensters und nennt darunter, woher sie stammen; jede Zahl
+   lässt sich überschreiben. Ein leeres Feld braucht eine Zahl, „0“, wenn niemand.
+
+   ![Seite „Tag aus Vorlage anlegen“ für einen Tag mit den Fenstern „Frühstück“, „Mittag“, „Abendessen“ und „Nachtverpflegung“ bis zum Folgetag, je mit vorgeschlagenen Einsatzkräften und Betreuten samt Herkunft und der Wahl „anlegen“](../bilder/verpflegung/tag-aus-vorlage.png)
+
+4. Ein Fenster, das an diesem Tag nicht gebraucht wird, mit „anlegen“ abwählen. Steht an einem
+   Fenster „schon angelegt“, gibt es am Tag schon ein Zeitfenster dieses Namens; es wird nicht
+   noch einmal angelegt.
+5. „Zeitfenster anlegen“ wählen. Die App kehrt zur Verpflegung zurück und meldet, wie viele
+   Zeitfenster für den Tag angelegt sind, und nennt jedes, das am Tag schon bestand.
+6. Weitere Personen, Sonderkost und Stellen auf der Karte über „Bedarf bearbeiten“ eintragen.
 
 ### Portionen an der Ausgabe zählen
 
@@ -261,6 +283,25 @@ die Stellen des Zeitfensters ändert; nur wenn die gewählte Stelle aufgelöst w
 bucht die offene Sammlung an der bisherigen Stelle; die Sammlung gehört immer zu der Stelle, an der
 ihre erste Portion gezählt wurde.
 
+### Tag aus der Vorlage
+
+Der Verpflegungsplan nennt Mahlzeiten mit Uhrzeit, aber ohne Datum. Erst „Tag aus Vorlage
+anlegen“ legt sie auf einen Tag, und zwar in der Zeitzone, in der die App die Zeiten anzeigt.
+Endet eine Mahlzeit vor ihrem Beginn, etwa eine Nachtverpflegung von 23:00 bis 01:00, endet ihr
+Zeitfenster am nächsten Tag. Am Tag der Umstellung auf Winterzeit gilt eine Uhrzeit, die es zweimal
+gibt, beim ersten Mal; am Tag der Umstellung auf Sommerzeit gilt eine Uhrzeit aus der
+ausfallenden Stunde eine Stunde später (02:30 wird 03:30). Liegt eine Mahlzeit ganz in dieser Stunde, steht
+sie als „fällt in die Zeitumstellung“ und wird nicht angelegt.
+
+Es entstehen gewöhnliche Zeitfenster, je eines mit demselben Eintrag im Einsatztagebuch wie beim
+Einzelanlegen. Sie hängen nicht am Plan: Wer danach ein Zeitfenster oder den Plan ändert, ändert
+nur das eine. Nichts legt sich von selbst für den nächsten Tag an. „Schon angelegt“ heißt: ein
+Zeitfenster gleichen Namens, ohne Unterschied von Groß- und Kleinschreibung, beginnt an diesem Tag.
+Legt es jemand an, während die Seite offen ist, bleibt die Seite stehen; die App überspringt es
+beim Anlegen und nennt es in der Meldung. Scheitert ein Fenster, etwa an seiner Sonderkost, legt
+die App keines an und nennt das Fenster auf der Seite. Höchstens 24 Zeitfenster lassen sich auf
+einmal anlegen.
+
 ### Bedarf und Sonderkost
 
 Der Bedarf ist die Summe aus Einsatzkräften, Betreuten und weiteren Personen. Sonderkost ist ein
@@ -328,11 +369,12 @@ Lesen darf, wer das Modul Verpflegung sieht. Zeitfenster anlegen, ändern und l�
 zählen, Ausgaben nachtragen und zurücknehmen, Stellen anlegen, in Betrieb nehmen, auflösen und
 stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht sind „Zeitfenster
-anlegen“ und „Stelle anlegen“ gesperrt, die Karten zeigen keine Aktionen und kein „Ausgabe
-öffnen“, die Stellen keine Aktionen, und in der Ausgabeansicht sind die Zähltasten, die
-Stellenwahl, die Empfängerwahl und „Wählen“ mit dem Grund gesperrt.
+anlegen“, „Tag aus Vorlage anlegen“ und „Stelle anlegen“ gesperrt, die Karten zeigen keine
+Aktionen und kein „Ausgabe öffnen“, die Stellen keine Aktionen, und in der Ausgabeansicht sind die
+Zähltasten, die Stellenwahl, die Empfängerwahl und „Wählen“ mit dem Grund gesperrt.
 
-Die Zeitfenster gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält. Wird die App
+Die Zeitfenster und der Verpflegungsplan gehören nicht zu dem, was die App für die Arbeit ohne
+Netz vorhält; einen Tag aus der Vorlage legt nur an, wer Netz hat. Wird die App
 ohne Netz neu gestartet, zeigt die Ausgabeansicht „Zeitfenster nicht geladen“ und es gibt nichts
 zu zählen. Fällt das Netz bei offener Seite aus, lässt sich weiter zählen und nachtragen: Der Kopf
 der Ausgabeansicht zeigt „Offline vorgemerkt“, gebuchte Sammlungen stehen als „+ … ausstehend“
