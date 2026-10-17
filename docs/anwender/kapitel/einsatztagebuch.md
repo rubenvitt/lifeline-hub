@@ -27,7 +27,7 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 
 1. Im Einsatz das Modul „ETB“ öffnen.
 
-   ![ETB mit Filterleiste, Zeitachse der Einträge, Seitenleiste „Bilanz“ und Erfassungsleiste am Fuß](../bilder/einsatztagebuch/zeitachse.png)
+   ![ETB beim Öffnen: Zeitachse mit den neuesten Einträgen unten über der Erfassungsleiste, Seitenleiste „Bilanz“ rechts](../bilder/einsatztagebuch/zeitachse.png)
 
 2. Die Seite öffnet am Ende: der neueste Eintrag steht über der Erfassungsleiste. Nach oben
    rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge.

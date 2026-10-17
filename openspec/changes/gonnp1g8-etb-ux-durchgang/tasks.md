@@ -24,13 +24,13 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 - [x] 2.3 `EtbPage`: Segmentleiste ab `md` aus dem Kopf in die Leiste, Switch durch den Umschaltknopf ersetzt (`aria-describedby` der Zahl bleibt), „Filter (n)“ unter `md` unverändert; Vitest `EtbPage.test.tsx` (role `switch` → `button`, `ohne_system` in der URL, Zusammenspiel mit `typ=system`)
 - [x] 2.4 Mehrzahl `lage` → „Lagefeststellungen“ in `etbTypMehrzahl`; Vitest `statusFarben.test.ts`, `EtbBilanz.test.tsx`, `lageentwicklungUebernahme.test.ts`
 - [x] 2.5 Spec-Wortlaut „Umschaltknopf“ und Regel „Systemeinträge ausblenden“/„Unter md zuerst die Zeitachse“ in `frontend/src/etb/AGENTS.md`
-- [ ] 2.6 e2e: Leiste bei 1440×900 kompakt in höchstens zwei Zeilen, Typ und System in einer, Kopf ohne Segmentleiste ab `md`, ergänzt in `etb-zeilenhoehe` oder eigener Spec
+- [x] 2.6 e2e: Leiste bei 1440×900 kompakt in höchstens zwei Zeilen, Typ und System in einer, Kopf ohne Segmentleiste ab `md` (eigene Spec `e2e/etb-filterleiste.spec.ts`)
 
 ## 3. Zeitraum-Schnellwahl — LLH-1080 (wyylm0tn)
 
 - [x] 3.1 `anzeige/zeitfenster.ts` (`zeitfensterWahl`, `zeitraumBeschriftung`) mit Vitest: Letzte Stunde/4 Stunden abgerundet, Heute in einer Anzeigezone ≠ Prozesszone (`test/prozessZone.ts`), seit LB nur mit Termin, Beschriftung ohne Sekunden und Wiedererkennung nach Neuladen
 - [x] 3.2 `etb/EtbZeitraumWahl.tsx` (Knopf mit Aufklapper, am Handy und im Handschuh als Blatt, Ziele in Steuerhöhe, „Eigener Zeitraum“ über `ZeitraumEingabe`); Vitest: eine Wahl setzt `von`/`bis` einmal, „bis“ leer erlaubt, Round-Trip durch `URLSearchParams`
-- [ ] 3.3 `EtbFilterleiste`/`EtbPage`: Zeitraum-Bedienziel statt zweier Felder, LB-Stand nur mit Freigabe `lagebesprechung`; Vitest `EtbPage.test.tsx`; e2e `dialoge-handy` auf den neuen Weg umgestellt
+- [x] 3.3 `EtbFilterleiste`/`EtbPage`: Zeitraum-Bedienziel statt zweier Felder, LB-Stand nur mit Freigabe `lagebesprechung`; Vitest `EtbPage.test.tsx`; e2e `dialoge-handy` auf den neuen Weg umgestellt
 - [x] 3.4 Doku `einsatztagebuch.md`, Abschnitt „Einträge suchen und filtern“: Leiste, Umschaltknopf und Schnellwahl beschrieben
 
 ## 4. Filterband — LLH-1071 (nyc0b0fm)
@@ -40,7 +40,7 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 - [x] 4.3 `EtbPage`: Band im `fuss` über der Erfassung bei jedem Merkmal, `m` aus der Zählung ohne Filter, „Filter zurücksetzen“ räumt Leiste und URL; Vitest je Merkmal und ohne Zählung keine Zahl
 - [x] 4.4 `useEtbErfassung.erfassen` liefert die Antwort; Zusatz „Nr. n erfasst – außerhalb des Filters · anzeigen“ mit Sprung ohne Filter; Vitest in `EtbPage.test.tsx` und `useEtbErfassung`-Test
 - [x] 4.5 Hinweis „+n Nachträge vor <Uhrzeit> erfasst · anzeigen“ bei Zeitraum „seit LB“; Vitest mit Mock-Antwort
-- [ ] 4.6 Bausteinliste in `frontend/AGENTS.md` um `Filterhinweis` ergänzt; e2e Kontrast Tag/Nacht des Bands (Muster `hinweis-kontrast.spec.ts`) und `leisten-flaeche` mit Filter auf 390 px
+- [x] 4.6 Bausteinliste in `frontend/AGENTS.md` um `Filterhinweis` ergänzt; e2e Kontrast Tag/Nacht des Bands (Muster `hinweis-kontrast.spec.ts`) und `leisten-flaeche` mit Filter auf 390 px
 - [x] 4.7 Doku `einsatztagebuch.md`: ein Satz zum Band und zum Eintrag außerhalb des Filters
 
 ## 5. Berichtigt-Kennzeichnung — LLH-1099 (rh1l9wpd)
@@ -76,7 +76,7 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 ## 9. Integration
 
 - [ ] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für ETB-Seite und Informationstelefon im PR ausgefüllt
-- [ ] 9.2 Doku-Bilder `einsatztagebuch/*` und `presse-infotelefon/*` über die Bilder-Specs neu erzeugt (Mitänderungsregel `docs/anwender/AGENTS.md`)
+- [x] 9.2 Doku-Bilder `einsatztagebuch/*` und `presse-infotelefon/*` über die Bilder-Specs neu erzeugt (Mitänderungsregel `docs/anwender/AGENTS.md`)
 - [ ] 9.3 `./scripts/check-all.sh` grün (lokal die Bündel ohne Server-Stack, vollständig in der CI des PRs)
 
 ## Workflow follow-up
