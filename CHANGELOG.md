@@ -1,3 +1,28 @@
+## [1.0.0-alpha.138](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.137...v1.0.0-alpha.138) (2026-10-17)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Das Update legt eine neue Tabelle für Besatzungswechsel an. Die Migration läuft beim ersten Start der neuen Version automatisch. Vorher bitte wie gewohnt eine Sicherung anlegen.
+- **Schnittstelle zum Vollzug einer Ablösung erweitert:** Ein Vollzug gibt jetzt die Art an, also ganze Einheit oder Besatzungswechsel, und beim Besatzungswechsel die neue Besatzung (höchstens 50 Personen). Für einen Besatzungswechsel braucht es die Freigabe des Moduls Einheiten. Fehlt sie, lehnt der Server den Vorgang ab.
+
+### Kräfte und Mittel – Ablösung
+
+- **Neu: Besatzungswechsel.** Eine Ablösung kann jetzt auch nur die Mannschaft tauschen. Einheit, Fahrzeug und Abschnitt bleiben bestehen, und die Folgeschicht gehört zur selben Einheit.
+- **Art im Vollzug-Dialog wählen:** „Ganze Einheit“ oder „Besatzungswechsel“. Beim Besatzungswechsel zeigt der Dialog die bisherige Besatzung, also die Einheit und ihre Untereinheiten. Die neue Besatzung wählt man aus dem Personal des Einsatzes.
+  - Wer schon zur Besatzung gehört, steht nicht in der Auswahl.
+  - Wer eine andere Einheit führt, erscheint gesperrt mit Begründung.
+  - Ohne Freigabe der Module Einheiten und Personal ist der Besatzungswechsel gesperrt, ebenfalls mit Begründung.
+- **Was beim Vollzug passiert:** Die bisherige Besatzung verlässt Einheit, Fahrzeug und Führungsfunktion. Die neue Besatzung kommt in die Einheit. Auf der Zeitachse stehen dazu nur Einträge zu den Personen, die Einheit selbst bekommt keinen Eintrag. Grenzwerte und Ruhezeiten werden dabei nicht berechnet.
+- **Anzeige:** Die Karte der abgelösten Schicht zeigt „Besatzungswechsel · neu: …“. Der Hinweis nach dem Vollzug nennt die neue Besatzung. Die Ansichten Einheiten und Personal aktualisieren sich nach Vollzug und Rücknahme sofort.
+- **Rücknahme:** Wird ein Besatzungswechsel zurückgenommen, entfallen die zugehörigen Einträge auf der Zeitachse. Jede Person kehrt an ihren alten Platz zurück, solange sie seit dem Vollzug nicht anderweitig umgesetzt wurde. Diese Einträge lassen sich nur über die Rücknahme entfernen, nicht einzeln.
+- **Rücknahme bei eigener Folgeschicht:** Eine bereits angelegte eigene Folgeschicht verhindert die Rücknahme nicht mehr.
+- **Datenschutz:** Personenbezüge aus Besatzungswechseln werden beim Schwärzen berücksichtigt.
+
+### Dokumentation
+
+- Das Kapitel „Ablösung“ der Anwenderdokumentation hat einen neuen Ablauf „Die Besatzung wechseln“ und erklärt den Hintergrund des Besatzungswechsels. Die Abschnitte zu Zeitachse und Einsatztagebuch sind angepasst.
+- Der Ablauf „Eine Ablösung vollziehen“ beschreibt das neue Feld „Art“. Die Bildschirmfotos sind aktualisiert.
+
 ## [1.0.0-alpha.137](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.136...v1.0.0-alpha.137) (2026-10-17)
 
 ### Kräfte und Mittel
