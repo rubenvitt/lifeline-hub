@@ -1241,3 +1241,174 @@ async fn untereinheit_erbt_die_schicht_des_verbands() {
         serde_json::json!([{"einheit_id": gruppe, "einheit_name": "Gruppe 1"}])
     );
 }
+
+/// Abschnitt einer Einheit laut `GET …/einheiten`.
+async fn abschnitt_von(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    einheit: i64,
+) -> serde_json::Value {
+    let (s, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == einheit)
+        .map(|x| x["abschnitt_id"].clone())
+        .unwrap()
+}
+
+/// LLH-1132 über die Route: Liste der Ablöser (höchstens 8 → sonst 400, nicht zugleich mit der
+/// Einzelangabe → 422), je Ablöser eine Folgeschicht, „Abschnitt übergeben“ samt Rücknahme. Die
+/// Übergabe verlangt die Freigabe des Moduls Einheiten (403), der Vollzug ohne sie nicht.
+#[tokio::test]
+async fn vollzug_mit_liste_und_abschnittsuebergabe() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt(&app, &admin, e, "Deichwache Nord").await;
+    let f1 = einheit(&app, &admin, e, "Florian 1", Some(nord)).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let f3 = einheit(&app, &admin, e, "Florian 3", None).await;
+    let (s, schicht) = anfrage(
+        &app,
+        "POST",
+        &pfad(e),
+        &admin,
+        Some(&format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":360}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let aid = schicht["id"].as_i64().unwrap();
+    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+
+    let neun = format!(
+        r#"{{"abloeser_ids":[{}]}}"#,
+        (0..9).map(|_| f2.to_string()).collect::<Vec<_>>().join(",")
+    );
+    let (s, j) = anfrage(&app, "POST", &vollzug, &admin, Some(&neun)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+    let beide = format!(r#"{{"abloeser_ids":[{f2}],"abloesende_einheit_id":{f3}}}"#);
+    let (s, _) = anfrage(&app, "POST", &vollzug, &admin, Some(&beide)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // Planen als Liste über PATCH; der Spiegel ist der erste Eintrag.
+    let (s, geplant) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/{aid}", pfad(e)),
+        &admin,
+        Some(&format!(r#"{{"abloeser_ids":[{f3},{f2}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{geplant:?}");
+    assert_eq!(geplant["abloesende_einheit_id"], f3);
+    assert_eq!(
+        geplant["abloeser"],
+        serde_json::json!([
+            {"einheit_id": f3, "einheit_name": "Florian 3"},
+            {"einheit_id": f2, "einheit_name": "Florian 2"}
+        ])
+    );
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &vollzug,
+        &admin,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f2},{f3}],"abschnitt_uebergeben":true}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["folgeschichten"].as_array().unwrap().len(), 2);
+    assert_eq!(v["folgeschicht"]["einheit_id"], f2);
+    assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], true);
+    assert_eq!(
+        v["abgeloest"]["uebergebener_abschnitt_name"],
+        "Deichwache Nord"
+    );
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f1).await,
+        serde_json::Value::Null
+    );
+    assert_eq!(abschnitt_von(&app, &admin, e, f2).await, nord);
+    assert_eq!(abschnitt_von(&app, &admin, e, f3).await, nord);
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(
+        treffer(
+            &etb,
+            "meldung",
+            "Abschnitt «Deichwache Nord» an «Florian 2», «Florian 3» übergeben"
+        )
+        .len(),
+        1,
+        "{etb:?}"
+    );
+
+    let (s, r) = anfrage(
+        &app,
+        "POST",
+        &format!("{vollzug}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r:?}");
+    assert_eq!(r["status"], "laufend");
+    assert_eq!(r["folgeschichten"], serde_json::json!([]));
+    assert_eq!(abschnitt_von(&app, &admin, e, f1).await, nord);
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f2).await,
+        serde_json::Value::Null
+    );
+
+    // Ohne Freigabe des Moduls Einheiten: Übergabe 403, Vollzug ohne Übergabe gelingt.
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &vollzug,
+        &frieda,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f2}],"abschnitt_uebergeben":true}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f1).await,
+        nord,
+        "nichts geschrieben"
+    );
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &vollzug,
+        &frieda,
+        Some(&format!(r#"{{"abloeser_ids":[{f2}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], false);
+}

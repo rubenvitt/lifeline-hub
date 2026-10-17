@@ -8303,6 +8303,87 @@ mod tests {
         assert_eq!(zaehle().await, (0, 0), "Zeilen fallen mit der Schicht");
     }
 
+    /// LLH-1132: 0215 legt die Marke `uebernommen_bei_vollzug` an (Vorgabe 0, nur 0/1) und
+    /// übernimmt jede Einzelplanung `abloesende_einheit_id` als genau eine Zeile in die Liste,
+    /// laufend wie abgelöst; Schichten ohne Verweis bekommen keine.
+    #[tokio::test]
+    async fn migration_0215_uebernimmt_die_einzelplanung_in_die_liste() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 212).await;
+        let (e, _b) = bild_grundlage(&pool).await;
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let mut einheiten = Vec::new();
+        for name in ["A", "B", "C", "D"] {
+            einheiten.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let mut schichten = Vec::new();
+        for (einheit, abloeser, status) in [
+            (einheiten[0], Some(einheiten[1]), "abgeloest"),
+            (einheiten[2], Some(einheiten[3]), "laufend"),
+            (einheiten[1], None, "laufend"),
+        ] {
+            schichten.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, \
+                        rhythmus_minuten, rhythmus_quelle, faellig_at, abloesende_einheit_id, \
+                        status, angelegt_von_id) \
+                     VALUES (?, ?, '2026-10-16 06:00:00', 720, 'einheit', \
+                        '2026-10-16 18:00:00', ?, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(einheit)
+                .bind(abloeser)
+                .bind(status)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+
+        migriere_bis(&pool, 215).await;
+
+        let liste: Vec<(i64, i64, Option<i64>)> = sqlx::query_as(
+            "SELECT abloesung_id, einheit_id, abschnitt_vorher_id FROM einsatz_abloesung_abloeser \
+             ORDER BY rowid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            liste,
+            vec![
+                (schichten[0], einheiten[1], None),
+                (schichten[1], einheiten[3], None)
+            ]
+        );
+        let marken: Vec<i64> =
+            sqlx::query_scalar("SELECT uebernommen_bei_vollzug FROM einsatz_abloesung ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(marken, vec![0, 0, 0], "Vorgabe 0 für den Bestand");
+        assert!(
+            sqlx::query("UPDATE einsatz_abloesung SET uebernommen_bei_vollzug = 2 WHERE id = ?")
+                .bind(schichten[0])
+                .execute(&pool)
+                .await
+                .is_err(),
+            "nur 0 oder 1"
+        );
+    }
+
     /// `demo_herkunft` bekommt die fünfte Art: Marken bleiben, nur der CHECK ist weiter.
     #[tokio::test]
     async fn migration_0212_baut_demo_herkunft_mit_schichtmodell_neu() {

@@ -13,9 +13,10 @@ use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
 
 use super::{
-    einstufung, faelligkeit, rhythmus_text, vererbung, vorwarnzeit, AbloesungAnzeige,
-    AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungStatus, AbloesungVollzugAnzeige,
-    AbloesungVorgabeAnzeige, BeendetGrund, RhythmusQuelle, VORWARNUNG_VORGABE_MINUTEN,
+    einstufung, faelligkeit, rhythmus_text, vererbung, vorwarnzeit, AbloesungAbloeser,
+    AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge,
+    AbloesungStatus, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund,
+    RhythmusQuelle, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::erinnerung::repo as erinnerung_repo;
@@ -28,10 +29,16 @@ use crate::schichtmodell::{Regel, Werte};
 use crate::write_retry;
 use crate::zeitachse::repo::Beruehrt;
 
-/// Was Vollzug oder Rücknahme an der Zeitachse geändert haben: die abgelöste Einheit samt den
-/// per Fan-out berührten Personen, `None` ohne Änderung. Die Route meldet danach `einheit` und
-/// `personal` (LLH-1189).
-pub type Zeitachsenwirkung = Option<(i64, Beruehrt)>;
+/// Was Vollzug oder Rücknahme außerhalb der Ablösung geändert haben; die Route meldet danach
+/// `einheit` und `personal` (LLH-1189).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Wirkung {
+    /// Je Einheit mit geschriebenem bzw. gestrichenem Ereignis `abloesung` (die abgelöste und
+    /// ihre erbenden Untereinheiten, LLH-1132) die per Fan-out berührten Personen.
+    pub zeitachse: Vec<(i64, Beruehrt)>,
+    /// Einheiten, deren Abschnitt die Übergabe oder ihre Rücknahme geändert hat.
+    pub einheiten: Vec<i64>,
+}
 
 /// Eingabe „Schicht beginnen" — von der Route validiert (Zeit normalisiert, Rhythmus im
 /// Wertebereich).
@@ -51,8 +58,20 @@ pub struct AenderungEingabe {
     pub beginn_at: Option<String>,
     /// `Some(None)` = zurück zur Vorgabe: der des Abschnitts, sonst der des Einsatzes.
     pub rhythmus_minuten: Option<Option<i64>>,
-    /// `Some(None)` = Planung aufheben.
-    pub abloesende_einheit_id: Option<Option<i64>>,
+    /// Die geplanten Ablöser in ihrer Reihenfolge, von der Route begrenzt und entdoppelt;
+    /// `Some(vec![])` = Planung aufheben.
+    pub abloeser: Option<Vec<i64>>,
+}
+
+/// Eingabe „Vollzug" (LLH-1132) — von der Route validiert (Zeit normalisiert, Liste begrenzt
+/// und entdoppelt).
+#[derive(Debug, Clone, Default)]
+pub struct VollzugEingabe {
+    pub vollzogen_at: String,
+    /// Die Ablöser in ihrer Reihenfolge; leer = ohne ablösende Einheit.
+    pub abloeser: Vec<i64>,
+    /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben, die den Knoten bilden.
+    pub abschnitt_uebergeben: bool,
 }
 
 /// Eine Zeile, wie sie die Anzeige-Projektion liefert.
@@ -78,11 +97,14 @@ struct Zeile {
     vollzogen_von_id: Option<i64>,
     vorgaenger_id: Option<i64>,
     folgeschicht_id: Option<i64>,
-    folgeschicht_laufend: Option<i64>,
+    folgen_unberuehrt: bool,
     einheit_laeuft_anderswo: i64,
     beendet_at: Option<String>,
     beendet_von_id: Option<i64>,
     beendet_grund: Option<String>,
+    uebernommen_bei_vollzug: bool,
+    abschnitt_uebergeben: bool,
+    uebergebener_abschnitt_name: Option<String>,
     angelegt_at: String,
 }
 
@@ -94,12 +116,8 @@ impl Zeile {
             }
             AbloesungStatus::Abgeloest | AbloesungStatus::Beendet => None,
         };
-        let folge_unberuehrt = match self.folgeschicht_id {
-            None => true,
-            Some(_) => self.folgeschicht_laufend == Some(1),
-        };
         let ruecknehmbar = self.status == AbloesungStatus::Abgeloest
-            && folge_unberuehrt
+            && self.folgen_unberuehrt
             && self.einheit_laeuft_anderswo == 0;
         AbloesungAnzeige {
             id: self.id,
@@ -115,12 +133,17 @@ impl Zeile {
             vorwarnung_minuten: self.vorwarnung_minuten,
             abloesende_einheit_id: self.abloesende_einheit_id,
             abloesende_einheit_name: self.abloesende_einheit_name,
+            abloeser: Vec::new(),
             status: self.status,
             einstufung,
             vollzogen_at: self.vollzogen_at,
             vollzogen_von_id: self.vollzogen_von_id,
             vorgaenger_id: self.vorgaenger_id,
             folgeschicht_id: self.folgeschicht_id,
+            folgeschichten: Vec::new(),
+            uebernommen_bei_vollzug: self.uebernommen_bei_vollzug,
+            abschnitt_uebergeben: self.abschnitt_uebergeben,
+            uebergebener_abschnitt_name: self.uebergebener_abschnitt_name,
             ruecknehmbar,
             beendet_at: self.beendet_at,
             beendet_von_id: self.beendet_von_id,
@@ -131,10 +154,12 @@ impl Zeile {
     }
 }
 
-/// Anzeige-Projektion. Die Folgeschicht ist die jüngste Schicht mit `vorgaenger_id` = diese:
-/// EIN Zugriff je Zeile (`MAX(id)` über `idx_abloesung_vorgaenger`, Migration 0153), dann der
-/// Join über den Primärschlüssel. Ohne den Index war jede der früheren zwei Unterabfragen ein
-/// Scan über die Ablösungen aller Einsätze (LFH-933); `liste_plan_ohne_scan` hält das fest.
+/// Anzeige-Projektion. Die Folgeschicht ist die jüngste Schicht mit `vorgaenger_id` = diese
+/// (`MAX(id)` über `idx_abloesung_vorgaenger`, Migration 0153); unberührt ist der Vollzug, wenn
+/// keine seiner Folgeschichten (LLH-1132: je Ablöser eine) aufgehört hat zu laufen — dieselbe
+/// Index-Suche. Ohne den Index war jede Unterabfrage ein Scan über die Ablösungen aller Einsätze
+/// (LFH-933); `liste_plan_ohne_scan` hält das fest. Ablöser und Folgeschichten hängt
+/// [`attach_listen`] an.
 /// Die Vorwarnung kommt aus der Kopie des Schichtmodells am Einsatz (LLH-1122), ohne sie 30 min
 /// ([`VORWARNUNG_VORGABE_MINUTEN`], im SQL als Literal; `vorwarnung_vorgabe_im_sql` hält beide
 /// gleich).
@@ -144,18 +169,21 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
             COALESCE(m.vorwarnung_minuten, 30) AS vorwarnung_minuten, a.abloesende_einheit_id, \
             ae.name AS abloesende_einheit_name, a.status, a.vollzogen_at, a.vollzogen_von_id, \
             a.vorgaenger_id, \
-            f.id AS folgeschicht_id, \
-            f.status = 'laufend' AS folgeschicht_laufend, \
+            (SELECT MAX(fv.id) FROM einsatz_abloesung fv WHERE fv.vorgaenger_id = a.id) \
+               AS folgeschicht_id, \
+            NOT EXISTS (SELECT 1 FROM einsatz_abloesung fu WHERE fu.vorgaenger_id = a.id \
+               AND fu.status <> 'laufend') AS folgen_unberuehrt, \
             EXISTS (SELECT 1 FROM einsatz_abloesung o WHERE o.einheit_id = a.einheit_id \
                AND o.status = 'laufend' AND o.id <> a.id) AS einheit_laeuft_anderswo, \
-            a.beendet_at, a.beendet_von_id, a.beendet_grund, a.angelegt_at \
+            a.beendet_at, a.beendet_von_id, a.beendet_grund, a.uebernommen_bei_vollzug, \
+            a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
      LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id \
      LEFT JOIN einsatz_schichtmodell m ON m.einsatz_id = a.einsatz_id \
-     LEFT JOIN einsatz_abloesung f ON f.id = \
-               (SELECT MAX(fv.id) FROM einsatz_abloesung fv WHERE fv.vorgaenger_id = a.id)";
+     LEFT JOIN einsatzabschnitt ua ON ua.id = a.abgeloest_abschnitt_vorher_id \
+               AND a.abschnitt_uebergeben = 1";
 
 /// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug und beendete
 /// nach ihrem Ende, beide absteigend. Laufende tragen ihre erbenden Untereinheiten.
@@ -171,7 +199,76 @@ pub async fn liste(
         .await?;
     let mut liste: Vec<AbloesungAnzeige> = zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect();
     attach_erben(pool, einsatz_id, &mut liste).await?;
+    attach_listen(pool, einsatz_id, &mut liste).await?;
     Ok(liste)
+}
+
+/// Hängt an jede Schicht ihre Ablöser (Reihenfolge der Planung) und ihre Folgeschichten (nach
+/// ID). Je eine Abfrage für den ganzen Einsatz, unabhängig von der Zahl der Schichten.
+async fn attach_listen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    liste: &mut [AbloesungAnzeige],
+) -> Result<(), AppError> {
+    if liste.is_empty() {
+        return Ok(());
+    }
+    let abloeser: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT l.abloesung_id, l.einheit_id, e.name FROM einsatz_abloesung_abloeser l \
+         JOIN einsatz_abloesung a ON a.id = l.abloesung_id \
+         JOIN einsatz_einheit e ON e.id = l.einheit_id \
+         WHERE a.einsatz_id = ? ORDER BY l.abloesung_id, l.rowid",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut je_schicht: HashMap<i64, Vec<AbloesungAbloeser>> = HashMap::new();
+    for (abloesung_id, einheit_id, einheit_name) in abloeser {
+        je_schicht
+            .entry(abloesung_id)
+            .or_default()
+            .push(AbloesungAbloeser {
+                einheit_id,
+                einheit_name,
+            });
+    }
+    #[derive(sqlx::FromRow)]
+    struct Folge {
+        vorgaenger_id: i64,
+        id: i64,
+        einheit_id: i64,
+        einheit_name: String,
+        #[sqlx(try_from = "String")]
+        status: AbloesungStatus,
+        uebernommen: bool,
+    }
+    let folgen: Vec<Folge> = sqlx::query_as(
+        "SELECT f.vorgaenger_id, f.id, f.einheit_id, e.name AS einheit_name, f.status, \
+                f.uebernommen_bei_vollzug AS uebernommen \
+         FROM einsatz_abloesung f JOIN einsatz_einheit e ON e.id = f.einheit_id \
+         WHERE f.einsatz_id = ? AND f.vorgaenger_id IS NOT NULL ORDER BY f.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut je_vorgaenger: HashMap<i64, Vec<AbloesungFolge>> = HashMap::new();
+    for f in folgen {
+        je_vorgaenger
+            .entry(f.vorgaenger_id)
+            .or_default()
+            .push(AbloesungFolge {
+                id: f.id,
+                einheit_id: f.einheit_id,
+                einheit_name: f.einheit_name,
+                status: f.status,
+                uebernommen: f.uebernommen,
+            });
+    }
+    for a in liste.iter_mut() {
+        a.abloeser = je_schicht.remove(&a.id).unwrap_or_default();
+        a.folgeschichten = je_vorgaenger.remove(&a.id).unwrap_or_default();
+    }
+    Ok(())
 }
 
 /// Die Gliederung eines Einsatzes für die Knoten-Vererbung: je aktive Einheit ihre
@@ -301,6 +398,7 @@ pub async fn laden(
     .ok_or(AppError::NotFound)?;
     let mut eine = [a];
     attach_erben(pool, einsatz_id, &mut eine).await?;
+    attach_listen(pool, einsatz_id, &mut eine).await?;
     let [a] = eine;
     Ok(a)
 }
@@ -378,6 +476,134 @@ async fn has_laufende_tx(conn: &mut SqliteConnection, einheit_id: i64) -> Result
     Ok(r.is_some())
 }
 
+/// Ein geprüfter Ablöser: aktive Einheit des Einsatzes, nicht die abgelöste selbst.
+#[derive(Debug, Clone)]
+struct Abloeser {
+    id: i64,
+    name: String,
+}
+
+/// Prüft eine Liste von Ablösern (LLH-1132) mit EINER Abfrage über `json_each` (`src/AGENTS.md`,
+/// „Eingabegrenzen“): die Einheit selbst → 422, eine fremde oder unbekannte → 404, eine
+/// aufgelöste → 409 (wie [`einheit_tx`]). Liefert die Ablöser in der Reihenfolge der Liste.
+async fn check_abloeser_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    selbst: i64,
+    ids: &[i64],
+) -> Result<Vec<Abloeser>, AppError> {
+    if ids.contains(&selbst) {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Einheit kann sich nicht selbst ablösen".into(),
+        ));
+    }
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let json = serde_json::to_string(ids).map_err(|e| AppError::Internal(e.to_string()))?;
+    let zeilen: Vec<(i64, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT j.value, e.name, e.aufgeloest_at FROM json_each(?) j \
+         LEFT JOIN einsatz_einheit e ON e.id = j.value AND e.einsatz_id = ? ORDER BY j.key",
+    )
+    .bind(json)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    zeilen
+        .into_iter()
+        .map(|(id, name, aufgeloest)| match (name, aufgeloest) {
+            (None, _) => Err(AppError::NotFound),
+            (Some(name), Some(_)) => Err(AppError::Conflict(format!(
+                "Die Einheit «{name}» ist aufgelöst"
+            ))),
+            (Some(name), None) => Ok(Abloeser { id, name }),
+        })
+        .collect()
+}
+
+/// Die Ablöser einer Schicht in ihrer Reihenfolge (`rowid` = Reihenfolge der Anlage).
+async fn load_abloeser_ids_tx(conn: &mut SqliteConnection, id: i64) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT einheit_id FROM einsatz_abloesung_abloeser WHERE abloesung_id = ? ORDER BY rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Ersetzt die Liste der Ablöser einer Schicht (Reihenfolge wie übergeben, EINE Anweisung über
+/// `json_each`) und zieht den Spiegel nach. Einziger Schreibweg der Liste und des Spiegels
+/// `abloesende_einheit_id` (= erster Eintrag, Migration 0215) neben [`sync_spiegel_tx`].
+async fn set_abloeser_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    if !ids.is_empty() {
+        let json = serde_json::to_string(ids).map_err(|e| AppError::Internal(e.to_string()))?;
+        sqlx::query(
+            "INSERT INTO einsatz_abloesung_abloeser (abloesung_id, einheit_id) \
+             SELECT ?, j.value FROM json_each(?) j ORDER BY j.key",
+        )
+        .bind(id)
+        .bind(json)
+        .execute(&mut *conn)
+        .await?;
+    }
+    sync_spiegel_tx(conn, id).await
+}
+
+/// `abloesende_einheit_id` = erster Ablöser der Liste, NULL ohne einen.
+async fn sync_spiegel_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET abloesende_einheit_id = \
+            (SELECT einheit_id FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?1 \
+             ORDER BY rowid LIMIT 1) \
+         WHERE id = ?1",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Ob ein Vorfahr der Einheit (über `ueber_einheit_id`) in `menge` liegt. Löst ein Verband ab,
+/// bilden nur die Ablöser ohne Vorfahren in der Liste den Knoten (LLH-1118 Punkt 3); die übrigen
+/// erben dessen Folgeschicht. Iterativ mit Besucht-Menge wie [`vererbung`].
+fn has_vorfahr_in(ueber: &HashMap<i64, Option<i64>>, einheit: i64, menge: &HashSet<i64>) -> bool {
+    let mut besucht = HashSet::from([einheit]);
+    let mut knoten = ueber.get(&einheit).copied().flatten();
+    while let Some(k) = knoten {
+        if !besucht.insert(k) {
+            return false;
+        }
+        if menge.contains(&k) {
+            return true;
+        }
+        knoten = ueber.get(&k).copied().flatten();
+    }
+    false
+}
+
+/// Die Untereinheiten, die die laufende Schicht von `traeger` gerade erben, nach ID.
+async fn load_erben_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    traeger: i64,
+) -> Result<Vec<i64>, AppError> {
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    let mut erben: Vec<i64> = vererbung(&g.ueber, &g.mit_schicht)
+        .into_iter()
+        .filter_map(|(erbe, t)| (t == traeger).then_some(erbe))
+        .collect();
+    erben.sort_unstable();
+    Ok(erben)
+}
+
 /// Rohdaten einer Schicht für die Schreibpfade.
 #[derive(sqlx::FromRow)]
 struct Roh {
@@ -388,7 +614,6 @@ struct Roh {
     #[sqlx(try_from = "String")]
     rhythmus_quelle: RhythmusQuelle,
     faellig_at: String,
-    abloesende_einheit_id: Option<i64>,
     #[sqlx(try_from = "String")]
     status: AbloesungStatus,
     vollzogen_at: Option<String>,
@@ -398,7 +623,7 @@ struct Roh {
 async fn roh_tx(conn: &mut SqliteConnection, einsatz_id: i64, id: i64) -> Result<Roh, AppError> {
     sqlx::query_as(
         "SELECT einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-                faellig_at, abloesende_einheit_id, status, vollzogen_at, etb_vollzug_id \
+                faellig_at, status, vollzogen_at, etb_vollzug_id \
          FROM einsatz_abloesung WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
@@ -681,7 +906,20 @@ pub async fn release_einheit_tx(
     .execute(&mut *conn)
     .await?
     .rows_affected();
-    Ok(laufend.is_some() || geleert > 0)
+    // LLH-1132: aus der Liste laufender Schichten fällt sie heraus, der Spiegel rückt nach;
+    // abgelöste behalten sie als Spur ihres Vollzugs.
+    let aus_liste: Vec<i64> = sqlx::query_scalar(
+        "DELETE FROM einsatz_abloesung_abloeser WHERE einheit_id = ? AND abloesung_id IN \
+            (SELECT id FROM einsatz_abloesung WHERE status = 'laufend') \
+         RETURNING abloesung_id",
+    )
+    .bind(einheit_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in &aus_liste {
+        sync_spiegel_tx(conn, *id).await?;
+    }
+    Ok(laufend.is_some() || geleert > 0 || !aus_liste.is_empty())
 }
 
 /// Legt eine laufende Schicht an und setzt ihre Fristen. Rhythmus und Fälligkeit rechnet
@@ -934,41 +1172,37 @@ pub async fn aendern(
             teile.push("Einsatzbeginn geändert".into());
         }
 
-        // Ablösende Einheit
-        let abloesende = match eingabe.abloesende_einheit_id {
-            None => roh.abloesende_einheit_id,
-            Some(v) => v,
-        };
-        if abloesende != roh.abloesende_einheit_id {
-            match abloesende {
-                Some(a) if a == roh.einheit_id => {
-                    return Err(AppError::UnprocessableEntity(
-                        "Eine Einheit kann sich nicht selbst ablösen".into(),
-                    ))
-                }
-                Some(a) => {
-                    let (a_name, _) = einheit_tx(conn, einsatz_id, a).await?;
-                    teile.push(format!("ablösende Einheit «{a_name}» geplant"));
-                }
-                None => teile.push("Planung der ablösenden Einheit aufgehoben".into()),
+        // Ablöser (LLH-1132: eine Liste, `einsatz_abloesung_abloeser`)
+        let neue_abloeser = match &eingabe.abloeser {
+            Some(neu) if *neu != load_abloeser_ids_tx(conn, id).await? => {
+                let geprueft = check_abloeser_tx(conn, einsatz_id, roh.einheit_id, neu).await?;
+                teile.push(match geprueft.as_slice() {
+                    [] => "Planung der ablösenden Einheit aufgehoben".into(),
+                    [a] => format!("ablösende Einheit «{}» geplant", a.name),
+                    viele => format!("ablösende Einheiten {} geplant", namen_text(viele)),
+                });
+                Some(neu)
             }
-        }
+            _ => None,
+        };
 
         if teile.is_empty() {
             return Ok(None);
         }
         sqlx::query(
             "UPDATE einsatz_abloesung SET beginn_at = ?, rhythmus_minuten = ?, \
-                rhythmus_quelle = ?, faellig_at = ?, abloesende_einheit_id = ? WHERE id = ?",
+                rhythmus_quelle = ?, faellig_at = ? WHERE id = ?",
         )
         .bind(&beginn_at)
         .bind(rhythmus)
         .bind(quelle.as_str())
         .bind(&faellig_at)
-        .bind(abloesende)
         .bind(id)
         .execute(&mut *conn)
         .await?;
+        if let Some(neu) = neue_abloeser {
+            set_abloeser_tx(conn, id, neu).await?;
+        }
         if faellig_at != roh.faellig_at {
             set_fristen_tx(
                 conn,
@@ -1293,20 +1527,37 @@ fn modell_text(w: &Werte) -> String {
     )
 }
 
-/// Vollzieht eine laufende Schicht. Mit ablösender Einheit entsteht deren Folgeschicht
-/// (Beginn = Vollzug, Rhythmus und Einsatzstelle der abgelösten Schicht; folgt sie der Vorgabe
-/// des Einsatzes, rechnet deren Regel neu, etwa bis zum nächsten Wechsel).
+/// Namen für ETB-Texte: „«A», «B»“.
+fn namen_text(abloeser: &[Abloeser]) -> String {
+    abloeser
+        .iter()
+        .map(|a| format!("«{}»", a.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Vollzieht eine laufende Schicht (LLH-1132). Die Ablöser kommen als Liste und werden zur Liste
+/// der Schicht (`einsatz_abloesung_abloeser`). Je Ablöser, der den Knoten bildet (kein Vorfahr
+/// ebenfalls in der Liste), entsteht eine Folgeschicht (Beginn = Vollzug, Rhythmus und
+/// Einsatzstelle der abgelösten Schicht; folgt sie der Vorgabe des Einsatzes, rechnet deren Regel
+/// neu, etwa bis zum nächsten Wechsel). Hat ein Ablöser schon eine eigene laufende Schicht ohne
+/// Vorgänger (ungeplant eingetroffen, Autostart), wird sie als Folgeschicht übernommen; ist seine
+/// laufende Schicht selbst schon eine Folgeschicht → 422. Das Ereignis `abloesung` der
+/// Zeitachse geht an die abgelöste Einheit und an jede Untereinheit, die ihre Schicht erbt
+/// (Knoten-Vererbung beim Lesen, samt Personen). Mit `abschnitt_uebergeben` geht der Abschnitt
+/// der abgelösten Einheit an die Knoten-Ablöser, ihr eigener wird geleert; die alten Werte
+/// stehen an der Schicht und an der Liste für die Rücknahme.
 pub async fn vollziehen(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     benutzer_id: i64,
-    vollzogen_at: &str,
-    abloesende_einheit_id: Option<i64>,
+    eingabe: &VollzugEingabe,
     jetzt: &str,
-) -> Result<(AbloesungVollzugAnzeige, i64, Zeitachsenwirkung), AppError> {
+) -> Result<(AbloesungVollzugAnzeige, i64, Wirkung), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
-    let (folge_id, etb_id, zeitachse) = write_retry!(pool, |conn| {
+    let vollzogen_at = eingabe.vollzogen_at.as_str();
+    let (folge_ids, etb_id, wirkung) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
             return Err(AppError::UnprocessableEntity(nicht_laufend(
@@ -1319,49 +1570,78 @@ pub async fn vollziehen(
                 "Der Vollzug liegt vor dem Beginn der Schicht".into(),
             ));
         }
-        let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
-        let abloeser = match abloesende_einheit_id {
-            Some(a) if a == roh.einheit_id => {
-                return Err(AppError::UnprocessableEntity(
-                    "Eine Einheit kann sich nicht selbst ablösen".into(),
-                ))
-            }
-            Some(a) => Some((a, einheit_tx(conn, einsatz_id, a).await?.0)),
-            None => None,
-        };
+        let (name, abschnitt_vorher) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
+        let abloeser =
+            check_abloeser_tx(conn, einsatz_id, roh.einheit_id, &eingabe.abloeser).await?;
+
+        // Vor jedem Schreiben: Knoten der Ablöser und Erben der abgelösten Schicht.
+        let g = load_gliederung(&mut *conn, einsatz_id).await?;
+        let menge: HashSet<i64> = abloeser.iter().map(|a| a.id).collect();
+        let knoten: Vec<&Abloeser> = abloeser
+            .iter()
+            .filter(|a| !has_vorfahr_in(&g.ueber, a.id, &menge))
+            .collect();
+        let mut erben: Vec<i64> = vererbung(&g.ueber, &g.mit_schicht)
+            .into_iter()
+            .filter_map(|(erbe, t)| (t == roh.einheit_id).then_some(erbe))
+            .collect();
+        erben.sort_unstable();
+        // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
+        let uebergabe =
+            abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
 
         sqlx::query(
             "UPDATE einsatz_abloesung SET status = 'abgeloest', vollzogen_at = ?, \
-                vollzogen_von_id = ?, abloesende_einheit_id = ? WHERE id = ?",
+                vollzogen_von_id = ?, abschnitt_uebergeben = ?, \
+                abgeloest_abschnitt_vorher_id = ? WHERE id = ?",
         )
         .bind(vollzogen_at)
         .bind(benutzer_id)
-        .bind(abloesende_einheit_id)
+        .bind(uebergabe.is_some())
+        .bind(uebergabe)
         .bind(id)
         .execute(&mut *conn)
         .await?;
+        set_abloeser_tx(conn, id, &eingabe.abloeser).await?;
         close_fristen_tx(conn, id, jetzt).await?;
-        // LFH-552: der Vollzug beendet die Einsatzperiode der abgelösten Einheit (samt Fan-out);
-        // ohne offene Periode bleibt die Zeitachse unberührt.
-        let zeitachse = crate::zeitachse::repo::abloesung_vollzogen_tx(
-            conn,
-            einsatz_id,
-            benutzer_id,
-            roh.einheit_id,
-            vollzogen_at,
-        )
-        .await?;
 
-        let folge_id = match &abloeser {
-            Some((a, a_name)) => {
-                let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
-                Some(
-                    create_schicht_tx(
+        // LFH-552/LLH-1132: der Vollzug beendet die Einsatzperiode der abgelösten Einheit und
+        // jeder erbenden Untereinheit (je samt Fan-out); ohne offene Periode bleibt die jeweilige
+        // Zeitachse unberührt.
+        let mut wirkung = Wirkung::default();
+        for einheit in std::iter::once(roh.einheit_id).chain(erben.iter().copied()) {
+            if let Some(w) = crate::zeitachse::repo::abloesung_vollzogen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit,
+                vollzogen_at,
+            )
+            .await?
+            {
+                wirkung.zeitachse.push(w);
+            }
+        }
+
+        let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+        let mut folge_ids = Vec::with_capacity(knoten.len());
+        let mut uebernommen: Vec<Abloeser> = Vec::new();
+        for a in &knoten {
+            let laufend: Option<(i64, Option<i64>)> = sqlx::query_as(
+                "SELECT id, vorgaenger_id FROM einsatz_abloesung \
+                 WHERE einheit_id = ? AND status = 'laufend'",
+            )
+            .bind(a.id)
+            .fetch_optional(&mut *conn)
+            .await?;
+            match laufend {
+                None => {
+                    let (f, _) = create_schicht_tx(
                         conn,
                         einsatz_id,
                         benutzer_id,
-                        *a,
-                        a_name,
+                        a.id,
+                        &a.name,
                         roh.abschnitt_id,
                         vollzogen_at,
                         roh.rhythmus_minuten,
@@ -1370,17 +1650,84 @@ pub async fn vollziehen(
                         Some(id),
                         jetzt,
                     )
-                    .await?
-                    .0,
-                )
+                    .await?;
+                    folge_ids.push(f);
+                }
+                Some((f, None)) => {
+                    sqlx::query(
+                        "UPDATE einsatz_abloesung SET vorgaenger_id = ?, \
+                            uebernommen_bei_vollzug = 1 WHERE id = ?",
+                    )
+                    .bind(id)
+                    .bind(f)
+                    .execute(&mut *conn)
+                    .await?;
+                    folge_ids.push(f);
+                    uebernommen.push((*a).clone());
+                }
+                Some((_, Some(_))) => {
+                    return Err(AppError::UnprocessableEntity(format!(
+                        "Einheit «{}» führt schon eine Folgeschicht aus einer anderen Ablösung",
+                        a.name
+                    )))
+                }
             }
-            None => None,
-        };
+        }
 
-        let inhalt = match &abloeser {
-            Some((_, a_name)) => format!("Ablösung vollzogen: «{name}» durch «{a_name}»."),
-            None => format!("Ablösung vollzogen: «{name}» (ohne ablösende Einheit)."),
+        let mut abschnitt_name = None;
+        if let Some(abschnitt) = uebergabe {
+            // Vorher-Werte aller Listeneinträge, damit die Rücknahme jeden auf seinen Stand legt.
+            sqlx::query(
+                "UPDATE einsatz_abloesung_abloeser SET abschnitt_vorher_id = \
+                    (SELECT e.abschnitt_id FROM einsatz_einheit e \
+                     WHERE e.id = einsatz_abloesung_abloeser.einheit_id) \
+                 WHERE abloesung_id = ?",
+            )
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+            let knoten_ids: Vec<i64> = knoten.iter().map(|a| a.id).collect();
+            sqlx::query(
+                "UPDATE einsatz_einheit SET abschnitt_id = ? \
+                 WHERE id IN (SELECT value FROM json_each(?))",
+            )
+            .bind(abschnitt)
+            .bind(
+                serde_json::to_string(&knoten_ids)
+                    .map_err(|e| AppError::Internal(e.to_string()))?,
+            )
+            .execute(&mut *conn)
+            .await?;
+            sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE id = ?")
+                .bind(roh.einheit_id)
+                .execute(&mut *conn)
+                .await?;
+            wirkung.einheiten.push(roh.einheit_id);
+            wirkung.einheiten.extend(knoten_ids);
+            abschnitt_name = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
+        }
+
+        let mut inhalt = if abloeser.is_empty() {
+            format!("Ablösung vollzogen: «{name}» (ohne ablösende Einheit).")
+        } else {
+            format!(
+                "Ablösung vollzogen: «{name}» durch {}.",
+                namen_text(&abloeser)
+            )
         };
+        if !uebernommen.is_empty() {
+            inhalt.push_str(&format!(
+                " Laufende Schicht übernommen: {}.",
+                namen_text(&uebernommen)
+            ));
+        }
+        if let Some(a) = &abschnitt_name {
+            let an: Vec<Abloeser> = knoten.iter().map(|k| (*k).clone()).collect();
+            inhalt.push_str(&format!(
+                " Abschnitt «{a}» an {} übergeben.",
+                namen_text(&an)
+            ));
+        }
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -1404,58 +1751,78 @@ pub async fn vollziehen(
             .bind(id)
             .execute(&mut *conn)
             .await?;
-        Ok((folge_id, etb_id, zeitachse))
+        Ok((folge_ids, etb_id, wirkung))
     })?;
     let abgeloest = laden(pool, einsatz_id, id, jetzt).await?;
-    let folgeschicht = match folge_id {
-        Some(f) => Some(laden(pool, einsatz_id, f, jetzt).await?),
-        None => None,
-    };
+    let mut folgeschichten = Vec::with_capacity(folge_ids.len());
+    for f in folge_ids {
+        folgeschichten.push(laden(pool, einsatz_id, f, jetzt).await?);
+    }
     Ok((
         AbloesungVollzugAnzeige {
             abgeloest,
-            folgeschicht,
+            folgeschicht: folgeschichten.first().cloned(),
+            folgeschichten,
         },
         etb_id,
-        zeitachse,
+        wirkung,
     ))
 }
 
-/// Nimmt einen Vollzug zurück, solange die Folgeschicht unberührt (laufend) ist.
+/// Nimmt einen Vollzug zurück, solange jede Folgeschicht unberührt (laufend) ist (LLH-1132):
+/// neu angelegte Folgeschichten werden samt Fristen entfernt, übernommene nur vom Vorgänger
+/// gelöst. Das Ereignis `abloesung` wird an der Einheit und an jeder Untereinheit gestrichen,
+/// die die wieder laufende Schicht erbt. Eine Abschnittsübergabe wird zurückgegeben, wo der
+/// Vollzug den Stand hinterlassen hat: die abgelöste Einheit bekommt ihren Abschnitt, solange sie
+/// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Liste
+/// der Ablöser bleibt als Planung stehen.
 pub async fn zuruecknehmen(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     benutzer_id: i64,
     jetzt: &str,
-) -> Result<(AbloesungAnzeige, i64, Zeitachsenwirkung), AppError> {
+) -> Result<(AbloesungAnzeige, i64, Wirkung), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
-    let (etb_id, zeitachse) = write_retry!(pool, |conn| {
+    let (etb_id, wirkung) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Abgeloest {
             return Err(AppError::UnprocessableEntity(
                 "Die Schicht ist nicht abgelöst — es gibt keinen Vollzug zurückzunehmen".into(),
             ));
         }
-        let folge: Option<(i64, String)> = sqlx::query_as(
-            "SELECT id, status FROM einsatz_abloesung WHERE vorgaenger_id = ? \
-             ORDER BY id DESC LIMIT 1",
+        let folgen: Vec<(i64, String, bool)> = sqlx::query_as(
+            "SELECT id, status, uebernommen_bei_vollzug FROM einsatz_abloesung \
+             WHERE vorgaenger_id = ? ORDER BY id",
         )
         .bind(id)
-        .fetch_optional(&mut *conn)
+        .fetch_all(&mut *conn)
         .await?;
-        if let Some((folge_id, status)) = &folge {
-            if status.as_str() != AbloesungStatus::Laufend.as_str() {
-                return Err(AppError::UnprocessableEntity(
-                    "Die Folgeschicht ist bereits selbst abgelöst oder beendet — der Vollzug lässt sich nicht mehr zurücknehmen"
-                        .into(),
-                ));
-            }
-            delete_fristen_tx(conn, *folge_id).await?;
-            sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+        if folgen
+            .iter()
+            .any(|(_, status, _)| status.as_str() != AbloesungStatus::Laufend.as_str())
+        {
+            return Err(AppError::UnprocessableEntity(
+                "Die Folgeschicht ist bereits selbst abgelöst oder beendet — der Vollzug lässt sich nicht mehr zurücknehmen"
+                    .into(),
+            ));
+        }
+        for (folge_id, _, uebernommen) in &folgen {
+            if *uebernommen {
+                sqlx::query(
+                    "UPDATE einsatz_abloesung SET vorgaenger_id = NULL, \
+                        uebernommen_bei_vollzug = 0 WHERE id = ?",
+                )
                 .bind(folge_id)
                 .execute(&mut *conn)
                 .await?;
+            } else {
+                delete_fristen_tx(conn, *folge_id).await?;
+                sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+                    .bind(folge_id)
+                    .execute(&mut *conn)
+                    .await?;
+            }
         }
         let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
         if has_laufende_tx(conn, roh.einheit_id).await? {
@@ -1463,29 +1830,84 @@ pub async fn zuruecknehmen(
                 "Einheit «{name}» hat inzwischen eine neue laufende Schicht"
             )));
         }
-        // LFH-552: das Ablösungsereignis der Zeitachse streichen, die Periode ist wieder offen.
-        let zeitachse = match &roh.vollzogen_at {
-            Some(vollzogen_at) => {
-                crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+        let (uebergeben, abschnitt): (bool, Option<i64>) = sqlx::query_as(
+            "SELECT abschnitt_uebergeben, abgeloest_abschnitt_vorher_id FROM einsatz_abloesung \
+             WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \
+                vollzogen_von_id = NULL, etb_vollzug_id = NULL, abschnitt_uebergeben = 0, \
+                abgeloest_abschnitt_vorher_id = NULL WHERE id = ?",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+
+        // LFH-552/LLH-1132: das Ablösungsereignis an der Einheit und an ihren Erben streichen,
+        // ihre Perioden sind wieder offen. Die Erben ermittelt die Vererbung jetzt, da die
+        // Schicht wieder läuft.
+        let mut wirkung = Wirkung::default();
+        if let Some(vollzogen_at) = &roh.vollzogen_at {
+            let erben = load_erben_tx(conn, einsatz_id, roh.einheit_id).await?;
+            for einheit in std::iter::once(roh.einheit_id).chain(erben) {
+                if let Some(w) = crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
                     conn,
                     einsatz_id,
                     benutzer_id,
-                    roh.einheit_id,
+                    einheit,
                     vollzogen_at,
                 )
                 .await?
+                {
+                    wirkung.zeitachse.push(w);
+                }
             }
-            None => None,
-        };
+        }
+
+        let mut zurueck = None;
+        if let (true, Some(abschnitt)) = (uebergeben, abschnitt) {
+            let abloeser: Vec<i64> = sqlx::query_scalar(
+                "UPDATE einsatz_einheit SET abschnitt_id = \
+                    (SELECT l.abschnitt_vorher_id FROM einsatz_abloesung_abloeser l \
+                     WHERE l.abloesung_id = ?1 AND l.einheit_id = einsatz_einheit.id) \
+                 WHERE abschnitt_id = ?2 AND id IN \
+                    (SELECT einheit_id FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?1) \
+                 RETURNING id",
+            )
+            .bind(id)
+            .bind(abschnitt)
+            .fetch_all(&mut *conn)
+            .await?;
+            let selbst = sqlx::query(
+                "UPDATE einsatz_einheit SET abschnitt_id = ? WHERE id = ? AND abschnitt_id IS NULL",
+            )
+            .bind(abschnitt)
+            .bind(roh.einheit_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected();
+            if selbst > 0 {
+                wirkung.einheiten.push(roh.einheit_id);
+            }
+            wirkung.einheiten.extend(abloeser);
+            zurueck = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
+        }
         sqlx::query(
-            "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \
-                vollzogen_von_id = NULL, etb_vollzug_id = NULL WHERE id = ?",
+            "UPDATE einsatz_abloesung_abloeser SET abschnitt_vorher_id = NULL \
+             WHERE abloesung_id = ?",
         )
         .bind(id)
         .execute(&mut *conn)
         .await?;
         restore_fristen_tx(conn, einsatz_id, benutzer_id, id, &roh, &name, jetzt).await?;
 
+        let mut inhalt = format!("Vollzug der Ablösung «{name}» zurückgenommen.");
+        if let Some(a) = zurueck {
+            inhalt.push_str(&format!(" Abschnitt «{a}» zurückgegeben."));
+        }
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -1493,7 +1915,7 @@ pub async fn zuruecknehmen(
             startwert,
             EintragDaten {
                 typ: TYP_BERICHTIGUNG,
-                inhalt: &format!("Vollzug der Ablösung «{name}» zurückgenommen."),
+                inhalt: &inhalt,
                 von: None,
                 an: None,
                 meldeweg: None,
@@ -1504,9 +1926,9 @@ pub async fn zuruecknehmen(
             },
         )
         .await?;
-        Ok((etb_id, zeitachse))
+        Ok((etb_id, wirkung))
     })?;
-    Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, zeitachse))
+    Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, wirkung))
 }
 
 /// Fristen einer wieder laufenden Schicht (Rücknahme des Vollzugs, gestrichene Entlassung) nach

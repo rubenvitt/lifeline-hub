@@ -12,15 +12,15 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::repo::{
-    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, Zeitachsenwirkung,
+    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, VollzugEingabe, Wirkung,
 };
 use crate::abloesung::{
     AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus, AbloesungVollzugAnzeige,
-    AbloesungVorgabeAnzeige, RHYTHMUS_MAX_MINUTEN,
+    AbloesungVorgabeAnzeige, ABLOESER_MAX, RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Abloesung;
+use crate::einsatz::modul::{Abloesung, Einheiten};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
@@ -59,14 +59,50 @@ pub(crate) fn publish_kopplung(state: &AppState, einsatz_id: i64, etb_ids: &[i64
     sse(state, einsatz_id);
 }
 
-/// Vollzug und Rücknahme ändern die Zeitachse der Einheit und per Fan-out die ihrer Personen;
-/// deren Leser mit nur Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189).
-fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Zeitachsenwirkung) {
-    if let Some((einheit_id, beruehrt)) = wirkung {
+/// Vollzug und Rücknahme ändern die Zeitachse der Einheit, ihrer erbenden Untereinheiten und per
+/// Fan-out die ihrer Personen, mit der Abschnittsübergabe auch Einheiten; deren Leser mit nur
+/// Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189). Je Einheit ein Ereignis.
+fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Wirkung) {
+    let mut gemeldet: Vec<i64> = Vec::new();
+    for (einheit_id, beruehrt) in wirkung.zeitachse {
         super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+        gemeldet.push(einheit_id);
         for ep_id in beruehrt.personen {
             super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
         }
+    }
+    for einheit_id in crate::kraefte_disposition::dedupe(&wirkung.einheiten, |id| *id) {
+        if !gemeldet.contains(&einheit_id) {
+            super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+        }
+    }
+}
+
+/// Eine Liste von Ablösern von außen (LLH-1132, `src/AGENTS.md`, „Eingabegrenzen“): mehr als
+/// [`ABLOESER_MAX`], gezählt vor dem Entdoppeln → 400; liefert sie entdoppelt in ihrer
+/// Reihenfolge. Leer ist erlaubt (ohne ablösende Einheit bzw. Planung aufheben).
+fn check_abloeser(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    if ids.len() > ABLOESER_MAX {
+        return Err(AppError::Validation(format!(
+            "abloeser_ids: höchstens {ABLOESER_MAX} Einheiten"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
+}
+
+/// Ablöser aus der Liste oder der Einzelangabe (Bestand). Beide zugleich → 422 (Feld-
+/// Kombination).
+fn abloeser_aus(
+    liste: Option<Vec<i64>>,
+    einzeln: Option<Option<i64>>,
+) -> Result<Option<Vec<i64>>, AppError> {
+    match (liste, einzeln) {
+        (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
+            "Entweder abloeser_ids oder abloesende_einheit_id, nicht beides".into(),
+        )),
+        (Some(l), None) => Ok(Some(check_abloeser(&l)?)),
+        (None, Some(e)) => Ok(Some(e.into_iter().collect())),
+        (None, None) => Ok(None),
     }
 }
 
@@ -164,9 +200,14 @@ pub struct Aendern {
     /// Tri-State: fehlt = unverändert, `null` = zurück zur Abschnittsvorgabe.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     rhythmus_minuten: Option<Option<i64>>,
-    /// Tri-State: fehlt = unverändert, `null` = Planung aufheben.
+    /// Tri-State: fehlt = unverändert, `null` = Planung aufheben. Bestand neben
+    /// `abloeser_ids`: plant genau einen Ablöser.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     abloesende_einheit_id: Option<Option<i64>>,
+    /// Die geplanten Ablöser in ihrer Reihenfolge (LLH-1132); fehlt = unverändert, `[]` =
+    /// Planung aufheben.
+    #[serde(default)]
+    abloeser_ids: Option<Vec<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abloesungen/{aid}
@@ -181,10 +222,11 @@ pub async fn aendern(
         Some(Some(r)) => Some(Some(pruefe_rhythmus(r)?)),
         andere => andere,
     };
+    let abloeser = abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id)?;
     let eingabe = AenderungEingabe {
         beginn_at: zeit(req.beginn_at, "Beginn")?,
         rhythmus_minuten,
-        abloesende_einheit_id: req.abloesende_einheit_id,
+        abloeser,
     };
     let (anzeige, etb_id) = repo::aendern(
         &state.pool,
@@ -205,8 +247,17 @@ pub async fn aendern(
 pub struct Vollziehen {
     #[serde(default)]
     vollzogen_at: Option<String>,
+    /// Bestand neben `abloeser_ids`: genau ein Ablöser.
     #[serde(default)]
     abloesende_einheit_id: Option<i64>,
+    /// Die Ablöser in ihrer Reihenfolge (LLH-1132, höchstens [`ABLOESER_MAX`]); fehlen beide
+    /// Angaben, wird ohne ablösende Einheit vollzogen.
+    #[serde(default)]
+    abloeser_ids: Option<Vec<i64>>,
+    /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben (LLH-1132). Verlangt die
+    /// Freigabe des Moduls Einheiten, das die Unterstellung sonst schreibt.
+    #[serde(default)]
+    abschnitt_uebergeben: bool,
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/{aid}/vollzug
@@ -219,18 +270,26 @@ pub async fn vollziehen(
     let einsatz_id = ctx.einsatz.id;
     let jetzt = jetzt();
     let vollzogen_at = zeit(req.vollzogen_at, "Vollzug")?.unwrap_or_else(|| jetzt.clone());
-    let (anzeige, etb_id, zeitachse) = repo::vollziehen(
+    let abloeser =
+        abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id.map(Some))?.unwrap_or_default();
+    if req.abschnitt_uebergeben {
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    let (anzeige, etb_id, wirkung) = repo::vollziehen(
         &state.pool,
         einsatz_id,
         aid,
         ctx.benutzer.id,
-        &vollzogen_at,
-        req.abloesende_einheit_id,
+        &VollzugEingabe {
+            vollzogen_at,
+            abloeser,
+            abschnitt_uebergeben: req.abschnitt_uebergeben,
+        },
         &jetzt,
     )
     .await?;
     publiziere(&state, einsatz_id, Some(etb_id));
-    publish_zeitachse(&state, einsatz_id, zeitachse);
+    publish_zeitachse(&state, einsatz_id, wirkung);
     Ok(Json(anzeige))
 }
 
@@ -241,10 +300,10 @@ pub async fn zuruecknehmen(
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<AbloesungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let (anzeige, etb_id, zeitachse) =
+    let (anzeige, etb_id, wirkung) =
         repo::zuruecknehmen(&state.pool, einsatz_id, aid, ctx.benutzer.id, &jetzt()).await?;
     publiziere(&state, einsatz_id, Some(etb_id));
-    publish_zeitachse(&state, einsatz_id, zeitachse);
+    publish_zeitachse(&state, einsatz_id, wirkung);
     Ok(Json(anzeige))
 }
 
@@ -379,6 +438,30 @@ mod tests {
             pruefe_rhythmus(RHYTHMUS_MAX_MINUTEN).unwrap(),
             RHYTHMUS_MAX_MINUTEN
         );
+    }
+
+    #[test]
+    fn abloeser_liste_begrenzt_und_entdoppelt() {
+        let neun: Vec<i64> = (1..=9).collect();
+        assert_eq!(
+            check_abloeser(&neun).unwrap_err().status(),
+            StatusCode::BAD_REQUEST
+        );
+        // Gezählt vor dem Entdoppeln: acht Einträge mit Dubletten sind erlaubt.
+        assert_eq!(
+            check_abloeser(&[3, 1, 3, 2, 1, 4, 5, 6]).unwrap(),
+            vec![3, 1, 2, 4, 5, 6]
+        );
+        assert_eq!(check_abloeser(&[]).unwrap(), Vec::<i64>::new());
+        assert_eq!(
+            abloeser_aus(Some(vec![1]), Some(Some(2)))
+                .unwrap_err()
+                .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(abloeser_aus(None, Some(None)).unwrap(), Some(vec![]));
+        assert_eq!(abloeser_aus(None, Some(Some(7))).unwrap(), Some(vec![7]));
+        assert_eq!(abloeser_aus(None, None).unwrap(), None);
     }
 
     #[test]

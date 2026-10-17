@@ -103,6 +103,56 @@ fn status(err: AppError) -> StatusCode {
     err.status()
 }
 
+/// Vollzug mit höchstens einem Ablöser und ohne Abschnittsübergabe (Form vor LLH-1132); die
+/// Liste prüft [`vollzug`].
+async fn vollziehen(
+    pool: &SqlitePool,
+    e: i64,
+    id: i64,
+    b: i64,
+    vollzogen_at: &str,
+    abloeser: Option<i64>,
+    jetzt: &str,
+) -> Result<(AbloesungVollzugAnzeige, i64, Wirkung), AppError> {
+    vollzug(
+        pool,
+        e,
+        id,
+        b,
+        vollzogen_at,
+        &abloeser.into_iter().collect::<Vec<_>>(),
+        false,
+        jetzt,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn vollzug(
+    pool: &SqlitePool,
+    e: i64,
+    id: i64,
+    b: i64,
+    vollzogen_at: &str,
+    abloeser: &[i64],
+    abschnitt_uebergeben: bool,
+    jetzt: &str,
+) -> Result<(AbloesungVollzugAnzeige, i64, Wirkung), AppError> {
+    super::vollziehen(
+        pool,
+        e,
+        id,
+        b,
+        &VollzugEingabe {
+            vollzogen_at: vollzogen_at.into(),
+            abloeser: abloeser.to_vec(),
+            abschnitt_uebergeben,
+        },
+        jetzt,
+    )
+    .await
+}
+
 // ── Schicht einer Einheit ───────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -334,7 +384,7 @@ async fn abloesende_einheit_planen() {
         a.id,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f2)),
+            abloeser: Some(vec![w.f2]),
             ..Default::default()
         },
         T0,
@@ -357,7 +407,7 @@ async fn selbstabloesung_ist_422() {
         a.id,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f1)),
+            abloeser: Some(vec![w.f1]),
             ..Default::default()
         },
         T0,
@@ -562,15 +612,30 @@ async fn vollzug_ohne_abloesende_einheit() {
     );
 }
 
+/// Nachtrag 17.10. (LLH-1132): Ein Ablöser, dessen laufende Schicht schon eine Folgeschicht ist,
+/// lässt sich nicht übernehmen → 422, und nichts ändert sich.
 #[tokio::test]
-async fn abloeser_mit_laufender_schicht_ist_422_und_aendert_nichts() {
+async fn abloeser_mit_laufender_folgeschicht_ist_422_und_aendert_nichts() {
     let w = welt().await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
-    beginnen(&w.pool, w.e, w.b, &beginn(w.f2, Some(360)), T0)
+    let (b, _) = beginnen(&w.pool, w.e, w.b, &beginn(f3, Some(360)), T0)
         .await
         .unwrap();
+    // Florian 2 löst Florian 3 ab und führt damit eine Folgeschicht.
+    vollziehen(
+        &w.pool,
+        w.e,
+        b.id,
+        w.b,
+        "2026-09-22 15:00:00",
+        Some(w.f2),
+        T0,
+    )
+    .await
+    .unwrap();
     let n_etb = etb(&w.pool, w.e).await.len();
     let err = vollziehen(
         &w.pool,
@@ -590,12 +655,74 @@ async fn abloeser_mit_laufender_schicht_ist_422_und_aendert_nichts() {
         AbloesungStatus::Laufend,
         "ursprüngliche Schicht bleibt laufend"
     );
+    assert!(a2.abloeser.is_empty(), "die Liste bleibt, wie sie war");
     assert_eq!(
         offene_fristen(&w.pool, a.id).await.len(),
         2,
         "Fristen unverändert offen"
     );
     assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+}
+
+/// Nachtrag 17.10. (LLH-1132): Hat der Ablöser schon eine eigene laufende Schicht ohne Vorgänger
+/// (ungeplant eingetroffen), übernimmt der Vollzug sie als Folgeschicht: Beginn, Fälligkeit und
+/// Fristen bleiben. Die Rücknahme löst sie wieder vom Vorgänger, statt sie zu löschen.
+#[tokio::test]
+async fn ungeplanter_abloeser_wird_uebernommen_und_bei_ruecknahme_geloest() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let (eigene, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            beginn_at: Some("2026-09-22 14:00:00".into()),
+            rhythmus_minuten: Some(240),
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    let fristen = offene_fristen(&w.pool, eigene.id).await;
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let f = v.folgeschicht.expect("übernommene Folgeschicht");
+    assert_eq!(f.id, eigene.id, "keine neue Schicht");
+    assert_eq!(f.vorgaenger_id, Some(a.id));
+    assert!(f.uebernommen_bei_vollzug);
+    assert_eq!(f.beginn_at, "2026-09-22 14:00:00", "Beginn bleibt");
+    assert_eq!(f.faellig_at, eigene.faellig_at, "Fälligkeit bleibt");
+    assert_eq!(offene_fristen(&w.pool, f.id).await, fristen);
+    assert_eq!(
+        v.abgeloest.folgeschichten,
+        vec![AbloesungFolge {
+            id: eigene.id,
+            einheit_id: w.f2,
+            einheit_name: "Florian 2".into(),
+            status: AbloesungStatus::Laufend,
+            uebernommen: true,
+        }]
+    );
+    assert!(v.abgeloest.ruecknehmbar);
+    let vollzug = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        vollzug.contains("Laufende Schicht übernommen: «Florian 2»"),
+        "{vollzug}"
+    );
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(r.status, AbloesungStatus::Laufend);
+    assert!(r.folgeschichten.is_empty());
+    let geloest = laden(&w.pool, w.e, eigene.id, jetzt).await.unwrap();
+    assert_eq!(geloest.status, AbloesungStatus::Laufend, "nicht gelöscht");
+    assert_eq!(geloest.vorgaenger_id, None);
+    assert!(!geloest.uebernommen_bei_vollzug);
+    assert_eq!(offene_fristen(&w.pool, eigene.id).await, fristen);
 }
 
 #[tokio::test]
@@ -793,7 +920,7 @@ async fn aufloesen_behaelt_abgeloeste_schicht_und_leert_fremde_planung() {
         c.id,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f1)),
+            abloeser: Some(vec![w.f1]),
             ..Default::default()
         },
         T0,
@@ -860,7 +987,7 @@ async fn aufgeloeste_einheit_ist_kein_ziel_der_abloesung() {
         a.id,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f2)),
+            abloeser: Some(vec![w.f2]),
             ..Default::default()
         },
         T0,
@@ -1230,7 +1357,7 @@ async fn entfernte_wechselzeiten_vorgabe_laesst_die_faelligkeit_stehen() {
         a.id,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f1)),
+            abloeser: Some(vec![w.f1]),
             ..Default::default()
         },
         T0,
@@ -1792,7 +1919,7 @@ async fn geplanter_abloeser_bekommt_beim_eintreffen_keine_schicht() {
         a,
         w.b,
         &AenderungEingabe {
-            abloesende_einheit_id: Some(Some(w.f2)),
+            abloeser: Some(vec![w.f2]),
             ..Default::default()
         },
         T0,
@@ -1818,4 +1945,463 @@ async fn geplanter_abloeser_bekommt_beim_eintreffen_keine_schicht() {
         "2030-06-03 14:00:00",
         "Folgeschicht ab dem Vollzug"
     );
+}
+
+// ── Vollzug mit Liste, Fan-out und Abschnittsübergabe (LLH-1132) ────────────────────────────
+
+/// Abschnitt einer Einheit, wie ihn die Gliederung führt.
+async fn abschnitt_von(w: &Welt, einheit: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT abschnitt_id FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+async fn neuer_abschnitt(w: &Welt, name: &str) -> i64 {
+    sqlx::query_scalar("INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, ?) RETURNING id")
+        .bind(w.e)
+        .bind(name)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Nicht gestrichene Ereignisse `abloesung` einer Einheit bzw. Person (`spalte`).
+async fn abloesungsereignisse(w: &Welt, spalte: &str, id: i64) -> i64 {
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT COUNT(*) FROM einsatz_kraft_zeitachse \
+         WHERE {spalte} = ? AND art = 'abloesung' AND gestrichen_at IS NULL"
+    )))
+    .bind(id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Entscheidung LLH-1118 Punkt 3: je Ablöser eine Folgeschicht, in der Reihenfolge der Liste;
+/// die Liste steht an der Schicht, der Spiegel ist ihr erster Eintrag, das ETB nennt alle. Die
+/// Rücknahme entfernt alle Folgeschichten und lässt die Liste als Planung stehen.
+#[tokio::test]
+async fn vollzug_mit_liste_legt_je_abloeser_eine_folgeschicht_an() {
+    let w = welt().await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) = vollzug(&w.pool, w.e, a.id, w.b, jetzt, &[f3, w.f2], false, jetzt)
+        .await
+        .unwrap();
+    let einheiten: Vec<i64> = v.folgeschichten.iter().map(|f| f.einheit_id).collect();
+    assert_eq!(einheiten, vec![f3, w.f2], "Reihenfolge der Liste");
+    for f in &v.folgeschichten {
+        assert_eq!(f.vorgaenger_id, Some(a.id));
+        assert_eq!(f.beginn_at, jetzt);
+        assert_eq!(f.faellig_at, "2026-09-22 21:40:00");
+        assert_eq!(offene_fristen(&w.pool, f.id).await.len(), 2);
+    }
+    assert_eq!(v.folgeschicht.as_ref().map(|f| f.einheit_id), Some(f3));
+    let namen: Vec<&str> = v
+        .abgeloest
+        .abloeser
+        .iter()
+        .map(|a| a.einheit_name.as_str())
+        .collect();
+    assert_eq!(namen, vec!["Florian 3", "Florian 2"]);
+    assert_eq!(
+        v.abgeloest.abloesende_einheit_id,
+        Some(f3),
+        "Spiegel = erster"
+    );
+    assert_eq!(v.abgeloest.folgeschichten.len(), 2);
+    assert!(v.abgeloest.ruecknehmbar);
+    let inhalt = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        inhalt.contains("«Florian 1» durch «Florian 3», «Florian 2»"),
+        "{inhalt}"
+    );
+
+    // Die ältere Folgeschicht endet, nicht die jüngste (`folgeschicht_id`): der Vollzug ist
+    // trotzdem nicht mehr unberührt.
+    vollziehen(
+        &w.pool,
+        w.e,
+        v.folgeschichten[0].id,
+        w.b,
+        "2026-09-22 16:00:00",
+        None,
+        jetzt,
+    )
+    .await
+    .unwrap();
+    assert!(!laden(&w.pool, w.e, a.id, jetzt).await.unwrap().ruecknehmbar);
+    let err = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt)
+        .await
+        .unwrap_err();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    zuruecknehmen(&w.pool, w.e, v.folgeschichten[0].id, w.b, jetzt)
+        .await
+        .unwrap();
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(r.status, AbloesungStatus::Laufend);
+    assert!(r.folgeschichten.is_empty());
+    for f in &v.folgeschichten {
+        assert!(laden(&w.pool, w.e, f.id, jetzt).await.is_err(), "entfernt");
+        assert!(offene_fristen(&w.pool, f.id).await.is_empty());
+    }
+    let geplant: Vec<i64> = r.abloeser.iter().map(|a| a.einheit_id).collect();
+    assert_eq!(geplant, vec![f3, w.f2], "die Liste bleibt als Planung");
+}
+
+/// Löst ein Verband ab, bekommt nur der Knoten eine Schicht; seine Untereinheit in derselben
+/// Liste erbt sie (Knoten-Modell, LLH-1118 Punkte 1 und 3).
+#[tokio::test]
+async fn verband_als_abloeser_bekommt_nur_am_knoten_eine_schicht() {
+    let w = welt().await;
+    let zug = einheit(&w.pool, w.e, "Zug 2", None).await;
+    let trupp = untereinheit(&w, "Trupp 2", zug).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) = vollzug(&w.pool, w.e, a.id, w.b, jetzt, &[trupp, zug], false, jetzt)
+        .await
+        .unwrap();
+    assert_eq!(v.folgeschichten.len(), 1);
+    let knoten = &v.folgeschichten[0];
+    assert_eq!(knoten.einheit_id, zug);
+    assert_eq!(
+        knoten
+            .erbende_einheiten
+            .iter()
+            .map(|e| e.einheit_id)
+            .collect::<Vec<_>>(),
+        vec![trupp]
+    );
+    assert!(schichten(&w, trupp).await.is_empty());
+    assert_eq!(v.abgeloest.abloeser.len(), 2, "die Liste nennt beide");
+}
+
+/// Entscheidung LLH-1118 Punkt 1: Der Vollzug schreibt `abloesung` auch an jede erbende
+/// Untereinheit samt ihren Personen; die Rücknahme streicht alle.
+#[tokio::test]
+async fn vollzug_schreibt_die_abloesung_an_erbende_untereinheiten() {
+    let w = welt().await;
+    let gruppe = untereinheit(&w, "Gruppe 1", w.f1).await;
+    let trupp = untereinheit(&w, "Trupp 1", gruppe).await;
+    let person: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) \
+         VALUES (?, 'Truppführer', ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(trupp)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    for e in [w.f1, gruppe, trupp] {
+        eintreffen(&w, e, T0).await;
+    }
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (_, _, wirkung) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    for e in [w.f1, gruppe, trupp] {
+        assert_eq!(abloesungsereignisse(&w, "einheit_id", e).await, 1, "{e}");
+        assert_eq!(perioden(&w, e).await[0].ende_at.as_deref(), Some(jetzt));
+    }
+    assert_eq!(abloesungsereignisse(&w, "personal_id", person).await, 1);
+    let mut einheiten: Vec<i64> = wirkung.zeitachse.iter().map(|(e, _)| *e).collect();
+    einheiten.sort_unstable();
+    assert_eq!(einheiten, vec![w.f1, gruppe, trupp]);
+    assert!(wirkung
+        .zeitachse
+        .iter()
+        .any(|(e, b)| *e == trupp && b.personen == vec![person]));
+    assert!(
+        perioden(&w, w.f2).await.is_empty(),
+        "der Ablöser bekommt kein Ereignis"
+    );
+
+    let (_, _, wirkung) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    for e in [w.f1, gruppe, trupp] {
+        assert_eq!(abloesungsereignisse(&w, "einheit_id", e).await, 0, "{e}");
+        assert_eq!(perioden(&w, e).await[0].ende_at, None, "wieder offen");
+    }
+    assert_eq!(abloesungsereignisse(&w, "personal_id", person).await, 0);
+    assert_eq!(wirkung.zeitachse.len(), 3);
+}
+
+/// Entscheidung LLH-1118 Punkt 6: „Abschnitt übergeben“ unterstellt den Knoten-Ablöser dem
+/// Abschnitt der abgelösten Einheit und leert deren Abschnitt; die Rücknahme stellt beide
+/// wieder her. Die Untereinheit in der Liste behält ihren Abschnitt.
+#[tokio::test]
+async fn abschnitt_uebergeben_und_zuruecknehmen() {
+    let w = welt().await;
+    let sued = neuer_abschnitt(&w, "Deichwache Süd").await;
+    let zug = einheit(&w.pool, w.e, "Zug 2", Some(sued)).await;
+    let trupp = untereinheit(&w, "Trupp 2", zug).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, wirkung) = vollzug(
+        &w.pool,
+        w.e,
+        a.id,
+        w.b,
+        jetzt,
+        &[w.f2, zug, trupp],
+        true,
+        jetzt,
+    )
+    .await
+    .unwrap();
+    assert_eq!(abschnitt_von(&w, w.f1).await, None, "geleert");
+    assert_eq!(abschnitt_von(&w, w.f2).await, Some(w.abschnitt));
+    assert_eq!(abschnitt_von(&w, zug).await, Some(w.abschnitt));
+    assert_eq!(abschnitt_von(&w, trupp).await, None, "nur der Knoten");
+    assert!(v.abgeloest.abschnitt_uebergeben);
+    assert_eq!(
+        v.abgeloest.uebergebener_abschnitt_name.as_deref(),
+        Some("Deichwache Nord")
+    );
+    let mut geaendert = wirkung.einheiten.clone();
+    geaendert.sort_unstable();
+    let mut erwartet = vec![w.f1, w.f2, zug];
+    erwartet.sort_unstable();
+    assert_eq!(geaendert, erwartet);
+    let inhalt = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        inhalt.contains("Abschnitt «Deichwache Nord» an «Florian 2», «Zug 2» übergeben"),
+        "{inhalt}"
+    );
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(abschnitt_von(&w, w.f1).await, Some(w.abschnitt));
+    assert_eq!(abschnitt_von(&w, w.f2).await, None, "alter Wert: keiner");
+    assert_eq!(abschnitt_von(&w, zug).await, Some(sued), "alter Wert");
+    assert_eq!(abschnitt_von(&w, trupp).await, None);
+    assert!(!r.abschnitt_uebergeben);
+    assert_eq!(r.uebergebener_abschnitt_name, None);
+    let berichtigung = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        berichtigung.contains("Abschnitt «Deichwache Nord» zurückgegeben"),
+        "{berichtigung}"
+    );
+    let vorher: i64 = sqlx::query_scalar(
+        "SELECT COUNT(abschnitt_vorher_id) FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?",
+    )
+    .bind(a.id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(vorher, 0, "die Vorher-Werte sind verbraucht");
+}
+
+/// Wer nach dem Vollzug von Hand umgehängt wurde, bleibt, wo er ist: die Rücknahme stellt nur
+/// den Stand her, den der Vollzug hinterlassen hat. Ohne Abschnitt der abgelösten Einheit oder
+/// ohne Ablöser gibt es nichts zu übergeben.
+#[tokio::test]
+async fn abschnittsuebergabe_nur_wo_der_vollzug_den_stand_hinterliess() {
+    let w = welt().await;
+    let sued = neuer_abschnitt(&w, "Deichwache Süd").await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    vollzug(&w.pool, w.e, a.id, w.b, jetzt, &[w.f2], true, jetzt)
+        .await
+        .unwrap();
+    for (einheit, abschnitt) in [(w.f1, Some(sued)), (w.f2, Some(sued))] {
+        sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = ? WHERE id = ?")
+            .bind(abschnitt)
+            .bind(einheit)
+            .execute(&w.pool)
+            .await
+            .unwrap();
+    }
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(
+        abschnitt_von(&w, w.f1).await,
+        Some(sued),
+        "von Hand gesetzt"
+    );
+    assert_eq!(
+        abschnitt_von(&w, w.f2).await,
+        Some(sued),
+        "von Hand gesetzt"
+    );
+
+    // Florian 2 (ohne Abschnitt) wird abgelöst: nichts zu übergeben, kein Flag.
+    sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE id = ?")
+        .bind(w.f2)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (b, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, Some(360)), T0)
+        .await
+        .unwrap();
+    let f3 = einheit(&w.pool, w.e, "Florian 3", Some(sued)).await;
+    let (v, _, wirkung) = vollzug(&w.pool, w.e, b.id, w.b, jetzt, &[f3], true, jetzt)
+        .await
+        .unwrap();
+    assert!(!v.abgeloest.abschnitt_uebergeben);
+    assert!(wirkung.einheiten.is_empty());
+    assert_eq!(abschnitt_von(&w, f3).await, Some(sued));
+
+    // Ohne Ablöser bleibt der Abschnitt der abgelösten Einheit stehen (`a` läuft wieder).
+    let (v, _, _) = vollzug(&w.pool, w.e, a.id, w.b, jetzt, &[], true, jetzt)
+        .await
+        .unwrap();
+    assert!(!v.abgeloest.abschnitt_uebergeben);
+    assert_eq!(abschnitt_von(&w, w.f1).await, Some(sued));
+}
+
+/// Statuscodes der Liste: die Einheit selbst → 422, eine fremde → 404, eine aufgelöste → 409;
+/// jeweils ohne halben Stand.
+#[tokio::test]
+async fn abloeserliste_prueft_jeden_eintrag() {
+    let w = welt().await;
+    let fremd_einsatz: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Sturm') RETURNING id",
+    )
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let fremd = einheit(&w.pool, fremd_einsatz, "Fremd", None).await;
+    let weg = einheit(&w.pool, w.e, "Aufgelöst", None).await;
+    sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = datetime('now') WHERE id = ?")
+        .bind(weg)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    for (liste, erwartet) in [
+        (vec![w.f2, w.f1], StatusCode::UNPROCESSABLE_ENTITY),
+        (vec![w.f2, fremd], StatusCode::NOT_FOUND),
+        (vec![w.f2, weg], StatusCode::CONFLICT),
+    ] {
+        let err = vollzug(&w.pool, w.e, a.id, w.b, jetzt, &liste, false, jetzt)
+            .await
+            .unwrap_err();
+        assert_eq!(status(err), erwartet, "{liste:?}");
+        let err = aendern(
+            &w.pool,
+            w.e,
+            a.id,
+            w.b,
+            &AenderungEingabe {
+                abloeser: Some(liste.clone()),
+                ..Default::default()
+            },
+            T0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(status(err), erwartet, "Planung {liste:?}");
+    }
+    let a2 = laden(&w.pool, w.e, a.id, T0).await.unwrap();
+    assert_eq!(a2.status, AbloesungStatus::Laufend);
+    assert!(a2.abloeser.is_empty());
+    assert!(schichten(&w, w.f2).await.is_empty());
+}
+
+/// Planen als Liste: die Reihenfolge bleibt, der Spiegel folgt dem ersten Eintrag, das ETB nennt
+/// alle; dieselbe Liste noch einmal schreibt nichts. Wird ein Ablöser aufgelöst, fällt er aus der
+/// Liste, und der Spiegel rückt nach.
+#[tokio::test]
+async fn abloeser_als_liste_planen() {
+    let w = welt().await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let planen = |liste: Vec<i64>| {
+        let pool = w.pool.clone();
+        let (e, id, b) = (w.e, a.id, w.b);
+        async move {
+            aendern(
+                &pool,
+                e,
+                id,
+                b,
+                &AenderungEingabe {
+                    abloeser: Some(liste),
+                    ..Default::default()
+                },
+                T0,
+            )
+            .await
+            .unwrap()
+        }
+    };
+    let (s, etb_id) = planen(vec![f3, w.f2]).await;
+    assert!(etb_id.is_some());
+    assert_eq!(
+        s.abloeser.iter().map(|x| x.einheit_id).collect::<Vec<_>>(),
+        vec![f3, w.f2]
+    );
+    assert_eq!(s.abloesende_einheit_id, Some(f3));
+    let inhalt = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        inhalt.contains("ablösende Einheiten «Florian 3», «Florian 2» geplant"),
+        "{inhalt}"
+    );
+    assert_eq!(planen(vec![f3, w.f2]).await.1, None, "unverändert");
+
+    let mut conn = w.pool.acquire().await.unwrap();
+    release_einheit_tx(&mut conn, f3, w.b, T0).await.unwrap();
+    drop(conn);
+    let s = laden(&w.pool, w.e, a.id, T0).await.unwrap();
+    assert_eq!(
+        s.abloeser.iter().map(|x| x.einheit_id).collect::<Vec<_>>(),
+        vec![w.f2]
+    );
+    assert_eq!(s.abloesende_einheit_id, Some(w.f2), "Spiegel rückt nach");
+
+    let (s, _) = planen(vec![]).await;
+    assert!(s.abloeser.is_empty());
+    assert_eq!(s.abloesende_einheit_id, None);
+}
+
+/// Nachtrag 17.10.: Die Ausnahme vom Autostart gilt für jeden Eintrag der Liste und für die
+/// Untereinheiten eines geplanten Verbands; ein ungeplanter bekommt seine Schicht.
+#[tokio::test]
+async fn ausnahme_vom_autostart_gilt_fuer_die_liste_und_den_verband() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    let a = schichten(&w, w.f1).await[0].id;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let zug = einheit(&w.pool, w.e, "Zug 2", None).await;
+    let trupp = untereinheit(&w, "Trupp 2", zug).await;
+    let frei = einheit(&w.pool, w.e, "Florian 4", None).await;
+    aendern(
+        &w.pool,
+        w.e,
+        a,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2, f3, zug]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    for e in [f3, trupp] {
+        let b = ereignis(&w, e, Eintreffen, "2030-06-03 13:30:00").await;
+        assert!(b.abloesung.is_empty(), "{e}");
+        assert!(schichten(&w, e).await.is_empty(), "{e}");
+    }
+    let b = ereignis(&w, frei, Eintreffen, "2030-06-03 13:30:00").await;
+    assert_eq!(b.abloesung.len(), 1, "ungeplant: eigene Schicht");
 }

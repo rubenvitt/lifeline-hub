@@ -126,3 +126,5 @@ export const SCHICHTMODELL_MINDESTDAUER_MAX_MINUTEN = 1_440;
 export const SCHICHTMODELL_VORLAUF_MAX_MINUTEN = 1_440;
 /** Rhythmus einer Schicht und eines Schichtmodells in Minuten: sieben Tage (LFH-635). */
 export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
+/** Ablöser je Schicht im Request, gezählt vor dem Entdoppeln (LLH-1132). */
+export const ABLOESUNG_ABLOESER_MAX = 8;
