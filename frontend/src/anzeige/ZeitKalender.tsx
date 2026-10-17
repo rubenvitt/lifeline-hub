@@ -14,7 +14,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { monoStil, useRollen } from '../components/instrument';
 import { IconChevronRechts } from '../icons';
 import './dayjsSprache';
-import { ZeitSchnellwahl } from './ZeitSchnellwahl';
+import { ZeitSchnellwahlKnoepfe } from './ZeitSchnellwahlKnoepfe';
 import { parseUhrzeit, uhrzeitAmTag } from './uhrzeit';
 import type { ZeitArt } from './zeitParser';
 import { GRUND } from './zeitParser';
@@ -201,7 +201,7 @@ export function ZeitKalender({
       )}
       {/* Die Fußzeile klebt im Blatt unten, wenn der Inhalt rollt (`ZeitpunktEingabe.css`). */}
       <Flex className={ZEIT_FUSS} gap="small" align="center" justify="space-between" wrap>
-        <ZeitSchnellwahl art={art} onWahl={onUebernehmen} />
+        <ZeitSchnellwahlKnoepfe art={art} onWahl={onUebernehmen} />
         <Button type="primary" onClick={() => uebernehmen()}>
           Übernehmen
         </Button>

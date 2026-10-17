@@ -39,7 +39,7 @@ import { serverJetzt } from '../offline/serveruhr';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { formatDtg } from './format';
 import { ZeitKalender } from './ZeitKalender';
-import { ZeitSchnellwahl } from './ZeitSchnellwahl';
+import { ZeitSchnellwahlKnoepfe } from './ZeitSchnellwahlKnoepfe';
 import { deuteZeit, type Deutung, type ZeitArt } from './zeitParser';
 import { browserZone, effektiveZone, istZukunftstag, zuWanduhr } from './zeitEingabe';
 import './ZeitpunktEingabe.css';
@@ -414,7 +414,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   return (
     <Space direction="vertical" size="small" style={{ width: style?.width }}>
       {feld}
-      <ZeitSchnellwahl art={art} disabled={disabled} onWahl={ausWahl} />
+      <ZeitSchnellwahlKnoepfe art={art} disabled={disabled} onWahl={ausWahl} />
     </Space>
   );
 }

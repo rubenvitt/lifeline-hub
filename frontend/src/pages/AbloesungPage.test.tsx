@@ -470,7 +470,7 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.click(await screen.findByTitle('Florian 2'));
     // Ohne Zeitachse ist der wirksame Wert unbekannt: kein Platzhalter statt eines falschen.
     const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
-    expect(beginn.getAttribute('placeholder')).not.toMatch(/Eintreffen|jetzt/);
+    expect(beginn.getAttribute('placeholder') ?? '').not.toMatch(/Eintreffen|jetzt/);
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
   });
 

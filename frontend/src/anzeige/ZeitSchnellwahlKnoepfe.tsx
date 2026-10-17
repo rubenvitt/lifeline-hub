@@ -17,7 +17,7 @@ export function schnellwahlFuer(art: ZeitArt | undefined): readonly SchnellwahlE
  * keine `Segmentleiste`, die ein Umschalter ist. Gerechnet wird ab jetzt nach Serveruhr
  * (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
  */
-export function ZeitSchnellwahl({
+export function ZeitSchnellwahlKnoepfe({
   art,
   disabled,
   onWahl,
