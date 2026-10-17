@@ -1,3 +1,59 @@
+## [1.0.0-alpha.136](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.135...v1.0.0-alpha.136) (2026-10-17)
+
+### Wichtige Änderungen
+
+- **Zwei neue Datenbank-Migrationen:** Die Benachrichtigungstabelle wird für zwei neue Hinweisarten neu aufgebaut. Außerdem werden die Ablöser einer Schicht jetzt als Liste gespeichert. Bestehende Einzelplanungen werden beim Update automatisch in diese Liste übernommen.
+- **Schnittstelle der Ablösung erweitert:** Bei Planung und Vollzug lassen sich jetzt mehrere ablösende Einheiten angeben. Die bisherige Angabe einer einzelnen ablösenden Einheit gibt es weiter, sie zeigt immer den ersten Eintrag der Liste. Schichten haben den neuen Status „beendet“ mit Zeitpunkt, Person und Grund. Die Schichtliste lässt sich nach diesem Status filtern.
+- **Auflösen einer Einheit löscht ihre laufende Schicht nicht mehr.** Die Schicht wird stattdessen mit dem Grund „Auflösung“ beendet und bleibt nachvollziehbar.
+
+### Kräfte und Mittel – Ablösung
+
+**Schicht folgt der Kräfte-Zeitachse**
+- Trifft eine Einheit ein, beginnt ihre Schicht automatisch. Voraussetzung: Für den Abschnitt oder den Einsatz ist eine Vorgabe festgelegt. Ohne Vorgabe beginnt keine Schicht. Das gilt auch für Nachträge und für das Eintreffen im Bereitstellungsraum. Im Einsatztagebuch steht dann „mit dem Eintreffen begonnen“.
+- Wird eine Einheit entlassen, endet ihre laufende Schicht als „beendet“. Ihre Fristen schließen, eine entlassene Einheit wird also nicht mehr als „überfällig“ gemeldet. Wird die Entlassung gestrichen, läuft die Schicht wieder.
+- Untereinheiten ohne eigene Schicht erben die Schicht ihres Verbands. Die Karte zeigt sie unter „gilt auch für: …“. Eine von Hand begonnene Schicht hat Vorrang.
+- Behoben: Bisher bekam eine geplante ablösende Einheit beim Eintreffen eine eigene Schicht, und der Vollzug scheiterte danach. Jetzt beginnt ihre Schicht erst mit dem Vollzug.
+
+**Neue Ansichten auf der Seite Ablösung**
+- Neues Segment **„Ohne Schicht“**: Es listet die Einheiten im Einsatz, die weder eine eigene noch eine geerbte Schicht haben, jeweils mit dem Knopf „Schicht beginnen“. Geplante Ablöser erscheinen mit der Einheit, die sie ablösen sollen. Ohne Freigabe des Moduls Einheiten ist das Segment gesperrt und nennt den Grund. Scheitert das Laden, erscheint jetzt eine Fehlermeldung, statt dass die Ansicht endlos lädt.
+- „Abgelöst“ heißt jetzt **„Vergangen“** und lässt sich nach „Abgelöst“ und „Beendet“ filtern. Beendete Schichten zeigen ihr Ende und den Grund („entlassen“ oder „aufgelöst“).
+- Auf schmalen Geräten im Handschuh-Betrieb stehen die Zahlen im Kopf statt in den Segmenten. So bleiben Leiste und Hinweisbanner vollständig lesbar.
+
+**Vollzug mit mehreren Ablösern**
+- Planung und Vollzug nehmen bis zu acht ablösende Einheiten. Der Vollzug ist mit der Planung vorbelegt.
+- Löst ein Verband ab, bekommt nur der Verband eine Folgeschicht. Seine Untereinheiten erben sie, und das Ablösungs-Ereignis wird auch bei ihnen und ihren Personen eingetragen.
+- Hat ein Ablöser schon eine eigene laufende Schicht ohne Vorgänger, übernimmt der Vollzug diese Schicht, statt abzulehnen. In der Auswahl ist sie mit „· Schicht läuft“ gekennzeichnet. Wird der Vollzug zurückgenommen, wird die übernommene Schicht nur wieder gelöst, nicht gelöscht.
+- Neu: **„Abschnitt übergeben“**. Die ablösenden Einheiten übernehmen den Abschnitt der abgelösten Einheit. Die Option ist vorbelegt, wenn die abgelöste Einheit einem Abschnitt zugeordnet ist, und erfordert die Freigabe des Moduls Einheiten. Bei einer Rücknahme wird der vorherige Stand wiederhergestellt.
+- Karte und Bestätigungsmeldung nennen alle Ablöser und den übergebenen Abschnitt.
+
+**Hinweise und Planungswarnungen**
+- Neuer **Planungshinweis**: Ist eine Schicht noch ohne ablösende Einheit, erscheint ein Hinweis. Er kommt um den Planungsvorlauf des Schichtmodells vor der Fälligkeit, ohne Modell 2 Stunden vorher. Der Hinweis schließt beim Planen oder beim Vollzug. Er steht in den Erinnerungen mit Sprung zur Ablösung.
+- Hinweise zur geplanten ablösenden Einheit kommen bei Alarmierung, Eintreffen, Eintreffen im Bereitstellungsraum und Abruf.
+- Wird die geplante Einheit aufgelöst oder entlassen, wird die Planung aufgehoben. Dazu gibt es einen Eintrag im Einsatztagebuch und einen Hinweis.
+- Beim Speichern einer Planung warnt die Anwendung, wenn die Einheit schon für eine andere Schicht geplant ist oder selbst im Einsatz steht. Gespeichert wird die Planung trotzdem.
+- Beide neuen Hinweisarten lassen sich in den Einstellungen einzeln abschalten.
+
+**Schichtmodell des Einsatzes**
+- Die Karte zeigt „(Vorgabe Einsatz)“ als Quelle. Ein Bereich „Vorgabe des Einsatzes“ führt direkt in die Einsatz-Einstellungen.
+- „Schicht beginnen“ und „Rhythmus ändern“ übernehmen die Einsatzvorgabe als letzte Stufe der Rangfolge. Das Feld darf leer bleiben.
+- Der Rhythmus wird als Dauer eingegeben und angezeigt („8 h“, „7:30“, „7,5“, „90 min“) statt als Stundenzahl („8.0“).
+- Vorwarnzeiten gelten jetzt je Schicht nach ihrem Schichtmodell, nicht mehr pauschal 30 Minuten. Das gilt auch für Einstufung, Modulzähler und Uhr.
+- Behoben: Ändert sich nur die Vorwarnzeit, wird „fällig“ nicht ein zweites Mal gemeldet. Wird eine Vorgabe entfernt, verschiebt sich die Fälligkeit nicht mehr um einige Sekunden. Eine Rücknahme setzt die Fristen nach der aktuellen Vorgabe. Eine ungültige Zeitzone des Einsatzes verdrängt nicht mehr die Zeitzone der Organisation.
+- Die Rhythmuszeile bleibt auch auf schmalen Geräten einzeilig, der Wert wird nie abgeschnitten.
+
+### Einsatz-Einstellungen
+
+- Neuer Reiter **„Ablösung“**: Hier lässt sich ein Schichtmodell der Organisation übernehmen oder mit eigenen Werten festlegen. Die Vorgabe lässt sich auch wieder entfernen, mit Rückgängig. Die Rechte entsprechen denen der Abschnittsvorgabe. Kann die Anwendung die Modulfreigaben nicht laden, zeigt sie einen Ladefehler mit „Wiederholen“ statt „nicht freigegeben“.
+
+### Verwaltung
+
+- Neuer Stammdaten-Reiter **„Schichtmodelle“**: Modelle lassen sich anlegen, bearbeiten und löschen. Einsätze behalten dabei ihre eigene Kopie. Ein Modell lässt sich als Vorgabe der Organisation setzen oder als Vorgabe aufheben. Als Typ gibt es Rhythmus oder feste Wechselzeiten (z. B. „0600/1800“), dazu Vorwarnung und Planungsvorlauf. Nur Administratoren dürfen Schichtmodelle ändern.
+- „Neuen Einsatz anlegen“ nennt das Vorgabe-Schichtmodell der Organisation, sofern eines gesetzt ist.
+
+### Dokumentation
+
+- Das Anwenderkapitel „Ablösung“ ist überarbeitet und hat neue Bilder: Beginn mit dem Eintreffen, Ende mit der Entlassung, „Ohne Schicht“, Vollzug mit mehreren Ablösern und Abschnittsübergabe, Hinweise. Die Kapitel zu Stammdaten, Einsatz-Einstellungen und Erinnerungen beschreiben jetzt auch die Schichtmodelle und den Planungsvorlauf.
+
 ## [1.0.0-alpha.135](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.134...v1.0.0-alpha.135) (2026-10-17)
 
 ### Wichtige Änderungen
