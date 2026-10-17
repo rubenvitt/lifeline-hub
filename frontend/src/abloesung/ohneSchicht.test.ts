@@ -135,6 +135,28 @@ describe('findOhneSchicht (LLH-1128)', () => {
     expect(ergebnis[0].abloeser_fuer).toBe('Florian 1');
   });
 
+  it('jeder Eintrag der Ablöser-Liste gilt als geplant, nicht nur der erste (LLH-1132)', () => {
+    const ergebnis = findOhneSchicht(
+      [einheit(1, 'Florian 1'), einheit(2, 'Florian 2'), einheit(3, 'Florian 3')],
+      [offen(2, '2026-10-17 10:00:00'), offen(3, '2026-10-17 10:05:00')],
+      [
+        schicht({
+          einheit_id: 1,
+          einheit_name: 'Florian 1',
+          abloesende_einheit_id: 2,
+          abloeser: [
+            { einheit_id: 2, einheit_name: 'Florian 2' },
+            { einheit_id: 3, einheit_name: 'Florian 3' },
+          ],
+        }),
+      ],
+    );
+    expect(ergebnis.map((e) => [e.einheit_name, e.abloeser_fuer])).toEqual([
+      ['Florian 2', 'Florian 1'],
+      ['Florian 3', 'Florian 1'],
+    ]);
+  });
+
   it('nur Einheiten der Liste: eine aufgelöste mit offener Periode fehlt', () => {
     expect(
       findOhneSchicht([einheit(1, 'Florian 1')], [offen(9, '2026-10-17 06:00:00')], []),

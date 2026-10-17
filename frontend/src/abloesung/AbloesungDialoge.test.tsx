@@ -370,3 +370,90 @@ describe('Ablösung — Rhythmus als Dauer (LLH-1122)', () => {
     );
   });
 });
+
+/** LLH-1132: Ablöser als Liste, „Abschnitt übergeben“ vorbelegt bzw. gesperrt mit Grund. */
+describe('Ablösung — Vollzug mit Liste und Abschnittsübergabe (LLH-1132)', () => {
+  const schicht = {
+    id: 3,
+    einheit_name: 'Florian 1',
+    abloeser: [
+      { einheit_id: 13, einheit_name: 'Florian 3' },
+      { einheit_id: 12, einheit_name: 'Florian 2' },
+    ],
+  } as unknown as Abloesung;
+  const einheiten = [
+    { value: 12, label: 'Florian 2' },
+    { value: 13, label: 'Florian 3' },
+  ];
+
+  it('vorbelegt mit der Planung und „Abschnitt übergeben“; beides geht hinaus', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={einheiten}
+        abschnittName="Deichwache Nord"
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const option = within(dialog).getByRole('checkbox', {
+      name: 'Abschnitt übergeben (Deichwache Nord)',
+    });
+    expect(option).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        abloeser_ids: [13, 12],
+        abschnitt_uebergeben: true,
+      }),
+    );
+  });
+
+  it('ohne Freigabe des Moduls Einheiten gesperrt mit Grund, und nichts wird übergeben', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={einheiten}
+        abschnittName="Deichwache Nord"
+        uebergabeGesperrt="Modul Einheiten gesperrt"
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const option = within(dialog).getByRole('checkbox', { name: /^Abschnitt übergeben/ });
+    expect(option).toBeDisabled();
+    expect(option).not.toBeChecked();
+    expect(option).toHaveAccessibleDescription('Modul Einheiten gesperrt');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(
+        expect.objectContaining({ abschnitt_uebergeben: false }),
+      ),
+    );
+  });
+
+  it('ohne Abschnitt der abgelösten Einheit keine Option', async () => {
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={einheiten}
+        abschnittName={null}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+  });
+});
