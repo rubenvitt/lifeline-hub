@@ -1157,6 +1157,29 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
+    // Besatzung einer Schicht beim Besatzungswechsel (LLH-1150, Mig 0216): wer ging, wer kam.
+    // Nur Verweise, Rolle, Marke und Zeit; die Person (Name) steckt in `einsatz_personal` und wird
+    // dort geschwärzt, wie bei der Kräfte-Zeitachse. Die Zuordnung zur Einheit bleibt als Skelett
+    // der Führungsdokumentation („wer war wann in welcher Einheit“) → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_besatzung",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("personal_id", G_FK),
+            retain("rolle", G_ENUM),
+            retain("einheit_vorher_id", G_FK),
+            retain("fahrzeug_vorher_id", G_FK),
+            retain("war_fuehrer", G_KONFIG),
+            retain("zeitachse_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
     // Schichtmodell des Einsatzes (LLH-1122): eine Kopie aus den Stammdaten der Org, Bezeichnung
     // wie „12-h-Schicht“ und Zahlen. Konfiguration ohne Personenbezug → RETAIN.
     TabellenRegel {

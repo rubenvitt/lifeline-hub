@@ -6,6 +6,11 @@ ist, abgelöst oder entlassen wurde, und daraus die laufende Einsatzdauer, die G
 und die Ruhezeit. Die Zeitpunkte entstehen überwiegend aus Statuswechseln, die ohnehin gepflegt
 werden.
 
+LLH-1150 hebt das Non-Goal „keine Personal-Ebene“ aus LFH-635 für den Besatzungswechsel der
+Ablösung auf: er schreibt Ereignisse nur an Personen (die alte Besatzung geht ab, die neue
+kommt), die Einheit behält ihre Periode. Grenzwerte und Ruhezeitrechnung je Person bleiben LFH-860
+vorbehalten und entstehen daraus nicht.
+
 ## Requirements
 
 ### Requirement: Ereignisse der Zeitachse
@@ -153,8 +158,9 @@ System-ETB-Eintrag schreiben, der Kraft, Art, Zeitpunkt und „nachgetragen“ n
 Das System SHALL ein nicht gestrichenes Ereignis mit Pflichtgrund streichen lassen. Die
 Streichung eines Einheit-Ereignisses MUST in derselben Transaktion alle noch nicht gestrichenen
 Ereignisse streichen, die per Fan-out daraus entstanden sind. Ein Ereignis der Art `abloesung`,
-auch seine Fan-out-Kopie an einer Person, MUST sich nur über die Rücknahme des Vollzugs streichen
-lassen (422). Jede Streichung von Hand MUST einen System-ETB-Eintrag schreiben, der Kraft, Art,
+auch seine Fan-out-Kopie an einer Person, und jedes Ereignis der Quelle `abloesung` (auch das
+Eintreffen der neuen Besatzung eines Besatzungswechsels, LLH-1150) MUST sich nur über die
+Rücknahme des Vollzugs streichen lassen (422). Jede Streichung von Hand MUST einen System-ETB-Eintrag schreiben, der Kraft, Art,
 Zeitpunkt und Grund nennt; die Streichung durch die Rücknahme weist die Berichtigung des Vollzugs
 nach. Führt eine Streichung bei der Kraft oder einer betroffenen Person zu einer Ereignisfolge,
 die die Perioden-Regeln verletzt, MUST sie mit 422 scheitern und die Person nennen.
@@ -186,6 +192,13 @@ zurück, MUST es diese Ereignisse samt Fan-out in derselben Transaktion streiche
 etwa weil die Person nach dem Vollzug neu alarmiert wurde, MUST die Rücknahme mit 422 scheitern,
 die Person nennen und nichts ändern. Die ablösenden Einheiten MUST durch den Vollzug kein
 Ereignis bekommen, auch eine übernommene Schicht nicht.
+
+Ein Besatzungswechsel (LLH-1150, Spec `kraefte-abloesung`) SHALL statt der Einheit nur Personen
+schreiben, je über den einzigen Schreibpfad und mit Quelle `abloesung`: jede Person der alten
+Besatzung (der Einheit und ihrer erbenden Untereinheiten) bekommt `abloesung`, jede der neuen
+`eintreffen`, sofern die Perioden-Regeln der Person es zulassen (sonst bleibt ihre Zeitachse
+unberührt, der Vollzug gelingt). Die Einheiten MUST kein Ereignis bekommen; ihre Periode läuft
+weiter. Die Rücknahme MUST genau diese Ereignisse streichen, mit derselben 422-Regel wie oben.
 
 Umgekehrt SHALL der einzige Schreibpfad der Zeitachse an einer Einheit die Schicht der Ablösung
 mitführen (LLH-1128, Spec `kraefte-abloesung`): das Eintreffen der offenen Periode beginnt eine
@@ -220,6 +233,11 @@ Ein Fehler dabei MUST den Statuswechsel, Nachtrag oder die Buchung nicht scheite
 #### Scenario: Einheit ohne Periode
 - **WHEN** eine Einheit ohne offene Periode abgelöst wird
 - **THEN** gelingt der Vollzug, und ihre Zeitachse bekommt kein Ereignis
+
+#### Scenario: Besatzungswechsel
+- **WHEN** an „Florian 1“ (seit 09:30 eingetroffen, mit „Anna Alt“) um 15:40 die Besatzung zu „Cora Neu“ wechselt
+- **THEN** endet die Periode von „Anna Alt“ um 15:40 mit der Art Ablösung, die von „Cora Neu“ beginnt um 15:40 mit dem Eintreffen, und die Periode von „Florian 1“ läuft weiter
+- **AND** das Eintreffen von „Cora Neu“ lässt sich von Hand nicht streichen (422), nur die Rücknahme streicht beide
 
 ### Requirement: Einsatzdauer und Ruhezeit
 

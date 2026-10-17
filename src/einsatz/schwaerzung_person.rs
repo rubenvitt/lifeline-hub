@@ -292,6 +292,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("personal_id"),
         spalten: &[("notiz", Mit), ("streichgrund", Mit)],
     },
+    // Besatzungswechsel der Ablösung (LLH-1150): nur Verweise, nichts zu entfernen; der Name
+    // geht mit `einsatz_personal`.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_abloesung_besatzung",
+        bezug: Bezug::Spalte("personal_id"),
+        spalten: &[],
+    },
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
         tabelle: "einsatz_schaden",

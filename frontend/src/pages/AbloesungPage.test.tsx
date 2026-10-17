@@ -23,8 +23,17 @@ vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
+const listeEinsatzPersonal = vi.fn();
+vi.mock('../api/einsatzPersonal', () => ({
+  listeEinsatzPersonal: (...a: unknown[]) => listeEinsatzPersonal(...a),
+}));
 const EINHEITEN = [
-  { id: 11, name: 'Florian 1', abschnitt_id: 7 },
+  {
+    id: 11,
+    name: 'Florian 1',
+    abschnitt_id: 7,
+    personal_mitglieder: [{ ep_id: 20, name: 'Anna Alt', ist_fuehrer: false }],
+  },
   { id: 12, name: 'Florian 2', abschnitt_id: null },
   { id: 13, name: 'Florian 3', abschnitt_id: 7 },
 ];
@@ -83,6 +92,8 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   abloeser: [],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
+  art: 'einheit',
+  besatzung: [],
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
@@ -402,6 +413,70 @@ describe('AbloesungPage (LFH-635)', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
     await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledWith(1, 1));
+  });
+
+  /** LLH-1150: Besatzungswechsel aus dem Dialog, die neue Besatzung aus dem Personal. */
+  it('Besatzungswechsel: bisherige Besatzung vorbelegt, neue gewählt, POST und Hinweis', async () => {
+    const a = schicht({ id: 1, faellig_at: inMinuten(-12) });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    listeEinsatzPersonal.mockResolvedValue([
+      { id: 20, name: 'Anna Alt', einheit_id: 11 },
+      { id: 21, name: 'Cora Neu', einheit_id: null },
+    ]);
+    const folge = schicht({ id: 2, einheit_id: 11, einheit_name: 'Florian 1', vorgaenger_id: 1 });
+    vollzieheAbloesung.mockResolvedValue({
+      abgeloest: {
+        ...a,
+        status: 'abgeloest',
+        ruecknehmbar: true,
+        art: 'besatzung',
+        besatzung: [
+          { personal_id: 20, name: 'Anna Alt', rolle: 'alt' },
+          { personal_id: 21, name: 'Cora Neu', rolle: 'neu' },
+        ],
+      },
+      folgeschicht: folge,
+      folgeschichten: [folge],
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    expect(
+      await within(dialog).findByText('Bisherige Besatzung: Anna Alt', { exact: false }),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Neue Besatzung' }));
+    await userEvent.click(await screen.findByTitle('Cora Neu'));
+    // Die bisherige Besatzung ist nicht wählbar.
+    expect(document.querySelector('.ant-select-item-option[title="Anna Alt"]')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung_ids: [21],
+      }),
+    );
+    expect(
+      await screen.findByText('Besatzungswechsel vollzogen: Florian 1, neu Cora Neu'),
+    ).toBeInTheDocument();
+    expect(listeEinsatzPersonal).toHaveBeenCalledWith(1);
+  });
+
+  it('Besatzungswechsel ohne Freigabe des Moduls Personal: gesperrt mit Grund, keine Anfrage', async () => {
+    freigaben.wert = freigabenFixture({ personal: { zugriff: false } });
+    renderPage();
+    const knoepfe = await screen.findAllByRole('button', { name: 'Ablösung vollziehen' });
+    await userEvent.click(knoepfe[0]);
+    const dialog = await screen.findByRole('dialog');
+    const wechsel = within(dialog).getByRole('radio', { name: 'Besatzungswechsel' });
+    await waitFor(() => expect(wechsel).toBeDisabled());
+    expect(within(dialog).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(listeEinsatzPersonal).not.toHaveBeenCalled();
   });
 
   it('Schicht beginnen: Enter-Struktur und Rhythmus als Dauer → Minuten', async () => {

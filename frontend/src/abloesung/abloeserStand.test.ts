@@ -20,6 +20,8 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
+  art: 'einheit',
+  besatzung: [],
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: '2026-01-05 06:00:00',

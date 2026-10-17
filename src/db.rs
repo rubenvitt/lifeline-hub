@@ -8384,6 +8384,106 @@ mod tests {
         );
     }
 
+    /// LLH-1150: 0216 legt die Besatzung einer Schicht an (alte und neue beim
+    /// Besatzungswechsel). Rolle nur `alt`/`neu`, Marke nur 0/1, je Person einmal je Schicht;
+    /// die Zeilen fallen mit der Schicht, der Person und dem Einsatz, Vorher-Verweise per SET NULL.
+    #[tokio::test]
+    async fn migration_0216_besatzung_einer_schicht() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 216).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schicht: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+                rhythmus_quelle, faellig_at, angelegt_von_id, art, status) \
+             VALUES (?, ?, '2026-10-16 06:00:00', 720, 'einheit', '2026-10-16 18:00:00', ?, \
+                'besatzung', 'abgeloest') RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut personen = Vec::new();
+        for name in ["Alt", "Neu"] {
+            personen.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let zeile = |person: i64, rolle: &'static str, vorher: Option<i64>, fuehrer: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_abloesung_besatzung (abloesung_id, personal_id, rolle, \
+                        einheit_vorher_id, war_fuehrer) VALUES (?, ?, ?, ?, ?)",
+                )
+                .bind(schicht)
+                .bind(person)
+                .bind(rolle)
+                .bind(vorher)
+                .bind(fuehrer)
+                .execute(&pool)
+                .await
+            }
+        };
+        zeile(personen[0], "alt", Some(einheit), 1).await.unwrap();
+        zeile(personen[1], "neu", None, 0).await.unwrap();
+        assert!(
+            zeile(personen[0], "neu", None, 0).await.is_err(),
+            "je Person einmal je Schicht"
+        );
+        let andere: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'X') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            zeile(andere, "weg", None, 0).await.is_err(),
+            "Rolle alt/neu"
+        );
+        assert!(zeile(andere, "alt", None, 2).await.is_err(), "Marke 0/1");
+        let zaehle = || {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (i64, i64)>(
+                    "SELECT COUNT(*), COUNT(einheit_vorher_id) FROM einsatz_abloesung_besatzung",
+                )
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(zaehle().await, (2, 1));
+        sqlx::query("DELETE FROM einsatz_personal WHERE id = ?")
+            .bind(personen[1])
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zaehle().await, (1, 1), "Zeile fällt mit der Person");
+        sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zaehle().await, (0, 0), "Zeilen fallen mit der Schicht");
+    }
+
     /// `demo_herkunft` bekommt die fünfte Art: Marken bleiben, nur der CHECK ist weiter.
     #[tokio::test]
     async fn migration_0212_baut_demo_herkunft_mit_schichtmodell_neu() {

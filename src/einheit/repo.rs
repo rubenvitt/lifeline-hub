@@ -1175,6 +1175,11 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_abloeser WHERE einheit_id = ?)",
         "Die Einheit ist als Ablösung geplant",
     ),
+    // LLH-1150 (Mig 0216): eine Besatzung stand beim Besatzungswechsel in der Einheit.
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_besatzung WHERE einheit_vorher_id = ?)",
+        "Ein Besatzungswechsel nennt die Einheit",
+    ),
     (
         "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
         "Einträge im Einsatztagebuch nennen die Einheit",

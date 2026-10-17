@@ -12,6 +12,7 @@ import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abloeserText } from './abloeser';
+import { besatzungText } from './besatzung';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
@@ -335,6 +336,23 @@ export default function AbloesungKarte({
           {s.status === 'abgeloest' && s.abschnitt_uebergeben && (
             <Text type="secondary" data-lfh="abloesung-abschnitt-uebergeben">
               Abschnitt {s.uebergebener_abschnitt_name ?? ''} übergeben
+            </Text>
+          )}
+          {/* Besatzungswechsel (LLH-1150): Einheit und Fahrzeug blieben, die neue Besatzung steht
+              hier; einzeilig, beide Besatzungen im Titel. */}
+          {s.status === 'abgeloest' && s.art === 'besatzung' && (
+            <Text
+              type="secondary"
+              data-lfh="abloesung-besatzung"
+              title={`Besatzungswechsel. Neue Besatzung: ${besatzungText(s, 'neu') ?? 'keine'}. Bisherige: ${besatzungText(s, 'alt') ?? 'keine'}`}
+              style={{
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              Besatzungswechsel · neu: {besatzungText(s, 'neu') ?? 'keine'}
             </Text>
           )}
           {/* Ende ohne Ablösung (LLH-1128): kein „abgelöst“, der Grund als Wort. Die Uhrzeit

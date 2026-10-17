@@ -953,6 +953,20 @@ fn abloesung_warnung_art_wire() {
     } in lifeline_hub::abloesung::AbloesungWarnungArt::ALLE);
 }
 
+/// LLH-1150: Art des Vollzugs (DB-CHECK `art` in `migrations/0212_schichtmodell.sql`) und Rolle
+/// einer Person beim Besatzungswechsel (DB-CHECK in `migrations/0216_abloesung_besatzung.sql`).
+#[test]
+fn abloesung_art_und_besatzung_rolle_wire() {
+    enum_wire!(lifeline_hub::abloesung::AbloesungArt {
+        Einheit => "einheit",
+        Besatzung => "besatzung",
+    } in lifeline_hub::abloesung::AbloesungArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::BesatzungRolle {
+        Alt => "alt",
+        Neu => "neu",
+    } in lifeline_hub::abloesung::BesatzungRolle::ALLE);
+}
+
 /// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).
 #[test]
 fn abloesung_rhythmus_quelle_wire() {
