@@ -329,6 +329,15 @@
       "notiz": "Freigabe 30.09.2026: statt channel-mosaic (11487), das wie ein Bildschirm wirkt."
     },
     {
+      "name": "kalender",
+      "bedeutung": "Kalender der Zeiteingabe (Nebenweg zum Tippen)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "23",
+        "commonName": "calendar"
+      }
+    },
+    {
       "name": "kamera",
       "bedeutung": "Kartenstand festhalten (Snapshot)",
       "herkunft": "icons8",
