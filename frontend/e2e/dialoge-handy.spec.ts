@@ -51,6 +51,17 @@ const panel = (page: Page) =>
 /** Die Zeitraum-Schnellwahl der ETB-Filterleiste (LLH-1080, `etb/EtbZeitraumWahl.tsx`). */
 const zeitraumWahl = (page: Page) => page.locator('[data-lfh="etb-zeitraum"]');
 
+/**
+ * Öffnet die Zeitraum-Schnellwahl und wartet ihre Einblendung ab: ein Klick auf den Kalender
+ * darin, solange sie noch skaliert, trifft daneben, und der Kalender bliebe zu.
+ */
+async function oeffneZeitraum(page: Page, tippen = false) {
+  if (tippen) await zeitraumWahl(page).tap();
+  else await zeitraumWahl(page).click();
+  await expect(page.getByPlaceholder('von', { exact: true })).toBeVisible();
+  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+}
+
 /** Der Kalender-Knopf neben einem Zeitfeld (`anzeige/ZeitpunktEingabe.tsx`, LLH-1070). */
 const kalenderKnopf = (feld: Locator) =>
   feld
@@ -246,7 +257,7 @@ async function pruefeEtbFilter(
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
       .not.toBe('BODY');
   }
-  await zeitraumWahl(page).click();
+  await oeffneZeitraum(page);
   const von = page.getByPlaceholder('von', { exact: true });
   await kalenderKnopf(von).click();
   await waehleImPanel(page, 14, `${wer}, ETB „von“`, dichte, g);
@@ -409,7 +420,7 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     // Getippt wird im Feld (LLH-1070); der Kalender ist der Nebenweg und steht als Blatt.
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await page.getByRole('button', { name: /^Filter/ }).tap();
-    await zeitraumWahl(page).tap();
+    await oeffneZeitraum(page, true);
     const von = page.getByPlaceholder('von', { exact: true });
     await expect(von).not.toHaveAttribute('readonly', '');
 
@@ -424,7 +435,7 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     // Der Tipp liegt auch außerhalb der Zeitraum-Schnellwahl: sie schließt mit, nichts ist gewählt.
     await expect(zeitraumWahl(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(zeitraumWahl(page)).toHaveAccessibleName('Zeitraum');
-    await zeitraumWahl(page).tap();
+    await oeffneZeitraum(page, true);
     await expect(von).toHaveValue('');
 
     // Mit Wert: Tag antippen, Uhrzeit eintragen, „Übernehmen“.
@@ -473,7 +484,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
       .not.toBe('BODY');
-    await zeitraumWahl(page).click();
+    await oeffneZeitraum(page);
     const von = page.getByPlaceholder('von', { exact: true });
     await kalenderKnopf(von).click();
     await expect(panel(page)).toBeVisible();
