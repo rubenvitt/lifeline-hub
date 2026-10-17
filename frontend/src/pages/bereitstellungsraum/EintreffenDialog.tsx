@@ -7,7 +7,6 @@ import {
   FAHRZEUG_ADHOC_TEXT_MAX,
   SAMMEL_MAX,
 } from '../../api/eingabegrenzen';
-import { bucheEintreffen } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheitenPerioden } from '../../api/kraefteZeitachse';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
@@ -27,6 +26,8 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { monoStil, useRollen } from '../../components/instrument';
 import AdhocFahrzeugFelder from '../../kraefte/AdhocFahrzeugFelder';
+import { eintreffenQueryKeys } from '../../bereitstellungsraum/eintreffenQueryKeys';
+import { erfasseEintreffenOfflineFaehig } from '../../offline/schreiben';
 import {
   buildEintreffenEingabe,
   buildEintreffenGruppen,
@@ -60,6 +61,7 @@ const KLAPP_WEITERE = 'weitere';
 const FAHRZEUG_FELDER = ['funkrufname', 'traegerorganisation', 'fahrzeugtyp'] as const;
 const KEINE_WEITEREN = [] as const;
 const KEINE_GRUPPEN: EintreffenGruppen = { erwartet: [], imEinsatz: [] };
+const KEINE_VORGEMERKT: readonly EintreffenEingabe[] = [];
 
 /** 422 „… ist schon im Einsatz“ (D9): die Serverprüfung fand eine gleichnamige Kraft. */
 function isDoppelbuchung(fehler: unknown): boolean {
@@ -76,13 +78,20 @@ function kurz(text: string, max = 30): string {
 
 export interface EintreffenDialogProps {
   einsatzId: number;
+  /** Besitzer der Offline-Queue, in die eine Buchung ohne Netz geht (Teil III). */
+  benutzerId: number | undefined;
   /** Der Raum; seine Kräfte stehen nicht zur Wahl, auch wenn die Listen sie noch frei führen. */
-  br: Pick<BrDetail, 'id' | 'einheiten' | 'fahrzeuge'>;
+  br: Pick<BrDetail, 'id' | 'bezeichnung' | 'einheiten' | 'fahrzeuge'>;
   einheiten: readonly Einheit[];
   fahrzeuge: readonly EinsatzFahrzeug[];
+  /**
+   * Ohne Netz vorgemerkte Buchungen dieses Geräts im Einsatz (Teil III): der Server kennt sie
+   * noch nicht, der Dialog bietet sie deshalb nicht erneut zum Buchen an.
+   */
+  vorgemerkt?: readonly EintreffenEingabe[];
   offen: boolean;
   onClose: () => void;
-  /** Nach einer Buchung, vor der Invalidierung: die eigene Anmeldung steht sofort. */
+  /** Nach einer Buchung beim Server, vor der Invalidierung: die eigene Anmeldung steht sofort. */
   onGebucht?: (ergebnis: EintreffenErgebnis) => void;
 }
 
@@ -91,12 +100,19 @@ export interface EintreffenDialogProps {
  * Kräften des Einsatzes und bucht einen Treffer mit einem Tipp; „Nicht in der Liste“ führt zu
  * Schritt 2, der eine unangemeldete Kraft mit dem Suchtext als Funkrufnamen anlegt. Am Gerät
  * vollflächig. Ablehnungen stehen im Dialog (`SpeicherFehler`), kein Fehler-Toast.
+ *
+ * Ohne Netz (Teil III, `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“) geht die Buchung
+ * mit `client_id` in die Offline-Queue: Hinweis „Offline vorgemerkt“, der Dialog schließt, die
+ * Seite zeigt sie unter „Vorgemerkt“. Eine Ablehnung beim Nachsenden landet im
+ * Wiederherstellungsbereich, nicht hier.
  */
 export default function EintreffenDialog({
   einsatzId,
+  benutzerId,
   br,
   einheiten,
   fahrzeuge,
+  vorgemerkt = KEINE_VORGEMERKT,
   offen,
   onClose,
   onGebucht,
@@ -133,9 +149,15 @@ export default function EintreffenDialog({
   const alle = useMemo(
     () =>
       offen
-        ? buildEintreffenGruppen({ einheiten, fahrzeuge, perioden: periodenQuery.data, imRaum })
+        ? buildEintreffenGruppen({
+            einheiten,
+            fahrzeuge,
+            perioden: periodenQuery.data,
+            imRaum,
+            vorgemerkt,
+          })
         : KEINE_GRUPPEN,
-    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum],
+    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum, vorgemerkt],
   );
   const gruppen = useMemo(
     () =>
@@ -145,32 +167,41 @@ export default function EintreffenDialog({
             fahrzeuge,
             perioden: periodenQuery.data,
             imRaum,
+            vorgemerkt,
             suche,
           })
         : KEINE_GRUPPEN,
-    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum, suche],
+    [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum, vorgemerkt, suche],
   );
 
   const buchung = useMutation({
-    mutationFn: ({ daten }: Buchung) => bucheEintreffen(einsatzId, br.id, daten),
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
+    networkMode: 'always',
+    mutationFn: ({ daten, name }: Buchung) => {
+      // Ohne Besitzer läge die Vormerkung keinem Benutzer zugeordnet in der Queue.
+      if (benutzerId == null) throw new Error('Nicht angemeldet');
+      return erfasseEintreffenOfflineFaehig(
+        benutzerId,
+        einsatzId,
+        { id: br.id, bezeichnung: br.bezeichnung },
+        name,
+        daten,
+      );
+    },
     onSuccess: (ergebnis, b) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(`Offline vorgemerkt: Eintreffen ${b.name}`);
+        return;
+      }
       message.success(
-        ergebnis.unangemeldet
+        ergebnis.daten.unangemeldet
           ? `${b.name} unangemeldet gebucht, Einsatzleitung informiert`
           : `${b.name} gebucht`,
       );
-      onGebucht?.(ergebnis);
-      for (const key of [
-        einsatzKeys.br(einsatzId),
-        einsatzKeys.brDetail(einsatzId, br.id),
-        einsatzKeys.brVerlauf(einsatzId, br.id),
-        einsatzKeys.einheiten(einsatzId),
-        einsatzKeys.fahrzeuge(einsatzId),
-        einsatzKeys.kraefteZeitachse(einsatzId),
-        einsatzKeys.meldungen(einsatzId),
-        einsatzKeys.etb(einsatzId),
-      ]) {
-        qc.invalidateQueries({ queryKey: key });
+      onGebucht?.(ergebnis.daten);
+      for (const queryKey of eintreffenQueryKeys(einsatzId, br.id)) {
+        qc.invalidateQueries({ queryKey });
       }
     },
   });
@@ -216,7 +247,7 @@ export default function EintreffenDialog({
   const funkrufname = Form.useWatch('funkrufname', form) ?? '';
   const doppel =
     schritt === 'neu'
-      ? findDoppelbuchung(funkrufname, { einheiten, fahrzeuge, kandidaten: alle })
+      ? findDoppelbuchung(funkrufname, { einheiten, fahrzeuge, kandidaten: alle, vorgemerkt })
       : null;
   const serverDoppel = schritt === 'neu' && isDoppelbuchung(buchung.error);
   const bemerkung = Form.useWatch('bemerkung', form) as string | undefined;
@@ -242,7 +273,9 @@ export default function EintreffenDialog({
               buchung.variables?.daten.kraft?.objekt_id === t.id &&
               buchung.variables.daten.kraft.objekt_typ === t.art
             }
-            disabled={buchung.isPending}
+            // Ohne Netz schon vorgemerkt: ein zweiter Tipp reihte eine zweite Buchung ein. Der
+            // Grund steht als „vorgemerkt …“ in den Hinweisen der Zeile.
+            disabled={buchung.isPending || t.vorgemerktAt != null}
           >
             Eintreffen
           </Button>,
@@ -458,7 +491,11 @@ export default function EintreffenDialog({
             type="warning"
             showIcon
             style={{ marginTop: token.marginSM }}
-            title={doppel ? `Schon im Einsatz: ${doppel.name}` : 'Schon im Einsatz'}
+            title={
+              doppel
+                ? `${doppel.vorgemerkt ? 'Schon vorgemerkt' : 'Schon im Einsatz'}: ${doppel.name}`
+                : 'Schon im Einsatz'
+            }
             // Unter dem Titel statt daneben: bei 390 px drückte die Knopfreihe den Titel auf null.
             description={
               <Space size="middle" wrap>

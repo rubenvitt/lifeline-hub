@@ -59,7 +59,7 @@ import {
 } from '../verpflegung/VerpflegungDialoge';
 import { StelleDialog } from '../verpflegung/StelleDialog';
 import StellenListe from '../verpflegung/StellenListe';
-import { offeneStellenCount } from '../verpflegung/stellenKern';
+import { eigeneStelle, offeneStellenCount } from '../verpflegung/stellenKern';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { LEERE_EMPFAENGER } from '../verpflegung/empfaengerKern';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
@@ -204,6 +204,8 @@ export default function VerpflegungPage() {
 
   const alle = useMemo(() => verpflegungQuery.data?.zeitfenster ?? [], [verpflegungQuery.data]);
   const stellen = useMemo(() => verpflegungQuery.data?.stellen ?? [], [verpflegungQuery.data]);
+  // Gebundenes Verpflegungsgerät (LLH-1048): der Nachtrag trägt fest seine Stelle.
+  const festeStelle = eigeneStelle(geraet, stellen);
   // Empfängerliste (LLH-1055): Projektion in `GET …/verpflegung`, auch am Gerät, nie `…/einheiten`.
   const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
   const stellenAnsicht = ansicht === 'stellen';
@@ -633,6 +635,7 @@ export default function VerpflegungPage() {
           zeitfenster={alle.find((zf) => zf.id === dialog.zf.id) ?? dialog.zf}
           nachforderungen={nachforderungOptionen}
           stellen={stellen}
+          festeStelle={festeStelle}
           empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}

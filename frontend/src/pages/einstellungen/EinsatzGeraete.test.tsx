@@ -45,9 +45,9 @@ interface Aufbau {
 
 /** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
 const ANSICHTEN = [
-  { ansicht: 'uhs-tablet', stellenart: 'uhs' },
-  { ansicht: 'uhs-laptop', stellenart: 'uhs' },
-  { ansicht: 'lagemonitor', stellenart: null },
+  { ansicht: 'uhs-tablet', stellenart: 'uhs', stelle_pflicht: true },
+  { ansicht: 'uhs-laptop', stellenart: 'uhs', stelle_pflicht: true },
+  { ansicht: 'lagemonitor', stellenart: null, stelle_pflicht: false },
 ];
 
 function stelleBereit(a: Aufbau = {}) {
@@ -250,7 +250,10 @@ describe('EinsatzGeraete (LFH-892)', () => {
   it('fragt nach der Stelle der Art, die die Ansicht braucht', async () => {
     const { aufrufe } = stelleBereit({
       kopplungen: [],
-      ansichten: [...ANSICHTEN, { ansicht: 'betreuungsstelle', stellenart: 'betreuungsstelle' }],
+      ansichten: [
+        ...ANSICHTEN,
+        { ansicht: 'betreuungsstelle', stellenart: 'betreuungsstelle', stelle_pflicht: true },
+      ],
     });
     rendern();
     await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
@@ -271,6 +274,112 @@ describe('EinsatzGeraete (LFH-892)', () => {
       ansicht: 'betreuungsstelle',
       stelle_id: 7,
       bezeichnung: 'Tablet BS',
+    });
+  });
+
+  describe('Verpflegung an einer Verpflegungsstelle, wahlweise (LLH-1048 Teil II)', () => {
+    const MIT_VERPFLEGUNG = [
+      ...ANSICHTEN,
+      { ansicht: 'verpflegung', stellenart: 'verpflegungsstelle', stelle_pflicht: false },
+    ];
+    function verpflegungBereit() {
+      const r = stelleBereit({ kopplungen: [], ansichten: MIT_VERPFLEGUNG });
+      server.use(
+        http.get('/api/einsaetze/1/verpflegung', () =>
+          HttpResponse.json({
+            zeitfenster: [],
+            empfaenger: { einheiten: [], abschnitte: [] },
+            // Stornierte liefert der Server nicht; eine aufgelöste nimmt keine Kopplung.
+            stellen: [
+              {
+                id: 21,
+                bezeichnung: 'Feldküche BR Sportplatz',
+                art: 'feldkueche',
+                status: 'aktiv',
+              },
+              { id: 23, bezeichnung: 'Zuführung Deich', art: 'zufuehrung', status: 'geplant' },
+              { id: 30, bezeichnung: 'Ausgabe Schule', art: 'ausgabestelle', status: 'aufgeloest' },
+            ],
+          }),
+        ),
+      );
+      return r;
+    }
+
+    it('bietet „ohne Stelle (einsatzweit)“ als Vorgabe und die geplanten und aktiven Stellen', async () => {
+      verpflegungBereit();
+      rendern();
+      await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+      await waehle('Ansicht', 'Verpflegung');
+      const feld = await screen.findByRole('combobox', { name: 'Verpflegungsstelle' });
+      // Kein Pflichtfeld: die Vorgabe steht als eigene Option, kein Löschkreuz (Handschuh).
+      expect(feld.closest('.ant-form-item')?.querySelector('.ant-form-item-required')).toBeNull();
+      expect(feld.closest('.ant-select')?.querySelector('.ant-select-clear')).toBeNull();
+      await waitFor(() =>
+        expect(feld.closest('.ant-select')?.textContent).toContain('ohne Stelle (einsatzweit)'),
+      );
+      await userEvent.click(feld);
+      await waitFor(() =>
+        expect(optionenVon('Verpflegungsstelle').map((k) => k.getAttribute('title'))).toEqual([
+          'ohne Stelle (einsatzweit)',
+          'Feldküche BR Sportplatz',
+          'Zuführung Deich',
+        ]),
+      );
+    });
+
+    it('ohne Wahl koppelt sie einsatzweit (`stelle_id: null`)', async () => {
+      const { aufrufe } = verpflegungBereit();
+      rendern();
+      await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+      await waehle('Ansicht', 'Verpflegung');
+      await screen.findByRole('combobox', { name: 'Verpflegungsstelle' });
+      await userEvent.type(screen.getByLabelText('Gerätebezeichnung'), 'Tresen');
+      await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+      await waitFor(() => expect(aufrufe).toHaveLength(1));
+      expect(aufrufe[0].body).toEqual({
+        ansicht: 'verpflegung',
+        stelle_id: null,
+        bezeichnung: 'Tresen',
+      });
+    });
+
+    it('mit gewählter Stelle koppelt sie an diese', async () => {
+      const { aufrufe } = verpflegungBereit();
+      rendern();
+      await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+      await waehle('Ansicht', 'Verpflegung');
+      await screen.findByRole('combobox', { name: 'Verpflegungsstelle' });
+      await waehle('Verpflegungsstelle', 'Feldküche BR Sportplatz');
+      await userEvent.type(screen.getByLabelText('Gerätebezeichnung'), 'Tresen');
+      await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+      await waitFor(() => expect(aufrufe).toHaveLength(1));
+      expect(aufrufe[0].body).toEqual({
+        ansicht: 'verpflegung',
+        stelle_id: 21,
+        bezeichnung: 'Tresen',
+      });
+    });
+
+    it('ein Wechsel auf den Lagemonitor nimmt die gewählte Stelle nicht mit', async () => {
+      const { aufrufe } = verpflegungBereit();
+      rendern();
+      await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+      await waehle('Ansicht', 'Verpflegung');
+      await screen.findByRole('combobox', { name: 'Verpflegungsstelle' });
+      await waehle('Verpflegungsstelle', 'Feldküche BR Sportplatz');
+      await waehle('Ansicht', 'Lagemonitor');
+      await waitFor(() =>
+        expect(screen.queryByRole('combobox', { name: 'Verpflegungsstelle' })).toBeNull(),
+      );
+      await userEvent.type(screen.getByLabelText('Gerätebezeichnung'), 'Wand');
+      await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+      await waitFor(() => expect(aufrufe).toHaveLength(1));
+      expect(aufrufe[0].body).toEqual({
+        ansicht: 'lagemonitor',
+        stelle_id: null,
+        bezeichnung: 'Wand',
+      });
     });
   });
 

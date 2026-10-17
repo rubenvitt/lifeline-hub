@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,8 +9,11 @@ import type {
   Einheit,
   EinheitPerioden,
   EinsatzFahrzeug,
+  EintreffenEingabe,
   EintreffenErgebnis,
 } from '../../api/types';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
+import { setzeOnline } from '../../test/utils';
 import { EINHEIT_BEMERKUNG_MAX } from '../../api/eingabegrenzen';
 import EintreffenDialog from './EintreffenDialog';
 
@@ -68,19 +71,29 @@ const EINHEITEN = [
 ];
 const FAHRZEUGE = [fahrzeug(5, 'FL-MUS 1-44-1', { einheit_id: 30 }), fahrzeug(6, 'RTW 2')];
 
+/** Gesendete Körper ohne `client_id`; die Schlüssel stehen getrennt in `clientIds` (Teil III). */
 let koerper: unknown[];
+let clientIds: unknown[];
 
 function antwortMit(antwort: () => Response | Promise<Response>) {
   server.use(
     http.post('/api/einsaetze/1/bereitstellungsraeume/1/eintreffen', async ({ request }) => {
-      koerper.push(await request.json());
+      const { client_id, ...rest } = (await request.json()) as Record<string, unknown>;
+      clientIds.push(client_id);
+      koerper.push(rest);
       return antwort();
     }),
   );
 }
 
-beforeEach(() => {
+afterEach(() => {
+  setzeOnline(true);
+});
+
+beforeEach(async () => {
+  await queueLeerenFuerTests();
   koerper = [];
+  clientIds = [];
   server.use(
     http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
       HttpResponse.json<EinheitPerioden[]>([]),
@@ -92,7 +105,12 @@ beforeEach(() => {
 function zeige({
   einheiten = EINHEITEN,
   fahrzeuge = FAHRZEUGE,
-}: { einheiten?: Einheit[]; fahrzeuge?: EinsatzFahrzeug[] } = {}) {
+  vorgemerkt = [],
+}: {
+  einheiten?: Einheit[];
+  fahrzeuge?: EinsatzFahrzeug[];
+  vorgemerkt?: EintreffenEingabe[];
+} = {}) {
   const onClose = vi.fn();
   const onGebucht = vi.fn();
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -101,9 +119,11 @@ function zeige({
       <AntApp>
         <EintreffenDialog
           einsatzId={1}
-          br={{ id: 1, einheiten: [], fahrzeuge: [] }}
+          benutzerId={11}
+          br={{ id: 1, bezeichnung: 'BR Sportplatz', einheiten: [], fahrzeuge: [] }}
           einheiten={einheiten}
           fahrzeuge={fahrzeuge}
+          vorgemerkt={vorgemerkt}
           offen={offen}
           onClose={onClose}
           onGebucht={onGebucht}
@@ -380,5 +400,76 @@ describe('EintreffenDialog — Doppelbuchung (D9)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Trotzdem neu anlegen' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(koerper[koerper.length - 1]).toMatchObject({ unangemeldet: { trotzdem_anlegen: true } });
+  });
+});
+
+describe('EintreffenDialog — ohne Netz (LLH-1075 Teil III)', () => {
+  it('online trägt jede Buchung eine eigene client_id', async () => {
+    const { wiederOeffnen } = zeige();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen RTW 2' }));
+    await waitFor(() => expect(clientIds).toHaveLength(1));
+    wiederOeffnen();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen RTW 2' }));
+    await waitFor(() => expect(clientIds).toHaveLength(2));
+    expect(clientIds[0]).toEqual(expect.any(String));
+    expect(clientIds[1]).not.toBe(clientIds[0]);
+  });
+
+  it('unangemeldet ohne Netz: vorgemerkt, nichts gesendet, der Dialog schließt', async () => {
+    const { onClose, onGebucht } = zeige();
+    const funkrufname = await zuSchrittZwei('Florian Nachbar 3');
+    expect(funkrufname).toHaveValue('Florian Nachbar 3');
+    setzeOnline(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Unangemeldet buchen' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(
+      await screen.findByText('Offline vorgemerkt: Eintreffen Florian Nachbar 3'),
+    ).toBeInTheDocument();
+    expect(koerper).toEqual([]);
+    expect(onGebucht).not.toHaveBeenCalled();
+    const [zeile] = await schreibaktionenLaden(11, 1);
+    expect(zeile.aktion).toMatchObject({
+      art: 'eintreffen',
+      br_id: 1,
+      bezeichnung: 'BR Sportplatz',
+      name: 'Florian Nachbar 3',
+      daten: { unangemeldet: { fahrzeuge: [{ funkrufname: 'Florian Nachbar 3' }] } },
+    });
+  });
+
+  it('eine vorgemerkte Kraft: kein „Diese buchen“, der Treffer ist gesperrt', async () => {
+    zeige({
+      vorgemerkt: [
+        { kraft: { objekt_typ: 'fahrzeug', objekt_id: 6 }, zeitpunkt_at: '2026-10-16 12:12:00' },
+      ],
+    });
+    expect(await screen.findByRole('button', { name: 'Eintreffen RTW 2' })).toBeDisabled();
+    expect(within(dialog()).getByText(/^vorgemerkt /)).toBeInTheDocument();
+    await zuSchrittZwei('rtw 2');
+    expect(await screen.findByText('Schon vorgemerkt: RTW 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Diese buchen' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Trotzdem neu anlegen' })).toBeInTheDocument();
+  });
+
+  it('eine vorgemerkte unangemeldete Kraft gleichen Namens: nur die Neuanlage', async () => {
+    zeige({
+      vorgemerkt: [
+        {
+          unangemeldet: { fahrzeuge: [{ funkrufname: 'Florian Nachbar 3' }] },
+          zeitpunkt_at: '2026-10-16 12:12:00',
+        },
+      ],
+    });
+    await zuSchrittZwei('florian nachbar 3');
+    expect(await screen.findByText('Schon vorgemerkt: Florian Nachbar 3')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Diese buchen' })).toBeNull();
+  });
+
+  it('ohne Kräfte des Einsatzes (nicht geladen) erfindet der Dialog keine Doppelbuchung', async () => {
+    zeige({ einheiten: [], fahrzeuge: [] });
+    await zuSchrittZwei('HLF 20 FF Musterstadt');
+    expect(screen.queryByText(/^Schon /)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeEnabled();
   });
 });

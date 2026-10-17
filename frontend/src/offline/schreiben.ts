@@ -1,11 +1,14 @@
 import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError } from '../api/client';
+import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import type {
   AusgabeEingabe,
   BelegungsmeldungEingabe,
   BezirkMeldung,
+  EintreffenEingabe,
+  EintreffenErgebnis,
   Meldung,
   NeueMeldung,
   Person,
@@ -24,7 +27,7 @@ import { serverJetzt } from './serveruhr';
 type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
-function clientId(vorgegeben?: string): string {
+function clientId(vorgegeben?: string | null): string {
   return vorgegeben ?? neueClientId();
 }
 
@@ -107,7 +110,7 @@ interface SchreibZiel {
  * `vormerkenMitZeit` schreibt die Kopie mit diesem Zeitpunkt in die Queue, falls keiner
  * eingetragen ist. Geteilt vom Senden-oder-Vormerken und vom direkten Vormerken (LLH-1032).
  */
-function vormerkbar<E extends { client_id?: string; zeitpunkt_at?: string }>(
+function vormerkbar<E extends { client_id?: string | null; zeitpunkt_at?: string | null }>(
   benutzerId: number,
   einsatzId: number,
   eingabe: E,
@@ -127,9 +130,9 @@ function vormerkbar<E extends { client_id?: string; zeitpunkt_at?: string }>(
 
 /**
  * Gemeinsamer Ablauf für Schreibvorgänge mit Erfassungszeitpunkt: Stand- und
- * Belegungsmeldungen (LFH-675), Verpflegungsausgaben (LFH-688). Die `client_id` wird EINMAL vor dem
- * Senden gesetzt: Online-Versuch und vorgemerkte Kopie tragen denselben Schlüssel, ein Timeout
- * nach dem Commit wird beim Flush zum Replay.
+ * Belegungsmeldungen (LFH-675), Verpflegungsausgaben (LFH-688), Eintreffen (LLH-1075). Die
+ * `client_id` wird EINMAL vor dem Senden gesetzt: Online-Versuch und vorgemerkte Kopie tragen
+ * denselben Schlüssel, ein Timeout nach dem Commit wird beim Flush zum Replay.
  *
  * Nur die vorgemerkte Kopie bekommt den Erfassungszeitpunkt (falls keiner eingetragen ist):
  * sonst stempelte der Server beim Flush „jetzt“, und eine ältere Zahl verdrängte eine neuere.
@@ -138,7 +141,7 @@ function vormerkbar<E extends { client_id?: string; zeitpunkt_at?: string }>(
  * (LFH-705): sonst scheiterte er auf einem vorgehenden Gerät am Zukunftsriegel des Servers.
  */
 async function mitErfassungszeitOfflineFaehig<
-  E extends { client_id?: string; zeitpunkt_at?: string },
+  E extends { client_id?: string | null; zeitpunkt_at?: string | null },
   T,
 >(
   benutzerId: number,
@@ -187,6 +190,29 @@ export function erfasseBelegungOfflineFaehig(
     eingabe,
     (daten) => meldeBelegung(einsatzId, stelle.id, daten, { offlineQueueBenutzerId: benutzerId }),
     (daten) => ({ art: 'belegung', stelle_id: stelle.id, bezeichnung: stelle.bezeichnung, daten }),
+  );
+}
+
+/**
+ * Eintreffen am Bereitstellungsraum senden oder mit Erfassungszeitpunkt vormerken (LLH-1075
+ * Teil III): eine bekannte Kraft wie eine unangemeldete. Die `client_id` steht vor dem ersten
+ * Versuch fest; der Server liefert für sie bei jeder Wiederholung die erste Buchung (Spec
+ * `bereitstellungsraum-belegung`, „Eintreffen ist idempotent“), auch nach einer abgerissenen
+ * Antwort. `name` nennt die Kraft nur in der Anzeige der Queue.
+ */
+export function erfasseEintreffenOfflineFaehig(
+  benutzerId: number,
+  einsatzId: number,
+  br: SchreibZiel,
+  name: string,
+  eingabe: EintreffenEingabe,
+): Promise<OfflineSchreibErgebnis<EintreffenErgebnis>> {
+  return mitErfassungszeitOfflineFaehig(
+    benutzerId,
+    einsatzId,
+    eingabe,
+    (daten) => bucheEintreffen(einsatzId, br.id, daten, { offlineQueueBenutzerId: benutzerId }),
+    (daten) => ({ art: 'eintreffen', br_id: br.id, bezeichnung: br.bezeichnung, name, daten }),
   );
 }
 

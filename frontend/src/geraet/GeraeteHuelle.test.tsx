@@ -849,6 +849,57 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
   });
 
+  describe('an einer Verpflegungsstelle (LLH-1048 Teil II)', () => {
+    const anKueche = geraet({
+      ansicht: 'verpflegung',
+      uhs_id: null,
+      stelle_id: 21,
+      stelle: 'Feldküche BR Sportplatz',
+      bezeichnung: 'Tresen',
+    });
+
+    it('der Kopf nennt die Stelle; eine Umbenennung kommt ohne Neuanmeldung an', async () => {
+      vi.useRealTimers();
+      const quellen: SendendeEventSource[] = [];
+      vi.stubGlobal(
+        'EventSource',
+        class extends SendendeEventSource {
+          constructor(url: string) {
+            super(url);
+            quellen.push(this);
+          }
+        },
+      );
+      verpflegungBereit([stelle({ id: 21, bezeichnung: 'Feldküche BR Sportplatz' })]);
+      server.use(
+        meHandler({
+          ...benutzerFixture({ id: 50, anzeigename: 'Feldküche BR Sportplatz · Tresen' }),
+          geraet: anKueche,
+        }),
+      );
+      renderApp('/geraet/7/verpflegung');
+      const kopf = await screen.findByRole('banner');
+      expect(await within(kopf).findByText('Feldküche BR Sportplatz')).toBeVisible();
+      expect(within(kopf).queryByText('Verpflegung')).toBeNull();
+
+      // Die Einsatzleitung benennt die Stelle um; `/me` nennt weiter den alten Namen.
+      server.use(
+        http.get('/api/einsaetze/7/verpflegung', () =>
+          HttpResponse.json({
+            zeitfenster: [],
+            stellen: [stelle({ id: 21, bezeichnung: 'Feldküche Festwiese' })],
+          }),
+        ),
+      );
+      await waitFor(() => expect(quellen.length).toBeGreaterThan(0));
+      act(() =>
+        quellen[quellen.length - 1].sende('verpflegung', JSON.stringify({ einsatz_id: 7 })),
+      );
+      expect(await within(kopf).findByText('Feldküche Festwiese')).toBeVisible();
+      expect(within(kopf).queryByText('Feldküche BR Sportplatz')).toBeNull();
+    });
+  });
+
   it('eine andere Ansicht landet von der Ausgabeansicht auf ihrer Startseite', async () => {
     stelleBereit();
     const router = renderApp('/geraet/7/verpflegung/1/ausgabe');

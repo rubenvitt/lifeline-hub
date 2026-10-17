@@ -12,13 +12,18 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Client blendet `geraetDarf`/`useGeraetDarf` (`geraet/geraetSicht.ts`) nur aus, was der Server
   ablehnt. Eine neue Fähigkeit beginnt mit Listeneintrag und Test in `tests/geraet_kopplung.rs`,
   erst dann `geraetDarf`.
-- **Stellenbindung je Art** (LFH-1040): UHS, Betreuungsstelle, Bereitstellungsraum und
-  Einsatzabschnitt haben je eine Spalte in `geraet_kopplung` (Migration 0159, höchstens eine
-  gesetzt); `Funktionsansicht::stellenart` nennt die Art, `GeraetKontext.stelle` die Stelle. Die
-  Helfer in `stelle.rs` gelten streng: ein Gerät, das nicht an eine Stelle genau dieser Art
-  gebunden ist, sieht keine (`sicht` → `Keine`), Personen nur über `sichtbare_personen` /
-  `fordere_person` seiner Art. Wer eine Route mehreren Ansichten öffnet, filtert über diese
-  Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt widerruft seine Kopplungen.
+- **Stellenbindung je Art** (LFH-1040, LLH-1048): UHS, Betreuungsstelle, Bereitstellungsraum,
+  Einsatzabschnitt und Verpflegungsstelle haben je eine Spalte in `geraet_kopplung` (Migration
+  0213, höchstens eine gesetzt); `Funktionsansicht::stellenart` nennt die Art,
+  `GeraetKontext.stelle` die Stelle. Die Helfer in `stelle.rs` gelten streng: ein Gerät, das
+  nicht an eine Stelle genau dieser Art gebunden ist, sieht keine (`sicht` → `Keine`), Personen
+  nur über `sichtbare_personen` / `fordere_person` seiner Art. Wer eine Route mehreren Ansichten
+  öffnet, filtert über diese Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt
+  widerruft seine Kopplungen; eine aufgelöste UHS, ein aufgelöster BR und eine aufgelöste
+  Verpflegungsstelle nicht. **Einzige wahlweise Stelle ist die Verpflegung**
+  (`stelle_wahlweise`, LLH-1024 F7, `AnsichtAuswahl.stelle_pflicht = false`): ohne Stelle bleibt
+  das Gerät einsatzweit. Ihre Handler fragen `sicht_wahlweise` / `ziel_stelle_wahlweise`, nie die
+  strenge `sicht`; eine neue wahlweise Ansicht braucht dieselbe Entscheidung in jedem Handler.
 - **Abschnittsansicht** (LFH-1043): der Bereich ist der Teilbaum des gebundenen Abschnitts samt
   seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Listen filtern über
   `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
@@ -69,7 +74,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
-  geführten Abfrage der Stelle, `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
+  geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/verpflegung`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
   einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü.
@@ -97,14 +102,16 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
   ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
   Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Die Suche kennt nur
-  Kräfte des Einsatzes, keine Stammdaten. Abrufen ist eine Führungsentscheidung (LLH-1085):
-  `br-abrufen` ist an keinem Gerät wahr, „Abrufen“, „Abrufen und austragen“ und „Abruf
+  Kräfte des Einsatzes, keine Stammdaten. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
+  `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Abrufen ist eine Führungsentscheidung
+  (LLH-1085): `br-abrufen` ist an keinem Gerät wahr, „Abrufen“, „Abrufen und austragen“ und „Abruf
   zurücknehmen“ fehlen dort. Das Gerät sieht abgerufene Kräfte live unter „Abgerufen“ (ohne Ton,
   Entscheidung 15.10.2026) und bucht „Ausrücken buchen“ als Austritt über `…/belegung`; „Austragen“
   steht an Desktop und Gerät im Aktionsmenü der Zeile. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
-- **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte
+- **Verpflegung** (LFH-1044): einsatzweit oder an einer Verpflegungsstelle (LLH-1048, s. u.),
+  Startseite ist die geteilte
   `VerpflegungPage` unter `/geraet/:id/verpflegung`; ohne `verpflegung-planen` kein Anlegen,
   Bearbeiten, Löschen. Eine Fehlmenge geht als Meldung an die Einsatzleitung (`meldungVorbelegung`,
   `?inhalt=` auf der Meldungsseite), nie als Nachforderung; eine Ausgabe mit `nachforderung_id`
@@ -117,8 +124,25 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Stellen (LLH-1040 Teil II): das Gerät liest die Verpflegungsstellen (Ansicht „Stellen“) und
   wählt beim Buchen eine (Stellenwahl der Ausgabeansicht, Feld „Stelle“ im Nachtrag), plant sie
   aber nicht: ohne `verpflegung-planen` gibt es weder „Stelle anlegen“ noch Zeilenaktionen, und
-  die Ortszeile zur Koordinate fehlt (`fremde-module`). Die Wahl wird am Gerät nicht gemerkt. Die
-  Kopplung bleibt einsatzweit, eine an die Stelle gebundene Kopplung folgt mit LLH-1048.
+  die Ortszeile zur Koordinate fehlt (`fremde-module`). Die Wahl wird am Gerät nicht gemerkt.
+  **An einer Stelle** (LLH-1048 Teil I, Server; Spec `funktionsansichten`, „Verpflegungsgerät an
+  einer Verpflegungsstelle“): die Kopplung nimmt wahlweise eine geplante oder aktive
+  Verpflegungsstelle. Gebunden schneidet `verpflegung::stellensicht` die Lesung nach der
+  Deckungsrechnung zu: Zeitfenster der Stelle und einsatzweite, Soll/Ist/Fehlmenge des ganzen
+  Zeitfensters, im Einzelnen nur die eigene Stelle (`ausgaben`, `je_stelle`, `stelle_ids`,
+  `stellen`), Ausgaben anderswo nur als `verpflegt_anderswo` (Kennung der Einheit und Menge,
+  gepinnt in `tests/geraet_kopplung.rs`). Gebucht wird immer an der eigenen Stelle (ohne Angabe
+  setzt der Server sie, eine andere 403), ein Zeitfenster nur fremder Stellen und eine fremde
+  Ausgabe sind 404; der Replay läuft vor der Zeitfensterprüfung. Absender und Erfasser ist die
+  Stelle über den Anzeigenamen des Gerätekontos und `geraet.stelle`. Oberfläche (LLH-1048 Teil
+  II): die Kopplungsmaske liest das Feld aus `stellenFeldVon` (`stellenart` und `stelle_pflicht`);
+  eine wahlweise Stelle hat die Vorgabe „ohne Stelle (einsatzweit)“ als eigene Option (kein
+  Löschkreuz, Handschuh), zur Wahl stehen die Stellen aus `GET …/verpflegung`. Am gebundenen Gerät
+  steht die Stelle fest (`verpflegung/stellenKern.ts:eigeneStelle`): keine Stellenwahl in
+  Ausgabeansicht und Nachtrag, jedes Bündel trägt sie; „Noch nicht verpflegt“ verrechnet
+  `verpflegt_anderswo` nur so, wie der Server es liefert. Eine geplante Stelle mit laufender
+  Kopplung (wartend oder aktiv) storniert der Server nicht (409 „Gerät gekoppelt“, Feld
+  `geraet_gekoppelt` der Stelle, Nachweis `tests/geraet_kopplung.rs`).
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**

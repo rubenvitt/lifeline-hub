@@ -211,6 +211,7 @@ Für Einsatzleitung und Führungspersonal:
    eingeklappt unter „aufgelöst“ am Ende der Liste und ist in der Ausgabeansicht nicht mehr wählbar.
 3. Eine geplante Stelle ohne Ausgabe lässt sich stattdessen über „Stornieren …“ im Menü entfernen;
    die Rückfrage mit „Stornieren“ bestätigen. Sie fällt aus der Liste und aus allen Zeitfenstern.
+   Ist an ihr ein Gerät gekoppelt, steht im Menü gesperrt „Stornieren … (Gerät gekoppelt)“.
 
 ## Hintergrund
 
@@ -233,7 +234,9 @@ Bestand und kein Material. Ausgeben lässt sich an geplanten und aktiven Stellen
 Stelle, der das Zeitfenster nicht zugeordnet ist. An einer aufgelösten Stelle nimmt die App nur
 noch Ausgaben an, deren Zeitpunkt vor der Auflösung liegt. Eine aufgelöste Stelle bleibt
 bearbeitbar. Stornieren geht nur, solange die Stelle geplant ist und an ihr nichts ausgegeben
-wurde, auch keine zurückgenommene Ausgabe.
+wurde, auch keine zurückgenommene Ausgabe, und solange an ihr kein Gerät gekoppelt ist, auch
+keines, das seinen Code noch nicht eingelöst hat. Erst nach dem Widerruf oder Ablauf der Kopplung
+(siehe [Geräte koppeln](geraete-koppeln.md)) geht das Storno.
 
 ### Stellen und Bedarf
 

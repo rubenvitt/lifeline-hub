@@ -171,6 +171,17 @@ draußen gelassen werden.
   `apiSend` samt CSRF, Serveruhr-Versatz und Antwort. Der Sync sendet und legt Ablehnungen in den
   Wiederherstellungsbereich. Ein Bündel, das an Ort und Stelle gesendet wird, ist keine Mutation
   (nichts zu pausieren); `networkMode` stellt sich dort nicht.
+- **Was vorgemerkt ist, kennt der Server noch nicht** (LLH-1075 Teil III, Eintreffen am
+  Bereitstellungsraum, `erfasseEintreffenOfflineFaehig`): Eine Fachseite zeigt ihre vorgemerkten
+  Schreibaktionen über `useVorgemerkteSchreibaktionen(benutzer, einsatz, art)` als „Vorgemerkt“
+  bzw. „ausstehend“, getrennt von den Serverdaten und nicht in deren Kennzahlen. Ein Dialog, der
+  Treffer aus dem Cache anbietet, nimmt die vorgemerkten derselben Art dazu: eine schon
+  vorgemerkte Kraft steht gesperrt mit „vorgemerkt …“ und ist kein Ziel für „Diese buchen“, eine
+  vorgemerkte Neuanlage gleichen Namens heißt „Schon vorgemerkt“. Fehlen die Daten für eine
+  Prüfung (nicht geladen), meldet der Client nichts, der Server prüft beim Senden. Der Abgleich
+  lädt die Fachansicht neu (`await invalidateQueries`), bevor er die Zeile entfernt, wie bei der
+  Ausgabe. Ablehnungen nennen im Wiederherstellungsbereich das Objekt (`bezeichnung`, beim
+  Eintreffen dazu `name`), nie nur Kennungen.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
   `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
   nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt

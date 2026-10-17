@@ -181,7 +181,11 @@ macro_rules! zuordnung_select {
 macro_rules! stelle_select {
     () => {
         "SELECT id, bezeichnung, art, standort, lat, lon, abschnitt_id, status, \
-                aufgeloest_at, storniert_at, angelegt_at \
+                aufgeloest_at, storniert_at, angelegt_at, \
+                EXISTS (SELECT 1 FROM geraet_kopplung k \
+                         WHERE k.verpflegungsstelle_id = verpflegungsstelle.id \
+                           AND k.widerrufen_at IS NULL \
+                           AND k.laeuft_ab_at > datetime('now')) AS geraet_gekoppelt \
          FROM verpflegungsstelle "
     };
 }
@@ -201,6 +205,8 @@ struct StelleZeile {
     aufgeloest_at: Option<String>,
     storniert_at: Option<String>,
     angelegt_at: String,
+    /// Eine laufende Kopplung (wartend oder aktiv) hängt an der Stelle (LLH-1048 Teil II).
+    geraet_gekoppelt: bool,
 }
 
 impl StelleZeile {
@@ -216,6 +222,7 @@ impl StelleZeile {
             status: self.status,
             aufgeloest_at: self.aufgeloest_at,
             angelegt_at: self.angelegt_at,
+            geraet_gekoppelt: self.geraet_gekoppelt,
         }
     }
 }
@@ -284,6 +291,7 @@ impl ZeitfensterZeile {
             fehlmenge: d.fehlmenge,
             stelle_ids,
             je_stelle: d.je_stelle,
+            verpflegt_anderswo: Vec::new(),
             ausgaben,
             angelegt_at: self.angelegt_at,
             geaendert_at: self.geaendert_at,
@@ -1379,6 +1387,53 @@ pub fn replay_am_zeitfenster(
     }
 }
 
+/// Für ein an die Stelle `stelle_id` gebundenes Gerät (LLH-1048): das Zeitfenster gibt es nur,
+/// wenn es der Stelle zugeordnet oder einsatzweit (ohne Zuordnung) ist; sonst, und für ein
+/// fremdes oder unbekanntes Zeitfenster, 404. In der Transaktion, nach dem Replay.
+pub async fn check_zeitfenster_an_stelle_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    zeitfenster_id: i64,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    let gilt: Option<bool> = sqlx::query_scalar(
+        "SELECT NOT EXISTS (SELECT 1 FROM verpflegung_zeitfenster_stelle zs \
+                            WHERE zs.zeitfenster_id = z.id) \
+             OR EXISTS (SELECT 1 FROM verpflegung_zeitfenster_stelle zs \
+                        WHERE zs.zeitfenster_id = z.id AND zs.stelle_id = ?) \
+         FROM verpflegung_zeitfenster z WHERE z.id = ? AND z.einsatz_id = ?",
+    )
+    .bind(stelle_id)
+    .bind(zeitfenster_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match gilt {
+        Some(true) => Ok(()),
+        _ => Err(AppError::NotFound),
+    }
+}
+
+/// Für ein an die Stelle `stelle_id` gebundenes Gerät (LLH-1048): eine Ausgabe gibt es nur, wenn
+/// sie an dieser Stelle gebucht ist; sonst, und für eine fremde oder unbekannte, 404.
+pub async fn check_ausgabe_an_stelle_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ausgabe_id: i64,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    let da: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM verpflegung_ausgabe \
+         WHERE id = ? AND einsatz_id = ? AND verpflegungsstelle_id = ?",
+    )
+    .bind(ausgabe_id)
+    .bind(einsatz_id)
+    .bind(stelle_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    da.map(|_| ()).ok_or(AppError::NotFound)
+}
+
 /// Nimmt eine Ausgabe zurück. Die Zeile bleibt stehen (append-only) und zählt nicht mehr in die
 /// Deckung. Eine zweite Rücknahme ist 422. Kein ETB-Eintrag (design.md D5).
 pub async fn ausgabe_zuruecknehmen_tx(
@@ -1468,6 +1523,31 @@ async fn check_stelle_bezeichnung_frei_tx(
             "Eine Verpflegungsstelle ‚{bezeichnung}‘ gibt es in diesem Einsatz bereits"
         ))),
     }
+}
+
+/// Was die Gerätekopplung von einer Stelle braucht (LLH-1048): Bezeichnung für den Anzeigenamen
+/// des Geräts, Status und ob sie storniert ist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StelleZustand {
+    pub bezeichnung: String,
+    pub status: VerpflegungsstelleStatus,
+    pub storniert: bool,
+}
+
+/// Lädt den Zustand einer Stelle des Einsatzes, auch einer stornierten. Fremd oder unbekannt →
+/// 404.
+pub async fn load_stelle_zustand(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<StelleZustand, AppError> {
+    let mut conn = pool.acquire().await?;
+    let roh = stelle_roh_tx(&mut conn, einsatz_id, id).await?;
+    Ok(StelleZustand {
+        storniert: roh.storniert_at.is_some(),
+        bezeichnung: roh.bezeichnung,
+        status: roh.status,
+    })
 }
 
 /// Die Stelle als Anzeige (Antwort der Schreibrouten). Fremd oder unbekannt → 404.
@@ -1640,8 +1720,11 @@ pub async fn update_stelle_status_tx(
 }
 
 /// Storniert eine Stelle (Fehlanlage, D2): nur `geplant` und nur, solange keine Ausgabe — auch
-/// keine zurückgenommene — auf sie verweist, sonst 422. Entfernt die Zuordnungen in derselben
-/// Transaktion und schreibt kein ETB. So zeigt nie eine Ausgabe auf eine stornierte Stelle, und
+/// keine zurückgenommene — auf sie verweist, sonst 422. Hängt eine laufende Gerätekopplung an ihr
+/// (LLH-1048 Teil II, wartend oder aktiv), ist das Storno 409 „Gerät gekoppelt“: das Gerät sähe
+/// danach nur die einsatzweiten Zeitfenster, und jede Buchung wäre 422. Die Kopplung ist ein
+/// Zustand der Stelle wie die stornierte (409), kein Fehler im Body; erst widerrufen oder ablaufen
+/// lassen. Entfernt die Zuordnungen in derselben Transaktion und schreibt kein ETB. So zeigt nie eine Ausgabe auf eine stornierte Stelle, und
 /// kein „in Betrieb genommen“ bleibt ohne Gegenstück.
 pub async fn stelle_stornieren_tx(
     conn: &mut SqliteConnection,
@@ -1674,6 +1757,11 @@ pub async fn stelle_stornieren_tx(
         return Err(AppError::UnprocessableEntity(format!(
             "An der Stelle hängen Ausgaben ({ausgaben}) — auflösen statt stornieren"
         )));
+    }
+    if roh.geraet_gekoppelt {
+        return Err(AppError::Conflict(
+            "Gerät gekoppelt — erst die Kopplung widerrufen".into(),
+        ));
     }
     sqlx::query("DELETE FROM verpflegung_zeitfenster_stelle WHERE stelle_id = ?")
         .bind(id)

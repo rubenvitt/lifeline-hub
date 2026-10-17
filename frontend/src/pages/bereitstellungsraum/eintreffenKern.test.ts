@@ -161,6 +161,23 @@ describe('buildEintreffenGruppen (LLH-1075, design.md D13)', () => {
     expect(namen(g.erwartet)).toEqual(['ELW', 'Zug 2', 'Zug 10']);
   });
 
+  it('eine offline vorgemerkte Kraft trägt den Zeitpunkt der Vormerkung (LLH-1075 Teil III)', () => {
+    const g = buildEintreffenGruppen({
+      einheiten: [einheit(1, 'HLF 20'), einheit(2, 'ELW 1')],
+      fahrzeuge: [fahrzeug(6, 'RTW 2')],
+      vorgemerkt: [
+        { kraft: { objekt_typ: 'einheit', objekt_id: 1 }, zeitpunkt_at: '2026-10-16 12:12:00' },
+        { kraft: { objekt_typ: 'fahrzeug', objekt_id: 6 }, zeitpunkt_at: '2026-10-16 12:13:00' },
+        { unangemeldet: { fahrzeuge: [{ funkrufname: 'ELW 1' }] } },
+      ],
+    });
+    expect(g.erwartet.map((t) => [t.name, t.vorgemerktAt])).toEqual([
+      ['ELW 1', null],
+      ['HLF 20', '2026-10-16 12:12:00'],
+      ['RTW 2', '2026-10-16 12:13:00'],
+    ]);
+  });
+
   describe('Suche', () => {
     const daten = {
       einheiten: [
@@ -221,7 +238,17 @@ describe('trefferHinweise', () => {
     abschnitt: null,
     alarmiertAt: null,
     eingetroffenAt: null,
+    vorgemerktAt: null,
   };
+
+  it('eine offline vorgemerkte Kraft nennt zuerst die Vormerkung (LLH-1075 Teil III)', () => {
+    expect(
+      trefferHinweise(
+        { ...basis, vorgemerktAt: '2026-10-16 14:12:00', alarmiertAt: '2026-10-16T13:42:00' },
+        zeit,
+      ),
+    ).toEqual(['vorgemerkt 1412', 'alarmiert 1342']);
+  });
 
   it('nennt Alarmierung, Abschnitt und Eintreffen in dieser Folge', () => {
     expect(
@@ -301,6 +328,65 @@ describe('findDoppelbuchung (D9)', () => {
   it('ein Teilstück trifft nicht', () => {
     expect(findDoppelbuchung('RTW', { einheiten, fahrzeuge, kandidaten })).toBeNull();
   });
+
+  it('eine Kraft aus dem Einsatz ist nicht vorgemerkt', () => {
+    expect(findDoppelbuchung('rtw 2', { einheiten, fahrzeuge, kandidaten })?.vorgemerkt).toBe(
+      false,
+    );
+  });
+
+  describe('ohne Netz vorgemerkt (LLH-1075 Teil III)', () => {
+    const vorgemerkt = [
+      {
+        kraft: { objekt_typ: 'fahrzeug' as const, objekt_id: 6 },
+        zeitpunkt_at: '2026-10-16 12:12:00',
+      },
+      {
+        unangemeldet: {
+          fahrzeuge: [{ funkrufname: 'FL-MUS 2-44-1' }, { funkrufname: 'FL-MUS 2-19-1' }],
+        },
+        zeitpunkt_at: '2026-10-16 12:13:00',
+      },
+    ];
+    const mitVormerkung = buildEintreffenGruppen({ einheiten, fahrzeuge, vorgemerkt });
+
+    it('eine schon vorgemerkte Kraft bietet „Diese buchen“ nicht noch einmal an', () => {
+      const d = findDoppelbuchung('RTW 2', {
+        einheiten,
+        fahrzeuge,
+        kandidaten: mitVormerkung,
+        vorgemerkt,
+      });
+      expect(d).toEqual({ name: 'RTW 2', treffer: null, vorgemerkt: true });
+    });
+
+    it('eine vorgemerkte unangemeldete Kraft ist noch keine buchbare Kraft', () => {
+      for (const eingabe of ['fl-mus 2-44-1', 'FL-MUS  2-19-1']) {
+        const d = findDoppelbuchung(eingabe, {
+          einheiten,
+          fahrzeuge,
+          kandidaten: mitVormerkung,
+          vorgemerkt,
+        });
+        expect(d, eingabe).toEqual({
+          name: eingabe.includes('19') ? 'FL-MUS 2-19-1' : 'FL-MUS 2-44-1',
+          treffer: null,
+          vorgemerkt: true,
+        });
+      }
+    });
+
+    it('ohne Kräfte des Einsatzes erfindet die Prüfung keine Doppelbuchung', () => {
+      expect(
+        findDoppelbuchung('HLF 20 FF Musterstadt', {
+          einheiten: [],
+          fahrzeuge: [],
+          kandidaten: buildEintreffenGruppen({}),
+          vorgemerkt: [],
+        }),
+      ).toBeNull();
+    });
+  });
 });
 
 describe('kraftEingabe', () => {
@@ -315,6 +401,7 @@ describe('kraftEingabe', () => {
         abschnitt: null,
         alarmiertAt: null,
         eingetroffenAt: null,
+        vorgemerktAt: null,
       }),
     ).toEqual({ kraft: { objekt_typ: 'einheit', objekt_id: 3 } });
   });

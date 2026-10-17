@@ -12,10 +12,12 @@ Das System SHALL genau diese Funktionsansichten kennen: `uhs-tablet`, `uhs-lapto
 `lagemonitor`, `betreuungsstelle`, `bereitstellungsraum`, `einsatzabschnitt` und `verpflegung`.
 Die beiden UHS-Ansichten MUST an genau eine UHS des Einsatzes gebunden sein, `betreuungsstelle`
 an genau eine Betreuungsstelle, `bereitstellungsraum` an genau einen Bereitstellungsraum und
-`einsatzabschnitt` an genau einen Einsatzabschnitt. `lagemonitor` und `verpflegung` MUST an
-keine Stelle gebunden sein. Ein unbekannter Ansichtswert MUST beim Anlegen einer Kopplung 400
-sein, ebenso eine fehlende Stelle bei einer gebundenen und eine angegebene Stelle bei einer
-ungebundenen Ansicht.
+`einsatzabschnitt` an genau einen Einsatzabschnitt. `verpflegung` MAY an genau eine
+Verpflegungsstelle des Einsatzes gebunden sein; ohne Stelle MUST sie einsatzweit gelten
+(LLH-1048). `lagemonitor` MUST an keine Stelle gebunden sein. Ein unbekannter Ansichtswert MUST
+beim Anlegen einer Kopplung 400 sein, ebenso eine fehlende Stelle bei einer Ansicht mit
+Pflichtstelle und eine angegebene Stelle beim Lagemonitor. Die Übersicht der Kopplungen MUST je
+Ansicht die Art ihrer Stelle nennen und ob die Stelle Pflicht ist.
 
 #### Scenario: Unbekannte Ansicht
 
@@ -25,7 +27,8 @@ ungebundenen Ansicht.
 #### Scenario: Alle Ansichten wählbar
 
 - **WHEN** die Einsatzleitung die Kopplungsmaske öffnet
-- **THEN** bietet sie alle sieben Ansichten an, jede mit der Stellenart, an die sie gebunden ist, oder ohne Stelle
+- **THEN** bietet sie alle sieben Ansichten an, jede mit der Stellenart, an die sie gebunden ist oder sein kann, oder ohne Stelle
+- **AND** nennt sie die Stelle der Verpflegung als wahlweise, die der übrigen gebundenen Ansichten als Pflicht
 
 #### Scenario: Gebundene Ansicht ohne Stelle
 
@@ -338,12 +341,13 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 
 ### Requirement: Ansicht Verpflegung
 
-Die Funktionsansicht `verpflegung` SHALL einsatzweit gelten, an keine Stelle gebunden sein und
-die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; was die Tabelle
+Die Funktionsansicht `verpflegung` SHALL ohne Stelle einsatzweit gelten oder an genau eine
+Verpflegungsstelle gebunden sein (Anforderung „Verpflegungsgerät an einer Verpflegungsstelle“)
+und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; was die Tabelle
 nicht nennt, MUST verboten sein. Sie MUST keine Namen von Einsatzkräften oder Benutzern
 erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung. Die
-Verpflegungsstellen des Einsatzes MUST sie alle lesen; beim Buchen einer Ausgabe MUST sie eine
-Verpflegungsstelle wählen können. Stellen planen MUST sie nicht. Die Empfängerliste der
+Verpflegungsstellen des Einsatzes MUST sie ohne Stelle alle lesen; beim Buchen einer Ausgabe MUST
+sie dann eine Verpflegungsstelle wählen können. Stellen planen MUST sie nicht. Die Empfängerliste der
 Verpflegung (Einheiten mit Name, Funkrufname, Gliederung, Abschnitt, Stärke und Eintreffen;
 Abschnitte mit Name) MUST sie lesen und beim Buchen einen Empfänger daraus wählen können; daraus
 MUST sie auch zeigen, welche Einheit in einem Zeitfenster noch nicht verpflegt ist.
@@ -369,10 +373,10 @@ enthalten, auch ohne Stellenbindung. Eigene Meldungen MUST ohne die Namen von Be
 Bestätiger kommen, der Einsatzkopf ohne Sachverhalt, meldende Stelle und Ortsangabe (wie beim
 Lagemonitor).
 
-#### Scenario: Keine Stelle
+#### Scenario: Ohne Stelle einsatzweit
 
-- **WHEN** die Einsatzleitung ein Verpflegungsgerät mit einer Stelle koppeln will
-- **THEN** antwortet der Server mit 400
+- **WHEN** die Einsatzleitung ein Verpflegungsgerät ohne Stelle koppelt
+- **THEN** koppelt der Server es einsatzweit, und es sieht alle Zeitfenster, Stellen und Ausgaben wie bisher
 
 #### Scenario: Portionen buchen
 
@@ -455,6 +459,84 @@ Lagemonitor).
 
 - **WHEN** an einem anderen Arbeitsplatz eine Einheit gebildet wird, während das Verpflegungsgerät verbunden ist
 - **THEN** erhält das Gerät das Ereignis `einheit` und lädt die Verpflegung neu, ohne Zugriff auf das Modul Einheiten zu bekommen
+
+### Requirement: Verpflegungsgerät an einer Verpflegungsstelle
+
+Ist ein Verpflegungsgerät an eine Verpflegungsstelle gebunden (LLH-1048), SHALL es nur die
+Zeitfenster sehen, die dieser Stelle zugeordnet sind, und die einsatzweiten ohne Zuordnung. Ein
+Zeitfenster, das nur anderen Stellen zugeordnet ist, MUST für das Gerät 404 sein. Bedarf,
+ausgegebene Menge und Fehlmenge MUST die Werte des ganzen Zeitfensters bleiben; im Einzelnen MUST
+das Gerät nur die eigene Stelle sehen: ihre Ausgaben, ihren Eintrag der Aufstellung je Stelle, ihre
+Zuordnung und in der Stellenliste nur sie. Was in einem sichtbaren Zeitfenster anderswo (an einer
+anderen Stelle oder ohne Stelle) an Einheiten ausgegeben wurde, MUST es als Summe je Einheit
+erhalten, nur mit Kennung der Einheit und Menge, ohne Zurückgenommenes. Jede Ausgabe des Geräts
+MUST an seiner Stelle gebucht werden: ohne Angabe setzt der Server sie, eine andere Stelle MUST 403
+sein. Eine Ausgabe, die nicht an seiner Stelle gebucht ist, MUST es nicht zurücknehmen können
+(404). Ein Replay über `client_id` MUST die gespeicherte Ausgabe liefern, auch wenn das
+Zeitfenster inzwischen nicht mehr an der Stelle gilt. Die Empfängerliste MUST einsatzweit bleiben.
+Wird die Stelle aufgelöst, MUST die Kopplung bestehen bleiben wie bei den übrigen Stellengeräten;
+für Ausgaben gilt die Regel der aufgelösten Stelle (`kraefte-verpflegung`, „Ausgabe an einer
+Verpflegungsstelle“). Die Kopplung MUST nur eine geplante oder aktive Stelle des eigenen Einsatzes
+annehmen: eine Stelle eines anderen Einsatzes oder eine unbekannte 404, eine stornierte 409, eine
+aufgelöste 422. Solange eine laufende Kopplung an einer geplanten Stelle hängt, MUST deren Storno
+409 sein („Gerät gekoppelt“). In der Oberfläche MUST der Kopf des Geräts die Stelle nennen und
+eine Umbenennung ohne neue Anmeldung zeigen; die Ausgabeansicht und der Nachtrag MUST die Stelle
+fest als Text zeigen statt einer Wahl (`kraefte-verpflegung`, „Ausgabeansicht eines
+Zeitfensters“), und „Noch nicht verpflegt“ MUST die Summe anderswo verrechnen
+(`kraefte-verpflegung`, „Noch nicht verpflegt“).
+
+#### Scenario: Nur die eigenen Zeitfenster
+
+- **WHEN** das Gerät der Feldküche die Verpflegung abruft und es Zeitfenster der Feldküche, der Turnhalle und ohne Zuordnung gibt
+- **THEN** enthält die Antwort die Zeitfenster der Feldküche und das ohne Zuordnung, aber nicht das der Turnhalle, und als Stelle nur die Feldküche
+
+#### Scenario: Zeitfenster einer fremden Stelle
+
+- **WHEN** das Gerät der Feldküche eine Ausgabe zu einem Zeitfenster bucht, das nur der Turnhalle zugeordnet ist
+- **THEN** antwortet der Server mit 404 und legt nichts an
+
+#### Scenario: Buchen ohne Angabe
+
+- **WHEN** das Gerät der Feldküche eine Ausgabe ohne Stelle bucht
+- **THEN** trägt die Ausgabe die Feldküche
+
+#### Scenario: Buchen an einer fremden Stelle
+
+- **WHEN** das Gerät der Feldküche eine Ausgabe an der Turnhalle bucht
+- **THEN** antwortet der Server mit 403 und legt nichts an
+
+#### Scenario: Anderswo verpflegt
+
+- **WHEN** zum Zeitfenster „Abend“ der Feldküche und der Turnhalle die „1. Gruppe“ 30 EP an der Turnhalle und 10 EP ohne Stelle bekommen hat
+- **AND** das Gerät der Feldküche die Verpflegung abruft
+- **THEN** sieht es diese Ausgaben nicht einzeln, aber für die „1. Gruppe“ 40 EP anderswo
+- **AND** bleibt die ausgegebene Menge des Zeitfensters die Summe aller Ausgaben
+
+#### Scenario: Fremde Ausgabe zurücknehmen
+
+- **WHEN** das Gerät der Feldküche eine Ausgabe der Turnhalle zurücknehmen will
+- **THEN** antwortet der Server mit 404
+
+#### Scenario: Stelle aufgelöst
+
+- **WHEN** die Einsatzleitung die Feldküche auflöst
+- **THEN** bleibt das Gerät gekoppelt und liest weiter
+- **AND** antwortet der Server auf eine neue Ausgabe mit 409, eine vor der Auflösung gezählte nimmt er an
+
+#### Scenario: Kopf nennt die Stelle
+
+- **WHEN** das Gerät an der Feldküche gekoppelt ist und die Einsatzleitung sie in „Feldküche Festwiese“ umbenennt
+- **THEN** zeigt der Kopf des Geräts erst „Feldküche BR Sportplatz“ und danach ohne neue Anmeldung „Feldküche Festwiese“
+
+#### Scenario: Stelle mit Gerät stornieren
+
+- **WHEN** die Einsatzleitung die geplante Feldküche stornieren will, an der das Gerät gekoppelt ist
+- **THEN** antwortet der Server mit 409 „Gerät gekoppelt“, und die Stelle bleibt
+
+#### Scenario: Stornierte Stelle koppeln
+
+- **WHEN** die Einsatzleitung ein Verpflegungsgerät an eine stornierte Verpflegungsstelle koppeln will
+- **THEN** antwortet der Server mit 409
 
 ### Requirement: Ansicht Betreuungsstelle
 
