@@ -59,12 +59,19 @@ export interface components {
              */
             abschnitt_uebergeben: boolean;
             angelegt_at: string;
+            /** @description Wie die Schicht vollzogen wurde (LLH-1150); eine laufende trägt `einheit`. */
+            art: components["schemas"]["AbloesungArt"];
             /** @description Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete. */
             beendet_at?: string | null;
             beendet_grund?: components["schemas"]["BeendetGrund"] | null;
             /** Format: int64 */
             beendet_von_id?: number | null;
             beginn_at: string;
+            /**
+             * @description Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des
+             *     Vollzugs. Leer bei jeder anderen Schicht.
+             */
+            besatzung: components["schemas"]["AbloesungBesatzung"][];
             /** Format: int64 */
             einheit_id: number;
             einheit_name: string;
@@ -124,6 +131,22 @@ export interface components {
              *     eines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit.
              */
             vorwarnung_minuten: number;
+        };
+        /**
+         * @description Wie eine Schicht vollzogen wurde (`einsatz_abloesung.art`, LLH-1150). Eine laufende Schicht
+         *     trägt die Vorgabe `einheit`. Wire == `as_str()`.
+         * @enum {string}
+         */
+        AbloesungArt: "einheit" | "besatzung";
+        /** @description Eine Person der alten oder neuen Besatzung (Eintrag in `einsatz_abloesung_besatzung`). */
+        AbloesungBesatzung: {
+            name: string;
+            /**
+             * Format: int64
+             * @description `einsatz_personal.id`
+             */
+            personal_id: number;
+            rolle: components["schemas"]["BesatzungRolle"];
         };
         /**
          * @description Vorgabe des Einsatzes (LLH-1122): die Kopie eines Schichtmodells, die beim Anlegen aus der
@@ -1041,6 +1064,12 @@ export interface components {
             /** Format: int64 */
             lfd_nr: number;
         };
+        /**
+         * @description Rolle einer Person beim Besatzungswechsel (`einsatz_abloesung_besatzung.rolle`). Wire ==
+         *     `as_str()`.
+         * @enum {string}
+         */
+        BesatzungRolle: "alt" | "neu";
         /**
          * @description Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
          *

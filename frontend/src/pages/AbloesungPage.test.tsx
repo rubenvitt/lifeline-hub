@@ -75,6 +75,8 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   abloeser: [],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
+  art: 'einheit',
+  besatzung: [],
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
