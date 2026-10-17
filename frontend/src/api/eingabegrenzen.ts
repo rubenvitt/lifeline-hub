@@ -128,3 +128,5 @@ export const SCHICHTMODELL_VORLAUF_MAX_MINUTEN = 1_440;
 export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
 /** Ablöser je Schicht im Request, gezählt vor dem Entdoppeln (LLH-1132). */
 export const ABLOESUNG_ABLOESER_MAX = 8;
+/** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */
+export const ABLOESUNG_BESATZUNG_MAX = 50;

@@ -25,6 +25,12 @@
 //! Vorgabe haben; eine Entlassung beendet sie (`beendet`, Grund `entlassung`), ihre Streichung
 //! öffnet sie wieder. Das Auflösen beendet sie mit Grund `aufloesung`.
 //!
+//! **Besatzungswechsel** (LLH-1150, Entscheidung LLH-1118 Punkt 4): Art [`AbloesungArt`] an der
+//! Schicht. Die Einheit und ihr Fahrzeug bleiben, die Folgeschicht hängt an derselben Einheit; die
+//! Personalzuordnung der Einheit und ihrer erbenden Untereinheiten geht, die gewählte neue
+//! Besatzung kommt (`einsatz_abloesung_besatzung`). Die Kräfte-Zeitachse bekommt nur
+//! Personen-Ereignisse, keine Grenzwerte und keine Ruhezeitrechnung (Abgrenzung zu LFH-860).
+//!
 //! **Knoten-Modell** (LLH-1118 Punkt 1): eine Untereinheit ohne eigene laufende Schicht erbt die
 //! ihres nächsten Vorfahren mit laufender Schicht (über `ueber_einheit_id`). Ermittelt wird das
 //! beim Lesen ([`vererbung`]), nie als Kopie gespeichert.
@@ -51,6 +57,44 @@ pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
 /// Höchstzahl der Ablöser je Schicht (LLH-1118 Punkt 3, LLH-1132), gezählt vor dem Entdoppeln
 /// (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
 pub const ABLOESER_MAX: usize = 8;
+
+/// Höchstzahl der Personen einer neuen Besatzung (LLH-1150), gezählt vor dem Entdoppeln wie die
+/// Sammel-Disposition (`kraefte_disposition::SAMMEL_MAX`). Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const BESATZUNG_MAX: usize = 50;
+
+wire_enum! {
+    /// Wie eine Schicht vollzogen wurde (`einsatz_abloesung.art`, LLH-1150). Eine laufende Schicht
+    /// trägt die Vorgabe `einheit`. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbloesungArt {
+        /// Die ganze Einheit wird abgelöst: ablösende Einheiten bekommen die Folgeschichten.
+        Einheit => "einheit",
+        /// Besatzungswechsel: Einheit und Fahrzeug bleiben, die Folgeschicht hängt an derselben
+        /// Einheit, nur das Personal wechselt.
+        Besatzung => "besatzung",
+    }
+    try_from = |s| format!("Ungültige Art der Ablösung: {s}");
+}
+
+impl Default for AbloesungArt {
+    fn default() -> Self {
+        Self::Einheit
+    }
+}
+
+wire_enum! {
+    /// Rolle einer Person beim Besatzungswechsel (`einsatz_abloesung_besatzung.rolle`). Wire ==
+    /// `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BesatzungRolle {
+        /// Gehörte zur Einheit oder einer erbenden Untereinheit und ist gegangen.
+        Alt => "alt",
+        /// Ist mit dem Wechsel zur Einheit gekommen.
+        Neu => "neu",
+    }
+    try_from = |s| format!("Ungültige Rolle in der Besatzung: {s}");
+}
 
 wire_enum! {
     /// Status einer Schicht. Wire == `as_str()`.
@@ -299,6 +343,11 @@ pub struct AbloesungAnzeige {
     /// Name des übergebenen Abschnitts (nur mit `abschnitt_uebergeben`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uebergebener_abschnitt_name: Option<String>,
+    /// Wie die Schicht vollzogen wurde (LLH-1150); eine laufende trägt `einheit`.
+    pub art: AbloesungArt,
+    /// Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des
+    /// Vollzugs. Leer bei jeder anderen Schicht.
+    pub besatzung: Vec<AbloesungBesatzung>,
     /// Der Vollzug lässt sich zurücknehmen: abgelöst, und jede Folgeschicht ist noch unberührt
     /// (laufend).
     pub ruecknehmbar: bool,
@@ -325,6 +374,15 @@ pub struct AbloesungAnzeige {
 pub struct AbloesungAbloeser {
     pub einheit_id: i64,
     pub einheit_name: String,
+}
+
+/// Eine Person der alten oder neuen Besatzung (Eintrag in `einsatz_abloesung_besatzung`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungBesatzung {
+    /// `einsatz_personal.id`
+    pub personal_id: i64,
+    pub name: String,
+    pub rolle: BesatzungRolle,
 }
 
 /// Eine Folgeschicht aus dem Vollzug einer Schicht.
@@ -608,6 +666,12 @@ mod tests {
         }
         for q in RhythmusQuelle::ALLE {
             assert_eq!(RhythmusQuelle::parse(q.as_str()), Some(q));
+        }
+        for a in AbloesungArt::ALLE {
+            assert_eq!(AbloesungArt::parse(a.as_str()), Some(a));
+        }
+        for r in BesatzungRolle::ALLE {
+            assert_eq!(BesatzungRolle::parse(r.as_str()), Some(r));
         }
         assert_eq!(AbloesungStatus::parse("offen"), None);
     }

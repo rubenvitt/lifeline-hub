@@ -1412,3 +1412,200 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], false);
 }
+
+/// Eine ad hoc disponierte Person, optional einer Einheit zugeordnet.
+async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Option<i64>) -> i64 {
+    let (s, p) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personal"),
+        cookie,
+        Some(&format!(r#"{{"adhoc":{{"name":"{name}"}}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p:?}");
+    let id = p["id"].as_i64().unwrap();
+    if let Some(einheit) = einheit {
+        let (s, j) = anfrage(
+            app,
+            "PUT",
+            &format!("/api/einsaetze/{e}/einheiten/{einheit}/personal/{id}"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{j:?}");
+    }
+    id
+}
+
+/// Die Personen einer Einheit, wie die Einheitenliste sie führt.
+async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> Vec<i64> {
+    let (s, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == einheit)
+        .map(|x| {
+            x["personal_mitglieder"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|m| m["ep_id"].as_i64().unwrap())
+                .collect()
+        })
+        .unwrap()
+}
+
+/// LLH-1150 über die Route: Art `besatzung` mit `besatzung_ids`. Erst die Felder (unbekannte Art,
+/// leere oder fehlende Besatzung, mehr als 50 → 400), dann der Zusammenhang (mit ablösenden
+/// Einheiten, mit „Abschnitt übergeben“, Besatzung ohne Besatzungswechsel → 422). Der Wechsel
+/// verlangt die Freigabe des Moduls Einheiten (403). Die Antwort trägt Art und Besatzung, die
+/// Folgeschicht hängt an derselben Einheit, das ETB nennt beide Besatzungen, die Rücknahme legt
+/// die Personen zurück.
+#[tokio::test]
+async fn besatzungswechsel_ueber_die_route() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt(&app, &admin, e, "Deichwache Nord").await;
+    let f1 = einheit(&app, &admin, e, "Florian 1", Some(nord)).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let alt = person(&app, &admin, e, "Anna Alt", Some(f1)).await;
+    let neu = person(&app, &admin, e, "Cora Neu", None).await;
+    let (s, schicht) = anfrage(
+        &app,
+        "POST",
+        &pfad(e),
+        &admin,
+        Some(&format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":360}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(schicht["art"], "einheit");
+    assert_eq!(schicht["besatzung"], serde_json::json!([]));
+    let aid = schicht["id"].as_i64().unwrap();
+    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+
+    let viele = (0..51).map(|i| i.to_string()).collect::<Vec<_>>().join(",");
+    for (body, code) in [
+        (r#"{"art":"fahrzeug"}"#.to_string(), StatusCode::BAD_REQUEST),
+        (
+            r#"{"art":"besatzung"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"art":"besatzung","besatzung_ids":[]}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            format!(r#"{{"art":"besatzung","besatzung_ids":[{viele}]}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            format!(r#"{{"art":"besatzung","besatzung_ids":[{neu}],"abloeser_ids":[{f2}]}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(r#"{{"art":"besatzung","besatzung_ids":[{neu}],"abschnitt_uebergeben":true}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(r#"{{"besatzung_ids":[{neu}]}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(r#"{{"art":"besatzung","besatzung_ids":[{alt}]}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "POST", &vollzug, &admin, Some(&body)).await;
+        assert_eq!(s, code, "{body}: {j:?}");
+    }
+
+    // Ohne Freigabe des Moduls Einheiten: 403, nichts geschrieben.
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let wechsel = format!(r#"{{"art":"besatzung","besatzung_ids":[{neu}]}}"#);
+    let (s, _) = anfrage(&app, "POST", &vollzug, &frieda, Some(&wechsel)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(mitglieder(&app, &admin, e, f1).await, vec![alt]);
+
+    let (s, v) = anfrage(&app, "POST", &vollzug, &admin, Some(&wechsel)).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["art"], "besatzung");
+    assert_eq!(
+        v["abgeloest"]["besatzung"],
+        serde_json::json!([
+            {"personal_id": alt, "name": "Anna Alt", "rolle": "alt"},
+            {"personal_id": neu, "name": "Cora Neu", "rolle": "neu"}
+        ])
+    );
+    assert_eq!(v["abgeloest"]["ruecknehmbar"], true);
+    assert_eq!(v["folgeschicht"]["einheit_id"], f1);
+    assert_eq!(v["folgeschicht"]["vorgaenger_id"], aid);
+    assert_eq!(mitglieder(&app, &admin, e, f1).await, vec![neu]);
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f1).await,
+        nord,
+        "Abschnitt bleibt"
+    );
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(
+        treffer(
+            &etb,
+            "meldung",
+            "Besatzungswechsel «Florian 1», Einheit und Fahrzeug bleiben. Alte Besatzung: \
+             «Anna Alt». Neue Besatzung: «Cora Neu»."
+        )
+        .len(),
+        1,
+        "{etb:?}"
+    );
+
+    let (s, r) = anfrage(
+        &app,
+        "POST",
+        &format!("{vollzug}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r:?}");
+    assert_eq!(r["status"], "laufend");
+    assert_eq!(r["art"], "einheit");
+    assert_eq!(mitglieder(&app, &admin, e, f1).await, vec![alt]);
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(
+        treffer(&etb, "berichtigung", "Besatzungswechsel rückgängig").len(),
+        1
+    );
+}

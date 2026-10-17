@@ -16,10 +16,10 @@ use std::collections::{HashMap, HashSet};
 use super::hinweis::{self, Wirkung};
 use super::{
     einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
-    AbloesungAbloeser, AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungErbe,
-    AbloesungFolge, AbloesungStatus, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, PlanungsStand, RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN,
-    VORWARNUNG_VORGABE_MINUTEN,
+    AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
+    AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungStatus,
+    AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund, BesatzungRolle, PlanungsStand,
+    RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -42,8 +42,12 @@ pub struct VollzugWirkung {
     /// Je Einheit mit geschriebenem bzw. gestrichenem Ereignis `abloesung` (die abgelöste und
     /// ihre erbenden Untereinheiten, LLH-1132) die per Fan-out berührten Personen.
     pub zeitachse: Vec<(i64, Beruehrt)>,
-    /// Einheiten, deren Abschnitt die Übergabe oder ihre Rücknahme geändert hat.
+    /// Einheiten, deren Abschnitt die Übergabe oder ihre Rücknahme geändert hat, beim
+    /// Besatzungswechsel die, deren Personal er geändert hat (LLH-1150).
     pub einheiten: Vec<i64>,
+    /// Personen, deren Einheit oder Zeitachse der Besatzungswechsel oder seine Rücknahme geändert
+    /// hat (LLH-1150).
+    pub personen: Vec<i64>,
 }
 
 /// Eingabe „Schicht beginnen" — von der Route validiert (Zeit normalisiert, Rhythmus im
@@ -78,6 +82,12 @@ pub struct VollzugEingabe {
     pub abloeser: Vec<i64>,
     /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben, die den Knoten bilden.
     pub abschnitt_uebergeben: bool,
+    /// Ganze Einheit oder Besatzungswechsel (LLH-1150); beim Besatzungswechsel sind `abloeser`
+    /// leer und `abschnitt_uebergeben` aus (die Route prüft das).
+    pub art: AbloesungArt,
+    /// Beim Besatzungswechsel die neue Besatzung (`einsatz_personal.id`), begrenzt und
+    /// entdoppelt; sonst leer.
+    pub besatzung: Vec<i64>,
 }
 
 /// Eine Zeile, wie sie die Anzeige-Projektion liefert.
@@ -111,6 +121,8 @@ struct Zeile {
     uebernommen_bei_vollzug: bool,
     abschnitt_uebergeben: bool,
     uebergebener_abschnitt_name: Option<String>,
+    #[sqlx(try_from = "String")]
+    art: AbloesungArt,
     angelegt_at: String,
 }
 
@@ -150,6 +162,8 @@ impl Zeile {
             uebernommen_bei_vollzug: self.uebernommen_bei_vollzug,
             abschnitt_uebergeben: self.abschnitt_uebergeben,
             uebergebener_abschnitt_name: self.uebergebener_abschnitt_name,
+            art: self.art,
+            besatzung: Vec::new(),
             ruecknehmbar,
             beendet_at: self.beendet_at,
             beendet_von_id: self.beendet_von_id,
@@ -164,7 +178,8 @@ impl Zeile {
 /// Anzeige-Projektion. Die Folgeschicht ist die jüngste Schicht mit `vorgaenger_id` = diese
 /// (`MAX(id)` über `idx_abloesung_vorgaenger`, Migration 0153); unberührt ist der Vollzug, wenn
 /// keine seiner Folgeschichten (LLH-1132: je Ablöser eine) aufgehört hat zu laufen — dieselbe
-/// Index-Suche. Ohne den Index war jede Unterabfrage ein Scan über die Ablösungen aller Einsätze
+/// Index-Suche. Eine laufende Schicht derselben Einheit sperrt die Rücknahme, außer sie ist die
+/// eigene Folgeschicht eines Besatzungswechsels (LLH-1150). Ohne den Index war jede Unterabfrage ein Scan über die Ablösungen aller Einsätze
 /// (LFH-933); `liste_plan_ohne_scan` hält das fest. Ablöser und Folgeschichten hängt
 /// [`attach_listen`] an.
 /// Die Vorwarnung kommt aus der Kopie des Schichtmodells am Einsatz (LLH-1122), ohne sie 30 min
@@ -181,9 +196,12 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
             NOT EXISTS (SELECT 1 FROM einsatz_abloesung fu WHERE fu.vorgaenger_id = a.id \
                AND fu.status <> 'laufend') AS folgen_unberuehrt, \
             EXISTS (SELECT 1 FROM einsatz_abloesung o WHERE o.einheit_id = a.einheit_id \
-               AND o.status = 'laufend' AND o.id <> a.id) AS einheit_laeuft_anderswo, \
+               AND o.status = 'laufend' AND o.id <> a.id \
+               AND (o.vorgaenger_id IS NULL OR o.vorgaenger_id <> a.id)) \
+               AS einheit_laeuft_anderswo, \
             a.beendet_at, a.beendet_von_id, a.beendet_grund, a.uebernommen_bei_vollzug, \
-            a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.angelegt_at \
+            a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.art, \
+            a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
@@ -271,9 +289,36 @@ async fn attach_listen(
                 uebernommen: f.uebernommen,
             });
     }
+    // Besatzung beim Besatzungswechsel (LLH-1150): erst die alte, dann die neue, je in der
+    // Reihenfolge des Vollzugs. Der Name ist der der Dispositionszeile, wie in der Einheit.
+    let besatzung: Vec<(i64, i64, String, String)> = sqlx::query_as(
+        "SELECT b.abloesung_id, b.personal_id, p.snap_name, b.rolle \
+         FROM einsatz_abloesung_besatzung b \
+         JOIN einsatz_abloesung a ON a.id = b.abloesung_id \
+         JOIN einsatz_personal p ON p.id = b.personal_id \
+         WHERE a.einsatz_id = ? ORDER BY b.abloesung_id, b.rolle, b.rowid",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut je_besatzung: HashMap<i64, Vec<AbloesungBesatzung>> = HashMap::new();
+    for (abloesung_id, personal_id, name, rolle) in besatzung {
+        let Some(rolle) = BesatzungRolle::parse(&rolle) else {
+            continue;
+        };
+        je_besatzung
+            .entry(abloesung_id)
+            .or_default()
+            .push(AbloesungBesatzung {
+                personal_id,
+                name,
+                rolle,
+            });
+    }
     for a in liste.iter_mut() {
         a.abloeser = je_schicht.remove(&a.id).unwrap_or_default();
         a.folgeschichten = je_vorgaenger.remove(&a.id).unwrap_or_default();
+        a.besatzung = je_besatzung.remove(&a.id).unwrap_or_default();
     }
     Ok(())
 }
@@ -697,12 +742,14 @@ struct Roh {
     status: AbloesungStatus,
     vollzogen_at: Option<String>,
     etb_vollzug_id: Option<i64>,
+    #[sqlx(try_from = "String")]
+    art: AbloesungArt,
 }
 
 async fn roh_tx(conn: &mut SqliteConnection, einsatz_id: i64, id: i64) -> Result<Roh, AppError> {
     sqlx::query_as(
         "SELECT einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-                faellig_at, status, vollzogen_at, etb_vollzug_id \
+                faellig_at, status, vollzogen_at, etb_vollzug_id, art \
          FROM einsatz_abloesung WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
@@ -1831,7 +1878,18 @@ fn namen_text(abloeser: &[Abloeser]) -> String {
         .join(", ")
 }
 
-/// Vollzieht eine laufende Schicht (LLH-1132). Die Ablöser kommen als Liste und werden zur Liste
+/// Was Vollzug und Rücknahme in der Transaktion brauchen.
+struct Vorgang<'a> {
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &'a str,
+}
+
+/// Vollzieht eine laufende Schicht (LLH-1132, LLH-1150). Gemeinsam ist beiden Arten: die Schicht
+/// wird `abgeloest`, ihre Fristen schließen, und ein ETB-Eintrag nennt, was geschah.
+///
+/// **Ganze Einheit** ([`AbloesungArt::Einheit`]): die Ablöser kommen als Liste und werden zur Liste
 /// der Schicht (`einsatz_abloesung_abloeser`). Je Ablöser, der den Knoten bildet (kein Vorfahr
 /// ebenfalls in der Liste), entsteht eine Folgeschicht (Beginn = Vollzug, Rhythmus und
 /// Einsatzstelle der abgelösten Schicht; folgt sie der Vorgabe des Einsatzes, rechnet deren Regel
@@ -1842,6 +1900,9 @@ fn namen_text(abloeser: &[Abloeser]) -> String {
 /// (Knoten-Vererbung beim Lesen, samt Personen). Mit `abschnitt_uebergeben` geht der Abschnitt
 /// der abgelösten Einheit an die Knoten-Ablöser, ihr eigener wird geleert; die alten Werte
 /// stehen an der Schicht und an der Liste für die Rücknahme.
+///
+/// **Besatzungswechsel** ([`AbloesungArt::Besatzung`], [`vollziehen_besatzung_tx`]): die
+/// Einheit, ihr Fahrzeug und ihr Abschnitt bleiben; nur das Personal wechselt.
 pub async fn vollziehen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -1852,6 +1913,12 @@ pub async fn vollziehen(
 ) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
     let vollzogen_at = eingabe.vollzogen_at.as_str();
+    let vorgang = Vorgang {
+        einsatz_id,
+        id,
+        benutzer_id,
+        jetzt,
+    };
     let (folge_ids, etb_id, wirkung) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
@@ -1865,164 +1932,13 @@ pub async fn vollziehen(
                 "Der Vollzug liegt vor dem Beginn der Schicht".into(),
             ));
         }
-        let (name, abschnitt_vorher) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
-        let abloeser =
-            check_abloeser_tx(conn, einsatz_id, roh.einheit_id, &eingabe.abloeser).await?;
-
-        // Vor jedem Schreiben: Knoten der Ablöser und Erben der abgelösten Schicht.
-        let g = load_gliederung(&mut *conn, einsatz_id).await?;
-        let menge: HashSet<i64> = abloeser.iter().map(|a| a.id).collect();
-        let knoten: Vec<&Abloeser> = abloeser
-            .iter()
-            .filter(|a| !has_vorfahr_in(&g.ueber, a.id, &menge))
-            .collect();
-        let mut erben: Vec<i64> = vererbung(&g.ueber, &g.mit_schicht)
-            .into_iter()
-            .filter_map(|(erbe, t)| (t == roh.einheit_id).then_some(erbe))
-            .collect();
-        erben.sort_unstable();
-        // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
-        let uebergabe =
-            abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
-
-        sqlx::query(
-            "UPDATE einsatz_abloesung SET status = 'abgeloest', vollzogen_at = ?, \
-                vollzogen_von_id = ?, abschnitt_uebergeben = ?, \
-                abgeloest_abschnitt_vorher_id = ? WHERE id = ?",
-        )
-        .bind(vollzogen_at)
-        .bind(benutzer_id)
-        .bind(uebergabe.is_some())
-        .bind(uebergabe)
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-        set_abloeser_tx(conn, id, &eingabe.abloeser).await?;
-        close_fristen_tx(conn, id, jetzt).await?;
-
-        // LFH-552/LLH-1132: der Vollzug beendet die Einsatzperiode der abgelösten Einheit und
-        // jeder erbenden Untereinheit (je samt Fan-out); ohne offene Periode bleibt die jeweilige
-        // Zeitachse unberührt.
-        let mut wirkung = VollzugWirkung::default();
-        for einheit in std::iter::once(roh.einheit_id).chain(erben.iter().copied()) {
-            if let Some(w) = crate::zeitachse::repo::abloesung_vollzogen_tx(
-                conn,
-                einsatz_id,
-                benutzer_id,
-                einheit,
-                vollzogen_at,
-            )
-            .await?
-            {
-                wirkung.zeitachse.push(w);
+        let (folge_ids, inhalt, wirkung) = match eingabe.art {
+            AbloesungArt::Einheit => vollziehen_einheit_tx(conn, &vorgang, &roh, eingabe).await?,
+            AbloesungArt::Besatzung => {
+                vollziehen_besatzung_tx(conn, &vorgang, &roh, vollzogen_at, &eingabe.besatzung)
+                    .await?
             }
-        }
-
-        let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
-        let mut folge_ids = Vec::with_capacity(knoten.len());
-        let mut uebernommen: Vec<Abloeser> = Vec::new();
-        for a in &knoten {
-            let laufend: Option<(i64, Option<i64>)> = sqlx::query_as(
-                "SELECT id, vorgaenger_id FROM einsatz_abloesung \
-                 WHERE einheit_id = ? AND status = 'laufend'",
-            )
-            .bind(a.id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            match laufend {
-                None => {
-                    let (f, _) = create_schicht_tx(
-                        conn,
-                        einsatz_id,
-                        benutzer_id,
-                        a.id,
-                        &a.name,
-                        roh.abschnitt_id,
-                        vollzogen_at,
-                        roh.rhythmus_minuten,
-                        roh.rhythmus_quelle,
-                        &vorgabe,
-                        Some(id),
-                        jetzt,
-                    )
-                    .await?;
-                    folge_ids.push(f);
-                }
-                Some((f, None)) => {
-                    sqlx::query(
-                        "UPDATE einsatz_abloesung SET vorgaenger_id = ?, \
-                            uebernommen_bei_vollzug = 1 WHERE id = ?",
-                    )
-                    .bind(id)
-                    .bind(f)
-                    .execute(&mut *conn)
-                    .await?;
-                    folge_ids.push(f);
-                    uebernommen.push((*a).clone());
-                }
-                Some((_, Some(_))) => {
-                    return Err(AppError::UnprocessableEntity(format!(
-                        "Einheit «{}» führt schon eine Folgeschicht aus einer anderen Ablösung",
-                        a.name
-                    )))
-                }
-            }
-        }
-
-        let mut abschnitt_name = None;
-        if let Some(abschnitt) = uebergabe {
-            // Vorher-Werte aller Listeneinträge, damit die Rücknahme jeden auf seinen Stand legt.
-            sqlx::query(
-                "UPDATE einsatz_abloesung_abloeser SET abschnitt_vorher_id = \
-                    (SELECT e.abschnitt_id FROM einsatz_einheit e \
-                     WHERE e.id = einsatz_abloesung_abloeser.einheit_id) \
-                 WHERE abloesung_id = ?",
-            )
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
-            let knoten_ids: Vec<i64> = knoten.iter().map(|a| a.id).collect();
-            sqlx::query(
-                "UPDATE einsatz_einheit SET abschnitt_id = ? \
-                 WHERE id IN (SELECT value FROM json_each(?))",
-            )
-            .bind(abschnitt)
-            .bind(
-                serde_json::to_string(&knoten_ids)
-                    .map_err(|e| AppError::Internal(e.to_string()))?,
-            )
-            .execute(&mut *conn)
-            .await?;
-            sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE id = ?")
-                .bind(roh.einheit_id)
-                .execute(&mut *conn)
-                .await?;
-            wirkung.einheiten.push(roh.einheit_id);
-            wirkung.einheiten.extend(knoten_ids);
-            abschnitt_name = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
-        }
-
-        let mut inhalt = if abloeser.is_empty() {
-            format!("Ablösung vollzogen: «{name}» (ohne ablösende Einheit).")
-        } else {
-            format!(
-                "Ablösung vollzogen: «{name}» durch {}.",
-                namen_text(&abloeser)
-            )
         };
-        if !uebernommen.is_empty() {
-            inhalt.push_str(&format!(
-                " Laufende Schicht übernommen: {}.",
-                namen_text(&uebernommen)
-            ));
-        }
-        if let Some(a) = &abschnitt_name {
-            let an: Vec<Abloeser> = knoten.iter().map(|k| (*k).clone()).collect();
-            inhalt.push_str(&format!(
-                " Abschnitt «{a}» an {} übergeben.",
-                namen_text(&an)
-            ));
-        }
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -2064,13 +1980,492 @@ pub async fn vollziehen(
     ))
 }
 
+/// Die Untereinheiten, die die laufende Schicht der Einheit `traeger` gerade erben, nach ID —
+/// aus einer schon geladenen Gliederung.
+fn erben_von(g: &Gliederung, traeger: i64) -> Vec<i64> {
+    let mut erben: Vec<i64> = vererbung(&g.ueber, &g.mit_schicht)
+        .into_iter()
+        .filter_map(|(erbe, t)| (t == traeger).then_some(erbe))
+        .collect();
+    erben.sort_unstable();
+    erben
+}
+
+/// Vollzug als Ablösung der ganzen Einheit (siehe [`vollziehen`]). Liefert die Folgeschichten,
+/// den ETB-Text und die Wirkung außerhalb der Ablösung.
+async fn vollziehen_einheit_tx(
+    conn: &mut SqliteConnection,
+    v: &Vorgang<'_>,
+    roh: &Roh,
+    eingabe: &VollzugEingabe,
+) -> Result<(Vec<i64>, String, VollzugWirkung), AppError> {
+    let Vorgang {
+        einsatz_id,
+        id,
+        benutzer_id,
+        jetzt,
+    } = *v;
+    let vollzogen_at = eingabe.vollzogen_at.as_str();
+    let (name, abschnitt_vorher) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
+    let abloeser = check_abloeser_tx(conn, einsatz_id, roh.einheit_id, &eingabe.abloeser).await?;
+
+    // Vor jedem Schreiben: Knoten der Ablöser und Erben der abgelösten Schicht.
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    let menge: HashSet<i64> = abloeser.iter().map(|a| a.id).collect();
+    let knoten: Vec<&Abloeser> = abloeser
+        .iter()
+        .filter(|a| !has_vorfahr_in(&g.ueber, a.id, &menge))
+        .collect();
+    let erben = erben_von(&g, roh.einheit_id);
+    // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
+    let uebergabe = abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
+
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET status = 'abgeloest', vollzogen_at = ?, \
+            vollzogen_von_id = ?, abschnitt_uebergeben = ?, \
+            abgeloest_abschnitt_vorher_id = ? WHERE id = ?",
+    )
+    .bind(vollzogen_at)
+    .bind(benutzer_id)
+    .bind(uebergabe.is_some())
+    .bind(uebergabe)
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    set_abloeser_tx(conn, id, &eingabe.abloeser).await?;
+    close_fristen_tx(conn, id, jetzt).await?;
+
+    // LFH-552/LLH-1132: der Vollzug beendet die Einsatzperiode der abgelösten Einheit und
+    // jeder erbenden Untereinheit (je samt Fan-out); ohne offene Periode bleibt die jeweilige
+    // Zeitachse unberührt.
+    let mut wirkung = VollzugWirkung::default();
+    for einheit in std::iter::once(roh.einheit_id).chain(erben.iter().copied()) {
+        if let Some(w) = crate::zeitachse::repo::abloesung_vollzogen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit,
+            vollzogen_at,
+        )
+        .await?
+        {
+            wirkung.zeitachse.push(w);
+        }
+    }
+
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let mut folge_ids = Vec::with_capacity(knoten.len());
+    let mut uebernommen: Vec<Abloeser> = Vec::new();
+    for a in &knoten {
+        let laufend: Option<(i64, Option<i64>)> = sqlx::query_as(
+            "SELECT id, vorgaenger_id FROM einsatz_abloesung \
+             WHERE einheit_id = ? AND status = 'laufend'",
+        )
+        .bind(a.id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        match laufend {
+            None => {
+                let (f, _) = create_schicht_tx(
+                    conn,
+                    einsatz_id,
+                    benutzer_id,
+                    a.id,
+                    &a.name,
+                    roh.abschnitt_id,
+                    vollzogen_at,
+                    roh.rhythmus_minuten,
+                    roh.rhythmus_quelle,
+                    &vorgabe,
+                    Some(id),
+                    jetzt,
+                )
+                .await?;
+                folge_ids.push(f);
+            }
+            Some((f, None)) => {
+                sqlx::query(
+                    "UPDATE einsatz_abloesung SET vorgaenger_id = ?, \
+                        uebernommen_bei_vollzug = 1 WHERE id = ?",
+                )
+                .bind(id)
+                .bind(f)
+                .execute(&mut *conn)
+                .await?;
+                folge_ids.push(f);
+                uebernommen.push((*a).clone());
+            }
+            Some((_, Some(_))) => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Einheit «{}» führt schon eine Folgeschicht aus einer anderen Ablösung",
+                    a.name
+                )))
+            }
+        }
+    }
+
+    let mut abschnitt_name = None;
+    if let Some(abschnitt) = uebergabe {
+        // Vorher-Werte aller Listeneinträge, damit die Rücknahme jeden auf seinen Stand legt.
+        sqlx::query(
+            "UPDATE einsatz_abloesung_abloeser SET abschnitt_vorher_id = \
+                (SELECT e.abschnitt_id FROM einsatz_einheit e \
+                 WHERE e.id = einsatz_abloesung_abloeser.einheit_id) \
+             WHERE abloesung_id = ?",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        let knoten_ids: Vec<i64> = knoten.iter().map(|a| a.id).collect();
+        sqlx::query(
+            "UPDATE einsatz_einheit SET abschnitt_id = ? \
+             WHERE id IN (SELECT value FROM json_each(?))",
+        )
+        .bind(abschnitt)
+        .bind(crate::kraefte_disposition::ids_json(&knoten_ids))
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE id = ?")
+            .bind(roh.einheit_id)
+            .execute(&mut *conn)
+            .await?;
+        wirkung.einheiten.push(roh.einheit_id);
+        wirkung.einheiten.extend(knoten_ids);
+        abschnitt_name = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
+    }
+
+    let mut inhalt = if abloeser.is_empty() {
+        format!("Ablösung vollzogen: «{name}» (ohne ablösende Einheit).")
+    } else {
+        format!(
+            "Ablösung vollzogen: «{name}» durch {}.",
+            namen_text(&abloeser)
+        )
+    };
+    if !uebernommen.is_empty() {
+        inhalt.push_str(&format!(
+            " Laufende Schicht übernommen: {}.",
+            namen_text(&uebernommen)
+        ));
+    }
+    if let Some(a) = &abschnitt_name {
+        let an: Vec<Abloeser> = knoten.iter().map(|k| (*k).clone()).collect();
+        inhalt.push_str(&format!(
+            " Abschnitt «{a}» an {} übergeben.",
+            namen_text(&an)
+        ));
+    }
+    Ok((folge_ids, inhalt, wirkung))
+}
+
+/// Eine Person der neuen Besatzung nach der Prüfung.
+#[derive(Debug, Clone)]
+struct NeuePerson {
+    id: i64,
+    name: String,
+    /// Ihre bisherige Einheit (keine = `None`).
+    einheit_id: Option<i64>,
+}
+
+/// Prüft die neue Besatzung (LLH-1150) mit EINER Abfrage über `json_each` (`src/AGENTS.md`,
+/// „Eingabegrenzen“): fremd oder unbekannt → 404, entlassen oder storniert → 409 (wie
+/// `personal::disposition_repo::require_nicht_beendet`), schon in der bisherigen Besatzung
+/// (`einheiten`: die Einheit und ihre Erben) → 422, Führung einer anderen aktiven Einheit → 422
+/// (die neue Besatzung nimmt niemandem die Führung). Liefert die Personen in der Reihenfolge der
+/// Liste.
+async fn check_neue_besatzung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheiten: &[i64],
+    ids: &[i64],
+) -> Result<Vec<NeuePerson>, AppError> {
+    /// `(id, Name, Einheit, beendet_als, beendet, in der bisherigen Besatzung, führt)`
+    type Pruefung = (
+        i64,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        bool,
+        bool,
+        Option<String>,
+    );
+    let zeilen: Vec<Pruefung> = sqlx::query_as(
+        "SELECT j.value, p.snap_name, p.einheit_id, p.beendet_als, \
+                p.beendet_at IS NOT NULL, \
+                COALESCE(p.einheit_id IN (SELECT value FROM json_each(?3)), 0), \
+                (SELECT e.name FROM einsatz_einheit e \
+                 WHERE e.fuehrer_id = p.id AND e.aufgeloest_at IS NULL \
+                   AND e.id NOT IN (SELECT value FROM json_each(?3)) \
+                 ORDER BY e.id LIMIT 1) \
+         FROM json_each(?1) j \
+         LEFT JOIN einsatz_personal p ON p.id = j.value AND p.einsatz_id = ?2 \
+         ORDER BY j.key",
+    )
+    .bind(crate::kraefte_disposition::ids_json(ids))
+    .bind(einsatz_id)
+    .bind(crate::kraefte_disposition::ids_json(einheiten))
+    .fetch_all(&mut *conn)
+    .await?;
+    zeilen
+        .into_iter()
+        .map(
+            |(id, name, einheit_id, beendet_als, beendet, in_besatzung, fuehrt)| {
+                let Some(name) = name else {
+                    return Err(AppError::NotFound);
+                };
+                if beendet {
+                    return Err(crate::personal::disposition_repo::beendet_conflict(
+                        beendet_als.as_deref().unwrap_or_default(),
+                    ));
+                }
+                if in_besatzung {
+                    return Err(AppError::UnprocessableEntity(format!(
+                        "«{name}» gehört schon zur bisherigen Besatzung"
+                    )));
+                }
+                if let Some(einheit) = fuehrt {
+                    return Err(AppError::UnprocessableEntity(format!(
+                        "«{name}» führt die Einheit «{einheit}»"
+                    )));
+                }
+                Ok(NeuePerson {
+                    id,
+                    name,
+                    einheit_id,
+                })
+            },
+        )
+        .collect()
+}
+
+/// Schreibt ein Ereignis der Person aus dem Besatzungswechsel (Quelle `abloesung`) über den
+/// einzigen Schreibpfad. Liefert seine ID; `None`, wenn die Perioden-Regeln es auslassen (ohne
+/// offene Periode keine Ablösung, mit offener kein zweites Eintreffen) — der Vollzug gelingt
+/// trotzdem.
+async fn besatzung_ereignis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    person: i64,
+    art: crate::zeitachse::ZeitachseArt,
+    zeitpunkt_at: &str,
+) -> Result<Option<i64>, AppError> {
+    use crate::zeitachse::repo::{schreibe_tx, Kraft, Neu, Schreibergebnis};
+    let (r, _) = schreibe_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        Kraft::Person(person),
+        Neu {
+            art,
+            zeitpunkt_at,
+            quelle: crate::zeitachse::ZeitachseQuelle::Abloesung,
+            notiz: None,
+        },
+    )
+    .await?;
+    Ok(match r {
+        Schreibergebnis::Geschrieben(z) => Some(z),
+        Schreibergebnis::Ausgelassen(_) => None,
+    })
+}
+
+/// Namen für ETB-Texte: „«A», «B»“, ohne einen „keine“.
+fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
+    let text = namen
+        .map(|n| format!("«{n}»"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if text.is_empty() {
+        "keine".into()
+    } else {
+        text
+    }
+}
+
+/// Vollzug als Besatzungswechsel (LLH-1150, Entscheidung LLH-1118 Punkt 4): die Einheit, ihr
+/// Fahrzeug und ihr Abschnitt bleiben, die Folgeschicht hängt an derselben Einheit (Beginn =
+/// Vollzug, Rhythmus und Einsatzstelle der abgelösten Schicht). Die alte Besatzung ist die
+/// Personalzuordnung der Einheit und jeder Untereinheit, die ihre Schicht erbt (Knoten-Modell,
+/// dieselbe Menge wie der Fan-out der ganzen Einheit); jede Person geht aus ihrer Einheit, von
+/// einem Fahrzeug dieser Einheiten und aus deren Führung und bekommt das Ereignis `abloesung`.
+/// Die neue Besatzung kommt in die Einheit selbst und bekommt `eintreffen`; die Einheiten selbst
+/// bekommen kein Ereignis, ihre Periode läuft weiter. Keine Grenzwerte, keine Ruhezeitrechnung
+/// (LFH-860). Was die Rücknahme braucht, steht in `einsatz_abloesung_besatzung`.
+async fn vollziehen_besatzung_tx(
+    conn: &mut SqliteConnection,
+    v: &Vorgang<'_>,
+    roh: &Roh,
+    vollzogen_at: &str,
+    neu_ids: &[i64],
+) -> Result<(Vec<i64>, String, VollzugWirkung), AppError> {
+    use crate::zeitachse::ZeitachseArt;
+    let Vorgang {
+        einsatz_id,
+        id,
+        benutzer_id,
+        jetzt,
+    } = *v;
+    let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    let einheiten: Vec<i64> = std::iter::once(roh.einheit_id)
+        .chain(erben_von(&g, roh.einheit_id))
+        .collect();
+    let einheiten_json = crate::kraefte_disposition::ids_json(&einheiten);
+    let neu = check_neue_besatzung_tx(conn, einsatz_id, &einheiten, neu_ids).await?;
+
+    // Die alte Besatzung, wie der Vollzug sie vorfindet: das Fahrzeug nur, wenn es einer dieser
+    // Einheiten gehört, die Führung nur die der eigenen Einheit.
+    let alt: Vec<(i64, String, i64, Option<i64>, bool)> = sqlx::query_as(
+        "SELECT p.id, p.snap_name, p.einheit_id, \
+                (SELECT f.id FROM einsatz_fahrzeug f WHERE f.id = p.fahrzeug_id \
+                   AND f.einheit_id IN (SELECT value FROM json_each(?2))), \
+                EXISTS (SELECT 1 FROM einsatz_einheit e \
+                        WHERE e.id = p.einheit_id AND e.fuehrer_id = p.id) \
+         FROM einsatz_personal p \
+         WHERE p.einsatz_id = ?1 AND p.beendet_at IS NULL \
+           AND p.einheit_id IN (SELECT value FROM json_each(?2)) \
+         ORDER BY p.id",
+    )
+    .bind(einsatz_id)
+    .bind(&einheiten_json)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET status = 'abgeloest', vollzogen_at = ?, \
+            vollzogen_von_id = ?, art = ?, abschnitt_uebergeben = 0, \
+            abgeloest_abschnitt_vorher_id = NULL WHERE id = ?",
+    )
+    .bind(vollzogen_at)
+    .bind(benutzer_id)
+    .bind(AbloesungArt::Besatzung.as_str())
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    // Beim Vollzug genannt wird keine ablösende Einheit (die Liste nennt die beim Vollzug
+    // genannten, LLH-1132).
+    set_abloeser_tx(conn, id, &[]).await?;
+    close_fristen_tx(conn, id, jetzt).await?;
+
+    let zeile = "INSERT INTO einsatz_abloesung_besatzung \
+            (abloesung_id, personal_id, rolle, einheit_vorher_id, fahrzeug_vorher_id, \
+             war_fuehrer, zeitachse_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    for (person, _, einheit, fahrzeug, fuehrer) in &alt {
+        let z = besatzung_ereignis_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            *person,
+            ZeitachseArt::Abloesung,
+            vollzogen_at,
+        )
+        .await?;
+        sqlx::query(zeile)
+            .bind(id)
+            .bind(person)
+            .bind(BesatzungRolle::Alt.as_str())
+            .bind(einheit)
+            .bind(fahrzeug)
+            .bind(fuehrer)
+            .bind(z)
+            .execute(&mut *conn)
+            .await?;
+    }
+    for p in &neu {
+        let z = besatzung_ereignis_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            p.id,
+            ZeitachseArt::Eintreffen,
+            vollzogen_at,
+        )
+        .await?;
+        sqlx::query(zeile)
+            .bind(id)
+            .bind(p.id)
+            .bind(BesatzungRolle::Neu.as_str())
+            .bind(p.einheit_id)
+            .bind(None::<i64>)
+            .bind(false)
+            .bind(z)
+            .execute(&mut *conn)
+            .await?;
+    }
+
+    // Zugehörigkeit in je einer Anweisung: die alte Besatzung verlässt Führung, Fahrzeug und
+    // Einheit, die neue kommt in die Einheit.
+    sqlx::query(
+        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id IN \
+            (SELECT einheit_vorher_id FROM einsatz_abloesung_besatzung \
+             WHERE abloesung_id = ? AND rolle = 'alt' AND war_fuehrer = 1)",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_personal SET einheit_id = NULL, \
+            fahrzeug_id = CASE WHEN EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung b \
+                WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id \
+                  AND b.fahrzeug_vorher_id IS NOT NULL) THEN NULL ELSE fahrzeug_id END \
+         WHERE id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
+                      WHERE abloesung_id = ?1 AND rolle = 'alt')",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_personal SET einheit_id = ?2 \
+         WHERE id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
+                      WHERE abloesung_id = ?1 AND rolle = 'neu')",
+    )
+    .bind(id)
+    .bind(roh.einheit_id)
+    .execute(&mut *conn)
+    .await?;
+
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let (folge, _) = create_schicht_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        roh.einheit_id,
+        &name,
+        roh.abschnitt_id,
+        vollzogen_at,
+        roh.rhythmus_minuten,
+        roh.rhythmus_quelle,
+        &vorgabe,
+        Some(id),
+        jetzt,
+    )
+    .await?;
+
+    let mut wirkung = VollzugWirkung::default();
+    wirkung.einheiten.extend(einheiten.iter().copied());
+    wirkung
+        .einheiten
+        .extend(neu.iter().filter_map(|p| p.einheit_id));
+    wirkung.personen.extend(alt.iter().map(|(p, ..)| *p));
+    wirkung.personen.extend(neu.iter().map(|p| p.id));
+    let inhalt = format!(
+        "Ablösung vollzogen: Besatzungswechsel «{name}», Einheit und Fahrzeug bleiben. \
+         Alte Besatzung: {}. Neue Besatzung: {}.",
+        personen_text(alt.iter().map(|(_, n, ..)| n.as_str())),
+        personen_text(neu.iter().map(|p| p.name.as_str())),
+    );
+    Ok((vec![folge], inhalt, wirkung))
+}
+
 /// Nimmt einen Vollzug zurück, solange jede Folgeschicht unberührt (laufend) ist (LLH-1132):
 /// neu angelegte Folgeschichten werden samt Fristen entfernt, übernommene nur vom Vorgänger
 /// gelöst. Das Ereignis `abloesung` wird an der Einheit und an jeder Untereinheit gestrichen,
 /// die die wieder laufende Schicht erbt. Eine Abschnittsübergabe wird zurückgegeben, wo der
 /// Vollzug den Stand hinterlassen hat: die abgelöste Einheit bekommt ihren Abschnitt, solange sie
 /// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Liste
-/// der Ablöser bleibt als Planung stehen.
+/// der Ablöser bleibt als Planung stehen. Einen Besatzungswechsel nimmt
+/// [`zuruecknehmen_besatzung_tx`] zurück (LLH-1150).
 pub async fn zuruecknehmen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -2135,29 +2530,49 @@ pub async fn zuruecknehmen(
         sqlx::query(
             "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \
                 vollzogen_von_id = NULL, etb_vollzug_id = NULL, abschnitt_uebergeben = 0, \
-                abgeloest_abschnitt_vorher_id = NULL WHERE id = ?",
+                abgeloest_abschnitt_vorher_id = NULL, art = ? WHERE id = ?",
         )
+        .bind(AbloesungArt::Einheit.as_str())
         .bind(id)
         .execute(&mut *conn)
         .await?;
 
-        // LFH-552/LLH-1132: das Ablösungsereignis an der Einheit und an ihren Erben streichen,
-        // ihre Perioden sind wieder offen. Die Erben ermittelt die Vererbung jetzt, da die
-        // Schicht wieder läuft.
         let mut wirkung = VollzugWirkung::default();
-        if let Some(vollzogen_at) = &roh.vollzogen_at {
-            let erben = load_erben_tx(conn, einsatz_id, roh.einheit_id).await?;
-            for einheit in std::iter::once(roh.einheit_id).chain(erben) {
-                if let Some(w) = crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+        match roh.art {
+            // LLH-1150: Personen-Ereignisse streichen und die Besatzung zurücklegen; die
+            // Einheiten hatten kein Ereignis.
+            AbloesungArt::Besatzung => {
+                wirkung = zuruecknehmen_besatzung_tx(
                     conn,
-                    einsatz_id,
-                    benutzer_id,
-                    einheit,
-                    vollzogen_at,
+                    &Vorgang {
+                        einsatz_id,
+                        id,
+                        benutzer_id,
+                        jetzt,
+                    },
+                    roh.einheit_id,
                 )
-                .await?
-                {
-                    wirkung.zeitachse.push(w);
+                .await?;
+            }
+            // LFH-552/LLH-1132: das Ablösungsereignis an der Einheit und an ihren Erben
+            // streichen, ihre Perioden sind wieder offen. Die Erben ermittelt die Vererbung
+            // jetzt, da die Schicht wieder läuft.
+            AbloesungArt::Einheit => {
+                if let Some(vollzogen_at) = &roh.vollzogen_at {
+                    let erben = load_erben_tx(conn, einsatz_id, roh.einheit_id).await?;
+                    for einheit in std::iter::once(roh.einheit_id).chain(erben) {
+                        if let Some(w) = crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+                            conn,
+                            einsatz_id,
+                            benutzer_id,
+                            einheit,
+                            vollzogen_at,
+                        )
+                        .await?
+                        {
+                            wirkung.zeitachse.push(w);
+                        }
+                    }
                 }
             }
         }
@@ -2203,6 +2618,9 @@ pub async fn zuruecknehmen(
         if let Some(a) = zurueck {
             inhalt.push_str(&format!(" Abschnitt «{a}» zurückgegeben."));
         }
+        if roh.art == AbloesungArt::Besatzung {
+            inhalt.push_str(" Besatzungswechsel rückgängig.");
+        }
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -2224,6 +2642,113 @@ pub async fn zuruecknehmen(
         Ok((etb_id, wirkung))
     })?;
     Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, wirkung))
+}
+
+/// Nimmt einen Besatzungswechsel zurück (LLH-1150): streicht die Ereignisse der Personen aus dem
+/// Vollzug (Grund „Ablösung zurückgenommen“; bräche das die Folge einer Person → 422 mit ihrem
+/// Namen, nichts geändert) und legt jede Person zurück, solange sie noch so steht, wie der
+/// Vollzug sie hinterlassen hat: die neue verlässt die Einheit wieder (zurück in ihre bisherige,
+/// solange die aktiv ist), die alte kommt in ihre Einheit (solange sie ohne Einheit und aktiv ist
+/// und die Einheit nicht aufgelöst), auf ihr Fahrzeug (solange sie auf keinem sitzt und es
+/// aktiv ist) und in ihre Führung (solange die Einheit keine hat). Danach fallen die Zeilen.
+async fn zuruecknehmen_besatzung_tx(
+    conn: &mut SqliteConnection,
+    v: &Vorgang<'_>,
+    einheit_id: i64,
+) -> Result<VollzugWirkung, AppError> {
+    use crate::zeitachse::repo::{streiche_tx, Kraft, GRUND_ABLOESUNG_ZURUECK};
+    let Vorgang {
+        einsatz_id,
+        id,
+        benutzer_id,
+        ..
+    } = *v;
+    let ereignisse: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT b.personal_id, z.id, p.snap_name FROM einsatz_abloesung_besatzung b \
+         JOIN einsatz_kraft_zeitachse z ON z.id = b.zeitachse_id AND z.gestrichen_at IS NULL \
+         JOIN einsatz_personal p ON p.id = b.personal_id \
+         WHERE b.abloesung_id = ? ORDER BY b.rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (person, ereignis, name) in ereignisse {
+        streiche_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            Kraft::Person(person),
+            ereignis,
+            GRUND_ABLOESUNG_ZURUECK,
+            true,
+        )
+        .await
+        .map_err(|e| match e {
+            AppError::UnprocessableEntity(m) => AppError::UnprocessableEntity(format!(
+                "Die Zeitachse von «{name}» verlöre ihre Ordnung: {m}"
+            )),
+            e => e,
+        })?;
+    }
+
+    let mut wirkung = VollzugWirkung::default();
+    // Die neue Besatzung zurück, solange sie noch in der Einheit steht.
+    let neu: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "UPDATE einsatz_personal SET einheit_id = \
+            (SELECT e.id FROM einsatz_abloesung_besatzung b \
+             JOIN einsatz_einheit e ON e.id = b.einheit_vorher_id AND e.aufgeloest_at IS NULL \
+             WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id) \
+         WHERE einheit_id = ?2 AND id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
+                                          WHERE abloesung_id = ?1 AND rolle = 'neu') \
+         RETURNING id, einheit_id",
+    )
+    .bind(id)
+    .bind(einheit_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    // Die alte Besatzung zurück, solange sie ohne Einheit und noch im Einsatz ist.
+    let alt: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "UPDATE einsatz_personal SET \
+            einheit_id = (SELECT e.id FROM einsatz_abloesung_besatzung b \
+                JOIN einsatz_einheit e ON e.id = b.einheit_vorher_id AND e.aufgeloest_at IS NULL \
+                WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id), \
+            fahrzeug_id = COALESCE(fahrzeug_id, (SELECT f.id FROM einsatz_abloesung_besatzung b \
+                JOIN einsatz_fahrzeug f ON f.id = b.fahrzeug_vorher_id AND f.beendet_at IS NULL \
+                WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id)) \
+         WHERE einheit_id IS NULL AND beendet_at IS NULL \
+           AND id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
+                      WHERE abloesung_id = ?1 AND rolle = 'alt') \
+         RETURNING id, einheit_id",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    // Die Führung zurück, wo die Person wieder in ihrer Einheit steht und die Einheit keine hat.
+    sqlx::query(
+        "UPDATE einsatz_einheit SET fuehrer_id = \
+            (SELECT b.personal_id FROM einsatz_abloesung_besatzung b \
+             JOIN einsatz_personal p ON p.id = b.personal_id AND p.einheit_id = b.einheit_vorher_id \
+             WHERE b.abloesung_id = ?1 AND b.rolle = 'alt' AND b.war_fuehrer = 1 \
+               AND b.einheit_vorher_id = einsatz_einheit.id) \
+         WHERE fuehrer_id IS NULL AND id IN (SELECT einheit_vorher_id \
+            FROM einsatz_abloesung_besatzung \
+            WHERE abloesung_id = ?1 AND rolle = 'alt' AND war_fuehrer = 1)",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    let alle: Vec<i64> = sqlx::query_scalar(
+        "DELETE FROM einsatz_abloesung_besatzung WHERE abloesung_id = ? RETURNING personal_id",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    wirkung.einheiten.push(einheit_id);
+    wirkung
+        .einheiten
+        .extend(neu.iter().chain(alt.iter()).filter_map(|(_, e)| *e));
+    wirkung.personen = alle;
+    Ok(wirkung)
 }
 
 /// Fristen einer wieder laufenden Schicht (Rücknahme des Vollzugs, gestrichene Entlassung) nach

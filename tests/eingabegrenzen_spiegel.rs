@@ -143,6 +143,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             usize::try_from(abloesung::RHYTHMUS_MAX_MINUTEN).unwrap(),
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
+        ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
     ])
 }
 
