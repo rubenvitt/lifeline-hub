@@ -11,7 +11,11 @@ import {
   type TzProps,
 } from '../pages/lagekarte/taktischesZeichen';
 import type { Ausmass, UhsTyp } from '../api/types';
-import { fachobjektZeichen, funktionsZeichen } from './fachobjektZeichen';
+import {
+  bereitstellungsraumZeichen,
+  fachobjektZeichen,
+  funktionsZeichen,
+} from './fachobjektZeichen';
 
 // Pins der fachlichen Abbildung Hub-Vokabular → @einsatzzeichen (LFH-835, design.md D2). Jeder Fall
 // zeichnet echt über `drawSymbol`: ein Bibliotheks-Update, das eine Abbildung bricht, wird hier rot
@@ -607,5 +611,20 @@ describe('funktionsZeichen — Funktionen im Kasten der Fernmeldeskizze (LFH-102
     const s2 = funktionsZeichen({ kuerzel: 'S2' });
     expect(s2!.spec).toMatchObject({ kind: 'person', organization: 'fuehrung-leitung' });
     expect(svg(s2)).toContain('>S2<');
+  });
+});
+
+describe('bereitstellungsraumZeichen — Raumzeichen nach DV 102 (LLH-1107)', () => {
+  it('zeichnet das Führungszeichen D.2.1 „Bereitstellungsraum“ aus dem Katalog, vermessen', () => {
+    const z = bereitstellungsraumZeichen();
+    expect(z).not.toBeNull();
+    expect(z!.spec).toEqual({ kind: 'pictogram', pictogram: 'leadership.staging-area' });
+    // Wörtlich aus der Kapiteldatei, keine Ableitung des Motors.
+    expect(z!.drawing.derivations ?? []).toEqual([]);
+    expect(z!.schluessel.startsWith('ez|')).toBe(true);
+  });
+
+  it('ist für jeden Raum dasselbe Bild (ein Bildschlüssel, gecacht)', () => {
+    expect(bereitstellungsraumZeichen()).toBe(bereitstellungsraumZeichen());
   });
 });

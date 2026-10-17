@@ -1,6 +1,7 @@
 import type { KarteMarker, MarkerTyp } from './marker';
 import type { PersonenZugriff } from './personenEbene';
 import type { BetreuungZugriff } from './betreuungEbene';
+import type { BrZugriff } from './brEbene';
 import { OBJEKTART } from './leistenDaten';
 
 /**
@@ -28,11 +29,20 @@ export function suchbareMarker(a: {
   personenZugriff: PersonenZugriff;
   personenEbeneAn: boolean;
   betreuungZugriff: BetreuungZugriff;
+  /** Ebene „Bereitstellungsräume" (LLH-1107). */
+  brZugriff: BrZugriff;
 }): KarteMarker[] {
   const personenFrei = a.personenZugriff === 'frei' && a.personenEbeneAn;
   const betreuungFrei = a.betreuungZugriff === 'frei';
+  const brFrei = a.brZugriff === 'frei';
   const erlaubt = (x: KarteMarker) =>
-    x.typ === 'person' ? personenFrei : x.typ === 'betreuungsstelle' ? betreuungFrei : true;
+    x.typ === 'person'
+      ? personenFrei
+      : x.typ === 'betreuungsstelle'
+        ? betreuungFrei
+        : x.typ === 'bereitstellungsraum'
+          ? brFrei
+          : true;
   return [...a.verortet, ...(personenFrei ? a.personen : [])].filter(erlaubt);
 }
 
@@ -46,6 +56,7 @@ export const TYP_REIHENFOLGE: readonly MarkerTyp[] = [
   'schaden',
   'uhs',
   'betreuungsstelle',
+  'bereitstellungsraum',
   'einheit',
   'fahrzeug',
   'fuehrung',

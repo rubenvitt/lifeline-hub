@@ -930,9 +930,23 @@ fn abloesung_status_wire() {
     enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus { Laufend, Abgeloest });
 }
 
+/// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).
 #[test]
 fn abloesung_rhythmus_quelle_wire() {
-    enum_wire_as_str!(lifeline_hub::abloesung::RhythmusQuelle { Abschnitt, Einheit });
+    enum_wire_as_str!(lifeline_hub::abloesung::RhythmusQuelle {
+        Abschnitt,
+        Einheit,
+        Einsatz,
+    });
+}
+
+/// LLH-1122: Typ eines Schichtmodells, DB-CHECK in `migrations/0212_schichtmodell.sql`.
+#[test]
+fn schichtmodell_typ_wire() {
+    enum_wire_as_str!(lifeline_hub::schichtmodell::SchichtmodellTyp {
+        Rhythmus,
+        Wechselzeiten,
+    });
 }
 
 #[test]
@@ -1079,6 +1093,7 @@ fn demo_bericht_enums_wire() {
         Personal => "personal",
         Material => "material",
         EinheitVorlage => "einheit_vorlage",
+        Schichtmodell => "schichtmodell",
     });
 }
 

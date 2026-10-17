@@ -37,6 +37,9 @@ export interface Buendel {
   sonderkost?: SonderkostEingabe;
   /** Stelle beim ersten Tipp (LLH-1040); setzt `useAusgabeSammlung`, der Kern kennt sie nicht. */
   verpflegungsstelle_id?: number;
+  /** Empfänger beim ersten Tipp (LLH-1055), höchstens einer; setzt ebenfalls der Hook. */
+  einheit_id?: number;
+  abschnitt_id?: number;
 }
 
 /** Ein Abschnitt gleicher Portionen auf dem Stapel (Lauflänge statt je Portion ein Eintrag). */

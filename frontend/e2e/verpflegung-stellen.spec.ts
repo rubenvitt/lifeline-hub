@@ -156,6 +156,8 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     await (await offenesMenue(page)).getByText('Ausgabe nachtragen').click();
     const nachtrag = page.getByRole('dialog', { name: 'Ausgabe nachtragen: Mittag Stellen' });
     await nachtrag.getByLabel('Menge (EP)').fill('100');
+    // Seit LLH-1055 liegt das Zuführungsziel unter „Weitere Angaben“ (Feldbudget).
+    await nachtrag.getByRole('button', { name: /^Weitere Angaben/ }).click();
     await expect(nachtrag.getByLabel('Zuführungsziel')).toBeVisible();
     await waehle(page, nachtrag, 'Stelle', 'Feldküche BR Sportplatz');
     await expect(nachtrag.getByLabel('Zuführungsziel')).toHaveCount(0);

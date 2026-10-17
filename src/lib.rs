@@ -61,6 +61,7 @@ pub mod personal;
 pub mod presse;
 pub mod routes;
 pub mod schaden;
+pub mod schichtmodell;
 pub mod sprechgruppe;
 pub mod stab;
 pub mod staerke;

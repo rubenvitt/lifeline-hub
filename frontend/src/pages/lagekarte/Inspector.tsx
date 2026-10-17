@@ -84,6 +84,9 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
     // Betreuungsstellen ebenso: die Peilung kennt nur, was jeder Einsatz-Leser sehen darf.
     case 'betreuungsstelle':
       return undefined;
+    // Bereitstellungsräume ebenso (LLH-1107).
+    case 'bereitstellungsraum':
+      return undefined;
   }
 }
 

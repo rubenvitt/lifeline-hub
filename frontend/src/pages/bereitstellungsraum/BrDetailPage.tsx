@@ -57,6 +57,7 @@ import { brStatus } from '../../theme/statusFarben';
 import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import BrBearbeitenModal from './BrBearbeitenModal';
+import AufKarteVerorten from './AufKarteVerorten';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
@@ -566,7 +567,15 @@ export default function BrDetailPage() {
           Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`, „Aktionen“). */}
       <SektionHeader
         titel="Raumdaten"
-        extra={bearbeitbar && <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>}
+        extra={
+          bearbeitbar && (
+            <Space wrap>
+              {/* Verorten auf der Lagekarte (LLH-1107), Muster Betreuungsstelle (LFH-673). */}
+              {!br.storniert_at && <AufKarteVerorten einsatzId={einsatzId} br={br} />}
+              <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
+            </Space>
+          )
+        }
       />
       <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: abstand.lg }}>
         <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>

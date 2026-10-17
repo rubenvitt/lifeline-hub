@@ -12,16 +12,20 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import {
+  ABSCHNITT_DEICH,
   DEICH,
   FELDKUECHE,
+  GRUPPE_1,
+  GRUPPE_2,
   KEINE_SONDERKOST,
   TURNHALLE,
   ausgabe,
+  empfaenger,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
 } from '../test/verpflegungDaten';
-import type { Verpflegungsstelle } from '../api/types';
+import type { VerpflegungEmpfaenger, Verpflegungsstelle } from '../api/types';
 import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
 
 dayjs.extend(utc);
@@ -75,8 +79,18 @@ const mittag = (over: Partial<VerpflegungZeitfenster> = {}) =>
     ...over,
   });
 
-function liefert(zf: VerpflegungZeitfenster[], stellen: Verpflegungsstelle[] = []) {
-  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf, stellen }));
+function liefert(
+  zf: VerpflegungZeitfenster[],
+  stellen: Verpflegungsstelle[] = [],
+  empfaengerListe?: VerpflegungEmpfaenger,
+) {
+  ladeVerpflegung.mockImplementation(() =>
+    Promise.resolve({
+      zeitfenster: zf,
+      stellen,
+      ...(empfaengerListe ? { empfaenger: empfaengerListe } : {}),
+    }),
+  );
 }
 
 const ansicht = (
@@ -692,5 +706,148 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
     zeige();
     await geladen();
     expect(platz().childNodes).toHaveLength(0);
+  });
+});
+
+describe('AusgabeAnsicht — Empfänger (LLH-1055 Teil II)', () => {
+  const platz = () => document.querySelector<HTMLElement>('[data-lfh="ausgabe-empfaenger"]')!;
+  const gewaehlt = () => platz().querySelector('.ant-select-content')?.textContent ?? '';
+  const offen = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="stand-offen"] > li[data-einheit]')].map(
+      (li) => Number(li.dataset.einheit),
+    );
+
+  beforeEach(() => {
+    liefert([mittag()], [], empfaenger());
+  });
+
+  it('Vorgabe „ohne Empfänger“; Einheiten mit Stärke, dann Abschnitte als Zuführung', async () => {
+    zeige();
+    await geladen();
+    expect(gewaehlt()).toBe('ohne Empfänger');
+    await oeffne('Empfänger');
+    expect(optionenVon('Empfänger')).toEqual([
+      'ohne Empfänger',
+      '1. Zug · Florian 1 · 1/2/17//20',
+      '1. Gruppe · Florian 1-1 · 0/1/8//9',
+      '2. Gruppe · Florian 1-2 · 0/1/8//9',
+      'Wasserrettung',
+      'Zuführung Deich',
+    ]);
+    // Ohne Empfänger geht das Bündel ohne Empfänger.
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toEqual({ menge: 1, client_id: expect.any(String) }),
+    );
+  });
+
+  it('Einheit gewählt: „+9“ zählt ihre Stärke, überschreibbar mit „−1“; das Bündel trägt sie', async () => {
+    zeige();
+    await geladen();
+    await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+    await userEvent.click(taste('Stärke zählen: 9 EP an 2. Gruppe'));
+    expect(sammlungMenge()).toBe('9');
+    await userEvent.click(taste('−1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toEqual({
+        menge: 8,
+        einheit_id: GRUPPE_2,
+        client_id: expect.any(String),
+      }),
+    );
+  });
+
+  it('„Menge …“ ist mit der Stärke der gewählten Einheit vorbelegt', async () => {
+    zeige();
+    await geladen();
+    await waehle('Empfänger', '1. Zug · Florian 1 · 1/2/17//20');
+    await userEvent.click(taste('Menge …'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Menge (EP)')).toHaveValue('20');
+  });
+
+  it('Zuführung an einen Abschnitt: keine Stärke-Taste, das Bündel trägt den Abschnitt', async () => {
+    zeige();
+    await geladen();
+    await waehle('Empfänger', 'Zuführung Deich');
+    expect(screen.queryByRole('button', { name: /^Stärke zählen/ })).toBeNull();
+    await userEvent.click(taste('+10'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 10,
+        abschnitt_id: ABSCHNITT_DEICH,
+      }),
+    );
+  });
+
+  it('ein Wechsel des Empfängers bucht das offene Bündel beim alten', async () => {
+    zeige();
+    await geladen();
+    await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+    await userEvent.click(taste('+5'));
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
+    await waehle('Empfänger', 'ohne Empfänger');
+    await waitFor(() => expect(erfasseAusgabe).toHaveBeenCalledTimes(1));
+    expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({ menge: 5, einheit_id: GRUPPE_2 });
+  });
+
+  it('„Noch nicht verpflegt“ in der Ansicht; „Wählen“ setzt den Empfänger', async () => {
+    liefert(
+      [mittag({ ausgaben: [ausgabe({ id: 7, menge: 9, einheit_id: GRUPPE_1 })] })],
+      [],
+      empfaenger(),
+    );
+    zeige();
+    await geladen();
+    expect(offen()).toEqual([31, GRUPPE_2]);
+    await userEvent.click(taste('Empfänger wählen: 2. Gruppe'));
+    expect(gewaehlt()).toBe('2. Gruppe · Florian 1-2 · 0/1/8//9');
+    // Die Ausgabe nennt ihren Empfänger in „Letzte Buchungen“.
+    expect(document.querySelector('[data-lfh="ausgabe-zeile"]')).toHaveTextContent(
+      '9 EP · an 1. Gruppe',
+    );
+  });
+
+  it('Beobachter: Empfängerwahl und „Wählen“ gesperrt', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    zeige();
+    await geladen();
+    expect(screen.getByRole('combobox', { name: 'Empfänger' })).toBeDisabled();
+    expect(taste('Empfänger wählen: 2. Gruppe')).toBeDisabled();
+  });
+
+  it('ohne Netz: die vorgemerkte Ausgabe trägt die Einheit, steht „ausstehend“ und nimmt sie nicht aus der Liste (AK)', async () => {
+    await queueLeerenFuerTests();
+    zeige();
+    await geladen();
+    setzeOnline(false);
+    await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+    await userEvent.click(taste('Stärke zählen: 9 EP an 2. Gruppe'));
+    await userEvent.click(taste('Buchen'));
+    expect(
+      await screen.findByText(/Offline vorgemerkt: 9 EP zu ‚Mittag‘/, {}, { timeout: 10000 }),
+    ).toBeInTheDocument();
+    const [aktion] = await schreibaktionenLaden(BENUTZER_ID, 1);
+    expect(aktion.aktion).toMatchObject({ daten: { menge: 9, einheit_id: GRUPPE_2 } });
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-lfh="stand-offen"] > li[data-einheit="33"]'),
+      ).toHaveTextContent('ausstehend 9 EP'),
+    );
+    expect(offen()).toContain(GRUPPE_2);
+    expect(document.querySelector('[data-lfh="ausgabe-zeile-ausstehend"]')).toHaveTextContent(
+      '9 EP · an 2. Gruppe',
+    );
+  });
+
+  it('ohne Einheiten und Abschnitte bleibt der Platz leer und es gibt keine Liste', async () => {
+    liefert([mittag()], [], { einheiten: [], abschnitte: [] });
+    zeige();
+    await geladen();
+    expect(platz().childNodes).toHaveLength(0);
+    expect(document.querySelector('[data-lfh="verpflegung-stand"]')).toBeNull();
   });
 });

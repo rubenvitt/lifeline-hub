@@ -10,7 +10,7 @@ quellen: [frontend/src/admin/DemoDatenPage.tsx, frontend/src/admin/adminNav.tsx,
 Demo-Daten sind eine fertig befüllte Übungslage: ein Einsatz „ÜBUNG – Starkregen Musterstadt“
 mit Abschnitten, Einheiten samt Untereinheiten, Fahrzeugen mit Besatzung, Material, Betroffenen,
 Betreuung, Meldungen, Aufträgen, Lagebericht und Einsatztagebuch, dazu die Fahrzeuge, das Personal und das Material, die er
-braucht, und eine Einheiten-Vorlage. Sie eignen sich zum Kennenlernen, für Schulungen und für Vorführungen. Ein System-Admin
+braucht, eine Einheiten-Vorlage und ein Schichtmodell. Sie eignen sich zum Kennenlernen, für Schulungen und für Vorführungen. Ein System-Admin
 spielt sie ein, entfernt sie wieder oder setzt sie auf den Anfangsstand zurück.
 
 Die Seite „Demo-Daten“ gibt es nur, wenn der Server mit eingeschalteten Demo-Daten gestartet
@@ -42,8 +42,8 @@ ist weg.
 
    ![Rückfrage „Demo-Daten entfernen?“ mit dem Knopf „Endgültig entfernen“](../bilder/demo-daten/entfernen.png)
 
-Das Paneel „Letzter Vorgang“ zählt danach je Fahrzeuge, Personal, Material und
-Einheiten-Vorlagen, was entfernt und was behalten wurde.
+Das Paneel „Letzter Vorgang“ zählt danach je Fahrzeuge, Personal, Material, Einheiten-Vorlagen
+und Schichtmodelle, was entfernt und was behalten wurde.
 
 ## Hintergrund
 
@@ -62,6 +62,10 @@ Einheiten-Vorlagen, was entfernt und was behalten wurde.
   mit Demo-Fahrzeugen und Stammbesetzung. Gibt es schon eine aktive Vorlage mit demselben Namen,
   benutzt der Import sie unverändert mit. Ist der Sanitätszug mitbenutzt, steht eine neu
   angelegte Rettungsstaffel ohne Unterstellung.
+- Das Schichtmodell „12-h-Schicht Hochwasser“ mit Wechsel um 06:00 und 18:00 und vier Stunden
+  Mindestdauer. Es wird nie die Vorgabe der Organisation, prägt also keinen echten Einsatz; der
+  Demo-Einsatz nimmt es als seine Vorgabe für die Ablösung, wenn die Organisation keine eigene
+  hat. Gibt es schon ein Schichtmodell mit demselben Namen, benutzt der Import es unverändert mit.
 - **Keine** Benutzerkonten. Kataloge wie Status, Einheitstypen und Qualifikationen benutzt der
   Import nur mit; fehlt ein benötigter Eintrag, bricht er mit einer Meldung ab.
 

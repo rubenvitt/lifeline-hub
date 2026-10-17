@@ -348,6 +348,13 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePlatzierenAuftrag('betreuungsstelle:abc')).toBeNull();
     expect(parsePlatzierenAuftrag('betreuungsstelle:0')).toBeNull();
   });
+  it('der Platzier-Auftrag „bereitstellungsraum“ überlebt den Weg durch die URL (LLH-1107)', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'bereitstellungsraum', id: 9 } });
+    const wert = new URL(pfad, 'http://x').searchParams.get('platzieren');
+    expect(wert).toBe('bereitstellungsraum:9');
+    expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'bereitstellungsraum', id: 9 });
+    expect(parsePlatzierenAuftrag('bereitstellungsraum:abc')).toBeNull();
+  });
   it('lagekartePfad trägt ?evakuierungsbezirk= (LFH-673)', () => {
     const pfad = lagekartePfad(E, { evakuierungsbezirk: 5 });
     expect(new URL(pfad, 'http://x').searchParams.get('evakuierungsbezirk')).toBe('5');

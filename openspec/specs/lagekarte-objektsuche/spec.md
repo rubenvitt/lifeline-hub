@@ -11,7 +11,8 @@ Die Kartenleiste SHALL im Paneel „Verortet“ ein Suchfeld anbieten, das die B
 wählbaren verorteten Kartenobjekte und ihre Objektart ohne Rücksicht auf Groß- und
 Kleinschreibung durchsucht.
 Wählbar sind Einsatzort, UHS, Schäden, Einheiten, Fahrzeuge, Führung, Einsatzabschnitte,
-Lagemeldungen, freie taktische Zeichen, Betreuungsstellen und Betroffene, jeweils nur unter
+Lagemeldungen, freie taktische Zeichen, Betreuungsstellen, Bereitstellungsräume und Betroffene,
+jeweils nur unter
 den Bedingungen der Anforderung „Modulsperren“. Die Treffer MUST nach Objektart gruppiert
 stehen, jede Gruppe mit Objektart und Trefferzahl in der Kopfzeile. Gruppen ohne Treffer MUST
 entfallen. Die Gruppen MUST nach Trefferzahl absteigend und bei Gleichstand in einer festen
@@ -62,7 +63,7 @@ Spec `lagekarte-ortssuche`), MUST statt des Leerzustands der Fläche nur ein kna
 
 ### Requirement: Modulsperren
 Die Suche MUST Betreuungsstellen nur enthalten, wenn das Modul Betreuung für die Person frei
-ist, und Betroffene nur, wenn das Modul Personen frei ist und die Ebene „Betroffene“ auf der
+ist, Bereitstellungsräume nur, wenn das Modul Bereitstellungsräume frei ist, und Betroffene nur, wenn das Modul Personen frei ist und die Ebene „Betroffene“ auf der
 Karte eingeschaltet ist. Ist ein Modul ausgeblendet, gesperrt oder vom Server mit 403
 abgelehnt, MUST kein Name aus diesem Modul in der Suche erscheinen, auch nicht als Treffer
 eines passenden Suchbegriffs.
@@ -74,6 +75,10 @@ eines passenden Suchbegriffs.
 #### Scenario: Ohne Betreuungsrecht
 - **WHEN** das Modul Betreuung gesperrt ist und dieselbe Stelle in den Daten stünde
 - **THEN** findet die Suche nach „turnhalle“ nichts, und keine Gruppe „Betreuungsstelle“ erscheint
+
+#### Scenario: Ohne Recht auf Bereitstellungsräume
+- **WHEN** das Modul Bereitstellungsräume gesperrt ist und der Raum „BR Sportplatz“ in den Daten stünde
+- **THEN** findet die Suche nach „sportplatz“ nichts, und keine Gruppe „Bereitstellungsraum“ erscheint
 
 #### Scenario: Betroffene nur mit Recht und Ebene
 - **WHEN** das Modul Personen gesperrt ist oder die Ebene „Betroffene“ aus ist

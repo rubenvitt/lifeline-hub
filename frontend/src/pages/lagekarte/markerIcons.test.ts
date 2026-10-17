@@ -86,6 +86,14 @@ describe('markerZeichen', () => {
     expect(markerZeichen(mk)?.drawing).toBeDefined();
     expect(markerZeichen({ typ: 'einheit' })).toBeNull();
   });
+
+  it('zeichnet einen Bereitstellungsraum mit dem Raumzeichen D.2.1, ohne `tz` (LLH-1107)', () => {
+    const z = markerZeichen({ typ: 'bereitstellungsraum' });
+    expect(z?.schluessel).toBe(
+      `ez|${serializeAnySpec({ kind: 'pictogram', pictogram: 'leadership.staging-area' })}`,
+    );
+    expect(markerIconKey({ typ: 'bereitstellungsraum' })).toBe(z?.schluessel);
+  });
 });
 
 describe('baueZeichenRegistry', () => {
