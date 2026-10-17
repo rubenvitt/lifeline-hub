@@ -87,6 +87,12 @@ export interface components {
             folgeschichten: components["schemas"]["AbloesungFolge"][];
             /** Format: int64 */
             id: number;
+            /**
+             * @description Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht
+             *     geplant oder selbst im Einsatz. Beim Lesen ermittelt; leer ohne Planung, ohne Auffälliges
+             *     und bei abgelösten und beendeten Schichten. Die Planung gelingt trotzdem.
+             */
+            planung_warnungen: components["schemas"]["AbloesungPlanungWarnung"][];
             /** Format: int64 */
             rhythmus_minuten: number;
             rhythmus_quelle: components["schemas"]["RhythmusQuelle"];
@@ -154,6 +160,31 @@ export interface components {
             uebernommen: boolean;
         };
         /**
+         * @description Eine Warnung zur geplanten ablösenden Einheit einer laufenden Schicht (LLH-1131). Gilt für
+         *     die Einzelplanung und für die Ablöser-Liste (LLH-1118 Punkt 3).
+         */
+        AbloesungPlanungWarnung: {
+            /** @description `schon_geplant`: die Einheit dieser anderen Schicht. */
+            abloesung_einheit_name?: string | null;
+            /**
+             * Format: int64
+             * @description `schon_geplant`: die andere Schicht, für die sie geplant ist.
+             */
+            abloesung_id?: number | null;
+            art: components["schemas"]["AbloesungWarnungArt"];
+            /**
+             * Format: int64
+             * @description Die geplante ablösende Einheit.
+             */
+            einheit_id: number;
+            einheit_name: string;
+            /**
+             * @description `im_einsatz`: Beginn der laufenden Schicht, in der sie steht (eigene oder die ihres
+             *     Verbands).
+             */
+            seit_at?: string | null;
+        };
+        /**
          * @description Status einer Schicht. Wire == `as_str()`.
          * @enum {string}
          */
@@ -178,6 +209,12 @@ export interface components {
             /** Format: int64 */
             rhythmus_minuten?: number | null;
         };
+        /**
+         * @description Was beim Planen einer ablösenden Einheit auffällt (LLH-1131): eine Warnung, kein Fehler.
+         *     Wire == `as_str()`.
+         * @enum {string}
+         */
+        AbloesungWarnungArt: "schon_geplant" | "im_einsatz";
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
          *     `etb_label` erscheint in Klammern in der ETB-Spur ("abgeschlossen (Übergabe an
@@ -913,13 +950,13 @@ export interface components {
          *     CHECK-Liste in `migrations/0196_benachrichtigung.sql` spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der

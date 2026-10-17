@@ -1263,6 +1263,9 @@ pub struct Aufgeloest {
     pub br: Option<i64>,
     /// Laufende Schicht beendet oder ein fremder Verweis auf sie geleert.
     pub abloesung: bool,
+    /// Entfallene Planungen als ablösende Einheit (LLH-1131): ETB-Einträge und Hinweise, nach
+    /// dem Commit über `routes::abloesung::publish_kopplung`.
+    pub abloesung_wirkung: crate::abloesung::hinweis::Wirkung,
 }
 
 /// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB, LLH-1079,
@@ -1334,8 +1337,9 @@ pub async fn aufloesen_tx(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-    ergebnis.abloesung =
-        crate::abloesung::repo::release_einheit_tx(conn, id, benutzer_id, jetzt).await?;
+    (ergebnis.abloesung, ergebnis.abloesung_wirkung) =
+        crate::abloesung::repo::release_einheit_tx(conn, einsatz_id, id, benutzer_id, jetzt)
+            .await?;
     ergebnis.br = crate::bereitstellungsraum::belegung_repo::austritt_bei_aufloesung_tx(
         conn,
         einsatz_id,

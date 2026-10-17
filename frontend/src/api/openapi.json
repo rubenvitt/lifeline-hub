@@ -111,6 +111,7 @@
           "abschnitt_uebergeben",
           "ruecknehmbar",
           "erbende_einheiten",
+          "planung_warnungen",
           "angelegt_at"
         ],
         "properties": {
@@ -232,6 +233,13 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "planung_warnungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbloesungPlanungWarnung"
+            },
+            "description": "Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht\ngeplant oder selbst im Einsatz. Beim Lesen ermittelt; leer ohne Planung, ohne Auffälliges\nund bei abgelösten und beendeten Schichten. Die Planung gelingt trotzdem."
           },
           "rhythmus_minuten": {
             "type": "integer",
@@ -365,6 +373,50 @@
           }
         }
       },
+      "AbloesungPlanungWarnung": {
+        "type": "object",
+        "description": "Eine Warnung zur geplanten ablösenden Einheit einer laufenden Schicht (LLH-1131). Gilt für\ndie Einzelplanung und für die Ablöser-Liste (LLH-1118 Punkt 3).",
+        "required": [
+          "art",
+          "einheit_id",
+          "einheit_name"
+        ],
+        "properties": {
+          "abloesung_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`schon_geplant`: die Einheit dieser anderen Schicht."
+          },
+          "abloesung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`schon_geplant`: die andere Schicht, für die sie geplant ist."
+          },
+          "art": {
+            "$ref": "#/components/schemas/AbloesungWarnungArt"
+          },
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die geplante ablösende Einheit."
+          },
+          "einheit_name": {
+            "type": "string"
+          },
+          "seit_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`im_einsatz`: Beginn der laufenden Schicht, in der sie steht (eigene oder die ihres\nVerbands)."
+          }
+        }
+      },
       "AbloesungStatus": {
         "type": "string",
         "description": "Status einer Schicht. Wire == `as_str()`.",
@@ -434,6 +486,14 @@
             "format": "int64"
           }
         }
+      },
+      "AbloesungWarnungArt": {
+        "type": "string",
+        "description": "Was beim Planen einer ablösenden Einheit auffällt (LLH-1131): eine Warnung, kein Fehler.\nWire == `as_str()`.",
+        "enum": [
+          "schon_geplant",
+          "im_einsatz"
+        ]
       },
       "AbschlussGrund": {
         "type": "string",
@@ -2435,6 +2495,8 @@
           "abloesung_faellig",
           "erinnerung_faellig",
           "abloesung_vorwarnung",
+          "abloesung_planung",
+          "abloesung_abloeser",
           "auftrag_erteilt",
           "auftrag_quittiert",
           "auftrag_erledigt",
@@ -2465,6 +2527,11 @@
           "lagebericht",
           "erinnerung",
           "abloesung",
+          "abloeser_alarmiert",
+          "abloeser_eingetroffen",
+          "abloeser_br_eingetroffen",
+          "abloeser_abgerufen",
+          "abloeser_entfallen",
           "lagebesprechung",
           "nachforderung",
           "nachforderung_zugesagt",

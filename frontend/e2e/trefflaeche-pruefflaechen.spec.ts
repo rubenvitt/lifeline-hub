@@ -893,6 +893,15 @@ async function gliederungSaeen(page: Page, einsatzId: string) {
   const status = await page.request.post(`${E}/bereitstellungsraeume/${br.id}/status`, {
     data: { status: 'aktiv' },
   });
+  // Eine bereitgestellte Einheit trägt „Abrufen“ und das Aktionsmenü der Zeile (LLH-1085).
+  const bereit = await seed(page, `${E}/einheiten`, { name: 'Zug BR' });
+  if (status.ok()) {
+    await seed(page, `${E}/bereitstellungsraeume/${br.id}/belegung`, {
+      objekt_typ: 'einheit',
+      objekt_id: bereit.id,
+      art: 'eintritt',
+    });
+  }
   return { abschnittId: nord.id, brId: br.id, brAktiv: status.ok() };
 }
 
@@ -946,6 +955,8 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
       ziele: [
         { sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 },
         { sorte: 'BR zuweisen', ziele: knopf(/ zuweisen$/), mindestens: 2 },
+        { sorte: 'BR Abrufen', ziele: knopf('Zug BR abrufen'), mindestens: 1 },
+        { sorte: 'BR Aktionsmenü', ziele: knopf('Weitere Aktionen zu Zug BR'), mindestens: 1 },
       ],
     },
   ];
@@ -991,7 +1002,7 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/bereitstellungsraeume/${brId}`,
       anker: (page) => inMain(page).getByTestId('kraefte-ohne-br'),
-      fehlt: knopf(/zuweisen$/),
+      fehlt: knopf(/zuweisen$|abrufen$|^Weitere Aktionen zu /),
       ziele: [{ sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 }],
     },
   ]);

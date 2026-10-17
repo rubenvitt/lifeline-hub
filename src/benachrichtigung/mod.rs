@@ -60,6 +60,12 @@ wire_enum! {
         AbloesungFaellig => "abloesung_faellig",
         ErinnerungFaellig => "erinnerung_faellig",
         AbloesungVorwarnung => "abloesung_vorwarnung",
+        /// Planungshinweis (LLH-1131): kurz vor der Fälligkeit ist noch keine ablösende Einheit
+        /// geplant. Eine eigene Art, aber keine Einstufung der Schicht (die bleibt bei drei).
+        AbloesungPlanung => "abloesung_planung",
+        /// Bei der geplanten ablösenden Einheit tut sich etwas, oder ihre Planung entfällt
+        /// (LLH-1131). Was, steckt im Bezug (`abloeser_*`), wie beim Status einer Nachforderung.
+        AbloesungAbloeser => "abloesung_abloeser",
         AuftragErteilt => "auftrag_erteilt",
         AuftragQuittiert => "auftrag_quittiert",
         AuftragErledigt => "auftrag_erledigt",
@@ -94,6 +100,8 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::AbloesungFaellig => BenachrichtigungStufe::Alarm,
             BenachrichtigungArt::ErinnerungFaellig
             | BenachrichtigungArt::AbloesungVorwarnung
+            | BenachrichtigungArt::AbloesungPlanung
+            | BenachrichtigungArt::AbloesungAbloeser
             | BenachrichtigungArt::AuftragErteilt
             | BenachrichtigungArt::AuftragQuittiert
             | BenachrichtigungArt::AuftragErledigt
@@ -145,6 +153,15 @@ wire_enum! {
         Erinnerung => "erinnerung",
         /// Eine Schicht des Ablösungsmoduls (`einsatz_abloesung.id`).
         Abloesung => "abloesung",
+        /// Eine Schicht (`einsatz_abloesung.id`) mit dem, was ihre geplante ablösende Einheit
+        /// getan hat (LLH-1131): alarmiert, eingetroffen, am Bereitstellungsraum eingetroffen,
+        /// abgerufen, oder dass ihre Planung entfallen ist. Wie bei der Nachforderung steckt das
+        /// Ereignis im Bezug, weil die Zeile keinen Text trägt (design.md D1).
+        AbloeserAlarmiert => "abloeser_alarmiert",
+        AbloeserEingetroffen => "abloeser_eingetroffen",
+        AbloeserBrEingetroffen => "abloeser_br_eingetroffen",
+        AbloeserAbgerufen => "abloeser_abgerufen",
+        AbloeserEntfallen => "abloeser_entfallen",
         /// Der Termin der Lagebesprechung am Einsatz; `bezug_id` ist die Einsatzkennung.
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
@@ -185,7 +202,12 @@ impl BenachrichtigungBezugTyp {
             | BenachrichtigungBezugTyp::Befehl => Some("auftraege"),
             BenachrichtigungBezugTyp::Lagebericht => Some("lageberichte"),
             BenachrichtigungBezugTyp::Erinnerung => Some("erinnerungen"),
-            BenachrichtigungBezugTyp::Abloesung => Some("abloesung"),
+            BenachrichtigungBezugTyp::Abloesung
+            | BenachrichtigungBezugTyp::AbloeserAlarmiert
+            | BenachrichtigungBezugTyp::AbloeserEingetroffen
+            | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
+            | BenachrichtigungBezugTyp::AbloeserAbgerufen
+            | BenachrichtigungBezugTyp::AbloeserEntfallen => Some("abloesung"),
             BenachrichtigungBezugTyp::Lagebesprechung => Some("lagebesprechung"),
             BenachrichtigungBezugTyp::Nachforderung
             | BenachrichtigungBezugTyp::NachforderungZugesagt

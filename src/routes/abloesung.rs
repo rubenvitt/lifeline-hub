@@ -12,7 +12,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::repo::{
-    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, VollzugEingabe, Wirkung,
+    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, VollzugEingabe, VollzugWirkung,
 };
 use crate::abloesung::{
     AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus, AbloesungVollzugAnzeige,
@@ -47,22 +47,31 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
 
 /// Nach einem Schreibweg der Kräfte-Zeitachse, dessen Kopplung die Ablösung geändert hat
 /// (LLH-1128: Schicht mit dem Eintreffen begonnen, mit der Entlassung beendet, nach gestrichener
-/// Entlassung wieder laufend): Kurzruf je ETB-Eintrag und Listen-Refresh, wie beim Beginnen von
-/// Hand. Ohne Einträge nichts.
-pub(crate) fn publish_kopplung(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
-    if etb_ids.is_empty() {
-        return;
+/// Entlassung wieder laufend; LLH-1131: Planung der ablösenden Einheit entfallen): Kurzruf je
+/// ETB-Eintrag und Listen-Refresh, wie beim Beginnen von Hand. Danach die Hinweise zur
+/// ablösenden Einheit (`abloesung::hinweis`) über `benachrichtigung::melden`; ein Fehler dort
+/// lässt den Schreibweg nicht scheitern. Ohne beides nichts.
+pub(crate) async fn publish_kopplung(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: &[i64],
+    hinweise: &[crate::benachrichtigung::Anlass],
+) {
+    if !etb_ids.is_empty() {
+        for etb_id in etb_ids {
+            state.live.publiziere(einsatz_id, *etb_id);
+        }
+        sse(state, einsatz_id);
     }
-    for etb_id in etb_ids {
-        state.live.publiziere(einsatz_id, *etb_id);
+    for anlass in hinweise {
+        crate::benachrichtigung::melden(&state.pool, &state.live, anlass.clone()).await;
     }
-    sse(state, einsatz_id);
 }
 
 /// Vollzug und Rücknahme ändern die Zeitachse der Einheit, ihrer erbenden Untereinheiten und per
 /// Fan-out die ihrer Personen, mit der Abschnittsübergabe auch Einheiten; deren Leser mit nur
 /// Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189). Je Einheit ein Ereignis.
-fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Wirkung) {
+fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: VollzugWirkung) {
     let mut gemeldet: Vec<i64> = Vec::new();
     for (einheit_id, beruehrt) in wirkung.zeitachse {
         super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);

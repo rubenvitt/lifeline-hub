@@ -76,14 +76,16 @@ Ablösung nur „↗ Ablösung“:
 - „Sofortmeldung #… unbestätigt“ zu einer Sofortmeldung (Kapitel [Meldungen](meldungen.md)),
 - „Auftrag #… Quittierfrist“ zu einem Auftrag mit Frist (Kapitel
   [Aufträge und Befehle](auftraege-befehle.md)),
-- Hinweise zu fälligen Ablösungen ([Ablösung](abloesung.md)).
+- Hinweise zu fälligen Ablösungen und zur noch fehlenden Planung einer ablösenden Einheit
+  ([Ablösung](abloesung.md)).
 
 Sie schließen sich selbst, wenn ihr Anlass erledigt ist, etwa wenn die Sofortmeldung bestätigt
 ist oder alle Empfänger den Auftrag quittiert haben.
 
 Die automatischen Erinnerungen melden sich nicht als „Erinnerung fällig“, sondern mit dem Hinweis
-ihres Anlasses: „Bestätigung ausstehend“, „Auftrag überfällig“, „Ablösung steht an“ oder
-„Ablösung fällig“. Wer ihn bekommt, steht im Kapitel des Anlasses.
+ihres Anlasses: „Bestätigung ausstehend“, „Auftrag überfällig“, „Keine ablösende Einheit
+geplant“, „Ablösung steht an“ oder „Ablösung fällig“. Wer ihn bekommt, steht im Kapitel des
+Anlasses.
 
 ### Wer den Hinweis bekommt
 

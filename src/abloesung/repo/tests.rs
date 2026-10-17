@@ -113,7 +113,7 @@ async fn vollziehen(
     vollzogen_at: &str,
     abloeser: Option<i64>,
     jetzt: &str,
-) -> Result<(AbloesungVollzugAnzeige, i64, Wirkung), AppError> {
+) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
     vollzug(
         pool,
         e,
@@ -137,7 +137,7 @@ async fn vollzug(
     abloeser: &[i64],
     abschnitt_uebergeben: bool,
     jetzt: &str,
-) -> Result<(AbloesungVollzugAnzeige, i64, Wirkung), AppError> {
+) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
     super::vollziehen(
         pool,
         e,
@@ -1947,6 +1947,352 @@ async fn geplanter_abloeser_bekommt_beim_eintreffen_keine_schicht() {
     );
 }
 
+// ── Hinweise zur ablösenden Einheit (LLH-1131) ──────────────────────────────────────────────
+
+use crate::benachrichtigung::BenachrichtigungBezugTyp as Bezugstyp;
+
+/// Beginn der Schichten dieses Abschnitts: weit genug in der Zukunft, dass der Planungshinweis
+/// (2 h vor der Fälligkeit) auch gegen die echte Uhr der Kopplung noch vor uns liegt.
+const BEGINN_ZUKUNFT: &str = "2030-06-03 08:00:00";
+
+/// Offene Planungs-Frist der Schicht, `None` ohne eine.
+async fn planung_frist(pool: &SqlitePool, id: i64) -> Option<String> {
+    sqlx::query_scalar(
+        "SELECT faellig_at FROM erinnerung WHERE quelle = 'auto_frist' AND status = 'offen' \
+           AND bezug_typ = 'abloesung_planung' AND bezug_id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .unwrap()
+}
+
+/// Schicht von `einheit`, Beginn [`BEGINN_ZUKUNFT`], 6 h: fällig 14:00, Planungshinweis 12:00.
+async fn schicht_zukunft(w: &Welt, einheit: i64) -> i64 {
+    beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: einheit,
+            beginn_at: Some(BEGINN_ZUKUNFT.into()),
+            rhythmus_minuten: Some(360),
+        },
+        T0,
+    )
+    .await
+    .unwrap()
+    .0
+    .id
+}
+
+async fn plane(w: &Welt, schicht: i64, abloeser: Option<i64>) -> AbloesungAnzeige {
+    aendern(
+        &w.pool,
+        w.e,
+        schicht,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(abloeser.into_iter().collect()),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap()
+    .0
+}
+
+fn anlass(w: &Welt, schicht: i64, typ: Bezugstyp) -> crate::benachrichtigung::Anlass {
+    crate::abloesung::hinweis::anlass(w.e, schicht, typ, w.b)
+}
+
+/// Spec „Planungshinweis“: die dritte Frist liegt den Planungsvorlauf (Vorgabe 2 h) vor der
+/// Fälligkeit, gibt es nur ohne geplante ablösende Einheit, kommt mit einer aufgehobenen Planung
+/// wieder, wandert mit der Fälligkeit und mit dem Vorlauf des Schichtmodells, und der Vollzug
+/// schließt sie.
+#[tokio::test]
+async fn planungshinweis_liegt_zwei_stunden_vor_der_faelligkeit_und_nur_ohne_planung() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 12:00:00")
+    );
+
+    plane(&w, id, Some(w.f2)).await;
+    assert_eq!(
+        planung_frist(&w.pool, id).await,
+        None,
+        "geplant: kein Hinweis"
+    );
+    plane(&w, id, None).await;
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 12:00:00"),
+        "Planung aufgehoben: der Hinweis steht wieder an"
+    );
+
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            beginn_at: Some("2030-06-03 09:00:00".into()),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 13:00:00"),
+        "verschiebt sich mit der Fälligkeit"
+    );
+
+    // Ein Schichtmodell mit 90 min Planungsvorlauf zieht die Frist nach, auch wenn die
+    // Fälligkeit (eigener Rhythmus) bleibt.
+    let mut werte = rhythmus_werte(480, 30);
+    werte.planungsvorlauf_minuten = 90;
+    set_einsatz_vorgabe(&w.pool, w.e, w.b, &EinsatzVorgabeInput::Werte(werte), T0)
+        .await
+        .unwrap();
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 13:30:00")
+    );
+
+    vollziehen(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        "2030-06-03 12:00:00",
+        None,
+        "2030-06-03 12:00:00",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        planung_frist(&w.pool, id).await,
+        None,
+        "der Vollzug schließt"
+    );
+}
+
+/// Liegt der Zeitpunkt schon hinter uns (kurzer Rhythmus), entsteht keine Planungs-Frist: ein
+/// Planungshinweis in der Vergangenheit ist keiner mehr (wie die Vorwarnung).
+#[tokio::test]
+async fn planungshinweis_in_der_vergangenheit_entsteht_nicht() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(90)), T0)
+        .await
+        .unwrap();
+    assert_eq!(planung_frist(&w.pool, a.id).await, None);
+}
+
+/// Spec „Hinweise zur ablösenden Einheit“: Alarmierung und Eintreffen der geplanten Einheit
+/// werden je genau ein Anlass an die Schicht; ein zweites Eintreffen (ausgelassen), eine nicht
+/// geplante Einheit und das Eintreffen am Bereitstellungsraum (meldet dessen Buchung) melden über
+/// die Kopplung nichts.
+#[tokio::test]
+async fn alarmierung_und_eintreffen_der_geplanten_einheit_werden_je_ein_anlass() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+
+    let b = ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserAlarmiert)]
+    );
+    let b = ereignis(&w, w.f2, Eintreffen, "2030-06-03 10:40:00").await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserEingetroffen)]
+    );
+    let (_, b) = schreibe(&w, w.f2, Eintreffen, "2030-06-03 10:41:00").await;
+    assert!(b.hinweise.is_empty(), "ausgelassen: kein zweiter Hinweis");
+
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let b = ereignis(&w, f3, Alarmierung, "2030-06-03 10:00:00").await;
+    assert!(b.hinweise.is_empty(), "nicht geplant");
+
+    // Eine zweite Schicht plant f3 über die Ablöser-Liste (LLH-1118 Punkt 3).
+    let f4 = einheit(&w.pool, w.e, "Florian 4", None).await;
+    let id4 = schicht_zukunft(&w, f4).await;
+    sqlx::query("INSERT INTO einsatz_abloesung_abloeser (abloesung_id, einheit_id) VALUES (?, ?)")
+        .bind(id4)
+        .bind(f3)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let mut tx = w.pool.begin().await.unwrap();
+    let (_, b) = crate::zeitachse::repo::schreibe_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(f3),
+        crate::zeitachse::repo::Neu {
+            art: Eintreffen,
+            zeitpunkt_at: "2030-06-03 10:30:00",
+            quelle: crate::zeitachse::ZeitachseQuelle::Bereitstellungsraum,
+            notiz: None,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert!(
+        b.hinweise.is_empty(),
+        "das Eintreffen am Raum meldet die Buchung, nicht die Kopplung"
+    );
+    let b = ereignis(&w, f3, Entlassung, "2030-06-03 11:00:00").await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id4, Bezugstyp::AbloeserEntfallen)],
+        "auch ein Eintrag der Ablöser-Liste entfällt"
+    );
+}
+
+/// Ein Nachtrag in einen abgeschlossenen Einsatzabschnitt der geplanten Einheit meldet nichts:
+/// Alarmierung und Eintreffen zählen nur als Beginn der offenen Periode.
+#[tokio::test]
+async fn nachtrag_in_eine_abgeschlossene_periode_meldet_nichts() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    // Frühere Perioden von f2, mit einer Ablösung geschlossen (keine Entlassung: die Planung
+    // entfiele sonst): eine nur mit Alarmierung, eine nur mit Eintreffen.
+    use crate::zeitachse::ZeitachseArt::Abloesung;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 06:00:00").await;
+    ereignis(&w, w.f2, Abloesung, "2030-06-03 07:00:00").await;
+    ereignis(&w, w.f2, Eintreffen, "2030-06-03 08:00:00").await;
+    ereignis(&w, w.f2, Abloesung, "2030-06-03 08:30:00").await;
+
+    let b = ereignis(&w, w.f2, Eintreffen, "2030-06-03 06:30:00").await;
+    assert!(
+        b.hinweise.is_empty(),
+        "Eintreffen nachgetragen: {:?}",
+        b.hinweise
+    );
+    let b = ereignis(&w, w.f2, Alarmierung, "2030-06-03 07:50:00").await;
+    assert!(
+        b.hinweise.is_empty(),
+        "Alarmierung nachgetragen: {:?}",
+        b.hinweise
+    );
+}
+
+/// Spec „Planung entfällt“: die Entlassung der geplanten Einheit hebt die Planung auf, mit ETB
+/// und Hinweis, und der Planungshinweis steht wieder an.
+#[tokio::test]
+async fn entlassung_der_geplanten_einheit_laesst_die_planung_entfallen() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+
+    let b = ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserEntfallen)]
+    );
+    assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.abloesende_einheit_id, None);
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter().any(|(_, i, _, _)| i
+            == "Ablösung «Florian 1»: Planung der ablösenden Einheit entfallen, «Florian 2» entlassen"),
+        "{etb:?}"
+    );
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 12:00:00"),
+        "ohne Planung steht der Planungshinweis wieder an"
+    );
+}
+
+/// Spec „Planung entfällt“: das Auflösen der geplanten Einheit hebt die Planung selbst auf, mit
+/// ETB und Hinweis, statt sie einem still leerenden FK `SET NULL` zu überlassen.
+#[tokio::test]
+async fn aufloesen_der_geplanten_einheit_laesst_die_planung_mit_hinweis_entfallen() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+
+    let f = crate::einheit::repo::aufloesen(&w.pool, w.e, w.f2, w.b)
+        .await
+        .unwrap();
+    assert!(
+        !f.geloescht,
+        "die Planung ist eine Spur: aufgelöst, nicht gelöscht"
+    );
+    assert!(f.abloesung);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.abloesende_einheit_id, None);
+    assert_eq!(
+        f.abloesung_wirkung.anlaesse,
+        vec![anlass(&w, id, Bezugstyp::AbloeserEntfallen)]
+    );
+    assert_eq!(f.abloesung_wirkung.etb.len(), 1);
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter().any(|(_, i, _, _)| i
+            == "Ablösung «Florian 1»: Planung der ablösenden Einheit entfallen, «Florian 2» aufgelöst"),
+        "{etb:?}"
+    );
+}
+
+/// Spec „Plausibilität beim Planen“: eine Einheit, die schon eine andere Schicht plant, oder
+/// eine mit eigener laufender Schicht ergibt eine Warnung im Antwort-DTO, die Planung gelingt.
+#[tokio::test]
+async fn planen_warnt_bei_doppelplanung_und_eigener_schicht() {
+    let w = welt().await;
+    let id1 = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let id3 = schicht_zukunft(&w, f3).await;
+
+    let a = plane(&w, id1, Some(w.f2)).await;
+    assert!(a.planung_warnungen.is_empty(), "{:?}", a.planung_warnungen);
+    let a = plane(&w, id3, Some(w.f2)).await;
+    assert_eq!(a.abloesende_einheit_id, Some(w.f2), "gelingt trotzdem");
+    assert_eq!(
+        a.planung_warnungen,
+        vec![crate::abloesung::AbloesungPlanungWarnung {
+            art: crate::abloesung::AbloesungWarnungArt::SchonGeplant,
+            einheit_id: w.f2,
+            einheit_name: "Florian 2".into(),
+            abloesung_id: Some(id1),
+            abloesung_einheit_name: Some("Florian 1".into()),
+            seit_at: None,
+        }]
+    );
+
+    // f3 hat selbst eine laufende Schicht: als Ablöser von f1 „steht selbst im Einsatz“.
+    let a = plane(&w, id1, Some(f3)).await;
+    assert_eq!(
+        a.planung_warnungen,
+        vec![crate::abloesung::AbloesungPlanungWarnung {
+            art: crate::abloesung::AbloesungWarnungArt::ImEinsatz,
+            einheit_id: f3,
+            einheit_name: "Florian 3".into(),
+            abloesung_id: None,
+            abloesung_einheit_name: None,
+            seit_at: Some(BEGINN_ZUKUNFT.into()),
+        }]
+    );
+    // Die Liste trägt dieselben Warnungen.
+    let l = liste(&w.pool, w.e, Some(AbloesungStatus::Laufend), T0)
+        .await
+        .unwrap();
+    let s1 = l.iter().find(|s| s.id == id1).unwrap();
+    assert_eq!(s1.planung_warnungen, a.planung_warnungen);
+}
+
 // ── Vollzug mit Liste, Fan-out und Abschnittsübergabe (LLH-1132) ────────────────────────────
 
 /// Abschnitt einer Einheit, wie ihn die Gliederung führt.
@@ -2358,7 +2704,9 @@ async fn abloeser_als_liste_planen() {
     assert_eq!(planen(vec![f3, w.f2]).await.1, None, "unverändert");
 
     let mut conn = w.pool.acquire().await.unwrap();
-    release_einheit_tx(&mut conn, f3, w.b, T0).await.unwrap();
+    release_einheit_tx(&mut conn, w.e, f3, w.b, T0)
+        .await
+        .unwrap();
     drop(conn);
     let s = laden(&w.pool, w.e, a.id, T0).await.unwrap();
     assert_eq!(

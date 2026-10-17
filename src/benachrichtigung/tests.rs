@@ -110,6 +110,21 @@ async fn detail_liest_nur_retain_spalten() {
             "abloesung: {tabelle}.{spalte} ist kein Retain-Wert"
         );
     }
+    // Hinweise zur ablösenden Einheit (LLH-1131): beide Einheiten der Schicht.
+    for (tabelle, spalte) in text::DETAIL_ABLOESER_SPALTEN {
+        assert!(
+            matches!(
+                klassifikation_von(tabelle, spalte),
+                Some(Klassifikation::Retain(_))
+            ),
+            "abloeser: {tabelle}.{spalte} ist kein Retain-Wert"
+        );
+        let sql = format!("SELECT {spalte} FROM {tabelle} LIMIT 0");
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_else(|e| panic!("{tabelle}.{spalte}: {e}"));
+    }
     for typ in BenachrichtigungBezugTyp::ALLE {
         let Some((tabelle, spalte)) = text::detail_quelle(typ) else {
             continue;
@@ -494,6 +509,110 @@ async fn detail_der_abloesung_nennt_einheit_und_uhrzeit_in_der_anzeigezone() {
         detail(BenachrichtigungArt::AbloesungFaellig).await,
         "Florian 1, 13:30"
     );
+}
+
+/// Hinweise zur ablösenden Einheit (LLH-1131): der Titel kommt aus dem Bezug, das Detail nennt
+/// beide Einheiten der Schicht, nach entfallener Planung nur die abzulösende. Beide neuen Arten
+/// sind Hinweise, keine Alarme, und springen in die Ablösung.
+#[tokio::test]
+async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_einheiten() {
+    let pool = crate::db::test_pool().await;
+    let (b, e) = setup(&pool).await;
+    let einheit = |name: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+            )
+            .bind(e)
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let rs = einheit("Rettungsstaffel").await;
+    let rs2 = einheit("2. Rettungsstaffel").await;
+    let schicht: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+             rhythmus_quelle, faellig_at, abloesende_einheit_id, angelegt_von_id) \
+         VALUES (?, ?, '2026-09-22 09:30:00', 240, 'einheit', '2026-09-22 13:30:00', ?, ?) \
+         RETURNING id",
+    )
+    .bind(e)
+    .bind(rs)
+    .bind(rs2)
+    .bind(b)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let art = BenachrichtigungArt::AbloesungAbloeser;
+    let t = text::bilden(
+        &pool,
+        e,
+        art,
+        Bezug::neu(BenachrichtigungBezugTyp::AbloeserEingetroffen, schicht),
+    )
+    .await
+    .unwrap();
+    assert_eq!(t.titel, "Ablösende Einheit eingetroffen");
+    assert_eq!(
+        t.detail.as_deref(),
+        Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel")
+    );
+    assert_eq!(t.pfad, format!("/einsaetze/{e}/abloesung"));
+    for (typ, titel) in [
+        (
+            BenachrichtigungBezugTyp::AbloeserAlarmiert,
+            "Ablösende Einheit alarmiert",
+        ),
+        (
+            BenachrichtigungBezugTyp::AbloeserBrEingetroffen,
+            "Ablösende Einheit im Bereitstellungsraum eingetroffen",
+        ),
+        (
+            BenachrichtigungBezugTyp::AbloeserAbgerufen,
+            "Ablösende Einheit abgerufen",
+        ),
+    ] {
+        let t = text::bilden(&pool, e, art, Bezug::neu(typ, schicht))
+            .await
+            .unwrap();
+        assert_eq!(t.titel, titel);
+    }
+    sqlx::query("UPDATE einsatz_abloesung SET abloesende_einheit_id = NULL WHERE id = ?")
+        .bind(schicht)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let t = text::bilden(
+        &pool,
+        e,
+        art,
+        Bezug::neu(BenachrichtigungBezugTyp::AbloeserEntfallen, schicht),
+    )
+    .await
+    .unwrap();
+    assert_eq!(t.titel, "Planung der ablösenden Einheit entfallen");
+    assert_eq!(t.detail.as_deref(), Some("Ablösung für Rettungsstaffel"));
+
+    // Der Planungshinweis nennt Einheit und Fälligkeit wie Vorwarnung und Fälligkeit.
+    let t = text::bilden(
+        &pool,
+        e,
+        BenachrichtigungArt::AbloesungPlanung,
+        Bezug::neu(BenachrichtigungBezugTyp::Abloesung, schicht),
+    )
+    .await
+    .unwrap();
+    assert_eq!(t.titel, "Keine ablösende Einheit geplant");
+    assert_eq!(t.detail.as_deref(), Some("Rettungsstaffel, 15:30"));
+    for a in [
+        BenachrichtigungArt::AbloesungPlanung,
+        BenachrichtigungArt::AbloesungAbloeser,
+    ] {
+        assert_eq!(a.stufe(), BenachrichtigungStufe::Hinweis);
+    }
 }
 
 /// Dasselbe für die Detailzeile eines Nachforderungs-Status (LLH-1216), die zwei Spalten liest:

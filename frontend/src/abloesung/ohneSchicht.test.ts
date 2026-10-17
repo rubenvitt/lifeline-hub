@@ -35,6 +35,7 @@ const schicht = (over: Partial<Abloesung> & { einheit_id: number }): Abloesung =
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
   abschnitt_uebergeben: false,
+  planung_warnungen: [],
   angelegt_at: '2026-10-17 06:00:00',
   ...over,
 });

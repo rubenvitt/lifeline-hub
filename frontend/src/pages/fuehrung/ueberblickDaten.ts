@@ -559,7 +559,13 @@ export function naechsteMarken(
     }
   }
   for (const e of erinnerungen) {
-    if (e.bezug_typ === 'abloesung' || e.bezug_typ === 'abloesung_vorwarnung') continue;
+    if (
+      e.bezug_typ === 'abloesung' ||
+      e.bezug_typ === 'abloesung_vorwarnung' ||
+      e.bezug_typ === 'abloesung_planung'
+    ) {
+      continue;
+    }
     if (e.status === 'offen' && zeitpunkt(e.faellig_at)) {
       roh.push({
         key: `e-${e.id}`,

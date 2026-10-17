@@ -8565,4 +8565,108 @@ mod tests {
             .unwrap();
         assert_eq!(kopie, 0, "die Kopie fällt mit dem Einsatz");
     }
+
+    /// LLH-1131: `benachrichtigung` bekommt die Hinweise der Ablösung. Zeilen samt ids, Spalten,
+    /// Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der `art`-Liste, die
+    /// neuen Arten gehen durch, eine unbekannte nicht, und die Kaskade am Einsatz hält.
+    #[tokio::test]
+    async fn migration_0214_baut_benachrichtigung_mit_den_hinweisen_der_abloesung_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 213).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO benachrichtigung (id, einsatz_id, benutzer_id, art, stufe, bezug_typ, \
+                bezug_id, ausloeser_id, erstellt_at, quittiert_at) VALUES \
+             (3, {e}, {b}, 'abloesung_faellig', 'alarm', 'abloesung', 7, NULL, \
+              '2026-10-17 08:00:00', NULL), \
+             (9, {e}, {b}, 'auftrag_erteilt', 'hinweis', 'auftrag', 2, {b}, \
+              '2026-10-17 08:05:00', '2026-10-17 08:06:00');"
+        )))
+        .execute(&pool)
+        .await
+        .unwrap();
+        let alle = "SELECT id, art, stufe, bezug_typ, bezug_id, ausloeser_id, erstellt_at, \
+                           quittiert_at FROM benachrichtigung ORDER BY id";
+        type Zeile = (
+            i64,
+            String,
+            String,
+            String,
+            i64,
+            Option<i64>,
+            String,
+            Option<String>,
+        );
+        let vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        let schema_vorher = schema_von(&pool, "benachrichtigung").await;
+        let ddl_vorher = ddl_ohne_namen(&pool, "benachrichtigung").await;
+        assert!(
+            sqlx::query(
+                "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
+                    bezug_id, erstellt_at) \
+                 VALUES (?, ?, 'abloesung_planung', 'hinweis', 'abloesung', 7, 'x')"
+            )
+            .bind(e)
+            .bind(b)
+            .execute(&pool)
+            .await
+            .is_err(),
+            "vor 0214 kennt der CHECK die neue Art nicht"
+        );
+
+        migriere_bis(&pool, 214).await;
+
+        let nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            nachher, vorher,
+            "jede Zeile übersteht den Neubau mit ihrer id"
+        );
+        assert_eq!(schema_von(&pool, "benachrichtigung").await, schema_vorher);
+        assert_eq!(
+            ddl_ohne_namen(&pool, "benachrichtigung").await.replacen(
+                " 'abloesung_planung', 'abloesung_abloeser',",
+                "",
+                1
+            ),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im art-CHECK"
+        );
+        for art in ["abloesung_planung", "abloesung_abloeser"] {
+            sqlx::query(
+                "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
+                    bezug_id, erstellt_at) VALUES (?, ?, ?, 'hinweis', 'abloeser_eingetroffen', 7, 'x')",
+            )
+            .bind(e)
+            .bind(b)
+            .bind(art)
+            .execute(&pool)
+            .await
+            .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        assert!(sqlx::query(
+            "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
+                bezug_id, erstellt_at) VALUES (?, ?, 'erfunden', 'hinweis', 'abloesung', 7, 'x')"
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .is_err());
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'benachrichtigung_neu'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
+    }
 }

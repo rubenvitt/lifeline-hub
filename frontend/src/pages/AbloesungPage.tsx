@@ -29,6 +29,8 @@ import {
   type EinheitOption,
 } from '../abloesung/AbloesungDialoge';
 import { formatDauer } from '../abloesung/dauer';
+import { planungWarnungText } from '../abloesung/planungWarnung';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { countFaellige } from '../abloesung/einstufung';
 import {
   BEGINN_DER_PERIODE,
@@ -131,6 +133,7 @@ export default function AbloesungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { message } = App.useApp();
+  const { konventionen } = useAnzeigeKonventionen();
   const qc = useQueryClient();
   const { token } = useRollen();
   const jetzt = useUhr();
@@ -410,6 +413,13 @@ export default function AbloesungPage() {
     // Banner.
     onSuccess: async (a, { body }) => {
       message.success('Schicht geändert');
+      // Plausibilität beim Planen (LLH-1131): die Planung gilt, der Server warnt nur.
+      // Geplant wird als Liste (LLH-1132); die Einzelangabe ist Bestand.
+      if (body.abloesende_einheit_id != null || (body.abloeser_ids?.length ?? 0) > 0) {
+        for (const w of a.planung_warnungen) {
+          message.warning(planungWarnungText(w, konventionen));
+        }
+      }
       if (body.rhythmus_minuten === undefined && body.beginn_at === undefined) {
         void invalidiere();
         return;

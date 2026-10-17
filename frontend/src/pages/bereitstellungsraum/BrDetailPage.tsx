@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -23,7 +23,14 @@ import {
   einsaetzePfad,
   einsatzPfad,
 } from '../../routing/deeplinks';
-import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
+import {
+  ladeBr,
+  setzeBrStatus,
+  storniereBr,
+  belegeBr,
+  hebtBrAbrufAuf,
+} from '../../api/einsatzBereitstellungsraum';
+import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -33,6 +40,7 @@ import type {
   BrFahrzeugKurz,
   BrStatus,
   Einheit,
+  Einsatzabschnitt,
   EinsatzFahrzeug,
 } from '../../api/types';
 import KraefteOhneBrSidebar, {
@@ -53,7 +61,7 @@ import {
 } from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
-import { brStatus } from '../../theme/statusFarben';
+import { brAbgerufen, brStatus } from '../../theme/statusFarben';
 import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import BrBearbeitenModal from './BrBearbeitenModal';
@@ -80,6 +88,15 @@ import {
   zuflussText,
 } from './belegungZufluss';
 import { ordnungsschluessel, seitText, wartezeitMinuten } from './brBelegungKern';
+import {
+  abrufAngabe,
+  abrufFolge,
+  abrufZeilenId,
+  splitNachAbruf,
+  type AbrufZeile,
+} from './abrufKern';
+import AbrufDialog, { type AbrufZiel } from './AbrufDialog';
+import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
 import BrVerlauf from './BrVerlauf';
 import EintreffenDialog from './EintreffenDialog';
 import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUebernommenMarke';
@@ -87,6 +104,7 @@ import dayjs from 'dayjs';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
+const KEINE_ABSCHNITTE: Einsatzabschnitt[] = [];
 
 /** Funkrufnamen der Fahrzeuge einer Einheit, in fester Folge, durch „ · “ getrennt. */
 function funkrufnamen(fahrzeuge: readonly BrEinheitFahrzeug[]): string {
@@ -100,18 +118,30 @@ function funkrufnamen(fahrzeuge: readonly BrEinheitFahrzeug[]): string {
     .join(' · ');
 }
 
-/** Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. */
-type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: string };
+/**
+ * Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. `ausruecken`:
+ * der Austritt einer abgerufenen Kraft ist ihr Ausrücken (LLH-1085).
+ */
+type BelegungMitName = {
+  daten: Parameters<typeof belegeBr>[2];
+  bezeichnung: string;
+  ausruecken?: boolean;
+};
 
 /**
- * Quittung der Belegung mit Handlung und Objekt (LFH-948). Dieselbe Mutation weist zu und
- * entfernt; ein bloßes „Erfolgreich“ sagte nicht, was geschehen ist.
+ * Quittung der Belegung mit Handlung und Objekt (LFH-948). Dieselbe Mutation weist zu, trägt aus
+ * und bucht das Ausrücken; ein bloßes „Erfolgreich“ sagte nicht, was geschehen ist.
  */
 export function belegungsQuittung(b: BelegungMitName): string {
   const objekt = belegungsObjekt(b);
-  return b.daten.art === 'eintritt'
-    ? `${objekt} dem BR zugewiesen`
-    : `${objekt} aus dem BR entfernt`;
+  if (b.daten.art === 'eintritt') return `${objekt} dem BR zugewiesen`;
+  return b.ausruecken ? `${objekt} ausgerückt` : `${objekt} aus dem BR ausgetragen`;
+}
+
+/** Was an der Zeile scheiterte, als Ersatztext ohne Servermeldung. */
+function belegungsFallback(b: BelegungMitName): string {
+  if (b.daten.art === 'eintritt') return 'Zuweisen fehlgeschlagen';
+  return b.ausruecken ? 'Ausrücken fehlgeschlagen' : 'Austragen fehlgeschlagen';
 }
 
 function belegungsObjekt(b: BelegungMitName): string {
@@ -120,7 +150,12 @@ function belegungsObjekt(b: BelegungMitName): string {
 
 /** Überschrift einer abgelehnten Belegung, deren Zeile nicht mehr steht. */
 function belegungsAblehnung(b: BelegungMitName): string {
-  const nicht = b.daten.art === 'eintritt' ? 'nicht zugewiesen' : 'nicht entfernt';
+  const nicht =
+    b.daten.art === 'eintritt'
+      ? 'nicht zugewiesen'
+      : b.ausruecken
+        ? 'nicht ausgerückt'
+        : 'nicht ausgetragen';
   return `${belegungsObjekt(b)} ${nicht}`;
 }
 
@@ -135,6 +170,9 @@ export default function BrDetailPage() {
   // und Stornieren, keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
   const verwalten = darf('br-verwalten');
+  // Abrufen und Zurücknehmen (LLH-1085) sind Führungsentscheidungen; das Gerät bucht nur das
+  // Ausrücken (`frontend/src/geraet/AGENTS.md`, „Bereitstellungsraum“).
+  const abrufen = darf('br-abrufen');
   const { token, rollen } = useRollen();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
@@ -177,6 +215,14 @@ export default function BrDetailPage() {
     queryFn: () => listEinsatzMaterial(einsatzId),
     enabled: materialFrei,
   });
+  // Ziel-Abschnitt des Abrufs (LLH-1085): die Liste nur für eine Person mit Freigabe
+  // Einsatzabschnitte, vorab geladen, damit der Dialog den Abschnitt des Raums mit Namen vorbelegt.
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled:
+      canLoadMaterial && abrufen && istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data),
+  });
 
   // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier. Ein
   // Gerät merkt nichts auf der Platte (`frontend/src/geraet/AGENTS.md`, „Nichts auf der Platte“).
@@ -205,18 +251,19 @@ export default function BrDetailPage() {
   const uhr = useUhr(60_000);
   const jetzt = druckt ? dayjs() : uhr;
   const { formatZeitKurz } = useAnzeigeKonventionen();
-  const einheitenZufluss = useBelegungZufluss(
-    detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
-    einheitFolge,
-    halten,
-    brId,
+  // Abgerufene Kräfte stehen getrennt oben (LLH-1085), in derselben Halte-Fläche: wer gerade auf
+  // eine Zeile zielt, dem schiebt auch ein fremder Abruf nichts darunter.
+  const teilung = useMemo(
+    () =>
+      splitNachAbruf(
+        detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
+        detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
+      ),
+    [detailQuery.data],
   );
-  const fahrzeugeZufluss = useBelegungZufluss(
-    detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
-    fahrzeugFolge,
-    halten,
-    brId,
-  );
+  const abgerufenZufluss = useBelegungZufluss(teilung.abgerufen, abrufFolge, halten, brId);
+  const einheitenZufluss = useBelegungZufluss(teilung.einheiten, einheitFolge, halten, brId);
+  const fahrzeugeZufluss = useBelegungZufluss(teilung.fahrzeuge, fahrzeugFolge, halten, brId);
 
   /*
    * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
@@ -244,6 +291,8 @@ export default function BrDetailPage() {
   const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
   // „Eintreffen buchen“ (LLH-1075, design.md D14): am Gerät nur mit `br-eintreffen`.
   const [eintreffenOffen, setEintreffenOffen] = useState(false);
+  // Die Kraft, die der Abruf-Dialog gerade abruft (LLH-1085); `null` = zu.
+  const [abrufZiel, setAbrufZiel] = useState<AbrufZiel | null>(null);
   const nichtInBetriebId = useId();
 
   const zeilen = useZeilenFehler<string>();
@@ -268,12 +317,29 @@ export default function BrDetailPage() {
       }
       invalidate();
     },
-    onError: (e, belegung) =>
-      zeilen.melde(
-        schluesselVon(belegung),
-        e,
-        belegung.daten.art === 'eintritt' ? 'Zuweisen fehlgeschlagen' : 'Entfernen fehlgeschlagen',
-      ),
+    onError: (e, belegung) => zeilen.melde(schluesselVon(belegung), e, belegungsFallback(belegung)),
+  });
+
+  // Abruf zurücknehmen (LLH-1085): die Kraft ist danach wieder bereitgestellt. Unterstellung und
+  // Auftrag bleiben; der Grund einer Ablehnung steht an der Zeile wie beim Austragen.
+  const ruecknahmeMut = useMutation({
+    mutationFn: (z: Pick<AbrufZeile, 'objekt_typ' | 'objekt_id' | 'name'>) =>
+      hebtBrAbrufAuf(einsatzId, brId, { objekt_typ: z.objekt_typ, objekt_id: z.objekt_id }),
+    onMutate: (z) => zeilen.beginne(brObjektSchluessel(z.objekt_typ, z.objekt_id)),
+    onSuccess: (_antwort, z) => {
+      message.success({ content: `Abruf von ${z.name} zurückgenommen`, key: 'br-belegung' });
+      // Die Kraft und die mit ihr abgerufenen Untereinheiten stehen sofort wieder bereit, auch
+      // wenn die Schleuse hält.
+      (z.objekt_typ === 'einheit' ? einheitenZufluss : fahrzeugeZufluss).merkeEigene(z.objekt_id);
+      if (z.objekt_typ === 'einheit') {
+        teilung.abgerufen
+          .filter((a) => a.objekt_typ === 'einheit' && a.abruf.mit_objekt_id === z.objekt_id)
+          .forEach((a) => einheitenZufluss.merkeEigene(a.objekt_id));
+      }
+      invalidate();
+    },
+    onError: (e, z) =>
+      zeilen.melde(brObjektSchluessel(z.objekt_typ, z.objekt_id), e, 'Zurücknehmen fehlgeschlagen'),
   });
 
   // Status und Storno teilen sich den Seitenhinweis: die zuletzt begonnene Handlung zählt, ihr
@@ -302,6 +368,7 @@ export default function BrDetailPage() {
     leereZeilen();
     setBearbeitenOffen(false);
     setEintreffenOffen(false);
+    setAbrufZiel(null);
   }, [brId, statusReset, stornoReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
@@ -347,17 +414,20 @@ export default function BrDetailPage() {
     });
   }
 
-  function onEntfernenEinheit(einheit: { id: number; name: string }) {
+  /**
+   * Austritt einer Kraft: bei einer abgerufenen ihr Ausrücken (das ETB nennt dann das Ziel des
+   * Abrufs, ihr Verband geht mit), sonst das Austragen (Fehlbuchung, umkehrbar).
+   */
+  function austrittBuchen(
+    typ: 'einheit' | 'fahrzeug',
+    objektId: number,
+    name: string,
+    ausruecken: boolean,
+  ) {
     belegungMut.mutate({
-      daten: { objekt_typ: 'einheit', objekt_id: einheit.id, art: 'austritt' },
-      bezeichnung: einheit.name,
-    });
-  }
-
-  function onEntfernenFahrzeug(fahrzeug: { id: number; funkrufname: string }) {
-    belegungMut.mutate({
-      daten: { objekt_typ: 'fahrzeug', objekt_id: fahrzeug.id, art: 'austritt' },
-      bezeichnung: fahrzeug.funkrufname,
+      daten: { objekt_typ: typ, objekt_id: objektId, art: 'austritt' },
+      bezeichnung: name,
+      ausruecken,
     });
   }
 
@@ -438,6 +508,118 @@ export default function BrDetailPage() {
     const g = zeilen.grund(brObjektSchluessel(typ, objektId));
     return g && <ZeilenFehler fehler={g.fehler} fallback={g.fallback} />;
   };
+  const isRuecknahmePending = (typ: 'einheit' | 'fahrzeug', objektId: number) =>
+    ruecknahmeMut.isPending &&
+    ruecknahmeMut.variables?.objekt_typ === typ &&
+    ruecknahmeMut.variables.objekt_id === objektId;
+
+  /**
+   * Aktionen einer bereitgestellten Kraft (LLH-1085): „Abrufen“ ist die Hauptaktion; „Abrufen und
+   * austragen“ (Lage ohne Einweiser) und „Austragen“ (Fehlbuchung, umkehrbar) sind Nebenwege im
+   * Aktionsmenü, kein roter Hauptknopf. Am Gerät bleibt nur „Austragen“, ebenfalls im Menü: so
+   * steht es an Desktop und Tablet an derselben Stelle.
+   */
+  function bereitAktionen(typ: 'einheit' | 'fahrzeug', objektId: number, name: string) {
+    if (schreibgeschuetzt) return [];
+    type Weg = 'abrufen-austragen' | 'austragen';
+    const weitere: MenueEintrag<Weg>[] = [
+      ...(abrufen ? [{ key: 'abrufen-austragen' as const, label: 'Abrufen und austragen' }] : []),
+      { key: 'austragen', label: 'Austragen' },
+    ];
+    const ziel = { objekt_typ: typ, objekt_id: objektId, name };
+    return [
+      ...(abrufen
+        ? [
+            <Button
+              key="abrufen"
+              aria-label={`${name} abrufen`}
+              onClick={() => setAbrufZiel({ ...ziel, austragen: false })}
+            >
+              Abrufen
+            </Button>,
+          ]
+        : []),
+      <MenueAusloeser<Weg>
+        key="weitere"
+        eintraege={weitere}
+        zugaenglicherName={`Weitere Aktionen zu ${name}`}
+        laeuft={laeuft(typ, objektId)}
+        onWahl={(weg) =>
+          weg === 'austragen'
+            ? austrittBuchen(typ, objektId, name, false)
+            : setAbrufZiel({ ...ziel, austragen: true })
+        }
+      />,
+    ];
+  }
+
+  /** Aktionen einer abgerufenen Kraft: „Ausrücken buchen“ (auch am Gerät), „Abruf zurücknehmen“. */
+  function abrufAktionen(z: AbrufZeile) {
+    if (schreibgeschuetzt) return [];
+    return [
+      <Button
+        key="ausruecken"
+        type="primary"
+        aria-label={`Ausrücken buchen für ${z.name}`}
+        loading={laeuft(z.objekt_typ, z.objekt_id)}
+        onClick={() => austrittBuchen(z.objekt_typ, z.objekt_id, z.name, true)}
+      >
+        Ausrücken buchen
+      </Button>,
+      ...(abrufen
+        ? [
+            <Button
+              key="zuruecknehmen"
+              aria-label={`Abruf zurücknehmen für ${z.name}`}
+              loading={isRuecknahmePending(z.objekt_typ, z.objekt_id)}
+              onClick={() => ruecknahmeMut.mutate(z)}
+            >
+              Abruf zurücknehmen
+            </Button>,
+          ]
+        : []),
+    ];
+  }
+
+  /** Name, Herkunft, Typ, Stärke und Fahrzeuge einer Einheit: in beiden Listen gleich. */
+  const einheitAngaben = (e: BrEinheitKurz) => (
+    <>
+      <span>{e.name}</span>
+      {/* Herkunft (LLH-1075): offen „nicht übernommen“, danach neutral. */}
+      {e.nicht_uebernommen_seit != null ? (
+        <NichtUebernommenMarke />
+      ) : (
+        e.unangemeldet && <UnangemeldetMarke />
+      )}
+      {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
+      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+        <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
+      </span>
+      {e.fahrzeuge.length > 0 && (
+        <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
+          {funkrufnamen(e.fahrzeuge)}
+        </span>
+      )}
+    </>
+  );
+  const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
+    <>
+      <span style={monoStil(13)}>{f.funkrufname}</span>
+      {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+    </>
+  );
+  /** Name der Einheit, mit der eine Untereinheit abgerufen wurde (Verband). */
+  const mitEinheit = (z: AbrufZeile) => {
+    const id = z.abruf.mit_objekt_id;
+    if (id == null) return undefined;
+    return br.einheiten.find((e) => e.id === id)?.name ?? einheitVon.get(id)?.name;
+  };
+  // „Abgerufen“ steht, solange der Raum in Betrieb ist oder noch Abgerufene trägt: so hat das
+  // Banner einer gehaltenen Zeile seinen Platz, und ein erster Abruf schiebt keinen Kopf ein.
+  const isAbgerufenSichtbar =
+    inBetrieb ||
+    abgerufenZufluss.sichtbar.length > 0 ||
+    abgerufenZufluss.zurueckgehalten.length > 0;
 
   return (
     <EinsatzSeite
@@ -635,9 +817,55 @@ export default function BrDetailPage() {
               />
             </Kennzahlenband>
           </div>
-          {/* Die Halte-Fläche umfasst BEIDE Listen: eine eingeschobene Einheit schöbe auch die
-              Fahrzeugliste darunter. */}
+          {/* Die Halte-Fläche umfasst ALLE Listen: eine eingeschobene Zeile schöbe auch die Listen
+              darunter. */}
           <div data-testid="br-belegung" {...flaeche}>
+            {/* Abgerufen (LLH-1085): oben und mit Achtungsrand abgesetzt, damit der Einweiser
+                sieht, wer ausrücken soll. Die Zeilen zählen weiter in Stärke und Kennzahlen. */}
+            {isAbgerufenSichtbar && (
+              <div data-testid="br-abgerufen">
+                <SektionHeader
+                  titel="Abgerufen"
+                  extra={bannerPlatz(abgerufenZufluss, ['neu abgerufen', 'neu abgerufen'])}
+                />
+                <div
+                  style={
+                    abgerufenZufluss.sichtbar.length > 0
+                      ? {
+                          borderInlineStart: `3px solid ${rollen.achtung}`,
+                          paddingInlineStart: token.paddingSM,
+                        }
+                      : undefined
+                  }
+                >
+                  <Liste
+                    style={{ marginBottom: abstand.lg }}
+                    dataSource={abgerufenZufluss.sichtbar}
+                    emptyText="Keine Kraft abgerufen"
+                    renderItem={(z) => (
+                      // Unter `md` stehen die zwei Knöpfe unter der Angabe (LFH-978): rechts
+                      // daneben ließen sie dem Ziel auf 390 px nur ein Wort je Zeile.
+                      <ListenEintrag actions={abrufAktionen(z)} gestapelt={!breit}>
+                        <Space wrap>
+                          {z.einheit
+                            ? einheitAngaben(z.einheit)
+                            : z.fahrzeug && fahrzeugAngaben(z.fahrzeug)}
+                        </Space>
+                        <div data-lfh="br-abruf">
+                          <Space wrap size={token.marginXS}>
+                            <StatusTag darstellung={brAbgerufen} />
+                            <span style={monoStil(12)}>
+                              {abrufAngabe(formatZeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
+                            </span>
+                          </Space>
+                        </div>
+                        {zeilenGrund(z.objekt_typ, z.objekt_id)}
+                      </ListenEintrag>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
             <SektionHeader
               titel="Bereitgestellte Einheiten"
               extra={bannerPlatz(einheitenZufluss, ['neue Einheit', 'neue Einheiten'])}
@@ -647,41 +875,9 @@ export default function BrDetailPage() {
               dataSource={einheitenZufluss.sichtbar}
               emptyText="Keine Einheiten bereitgestellt"
               renderItem={(e) => (
-                <ListenEintrag
-                  actions={
-                    !schreibgeschuetzt
-                      ? [
-                          <Button
-                            key="entfernen"
-                            danger
-                            onClick={() => onEntfernenEinheit(e)}
-                            loading={laeuft('einheit', e.id)}
-                          >
-                            entfernen
-                          </Button>,
-                        ]
-                      : []
-                  }
-                >
+                <ListenEintrag actions={bereitAktionen('einheit', e.id, e.name)}>
                   <Space wrap>
-                    <span>{e.name}</span>
-                    {/* Herkunft (LLH-1075): offen „nicht übernommen“, danach neutral. */}
-                    {e.nicht_uebernommen_seit != null ? (
-                      <NichtUebernommenMarke />
-                    ) : (
-                      e.unangemeldet && <UnangemeldetMarke />
-                    )}
-                    {einheitVon.get(e.id)?.typ_label && (
-                      <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>
-                    )}
-                    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-                      <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
-                    </span>
-                    {e.fahrzeuge.length > 0 && (
-                      <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
-                        {funkrufnamen(e.fahrzeuge)}
-                      </span>
-                    )}
+                    {einheitAngaben(e)}
                     {seitAngabe(e.seit_at)}
                   </Space>
                   {zeilenGrund('einheit', e.id)}
@@ -697,27 +893,9 @@ export default function BrDetailPage() {
               dataSource={fahrzeugeZufluss.sichtbar}
               emptyText="Keine Fahrzeuge bereitgestellt"
               renderItem={(f) => (
-                <ListenEintrag
-                  actions={
-                    !schreibgeschuetzt
-                      ? [
-                          <Button
-                            key="entfernen"
-                            danger
-                            onClick={() => onEntfernenFahrzeug(f)}
-                            loading={laeuft('fahrzeug', f.id)}
-                          >
-                            entfernen
-                          </Button>,
-                        ]
-                      : []
-                  }
-                >
+                <ListenEintrag actions={bereitAktionen('fahrzeug', f.id, f.funkrufname)}>
                   <Space wrap>
-                    <span style={monoStil(13)}>{f.funkrufname}</span>
-                    {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
-                      <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
-                    )}
+                    {fahrzeugAngaben(f)}
                     {seitAngabe(f.seit_at)}
                   </Space>
                   {zeilenGrund('fahrzeug', f.id)}
@@ -781,6 +959,26 @@ export default function BrDetailPage() {
             // Die eigene Buchung steht sofort, auch wenn die Schleuse hält (wie `belegungMut`).
             if (ergebnis.einheit_id != null) einheitenZufluss.merkeEigene(ergebnis.einheit_id);
             else ergebnis.fahrzeug_ids.forEach((f) => fahrzeugeZufluss.merkeEigene(f));
+          }}
+        />
+      )}
+      {abrufen && (
+        <AbrufDialog
+          einsatzId={einsatzId}
+          br={br}
+          ziel={abrufZiel}
+          onClose={() => setAbrufZiel(null)}
+          einheiten={einheitenQuery.data ?? []}
+          abschnitte={abschnitteQuery.data ?? KEINE_ABSCHNITTE}
+          freigaben={freigabenQuery.data}
+          onAbgerufen={(ziel, ergebnis) => {
+            // Die eigene Zeile steht sofort unter „Abgerufen“, auch wenn die Schleuse hält; ein
+            // gleich ausgetragener Abruf hinterlässt keine.
+            if (ziel.austragen) return;
+            abgerufenZufluss.merkeEigene(abrufZeilenId(ziel.objekt_typ, ziel.objekt_id));
+            ergebnis.mitgenommen.forEach((id) =>
+              abgerufenZufluss.merkeEigene(abrufZeilenId('einheit', id)),
+            );
           }}
         />
       )}
