@@ -15,6 +15,9 @@ import {
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import type { Dayjs } from 'dayjs';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -936,5 +939,63 @@ describe('ErfassungsFormular — Zusammenfassung am Knopf (LLH-1049)', () => {
     expect(screen.getByRole('button', { name: 'Erfassen' })).not.toHaveAttribute(
       'aria-describedby',
     );
+  });
+});
+
+/**
+ * Die Zeiteingabe in einer Erfassung (LLH-1070, Review): eine unlesbare Zeit sperrt auch die
+ * Kürzel, Strg/⌘+S übernimmt den getippten Text, Escape setzt nur das Feld zurück.
+ */
+describe('ErfassungsFormular — mit Zeiteingabe', () => {
+  function ZeitHarness(props: {
+    onErfassen: (w: { zeit?: Dayjs | null }) => Promise<unknown>;
+    onAbbrechen?: () => void;
+  }) {
+    const [form] = Form.useForm<{ zeit?: Dayjs | null }>();
+    return (
+      <ErfassungsFormular<{ zeit?: Dayjs | null }>
+        form={form}
+        onErfassen={props.onErfassen}
+        onFertig={() => {}}
+        onAbbrechen={props.onAbbrechen}
+        serie
+      >
+        <Form.Item label="Zeit" name="zeit">
+          <ZeitpunktEingabe />
+        </Form.Item>
+      </ErfassungsFormular>
+    );
+  }
+
+  it('Strg+Enter sendet nicht, solange die getippte Zeit unlesbar ist', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitHarness onErfassen={onErfassen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Zeit'), '2460');
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+    expect(screen.getByText('Uhrzeit gibt es nicht')).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('Strg+S übernimmt die getippte Zeit, bevor gespeichert wird', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitHarness onErfassen={onErfassen} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Zeit'), '101430okt26');
+    await nutzer.keyboard('{Control>}s{/Control}');
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(alsBackendZeit(onErfassen.mock.lastCall![0].zeit)).toBe('2026-10-10 12:30:00');
+  });
+
+  it('Escape mit getippter Zeit setzt nur das Feld zurück, der Dialog bleibt', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ZeitHarness onErfassen={vi.fn().mockResolvedValue(undefined)} onAbbrechen={onAbbrechen} />,
+    );
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByLabelText('Zeit'), '0900');
+    await nutzer.keyboard('{Escape}');
+    expect(screen.getByLabelText('Zeit')).toHaveValue('');
+    expect(onAbbrechen).not.toHaveBeenCalled();
   });
 });

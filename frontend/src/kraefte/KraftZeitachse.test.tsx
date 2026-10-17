@@ -348,7 +348,7 @@ describe('KraftZeitachse — Nachtrag in der Anzeigezone (LFH-692)', () => {
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
     await waitFor(() => expect(feld).toHaveValue('010130okt26'));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const kalender = await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });
     const zelle = (tag: string) => kalender.querySelector(`td[title="${tag}"]`);
     await waitFor(() => expect(zelle('01.10.2026')).not.toBeNull());

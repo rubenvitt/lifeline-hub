@@ -382,6 +382,31 @@ describe('ZeitfensterDialog — anlegen', () => {
     expect(kraefte).toHaveValue('150');
   });
 
+  it('nur der Beginn: „Anlegen“ nennt das fehlende Ende und sendet nichts (Review LLH-1070)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <ZeitfensterDialog
+        einsatzId={1}
+        freigaben={FREIGABEN}
+        jetzt={JETZT}
+        laeuft={false}
+        fehler={null}
+        onSchliessen={vi.fn()}
+        modus={{ art: 'anlegen', onErfassen }}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+    const start = within(dialog).getByRole('textbox', { name: 'Beginn' });
+    await userEvent.type(start, '2026-09-24 12:00');
+    await userEvent.tab();
+    await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '180');
+    await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '70');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await within(dialog).findByText('Bitte Beginn und Ende angeben')).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
   it('eine Ablehnung (422) lässt die Felder stehen und zeigt den Grund im Dialog', async () => {
     const fehler = new ApiError(422, 'Das Ende muss nach dem Beginn liegen');
     const onErfassen = vi.fn().mockRejectedValue(fehler);

@@ -328,7 +328,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
   it('die Woche beginnt am Montag', async () => {
     const user = userEvent.setup();
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const kopf = within(await kalender()).getAllByRole('columnheader');
     expect(kopf[0]).toHaveTextContent('Mo');
   });
@@ -343,7 +343,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
         <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} onOpenChange={onOpenChange} />,
       ),
     );
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const k = await kalender();
     await user.click(
       k.querySelector<HTMLElement>('td[title="20.10.2026"] .ant-picker-cell-inner')!,
@@ -361,7 +361,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
     const onChange = vi.fn<(d: Dayjs | null) => void>();
     const user = userEvent.setup();
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const uhr = within(await kalender()).getByRole('textbox', { name: 'Uhrzeit' });
     await user.clear(uhr);
     await user.type(uhr, '2575{Enter}');
@@ -374,14 +374,14 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
   it('das Uhrzeitfeld nimmt den Fokus nur ohne Fingerbedienung (sonst deckte die Tastatur das Blatt)', async () => {
     const user = userEvent.setup();
     const { unmount } = render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const k = await kalender();
     await waitFor(() => expect(within(k).getByRole('textbox', { name: 'Uhrzeit' })).toHaveFocus());
     unmount();
 
     setzeZeigerGrob(true);
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const uhr = within(await kalender()).getByRole('textbox', { name: 'Uhrzeit' });
     expect(uhr).not.toHaveFocus();
   });
@@ -398,7 +398,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
         </div>,
       ),
     );
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     await kalender();
     await user.keyboard('{Escape}');
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
@@ -411,7 +411,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
     const onChange = vi.fn<(d: Dayjs | null) => void>();
     const user = userEvent.setup();
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     await user.click(within(await kalender()).getByRole('button', { name: 'jetzt' }));
     expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-17 13:00:00');
     expect(zeitFeld('Zeit')).toHaveValue('171500okt26');
@@ -430,7 +430,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
         />,
       ),
     );
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     const k = await kalender();
     expect(k.querySelector('td[title="15.07.2026"]')).not.toHaveClass('ant-picker-cell-disabled');
     expect(k.querySelector('td[title="16.07.2026"]')).toHaveClass('ant-picker-cell-disabled');
@@ -439,7 +439,7 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
   it('zeigt die Zone, wenn sie abweicht', async () => {
     const user = userEvent.setup();
     render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
-    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
     expect(within(await kalender()).getByText(/Zeiten in/)).toHaveTextContent(
       `Zeiten in ${BERLIN}`,
     );
@@ -612,6 +612,124 @@ describe('ZeitpunktEingabe — stabil über Re-Render', () => {
     rerender(<Huelle takt={1} />);
     await user.keyboard('{Enter}');
     expect(wire(onChange.mock.lastCall![0])).toBe('2026-07-20 10:00:00');
+  });
+});
+
+describe('ZeitpunktEingabe — Review LLH-1070', () => {
+  mitProzessZone('UTC');
+  uhrSteht('2026-10-17T13:00:00Z');
+
+  it('meldet einen Prüffehler des Form.Item als aria-invalid', async () => {
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={vi.fn()}>
+          <Form.Item name="t" label="Zeit" rules={[{ required: true, message: 'Zeit fehlt' }]}>
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Zeit fehlt');
+    expect(zeitFeld('Zeit')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('der Kalender-Knopf nennt sein Feld', () => {
+    render(mitZone(null, <ZeitraumEingabe />));
+    expect(
+      screen.getByRole('button', { name: 'Kalender und Uhrzeit zu Beginn' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Kalender und Uhrzeit zu Ende' }),
+    ).toBeInTheDocument();
+  });
+
+  it('„Übernehmen“ ohne Änderung behält den Wert samt Sekunden', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-10-17 06:00:17')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    await user.click(within(await kalender()).getByRole('button', { name: 'Übernehmen' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Blättern behält den Tag im Monat (31.10. → November → Oktober bleibt der 31.)', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-10-31 07:00:00')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    await user.click(within(k).getByRole('button', { name: 'Folgemonat' }));
+    await user.click(within(k).getByRole('button', { name: 'Vormonat' }));
+    const uhr = within(k).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '0900');
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-31 08:00:00');
+  });
+
+  it('keine Zukunftstage: kein Folgemonat, und ein Zukunftstag wird nicht übernommen', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          keineZukunftstage
+          defaultValue={alsZeitpunkt('2026-10-20 10:00:00')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    expect(within(k).getByRole('button', { name: 'Folgemonat' })).toBeDisabled();
+    const uhr = within(k).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '0900');
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(within(k).getByText('liegt in der Zukunft')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Zeitraum: Enter im Beginn führt ins leere Ende, statt halb abzusenden', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Form.Item name="zeitraum" label="Zeitraum">
+            <ZeitraumEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '1200');
+    expect(zeitFeld('Ende')).toHaveFocus();
+    expect(onFinish).not.toHaveBeenCalled();
   });
 });
 

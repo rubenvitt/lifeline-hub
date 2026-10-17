@@ -28,7 +28,7 @@ import { Augenbraue } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   empfaengerFelder,
@@ -421,7 +421,16 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="zeitraum"
         label="Zeitraum"
-        rules={[{ required: true, message: 'Bitte Beginn und Ende angeben' }]}
+        required
+        rules={[
+          {
+            // Beide Enden: `required` hielte ein halbes Tupel `[Beginn, null]` für gefüllt.
+            validator: (_, wert: Zeitraum | null | undefined) =>
+              wert?.[0] && wert?.[1]
+                ? Promise.resolve()
+                : Promise.reject(new Error('Bitte Beginn und Ende angeben')),
+          },
+        ]}
       >
         <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />
       </Form.Item>

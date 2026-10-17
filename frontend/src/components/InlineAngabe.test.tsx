@@ -407,7 +407,7 @@ describe('InlineAngabe · Zeiteingabe als Eingabe', () => {
     renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' }));
-    const kalenderKnopf = screen.getByRole('button', { name: 'Kalender und Uhrzeit' });
+    const kalenderKnopf = screen.getByRole('button', { name: /^Kalender und Uhrzeit/ });
     await user.click(kalenderKnopf);
     // Der Kalender nimmt beim Öffnen den Fokus (Uhrzeitfeld); dort landet das erste Escape.
     await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });

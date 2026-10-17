@@ -148,6 +148,8 @@ export interface ZeitpunktEingabeProps {
   id?: string;
   'aria-label'?: string;
   'aria-describedby'?: string;
+  /** `Form.Item` meldet einen Prüffehler darüber; ein eigener Grund des Felds geht vor. */
+  'aria-invalid'?: boolean | 'true' | 'false';
   autoFocus?: boolean;
   style?: CSSProperties;
   className?: string;
@@ -190,6 +192,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     ref,
     'aria-label': ariaLabel,
     'aria-describedby': beschriebenVon,
+    'aria-invalid': ariaInvalid,
     ...daten
   } = props;
   const z = useZeitEingabe();
@@ -206,6 +209,8 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const [offenIntern, setOffenIntern] = useState(false);
   const offen = open ?? offenIntern;
   const hinweisId = useId();
+  /** Name des Felds für den Kalender-Knopf: mehrere Zeitfelder stehen oft nebeneinander. */
+  const feldName = ariaLabel;
   const feldRef = useRef<InputRef | null>(null);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
@@ -331,7 +336,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         id={id}
         aria-label={ariaLabel}
         aria-describedby={beschreibung || undefined}
-        aria-invalid={grund ? true : undefined}
+        aria-invalid={grund ? true : ariaInvalid}
         autoFocus={autoFocus}
         autoComplete="off"
         spellCheck={false}
@@ -355,11 +360,20 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
           setVerworfen(null);
         }}
         onKeyDown={(e) => {
+          const speichern = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's';
           if (e.key === 'Enter') {
             const neu = uebernimmText();
             if (neu === false) e.preventDefault();
             else onOk?.(neu);
+          } else if (speichern && text !== null) {
+            // Strg/⌘+S speichert ohne Verlassen des Felds (`command-palette/befehle.ts`); die
+            // getippte Zeit gilt dann wie bei Enter, eine unlesbare sperrt das Speichern.
+            if (uebernimmText() === false) e.preventDefault();
           } else if (e.key === 'Escape' && text !== null) {
+            // Nur die Eingabe zurück, nicht den ganzen Dialog (Spec „Escape verwirft“): die
+            // Tastaturebene der App liest `defaultPrevented`. `InlineAngabe` schließt die Zeile
+            // weiter, wie es Escape dort immer tut.
+            e.preventDefault();
             setText(null);
             setVerworfen(null);
           }
@@ -384,7 +398,9 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         content={kalender}
       >
         <Button
-          aria-label={nurTag ? 'Kalender' : 'Kalender und Uhrzeit'}
+          aria-label={`${nurTag ? 'Kalender' : 'Kalender und Uhrzeit'}${
+            feldName ? ` zu ${feldName}` : ''
+          }`}
           aria-haspopup="dialog"
           aria-expanded={offen}
           disabled={disabled}
@@ -430,6 +446,9 @@ export function ZeitraumEingabe({
   ...rest
 }: ZeitraumEingabeProps) {
   const [von, bis] = value ?? [null, null];
+  const endeRef = useRef<InputRef | null>(null);
+  // Halbe Tupel bleiben stehen, damit das andere Ende beim Tippen nicht verloren geht; die
+  // Pflichtprüfung des Aufrufers verlangt beide Enden (`verpflegung/VerpflegungDialoge.tsx`).
   const melde = (neu: Zeitraum) => onChange?.(neu[0] || neu[1] ? neu : null);
   return (
     <div
@@ -446,11 +465,19 @@ export function ZeitraumEingabe({
           style={{ width: '100%' }}
           value={von ?? null}
           onChange={(d) => melde([d, bis ?? null])}
+          onKeyDown={(e) => {
+            // Enter im Beginn führt ins leere Ende, statt das Formular halb abzusenden.
+            if (e.key === 'Enter' && !e.defaultPrevented && !bis) {
+              e.preventDefault();
+              endeRef.current?.focus();
+            }
+          }}
         />
       </div>
       <div style={{ flex: '1 1 14ch', minWidth: 0 }}>
         <ZeitpunktEingabe
           {...rest}
+          ref={endeRef}
           aria-label={placeholder[1]}
           placeholder={placeholder[1]}
           style={{ width: '100%' }}

@@ -66,6 +66,9 @@ export function ZeitKalender({
   const start = wert ?? jetzt();
   const heute = heuteInZone(zone, jetzt());
   const [tag, setTag] = useState(() => tagInZone(start, zone));
+  /** Gewählter Tag im Monat; beim Blättern bleibt er, auch über einen kürzeren Monat hinweg. */
+  const [tagImMonat, setTagImMonat] = useState(() => dayjs(tagInZone(start, zone)).date());
+  const startUhrzeit = zuWanduhr(start, zone).format('HHmm');
   const [uhrzeit, setUhrzeit] = useState(() => zuWanduhr(start, zone).format('HHmm'));
   const [grund, setGrund] = useState<string | null>(null);
   const uhrRef = useRef<InputRef>(null);
@@ -76,6 +79,17 @@ export function ZeitKalender({
   }, [fokusUhrzeit]);
 
   function uebernehmen(amTag = tag) {
+    // Unverändert übernommen bleibt der Wert, wie er ist (mit seinen Sekunden): sonst zählte ein
+    // „Übernehmen“ ohne Änderung als neuer Zeitpunkt (Spec: „Unverändertes Speichern …“).
+    if (wert && amTag === tagInZone(wert, zone) && (nurTag || uhrzeit === startUhrzeit)) {
+      onUebernehmen(wert);
+      return;
+    }
+    // Der Kalender sperrt Zukunftstage nur beim Klick; geblättert oder vorbelegt prüft es hier.
+    if (keineZukunftstage && amTag > heute) {
+      setGrund(GRUND.zukunft);
+      return;
+    }
     if (nurTag) {
       onUebernehmen(uhrzeitAmTag(amTag, '00:00', zone));
       return;
@@ -97,7 +111,16 @@ export function ZeitKalender({
   }
 
   const monat = dayjs(tag);
-  const blaettern = (n: number) => setTag(monat.add(n, 'month').format(TAG));
+  const blaettern = (n: number) => {
+    const ziel = monat.add(n, 'month');
+    let neu = ziel.date(Math.min(tagImMonat, ziel.daysInMonth())).format(TAG);
+    // Ohne Zukunftstage nie über heute hinaus; der Folgemonat ist dann gesperrt.
+    if (keineZukunftstage && neu > heute) neu = heute;
+    setTag(neu);
+    setGrund(null);
+  };
+  const folgemonatGesperrt =
+    !!keineZukunftstage && monat.add(1, 'month').startOf('month').format(TAG) > heute;
 
   return (
     <div
@@ -113,6 +136,8 @@ export function ZeitKalender({
         onSelect={(d, info) => {
           const neu = d.format(TAG);
           setTag(neu);
+          setTagImMonat(d.date());
+          setGrund(null);
           if (nurTag && info.source === 'date') uebernehmen(neu);
         }}
         headerRender={() => (
@@ -127,6 +152,7 @@ export function ZeitKalender({
             <Button
               type="text"
               aria-label="Folgemonat"
+              disabled={folgemonatGesperrt}
               icon={<IconChevronRechts />}
               onClick={() => blaettern(1)}
             />
@@ -141,8 +167,8 @@ export function ZeitKalender({
             inputMode="numeric"
             autoComplete="off"
             value={uhrzeit}
-            status={grund ? 'error' : undefined}
-            aria-invalid={grund ? true : undefined}
+            status={grund === GRUND.uhrzeit ? 'error' : undefined}
+            aria-invalid={grund === GRUND.uhrzeit ? true : undefined}
             aria-describedby={grund ? grundId : undefined}
             style={{ ...monoStil(16), width: '8ch', flex: '0 0 auto', boxSizing: 'content-box' }}
             onChange={(e) => {
@@ -162,6 +188,11 @@ export function ZeitKalender({
             </span>
           )}
         </Flex>
+      )}
+      {nurTag && grund && (
+        <span id={grundId} style={{ color: rollen.alarmText }}>
+          {grund}
+        </span>
       )}
       {zonenHinweis && (
         <span style={{ color: rollen.gedaempft }}>

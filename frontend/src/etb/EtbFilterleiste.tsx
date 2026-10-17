@@ -99,11 +99,13 @@ export default function EtbFilterleiste({ onChange, startWerte, zusatz }: Props)
       />
       {/* Zeiten in der Anzeigezone — dieselbe, in der der Druckkopf sie nennt (LFH-692). */}
       <ZeitpunktEingabe
+        aria-label="von"
         placeholder="von"
         defaultValue={alsZeitpunkt(startWerte?.von)}
         onChange={(d) => aktualisiere({ von: d ? alsBackendZeit(d) : undefined })}
       />
       <ZeitpunktEingabe
+        aria-label="bis"
         placeholder="bis"
         defaultValue={alsZeitpunkt(startWerte?.bis)}
         onChange={(d) => aktualisiere({ bis: d ? alsBackendZeit(d) : undefined })}

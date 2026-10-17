@@ -41,7 +41,7 @@ const PICKER_IMPORT = /import\s*\{[^}]*\b(?:DatePicker|TimePicker)\b[^}]*\}\s*fr
 const KALENDER_IMPORT = /import\s*\{[^}]*\bCalendar\b[^}]*\}\s*from\s*['"]antd['"]/;
 
 /** Ein `format=` an einem der Bausteine (über mehrere Zeilen der Props hinweg). */
-const FORMAT_AM_BAUSTEIN = /<(?:ZeitpunktEingabe|ZeitraumEingabe)\b[^>]*\bformat=/;
+const FORMAT_AM_BAUSTEIN = /<(?:ZeitpunktEingabe|ZeitraumEingabe)\b(?:=>|[^>])*?\bformat=/;
 
 /** Ein Aufruf `.local()` — die Wanduhr der Browserzone. */
 const LOKAL = /\.local\(\)/;
@@ -88,6 +88,12 @@ describe('Zeiteingabe nur über die Bausteine in anzeige/ (LFH-692)', () => {
     expect(PICKER_IMPORT.test("import { Button, DatePicker } from 'antd';")).toBe(true);
     expect(
       FORMAT_AM_BAUSTEIN.test('<ZeitpunktEingabe\n  aria-label="x"\n  format="DD.MM.YYYY"'),
+    ).toBe(true);
+    // Auch hinter einer Pfeilfunktion in den Props (`=>` enthält ein `>`).
+    expect(
+      FORMAT_AM_BAUSTEIN.test(
+        '<ZeitpunktEingabe\n  onChange={(d) => setze(d)}\n  format="DD.MM.YYYY"',
+      ),
     ).toBe(true);
   });
 });
