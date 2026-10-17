@@ -1,5 +1,6 @@
 import { Button, Space } from 'antd';
 import {
+  Fragment,
   memo,
   useCallback,
   useId,
@@ -13,6 +14,7 @@ import {
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
+import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
@@ -73,6 +75,19 @@ interface Props {
   sprungMarke?: number;
   /** Die angemeldete Person — ihre eigenen Einträge werden nie zurückgehalten. */
   eigeneBenutzerId?: number | null;
+  /**
+   * Steht die Seite am Ende (LLH-1149, `components/useFunkprotokollLauf.ts`)? Wer hochgerollt
+   * hat, liest: dann hält die Zeitachse neue fremde Einträge zurück wie bei Fokus darin. Vorgabe
+   * `true` (kein Bildlauf bekannt).
+   */
+  amEnde?: boolean;
+  /** „anzeigen“ am Sammelbanner: die Seite rollt ans Ende, wo die neuen Einträge stehen. */
+  onZumEnde?: () => void;
+  /**
+   * Lesemarke als Trennlinie (LLH-1149): `knoten` (ein `<li>`) steht direkt unter dem Eintrag mit
+   * `nachLfdNr`. Ob sie in der Achse steht oder als Banner darüber, entscheidet die Seite.
+   */
+  lesemarke?: { nachLfdNr: number; knoten: ReactNode };
   /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /**
@@ -171,14 +186,23 @@ function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
  * (`index.css`, e2e `palette-datensaetze`). Der Markenname stammt aus der Datensicht; ein
  * zweiter Selektor wäre eine zweite Wahrheit.
  *
+ * ── FUNKPROTOKOLL-ORDNUNG (LLH-1149) ────────────────────────────────────────────────
+ *
+ * Älteste oben, neueste unten direkt über der Erfassung: der eigene Eintrag erscheint dort, wo
+ * man tippt. Die Zeilen kommen in Serverordnung und werden erst nach dem Zufluss gekehrt
+ * (`funkprotokollFolge`). Den Bildlauf (Öffnen am Ende, Mitlaufen, Anker beim Nachladen oben)
+ * trägt die Seite über `components/useFunkprotokollLauf.ts`.
+ *
  * ── LIVE-ZUFLUSS SPRINGT NICHT UNTER DEM CURSOR ─────────────────────────────────────
  *
- * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis), ist die Menge der
- * gesendeten Einträge eingefroren; NEUES fremder Erfasser (s. `teileZufluss`) wird als
- * Sammelbanner gezählt und erst auf „anzeigen" eingefügt — nachgeladene ältere und eigene
- * Einträge stehen sofort, ein Sprung taut auf (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
- * Das Banner liegt als Überlagerung über der Liste, nicht in ihrem Fluss — sonst schöbe es
- * genau die Zeilen weg, die es schützen soll. Gepufferte Einträge stehen immer.
+ * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis) oder die Seite nicht am Ende
+ * steht (`amEnde`), ist die Menge der gesendeten Einträge eingefroren; NEUES fremder Erfasser
+ * (s. `teileZufluss`) wird als Sammelbanner am unteren Rand gezählt und erst auf „anzeigen"
+ * eingefügt — nachgeladene ältere und eigene Einträge stehen sofort, ein Sprung taut auf
+ * (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Am Ende ohne Fokus steht unter der Lesestelle
+ * nichts mehr: dort läuft die Seite neuen Einträgen nach. Das Banner liegt als Überlagerung über
+ * der Liste, nicht in ihrem Fluss — sonst schöbe es genau die Zeilen weg, die es schützen soll.
+ * Gepufferte Einträge stehen immer.
  */
 export default function EtbZeitachse({
   zeilen,
@@ -187,6 +211,9 @@ export default function EtbZeitachse({
   fundstellen,
   sprungMarke,
   eigeneBenutzerId,
+  amEnde = true,
+  onZumEnde,
+  lesemarke,
   onBerichtigen,
   berichtigenGesperrt,
   onWiedervorlage,
@@ -206,6 +233,19 @@ export default function EtbZeitachse({
   const wurzel = useRef<HTMLDivElement>(null);
   const kopfIdBasis = useId();
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
+  /** Liegt der Fokus in der Zeitachse? Zweiter Grund zum Einfrieren neben „nicht am Ende“. */
+  const [fokusDrin, setFokusDrin] = useState(false);
+  /*
+   * Hochgerollt friert ein, zurück am Ende taut auf — sofern kein Fokus darin liegt (LLH-1149,
+   * design.md D2). Im Render angeglichen wie der Sprung unten: ein Effekt käme einen Commit zu
+   * spät, und eine eben eingetroffene Zeile stünde schon unter der Lesestelle.
+   */
+  const [gesehenAmEnde, setGesehenAmEnde] = useState(amEnde);
+  if (amEnde !== gesehenAmEnde) {
+    setGesehenAmEnde(amEnde);
+    if (!amEnde) setGefroren((vorher) => vorher ?? einfrieren(zeilen));
+    else if (!fokusDrin) setGefroren(null);
+  }
   /*
    * Ein Sprung taut auf, und zwar IM RENDER (Zustandsangleich an eine Prop), nicht in
    * einem Effekt: der Scroll-Effekt der Seite läuft im selben Commit und fände das Ziel
@@ -226,23 +266,34 @@ export default function EtbZeitachse({
     () => teileZufluss(zeilen, gefroren, eigeneBenutzerId),
     [zeilen, gefroren, eigeneBenutzerId],
   );
+  // Funkprotokoll-Ordnung (LLH-1149): erst nach dem Zufluss gekehrt, damit Einfrieren und
+  // Wassermarke weiter auf der Serverordnung rechnen (`funkprotokollFolge`).
   const gruppen = useMemo(
-    () => gruppiereNachStunde(sichtbar, (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH')),
+    () =>
+      gruppiereNachStunde(funkprotokollFolge(sichtbar), (utc) =>
+        inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+      ),
     [sichtbar, konventionen],
   );
 
   const betreten = useCallback(() => {
+    setFokusDrin(true);
     setGefroren((vorher) => vorher ?? einfrieren(zeilen));
   }, [zeilen]);
 
-  const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
-    const ziel = e.relatedTarget as Node | null;
-    if (ziel != null && wurzel.current?.contains(ziel)) return;
-    // Ein Menü im Portal ist kein Verlassen: antds `autoFocus` schiebt den Fokus an
-    // `document.body`, und die Zeile unter dem offenen Menü soll stehen bleiben.
-    if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
-    setGefroren(null);
-  }, []);
+  const verlassen = useCallback(
+    (e: FocusEvent<HTMLDivElement>) => {
+      const ziel = e.relatedTarget as Node | null;
+      if (ziel != null && wurzel.current?.contains(ziel)) return;
+      // Ein Menü im Portal ist kein Verlassen: antds `autoFocus` schiebt den Fokus an
+      // `document.body`, und die Zeile unter dem offenen Menü soll stehen bleiben.
+      if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
+      setFokusDrin(false);
+      // Hochgerollt bleibt sie eingefroren: dort liest jemand.
+      if (amEnde) setGefroren(null);
+    },
+    [amEnde],
+  );
 
   /*
    * Die Handler über einen Ref (LFH-947): die Zeile ist gemerkt, und eine neue Handler-Identität
@@ -334,7 +385,18 @@ export default function EtbZeitachse({
               {g.etikett}
             </Augenbraue>
           </div>
-          <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
+          <ol style={{ margin: 0, padding: 0 }}>
+            {g.zeilen.map((z) =>
+              lesemarke && z.art === 'eintrag' && z.eintrag.lfd_nr === lesemarke.nachLfdNr ? (
+                <Fragment key={z.schluessel}>
+                  {zeile(z)}
+                  {lesemarke.knoten}
+                </Fragment>
+              ) : (
+                zeile(z)
+              ),
+            )}
+          </ol>
         </div>
       );
     });
@@ -351,22 +413,36 @@ export default function EtbZeitachse({
       onBlur={verlassen}
       style={{ position: 'relative' }}
     >
-      {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. Es klebt unter dem
-          Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen). */}
-      <div style={{ position: 'sticky', top: 'var(--lfh-rahmen-oben, 0px)', height: 0, zIndex: 5 }}>
+      {inhalt}
+      {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
+          das Banner klebt dort über der angepinnten Erfassung (`--lfh-etb-fokusabstand`, ihre
+          gemessene Höhe) und nimmt keinen Platz im Fluss. */}
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 'var(--lfh-etb-fokusabstand, 0px)',
+          height: 0,
+          zIndex: 5,
+        }}
+      >
         {zurueckgehalten > 0 && (
           <Sammelbanner
             aktion={{
               label: 'anzeigen',
-              onKlick: () => setGefroren(einfrieren(zeilen)),
+              onKlick: () => {
+                // Der Knopf verschwindet mit dem Banner, und mit ihm der Fokus — ohne Blur-Ereignis.
+                // Stünde `fokusDrin` weiter, bliebe die Achse am Ende eingefroren.
+                setFokusDrin(false);
+                setGefroren(amEnde ? null : einfrieren(zeilen));
+                onZumEnde?.();
+              },
             }}
-            style={{ position: 'absolute', insetInline: 0, top: 0 }}
+            style={{ position: 'absolute', insetInline: 0, bottom: 0 }}
           >
             {zuflussText(zurueckgehalten)}
           </Sammelbanner>
         )}
       </div>
-      {inhalt}
     </div>
   );
 }

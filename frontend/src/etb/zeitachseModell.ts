@@ -42,9 +42,10 @@ export function stundenEtikett(schluessel: string): string {
  * Anzeigekonventionen gebaut); aus dem UTC-Wirestring geschnitten stünden die Köpfe um den
  * Zonenversatz neben den Uhrzeiten darunter.
  *
- * Gruppen erscheinen in Antreffreihenfolge (Serverordnung, neueste zuerst). Eine Zeile, deren
- * Stunde schon einmal vorkam, aber nicht direkt davor, eröffnet bewusst eine NEUE Gruppe: die
- * Reihenfolge der Beweiskette gewinnt gegen die Gruppierung.
+ * Gruppen erscheinen in Antreffreihenfolge — in der Zeitachse die Funkprotokoll-Ordnung aus
+ * `funkprotokollFolge` (`components/useFunkprotokollLauf.ts`), älteste zuerst. Eine Zeile, deren Stunde schon einmal vorkam, aber
+ * nicht direkt davor, eröffnet bewusst eine NEUE Gruppe: die Reihenfolge der Beweiskette gewinnt
+ * gegen die Gruppierung.
  */
 export function gruppiereNachStunde(
   zeilen: readonly EtbZeile[],

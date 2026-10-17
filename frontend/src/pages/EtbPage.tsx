@@ -33,7 +33,8 @@ import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
-import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
+import EtbLesemarkeBanner, { useEtbLesemarke } from '../etb/EtbLesemarkeBanner';
+import { lesemarkeImFenster } from '../etb/lesemarkeModell';
 import { Select } from '../components/Select';
 import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
@@ -58,6 +59,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { useFokusInLeiste } from '../components/fokusInLeiste';
@@ -501,6 +503,39 @@ export default function EtbPage() {
     [eintraege, ausstehend, abgelehnt],
   );
 
+  /*
+   * Funkprotokoll-Ordnung (LLH-1149, design.md D2): die Seite öffnet am Ende, läuft dort neuen
+   * Einträgen nach und hält beim Nachladen oben die Lesestelle. Die Chronologie steht in
+   * Serverordnung — ihre erste Zeile ist die jüngste, ihre letzte die älteste. Ein Sprungziel
+   * rollt selbst (`scrolleZurZeile`), dann nicht ans Ende.
+   */
+  /*
+   * Lesemarke (LLH-1149, D3): steht der zuletzt gesichtete Eintrag im ungefilterten Fenster, ist
+   * sie eine Linie in der Achse, sonst ein Banner darüber. Derselbe Abruf wie im Banner.
+   */
+  const lesemarkeQuery = useEtbLesemarke(einsatzId);
+  const geladeneNummern = useMemo(() => eintraege.map((e) => e.lfd_nr), [eintraege]);
+  const markeInAchse = lesemarkeImFenster(lesemarkeQuery.data, geladeneNummern, filterAktiv);
+  const markeNr = lesemarkeQuery.data?.gesichtet_lfd_nr;
+  const lesemarkeLinie = useMemo(
+    () =>
+      markeInAchse && markeNr != null
+        ? {
+            nachLfdNr: markeNr,
+            knoten: <EtbLesemarkeBanner key="lesemarke" einsatzId={einsatzId} form="linie" />,
+          }
+        : undefined,
+    [markeInAchse, markeNr, einsatzId],
+  );
+
+  const { amEnde, zumEnde } = useFunkprotokollLauf({
+    wurzel: zeitachseKopf,
+    bereit: !etbQuery.isLoading,
+    juengste: chronologie[0]?.schluessel,
+    aelteste: chronologie[chronologie.length - 1]?.schluessel,
+    ohneStartlauf: zielEintragId != null,
+  });
+
   /**
    * Steht das Fenster tief im Tagebuch, läge der eigene neue Eintrag außerhalb (LFH-947): das
    * Neuladen nach dem Senden beginnt bei der ersten gehaltenen Seite. Die Seite holt deshalb den
@@ -523,20 +558,20 @@ export default function EtbPage() {
   }
 
   /**
-   * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
+   * Eingabe unten, neueste unten — und was nach dem eigenen Eintrag passiert (LLH-1149).
    *
-   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft neueste
-   * zuerst. Wer weiter unten liest und erfasst, sähe seinen Eintrag nicht ankommen. Nach einem
-   * angenommenen Eintrag (gesendet oder gepuffert) rollt die Seite deshalb den Kopf der Zeitachse
-   * ins Bild — `block: 'nearest'`, also gar nicht, wenn er sichtbar ist. Das ist die Antwort auf
-   * eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte
-   * Änderungen). Der Fokus bleibt im Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht
-   * noch im Feld, der Grund an der Erfassung (`Schnellerfassung`, LFH-1077), kein Toast.
+   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, und die Zeitachse endet
+   * direkt darüber mit dem jüngsten Eintrag. Nach einem angenommenen Eintrag (gesendet oder
+   * gepuffert) rollt die Seite ans Ende, auch wenn man vorher hochgerollt hatte: der eigene
+   * Eintrag steht dann direkt über dem Feld. Das ist die Antwort auf eine eigene Handlung, kein
+   * Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte Änderungen). Der Fokus bleibt im
+   * Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht noch im Feld, der Grund an der
+   * Erfassung (`Schnellerfassung`, LFH-1077), kein Toast.
    */
   async function erfassenUndZeigen(e: NeuerEintrag) {
     await erfassen(e);
     if (etbQuery.hasPreviousPage) await zumKopf();
-    zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
+    zumEnde();
   }
 
   // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
@@ -801,11 +836,102 @@ export default function EtbPage() {
             </div>
           )}
 
+          <div
+            ref={zeitachseKopf}
+            data-lfh="etb-zeitachse-rahmen"
+            style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
+          >
+            {/* „neu seit Ihrer letzten Sichtung" — als Linie in der Achse, wenn die Marke im
+                Fenster steht, sonst hier als Banner im Fluss; das Sammelbanner des
+                Live-Zuflusses liegt dagegen auf der Zeitachse. */}
+            {!markeInAchse && <EtbLesemarkeBanner einsatzId={einsatzId} />}
+            {/* Funkprotokoll (LLH-1149): ältere Einträge stehen oben, also auch der Weg zu ihnen.
+                Die Lesestelle hält `useFunkprotokollLauf` beim Einfügen darüber. */}
+            {etbQuery.hasNextPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockEnd: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchNextPage()}
+                  loading={etbQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+              </div>
+            )}
+            <EtbZeitachse
+              zeilen={chronologie}
+              einsatzId={einsatzId}
+              highlightId={highlightId}
+              fundstellen={filter.q}
+              sprungMarke={hervorhebung?.marke}
+              eigeneBenutzerId={benutzer?.id}
+              amEnde={amEnde}
+              onZumEnde={zumEnde}
+              lesemarke={lesemarkeLinie}
+              ladend={etbQuery.isLoading}
+              fehler={etbQuery.isError}
+              leerText={leerInhalt}
+              dokumente={dokumenteZuEintrag}
+              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
+              onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
+              onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
+              auftragGesperrt={auftragGesperrt}
+              onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+              zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
+              onVerwerfen={(p) => {
+                if (p.id != null) void abgelehntVerwerfen(p.id);
+              }}
+            />
+
+            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg ans Ende,
+                lückenlos über den Cursor. Keine Zahl — die zählt der Server im Kopf. */}
+            {etbQuery.hasPreviousPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockStart: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchPreviousPage()}
+                  loading={etbQuery.isFetchingPreviousPage}
+                >
+                  Neuere laden
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Gepufferte Einträge stehen als Zeilen ganz unten; die Zusammenfassung direkt
+              darunter, über der Erfassung, wo der Blick nach dem Erfassen ist (LLH-1149).
+              Abgelehnt zuletzt, wie in der Zeitachse: es verlangt eine Handlung. */}
+          {ausstehend.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: token.marginSM }}
+              title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
+              description={
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {ausstehend.map((a) => (
+                    <li key={a.id}>{a.eintrag.inhalt}</li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
           {abgelehnt.length > 0 && (
             <Alert
               type="error"
               showIcon
-              style={{ marginBottom: token.marginSM }}
+              style={{ marginTop: token.marginSM }}
               title={`${abgelehnt.length === 1 ? '1 gepufferter Eintrag' : `${abgelehnt.length} gepufferte Einträge`} abgelehnt und NICHT gespeichert`}
               description={
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -822,82 +948,6 @@ export default function EtbPage() {
                 </ul>
               }
             />
-          )}
-          {ausstehend.length > 0 && (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: token.marginSM }}
-              title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
-              description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {ausstehend.map((a) => (
-                    <li key={a.id}>{a.eintrag.inhalt}</li>
-                  ))}
-                </ul>
-              }
-            />
-          )}
-
-          <div
-            ref={zeitachseKopf}
-            data-lfh="etb-zeitachse-rahmen"
-            style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
-          >
-            {/* „neu seit Ihrer letzten Sichtung" — im Fluss über der Zeitachse; das
-                Sammelbanner des Live-Zuflusses liegt dagegen auf ihr. */}
-            <EtbLesemarkeBanner einsatzId={einsatzId} />
-            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg nach oben,
-                lückenlos über den Cursor nach oben. Keine Zahl — die zählt der Server im Kopf. */}
-            {etbQuery.hasPreviousPage && (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: token.paddingXS,
-                  borderBlockEnd: `1px solid ${rollen.linie}`,
-                }}
-              >
-                <Button
-                  onClick={() => etbQuery.fetchPreviousPage()}
-                  loading={etbQuery.isFetchingPreviousPage}
-                >
-                  Neuere laden
-                </Button>
-              </div>
-            )}
-            <EtbZeitachse
-              zeilen={chronologie}
-              einsatzId={einsatzId}
-              highlightId={highlightId}
-              fundstellen={filter.q}
-              sprungMarke={hervorhebung?.marke}
-              eigeneBenutzerId={benutzer?.id}
-              ladend={etbQuery.isLoading}
-              fehler={etbQuery.isError}
-              leerText={leerInhalt}
-              dokumente={dokumenteZuEintrag}
-              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
-              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
-              onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
-              onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
-              auftragGesperrt={auftragGesperrt}
-              onErneutSenden={(p) => void abgelehntErneutSenden(p)}
-              zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
-              onVerwerfen={(p) => {
-                if (p.id != null) void abgelehntVerwerfen(p.id);
-              }}
-            />
-          </div>
-
-          {etbQuery.hasNextPage && (
-            <div style={{ textAlign: 'center', marginTop: token.marginSM }}>
-              <Button
-                onClick={() => etbQuery.fetchNextPage()}
-                loading={etbQuery.isFetchingNextPage}
-              >
-                Ältere laden
-              </Button>
-            </div>
           )}
         </div>
 

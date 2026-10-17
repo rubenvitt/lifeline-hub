@@ -8,6 +8,19 @@ Ableitungen in `etb/zeitachseModell.ts`)
 
 - Keine Sortierung/Spaltenfilter/-auswahl; Ordnung = Zeit (Server). Ebenso Lagemeldungen
   (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`).
+- **Funkprotokoll-Ordnung** (LLH-1149, Entscheidung Ruben 10.10./17.10.2026, Specs
+  `etb-zeitachse-darstellung`, `etb-zeitachse-fenster`, Herleitung
+  `openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
+  unten direkt über der Erfassung, Stundengruppen aufsteigend, gepufferte ganz unten (abgelehnte
+  zuletzt), ihre Hinweise unter der Zeitachse. Gekehrt wird nur in der Darstellung
+  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
+  Serverordnung. Den Bildlauf am Dokument trägt `components/useFunkprotokollLauf.ts`: Öffnen am
+  Ende (außer mit `?eintrag=`), Mitlaufen am Ende an der jüngsten Zeile, Anker beim Nachladen
+  oben (`overflow-anchor: none`, eigene Korrektur). Eingefroren wird bei Fokus in der Achse ODER
+  nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
+  die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
+  wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
+  springen“. Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
 - Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
   stehend (Riegel `bilanzFrei`, nicht `isLoading`).
@@ -57,10 +70,10 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`): die Liste
   hält höchstens `ETB_MAX_SEITEN` (5) Seiten (`etb/seitenfenster.ts`); Seitenparameter mit
   Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
-  Fällt der Kopf heraus, steht „Neuere laden“ über der Zeitachse. Ein `?eintrag=` wählt die
+  „Ältere laden“ steht über der Zeitachse; fällt der Kopf heraus, steht „Neuere laden“ darunter. Ein `?eintrag=` wählt die
   Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
   Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
-  neueste Seite (`zumKopf`). Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  neueste Seite (`zumKopf`) und rollt ans Ende. Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
   laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
 - **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
   `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler

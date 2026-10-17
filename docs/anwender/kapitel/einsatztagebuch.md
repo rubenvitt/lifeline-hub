@@ -2,14 +2,15 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
+quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
 ---
 
 ## Überblick
 
 Das Einsatztagebuch (ETB) ist die fortlaufende Niederschrift des Einsatzes. Jeder Eintrag trägt
 eine laufende Nummer, die Ereigniszeit, einen Typ („Meldung“, „Anordnung“, „Lage“ oder
-„Entscheidung“), „Von“ und „An“ sowie den Inhalt. Die Zeitachse zeigt den neuesten Eintrag oben.
+„Entscheidung“), „Von“ und „An“ sowie den Inhalt. Die Zeitachse liest sich wie ein Funkprotokoll:
+der älteste Eintrag steht oben, der neueste unten direkt über der Erfassungsleiste.
 
 Ein erfasster Eintrag lässt sich weder ändern noch löschen. Ein Fehler wird mit einer
 **Berichtigung** korrigiert: einem neuen Eintrag, der auf den alten verweist. Viele Einträge
@@ -28,10 +29,15 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 
    ![ETB mit Filterleiste, Zeitachse der Einträge, Seitenleiste „Bilanz“ und Erfassungsleiste am Fuß](../bilder/einsatztagebuch/zeitachse.png)
 
-2. Die Zeitachse von oben nach unten lesen; „Ältere laden“ am Ende holt frühere Einträge.
-3. Sind seit dem letzten Besuch Einträge hinzugekommen, steht darüber ein Hinweis wie „14 neue
-   Einträge seit Ihrer letzten Sichtung um 13:04“. „alle als gesichtet markieren“ setzt die
-   Lesemarke auf den neuesten Eintrag.
+2. Die Seite öffnet am Ende: der neueste Eintrag steht über der Erfassungsleiste. Nach oben
+   rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge.
+3. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
+   Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
+   geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
+   Marke springen“. „alle als gesichtet markieren“ setzt die Lesemarke auf den neuesten Eintrag.
+4. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
+   läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
+   unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
 
 Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
 ein Filter gesetzt, heißt sie „Bilanz im Filter“.

@@ -39,7 +39,10 @@ export function abgelehntSchluessel(p: AbgelehnterEintrag): string {
  * Reihenfolge: abgelehnt, dann ausstehend, dann die Serverliste. Beide gepufferten
  * Sorten stehen am KOPF, weil die Liste neueste-zuerst läuft und ein noch nicht
  * gesendeter Eintrag der jüngste ist — und weil ein abgelehnter Eintrag eine Handlung
- * verlangt, ein ausstehender nur Geduld. Die Serverordnung selbst bleibt unangetastet.
+ * verlangt, ein ausstehender nur Geduld. Die Serverordnung selbst bleibt unangetastet; die
+ * Zeitachse kehrt die ganze Folge erst beim Darstellen um (`funkprotokollFolge` in
+ * `components/useFunkprotokollLauf.ts`, LLH-1149), dann stehen die gepufferten ganz unten über
+ * der Erfassung, abgelehnte zuletzt.
  */
 export function baueZeilen(args: {
   eintraege: readonly EtbEintragAnzeige[];

@@ -1,6 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EtbLesemarke } from '../api/types';
@@ -216,5 +217,62 @@ describe('EtbLesemarkeBanner', () => {
     // Dem veralteten Abruf Zeit geben, seinen alten Stand abzuliefern.
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByRole('button', { name: 'alle als gesichtet markieren' })).toBeNull();
+  });
+});
+
+describe('EtbLesemarkeBanner – Funkprotokoll (LLH-1149)', () => {
+  const marke = {
+    neue_anzahl: 3,
+    hoechste_lfd_nr: 12,
+    gesichtet_lfd_nr: 9,
+    gesichtet_at: '2026-09-22 11:04:00',
+  };
+
+  it('als Linie: „Neu seit …“ mit Markieren, ohne Sprung', async () => {
+    stand(marke);
+    renderMitProviders(
+      <ol>
+        <EtbLesemarkeBanner einsatzId={7} form="linie" />
+      </ol>,
+    );
+    const linie = await screen.findByText(/^Neu seit \d{4,6} · 3 Einträge$/);
+    expect(linie.closest('li')).toHaveAttribute('data-lfh', 'etb-lesemarke');
+    expect(screen.getByRole('button', { name: 'alle als gesichtet markieren' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Zur Marke springen' })).toBeNull();
+  });
+
+  it('als Banner: springt zur Marke über den Eintrag mit ihrer Nummer, ohne Filter', async () => {
+    stand(marke);
+    let abgefragt = '';
+    server.use(
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        abgefragt = new globalThis.URL(request.url).search;
+        return HttpResponse.json([{ id: 90, lfd_nr: 9 }]);
+      }),
+    );
+    function Ort() {
+      const ort = useLocation();
+      return <output data-testid="ort">{ort.pathname + ort.search}</output>;
+    }
+    renderMitProviders(
+      <>
+        <EtbLesemarkeBanner einsatzId={7} />
+        <Ort />
+      </>,
+      { route: '/einsaetze/7/etb?typ=meldung' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Zur Marke springen' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/7/etb?eintrag=90'),
+    );
+    expect(abgefragt).toContain('before_lfd_nr=10');
+    expect(abgefragt).toContain('limit=1');
+  });
+
+  it('als Banner ohne Marke: kein Sprung, es gibt kein Ziel', async () => {
+    stand({ neue_anzahl: 2, hoechste_lfd_nr: 5 });
+    renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
+    await screen.findByText('2 Einträge, die Sie noch nicht gesichtet haben');
+    expect(screen.queryByRole('button', { name: 'Zur Marke springen' })).toBeNull();
   });
 });

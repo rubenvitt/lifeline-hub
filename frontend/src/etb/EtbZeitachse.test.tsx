@@ -116,7 +116,7 @@ describe('EtbZeitachse – der Eintrag', () => {
     }
   });
 
-  it('gruppiert nach Stunde mit Tag im Kopf und hält die Serverordnung', () => {
+  it('gruppiert nach Stunde mit Tag im Kopf, älteste oben (Funkprotokoll, LLH-1149)', () => {
     const { container } = renderZeitachse({
       eintraege: [
         eintrag({ id: 3, lfd_nr: 3, ereigniszeit: '2026-05-23 11:10:00', inhalt: 'drei' }),
@@ -131,8 +131,12 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(gruppen[0]).toHaveAccessibleName(/^23\.05\. · \d{2} Uhr$/);
     expect(gruppen[0]).not.toHaveAttribute('aria-label');
     const texte = [...container.querySelectorAll('[data-zeile]')].map((z) => z.textContent);
-    expect(texte[0]).toContain('drei');
-    expect(texte[2]).toContain('eins');
+    expect(texte[0]).toContain('eins');
+    expect(texte[2]).toContain('drei');
+    // Die Stundengruppen laufen ebenfalls aufsteigend.
+    expect(
+      within(gruppen[0] as HTMLElement).getByText('eins', { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it('beschriftet einen Nachtrag mit „nachgetragen um HH:MM" — das ⧖ ist Zierde', () => {
@@ -375,11 +379,12 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
     expect(z).toHaveTextContent('vorgemerkt');
     expect(z).not.toHaveTextContent('Nr.');
     expect(within(z).queryByRole('button')).toBeNull();
-    // Und sie steht VOR den gesendeten — sie ist der jüngste Eintrag.
+    // Und sie steht NACH den gesendeten, ganz unten über der Erfassung — sie ist der jüngste
+    // Eintrag (Funkprotokoll, LLH-1149).
     const reihenfolge = [...container.querySelectorAll('[data-zeile]')].map((e) =>
       e.getAttribute('data-zeile'),
     );
-    expect(reihenfolge).toEqual(['ausstehend-1', 'eintrag-1']);
+    expect(reihenfolge).toEqual(['eintrag-1', 'ausstehend-1']);
   });
 
   it('bietet an einer abgelehnten Zeile beide Auswege offen an und nennt den Grund', async () => {
@@ -543,6 +548,44 @@ describe('EtbZeitachse – Sammelbanner', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
   });
 
+  /*
+   * Funkprotokoll (LLH-1149, design.md D2): wer hochgerollt hat, liest — auch ohne Fokus. Neue
+   * Einträge kommen unten an; das Banner steht dort, „anzeigen“ rollt ans Ende.
+   */
+  it('hält hochgerollt zurück, taut am Ende auf und rollt auf „anzeigen“ ans Ende', async () => {
+    const onZumEnde = vi.fn();
+    const bau = (zeilen: readonly EtbZeile[], amEnde: boolean) => (
+      <EtbZeitachse einsatzId={1} zeilen={zeilen} amEnde={amEnde} onZumEnde={onZumEnde} />
+    );
+    const { rerender } = renderMitProviders(bau(zeilenAus([alt]), true));
+    rerender(bau(zeilenAus([alt]), false));
+    rerender(bau(zeilenAus([neu, alt]), false));
+    expect(screen.queryByText('Neu')).toBeNull();
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('1 neuer Eintrag');
+    await userEvent.click(within(banner).getByRole('button', { name: 'anzeigen' }));
+    expect(onZumEnde).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    // Zurück am Ende ohne Fokus: Neues steht sofort, kein Banner.
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    rerender(bau(zeilenAus([neu, alt]), true));
+    rerender(bau(zeilenAus([eintrag({ id: 3, lfd_nr: 3, inhalt: 'Dritt' }), neu, alt]), true));
+    expect(screen.getByText('Dritt')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('bleibt hochgerollt eingefroren, wenn der Fokus die Zeitachse verlässt', () => {
+    const bau = (zeilen: readonly EtbZeile[]) => (
+      <EtbZeitachse einsatzId={1} zeilen={zeilen} amEnde={false} onWiedervorlage={vi.fn()} />
+    );
+    const { container, rerender } = renderMitProviders(bau(zeilenAus([alt])));
+    const wurzel = container.querySelector<HTMLElement>('[data-lfh="etb-zeitachse"]')!;
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    rerender(bau(zeilenAus([neu, alt])));
+    fireEvent.focusOut(wurzel, { relatedTarget: document.body });
+    expect(screen.queryByText('Neu')).toBeNull();
+  });
+
   it('hebt das Einfrieren beim Sprung auf einen Eintrag auf (?eintrag=)', () => {
     const bau = (zeilen: readonly EtbZeile[], sprungMarke?: number) => (
       <EtbZeitachse
@@ -560,6 +603,23 @@ describe('EtbZeitachse – Sammelbanner', () => {
     rerender(bau(zeilenAus([neu, alt]), 1));
     expect(screen.getByText('Neu')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('EtbZeitachse – Lesemarke als Trennlinie (LLH-1149)', () => {
+  it('setzt die Linie direkt unter den zuletzt gesichteten Eintrag', () => {
+    const { container } = renderZeitachse({
+      eintraege: [
+        eintrag({ id: 3, lfd_nr: 3, ereigniszeit: '2026-05-23 10:30:00' }),
+        eintrag({ id: 2, lfd_nr: 2, ereigniszeit: '2026-05-23 10:20:00' }),
+        eintrag({ id: 1, lfd_nr: 1, ereigniszeit: '2026-05-23 10:10:00' }),
+      ],
+      lesemarke: { nachLfdNr: 2, knoten: <li data-testid="linie">Neu seit</li> },
+    });
+    const folge = [...container.querySelectorAll('[data-zeile], [data-testid="linie"]')].map(
+      (el) => el.getAttribute('data-zeile') ?? 'linie',
+    );
+    expect(folge).toEqual(['eintrag-1', 'eintrag-2', 'linie', 'eintrag-3']);
   });
 });
 

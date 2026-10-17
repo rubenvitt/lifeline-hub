@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
+import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
 import { baueZeilen } from './etbZeile';
 import {
   berichtigungsindex,
@@ -83,6 +84,52 @@ describe('gruppiereNachStunde', () => {
 
   it('beschriftet die Stunde mit Tag', () => {
     expect(stundenEtikett('2026-09-21 07')).toBe('21.09. · 07 Uhr');
+  });
+});
+
+describe('funkprotokollFolge (LLH-1149)', () => {
+  const stunde = (utc: string) => utc.slice(0, 13);
+
+  it('kehrt die Serverordnung um: älteste oben, gepufferte ganz unten, abgelehnte zuletzt', () => {
+    const zeilen = baueZeilen({
+      eintraege: [e({ id: 3, lfd_nr: 3 }), e({ id: 2, lfd_nr: 2 }), e({ id: 1, lfd_nr: 1 })],
+      ausstehend: [puffer],
+      abgelehnt: [abgelehnt],
+    });
+    expect(funkprotokollFolge(zeilen).map((z) => z.schluessel)).toEqual([
+      'eintrag-1',
+      'eintrag-2',
+      'eintrag-3',
+      'ausstehend-1',
+      'abgelehnt-1',
+    ]);
+  });
+
+  it('lässt die Eingabe unberührt', () => {
+    const zeilen = baueZeilen({
+      eintraege: [e({ id: 2 }), e({ id: 1 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    funkprotokollFolge(zeilen);
+    expect(zeilen.map((z) => z.schluessel)).toEqual(['eintrag-2', 'eintrag-1']);
+  });
+
+  it('ergibt aufsteigende Stundengruppen mit nach unten wachsender Nummer', () => {
+    const zeilen = baueZeilen({
+      eintraege: [
+        e({ id: 3, lfd_nr: 3, ereigniszeit: '2026-05-23 14:20:00' }),
+        e({ id: 2, lfd_nr: 2, ereigniszeit: '2026-05-23 14:10:00' }),
+        e({ id: 1, lfd_nr: 1, ereigniszeit: '2026-05-23 13:50:00' }),
+      ],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    const gruppen = gruppiereNachStunde(funkprotokollFolge(zeilen), stunde);
+    expect(gruppen.map((g) => g.etikett)).toEqual(['23.05. · 13 Uhr', '23.05. · 14 Uhr']);
+    expect(gruppen[1].zeilen.map((z) => (z.art === 'eintrag' ? z.eintrag.lfd_nr : null))).toEqual([
+      2, 3,
+    ]);
   });
 });
 

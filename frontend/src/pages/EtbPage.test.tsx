@@ -181,6 +181,30 @@ describe('EtbPage', () => {
     ).toBeTruthy();
   });
 
+  it('LLH-1149: steht die Marke im Fenster, ist sie eine Linie IN der Achse, unter Filter ein Banner', async () => {
+    const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
+    const handler = [
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])),
+      http.get('/api/einsaetze/7/etb/lesemarke', () =>
+        HttpResponse.json({
+          neue_anzahl: 1,
+          hoechste_lfd_nr: 2,
+          gesichtet_lfd_nr: 1,
+          gesichtet_at: '2026-05-23 10:00:00',
+        }),
+      ),
+    ];
+    const { unmount } = setup('/einsaetze/7/etb', handler);
+    const linie = await screen.findByText(/^Neu seit \d{4,6} · 1 Eintrag$/);
+    const zeitachse = screen.getByRole('region', { name: 'Einsatztagebuch' });
+    expect(zeitachse.contains(linie)).toBe(true);
+    unmount();
+
+    setup('/einsaetze/7/etb?typ=meldung', handler);
+    const banner = await screen.findByText(/^1 neuer Eintrag seit Ihrer letzten Sichtung/);
+    expect(screen.getByRole('region', { name: 'Einsatztagebuch' }).contains(banner)).toBe(false);
+  });
+
   it.each(['2099-09-09 15:17:43', null])(
     'LFH-463: lädt beim Öffnen den inzwischen geänderten Termin frisch (%s)',
     async (termin) => {
@@ -999,12 +1023,13 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     );
   });
 
-  it('rollt nach einem angenommenen eigenen Eintrag den Kopf der Zeitachse ins Bild — nicht nach einer Ablehnung', async () => {
+  it('rollt nach einem angenommenen eigenen Eintrag ans Ende — nicht nach einer Ablehnung', async () => {
+    // Funkprotokoll (LLH-1149): der eigene Eintrag steht unten direkt über dem Feld.
+    const vorher = window.scrollTo;
     const aufrufe: unknown[] = [];
-    const vorher = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
-      if (this.getAttribute('data-lfh') === 'etb-zeitachse-rahmen') aufrufe.push(arg);
-    };
+    window.scrollTo = ((arg?: unknown) => {
+      aufrufe.push(arg);
+    }) as typeof window.scrollTo;
     let status = 422;
     server.use(
       http.post('/api/einsaetze/7/etb', () =>
@@ -1017,14 +1042,18 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
       setup();
       const user = userEvent.setup();
       const feld = await screen.findByPlaceholderText(/Inhalt/);
+      await screen.findByText('Erste Meldung');
+      aufrufe.length = 0;
       await user.type(feld, 'Wird abgelehnt{Enter}');
       await waitFor(() => expect(feld).toHaveValue('Wird abgelehnt'));
       expect(aufrufe).toEqual([]);
       status = 201;
       await user.type(feld, '{Enter}');
-      await waitFor(() => expect(aufrufe).toEqual([{ block: 'nearest' }]));
+      await waitFor(() =>
+        expect(aufrufe).toContainEqual(expect.objectContaining({ behavior: 'instant' })),
+      );
     } finally {
-      Element.prototype.scrollIntoView = vorher;
+      window.scrollTo = vorher;
     }
   });
 

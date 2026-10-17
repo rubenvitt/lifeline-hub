@@ -6,16 +6,16 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 
 ## 1. Funkprotokoll-Ordnung — LLH-1149 (vkoertmc)
 
-- [ ] 1.1 Reine Kehrung im Modell (`funkprotokollFolge`) und `baueZeilen` mit gepufferten Zeilen am Ende; Vitest in `zeitachseModell.test.ts`/`etbZeile.test.ts` (Ordnung aufsteigend, Stundengruppen aufsteigend, Puffer unten, Bilanz/`letzteBerichtigungen` unverändert)
-- [ ] 1.2 `EtbZeitachse` rendert gespiegelt, Sammelbanner unten mit „↓“; Vitest `EtbZeitachse.test.tsx` und `EtbZeitachse.render.test.tsx` (gemerktes Rendern: neuer Eintrag unten rendert keine fremde Gruppe)
-- [ ] 1.3 Hook `components/useFunkprotokollLauf.ts` (Öffnen am Ende, `amEnde`, Mitlaufen an der jüngsten id, Anker bei Nachladen oben) mit Vitest gegen ein Dokument-Double; `overflow-anchor: none` an der Zeitachse
-- [ ] 1.4 Einfrieren bei „nicht am Ende ODER Fokus“, Auftauen am Ende ohne Fokus; Vitest am Modell und an der Zeitachse
-- [ ] 1.5 `EtbPage`: „Ältere laden“ oben, „Neuere laden“ unten, Alerts unter der Zeitachse, `erfassenUndZeigen` rollt ans Ende statt zum Kopf; Vitest `EtbPage.test.tsx`/`EtbPage.seitenfenster.test.tsx` nachgezogen
-- [ ] 1.6 Lesemarke als Trennlinie in der Achse mit Banner-Rückfall außerhalb des Fensters bzw. unter Filter, Text taktisch; Vitest `EtbLesemarke*.test.tsx`, `lesemarkeModell.test.ts`
-- [ ] 1.7 Informationstelefon in derselben Bauform (Kehrung, „Ältere laden“ oben, Sammelbanner unten, Deeplink-Anruf vorn, Hook aus 1.3); Vitest `InfotelefonPage.test.tsx`, `infotelefon/zufluss.test.ts`
-- [ ] 1.8 Regeln fortgeschrieben: `frontend/src/etb/AGENTS.md` (Erfassung, Seitenfenster, Zufluss, Lesemarke) und `frontend/src/stab/AGENTS.md` (Infotelefon); Prettier grün
+- [x] 1.1 Reine Kehrung im Modell (`funkprotokollFolge`) und `baueZeilen` mit gepufferten Zeilen am Ende; Vitest in `zeitachseModell.test.ts`/`etbZeile.test.ts` (Ordnung aufsteigend, Stundengruppen aufsteigend, Puffer unten, Bilanz/`letzteBerichtigungen` unverändert)
+- [x] 1.2 `EtbZeitachse` rendert gespiegelt, Sammelbanner unten mit „↓“; Vitest `EtbZeitachse.test.tsx` und `EtbZeitachse.render.test.tsx` (gemerktes Rendern: neuer Eintrag unten rendert keine fremde Gruppe)
+- [x] 1.3 Hook `components/useFunkprotokollLauf.ts` (Öffnen am Ende, `amEnde`, Mitlaufen an der jüngsten id, Anker bei Nachladen oben) mit Vitest gegen ein Dokument-Double; `overflow-anchor: none` an der Zeitachse
+- [x] 1.4 Einfrieren bei „nicht am Ende ODER Fokus“, Auftauen am Ende ohne Fokus; Vitest am Modell und an der Zeitachse
+- [x] 1.5 `EtbPage`: „Ältere laden“ oben, „Neuere laden“ unten, Alerts unter der Zeitachse, `erfassenUndZeigen` rollt ans Ende statt zum Kopf; Vitest `EtbPage.test.tsx`/`EtbPage.seitenfenster.test.tsx` nachgezogen
+- [x] 1.6 Lesemarke als Trennlinie in der Achse mit Banner-Rückfall außerhalb des Fensters bzw. unter Filter, Text taktisch; Vitest `EtbLesemarke*.test.tsx`, `lesemarkeModell.test.ts`
+- [x] 1.7 Informationstelefon in derselben Bauform (Kehrung, „Ältere laden“ oben, Sammelbanner unten, Deeplink-Anruf vorn, Hook aus 1.3); Vitest `InfotelefonPage.test.tsx`, `infotelefon/zufluss.test.ts`
+- [x] 1.8 Regeln fortgeschrieben: `frontend/src/etb/AGENTS.md` (Erfassung, Seitenfenster, Zufluss, Lesemarke) und `frontend/src/stab/AGENTS.md` (Infotelefon); Prettier grün
 - [ ] 1.9 e2e nachgezogen: `etb-chronologie`, `etb-zeilenhoehe`, `leisten-flaeche`, `etb-seitenfenster`, `fokus-verdeckung`, `palette-datensaetze` (Leserichtung, Lage von „Neuere/Ältere laden“); `tsc` und `eslint` über `frontend/e2e` grün
-- [ ] 1.10 Doku: `docs/anwender/kapitel/einsatztagebuch.md` und `presse-infotelefon.md` beschreiben die Leserichtung, Mitlaufen, Sammelbanner unten und die Lesemarke; Wächter der Anwenderdoku grün
+- [x] 1.10 Doku: `docs/anwender/kapitel/einsatztagebuch.md` und `presse-infotelefon.md` beschreiben die Leserichtung, Mitlaufen, Sammelbanner unten und die Lesemarke; Wächter der Anwenderdoku grün
 
 ## 2. Eine Filterleiste — LLH-1065 (wbej3nl0)
 
