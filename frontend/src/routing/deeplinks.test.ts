@@ -39,6 +39,8 @@ import {
   abloesungPfad,
   betreuungPfad,
   verpflegungAusgabePfad,
+  verpflegungAusVorlagePfad,
+  parseVerpflegungTag,
   parseVerpflegungStelle,
   geraetVerpflegungAusgabePfad,
   verpflegungPfad,
@@ -413,6 +415,26 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parseVerpflegungStelle(new URLSearchParams('?stelle=abc'))).toBeNull();
     expect(parseVerpflegungStelle(new URLSearchParams('?stelle=0'))).toBeNull();
     expect(parseVerpflegungStelle(new URLSearchParams('?stelle=-3'))).toBeNull();
+  });
+
+  it('Tag aus der Vorlage mit gewähltem Tag per `?tag=` (LLH-1058)', () => {
+    expect(verpflegungAusVorlagePfad(E)).toBe('/einsaetze/5/verpflegung/aus-vorlage');
+    expect(verpflegungAusVorlagePfad(E, { tag: '2026-10-11' })).toBe(
+      '/einsaetze/5/verpflegung/aus-vorlage?tag=2026-10-11',
+    );
+    expect(parseVerpflegungTag(new URLSearchParams('?tag=2026-10-11'))).toBe('2026-10-11');
+    expect(parseVerpflegungTag(new URLSearchParams(''))).toBeNull();
+    // Kein Kalendertag: ganz verworfen, nie ein „Invalid Date“ in der Rechnung.
+    for (const roh of [
+      '2026-13-01',
+      '2026-02-30',
+      '11.10.2026',
+      '2026-10-1',
+      'heute',
+      '2026-10-11T00:00',
+    ]) {
+      expect(parseVerpflegungTag(new URLSearchParams({ tag: roh })), roh).toBeNull();
+    }
   });
 
   it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {

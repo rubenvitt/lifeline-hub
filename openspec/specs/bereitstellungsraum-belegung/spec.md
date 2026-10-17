@@ -10,7 +10,9 @@ des Raums das Eintreffen einer Kraft, auch einer unangemeldeten, die das System 
 Meldung an die Einsatzleitung anlegt; die Führung übernimmt oder weist sie ab. Die Führung ruft
 eine Kraft aus dem Raum ab, wahlweise mit Ziel-Abschnitt und Auftrag in einer Transaktion mit
 genau einem ETB-Eintrag; eine Einheit nimmt ihre Untereinheiten mit. Die abgerufene Kraft bleibt
-im Raum, bis ihr Ausrücken als Austritt gebucht ist; ein Abruf lässt sich zurücknehmen.
+im Raum, bis ihr Ausrücken als Austritt gebucht ist; ein Abruf lässt sich zurücknehmen. Die
+Detailseite bietet „Abrufen“ als Hauptaktion je bereitgestellter Kraft und zeigt abgerufene Kräfte
+getrennt oben unter „Abgerufen“; das Gerät des Raums bucht dort das Ausrücken.
 Detailseite, Liste und Druck zeigen die Kennzahlen mit laufender Wartezeit, die Belegung am längsten
 wartend zuerst und den Verlauf in einem Aufklappbereich, der erst beim Aufklappen lädt.
 
@@ -723,3 +725,74 @@ die Übernahme offen ist, und danach „unangemeldet“ als neutrale Marke ohne 
 #### Scenario: Nach der Übernahme
 - **WHEN** eine unangemeldet gebuchte Einheit übernommen wurde und weiter im Raum steht
 - **THEN** zeigt ihre Belegungszeile „unangemeldet“ ohne Farbe und nicht „nicht übernommen“
+
+### Requirement: Abruf in der Oberfläche
+Die Detailseite eines aktiven Raums SHALL je bereitgestellter Einheit und je einheitenlosem
+Fahrzeug „Abrufen“ als Hauptaktion anbieten. „Abrufen und austragen“ (Abruf mit
+`ausgerueckt: true`) und „Austragen“ (Austritt) MUST als Nebenwege im Aktionsmenü der Zeile
+stehen; die Belegung MUST keinen roten Knopf tragen. Eine Mehrfachauswahl gibt es nicht; ein
+Verband geht mit seiner Einheit.
+
+#### Scenario: Kein roter Knopf
+- **WHEN** die Führung einen aktiven Raum mit bereitgestellten Kräften öffnet
+- **THEN** trägt jede Zeile „Abrufen“ und ein Aktionsmenü mit „Abrufen und austragen“ und
+  „Austragen“, und die Belegung zeigt keinen roten Knopf
+
+### Requirement: Felder des Abruf-Dialogs
+Der Abruf-Dialog SHALL einen Ziel-Abschnitt, nur bei einer Einheit und vorbelegt mit dem
+Abschnitt des Raums, und einen Auftrag anbieten, beide optional; ein leeres Feld MUST nicht
+gesendet werden. Nimmt eine Einheit Untereinheiten mit, MUST der Dialog sie am Knopf nennen. Eine
+Ablehnung des Servers MUST im Dialog stehen, ohne Fehler-Toast.
+
+#### Scenario: Abrufen mit Ziel und Auftrag
+- **WHEN** die Führung bei „HLF 20“ im BR Sportplatz „Abrufen“ wählt, „EA Deich“ und den Auftrag
+  „Sandsackverbau“ einträgt und „Abrufen“ wählt
+- **THEN** geht ein Abruf mit Abschnitt „EA Deich“ und Auftragstext „Sandsackverbau“ hinaus, und
+  ein Hinweis nennt „HLF 20 abgerufen → EA Deich · Auftrag Nr. 7“
+
+#### Scenario: Ohne Einweiser
+- **WHEN** die Führung im Aktionsmenü von „HLF 20“ „Abrufen und austragen“ wählt und bestätigt
+- **THEN** geht ein Abruf mit `ausgerueckt: true` hinaus, und „HLF 20“ steht in keinem Raum mehr
+
+#### Scenario: Fahrzeug ohne Einheit
+- **WHEN** die Führung ein einheitenloses Fahrzeug abruft
+- **THEN** bietet der Dialog keinen Ziel-Abschnitt an
+
+### Requirement: Rechte der Abruf-Felder in der Oberfläche
+Fehlt der Person das Modul Einheiten oder Einsatzabschnitte, SHALL der Ziel-Abschnitt gesperrt
+mit Grund stehen; fehlt das Modul Aufträge, der Auftrag. Ein gesperrtes Feld MUST NOT gesendet
+werden.
+
+#### Scenario: Aufträge gesperrt
+- **WHEN** eine Person ohne Freigabe Aufträge den Abruf-Dialog öffnet
+- **THEN** steht der Auftrag gesperrt mit „Modul Aufträge gesperrt“, und der Abruf geht ohne
+  Auftragstext hinaus
+
+### Requirement: Abgerufene Kräfte in der Oberfläche
+Abgerufene Kräfte SHALL auf der Detailseite und am Gerät des Raums getrennt über den
+bereitgestellten unter „Abgerufen“ stehen, mit dem Wort „abgerufen“ in der Rolle Achtung, der
+taktischen Uhrzeit des Abrufs, dem Ziel und der Auftragsnummer, eine mitgenommene Untereinheit
+mit „mit …“ und ihrer Einheit, die am längsten abgerufene zuerst. Fremde Abrufe MUST der
+Zuflussschleuse der Belegung folgen, eigene MUST sofort stehen.
+
+#### Scenario: Abgerufen oben
+- **WHEN** „HLF 20“ um 14:32 nach „EA Deich“ mit Auftrag Nr. 7 abgerufen ist
+- **THEN** steht „HLF 20“ unter „Abgerufen“ mit „abgerufen 1432 → EA Deich · Auftrag Nr. 7“ und
+  nicht unter „Bereitgestellte Einheiten“, und die Kennzahl „Einheiten“ zählt es weiter
+
+#### Scenario: Mitgenommene Untereinheit im Verlauf
+- **WHEN** „Gruppe 1“ mit dem „1. Zug“ nach „EA Deich“ abgerufen wurde
+- **THEN** nennt der Verlauf „Abruf mit 1. Zug nach EA Deich“
+
+### Requirement: Ausrücken und Rücknahme in der Oberfläche
+Je abgerufener Kraft SHALL „Ausrücken buchen“ den Austritt buchen, auch am Gerät des Raums;
+„Abruf zurücknehmen“ MUST nur die Führung angeboten bekommen.
+
+#### Scenario: Ausrücken am Gerät
+- **WHEN** der Einweiser am Tablet des BR Sportplatz bei „HLF 20“ „Ausrücken buchen“ wählt
+- **THEN** ist der Austritt gebucht, und ein Hinweis nennt „Einheit „HLF 20“ ausgerückt“
+
+#### Scenario: Fehlabruf zurücknehmen
+- **WHEN** die Führung bei „HLF 20“ „Abruf zurücknehmen“ wählt
+- **THEN** ist der Abruf zurückgenommen, und „HLF 20“ steht wieder unter „Bereitgestellte
+  Einheiten“

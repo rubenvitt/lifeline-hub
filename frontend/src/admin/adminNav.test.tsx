@@ -113,6 +113,7 @@ function stammdatenHandler() {
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
     http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
+    http.get('/api/verpflegung-vorlagen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),

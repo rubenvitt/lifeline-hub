@@ -1,7 +1,9 @@
 import { apiGet, apiSend, type ApiSendOptionen } from './client';
 import type {
   AusgabeEingabe,
+  TagAusVorlageEingabe,
   Verpflegung,
+  VerpflegungTagErgebnis,
   VerpflegungAusgabeErgebnis,
   Verpflegungsstelle,
   VerpflegungsstelleEingabe,
@@ -30,6 +32,21 @@ export function legeZeitfensterAn(
   body: ZeitfensterEingabe,
 ): Promise<VerpflegungZeitfenster> {
   return apiSend<VerpflegungZeitfenster>(`${basis(einsatzId)}/zeitfenster`, 'POST', body);
+}
+
+/**
+ * Tag aus der Vorlage (LLH-1058): legt die Zeitfenster eines Tages in einer Transaktion an. 201,
+ * wenn mindestens eins entsteht; 200, wenn jedes übersprungen wird (gleichnamig am Tag schon da).
+ */
+export function createTagAusVorlage(
+  einsatzId: number,
+  body: TagAusVorlageEingabe,
+): Promise<VerpflegungTagErgebnis> {
+  return apiSend<VerpflegungTagErgebnis>(
+    `${basis(einsatzId)}/zeitfenster/aus-vorlage`,
+    'POST',
+    body,
+  );
 }
 
 /** Teiländerung; geprüft wird serverseitig gegen den Effektivzustand (Bestand + Patch). */

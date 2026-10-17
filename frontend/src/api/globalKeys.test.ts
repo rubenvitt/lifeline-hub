@@ -84,6 +84,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.einheitVorlagenListe('alle')).toEqual(['einheit-vorlagen', 'alle']);
     // Schichtmodelle (LLH-1122).
     expect(globalKeys.schichtmodelle()).toEqual(['schichtmodelle']);
+    // Verpflegungsplan (LLH-1058): Verwaltung liest alle, der Tag aus der Vorlage die aktiven.
+    expect(globalKeys.verpflegungVorlagen()).toEqual(['verpflegung-vorlagen']);
+    expect(globalKeys.verpflegungVorlagenListe('aktiv')).toEqual(['verpflegung-vorlagen', 'aktiv']);
+    expect(globalKeys.verpflegungVorlagenListe('alle')).toEqual(['verpflegung-vorlagen', 'alle']);
   });
 
   it('Betrieb: Datenträgerprüfung (LFH-1100)', () => {

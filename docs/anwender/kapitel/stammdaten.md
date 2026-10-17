@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
 ---
 
 ## Überblick
@@ -12,8 +12,8 @@ Material und Personal, dazu die Kataloge, aus denen Einsätze schöpfen (Einsatz
 externe Stellen, Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
 Führungsfunktionen, Schichtmodelle), sowie Name, Logo und Zeichen der Organisation. Einheiten-Vorlagen
 beschreiben stehende Einheiten wie einen Sanitätszug mit seinen Untereinheiten, Fahrzeugen und
-seiner Stammbesetzung. Im Einsatz werden aus den Stammdaten Kräfte disponiert und Einträge
-vorbelegt.
+seiner Stammbesetzung. Der Verpflegungsplan nennt die Mahlzeiten eines Einsatztags. Im Einsatz
+werden aus den Stammdaten Kräfte disponiert und Einträge vorbelegt.
 
 Gepflegt werden die Stammdaten in der Verwaltung unter „Stammdaten“, und zwar nur von
 System-Admins. Führungskräfte der Organisation sehen sie zum Nachschlagen.
@@ -128,6 +128,22 @@ bestätigt.
 
 3. Um keine Vorgabe mehr zu führen, beim bisherigen Modell „Vorgabe aufheben“ wählen.
 
+### Den Verpflegungsplan pflegen
+
+1. Unter „Stammdaten“ „Verpflegungsplan“ öffnen. Je Mahlzeit stehen Bezeichnung, Zeit, Art und
+   ob sie aktiv ist.
+2. „Mahlzeit anlegen“ wählen.
+3. „Bezeichnung“ eintragen, etwa „Frühstück“, und unter „Beginn“ und „Ende“ die Uhrzeit, etwa
+   „0630“ und „0800“. Endet die Mahlzeit nach Mitternacht, steht unter dem Ende „Ende am
+   Folgetag“.
+
+   ![Tabelle „Verpflegungsplan“ mit Frühstück, Mittag, der inaktiven Mahlzeit „Kaffee“, Abendessen und der Nachtverpflegung „2300–0100 +1 Tag“, je mit Art, Zustand und Aktionen](../bilder/stammdaten/verpflegungsplan.png)
+
+4. Nach Bedarf unter „Art“ „warm“, „kalt“ oder „Getränke“ wählen.
+5. „Anlegen“ wählen. Zum Ändern in der Zeile „Bearbeiten“ wählen.
+6. Eine Mahlzeit, die nicht mehr gebraucht wird, mit „Deaktivieren“ stilllegen; „Aktivieren“
+   holt sie zurück.
+
 ### Name, Logo und Zeichen der Organisation festlegen
 
 1. Unter „Stammdaten“ „Organisation“ öffnen.
@@ -227,6 +243,19 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)).
 - Jede Bezeichnung gibt es nur einmal, ohne Unterschied von Groß- und Kleinschreibung. Das
   Modell der Demo-Daten wird nie die Vorgabe der Organisation.
+
+### Verpflegungsplan
+
+- Uhrzeiten lassen sich als „0630“, „06:30“, „630“ oder „6:30“ eintragen; die Tabelle zeigt sie
+  als „0630–0800“. Ein Ende vor dem Beginn heißt: die Mahlzeit endet am nächsten Tag, die Tabelle
+  zeigt dann „+1 Tag“. Ende und Beginn dürfen nicht gleich sein.
+- Unter den aktiven Mahlzeiten ist jede Bezeichnung nur einmal erlaubt, ohne Unterschied von
+  Groß- und Kleinschreibung. Eine Mahlzeit lässt sich nicht löschen, nur deaktivieren; das fragt
+  nicht nach, weil es umkehrbar ist. Wer eine deaktivierte Mahlzeit aktiviert, deren Name inzwischen
+  eine aktive trägt, bekommt den Grund über der Tabelle.
+- Der Plan trägt keinen Bedarf und keine Daten. Im Einsatz legt die Verpflegung aus den aktiven
+  Mahlzeiten die Zeitfenster eines Tages an (Kapitel [Verpflegung](verpflegung.md)); eine spätere
+  Änderung am Plan ändert keine schon angelegten Zeitfenster.
 
 ### Demo-Stammdaten
 

@@ -56,10 +56,11 @@ export function folgeSchluessel(seitAt: string | null | undefined, name: string)
 
 /**
  * Art eines Verlaufseintrags als Wort, ein Wechsel mit dem anderen Raum (D12). Abruf und Austritt
- * nach einem Abruf nennen das Ziel, der Abruf dazu die Nummer des erteilten Auftrags (LLH-1085).
+ * nach einem Abruf nennen das Ziel, der Abruf dazu die Nummer des erteilten Auftrags (LLH-1085),
+ * der Abruf einer mitgenommenen Untereinheit die Einheit, mit der sie abgerufen wurde (D10).
  */
 export function verlaufText(
-  e: Pick<BrVerlaufEintrag, 'art' | 'herkunft' | 'ziel' | 'auftrag_nr'>,
+  e: Pick<BrVerlaufEintrag, 'art' | 'herkunft' | 'ziel' | 'auftrag_nr' | 'mit_einheit'>,
 ): string {
   switch (e.art) {
     case 'eintritt':
@@ -67,9 +68,10 @@ export function verlaufText(
     case 'austritt':
       return e.ziel ? `Austritt nach ${e.ziel}` : 'Austritt';
     case 'abruf': {
+      const mit = e.mit_einheit ? ` mit ${e.mit_einheit}` : '';
       const ziel = e.ziel ? ` nach ${e.ziel}` : '';
       const auftrag = e.auftrag_nr != null ? ` (Auftrag Nr. ${e.auftrag_nr})` : '';
-      return `Abruf${ziel}${auftrag}`;
+      return `Abruf${mit}${ziel}${auftrag}`;
     }
     case 'abruf_aufgehoben':
       return 'Abruf zurückgenommen';

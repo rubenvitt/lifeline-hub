@@ -11,6 +11,7 @@ import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import EinheitVorlagenTab from '../stammdaten/EinheitVorlagenTab';
 import SchichtmodelleTab from '../stammdaten/SchichtmodelleTab';
+import VerpflegungsplanTab from '../stammdaten/VerpflegungsplanTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 import FuehrungsfunktionenTab from '../stammdaten/FuehrungsfunktionenTab';
@@ -61,6 +62,8 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'einheiten', label: 'Einheiten-Vorlagen', element: <EinheitVorlagenTab /> },
       // Schichtmodelle der Ablösung (LLH-1122); die Vorgabe der Organisation geht in neue Einsätze.
       { key: 'schichtmodelle', label: 'Schichtmodelle', element: <SchichtmodelleTab /> },
+      // LLH-1058: Mahlzeiten, aus denen die Verpflegung eines Einsatzes einen Tag anlegt.
+      { key: 'verpflegungsplan', label: 'Verpflegungsplan', element: <VerpflegungsplanTab /> },
       { key: 'organisation', label: 'Organisation', element: <OrganisationTab /> },
       { key: 'sprechgruppen', label: 'Sprechgruppen', element: <SprechgruppenTab /> },
       {
