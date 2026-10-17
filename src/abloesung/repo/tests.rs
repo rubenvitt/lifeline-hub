@@ -2046,9 +2046,17 @@ async fn nachtrag_in_eine_abgeschlossene_periode_meldet_nichts() {
     ereignis(&w, w.f2, Abloesung, "2030-06-03 08:30:00").await;
 
     let b = ereignis(&w, w.f2, Eintreffen, "2030-06-03 06:30:00").await;
-    assert!(b.hinweise.is_empty(), "Eintreffen nachgetragen: {:?}", b.hinweise);
+    assert!(
+        b.hinweise.is_empty(),
+        "Eintreffen nachgetragen: {:?}",
+        b.hinweise
+    );
     let b = ereignis(&w, w.f2, Alarmierung, "2030-06-03 07:50:00").await;
-    assert!(b.hinweise.is_empty(), "Alarmierung nachgetragen: {:?}", b.hinweise);
+    assert!(
+        b.hinweise.is_empty(),
+        "Alarmierung nachgetragen: {:?}",
+        b.hinweise
+    );
 }
 
 /// Spec „Planung entfällt“: die Entlassung der geplanten Einheit hebt die Planung auf, mit ETB

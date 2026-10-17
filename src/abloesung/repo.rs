@@ -255,8 +255,8 @@ async fn attach_erben(
 }
 
 /// Die Planungswarnungen der laufenden Schichten in `liste` ([`planung_warnungen`]), gegen
-/// alle laufenden Schichten des Einsatzes: Einzelplanung und Ablöser-Liste. Ohne eine Planung in
-/// `liste` liest sie nichts.
+/// alle laufenden Schichten des Einsatzes: Einzelplanung und Ablöser-Liste. Ohne laufende Schicht
+/// in `liste` liest sie nichts.
 async fn attach_warnungen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -654,7 +654,7 @@ async fn has_abloeser_tx(conn: &mut SqliteConnection, id: i64) -> Result<bool, A
 }
 
 /// Zeitpunkt des Planungshinweises: `planungsvorlauf_minuten` vor der Fälligkeit.
-pub(crate) fn planungszeit(faellig_at: &str, planungsvorlauf_minuten: i64) -> Option<String> {
+fn planungszeit(faellig_at: &str, planungsvorlauf_minuten: i64) -> Option<String> {
     crate::zeit::plus_minuten(faellig_at, -planungsvorlauf_minuten)
 }
 
