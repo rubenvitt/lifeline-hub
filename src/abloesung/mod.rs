@@ -10,7 +10,15 @@
 //! ein verpasster Scheduler-Tick darf sie nicht verfälschen. Der Erinnerungs-Scheduler liefert
 //! nur den einmaligen Hinweis (Vorwarnung und Fälligkeit). Die Vorwarnzeit kommt aus dem
 //! Schichtmodell des Einsatzes, ohne eines gilt [`VORWARNUNG_VORGABE_MINUTEN`] (LLH-1122 hebt
-//! das Non-Goal „Vorwarnzeit fest 30 min“ aus LFH-635 auf).
+//! das Non-Goal „Vorwarnzeit fest 30 min“ aus LFH-635 auf). Eine dritte Frist ist der
+//! **Planungshinweis** (LLH-1131): `planungsvorlauf_minuten` vor der Fälligkeit (ohne
+//! Schichtmodell [`PLANUNGSVORLAUF_VORGABE_MINUTEN`]), nur solange keine ablösende Einheit
+//! geplant ist. Er ist eine Benachrichtigung, keine vierte Einstufung.
+//!
+//! **Hinweise zur ablösenden Einheit** (LLH-1131, [`hinweis`]): Alarmierung, Eintreffen,
+//! Eintreffen am Bereitstellungsraum und Abruf einer geplanten ablösenden Einheit sowie eine
+//! entfallene Planung erreichen die Leser des Moduls. Beim Planen warnt die Schicht
+//! ([`AbloesungPlanungWarnung`]), lehnt aber nicht ab.
 //!
 //! **Kopplung an die Kräfte-Zeitachse** (LLH-1128, [`kopplung`]): ein Eintreffen beginnt die
 //! Schicht einer Einheit ohne laufende (auch ohne geerbte), sofern Abschnitt oder Einsatz eine
@@ -31,10 +39,11 @@ use crate::zeit;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+pub mod hinweis;
 pub mod kopplung;
 pub mod repo;
 
-pub use crate::schichtmodell::VORWARNUNG_VORGABE_MINUTEN;
+pub use crate::schichtmodell::{PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN};
 
 /// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0114_abloesung.sql`).
 pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
@@ -94,6 +103,106 @@ wire_enum! {
         /// Fälligkeit erreicht oder überschritten.
         Ueberfaellig => "ueberfaellig",
     }
+}
+
+wire_enum! {
+    /// Was beim Planen einer ablösenden Einheit auffällt (LLH-1131): eine Warnung, kein Fehler.
+    /// Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbloesungWarnungArt {
+        /// Die Einheit ist schon für eine andere laufende Schicht geplant.
+        SchonGeplant => "schon_geplant",
+        /// Die Einheit steht selbst im Einsatz: sie hat eine eigene laufende Schicht oder läuft in
+        /// der ihres Verbands mit (Knoten-Modell).
+        ImEinsatz => "im_einsatz",
+    }
+    try_from = |s| format!("Ungültige Art einer Planungswarnung: {s}");
+}
+
+/// Eine Warnung zur geplanten ablösenden Einheit einer laufenden Schicht (LLH-1131). Gilt für
+/// die Einzelplanung und für die Ablöser-Liste (LLH-1118 Punkt 3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungPlanungWarnung {
+    pub art: AbloesungWarnungArt,
+    /// Die geplante ablösende Einheit.
+    pub einheit_id: i64,
+    pub einheit_name: String,
+    /// `schon_geplant`: die andere Schicht, für die sie geplant ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abloesung_id: Option<i64>,
+    /// `schon_geplant`: die Einheit dieser anderen Schicht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abloesung_einheit_name: Option<String>,
+    /// `im_einsatz`: Beginn der laufenden Schicht, in der sie steht (eigene oder die ihres
+    /// Verbands).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seit_at: Option<String>,
+}
+
+/// Eine laufende Schicht, wie die Planungswarnungen sie lesen.
+#[derive(Debug, Clone)]
+pub struct PlanungsStand {
+    pub id: i64,
+    pub einheit_id: i64,
+    pub einheit_name: String,
+    pub beginn_at: String,
+    /// Geplante ablösende Einheiten: die Einzelplanung und die Einträge der Ablöser-Liste.
+    pub abloeser: Vec<i64>,
+}
+
+/// Planungswarnungen je laufender Schicht (rein): eine geplante Einheit, die auch eine andere
+/// laufende Schicht plant (`schon_geplant`, je andere Schicht), oder die selbst in einer
+/// laufenden Schicht steht, eigener oder geerbter (`im_einsatz`; `erbt` aus [`vererbung`]).
+/// Schichten ohne Warnung fehlen. `namen` liefert die Namen der geplanten Einheiten.
+pub fn planung_warnungen(
+    schichten: &[PlanungsStand],
+    erbt: &HashMap<i64, i64>,
+    namen: &HashMap<i64, String>,
+) -> HashMap<i64, Vec<AbloesungPlanungWarnung>> {
+    let mut aus: HashMap<i64, Vec<AbloesungPlanungWarnung>> = HashMap::new();
+    let schicht_von = |einheit: i64| schichten.iter().find(|s| s.einheit_id == einheit);
+    for s in schichten {
+        let mut gesehen = HashSet::new();
+        for &p in &s.abloeser {
+            if !gesehen.insert(p) {
+                continue;
+            }
+            let name = namen.get(&p).cloned().unwrap_or_default();
+            let warnung = |art, abloesung: Option<&PlanungsStand>, seit_at: Option<String>| {
+                AbloesungPlanungWarnung {
+                    art,
+                    einheit_id: p,
+                    einheit_name: name.clone(),
+                    abloesung_id: abloesung.map(|a| a.id),
+                    abloesung_einheit_name: abloesung.map(|a| a.einheit_name.clone()),
+                    seit_at,
+                }
+            };
+            let mut liste = Vec::new();
+            for andere in schichten
+                .iter()
+                .filter(|o| o.id != s.id && o.abloeser.contains(&p))
+            {
+                liste.push(warnung(
+                    AbloesungWarnungArt::SchonGeplant,
+                    Some(andere),
+                    None,
+                ));
+            }
+            let traeger = schicht_von(p).or_else(|| erbt.get(&p).and_then(|&t| schicht_von(t)));
+            if let Some(t) = traeger {
+                liste.push(warnung(
+                    AbloesungWarnungArt::ImEinsatz,
+                    None,
+                    Some(t.beginn_at.clone()),
+                ));
+            }
+            if !liste.is_empty() {
+                aus.entry(s.id).or_default().append(&mut liste);
+            }
+        }
+    }
+    aus
 }
 
 /// Fälligkeit = Beginn + Rhythmus. `None` bei unparsbarem Beginn.
@@ -183,6 +292,10 @@ pub struct AbloesungAnzeige {
     /// laufende Schicht unter dieser Einheit, bis zur nächsten mit eigener. Leer bei
     /// abgelösten und beendeten Schichten.
     pub erbende_einheiten: Vec<AbloesungErbe>,
+    /// Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht
+    /// geplant oder selbst im Einsatz. Beim Lesen ermittelt; leer ohne Planung, ohne Auffälliges
+    /// und bei abgelösten und beendeten Schichten. Die Planung gelingt trotzdem.
+    pub planung_warnungen: Vec<AbloesungPlanungWarnung>,
     pub angelegt_at: String,
 }
 
@@ -372,6 +485,76 @@ mod tests {
         assert_eq!(erbt.get(&7), None, "ohne Träger keine Schicht");
         assert_eq!(erbt.get(&8), None, "Zyklus ohne Träger terminiert");
         assert_eq!(erbt.len(), 3);
+    }
+
+    /// LLH-1131: eine geplante Einheit, die auch eine andere Schicht plant, warnt „schon
+    /// geplant“ an beiden; eine mit eigener oder geerbter laufender Schicht „im Einsatz seit“
+    /// deren Beginn. Ohne Auffälliges keine Warnung, eine doppelt genannte zählt einmal.
+    #[test]
+    fn planung_warnungen_schon_geplant_und_im_einsatz() {
+        let s = |id, einheit_id, name: &str, beginn: &str, abloeser: Vec<i64>| PlanungsStand {
+            id,
+            einheit_id,
+            einheit_name: name.into(),
+            beginn_at: beginn.into(),
+            abloeser,
+        };
+        // Schicht 1 (Einheit 10) und 2 (Einheit 20) planen beide 30; Schicht 3 (Einheit 40) plant
+        // 20, die selbst läuft; Schicht 4 (Einheit 50) plant 61, die die Schicht ihres Verbands
+        // 40 erbt; Schicht 5 (Einheit 70) plant 80 zweimal, unauffällig.
+        let schichten = vec![
+            s(1, 10, "Florian 1", "2026-10-17 06:00:00", vec![30]),
+            s(2, 20, "Florian 2", "2026-10-17 07:00:00", vec![30]),
+            s(3, 40, "Zug 4", "2026-10-17 08:00:00", vec![20]),
+            s(4, 50, "Florian 5", "2026-10-17 09:00:00", vec![61]),
+            s(5, 70, "Florian 7", "2026-10-17 09:30:00", vec![80, 80]),
+        ];
+        let erbt = HashMap::from([(61, 40)]);
+        let namen: HashMap<i64, String> = [
+            (20, "Florian 2"),
+            (30, "Florian 3"),
+            (61, "Gruppe 6"),
+            (80, "Florian 8"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k, v.to_string()))
+        .collect();
+        let w = planung_warnungen(&schichten, &erbt, &namen);
+        let an = |id: i64| w.get(&id).cloned().unwrap_or_default();
+
+        assert_eq!(
+            an(1),
+            vec![AbloesungPlanungWarnung {
+                art: AbloesungWarnungArt::SchonGeplant,
+                einheit_id: 30,
+                einheit_name: "Florian 3".into(),
+                abloesung_id: Some(2),
+                abloesung_einheit_name: Some("Florian 2".into()),
+                seit_at: None,
+            }]
+        );
+        assert_eq!(an(2)[0].abloesung_id, Some(1), "an beiden Schichten");
+        assert_eq!(
+            an(3),
+            vec![AbloesungPlanungWarnung {
+                art: AbloesungWarnungArt::ImEinsatz,
+                einheit_id: 20,
+                einheit_name: "Florian 2".into(),
+                abloesung_id: None,
+                abloesung_einheit_name: None,
+                seit_at: Some("2026-10-17 07:00:00".into()),
+            }]
+        );
+        assert_eq!(
+            an(4)[0].seit_at.as_deref(),
+            Some("2026-10-17 08:00:00"),
+            "geerbt: Beginn der Schicht des Verbands"
+        );
+        assert!(
+            an(5).is_empty(),
+            "unauffällig, doppelt genannt zählt einmal"
+        );
+        assert_eq!(w.len(), 4);
     }
 
     #[test]

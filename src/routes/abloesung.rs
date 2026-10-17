@@ -47,16 +47,25 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
 
 /// Nach einem Schreibweg der Kräfte-Zeitachse, dessen Kopplung die Ablösung geändert hat
 /// (LLH-1128: Schicht mit dem Eintreffen begonnen, mit der Entlassung beendet, nach gestrichener
-/// Entlassung wieder laufend): Kurzruf je ETB-Eintrag und Listen-Refresh, wie beim Beginnen von
-/// Hand. Ohne Einträge nichts.
-pub(crate) fn publish_kopplung(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
-    if etb_ids.is_empty() {
-        return;
+/// Entlassung wieder laufend; LLH-1131: Planung der ablösenden Einheit entfallen): Kurzruf je
+/// ETB-Eintrag und Listen-Refresh, wie beim Beginnen von Hand. Danach die Hinweise zur
+/// ablösenden Einheit (`abloesung::hinweis`) über `benachrichtigung::melden`; ein Fehler dort
+/// lässt den Schreibweg nicht scheitern. Ohne beides nichts.
+pub(crate) async fn publish_kopplung(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: &[i64],
+    hinweise: &[crate::benachrichtigung::Anlass],
+) {
+    if !etb_ids.is_empty() {
+        for etb_id in etb_ids {
+            state.live.publiziere(einsatz_id, *etb_id);
+        }
+        sse(state, einsatz_id);
     }
-    for etb_id in etb_ids {
-        state.live.publiziere(einsatz_id, *etb_id);
+    for anlass in hinweise {
+        crate::benachrichtigung::melden(&state.pool, &state.live, anlass.clone()).await;
     }
-    sse(state, einsatz_id);
 }
 
 /// Vollzug und Rücknahme ändern die Zeitachse der Einheit und per Fan-out die ihrer Personen;
