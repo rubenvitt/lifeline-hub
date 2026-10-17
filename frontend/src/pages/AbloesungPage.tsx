@@ -17,8 +17,9 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Abloesung, AbloesungVorgabe } from '../api/types';
+import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
+import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import {
   AbloeserDialog,
   RhythmusDialog,
@@ -30,14 +31,23 @@ import { formatDauer } from '../abloesung/dauer';
 import { planungWarnungText } from '../abloesung/planungWarnung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { countFaellige } from '../abloesung/einstufung';
+import {
+  BEGINN_DER_PERIODE,
+  findOhneSchicht,
+  ohneSchichtZuflussText,
+  type OhneSchicht,
+} from '../abloesung/ohneSchicht';
 import { formatRegel, formatRegelKurz } from '../abloesung/schichtmodellText';
 import { useUhr } from '../abloesung/useUhr';
 import {
   eingeordnet,
   freigegeben,
+  freigegebenNach,
   LEERER_ZUFLUSSSTAND,
   nachgefuehrt,
+  nachgefuehrtNach,
   teileZufluss,
+  teileZuflussNach,
   zuflussText,
   type Zuflussstand,
 } from '../abloesung/zufluss';
@@ -57,7 +67,7 @@ import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { einsatzRechteGrund, MODUL_EINHEITEN_GESPERRT } from '../components/nurAnsicht';
 import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import { einsatzEinstellungenPfad } from '../routing/deeplinks';
 
@@ -66,10 +76,31 @@ const { Text } = Typography;
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const abloesungRechteText = einsatzRechteGrund;
 
+/**
+ * Die Ansichten der Seite (LLH-1128): laufende Schichten, Einheiten im Einsatz ohne Schicht und
+ * die vergangenen Schichten. „Vergangen“ teilt sich in abgelöste und beendete; ein eigenes
+ * Segment je Status trüge die Werkzeugzeile auf 390 px im Handschuh-Betrieb nicht neben dem
+ * Sammelbanner (gemessen in `e2e/gate1-ueberlauf.spec.ts`).
+ */
+type Ansicht = 'laufend' | 'ohne' | 'vergangen';
+type Vergangen = 'abgeloest' | 'beendet';
+
 type Rhythmusziel =
   /** `vorgabe`: was bei leerem Feld gilt, schon als Platzhalter (Abschnitt vor Einsatz). */
   | { art: 'schicht'; schicht: Abloesung; vorgabe: string | undefined }
   | { art: 'abschnitt'; vorgabe: AbloesungVorgabe };
+
+/** Leerzustand und Name der Schichtliste je Status. */
+const LEER: Record<AbloesungStatus, string> = {
+  laufend: 'Keine laufenden Schichten',
+  abgeloest: 'Noch keine Ablösung vollzogen',
+  beendet: 'Keine beendete Schicht',
+};
+const BEREICH: Record<AbloesungStatus, string> = {
+  laufend: 'Laufende Schichten',
+  abgeloest: 'Abgelöste Schichten',
+  beendet: 'Beendete Schichten',
+};
 
 /**
  * Fachmodul Ablösung (LFH-635): Schichten der Einheiten, nach Fälligkeit geordnet.
@@ -90,6 +121,12 @@ type Rhythmusziel =
  *
  * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und „in x min" laufen ohne Abruf mit. Nichts
  * blinkt; der Hinweis bei Fälligkeit kommt einmalig über die AlarmZentrale.
+ *
+ * „Ohne Schicht“ (LLH-1128) zeigt die Einheiten im Einsatz, die weder eine eigene laufende Schicht
+ * haben noch eine erben (`abloesung/ohneSchicht.ts`), mit „Schicht beginnen“ je Zeile. Die Liste
+ * hat ihre eigene Schleuse nach denselben Regeln; Zähler und Kopf rechnen mit der vollen Menge.
+ * Ohne das Modul Einheiten fehlen Einheiten und Zeitachse, das Segment steht dann gesperrt mit
+ * Grund. Auf dem Handschirm tragen die Segmente keine Zahl, der Kopf nennt sie.
  */
 export default function AbloesungPage() {
   const { id } = useParams();
@@ -101,14 +138,22 @@ export default function AbloesungPage() {
   const jetzt = useUhr();
   const { istSchmal } = useViewport();
 
-  const [ansicht, setAnsicht] = useState<'laufend' | 'abgeloest'>('laufend');
+  const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
+  const [vergangen, setVergangen] = useState<Vergangen>('abgeloest');
   const [beginnenOffen, setBeginnenOffen] = useState(false);
+  // Aus einer Zeile „Ohne Schicht“: die Einheit steht im Dialog schon gewählt.
+  const [beginnenVorbelegt, setBeginnenVorbelegt] = useState<number | undefined>(undefined);
   const [vollzugSchicht, setVollzugSchicht] = useState<Abloesung | null>(null);
   const [abloeserSchicht, setAbloeserSchicht] = useState<Abloesung | null>(null);
   const [rhythmusZiel, setRhythmusZiel] = useState<Rhythmusziel | null>(null);
   // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
   // alle Schichten des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
+    einsatzId,
+    ...LEERER_ZUFLUSSSTAND,
+  });
+  // Eine zweite Schleuse für „Ohne Schicht“, nach demselben Muster (`abloesung/zufluss.ts`).
+  const [ohneZustand, setOhneZustand] = useState<{ einsatzId: number } & Zuflussstand>({
     einsatzId,
     ...LEERER_ZUFLUSSSTAND,
   });
@@ -124,7 +169,13 @@ export default function AbloesungPage() {
   const abgeloestQuery = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'abgeloest'),
     queryFn: () => listeAbloesungen(einsatzId, 'abgeloest'),
-    enabled: ansicht === 'abgeloest',
+    enabled: ansicht === 'vergangen' && vergangen === 'abgeloest',
+  });
+  // Beendet ohne Ablösung (LLH-1128): mit der Entlassung oder beim Auflösen der Einheit.
+  const beendetQuery = useQuery({
+    queryKey: einsatzKeys.abloesungListe(einsatzId, 'beendet'),
+    queryFn: () => listeAbloesungen(einsatzId, 'beendet'),
+    enabled: ansicht === 'vergangen' && vergangen === 'beendet',
   });
   const vorgabenQuery = useQuery({
     queryKey: einsatzKeys.abloesungVorgaben(einsatzId),
@@ -141,29 +192,40 @@ export default function AbloesungPage() {
   const einsatzVorgabePfad = einsatzEinstellungenPfad(einsatzId, 'abloesung');
   const zurEinsatzVorgabe = useLinkClickHandler<HTMLElement>(einsatzVorgabePfad);
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
-  // Die Einheiten braucht nur, wer Schichten beginnen oder Ablöser wählen darf.
-  const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-    enabled: darfSchreiben,
-  });
 
-  // Nur für den Platzhalter „Im Einsatz seit“ des offenen Beginnen-Dialogs (LFH-1078). Die
-  // Zeitachse gehört dem Modul Einheiten: ohne dessen Freigabe keine Anfrage (Spec
-  // `modul-freigabe`), der Platzhalter bleibt dann leer.
+  // Einheiten und ihre Zeitachse gehören dem Modul Einheiten: ohne dessen Freigabe keine Anfrage
+  // (Spec `modul-freigabe`). Sie tragen „Ohne Schicht“ (LLH-1128) und den Platzhalter „Im Einsatz
+  // seit“ des Beginnen-Dialogs (LFH-1078); ohne sie ist das Segment gesperrt und der Platzhalter
+  // leer. Live kommen beide über `einheit`, `fahrzeug` und `abloesung` (`api/queryKeys.ts`).
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
-    enabled: darfSchreiben && beginnenOffen,
+  });
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
+  // Gesperrt erst, wenn die Freigaben da sind: beim Laden steht das Segment offen, ohne Zahl.
+  const einheitenGesperrt = freigabenQuery.data != null && !einheitenFrei;
+  // Die Einheiten braucht, wer Schichten beginnen oder Ablöser wählen darf, und „Ohne Schicht“.
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+    enabled: darfSchreiben || einheitenFrei,
   });
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
-    enabled: darfSchreiben && beginnenOffen && istKeyFreigegeben('einheiten', freigabenQuery.data),
+    enabled: einheitenFrei,
   });
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
+  // Erst mit allen drei Quellen: ohne die laufenden stünde jede Einheit kurz „ohne Schicht“.
+  const ohneSchicht = useMemo(
+    () =>
+      einheitenFrei && einheitenQuery.data && periodenQuery.data && laufendQuery.data
+        ? findOhneSchicht(einheitenQuery.data, periodenQuery.data, laufendQuery.data)
+        : null,
+    [einheitenFrei, einheitenQuery.data, periodenQuery.data, laufendQuery.data],
+  );
 
   // ── Live-Zufluss ── Nur die gerenderte Liste nimmt `sichtbar`. Kopfzeile, Zähler,
   // Fälligkeitszahl und freie Einheiten rechnen mit der vollen Menge: die Zahlen dürfen nicht
@@ -201,6 +263,34 @@ export default function AbloesungPage() {
     setZuflussZustand((z) => ({
       einsatzId,
       ...freigegeben(z.einsatzId === einsatzId ? z : LEERER_ZUFLUSSSTAND, laufende),
+    }));
+
+  // ── Zufluss „Ohne Schicht“ ── Gleiche Regeln: neue Einheiten warten hinter dem Banner, eine
+  // Einheit, die eine Schicht bekommt, fällt sofort weg, die Folge bleibt eingefroren. Eigene
+  // Neuzugänge gibt es nicht: die Seite legt keine Einheit an. Der Zähler rechnet mit der vollen
+  // Menge.
+  const ohneStand: Zuflussstand =
+    ohneZustand.einsatzId === einsatzId ? ohneZustand : LEERER_ZUFLUSSSTAND;
+  const ohneGeteilt = teileZuflussNach(ohneSchicht ?? [], ohneStand, BEGINN_DER_PERIODE);
+  if (ohneSchicht) {
+    const neu = nachgefuehrtNach(
+      ohneStand,
+      ohneGeteilt.sichtbar,
+      ohneGeteilt.umgeordnet,
+      BEGINN_DER_PERIODE,
+    );
+    if (neu || ohneZustand.einsatzId !== einsatzId) {
+      setOhneZustand({ einsatzId, ...(neu ?? ohneStand) });
+    }
+  }
+  const gibOhneFrei = () =>
+    setOhneZustand((z) => ({
+      einsatzId,
+      ...freigegebenNach(
+        z.einsatzId === einsatzId ? z : LEERER_ZUFLUSSSTAND,
+        ohneSchicht ?? [],
+        BEGINN_DER_PERIODE,
+      ),
     }));
 
   // Einheiten ohne laufende Schicht — nur sie können beginnen oder ablösen.
@@ -358,18 +448,51 @@ export default function AbloesungPage() {
   }
   const einsatz = einsatzQuery.data;
   const faellig = countFaellige(laufende, jetzt);
-  const liste = ansicht === 'laufend' ? sichtbar : (abgeloestQuery.data ?? []);
-  const bannerText = zuflussText(zurueckgehalten, jetzt, umgeordnet ? sichtbar : null);
-  const listenQuery = ansicht === 'laufend' ? laufendQuery : abgeloestQuery;
-  const oeffneBeginnen = () => {
+  // Ist „Ohne Schicht“ gesperrt, gilt die Ansicht nicht, auch wenn die Sperre erst später kam.
+  const wirksam: Ansicht = ansicht === 'ohne' && einheitenGesperrt ? 'laufend' : ansicht;
+  const vergangenQuery = vergangen === 'abgeloest' ? abgeloestQuery : beendetQuery;
+  const listenArt = wirksam === 'laufend' ? 'laufend' : vergangen;
+  const listenQuery = wirksam === 'laufend' ? laufendQuery : vergangenQuery;
+  const liste =
+    wirksam === 'laufend' ? sichtbar : wirksam === 'vergangen' ? (vergangenQuery.data ?? []) : [];
+  const banner =
+    wirksam === 'laufend'
+      ? {
+          zeigen: zurueckgehalten.length > 0 || umgeordnet,
+          text: zuflussText(zurueckgehalten, jetzt, umgeordnet ? sichtbar : null),
+          kurz: sammelbannerKurz(zurueckgehalten.length, umgeordnet),
+          onKlick: gibFrei,
+        }
+      : wirksam === 'ohne'
+        ? {
+            zeigen: ohneGeteilt.zurueckgehalten.length > 0 || ohneGeteilt.umgeordnet,
+            text: ohneSchichtZuflussText(
+              ohneGeteilt.zurueckgehalten.length,
+              ohneGeteilt.umgeordnet,
+            ),
+            kurz: sammelbannerKurz(ohneGeteilt.zurueckgehalten.length, ohneGeteilt.umgeordnet),
+            onKlick: gibOhneFrei,
+          }
+        : null;
+  const oeffneBeginnen = (vorbelegt?: number) => {
     beginnenMut.reset();
+    setBeginnenVorbelegt(vorbelegt);
     setBeginnenOffen(true);
   };
+  const ohneZahl = ohneSchicht?.length;
+  // Jede der drei Quellen kann scheitern; dann steht der Fehler statt eines ewigen Ladens.
+  const ohneFehler = einheitenQuery.isError || periodenQuery.isError || laufendQuery.isError;
+  // Auf dem Handschirm tragen die Segmente keine Zahl (Platz neben dem Banner, LLH-1128); der
+  // Kopf nennt sie dort wie überall. Im Handschuh-Betrieb bricht „Ohne Schicht“ zudem in zwei
+  // Zeilen: das Segment ist dort 72 px hoch, und einzeilig bliebe neben drei Segmenten kein Platz
+  // für „1 neu“ (gemessen in `e2e/gate1-ueberlauf.spec.ts`).
+  const segmentZahl = (n: number | undefined) => (istSchmal || n == null ? '' : ` (${n})`);
+  const ohneWort = istSchmal && token.controlHeight >= 72 ? 'Ohne\nSchicht' : 'Ohne Schicht';
 
   return (
     <EinsatzSeite
       titel="Ablösung"
-      meta={`${laufende.length} laufend · ${faellig} fällig`}
+      meta={`${laufende.length} laufend · ${faellig} fällig${ohneZahl ? ` · ${ohneZahl} ohne Schicht` : ''}`}
       dataUpdatedAt={laufendQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb
@@ -382,11 +505,11 @@ export default function AbloesungPage() {
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!darfSchreiben} onClick={oeffneBeginnen}>
+        <Button type="primary" disabled={!darfSchreiben} onClick={() => oeffneBeginnen()}>
           Schicht beginnen
         </Button>
       }
-      neueZeile={darfSchreiben ? oeffneBeginnen : undefined}
+      neueZeile={darfSchreiben ? () => oeffneBeginnen() : undefined}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (!darfSchreiben || rueckgaengigFehler != null) && (
@@ -404,33 +527,41 @@ export default function AbloesungPage() {
           (Segmentleiste und Banner tragen beide einen 1-px-Rand). Das Banner ändert ihre Höhe
           nicht, also verschiebt es keine Karte. */}
       <Flex
-        gap={token.marginSM}
+        // Schmal nur `marginXS` (Muster Verpflegung, LLH-1040): die Segmente rücken in ihrer Zelle
+        // um den Zielabstand ein, die Ziele stehen so weiter ≥ 16 px auseinander.
+        gap={istSchmal ? token.marginXS : token.marginSM}
         align="center"
         data-lfh="abloesung-werkzeugzeile"
         style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
       >
         <Segmentleiste
           beschriftung="Ansicht"
-          wert={ansicht}
+          wert={wirksam}
           onWechsel={(w) => {
             // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
             gibFrei();
+            gibOhneFrei();
             setAnsicht(w);
           }}
           optionen={[
-            { wert: 'laufend', label: `Laufend (${laufende.length})` },
-            { wert: 'abgeloest', label: 'Abgelöst' },
+            { wert: 'laufend', label: `Laufend${segmentZahl(laufende.length)}` },
+            {
+              wert: 'ohne',
+              label: `${ohneWort}${segmentZahl(ohneZahl)}`,
+              gesperrt: einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined,
+            },
+            { wert: 'vergangen', label: 'Vergangen' },
           ]}
           style={{ flex: 'none' }}
         />
-        {ansicht === 'laufend' && (zurueckgehalten.length > 0 || umgeordnet) && (
+        {banner?.zeigen && (
           <Sammelbanner
-            aktion={{ label: 'anzeigen', onKlick: gibFrei }}
-            kurz={istSchmal ? sammelbannerKurz(zurueckgehalten.length, umgeordnet) : undefined}
+            aktion={{ label: 'anzeigen', onKlick: banner.onKlick }}
+            kurz={istSchmal ? banner.kurz : undefined}
             style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
           >
             <span
-              title={bannerText}
+              title={banner.text}
               style={{
                 display: 'block',
                 overflow: 'hidden',
@@ -438,61 +569,104 @@ export default function AbloesungPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {bannerText}
+              {banner.text}
             </span>
           </Sammelbanner>
         )}
       </Flex>
-
-      {listenQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Ablösungen konnten nicht geladen werden"
+      {/* Die vergangenen Schichten nach Status (LLH-1128). Eine eigene Zeile: in dieser Ansicht
+          steht kein Banner, und neben der Ansichtsleiste fehlte auf dem Handschirm der Platz. */}
+      {wirksam === 'vergangen' && (
+        <Segmentleiste
+          beschriftung="Vergangene Schichten"
+          wert={vergangen}
+          onWechsel={setVergangen}
+          optionen={[
+            { wert: 'abgeloest', label: 'Abgelöst' },
+            { wert: 'beendet', label: 'Beendet' },
+          ]}
+          style={{ marginBottom: token.margin }}
         />
       )}
-      {listenQuery.isLoading ? (
-        <Spin />
-      ) : liste.length === 0 ? (
-        <SeitenLeer
-          titel={
-            ansicht === 'laufend' ? 'Keine laufenden Schichten' : 'Noch keine Ablösung vollzogen'
-          }
-        />
-      ) : (
-        <section aria-label={ansicht === 'laufend' ? 'Laufende Schichten' : 'Abgelöste Schichten'}>
-          {liste.map((s) => (
-            <AbloesungKarte
-              key={s.id}
-              schicht={s}
-              jetzt={jetzt}
-              darfSchreiben={darfSchreiben}
-              onVollziehen={(x) => {
-                vollzugMut.reset();
-                setVollzugSchicht(x);
-              }}
-              onAbloeserPlanen={(x) => {
-                aendernMut.reset();
-                setAbloeserSchicht(x);
-              }}
-              onRhythmusAendern={(x) => {
-                aendernMut.reset();
-                const v = vorgaben.find((g) => g.abschnitt_id === x.abschnitt_id)?.rhythmus_minuten;
-                // Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122).
-                const vorgabe =
-                  v != null
-                    ? abschnittVorgabe(formatDauer(v))
-                    : einsatzVorgabeKurz != null
-                      ? einsatzVorgabe(einsatzVorgabeKurz)
-                      : undefined;
-                setRhythmusZiel({ art: 'schicht', schicht: x, vorgabe });
-              }}
-              onZuruecknehmen={(x) => zuruecknehmenMut.mutate(x.id)}
-              fehlerGrund={kartenFehler.grund(s.id)}
+
+      {wirksam === 'ohne' ? (
+        <>
+          {ohneFehler && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: token.marginSM }}
+              title="Einheiten ohne Schicht konnten nicht geladen werden"
             />
-          ))}
-        </section>
+          )}
+          {ohneSchicht == null ? (
+            !ohneFehler && <Spin />
+          ) : ohneSchicht.length === 0 ? (
+            <SeitenLeer titel="Keine Einheit ohne Schicht" />
+          ) : (
+            <section aria-label="Einheiten ohne Schicht">
+              {ohneGeteilt.sichtbar.map((e: OhneSchicht) => (
+                <OhneSchichtKarte
+                  key={e.id}
+                  eintrag={e}
+                  darfSchreiben={darfSchreiben}
+                  onBeginnen={(x) => oeffneBeginnen(x.id)}
+                />
+              ))}
+            </section>
+          )}
+        </>
+      ) : (
+        <>
+          {listenQuery.isError && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: token.marginSM }}
+              title="Ablösungen konnten nicht geladen werden"
+            />
+          )}
+          {listenQuery.isLoading ? (
+            <Spin />
+          ) : liste.length === 0 ? (
+            <SeitenLeer titel={LEER[listenArt]} />
+          ) : (
+            <section aria-label={BEREICH[listenArt]}>
+              {liste.map((s) => (
+                <AbloesungKarte
+                  key={s.id}
+                  schicht={s}
+                  jetzt={jetzt}
+                  darfSchreiben={darfSchreiben}
+                  onVollziehen={(x) => {
+                    vollzugMut.reset();
+                    setVollzugSchicht(x);
+                  }}
+                  onAbloeserPlanen={(x) => {
+                    aendernMut.reset();
+                    setAbloeserSchicht(x);
+                  }}
+                  onRhythmusAendern={(x) => {
+                    aendernMut.reset();
+                    const v = vorgaben.find(
+                      (g) => g.abschnitt_id === x.abschnitt_id,
+                    )?.rhythmus_minuten;
+                    // Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122).
+                    const vorgabe =
+                      v != null
+                        ? abschnittVorgabe(formatDauer(v))
+                        : einsatzVorgabeKurz != null
+                          ? einsatzVorgabe(einsatzVorgabeKurz)
+                          : undefined;
+                    setRhythmusZiel({ art: 'schicht', schicht: x, vorgabe });
+                  }}
+                  onZuruecknehmen={(x) => zuruecknehmenMut.mutate(x.id)}
+                  fehlerGrund={kartenFehler.grund(s.id)}
+                />
+              ))}
+            </section>
+          )}
+        </>
       )}
 
       <Paneel titel="Rhythmus je Abschnitt" style={{ marginTop: token.marginLG }}>
@@ -584,6 +758,7 @@ export default function AbloesungPage() {
         <SchichtBeginnenDialog
           offen
           einheiten={freieEinheiten}
+          vorbelegt={beginnenVorbelegt}
           vorgabeJeEinheit={vorgabeJeEinheit}
           einsatzVorgabe={einsatzVorgabeKurz}
           eintreffenJeEinheit={eintreffenJeEinheit}

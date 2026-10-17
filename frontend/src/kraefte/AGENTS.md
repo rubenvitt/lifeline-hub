@@ -53,8 +53,13 @@ der Organisation wechselt in den zwei Schritten, die der Server verlangt, nur ü
 ohne eigene laufende Schicht erbt die ihres nächsten Vorfahren; der Server ermittelt das beim
 Lesen (`abloesung::vererbung`, DTO `erbende_einheiten` an der tragenden Schicht), der Client
 rechnet keine Vererbung nach. Status `beendet` (mit `beendet_grund`) ist kein `laufend`: jede
-Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. **Geplant** heißt
-Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste `einsatz_abloesung_abloeser`; jede
-Prüfung darauf liest beide (Planungshinweis, Hinweise, Planungswarnungen, LLH-1131). Die
-Planungswarnungen ermittelt der Server beim Lesen (`planung_warnungen`), der Client zeigt sie
-nur (`abloesung/planungWarnung.ts`). Der Planungshinweis ist eine Frist, keine Einstufung.
+Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. „Ohne Schicht“
+(LLH-1128) bildet nur `abloesung/ohneSchicht.ts`: offene Periode wie `has_offene_periode_tx`,
+Einheitenliste, minus eigene laufende Schicht und `erbende_einheiten`; nur mit Freigabe des
+Moduls Einheiten (sonst gesperrt mit Grund), eigene Zuflussschleuse, kein „Schicht beginnen“ für
+einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen.
+**Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
+`einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
+Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
+(`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`). Der
+Planungshinweis ist eine Frist, keine Einstufung.

@@ -2,6 +2,7 @@ import { apiGet, apiSend } from './client';
 import type {
   Abloesung,
   AbloesungEinsatzVorgabe,
+  AbloesungStatus,
   AbloesungVollzug,
   AbloesungVorgabe,
   EinsatzSchichtmodellBody,
@@ -13,11 +14,11 @@ import type {
 /** Ablösung (LFH-635): Schichten von Einheiten, Rhythmus-Vorgaben je Abschnitt. */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/abloesungen`;
 
-/** Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend (Ordnung vom Server). */
-export function listeAbloesungen(
-  einsatzId: number,
-  status: 'laufend' | 'abgeloest',
-): Promise<Abloesung[]> {
+/**
+ * Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend, beendete (LLH-1128) nach ihrem
+ * Ende absteigend (Ordnung vom Server).
+ */
+export function listeAbloesungen(einsatzId: number, status: AbloesungStatus): Promise<Abloesung[]> {
   return apiGet<Abloesung[]>(`${basis(einsatzId)}?status=${status}`);
 }
 
