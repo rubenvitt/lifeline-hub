@@ -10,6 +10,7 @@ import PersonalStatusTab from '../stammdaten/PersonalStatusTab';
 import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import EinheitVorlagenTab from '../stammdaten/EinheitVorlagenTab';
+import VerpflegungsplanTab from '../stammdaten/VerpflegungsplanTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 import FuehrungsfunktionenTab from '../stammdaten/FuehrungsfunktionenTab';
@@ -58,6 +59,8 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'etb-bausteine', label: 'ETB-Schnellbausteine', element: <EtbBausteineTab /> },
       { key: 'einheit-typen', label: 'Einheitstypen', element: <EinheitTypenTab /> },
       { key: 'einheiten', label: 'Einheiten-Vorlagen', element: <EinheitVorlagenTab /> },
+      // LLH-1058: Mahlzeiten, aus denen die Verpflegung eines Einsatzes einen Tag anlegt.
+      { key: 'verpflegungsplan', label: 'Verpflegungsplan', element: <VerpflegungsplanTab /> },
       { key: 'organisation', label: 'Organisation', element: <OrganisationTab /> },
       { key: 'sprechgruppen', label: 'Sprechgruppen', element: <SprechgruppenTab /> },
       {

@@ -756,6 +756,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'qualifikationen',
         'einheit-typen',
         'einheit-vorlagen',
+        // Verpflegungsplan der Organisation (LLH-1058).
+        'verpflegung-vorlagen',
         'etb-bausteine',
         'stichwort-vorschlaege',
         'externe-stellen',
