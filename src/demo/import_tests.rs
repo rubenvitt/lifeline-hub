@@ -1558,8 +1558,8 @@ async fn rundlauf_import_entfernen_import() {
 /// `block-4.3-report.md` für die drei Erinnerungen).
 ///
 /// Die Eskalations- und Ablösungs-Zählungen daneben (`meldung.eskaliert = 1`,
-/// `erinnerung.bezug_typ ∈ {abloesung, abloesung_vorwarnung}`) sind mit dem HEUTIGEN Drehbuch
-/// vakuos: D10 legt bewusst keine Auto-Frist-Erinnerung (weder an einer Meldung noch an einem
+/// `erinnerung.bezug_typ ∈ {abloesung, abloesung_vorwarnung, abloesung_planung}`) sind mit dem
+/// HEUTIGEN Drehbuch vakuos: D10 legt bewusst keine Auto-Frist-Erinnerung (weder an einer Meldung noch an einem
 /// Auftrag) und keine Ablösungsschicht an, also können sie am aktuellen Szenario gar nicht rot
 /// werden. Sie stehen als Riegel gegen eine künftige Drehbuch-Erweiterung — kommt eine
 /// Auto-Frist oder eine Ablösungsschicht dazu, muss D10 dafür neu geprüft werden, und der Riegel
@@ -1605,11 +1605,13 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
     // auch diese Zählung mit dem heutigen Drehbuch vakuos (kann nicht rot werden) — Riegel
     // gegen eine künftige Erweiterung, nicht eigenständiger Beleg für D10 heute.
     let abloesungsfristen: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM erinnerung WHERE einsatz_id = ? AND bezug_typ IN (?, ?)",
+        "SELECT COUNT(*) FROM erinnerung WHERE einsatz_id = ? AND bezug_typ IN (?, ?, ?)",
     )
     .bind(erg.einsatz_id)
     .bind(crate::kommunikation::OBJEKT_ABLOESUNG)
     .bind(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG)
+    // Planungshinweis (LLH-1131), die dritte Frist einer Schicht.
+    .bind(crate::kommunikation::OBJEKT_ABLOESUNG_PLANUNG)
     .fetch_one(&pool)
     .await
     .unwrap();
