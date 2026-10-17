@@ -1,3 +1,33 @@
+## [1.0.0-alpha.139](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.138...v1.0.0-alpha.139) (2026-10-17)
+
+### Wichtige Änderungen
+
+- **Zeiten werden jetzt getippt statt gerollt.** Jedes Zeitfeld in der Anwendung ist jetzt ein Textfeld. Die bisherigen Auswahlfenster mit Scrollspalten für Datum und Uhrzeit gibt es nicht mehr. Der Kalender ist nur noch ein zusätzlicher Weg zur Eingabe. Die Daten selbst und die Schnittstellen bleiben unverändert.
+
+### Zeiteingabe (alle Bereiche)
+
+- **Taktische Schreibweisen:** Eine Zeit lässt sich kurz eintippen, zum Beispiel `1430`, `101430`, `101430okt26` oder `10.10.26 1430`. Möglich sind auch relative Angaben wie `-5` oder `+2h` und `j` für jetzt.
+- **Richtung je nach Feld:** Bei Ereigniszeiten wird eine mehrdeutige Angabe in der Vergangenheit gesucht, bei Fristen in der Zukunft.
+- **Anzeige als Datum-Zeit-Gruppe nach FwDV/DV 810:** Das Feld zeigt Zeiten einheitlich in der Form `161430okt26`.
+- **Klare Rückmeldung:** Am Feld steht, wie die Eingabe verstanden wurde oder warum sie nicht lesbar ist. Eine unlesbare Eingabe wird nie übernommen und auch nicht stillschweigend korrigiert.
+- **Tastatur:** Enter übernimmt die Eingabe. Beim Verlassen des Feldes wird übernommen, was lesbar ist. Escape verwirft die Eingabe und setzt nur das Feld zurück. Strg/⌘+S speichert auch Text, der gerade erst getippt wurde.
+- **Kalender als Nebenweg:** Der Kalender hat ein Uhrzeitfeld statt Scrollspalten und beginnt die Woche am Montag. Nach dem Schließen springt der Fokus zurück ins Feld. Wo Zukunftszeiten nicht erlaubt sind, lassen sich zukünftige Tage weder wählen noch durchblättern. Auf schmalen Bildschirmen und im Handschuhmodus öffnet sich der Kalender als Blatt in Bildschirmbreite, auf Touchgeräten ohne automatischen Fokus. Der Knopf nennt sein Feld, zum Beispiel „Kalender und Uhrzeit zu Beginn“.
+- **Schnellwahl:** Für Ereigniszeiten gibt es die Knöpfe „jetzt“, „−5 min“ und „−15 min“, für Fristen die gewohnten Terminvorschläge.
+- **Zeiträume:** Ein Zeitraum besteht aus zwei Feldern. Ein Ende ohne Tag gilt für den Tag des Beginns, und Enter im Beginn springt ins Ende. Bei der Verpflegung müssen jetzt beide Enden ausgefüllt sein.
+
+### Einsatztagebuch
+
+- Der Zeit-Chip bei der Erfassung arbeitet mit der neuen Eingabe und hat eine Schnellwahl. Er holt sich nach dem Verlassen nicht mehr ungewollt den Fokus zurück.
+- Die Zeitfilter haben jetzt eindeutige Namen.
+
+### Einsatzdaten und Inline-Angaben
+
+- Bei direkt bearbeitbaren Angaben übernimmt Enter den neuen Wert und speichert ihn mit demselben Tastendruck.
+
+### Hilfe
+
+- Das neue Kapitel „Eine Zeit eintragen“ in der Anwenderdokumentation beschreibt alle Schreibweisen. Als Quelle nennt es die FwDV/DV 810.
+
 ## [1.0.0-alpha.138](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.137...v1.0.0-alpha.138) (2026-10-17)
 
 ### Wichtige Änderungen
