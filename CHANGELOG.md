@@ -1,3 +1,15 @@
+## [1.0.0-alpha.137](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.136...v1.0.0-alpha.137) (2026-10-17)
+
+### Kräfte und Mittel
+
+- **Stand der ablösenden Einheit auf der Schichtkarte:** Die Karte einer laufenden Schicht zeigt jetzt, wie weit die geplante Ablösung ist, zum Beispiel „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Diese Zeile ersetzt den bisherigen Hinweis „Ablösung geplant durch …“, sobald für die ablösende Einheit ein Ereignis in der Kräfte-Zeitachse erfasst ist. Die Zeile bleibt einzeilig, der volle Text erscheint beim Darüberfahren. Den Bereitstellungsraum sieht nur, wer die Bereitstellungsräume einsehen darf.
+- **Planungswarnungen direkt an der Karte:** Die Warnungen, die beim Planen einer Ablösung erscheinen, stehen jetzt auch dezent auf der Schichtkarte. Ein Beispiel ist „… steht selbst im Einsatz seit 1340“. Der Wortlaut ist derselbe wie beim Planen, die Uhrzeit steht wie alle Zeiten der Karte in fester Ziffernbreite.
+- **Sprung zur Schicht:** Benachrichtigungen zur Ablösung führen jetzt direkt zur betroffenen Schicht statt nur zur Ablösungsübersicht. Das gilt für Vorwarnung, Fälligkeit, Planungshinweise und Hinweise zur ablösenden Einheit. Die Ansicht wechselt dabei zur passenden Liste (laufend, abgelöst oder beendet), rollt die Schichtkarte ins Bild und hebt sie einige Sekunden hervor. Auch ein Link auf eine bestimmte Schicht funktioniert so. Eine unbekannte Schicht ändert die Ansicht nicht.
+
+### Dokumentation
+
+- Das Handbuchkapitel zur Ablösung beschreibt jetzt den Stand der ablösenden Einheit, die Warnungen an der Karte und den Sprung zur Schicht, mit neuen Bildern.
+
 ## [1.0.0-alpha.136](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.135...v1.0.0-alpha.136) (2026-10-17)
 
 ### Wichtige Änderungen
