@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -28,12 +28,14 @@ Einsatzleitung und Führungspersonal.
    bald fällig“ (ab der Vorwarnzeit, ohne anderes Schichtmodell 30 Minuten vorher) oder
    „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, „im Einsatz seit“, der Rhythmus
    als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“), unter
-   „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und eine geplante
-   ablösende Einheit.
+   „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und die geplanten
+   ablösenden Einheiten („Ablösung geplant durch …“).
 
    ![Drei Schichtkarten: Rettungsstaffel überfällig mit geplanter Ablösung durch die 2. Rettungsstaffel, Sanitätszug „Ablösung bald fällig“ und Sanitätsgruppe UHS planmäßig mit eigenem Rhythmus](../bilder/abloesung/schichten.png)
 
-3. Unter „Vergangen“ mit „Abgelöst“ die vollzogenen Ablösungen nachlesen, mit „Beendet“ die
+3. Unter „Vergangen“ mit „Abgelöst“ die vollzogenen Ablösungen nachlesen: „Abgelöst durch …“
+   nennt alle ablösenden Einheiten, eine übernommene Schicht mit „(Schicht übernommen)“, und
+   „Abschnitt … übergeben“ den Abschnitt, der mitging. Mit „Beendet“ stehen dort die
    Schichten, die ohne Ablösung endeten: „beendet · entlassen“ mit der Uhrzeit der Entlassung oder
    „beendet · aufgelöst“.
 
@@ -72,23 +74,28 @@ Für Einsatzleitung und Führungspersonal:
 Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte „Ablösung vollziehen“ wählen.
-2. Unter „Ablösende Einheit“ die Einheit wählen, die übernimmt; eine geplante steht schon dort. Ohne
-   ablösende Einheit bleibt das Feld leer.
+2. Unter „Ablösende Einheiten“ die Einheiten wählen, die übernehmen, höchstens acht; die geplanten
+   stehen schon dort. Ohne ablösende Einheit bleibt das Feld leer. Eine Einheit mit „· Schicht
+   läuft“ hat schon eine eigene Schicht; der Vollzug übernimmt sie.
 3. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt der Übergabe wählen.
+4. „Abschnitt übergeben (…)“ angehakt lassen, wenn die ablösenden Einheiten den Abschnitt der
+   abgelösten übernehmen; sonst den Haken entfernen. Die Option steht nur da, wenn die abgelöste
+   Einheit einen Abschnitt hat.
 
-   ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“ und Zeitpunkt jetzt](../bilder/abloesung/vollziehen.png)
+   ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“, Zeitpunkt jetzt und angehaktem „Abschnitt übergeben (Sanitätsdienst)“](../bilder/abloesung/vollziehen.png)
 
-4. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“; die ablösende
+5. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“; jede ablösende
    Einheit beginnt eine Folgeschicht mit demselben Rhythmus.
-5. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
-   „Abgelöst“ mit „Vollzug zurücknehmen“, solange die Folgeschicht unberührt ist.
+6. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
+   „Abgelöst“ mit „Vollzug zurücknehmen“, solange jede Folgeschicht unberührt ist.
 
 ### Ablösende Einheit planen und Rhythmus ändern
 
 Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte das Menü „Aktionen zu …“ (drei Punkte) öffnen.
-2. „Ablösende Einheit planen“ wählen, die Einheit wählen und „Speichern“ wählen. Ist die Einheit
+2. „Ablösende Einheit planen“ wählen, unter „Ablösende Einheiten“ eine oder mehrere Einheiten
+   wählen (höchstens acht) und „Speichern“ wählen. Ist eine Einheit
    schon für eine andere Schicht geplant oder steht sie selbst im Einsatz, nennt eine Meldung das,
    etwa „2. Rettungsstaffel schon für Schicht Florian 1 geplant“ oder „… steht selbst im Einsatz
    seit 1340“. Die Planung gilt trotzdem.
@@ -191,8 +198,33 @@ wenn der Platz nicht reicht; der Wert des Rhythmus bleibt ganz stehen.
 ### Eine Schicht je Einheit
 
 Je Einheit läuft höchstens eine Schicht. „Schicht beginnen“ bietet deshalb nur Einheiten ohne
-laufende Schicht an. Hat die ablösende Einheit schon eine laufende Schicht, scheitert der Vollzug,
-und nichts ändert sich.
+laufende Schicht an.
+
+### Vollzug mit mehreren Ablösern
+
+Eine Schicht kann von bis zu acht Einheiten abgelöst werden, etwa wenn zwei Staffeln eine Gruppe
+ersetzen. Jede bekommt mit dem Vollzug ihre eigene Folgeschicht. Löst ein Verband ab, bekommt nur
+seine oberste Einheit eine Folgeschicht; steht eine seiner Untereinheiten ebenfalls in der Liste,
+läuft sie in dieser Schicht mit („gilt auch für:“).
+
+Ist eine ablösende Einheit eingetroffen, ohne geplant zu sein, hat sie mit dem Eintreffen schon
+eine eigene Schicht begonnen. Der Vollzug übernimmt diese Schicht als Folgeschicht: „Im Einsatz
+seit“, Fälligkeit und Erinnerungen bleiben, das Einsatztagebuch nennt „Laufende Schicht
+übernommen“. Die Rücknahme lässt diese Schicht weiterlaufen und löst sie nur von der abgelösten.
+Führt eine Einheit schon die Folgeschicht einer anderen Ablösung, scheitert der Vollzug, und
+nichts ändert sich.
+
+Eine als Ablöser geplante Einheit beginnt mit ihrem Eintreffen keine eigene Schicht, ebenso wenig
+die Untereinheiten eines geplanten Verbands.
+
+### Abschnitt übergeben
+
+Mit „Abschnitt übergeben“ werden die ablösenden Einheiten dem Abschnitt der abgelösten Einheit
+unterstellt, bei einem Verband nur seine oberste Einheit; die abgelöste Einheit steht danach ohne
+Abschnitt, bis sie neu eingeteilt wird. Das Einsatztagebuch nennt „Abschnitt … an … übergeben“.
+Die Rücknahme gibt jeder Einheit ihren alten Abschnitt zurück, sofern sie inzwischen nicht von
+Hand anders eingeteilt wurde. Die Option braucht das Modul Einheiten; fehlt es der Person, steht
+sie gesperrt mit „Modul Einheiten gesperrt“, und der Vollzug ohne sie geht weiter.
 
 ### Schicht beginnt mit dem Eintreffen
 
@@ -202,7 +234,8 @@ Eintreffen in der Kräfte-Zeitachse oder das Eintreffen am Bereitstellungsraum. 
 ist dann der Zeitpunkt des Eintreffens, der Rhythmus kommt aus der Vorgabe (die des Abschnitts vor
 der des Einsatzes). Das Einsatztagebuch nennt das mit „mit dem Eintreffen begonnen“. Ohne Vorgabe
 beginnt keine Schicht von selbst; dann bleibt „Schicht beginnen“ von Hand. Ist die Einheit schon
-als ablösende Einheit geplant, beginnt ihre Schicht erst mit dem Vollzug der Ablösung.
+als ablösende Einheit geplant, auch als Teil eines geplanten Verbands, beginnt ihre Schicht erst
+mit dem Vollzug der Ablösung.
 
 Gehört eine Einheit zu einem Verband, dessen Einheit schon eine laufende Schicht hat, bekommt sie
 mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. Die Karte des
@@ -243,15 +276,16 @@ ihre Zeile sofort weg. Dasselbe gilt für neue Schichten unter „Laufend“.
 ### Zusammenhang mit der Kräfte-Zeitachse
 
 Der Vollzug schreibt an der abgelösten Einheit das Ereignis „Ablösung“ in die Kräfte-Zeitachse, mit
-dem ihr Einsatzabschnitt endet; die Rücknahme streicht es wieder. Dieses Ereignis lässt sich nicht
+dem ihr Einsatzabschnitt endet, ebenso an jeder Untereinheit, die in ihrer Schicht mitläuft, und
+an deren Personen; die Rücknahme streicht alle wieder. Dieses Ereignis lässt sich nicht
 von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben).
 
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält den Beginn einer Schicht (auch mit dem Eintreffen), Änderungen an Rhythmus
-und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösender Einheit und
-Zeitpunkt, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
+und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösenden Einheiten,
+übernommener Schicht, übergebenem Abschnitt und Zeitpunkt, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
 dort als Entscheidung.
 
 ### Rechte und ohne Netz

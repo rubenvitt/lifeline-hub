@@ -72,6 +72,10 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   status: 'laufend',
   ruecknehmbar: false,
   erbende_einheiten: [],
+  abloeser: [],
+  folgeschichten: [],
+  uebernommen_bei_vollzug: false,
+  abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
   ...over,
@@ -347,9 +351,11 @@ describe('AbloesungPage (LFH-635)', () => {
     listeAbloesungen.mockImplementation((_e: number, status: string) =>
       Promise.resolve(status === 'laufend' ? [a] : []),
     );
+    const folge = schicht({ id: 2, einheit_id: 12, einheit_name: 'Florian 2' });
     vollzieheAbloesung.mockResolvedValue({
       abgeloest: { ...a, status: 'abgeloest', ruecknehmbar: true },
-      folgeschicht: schicht({ id: 2, einheit_id: 12, einheit_name: 'Florian 2' }),
+      folgeschicht: folge,
+      folgeschichten: [folge],
     });
     nimmVollzugZurueck.mockResolvedValue(a);
     renderPage();
@@ -361,10 +367,13 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(knopf.closest('form')).not.toBeNull();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
+    // Vorbelegt mit der Planung (Spiegel), als Liste (LLH-1132); die Schicht hat keinen
+    // Abschnitt, also nichts zu übergeben.
     await waitFor(() =>
       expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
         vollzogen_at: undefined,
-        abloesende_einheit_id: 12,
+        abloeser_ids: [12],
+        abschnitt_uebergeben: false,
       }),
     );
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
@@ -505,14 +514,14 @@ describe('AbloesungPage (LFH-635)', () => {
     ) as HTMLElement;
     await userEvent.click(within(menu).getByText('Ablösende Einheit planen'));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ablösende Einheit' }));
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }));
     await userEvent.click(await screen.findByTitle('Florian 2'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
     expect(
       await screen.findByText('Florian 2 schon für Schicht Florian 5 geplant'),
     ).toBeInTheDocument();
-    expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloesende_einheit_id: 12 });
+    expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloeser_ids: [12] });
   });
 
   it('Rhythmus-Vorgabe am Abschnitt: Platzhalter „keine Vorgabe“, kein Erklärsatz', async () => {
@@ -902,6 +911,7 @@ describe('AbloesungPage — Rücknahme abgelehnt (LFH-1077)', () => {
       vollzieheAbloesung.mockResolvedValue({
         abgeloest: { ...a, status: 'abgeloest', ruecknehmbar: true },
         folgeschicht: null,
+        folgeschichten: [],
       });
     });
     async function vollzieheUndNimmZurueck() {

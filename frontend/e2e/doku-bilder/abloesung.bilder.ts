@@ -20,7 +20,8 @@ import {
  *   ohne-schicht.png     frontend/src/pages/AbloesungPage.tsx (Ansicht „Ohne Schicht“),
  *                        frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
- *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog)
+ *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Ablöser-Liste und
+ *                        „Abschnitt übergeben“, LLH-1132), frontend/src/abloesung/abloeser.ts
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
  *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
  *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
@@ -186,7 +187,8 @@ test.describe(KAPITEL, () => {
     const dialog = page.getByRole('dialog', { name: 'Ablösung Rettungsstaffel vollziehen' });
     await expect(dialog.getByTitle('2. Rettungsstaffel', { exact: true })).toBeVisible();
     // Der Dialog setzt den Fokus ins erste Feld; das Bild soll keinen Fokusrahmen zeigen.
-    await dialog.getByRole('combobox', { name: 'Ablösende Einheit' }).blur();
+    await expect(dialog.getByRole('checkbox', { name: /^Abschnitt übergeben/ })).toBeChecked();
+    await dialog.getByRole('combobox', { name: 'Ablösende Einheiten' }).blur();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'vollziehen');

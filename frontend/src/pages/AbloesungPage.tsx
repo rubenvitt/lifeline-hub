@@ -19,6 +19,7 @@ import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
+import { abloeserOptionen, abloeserText } from '../abloesung/abloeser';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import {
   AbloeserDialog,
@@ -326,6 +327,10 @@ export default function AbloesungPage() {
   }, [periodenQuery.data]);
 
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.abloesungen(einsatzId) });
+  // Vollzug und Rücknahme können den Abschnitt von Einheiten ändern (LLH-1132); das Ereignis
+  // `einheit` kommt live, der eigene Tab gleicht sofort ab.
+  const invalidiereEinheiten = () =>
+    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
 
   // Fehler stehen im jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle lässt
   // die Felder stehen.
@@ -349,6 +354,7 @@ export default function AbloesungPage() {
     // Die zurückgenommene Schicht kehrt in die laufenden zurück — als eigene Handlung.
     merkeEigene(a.id);
     invalidiere();
+    invalidiereEinheiten();
     message.success(`Vollzug der Ablösung ${a.einheit_name} zurückgenommen`);
   };
   const zuruecknehmenMut = useMutation({
@@ -381,10 +387,13 @@ export default function AbloesungPage() {
     // Der Vollzug hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage. Der Dialog
     // davor erfasst Zeitpunkt und Ablöser, er ist keine Rückfrage.
     onSuccess: (v) => {
-      if (v.folgeschicht) merkeEigene(v.folgeschicht.id);
+      // Je Ablöser eine Folgeschicht (LLH-1132): jede ist eine eigene Handlung.
+      for (const f of v.folgeschichten) merkeEigene(f.id);
       invalidiere();
-      const text = v.folgeschicht
-        ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${v.folgeschicht.einheit_name}`
+      if (v.abgeloest.abschnitt_uebergeben) invalidiereEinheiten();
+      const durch = abloeserText(v.abgeloest);
+      const text = durch
+        ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${durch}`
         : `Ablösung vollzogen: ${v.abgeloest.einheit_name}`;
       zeigeRueckgaengig(message, text, () => rueckgaengigMut.mutate(v.abgeloest.id));
     },
@@ -405,7 +414,8 @@ export default function AbloesungPage() {
     onSuccess: async (a, { body }) => {
       message.success('Schicht geändert');
       // Plausibilität beim Planen (LLH-1131): die Planung gilt, der Server warnt nur.
-      if (body.abloesende_einheit_id != null) {
+      // Geplant wird als Liste (LLH-1132); die Einzelangabe ist Bestand.
+      if (body.abloesende_einheit_id != null || (body.abloeser_ids?.length ?? 0) > 0) {
         for (const w of a.planung_warnungen) {
           message.warning(planungWarnungText(w, konventionen));
         }
@@ -772,7 +782,16 @@ export default function AbloesungPage() {
         <VollzugDialog
           key={vollzugSchicht.id}
           schicht={vollzugSchicht}
-          einheiten={freieEinheiten.filter((e) => e.value !== vollzugSchicht.einheit_id)}
+          einheiten={abloeserOptionen(einheitenQuery.data ?? [], laufende, vollzugSchicht)}
+          // Der Abschnitt der Einheit, wie die Einheitenliste ihn führt; ohne sie (Modul gesperrt)
+          // der der Schicht, damit die gesperrte Option mit Grund sichtbar bleibt.
+          abschnittName={
+            einheitenQuery.data
+              ? (einheitenQuery.data.find((e) => e.id === vollzugSchicht.einheit_id)
+                  ?.abschnitt_name ?? null)
+              : (vollzugSchicht.abschnitt_name ?? null)
+          }
+          uebergabeGesperrt={einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}
@@ -783,13 +802,13 @@ export default function AbloesungPage() {
         <AbloeserDialog
           key={abloeserSchicht.id}
           schicht={abloeserSchicht}
-          einheiten={freieEinheiten.filter((e) => e.value !== abloeserSchicht.einheit_id)}
+          einheiten={abloeserOptionen(einheitenQuery.data ?? [], laufende, abloeserSchicht)}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
-          onErfassen={(abloesendeEinheitId) =>
+          onErfassen={(abloeserIds) =>
             aendernMut.mutateAsync({
               abloesungId: abloeserSchicht.id,
-              body: { abloesende_einheit_id: abloesendeEinheitId },
+              body: { abloeser_ids: abloeserIds },
             })
           }
           onSchliessen={() => setAbloeserSchicht(null)}

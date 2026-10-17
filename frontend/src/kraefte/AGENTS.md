@@ -23,7 +23,7 @@ zu „neue Einheiten bekommen kein Ereignis“ aus `kraefte-disposition`: die un
 Einheit beginnt ihre Periode mit diesem Eintreffen). Das Kennzeichen `uebernahme_offen_seit`
 ist kein Zeitpunkt der Zeitachse. Ein Einheit-Ereignis gilt per Fan-out für die
 JETZT zugeordneten Personen; Fahrzeuge wirken nur über ihre Einheit (erstes Fahrzeug bzw. alle für
-die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie, streicht nur die Rücknahme des Vollzugs.
+die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie und die an einer erbenden Untereinheit (LLH-1132), streicht nur die Rücknahme des Vollzugs.
 `schreibe_tx` koppelt an einer Einheit auch die Schicht (LLH-1128, `src/abloesung/kopplung.rs`):
 Eintreffen der offenen Periode beginnt sie (nur mit Vorgabe, nie bei geerbter), eine Entlassung
 ohne offene Periode danach beendet sie (`beendet`), die Streichung dieser Entlassung öffnet sie;
@@ -63,3 +63,16 @@ einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO 
 Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
 (`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`). Der
 Planungshinweis ist eine Frist, keine Einstufung.
+
+**Vollzug** (LLH-1132, Spec `kraefte-abloesung`): Die Liste der Ablöser ist die Wahrheit
+(höchstens `ABLOESER_MAX`, Spiegel `ABLOESUNG_ABLOESER_MAX`); `abloesende_einheit_id` ist ihr
+erster Eintrag: wer die Liste ändert, zieht ihn über `abloesung::repo::set_abloeser_tx` bzw.
+`sync_spiegel_tx` nach (auch `drop_planungen_tx`), nie von Hand. Welcher Ablöser den Knoten bildet (kein Vorfahr in der Liste) und wer
+erbt, entscheidet der Server; der Client zeigt die Liste über `abloesung/abloeser.ts` und rechnet
+nichts nach. Wählbar ist jede andere Einheit ohne laufende Folgeschicht (`abloeserOptionen`);
+eine eigene laufende Schicht ohne Vorgänger übernimmt der Vollzug, die Rücknahme löst sie nur
+(`uebernommen_bei_vollzug`). Die Ausnahme vom Autostart gilt für jeden geplanten Ablöser und die
+Untereinheiten eines geplanten Verbands. „Abschnitt übergeben“ ändert `einsatz_einheit.abschnitt_id`
+nur am Knoten und an der abgelösten Einheit, mit Vorher-Werten an Schicht und Liste, und
+verlangt die Freigabe des Moduls Einheiten; die Rücknahme legt nur zurück, was noch den Stand des
+Vollzugs trägt.

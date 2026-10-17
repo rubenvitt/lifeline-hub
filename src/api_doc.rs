@@ -374,6 +374,8 @@ use utoipa::OpenApi;
         crate::abloesung::AbloesungAnzeige,
         crate::abloesung::AbloesungEinsatzVorgabeAnzeige,
         crate::abloesung::AbloesungErbe,
+        crate::abloesung::AbloesungAbloeser,
+        crate::abloesung::AbloesungFolge,
         crate::abloesung::AbloesungPlanungWarnung,
         crate::abloesung::AbloesungStatus,
         crate::abloesung::AbloesungWarnungArt,

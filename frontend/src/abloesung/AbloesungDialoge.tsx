@@ -1,19 +1,22 @@
-import { Form, Input } from 'antd';
+import { Checkbox, Form, Input, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
+import { useId } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, VollzugBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { ABLOESUNG_RHYTHMUS_MAX_MINUTEN } from '../api/eingabegrenzen';
+import { ABLOESUNG_ABLOESER_MAX, ABLOESUNG_RHYTHMUS_MAX_MINUTEN } from '../api/eingabegrenzen';
+import { abloeserIds } from './abloeser';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 
 /**
- * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog.
+ * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
+ * (der Vollzug: Ablöser, Zeitpunkt, „Abschnitt übergeben“).
  * Der Rhythmus wird als DAUER erfasst und angezeigt („8 h“, „7:30 h“, nie „8.0“, LLH-1122,
  * `abloesung/dauer.ts`) und als Minuten gesendet — die Lage spricht in „6-Stunden-Rhythmus",
  * nicht in 360 Minuten. Zeiten stehen in der Anzeigezone (`ZeitpunktEingabe`, LFH-692).
@@ -174,28 +177,46 @@ export function SchichtBeginnenDialog({
 
 interface VollzugWerte {
   zeitpunkt?: Dayjs | null;
-  abloesende_einheit_id?: number | null;
+  abloeser_ids?: number[];
+  abschnitt_uebergeben?: boolean;
 }
 
 interface VollzugProps {
   schicht: Abloesung | null;
-  /** Mögliche Ablöser: andere Einheiten ohne laufende Schicht. */
+  /** Mögliche Ablöser (`abloesung/abloeser.ts:abloeserOptionen`). */
   einheiten: EinheitOption[];
+  /**
+   * Abschnitt der abgelösten Einheit, den „Abschnitt übergeben“ an die Ablöser gäbe (LLH-1132);
+   * fehlt, wenn sie keinen hat — dann gibt es nichts zu übergeben und keine Option.
+   */
+  abschnittName?: string | null;
+  /** Grund in wenigen Wörtern, warum die Übergabe gesperrt ist (Modul Einheiten). */
+  uebergabeGesperrt?: string;
   laeuft: boolean;
   fehler: unknown;
-  onErfassen: (body: { vollzogen_at?: string; abloesende_einheit_id?: number }) => Promise<unknown>;
+  onErfassen: (body: VollzugBody) => Promise<unknown>;
   onSchliessen: () => void;
 }
 
+/**
+ * Vollzug (LLH-1132): die Ablöser als Liste (höchstens `ABLOESUNG_ABLOESER_MAX`, vorbelegt mit
+ * der Planung), der Zeitpunkt und „Abschnitt übergeben“ — vorbelegt, sobald die abgelöste
+ * Einheit einen Abschnitt hat. Ohne Freigabe des Moduls Einheiten steht die Option gesperrt mit
+ * Grund daneben (der Server lehnte sie mit 403 ab). Drei Felder, Feldbudget eines Modals.
+ */
 export function VollzugDialog({
   schicht,
   einheiten,
+  abschnittName,
+  uebergabeGesperrt,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: VollzugProps) {
   const [form] = Form.useForm<VollzugWerte>();
+  const grundId = useId();
+  const uebergabeMoeglich = abschnittName != null && uebergabeGesperrt == null;
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
@@ -203,22 +224,49 @@ export function VollzugDialog({
       form={form}
       erfassenText="Vollziehen"
       laeuft={laeuft}
-      initialValues={{ abloesende_einheit_id: schicht?.abloesende_einheit_id ?? undefined }}
-      onErfassen={(w) =>
-        onErfassen({
+      initialValues={{
+        abloeser_ids: schicht ? abloeserIds(schicht) : [],
+        abschnitt_uebergeben: uebergabeMoeglich,
+      }}
+      onErfassen={(w) => {
+        const ids = w.abloeser_ids ?? [];
+        return onErfassen({
           vollzogen_at: w.zeitpunkt ? alsBackendZeit(w.zeitpunkt) : undefined,
-          abloesende_einheit_id: w.abloesende_einheit_id ?? undefined,
-        })
-      }
+          abloeser_ids: ids,
+          // Ohne Ablöser gibt es niemanden, dem der Abschnitt ginge; der Server übergäbe nichts.
+          abschnitt_uebergeben: uebergabeMoeglich && ids.length > 0 && w.abschnitt_uebergeben,
+        });
+      }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<VollzugWerte> name="abloesende_einheit_id" label="Ablösende Einheit">
-        <Select allowClear placeholder="ohne ablösende Einheit" options={einheiten} />
+      <Form.Item<VollzugWerte> name="abloeser_ids" label="Ablösende Einheiten">
+        <Select
+          mode="multiple"
+          allowClear
+          maxCount={ABLOESUNG_ABLOESER_MAX}
+          placeholder="ohne ablösende Einheit"
+          options={einheiten}
+        />
       </Form.Item>
       <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
+      {abschnittName != null && (
+        <Form.Item<VollzugWerte> name="abschnitt_uebergeben" valuePropName="checked">
+          <Checkbox
+            disabled={uebergabeGesperrt != null}
+            aria-describedby={uebergabeGesperrt != null ? grundId : undefined}
+          >
+            Abschnitt übergeben ({abschnittName})
+          </Checkbox>
+        </Form.Item>
+      )}
+      {abschnittName != null && uebergabeGesperrt != null && (
+        <Typography.Text type="secondary" id={grundId} data-lfh="vollzug-uebergabe-gesperrt">
+          {uebergabeGesperrt}
+        </Typography.Text>
+      )}
       <SpeicherFehler fehler={fehler} titel="Ablösung konnte nicht vollzogen werden" />
     </ErfassungsModal>
   );
@@ -227,7 +275,7 @@ export function VollzugDialog({
 // ── Ablöser planen ────────────────────────────────────────────────────────────
 
 interface AbloeserWerte {
-  abloesende_einheit_id?: number | null;
+  abloeser_ids?: number[];
 }
 
 interface AbloeserProps {
@@ -235,10 +283,12 @@ interface AbloeserProps {
   einheiten: EinheitOption[];
   laeuft: boolean;
   fehler: unknown;
-  onErfassen: (abloesendeEinheitId: number | null) => Promise<unknown>;
+  /** Die geplanten Ablöser in ihrer Reihenfolge; leer = Planung aufheben. */
+  onErfassen: (abloeserIds: number[]) => Promise<unknown>;
   onSchliessen: () => void;
 }
 
+/** Ablöser planen (LLH-1132): eine Liste wie im Vollzug, sie ersetzt die bisherige Planung. */
 export function AbloeserDialog({
   schicht,
   einheiten,
@@ -255,13 +305,19 @@ export function AbloeserDialog({
       form={form}
       erfassenText="Speichern"
       laeuft={laeuft}
-      initialValues={{ abloesende_einheit_id: schicht?.abloesende_einheit_id ?? undefined }}
-      onErfassen={(w) => onErfassen(w.abloesende_einheit_id ?? null)}
+      initialValues={{ abloeser_ids: schicht ? abloeserIds(schicht) : [] }}
+      onErfassen={(w) => onErfassen(w.abloeser_ids ?? [])}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<AbloeserWerte> name="abloesende_einheit_id" label="Ablösende Einheit">
-        <Select allowClear placeholder="keine geplant" options={einheiten} />
+      <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
+        <Select
+          mode="multiple"
+          allowClear
+          maxCount={ABLOESUNG_ABLOESER_MAX}
+          placeholder="keine geplant"
+          options={einheiten}
+        />
       </Form.Item>
       <SpeicherFehler fehler={fehler} titel="Planung konnte nicht gespeichert werden" />
     </ErfassungsModal>

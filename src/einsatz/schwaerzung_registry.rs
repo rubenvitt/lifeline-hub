@@ -1137,6 +1137,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beendet_grund", G_KONFIG),
             retain("abschnitt_uebergeben", G_KONFIG),
             retain("abgeloest_abschnitt_vorher_id", G_FK),
+            // LLH-1132 (0215): Marke einer beim Vollzug übernommenen Schicht.
+            retain("uebernommen_bei_vollzug", G_KONFIG),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.

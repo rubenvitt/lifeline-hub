@@ -48,6 +48,10 @@ pub use crate::schichtmodell::{PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGA
 /// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0114_abloesung.sql`).
 pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
 
+/// Höchstzahl der Ablöser je Schicht (LLH-1118 Punkt 3, LLH-1132), gezählt vor dem Entdoppeln
+/// (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const ABLOESER_MAX: usize = 8;
+
 wire_enum! {
     /// Status einer Schicht. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -260,10 +264,15 @@ pub struct AbloesungAnzeige {
     /// Vorwarnzeit vor der Fälligkeit in Minuten: aus dem Schichtmodell des Einsatzes, ohne
     /// eines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit.
     pub vorwarnung_minuten: i64,
+    /// Der erste Eintrag von [`Self::abloeser`] (Spiegel für bestehende Leser).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abloesende_einheit_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abloesende_einheit_name: Option<String>,
+    /// Die Ablöser der Schicht in der Reihenfolge der Planung (LLH-1132, höchstens
+    /// [`ABLOESER_MAX`]): bei einer laufenden die geplanten, bei einer abgelösten die beim
+    /// Vollzug genannten.
+    pub abloeser: Vec<AbloesungAbloeser>,
     pub status: AbloesungStatus,
     /// Nur bei laufenden Schichten; berechnet gegen die Zeit der Abfrage.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,11 +284,23 @@ pub struct AbloesungAnzeige {
     /// Die abgelöste Schicht, aus deren Vollzug diese hervorging.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vorgaenger_id: Option<i64>,
-    /// Die Folgeschicht, die beim Vollzug dieser Schicht entstand.
+    /// Die jüngste Folgeschicht, die beim Vollzug dieser Schicht entstand oder übernommen wurde.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folgeschicht_id: Option<i64>,
-    /// Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder
-    /// nicht vorhanden oder noch unberührt (laufend).
+    /// Alle Folgeschichten dieses Vollzugs, je Ablöser höchstens eine (LLH-1132), nach ID.
+    pub folgeschichten: Vec<AbloesungFolge>,
+    /// Diese Schicht lief schon vor dem Vollzug ihres Vorgängers (ungeplanter Ablöser, etwa mit
+    /// dem Eintreffen begonnen) und wurde von ihm als Folgeschicht übernommen. Die Rücknahme
+    /// löst sie wieder vom Vorgänger, statt sie zu entfernen.
+    pub uebernommen_bei_vollzug: bool,
+    /// Der Vollzug hat den Abschnitt der abgelösten Einheit an die Ablöser übergeben; die
+    /// Rücknahme gibt ihn zurück.
+    pub abschnitt_uebergeben: bool,
+    /// Name des übergebenen Abschnitts (nur mit `abschnitt_uebergeben`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uebergebener_abschnitt_name: Option<String>,
+    /// Der Vollzug lässt sich zurücknehmen: abgelöst, und jede Folgeschicht ist noch unberührt
+    /// (laufend).
     pub ruecknehmbar: bool,
     /// Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -297,6 +318,24 @@ pub struct AbloesungAnzeige {
     /// und bei abgelösten und beendeten Schichten. Die Planung gelingt trotzdem.
     pub planung_warnungen: Vec<AbloesungPlanungWarnung>,
     pub angelegt_at: String,
+}
+
+/// Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungAbloeser {
+    pub einheit_id: i64,
+    pub einheit_name: String,
+}
+
+/// Eine Folgeschicht aus dem Vollzug einer Schicht.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungFolge {
+    pub id: i64,
+    pub einheit_id: i64,
+    pub einheit_name: String,
+    pub status: AbloesungStatus,
+    /// Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht).
+    pub uebernommen: bool,
 }
 
 /// Eine Untereinheit, die die Schicht eines Vorfahren erbt.
@@ -360,13 +399,15 @@ pub struct AbloesungEinsatzVorgabeAnzeige {
     pub laufende_schichten: i64,
 }
 
-/// Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
-/// Folgeschicht.
+/// Antwort auf einen Vollzug: die abgelöste Schicht und — mit Ablösern — ihre Folgeschichten.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AbloesungVollzugAnzeige {
     pub abgeloest: AbloesungAnzeige,
+    /// Die erste Folgeschicht (Spiegel für bestehende Leser).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folgeschicht: Option<AbloesungAnzeige>,
+    /// Je Ablöser, der den Knoten bildet, eine Folgeschicht, in der Reihenfolge der Liste.
+    pub folgeschichten: Vec<AbloesungAnzeige>,
 }
 
 #[cfg(test)]

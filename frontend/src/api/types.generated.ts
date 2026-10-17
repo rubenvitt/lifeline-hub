@@ -30,14 +30,34 @@ export interface components {
          * @enum {string}
          */
         AbgleichStatus: "verdacht" | "bestaetigt" | "verworfen";
+        /** @description Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`). */
+        AbloesungAbloeser: {
+            /** Format: int64 */
+            einheit_id: number;
+            einheit_name: string;
+        };
         /** @description Öffentliche Darstellung einer Schicht. */
         AbloesungAnzeige: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Der erste Eintrag von [`Self::abloeser`] (Spiegel für bestehende Leser).
+             */
             abloesende_einheit_id?: number | null;
             abloesende_einheit_name?: string | null;
+            /**
+             * @description Die Ablöser der Schicht in der Reihenfolge der Planung (LLH-1132, höchstens
+             *     [`ABLOESER_MAX`]): bei einer laufenden die geplanten, bei einer abgelösten die beim
+             *     Vollzug genannten.
+             */
+            abloeser: components["schemas"]["AbloesungAbloeser"][];
             /** Format: int64 */
             abschnitt_id?: number | null;
             abschnitt_name?: string | null;
+            /**
+             * @description Der Vollzug hat den Abschnitt der abgelösten Einheit an die Ablöser übergeben; die
+             *     Rücknahme gibt ihn zurück.
+             */
+            abschnitt_uebergeben: boolean;
             angelegt_at: string;
             /** @description Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete. */
             beendet_at?: string | null;
@@ -60,9 +80,11 @@ export interface components {
             faellig_at: string;
             /**
              * Format: int64
-             * @description Die Folgeschicht, die beim Vollzug dieser Schicht entstand.
+             * @description Die jüngste Folgeschicht, die beim Vollzug dieser Schicht entstand oder übernommen wurde.
              */
             folgeschicht_id?: number | null;
+            /** @description Alle Folgeschichten dieses Vollzugs, je Ablöser höchstens eine (LLH-1132), nach ID. */
+            folgeschichten: components["schemas"]["AbloesungFolge"][];
             /** Format: int64 */
             id: number;
             /**
@@ -75,11 +97,19 @@ export interface components {
             rhythmus_minuten: number;
             rhythmus_quelle: components["schemas"]["RhythmusQuelle"];
             /**
-             * @description Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder
-             *     nicht vorhanden oder noch unberührt (laufend).
+             * @description Der Vollzug lässt sich zurücknehmen: abgelöst, und jede Folgeschicht ist noch unberührt
+             *     (laufend).
              */
             ruecknehmbar: boolean;
             status: components["schemas"]["AbloesungStatus"];
+            /** @description Name des übergebenen Abschnitts (nur mit `abschnitt_uebergeben`). */
+            uebergebener_abschnitt_name?: string | null;
+            /**
+             * @description Diese Schicht lief schon vor dem Vollzug ihres Vorgängers (ungeplanter Ablöser, etwa mit
+             *     dem Eintreffen begonnen) und wurde von ihm als Folgeschicht übernommen. Die Rücknahme
+             *     löst sie wieder vom Vorgänger, statt sie zu entfernen.
+             */
+            uebernommen_bei_vollzug: boolean;
             vollzogen_at?: string | null;
             /** Format: int64 */
             vollzogen_von_id?: number | null;
@@ -118,6 +148,17 @@ export interface components {
             einheit_id: number;
             einheit_name: string;
         };
+        /** @description Eine Folgeschicht aus dem Vollzug einer Schicht. */
+        AbloesungFolge: {
+            /** Format: int64 */
+            einheit_id: number;
+            einheit_name: string;
+            /** Format: int64 */
+            id: number;
+            status: components["schemas"]["AbloesungStatus"];
+            /** @description Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht). */
+            uebernommen: boolean;
+        };
         /**
          * @description Eine Warnung zur geplanten ablösenden Einheit einer laufenden Schicht (LLH-1131). Gilt für
          *     die Einzelplanung und für die Ablöser-Liste (LLH-1118 Punkt 3).
@@ -148,13 +189,12 @@ export interface components {
          * @enum {string}
          */
         AbloesungStatus: "laufend" | "abgeloest" | "beendet";
-        /**
-         * @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
-         *     Folgeschicht.
-         */
+        /** @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit Ablösern — ihre Folgeschichten. */
         AbloesungVollzugAnzeige: {
             abgeloest: components["schemas"]["AbloesungAnzeige"];
             folgeschicht?: components["schemas"]["AbloesungAnzeige"] | null;
+            /** @description Je Ablöser, der den Knoten bildet, eine Folgeschicht, in der Reihenfolge der Liste. */
+            folgeschichten: components["schemas"]["AbloesungAnzeige"][];
         };
         /** @description Rhythmus-Vorgabe eines Einsatzabschnitts. */
         AbloesungVorgabeAnzeige: {

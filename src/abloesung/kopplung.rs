@@ -7,7 +7,8 @@
 //! - **Eintreffen** der offenen Periode: hat die Einheit keine laufende Schicht, auch keine
 //!   geerbte (Knoten-Modell), und gibt es eine Vorgabe des Abschnitts oder des Einsatzes, beginnt
 //!   die Schicht zum Eintreffen ([`repo::start_schicht_tx`], Rangfolge wie von Hand). Ohne
-//!   Vorgabe entsteht nichts: keine erfundene Zahl. Eine als ablösende geplante Einheit bekommt
+//!   Vorgabe entsteht nichts: keine erfundene Zahl. Eine als Ablöser geplante Einheit (Eintrag
+//!   der Liste einer laufenden Schicht, auch über einen geplanten Vorfahren, LLH-1132) bekommt
 //!   keine: ihre Schicht entsteht mit dem Vollzug als Folgeschicht.
 //! - **Entlassung**, die die letzte Periode schließt: die laufende Schicht der Einheit endet als
 //!   `beendet` mit Grund `entlassung`, ihre Fristen schließen.
@@ -243,21 +244,38 @@ async fn is_aktiv_tx(
     Ok(r.is_some())
 }
 
-/// Ob eine laufende Schicht des Einsatzes die Einheit als ablösende plant.
+/// Ob eine laufende Schicht des Einsatzes die Einheit oder einen ihrer Vorfahren als Ablöser
+/// plant ([`hinweis::load_geplante_tx`]: Einzelplanung oder Eintrag der Liste
+/// `einsatz_abloesung_abloeser`, LLH-1132). Der Vorfahr zählt mit, weil ein Verband als Knoten
+/// ablöst: seine Untereinheiten erben die Folgeschicht, die der Vollzug ihm anlegt (LLH-1118
+/// Punkt 1). Die Kette läuft mit Besucht-Menge, ein korrupter Zyklus terminiert.
 async fn is_geplanter_abloeser_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
 ) -> Result<bool, AppError> {
-    let r: Option<i64> = sqlx::query_scalar(
-        "SELECT 1 FROM einsatz_abloesung \
-         WHERE einsatz_id = ? AND status = 'laufend' AND abloesende_einheit_id = ? LIMIT 1",
-    )
-    .bind(einsatz_id)
-    .bind(einheit_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    Ok(r.is_some())
+    let mut besucht = std::collections::HashSet::new();
+    let mut knoten = Some(einheit_id);
+    while let Some(k) = knoten {
+        if !besucht.insert(k) {
+            break;
+        }
+        if !super::hinweis::load_geplante_tx(conn, einsatz_id, k)
+            .await?
+            .is_empty()
+        {
+            return Ok(true);
+        }
+        knoten = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(k)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .flatten();
+    }
+    Ok(false)
 }
 
 async fn autostart_tx(
@@ -279,9 +297,9 @@ async fn autostart_tx(
     {
         return Ok(Vec::new());
     }
-    // Als ablösende Einheit geplant: ihre Schicht beginnt mit dem Vollzug als Folgeschicht.
-    // Eine Schicht schon beim Eintreffen ließe den Vollzug scheitern („hat schon eine laufende
-    // Schicht“).
+    // Als Ablöser geplant (auch als Untereinheit eines geplanten Verbands): ihre Schicht beginnt
+    // mit dem Vollzug als Folgeschicht. Ein ungeplant eingetroffener Ablöser bekommt hier seine
+    // eigene, die der Vollzug dann übernimmt (LLH-1132).
     if is_geplanter_abloeser_tx(conn, einsatz_id, einheit_id).await? {
         return Ok(Vec::new());
     }

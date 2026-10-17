@@ -722,6 +722,9 @@ export type RhythmusQuelle = S['RhythmusQuelle'];
 /** Status einer Schicht (LLH-1128: `beendet` endet ohne Ablösung, mit `beendet_grund`). */
 export type AbloesungStatus = S['AbloesungStatus'];
 export type BeendetGrund = S['BeendetGrund'];
+/** Ein Ablöser einer Schicht und eine Folgeschicht aus ihrem Vollzug (LLH-1132). */
+export type AbloesungAbloeser = S['AbloesungAbloeser'];
+export type AbloesungFolge = S['AbloesungFolge'];
 /** Warnung zur geplanten ablösenden Einheit (LLH-1131): schon geplant oder selbst im Einsatz. */
 export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
 
@@ -772,18 +775,27 @@ export interface SchichtBeginnenBody {
 /**
  * Kein Backend-Schema: Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal. DREIWERTIG:
  * Schlüssel fehlt = unverändert · `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe ·
- * `abloesende_einheit_id: null` = Planung aufheben.
+ * `abloeser_ids: []` = Planung aufheben. `abloeser_ids` (LLH-1132, höchstens
+ * `ABLOESUNG_ABLOESER_MAX`) ersetzt die Liste der Ablöser; die Einzelangabe
+ * `abloesende_einheit_id` ist Bestand und nicht zugleich erlaubt (422).
  */
 export interface SchichtAendernBody {
   beginn_at?: string;
   rhythmus_minuten?: number | null;
   abloesende_einheit_id?: number | null;
+  abloeser_ids?: number[];
 }
 
-/** Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. */
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. `abloeser_ids`
+ * (LLH-1132): je Knoten-Ablöser eine Folgeschicht, eine schon laufende ohne Vorgänger wird
+ * übernommen. `abschnitt_uebergeben` verlangt die Freigabe des Moduls Einheiten (sonst 403).
+ */
 export interface VollzugBody {
   vollzogen_at?: string;
   abloesende_einheit_id?: number;
+  abloeser_ids?: number[];
+  abschnitt_uebergeben?: boolean;
 }
 
 // ============================== LFH-639 Betreuung ==============================
