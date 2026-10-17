@@ -29,6 +29,10 @@ kein Zustand ist.
 - **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=`, ein nicht alarmierter Auftrag per `?auftrag=` oder ein Einsatzbefehl per `?befehl=` angesprungen wird
 - **THEN** trägt die Karte die Fläche und die Linie der Bedienrollen des Modus, wie die Tabellenzeile
 
+#### Scenario: Schichtkarte der Ablösung
+- **WHEN** eine nicht überfällige Schicht per `?schicht=` angesprungen wird (LLH-1131 Teil II)
+- **THEN** trägt ihre Karte die Fläche und die Linie der Bedienrollen wie die Kommunikationskarte; eine überfällige behält ihre Alarmfläche und Alarmkante und trägt nur die Linie
+
 ### Requirement: Zwei Kanäle, in beiden Modi sichtbar
 
 Die Markierung MUST neben einer getönten Fläche einen zweiten Kanal tragen, eine Linie oben und

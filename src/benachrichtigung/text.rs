@@ -220,12 +220,14 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         BenachrichtigungBezugTyp::Befehl => format!("{basis}/auftraege/befehle/{id}"),
         BenachrichtigungBezugTyp::Lagebericht => format!("{basis}/lageberichte/{id}"),
         BenachrichtigungBezugTyp::Erinnerung => format!("{basis}/erinnerungen"),
+        // Der Bezug ist immer die Schicht; die Seite springt zu ihr (LLH-1131 Teil II,
+        // `abloesungPfad` in `frontend/src/routing/deeplinks.ts`).
         BenachrichtigungBezugTyp::Abloesung
         | BenachrichtigungBezugTyp::AbloeserAlarmiert
         | BenachrichtigungBezugTyp::AbloeserEingetroffen
         | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
         | BenachrichtigungBezugTyp::AbloeserAbgerufen
-        | BenachrichtigungBezugTyp::AbloeserEntfallen => format!("{basis}/abloesung"),
+        | BenachrichtigungBezugTyp::AbloeserEntfallen => format!("{basis}/abloesung?schicht={id}"),
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),
         BenachrichtigungBezugTyp::Nachforderung
         | BenachrichtigungBezugTyp::NachforderungZugesagt
