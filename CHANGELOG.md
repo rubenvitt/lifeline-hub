@@ -1,3 +1,57 @@
+## [1.0.0-alpha.135](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.134...v1.0.0-alpha.135) (2026-10-17)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration für Gerätekopplungen:** Beim Update wird die Tabelle der Gerätekopplungen neu aufgebaut, damit ein Gerät auch an eine Verpflegungsstelle gebunden werden kann. Bestehende Kopplungen, ihre Codes, Ereignisse und angemeldeten Gerätesitzungen bleiben erhalten. Alle bestehenden Kopplungen gelten danach als „ohne Stelle“.
+- **Stornieren von Verpflegungsstellen eingeschränkt:** Eine geplante Verpflegungsstelle mit einem gekoppelten Gerät (wartend oder aktiv) lässt sich nicht mehr stornieren. Der Server lehnt das mit „Gerät gekoppelt“ ab.
+
+### Kräfte und Mittel – Bereitstellungsräume
+
+- **Kräfte abrufen:** Für jede bereitgestellte Kraft ist „Abrufen“ jetzt die wichtigste Aktion. Im Dialog wählt die Führung einen Ziel-Abschnitt und einen Auftrag. Der Ziel-Abschnitt ist mit dem Abschnitt des Raums vorbelegt und gilt nur bei einer Einheit. „Abrufen und austragen“ (für Lagen ohne Einweiser) und „Austragen“ stehen im Aktionsmenü der Zeile. Das rote „entfernen“ gibt es nicht mehr.
+- **Abgerufene Kräfte oben im Raum:** Abgerufene Kräfte stehen gesondert unter „Abgerufen“ mit Uhrzeit, Ziel und Auftrag, zum Beispiel „abgerufen 1432 → EA Deich · Auftrag Nr. 7“. Dort gibt es „Ausrücken buchen“ und „Abruf zurücknehmen“. Wird ein Abruf zurückgenommen, erscheinen auch die mitgenommenen Untereinheiten sofort wieder bei den bereitgestellten Kräften.
+- **Verlauf:** Wurde eine Untereinheit mit ihrer Einheit abgerufen, nennt der Verlauf das, zum Beispiel „Abruf mit 1. Zug nach EA Deich“.
+- **Am BR-Tablet:** Das Tablet sieht Abrufe sofort und kann für abgerufene Kräfte „Ausrücken buchen“. Abrufen und einen Abruf zurücknehmen kann nur die Führung, nicht das Gerät. Ausgetragen wird am Tablet über das Aktionsmenü.
+- **Eintreffen ohne Netz:** Am Bereitstellungsraum lässt sich das Eintreffen von bekannten und unangemeldeten Kräften auch ohne Netz buchen. Die Buchung wird mit ihrer Erfassungszeit vorgemerkt und erscheint am Raum unter „Vorgemerkt“. Sie fließt nicht in die Kennzahlen ein. Sobald wieder Netz da ist, wird sie nachgesendet. Bricht die Verbindung mitten in der Antwort ab, entsteht trotzdem keine doppelte Einheit und keine doppelte Meldung. Abgelehnte Buchungen landen im Wiederherstellungsbereich mit Kraft und Raum.
+- **Keine Doppelbuchungen ohne Netz:** Eine schon vorgemerkte Kraft wird nicht noch einmal zur Buchung angeboten. Bei einer vorgemerkten unangemeldeten Kraft mit gleichem Namen meldet der Dialog „Schon vorgemerkt“.
+- Die Vorbelegung des Ziel-Abschnitts klappt jetzt auch, wenn die Modulfreigaben erst nach dem Öffnen des Dialogs geladen werden.
+- Bei 390 px Breite stehen die Knöpfe einer abgerufenen Kraft unter der Angabe statt daneben. Das Ziel bleibt lesbar.
+
+### Betreuung und Verpflegung
+
+- **Verpflegungsgerät an einer Verpflegungsstelle:** Ein Verpflegungsgerät kann wahlweise an eine geplante oder aktive Verpflegungsstelle gekoppelt werden. Vorgabe bleibt „ohne Stelle (einsatzweit)“.
+  - Ein gebundenes Gerät sieht die Zeitfenster seiner Stelle und die einsatzweiten.
+  - Es zeigt keine Stellenwahl, und jede Ausgabe wird an der eigenen Stelle gebucht.
+  - Der Gerätekopf zeigt den Namen der Stelle. Wird sie umbenannt, ändert sich der Name sofort, ohne dass sich das Gerät neu anmelden muss.
+- **„Anderswo verpflegt“:** Hat eine Einheit an einer anderen Stelle oder ohne Stelle Portionen bekommen, steht sie unter „Verpflegt“ als „anderswo verpflegt · n EP“ statt als „noch nicht verpflegt“.
+- **Stornieren gesperrt:** Für eine Stelle mit gekoppeltem Gerät ist „Stornieren“ gesperrt, mit dem Grund „Gerät gekoppelt“.
+- **Tag aus Vorlage anlegen:** Neu auf der Verpflegungsseite. Man wählt einen Tag, und für jede aktive Mahlzeit des Verpflegungsplans entsteht ein Zeitfenster mit vorgeschlagenem Bedarf. Der Vorschlag zeigt seine Herkunft und lässt sich überschreiben.
+  - Die Uhrzeiten stimmen auch an den Tagen der Zeitumstellung.
+  - Schon am Tag vorhandene Zeitfenster mit gleichem Namen stehen als „schon angelegt“ da und werden übersprungen.
+  - Ändert sich während der Eingabe etwas, bleibt die Vorschau stehen. Die Quittung nennt, was übersprungen wurde.
+  - Ohne Schreibrecht ist die Seite mit Begründung gesperrt. Am Verpflegungsgerät gibt es sie nicht.
+
+### Verwaltung
+
+- **Stammdaten „Verpflegungsplan“:** Neuer Tab unter Verwaltung › Stammdaten. Hier pflegt der Admin die Mahlzeiten der Organisation mit Bezeichnung, Beginn, Ende und Art.
+  - Uhrzeiten lassen sich in Kurzform eingeben, etwa „0630“.
+  - Mahlzeiten über Mitternacht stehen mit „+1 Tag“ in der Tabelle.
+  - Mahlzeiten werden nicht gelöscht, sondern deaktiviert oder aktiviert.
+  - Ungültige Eingaben werden schon am Feld gemeldet.
+- **Gerät koppeln:** Beim Koppeln eines Verpflegungsgeräts gibt es das neue Feld „Verpflegungsstelle“.
+
+### Betrieb und Installation
+
+- Drei bekannte Sicherheitslücken in einer Komponente des Desktop-Updaters wurden bewertet. Der Updater entpackt nur unter Windows und erst, nachdem er die Signatur gegen den eingebauten Schlüssel geprüft hat. Ein manipuliertes Update-Paket bräuchte also den privaten Release-Schlüssel. Eine korrigierte Version der Komponente gibt es noch nicht.
+
+### Dokumentation
+
+- Neue und überarbeitete Kapitel in der Anwenderdokumentation zu folgenden Themen, mit neuen Bildern:
+  - Abrufen, Ausrücken und Austragen am Bereitstellungsraum
+  - Eintreffen ohne Netz
+  - Verpflegungsgerät an einer Verpflegungsstelle
+  - Tag aus Vorlage
+  - Verpflegungsplan
+
 ## [1.0.0-alpha.134](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.133...v1.0.0-alpha.134) (2026-10-16)
 
 ### Wichtige Änderungen
