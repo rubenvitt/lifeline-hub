@@ -99,6 +99,12 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
   /**
+   * Schichtmodelle der Organisation (LLH-1122) — keine als Default, der echte Zustand einer
+   * Organisation ohne Stammdaten dazu. Die Einsatzanlage fragt sie für die Zeile „Schichtmodell“
+   * ab; Tests mit Modellen überschreiben per `server.use()`.
+   */
+  http.get('/api/schichtmodelle', () => HttpResponse.json([])),
+  /**
    * Dokumentenablage — leere Liste als Default (LFH-743). Die ETB-Seite fragt sie mit Freigabe
    * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein
    * echter Serverzustand. Tests mit Dokumenten überschreiben per `server.use()`.

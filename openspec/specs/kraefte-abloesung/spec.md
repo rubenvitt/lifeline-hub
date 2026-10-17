@@ -10,6 +10,11 @@ LLH-1122 hebt das Non-Goal „Die Vorwarnzeit ist fest auf 30 min gesetzt“ aus
 (`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/design.md`, Non-Goals) auf:
 die Vorwarnzeit kommt aus dem Schichtmodell des Einsatzes, 30 min sind nur noch die Vorgabe.
 
+LLH-1131 (Entscheidung LLH-1118 Punkte 3 und 5) ergänzt Hinweise an die Führung: zur geplanten
+ablösenden Einheit (alarmiert, eingetroffen, am Bereitstellungsraum eingetroffen, abgerufen,
+Planung entfallen), den Planungshinweis als dritte Frist und Warnungen beim Planen. Es bleibt bei
+drei Einstufungen.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -17,7 +22,11 @@ die Vorwarnzeit kommt aus dem Schichtmodell des Einsatzes, 30 min sind nur noch 
 Das System SHALL je Einheit eines Einsatzes Schichten führen. Eine Schicht trägt Beginn
 (Einsatzbeginn der Einheit), Rhythmus in Minuten, die daraus berechnete Fälligkeit
 (Beginn + Rhythmus), optional eine geplante ablösende Einheit und einen Status
-(`laufend` oder `abgeloest`). Je Einheit MUST höchstens eine Schicht `laufend` sein. Fehlt beim
+(`laufend`, `abgeloest` oder `beendet`). `beendet` heißt: ohne Ablösung zu Ende, mit Zeitpunkt,
+Person und Grund (`entlassung` oder `aufloesung`); eine beendete Schicht MUST weder Einstufung
+noch offene Fristen tragen und lässt sich weder ändern noch vollziehen (422). Die Liste MUST
+nach `laufend`, `abgeloest` und `beendet` filtern können. Je Einheit MUST höchstens eine
+Schicht `laufend` sein. Fehlt beim
 Anlegen der Beginn, MUST das System das nicht gestrichene Eintreffen der offenen Einsatzperiode
 der Einheit aus der Kräfte-Zeitachse übernehmen und ohne ein solches den Zeitpunkt der Anlage.
 
@@ -72,8 +81,8 @@ nennen.
 
 Das System SHALL bei einem Schichtmodell vom Typ `wechselzeiten` die Fälligkeit als den
 ersten Wechsel bestimmen, der mindestens die Mindestdauer nach dem Beginn und echt nach dem
-Beginn liegt. Die Wechselzeiten MUST als Wanduhrzeit in der wirksamen Zone gelten: die des
-Einsatzes, sonst die der Organisation, sonst Europe/Berlin. Über eine Zeitumstellung MUST die
+Beginn liegt. Die Wechselzeiten MUST als Wanduhrzeit in der wirksamen Zone gelten: die erste
+gültige aus der Zone des Einsatzes und der der Organisation, sonst Europe/Berlin. Über eine Zeitumstellung MUST die
 echte Dauer zählen; eine Wechselzeit, die es am Umstellungstag nicht gibt, gilt eine Stunde
 später, eine doppelte beim ersten Mal. Die Fälligkeit MUST gespeichert werden.
 
@@ -128,8 +137,9 @@ damit laufende Fälligkeiten unverändert lassen. Die Vorgabe des Einsatzes MUST
 Abschnittsvorgabe lesbar und änderbar sein: als Kopie eines Modells der eigenen Organisation, mit
 eigenen Werten oder entfernt. Ändert sie sich, MUST das System Rhythmus, Fälligkeit und Fristen
 aller laufenden Schichten mit Quelle `einsatz` neu setzen und die Vorwarn-Fristen aller laufenden
-Schichten auf die neue Vorwarnzeit legen; eine entfernte Vorgabe lässt den zuletzt gültigen
-Rhythmus stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festgehalten werden.
+Schichten auf die neue Vorwarnzeit legen. Eine Fälligkeitsfrist MUST nur neu gesetzt werden,
+wenn sich die Fälligkeit ändert, damit eine überfällige Schicht nicht ein zweites Mal „fällig“
+meldet. Eine entfernte Vorgabe lässt Rhythmus und Fälligkeit stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festgehalten werden.
 
 #### Scenario: Anlage übernimmt die Org-Vorgabe
 - **WHEN** die Organisation die Vorgabe „12-h-Schicht“ führt und ein Einsatz angelegt wird
@@ -143,6 +153,10 @@ Rhythmus stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festge
 - **WHEN** die Vorgabe des Einsatzes von 360 auf 240 min mit 45 min Vorwarnung gesetzt wird und eine laufende Schicht ihr folgt
 - **THEN** ist diese Schicht 120 min früher fällig, ihre Fristen stehen auf der neuen Fälligkeit und 45 min davor
 - **AND** Schichten mit eigenem Rhythmus oder nach der Abschnittsvorgabe behalten ihre Fälligkeit
+
+#### Scenario: Nur die Vorwarnung ändert sich
+- **WHEN** eine Schicht seit 10:30 überfällig ist, „fällig“ schon gemeldet hat und um 10:33 eine Vorgabe mit 45 min Vorwarnung gesetzt wird
+- **THEN** meldet der Scheduler für diese Schicht kein zweites „fällig“
 
 #### Scenario: Weder Modell noch Werte
 - **WHEN** die Vorgabe ohne `schichtmodell_id` und ohne `schichtmodell` gesetzt werden soll
@@ -216,7 +230,8 @@ Das System SHALL für jede laufende Schicht eine offene Auto-Frist zur Fälligke
 solange die Vorwarnzeit noch in der Zukunft liegt, eine zweite um die Vorwarnzeit vor
 Fälligkeit.
 Beim Anlegen einer Schicht und bei Änderungen von Beginn oder Rhythmus MUST das System diese
-Fristen anlegen oder verschieben. Bei Vollzug MUST es sie schließen. Erreicht der Scheduler
+Fristen anlegen oder verschieben. Bei Vollzug und beim Ende einer Schicht (`beendet`) MUST es sie
+schließen. Erreicht der Scheduler
 eine dieser Fristen, MUST er genau einmal ein Live-Ereignis an alle Leser des Moduls
 Ablösung senden, das die Schicht und die Art (`vorwarnung` oder `faellig`) nennt.
 
@@ -276,7 +291,9 @@ Das System SHALL einen Vollzug zurücknehmen, solange die daraus entstandene Fol
 unberührt ist, also noch laufend und ohne eigenen Vollzug. Bei der Rücknahme MUST die
 Folgeschicht samt ihrer Fristen entfernt werden, die abgelöste Schicht MUST wieder laufend
 sein, ihre Fristen MUST wieder offen sein, ohne dass eine schon erfolgte Auslösung
-wiederholt wird, und ein ETB-Eintrag vom Typ Berichtigung MUST auf den Vollzugseintrag
+wiederholt wird. Die Vorwarn-Frist MUST dabei der aktuellen Vorwarnzeit folgen; folgt die
+Schicht der Vorgabe des Einsatzes und rechnet deren Regel inzwischen anders, MUST die neue
+Fälligkeit samt neuer Fristen gelten. Ein ETB-Eintrag vom Typ Berichtigung MUST auf den Vollzugseintrag
 verweisen.
 
 #### Scenario: Rücknahme direkt nach Vollzug
@@ -319,8 +336,10 @@ mit Einheit, Abschnitt, Beginn, Rhythmus (mit Kennzeichnung Vorgabe oder eigener
 Fälligkeit als Uhrzeit, Einstufung als Wort und Farbe sowie der geplanten ablösenden
 Einheit. Die Einstufung MUST einen zweiten Kanal neben der Farbe tragen (Wort), und nichts
 davon darf blinken. Ohne Schreibrecht MUST die Seite den Grund nennen und die Aktionen
-gesperrt statt entfernt zeigen. Abgelöste Schichten MUST in einer eigenen Ansicht
-nachlesbar sein.
+gesperrt statt entfernt zeigen. Abgelöste und beendete Schichten MUST in der Ansicht
+„Vergangen“ nachlesbar sein, getrennt nach Status („Abgelöst“, „Beendet“, LLH-1128). Eine
+beendete Schicht MUST als „beendet“ mit ihrem Grund erscheinen („beendet · entlassen“ mit
+Uhrzeit, „beendet · aufgelöst“), nie als „abgelöst“; ihre Zeitspalte trägt das Ende.
 
 #### Scenario: Überfällige Schicht in der Liste
 - **WHEN** eine Schicht überfällig ist
@@ -330,13 +349,19 @@ nachlesbar sein.
 - **WHEN** eine Person eine Ablösung über den Dialog vollzieht
 - **THEN** zeigt die Seite einen Hinweis mit der Aktion „Rückgängig“, die die Rücknahme auslöst
 
+#### Scenario: Mit der Entlassung beendet
+- **WHEN** die Schicht von „Florian 1“ mit seiner Entlassung um 14:12 endete und jemand „Vergangen“ → „Beendet“ wählt
+- **THEN** lädt die Seite die Schichten mit Status `beendet` und zeigt die Karte mit „beendet · entlassen 1412“, ohne Aktion und ohne „abgelöst“
+
 ### Requirement: Kartenhöhe unabhängig von Uhrzeit und fremder Rhythmusänderung
 
 Die Karte einer Schicht SHALL die Fälligkeit in einer Zeitspalte zeigen, die das breiteste
 Zeitformat (Tag und Uhrzeit) fasst, sodass Tageszeit und Tageswechsel weder Spaltenbreite noch
-Umbruch ändern. Der Rhythmus MUST in einer eigenen Zeile stehen, die Quelle als „Vorgabe“ oder
-„eigen“. Ändert eine andere Person den Rhythmus einer gezeigten Schicht, MUST die Karte ihre
-Höhe behalten, solange die Zeile mindestens 226 px Platz für Text hat.
+Umbruch ändern. Der Rhythmus MUST in einer eigenen, einzeiligen Zeile stehen, als Dauer mit der
+Quelle „eigen“, „Vorgabe“ (des Abschnitts) oder „Vorgabe Einsatz“; reicht der Platz nicht, kürzt
+sie nur das Quellenwort mit „…“. Ändert eine andere Person den Rhythmus einer gezeigten
+Schicht, MUST die Karte ihre Höhe behalten, solange die Zeile mindestens 226 px Platz für Text
+hat.
 
 #### Scenario: Fremde Rhythmusänderung kurz vor Mitternacht, mobil
 - **WHEN** um 23:40 (Anzeigezone Europe/Berlin) auf 390 px Breite in der Dichte `komfortabel` drei Schichten mit 6 h gezeigt werden und eine andere Person den Rhythmus der mittleren auf 30 min setzt
@@ -347,8 +372,74 @@ Höhe behalten, solange die Zeile mindestens 226 px Platz für Text hat.
 - **THEN** ist die Zeitspalte der Karten in beiden Fällen gleich breit
 
 #### Scenario: Längster zulässiger Rhythmus bleibt einzeilig
-- **WHEN** eine Schicht einen Rhythmus von 167 h 59 min als Vorgabe des Abschnitts trägt und die Karte auf 390 px Breite in der Dichte `komfortabel` oder `handschuh` steht
-- **THEN** steht „Rhythmus 167 h 59 min (Vorgabe)“ in einer Zeile
+- **WHEN** eine Schicht einen Rhythmus von 167 h 59 min als Vorgabe des Einsatzes trägt und die Karte auf 390 px Breite in der Dichte `komfortabel` oder `handschuh` steht
+- **THEN** steht die Zeile „Rhythmus 167:59 h (Vorgabe Einsatz)“ einzeilig, der Wert „Rhythmus 167:59 h“ ganz sichtbar und der ganze Text im Titel
+
+### Requirement: Schichtmodelle in der Verwaltung
+
+Die Verwaltung SHALL unter „Stammdaten“ einen Bereich „Schichtmodelle“ führen: eine Tabelle mit
+Bezeichnung, Regel, Vorwarnung und Planungsvorlauf, Vorgabe- und Demo-Marke. Ein Admin MUST Modelle anlegen, ändern, nach Rückfrage löschen und mit
+einem Handgriff zur Vorgabe der Organisation machen oder deren Vorgabe aufheben können. Ohne
+Admin-Recht MUST der Bereich den Grund nennen und das Anlegen gesperrt zeigen. Er MUST über das
+Org-Ereignis `stammdaten` live bleiben.
+
+#### Scenario: Vorgabe der Organisation wechseln
+- **WHEN** „Sanitätsdienst“ die Vorgabe der Organisation ist und ein Admin bei „Hochwasser“ „Als Vorgabe setzen“ wählt
+- **THEN** sendet die Oberfläche zuerst „Sanitätsdienst“ ohne Vorgabe und dann „Hochwasser“ als Vorgabe, jeweils mit dem ganzen Satz
+
+#### Scenario: Zweiter Schritt scheitert
+- **WHEN** beim Wechsel das Setzen der neuen Vorgabe abgelehnt wird
+- **THEN** stellt die Oberfläche die bisherige Vorgabe wieder her und nennt den Grund
+
+### Requirement: Schichtmodell in der Einsatzanlage
+
+Der Dialog „Neuen Einsatz anlegen“ SHALL die Vorgabe der Organisation als Zeile
+„Schichtmodell: <Bezeichnung> (Vorgabe)“ nennen, ohne eigenes Feld. Ohne Vorgabe der
+Organisation MUST die Zeile fehlen.
+
+#### Scenario: Zeile in der Einsatzanlage
+- **WHEN** die Organisation „12-h-Schicht“ als Vorgabe führt und jemand „Neuen Einsatz anlegen“ öffnet
+- **THEN** steht im Dialog „Schichtmodell: 12-h-Schicht (Vorgabe)“, und der Dialog hat weiter fünf Felder
+
+### Requirement: Vorgabe des Einsatzes in den Einstellungen
+
+Die Einsatz-Einstellungen SHALL einen Reiter „Ablösung“ führen, der die Vorgabe des Einsatzes
+zeigt (Bezeichnung, Regel, Vorwarnung, Planungsvorlauf, laufende Schichten). Mit den Rechten der
+Abschnittsvorgabe MUST er ein Modell der Organisation übernehmen, eigene Werte setzen und die
+Vorgabe entfernen lassen; Entfernen MUST über „Rückgängig“ mit den alten Werten umkehrbar sein.
+Ohne Freigabe des Moduls Ablösung MUST der Reiter das sagen, statt die Vorgabe abzufragen.
+
+#### Scenario: Modell übernehmen
+- **WHEN** die Einsatzleitung im Reiter „Ablösung“ „Sanitätsdienst“ wählt und „Übernehmen“ wählt
+- **THEN** sendet die Oberfläche `schichtmodell_id` und zeigt danach „Rhythmus 6 h“
+
+#### Scenario: Entfernen und zurücknehmen
+- **WHEN** die Einsatzleitung „Vorgabe entfernen“ wählt und danach im Hinweis „Rückgängig“
+- **THEN** ist die alte Vorgabe mit denselben Werten wieder gesetzt
+
+### Requirement: Dauern und Einsatzvorgabe auf der Seite Ablösung
+
+Dauern SHALL als „8 h“, „7:30 h“ oder „45 min“ erscheinen und so vorbelegt werden, nie mit
+Dezimalpunkt; Wechselzeiten taktisch („0600/1800“). Die Seite Ablösung MUST die Vorgabe des
+Einsatzes zeigen und sie in „Schicht beginnen“ und „Rhythmus ändern“ als letzte Stufe der
+Rangfolge nennen: ohne Vorgabe des Abschnitts als Platzhalter, und das Rhythmusfeld darf leer
+bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rechnen.
+
+#### Scenario: Einsatzvorgabe als Platzhalter
+- **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit 12 h hat und eine Schicht für eine Einheit ohne Abschnittsvorgabe beginnen soll
+- **THEN** zeigt das Rhythmusfeld „12 h (Vorgabe Einsatz)“, ist kein Pflichtfeld und sendet leer keinen Rhythmus
+
+#### Scenario: Dauer statt Dezimalzahl
+- **WHEN** eine Schicht einen eigenen Rhythmus von 450 min hat und jemand „Rhythmus ändern“ öffnet
+- **THEN** steht im Feld „7:30 h“
+
+#### Scenario: Eingabe einer Dauer
+- **WHEN** jemand „8“, „7:30“, „7,5“ oder „90 min“ einträgt
+- **THEN** gelten 480, 450, 450 bzw. 90 Minuten, und Unlesbares lehnt das Feld ab, ohne zu senden
+
+#### Scenario: Vorwarnung aus der Schicht
+- **WHEN** eine laufende Schicht in 50 min fällig ist und `vorwarnung_minuten: 60` meldet
+- **THEN** zählt der Modulzähler sie als fällig, ohne neuen Abruf
 
 ### Requirement: Hinweis in der AlarmZentrale
 
@@ -358,7 +449,9 @@ mit Einheit, Uhrzeit und einem Sprung zur Seite Ablösung. Er kommt als Benachri
 an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
 Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
 Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
-Erinnerung alarmieren.
+Erinnerung alarmieren. Der Planungshinweis und die Hinweise zur ablösenden Einheit (LLH-1131)
+SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zur Seite
+Ablösung, ohne dass etwas blinkt.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
@@ -385,12 +478,208 @@ erscheinen, wenn das Modul für die Person sichtbar ist.
 - **WHEN** eine Schicht überfällig ist, eine in 20 min fällig und eine in 3 h
 - **THEN** zeigt das Modulpanel am Modul Ablösung die Zahl 2
 
-### Requirement: Auflösen behält abgelöste Schichten
+### Requirement: Auflösen beendet die laufende Schicht mit Spur
 
-Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht samt offener Fristen
-entfernen und ihre abgelösten Schichten samt Vollzug behalten. Verweist eine Schicht einer
-anderen Einheit auf die aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden.
+Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht als `beendet` mit Grund
+`aufloesung`, Zeitpunkt und Person behalten und ihre offenen Fristen schließen, statt sie zu
+löschen (LLH-1128, Entscheidung vom 15.10.2026; ändert die Fassung aus LLH-1079). Abgelöste
+Schichten MUST samt Vollzug bleiben. Verweist eine Schicht einer anderen Einheit auf die
+aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden; an einer laufenden Schicht
+mit Hinweis und ETB-Eintrag (Requirement „Planung entfällt“).
 
 #### Scenario: Historie bleibt
 - **WHEN** eine Einheit mit zwei abgelösten und einer laufenden Schicht aufgelöst wird
-- **THEN** zeigt die Ablösung die beiden abgelösten Schichten weiter, die laufende nicht mehr
+- **THEN** zeigt die Ablösung die beiden abgelösten Schichten weiter, die laufende ist nicht mehr laufend, sondern `beendet` mit Grund `aufloesung`
+
+### Requirement: Schicht mit dem Eintreffen
+
+Schreibt die Kräfte-Zeitachse das Eintreffen der offenen Periode einer Einheit, die weder eine
+eigene noch eine geerbte laufende Schicht hat, SHALL das System in derselben Transaktion eine
+Schicht mit Beginn = Eintreffen anlegen, sofern der Abschnitt der Einheit oder der Einsatz eine
+Vorgabe hat (LLH-1128). Rhythmus und Quelle MUST der Rangfolge des Beginnens von Hand folgen
+(Abschnitt vor Einsatz), samt Fristen, ETB-Eintrag mit der Herkunft („mit dem Eintreffen
+begonnen“) und Live-Ereignis `abloesung`. Ohne Vorgabe MUST keine Schicht entstehen, ebenso
+wenig für eine Einheit, die eine laufende Schicht als ablösende plant: ihre Schicht entsteht mit
+dem Vollzug als Folgeschicht. Das gilt
+für jeden Weg des Eintreffens (Statuswechsel, Nachtrag, Bereitstellungsraum). Ein Fehler beim
+Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelingen trotzdem.
+
+#### Scenario: Einsatzvorgabe 6 h
+- **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit 6 h hat und „Florian 1“ um 08:00 per Status eintrifft
+- **THEN** läuft eine Schicht ab 08:00, fällig um 14:00, mit Fristen zu 13:30 und 14:00, und das ETB nennt „mit dem Eintreffen begonnen … (Vorgabe Einsatz «Sanitätsdienst»)“
+
+#### Scenario: Ohne Vorgabe
+- **WHEN** weder Abschnitt noch Einsatz eine Vorgabe haben und eine Einheit eintrifft
+- **THEN** entsteht keine Schicht
+
+#### Scenario: Zweites Eintreffen
+- **WHEN** eine Einheit mit laufender Schicht ein weiteres Eintreffen bekommt
+- **THEN** entsteht keine zweite Schicht
+
+#### Scenario: Geplanter Ablöser trifft ein
+- **WHEN** „Florian 2“ als ablösende Einheit von „Florian 1“ geplant ist und eintrifft
+- **THEN** bekommt „Florian 2“ keine eigene Schicht, und der spätere Vollzug legt seine Folgeschicht ab dem Vollzug an
+
+#### Scenario: Fehler im Autostart
+- **WHEN** das Anlegen der Schicht scheitert
+- **THEN** gelingt der Statuswechsel, das Eintreffen steht, und von der Schicht bleibt nichts zurück
+
+### Requirement: Ende mit der Entlassung
+
+Schreibt die Kräfte-Zeitachse eine Entlassung, nach der die Einheit keine offene Periode mehr
+hat, SHALL das System ihre laufende Schicht in derselben Transaktion als `beendet` mit Grund
+`entlassung`, Zeitpunkt der Entlassung und Person beenden, ihre Fristen schließen und einen
+ETB-Eintrag schreiben. Eine entlassene Einheit MUST danach keinen Hinweis „fällig“ mehr
+auslösen. Wird genau diese Entlassung gestrichen, MUST die Schicht wieder laufen, samt Fristen
+wie bei der Rücknahme eines Vollzugs, sofern die Einheit inzwischen keine neue laufende Schicht
+hat.
+
+#### Scenario: Entlassen vor der Fälligkeit
+- **WHEN** „Florian 1“ mit einer um 14:00 fälligen Schicht um 12:00 entlassen wird
+- **THEN** ist die Schicht `beendet` mit Grund `entlassung` und Ende 12:00, und der Scheduler löst um 14:01 nichts aus
+
+#### Scenario: Entlassung gestrichen
+- **WHEN** diese Entlassung gestrichen wird
+- **THEN** läuft die Schicht wieder, mit Fristen zu 13:30 und 14:00
+
+#### Scenario: Entlassung einer früheren Periode
+- **WHEN** eine Entlassung nachgetragen wird, die eine frühere Periode schließt, während eine spätere offen bleibt
+- **THEN** bleibt die laufende Schicht unberührt
+
+### Requirement: Knoten-Vererbung der Schicht
+
+Eine Untereinheit ohne eigene laufende Schicht SHALL die laufende Schicht ihres nächsten
+Vorfahren mit einer erben (über die übergeordnete Einheit, LLH-1118 Punkt 1). Die Vererbung MUST
+beim Lesen ermittelt und nicht gespeichert werden; die tragende Schicht MUST ihre erbenden
+Untereinheiten nennen (`erbende_einheiten`). Mit ihrem Eintreffen MUST eine erbende
+Untereinheit keine eigene Schicht bekommen. Eine von Hand begonnene Schicht an einer
+Untereinheit SHALL möglich bleiben und übersteuert die Vererbung für sie und ihren Teilbaum.
+
+#### Scenario: Gruppe erbt vom Zug
+- **WHEN** „Zug 1“ eine laufende Schicht hat und seine „Gruppe 1“ eintrifft
+- **THEN** bekommt die Gruppe keine eigene Schicht, und die Schicht des Zugs nennt „Gruppe 1“ als erbend
+
+#### Scenario: Eigene Schicht übersteuert
+- **WHEN** an „Gruppe 1“ von Hand eine Schicht begonnen wird
+- **THEN** erbt deren „Trupp 1“ von der Gruppe, und der Zug nennt beide nicht mehr
+
+#### Scenario: Erben auf der Karte
+- **WHEN** die laufende Schicht von „Zug 1“ an „1. Trupp“ und „2. Trupp“ vererbt
+- **THEN** nennt ihre Karte in einer einzeiligen Zeile „gilt auch für: 1. Trupp, 2. Trupp“, den ganzen Text im Titel, und der Client rechnet die Vererbung nicht selbst nach
+
+### Requirement: Einheiten ohne Schicht
+
+Die Seite Ablösung SHALL eine Ansicht „Ohne Schicht“ mit Zahl führen (LLH-1128): die Einheiten
+mit offener Einsatzperiode (letzte Periode ohne Ende, alarmiert oder eingetroffen), die weder
+eine eigene laufende Schicht haben noch über `erbende_einheiten` eine erben, die am längsten im
+Einsatz zuerst. Jede Zeile MUST Eintreffen (ohne es die Alarmierung) und Abschnitt zeigen und
+mit Schreibrecht „Schicht beginnen“ anbieten, das den Dialog mit der Einheit vorbelegt. Ein
+geplanter Ablöser MUST in der Ansicht stehen, mit der Einheit, die er ablösen soll, aber ohne
+„Schicht beginnen“.
+
+#### Scenario: Zug, Trupp und eine einzelne Einheit
+- **WHEN** „Zug Nord“ eine laufende Schicht hat, sein „Trupp Nord“ und „Florian Süd“ eingetroffen sind und keine eigene haben
+- **THEN** zeigt das Segment „Ohne Schicht (1)“ und die Ansicht nur „Florian Süd“
+
+#### Scenario: Schicht aus der Zeile beginnen
+- **WHEN** jemand an der Zeile „Florian Süd“ „Schicht beginnen“ wählt und mit Rhythmus 6 h absendet
+- **THEN** ist „Florian Süd“ im Dialog vorbelegt, „Im Einsatz seit“ nennt das Eintreffen, die Schicht läuft, und die Zeile fällt weg
+
+### Requirement: Zufluss und Sperre der Ansicht „Ohne Schicht“
+
+Neue Einheiten ohne Schicht MUST hinter dem Sammelbanner warten, eine Einheit, die eine Schicht
+bekommt, MUST sofort wegfallen, und Zahl wie Kopf MUST mit der vollen Menge rechnen (Regeln wie
+bei den laufenden Schichten). Ohne Freigabe des Moduls Einheiten MUST das Segment gesperrt mit
+Grund stehen, ohne Zahl und ohne Anfrage an die Kräfte-Zeitachse. Auf 390 px MUST die
+Ansichtsleiste mit dem Banner in jeder Dichte ungekürzt im Fenster stehen; schmal trägt dann der
+Kopf die Zahlen.
+
+#### Scenario: Fremd eingetroffen
+- **WHEN** eine andere Einheit ohne Schicht eintrifft, während die Ansicht gezeigt wird
+- **THEN** zählt das Segment sie sofort mit, die gezeigten Zeilen bleiben, wo sie sind, und das Banner nennt „1 neue Einheit ohne Schicht“
+
+#### Scenario: Modul Einheiten gesperrt
+- **WHEN** der Person die Freigabe des Moduls Einheiten fehlt
+- **THEN** steht „Ohne Schicht“ gesperrt mit dem Grund „Modul Einheiten gesperrt“, und die Seite fragt die Zeitachse nicht ab
+
+### Requirement: Planungshinweis
+
+Das System SHALL für jede laufende Schicht ohne geplante ablösende Einheit eine dritte Auto-Frist
+führen, den Planungsvorlauf vor der Fälligkeit (aus dem Schichtmodell des Einsatzes, ohne eines
+2 h; LLH-1118 Punkt 5). Erreicht der Scheduler sie, MUST er genau einmal die Benachrichtigung
+`abloesung_planung` („Keine ablösende Einheit geplant“, Hinweis) an alle Leser des Moduls Ablösung
+melden. Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
+ablösenden Einheit (auch über die Ablöser-Liste) schließen und mit einer aufgehobenen oder
+entfallenen Planung wieder entstehen, solange ihr Zeitpunkt noch vor uns liegt; ein Zeitpunkt in
+der Vergangenheit MUST keine Frist ergeben. Der Planungshinweis MUST NOT eine Einstufung sein:
+es bleibt bei `planmaessig`, `vorwarnung` und `ueberfaellig`.
+
+#### Scenario: Zwei Stunden vorher
+- **WHEN** eine Schicht ohne Schichtmodell um 15:30 fällig ist und keine ablösende Einheit geplant ist
+- **THEN** erhalten alle mit dem Modul Ablösung um 13:30 genau einmal den Hinweis „Keine ablösende Einheit geplant“ mit „Florian 1, 15:30“
+
+#### Scenario: Geplant
+- **WHEN** vor 13:30 eine ablösende Einheit geplant wird
+- **THEN** kommt kein Planungshinweis
+
+#### Scenario: Fälligkeit verschoben
+- **WHEN** der Beginn der Schicht um eine Stunde später gesetzt wird
+- **THEN** kommt der Planungshinweis um 14:30
+
+### Requirement: Hinweise zur ablösenden Einheit
+
+Wird die geplante ablösende Einheit einer laufenden Schicht alarmiert, trifft sie ein, trifft sie
+am Bereitstellungsraum ein oder wird sie dort abgerufen, SHALL das System je Ereignis und Schicht
+genau eine Benachrichtigung `abloesung_abloeser` (Hinweis) an alle Leser des Moduls Ablösung
+melden, mit der Schicht als Bezug und dem Ereignis im Bezugstyp (`abloeser_alarmiert`,
+`abloeser_eingetroffen`, `abloeser_br_eingetroffen`, `abloeser_abgerufen`). Geplant heißt: als
+`abloesende_einheit_id` oder in der Ablöser-Liste der Schicht. Alarmierung und Eintreffen MUST nur
+als Beginn der offenen Periode zählen, aus der Kräfte-Zeitachse in derselben Transaktion; das
+Eintreffen am Bereitstellungsraum meldet dessen Buchung, auch wenn die Zeitachse es auslässt, und
+nicht zusätzlich als „eingetroffen“. Bei einem Verband zählt nur die geplante Einheit, nicht ihre
+mitgenommenen Untereinheiten. Gemeldet wird nach dem Commit; ein Fehler dabei MUST den
+Statuswechsel nicht brechen. Andere Leser und die auslösende Person MUST NOT einen Hinweis
+erhalten.
+
+#### Scenario: Eingetroffen
+- **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
+- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Seite Ablösung, und Mitglieder ohne das Modul erhalten nichts
+
+#### Scenario: Am Bereitstellungsraum
+- **WHEN** dieselbe Einheit am Bereitstellungsraum eingebucht und später abgerufen wird
+- **THEN** gehen je ein Hinweis „im Bereitstellungsraum eingetroffen“ und „abgerufen“ an die Leser
+
+#### Scenario: Nicht geplant
+- **WHEN** eine Einheit ohne Planung alarmiert wird
+- **THEN** entsteht kein Hinweis
+
+### Requirement: Planung entfällt
+
+Wird die geplante ablösende Einheit einer laufenden Schicht aufgelöst oder entlassen (Entlassung
+ohne offene Periode danach), SHALL das System die Planung selbst aufheben, bevor ein
+Fremdschlüssel sie still leeren könnte: Einzelplanung leeren und den Eintrag der Ablöser-Liste
+entfernen, je Schicht ein ETB-Eintrag „Ablösung «…»: Planung der ablösenden Einheit entfallen,
+«…» aufgelöst“ bzw. „… entlassen“ und ein Hinweis `abloesung_abloeser` mit Bezugstyp
+`abloeser_entfallen` an die Leser des Moduls. Ohne verbleibende Planung MUST der Planungshinweis
+wieder anstehen.
+
+#### Scenario: Geplante Einheit aufgelöst
+- **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und aufgelöst wird
+- **THEN** trägt die Schicht keine Planung mehr, das ETB nennt „Planung der ablösenden Einheit entfallen“, und die Leser erhalten den Hinweis „Planung der ablösenden Einheit entfallen“
+
+### Requirement: Plausibilität beim Planen
+
+Das System SHALL beim Planen einer ablösenden Einheit warnen, aber nicht ablehnen: jede laufende
+Schicht trägt `planung_warnungen`, beim Lesen ermittelt, für ihre Einzelplanung und die Einträge
+ihrer Ablöser-Liste. `schon_geplant` MUST erscheinen, wenn dieselbe Einheit auch eine andere
+laufende Schicht plant (mit dieser Schicht und ihrer Einheit), `im_einsatz`, wenn die Einheit
+selbst eine eigene oder geerbte laufende Schicht hat (mit deren Beginn). Die Oberfläche zeigt
+die Warnungen nach dem Speichern der Planung als Meldung.
+
+#### Scenario: Schon geplant
+- **WHEN** „Florian 3“ für die Schicht von „Florian 1“ geplant ist und auch für „Florian 2“ geplant wird
+- **THEN** gelingt die Planung, und die Antwort warnt „Florian 3 schon für Schicht Florian 1 geplant“
+
+#### Scenario: Selbst im Einsatz
+- **WHEN** eine Einheit mit eigener laufender Schicht seit 13:40 als ablösende Einheit geplant wird
+- **THEN** gelingt die Planung, und die Antwort warnt „steht selbst im Einsatz seit 1340“

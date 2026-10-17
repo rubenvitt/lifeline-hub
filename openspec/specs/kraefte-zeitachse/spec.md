@@ -186,6 +186,20 @@ etwa weil die Person nach dem Vollzug neu alarmiert wurde, MUST die Rücknahme m
 die Person nennen und nichts ändern. Die ablösende Einheit MUST durch den Vollzug kein Ereignis
 bekommen.
 
+Umgekehrt SHALL der einzige Schreibpfad der Zeitachse an einer Einheit die Schicht der Ablösung
+mitführen (LLH-1128, Spec `kraefte-abloesung`): das Eintreffen der offenen Periode beginnt eine
+Schicht („Schicht mit dem Eintreffen“), eine Entlassung, nach der keine Periode mehr offen ist,
+beendet sie, die Streichung dieser Entlassung öffnet sie wieder („Ende mit der Entlassung“).
+Ein Fehler dabei MUST den Statuswechsel, Nachtrag oder die Buchung nicht scheitern lassen.
+
+#### Scenario: Nachgetragenes Eintreffen beginnt die Schicht
+- **WHEN** der Einsatz eine Vorgabe hat und für eine Einheit ohne Schicht ein Eintreffen nachgetragen wird
+- **THEN** läuft eine Schicht ab dem nachgetragenen Zeitpunkt, und das Live-Ereignis `abloesung` geht hinaus
+
+#### Scenario: Eintreffen am Bereitstellungsraum
+- **WHEN** eine Einheit am Bereitstellungsraum eintrifft und der Einsatz eine Vorgabe hat
+- **THEN** beginnt ihre Schicht zum Zeitpunkt der Buchung; die Buchung behält ihren einen ETB-Eintrag, die Ablösung schreibt ihren eigenen
+
 #### Scenario: Vollzug beendet die Periode
 - **WHEN** die Schicht von „Florian 1“ um 14:40 vollzogen wird und die Einheit seit 06:40 eingetroffen ist
 - **THEN** endet ihre Periode um 14:40 mit der Art Ablösung

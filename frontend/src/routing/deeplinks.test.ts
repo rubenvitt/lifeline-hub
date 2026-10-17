@@ -862,6 +862,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'aufbewahrung',
       'module',
       'pegel',
+      'abloesung',
       'geraete',
       'zugriff',
     ]);

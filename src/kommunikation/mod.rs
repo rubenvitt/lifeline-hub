@@ -23,6 +23,10 @@ pub const OBJEKT_MELDUNG: &str = "meldung";
 /// `idx_erinnerung_auto_bezug` beide ab, ohne dass man ihn anfasst.
 pub const OBJEKT_ABLOESUNG: &str = "abloesung";
 pub const OBJEKT_ABLOESUNG_VORWARNUNG: &str = "abloesung_vorwarnung";
+/// Dritte Auto-Frist einer Schicht (LLH-1131): der Planungshinweis, `planungsvorlauf_minuten`
+/// vor der Fälligkeit, nur ohne geplante ablösende Einheit. Eigener Bezugstyp aus demselben
+/// Grund wie die Vorwarnung.
+pub const OBJEKT_ABLOESUNG_PLANUNG: &str = "abloesung_planung";
 
 /// Vollzug-Achse (Achse 2): Bearbeitungszustand eines Objekts.
 pub const VOLLZUG_OFFEN: &str = "offen";

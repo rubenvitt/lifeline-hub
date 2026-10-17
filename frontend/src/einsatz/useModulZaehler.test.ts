@@ -78,6 +78,8 @@ describe('Modul-Zähler', () => {
       faellig_at,
       status: 'laufend' as const,
       ruecknehmbar: false,
+      erbende_einheiten: [],
+      planung_warnungen: [],
       angelegt_at: '2026-09-22 09:00:00',
     });
     expect(

@@ -622,7 +622,7 @@ pub async fn abruf(
         etb: einst.etb_startwert(),
         auto_etb: crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
     };
-    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, etb_id, hinweise) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis =
             abruf::abruf_tx(conn, einsatz_id, br_id, &daten, startwerte, ctx.benutzer.id).await?;
         let etb_id = crate::etb::system_audit_tx(
@@ -633,11 +633,27 @@ pub async fn abruf(
             &ergebnis.etb_text(),
         )
         .await?;
-        Ok((ergebnis, etb_id))
+        // Eine als ablösende geplante Einheit ist abgerufen (LLH-1131); mitgenommene
+        // Untereinheiten zählen nicht, wie beim Verband nur der Knoten.
+        let hinweise = match typ {
+            ObjektTyp::Einheit => {
+                crate::abloesung::hinweis::anlaesse_tx(
+                    conn,
+                    einsatz_id,
+                    body.objekt_id,
+                    crate::benachrichtigung::BenachrichtigungBezugTyp::AbloeserAbgerufen,
+                    ctx.benutzer.id,
+                )
+                .await?
+            }
+            ObjektTyp::Fahrzeug => Vec::new(),
+        };
+        Ok((ergebnis, etb_id, hinweise))
     })?;
 
     // Live nach dem Commit (D15).
     state.live.publiziere(einsatz_id, etb_id);
+    super::abloesung::publish_kopplung(&state, einsatz_id, &[], &hinweise).await;
     sse_br(&state, einsatz_id, br_id);
     sse_kraefte(
         &state,
@@ -838,8 +854,9 @@ async fn eintreffen_replay(
     Ok((StatusCode::CREATED, Json(ergebnis)))
 }
 
-/// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, bei
-/// unangemeldet das Meldungsbündel samt Benachrichtigung und Auto-Frist-Erinnerung.
+/// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, die
+/// Ablösung bei begonnener Schicht (LLH-1128), bei unangemeldet das Meldungsbündel samt
+/// Benachrichtigung und Auto-Frist-Erinnerung.
 async fn notify_eintreffen(
     state: &AppState,
     einsatz_id: i64,
@@ -860,6 +877,9 @@ async fn notify_eintreffen(
     for ep_id in &g.personen {
         super::einsatz_personal::sse_personal(state, einsatz_id, *ep_id);
     }
+    // Das Eintreffen hat die Schicht der Einheit begonnen (LLH-1128); eine geplante ablösende
+    // Einheit ist am Raum eingetroffen (LLH-1131).
+    super::abloesung::publish_kopplung(state, einsatz_id, &g.abloesung, &g.hinweise).await;
     if let Some(meldung_id) = g.meldung_id {
         notify_meldung(state, meldung_id).await?;
     }

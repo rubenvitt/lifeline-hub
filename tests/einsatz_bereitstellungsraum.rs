@@ -3992,3 +3992,63 @@ async fn fremder_einsatz_verorten_404() {
     let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
     assert!(detail.get("lat").is_none(), "{detail}");
 }
+
+/// LLH-1128: das Eintreffen am Bereitstellungsraum läuft durch den einzigen Schreibpfad der
+/// Zeitachse und beginnt mit einer Einsatzvorgabe die Schicht der Einheit; die Buchung behält
+/// ihren einen ETB-Eintrag, die Ablösung schreibt ihren eigenen, und `abloesung` geht live.
+#[tokio::test]
+async fn eintreffen_beginnt_die_schicht_der_einheit() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/abloesungen/schichtmodell"),
+        &cookie,
+        Some(
+            &json!({"schichtmodell": {"bezeichnung": "Sanitätsdienst", "typ": "rhythmus",
+                                       "rhythmus_minuten": 360}}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = eintreffen(
+        &app,
+        &cookie,
+        eid,
+        br,
+        json!({"kraft": {"objekt_typ": "einheit", "objekt_id": einheit}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    common::recv_until_tag(&mut rx, "abloesung", std::time::Duration::from_secs(2)).await;
+    let (s, liste) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/abloesungen?status=laufend"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(liste.as_array().unwrap().len(), 1, "{liste}");
+    assert_eq!(liste[0]["einheit_id"], einheit);
+    assert_eq!(liste[0]["beginn_at"], v["belegung"]["zeitpunkt_at"]);
+    let etb = etb_inhalte(&app, &cookie, eid).await;
+    assert!(
+        etb.contains(&"HLF 20 im BR Sportplatz eingetroffen".to_string()),
+        "{etb:?}"
+    );
+    assert_eq!(
+        etb.iter()
+            .filter(|t| t.contains("«HLF 20» mit dem Eintreffen begonnen"))
+            .count(),
+        1,
+        "{etb:?}"
+    );
+}

@@ -98,6 +98,14 @@ pub fn offenes_eintreffen(perioden: &[Einsatzperiode]) -> Option<&str> {
         .and_then(|p| p.eintreffen_at.as_deref())
 }
 
+/// Die Alarmierung, mit der die offene Periode beginnt, falls sie eine hat (LLH-1131).
+pub fn offene_alarmierung(perioden: &[Einsatzperiode]) -> Option<&str> {
+    perioden
+        .last()
+        .filter(|p| p.ende_at.is_none() && p.anker == ZeitachseArt::Alarmierung)
+        .map(|p| p.beginn_at.as_str())
+}
+
 fn gehe(folge: &[Ereignis], streng: bool) -> Result<Vec<Einsatzperiode>, Verstoss> {
     let mut sortiert: Vec<&Ereignis> = folge.iter().collect();
     sortiert.sort_by(|a, b| {

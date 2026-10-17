@@ -28,7 +28,8 @@ export const MODUL_FAHRZEUGE_GESPERRT = 'Modul Fahrzeuge gesperrt';
 export const MODUL_MATERIAL_GESPERRT = 'Modul Material gesperrt';
 export const MODULE_PERSONAL_FAHRZEUGE_GESPERRT = 'Module Personal und Fahrzeuge gesperrt';
 /** Abruf aus dem Bereitstellungsraum (LLH-1085): der Ziel-Abschnitt setzt die Unterstellung, der
- *  Auftragstext erteilt einen Auftrag; die Liste der Abschnitte liest das Modul Einsatzabschnitte. */
+ *  Auftragstext erteilt einen Auftrag; die Liste der Abschnitte liest das Modul Einsatzabschnitte.
+ *  „Ohne Schicht“ der Ablösung liest Einheiten und ihre Zeitachse (LLH-1128). */
 export const MODUL_EINHEITEN_GESPERRT = 'Modul Einheiten gesperrt';
 export const MODUL_ABSCHNITTE_GESPERRT = 'Modul Einsatzabschnitte gesperrt';
 export const MODUL_AUFTRAEGE_GESPERRT = 'Modul Aufträge gesperrt';

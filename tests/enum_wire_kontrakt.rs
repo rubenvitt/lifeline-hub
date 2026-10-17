@@ -927,7 +927,30 @@ fn wetter_messgroesse_wire() {
 /// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).
 #[test]
 fn abloesung_status_wire() {
-    enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus { Laufend, Abgeloest });
+    enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus {
+        Laufend,
+        Abgeloest,
+        Beendet,
+    });
+}
+
+/// LLH-1128: `beendet_grund` ist TEXT ohne CHECK (`migrations/0212_schichtmodell.sql`); den Wert
+/// setzt nur dieser Enum.
+#[test]
+fn abloesung_beendet_grund_wire() {
+    enum_wire!(lifeline_hub::abloesung::BeendetGrund {
+        Entlassung => "entlassung",
+        Aufloesung => "aufloesung",
+    } in lifeline_hub::abloesung::BeendetGrund::ALLE);
+}
+
+/// LLH-1131: Art einer Warnung beim Planen der ablösenden Einheit (nur im Antwort-DTO).
+#[test]
+fn abloesung_warnung_art_wire() {
+    enum_wire!(lifeline_hub::abloesung::AbloesungWarnungArt {
+        SchonGeplant => "schon_geplant",
+        ImEinsatz => "im_einsatz",
+    } in lifeline_hub::abloesung::AbloesungWarnungArt::ALLE);
 }
 
 /// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).
@@ -1194,6 +1217,8 @@ fn benachrichtigung_wire() {
         AbloesungFaellig => "abloesung_faellig",
         ErinnerungFaellig => "erinnerung_faellig",
         AbloesungVorwarnung => "abloesung_vorwarnung",
+        AbloesungPlanung => "abloesung_planung",
+        AbloesungAbloeser => "abloesung_abloeser",
         AuftragErteilt => "auftrag_erteilt",
         AuftragQuittiert => "auftrag_quittiert",
         AuftragErledigt => "auftrag_erledigt",
@@ -1220,6 +1245,11 @@ fn benachrichtigung_wire() {
         Lagebericht => "lagebericht",
         Erinnerung => "erinnerung",
         Abloesung => "abloesung",
+        AbloeserAlarmiert => "abloeser_alarmiert",
+        AbloeserEingetroffen => "abloeser_eingetroffen",
+        AbloeserBrEingetroffen => "abloeser_br_eingetroffen",
+        AbloeserAbgerufen => "abloeser_abgerufen",
+        AbloeserEntfallen => "abloeser_entfallen",
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
         NachforderungZugesagt => "nachforderung_zugesagt",

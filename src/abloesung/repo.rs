@@ -5,22 +5,30 @@
 //! Ablauf lässt deshalb nichts zurück (Spec: „Vollzug mit Folgeschicht", Atomarität).
 //!
 //! Die Fristen hängen polymorph an der Schicht (`bezug_typ` `abloesung` /
-//! `abloesung_vorwarnung`, `bezug_id` = Schicht-ID) — ohne FK, wie alle Auto-Fristen.
+//! `abloesung_vorwarnung` / `abloesung_planung`, `bezug_id` = Schicht-ID) — ohne FK, wie alle
+//! Auto-Fristen.
 
 use chrono_tz::Tz;
 use sqlx::{SqliteConnection, SqlitePool};
 
+use std::collections::{HashMap, HashSet};
+
+use super::hinweis::{self, Wirkung};
 use super::{
-    einstufung, faelligkeit, rhythmus_text, vorwarnzeit, AbloesungAnzeige,
-    AbloesungEinsatzVorgabeAnzeige, AbloesungStatus, AbloesungVollzugAnzeige,
-    AbloesungVorgabeAnzeige, RhythmusQuelle, VORWARNUNG_VORGABE_MINUTEN,
+    einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
+    AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungStatus,
+    AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund, PlanungsStand, RhythmusQuelle,
+    PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
+use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::erinnerung::repo as erinnerung_repo;
 use crate::error::AppError;
 use crate::etb::repo::EintragDaten;
 use crate::etb::{TYP_BERICHTIGUNG, TYP_ENTSCHEIDUNG, TYP_MELDUNG};
-use crate::kommunikation::{OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_VORWARNUNG};
+use crate::kommunikation::{
+    OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_PLANUNG, OBJEKT_ABLOESUNG_VORWARNUNG,
+};
 use crate::schichtmodell::repo as schichtmodell_repo;
 use crate::schichtmodell::{Regel, Werte};
 use crate::write_retry;
@@ -78,6 +86,9 @@ struct Zeile {
     folgeschicht_id: Option<i64>,
     folgeschicht_laufend: Option<i64>,
     einheit_laeuft_anderswo: i64,
+    beendet_at: Option<String>,
+    beendet_von_id: Option<i64>,
+    beendet_grund: Option<String>,
     angelegt_at: String,
 }
 
@@ -87,7 +98,7 @@ impl Zeile {
             AbloesungStatus::Laufend => {
                 Some(einstufung(&self.faellig_at, jetzt, self.vorwarnung_minuten))
             }
-            AbloesungStatus::Abgeloest => None,
+            AbloesungStatus::Abgeloest | AbloesungStatus::Beendet => None,
         };
         let folge_unberuehrt = match self.folgeschicht_id {
             None => true,
@@ -117,6 +128,11 @@ impl Zeile {
             vorgaenger_id: self.vorgaenger_id,
             folgeschicht_id: self.folgeschicht_id,
             ruecknehmbar,
+            beendet_at: self.beendet_at,
+            beendet_von_id: self.beendet_von_id,
+            beendet_grund: self.beendet_grund.as_deref().and_then(BeendetGrund::parse),
+            erbende_einheiten: Vec::new(),
+            planung_warnungen: Vec::new(),
             angelegt_at: self.angelegt_at,
         }
     }
@@ -139,7 +155,7 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
             f.status = 'laufend' AS folgeschicht_laufend, \
             EXISTS (SELECT 1 FROM einsatz_abloesung o WHERE o.einheit_id = a.einheit_id \
                AND o.status = 'laufend' AND o.id <> a.id) AS einheit_laeuft_anderswo, \
-            a.angelegt_at \
+            a.beendet_at, a.beendet_von_id, a.beendet_grund, a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
@@ -148,7 +164,8 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
      LEFT JOIN einsatz_abloesung f ON f.id = \
                (SELECT MAX(fv.id) FROM einsatz_abloesung fv WHERE fv.vorgaenger_id = a.id)";
 
-/// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug absteigend.
+/// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug und beendete
+/// nach ihrem Ende, beide absteigend. Laufende tragen ihre erbenden Untereinheiten.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -159,7 +176,167 @@ pub async fn liste(
         .bind(einsatz_id)
         .fetch_all(pool)
         .await?;
-    Ok(zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect())
+    let mut liste: Vec<AbloesungAnzeige> = zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect();
+    attach_erben(pool, einsatz_id, &mut liste).await?;
+    Ok(liste)
+}
+
+/// Die Gliederung eines Einsatzes für die Knoten-Vererbung: je aktive Einheit ihre
+/// übergeordnete und ihr Name, dazu die Einheiten mit eigener laufender Schicht. Aufgelöste
+/// fehlen (ihre Kinder hängt das Auflösen um, `einheit::repo::aufloesen_tx`).
+struct Gliederung {
+    ueber: HashMap<i64, Option<i64>>,
+    namen: HashMap<i64, String>,
+    mit_schicht: HashSet<i64>,
+}
+
+async fn load_gliederung(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+) -> Result<Gliederung, AppError> {
+    let zeilen: Vec<(i64, Option<i64>, String, bool)> = sqlx::query_as(
+        "SELECT e.id, e.ueber_einheit_id, e.name, \
+                EXISTS (SELECT 1 FROM einsatz_abloesung a \
+                        WHERE a.einheit_id = e.id AND a.status = 'laufend') \
+         FROM einsatz_einheit e WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(executor)
+    .await?;
+    let mut g = Gliederung {
+        ueber: HashMap::new(),
+        namen: HashMap::new(),
+        mit_schicht: HashSet::new(),
+    };
+    for (id, ueber, name, hat) in zeilen {
+        g.ueber.insert(id, ueber);
+        g.namen.insert(id, name);
+        if hat {
+            g.mit_schicht.insert(id);
+        }
+    }
+    Ok(g)
+}
+
+/// Hängt an jede laufende Schicht die Untereinheiten, die sie erben (nach Name, dann ID), und
+/// die Warnungen zu ihrer geplanten ablösenden Einheit (LLH-1131).
+async fn attach_erben(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    liste: &mut [AbloesungAnzeige],
+) -> Result<(), AppError> {
+    if !liste.iter().any(|a| a.status == AbloesungStatus::Laufend) {
+        return Ok(());
+    }
+    let g = load_gliederung(pool, einsatz_id).await?;
+    let erbt = vererbung(&g.ueber, &g.mit_schicht);
+    attach_warnungen(pool, einsatz_id, &g, &erbt, liste).await?;
+    let mut je_traeger: HashMap<i64, Vec<AbloesungErbe>> = HashMap::new();
+    for (&erbe, &traeger) in &erbt {
+        je_traeger.entry(traeger).or_default().push(AbloesungErbe {
+            einheit_id: erbe,
+            einheit_name: g.namen.get(&erbe).cloned().unwrap_or_default(),
+        });
+    }
+    for a in liste
+        .iter_mut()
+        .filter(|a| a.status == AbloesungStatus::Laufend)
+    {
+        if let Some(mut erben) = je_traeger.remove(&a.einheit_id) {
+            erben.sort_by(|x, y| {
+                x.einheit_name
+                    .cmp(&y.einheit_name)
+                    .then(x.einheit_id.cmp(&y.einheit_id))
+            });
+            a.erbende_einheiten = erben;
+        }
+    }
+    Ok(())
+}
+
+/// Die Planungswarnungen der laufenden Schichten in `liste` ([`planung_warnungen`]), gegen
+/// alle laufenden Schichten des Einsatzes: Einzelplanung und Ablöser-Liste. Ohne laufende Schicht
+/// in `liste` liest sie nichts.
+async fn attach_warnungen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    g: &Gliederung,
+    erbt: &HashMap<i64, i64>,
+    liste: &mut [AbloesungAnzeige],
+) -> Result<(), AppError> {
+    let ziel: HashSet<i64> = liste
+        .iter()
+        .filter(|a| a.status == AbloesungStatus::Laufend)
+        .map(|a| a.id)
+        .collect();
+    if ziel.is_empty() {
+        return Ok(());
+    }
+    let zeilen: Vec<(i64, i64, String, String, Option<i64>)> = sqlx::query_as(
+        "SELECT a.id, a.einheit_id, e.name, a.beginn_at, a.abloesende_einheit_id \
+         FROM einsatz_abloesung a JOIN einsatz_einheit e ON e.id = a.einheit_id \
+         WHERE a.einsatz_id = ? AND a.status = 'laufend' ORDER BY a.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let liste_eintraege: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT l.abloesung_id, l.einheit_id FROM einsatz_abloesung_abloeser l \
+         JOIN einsatz_abloesung a ON a.id = l.abloesung_id \
+         WHERE a.einsatz_id = ? AND a.status = 'laufend' ORDER BY l.rowid",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let stand: Vec<PlanungsStand> = zeilen
+        .into_iter()
+        .map(
+            |(id, einheit_id, einheit_name, beginn_at, abloesende)| PlanungsStand {
+                id,
+                einheit_id,
+                einheit_name,
+                beginn_at,
+                abloeser: abloesende
+                    .into_iter()
+                    .chain(
+                        liste_eintraege
+                            .iter()
+                            .filter(|(s, _)| *s == id)
+                            .map(|(_, e)| *e),
+                    )
+                    .collect(),
+            },
+        )
+        .collect();
+    if !stand
+        .iter()
+        .any(|s| ziel.contains(&s.id) && !s.abloeser.is_empty())
+    {
+        return Ok(());
+    }
+    let mut warnungen = planung_warnungen(&stand, erbt, &g.namen);
+    for a in liste.iter_mut().filter(|a| ziel.contains(&a.id)) {
+        if let Some(w) = warnungen.remove(&a.id) {
+            a.planung_warnungen = w;
+        }
+    }
+    Ok(())
+}
+
+/// Die Einheit, deren laufende Schicht für `einheit_id` gilt: sie selbst, sonst ihr nächster
+/// Vorfahr mit laufender Schicht (Knoten-Modell). `None` ohne eine.
+pub(crate) async fn load_wirksamen_traeger_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    if g.mit_schicht.contains(&einheit_id) {
+        return Ok(Some(einheit_id));
+    }
+    Ok(vererbung(&g.ueber, &g.mit_schicht)
+        .get(&einheit_id)
+        .copied())
 }
 
 /// SQL der Liste je Statusfilter; ein Platzhalter (`einsatz_id`).
@@ -173,9 +350,14 @@ fn liste_sql(status: Option<AbloesungStatus>) -> String {
             "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? AND a.status = 'abgeloest' \
              ORDER BY a.vollzogen_at DESC, a.id DESC"
         ),
+        Some(AbloesungStatus::Beendet) => format!(
+            "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? AND a.status = 'beendet' \
+             ORDER BY a.beendet_at DESC, a.id DESC"
+        ),
+        // Laufende zuerst: eine beendete Schicht steht nie zwischen laufenden.
         None => format!(
             "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? \
-             ORDER BY a.status = 'abgeloest', a.faellig_at, a.id"
+             ORDER BY a.status <> 'laufend', a.faellig_at, a.id"
         ),
     }
 }
@@ -187,7 +369,7 @@ pub async fn laden(
     id: i64,
     jetzt: &str,
 ) -> Result<AbloesungAnzeige, AppError> {
-    sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(format!(
+    let a = sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(format!(
         "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? AND a.id = ?"
     )))
     .bind(einsatz_id)
@@ -195,7 +377,11 @@ pub async fn laden(
     .fetch_optional(pool)
     .await?
     .map(|z| z.anzeige(jetzt))
-    .ok_or(AppError::NotFound)
+    .ok_or(AppError::NotFound)?;
+    let mut eine = [a];
+    attach_erben(pool, einsatz_id, &mut eine).await?;
+    let [a] = eine;
+    Ok(a)
 }
 
 /// Rhythmus-Vorgaben aller Abschnitte eines Einsatzes, in Abschnitts-Reihenfolge.
@@ -320,23 +506,46 @@ impl EinsatzVorgabe {
             .as_ref()
             .map_or(VORWARNUNG_VORGABE_MINUTEN, |w| w.vorwarnung_minuten)
     }
+
+    /// Vorlauf des Planungshinweises aller Schichten des Einsatzes (LLH-1131): aus dem
+    /// Schichtmodell, ohne eines [`PLANUNGSVORLAUF_VORGABE_MINUTEN`] (2 h).
+    pub fn planungsvorlauf(&self) -> i64 {
+        self.werte
+            .as_ref()
+            .map_or(PLANUNGSVORLAUF_VORGABE_MINUTEN, |w| {
+                w.planungsvorlauf_minuten
+            })
+    }
 }
 
-/// Die wirksame Zone eines Einsatzes: seine Einstellung, sonst die der Organisation, sonst
-/// Europe/Berlin (`einsatz::nummer::zone_oder_vorgabe`, auch für einen unbekannten Namen).
+/// Die wirksame Zone eines Einsatzes: die erste gültige aus seiner Einstellung und der der
+/// Organisation, sonst Europe/Berlin (`einsatz::nummer::ZEITZONE_VORGABE`). Jeder Name wird
+/// für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige der
+/// Organisation (Review PR #833).
 async fn zone_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Tz, AppError> {
-    let name: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(NULLIF(TRIM(ee.zeitzone), ''), NULLIF(TRIM(oe.zeitzone), '')) \
-         FROM einsatz e \
+    let namen: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT ee.zeitzone, oe.zeitzone FROM einsatz e \
          LEFT JOIN einsatz_einstellungen ee ON ee.einsatz_id = e.id \
          LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
     )
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
-        name.flatten().as_deref(),
-    ))
+    let (einsatz, org) = namen.unwrap_or_default();
+    Ok([einsatz, org]
+        .into_iter()
+        .flatten()
+        .find_map(|name| {
+            let zone = name.trim().parse::<Tz>().ok();
+            if zone.is_none() && !name.trim().is_empty() {
+                tracing::warn!(
+                    zeitzone = name,
+                    "Unbekannte Zeitzone für die Ablösung übergangen"
+                );
+            }
+            zone
+        })
+        .unwrap_or(crate::einsatz::nummer::ZEITZONE_VORGABE))
 }
 
 pub(crate) async fn load_einsatz_vorgabe_tx(
@@ -380,10 +589,11 @@ fn rhythmus_label(rhythmus: i64, quelle: RhythmusQuelle, vorgabe: &EinsatzVorgab
     }
 }
 
-/// Setzt die beiden Auto-Fristen einer laufenden Schicht auf ihre Fälligkeit; die Vorwarnung
-/// liegt `vorwarnung_minuten` davor (Schichtmodell des Einsatzes). Liegt die Vorwarnzeit schon
-/// hinter `jetzt`, wird eine offene Vorwarnung geschlossen statt verschoben — eine Vorwarnung in
-/// der Vergangenheit ist keine mehr.
+/// Setzt die Auto-Fristen einer laufenden Schicht auf ihre Fälligkeit; die Vorwarnung liegt
+/// die Vorwarnzeit davor, der Planungshinweis den Planungsvorlauf (beide aus dem Schichtmodell
+/// des Einsatzes, [`set_planung_frist_tx`]). Liegt die Vorwarnzeit schon hinter `jetzt`, wird
+/// eine offene Vorwarnung geschlossen statt verschoben — eine Vorwarnung in der Vergangenheit ist
+/// keine mehr.
 #[allow(clippy::too_many_arguments)]
 async fn set_fristen_tx(
     conn: &mut SqliteConnection,
@@ -392,7 +602,7 @@ async fn set_fristen_tx(
     id: i64,
     einheit_name: &str,
     faellig_at: &str,
-    vorwarnung_minuten: i64,
+    vorgabe: &EinsatzVorgabe,
     jetzt: &str,
 ) -> Result<(), AppError> {
     erinnerung_repo::setze_auto_frist_tx(
@@ -405,6 +615,102 @@ async fn set_fristen_tx(
         faellig_at,
     )
     .await?;
+    set_vorwarn_frist_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        id,
+        einheit_name,
+        faellig_at,
+        vorgabe.vorwarnung(),
+        jetzt,
+    )
+    .await?;
+    set_planung_frist_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        id,
+        einheit_name,
+        faellig_at,
+        vorgabe.planungsvorlauf(),
+        jetzt,
+    )
+    .await
+}
+
+/// Ob für die Schicht eine ablösende Einheit geplant ist: Einzelplanung oder Ablöser-Liste.
+async fn has_abloeser_tx(conn: &mut SqliteConnection, id: i64) -> Result<bool, AppError> {
+    let r: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_abloesung a WHERE a.id = ? \
+           AND (a.abloesende_einheit_id IS NOT NULL \
+                OR EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l \
+                           WHERE l.abloesung_id = a.id))",
+    )
+    .bind(id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(r.is_some())
+}
+
+/// Zeitpunkt des Planungshinweises: `planungsvorlauf_minuten` vor der Fälligkeit.
+fn planungszeit(faellig_at: &str, planungsvorlauf_minuten: i64) -> Option<String> {
+    crate::zeit::plus_minuten(faellig_at, -planungsvorlauf_minuten)
+}
+
+/// Setzt die Planungs-Frist einer laufenden Schicht (LLH-1131): `planungsvorlauf_minuten` vor
+/// der Fälligkeit, aber nur, solange keine ablösende Einheit geplant ist und der Zeitpunkt noch
+/// vor `jetzt` liegt; sonst wird eine offene geschlossen (wie die Vorwarnung). Der Hinweis kommt
+/// damit einmal je Zustand: Planen schließt die Frist, eine aufgehobene oder entfallene Planung
+/// setzt sie neu, eine neue Fälligkeit verschiebt sie.
+#[allow(clippy::too_many_arguments)]
+async fn set_planung_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    einheit_name: &str,
+    faellig_at: &str,
+    planungsvorlauf_minuten: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let zeit = planungszeit(faellig_at, planungsvorlauf_minuten).filter(|p| p.as_str() > jetzt);
+    match zeit {
+        Some(p) if !has_abloeser_tx(conn, id).await? => {
+            erinnerung_repo::setze_auto_frist_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                OBJEKT_ABLOESUNG_PLANUNG,
+                id,
+                &format!("Keine ablösende Einheit geplant: {einheit_name}"),
+                &p,
+            )
+            .await?;
+        }
+        _ => {
+            erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id, jetzt)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+/// Setzt nur die Vorwarn-Frist einer laufenden Schicht (Regeln wie [`set_fristen_tx`]). Für eine
+/// reine Änderung der Vorwarnzeit: die Fälligkeitsfrist bleibt unberührt, sonst leerte
+/// `setze_auto_frist_tx` ihr `zuletzt_ausgeloest_at`, und eine überfällige Schicht meldete
+/// „fällig“ ein zweites Mal (Spec „Einmaliges Auslösen“, Review PR #833).
+#[allow(clippy::too_many_arguments)]
+async fn set_vorwarn_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    einheit_name: &str,
+    faellig_at: &str,
+    vorwarnung_minuten: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     match vorwarnzeit(faellig_at, vorwarnung_minuten) {
         Some(v) if v.as_str() > jetzt => {
             erinnerung_repo::setze_auto_frist_tx(
@@ -429,40 +735,116 @@ async fn set_fristen_tx(
     Ok(())
 }
 
+/// Zeitpunkt der offenen Auto-Frist eines Bezugs, `None` ohne eine.
+async fn open_frist_at_tx(
+    conn: &mut SqliteConnection,
+    bezug_typ: &str,
+    id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT faellig_at FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(bezug_typ)
+    .bind(id)
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
 async fn close_fristen_tx(
     conn: &mut SqliteConnection,
     id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
     erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG, id, jetzt).await?;
-    erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id, jetzt).await
+    erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id, jetzt).await?;
+    erinnerung_repo::schliesse_offene_auto_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id, jetzt).await
 }
 
 async fn delete_fristen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
-    erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await
+    erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await?;
+    erinnerung_repo::loesche_auto_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id).await
 }
 
-/// Auflösen einer Einheit (LLH-1079, Spec `kraefte-abloesung` „Auflösen behält abgelöste
-/// Schichten“): ihre laufende Schicht geht samt Fristen (Planung, kein Vollzug), abgelöste
-/// bleiben mit ihrem Vollzug. Verweist eine Schicht einer anderen Einheit auf sie als ablösende,
-/// wird der Verweis geleert. Liefert, ob sich die Ablösung geändert hat.
-pub async fn release_einheit_tx(
+/// Beendet eine laufende Schicht ohne Ablösung (LLH-1128): Status `beendet` mit Zeitpunkt,
+/// Person und Grund als Spur, offene Fristen geschlossen (nicht gelöscht: die Streichung einer
+/// Entlassung öffnet sie wieder). Keine Folgeschicht, kein ETB (das schreibt der Aufrufer).
+/// Liefert, ob eine laufende Schicht beendet wurde.
+pub(crate) async fn end_schicht_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+    benutzer_id: i64,
+    grund: BeendetGrund,
+    beendet_at: &str,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let n = sqlx::query(
+        "UPDATE einsatz_abloesung SET status = 'beendet', beendet_at = ?, beendet_von_id = ?, \
+            beendet_grund = ? WHERE id = ? AND status = 'laufend'",
+    )
+    .bind(beendet_at)
+    .bind(benutzer_id)
+    .bind(grund.as_str())
+    .bind(id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if n > 0 {
+        close_fristen_tx(conn, id, jetzt).await?;
+    }
+    Ok(n > 0)
+}
+
+/// Die laufende Schicht einer Einheit: ID und Name der Einheit, `None` ohne eine.
+pub(crate) async fn load_laufende_tx(
     conn: &mut SqliteConnection,
     einheit_id: i64,
-) -> Result<bool, AppError> {
-    let laufend: Vec<i64> = sqlx::query_scalar(
-        "SELECT id FROM einsatz_abloesung WHERE einheit_id = ? AND status = 'laufend'",
+) -> Result<Option<(i64, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT a.id, e.name FROM einsatz_abloesung a \
+         JOIN einsatz_einheit e ON e.id = a.einheit_id \
+         WHERE a.einheit_id = ? AND a.status = 'laufend'",
     )
     .bind(einheit_id)
-    .fetch_all(&mut *conn)
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
+/// Auflösen einer Einheit (LLH-1079, LLH-1128, Spec `kraefte-abloesung` „Auflösen beendet die
+/// laufende Schicht“): ihre laufende Schicht wird mit Grund `aufloesung` beendet (Spur statt
+/// Löschen, Entscheidung vom 15.10.2026), ihre Fristen geschlossen; abgelöste bleiben mit ihrem
+/// Vollzug. Plant eine laufende Schicht sie als ablösende, entfällt die Planung mit Hinweis und
+/// ETB ([`drop_planungen_tx`], LLH-1131), bevor ein FK `SET NULL` sie still leeren könnte;
+/// Verweise abgelöster Schichten werden still geleert. Liefert, ob sich die Ablösung geändert
+/// hat, und die Wirkung der entfallenen Planungen.
+pub async fn release_einheit_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(bool, Wirkung), AppError> {
+    let wirkung = drop_planungen_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        einheit_id,
+        Entfallen::Aufloesung,
+        jetzt,
+    )
     .await?;
-    for id in &laufend {
-        delete_fristen_tx(conn, *id).await?;
-        sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
+    let laufend = load_laufende_tx(conn, einheit_id).await?;
+    if let Some((id, _)) = laufend {
+        end_schicht_tx(
+            conn,
+            id,
+            benutzer_id,
+            BeendetGrund::Aufloesung,
+            jetzt,
+            jetzt,
+        )
+        .await?;
     }
     let geleert = sqlx::query(
         "UPDATE einsatz_abloesung SET abloesende_einheit_id = NULL WHERE abloesende_einheit_id = ?",
@@ -471,7 +853,111 @@ pub async fn release_einheit_tx(
     .execute(&mut *conn)
     .await?
     .rows_affected();
-    Ok(!laufend.is_empty() || geleert > 0)
+    let geaendert = laufend.is_some() || geleert > 0 || !wirkung.is_empty();
+    Ok((geaendert, wirkung))
+}
+
+/// Warum die Planung einer ablösenden Einheit entfällt (LLH-1131).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Entfallen {
+    /// Die geplante Einheit wurde aufgelöst.
+    Aufloesung,
+    /// Die geplante Einheit wurde entlassen (Zeitachse, keine Periode mehr offen).
+    Entlassung,
+}
+
+impl Entfallen {
+    fn partizip(self) -> &'static str {
+        match self {
+            Entfallen::Aufloesung => "aufgelöst",
+            Entfallen::Entlassung => "entlassen",
+        }
+    }
+}
+
+/// Hebt jede Planung auf, mit der eine laufende Schicht `einheit_id` als ablösende Einheit
+/// trägt (Einzelplanung und Ablöser-Liste), weil die Einheit aufgelöst oder entlassen ist
+/// (LLH-1131, Spec `kraefte-abloesung` „Planung entfällt“): je Schicht ein ETB-Eintrag
+/// „Ablösung «…»: Planung der ablösenden Einheit entfallen, «…» aufgelöst“, ein Hinweis
+/// `abloeser_entfallen` und, ohne verbleibende Planung, wieder die Planungs-Frist. Läuft in der
+/// Transaktion des Aufrufers.
+pub(crate) async fn drop_planungen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    grund: Entfallen,
+    jetzt: &str,
+) -> Result<Wirkung, AppError> {
+    let schichten = hinweis::load_geplante_tx(conn, einsatz_id, einheit_id).await?;
+    if schichten.is_empty() {
+        return Ok(Wirkung::default());
+    }
+    let abloeser_name: String =
+        sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(einheit_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let startwert = etb_startwert(&mut *conn, einsatz_id).await?;
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let mut wirkung = Wirkung::default();
+    for id in schichten {
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET abloesende_einheit_id = NULL \
+             WHERE id = ? AND abloesende_einheit_id = ?",
+        )
+        .bind(id)
+        .bind(einheit_id)
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "DELETE FROM einsatz_abloesung_abloeser WHERE abloesung_id = ? AND einheit_id = ?",
+        )
+        .bind(id)
+        .bind(einheit_id)
+        .execute(&mut *conn)
+        .await?;
+        let (name, faellig_at): (String, String) = sqlx::query_as(
+            "SELECT e.name, a.faellig_at FROM einsatz_abloesung a \
+             JOIN einsatz_einheit e ON e.id = a.einheit_id WHERE a.id = ?",
+        )
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
+        set_planung_frist_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            id,
+            &name,
+            &faellig_at,
+            vorgabe.planungsvorlauf(),
+            jetzt,
+        )
+        .await?;
+        wirkung.etb.push(
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                &format!(
+                    "Ablösung «{name}»: Planung der ablösenden Einheit entfallen, \
+                     «{abloeser_name}» {}",
+                    grund.partizip()
+                ),
+            )
+            .await?,
+        );
+        wirkung.anlaesse.push(hinweis::anlass(
+            einsatz_id,
+            id,
+            BenachrichtigungBezugTyp::AbloeserEntfallen,
+            benutzer_id,
+        ));
+    }
+    Ok(wirkung)
 }
 
 /// Legt eine laufende Schicht an und setzt ihre Fristen. Rhythmus und Fälligkeit rechnet
@@ -521,7 +1007,7 @@ async fn create_schicht_tx(
         id,
         einheit_name,
         &faellig_at,
-        vorgabe.vorwarnung(),
+        vorgabe,
         jetzt,
     )
     .await?;
@@ -542,66 +1028,109 @@ pub async fn beginnen(
 ) -> Result<(AbloesungAnzeige, i64), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
     let (id, etb_id) = write_retry!(pool, |conn| {
-        let (name, abschnitt_id) = einheit_tx(conn, einsatz_id, eingabe.einheit_id).await?;
-        let abschnitt = match abschnitt_id {
-            Some(a) => abschnitt_tx(conn, a).await?,
-            None => None,
-        };
-        let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
-        let (rhythmus, quelle) =
-            match (eingabe.rhythmus_minuten, &abschnitt, &vorgabe.werte) {
-                (Some(r), _, _) => (r, RhythmusQuelle::Einheit),
-                (None, Some((_, Some(v))), _) => (*v, RhythmusQuelle::Abschnitt),
-                // Der Rhythmus folgt aus der Regel der Einsatzvorgabe (`compute_faellig`).
-                (None, _, Some(_)) => (0, RhythmusQuelle::Einsatz),
-                (None, _, None) => return Err(AppError::Validation(
-                    "rhythmus_minuten fehlt, und weder der Abschnitt der Einheit noch der Einsatz \
-                     hat eine Vorgabe"
-                        .into(),
-                )),
-            };
         let beginn_at = match &eingabe.beginn_at {
             Some(b) => b.clone(),
             None => crate::zeitachse::repo::offenes_eintreffen_tx(conn, eingabe.einheit_id)
                 .await?
                 .unwrap_or_else(|| jetzt.to_string()),
         };
-        let (id, rhythmus) = create_schicht_tx(
+        start_schicht_tx(
             conn,
-            einsatz_id,
-            benutzer_id,
-            eingabe.einheit_id,
-            &name,
-            abschnitt_id,
-            &beginn_at,
-            rhythmus,
-            quelle,
-            &vorgabe,
-            None,
+            &Start {
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                einheit_id: eingabe.einheit_id,
+                beginn_at: &beginn_at,
+                rhythmus_minuten: eingabe.rhythmus_minuten,
+                wie: "begonnen",
+            },
             jetzt,
         )
-        .await?;
-        let herkunft = match (quelle, &abschnitt, &vorgabe.werte) {
-            (RhythmusQuelle::Abschnitt, Some((a, _)), _) => format!(" (Vorgabe Abschnitt «{a}»)"),
-            (RhythmusQuelle::Einsatz, _, Some(w)) => {
-                format!(" (Vorgabe Einsatz «{}»)", w.bezeichnung)
-            }
-            _ => String::new(),
-        };
-        let etb_id = crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            benutzer_id,
-            startwert,
-            &format!(
-                "Ablösung: Schicht von «{name}» begonnen, Rhythmus {}{herkunft}",
-                rhythmus_label(rhythmus, quelle, &vorgabe)
-            ),
-        )
-        .await?;
-        Ok((id, etb_id))
+        .await?
+        .ok_or_else(|| {
+            AppError::Validation(
+                "rhythmus_minuten fehlt, und weder der Abschnitt der Einheit noch der Einsatz \
+                 hat eine Vorgabe"
+                    .into(),
+            )
+        })
     })?;
     Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id))
+}
+
+/// Was der Beginn einer Schicht braucht — von Hand ([`beginnen`]) oder mit dem Eintreffen
+/// ([`super::kopplung`]).
+pub(crate) struct Start<'a> {
+    pub einsatz_id: i64,
+    pub benutzer_id: i64,
+    pub startwert: i64,
+    pub einheit_id: i64,
+    pub beginn_at: &'a str,
+    /// `None` = Vorgabe übernehmen: die des Abschnitts, sonst die des Einsatzes.
+    pub rhythmus_minuten: Option<i64>,
+    /// Wie der ETB-Eintrag den Beginn nennt („begonnen“, „mit dem Eintreffen begonnen“).
+    pub wie: &'a str,
+}
+
+/// Beginnt eine Schicht in der Transaktion des Aufrufers. Rangfolge (LLH-1122): eigener
+/// Rhythmus → Vorgabe des Abschnitts der Einheit → Vorgabe des Einsatzes. `None`, wenn es
+/// nichts davon gibt (keine erfundene Zahl): der Handweg macht daraus eine 400, der Autostart
+/// legt nichts an. Sonst Schicht samt Fristen und ETB-Eintrag mit der Herkunft; liefert ihre ID
+/// und die des ETB-Eintrags.
+pub(crate) async fn start_schicht_tx(
+    conn: &mut SqliteConnection,
+    s: &Start<'_>,
+    jetzt: &str,
+) -> Result<Option<(i64, i64)>, AppError> {
+    let (name, abschnitt_id) = einheit_tx(conn, s.einsatz_id, s.einheit_id).await?;
+    let abschnitt = match abschnitt_id {
+        Some(a) => abschnitt_tx(conn, a).await?,
+        None => None,
+    };
+    let vorgabe = load_einsatz_vorgabe_tx(conn, s.einsatz_id).await?;
+    let (rhythmus, quelle) = match (s.rhythmus_minuten, &abschnitt, &vorgabe.werte) {
+        (Some(r), _, _) => (r, RhythmusQuelle::Einheit),
+        (None, Some((_, Some(v))), _) => (*v, RhythmusQuelle::Abschnitt),
+        // Der Rhythmus folgt aus der Regel der Einsatzvorgabe (`compute_faellig`).
+        (None, _, Some(_)) => (0, RhythmusQuelle::Einsatz),
+        (None, _, None) => return Ok(None),
+    };
+    let (id, rhythmus) = create_schicht_tx(
+        conn,
+        s.einsatz_id,
+        s.benutzer_id,
+        s.einheit_id,
+        &name,
+        abschnitt_id,
+        s.beginn_at,
+        rhythmus,
+        quelle,
+        &vorgabe,
+        None,
+        jetzt,
+    )
+    .await?;
+    let herkunft = match (quelle, &abschnitt, &vorgabe.werte) {
+        (RhythmusQuelle::Abschnitt, Some((a, _)), _) => format!(" (Vorgabe Abschnitt «{a}»)"),
+        (RhythmusQuelle::Einsatz, _, Some(w)) => {
+            format!(" (Vorgabe Einsatz «{}»)", w.bezeichnung)
+        }
+        _ => String::new(),
+    };
+    let etb_id = crate::etb::system_audit_tx(
+        conn,
+        s.einsatz_id,
+        s.benutzer_id,
+        s.startwert,
+        &format!(
+            "Ablösung: Schicht von «{name}» {}, Rhythmus {}{herkunft}",
+            s.wie,
+            rhythmus_label(rhythmus, quelle, &vorgabe)
+        ),
+    )
+    .await?;
+    Ok(Some((id, etb_id)))
 }
 
 /// Schicht ändern (Beginn, Rhythmus, geplante ablösende Einheit). Liefert den ETB-Eintrag nur,
@@ -618,9 +1147,10 @@ pub async fn aendern(
     let etb_id = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
-            return Err(AppError::UnprocessableEntity(
-                "Eine abgelöste Schicht lässt sich nicht ändern".into(),
-            ));
+            return Err(AppError::UnprocessableEntity(nicht_laufend(
+                roh.status,
+                "lässt sich nicht ändern",
+            )));
         }
         let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
         let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
@@ -651,7 +1181,15 @@ pub async fn aendern(
 
         // Beginn
         let beginn_at = eingabe.beginn_at.clone().unwrap_or(roh.beginn_at.clone());
-        let (faellig_at, rhythmus) = compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?;
+        // Ohne neuen Beginn und ohne Rhythmusangabe bleibt die gespeicherte Fälligkeit: nach einer
+        // entfernten Wechselzeiten-Vorgabe ergäbe Beginn + aufgerundeter Rhythmus sonst eine um
+        // Sekunden verschobene Fälligkeit samt neu gesetzter Fristen (Review PR #833).
+        let (faellig_at, rhythmus) =
+            if eingabe.rhythmus_minuten.is_none() && beginn_at == roh.beginn_at {
+                (roh.faellig_at.clone(), roh.rhythmus_minuten)
+            } else {
+                compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?
+            };
         // Bei der Einsatzvorgabe folgt der Rhythmus der Regel; ändert ihn nur der Beginn
         // (Wechselzeiten), ist das keine Rhythmusänderung.
         let rhythmus_geaendert = quelle != roh.rhythmus_quelle
@@ -715,7 +1253,20 @@ pub async fn aendern(
                 id,
                 &name,
                 &faellig_at,
-                vorgabe.vorwarnung(),
+                &vorgabe,
+                jetzt,
+            )
+            .await?;
+        } else if abloesende != roh.abloesende_einheit_id {
+            // Geplant schließt den Planungshinweis, aufgehoben setzt ihn wieder (LLH-1131).
+            set_planung_frist_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorgabe.planungsvorlauf(),
                 jetzt,
             )
             .await?;
@@ -767,9 +1318,7 @@ pub async fn vorgabe_setzen(
         // Weitergabe: nur bei einem neuen Wert. Eine entfernte Vorgabe lässt den zuletzt
         // gültigen Rhythmus stehen (Spec: „Vorgabe entfernen").
         if let Some(neu) = rhythmus_minuten {
-            let vorwarnung = load_einsatz_vorgabe_tx(conn, einsatz_id)
-                .await?
-                .vorwarnung();
+            let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
             let folgende: Vec<(i64, String, i64)> = sqlx::query_as(
                 "SELECT a.id, a.beginn_at, a.einheit_id FROM einsatz_abloesung a \
                  WHERE a.einsatz_id = ? AND a.abschnitt_id = ? AND a.status = 'laufend' \
@@ -797,7 +1346,7 @@ pub async fn vorgabe_setzen(
                     id,
                     &name,
                     &faellig_at,
-                    vorwarnung,
+                    &vorgabe,
                     jetzt,
                 )
                 .await?;
@@ -869,11 +1418,11 @@ pub async fn load_einsatz_vorgabe(
 #[derive(Debug, Clone)]
 pub enum EinsatzVorgabeInput {
     /// Kopie eines Schichtmodells der Organisation des Einsatzes (fremd oder unbekannt: 404).
-    AusStammdaten(i64),
+    FromStammdaten(i64),
     /// Eigene Werte, von der Route geprüft.
     Werte(Werte),
     /// Keine Vorgabe mehr.
-    Entfernen,
+    Remove,
 }
 
 /// Setzt oder entfernt die Vorgabe des Einsatzes und zieht die laufenden Schichten nach: wer der
@@ -892,7 +1441,7 @@ pub async fn set_einsatz_vorgabe(
     let startwert = etb_startwert(pool, einsatz_id).await?;
     write_retry!(pool, |conn| {
         let neu = match eingabe {
-            EinsatzVorgabeInput::AusStammdaten(id) => {
+            EinsatzVorgabeInput::FromStammdaten(id) => {
                 let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
                     .fetch_one(&mut *conn)
@@ -900,7 +1449,7 @@ pub async fn set_einsatz_vorgabe(
                 Some(schichtmodell_repo::load_werte_tx(conn, org_id, *id).await?)
             }
             EinsatzVorgabeInput::Werte(w) => Some(w.clone()),
-            EinsatzVorgabeInput::Entfernen => None,
+            EinsatzVorgabeInput::Remove => None,
         };
         let vorher = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
         if vorher.werte == neu {
@@ -912,6 +1461,7 @@ pub async fn set_einsatz_vorgabe(
             zone: vorher.zone,
         };
         let vorwarnung_geaendert = vorgabe.vorwarnung() != vorher.vorwarnung();
+        let planungsvorlauf_geaendert = vorgabe.planungsvorlauf() != vorher.planungsvorlauf();
 
         #[derive(sqlx::FromRow)]
         struct Laufend {
@@ -931,12 +1481,17 @@ pub async fn set_einsatz_vorgabe(
         .fetch_all(&mut *conn)
         .await?;
         for s in laufende {
-            let (faellig_at, rhythmus) = compute_faellig(
-                &s.beginn_at,
-                s.rhythmus_minuten,
-                s.rhythmus_quelle,
-                &vorgabe,
-            )?;
+            // Neu gerechnet wird nur, wer der neuen Vorgabe folgt. Eine entfernte Vorgabe lässt
+            // die gespeicherte Fälligkeit sekundengenau stehen (Review PR #833).
+            let (faellig_at, rhythmus) = match (s.rhythmus_quelle, &vorgabe.werte) {
+                (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+                    &s.beginn_at,
+                    s.rhythmus_minuten,
+                    s.rhythmus_quelle,
+                    &vorgabe,
+                )?,
+                _ => (s.faellig_at.clone(), s.rhythmus_minuten),
+            };
             let faellig_geaendert = faellig_at != s.faellig_at;
             if faellig_geaendert || rhythmus != s.rhythmus_minuten {
                 sqlx::query(
@@ -949,7 +1504,7 @@ pub async fn set_einsatz_vorgabe(
                 .execute(&mut *conn)
                 .await?;
             }
-            if faellig_geaendert || vorwarnung_geaendert {
+            if faellig_geaendert {
                 let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
                 set_fristen_tx(
                     conn,
@@ -958,10 +1513,40 @@ pub async fn set_einsatz_vorgabe(
                     s.id,
                     &name,
                     &faellig_at,
-                    vorgabe.vorwarnung(),
+                    &vorgabe,
                     jetzt,
                 )
                 .await?;
+            } else if vorwarnung_geaendert || planungsvorlauf_geaendert {
+                // Nur die geänderte Vorlauf-Frist wandert; die Fälligkeitsfrist bleibt (Review
+                // PR #833), eine schon ausgelöste andere auch.
+                let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
+                if vorwarnung_geaendert {
+                    set_vorwarn_frist_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        s.id,
+                        &name,
+                        &faellig_at,
+                        vorgabe.vorwarnung(),
+                        jetzt,
+                    )
+                    .await?;
+                }
+                if planungsvorlauf_geaendert {
+                    set_planung_frist_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        s.id,
+                        &name,
+                        &faellig_at,
+                        vorgabe.planungsvorlauf(),
+                        jetzt,
+                    )
+                    .await?;
+                }
             }
         }
 
@@ -1029,9 +1614,10 @@ pub async fn vollziehen(
     let (folge_id, etb_id, zeitachse) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
-            return Err(AppError::UnprocessableEntity(
-                "Die Schicht ist bereits abgelöst".into(),
-            ));
+            return Err(AppError::UnprocessableEntity(nicht_laufend(
+                roh.status,
+                "lässt sich nicht vollziehen",
+            )));
         }
         if vollzogen_at < roh.beginn_at.as_str() {
             return Err(AppError::UnprocessableEntity(
@@ -1166,7 +1752,7 @@ pub async fn zuruecknehmen(
         if let Some((folge_id, status)) = &folge {
             if status.as_str() != AbloesungStatus::Laufend.as_str() {
                 return Err(AppError::UnprocessableEntity(
-                    "Die Folgeschicht ist bereits selbst abgelöst — der Vollzug lässt sich nicht mehr zurücknehmen"
+                    "Die Folgeschicht ist bereits selbst abgelöst oder beendet — der Vollzug lässt sich nicht mehr zurücknehmen"
                         .into(),
                 ));
             }
@@ -1203,14 +1789,7 @@ pub async fn zuruecknehmen(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-        erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
-        // Die Vorwarnung nur wieder öffnen, solange sie noch vor uns liegt.
-        let vorwarnung = load_einsatz_vorgabe_tx(conn, einsatz_id)
-            .await?
-            .vorwarnung();
-        if vorwarnzeit(&roh.faellig_at, vorwarnung).is_some_and(|v| v.as_str() > jetzt) {
-            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await?;
-        }
+        restore_fristen_tx(conn, einsatz_id, benutzer_id, id, &roh, &name, jetzt).await?;
 
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
@@ -1233,6 +1812,146 @@ pub async fn zuruecknehmen(
         Ok((etb_id, zeitachse))
     })?;
     Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, zeitachse))
+}
+
+/// Fristen einer wieder laufenden Schicht (Rücknahme des Vollzugs, gestrichene Entlassung) nach
+/// der aktuellen Vorgabe (Review PR #833). Folgt die Schicht der Vorgabe des Einsatzes und
+/// rechnet deren Regel inzwischen anders, gilt die neue Fälligkeit samt neuer Fristen. Sonst
+/// öffnet das die alte Fälligkeitsfrist, ohne eine schon erfolgte Auslösung zu wiederholen, und
+/// legt die Vorwarnung auf die aktuelle Vorwarnzeit — nur, solange sie noch vor uns liegt.
+async fn restore_fristen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    roh: &Roh,
+    name: &str,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let vorwarnung = vorgabe.vorwarnung();
+    let (faellig_at, rhythmus) = match (roh.rhythmus_quelle, &vorgabe.werte) {
+        (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+            &roh.beginn_at,
+            roh.rhythmus_minuten,
+            roh.rhythmus_quelle,
+            &vorgabe,
+        )?,
+        _ => (roh.faellig_at.clone(), roh.rhythmus_minuten),
+    };
+    if faellig_at != roh.faellig_at {
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? WHERE id = ?",
+        )
+        .bind(rhythmus)
+        .bind(&faellig_at)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        set_fristen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            id,
+            name,
+            &faellig_at,
+            &vorgabe,
+            jetzt,
+        )
+        .await?;
+    } else {
+        erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
+        if let Some(v) = vorwarnzeit(&faellig_at, vorwarnung).filter(|v| v.as_str() > jetzt) {
+            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await?;
+            if open_frist_at_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await? != Some(v) {
+                set_vorwarn_frist_tx(
+                    conn,
+                    einsatz_id,
+                    benutzer_id,
+                    id,
+                    name,
+                    &faellig_at,
+                    vorwarnung,
+                    jetzt,
+                )
+                .await?;
+            }
+        }
+        // Planungshinweis (LLH-1131) wie die Vorwarnung: nur vor uns und ohne Planung, ein schon
+        // ausgelöster wird nicht wiederholt.
+        let vorlauf = vorgabe.planungsvorlauf();
+        if let Some(p) = planungszeit(&faellig_at, vorlauf).filter(|p| p.as_str() > jetzt) {
+            if !has_abloeser_tx(conn, id).await? {
+                erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id).await?;
+                if open_frist_at_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id).await? != Some(p) {
+                    set_planung_frist_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        id,
+                        name,
+                        &faellig_at,
+                        vorlauf,
+                        jetzt,
+                    )
+                    .await?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Öffnet die mit einer Entlassung beendete Schicht einer Einheit wieder, wenn genau diese
+/// Entlassung gestrichen wurde (LLH-1128): Grund `entlassung`, Ende = Zeitpunkt der
+/// gestrichenen Entlassung, die jüngste solche Schicht. Hat die Einheit inzwischen eine neue
+/// laufende Schicht, bleibt sie beendet. Fristen wie bei der Rücknahme eines Vollzugs. Liefert
+/// die ID der Schicht und den Namen der Einheit, `None` ohne Wirkung.
+pub(crate) async fn reopen_nach_entlassung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    entlassung_at: &str,
+    jetzt: &str,
+) -> Result<Option<(i64, String)>, AppError> {
+    let id: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND einheit_id = ? AND status = 'beendet' \
+           AND beendet_grund = ? AND beendet_at = ? \
+         ORDER BY id DESC LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .bind(BeendetGrund::Entlassung.as_str())
+    .bind(entlassung_at)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    if has_laufende_tx(conn, einheit_id).await? {
+        return Ok(None);
+    }
+    let roh = roh_tx(conn, einsatz_id, id).await?;
+    let (name, _) = einheit_tx(conn, einsatz_id, einheit_id).await?;
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET status = 'laufend', beendet_at = NULL, \
+            beendet_von_id = NULL, beendet_grund = NULL WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    restore_fristen_tx(conn, einsatz_id, benutzer_id, id, &roh, &name, jetzt).await?;
+    Ok(Some((id, name)))
+}
+
+/// Text der 422 für eine Schicht, die nicht mehr läuft.
+fn nicht_laufend(status: AbloesungStatus, was: &str) -> String {
+    match status {
+        AbloesungStatus::Beendet => format!("Eine beendete Schicht {was}"),
+        _ => format!("Eine abgelöste Schicht {was}"),
+    }
 }
 
 #[cfg(test)]

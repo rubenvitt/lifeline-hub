@@ -36,6 +36,7 @@ const BEZUG_LINK: Record<
   // führt auf die nach Fälligkeit geordnete Liste.
   abloesung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
   abloesung_vorwarnung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
+  abloesung_planung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
 };
 
 /**

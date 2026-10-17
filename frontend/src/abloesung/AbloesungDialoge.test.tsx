@@ -123,16 +123,14 @@ describe('Schicht beginnen — Rhythmus-Vorgabe erst nach der Einheitenwahl (LFH
     oeffne(new Map());
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText(/Vorgabe/)).not.toBeInTheDocument();
-    expect(
-      within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' }),
-    ).not.toBeRequired();
+    expect(within(dialog).getByRole('textbox', { name: 'Rhythmus' })).not.toBeRequired();
   });
 
   it('mit Einheit ohne Vorgabe: Rhythmus wird Pflicht, ohne Satz dazu (LFH-1078)', async () => {
     oeffne(new Map());
     const dialog = await screen.findByRole('dialog');
     await waehleFlorian(dialog);
-    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     await waitFor(() => expect(feld).toBeRequired());
     expect(feld).not.toHaveAttribute('placeholder');
     expect(within(dialog).queryByText(/Vorgabe/)).not.toBeInTheDocument();
@@ -142,7 +140,7 @@ describe('Schicht beginnen — Rhythmus-Vorgabe erst nach der Einheitenwahl (LFH
     oeffne(new Map([[5, 360]]));
     const dialog = await screen.findByRole('dialog');
     await waehleFlorian(dialog);
-    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     await waitFor(() => expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)'));
     expect(feld).not.toBeRequired();
     expect(within(dialog).queryByText(/Leer/)).not.toBeInTheDocument();
@@ -262,8 +260,113 @@ describe('Ablösung — Platzhalter statt Feldhilfe (LFH-1078)', () => {
       />,
     );
     const dialog = await screen.findByRole('dialog');
-    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     expect(feld).toHaveAttribute('placeholder', 'keine Vorgabe');
     expect(feld).not.toBeRequired();
+  });
+});
+
+/** LLH-1122: Rhythmus als Dauer „8 h“ / „7:30 h“, nie „8.0“; die Einsatzvorgabe als Platzhalter. */
+describe('Ablösung — Rhythmus als Dauer (LLH-1122)', () => {
+  function rhythmus(props: Partial<Parameters<typeof RhythmusDialog>[0]> = {}) {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <RhythmusDialog
+        offen
+        titel="Rhythmus Florian 1"
+        minuten={480}
+        leerErlaubt={false}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+        {...props}
+      />,
+    );
+    return onErfassen;
+  }
+
+  it('belegt mit „8 h“ vor, nicht mit „8.0“', async () => {
+    rhythmus();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'Rhythmus' })).toHaveValue('8 h');
+  });
+
+  it('liest „7:30“ als 450 Minuten', async () => {
+    const onErfassen = rhythmus({ minuten: null });
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), '7:30');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith(450));
+  });
+
+  it('lehnt Unlesbares am Feld ab und sendet nicht', async () => {
+    const onErfassen = rhythmus({ minuten: null });
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), 'acht');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    expect(await within(dialog).findByText(/Dauer wie „8 h“/)).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('Schicht beginnen: die Einsatzvorgabe steht als Platzhalter, wenn der Abschnitt keine hat', async () => {
+    renderMitProviders(
+      <SchichtBeginnenDialog
+        offen
+        einheiten={[{ value: 5, label: 'Florian 1' }]}
+        vorgabeJeEinheit={new Map()}
+        einsatzVorgabe="12 h"
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
+    // Vor der Wahl der Einheit nichts (LFH-948).
+    expect(feld).not.toHaveAttribute('placeholder');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    const option = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Florian 1"]',
+      );
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await userEvent.click(option);
+    await waitFor(() => expect(feld).toHaveAttribute('placeholder', '12 h (Vorgabe Einsatz)'));
+    expect(feld).not.toBeRequired();
+  });
+
+  it('Schicht beginnen: vorbelegte Einheit (LLH-1128) — Vorgabe greift, Absenden ohne Wahl', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <SchichtBeginnenDialog
+        offen
+        einheiten={[
+          { value: 5, label: 'Florian 1' },
+          { value: 6, label: 'Florian 2' },
+        ]}
+        vorbelegt={6}
+        vorgabeJeEinheit={new Map([[6, 360]])}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTitle('Florian 2')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: 'Rhythmus' })).toHaveAttribute(
+        'placeholder',
+        '6 h (Vorgabe Abschnitt)',
+      ),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ einheit_id: 6 })),
+    );
   });
 });

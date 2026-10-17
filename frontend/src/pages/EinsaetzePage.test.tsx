@@ -128,6 +128,65 @@ describe('EinsaetzePage', () => {
     expect(screen.queryByTestId('kartenausschnitt')).toBeNull();
   });
 
+  it('nennt das Schichtmodell der Organisation als Zeile, nicht als Feld (LLH-1122)', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            bezeichnung: '12-h-Schicht',
+            typ: 'rhythmus',
+            rhythmus_minuten: 720,
+            vorwarnung_minuten: 30,
+            planungsvorlauf_minuten: 120,
+            ist_vorgabe: true,
+            ist_demo: false,
+          },
+        ]),
+      ),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
+    ).toBeInTheDocument();
+    // Feldbudget (LFH-1175): weiter fünf Felder.
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+  });
+
+  it('ohne Vorgabe der Organisation keine Schichtmodell-Zeile (LLH-1122)', async () => {
+    let beantwortet = false;
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/schichtmodelle', () => {
+        beantwortet = true;
+        return HttpResponse.json([
+          {
+            id: 2,
+            bezeichnung: 'Demo-Schicht',
+            typ: 'rhythmus',
+            rhythmus_minuten: 720,
+            vorwarnung_minuten: 30,
+            planungsvorlauf_minuten: 120,
+            ist_vorgabe: false,
+            ist_demo: true,
+          },
+        ]);
+      }),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    const dialog = await screen.findByRole('dialog');
+    // Erst nach der Antwort ist die Abwesenheit eine Aussage.
+    await waitFor(() => expect(beantwortet).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(within(dialog).queryByText(/Schichtmodell/)).toBeNull();
+  });
+
   it('setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter', async () => {
     server.use(
       meHandler(admin),

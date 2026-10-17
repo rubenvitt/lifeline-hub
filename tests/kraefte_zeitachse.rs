@@ -925,3 +925,110 @@ async fn nachgetragene_entlassung_bleibt_die_einzige() {
     assert_eq!(entlassungen[0]["quelle"], "nachtrag");
     assert_eq!(entlassungen[0]["zeitpunkt_at"], ende.as_str());
 }
+
+// ── Kopplung an die Ablösung (LLH-1128) ─────────────────────────────────────────────────────
+
+async fn einsatzvorgabe_6h(w: &Welt) {
+    let (s, v) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("/api/einsaetze/{}/abloesungen/schichtmodell", w.e),
+        &w.admin,
+        Some(r#"{"schichtmodell":{"bezeichnung":"Sanitätsdienst","typ":"rhythmus","rhythmus_minuten":360}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+async fn laufende_schichten(w: &Welt) -> Vec<Value> {
+    let (s, v) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/abloesungen?status=laufend", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v.as_array().unwrap().clone()
+}
+
+/// Spec `kraefte-zeitachse` „Kopplung an die Ablösung“: auch ein nachgetragenes Eintreffen
+/// läuft durch den einzigen Schreibpfad und beginnt die Schicht zum nachgetragenen Zeitpunkt;
+/// der Nachtrag meldet `abloesung` an die Leser des Moduls. Die nachgetragene Entlassung beendet
+/// sie wieder.
+#[tokio::test]
+async fn nachgetragenes_eintreffen_beginnt_die_schicht() {
+    let (app, live) = setup_mit_live().await;
+    let w = welt_in(app).await;
+    einsatzvorgabe_6h(&w).await;
+    let eintreffen = vor(1, 0);
+    let mut rx = live.abonniere(w.e);
+    let (s, json) = w
+        .nachtrag(
+            &w.einheit_pfad(),
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{eintreffen}"}}"#),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    recv_until_tag(&mut rx, "abloesung", Duration::from_secs(2)).await;
+    let laufend = laufende_schichten(&w).await;
+    assert_eq!(laufend.len(), 1, "{laufend:?}");
+    assert_eq!(laufend[0]["einheit_id"], w.einheit);
+    assert_eq!(laufend[0]["beginn_at"], eintreffen.as_str());
+    assert_eq!(laufend[0]["rhythmus_quelle"], "einsatz");
+
+    let (s, json) = w
+        .nachtrag(
+            &w.einheit_pfad(),
+            &format!(r#"{{"art":"entlassung","zeitpunkt_at":"{}"}}"#, vor(1, 30)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    assert!(laufende_schichten(&w).await.is_empty());
+}
+
+/// Das Eintreffen über das erste Fahrzeug der Einheit beginnt die Schicht der Einheit.
+#[tokio::test]
+async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
+    let w = welt().await;
+    einsatzvorgabe_6h(&w).await;
+    let am_ort = status_anlegen(
+        &w.app,
+        &w.admin,
+        "fahrzeug-status",
+        r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
+    )
+    .await;
+    let (s, fz) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/fahrzeuge", w.e),
+        &w.admin,
+        Some(r#"{"adhoc":{"funkrufname":"HLF 1"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let ef = fz["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("{}/fahrzeug/{ef}", w.einheit_pfad()),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, json) = anfrage(
+        &w.app,
+        "PATCH",
+        &format!("/api/einsaetze/{}/fahrzeuge/{ef}", w.e),
+        &w.admin,
+        Some(&format!(r#"{{"status_id":{am_ort}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    let laufend = laufende_schichten(&w).await;
+    assert_eq!(laufend.len(), 1, "{laufend:?}");
+    assert_eq!(laufend[0]["einheit_id"], w.einheit);
+}

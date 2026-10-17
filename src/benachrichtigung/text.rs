@@ -29,6 +29,10 @@ pub const fn titel(art: BenachrichtigungArt) -> &'static str {
         BenachrichtigungArt::AbloesungFaellig => "Ablösung fällig",
         BenachrichtigungArt::ErinnerungFaellig => "Erinnerung fällig",
         BenachrichtigungArt::AbloesungVorwarnung => "Ablösung steht an",
+        BenachrichtigungArt::AbloesungPlanung => "Keine ablösende Einheit geplant",
+        // Der Titel einer einzelnen Benachrichtigung kommt aus ihrem Bezug
+        // ([`abloeser_titel`]); dieser steht für die Art als Ganzes.
+        BenachrichtigungArt::AbloesungAbloeser => "Ablösende Einheit",
         BenachrichtigungArt::AuftragErteilt => "Neuer Auftrag",
         BenachrichtigungArt::AuftragQuittiert => "Auftrag quittiert",
         BenachrichtigungArt::AuftragErledigt => "Auftrag erledigt",
@@ -62,6 +66,12 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         // Die Schicht hat keine eigene Bezeichnung: Einheit und Uhrzeit liest
         // `detail_abloesung` über [`DETAIL_ABLOESUNG_SPALTEN`].
         BenachrichtigungBezugTyp::Abloesung => None,
+        // Beide Einheiten der Schicht: eigener Weg über `DETAIL_ABLOESER_SPALTEN`.
+        BenachrichtigungBezugTyp::AbloeserAlarmiert
+        | BenachrichtigungBezugTyp::AbloeserEingetroffen
+        | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
+        | BenachrichtigungBezugTyp::AbloeserAbgerufen
+        | BenachrichtigungBezugTyp::AbloeserEntfallen => None,
         // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
         BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
@@ -119,6 +129,65 @@ async fn detail_abloesung(
     }))
 }
 
+/// Titel eines Hinweises zur ablösenden Einheit (LLH-1131) aus seinem Bezug; `None` für jeden
+/// anderen Bezug.
+pub const fn abloeser_titel(typ: BenachrichtigungBezugTyp) -> Option<&'static str> {
+    match typ {
+        BenachrichtigungBezugTyp::AbloeserAlarmiert => Some("Ablösende Einheit alarmiert"),
+        BenachrichtigungBezugTyp::AbloeserEingetroffen => Some("Ablösende Einheit eingetroffen"),
+        BenachrichtigungBezugTyp::AbloeserBrEingetroffen => {
+            Some("Ablösende Einheit im Bereitstellungsraum eingetroffen")
+        }
+        BenachrichtigungBezugTyp::AbloeserAbgerufen => Some("Ablösende Einheit abgerufen"),
+        BenachrichtigungBezugTyp::AbloeserEntfallen => {
+            Some("Planung der ablösenden Einheit entfallen")
+        }
+        _ => None,
+    }
+}
+
+/// Die Spalten der Detailzeile eines Hinweises zur ablösenden Einheit, „Ablösung für
+/// Rettungsstaffel: 2. Rettungsstaffel“: die Namen der abzulösenden und der geplanten Einheit
+/// über die Verweise der Schicht, alle Retain (Guard `detail_liest_nur_retain_spalten`).
+pub const DETAIL_ABLOESER_SPALTEN: [(&str, &str); 4] = [
+    ("einsatz_einheit", "name"),
+    ("einsatz_abloesung", "einheit_id"),
+    ("einsatz_abloesung", "abloesende_einheit_id"),
+    ("einsatz_abloesung", "einsatz_id"),
+];
+
+/// Die Abfrage der Detailzeile; liest nur [`DETAIL_ABLOESER_SPALTEN`].
+pub const DETAIL_ABLOESER_SQL: &str = "SELECT e.name, ae.name FROM einsatz_abloesung a \
+     JOIN einsatz_einheit e ON e.id = a.einheit_id \
+     LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id \
+     WHERE a.id = ? AND a.einsatz_id = ?";
+
+/// Text eines Hinweises zur ablösenden Einheit: Titel aus dem Bezug, Detail „Ablösung für
+/// Rettungsstaffel: 2. Rettungsstaffel“. Die geplante Einheit liest die Schicht beim Lesen (die
+/// Zeile trägt keinen Text); ist die Planung inzwischen entfallen, nennt das Detail nur die
+/// abzulösende Einheit.
+async fn abloeser_text(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    titel: &str,
+    bezug: Bezug,
+) -> Result<Text, AppError> {
+    let zeile: Option<(String, Option<String>)> = sqlx::query_as(DETAIL_ABLOESER_SQL)
+        .bind(bezug.id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let detail = zeile.map(|(einheit, abloesende)| match abloesende {
+        Some(a) if !a.trim().is_empty() => format!("Ablösung für {einheit}: {a}"),
+        _ => format!("Ablösung für {einheit}"),
+    });
+    Ok(Text {
+        titel: titel.to_string(),
+        detail,
+        pfad: pfad(einsatz_id, bezug),
+    })
+}
+
 /// Formt den gelesenen Wert zur Detailzeile.
 fn detail_formen(typ: BenachrichtigungBezugTyp, wert: String) -> String {
     match typ {
@@ -151,7 +220,12 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         BenachrichtigungBezugTyp::Befehl => format!("{basis}/auftraege/befehle/{id}"),
         BenachrichtigungBezugTyp::Lagebericht => format!("{basis}/lageberichte/{id}"),
         BenachrichtigungBezugTyp::Erinnerung => format!("{basis}/erinnerungen"),
-        BenachrichtigungBezugTyp::Abloesung => format!("{basis}/abloesung"),
+        BenachrichtigungBezugTyp::Abloesung
+        | BenachrichtigungBezugTyp::AbloeserAlarmiert
+        | BenachrichtigungBezugTyp::AbloeserEingetroffen
+        | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
+        | BenachrichtigungBezugTyp::AbloeserAbgerufen
+        | BenachrichtigungBezugTyp::AbloeserEntfallen => format!("{basis}/abloesung"),
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),
         BenachrichtigungBezugTyp::Nachforderung
         | BenachrichtigungBezugTyp::NachforderungZugesagt
@@ -387,6 +461,9 @@ pub async fn bilden(
     }
     if bezug.typ == BenachrichtigungBezugTyp::ChatNachricht {
         return chat_nachricht_text(pool, einsatz_id, art, bezug).await;
+    }
+    if let Some(titel) = abloeser_titel(bezug.typ) {
+        return abloeser_text(pool, einsatz_id, titel, bezug).await;
     }
     let detail = match detail_quelle(bezug.typ) {
         None if bezug.typ == BenachrichtigungBezugTyp::Abloesung => {

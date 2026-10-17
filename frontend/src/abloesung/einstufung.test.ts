@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { Abloesung } from '../api/types';
-import { abloesungsMarken, einstufungVon, rhythmusText, zaehleFaellige } from './einstufung';
+import { abloesungsMarken, computeEinstufung, countFaellige } from './einstufung';
 
 dayjs.extend(utc);
 
@@ -20,32 +20,40 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
     faellig_at: '2026-09-22 15:30:00',
     status: 'laufend',
     ruecknehmbar: false,
+    erbende_einheiten: [],
+    planung_warnungen: [],
     angelegt_at: '2026-09-22 09:30:00',
     ...teil,
   };
 }
 
-describe('einstufungVon — dieselben Grenzfälle wie im Backend', () => {
+describe('computeEinstufung — dieselben Grenzfälle wie im Backend', () => {
   const f = '2026-09-22 15:30:00';
   it('genau fällig ist überfällig', () => {
-    expect(einstufungVon(f, t('2026-09-22 15:30:00'))).toBe('ueberfaellig');
-    expect(einstufungVon(f, t('2026-09-22 15:31:00'))).toBe('ueberfaellig');
+    expect(computeEinstufung(f, t('2026-09-22 15:30:00'), 30)).toBe('ueberfaellig');
+    expect(computeEinstufung(f, t('2026-09-22 15:31:00'), 30)).toBe('ueberfaellig');
   });
   it('genau 30 min vorher ist Vorwarnung, 30 min + 1 s planmäßig', () => {
-    expect(einstufungVon(f, t('2026-09-22 15:29:59'))).toBe('vorwarnung');
-    expect(einstufungVon(f, t('2026-09-22 15:00:00'))).toBe('vorwarnung');
-    expect(einstufungVon(f, t('2026-09-22 14:59:59'))).toBe('planmaessig');
+    expect(computeEinstufung(f, t('2026-09-22 15:29:59'), 30)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 15:00:00'), 30)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 14:59:59'), 30)).toBe('planmaessig');
   });
   it('liest die Wire-Zeit als UTC, nicht als Ortszeit', () => {
     // Gegen einen absoluten Zeitpunkt geprüft: ein Ortszeit-Lesen verschöbe sonst beide Seiten gleich.
-    expect(einstufungVon(f, dayjs('2026-09-22T15:29:00Z'))).toBe('vorwarnung');
+    expect(computeEinstufung(f, dayjs('2026-09-22T15:29:00Z'), 30)).toBe('vorwarnung');
+  });
+  it('die Vorwarnung kommt aus der Schicht, nicht aus einer festen Zahl (LLH-1122)', () => {
+    // Spiegel von `einstufung_mit_eigener_vorwarnung` in `src/abloesung/mod.rs`.
+    expect(computeEinstufung(f, t('2026-09-22 14:45:00'), 45)).toBe('vorwarnung');
+    expect(computeEinstufung(f, t('2026-09-22 14:44:59'), 45)).toBe('planmaessig');
+    expect(computeEinstufung(f, t('2026-09-22 14:45:00'), 30)).toBe('planmaessig');
   });
   it('unlesbar gilt als überfällig', () => {
-    expect(einstufungVon('kaputt', t('2026-09-22 10:00:00'))).toBe('ueberfaellig');
+    expect(computeEinstufung('kaputt', t('2026-09-22 10:00:00'), 30)).toBe('ueberfaellig');
   });
 });
 
-describe('zaehleFaellige', () => {
+describe('countFaellige', () => {
   it('zählt Vorwarnung und Überfälliges, nicht Planmäßiges und nicht Abgelöstes', () => {
     const jetzt = t('2026-09-22 15:10:00');
     const liste = [
@@ -54,7 +62,16 @@ describe('zaehleFaellige', () => {
       schicht({ id: 3, faellig_at: '2026-09-22 18:10:00' }), // in 3 h
       schicht({ id: 4, faellig_at: '2026-09-22 15:00:00', status: 'abgeloest' }),
     ];
-    expect(zaehleFaellige(liste, jetzt)).toBe(2);
+    expect(countFaellige(liste, jetzt)).toBe(2);
+  });
+  it('rechnet je Schicht mit ihrer Vorwarnung (LLH-1122)', () => {
+    const jetzt = t('2026-09-22 15:10:00');
+    const liste = [
+      // In 50 min fällig: mit 60 min Vorwarnung schon fällig, mit 30 min noch nicht.
+      schicht({ id: 1, faellig_at: '2026-09-22 16:00:00', vorwarnung_minuten: 60 }),
+      schicht({ id: 2, faellig_at: '2026-09-22 16:00:00', vorwarnung_minuten: 30 }),
+    ];
+    expect(countFaellige(liste, jetzt)).toBe(1);
   });
 });
 
@@ -97,13 +114,5 @@ describe('abloesungsMarken', () => {
   });
   it('lässt abgelöste Schichten weg', () => {
     expect(abloesungsMarken([schicht({ id: 1, status: 'abgeloest' })])).toEqual([]);
-  });
-});
-
-describe('rhythmusText', () => {
-  it('liest sich wie im ETB', () => {
-    expect(rhythmusText(360)).toBe('6 h');
-    expect(rhythmusText(390)).toBe('6 h 30 min');
-    expect(rhythmusText(45)).toBe('45 min');
   });
 });

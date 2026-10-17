@@ -1,8 +1,11 @@
 import { apiGet, apiSend } from './client';
 import type {
   Abloesung,
+  AbloesungEinsatzVorgabe,
+  AbloesungStatus,
   AbloesungVollzug,
   AbloesungVorgabe,
+  EinsatzSchichtmodellBody,
   SchichtAendernBody,
   SchichtBeginnenBody,
   VollzugBody,
@@ -11,11 +14,11 @@ import type {
 /** Ablösung (LFH-635): Schichten von Einheiten, Rhythmus-Vorgaben je Abschnitt. */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/abloesungen`;
 
-/** Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend (Ordnung vom Server). */
-export function listeAbloesungen(
-  einsatzId: number,
-  status: 'laufend' | 'abgeloest',
-): Promise<Abloesung[]> {
+/**
+ * Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend, beendete (LLH-1128) nach ihrem
+ * Ende absteigend (Ordnung vom Server).
+ */
+export function listeAbloesungen(einsatzId: number, status: AbloesungStatus): Promise<Abloesung[]> {
   return apiGet<Abloesung[]>(`${basis(einsatzId)}?status=${status}`);
 }
 
@@ -58,4 +61,21 @@ export function setzeAbloesungVorgabe(
   return apiSend<AbloesungVorgabe[]>(`${basis(einsatzId)}/vorgaben/${abschnittId}`, 'PUT', {
     rhythmus_minuten: rhythmusMinuten,
   });
+}
+
+/** Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells, Vorwarnung, folgende Schichten. */
+export function fetchEinsatzSchichtmodell(einsatzId: number): Promise<AbloesungEinsatzVorgabe> {
+  return apiGet<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/schichtmodell`);
+}
+
+/**
+ * Setzt die Vorgabe des Einsatzes: Kopie eines Modells der Organisation, eigene Werte oder
+ * `schichtmodell: null` (entfernen). Laufende Schichten mit Quelle `einsatz` rechnen neu; eine
+ * entfernte Vorgabe lässt ihren Rhythmus stehen.
+ */
+export function setEinsatzSchichtmodell(
+  einsatzId: number,
+  body: EinsatzSchichtmodellBody,
+): Promise<AbloesungEinsatzVorgabe> {
+  return apiSend<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/schichtmodell`, 'PUT', body);
 }

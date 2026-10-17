@@ -346,7 +346,7 @@ pub async fn update(
             let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
             let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-            let mut beruehrt = Vec::new();
+            let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
             if vorher.status_id != nachher.status_id {
                 // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
                 // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
@@ -362,7 +362,7 @@ pub async fn update(
                     )
                     .await?
                     {
-                        beruehrt = b.personen;
+                        beruehrt = b;
                     }
                 }
                 crate::etb::system_audit_tx(
@@ -421,9 +421,13 @@ pub async fn update(
     }
     // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
     // Personalrecht erreicht weder `fahrzeug` noch `einheit` (LLH-1185).
-    for ep_id in beruehrt {
-        sse_personal(&state, einsatz_id, ep_id);
+    for ep_id in &beruehrt.personen {
+        sse_personal(&state, einsatz_id, *ep_id);
     }
+    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128), Alarmierung
+    // oder Eintreffen einer geplanten ablösenden Einheit ist ein Hinweis (LLH-1131).
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
     // Vor- und Nachzustand stammen aus der Transaktion: ein wiederholter Patch mit demselben
     // Status meldet nicht noch einmal.
     if StatusKategorie::wird_wieder_verfuegbar(vorher.status_kategorie, nachher.status_kategorie) {

@@ -11,6 +11,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   verhalten.png   frontend/src/pages/einstellungen/EinsatzVerhalten.tsx
  *   module.png      frontend/src/pages/einstellungen/EinsatzModule.tsx,
  *                   frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx
+ *   abloesung.png   frontend/src/pages/einstellungen/EinsatzAbloesung.tsx,
+ *                   frontend/src/abloesung/schichtmodellText.ts (Vorgabe des Einsatzes aus den
+ *                   Demo-Daten, LLH-1122)
  */
 
 const KAPITEL = 'einsatz-einstellungen';
@@ -24,6 +27,20 @@ test.describe(KAPITEL, () => {
     const reiter = page.getByRole('tabpanel', { name: 'Allgemein' });
     await expect(reiter.getByLabel('Einstiegsmodul')).toBeVisible();
     await fotografiere(reiter, KAPITEL, 'allgemein');
+  });
+
+  test('Reiter „Ablösung“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einstellungen/abloesung`);
+    const reiter = page.getByRole('tabpanel', { name: 'Ablösung' });
+    await expect(reiter.getByText('Wechsel 0600/1800 · Mindestdauer 4 h')).toBeVisible();
+    await expect(
+      reiter.getByRole('combobox', { name: 'Schichtmodell der Organisation' }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(reiter, KAPITEL, 'abloesung');
   });
 
   test('Reiter „Verhalten & Automatik“', async ({ page }) => {

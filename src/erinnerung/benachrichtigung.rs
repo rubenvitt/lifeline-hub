@@ -10,7 +10,9 @@
 //! - Quittierfrist eines Auftrags (Auto-Frist): `auftrag_ueberfaellig` an den Auftraggeber und an
 //!   die Funktionen und Personen, die noch nicht quittiert haben; nur, solange er überfällig ist.
 //! - Fristen einer Ablösungsschicht: `abloesung_vorwarnung` bzw. `abloesung_faellig` an alle mit
-//!   dem Modul Ablösung. Keine zweite Benachrichtigung als Erinnerung.
+//!   dem Modul Ablösung. Keine zweite Benachrichtigung als Erinnerung. Der Planungshinweis
+//!   (LLH-1131) meldet `abloesung_planung` ebenso, aber nur, solange die Schicht läuft und keine
+//!   ablösende Einheit geplant ist.
 //! - Jede andere Erinnerung, auch eine von Hand mit Bezug auf Meldung oder Auftrag:
 //!   `erinnerung_faellig` an ihre Empfängerfunktion, ohne eine solche an den Ersteller. Eskaliert
 //!   ihr Tick eine Sofortmeldung (der Scheduler prüft die Frist bei jedem Meldungsbezug), kommt
@@ -24,7 +26,8 @@ use crate::benachrichtigung::{
 use crate::error::AppError;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::kommunikation::{
-    OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_VORWARNUNG, OBJEKT_AUFTRAG, OBJEKT_MELDUNG,
+    OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_PLANUNG, OBJEKT_ABLOESUNG_VORWARNUNG, OBJEKT_AUFTRAG,
+    OBJEKT_MELDUNG,
 };
 use crate::live::LiveHub;
 use sqlx::SqlitePool;
@@ -70,6 +73,16 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
         Some((OBJEKT_AUFTRAG, id)) if auto_frist => {
             auftrag_ueberfaellig(pool, f.einsatz_id, id).await?
         }
+        Some((OBJEKT_ABLOESUNG_PLANUNG, id)) => {
+            planung_offen(pool, f.einsatz_id, id).await?.then(|| {
+                neu(
+                    BenachrichtigungArt::AbloesungPlanung,
+                    BenachrichtigungBezugTyp::Abloesung,
+                    id,
+                )
+                .an(Adressat::ModulLeser("abloesung"))
+            })
+        }
         Some((typ @ (OBJEKT_ABLOESUNG | OBJEKT_ABLOESUNG_VORWARNUNG), id)) => {
             let art = if typ == OBJEKT_ABLOESUNG {
                 BenachrichtigungArt::AbloesungFaellig
@@ -100,6 +113,23 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
             )
         }
     })
+}
+
+/// Ob der Planungshinweis einer Schicht noch gilt (LLH-1131): sie läuft, und weder die
+/// Einzelplanung noch die Ablöser-Liste nennt eine ablösende Einheit. Das Planen schließt die
+/// Frist schon; das hier ist das Netz gegen einen Tick im selben Augenblick.
+async fn planung_offen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool, AppError> {
+    let r: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_abloesung a \
+         WHERE a.id = ? AND a.einsatz_id = ? AND a.status = 'laufend' \
+           AND a.abloesende_einheit_id IS NULL \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l WHERE l.abloesung_id = a.id)",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(r.is_some())
 }
 
 /// Der Anlass eines überfälligen Auftrags: Auftraggeber und jede Funktion oder Person, deren

@@ -1,6 +1,6 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, BeendetGrund, RhythmusQuelle } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -10,7 +10,8 @@ import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
-import { abloesungZeit, einstufungVon, rhythmusText } from './einstufung';
+import { formatDauer } from './dauer';
+import { abloesungZeit, einstufungOf } from './einstufung';
 
 const { Text } = Typography;
 
@@ -36,6 +37,26 @@ function abstandText(faelligAt: string, jetzt: Dayjs): string {
   return `in ${dauerText(minuten)}`;
 }
 
+/** Herkunft des Rhythmus in der Karte (LLH-1122: Rangfolge eigen → Abschnitt → Einsatz). */
+const QUELLE_WORT: Record<RhythmusQuelle, string> = {
+  einheit: 'eigen',
+  abschnitt: 'Vorgabe',
+  einsatz: 'Vorgabe Einsatz',
+};
+
+/** Grund des Endes ohne Ablösung (LLH-1128) im Wortlaut der Karte. */
+const GRUND_WORT: Record<BeendetGrund, string> = {
+  entlassung: 'entlassen',
+  aufloesung: 'aufgelöst',
+};
+
+/** Die Zeitspalte je Status: welcher Zeitpunkt führt und welches Wort darunter steht. */
+function zeitspalte(s: Abloesung): { zeit: string | null | undefined; wort: string } {
+  if (s.status === 'laufend') return { zeit: s.faellig_at, wort: 'fällig' };
+  if (s.status === 'beendet') return { zeit: s.beendet_at, wort: 'beendet' };
+  return { zeit: s.vollzogen_at, wort: 'abgelöst' };
+}
+
 /**
  * Eine Schicht. Der linke Rand trägt die Einstufung — EINE Farbe, Gefahr gewinnt: überfällig
  * rot, Vorwarnung gelb, sonst Linienfarbe. Zweiter Kanal ist das Wort im Etikett (WCAG 1.4.1).
@@ -44,6 +65,10 @@ function abstandText(faelligAt: string, jetzt: Dayjs): string {
  * „Ablösung vollziehen" ist die sichtbare Kartenaktion, „Ablösende Einheit planen" und
  * „Rhythmus ändern" liegen im Dreipunkt-Menü (ab drei Aktionen wird gebündelt). Ohne
  * Schreibrecht fällt die Aktionszeile ganz weg; den Grund nennt der Seitenkopf.
+ *
+ * Nicht laufend ist eine Schicht abgelöst (Zeitspalte: Vollzug) oder beendet (LLH-1128,
+ * Zeitspalte: Ende, dazu „beendet · entlassen …“ bzw. „beendet · aufgelöst“). Eine laufende nennt
+ * die Untereinheiten, die sie erben („gilt auch für: …“, Knoten-Modell).
  */
 export default function AbloesungKarte({
   schicht: s,
@@ -57,7 +82,12 @@ export default function AbloesungKarte({
 }: AbloesungKarteProps) {
   const { token, rollen } = useRollen();
   const laufend = s.status === 'laufend';
-  const stufe = laufend ? einstufungVon(s.faellig_at, jetzt) : null;
+  const spalte = zeitspalte(s);
+  const erben =
+    s.erbende_einheiten.length > 0
+      ? `gilt auch für: ${s.erbende_einheiten.map((e) => e.einheit_name).join(', ')}`
+      : null;
+  const stufe = laufend ? einstufungOf(s, jetzt) : null;
   const darstellung = stufe ? abloesungEinstufung[stufe] : null;
   const kante =
     darstellung && darstellung.rolle !== 'neutral'
@@ -106,11 +136,9 @@ export default function AbloesungKarte({
         }}
       >
         <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
-          <ZeitAnzeige wert={laufend ? s.faellig_at : s.vollzogen_at} format="kurz" />
+          <ZeitAnzeige wert={spalte.zeit} format="kurz" />
         </span>
-        <span style={{ ...monoStil(10), color: rollen.schwach }}>
-          {laufend ? 'fällig' : 'abgelöst'}
-        </span>
+        <span style={{ ...monoStil(10), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
         <Flex justify="space-between" align="center" gap={token.marginXS} wrap>
@@ -134,16 +162,67 @@ export default function AbloesungKarte({
             </span>
           </Text>
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
-              Zeile darf sie berühren. Die kurzen Quellenwörter halten auch 167 h 59 min als
-              Vorgabe auf 390 px einzeilig (LFH-708); den Abschnitt nennt die Zeile darüber. */}
-          <Text type="secondary" data-lfh="abloesung-rhythmus">
-            Rhythmus {rhythmusText(s.rhythmus_minuten)} (
-            {s.rhythmus_quelle === 'einheit' ? 'eigen' : 'Vorgabe'})
+              Zeile darf sie berühren; sie bleibt deshalb immer einzeilig (LFH-708). Den Abschnitt
+              nennt die Zeile darüber, seine Vorgabe heißt nur „Vorgabe“. „Vorgabe Einsatz“
+              (LLH-1122) passt auf 390 px in `komfortabel` für jeden Wert (167:59 h: 252 von
+              256 px); nur im Handschuh-Betrieb auf 390 px kürzt die Zeile bei Werten mit Minuten
+              oder ab 100 h das Quellenwort mit „…“, nie den Wert, und der ganze Text steht im
+              `title` (gemessen in `e2e/abloesung-zufluss.spec.ts`). */}
+          <Text
+            type="secondary"
+            data-lfh="abloesung-rhythmus"
+            title={`Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`}
+            style={{
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <span data-lfh="abloesung-rhythmus-wert">
+              Rhythmus {formatDauer(s.rhythmus_minuten)}
+            </span>{' '}
+            ({QUELLE_WORT[s.rhythmus_quelle]})
           </Text>
-          {s.abloesende_einheit_name && (
+          {/* Knoten-Modell (LLH-1118 Punkt 1): die Erben nennt der Server, der Client rechnet
+              nichts nach. Einzeilig wie der Rhythmus: kommt ein Erbe hinzu oder fällt einer weg,
+              ändert das die Höhe nur, wenn die Zeile erscheint oder verschwindet. */}
+          {laufend && erben && (
+            <Text
+              type="secondary"
+              data-lfh="abloesung-erben"
+              title={erben}
+              style={{
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {erben}
+            </Text>
+          )}
+          {s.abloesende_einheit_name && s.status !== 'beendet' && (
             <Text type="secondary">
               {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
               {s.abloesende_einheit_name}
+            </Text>
+          )}
+          {/* Ende ohne Ablösung (LLH-1128): kein „abgelöst“, der Grund als Wort. Die Uhrzeit
+              nur bei der Entlassung, wie die Einsatzkräfte sie melden; die Zeitspalte trägt das
+              Ende in jedem Fall. */}
+          {s.status === 'beendet' && (
+            <Text type="secondary" data-lfh="abloesung-ende">
+              beendet
+              {s.beendet_grund ? ` · ${GRUND_WORT[s.beendet_grund]}` : ''}
+              {s.beendet_grund === 'entlassung' && s.beendet_at && (
+                <>
+                  {' '}
+                  <span style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}>
+                    <ZeitAnzeige wert={s.beendet_at} format="kurz" />
+                  </span>
+                </>
+              )}
             </Text>
           )}
         </Space>

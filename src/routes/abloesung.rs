@@ -45,6 +45,29 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
     sse(state, einsatz_id);
 }
 
+/// Nach einem Schreibweg der Kräfte-Zeitachse, dessen Kopplung die Ablösung geändert hat
+/// (LLH-1128: Schicht mit dem Eintreffen begonnen, mit der Entlassung beendet, nach gestrichener
+/// Entlassung wieder laufend; LLH-1131: Planung der ablösenden Einheit entfallen): Kurzruf je
+/// ETB-Eintrag und Listen-Refresh, wie beim Beginnen von Hand. Danach die Hinweise zur
+/// ablösenden Einheit (`abloesung::hinweis`) über `benachrichtigung::melden`; ein Fehler dort
+/// lässt den Schreibweg nicht scheitern. Ohne beides nichts.
+pub(crate) async fn publish_kopplung(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: &[i64],
+    hinweise: &[crate::benachrichtigung::Anlass],
+) {
+    if !etb_ids.is_empty() {
+        for etb_id in etb_ids {
+            state.live.publiziere(einsatz_id, *etb_id);
+        }
+        sse(state, einsatz_id);
+    }
+    for anlass in hinweise {
+        crate::benachrichtigung::melden(&state.pool, &state.live, anlass.clone()).await;
+    }
+}
+
 /// Vollzug und Rücknahme ändern die Zeitachse der Einheit und per Fan-out die ihrer Personen;
 /// deren Leser mit nur Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189).
 fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Zeitachsenwirkung) {
@@ -82,8 +105,8 @@ fn zeit(eingabe: Option<String>, was: &str) -> Result<Option<String>, AppError> 
 
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
-    /// `laufend` | `abgeloest`; fehlt = alle. Als `String`, damit ein unbekannter Wert eine
-    /// benannte 400 liefert.
+    /// `laufend` | `abgeloest` | `beendet`; fehlt = alle. Als `String`, damit ein unbekannter
+    /// Wert eine benannte 400 liefert.
     #[serde(default)]
     status: Option<String>,
 }
@@ -98,7 +121,7 @@ pub async fn liste(
         None | Some("") => None,
         Some(s) => Some(AbloesungStatus::parse(s).ok_or_else(|| {
             AppError::Validation(format!(
-                "Unbekannter Status '{s}' (erlaubt: laufend, abgeloest)"
+                "Unbekannter Status '{s}' (erlaubt: laufend, abgeloest, beendet)"
             ))
         })?),
     };
@@ -302,7 +325,7 @@ pub struct SetEinsatzVorgabe {
 
 impl SetEinsatzVorgabe {
     /// Genau eine der beiden Angaben: keine → 400 (fehlender Pflichtwert), beide → 422
-    /// (Feld-Kombination). Die Werte prüft `WerteBody::pruefen` (400/422).
+    /// (Feld-Kombination). Die Werte prüft `WerteBody::check` (400/422).
     fn into_input(self) -> Result<EinsatzVorgabeInput, AppError> {
         // Erst die Werte für sich (400), dann der Zusammenhang (422).
         let werte = match self.schichtmodell {
@@ -320,8 +343,8 @@ impl SetEinsatzVorgabe {
                  (schichtmodell), nicht beides"
                     .into(),
             )),
-            (Some(id), None) => Ok(EinsatzVorgabeInput::AusStammdaten(id)),
-            (None, Some(None)) => Ok(EinsatzVorgabeInput::Entfernen),
+            (Some(id), None) => Ok(EinsatzVorgabeInput::FromStammdaten(id)),
+            (None, Some(None)) => Ok(EinsatzVorgabeInput::Remove),
             (None, Some(Some(w))) => Ok(EinsatzVorgabeInput::Werte(w)),
         }
     }

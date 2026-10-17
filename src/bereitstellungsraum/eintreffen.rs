@@ -261,6 +261,13 @@ pub struct Gebucht {
     pub etb_id: i64,
     /// Personen aus dem Fan-out des Eintreffens (für `sse_personal`).
     pub personen: Vec<i64>,
+    /// ETB-Einträge der Kopplung an die Ablösung (LLH-1128: Schicht mit dem Eintreffen
+    /// begonnen), für `routes::abloesung::publish_kopplung`. Eigene Einträge des Moduls
+    /// Ablösung, nicht der Buchung: die Regel „genau ein ETB-Eintrag“ (D5) gilt für die Buchung.
+    pub abloesung: Vec<i64>,
+    /// Hinweise zur ablösenden Einheit (LLH-1131): eine als ablösende geplante Einheit ist am
+    /// Raum eingetroffen. Gemeldet nach dem Commit über `routes::abloesung::publish_kopplung`.
+    pub hinweise: Vec<crate::benachrichtigung::Anlass>,
 }
 
 /// Rahmen einer Buchung: wer, wo, wann.
@@ -313,7 +320,7 @@ async fn eintreffen_zeitachse_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
     einheit_id: i64,
-) -> Result<(EintreffenZeitachse, Vec<i64>), AppError> {
+) -> Result<(EintreffenZeitachse, zeitachse_repo::Beruehrt), AppError> {
     let (ergebnis, beruehrt) = zeitachse_repo::schreibe_tx(
         &mut *conn,
         r.einsatz_id,
@@ -328,8 +335,11 @@ async fn eintreffen_zeitachse_tx(
     )
     .await?;
     Ok(match ergebnis {
-        Schreibergebnis::Geschrieben(_) => (EintreffenZeitachse::Geschrieben, beruehrt.personen),
-        Schreibergebnis::Ausgelassen(_) => (EintreffenZeitachse::Ausgelassen, Vec::new()),
+        Schreibergebnis::Geschrieben(_) => (EintreffenZeitachse::Geschrieben, beruehrt),
+        Schreibergebnis::Ausgelassen(_) => (
+            EintreffenZeitachse::Ausgelassen,
+            zeitachse_repo::Beruehrt::default(),
+        ),
     })
 }
 
@@ -368,10 +378,10 @@ async fn bekannt_tx(
     )
     .await?
     .ereignis;
-    let (einheit_id, fahrzeug_ids, zeitachse, personen, name) = match typ {
+    let (einheit_id, fahrzeug_ids, zeitachse, beruehrt, name) = match typ {
         ObjektTyp::Einheit => {
             // 4. Zeitachse; `Ausgelassen` ist kein Fehler.
-            let (zeitachse, personen) = eintreffen_zeitachse_tx(conn, r, objekt_id).await?;
+            let (zeitachse, beruehrt) = eintreffen_zeitachse_tx(conn, r, objekt_id).await?;
             let name: String = sqlx::query_scalar(
                 "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
             )
@@ -380,7 +390,7 @@ async fn bekannt_tx(
             .fetch_one(&mut *conn)
             .await?;
             let fahrzeuge = aktive_fahrzeuge_tx(conn, r.einsatz_id, objekt_id).await?;
-            (Some(objekt_id), fahrzeuge, zeitachse, personen, name)
+            (Some(objekt_id), fahrzeuge, zeitachse, beruehrt, name)
         }
         ObjektTyp::Fahrzeug => {
             let name: String = sqlx::query_scalar(
@@ -394,11 +404,26 @@ async fn bekannt_tx(
                 None,
                 vec![objekt_id],
                 EintreffenZeitachse::Keine,
-                Vec::new(),
+                zeitachse_repo::Beruehrt::default(),
                 name,
             )
         }
     };
+    // Ist die Einheit als ablösende geplant, ist ihr Eintreffen am Raum ein Hinweis (LLH-1131),
+    // auch wenn die Zeitachse es auslässt, weil die Einheit schon eingetroffen war.
+    let mut hinweise = beruehrt.hinweise;
+    if let Some(e) = einheit_id {
+        hinweise.extend(
+            crate::abloesung::hinweis::anlaesse_tx(
+                conn,
+                r.einsatz_id,
+                e,
+                crate::benachrichtigung::BenachrichtigungBezugTyp::AbloeserBrEingetroffen,
+                r.benutzer_id,
+            )
+            .await?,
+        );
+    }
     // 6. Genau ein ETB-Eintrag (D5): „eingetroffen“ nur, wenn die Zeitachse es trägt.
     let text = match zeitachse {
         EintreffenZeitachse::Geschrieben => super::etb_text_eingetroffen(&name, br_bezeichnung),
@@ -421,7 +446,9 @@ async fn bekannt_tx(
         zeitachse,
         meldung_id: None,
         etb_id,
-        personen,
+        personen: beruehrt.personen,
+        abloesung: beruehrt.abloesung,
+        hinweise,
     })
 }
 
@@ -538,7 +565,7 @@ async fn unangemeldet_tx(
     )
     .await?
     .ereignis;
-    let (zeitachse, personen) = eintreffen_zeitachse_tx(conn, r, einheit_id).await?;
+    let (zeitachse, beruehrt) = eintreffen_zeitachse_tx(conn, r, einheit_id).await?;
 
     // 5. Meldung an die Einsatzleitung (D5).
     let abschnitt: Option<String> = match br.abschnitt_id {
@@ -639,7 +666,9 @@ async fn unangemeldet_tx(
         zeitachse,
         meldung_id: Some(meldung_id),
         etb_id,
-        personen,
+        personen: beruehrt.personen,
+        abloesung: beruehrt.abloesung,
+        hinweise: beruehrt.hinweise,
     })
 }
 

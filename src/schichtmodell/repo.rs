@@ -32,7 +32,7 @@ struct ModellZeile {
 
 impl ModellZeile {
     fn anzeige(self) -> Result<Schichtmodell, AppError> {
-        Ok(Schichtmodell::aus(
+        Ok(Schichtmodell::from_werte(
             self.id,
             self.werte.werte()?,
             self.ist_vorgabe,
@@ -101,7 +101,7 @@ pub(crate) async fn load_werte_tx(
 }
 
 /// 409, wenn ein anderes Modell der Org dieselbe Bezeichnung trägt.
-async fn check_name_frei_tx(
+async fn check_name_free_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     bezeichnung: &str,
@@ -122,7 +122,7 @@ async fn check_name_frei_tx(
 }
 
 /// 409, wenn ein anderes Modell der Org schon die Vorgabe ist.
-async fn check_vorgabe_frei_tx(
+async fn check_vorgabe_free_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     ausser_id: Option<i64>,
@@ -168,9 +168,9 @@ pub async fn create(
     ist_vorgabe: bool,
 ) -> Result<Schichtmodell, AppError> {
     write_retry!(pool, |conn| {
-        check_name_frei_tx(conn, org_id, &werte.bezeichnung, None).await?;
+        check_name_free_tx(conn, org_id, &werte.bezeichnung, None).await?;
         if ist_vorgabe {
-            check_vorgabe_frei_tx(conn, org_id, None).await?;
+            check_vorgabe_free_tx(conn, org_id, None).await?;
         }
         let id = insert_tx(conn, org_id, werte, ist_vorgabe).await?;
         load_tx(conn, org_id, id).await
@@ -218,9 +218,9 @@ pub async fn update(
 ) -> Result<Schichtmodell, AppError> {
     write_retry!(pool, |conn| {
         load_tx(conn, org_id, id).await?;
-        check_name_frei_tx(conn, org_id, &werte.bezeichnung, Some(id)).await?;
+        check_name_free_tx(conn, org_id, &werte.bezeichnung, Some(id)).await?;
         if ist_vorgabe {
-            check_vorgabe_frei_tx(conn, org_id, Some(id)).await?;
+            check_vorgabe_free_tx(conn, org_id, Some(id)).await?;
         }
         let (typ, rhythmus, wechselzeiten, mindestdauer) = columns(&werte.regel);
         sqlx::query(
@@ -303,7 +303,7 @@ pub async fn load_einsatz(
     let mut conn = pool.acquire().await?;
     Ok(load_einsatz_tx(&mut conn, einsatz_id)
         .await?
-        .map(|(w, at)| EinsatzSchichtmodell::aus(w, at)))
+        .map(|(w, at)| EinsatzSchichtmodell::from_werte(w, at)))
 }
 
 /// Setzt (`Some`) oder entfernt (`None`) die Kopie am Einsatz. Nur die Zeile; das Nachziehen

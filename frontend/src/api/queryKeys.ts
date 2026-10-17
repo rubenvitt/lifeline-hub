@@ -1,5 +1,5 @@
 import type { FachebeneQuelle } from './fachebenen';
-import type { EtbTyp } from './types';
+import type { AbloesungStatus, EtbTyp } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
 /**
@@ -708,10 +708,13 @@ export const einsatzKeys = {
   // Ablösung: argumentlos = Invalidierungs-Prefix; Liste je Statusfilter und Rhythmus-Vorgaben
   // hängen als Sub-Keys darunter.
   abloesungen: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId] as const,
-  abloesungListe: (einsatzId: number, status: 'laufend' | 'abgeloest') =>
+  abloesungListe: (einsatzId: number, status: AbloesungStatus) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
+  /** Vorgabe des Einsatzes (LLH-1122); live über `abloesung` wie die Abschnittsvorgaben. */
+  abloesungEinsatzVorgabe: (einsatzId: number) =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtmodell'] as const,
   // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
   // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.
   kraefteZeitachse: (einsatzId: number) => [EINSATZ_KEYS.kraefteZeitachse, einsatzId] as const,
@@ -951,6 +954,9 @@ export const GLOBAL_KEYS = {
   // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
   // werden Snapshot und Auflösung, die im Auftrag stecken.
   fuehrungsfunktionen: 'fuehrungsfunktionen',
+  // Katalog „Schichtmodelle“ (LLH-1122). Nicht im Lagebild: der Einsatz trägt seine Kopie
+  // (`einsatz-abloesungen`), und gewählt wird ein Modell nur mit Netz.
+  schichtmodelle: 'schichtmodelle',
 
   // Instanz / Betrieb — NICHT mandantenbezogen
   adminKarte: 'admin-karte',
@@ -1048,6 +1054,7 @@ export const globalKeys = {
   etbBausteine: () => [GLOBAL_KEYS.etbBausteine] as const,
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
   fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
+  schichtmodelle: () => [GLOBAL_KEYS.schichtmodelle] as const,
 
   // Dienstfilter-Listen: barer Prefix (= Invalidierung beider Fächer) + adressiertes Fach
   personal: () => [GLOBAL_KEYS.personal] as const,
@@ -1141,6 +1148,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.stichwortVorschlaege,
     GLOBAL_KEYS.externeStellen,
     GLOBAL_KEYS.fuehrungsfunktionen,
+    GLOBAL_KEYS.schichtmodelle,
     GLOBAL_KEYS.organisation,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
     GLOBAL_KEYS.einsaetze,
@@ -1210,7 +1218,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Modul-Vorgaben am Einsatz (LLH-1183, nur der Editor liest sie, wie die Overrides), die eigene
  * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), die externen
- * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), dazu S5
+ * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), die
+ * Schichtmodelle (LLH-1122: der Einsatz trägt seine Kopie), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
  * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an

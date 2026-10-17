@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Abloesung } from '../api/types';
-import { naechsterWechsel, useEinstufungsUhr } from './useUhr';
+import { findNextChange, useEinstufungsUhr } from './useUhr';
 
 dayjs.extend(utc);
 
@@ -11,6 +11,7 @@ const schicht = (
   id: number,
   faellig_at: string,
   status: Abloesung['status'] = 'laufend',
+  vorwarnung_minuten = 30,
 ): Abloesung => ({
   id,
   einsatz_id: 1,
@@ -18,28 +19,35 @@ const schicht = (
   einheit_name: `F${id}`,
   beginn_at: '2026-09-22 09:00:00',
   rhythmus_minuten: 360,
-  vorwarnung_minuten: 30,
+  vorwarnung_minuten,
   rhythmus_quelle: 'einheit',
   faellig_at,
   status,
   ruecknehmbar: false,
+  erbende_einheiten: [],
+  planung_warnungen: [],
   angelegt_at: '2026-09-22 09:00:00',
 });
 
-describe('naechsterWechsel (LFH-635)', () => {
+describe('findNextChange (LFH-635)', () => {
   it('nimmt die früheste künftige Grenze: Vorwarnbeginn oder Fälligkeit', () => {
     const jetzt = dayjs.utc('2026-09-22 15:10:00');
-    const w = naechsterWechsel(
+    const w = findNextChange(
       [schicht(1, '2026-09-22 15:30:00'), schicht(2, '2026-09-22 16:00:00')],
       jetzt,
     );
     // Schicht 2 beginnt ihre Vorwarnung um 15:30 — gleichauf mit der Fälligkeit von Schicht 1.
     expect(w?.format('YYYY-MM-DD HH:mm:ss')).toBe('2026-09-22 15:30:00');
   });
+  it('nimmt den Vorwarnbeginn aus der Schicht (LLH-1122)', () => {
+    const jetzt = dayjs.utc('2026-09-22 15:10:00');
+    const w = findNextChange([schicht(1, '2026-09-22 17:00:00', 'laufend', 90)], jetzt);
+    expect(w?.format('YYYY-MM-DD HH:mm:ss')).toBe('2026-09-22 15:30:00');
+  });
   it('steht ohne laufende Schicht oder künftige Grenze still', () => {
     const jetzt = dayjs.utc('2026-09-22 20:00:00');
-    expect(naechsterWechsel([schicht(1, '2026-09-22 15:30:00')], jetzt)).toBeNull();
-    expect(naechsterWechsel([schicht(1, '2026-09-22 21:30:00', 'abgeloest')], jetzt)).toBeNull();
+    expect(findNextChange([schicht(1, '2026-09-22 15:30:00')], jetzt)).toBeNull();
+    expect(findNextChange([schicht(1, '2026-09-22 21:30:00', 'abgeloest')], jetzt)).toBeNull();
   });
 });
 

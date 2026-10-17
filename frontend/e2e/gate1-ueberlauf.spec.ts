@@ -633,6 +633,18 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       umleitungOhneAdmin: true,
     },
     {
+      // LLH-1122: Anker ist der Seitentitel, die Liste der Schichtmodelle kann leer sein.
+      pfad: '/admin/stammdaten/schichtmodelle',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Schichtmodelle', level: 1 }),
+      umleitungOhneAdmin: true,
+    },
+    {
+      // LLH-1122: Vorgabe des Einsatzes; der Beobachter sieht sie mit dem Rechtehinweis.
+      pfad: `/einsaetze/${einsatzId}/einstellungen/abloesung`,
+      anker: (p: Page) => p.getByRole('region', { name: 'Schichtmodell des Einsatzes' }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/personal`,
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
     },
@@ -957,6 +969,20 @@ function gate1VerwaltungRouten(): Gate1Route[] {
       },
     },
     {
+      // LLH-1122: Schichtmodelle, gelesen ohne Admin-Recht.
+      pfad: '/admin/stammdaten/schichtmodelle',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Schichtmodelle', level: 1 }),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SYSTEM_ADMIN);
+          await expect(
+            p.getByRole('button', { name: 'Schichtmodell anlegen' }),
+            'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+          ).toBeDisabled();
+        },
+      },
+    },
+    {
       pfad: '/admin/einstellungen/einsatz',
       anker: (p: Page) => p.getByRole('heading', { name: 'Einsatz-Vorgaben', level: 1 }),
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SYSTEM_ADMIN) },
@@ -1129,7 +1155,9 @@ test.describe('Gate 1', () => {
    * Segmente; gemessen wird zusätzlich, dass jedes Segment ungekürzt im Fenster steht — auch im
    * Handschuh-Betrieb. Mit „vergangen (3)“ und „Stellen (12)“ wurde dort „1 neu“ gekürzt (5 px
    * Überlauf); schmal heißen beide deshalb ohne Zahl (design.md LLH-1040, Risiken). Gesät werden
-   * trotzdem 12 Stellen: fiele die Kürzung weg, liefe die Zeile wieder über.
+   * trotzdem 12 Stellen: fiele die Kürzung weg, liefe die Zeile wieder über. Die Ablösung trägt
+   * seit LLH-1128 ebenfalls DREI Segmente („Laufend“, „Ohne Schicht“, „Vergangen“), schmal alle
+   * ohne Zahl; vier (abgelöst und beendet getrennt) trügen den Knopf im Handschuh-Betrieb nicht.
    *
    * ROLLEN (LFH-435): nur Admin. Die Werkzeugzeile hat keinen Rollenzweig; der Beobachter sieht
    * dieselbe Segmentleiste und dasselbe Banner, ein zweiter Lauf bewiese nichts Neues.
@@ -1250,7 +1278,14 @@ test.describe('Gate 1', () => {
             'vergangen',
             'Stellen',
           ]);
-        } else expect(mass.segmente, 'Segmente der Ansichtsleiste').toHaveLength(2);
+        } else {
+          // Drei Segmente seit LLH-1128; schmal ohne Zahl, die nennt der Kopf.
+          expect(mass.segmente, 'Segmente der Ansichtsleiste').toEqual([
+            'Laufend',
+            dichte === 'handschuh' ? 'Ohne\nSchicht' : 'Ohne Schicht',
+            'Vergangen',
+          ]);
+        }
         expect(mass.segmentRechts, 'letztes Segment rechts im Fenster').toBeLessThanOrEqual(390);
         expect(mass.segmentGekuerzt, 'kein Segment gekürzt').toEqual([]);
         expect(

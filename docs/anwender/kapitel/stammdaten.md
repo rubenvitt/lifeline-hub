@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, src/verpflegung/vorlage.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
 ---
 
 ## Überblick
@@ -10,7 +10,7 @@ quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormM
 Stammdaten sind das, was eine Organisation über jeden Einsatz hinweg vorhält: Fahrzeuge,
 Material und Personal, dazu die Kataloge, aus denen Einsätze schöpfen (Einsatz-Stichworte,
 externe Stellen, Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
-Führungsfunktionen), sowie Name, Logo und Zeichen der Organisation. Einheiten-Vorlagen
+Führungsfunktionen, Schichtmodelle), sowie Name, Logo und Zeichen der Organisation. Einheiten-Vorlagen
 beschreiben stehende Einheiten wie einen Sanitätszug mit seinen Untereinheiten, Fahrzeugen und
 seiner Stammbesetzung. Der Verpflegungsplan nennt die Mahlzeiten eines Einsatztags. Im Einsatz
 werden aus den Stammdaten Kräfte disponiert und Einträge vorbelegt.
@@ -97,6 +97,36 @@ deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
 
 Fahrzeuge und Stammbesetzung gelten sofort; „Speichern“ betrifft nur die Felder des Kopfes.
 Eine weitere Untereinheit entsteht auf der Seite der Vorlage mit „Untereinheit anlegen“.
+
+### Ein Schichtmodell anlegen
+
+Ein Schichtmodell legt fest, wann eine Einheit abgelöst werden soll (Kapitel
+[Ablösung](abloesung.md)).
+
+1. Unter „Stammdaten“ „Schichtmodelle“ öffnen.
+2. „Schichtmodell anlegen“ wählen.
+3. „Bezeichnung“ eintragen und unter „Typ“ „Rhythmus“ oder „Wechselzeiten“ wählen.
+4. Beim Rhythmus die Dauer eintragen, etwa „12 h“ oder „7:30“. Bei Wechselzeiten die Uhrzeiten
+   eintragen, etwa „0600 1800“, und die „Mindestdauer“, etwa „4 h“.
+
+   ![Dialog „Schichtmodell anlegen“ mit Bezeichnung „Hochwasser 12 h“, Typ Wechselzeiten, Wechselzeiten 0600 1800 und Mindestdauer 4 h](../bilder/stammdaten/schichtmodell-anlegen.png)
+
+5. Nach Bedarf „Vorwarnung … · Planungsvorlauf …“ aufklappen und beide Werte eintragen; leer
+   gelten 30 Minuten und 2 Stunden.
+6. „Speichern“ wählen.
+
+Zum Ändern oder Löschen in der Zeile das Menü „Aktionen zu …“ öffnen und „Bearbeiten“ bzw.
+„Löschen“ wählen; Löschen fragt mit „… löschen?“ nach und wird mit „Schichtmodell löschen“
+bestätigt.
+
+### Die Vorgabe der Organisation festlegen
+
+1. Unter „Stammdaten“ „Schichtmodelle“ öffnen.
+2. In der Zeile des Modells das Menü „Aktionen zu …“ öffnen und „Als Vorgabe setzen“ wählen.
+
+   ![Tabelle der Schichtmodelle: „Sanitätsdienst“ als Vorgabe der Organisation mit Rhythmus 6 h, „12-h-Schicht Hochwasser“ mit Demo-Marke und Wechsel 0600/1800](../bilder/stammdaten/schichtmodelle.png)
+
+3. Um keine Vorgabe mehr zu führen, beim bisherigen Modell „Vorgabe aufheben“ wählen.
 
 ### Den Verpflegungsplan pflegen
 
@@ -195,6 +225,25 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 - Im Einsatz bildet die Führung aus einer aktiven Vorlage eine Einheit samt Untereinheiten,
   Fahrzeugen und Besatzung (Kapitel [Einheiten](einheiten.md)). Eine stillgelegte Vorlage steht
   dort nicht zur Wahl.
+
+### Schichtmodelle
+
+- Ein Modell hat entweder einen festen Rhythmus oder feste Wechselzeiten mit Mindestdauer: fällig
+  ist dann der erste Wechsel, zu dem die Einheit mindestens die Mindestdauer im Einsatz ist. Dazu
+  kommen die Vorwarnung, wie lange vor der Fälligkeit der Hinweis „Ablösung steht an“ erscheint,
+  und der Planungsvorlauf, wie lange vorher der Hinweis „Keine ablösende Einheit geplant“
+  erscheint, solange keine geplant ist (Kapitel [Ablösung](abloesung.md)); beide höchstens einen
+  Tag und mit dem Modell in den Einsatz übernommen.
+- Dauern stehen als „8 h“, „7:30 h“ oder „45 min“, Wechselzeiten taktisch wie „0600/1800“.
+- Höchstens ein Modell ist die „Vorgabe der Organisation“. Wer ein anderes als Vorgabe setzt,
+  nimmt dem bisherigen die Markierung ab. Jeder neue Einsatz bekommt eine Kopie der Vorgabe; die
+  Einsatzanlage nennt sie als „Schichtmodell: … (Vorgabe)“. Ohne Vorgabe bekommt ein Einsatz
+  keins.
+- Ändern und Löschen eines Modells berühren keinen Einsatz, der schon eine Kopie trägt. Im
+  Einsatz wird die Vorgabe in den Einstellungen geändert (Kapitel
+  [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)).
+- Jede Bezeichnung gibt es nur einmal, ohne Unterschied von Groß- und Kleinschreibung. Das
+  Modell der Demo-Daten wird nie die Vorgabe der Organisation.
 
 ### Verpflegungsplan
 

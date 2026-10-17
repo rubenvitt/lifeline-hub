@@ -78,9 +78,14 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     zeige();
     const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
     const alle = await within(hinweise).findAllByRole('switch');
-    expect(alle).toHaveLength(18);
+    expect(alle).toHaveLength(20);
     for (const s of alle) expect(s).toBeChecked();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Auftrag' })).toBeInTheDocument();
+    // Die Hinweise der Ablösung (LLH-1131) sind je für sich abschaltbar.
+    expect(
+      within(hinweise).getByRole('switch', { name: 'Keine ablösende Einheit geplant' }),
+    ).toBeInTheDocument();
+    expect(within(hinweise).getByRole('switch', { name: 'Ablösende Einheit' })).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     // Unwetter erkennt der Browser selbst und prüft diesen Schalter dort (LLH-1209).
     expect(within(hinweise).getByRole('switch', { name: 'Unwetterwarnung' })).toBeInTheDocument();
