@@ -57,7 +57,9 @@ Spec `eingabegrenzen`, Herleitung
   je Zeile (`AppError::Zeilen`, 422 `{error, zeilen}`) und schreibt nichts. Ebenso das **Bilden
   aus einer Vorlage** (`einheit::aus_vorlage`, LLH-1049): eine `json_each`-Abfrage je Art für
   den Zustand, Schreiben je Kraft über den Baustein, gedeckelt durch `SAMMEL_MAX` je Liste und
-  `aus_vorlage::KNOTEN_MAX` Einheiten.
+  `aus_vorlage::KNOTEN_MAX` Einheiten. Ebenso der **Vollzug der Ablösung** (LLH-1132): Prüfen
+  und Schreiben der Ablöser-Liste über `json_each`, Folgeschichten je Ablöser, gedeckelt durch
+  `abloesung::ABLOESER_MAX`.
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,

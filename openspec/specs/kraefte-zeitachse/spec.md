@@ -179,12 +179,13 @@ die die Perioden-Regeln verletzt, MUST sie mit 422 scheitern und die Person nenn
 
 Vollzieht das System eine Ablösungsschicht einer Einheit, SHALL es in derselben Transaktion ein
 Ereignis `abloesung` zum Vollzugszeitpunkt für diese Einheit schreiben (Quelle `abloesung`),
-samt Fan-out, sofern die Einheit eine offene Periode hat. Nimmt das System den Vollzug zurück,
-MUST es dieses Ereignis samt Fan-out in derselben Transaktion streichen, mit dem Grund
+samt Fan-out, sofern die Einheit eine offene Periode hat; ebenso für jede Untereinheit, die die
+Schicht erbt (Knoten-Modell, LLH-1132), je mit eigenem Fan-out. Nimmt das System den Vollzug
+zurück, MUST es diese Ereignisse samt Fan-out in derselben Transaktion streichen, mit dem Grund
 „Ablösung zurückgenommen“. Würde diese Streichung die Folge der Einheit oder einer Person brechen,
 etwa weil die Person nach dem Vollzug neu alarmiert wurde, MUST die Rücknahme mit 422 scheitern,
-die Person nennen und nichts ändern. Die ablösende Einheit MUST durch den Vollzug kein Ereignis
-bekommen.
+die Person nennen und nichts ändern. Die ablösenden Einheiten MUST durch den Vollzug kein
+Ereignis bekommen, auch eine übernommene Schicht nicht.
 
 Umgekehrt SHALL der einzige Schreibpfad der Zeitachse an einer Einheit die Schicht der Ablösung
 mitführen (LLH-1128, Spec `kraefte-abloesung`): das Eintreffen der offenen Periode beginnt eine
@@ -203,6 +204,10 @@ Ein Fehler dabei MUST den Statuswechsel, Nachtrag oder die Buchung nicht scheite
 #### Scenario: Vollzug beendet die Periode
 - **WHEN** die Schicht von „Florian 1“ um 14:40 vollzogen wird und die Einheit seit 06:40 eingetroffen ist
 - **THEN** endet ihre Periode um 14:40 mit der Art Ablösung
+
+#### Scenario: Vollzug an einer Untereinheit, die erbt
+- **WHEN** die Schicht von „Zug 1“ vollzogen wird und „Gruppe 1“ sie erbt
+- **THEN** endet auch die Periode von „Gruppe 1“ und ihrer Personen mit der Ablösung, und die Rücknahme öffnet beide wieder
 
 #### Scenario: Rücknahme öffnet die Periode wieder
 - **WHEN** dieser Vollzug zurückgenommen wird

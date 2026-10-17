@@ -15,6 +15,11 @@ ablösenden Einheit (alarmiert, eingetroffen, am Bereitstellungsraum eingetroffe
 Planung entfallen), den Planungshinweis als dritte Frist und Warnungen beim Planen. Es bleibt bei
 drei Einstufungen.
 
+LLH-1132 (Entscheidung LLH-1118 Punkte 1, 3 und 6) hebt das Non-Goal „Der Vollzug verschiebt die
+ablösende Einheit nicht in den Abschnitt“ aus LFH-635 auf: der Vollzug nimmt eine Liste von
+Ablösern, übergibt auf Wunsch den Abschnitt, übernimmt die laufende Schicht eines ungeplant
+eingetroffenen Ablösers und schreibt die Ablösung an jede erbende Untereinheit.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -186,14 +191,26 @@ Jede Änderung der Vorgabe MUST als ETB-Eintrag vom Typ Entscheidung festgehalte
 ### Requirement: Schicht bearbeiten
 
 Das System SHALL an einer laufenden Schicht Beginn, Rhythmus (eigener Wert oder zurück zur
-Vorgabe des Abschnitts, sonst des Einsatzes) und geplante ablösende Einheit änderbar machen.
+Vorgabe des Abschnitts, sonst des Einsatzes) und die geplanten Ablöser änderbar machen.
 Eine Änderung von Beginn
 oder Rhythmus MUST die Fälligkeit und die zugehörigen Fristen neu setzen. Eine abgelöste
-Schicht MUST NOT änderbar sein.
+Schicht MUST NOT änderbar sein. Die Ablöser sind eine geordnete Liste
+(`einsatz_abloesung_abloeser`, LLH-1132) von höchstens `ABLOESER_MAX = 8` Einheiten (mehr → 400,
+gezählt vor dem Entdoppeln); die Liste ersetzt die bisherige, eine leere hebt die Planung auf.
+`abloesende_einheit_id` MUST der erste Eintrag sein (Spiegel für bestehende Leser); die
+Einzelangabe bleibt als Bestand, beide zugleich → 422.
 
 #### Scenario: Ablösende Einheit planen
 - **WHEN** an der laufenden Schicht von „Florian 1“ die Einheit „Florian 2“ als ablösende Einheit gesetzt wird
 - **THEN** zeigt die Schicht „Florian 2“ als geplante Ablösung
+
+#### Scenario: Mehrere Ablöser planen
+- **WHEN** an der Schicht von „Florian 1“ die Ablöser „Florian 3“ und „Florian 2“ geplant werden
+- **THEN** nennt die Schicht beide in dieser Reihenfolge, `abloesende_einheit_id` ist „Florian 3“, und das ETB nennt „ablösende Einheiten «Florian 3», «Florian 2» geplant“
+
+#### Scenario: Neun Ablöser
+- **WHEN** neun Einheiten als Ablöser gesendet werden
+- **THEN** antwortet das System mit 400 und ändert nichts
 
 #### Scenario: Ablösende Einheit ist dieselbe Einheit
 - **WHEN** die Einheit der Schicht als ihre eigene ablösende Einheit gesetzt wird
@@ -257,15 +274,20 @@ Ablösung senden, das die Schicht und die Art (`vorwarnung` oder `faellig`) nenn
 
 ### Requirement: Vollzug mit Folgeschicht
 
-Das System SHALL eine laufende Schicht mit Zeitpunkt (Vorgabe: jetzt) und optionaler
-ablösender Einheit vollziehen. Beim Vollzug MUST die Schicht `abgeloest` werden, ihre offenen
-Fristen MUST geschlossen werden, und ein ETB-Eintrag MUST Einheit, ablösende Einheit und
-Zeitpunkt nennen. Ist eine ablösende Einheit angegeben, MUST für sie in derselben
-Transaktion eine laufende Folgeschicht mit Beginn = Vollzugszeitpunkt und dem Rhythmus der
-abgelösten Schicht entstehen, samt eigener Fristen; folgt die abgelöste Schicht der Vorgabe des
-Einsatzes, rechnet deren Schichtmodell die Folgeschicht ab dem Vollzug. Hat die ablösende
-Einheit schon eine
-laufende Schicht, MUST der Vollzug mit 422 scheitern und nichts ändern.
+Das System SHALL eine laufende Schicht mit Zeitpunkt (Vorgabe: jetzt) und einer Liste von
+Ablösern (höchstens `ABLOESER_MAX = 8`, leer = ohne ablösende Einheit) vollziehen; die Liste
+wird die der Schicht. Beim Vollzug MUST die Schicht `abgeloest` werden, ihre offenen
+Fristen MUST geschlossen werden, und ein ETB-Eintrag MUST Einheit, alle Ablöser und
+Zeitpunkt nennen. Je Ablöser, dessen Vorfahr nicht ebenfalls in der Liste steht (der Knoten,
+LLH-1118 Punkt 3), MUST in derselben Transaktion eine laufende Folgeschicht mit Beginn =
+Vollzugszeitpunkt und dem Rhythmus der abgelösten Schicht entstehen, samt eigener Fristen; folgt
+die abgelöste Schicht der Vorgabe des Einsatzes, rechnet deren Schichtmodell die Folgeschicht
+ab dem Vollzug. Untereinheiten eines Knotens in der Liste bekommen keine eigene, sie erben seine.
+Hat ein Ablöser schon eine eigene laufende Schicht ohne Vorgänger (ungeplant eingetroffen,
+Nachtrag 17.10.), MUST der Vollzug sie als Folgeschicht übernehmen (Beginn, Fälligkeit und
+Fristen bleiben, Marke `uebernommen_bei_vollzug`), und das ETB nennt die Übernahme. Ist seine
+laufende Schicht selbst schon eine Folgeschicht, MUST der Vollzug mit 422 scheitern und nichts
+ändern. Die abgelöste Schicht MUST alle Folgeschichten nennen (`folgeschichten`).
 
 #### Scenario: Vollzug mit ablösender Einheit
 - **WHEN** die Schicht von „Florian 1“ (Rhythmus 360 min) um 15:40 durch „Florian 2“ vollzogen wird
@@ -277,8 +299,20 @@ laufende Schicht, MUST der Vollzug mit 422 scheitern und nichts ändern.
 - **WHEN** eine Schicht ohne ablösende Einheit vollzogen wird
 - **THEN** ist sie abgelöst, und es entsteht keine Folgeschicht
 
-#### Scenario: Ablösende Einheit hat schon eine Schicht
-- **WHEN** die ablösende Einheit bereits eine laufende Schicht hat
+#### Scenario: Zwei Ablöser
+- **WHEN** die Schicht von „Florian 1“ um 15:40 durch „Florian 3“ und „Florian 2“ vollzogen wird
+- **THEN** haben beide eine laufende Folgeschicht ab 15:40, die abgelöste Schicht nennt beide Folgeschichten, und das ETB nennt „«Florian 1» durch «Florian 3», «Florian 2»“
+
+#### Scenario: Verband löst ab
+- **WHEN** „Zug 2“ und sein „Trupp 2“ als Ablöser genannt werden
+- **THEN** bekommt nur „Zug 2“ eine Folgeschicht, und „Trupp 2“ erbt sie
+
+#### Scenario: Ungeplanter Ablöser
+- **WHEN** „Florian 2“ ungeplant eingetroffen ist, seit 14:00 eine eigene Schicht ohne Vorgänger hat und als Ablöser von „Florian 1“ vollzogen wird
+- **THEN** wird diese Schicht die Folgeschicht, mit Beginn 14:00 und unveränderter Fälligkeit, und das ETB nennt „Laufende Schicht übernommen: «Florian 2»“
+
+#### Scenario: Ablöser führt schon eine Folgeschicht
+- **WHEN** die ablösende Einheit bereits eine laufende Folgeschicht aus einer anderen Ablösung hat
 - **THEN** antwortet das System mit 422, und die ursprüngliche Schicht bleibt laufend
 
 #### Scenario: Doppelter Vollzug
@@ -287,9 +321,11 @@ laufende Schicht, MUST der Vollzug mit 422 scheitern und nichts ändern.
 
 ### Requirement: Rücknahme eines Vollzugs
 
-Das System SHALL einen Vollzug zurücknehmen, solange die daraus entstandene Folgeschicht
-unberührt ist, also noch laufend und ohne eigenen Vollzug. Bei der Rücknahme MUST die
-Folgeschicht samt ihrer Fristen entfernt werden, die abgelöste Schicht MUST wieder laufend
+Das System SHALL einen Vollzug zurücknehmen, solange jede daraus entstandene Folgeschicht
+unberührt ist, also noch laufend und ohne eigenen Vollzug. Bei der Rücknahme MUST jede neu
+angelegte Folgeschicht samt ihrer Fristen entfernt werden; eine übernommene MUST nur vom
+Vorgänger gelöst werden und samt Fristen weiterlaufen. Die Liste der Ablöser bleibt als
+Planung stehen. Die abgelöste Schicht MUST wieder laufend
 sein, ihre Fristen MUST wieder offen sein, ohne dass eine schon erfolgte Auslösung
 wiederholt wird. Die Vorwarn-Frist MUST dabei der aktuellen Vorwarnzeit folgen; folgt die
 Schicht der Vorgabe des Einsatzes und rechnet deren Regel inzwischen anders, MUST die neue
@@ -305,6 +341,14 @@ verweisen.
 #### Scenario: Folgeschicht schon vollzogen
 - **WHEN** die Folgeschicht ihrerseits schon vollzogen ist
 - **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Eine von zwei Folgeschichten vollzogen
+- **WHEN** von zwei Folgeschichten die ältere schon vollzogen ist
+- **THEN** ist der Vollzug nicht mehr zurücknehmbar (`ruecknehmbar: false`), und die Rücknahme antwortet mit 422
+
+#### Scenario: Übernommene Schicht
+- **WHEN** ein Vollzug zurückgenommen wird, der die laufende Schicht von „Florian 2“ übernommen hat
+- **THEN** läuft die Schicht von „Florian 2“ weiter, ohne Vorgänger und mit ihren Fristen
 
 #### Scenario: Schicht ohne Vollzug
 - **WHEN** eine laufende Schicht zurückgenommen werden soll
@@ -499,8 +543,9 @@ Schicht mit Beginn = Eintreffen anlegen, sofern der Abschnitt der Einheit oder d
 Vorgabe hat (LLH-1128). Rhythmus und Quelle MUST der Rangfolge des Beginnens von Hand folgen
 (Abschnitt vor Einsatz), samt Fristen, ETB-Eintrag mit der Herkunft („mit dem Eintreffen
 begonnen“) und Live-Ereignis `abloesung`. Ohne Vorgabe MUST keine Schicht entstehen, ebenso
-wenig für eine Einheit, die eine laufende Schicht als ablösende plant: ihre Schicht entsteht mit
-dem Vollzug als Folgeschicht. Das gilt
+wenig für eine Einheit, die eine laufende Schicht als Ablöser plant (Einzelplanung oder Eintrag
+der Liste, LLH-1132), oder deren Vorfahr so geplant ist (ein Verband löst als Knoten ab): ihre
+Schicht entsteht mit dem Vollzug als Folgeschicht. Das gilt
 für jeden Weg des Eintreffens (Statuswechsel, Nachtrag, Bereitstellungsraum). Ein Fehler beim
 Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelingen trotzdem.
 
@@ -519,6 +564,10 @@ Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelinge
 #### Scenario: Geplanter Ablöser trifft ein
 - **WHEN** „Florian 2“ als ablösende Einheit von „Florian 1“ geplant ist und eintrifft
 - **THEN** bekommt „Florian 2“ keine eigene Schicht, und der spätere Vollzug legt seine Folgeschicht ab dem Vollzug an
+
+#### Scenario: Geplanter Verband trifft ein
+- **WHEN** „Zug 2“ als einer von drei Ablösern von „Florian 1“ geplant ist und sein „Trupp 2“ eintrifft
+- **THEN** bekommt „Trupp 2“ keine eigene Schicht; eine ungeplante Einheit, die zugleich eintrifft, bekommt ihre
 
 #### Scenario: Fehler im Autostart
 - **WHEN** das Anlegen der Schicht scheitert
@@ -683,3 +732,57 @@ die Warnungen nach dem Speichern der Planung als Meldung.
 #### Scenario: Selbst im Einsatz
 - **WHEN** eine Einheit mit eigener laufender Schicht seit 13:40 als ablösende Einheit geplant wird
 - **THEN** gelingt die Planung, und die Antwort warnt „steht selbst im Einsatz seit 1340“
+
+### Requirement: Abschnitt übergeben beim Vollzug
+
+Mit der Option „Abschnitt übergeben“ (LLH-1132, Entscheidung LLH-1118 Punkt 6) SHALL der Vollzug
+jeden Knoten-Ablöser dem Abschnitt der abgelösten Einheit unterstellen und den Abschnitt der
+abgelösten Einheit leeren, in derselben Transaktion; Untereinheiten eines Knotens in der Liste
+behalten ihren Abschnitt. Hat die abgelöste Einheit keinen Abschnitt oder gibt es keinen
+Ablöser, MUST nichts übergeben werden. Die alten Werte MUST an der Schicht
+(`abgeloest_abschnitt_vorher_id`) und an der Liste (`abschnitt_vorher_id`) stehen; die
+Rücknahme MUST jeden auf seinen alten Wert legen, solange er noch den Stand trägt, den der
+Vollzug hinterlassen hat (eine Änderung von Hand danach bleibt). ETB von Vollzug und Rücknahme
+nennen den Abschnitt. Die Option MUST die Freigabe des Moduls Einheiten verlangen (403 ohne);
+der Vollzug ohne Option nicht.
+
+#### Scenario: Übergabe und Rücknahme
+- **WHEN** „Florian 1“ (Abschnitt „Deichwache Nord“) durch „Florian 2“ (ohne Abschnitt) und „Zug 2“ (Abschnitt „Süd“) mit „Abschnitt übergeben“ vollzogen wird
+- **THEN** stehen „Florian 2“ und „Zug 2“ in „Deichwache Nord“, „Florian 1“ ohne Abschnitt, und das ETB nennt „Abschnitt «Deichwache Nord» an «Florian 2», «Zug 2» übergeben“
+- **AND** nach der Rücknahme steht „Florian 1“ wieder in „Deichwache Nord“, „Florian 2“ ohne und „Zug 2“ in „Süd“
+
+#### Scenario: Von Hand umgehängt
+- **WHEN** „Florian 2“ nach dem Vollzug von Hand einem anderen Abschnitt unterstellt wurde
+- **THEN** lässt die Rücknahme ihn dort
+
+#### Scenario: Ohne Freigabe des Moduls Einheiten
+- **WHEN** eine Person ohne Freigabe des Moduls Einheiten mit „Abschnitt übergeben“ vollzieht
+- **THEN** antwortet das System mit 403 und ändert nichts
+
+### Requirement: Ablösung der erbenden Untereinheiten
+
+Der Vollzug SHALL das Ereignis `abloesung` der Kräfte-Zeitachse auch an jede Untereinheit
+schreiben, die die abgelöste Schicht erbt (Knoten-Vererbung beim Lesen, LLH-1118 Punkt 1), je
+samt Fan-out auf ihre Personen; eine ohne offene Periode bleibt unberührt. Die Rücknahme MUST
+diese Ereignisse an der Einheit und an jeder Untereinheit streichen, die die wieder laufende
+Schicht erbt.
+
+#### Scenario: Zug mit Gruppe und Trupp
+- **WHEN** die Schicht von „Florian 1“ vollzogen wird, deren „Gruppe 1“ und „Trupp 1“ sie erben
+- **THEN** endet die Periode aller drei mit der Ablösung, auch die des Truppführers, und die Rücknahme öffnet sie wieder
+
+### Requirement: Vollzug-Dialog mit Ablöser-Liste
+
+Der Vollzug-Dialog SHALL die Ablöser als Liste wählen lassen (höchstens `ABLOESUNG_ABLOESER_MAX`,
+vorbelegt mit der Planung), dazu Zeitpunkt und „Abschnitt übergeben“; mehr Felder hat er nicht.
+Wählbar MUST jede andere Einheit sein, deren laufende Schicht keine Folgeschicht ist; eine mit
+eigener laufender Schicht steht mit „· Schicht läuft“ in der Liste. „Abschnitt übergeben“ MUST
+mit dem Abschnitt der abgelösten Einheit beschriftet und vorbelegt sein, sobald sie einen hat;
+ohne Freigabe des Moduls Einheiten steht die Option gesperrt mit dem Grund „Modul Einheiten
+gesperrt“. Die Planung wählt die Liste ebenso. Die Karte MUST alle Ablöser nennen (eine
+übernommene Schicht mit „(Schicht übernommen)“) und an der abgelösten Schicht den übergebenen
+Abschnitt.
+
+#### Scenario: Vorbelegt aus der Planung
+- **WHEN** an der Schicht von „Florian 1“ (Abschnitt „Deichwache Nord“) „Florian 3“ und „Florian 2“ geplant sind und jemand „Ablösung vollziehen“ wählt
+- **THEN** stehen beide im Feld „Ablösende Einheiten“, und „Abschnitt übergeben (Deichwache Nord)“ ist angehakt
