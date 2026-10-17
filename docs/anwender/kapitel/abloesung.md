@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -142,17 +142,40 @@ Je Einheit läuft höchstens eine Schicht. „Schicht beginnen“ bietet deshalb
 laufende Schicht an. Hat die ablösende Einheit schon eine laufende Schicht, scheitert der Vollzug,
 und nichts ändert sich.
 
+### Schicht beginnt mit dem Eintreffen
+
+Hat der Einsatz oder der Abschnitt einer Einheit eine Vorgabe, beginnt ihre Schicht von selbst,
+sobald die Einheit eintrifft: über einen Status mit der Marke „Eintreffen“, ein nachgetragenes
+Eintreffen in der Kräfte-Zeitachse oder das Eintreffen am Bereitstellungsraum. „Im Einsatz seit“
+ist dann der Zeitpunkt des Eintreffens, der Rhythmus kommt aus der Vorgabe (die des Abschnitts vor
+der des Einsatzes). Das Einsatztagebuch nennt das mit „mit dem Eintreffen begonnen“. Ohne Vorgabe
+beginnt keine Schicht von selbst; dann bleibt „Schicht beginnen“ von Hand.
+
+Gehört eine Einheit zu einem Verband, dessen Einheit schon eine laufende Schicht hat, bekommt sie
+mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. Wer für sie trotzdem
+eine eigene Schicht braucht, beginnt sie von Hand.
+
+### Schicht endet mit der Entlassung
+
+Wird eine Einheit entlassen (Status mit der Marke „Entlassung“ oder nachgetragen), endet ihre
+laufende Schicht ohne Ablösung, und ihre Erinnerungen fallen weg: eine entlassene Einheit meldet
+nie „Ablösung fällig“. Wird diese Entlassung in der Kräfte-Zeitachse wieder gestrichen, läuft die
+Schicht weiter wie zuvor. Wird eine Einheit aufgelöst, endet ihre Schicht ebenso; sie bleibt als
+Nachweis erhalten.
+
 ### Zusammenhang mit der Kräfte-Zeitachse
 
 Der Vollzug schreibt an der abgelösten Einheit das Ereignis „Ablösung“ in die Kräfte-Zeitachse, mit
 dem ihr Einsatzabschnitt endet; die Rücknahme streicht es wieder. Dieses Ereignis lässt sich nicht
-von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
+von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
+Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben).
 
 ### Einsatztagebuch
 
-Das Einsatztagebuch hält den Beginn einer Schicht, Änderungen an Rhythmus und Planung, jeden Vollzug
-mit Einheit, ablösender Einheit und Zeitpunkt und jede Rücknahme fest. Eine Änderung der Vorgabe
-eines Abschnitts oder des Einsatzes steht dort als Entscheidung.
+Das Einsatztagebuch hält den Beginn einer Schicht (auch mit dem Eintreffen), Änderungen an Rhythmus
+und Planung, jeden Vollzug mit Einheit, ablösender Einheit und Zeitpunkt, jede Rücknahme und das
+Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
+dort als Entscheidung.
 
 ### Rechte und ohne Netz
 
